@@ -14,6 +14,7 @@ addresses and paths to your setup.
 - [Database (PostgreSQL)](#database-postgresql)
 - [Upgrade to 2.37 (PostgreSQL required)](#upgrade-to-237-postgresql-required)
 - [Backup and encryption](#backup-and-encryption)
+- [Encryption of organisation data](#encryption-of-organisation-data)
 - [Organisation export](#organisation-export)
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
@@ -312,6 +313,45 @@ docker compose up -d kalmido
   there (for example with `age`, or Kalmido's own *Encrypt backups*), and run a restore test now and then.
 - **Old snapshots contain plain text.** Filesystem, VM or provider snapshots taken before you switched on encryption
   still hold the data unencrypted: delete them.
+
+## Encryption of organisation data
+
+Since 2.42 the server encrypts the sensitive data of every organisation **at rest** with a key of its own (AES-256-GCM).
+Nothing changes for the people: whoever may see a value or a file (also an agent through the API) sees it as before;
+only the database and the data folder hold ciphertext.
+
+- **What is encrypted:** the office's bank and tax data (IBAN, BIC, bank, tax number, VAT ID), the free company lines,
+  the frozen sender of finalised documents, purchase prices of positions (and the costs / margin of a document), the
+  special rates of framework contracts, office log entries that carry such values, and the stored files: attachments
+  of tasks in the organisation's lists (comments included), project files of its lists, stored invoices / credit notes
+  (PDF/A-3 and e-invoice XML) and the archived PDFs of the legacy import. A stored PDF stays a PDF/A-3 without a
+  password: it is sealed only on disk and served as the original (same checksum). Not encrypted: names, addresses,
+  task texts, logos, profile pictures, files in agent chats and private lists, the search index.
+- **The keys.** `KALMIDO_SECRET_KEY` (32 random bytes, base64) is the master key. Each organisation gets a random key,
+  stored in the database only wrapped with a key derived from the master key. Without `KALMIDO_SECRET_KEY` nothing is
+  encrypted (everything as before); *Settings > Organisation > Encryption* says so.
+- **Existing data** is encrypted by a background pass after the start (idempotent, in batches; the log says
+  `orgcrypt: encrypted at rest: ...`). The instance admin can pause it (*Settings > Administration > Organisation >
+  Encrypt organisation data*): then new data is stored unencrypted, encrypted data stays readable.
+- **Keep the master key apart from the backups.** A backup contains the wrapped organisation keys but never
+  `KALMIDO_SECRET_KEY`: backup + master key restore everything; a backup alone does not reveal the encrypted data.
+- **Recovery key.** An organisation's admins can show its recovery key in *Settings > Organisation > Encryption*
+  (after their password; the showing is noted in the office log). Store it offline. If the master key is lost: set a
+  new `KALMIDO_SECRET_KEY`, start, then for each organisation
+
+  ```
+  docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rewrap --org <id> --recovery-file - < recovery.txt
+  ```
+
+  (the key is read from a file or stdin, never from the command line). Without the master key **and** without the
+  recovery key the encrypted data is lost. A wrong master key never shows garbage: the app answers with a clear error.
+- **Commands:** `python -m kalmido.admin.orgcrypt_cli status` (per organisation: key, encrypted / plain fields and
+  files), `encrypt-all`, `decrypt-all`, `rewrap`. All of them can be repeated and print counts only.
+- **Before a downgrade below 2.42** run `decrypt-all` (it switches the encryption off first, then turns every field and
+  file back into plain text and exits with 0 only when nothing is left encrypted); then start the older image.
+- **Deleting an organisation** deletes its key and its office folder: whatever of it is left encrypted can no longer
+  be read on this server. Files of lists that moved to another workspace are re-sealed first. Older backups still
+  contain the wrapped key, so with the master key a restored old backup can read that organisation's data again.
 
 ## Organisation export
 

@@ -431,6 +431,13 @@ Since 2.38.0 also `office_payments` (`org_id`, `doc_id`, `date`, `amount NUMERIC
 `einvoice_format`, `pdf_sha256`, `xml_sha256`, `datev_sent_at`, `vat_note` of `office_docs`; 2.37.1 runs on with them.
 Since 2.39.1 also `office_import_runs` and `office_archive` (both under row-level security) and the nullable column
 `import_run_id` of `clients`, `office_services` and `office_equipment`; 2.39.0 runs on with them.
+Since 2.42.0 the sensitive values are encrypted at rest with a key per organisation when the server has
+`KALMIDO_SECRET_KEY` (see SELF-HOSTING.md, *Encryption of organisation data*): in `office_company` the tax number, VAT ID,
+IBAN, BIC and bank; the key `company` of `office_settings.data`; `office_contracts.rates`; `office_docs.sender` and the
+keys `costs` / `margin` of `office_docs.totals`; office log entries with such values; purchase prices move from
+`office_doc_items.cost` (then 0) to the new nullable column `cost_enc`. Stored invoice PDFs / XML and archived PDFs are
+sealed on disk and served as the originals (same SHA-256 as recorded). The API answers in plain as before. Before going
+back to an older release run `python -m kalmido.admin.orgcrypt_cli decrypt-all`.
 
 ## E-invoices (ZUGFeRD / XRechnung) and PDF/A-3
 
