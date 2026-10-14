@@ -275,8 +275,17 @@ check(r.status_code == 500 and r.json().get("code") == "orgcrypt" and "KALMIDO_S
 check(A.get(B + f"/api/orgs/{ORG}/encryption").json().get("key_ok") is False, "wrong server key: the state says key_ok false")
 rc, out, err_ = cli("rewrap", "--org", str(ORG), "--recovery-file", "-", stdin="not a key\n")
 check(rc == 2 and "not a recovery key" in out, "rewrap: a wrong recovery key is refused")
+# 2.42.0 review: a typo in the recovery key (still 32 valid bytes) is tested on the organisation's data first -> exit 1, nothing changed
+row0 = tuple(dbx("SELECT wrapped, kek_check FROM org_keys WHERE org_id=?", (ORG,))[0])
+WRONG = ("B" if RK[0] != "B" else "C") + RK[1:]
+rc, out, err_ = cli("rewrap", "--org", str(ORG), "--recovery-file", "-", stdin=WRONG + "\n")
+check(rc == 1 and "nothing changed" in out and WRONG not in out, f"rewrap: a mistyped recovery key is refused {out[-200:]}")
+check(tuple(dbx("SELECT wrapped, kek_check FROM org_keys WHERE org_id=?", (ORG,))[0]) == row0, "rewrap: a refused key leaves the key row unchanged")
 rc, out, err_ = cli("rewrap", "--org", str(ORG), "--recovery-file", "-", stdin=RK + "\n")
 check(rc == 0 and "stored with the current server key" in out and RK not in out, f"rewrap from stdin {out[-200:]} {err_[-200:]}")
+row1 = tuple(dbx("SELECT wrapped, kek_check, wrapped_prev, kek_check_prev FROM org_keys WHERE org_id=?", (ORG,))[0])
+check(row1[2] == row0[0] and row1[3] == row0[1] and row1[0] != row0[0],
+      "rewrap: the replaced wrapped key is kept in wrapped_prev")
 check(A.get(B + O + "/settings").json().get("company_fields", {}).get("iban") == TEST_IBAN and A.get(B + f"/api/attachments/{AID}").content == BODY,
       "after rewrap: fields and files readable with the new server key")
 

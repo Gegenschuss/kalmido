@@ -344,7 +344,10 @@ only the database and the data folder hold ciphertext.
   docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rewrap --org <id> --recovery-file - < recovery.txt
   ```
 
-  (the key is read from a file or stdin, never from the command line). Without the master key **and** without the
+  (the key is read from a file or stdin, never from the command line). `rewrap` first tests the key on the
+  organisation's encrypted data and changes nothing when it does not fit (exit 1, e.g. a typo); an organisation without
+  any encrypted data needs `--force`. The replaced wrapped key stays in the key row, so an old master key that turns up
+  later still opens it. Without the master key **and** without the
   recovery key the encrypted data is lost. A wrong master key never shows garbage: the app answers with a clear error.
 - **Commands:** `python -m kalmido.admin.orgcrypt_cli status` (per organisation: key, encrypted / plain fields and
   files), `encrypt-all`, `decrypt-all`, `rewrap`. All of them can be repeated and print counts only.
