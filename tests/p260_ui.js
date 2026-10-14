@@ -270,7 +270,7 @@ const TOUCH = `(() => {
   const ags = md.querySelector('#sh-agents');
   // 2.26.0: one agent per list -- one select "Agent", the switches who may address it, then the tidy row
   check(ags && ags.querySelector('#sh-agsel')?.value === String(ag.id) && [...ags.querySelectorAll('#sh-agsel option')].map(o => o.textContent).includes('Helper')
-        && !ags.querySelector(`.mrow[data-uid="${ag.id}"]`) && md.querySelector('#l-tidyrow #l-tidy') && md.querySelector('#l-agm') && md.querySelector('#l-agp'), 'agents: one select (Claude, Helper to pick), the switches, the tidy agent');
+        && !ags.querySelector(`.mrow[data-uid="${ag.id}"]`) && md.querySelector('#l-tidyrow #l-tidy') && md.querySelector('#l-agm') && !md.querySelector('#l-agp'), 'agents: one select (Claude, Helper to pick), the switches (2.40.0 #1373: no agent_peers), the tidy agent');
   check(md.querySelector('#l-pub') && md.querySelector('#l-owner') !== null, 'public link + ownership sections');
   await until(() => md.querySelector('#l-owner [data-m="own-xfer"]'));
   check(md.querySelector('#l-owner [data-m="own-xfer"]') && /Transfer ownership/.test(md.querySelector('#l-owner').textContent), 'Transfer ownership…');

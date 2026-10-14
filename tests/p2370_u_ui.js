@@ -84,7 +84,7 @@ const FEAT = 'cal,comments,collab,agents';
     // ================= #1158: the dry run in "Studio" says "Not saved yet"
     await ev(`(() => { folderPropsModal('Studio'); return 1; })()`);
     await ready(ev, `!!document.querySelector('.modal #fs-td')`);
-    await ev(`(() => { const set = (id, v) => { const s = document.querySelector('.modal ' + id); s.value = v; s.dispatchEvent(new Event('change', {bubbles: true})); }; set('#fs-am', '1'); set('#fs-ap', '1'); set('#fs-td', 'suggest'); document.querySelector('.modal [data-m="ok"]').click(); return 1; })()`);
+    await ev(`(() => { const set = (id, v) => { const s = document.querySelector('.modal ' + id); s.value = v; s.dispatchEvent(new Event('change', {bubbles: true})); }; set('#fs-am', '1'); set('#fs-td', 'suggest'); document.querySelector('.modal [data-m="ok"]').click(); return 1; })()`);
     await ready(ev, `!document.querySelector('.modal #fs-prev').hidden`);
     const pv = await ev(`(() => { const p = document.querySelector('.modal #fs-prev'); return {txt: p.textContent, cls: p.className, role: p.getAttribute('role'), btn: document.querySelector('.modal [data-m="ok"]').textContent, still: !!document.querySelector('.modal #fs-td')}; })()`);
     check(/^Not saved yet/.test(pv.txt.trim()) && /unsaved/.test(pv.cls) && pv.role === 'alert' && pv.btn === 'Save anyway' && pv.still, '#1158: the dry run: "Not saved yet" + "Save anyway", the dialog stays ' + JSON.stringify(pv));
@@ -93,8 +93,8 @@ const FEAT = 'cal,comments,collab,agents';
     check(await ready(ev, `!document.querySelector('.modal #fs-td')`), '#1158: "Save anyway" saves and closes');
     await ev(`(() => { folderPropsModal('Studio'); return 1; })()`);
     await ready(ev, `!!document.querySelector('.modal #fs-td')`);
-    const vals = await ev(`(() => ({am: document.querySelector('.modal #fs-am').value, ap: document.querySelector('.modal #fs-ap').value, td: document.querySelector('.modal #fs-td').value}))()`);
-    check(vals.am === '1' && vals.ap === '1' && vals.td === 'suggest', '#1158: open again shows the saved values ' + JSON.stringify(vals));
+    const vals = await ev(`(() => ({am: document.querySelector('.modal #fs-am').value, ap: !!document.querySelector('.modal #fs-ap[data-fk]'), td: document.querySelector('.modal #fs-td').value}))()`);
+    check(vals.am === '1' && !vals.ap && vals.td === 'suggest', '#1158: open again shows the saved values (2.40.0 #1373: no agent_peers select) ' + JSON.stringify(vals));
 
     // ================= #1158: "People and roles…" as a sub-dialog with Back; closing with changes asks
     await ev(`(() => { const s = document.querySelector('.modal #fs-am'); s.value = '0'; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('.modal [data-m="people"]').click(); return 1; })()`);

@@ -533,8 +533,10 @@ Three rules decide whether an action of someone reaches an agent as an event:
   agent is refused ("The list owner has not opened this agent to members"). Members still see what the agent does in
   the list. The chat lists an agent only for people it is open to in at least one list (`agents_open` per list in the
   state). API: `PATCH /api/v1/lists/{id}` `{"agent_members": true}`.
-- **Agents may address each other** (per list, default off): an agent's mention, comment or assignment reaches another
-  agent only where this is on (`agent_peers`). Events and webhooks carry `actor.kind`: `person` or `agent`.
+- **Agents never address each other** (2.40.0, fixed off): an agent's mention, comment or assignment never reaches another
+  agent as an event, also in older lists with two agents. The former switch *Agents may address each other* is gone;
+  `agent_peers` is still accepted by `PATCH /api/v1/lists/{id}` and `PUT /api/folders/props`, ignored, and always `false`
+  in answers (deprecated). Events and webhooks carry `actor.kind`: `person` or `agent`.
 - **One agent per list.** A list holds at most one agent. Sharing a second one answers `409` with "Only one agent per
   list is allowed. Create a separate list for the second agent."; a folder share skips such lists and names them
   (`skipped`), *Share all* names them (`other_agent`). `PUT /api/lists/{id}/agent {"agent_id": id | null}` swaps the

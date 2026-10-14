@@ -82,13 +82,13 @@ check(r.ok and r.json().get("dry_run") and r.json()["lists"] == [] and A.get(B +
 r = A.put(B + "/api/folders/props", json={"folder": "Studio/Shopping", "props": P, "apply": "all"})
 check(r.ok and r.json()["changed"] == 0, "#1158: PUT for the folder saves (nothing of others changed) " + r.text[:200])
 g = A.get(B + "/api/folders/props?folder=Studio/Shopping").json()
-check(g["props"] == P, "#1158: PUT then GET returns the values " + str(g["props"]))
+check(g["props"] == {k: v for k, v in P.items() if k != "agent_peers"}, "#1158: PUT then GET returns the values (2.40.0 #1373: agent_peers ignored) " + str(g["props"]))
 dm1 = lists_of(Bo)[DM["id"]]
 check(all(dm1.get(k) == dm0.get(k) for k in ("agent_members", "agent_peers", "agent_tidy", "agent_listen", "org_id")),
       "#1158: Bob's list keeps its own settings (tenant boundary) " + str({k: (dm0.get(k), dm1.get(k)) for k in ("agent_members", "agent_peers", "agent_tidy")}))
 NL = A.post(B + "/api/lists", json={"name": "New one", "folder": "Studio/Shopping"}).json()
 nl = lists_of(A)[NL["id"]]
-check(nl.get("agent_members") == 1 and nl.get("agent_peers") == 1, "#1158: a new list of hers in the folder takes the defaults " + str({k: nl.get(k) for k in P}))
+check(nl.get("agent_members") == 1 and not nl.get("agent_peers"), "#1158: a new list of hers in the folder takes the defaults " + str({k: nl.get(k) for k in P}))
 check(Bo.get(B + "/api/folders/props?folder=Studio/Shopping").json()["props"] == {}, "#1158: the folder settings are Alice's alone (Bob's folder of that name has none)")
 r = requests.put(B + "/api/folders/props", headers={**AGH, **H}, json={"folder": "Studio/Shopping", "props": {"agent_members": False}})
 check(r.status_code in (401, 403), "#1158: an agent cannot set folder settings " + str(r.status_code))

@@ -212,6 +212,7 @@ had been made in the app. Webhooks fire too.
 | `POST /agents/{id}/chat/{message_id}/choice` | comments | 2.28.0 (#1005): answer an agent's question with one of its buttons `{choice_ids: [...]}` (several with `multi`); once per message; the agent gets the event `chat_choice`, see [AGENTS.md](AGENTS.md#answer-buttons-2280) |
 | `POST /agents/{id}/chat/{message_id}/reactions` | comments | 2.7.2: react to a message in your chat with the agent: `{emoji: up \| down \| heart, on?}` (toggles without `on`); your 👍 / 👎 on an agent message that asks something (`asks`, 2.13.0) is sent to it as an approval (`reaction` event, see [AGENTS.md](AGENTS.md#chat-reactions-and-delivery-272)) |
 | (app) `PATCH /api/agents/{id}/chat/{message_id}` | session | 2.39.0 (#1179): a person edits the text of their own message to an agent `{body}` (in the app, not with a token; the agent's messages 403, others' 404, same limits as sending, same text = no change); the answer carries `edited_at` and `edits` (the earlier versions `[{body, at}]`, only for the person). The agent sees `edited_at` + the current text in `GET /agent/chats` and gets the event `message_edited` once it had the message, see [AGENTS.md](AGENTS.md) |
+| (app) `GET /api/agents/jobs?limit=&before=` · `GET /api/tasks?scope=done\|trash&limit=&before=` · `GET /api/news?limit=&before=` | session | 2.40.0 (#1432): "Load more" pages in the app (not with a token). The answer carries `next` (null = the end); pass it as `before` for the following page. Jobs: `limit` 20 by default (at most 200), the first page also brings every running / waiting job, the pages hold the ended ones (newest change first, cursor = change time + id); without `limit` / `before` the list is unchanged (up to 200 visible jobs), `id=` still returns one job. Completed / trash: `limit` as before (default 300, at most 2000), cursor = completion resp. deletion time + id; the first trash page also says `deletable` and `kept` for the whole trash (`DELETE /api/trash` empties all of it, not only the loaded page). News: the pages count read items (`limit` at most 500); the first page also brings every unread item; `unread`, `unread_me`, "mark all as read" and `filter=` always cover the whole feed; without `limit` the whole feed as before |
 | `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); `POST /agent/jobs/{id}/proposal` answers a `job_request` (2.39.0: kind `cleanup` = tidy up a list, see AGENTS.md *Tidy up a list*); the status may name the task it works on (`task_id`, shows "… is writing" there); 2.37.0: a chat message with `offer_save: true` offers the person "Save as task" (saving itself is a click in the app, never an API call of an agent) |
 | `POST /agent/usage` · `GET /agent/usage?from=&to=&group=` | agent | **Agent tokens only** (2.1.1): report model usage (numbers and ids only), read it grouped by day, task, list or model; over its hard limit an agent gets `429` on every other call, see [AGENTS.md](AGENTS.md#usage-and-limits) |
 | `GET /search?q=` | read | Search titles, notes, links and custom field values |
@@ -886,8 +887,7 @@ Folders are paths of their owner (`"folder": "Clients/Company X"`). How they beh
   (2.29.0). Stopping the share stops new lists; with *also remove* the person leaves the folder's lists too (a share
   through a group stays). A list that someone creates in a folder shared with them stays theirs and is shared at once
   with the folder's owner (as list admin) and the folder's other people.
-- **Folder settings** (2.29.0, owner): the workspace, the agent (with *Members may see and use the agent* / *Agents may
-  address each other*) and tidying are defaults for every list in the folder and its subfolders. A new or moved list
+- **Folder settings** (2.29.0, owner): the workspace, the agent (with *Members may see and use the agent*) and tidying are defaults for every list in the folder and its subfolders. A new or moved list
   takes them; changing them asks whether the existing lists follow. A list changed on its own keeps its value
   ("differs from the folder") until *Back to the folder*. What cannot be applied (for example an agent that would
   create a [bridge](#lists-people-and-agents-2300)) is skipped and named.
@@ -898,7 +898,7 @@ Folders are paths of their owner (`"folder": "Clients/Company X"`). How they beh
 
 Web API (signed in as a person): `GET /api/folders/people?folder=` · `PUT /api/folders/people`
 `{folder, user_id, role?}` · `DELETE /api/folders/people` `{folder, user_id, remove?}`; `GET /api/folders/props?folder=`
-· `PUT /api/folders/props` `{folder, props: {org_id?, agent_id?, agent_members?, agent_peers?, agent_tidy?, …}
+· `PUT /api/folders/props` `{folder, props: {org_id?, agent_id?, agent_members?, agent_tidy?, …}
 (null removes a default), apply?: all | new, force?, dry_run?}` (`dry_run: true` only reports what would change);
 `POST /api/lists/{id}/folder-reset` `{keys?}` (*Back to the folder*). `/api/v1`: `GET /folders`,
 `POST /folders/rename`, `POST /folders/delete` (see [Endpoints](#endpoints)).

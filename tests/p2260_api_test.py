@@ -160,7 +160,7 @@ check(not [e for e in events(CXH, "cx") if e["event"] in ("mention", "comment")]
 A.patch(B + f"/api/lists/{L2}", json={"agent_peers": True})
 requests.post(V + f"/tasks/{t2['id']}/comments", headers=CLH, json={"body": f"<@{CX}> again"})
 ev = [e for e in events(CXH, "cx") if e["event"] == "mention"]
-check(len(ev) == 1 and ev[0]["actor"]["kind"] == "agent", "agent->agent: with agent_peers on the event arrives, actor.kind agent " + str(ev[:1])[:160])
+check(not ev, "agent->agent: 2.40.0 (#1373) agent_peers is ignored (fixed off), still no event " + str(ev[:1])[:160])
 
 # ================================================================== #949 integrate / deploy
 events(CLH, "cl")
