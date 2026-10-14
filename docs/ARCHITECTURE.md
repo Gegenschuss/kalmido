@@ -43,6 +43,11 @@ development workflow see [CONTRIBUTING.md](../CONTRIBUTING.md).
    comments, chats, news or calendars only fetches those parts and redraws only the counters that moved (`static/js/liveparts.js`);
    tasks / lists / other reload the state as before. Office views are never redrawn by someone else's change, and unsaved
    form input (`formguard.js`) holds redraws back.
+   2.42.0 (#1376): a change of the tasks area fetches only the tasks changed since the client's `v` (`GET /api/state/delta`,
+   `tasks/delta.py`): database triggers write the id of every task whose serialization changes into `dl_changes`, `bump()`
+   stamps them with the new version; a change of what someone sees (lists, shares, sections, fields) or too many / too old
+   changes answer `full` and the client loads the whole state as before. The view is morphed (unchanged rows keep their
+   nodes), the sidebar is redrawn only when a counter moved.
 5. **In the background** (`kalmido/startup.py` starts the threads): the watchdog (`notify/push.py`: reminders, nags,
    digests, rotations, clean-ups), the update check, calendar subscriptions, backups, webhook deliveries, mail and Git
    polling. Every thread and request passes the maintenance gate (`GATE` in `accounts/session.py`), so a restore can
@@ -118,6 +123,7 @@ The most used helpers:
 | `tasks/lifecycle.py` | Applying changes, completing (repeats), undo, skip, reopen, delete, trash and restore. |
 | `tasks/attachments.py` | Files of tasks (upload, download, delete). |
 | `tasks/batch.py` | Reordering and batch changes of tasks, occurrences of repeating tasks, deleting attachments. |
+| `tasks/delta.py` | 2.42.0 (#1376): the delta state `GET /api/state/delta?since=v` (change triggers into `dl_changes`, stamped by `bump()`; `full` when unsure). |
 | `collab/comments.py` | Comments, mentions, the activity timeline and collaboration pushes. |
 | `collab/news.py` | The News feed and the notification settings (matrix + list bells). |
 | `personal/habits.py` | Habits and focus sessions (pomodoro), private per user. |
