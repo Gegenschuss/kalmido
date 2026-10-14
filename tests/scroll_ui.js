@@ -108,9 +108,12 @@ async function seed() {
     v.scrollTop = v.scrollHeight;
     const scrolled = v.scrollTop;
     const nested = e => { for (let p = e.parentElement; p && p !== v; p = p.parentElement) { const s = cs(p); if (/(auto|scroll|hidden|clip)/.test(s.overflowY) && p.scrollHeight > p.clientHeight + 1) return true; } return false; };
+    // 2.41.0 (#1475): folded = inside a closed <details> other than in that details' own summary (a nested closed section's
+    // summary, e.g. "History" in the closed "More details", is hidden too; Firefox still lays it out below the fold)
+    const folded = e => { for (let d = e.closest('details:not([open])'); d; d = d.parentElement && d.parentElement.closest('details:not([open])')) if (![...d.children].some(c => c.tagName === 'SUMMARY' && c.contains(e))) return true; return false; };
     let worst = null;
     for (const e of v.querySelectorAll('*')) {
-      if (!shown(e) || cs(e).position === 'fixed' || e.closest('.hidden') || (e.closest('details:not([open])') && !e.closest('summary'))) continue;
+      if (!shown(e) || cs(e).position === 'fixed' || e.closest('.hidden') || folded(e)) continue;
       const leaf = !e.firstElementChild || (/(auto|scroll)/.test(cs(e).overflowY) && e.scrollHeight > e.clientHeight + 1);
       if (!leaf || nested(e)) continue;
       const r = e.getBoundingClientRect();
