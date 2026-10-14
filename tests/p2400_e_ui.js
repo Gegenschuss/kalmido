@@ -47,7 +47,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(`(() => { window.__t = []; const o = toast; toast = (m, ...a) => { __t.push(String(m)); return o(m, ...a); }; return 1; })()`);
 
     // ================= #1378 logo + import through the page's own functions (the header comes from the helper)
-    const PNG = '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082';
+    const PNG = '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360606060000000050001a5f645400000000049454e44ae426082';
     await ev(`(async () => { const b = new Uint8Array('${PNG}'.match(/../g).map(h => parseInt(h, 16))); await ofcLogoUpload(new File([b], 'logo.png', {type: 'image/png'})); return 1; })()`);
     check(await ready(ev, `!!OFC.info?.settings?.logo && __t.includes(tr('Logo saved'))`), '#1378: the logo upload of the page works ' + JSON.stringify(await ev('__t')));
     await ev(`(async () => { const t = await (await fetch('/api/office/export')).text(); await ofcImport(new File([t], 'office.json', {type: 'application/json'}), false); return 1; })()`);
