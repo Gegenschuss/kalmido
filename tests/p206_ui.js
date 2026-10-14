@@ -27,7 +27,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
   const mk = async (title, list_id, extra = {}) => (await call('POST', '/api/tasks', {title, list_id, ...extra})).id;
-  const WEB = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
+  const WEB = (await call('POST', '/api/lists', {name: 'Website', kind: 'project', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
   const launch = await mk('Plan launch', WEB, {due: ds(3)}), idea = await mk('Undated idea', WEB), idea2 = await mk('Another idea', WEB);
   const copy = await mk('Write copy', WEB, {due: ds(4)}); await mk('Outline', WEB, {parent_id: copy, due: ds(4)});
   await call('POST', '/api/deps', {task_id: copy, blocker_id: launch});

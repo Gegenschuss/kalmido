@@ -15,8 +15,8 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'});
   const BK = await login('bob');
   await call('PATCH', '/api/settings', {lang: 'de'}, BK);
-  const WORK = (await call('POST', '/api/lists', {name: 'Work', kind: 'project'})).id;
-  const SH = (await call('POST', '/api/lists', {name: 'Shared', kind: 'project'}, BK)).id;
+  const WORK = (await call('POST', '/api/lists', {name: 'Work', kind: 'project', time_tracking: true})).id;  // 2.41.0 (#1471): time tracking is a switch of the list
+  const SH = (await call('POST', '/api/lists', {name: 'Shared', kind: 'project', time_tracking: true}, BK)).id;
   await call('PUT', `/api/lists/${SH}/members`, {user_id: 1, role: 'edit'}, BK);
   const t1 = (await call('POST', '/api/tasks', {title: 'Write report', list_id: WORK})).id;
   const t2 = (await call('POST', '/api/tasks', {title: 'Review', list_id: WORK})).id;

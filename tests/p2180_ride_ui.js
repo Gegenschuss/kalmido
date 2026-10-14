@@ -38,7 +38,7 @@ const LONG = 'Website relaunch 2026 for the client';
   await call('PATCH', '/api/settings', {features: ALL, tour: 'done'}, CB);
   const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const AG = ag.id, TOK = ag.token;
-  const L = (await call('POST', '/api/lists', {name: LONG, kind: 'project'})).id;
+  const L = (await call('POST', '/api/lists', {name: LONG, kind: 'project', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
   await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${L}/members`, {user_id: AG, role: 'edit'});
   const L2 = (await call('POST', '/api/lists', {name: 'Home'})).id;  // a short name: the view switch stays in the header

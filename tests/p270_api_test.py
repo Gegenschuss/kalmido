@@ -268,7 +268,7 @@ check(A.patch(B + "/api/admin/settings", json={"time_day_h": 30}).status_code ==
 r = A.patch(B + "/api/admin/settings", json={"time_day_h": "7,5"})
 check(r.ok and r.json().get("time_day_h") == 7.5, f"time_day_h 7,5: {r.status_code} {r.text[:120]}")
 check(Bo.get(B + "/api/state").json()["time_day_h"] == 7.5, "every user sees it")
-P = Bo.post(B + "/api/lists", json={"name": "Client X", "ptype": "agency"}).json()["id"]
+P = Bo.post(B + "/api/lists", json={"name": "Client X", "ptype": "agency", "time_tracking": True}).json()["id"]  # 2.41.0 (#1471): time tracking
 check(Bo.patch(B + f"/api/lists/{P}", json={"day_hours": 10}).ok and next(x for x in Bo.get(B + "/api/state").json()["lists"] if x["id"] == P)["day_hours"] == 10, "list day_hours 10")
 check(Bo.patch(B + f"/api/lists/{P}", json={"day_hours": 0}).status_code == 400 and Bo.patch(B + f"/api/lists/{P}", json={"day_hours": "x"}).status_code == 400, "day_hours invalid 400")
 check(Bo.patch(B + f"/api/lists/{P}", json={"day_hours": ""}).ok and next(x for x in Bo.get(B + "/api/state").json()["lists"] if x["id"] == P)["day_hours"] is None, "day_hours '' -> the server's value")

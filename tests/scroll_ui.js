@@ -28,7 +28,7 @@ async function seed() {
     show_done_views: JSON.stringify({tomorrow: 1, today: 1})});
   const L = async (name, extra = {}) => (await call('POST', '/api/lists', {name, ...extra})).id;
   const home = await L('Home', {folder: 'Private'}), garden = await L('Garden', {folder: 'Private'});
-  const shop = await L('Shopping', {kind: 'checklist'}), team = await L('Team', {kind: 'project'});
+  const shop = await L('Shopping', {kind: 'checklist'}), team = await L('Team', {kind: 'project', time_tracking: true}); // 2.41.0 (#1471): time tracking is a switch of the list
   const board = await L('Board', {view: 'kanban'}), plan = await L('Plan', {view: 'timeline'});
   await call('PUT', `/api/lists/${team}/members`, {user_id: BOB, role: 'edit'});
   const T = async (title, list_id, extra = {}) => (await call('POST', '/api/tasks', {title, list_id, ...extra})).id;

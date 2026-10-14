@@ -38,7 +38,7 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   const BCK = await login('bob');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: BASE + ',workload'}, BCK);
-  const P = (await call('POST', '/api/lists', {name: 'Website relaunch', kind: 'project'})).id;
+  const P = (await call('POST', '/api/lists', {name: 'Website relaunch', kind: 'project', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
   await call('PUT', `/api/lists/${P}/members`, {user_id: BOB, role: 'edit'});
   await call('POST', '/api/lists', {name: '🎯 Goals', folder: 'Work'}); await call('POST', '/api/lists', {name: 'Plain', folder: 'Work'});
   await call('POST', '/api/lists', {name: '🌀 Top emoji'}); await call('POST', '/api/lists', {name: 'Top plain'});

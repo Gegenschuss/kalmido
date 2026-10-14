@@ -167,8 +167,8 @@ check(CL2 not in [c["id"] for c in Bo.get(B + "/api/clients").json()["clients"]]
 # 2.37.0 (#1150, decision 10.10.2026): row-level security applies to instance admins too -- only their own organisations' content
 check(CL2 not in [c["id"] for c in A.get(B + "/api/clients").json()["clients"]], "admins see the clients of their own organisations only (2.37)")
 # lists of the client
-P1 = A.post(B + "/api/lists", json={"name": "Aurora website", "kind": "project"}).json()["id"]
-P2 = A.post(B + "/api/lists", json={"name": "Aurora menu", "kind": "project"}).json()["id"]
+P1 = A.post(B + "/api/lists", json={"name": "Aurora website", "kind": "project", "time_tracking": True}).json()["id"]  # 2.41.0 (#1471): time tracking
+P2 = A.post(B + "/api/lists", json={"name": "Aurora menu", "kind": "project", "time_tracking": True}).json()["id"]
 A.patch(B + f"/api/lists/{P2}", json={"rate": 100})
 A.put(B + f"/api/lists/{P1}/members", json={"user_id": BOB, "role": "edit"})
 check(A.patch(B + f"/api/lists/{P1}", json={"client_id": CL}).ok and A.patch(B + f"/api/lists/{P2}", json={"client_id": CL}).ok, "lists -> the client")

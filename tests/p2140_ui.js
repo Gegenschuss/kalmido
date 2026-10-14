@@ -39,7 +39,7 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   const CAR = (await call('POST', '/api/users', {username: 'carol', display_name: 'Carol', password: 'password123'})).id;
   const CB = await login('bob'), CC = await login('carol');
   for (const ck of [CB, CC]) await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'}, ck);
-  const P = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
+  const P = (await call('POST', '/api/lists', {name: 'Website', kind: 'project', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
   await call('PUT', `/api/lists/${P}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${P}/members`, {user_id: CAR, role: 'admin'});
   const FS = await call('POST', `/api/lists/${P}/fields`, {name: 'Stage', type: 'select', options: {options: [{name: 'Idea', color: '#94a3b8'}, {name: 'Doing', color: '#6d8cff'}]}});

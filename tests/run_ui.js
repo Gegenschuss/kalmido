@@ -14,7 +14,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
 (async () => {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
-  const P = (await call('POST', '/api/lists', {name: 'Client work', kind: 'project'})).id;
+  const P = (await call('POST', '/api/lists', {name: 'Client work', kind: 'project', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
   const t = (await call('POST', '/api/tasks', {title: 'Write the offer', list_id: P})).id;
   await call('POST', '/api/time/start', {task_id: t});
   let w = await boot({user: 'alice', hash: 'l/' + P}); let d = w.document;

@@ -34,7 +34,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   const BK = await login('bob'), CKc = await login('carol');
   await call('PATCH', '/api/settings', {lang: 'de'}, BK);
   const PRJ = (await call('POST', '/api/lists', {name: 'Relaunch', view: 'timeline', kind: 'project'})).id;
-  const HOME = (await call('POST', '/api/lists', {name: 'Home', kind: 'project'})).id;
+  const HOME = (await call('POST', '/api/lists', {name: 'Home', kind: 'project', time_tracking: true})).id;  // 2.41.0 (#1471): time tracking is a switch of the list
   await call('PUT', `/api/lists/${PRJ}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${PRJ}/members`, {user_id: CAROL, role: 'view'});
   const mk = async (title, start, due, list = PRJ) => (await call('POST', '/api/tasks', {title, list_id: list, ...(start != null ? {start: ds(start)} : {}), due: ds(due)})).id;
@@ -210,7 +210,8 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   check(md.querySelector('#l-kind').value === 'list' && md.querySelector('#l-kindp') && !md.querySelector('#l-kindp').checked, 'new list dialog: the switch Project features, off (2.25.0)');
   check(md.querySelector('.kproj').hidden, 'type List: project settings hidden');
   { const kp = md.querySelector('#l-kindp'); kp.checked = true; kp.dispatchEvent(new w.Event('change', {bubbles: true})); }
-  check(!md.querySelector('.kproj').hidden && /time tracking, dependencies with the Gantt timeline, progress and status/.test(md.querySelector('#l-khint').textContent), 'type Project: hint names the features that are on');  // 2.39.1 (#1217): custom fields are in every list, not a project feature
+  // 2.41.0 (#1471): time tracking is no project feature any more (a switch of every list)
+  check(!md.querySelector('.kproj').hidden && /dependencies with the Gantt timeline, progress and status/.test(md.querySelector('#l-khint').textContent) && !/time tracking/.test(md.querySelector('#l-khint').textContent), 'type Project: hint names the features that are on');  // 2.39.1 (#1217): custom fields are in every list, not a project feature
   check(md.querySelector('#l-dab') && /shopping and packing/i.test(md.textContent), '2.7.2: "Show completed at the bottom" instead of a type');
   md.remove();
   const srow = d.querySelector(`#side .srow[data-list="${PL}"]`);
@@ -222,7 +223,16 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === PL).kind === 'project'), 'context menu: type changed on the server');
   check(await until(() => d.querySelector('#top .kbadge') && /Project/.test(d.querySelector('#top .kbadge').textContent)), 'Project badge in the header');
   w.eval(`openDetail(${pt})`); await sleep(300);
-  check(d.querySelector('[data-act="timer-toggle"]'), 'after switching to Project: timer button there');
+  // 2.41.0 (#1471): the type does not switch time tracking on; the list's own switch "Time tracking" does
+  check(!d.querySelector('[data-act="timer-toggle"]'), 'after switching to Project: still no timer (time tracking is its own switch, off)');
+  w.eval('closeDetail()');
+  w.eval(`listModal(${PL})`); await sleep(200);
+  { const tt = lastModal(d).querySelector('#l-time'); check(tt && !tt.checked && lastModal(d).querySelector('.ltimex')?.hidden, 'list dialog: switch Time tracking, off; hours / rate hidden');
+    tt.checked = true; tt.dispatchEvent(new w.Event('change', {bubbles: true})); }
+  check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === PL).time_tracking === 1) && !lastModal(d).querySelector('.ltimex').hidden, 'Time tracking on: saved at once, hours / rate shown');
+  lastModal(d).remove();
+  w.eval(`openDetail(${pt})`); await sleep(300);
+  check(await until(() => d.querySelector('[data-act="timer-toggle"]')), 'time tracking on: timer button there');
   w.eval('closeDetail()');
   w.close();
   // 2.40.0 (#1190): the progress bar of a project is off by default, no x on it; switched on per user and project

@@ -96,7 +96,7 @@ check(r.ok and r.json().get("modules_on") == [], f"web PATCH field columns, modu
 P = A.post(B + "/api/lists", json={"name": "Project", "kind": "project"}).json()["id"]
 FP = A.post(B + f"/api/lists/{P}/fields", json={"name": "Budget", "type": "number"}).json()["id"]
 check(A.patch(B + f"/api/tasks/{T1}", json={"fields": {str(FP): "3"}}).status_code == 400, "#1217: a field of another list: 400")
-check(A.post(B + "/api/time/start", json={"task_id": T1}).status_code == 409, "#1217: time tracking stays project-only (409)")
+check(A.post(B + "/api/time/start", json={"task_id": T1}).status_code == 409, "#1217: no time tracking in a plain list (409; 2.41.0 #1471: the list's switch, off by default)")
 TP = A.post(B + "/api/tasks", json={"title": "p", "list_id": P}).json()["id"]
 check(A.post(B + "/api/deps", json={"task_id": T1, "blocker_id": TP}).status_code == 409, "#1217: dependencies stay project-only (409)")
 # a template of the plain list keeps its fields

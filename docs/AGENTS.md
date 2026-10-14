@@ -744,8 +744,8 @@ lies idle.
 ### Time gaps (2.34.0)
 
 `GET /api/v1/time/gaps` (MCP `get_time_gaps`; `?days=` 1-31, default 14; `?user_id=`) returns the working days
-(Monday to Friday, before today) on which a person completed, commented or changed tasks of project lists but tracked
-no time there: `{user_id, from, to, days: [{date, count, tasks: [{id, title, list_id}]}]}` (at most five example
+(Monday to Friday, before today) on which a person completed, commented or changed tasks of lists with time tracking
+(2.41.0: the list's switch `time_tracking`; before: project lists) but tracked no time there: `{user_id, from, to, days: [{date, count, tasks: [{id, title, list_id}]}]}` (at most five example
 tasks per day). Without `user_id` it is the token user's own; an agent may pass the id of a person who may chat with
 it, and then only lists that the agent **and** that person see count (tasks and time entries). Pure data: suggest
 entries to the person (with `list_time_entries` for what is already there), never add time for them without asking.
@@ -854,8 +854,8 @@ client". Kalmido writes no prose itself: you get the data and formulate the text
 - **Status report of a list** `GET /lists/{id}/status-report?days=7` (or `from` / `to`, `lang`; MCP
   `read_project_status`, scope read). Only lists shared with you. `done` (completed in the period), `in_progress`
   (open main tasks with a change, comment or time entry in the period), `blocked`, `overdue`, `upcoming` (due from today
-  until 14 days after the period), `milestones` (reached in the period + the next open ones), `time` (project lists
-  with time tracking: `seconds`, `rounded`, per task; `null` unless time tracking is on for the person and the token
+  until 14 days after the period), `milestones` (reached in the period + the next open ones), `time` (lists with
+  time tracking switched on, 2.41.0 `time_tracking`: `seconds`, `rounded`, per task; `null` unless time tracking is on for the person and the token
   has the scope `time`) and `markdown`: a plain text from fixed sentences that leaves out
   comments, descriptions, notes and every name of people or agents. Use it as a base; a client report goes out only
   through a person.

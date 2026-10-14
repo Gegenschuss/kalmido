@@ -16,7 +16,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   CK = await login('alice');
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   await call('PATCH', '/api/settings', {features: ALL});
-  const P = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project'})).id;
+  const P = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
   await call('PATCH', '/api/settings', {show_progress: String(P)});  // 2.40.0 (#1190): the bar is off by default in projects
   await call('PUT', `/api/lists/${P}/members`, {user_id: BOB, role: 'edit'});
   const T = (await call('POST', '/api/tasks', {title: 'Write brief', list_id: P, due: ds(0), start: ds(-1)})).id;

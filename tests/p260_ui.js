@@ -142,7 +142,7 @@ const TOUCH = `(() => {
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'}, CKB);
   const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const ag2 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'helper', display_name: 'Helper'});
-  const L = (await call('POST', '/api/lists', {name: 'Website Relaunch Müller GmbH', kind: 'project'})).id;  // a long project name
+  const L = (await call('POST', '/api/lists', {name: 'Website Relaunch Müller GmbH', kind: 'project', time_tracking: true})).id;  // a long project name; 2.41.0 (#1471): time tracking
   for (const id of [BOB, ag.id]) await shareAny(call, DATA, L, id, 'edit');
   const CL = (await call('POST', '/api/lists', {name: 'Shopping', kind: 'checklist'})).id;
   await shareAny(call, DATA, CL, BOB, 'edit');

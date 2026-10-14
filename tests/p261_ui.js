@@ -54,7 +54,7 @@ const HEAD = `(() => {
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'}, CKB);
   const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const ag2 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'helper', display_name: 'Helper'});
-  const L = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project'})).id;
+  const L = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
   for (const id of [BOB, ag.id, ag2.id]) await shareAny(call, DATA, L, id, 'edit');
   const T = (await call('POST', '/api/tasks', {title: 'Go live', list_id: L, due: day(5)})).id;
   for (let i = 0; i < 3; i++) await call('POST', '/api/tasks', {title: `Task ${i + 1}`, list_id: L, due: day(i)});

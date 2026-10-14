@@ -78,10 +78,10 @@ Bo, Ca, Da = sess("bob"), sess("carol"), sess("dave")
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments", "time"], "username": "claude", "display_name": "Claude"})
 CL, CLH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
 
-W = A.post(B + "/api/lists", json={"name": "Work", "kind": "project"}).json()["id"]
+W = A.post(B + "/api/lists", json={"name": "Work", "kind": "project", "time_tracking": True}).json()["id"]  # 2.41.0 (#1471): time gaps need time tracking
 for who, role in ((CL, "edit"), (BOB, "edit"), (DAVE, "participant")):
     check(A.put(B + f"/api/lists/{W}/members", json={"user_id": who, "role": role}).ok, f"setup: {who} in the list as {role}")
-PRIV = A.post(B + "/api/lists", json={"name": "Private", "kind": "project"}).json()["id"]
+PRIV = A.post(B + "/api/lists", json={"name": "Private", "kind": "project", "time_tracking": True}).json()["id"]
 CLIST = Ca.post(B + "/api/lists", json={"name": "Carol's"}).json()["id"]
 
 

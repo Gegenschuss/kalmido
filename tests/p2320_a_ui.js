@@ -35,7 +35,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob Baker', password: 'password123'})).id;
   const BCK = await login('bob');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, BCK);
-  const P = (await call('POST', '/api/lists', {name: 'Website relaunch', kind: 'project'})).id;
+  const P = (await call('POST', '/api/lists', {name: 'Website relaunch', kind: 'project', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
   await call('PUT', `/api/lists/${P}/members`, {user_id: BOB, role: 'edit'});
   await call('PATCH', `/api/lists/${P}/overview`, {description: '## Goal\nA new site.'});
   const T1 = (await call('POST', '/api/tasks', {title: 'Draft the sitemap', list_id: P})).id;

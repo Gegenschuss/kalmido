@@ -62,7 +62,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const D1 = (await call('POST', '/api/tasks', {title: 'Tax return', list_id: L, due: day(10), reminders: '20160', deadline: 2})).id;
   const D2 = (await call('POST', '/api/tasks', {title: 'Renew passport', list_id: L, due: day(30), reminders: '1440', deadline: 1})).id;
   const D3 = (await call('POST', '/api/tasks', {title: 'Water plants', list_id: L, due: day(3)})).id;
-  const P = (await call('POST', '/api/lists', {name: 'Client X', ptype: 'agency', folder: 'Clients'})).id;
+  const P = (await call('POST', '/api/lists', {name: 'Client X', ptype: 'agency', folder: 'Clients', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
   const st0 = await call('GET', '/api/state');
   const fb = st0.fields.find(f => f.list_id === P && f.name === 'Budget h');
   const PT = (await call('POST', '/api/tasks', {title: 'Concept', list_id: P, fields: {[fb.id]: '20'}, due: day(2)})).id;

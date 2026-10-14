@@ -107,7 +107,7 @@ Bo, C, P, V, D = (sess(u) for u in ("bob", "carol", "pete", "vic", "dave"))
 T0 = date.today().isoformat()
 
 # ------------------------------------------------------------------ the shared project list
-L = A.post(B + "/api/lists", json={"name": "Film", "kind": "project"}).json()["id"]
+L = A.post(B + "/api/lists", json={"name": "Film", "kind": "project", "time_tracking": True}).json()["id"]  # 2.41.0 (#1471): time tracking is a switch
 sec = {n: A.post(B + "/api/sections", json={"list_id": L, "name": n}).json()["id"] for n in ("Alpha", "Beta", "Gamma")}
 roles = {"bob": "admin", "carol": "edit", "pete": "participant", "vic": "view"}
 for u, ro in roles.items():

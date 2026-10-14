@@ -189,7 +189,7 @@ check(not [x for x in fake_log() if x["port"] == 8082], "nothing ever reached Pa
 users = {u["username"]: u for u in A.get(B + "/api/users").json()["users"]}
 check("paperless_access" not in users["alice"], "users list: no Paperless access flag")
 # shared list used further below
-Sh = A.post(B + "/api/lists", json={"name": "Shared", "kind": "project"}).json()["id"]
+Sh = A.post(B + "/api/lists", json={"name": "Shared", "kind": "project", "time_tracking": True}).json()["id"]  # 2.41.0 (#1471): time tracking
 A.put(B + f"/api/lists/{Sh}/members", json={"user_id": ids["bob"], "role": "edit"})
 A.put(B + f"/api/lists/{Sh}/members", json={"user_id": ids["carol"], "role": "edit"})
 ts = A.post(B + "/api/tasks", json={"title": "shared doc task", "list_id": Sh}).json()["id"]

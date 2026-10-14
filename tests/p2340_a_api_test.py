@@ -107,7 +107,7 @@ def share(lid, uid, role="edit"):
 
 CL, CLH = agent("claude")
 OT, OTH = agent("otto")
-P = A.post(B + "/api/lists", json={"name": "Website", "kind": "project"}).json()["id"]   # alice, bob, dave (participant), claude
+P = A.post(B + "/api/lists", json={"name": "Website", "kind": "project", "time_tracking": True}).json()["id"]   # alice, bob, dave (participant), claude; 2.41.0 (#1471): time tracking
 PRIV = A.post(B + "/api/lists", json={"name": "Private"}).json()["id"]                  # alice only
 share(P, BOB)
 share(P, DAVE, "participant")

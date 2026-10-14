@@ -29,7 +29,7 @@ const ago = d => new Date(Date.now() - d * 86400000).toISOString().slice(0, 19) 
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const ME = (await call('GET', '/api/state')).me.id;
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'claude', display_name: 'Claude'});
-  const L = (await call('POST', '/api/lists', {name: 'Client work', kind: 'project'})).id;
+  const L = (await call('POST', '/api/lists', {name: 'Client work', kind: 'project', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
   await call('PUT', `/api/lists/${L}/members`, {user_id: ag.id, role: 'edit'});
   const T1 = (await call('POST', '/api/tasks', {title: 'Offer for the kitchen', list_id: L})).id;
   const T2 = (await call('POST', '/api/tasks', {title: 'Plans from the architect', list_id: L})).id;

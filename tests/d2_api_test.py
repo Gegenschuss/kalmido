@@ -153,7 +153,8 @@ lst = lambda s, i: next(l for l in state(s)["lists"] if l["id"] == i)  # noqa: E
 check(lst(A, PL)["kind"] == "list" and lst(A, W)["kind"] == "project", "new list: type list by default; kind project on request")
 pt = A.post(B + "/api/tasks", json={"list_id": PL, "title": "Plain task"}).json()["id"]
 r = A.post(B + "/api/time/start", json={"task_id": pt})
-check(r.status_code == 409 and "project" in r.json().get("error", ""), f"plain list: timer refused with a clear message: {r.status_code} {r.text[:120]}")
+# 2.41.0 (#1471): time tracking is the list's own switch (default off), the message names it
+check(r.status_code == 409 and "time tracking" in r.json().get("error", ""), f"list without time tracking: timer refused with a clear message: {r.status_code} {r.text[:120]}")
 r = A.post(B + "/api/time/entries", json={"list_id": PL, "start": D(-1) + "T09:00", "minutes": 30})
 check(r.status_code == 409, f"plain list: time entry refused: {r.status_code}")
 r = A.post(B + "/api/deps", json={"task_id": pt, "blocker_id": t3})
@@ -186,8 +187,9 @@ r = requests.post(B + "/api/v1/lists", headers=VH, json={"name": "API project", 
 check(r.status_code == 201 and r.json()["kind"] == "project", f"API v1: create with kind: {r.text[:120]}")
 r = requests.post(B + "/api/v1/lists", headers=VH, json={"name": "API check", "checklist": True})
 check(r.status_code == 201 and r.json()["kind"] == "list" and r.json()["checklist"] is True, "API v1: checklist=true still works (alias, 2.7.2)")
-# switching a project back to a list hides its time and dependencies (nothing deleted), and back again
-TP = A.post(B + "/api/lists", json={"name": "Client X", "kind": "project"}).json()["id"]
+# switching a project back to a list hides its dependencies (nothing deleted), and back again
+# 2.41.0 (#1471): time tracking is a switch of its own (time_tracking); the type no longer hides tracked time
+TP = A.post(B + "/api/lists", json={"name": "Client X", "kind": "project", "time_tracking": True}).json()["id"]
 tp1, tp2 = A.post(B + "/api/tasks", json={"list_id": TP, "title": "Brief"}).json()["id"], A.post(B + "/api/tasks", json={"list_id": TP, "title": "Pitch"}).json()["id"]
 A.post(B + "/api/time/entries", json={"task_id": tp1, "start": D(-1) + "T09:00", "minutes": 90})
 A.post(B + "/api/deps", json={"task_id": tp2, "blocker_id": tp1})
@@ -195,7 +197,7 @@ rep_ = lambda: A.get(B + "/api/time/report", params={"from": D(-3), "to": D(0)})
 s0 = rep_()
 check(s0 >= 5400 and task(A, tp2)["blocked"] == 1, "project: time in the report, the task waits")
 A.patch(B + f"/api/lists/{TP}", json={"kind": "list"})
-check(rep_() == s0 - 5400 and task(A, tp2)["blocked"] == 0, "back to a list: its time left out of reports, no waiting")
+check(rep_() == s0 and task(A, tp2)["blocked"] == 0, "back to a list: no waiting; its tracked time stays in the reports (2.41.0, #1471)")
 with db() as c:
     check(c.execute("SELECT COUNT(*) FROM time_entries WHERE task_id=?", (tp1,)).fetchone()[0] == 1 and c.execute("SELECT COUNT(*) FROM task_deps WHERE task_id=?", (tp2,)).fetchone()[0] == 1, "... nothing deleted")
 A.patch(B + f"/api/lists/{TP}", json={"kind": "project"})

@@ -264,7 +264,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(!rk.includes('search') && d.querySelector('#side .scmd[data-act="palette"]') && !d.querySelector('#side [data-go="search"]') && rk.includes('settings'), 'sidebar: the command-bar field at the top is the search, settings in the footer: ' + rk.join(','));
 
   // ================= (h) time page: the running timer as a card
-  const PRJ = (await call('POST', '/api/lists', {name: 'Client X', kind: 'project', color: '#f59e0b'})).id;
+  const PRJ = (await call('POST', '/api/lists', {name: 'Client X', kind: 'project', color: '#f59e0b', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
   const tt = await mk('Write offer', PRJ);
   await w.eval('load()'); w.eval(`go('time')`); await sleep(400);
   check(!!d.querySelector('.tvrun.idle') && /No timer running/.test(d.querySelector('.tvrun').textContent), 'nothing running: short hint');

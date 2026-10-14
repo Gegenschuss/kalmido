@@ -412,7 +412,7 @@ A.patch(B + "/api/settings", json={"digest_time": ""})
 # time tracking: timer running longer than time_remind_h -> Web Push; instance switch off -> nothing
 clear()
 A.patch(B + "/api/settings", json={"time_remind_h": "1", "time_autostop_h": "0"})
-A.patch(B + "/api/lists/" + str(next(x["id"] for x in A.get(B + "/api/state").json()["lists"] if x["is_inbox"])), json={"kind": "project"})  # time tracking: project lists
+A.patch(B + "/api/lists/" + str(next(x["id"] for x in A.get(B + "/api/state").json()["lists"] if x["is_inbox"])), json={"time_tracking": True})  # 2.41.0 (#1471): time tracking is a switch of the list
 A.post(B + "/api/time/start", json={"task_id": T2, "at": (datetime.now(TZ) - timedelta(hours=2)).isoformat()})
 w = wait_for(good.got, 1, 6)
 p = good.decrypt(w[0]) if w else {}

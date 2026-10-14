@@ -851,7 +851,8 @@ TASK_PLACE = {"list_id": S_ID, "section_id": {"type": ["integer", "null"]}, "par
               "before_id": S_ID, "after_id": S_ID, "position": {"type": "string", "enum": ["top", "bottom"]}}
 LIST_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "folder": {"type": "string", "description": "path, e.g. Clients/Acme"},
               "view": {"type": "string", "enum": ["list", "kanban", "timeline"]}, "kind": {"type": "string", "enum": ["list", "project"]},
-              "done_at_bottom": {"type": "boolean"}, "nag": {"type": "string"}, "day_hours": {"type": ["number", "null"]}}
+              "done_at_bottom": {"type": "boolean"}, "nag": {"type": "string"}, "day_hours": {"type": ["number", "null"]},
+              "time_tracking": {"type": "boolean", "description": "2.41.0: time tracking on for this list (any type, default off)"}}
 HABIT_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer", "minimum": 1},
                "days": {"type": "string", "description": "weekdays 1-7 (1 = Monday), e.g. 12345"}, "per_week": {"type": "integer", "minimum": 0},
                "remind_at": {"type": "string", "description": "HH:MM or empty"}}
@@ -882,13 +883,14 @@ TOOLS += [
                          "state: applied | discarded}. At most 3 open proposals per list.",
      _obj({"list_id": S_ID, "text": {"type": "string", "maxLength": 8000}, "note": {"type": "string", "maxLength": 500}}, ["list_id", "text"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/playbook/proposals", body=_pick(a, ("text", "note")))),
-    ("create_list", "Create a list (you become its owner). kind project = time tracking, dependencies, custom fields, overview. "
+    ("create_list", "Create a list (you become its owner). kind project = dependencies, project status, overview; time_tracking "
+                    "true (2.41.0) = time tracking on (any type, default off). "
                     "project_type agency | software | private = a project of that built-in type (fields, ticket types); "
                     "sections true (2.27.0) = also the type's standard sections (default: none).",
      _obj({**LIST_PROPS, "project_type": {"type": "string", "enum": ["agency", "software", "private"]}, "sections": {"type": "boolean"}}, ["name"]),
      lambda api, a: api.call("POST", "/lists", body=a)),
     ("update_list", "Change a list: name, color, folder (moving your own list into another folder waits for approval), view, kind, "
-                    "archived (true = archive), done_at_bottom, nag, day_hours, project_type (2.18.0, owner / list admins: "
+                    "archived (true = archive), done_at_bottom, nag, day_hours, time_tracking (2.41.0, owner), project_type (2.18.0, owner / list admins: "
                     "agency | software | private, null = none; switches on what the type needs, never deletes anything).",
      _obj({"list_id": S_ID, **LIST_PROPS, "archived": {"type": "boolean"},
            "project_type": {"type": ["string", "null"], "enum": ["agency", "software", "private", "", None]}}, ["list_id"]),
