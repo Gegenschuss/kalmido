@@ -14,6 +14,7 @@ addresses and paths to your setup.
 - [Database (PostgreSQL)](#database-postgresql)
 - [Upgrade to 2.37 (PostgreSQL required)](#upgrade-to-237-postgresql-required)
 - [Backup and encryption](#backup-and-encryption)
+- [Organisation export](#organisation-export)
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
 - [Mail](#mail)
@@ -311,6 +312,42 @@ docker compose up -d kalmido
   there (for example with `age`, or Kalmido's own *Encrypt backups*), and run a restore test now and then.
 - **Old snapshots contain plain text.** Filesystem, VM or provider snapshots taken before you switched on encryption
   still hold the data unencrypted: delete them.
+
+## Organisation export
+
+Since 2.42 an admin of an organisation can export it as one encrypted archive: *Settings > Organisation > Export the
+organisation*. The server builds it in the background (one at a time per organisation) and keeps the file for 24 hours
+in the data folder (`exports/`, not part of the backups); after that, or with *Delete now*, it is removed. Every export
+and download is written to the office log (who, when, size).
+
+- **What is in it.** A zip with `manifest.json` (format version, Kalmido version, counts, SHA-256 of every entry), one
+  JSON file per area and the files: the organisation's lists (sections, members and roles, fields, tags, status
+  updates, links, milestones, history, project notes, project files, forms, playbooks), all tasks of those lists
+  (subtasks, field values, dependencies, history, the trash), comments, attachments, time entries on those lists, the
+  team chat channels of those lists, the organisation's calendars with their events, its address books with their
+  contacts, its clients, the whole office (company data, services, equipment, packages, texts, framework contracts,
+  quotations / invoices / credit notes with positions, payments, PDF and XML files, the archive, the office log) and the
+  members with their roles (name, user name, e-mail address).
+- **What is not in it.** Lists outside the organisation (the members' private space), other organisations, passwords,
+  sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
+  personal data (settings, own tags, filters, templates, direct messages, agent chats).
+- **Encrypted content.** Fields and files that the server encrypts with the organisation's key are plain text inside
+  the archive (the archive itself is encrypted). Content encrypted in the browser by its author (encrypted task notes
+  and files) stays ciphertext; the manifest lists it under `client_encrypted`.
+- **Opening it.** The archive is encrypted with AES-256-GCM under the organisation's key. You need the organisation's
+  recovery key (*Settings > Organisation > Encryption*) and the tool `tools/kalmido_export_decrypt.py` from the
+  repository (Python 3.8+ and the package `cryptography`):
+
+  ```sh
+  python3 tools/kalmido_export_decrypt.py acme-2026-10-14.kalmido-export -o acme.zip
+  # asks for the recovery key; or: --key-file key.txt (never put the key on the command line)
+  ```
+
+  The tool checks every block (a wrong key, a damaged or shortened file is refused) and then the checksums of the
+  manifest.
+- **Without `KALMIDO_SECRET_KEY`** the organisation data is not encrypted and the export is refused: set the server key
+  first (see the section on the encryption of the organisation data).
+- **Import** of such an archive into another Kalmido follows in a later version.
 
 ## Server hardening
 
