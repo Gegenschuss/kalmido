@@ -390,7 +390,7 @@ check(Bo.put(B + f"/api/lists/{L}/members", json={"user_id": ids["alice"], "role
 check(Bo.delete(B + f"/api/lists/{L}/members/{ids['alice']}").status_code == 404, "owner cannot be removed")
 check(Bo.put(B + f"/api/lists/{L}/members", json={"user_id": ids["dave"], "role": "boss"}).status_code == 400, "unknown role")
 check(Bo.delete(B + f"/api/lists/{L}/members/{ids['dave']}").ok, "admin removes a member")
-check(Bo.patch(B + f"/api/lists/{L}", json={"name": "Renamed"}).status_code == 403, "list settings stay owner-only")
+check(Bo.patch(B + f"/api/lists/{L}", json={"kind": "project"}).status_code == 403, "list settings stay owner-only (2.40.0 #1431: an admin may rename)")
 check(Bo.delete(B + f"/api/comments/{c3}").ok, "admin moderates comments")
 news_d = [n for n in dbx("SELECT kind, data FROM notifications WHERE user_id=?", (ids["dave"],))]
 check(any(k == "share" and (d if isinstance(d, dict) else json.loads(d))["role"] == "participant" for k, d in news_d) and any(k == "role" for k, d in news_d), f"News share / role {news_d}")

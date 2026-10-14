@@ -153,7 +153,7 @@ check(state_list(A, L1)["owner_name"] == "Bob", "owner_name Bob")
 check(Bo.post(B + "/api/tasks", json={"title": "By the new owner", "list_id": L1}).ok, "the new owner adds a task")
 check(A.post(B + "/api/tasks", json={"title": "By the old owner", "list_id": L1}).ok, "the old owner (admin) adds a task")
 check(A.put(B + f"/api/lists/{L1}/members", json={"user_id": ids["erin"], "role": "view"}).ok, "the old owner manages members")
-check(A.patch(B + f"/api/lists/{L1}", json={"name": "Renamed"}).status_code == 403, "the old owner cannot rename it any more")
+check(A.patch(B + f"/api/lists/{L1}", json={"kind": "project"}).status_code == 403, "the old owner cannot change the type any more (2.40.0 #1431: a list admin may rename)")
 check(Bo.patch(B + f"/api/lists/{L1}", json={"name": "Team 2"}).ok, "the new owner renames it")
 ctasks = {t["id"] for t in Ca.get(B + "/api/state").json()["tasks"] if t["list_id"] == L1}
 check(TC in ctasks and TX not in ctasks, "the participant still sees only her task")

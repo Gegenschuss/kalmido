@@ -99,7 +99,7 @@ check(r.ok and dbx("SELECT archived, archived_at IS NOT NULL FROM lists WHERE id
 nb = news(Bo)
 check(any((x.get("data") or {}).get("action") == "larchive" and (x.get("data") or {}).get("name") == "Fair stand" for x in nb),
       "#1188: the owner hears about the archive " + json.dumps(nb)[:300])
-check(Ca.patch(B + f"/api/lists/{SH}", json={"archived": 1, "name": "Renamed"}).status_code == 403, "#1188: the list admin still cannot rename (owner)")
+check(Ca.patch(B + f"/api/lists/{SH}", json={"archived": 1, "kind": "project"}).status_code == 403, "#1188: the list admin still cannot change the type (owner; 2.40.0 #1431: renaming is allowed)")
 r = Ca.patch(B + f"/api/lists/{SH}", json={"archived": 0})
 check(r.ok and dbx("SELECT archived FROM lists WHERE id=?", (SH,))[0][0] == 0, "#1188: ... and restores")
 Ca.patch(B + f"/api/lists/{SH}", json={"archived": 1})
