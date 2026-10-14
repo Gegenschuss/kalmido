@@ -275,7 +275,7 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   check(!lastModal(dc).querySelector('[data-m="save"]') && /View only/.test(lastModal(dc).textContent), 'view only: status dialog without save');
   lastModal(dc).remove();
   wc2.eval(`listModal(${WORK})`); await sleep(100);
-  check(!lastModal(dc).querySelector('#l-fields') && /only the owner can change them/.test(lastModal(dc).textContent), 'view only: list dialog shows fields read-only');
+  check(!lastModal(dc).querySelector('#l-fields') && /only the owner and list admins can change them/.test(lastModal(dc).textContent), 'view only: list dialog shows fields read-only');
   lastModal(dc).remove(); wc2.eval('closeDetail()');
   wc2.location.hash = 'overview'; await sleep(400);
   const cn = [...dc.querySelectorAll('.ovcard .ovname')].map(x => x.textContent.trim());
