@@ -133,6 +133,10 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
   type(w, d.querySelector('#e2e-code-in'), CODE.toLowerCase().replace(/-/g, ' '));
   type(w, d.querySelector('#e2e-p1'), PASS2); type(w, d.querySelector('#e2e-p2'), PASS2);
   md.querySelector('form').dispatchEvent(new w.Event('submit', {cancelable: true}));
+  // 2.42.0 (#828 review): replacing the stored bundle asks for the account password
+  const pp = await until(() => d.querySelector('.pwprompt'), 80);
+  check(!!pp, 'reset: the account password is asked before the keys are replaced');
+  if (pp) { pp.querySelector('#pp-pw').value = 'password123'; pp.querySelector('form').dispatchEvent(new w.Event('submit', {cancelable: true})); }
   check(await w.eval('window.__r') === true && w.eval('e2eUnlocked()'), 'reset: the recovery code sets a new passphrase');
   const k2 = await call('GET', '/api/e2e/keys');
   check(k2.pub.x === keys.pub.x && k2.bundle_pass.ct !== keys.bundle_pass.ct && k2.bundle_rec.ct === keys.bundle_rec.ct, 'reset: same key pair, new passphrase bundle');
@@ -181,6 +185,30 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
   // a plain message is refused by the server in this room
   const pl = await call('POST', `/api/team/rooms/${room.id}/messages`, {body: 'plain'});
   check(pl.status === 409, 'dm: plain text refused in the encrypted DM');
+  // 2.42.0 (#909 review): my own key in the safety number comes from my unlocked bundle; a swapped copy on the server is noticed
+  const pA = JSON.parse(pubA);
+  check(w.eval('E2E.own && E2E.own.x') === pA.x && w.eval('E2E.own.y') === pA.y && w.eval('E2E.badPub') === false, 'dm: own key from the bundle = the server copy');
+  w.eval(`E2E.st.pub = ${pubB}; e2eOwnSet(E2E.own)`);
+  check(w.eval('E2E.badPub') === true, 'dm: a swapped own key on the server is noticed');
+  check(await w.eval(`e2eDmEncrypt(${room.id}, 'x').then(() => false, e => /does not match/.test(e.message))`), 'dm: no encryption with a swapped own key');
+  w.eval('renderView()');
+  check(!!d.querySelector('.e2ewarn'), 'dm: a clear warning in the conversation');
+  w.eval(`E2E.st.pub = ${pubA}; e2eOwnSet(E2E.own); renderView()`);
+  check(w.eval('E2E.badPub') === false, 'dm: matching again');
+  // 2.42.0 (#909 review): the server reports the DM as plain without a "switched off" notice -> warning, plain only after a yes
+  check(w.eval(`LS.get('e2eOn:' + S.me.id + ':${room.id}', null)`) !== null, 'dm: this browser remembers the encrypted DM');
+  w.eval(`S.tc.room.e2e = false; e2eRoomDecrypt(${room.id}); renderView()`);
+  check(w.eval(`!!E2E.down[${room.id}]`) && !!d.querySelector('.e2ewarn [data-e2e="dm-down-ok"]'), 'dm: a silent downgrade shows a warning');
+  w.eval('window.__ask = 0; askConfirm = async () => { window.__ask++; return false; }');
+  const n0 = (await call('GET', `/api/team/rooms/${room.id}/messages`)).messages.length;
+  d.querySelector('#tc-in').value = 'would be plain';
+  await w.eval('tcSend()');
+  const n1 = (await call('GET', `/api/team/rooms/${room.id}/messages`)).messages.length;
+  check(w.eval('window.__ask') === 1 && n1 === n0, 'dm: nothing sent without the confirmation');
+  // switched off by a person (notice in the conversation): no warning, the marker goes
+  const off = await call('POST', `/api/team/rooms/${room.id}/e2e`, {on: false}, CKB);
+  await w.eval(`loadRoom(${room.id})`);
+  check(off.status < 300 && w.eval(`!E2E.down[${room.id}]`) && w.eval(`LS.get('e2eOn:' + S.me.id + ':${room.id}', null)`) === null, 'dm: switched off by Bob -> no warning');
   w.close(); wb.close();
 
   console.log(`p2420_a_ui: ${ok} ok, ${F.length} failed`);

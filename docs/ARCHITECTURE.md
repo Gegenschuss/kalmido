@@ -438,7 +438,9 @@ ciphertext. A DM is switched by either person, only when both have keys; the swi
 conversation. Both sides can compare a safety number (SHA-256 over both public keys, 8 groups of 5 digits); the own
 public key in it comes from the unlocked key bundle, never from the server. If the server's copy of the own public key
 differs from the bundle, the app warns and refuses to encrypt DMs (changing the passphrase stores the right key again).
-When the other person's key changes, the conversation says so.
+When the other person's key changes, the conversation says so. The browser remembers that a DM was encrypted: if the
+server later reports it as plain without a "switched off" notice in the conversation, a warning shows and plain text is
+sent only after a confirmation. Replacing or removing one's keys asks for the account password.
 
 **Limits.** This protects against the server operator, a reader of the database and the backups. A web app cannot
 protect against a changed script delivered by the server itself. Encrypted DMs have no forward secrecy (a static key
