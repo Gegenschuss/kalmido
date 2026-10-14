@@ -28,7 +28,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const st = await call('GET', '/api/office/settings');
   check(st.http === 200 && st.role === 'admin', 'office settings, alice is the organisation admin ' + st.http);
-  await call('PUT', '/api/office/settings', {company: {name: 'Studio Nordlicht GmbH'}, lang: 'en', company_fields: {name: 'Studio Nordlicht GmbH', street: 'Hafenstraße 12', zip: '20457', city: 'Hamburg', country: 'DE', tax_number: '12/345/67890', iban: TEST_IBAN}});
+  await call('PUT', '/api/office/settings', {company: {name: 'Studio Nordlicht GmbH'}, lang: 'en', company_fields: {name: 'Studio Nordlicht GmbH', street: 'Hafenstraße 12', zip: '20457', city: 'Hamburg', country: 'DE', tax_number: '12/345/67890', iban: TEST_IBAN}, producing_on: 1, raw_on: 1});  // 2.40.0 (#1379)
   const S1 = (await call('POST', '/api/office/services', {name_de: 'Schnitt', name_en: 'Editing', category: 'Video', daily_rate: 1000})).id;
   const CL = (await call('POST', '/api/clients', {name: 'Beispielkunde AG', street: 'Marktstraße 5', zip: '50667', city: 'Köln', country: 'DE'})).id;
   const offer = await call('POST', '/api/office/docs', {project_title: 'Imagefilm', client_id: CL, project_ref: 'PO-77', service_from: '2026-05-01', items: [{service_id: S1, qty: 2}]});

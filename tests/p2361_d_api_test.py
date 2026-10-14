@@ -118,7 +118,8 @@ r = A.put(B + "/api/office/settings", json={"company": {"name": "Studio Nordlich
                                                         "contact_lines": ["post@beispiel-studio.example"], "register_lines": ["Amtsgericht Hamburg HRB 00000"],
                                                         "bank_lines": ["Beispielbank", "IBAN DE00 0000 0000 0000 0000 00"]},
                                             "lang": "de", "currency": "EUR", "prod_quotient": 3, "raw_factor": 0.25, "producing_rate": 600,
-                                            "offer_valid_days": 30, "offer_scheme": "KVA-{yyyy}-{seq:03}", "color": "#1f7a68"})
+                                            "offer_valid_days": 30, "offer_scheme": "KVA-{yyyy}-{seq:03}", "color": "#1f7a68",
+                                            "producing_on": 1, "raw_on": 1})  # 2.40.0 (#1379)
 check(r.ok, "settings saved " + r.text[:200])
 check(r.json()["settings"].get("logo", "") == "", "no logo at the start")
 

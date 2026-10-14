@@ -204,6 +204,7 @@ ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": ids["caro
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 Bo.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 Ca.patch(B + "/api/settings", json={"workspace": f"org:{ORG2}"})
+A.put(B + "/api/office/settings", json={"producing_on": 1, "raw_on": 1})  # 2.40.0 (#1379): the raw data / producing columns need the switches
 ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"}).json()
 AGH = {"Authorization": "Bearer " + ag["token"], "X-Requested-With": "kalmido"}
 L = "/api/office/legacy"

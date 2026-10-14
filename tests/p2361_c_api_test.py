@@ -81,7 +81,8 @@ D = "/api/office/docs"
 # ---------------------------------------------------------------- settings + master data (B's routes), invented data only
 r = A.put(B + "/api/office/settings", json={"company": {"name": "Studio Nordlicht GmbH", "lines": ["Studio Nordlicht GmbH", "Hafenstraße 12", "20457 Hamburg"]},
                                             "lang": "de", "currency": "EUR", "fx_usd": 1.09, "prod_quotient": 3, "raw_factor": 0.25, "producing_rate": 600,
-                                            "offer_valid_days": 30, "offer_scheme": "KVA-{yyyy}-{seq:03}"})
+                                            "offer_valid_days": 30, "offer_scheme": "KVA-{yyyy}-{seq:03}",
+                                            "producing_on": 1, "raw_on": 1})  # 2.40.0 (#1379): switched on per organisation
 check(r.ok, "settings saved " + r.text[:200])
 check(A.get(B + "/api/office/settings").ok, "GET settings (seeds the text blocks)")
 texts = A.get(B + "/api/office/texts").json()

@@ -96,7 +96,8 @@ D = O + "/docs"
 # ---------------------------------------------------------------- settings, services, client (invented data)
 r = A.put(B + O + "/settings", json={"company": {"name": "Studio Nordlicht GmbH", "lines": ["Hafenstraße 12", "20457 Hamburg"],
                                                  "bank_lines": ["Beispielbank", "IBAN DE02 1203 0000 0000 2020 51"]},
-                                     "lang": "de", "currency": "EUR", "offer_scheme": "KVA-{yyyy}-{seq:03}", "color": "#2f5d8a"})
+                                     "lang": "de", "currency": "EUR", "offer_scheme": "KVA-{yyyy}-{seq:03}", "color": "#2f5d8a",
+                                     "producing_on": 1, "raw_on": 1})  # 2.40.0 (#1379)
 check(r.ok, "settings saved " + r.text[:200])
 st = A.get(B + O + "/settings").json()
 check(st.get("company_fields", {}).get("street") == "" and st["settings"].get("offer_number_at") == "create", "settings: empty company fields, numbers at creation by default")

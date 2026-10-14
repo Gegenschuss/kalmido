@@ -29,7 +29,7 @@ const FEAT = 'cal,comments,collab,office,clients';
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const st = await call('GET', '/api/office/settings');
   check(st.status === 200 && st.role === 'admin', 'office settings reachable, alice is the organisation admin ' + st.status);
-  await call('PUT', '/api/office/settings', {company: {name: 'Studio Nordlicht GmbH', lines: ['Studio Nordlicht GmbH', 'Hafenstraße 12', '20457 Hamburg']}, lang: 'de'});
+  await call('PUT', '/api/office/settings', {company: {name: 'Studio Nordlicht GmbH', lines: ['Studio Nordlicht GmbH', 'Hafenstraße 12', '20457 Hamburg']}, lang: 'de', producing_on: 1, raw_on: 1});  // 2.40.0 (#1379)
   const svc = async (name_de, name_en, rate, o = {}) => (await call('POST', '/api/office/services', {name_de, name_en, category: o.cat || 'Video', daily_rate: rate, unit: o.unit || 'day', tax: o.tax || 'standard', raw_fee: o.raw ? 1 : 0, producing: o.prod ? 1 : 0, intext: o.intext || 'intern'})).id;
   const S1 = await svc('Storyboard-Erstellung', 'Storyboard creation', 980);
   const S2 = await svc('Schnitt', 'Editing', 980, {raw: 1, prod: 1});
