@@ -18,6 +18,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.41.2** (2026-10-14): **the interface answers at once**: list colours and names, folders, sections, list tags,
+  fields and settings show a change right away instead of waiting for the whole state to reload.
 - **2.41.0** (2026-10-14): **folders show and manage who they are shared with** (people, groups and several agents in one
   Share dialog, folder settings that work like a list's), **My tasks** can leave lists out, **time tracking is a switch
   per list**, recent *Waiting on* entries, chat messages **copy with formatting**, **approval cards in comments** and

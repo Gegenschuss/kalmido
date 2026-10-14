@@ -7,6 +7,12 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+### Changed
+- **The interface answers at once** (#1501): a list's colour, name, view and display options, folders (rename, move),
+  sections (add, rename, order, delete), list tags, custom fields (pin, order), shown fields and settings change on
+  screen right away; the server is updated behind it instead of reloading the whole state first. An error puts the old
+  value back, other devices and windows get the change with the live update, Undo works as before.
+
 ## [2.41.1] - 2026-10-14
 
 ### Fixed
