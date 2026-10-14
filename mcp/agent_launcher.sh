@@ -58,7 +58,7 @@ set -a
 set +a
 : "${KALMIDO_URL:?KALMIDO_URL missing in $ENV_FILE}" "${KALMIDO_TOKEN:?KALMIDO_TOKEN missing in $ENV_FILE}"
 [[ "${KALMIDO_EVENTS:-0}" == 1 ]] && EVENTS=1
-# kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server, proposals, message_edited, playbook, approval_check, notice
+# kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server, proposals, message_edited, playbook, approval_check, notice, comment_answer
 # (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)
 if [[ $EVENTS == 1 ]]; then
   RUNNER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent_run.py"

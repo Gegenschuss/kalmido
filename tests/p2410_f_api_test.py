@@ -146,6 +146,88 @@ for _ in range(120):
     time.sleep(0.25)
 check(st.get("state") == "done" and st["created"] == 150 and st["errors"] == 1, f"#1437: a card without a name is not readable {st}")
 
+# ================================================================== #1383: answer buttons / approval cards in comments
+r = A.post(B + "/api/users", json={"username": "carol", "display_name": "Carol", "password": "password123", "email": "carol@example.com"})
+assert r.ok, r.text
+Ca = sess("carol")
+ids = {u["username"]: u["id"] for u in A.get(B + "/api/users").json()["users"]} if A.get(B + "/api/users").ok else {}
+L = A.post(B + "/api/lists", json={"name": "Agent work"}).json()["id"]
+A.put(B + f"/api/lists/{L}/members", json={"user_id": ids.get("bob"), "role": "view"})
+A.put(B + f"/api/lists/{L}/members", json={"user_id": ids.get("carol"), "role": "edit"})
+ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"}).json()
+AGH = {"Authorization": "Bearer " + ag.get("token", "x")}
+A.put(B + f"/api/lists/{L}/members", json={"user_id": ag.get("id"), "role": "edit"})
+T = A.post(B + "/api/tasks", json={"title": "Release the draft", "list_id": L}).json()["id"]
+V = B + "/api/v1"
+
+
+def agc(body):
+    return requests.post(V + f"/tasks/{T}/comments", headers=AGH, json=body)
+
+
+def evs(since):
+    return requests.get(V + "/agent/events", headers=AGH, params={"since": since}).json().get("data", [])
+
+
+seq0 = max([e.get("seq", 0) for e in evs(0)] or [0])
+r = agc({"body": "Shall I publish the draft?", "approval": {"title": "Publish the draft", "what": "it goes online"}})
+check(r.status_code == 201 and (r.json().get("choices") or {}).get("approval", {}).get("title") == "Publish the draft"
+      and r.json().get("choice_state") == "open", f"#1383: an agent posts an approval card {r.status_code} {r.text[:300]}")
+AP = r.json().get("id")
+check(A.post(B + f"/api/tasks/{T}/comments", json={"body": "x", "choices": ["a", "b"]}).status_code == 403, "#1383: people post no buttons")
+check(agc({"body": "may I?", "choices": ["allow", "deny"]}).status_code == 400, "#1383: no permission questions in comments (they belong to the chat)")
+check(agc({"body": "bad", "choices": [{"id": "x y", "label": ""}]}).status_code == 400, "#1383: invalid buttons -> 400")
+tl = A.get(B + f"/api/tasks/{T}/timeline").json()
+c0 = [x for x in tl["comments"] if x["id"] == AP]
+check(c0 and c0[0]["choice_state"] == "open" and c0[0]["choice"] is None, f"#1383: the timeline shows the open card {c0}")
+check(Bo.post(B + f"/api/comments/{AP}/choice", json={"choice_ids": ["yes"]}).status_code == 403, "#1383: a reader cannot answer")
+check(requests.post(V + f"/comments/{AP}/choice", headers=AGH, json={"choice_ids": ["yes"]}).status_code == 403, "#1383: an agent never answers")
+check(A.post(B + f"/api/comments/{AP}/choice", json={"choice_ids": ["maybe"]}).status_code == 400, "#1383: unknown choice -> 400")
+r = Ca.post(B + f"/api/comments/{AP}/choice", json={"choice_ids": ["yes"]})
+check(r.status_code == 403, f"#1383: an editor the agent does not take instructions from (#928) cannot answer {r.status_code}")
+A.patch(B + f"/api/lists/{L}", json={"agent_members": True})  # "Members may see and use the agent"
+r = Ca.post(B + f"/api/comments/{AP}/choice", json={"choice_ids": ["yes"]})
+check(r.ok and r.json()["choice_state"] == "answered" and r.json()["choice"]["ids"] == ["yes"] and r.json()["choice"]["user_name"] == "Carol"
+      and r.json()["answer_comment_id"] is None, f"#1383: an editor answers yes {r.status_code} {r.text[:300]}")
+check(A.post(B + f"/api/comments/{AP}/choice", json={"choice_ids": ["no"]}).status_code == 409, "#1383: the answer is written once")
+acts = A.get(B + f"/api/tasks/{T}/timeline").json()["activity"]
+check(any(a["kind"] == "choice" and a["data"].get("approval") == "approved" and a["data"].get("comment") == AP for a in acts),
+      f"#1383: the answer is in the history {[a['kind'] for a in acts]}")
+ev = [e for e in evs(seq0) if e["event"] == "comment" and (e["data"].get("answer") or {}).get("comment_id") == AP]
+check(ev and ev[0]["data"]["answer"]["approval"] == "approved" and ev[0]["data"]["answer"]["user"]["name"] == "Carol",
+      f"#1383: the agent hears the answer as a comment event {ev[:1]}")
+g = A.get(B + f"/api/comments/{AP}/choice").json()
+check(g.get("choice_state") == "answered", f"#1383: GET the state {g}")
+# plain buttons / suggestions: only the newest is live (#1037); a press becomes the person's comment
+q1 = agc({"body": "Which variant?", "choices": ["Short", "Long"]}).json().get("id")
+ap2 = agc({"body": "Delete the old drafts?", "approval": {"title": "Delete old drafts"}}).json().get("id")
+q2 = agc({"body": "And the colour?", "choices": [{"id": "blue", "label": "Blue"}, {"id": "green", "label": "Green"}], "multi": True}).json().get("id")
+st = {x["id"]: x["choice_state"] for x in A.get(B + f"/api/tasks/{T}/timeline").json()["comments"]}
+check(st.get(q1) == "expired" and st.get(q2) == "open" and st.get(ap2) == "open", f"#1383: a newer comment expires older buttons, not an approval card {st}")
+check(A.post(B + f"/api/comments/{q1}/choice", json={"choice_ids": ["Short"]}).status_code == 409, "#1383: expired buttons -> 409")
+seq1 = max([e.get("seq", 0) for e in evs(0)] or [0])
+r = A.post(B + f"/api/comments/{q2}/choice", json={"choice_ids": ["green", "blue"]})
+said = r.json().get("answer_comment_id") if r.ok else None
+check(r.ok and r.json()["choice"]["ids"] == ["blue", "green"] and said, f"#1383: several with multi {r.status_code} {r.text[:200]}")
+cm = [x for x in A.get(B + f"/api/tasks/{T}/timeline").json()["comments"] if x["id"] == said]
+check(cm and cm[0]["body"] == "Blue, Green" and cm[0]["reply_to"] == q2, f"#1383: a pressed suggestion is sent as my comment {cm}")
+ev = [e for e in evs(seq1) if e["event"] == "comment"]
+check(len(ev) == 1 and ev[0]["data"]["answer"]["labels"] == ["Blue", "Green"] and ev[0]["data"]["comment"]["id"] == said,
+      f"#1383: one comment event with the answer {[(e['event'], (e['data'].get('answer') or {}).get('labels')) for e in ev]}")
+# the agent withdraws an approval card
+r = requests.post(V + f"/comments/{ap2}/withdraw", headers=AGH, json={"outcome": "expired"})
+check(r.ok and r.json().get("choice_state") == "expired", f"#1383: the agent withdraws its card {r.status_code} {r.text[:200]}")
+check(A.post(B + f"/api/comments/{ap2}/choice", json={"choice_ids": ["yes"]}).status_code == 409, "#1383: a withdrawn card cannot be answered")
+check(requests.post(V + f"/comments/{AP}/withdraw", headers=AGH, json={}).status_code == 409, "#1383: an answered card cannot be withdrawn")
+# REST list carries the state
+d = requests.get(V + f"/tasks/{T}/comments", headers=AGH).json()["data"]
+check(any(x["id"] == AP and x["choice_state"] == "answered" and x["choice"]["ids"] == ["yes"] for x in d), "#1383: GET comments (REST) has the state")
+# a person's token answers in the REST API too
+TA = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "comments"]}).json().get("token", "x")
+q3 = agc({"body": "Ok?", "choices": ["Yes", "Later"]}).json().get("id")
+r = requests.post(V + f"/comments/{q3}/choice", headers={"Authorization": "Bearer " + TA}, json={"choice_ids": ["Later"]})
+check(r.ok and r.json()["choice"]["ids"] == ["Later"], f"#1383: a person's token answers {r.status_code} {r.text[:200]}")
+
 print(f"p2410_f_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 time.sleep(0.1)
 sys.exit(1 if FAILS else 0)

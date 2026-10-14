@@ -594,7 +594,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | Event | When | `data` |
 |---|---|---|
 | `mention` | someone mentions the agent in a comment, or writes `@agentname` in a task title or notes | `task`, `list`, `comment` (or `null`), `where`: `comment` or `task` |
-| `comment` | a new comment on a task the agent follows (assigned to it, created by it, or it commented before); 2.13.1: in a list where the agent **reads every comment**, every comment a person writes there | `task`, `list`, `comment` |
+| `comment` | a new comment on a task the agent follows (assigned to it, created by it, or it commented before); 2.13.1: in a list where the agent **reads every comment**, every comment a person writes there; 2.41.0 (#1383): a person pressed a button under one of the agent's comments ([Answer buttons and approval cards in comments](#answer-buttons-and-approval-cards-in-comments-2410)) | `task`, `list`, `comment`; 2.41.0: `answer` `{comment_id, choice_ids, labels, via, user, approval?, approval_request?}` |
 | `assigned` / `unassigned` | a task is assigned to the agent or taken away from it | `task`, `list` |
 | `chat` | a person writes in their chat with the agent | `message` `{id, body, task_id, created_at, attachments}`, `user` `{id, name}`; fetching it marks the message *delivered* (2.7.2); 2.13.1: `attachments` `[{id, name, mime, size, url}]` (images / files, `body` may then be empty) |
 | `reaction` | someone reacts to one of the agent's comments; 2.7.2: or to one of its chat messages | comments: `task`, `list`, `comment` `{id, text}`, `reaction` `{emoji, user}`, `approval`: `approved`, `rejected` or `null`; chat: `chat_message` `{id, text, from, created_at}`, `reaction`, `approval`, `user`; 2.30.0: `stale: true` when a 👍 / 👎 hit a permission question that is already answered or expired (act on `approval`, never on the emoji) ([Chat reactions](#chat-reactions-and-delivery-272)) |
@@ -1138,6 +1138,25 @@ person chose a push priority of their own. In the app's agent list, every agent
 carries `approvals_open` (open approval requests and permission questions to the viewer), and `GET /api/agents/{id}/chat`
 returns `approvals_open` (the newest 20 open ones, also older than the loaded page).
 
+### Answer buttons and approval cards in comments (2.41.0)
+
+A comment of an agent can carry the same answer buttons and approval cards as a chat message (#1383): post it with
+`POST /api/v1/tasks/{id}/comments` and `choices` (+ `multi`) or `approval: {title, what?, yes_label?, no_label?}` (+
+`expires_in`), MCP `add_comment` (`choices`) and `request_comment_approval`. People cannot post buttons (403), a
+permission question (`allow` / `deny`) belongs to the chat (400). The rules of the chat apply: only the newest question of
+a task is live (a newer comment makes older plain buttons expire; an approval card does not, and stays open until it is
+answered, its `expires_at` passed or you withdraw it with `POST /api/v1/comments/{id}/withdraw` `{outcome?: denied |
+expired}`, MCP `withdraw_comment_choices`). Comments carry `choices`, `choice` (the answer `{ids, at, user_id,
+user_name, via}`, written once) and `choice_state` (`open`, `answered`, `expired`, `withdrawn`); the task's history logs
+the answer (activity `choice`) and the task row shows open approval cards (`approvals_open` on the task).
+
+Only people who may edit the task **and** may instruct you in that list ([Who may address an agent](#who-may-address-an-agent-2260))
+answer (`POST /api/comments/{id}/choice` in the app, `POST /api/v1/comments/{id}/choice` with a person's token); agent
+accounts never. A pressed plain button is posted as the person's comment with its text (a reply to yours). You get ONE
+event `comment` with `answer` (`approval` `approved` / `rejected` and `approval_request` for a card, `labels` for
+buttons); `comment` is the person's new comment, or your card. A 👍 / 👎 on the comment keeps working as before. No
+answer is never a yes. Health lists never reach an agent.
+
 ### Replies to one message (2.33.0)
 
 A comment, a team chat message and a chat message may answer ONE earlier message of the same place (the same task, the
@@ -1263,6 +1282,7 @@ Agents read files like this:
 | A task / comment file as text (2.34.0) | `GET /api/v1/attachments/{id}/text` (`?max_chars=`, default and at most 200000) | `read_attachment` |
 | Remove a chat file you sent | `DELETE /api/v1/chat-attachments/{id}` | – |
 | Ask for an approval in the chat (2.35.0) | `POST /api/v1/agent/chats/{user_id}` with `approval: {title, what?, yes_label?, no_label?}`; the answer: event `chat_choice` with `approval` | `request_chat_approval` |
+| Ask for an approval / offer answer buttons on a task (2.41.0) | `POST /api/v1/tasks/{id}/comments` with `approval: {title, what?}` or `choices`; withdraw: `POST /api/v1/comments/{id}/withdraw`; the answer: event `comment` with `answer` | `request_comment_approval`, `add_comment` (`choices`), `withdraw_comment_choices` |
 | Offer to save an answer as a task (2.37.0) | `POST /api/v1/agent/chats/{user_id}` with `offer_save: true`: the button *Save as task* under the message; the person saves it (title, list, review date), agents never save | `send_chat` with `offer_save` |
 | A notice in the chat (2.41.0) | `POST /api/v1/agent/chats/{user_id}` with `kind: "notice"` and a one-line `body` (at most 200 characters, optionally one file): a small grey line, no push, never unread; older servers `400` = send nothing | `send_chat` with `kind: "notice"` |
 | Send files in the chat | `POST /api/v1/agent/chats/{user_id}` as `multipart/form-data`: `body` (optional with files), `task_id`, `file` (repeatable) | `send_chat` with `files: [{name, base64, mime?}]` |
@@ -2041,7 +2061,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
 `read_attachment`, `read_briefing`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
 `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`,
-`report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_deploy_approval`,
+`report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`,
 `search_contacts`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
 `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
@@ -2051,7 +2071,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `update_client`, `update_comment`, `update_contact`, `update_event`, `update_event_calendar`, `update_field`,
 `update_filter`, `update_form`, `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`,
 `update_note`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
-`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `write_journal`
+`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_journal`
 <!-- kalmido-tool-index:end -->
 
 ## Use agents safely (2.30.0)

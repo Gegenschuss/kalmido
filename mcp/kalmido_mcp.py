@@ -231,6 +231,13 @@ def t_add_comment(api, a):
         b["suggestion"] = a["suggestion"]
     if a.get("reply_to"):  # 2.33.0 (#1076): answer one comment of the same task
         b["reply_to"] = int(a["reply_to"])
+    b.update(_pick(a, ("choices", "multi")))  # 2.41.0 (#1383): answer buttons under the comment
+    return api.call("POST", f"/tasks/{int(a['task_id'])}/comments", body=b)
+
+
+def t_request_comment_approval(api, a):
+    """2.41.0 (#1383): an approval card in a task comment (yes / no; the answer comes as a comment event with answer)."""
+    b = {"body": a.get("body") or a["title"], **_pick(a, ("reply_to", "expires_in")), "approval": _pick(a, ("title", "what", "yes_label", "no_label"))}
     return api.call("POST", f"/tasks/{int(a['task_id'])}/comments", body=b)
 
 
@@ -465,7 +472,26 @@ TOOLS = [
      lambda api, a: api.call("GET", "/stale", _pick(a, ("list_id", "days", "limit")))),
     ("add_comment", "Comment on a task (Markdown; mention people as <@user_id>). Optional structured tidy suggestion. reply_to (2.33.0): "
                     "the id of a comment of the same task you answer (its author is notified; the app shows a quote above yours).",
-     _obj({"task_id": S_ID, "body": {"type": "string", "minLength": 1}, "suggestion": SUGGESTION, "reply_to": S_ID}, ["task_id", "body"]), t_add_comment),
+     _obj({"task_id": S_ID, "body": {"type": "string", "minLength": 1}, "suggestion": SUGGESTION, "reply_to": S_ID,
+           "choices": {"type": "array", "maxItems": 8, "description": "2.41.0: answer buttons under the comment (suggestions for the person's "
+                       "answer; a press is sent as the person's comment and reaches you as a comment event with answer). Only the newest "
+                       "question of a task stays live", "items": {"type": "object", "properties": {
+                           "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
+                           "style": {"type": "string", "enum": ["default", "primary", "danger"]}}, "required": ["id", "label"]}},
+           "multi": {"type": "boolean", "description": "2.41.0: the person may pick several buttons"}}, ["task_id", "body"]), t_add_comment),
+    ("request_comment_approval", "2.41.0: ask for an approval in a task comment (task_id): a card 'Approval needed' with Yes / No under "
+                                 "your comment, shown on the task's row until answered. title = what is to be approved, what = what happens "
+                                 "on yes. Only people who may edit the task (and may instruct you) answer; the answer arrives as the event "
+                                 "comment with answer.approval approved | rejected. No answer is never a yes. Close it with "
+                                 "withdraw_comment_choices when it is no longer needed.",
+     _obj({"task_id": S_ID, "title": {"type": "string", "maxLength": 200}, "what": {"type": "string", "maxLength": 1000},
+           "yes_label": {"type": "string", "maxLength": 80}, "no_label": {"type": "string", "maxLength": 80},
+           "body": {"type": "string", "description": "the comment's text above the card (default: the title)"}, "reply_to": S_ID,
+           "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800}}, ["task_id", "title"]), t_request_comment_approval),
+    ("withdraw_comment_choices", "2.41.0: take back the open answer buttons / approval card of one of your comments (comment_id); "
+                                 "outcome (approval cards only): denied | expired when it was decided another way.",
+     _obj({"comment_id": S_ID, "outcome": {"type": "string", "enum": ["denied", "expired"]}}, ["comment_id"]),
+     lambda api, a: api.call("POST", f"/comments/{int(a['comment_id'])}/withdraw", body=_pick(a, ("outcome",)))),
     ("request_merge_approval", "Ask for approval to merge your pull request: posts a 'ready to merge' comment on the task "
                                "(structured field kind merge_request). pr_url must be a pull request of a repository connected to "
                                "the task's list (GitLab: .../-/merge_requests/<n>, Bitbucket: .../pull-requests/<n>). Wait for the reaction event with approval 'approved' (👍 by the list owner / a list "
@@ -1326,7 +1352,7 @@ TOOL_SCOPES = {
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
                     "update_habit", "check_in_habit", "shift_list_dates", "request_approval"),
-    "comments": ("comment_typing", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "request_integration_approval", "request_deploy_approval", "update_comment", "delete_comment", "mark_news_read",
+    "comments": ("comment_typing", "request_comment_approval", "withdraw_comment_choices", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "request_integration_approval", "request_deploy_approval", "update_comment", "delete_comment", "mark_news_read",
                  "delete_chat_attachment"),
     "structure": ("create_trip", "add_shop_areas", "create_packing_list", "set_list_columns", "create_list", "update_list", "share_list", "unshare_list", "share_list_with_group",
                   "unshare_list_from_group", "create_section", "rename_section", "reorder_sections", "rename_folder", "delete_folder",

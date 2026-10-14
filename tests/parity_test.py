@@ -251,6 +251,10 @@ APP_ONLY = [
      ("=POST /api/chat-save",)),
     ("2.28.0 (#1005): a person answers an agent's question with a button: in the API as POST /agents/{id}/chat/{mid}/choice (a person's token); agents never answer",
      ("POST /api/agents/{}/chat/{}/choice",)),
+    ("2.41.0 (#1383): a person answers an agent's comment with a button: in the API as POST /comments/{id}/choice (a person's token); agents "
+     "never answer; the state comes with GET /tasks/{id}/comments", ("POST /api/comments/{}/choice", "GET /api/comments/{}/choice")),
+    ("2.41.0 (#1437): the app's progress of a vCard import in the background; the REST import answers when it is done",
+     ("GET /api/books/imports/{}",)),
     ("2.29.0 (#1030 / #929): folder settings are per person (their own folders, like the sidebar order); people only, the "
      "lists' own values stay in /lists/{id}", ("* /api/folders/props", "POST /api/lists/{}/folder-reset")),
     ("2.39.1 (#1188): the app asks before a moved list takes its folder's workspace / agent; the API sends folder_adopt "
@@ -381,6 +385,7 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "PATCH /me/notifications": "account: never for agents",
     "POST /agents/{}/chat/{}/reactions": "a person's reaction in an agent chat (the agent: react_to_chat)",
     "POST /agents/{}/chat/{}/choice": "2.28.0 (#1005): a person's answer to an agent's buttons; agents never answer (the agent asks with send_chat choices)",
+    "POST /comments/{}/choice": "2.41.0 (#1383): a person's answer to an agent's comment buttons; agents never answer (the agent asks with add_comment choices)",
     "GET /lists/{}/links": "in get_project_overview",
     "GET /lists/{}/milestones": "in get_project_overview",
     "GET /lists/{}/error-hook": "2.18.0: the error-report webhook carries a secret URL; agents are refused (403), people manage it",

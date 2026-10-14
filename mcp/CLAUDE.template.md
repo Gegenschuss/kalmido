@@ -48,6 +48,8 @@
   (the launcher's event mode) turns a final block ` ```approval ` (first line the title, then what happens) into the card.
   A proposal is a decision too ("I would take it into 2.41", "Proposal: ...", variants): it gets the block as well; the
   launcher (2.40.0) sends an answer that asks or proposes without one back to you once, then posts it with a note.
+- **On a task, ask in a comment** (2.41.0): `request_comment_approval` puts the same card under your comment, and
+  `add_comment` with `choices` offers answer buttons there. The answer comes as the event `comment` with `answer`.
 - A 429 is a pause, not an error: wait (`Retry-After`, else 5, 15, 30, 60 seconds) and try again; your service, jobs and
   other agents may be calling at the same time.
 - Before a large piece of work check `usage_limit` (`GET /api/v1/agent`); at the soft limit finish the current step, park
@@ -296,7 +298,7 @@ The MCP tools of the Kalmido MCP server (it lists only the ones your token may u
 `move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
 `read_attachment`, `read_briefing`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
 `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`,
-`report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_deploy_approval`,
+`report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`,
 `search_contacts`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
 `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
@@ -306,5 +308,5 @@ The MCP tools of the Kalmido MCP server (it lists only the ones your token may u
 `update_client`, `update_comment`, `update_contact`, `update_event`, `update_event_calendar`, `update_field`,
 `update_filter`, `update_form`, `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`,
 `update_note`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
-`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `write_journal`
+`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_journal`
 <!-- kalmido-tool-index:end -->

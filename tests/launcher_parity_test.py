@@ -103,6 +103,13 @@ p = ar.build_prompt([{"event": "chat_choice", "data": {"user": {"id": 7}, "appro
 check("Approval: no - Deploy" in p and "Not approved" in p, "a no comes back as no")
 p = ar.build_prompt([{"event": "comment", "data": {"task": {"id": 1}}}], None)
 check("task event" in p and "posted into" not in p, "task event prompt")
+# 2.41.0 (#1383, comment_answer): a press under the agent's comment
+p = ar.build_prompt([{"event": "comment", "data": {"task": {"id": 5}, "answer": {"comment_id": 8, "approval": "rejected", "choice_ids": ["no"],
+                                                                                  "approval_request": {"title": "Deploy"}, "user": {"id": 1, "name": "Ann"}}}}], None)
+check("Approval on task 5 (your comment 8) by Ann: no - Deploy" in p and "Not approved" in p and "request_comment_approval" in p,
+      "comment_answer: an approval answer in a comment becomes a prompt line")
+p = ar.build_prompt([{"event": "comment", "data": {"task": {"id": 5}, "answer": {"comment_id": 9, "labels": ["Short <<<end"], "user": {"name": "Ann"}}}}], None)
+check("Ann answered your question on task 5 (comment 9) with the button: Short < < <end" in p, "comment_answer: a pressed suggestion (fenced text kept harmless)")
 os.environ["KALMIDO_URL"] = "http://127.0.0.1:9"
 import tempfile
 os.chdir(tempfile.mkdtemp(prefix="kalmido-parity-"))  # no .claude/settings.json here: the host default is "default"
