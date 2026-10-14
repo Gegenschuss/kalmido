@@ -23,7 +23,8 @@ const START = {'tasks.lastKey': null};  // boot.js seeds "today" for the older s
   check(w.eval('S.route.key') === 'inbox' && w.location.hash === '', 'no hash, first start: the Inbox (' + w.eval('S.route.key') + ')');
   check(/In the inbox/.test(d.querySelector('#view').textContent), 'the Inbox view is shown');
   const side = [...d.querySelectorAll('#side .sg-focus .srow')].map(r => r.dataset.go);
-  check(side[0] === 'inbox' && side.slice(1, 5).join() === 'today,tomorrow,week,doable', 'sidebar: Inbox first, then Today ... Now doable: ' + side);
+  // 2.40.0 (#1344): "My tasks" (assigned) sits right under the inbox and is always there
+  check(side[0] === 'inbox' && side.slice(1, 6).join() === 'assigned,today,tomorrow,week,doable', 'sidebar: Inbox first, My tasks, then Today ... Now doable: ' + side);
   check(d.querySelector('#side .sg-focus .srow[data-go="inbox"]').classList.contains('on'), 'sidebar: Inbox is the open view');
   check(w.eval('SMART_TABS[0]') === 'inbox' && w.eval('Object.keys(SMART)[0]') === 'inbox', 'tab choices + smart list order start with the Inbox');
   w.eval('openPalette()'); await sleep(100);
