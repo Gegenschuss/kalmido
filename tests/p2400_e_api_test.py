@@ -145,14 +145,14 @@ r = A.put(B + O + "/settings", json={"lang": "de", "company_fields": {"name": "S
 check(r.ok, "company data " + r.text[:160])
 CL = A.post(B + "/api/clients", json={"name": "Beispielkunde AG", "street": "Marktstraße 5", "zip": "50667", "city": "Köln", "country": "DE"}).json()["id"]
 SV = A.post(B + O + "/services", json={"name_de": "Dreh", "daily_rate": 1000, "producing": 1, "raw_fee": 1}).json()["id"]
-CT = A.post(B + O + "/contracts", json={"name": "Rahmenvertrag", "client_id": CL, "raw_included": 1}).json()["id"]
+CTR = A.post(B + O + "/contracts", json={"name": "Rahmenvertrag", "client_id": CL, "raw_included": 1}).json()["id"]  # the contract (CT is the test container)
 Q1 = A.post(B + D, json={"project_title": "Film", "client_id": CL}).json()
 check(Q1.get("raw_mode") == "none", "#1379 off: a new quotation has no raw data line " + str(Q1.get("raw_mode")))
 j = A.put(B + f"{D}/{Q1['id']}/items", json={"items": [{"kind": "service", "service_id": SV, "qty": 6}]}).json()
 kinds = [x["kind"] for x in j["totals"]["lines"]]
 check(kinds == ["item"] and j["totals"]["net"] == 6000 and j["items"][0]["producing"] == 0 and j["items"][0]["raw_fee"] == 0,
       f"#1379 off: no producing / raw data, the catalogue flags are not taken over {kinds} {j['totals']['net']}")
-j = A.patch(B + f"{D}/{Q1['id']}", json={"contract_id": CT}).json()
+j = A.patch(B + f"{D}/{Q1['id']}", json={"contract_id": CTR}).json()
 check(j.get("raw_mode") == "none", "#1379 off: a contract with raw data included leaves the mode alone " + str(j.get("raw_mode")))
 r = A.post(B + f"{D}/{Q1['id']}/invoice")
 check(r.status_code == 201 and [x["title"] for x in r.json()["items"]] == ["Dreh"], "#1379 off: the invoice from the quotation has only the position " + r.text[:120])
@@ -170,7 +170,7 @@ j = A.put(B + f"{D}/{Q2['id']}/items", json={"items": [{"kind": "service", "serv
 kinds = [x["kind"] for x in j["totals"]["lines"]]
 check(Q2.get("raw_mode") == "optional" and kinds == ["item", "producing", "raw"] and j["totals"]["net"] == 7200,
       f"#1379 on: producing 2 days x 600 + raw data option as before {kinds} {j['totals']['net']}")
-j = A.patch(B + f"{D}/{Q2['id']}", json={"contract_id": CT}).json()
+j = A.patch(B + f"{D}/{Q2['id']}", json={"contract_id": CTR}).json()
 check(j.get("raw_mode") == "included", "#1379 on: the contract presets raw data included")
 j = A.get(B + f"{D}/{Q1['id']}").json()
 check(j.get("raw_mode") == "none" and [x["kind"] for x in j["totals"]["lines"]] == ["item"], "#1379: the existing quotation stays as it was")
