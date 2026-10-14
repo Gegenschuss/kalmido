@@ -159,7 +159,8 @@ need the organisation's admin. `GET/PUT /api/office/settings`, `GET /api/office/
 `/api/office/docs` below. 2.38.0 adds `POST /api/office/docs/<id>/invoice`, `POST /api/office/docs/<id>/credit`,
 `POST /api/office/docs/from-time`, `POST /api/office/docs/reminder`, `GET/POST /api/office/docs/<id>/payments`,
 `DELETE /api/office/docs/<id>/payments/<pid>`, `POST /api/office/docs/<id>/send`, `POST /api/office/docs/<id>/datev` and
-`GET /api/office/mail-status` (see "Invoices and credit notes" below). Agents never reach `/api/office/*`.
+`GET /api/office/mail-status` (see "Invoices and credit notes" below); 2.40.0 adds `POST /api/office/docs/<id>/fee`
+(see "Payments and reminders"). Agents never reach `/api/office/*`.
 
 ## Quotations and the calculator
 
@@ -250,7 +251,17 @@ and writing a number run under one lock per organisation. Numbers are unique per
 A **credit note** (`POST /api/office/docs/<id>/credit` on a finalised invoice; button "Credit note / cancel") is a draft
 with the invoice's positions and `cancels_id`; shorten it for a partial credit. When the credit note is finalised it
 lowers the invoice's open amount; over the full gross it sets the invoice to `cancelled`. Credit notes have their own
-number series and print "Credit note for invoice no. ...".
+number series and print "Credit note for invoice no. ...". Since 2.40.0 a credit note keeps the e-invoice format of its
+invoice (XRechnung for a client with a buyer reference), has its own closing (pack text `credit_closing`) and its XML
+carries no "payable on receipt" terms.
+
+**Changing the language of a draft** (2.40.0): `PATCH /api/office/docs/<id> {lang}` sets intro, closing (settings, pack or
+framework contract), the rights texts, the rights note and the titles of catalogue positions anew in the new language,
+but only where the field still holds the standard text of the old language; for reminders a new `reminder_level` swaps
+the level's texts the same way. Texts changed by hand stay. The answer then carries `lang_notes` (list of plain
+sentences: "Introduction changed by hand, not translated", "Media: no English text stored", ...), which the editor shows
+in a note box. A text block without an English text keeps its German text and is named there. Finalised documents are
+never changed (409).
 
 ## Payments and reminders
 
@@ -266,6 +277,18 @@ recipient comes from the first invoice. Level 1 prints "Payment reminder", 2 "Re
 pack labels `reminder_1..3`), with a table of the invoices (number, date, due date, amount outstanding), the fee and the
 deadline; totals = the open amounts plus the fee. Reminders are finalised and sent like other documents (`draft ->
 issued -> sent`) and keep the amounts of their day. Defaults: settings `reminder_fee` and `reminder_deadline_days`.
+Since 2.40.0 each level has its own intro and closing (pack texts `reminder_intro_2/3`, `reminder_closing_2/3`; level 3
+in a clear tone); the last sum row is "Gesamtbetrag" / "Total amount due". The reminder dialog only hints (no block)
+when the fee is above 5 (private clients: only the actual costs) or a chosen invoice is not yet due.
+
+Reminder fee as an open item (2.40.0, decision 2026-10-13: no fees for now; if one is charged, it must not vanish): the
+fee of a finalised reminder stays open after its invoices are paid. Reminder answers carry `fee`, `fee_state` (`""` open,
+`waived`, `paid`) and `fee_open`; invoice answers carry `fee_open` / `fee_reminders` from the reminders that name them
+(invoice and reminder lists show "reminder fee open"). The organisation's admin sets `POST /api/office/docs/<id>/fee
+{state: "waived" | "paid" | ""}` (members 403, drafts 409; office log `reminder_fee`). The reminder document itself and
+the invoice stay unchanged; the fee does not keep an invoice from being `paid`. A finalised reminder whose invoices are
+all paid or cancelled has the derived state `done` ("Settled", `settled: true`, never stored); the list shows settled
+reminders below the open ones.
 
 ## Sending and DATEV
 
@@ -274,8 +297,14 @@ issued -> sent`) and keep the amounts of their day. Defaults: settings `reminder
 the status becomes `sent` and `sent_at` is set. Without SMTP the route answers `409` with a readable reason (the send
 dialog says so and offers the PDF download instead). Mails with an own `text` (not the standard text) are limited to 50
 per organisation and day (UTC): admins' mails count, admins are not limited; a member past the limit gets `429` and can
-still send with the standard text. `GET /api/office/mail-status` tells the client whether mail is set
-up and which DATEV address is configured.
+still send with the standard text (the daily count reads the index `office_doc_log_action` since 2.40.0).
+`GET /api/office/mail-status` tells the client whether mail is set up and which DATEV address is configured; without
+mail the send dialog's button downloads the PDF (2.40.0).
+
+PDF in the browser (2.40.0): the editor's PDF button opens `GET /api/office/docs/<id>/pdf?inline=1` in a new tab, the
+"Download" button next to it the attachment (`/pdf` without `inline`); "Preview (PDF)" in the menu opens the same inline
+PDF (the JSON print model stays at `/render` for the API). In the Android app's WebView, which shows no PDF itself,
+the PDF button downloads as before. Archive PDFs of the legacy import open inline, `?download=1` downloads them.
 
 DATEV: the settings hold one e-mail address of the DATEV document inbox (`datev_email`); `datev: true` in the send
 body, the setting `datev_auto` or `POST /api/office/docs/<id>/datev` mail the PDF + XML of an invoice or credit note
@@ -396,6 +425,10 @@ default:
   without an embedded file. XRechnung needs the client's buyer reference (routing id, billing details of the client);
   without it, finalising answers `400` with the reason. The seller contact (phone and e-mail of the company) and the
   electronic addresses (seller e-mail, the client's invoice e-mail) are part of it.
+
+Buyer address without client data (only free address lines, 2.40.0): the last line with a postcode ("12345 Town",
+"1010 Wien", "CH-8000 Zürich") gives postcode and city, the line before it the street (LineOne), the lines before that
+LineTwo / LineThree (attention, department). Without a postcode line (e.g. UK) the last line is the city.
 
 Tax categories follow the document: `S` for taxed documents (one breakdown per rate, the tax of a rate computed from the
 rounded base), `AE` (reverse charge), `G` (export) or `E` (exempt / small business) by the VAT note of a document without
