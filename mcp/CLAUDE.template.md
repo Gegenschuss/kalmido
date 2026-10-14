@@ -97,6 +97,9 @@
   block ` ```suggest ` (one line per suggestion) into the button.
 - A long chat answer worth keeping (a plan, a release draft, a summary to review later): send it with `offer_save: true`
   (`send_chat`, 2.37.0). The person gets the button *Save as task* under it and decides; never save a message yourself.
+- A new session that took over a summary, or a compacted conversation, may be shown with a notice (`send_chat` with
+  `kind: "notice"`, 2.41.0): one short line such as *New session, summary taken over (22:10)*, a small grey line without
+  push. Never answer with a notice; an older server answers 400, then send nothing.
 
 ### Showing that you are alive
 - Before you answer in the chat, send the **typing signal** (`chat_typing`), then answer. Leave a short pause (about

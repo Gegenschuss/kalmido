@@ -4,6 +4,8 @@
 //   clipboard (ClipboardItem, stubbed here); closing blocks (```suggest) and host notes stay out; an answer in parts
 //   (also the reference launcher's "_(1/3)_") as one piece; without ClipboardItem a hidden rendered copy +
 //   execCommand('copy'); "Copy as Markdown" = the raw text; the team chat the same
+// - #1206 a notice of the agent (kind notice) is a small grey line in the middle (no bubble, no menu); with a file the
+//   line opens it; it is no answer to my waiting message (the typing dots stay)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');
@@ -43,6 +45,13 @@ const V = B + 'api/v1';
   const noted = await say('Shall I start?\n\n_Note from the launcher: this answer makes a proposal or asks you to decide, but has no approval card. Nothing of it happens without your explicit yes._');
   const P = ['Part one.\n\n_(1/3)_', 'Part *two*.\n\n_(2/3)_', 'Part three.\n\n_(3/3)_'];
   const parts = []; for (const b of P) parts.push(await say(b));
+  // #1206: my question, then two notices of the agent (the second with the summary as a file)
+  await call('POST', `/api/agents/${AG}/chat`, {body: 'Status?'});
+  const nt1 = await say('New session, summary taken over (22:10)', {kind: 'notice'});
+  const fd = new FormData(); fd.append('body', 'Conversation compacted (22:12)'); fd.append('kind', 'notice');
+  fd.append('file', new Blob(['# Summary\n\n- done\n'], {type: 'text/markdown'}), 'summary.md');
+  const nt2 = await (await fetch(V + `/agent/chats/${ME.id}`, {method: 'POST', headers: {Authorization: 'Bearer ' + ag.token}, body: fd})).json();
+  check(nt1.kind === 'notice' && nt2.kind === 'notice' && nt2.attachments?.length === 1, '#1206: set-up: two notices ' + JSON.stringify([nt1, nt2]).slice(0, 300));
   let w = await boot({hash: 'today'}), d = w.document;
   w.eval(`window.__toasts = []; { const __t = toast; toast = (m, ...a) => { window.__toasts.push(String(m)); return __t(m, ...a); }; }`);
   const stub = () => {
@@ -56,6 +65,16 @@ const V = B + 'api/v1';
   w.eval(`chatOpen(${AG})`);
   const cm = id => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${id}"]`);
   await until(() => cm(one.id) && cm(parts[2].id));
+  // ================= #1206 notices
+  await until(() => d.querySelectorAll('#chat-msgs .cnotice').length === 2);
+  const nts = [...d.querySelectorAll('#chat-msgs .cnotice')];
+  check(nts.length === 2 && nts[0].textContent === 'New session, summary taken over (22:10)' && !nts[0].closest('.cmsg') && !nts[0].querySelector('.cbub, [data-act="chat-msg-menu"], a'),
+    '#1206: a notice is a grey line without bubble or menu ' + (nts[0]?.outerHTML || ''));
+  const na = nts[1]?.querySelector('a');
+  check(na && na.textContent === 'Conversation compacted (22:12)' && /\/api\/chat-files\/\d+/.test(na.getAttribute('href')) && na.hasAttribute('data-tview'),
+    '#1206: a notice with the summary opens the file ' + (nts[1]?.outerHTML || ''));
+  check(!cm(nt1.id) && !cm(nt2.id), '#1206: no message row for a notice');
+  check(w.eval('chatPending()?.body') === 'Status?', '#1206: a notice is no answer: my question still waits ' + w.eval('JSON.stringify(chatPending())'));
   const pick = async (sel, label) => {
     d.querySelector(sel).click();
     await until(() => [...d.querySelectorAll('#pop [role="menuitem"]')].length);
@@ -76,7 +95,7 @@ const V = B + 'api/v1';
   check(/<a href="https:\/\/example\.com\/doc"[^>]*>link<\/a>/.test(c.html) && !/target=|rel=/.test(c.html), '#1374: html: the link (only its address) ' + c.html);
   check(/<pre[^>]*>echo hi<\/pre>/.test(c.html), '#1374: html: the code block as plain text ' + c.html);
   check(!/class=|<button|data-|<svg|<img|<input|aria-/.test(c.html), '#1374: html: no app classes, buttons, pictures, data attributes ' + c.html);
-  check(/^<div style="[^"]*color:#1f2328/.test(c.html) && !/#fff\b|#ffffff|white/i.test(c.html), '#1374: html: dark text, never white ' + c.html.slice(0, 200));
+  check(/^<div style="[^"]*color:#1f2328/.test(c.html) && !/#fff\b|#ffffff|(?:color|background):\s*white\b/i.test(c.html), '#1374: html: dark text, never white ' + c.html.slice(0, 200));
   check(!/suggest|Start the build/.test(c.html) && !/Start the build/.test(c.plain), '#1374: the ```suggest block is not copied');
   check(c.plain === 'Plan\n\nThe whole plan with a link (https://example.com/doc):\n\n- one\n- two\n\nA\tB\n1\t2\n\necho hi', '#1374: text/plain is the readable text ' + JSON.stringify(c.plain));
   await until(() => w.__toasts.includes('Copied'));

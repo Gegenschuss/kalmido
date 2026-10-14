@@ -1170,6 +1170,24 @@ the list is one the person may change (the inbox by default), a review date is o
 draft, a summary) send it with `offer_save: true` (`POST /api/v1/agent/chats/{user_id}`, MCP `send_chat`); the message
 carries `offer_save` and shows the button *Save as task*, the person decides. No event comes back to the agent.
 
+### Notices in the chat (2.41.0)
+
+An agent can put a **notice** into its chat with a person: one small grey line in the middle, like a date divider, no
+bubble. Use it for things about the conversation itself, not for answers, e.g. *New session, summary taken over (22:10)*
+when the host started a fresh session from a summary of the old one, or *Conversation compacted (22:10)* when the model
+compacted its context in the middle of a run. `POST /api/v1/agent/chats/{user_id}` with `{"body": "…", "kind": "notice"}`
+(MCP `send_chat` with `kind: "notice"`):
+
+- `body`: one line (line breaks become spaces), at most 200 characters; nothing else (`choices`, `approval`, `task_id`,
+  `reply_to`, `job_id`, `offer_save` answer `400`). As `multipart/form-data` it may carry **one** file (e.g. the summary):
+  a tap on the line opens it; without a file the line is only text.
+- No push, never counted as unread, no event to anyone, no answer buttons; it does not make older answer buttons expire
+  and does not count as an answer (the typing dots of a waiting message stay).
+- The message carries `kind: "notice"` (every other message `kind: "message"`) in `GET /agent/chats` and in the app.
+- Older servers (before 2.41.0) answer `400` (unknown field `kind`): send nothing then -- never a normal message instead.
+  The reference launcher does this: it sends *Conversation compacted (HH:MM)* when a chat run's command reports a
+  `compact_boundary` (text `KALMIDO_NOTICE_COMPACTED`) and stops trying after the first `400` / `404`.
+
 ### Chat reactions and delivery (2.7.2)
 
 People react to chat messages like to comments: 👍 (`up`), 👎 (`down`), ❤️ (`heart`). Every message from
@@ -1246,6 +1264,7 @@ Agents read files like this:
 | Remove a chat file you sent | `DELETE /api/v1/chat-attachments/{id}` | – |
 | Ask for an approval in the chat (2.35.0) | `POST /api/v1/agent/chats/{user_id}` with `approval: {title, what?, yes_label?, no_label?}`; the answer: event `chat_choice` with `approval` | `request_chat_approval` |
 | Offer to save an answer as a task (2.37.0) | `POST /api/v1/agent/chats/{user_id}` with `offer_save: true`: the button *Save as task* under the message; the person saves it (title, list, review date), agents never save | `send_chat` with `offer_save` |
+| A notice in the chat (2.41.0) | `POST /api/v1/agent/chats/{user_id}` with `kind: "notice"` and a one-line `body` (at most 200 characters, optionally one file): a small grey line, no push, never unread; older servers `400` = send nothing | `send_chat` with `kind: "notice"` |
 | Send files in the chat | `POST /api/v1/agent/chats/{user_id}` as `multipart/form-data`: `body` (optional with files), `task_id`, `file` (repeatable) | `send_chat` with `files: [{name, base64, mime?}]` |
 | Write a text file onto a task (2.30.0) | `POST /api/v1/tasks/{id}/attachments/text` with `{name, content}` (needs `attachments:write`) | `create_text_file` |
 

@@ -27,6 +27,7 @@ usage: pwsh -File agent_launcher.ps1 [-e ENV_FILE] [--once] [-- COMMAND ...]
                  is posted as the answer. COMMAND is then the plain agent command without -p. Same as KALMIDO_EVENTS=1.
                  Python: KALMIDO_PYTHON, else python3 / py / python on PATH. See agent_launcher.sh for the optional keys.
                  KALMIDO_APPROVAL_CHECK=0 (2.40.0): no check of chat answers that ask to decide without an approval block.
+                 KALMIDO_NOTICE_COMPACTED (2.41.0): the notice in the chat when a run compacts its conversation.
 Needs: Windows PowerShell 5.1 or PowerShell 7+. See docs/AGENTS.md "Set up an agent" for a scheduled task.
 #>
 # arguments by hand (no param block): everything after "--" (or the first unknown word) is the command, as in the .sh
@@ -61,7 +62,7 @@ foreach ($raw in Get-Content -LiteralPath $EnvFile) {
 if (-not $env:KALMIDO_URL) { Log "KALMIDO_URL missing in $EnvFile"; exit 2 }
 if (-not $env:KALMIDO_TOKEN) { Log "KALMIDO_TOKEN missing in $EnvFile"; exit 2 }
 if ($env:KALMIDO_EVENTS -eq '1') { $Events = $true }
-# kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server, proposals, message_edited, playbook, approval_check
+# kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server, proposals, message_edited, playbook, approval_check, notice
 # (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)
 if ($Events) {
   $Runner = Join-Path $PSScriptRoot 'agent_run.py'

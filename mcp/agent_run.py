@@ -103,7 +103,7 @@ class Api:
     def __init__(self, url, token):
         self.base = url.rstrip("/") + "/api/v1"
         self.token = token
-        self.progress_ok = self.host_ok = self.quota_ok = self.approval_ok = self.choices_ok = None
+        self.progress_ok = self.host_ok = self.quota_ok = self.approval_ok = self.choices_ok = self.notice_ok = None
 
     def req(self, method, path, body=None, query=None, timeout=30):
         url = self.base + path + ("?" + urllib.parse.urlencode(query) if query else "")
@@ -169,6 +169,20 @@ class Api:
             log("the server has no plan usage ring (before 2.33)")
         elif st == 200:
             self.quota_ok = True
+        return st == 200
+
+    # kalmido-capability: notice (2.41.0, #1206)
+    def notice(self, uid, text):
+        """A notice in the chat: one small grey line (kind notice), no push, never unread. An older server (400 / 404)
+        gets nothing -- never a normal message instead."""
+        if self.notice_ok is False or not uid:
+            return False
+        st = self.soft("POST", f"/agent/chats/{uid}", {"body": " ".join(str(text).split())[:200], "kind": "notice"})
+        if st in (400, 404) and not self.notice_ok:
+            self.notice_ok = False
+            log("the server has no chat notices (before 2.41): sending none")
+        elif st == 200:
+            self.notice_ok = True
         return st == 200
 
     # kalmido-capability: approval
@@ -298,8 +312,8 @@ class Stream:
     """Reads COMMAND's stream-json output line by line: model (init), steps (a text block followed by a tool call), plan
     usage (rate_limit_event), the result. Tool input and tool output are never looked at."""
 
-    def __init__(self, send_step, on_model, on_usage):
-        self.send_step, self.on_model, self.on_usage = send_step, on_model, on_usage
+    def __init__(self, send_step, on_model, on_usage, on_compact=None):
+        self.send_step, self.on_model, self.on_usage, self.on_compact = send_step, on_model, on_usage, on_compact
         self.text, self.pending, self.last_sent = "", "", 0.0
         self.result, self.model, self.last_text = None, "", ""
         self.session_id = ""  # for the one approval_check follow-up in the same session
@@ -329,6 +343,8 @@ class Stream:
                     self.pending, self.text = self.text, ""
         elif t == "rate_limit_event":
             self.on_usage(ev.get("rate_limit_info") or {})
+        elif t == "system" and ev.get("subtype") == "compact_boundary" and self.on_compact:
+            self.on_compact()  # kalmido-capability: notice -- the command compacted its conversation
         elif t == "result":
             self.result = ev
         self.tick()
@@ -546,6 +562,10 @@ def split_tail_blocks(text):
         elif kind == "done":
             done = [re.sub(r"^[-*]\s*", "", x)[:200] for x in inner] + done
     return "\n".join(lines).rstrip(), appr, [s for s in sugg if s], done
+
+
+# kalmido-capability: notice (2.41.0, #1206): the line a chat shows when the agent's conversation was compacted mid-run
+NOTICE_COMPACTED = os.environ.get("KALMIDO_NOTICE_COMPACTED", "Conversation compacted ({0})")
 
 
 def suggest_line(sugg):
@@ -815,7 +835,11 @@ class Runner:
             self.usage.seen(info)
             self.usage.report()
 
-        st = Stream((lambda t: self.api.progress(t, uid)) if uid and steps else (lambda t: False), on_model, on_usage)
+        def on_compact():  # 2.41.0 (#1206): a chat run whose conversation was compacted says so in the chat (a notice)
+            if uid:
+                self.api.notice(uid, NOTICE_COMPACTED.format(time.strftime("%H:%M")))
+
+        st = Stream((lambda t: self.api.progress(t, uid)) if uid and steps else (lambda t: False), on_model, on_usage, on_compact)
         typing()
         exe = shutil.which(args[0]) or args[0]  # Windows: claude.exe / claude.cmd (PATHEXT); a .cmd runs through cmd.exe
         run_args = (["cmd.exe", "/d", "/c", exe] if os.name == "nt" and exe.lower().endswith((".cmd", ".bat")) else [exe]) + args[1:]

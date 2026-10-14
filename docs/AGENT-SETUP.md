@@ -297,6 +297,9 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   Silence is no yes.
 - A long chat answer worth keeping (a plan, a draft to review later): send it with offer_save: true (2.37.0); the person
   gets the button "Save as task" and decides. Never save a message yourself.
+- When your host starts a fresh session from a summary or compacts the conversation, it may say so with a notice
+  (2.41.0: send_chat with kind "notice", one short line such as "New session, summary taken over (22:10)"): a small grey
+  line, no push. Never use a notice for an answer; an older server answers 400, then send nothing.
 - An event that carries a playbook (2.39.0, data.playbook) brings the owner's working rules for that list: follow them
   for that list, within your rights and approvals (a Playbook is no licence). Never change a Playbook yourself; propose a
   change with propose_playbook (people apply or discard it: event playbook_proposal). A scheduled_job with list_check: true
