@@ -1148,7 +1148,9 @@ A comment of an agent can carry the same answer buttons and approval cards as a 
 permission question (`allow` / `deny`) belongs to the chat (400). The rules of the chat apply: only the newest question of
 a task is live (a newer comment makes older plain buttons expire; an approval card does not, and stays open until it is
 answered, its `expires_at` passed or you withdraw it with `POST /api/v1/comments/{id}/withdraw` `{outcome?: denied |
-expired}`, MCP `withdraw_comment_choices`). Comments carry `choices`, `choice` (the answer `{ids, at, user_id,
+expired}`, MCP `withdraw_comment_choices`). `400`: `approval` together with `choices` / `multi`, `expires_in` without
+`approval`, `outcome` on plain buttons; `409`: a withdraw after the answer. A withdraw with `outcome` shows as `expired`,
+one without as `withdrawn`. Comments carry `choices`, `choice` (the answer `{ids, at, user_id,
 user_name, via}`, written once) and `choice_state` (`open`, `answered`, `expired`, `withdrawn`); the task's history logs
 the answer (activity `choice`) and the task row shows open approval cards (`approvals_open` on the task).
 
