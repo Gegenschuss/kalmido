@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=9
+SHARDS_DEFINED=10
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -577,6 +577,7 @@ fresh; run p2391_t_ui node p2391_t_ui.js "$KALMIDO_TEST_DATA"
 # screen (#1213), celebration (#1292)
 fresh; run p2391_r_api "$PY" p2391_r_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2391_r_ui node p2391_r_ui.js "$KALMIDO_TEST_DATA"
+shard 10  # --------------------------------------------------------------- shard 10 of 10 (2.40.0: the 2.40 suites, shard 9 is full)
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
