@@ -3,7 +3,7 @@
  - rights: an organisation admin starts, polls, downloads, deletes; a member 403, the admin of another organisation 404, a
    person without organisation 404, an agent token 401/403 (people only)
  - content: the organisation's list with task, subtask, comment, attachments and the office (company fields with the test
-   IBAN, a finalised quotation with its PDF) are in it, decrypted (no "kenc1:" value, no sealed file); a private list of a
+   IBAN, a finalised invoice with its PDF + XML) are in it, decrypted (no "kenc1:" value, no sealed file); a private list of a
    member and the list of another organisation are not; no secrets (password hashes, session / token hashes, the agent
    token, 2FA fields)
  - the tool tools/kalmido_export_decrypt.py opens it with the recovery key (stdin and --key-file), checks the manifest;
@@ -143,16 +143,20 @@ r = A.put(B + O + "/settings", json={"company_fields": {"name": "Alpha Studio Gm
 check(r.ok, "company fields saved " + r.text[:160])
 SV = A.post(B + O + "/services", json={"name_de": "Schnitt", "name_en": "Editing", "category": "Video", "daily_rate": 1000}).json()["id"]
 CL = A.post(B + "/api/clients", json={"name": "Beispielkunde AG", "street": "Marktstraße 5", "zip": "50667", "city": "Köln", "country": "de"}).json()["id"]
-r = A.post(B + O + "/docs", json={"project_title": "Imagefilm Export", "client_id": CL})
-check(r.status_code == 201, "quotation " + r.text[:160])
+r = A.post(B + O + "/docs", json={"kind": "invoice", "project_title": "Imagefilm Export", "client_id": CL, "service_from": "2026-04-01",
+                                 "service_to": "2026-05-31", "payment_days": 14, "date": "2026-05-08", "einvoice_format": "zugferd"})
+check(r.status_code == 201, "invoice " + r.text[:160])
 DOC = r.json()["id"]
-check(A.put(B + f"{O}/docs/{DOC}/items", json={"items": [{"service_id": SV, "qty": 2}]}).ok, "positions")
-check(A.post(B + f"{O}/docs/{DOC}/finalize").ok, "quotation finalised")
-check(A.get(B + f"{O}/docs/{DOC}/pdf").ok, "PDF of the finalised quotation")
+check(A.put(B + f"{O}/docs/{DOC}/items", json={"items": [{"service_id": SV, "qty": 2}, {"title": "Sprachfassung EN", "qty": 1, "rate": 1215}]}).ok, "positions")
+r = A.post(B + f"{O}/docs/{DOC}/finalize")
+check(r.ok and r.json().get("pdf_sha256"), "invoice finalised (PDF + XML stored) " + r.text[:160])
 office_files = []
 for root, _d, files in os.walk(os.path.join(DATA, "office", str(ORG))):
     office_files += [os.path.join(root, f) for f in files]
-check(any(f.endswith(".pdf") for f in office_files), f"the office folder holds the PDF: {office_files}")
+check(any(f.endswith(".pdf") for f in office_files) and any(f.endswith(".xml") for f in office_files), f"the office folder holds PDF + XML: {office_files}")
+check(all(open(f, "rb").read(6) == b"KENC1\n" for f in office_files if f.endswith(".pdf")), "the PDF is sealed on disk (organisation key)")
+check(open(os.path.join(DATA, "attachments", str(T), sorted(os.listdir(os.path.join(DATA, "attachments", str(T))))[0]), "rb").read(6) == b"KENC1\n",
+      "the attachments are sealed on disk")
 
 # ---------------------------------------------------------------- rights
 P = f"/api/orgs/{ORG}/export"
@@ -232,6 +236,8 @@ big = sorted(n for n in names if n.startswith("files/attachments/") and n.endswi
 check(len(big) == 2 and sorted(z.read(n) for n in big) == sorted(BIG), "the big attachments, unchanged")
 pdfs = [n for n in names if n.startswith("files/office/") and n.endswith(".pdf")]
 check(pdfs and all(z.read(n)[:5] == b"%PDF-" for n in pdfs), f"the office PDF, decrypted: {pdfs}")
+xmls = [n for n in names if n.startswith("files/office/") and n.endswith(".xml")]
+check(xmls and all(b"<?xml" in z.read(n)[:100] or b"<rsm:" in z.read(n)[:400] for n in xmls), f"the e-invoice XML, decrypted: {xmls}")
 check(not any(z.read(n)[:6] == b"KENC1\n" for n in names if n.startswith("files/")), "no sealed file in the archive")
 co = json.loads(z.read("office/company.json"))
 check(co and co[0]["iban"] == TEST_IBAN and co[0]["tax_number"] == "12/345/67890", f"company fields in plain text: {co}")
