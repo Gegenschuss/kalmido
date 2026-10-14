@@ -33,8 +33,8 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   const CAROL = (await call('POST', '/api/users', {username: 'carol', display_name: 'Carol', password: 'password123'})).id;
   const BK = await login('bob'), CKc = await login('carol');
   await call('PATCH', '/api/settings', {lang: 'de'}, BK);
-  const PRJ = (await call('POST', '/api/lists', {name: 'Relaunch', view: 'timeline', kind: 'project'})).id;
-  const HOME = (await call('POST', '/api/lists', {name: 'Home', kind: 'project', time_tracking: true})).id;  // 2.41.0 (#1471): time tracking is a switch of the list
+  const PRJ = (await call('POST', '/api/lists', {name: 'Relaunch', view: 'timeline', kind: 'project', time_tracking: true})).id;  // 2.41.0 (#1471): time tracking is a switch of the list
+  const HOME = (await call('POST', '/api/lists', {name: 'Home', kind: 'project'})).id;
   await call('PUT', `/api/lists/${PRJ}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${PRJ}/members`, {user_id: CAROL, role: 'view'});
   const mk = async (title, start, due, list = PRJ) => (await call('POST', '/api/tasks', {title, list_id: list, ...(start != null ? {start: ds(start)} : {}), due: ds(due)})).id;
