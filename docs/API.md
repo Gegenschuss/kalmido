@@ -950,3 +950,18 @@ lists automatically*, shared folders, a folder's agent setting, groups and shari
 with `list_ids` that would switch on an unapproved bridge: `409 agent_bridge`, `bridge_ok: true` confirms it. A limited
 token gets `403` on `GET /export` and only the News of its lists. Bridges from before 2.30 stay, flagged in the agent's
 settings ("connects lists with different people").
+
+## Favourites (2.40.0)
+
+Every person can star the lists and projects they really work on. The stars are **personal**: other members of a list
+and agents never see them, and agents cannot set any (`403`).
+
+| Call | What it does |
+|---|---|
+| `PUT /api/lists/{id}/favorite` | Web API (the signed-in person): `{on: true}` (default) stars list `{id}`, `{on: false}` removes the star; `404` for a list you cannot see. Answer `{ok, favorite, fav_lists}` |
+| `DELETE /api/lists/{id}/favorite` | Removes the star |
+
+The stars travel with the person's settings in `GET /api/state` (`settings.fav_lists`: comma list of list ids, in the
+order they were starred). Two more settings belong to them (`PATCH /api/settings`): `fav_only` (`"1"` = the sidebar shows
+the favourites and folds every other list under *More lists*) and `fav_views` (comma list of the views that show only tasks
+of favourites: `today`, `tomorrow`, `week`, `doable`, `assigned`). With and without an organisation alike.
