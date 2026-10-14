@@ -166,7 +166,7 @@ had been made in the app. Webhooks fire too.
 | `GET /me/app-passwords` | read | 2.9.0: your app passwords for calendar apps (`id`, `name`, `created_at`, `last_used_at`, `last_client`; never the password) and `caldav` (`url`, `server`, `username`, `principal`, `home`, `done_days`). Persons only: an agent's token gets `403` |
 | `POST /me/app-passwords` | account | 2.9.0: `{name}` -> `201` with `password` (shown only in this answer; Kalmido keeps a hash). At most 20. Log in to `/dav/` with your user name and it (see [CALDAV.md](CALDAV.md)) |
 | `DELETE /me/app-passwords/{id}` | account | 2.9.0: revoke it; the calendar app using it stops at once |
-| `GET /lists` | read | Lists the user can see: own and shared, with role (`owner`, `admin`, `edit` = member, `participant`, `view` = viewer), `done_at_bottom` (2.7.2; `checklist` = the same, deprecated), progress, `icon` (URL of the list's own picture, empty = none; set in the app), `agent_tidy`, and (2.0.8) its sections `[{id, name}]` |
+| `GET /lists` | read | Lists the user can see: own and shared, with role (`owner`, `admin`, `edit` = member, `participant`, `view` = viewer), `done_at_bottom` (2.7.2; `checklist` = the same, deprecated), progress, `icon` (URL of the list's own picture, empty = none; set in the app), `agent_tidy`, (2.0.8) its sections `[{id, name}]` and (2.41.0) `time_tracking` (boolean: time tracking on for this list) |
 | `POST /lists` | structure | Create a list: `{name, color?, folder?, kind?, done_at_bottom?, nag?, day_hours?, time_tracking?}` (2.41.0: `time_tracking` boolean, default `false`) (`kind`: `list` default or `project`; `checklist` (deprecated) = `list` + `done_at_bottom`). `project_type` (`agency`, `software`, `private`) creates a project of that built-in type; 2.27.0: its standard sections only with `sections: true` (a boolean, only together with `project_type`) |
 | `GET /lists/{id}` | read | One list with its sections and (2.14.0) its custom `fields` `[{id, name, type}]` (also on `GET /lists`); 2.39.0: `playbook` = the list's effective Playbook (null = none) |
 | `GET /lists/{id}/playbook` | read | 2.39.0 (#1168): the list's Playbook, the owner's working rules for agents: `{list_id, text` (effective: the folders' parts, then the list's own)`, list_text, folders [{folder, text}], version` (a short marker)`, list_version, updated_at}`; health lists `404`. See [AGENTS.md](AGENTS.md#playbook-2390) |
@@ -909,8 +909,9 @@ Folders are paths of their owner (`"folder": "Clients/Company X"`). How they beh
 
 Web API (signed in as a person): `GET /api/folders/people?folder=` · `PUT /api/folders/people`
 `{folder, user_id, role?}` · `DELETE /api/folders/people` `{folder, user_id, remove?}`; `GET /api/folders/props?folder=`
-· `PUT /api/folders/props` `{folder, props: {org_id?, agent_id?, agent_members?, agent_tidy?, …}
-(null removes a default), apply?: all | new, force?, dry_run?}` (`dry_run: true` only reports what would change);
+· `PUT /api/folders/props` `{folder, props: {org_id?, agent_id?, agent_members?, agent_tidy?, agent_followup?, time_tracking?, …}
+(null removes a default; 2.41.0: `agent_followup` and `time_tracking` booleans), apply?: all | new, force?, dry_run?}`
+(`dry_run: true` only reports what would change);
 `POST /api/lists/{id}/folder-reset` `{keys?}` (*Back to the folder*). 2.41.0: `PUT /api/folders/people` also takes
 `{folder, email, role?}` (the answer is the same whether the address has an account: `{shared: 0, updated: 0, by_email: true}`)
 and `GET` names the people (`name`). The folder's agents: `GET /api/folders/agents?folder=` → `{folder, agents: [{agent_id,

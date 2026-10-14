@@ -715,8 +715,8 @@ TOOLS = [
      lambda api, a: api.call("GET", "/briefing", _pick(a, ("user_id", "since")))),
     ("read_project_status", "2.34.0: the status report of a list shared with you for a period (default: the last 7 days): counts, "
                             "done, in_progress (changed / commented / time tracked in the period), blocked, overdue, upcoming (due until "
-                            "14 days after the period), milestones (reached + next), time {seconds, rounded, tasks} (project lists with "
-                            "time tracking; null without the token scope time) and markdown (a plain text from fixed sentences, no comments / notes / names). Use the data to "
+                            "14 days after the period), milestones (reached + next), time {seconds, rounded, tasks} (lists with "
+                            "time tracking switched on, 2.41.0: time_tracking; null without the token scope time) and markdown (a plain text from fixed sentences, no comments / notes / names). Use the data to "
                             "write a weekly or client status; never send anything outside the app yourself.",
      _obj({"list_id": S_ID, "from": {"type": "string", "description": "First day YYYY-MM-DD"},
            "to": {"type": "string", "description": "Last day YYYY-MM-DD (default today)"},
@@ -1110,7 +1110,8 @@ TOOLS += [
      lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}/files/{_id(a, 'file_id')}")),
     # ---- time tracking
     ("get_timer", "The running timer (null = none).", _obj({}), lambda api, a: api.call("GET", "/time/timer")),
-    ("start_timer", "Start the timer on a task (or a project list); a running one stops.", _obj({"task_id": S_ID, "list_id": S_ID, "note": {"type": "string"}}),
+    ("start_timer", "Start the timer on a task (or a list) of a list with time tracking on (2.41.0: the list's switch time_tracking, "
+                    "any list type); a running one stops.", _obj({"task_id": S_ID, "list_id": S_ID, "note": {"type": "string"}}),
      lambda api, a: api.call("POST", "/time/timer", body=a)),
     ("stop_timer", "Stop the running timer.", _obj({}), lambda api, a: api.call("DELETE", "/time/timer")),
     ("list_time_entries", "Time entries (from / to YYYY-MM-DD, default the last 7 days; scope mine | all; list_id, task_id).",
@@ -1118,7 +1119,7 @@ TOOLS += [
            "task_id": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "cursor": {"type": "string"}}),
      lambda api, a: api.call("GET", "/time/entries", a)),
     ("get_time_gaps", "2.34.0: working days (Monday to Friday, the last 14 days before today; days = 1-31) on which a person worked on "
-                      "tasks of project lists (completed, commented, changed) but tracked no time there: {user_id, from, to, days: [{date, "
+                      "tasks of lists with time tracking on (2.41.0: time_tracking; completed, commented, changed) but tracked no time there: {user_id, from, to, days: [{date, "
                       "count, tasks: [{id, title, list_id}]}]}. user_id = the person you work for (someone who may chat with you; "
                       "default: yourself); only lists you and the person both see. Suggest entries to the person; never add time for "
                       "them without asking.",

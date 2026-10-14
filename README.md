@@ -273,9 +273,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 **Habits, focus and time**
 - Habits per day or *n* times per week, counters (e.g. 8 glasses of water), notes per day, streaks
 - Pomodoro timer and stopwatch, focus minutes per task
-- **Time tracking** (project lists): a timer on any task that follows you across devices, manual entries, hours per list and task
+- **Time tracking** (2.41.0: its own switch per list, any list type): a timer on any task that follows you across devices, manual entries, hours per list and task
   for any period, rounding, hourly rates, CSV export and a printable timesheet
-- **Time sum in the list header** (2.7.0): a project list (and a folder of them) shows its tracked time in hours and in
+- **Time sum in the list header** (2.7.0): a list with time tracking (and a folder of them) shows its tracked time in hours and in
   working days, e.g. *12.5 h · 1.6 days*. The length of a day / shift is one value for the whole server
   (*Settings > Administration*, 8 h by default) that a list can override in its dialog, the same for everyone in it. A
   number field *Budget h* (the agency project type has one) adds a budget bar: tracked against the sum of the budgets
@@ -1379,7 +1379,8 @@ criteria* (in your language; *Templates…* next to the switch sets the list's o
 the task has `"type": "bug" | "feature" | "task" | null`; `GET /api/v1/tasks?type=bug` filters.
 
 For lists that are projects rather than to-do piles. Set the list's **type** to *Project* (list dialog, the list's
-… menu or right-click in the sidebar): only project lists get time tracking, dependencies (and the Gantt arrows),
+… menu or right-click in the sidebar): only project lists get dependencies (and the Gantt arrows; 2.41.0: time tracking
+is a switch of its own per list, `time_tracking`, off by default),
 custom fields and progress / status, so a shopping list or a household list never shows timers or fields. The
 modules below stay the outer switch: a feature shows when its module is on **and** the list is a project. Switching a
 list back to *List* only hides these things (nothing is deleted; its tracked time is left out of reports until it is
