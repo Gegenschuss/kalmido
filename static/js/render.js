@@ -240,7 +240,8 @@ const sbiProg = () => S.settings?.side_progress !== '0';
 // with "Line" / "Dot" the name's leading emoji is not shown (the name itself stays as it is), a grey line icon with the dot
 // in the list colour (or a round dot) stands for it; with "Emoji" everything stays as before 2.36.0
 function licName(l) {
-  const nm = listName(l?.name), em = l && !l.icon && sbiMode() !== 'emoji' ? leadEmoji(l.name) : '';
+  const n0 = l?._live ?? l?.name;  // 2.46.2 (#1659): the name being typed in the list dialog
+  const nm = listName(n0), em = l && !l.icon && sbiMode() !== 'emoji' ? leadEmoji(n0) : '';
   return em ? nm.slice(em.length).trim() || nm : nm;
 }
 function licMark(l, cls = '', full = false) {  // full: a list without an emoji gets its icon too (header, archive, menus)
@@ -296,10 +297,10 @@ function renderSide() {
     // 2.23.0 (#794): ONE fixed icon column for a picture, an emoji (taken from the name) or the dot, so the names line up
     // 2.36.0 (#1117): what the column shows follows Settings > Appearance > Sidebar: a grey line icon for the name's emoji with its
     // dot in the list colour (default), the emoji itself, or only a round dot; a list's own picture stays (not with "Dot")
-    const em = !l.icon && leadEmoji(l.name);
+    const em = !l.icon && leadEmoji(l._live ?? l.name);  // 2.46.2 (#1659): _live = the name being typed
     // 2.38.0 (#1174): the icon itself in the list colour (listIconHtml), no extra dot
     const sw = `<span class="sic" aria-hidden="true">${listIconHtml(l, {emoji: true})}</span>`;
-    const nmOf = x => em ? listName(x.name).slice(em.length).trim() : listName(x.name);
+    const nmOf = x => em ? listName(x._live ?? x.name).slice(em.length).trim() : listName(x._live ?? x.name);
     // 2.25.0 (UX-07): one number per row (the open tasks); a project's progress is a thin bar along the row's bottom
     const pg = progressFor(l) && l.progress?.total && sbiProg() && !progHidden(l.id) ? `<span class="sprog" role="img" style="--p:${pct(l.progress)}%" aria-label="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}" title="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}"></span>` : '';
     const shr = (l.status && statusFor(l) ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +

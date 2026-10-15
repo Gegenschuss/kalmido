@@ -9,6 +9,15 @@
 // week grid (drag over free time) and the quick sheet's "Event" button open the editor (evEditor).
 const evOn = () => feat('events');
 const evCal = id => (S.evcals || []).find(c => c.id === id);
+// 2.46.2 (#1659): a calendar's new name shows at once (optimistic, an error puts the old one back), no reload of everything
+function evCalRename(id, name, draw) {
+  const put = () => {
+    const x = evCal(id), y = (S.cal.evcals || {})[id], o1 = x?.name, o2 = y?.name;
+    if (x) x.name = name; if (y) y.name = name;
+    return () => { if (x) x.name = o1; if (y) y.name = o2; };
+  };
+  return optWrite(put, () => api('PATCH', `/api/evcals/${id}`, {name}), draw).then(() => cvxCals(true).then(draw), () => {});
+}
 const evWrite = c => !!c && (c.role === 'owner' || c.role === 'edit');
 const evWritable = () => (S.evcals || []).filter(c => evWrite(c) && !c.hidden && wsObjIn(c));  // 2.30.0 (#1036): of the shown workspace
 const EV_PS = [['accepted', N_('Accept'), 'check'], ['tentative', N_('Maybe'), 'help'], ['declined', N_('Decline'), 'x']];
@@ -401,7 +410,7 @@ async function evCalsModal() {
     if (m) {
       const c = evCal(+m.dataset.evcmenu); if (!c) return;
       const own = c.role === 'owner';
-      menu(m, [own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the calendar'), c.name, {input: {max: 100}}); if (n && n.trim()) { try { await api('PATCH', `/api/evcals/${c.id}`, {name: n.trim()}); } catch { return; } refresh(); } }},
+      menu(m, [own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the calendar'), c.name, {input: {max: 100}}); if (n && n.trim()) evCalRename(c.id, n.trim(), redraw); }},  // 2.46.2 (#1659): at once
         own && {label: tr('Colour…'), icon: 'palette', fn: () => calColorPop(m, LCOLORS.filter(Boolean), c.color, async col => { try { await api('PATCH', `/api/evcals/${c.id}`, {color: col}); } catch { return; } refresh(); })},
         own && wsOn() && {label: tr('Workspace…'), icon: 'brief', fn: () => wsMoveMenu(m, c.org_id, async org => { try { await api('PATCH', `/api/evcals/${c.id}`, {org_id: org}); } catch { return; } refresh(); })},
         own && collab() && {label: tr('Share…'), icon: 'users', fn: () => evShareModal(c, users, refresh)},
