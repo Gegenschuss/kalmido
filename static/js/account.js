@@ -703,6 +703,7 @@ async function inviteScreen(tok) {
   setTimeout(() => $('#inv-pw', el)?.focus(), 50);
 }
 async function logout() {
+  if (kd_pinNeed()) return kd_pinAsk(logout);  // 2.49.0 (#1551): a child with the parents' PIN
   if (OUT.q.length && !await askConfirm(trn('{0} change is not synced yet and will be lost. Log out anyway?', '{0} changes are not synced yet and will be lost. Log out anyway?', OUT.q.length), '', {ok: tr('Log out'), danger: true})) return;
   await wpDisable().catch(() => {});  // this device stops getting the pushes of the account that logs out
   await e2eForget();  // 2.42.0 (#828): keys remembered on this device go

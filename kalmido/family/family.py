@@ -108,8 +108,9 @@ PURPOSE_EXTRA = {"office": ("clients", "workload", "forms", "office")}
 
 # 2.19.0: what a child account may change: tick / untick (and undo) the tasks it sees, ask for a reward, its own
 # account (name, password, picture, sign-in, push, settings), the news it has read. Everything else is read-only.
+# 2.49.0 (#1537): + the onboarding (a kid's first start marks it done, no sample list) and the parents' PIN (#1551)
 KID_WRITE = re.compile(r"^/api/(auth/.+|me|me/(avatar|2fa/.+|passkeys(/.*)?)|push/.+|news/(read|dismiss)|settings"
-                       r"|tasks/\d+/(complete|reopen|undo)|family/rewards/\d+/request)$")
+                       r"|tasks/\d+/(complete|reopen|undo)|family/rewards/\d+/request|onboarding|me/pin/(unlock|lock))$")
 
 
 def is_kid(c, uid):
@@ -906,6 +907,9 @@ def kid_dict(c, kid, full=True):
                          "by": r["by_id"], "at": r["created_at"]}
                         for r in c.execute("SELECT * FROM kid_stars WHERE kid_id=? ORDER BY id DESC LIMIT 30", (kid,))]
         d["requests"] = sum(1 for x in d["rewards"] if x["state"] == "requested")
+    if has_request_context() and g.get("user"):
+        from .pin import pin_state
+        d.update(pin_state(c, kid))  # 2.49.0 (#1551): pin set? (never the PIN itself)
     return d
 
 

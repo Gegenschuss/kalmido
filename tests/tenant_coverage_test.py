@@ -252,6 +252,9 @@ ROUTES = {
     "POST /api/family/kids/{}/rewards": "family", "PATCH /api/family/rewards/{}": "family",
     "DELETE /api/family/rewards/{}": "family", "POST /api/family/rewards/{}/request": "family",
     "POST /api/family/rewards/{}/decide": "family",
+    # 2.49.0 (#1551): the parents' PIN of a child account (set / removed by its parents, opened by the child for its session)
+    "PUT /api/family/kids/{}/pin": "family", "DELETE /api/family/kids/{}/pin": "family",
+    "POST /api/me/pin/unlock": "family", "POST /api/me/pin/lock": "family",
     # ---- folder (13)
     "GET /api/v1/folders": "folder", "POST /api/v1/folders/rename": "folder", "POST /api/v1/folders/delete": "folder",
     "GET /api/folders/props": "folder", "PUT /api/folders/props": "folder", "GET /api/folders/groups": "folder",

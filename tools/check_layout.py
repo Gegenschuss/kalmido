@@ -91,6 +91,7 @@ TENANT_EXEMPT = {
     "agent_bridges": _AGENT + " (an owner's approval between two lists)",
     "chat_saves": _OWN + " (2.37.0 #1159: which chat message a person saved as a task; the task itself keeps its list)",
     "kid_parents": _FAM, "kid_stars": _FAM, "kid_rewards": _FAM,
+    "kid_pins": _FAM, "kid_pin_open": _OWN + " (2.49.0 #1551: the session of a kid)",
 }
 schema_src = re.sub(r"--[^\n]*", "", read("kalmido", "core", "schema.py"))
 tables = {m.group(1): m.group(2) for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\);", schema_src, re.S)}

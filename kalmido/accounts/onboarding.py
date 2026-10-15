@@ -60,6 +60,11 @@ def onboarding():
     if usettings(c, uid).get("onboard") != "pending":
         c.rollback()
         return jsonify(ok=True, created=False)
+    if g.user["kid"]:  # 2.49.0 (#1537): a kid gets no "Getting started" list (its view shows none), only done
+        uset(c, uid, "onboard", "done")
+        bump(c)
+        c.commit()
+        return jsonify(ok=True, created=False)
     lg = lang(c, uid)
     feats = [f for f in usettings(c, uid)["features"].split(",") if f]
     feats = [f for f in feats if (f != "collab" or collab_all()) and (f != "time" or time_all())]

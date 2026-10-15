@@ -446,6 +446,7 @@ function unionRect(els) {
   return {left: l, top: t, width: rr - l, height: b - t, right: rr, bottom: b};
 }
 function tourSteps() {
+  if (S.me?.kid) return kd_tourSteps();  // 2.49.0 (#1533): a child gets its own short tour (family.js)
   const m = isMobile(), touch = isTouch(), s = [];
   const rect = sel => () => { const e = typeof sel === 'function' ? sel() : $(sel); return e ? e.getBoundingClientRect() : null; };
   s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('The Basket comes first: new tasks without a list land there. Today, Tomorrow and Next 7 days collect tasks from all your lists. Lists, filters and tags are in this menu.'), sel: '#top .menu', r: rect('#top .menu')}
@@ -465,10 +466,10 @@ function tourSteps() {
 function tourStart() {
   closePalette(); $$('.modal:not(.authscreen)').forEach(x => x.remove()); closePop(); if (S.sel) closeDetail();
   const inList = S.route.mod === 'tasks' && !NOLIST_KEYS.includes(S.route.key) && !isKanban() && !isTimeline();
-  if (!inList || !$('#view .trow')) go('today');  // the tour points at a task (a fresh account's Inbox is empty)
+  if (!S.me?.kid && (!inList || !$('#view .trow'))) go('today');  // the tour points at a task (a fresh account's Inbox is empty); 2.49.0 (#1533): a child stays in My day
   TOUR.on = true; TOUR.steps = tourSteps(); TOUR.i = 0;
   // 1.8.0: first start of an account: "Create a sample project" on the first card (preticked for project setups)
-  TOUR.sample = S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0'; TOUR.sampleOn = false;  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
+  TOUR.sample = S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid; TOUR.sampleOn = false;  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
   let el = $('.tour');
   if (!el) { el = document.createElement('div'); el.className = 'tour'; el.innerHTML = '<div class="tring"></div><div class="tcard" role="dialog" aria-live="polite"></div>'; document.body.appendChild(el); }
   el.addEventListener('click', e => {
@@ -535,7 +536,7 @@ async function tourEnd(skipped) {
   tourSample();
   TOUR.on = false; $('.tour')?.remove();
   if (S.settings.tour === 'pending') { S.settings.tour = 'done'; try { await api('PATCH', '/api/settings', {tour: 'done'}); } catch { /* offline: shows again next start */ } }
-  if (!skipped) toast(tr('Tour finished. Restart it any time under Settings > Help.'));
+  if (!skipped && !S.me?.kid) toast(tr('Tour finished. Restart it any time under Settings > Help.'));  // 2.49.0 (#1533): a child has no Help
 }
 window.addEventListener('resize', () => { if (TOUR.on) tourGo(TOUR.i); });
 

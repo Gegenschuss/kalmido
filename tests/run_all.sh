@@ -757,6 +757,9 @@ fresh; run p249_l_ui node p249_l_ui.js "$KALMIDO_TEST_DATA"
 # 2.49.0 part A: Forgot your password? (#1531), the login page (#1553)
 fresh; run p249_a_api "$PY" p249_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p249_a_ui node p249_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.49.0 part B: child accounts - start without errors, parent PIN, child tour (#1537, #1551, #1533)
+fresh; run p249_b_api "$PY" p249_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p249_b_ui node p249_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

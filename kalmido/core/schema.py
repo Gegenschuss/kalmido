@@ -932,6 +932,14 @@ CREATE TABLE IF NOT EXISTS office_purchases (
   ref BIGINT, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS office_purchases_org ON office_purchases(org_id, date);
 CREATE INDEX IF NOT EXISTS office_purchases_doc ON office_purchases(doc_id);
+-- 2.49.0 B (#1551): the parents' PIN of a kid account (family/pin.py): only its password hash; fails / lock_until = the
+-- brake per kid. kid_pin_open: the few minutes a correct PIN opens account / settings / log out, bound to one session.
+CREATE TABLE IF NOT EXISTS kid_pins (
+  kid_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, pin_hash TEXT NOT NULL, fails BIGINT NOT NULL DEFAULT 0,
+  lock_until TEXT NOT NULL DEFAULT '', set_by BIGINT REFERENCES users(id) ON DELETE SET NULL, set_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS kid_pin_open (
+  token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash) ON DELETE CASCADE,
+  kid_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, until TEXT NOT NULL);
 """
 # Bumped when the database layout changes (stored in kalmido_meta.schema_version; SQLite: PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).

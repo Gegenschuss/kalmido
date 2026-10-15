@@ -30,7 +30,7 @@ function bootDone() {
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)
   if (LS.get('after2fa', false)) { LS.set('after2fa', false); setTimeout(() => settingsModal('account'), 400); }  // 2.22.0 (#697)
   setTimeout(() => { if (document && !document.hidden) wpSweep(); }, 2500);
-  setTimeout(() => { if (!document.hidden && !S.setupPending) lc_favSuggest(); }, 8000);  // 2.46.1 (#1361): a favourite suggestion, once  // 2.19.0 (#668): opening the app tidies the shade  // render in the server-side language
+  setTimeout(() => { if (!document.hidden && !S.setupPending && !S.me?.kid) lc_favSuggest(); }, 8000);  /* 2.49.0 (#1537): not for a child */  // 2.46.1 (#1361): a favourite suggestion, once  // 2.19.0 (#668): opening the app tidies the shade  // render in the server-side language
   // 2.13.0 (#453 A16): the first-run step 2 ("What do you want to use?") was not finished (tab reloaded / closed after the
   // admin account was created): it comes back until "Start" is pressed
   if (S.setupPending && !$('.authscreen')) { const el = document.createElement('div'); el.className = 'modal authscreen'; document.body.appendChild(el); $('#app')?.setAttribute('inert', ''); setupChoices(el, `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`); }
