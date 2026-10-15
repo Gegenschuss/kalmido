@@ -365,7 +365,7 @@ deadlines are ordinary tasks with a `family` object; rotations, people and stars
 | `POST /family/kids/{id}/rewards` · `PATCH /family/rewards/{id}` · `DELETE` | tasks:write · tasks:write · delete | `{title, cost, emoji?, once?}` (parents) |
 | `POST /family/rewards/{id}/request` | tasks:write | the kid asks (with enough stars); its parents get a push |
 | `POST /family/rewards/{id}/decide` | tasks:write | `{approve}`: redeem (the stars are taken; `once` rewards are done) or decline (parents) |
-| `POST /me/purpose` | account | `{purpose: me\|home\|family\|team\|software\|office, examples?, all_modules?}`: switches your modules and creates the starter lists once; `all_modules` true = every module, false = lists and tasks only, missing = the purpose's own set |
+| `POST /me/purpose` | account | `{purpose: me\|home\|family\|team\|software\|office, examples?, all_modules?}`: switches your modules; the sample project of the purpose only with `examples: true` (since 2.46.1 off by default; Family always gets its shopping list and the list Family once); `all_modules` true = every module, false = lists and tasks only, missing = the purpose's own set |
 
 Task fields: `family` (`{kind: birthday|anniversary, name, year?, lead?, src?, card?}` (`card`: the vCard UID of a date
 imported from an address book) or `{kind: deadline, type, who, expires, notice,
