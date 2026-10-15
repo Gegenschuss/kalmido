@@ -42,6 +42,7 @@ async function teamChanged() {
   if (S.route.mod === 'team' && S.tc.rid) await loadRoom(S.tc.rid);
   if (S.route.mod === 'team' && !editingTeam()) renderView();
   else if (S.route.mod === 'team') tcPatch();
+  if (typeof cw_teamLive === 'function') cw_teamLive();  // 2.47c (#1720): the team chats in the chat panel
   renderSide(); renderTabs(); renderTop();
 }
 // 2.18.0 (review): a one-line preview without Markdown markers ("```js", `code`, **bold**, headings, list markers, links ->
@@ -55,6 +56,7 @@ const editingTeam = () => document.activeElement?.id === 'tc-in' || document.act
 const roomName = r => r ? (r.kind === 'dm' ? (r.name || '?') : lname(listById(r.list_id)) || r.name || '?') : '';
 const roomIcon = r => r.kind === 'dm' ? av(r.user_id, r.name, 'avatar') : `<span class="tcico">${licon(listById(r.list_id), 'licon') || ic('users', 's')}</span>`;
 function viewTeam() {
+  if (typeof cw_tcHome === 'function' && S.cw.lt) return cw_tcHome(viewTeam);  // 2.47c (#1720): a conversation live in the chat panel (chatwins.js)
   if (!teamOn()) return `<div class="empty">${tr('The team chat needs collaboration (Settings > Modules).')}</div>`;
   if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'team') renderView(); }); }
   // 2.27.0 (#986): only conversations that have messages (newest first); an empty one shows once it is opened / written in
@@ -75,8 +77,8 @@ function tcRoomHtml() {
   const head = `<div class="tcrhead"><button type="button" class="iconbtn tcback" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>
     ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind === 'list' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
     <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the list'))}" aria-label="${esc(tr('Open the list'))}">${ic('list')}</button>` : ''}
-    ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${e2eRoomBtns(room)}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button></div>`;
-  return `${head}${e2eRoomNotice(room)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
+    ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${e2eRoomBtns(room)}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
+  return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
     <button type="button" class="chnew hidden" id="tc-new">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${replyBarHtml('t:' + rid)}<div class="chcomp tccomp"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > 18 ? name.slice(0, 17).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="send" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
     <button type="button" class="btn pri" data-act="tc-send">${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
@@ -216,6 +218,7 @@ async function dmWhy(kind, msg, name) {
 }
 // the open conversation follows the route; switching rooms loads it
 function teamRoute(rid) {
+  if (typeof cw_route === 'function' && cw_route(rid)) return;  // 2.47c (#1720): the phone's row of open chats / a conversation live in the chat panel
   if (S.tc.rid !== rid) { S.tc.rid = rid; S.tc.room = null; S.tc.msgs = []; S.tc.more = false; S.tc.edit = null; if (rid) loadRoom(rid).then(() => { if (S.route.mod === 'team' && S.tc.rid === rid) { renderView(); teamFit(); } }); }
 }
 document.addEventListener('keydown', e => {

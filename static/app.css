@@ -6739,3 +6739,28 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .pfcol button{width:1.75rem;height:1.75rem;padding:0;border:0;border-radius:50%;background:var(--acol);cursor:pointer}
 .pfcol button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--acol)}
 @media (pointer:coarse){ .pfcol{gap:.5rem} .pfcol button{width:2.25rem;height:2.25rem} }
+/* 2.47c A (#1720) several chats in the chat panel, one above the other (chatwins.js); phones: a row of the open chats */
+#achat.cwsplit .cwin{display:flex;flex-direction:column;flex:1 1 0;min-height:13.75rem;overflow:hidden;position:relative;background:var(--bg2)}
+#achat.cwsplit .cwin .chmsgs{min-height:0}
+#achat.cwsplit .cwin.cwc{flex:0 0 auto!important;min-height:0}
+#achat.cwsplit .cwin.cwc>:not(.chath):not(.tcrhead){display:none}
+#achat.cwsplit .cwin.cwc [data-cwact="fold"] svg{transform:rotate(-90deg)}
+#achat.cwsplit .cwin>.chath{padding:.5rem .75rem}
+#achat.cwsplit .cwin>.chath,#achat.cwsplit .cwin>.tcrhead{cursor:grab;user-select:none;border-bottom:1px solid var(--line)}
+#achat.cwsplit .cwin.cwact>.chath,#achat.cwsplit .cwin.cwact>.tcrhead{box-shadow:inset 3px 0 0 var(--accent)}
+#achat.cwsplit .cwin.cwcol>.chath,#achat.cwsplit .cwin.cwcol>.tcrhead{border-top:3px solid var(--cwcol)}
+#achat.cwsplit .cwin.cwdrag{z-index:3;opacity:.92;box-shadow:var(--shadow)}
+#achat.cwsplit .cwin .tcback{display:none}
+#achat.cwmany .cwin [data-dwchat],#achat.cwmany .cwin [data-act="chat-dock"]{display:none}  /* in the window menu */
+.cwsep{flex:0 0 auto;height:.5rem;margin:-.25rem 0;position:relative;z-index:2;cursor:row-resize;touch-action:none;outline:0}
+.cwsep::after{content:"";position:absolute;left:0;right:0;top:calc(50% - .5px);height:1px;background:var(--line2)}
+.cwsep:hover::after,.cwsep.on::after,.cwsep:focus-visible::after{top:calc(50% - 1.5px);height:3px;background:var(--accent)}
+.cwdot{display:inline-block;width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);flex:0 0 auto}
+.cwdot[hidden]{display:none}
+.cwsw{display:flex;align-items:center;gap:.375rem;overflow-x:auto;padding:.375rem .5rem;border-bottom:1px solid var(--line);scrollbar-width:none;flex:0 0 auto}
+.cwsw::-webkit-scrollbar{display:none}
+.cwswb{display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem;max-width:12rem;padding:0 .75rem 0 .375rem;border:1px solid var(--line);border-radius:999px;background:var(--bg);color:inherit;flex:0 0 auto}
+.cwswb>span:not(.cwdot){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cwswb.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+.cwswb .tcico{display:inline-flex}
+.cwswx{flex:0 0 auto;width:2.75rem;height:2.75rem;margin-left:-.25rem}

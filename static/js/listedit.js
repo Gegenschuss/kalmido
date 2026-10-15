@@ -215,6 +215,7 @@ const agentStatusLines = () => (S.agents || []).filter(a => a.enabled && a.statu
 // live update without re-rendering what someone may be typing in (task panel, chat)
 function agentLive() {
   chatFabDraw();  // 2.29.0 (#363): the pop-up button follows the agents (unread count, last agent, module on / off)
+  if (typeof cw_live === 'function') cw_live();  // 2.47c (#1720): parked chat windows with new answers (chatwins.js)
   const t = S.sel && taskById(S.sel), d = $('#d-typing');
   if (d) d.outerHTML = typingHtml(taskTypers(t), 'd-typing');
   // 2.12.2 (#451): the typing row and the state chip are swapped only when they changed; the dots appearing make the list

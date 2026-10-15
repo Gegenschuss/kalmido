@@ -32,7 +32,9 @@ the app has not yet been tested by people who use a screen reader every day (see
   visible.
 - **Dragging is never the only way.** Tasks: *Move up / Move down* in the task menu or Alt+↑ / Alt+↓, *Move to
   section…*, *Move to list* (m), the date picker; the panels and columns that can be resized by dragging have a grip
-  that works with ← → and Enter (standard width) or a double-click. *Customize* on the start page, Today, Time
+  that works with ← → and Enter (standard width) or a double-click. The divider between the chats of the split chat
+  panel works with ↑ ↓ and Enter (even heights); a chat window's menu moves it up / down, folds and closes it, and Esc
+  in its message box closes only that window. *Customize* on the start page, Today, Time
   tracking, the overviews and the project page: ↑ / ↓ buttons, Alt+↑ / Alt+↓ on a row and a switch per block (each move
   is announced); dragging the rows is only an extra on a computer. Dependencies (Alt + drop onto a task) also via
   *Waiting on a task…* in the task menu; several selected tasks also via *Subtasks of…* / *Out of the parent task* in the

@@ -524,6 +524,7 @@ function personCard(anchor, id) {
   const mine = l ? openTasks().filter(x => x.list_id === l.id && x.assignee_id === id && x.id !== t?.id).sort(bySort) : [];
   const acts = [];
   if (a && a.enabled && typeof chatOpen === 'function') acts.push(['chat', 'comment', tr('Open chat')]);
+  if ((a ? a.enabled && typeof chatOpen === 'function' : id !== meId && teamOn()) && typeof cw_split === 'function') acts.push(['cwsplit', 'panel', tr('Open in split window')]);  // 2.47c (#1720)
   if (a && feat('agents')) acts.push(['jobs', 'bot', tr('Jobs')]);
   if (!a && id !== meId) acts.push(['dm', 'comment', tr('Message')]);  // 2.24.0 (#906): a direct message, first and big
   if (!a) acts.push(['who', 'list', id === meId ? tr('My tasks') : tr('Tasks of {0}', name)]);  // 2.7.2 (#418)
@@ -544,6 +545,7 @@ function personCard(anchor, id) {
     else if (k === 'who') { if (S.sel && isMobile()) closeDetail(); go('who/' + id); }
     else if (k === 'dm') { if (S.sel && isMobile()) closeDetail(); dmOpen(id, name); }
     else if (k === 'chat') chatOpen(id);
+    else if (k === 'cwsplit') { if (a) cw_split('a:' + id); else { try { const r = await rawFetch('POST', '/api/team/dm', {user_id: id}); if (!(S.tc.rooms || []).some(x => x.id === r.id)) S.tc.rooms = [{...r, unread: 0, mention: false, muted: false, last: null, last_at: null}, ...(S.tc.rooms || [])]; cw_split('t:' + r.id); } catch (er) { dmWhy('err', er.message, name); } } }  // 2.47c (#1720)
     else if (k === 'jobs') go('agents');
     else if (k === 'assign') patchTask(t.id, {assignee_id: id});
     else if (k === 'mention') { const ta = $('#c-input'); if (!ta) return; const add = (ta.value && !/\s$/.test(ta.value) ? ' ' : '') + '@' + name + ' '; ta.value += add; S.drafts[S.sel] = ta.value; ta.closest('.ccomp')?.classList.add('used'); autosize(ta); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
