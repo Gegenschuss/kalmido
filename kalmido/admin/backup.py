@@ -1238,6 +1238,7 @@ def backups_settings():
         gset(c, "bk_enabled_at", iso(now_utc()))
         if gsetting(c, "bk_time") <= local_now().strftime("%H:%M"):
             gset(c, "bk_last_day", local_now().date().isoformat())  # today's time is over: the first one runs tomorrow
+        _BK["stale_at"] = 0.0  # 2.45.0 (#1515): switched on again: the "no backup for 2 days" check runs at once (on since the setup)
     c.commit()
     if "on" in b and b["on"] != was_on:
         aa_switch(c, g.user, "bk_on", b["on"])
