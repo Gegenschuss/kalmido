@@ -87,6 +87,8 @@ r = A.put(B + "/api/office/settings", json={"industry_packs": ["film", "nope"]})
 check(r.ok, "admin switches the pack on " + r.text[:200])
 st = A.get(B + "/api/office/settings").json()
 check((st.get("settings") or st).get("industry_packs") == ["film"], "only known packs are kept")
+check([x.get("code") for x in st.get("industry") or []] == ["film"] and st["industry"][0]["defaults"]["meal_large"] == 28,
+      "the settings answer lists the pack with its defaults")
 
 # ---------------------------------------------------------------- master data
 cam = A.post(B + "/api/office/crew", json={"name_de": "Kamera", "name_en": "Camera", "rate_day": 650, "intext": "intern"}).json()
