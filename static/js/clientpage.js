@@ -9,7 +9,7 @@ const MSC = {items: null, loading: false, seq: 0, q: '', arch: false, pick: null
 async function ms_clLoad() {
   const seq = ++MSC.seq;
   MSC.loading = true;
-  try { const j = await api('GET', '/api/clients?archived=1'); if (seq === MSC.seq) MSC.items = j.clients || []; }
+  try { const j = await api('GET', '/api/clients?archived=1'); if (seq === MSC.seq) MSC.items = (j.clients || []).filter(ms_inWs); }
   catch { if (seq === MSC.seq) MSC.items = MSC.items || []; }
   MSC.loading = false;
   if (seq === MSC.seq) ms_clDraw();
@@ -28,7 +28,12 @@ const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived)
 const ms_clAv = (c, big) => `<span class="avatar ctav mscav ${big ? 'big' : ''}" style="${cssColor(c.color) ? '--cc:' + cssColor(c.color) : ''}" aria-hidden="true">${c.icon ? esc(c.icon) : ic('brief', big ? '' : 's')}</span>`;
 const ms_tag = (kind) => kind === 'client' ? `<span class="mstag mstag-cl">${ic('brief', 's')}${tr('Client')}</span>` : `<span class="mstag">${ic('user', 's')}${tr('Contact')}</span>`;
 
+// 2.47.3 (#1360): the page follows the workspace of the sidebar like the office (Private = the private clients, an
+// organisation = its clients, All = every client one sees)
+const ms_inWs = c => { const ws = typeof wsCur === 'function' ? wsCur() : 'all'; return ws === 'all' || (ws === 'private' ? c.org_id == null : 'org:' + c.org_id === ws); };
 function ms_clView() {
+  if (MSC.ws !== undefined && MSC.ws !== (typeof wsCur === 'function' ? wsCur() : 'all')) ms_clDirty();
+  MSC.ws = typeof wsCur === 'function' ? wsCur() : 'all';
   if (MSC.items === null && !MSC.loading) setTimeout(ms_clLoad, 0);
   const id = S.route.client || null, mob = isMobile();
   if (id && (!CLV.data || CLV.id !== id) && !CLV.loading) setTimeout(clLoad, 0);
