@@ -60,10 +60,11 @@ const BASE = 'cal,comments,collab,time,progress,agents';
 
   // ================= clients
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
-  const grp = d.querySelector('#side .sg-clients');
-  const order = [...d.querySelectorAll('#side .sgroup')].map(x => x.className);
-  check(grp && order.findIndex(c => c.includes('sg-clients')) === order.findIndex(c => c.includes('sg-lists')) - 1, 'the group "Clients" right above the lists');
-  click(w, d.querySelector('#side [data-act="client-new"]')); await sleep(200);
+  // 2.44.0 (#1187): the clients are a tab of the area Office (no own sidebar group); "New client" on their page
+  const grp = d.querySelector('#side .sg-areas [data-mgside="office"]');
+  check(grp && grp.dataset.go === 'clients' && !d.querySelector('#side .sg-clients'), 'the area "Office" in the sidebar opens the clients (no own group)');
+  w.eval(`go('clients')`); await until(() => d.querySelector('#view [data-act="client-new"]'));
+  click(w, d.querySelector('#view [data-act="client-new"]')); await sleep(200);
   let md = d.querySelector('.modal.cldlg');
   check(md && md.querySelector('#cl-name') && md.querySelector('#cl-rate') && md.querySelector('#cl-bh'), 'the client dialog (with rate and budget)');
   input(w, md.querySelector('#cl-name'), 'Café Aurora'); md.querySelector('#cl-icon').value = '☕'; click(w, md.querySelector('[data-clk-add]')); md.querySelector('[data-clk="name"]').value = 'Maria';  // 2.40.0 (#1380): contact persons as a list
@@ -72,7 +73,7 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   await until(() => w.eval('S.route.mod') === 'clients' && d.querySelector('#view .cldetail'));
   const CL = w.eval('S.route.client');
   check(CL && d.querySelector('#view .cldetail h2')?.textContent === 'Café Aurora' && d.querySelectorAll('#view .sttiles > div').length === 4, 'saved: the client page with four tiles');
-  check(d.querySelector(`#side .scl[data-go="client/${CL}"].on`) && d.querySelector('#side .scl .semo')?.textContent === '☕', 'the sidebar row, highlighted, with its symbol');
+  check(d.querySelector('#side [data-mgside="office"].on') && w.eval("mg_areaOf(S.route.mod)?.[0]") === 'office', 'the area Office is highlighted (2.44.0, #1187: no own client rows)');
   // the list's client in the list dialog
   w.eval(`listModal(${P})`); await sleep(400);
   const sel = d.querySelector('.modal #l-client');

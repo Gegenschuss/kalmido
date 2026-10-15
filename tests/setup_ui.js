@@ -57,15 +57,15 @@ const feats = st => st.settings.features.split(',');
   check(/What do you use Kalmido for\?/.test(d.querySelector('.setupcard').textContent), 'step 2 title');
   check([...d.querySelectorAll('[data-su-preset]')].map(b => b.dataset.suPreset).join() === 'me,home,family,team,software,office', '2.19.0: the purposes: For me, (2.22.0) Home, Family, Team, Software projects, (2.36.1) Office & finance');
   check(d.querySelector('[data-su-preset="me"]').classList.contains('on') && d.querySelector('[data-su-preset="me"]').getAttribute('aria-pressed') === 'true' && !d.querySelector('[data-su-preset="team"]').classList.contains('on'), '"For me" preselected');
-  check(!d.querySelector('[data-use="comments"]').checked && !d.querySelector('[data-use="collab"]').checked && !d.querySelector('[data-use="family"]').checked, 'For me: comments, collaboration + Family off');
+  check(!d.querySelector('[data-use="comments"]').checked && !d.querySelector('[data-use="collab"]').checked && !d.querySelector('[data-use="a:life"]').checked, 'For me: comments, collaboration + Home (Family) off');  // 2.44.0 (#1187): the areas in the setup
   check([...d.querySelectorAll('[data-su-start]')].map(b => b.dataset.suStart).join() === ',sample,agency,software,private' && d.querySelector('[data-su-start=""]').classList.contains('on'), 'K21: "Start with": Empty (preselected), Sample, Agency, Software, Personal');
   check(!d.querySelector('#su-ptype') && !d.querySelector('[data-su-sample]'), 'K21: no project select, no sample checkbox any more');
   click(w, d.querySelector('[data-su-preset="family"]')); await sleep(100);
   check(d.querySelector('[data-su-preset="family"]').classList.contains('on'), '"Family" picked');
-  check(d.querySelector('[data-use="collab"]').checked && !d.querySelector('[data-use="time"]').checked && d.querySelector('[data-use="habits"]').checked && d.querySelector('[data-use="family"]').checked && !d.querySelector('[data-use="timeline"]').checked, 'Family: collaboration, habits, Family ticked; time + timeline not');
+  check(d.querySelector('[data-use="collab"]').checked && !d.querySelector('[data-use="a:time"]').checked && d.querySelector('[data-use="habits"]').checked && d.querySelector('[data-use="a:life"]').checked && !d.querySelector('[data-use="timeline"]').checked, 'Family: collaboration, habits, Family ticked; time + timeline not');
   check(d.querySelector('[data-use="deps"]') && !d.querySelector('[data-use="deps"]').checked && !d.querySelector('[data-use="fields"]').checked, 'Family: dependencies + custom fields listed, unticked');
   click(w, d.querySelector('[data-su-preset="software"]')); await sleep(100);
-  check(d.querySelector('[data-su-start="software"]').classList.contains('on') && d.querySelector('[data-use="deps"]').checked && !d.querySelector('[data-use="family"]').checked, 'Software projects: everything but Family, starts with a software project');
+  check(d.querySelector('[data-su-start="software"]').classList.contains('on') && d.querySelector('[data-use="deps"]').checked && !d.querySelector('[data-use="a:life"]').checked, 'Software projects: everything but Family, starts with a software project');
   click(w, d.querySelector('[data-su-preset="me"]')); await sleep(100);
   check(d.querySelector('[data-su-start=""]').classList.contains('on'), 'back to For me: the start is Empty again');
   check(!d.querySelector('[data-use="paperless"]'), 'Paperless hidden when not configured');
@@ -129,7 +129,7 @@ const feats = st => st.settings.features.split(',');
   jar = {}; w = await open(jar); d = w.document;
   await step1(w);
   click(w, d.querySelector('[data-su-preset="team"]')); await sleep(100);
-  check([...d.querySelectorAll('[data-use]')].every(c => c.checked === !['family', 'habits', 'pomo', 'matrix', 'stats'].includes(c.dataset.use)) && d.querySelector('[data-su-preset="team"]').classList.contains('on') && !d.querySelector('[data-su-preset="me"]').classList.contains('on'), 'Team: all ticked but Family, habits, focus timer, matrix, statistics (2.25.0)');
+  check([...d.querySelectorAll('[data-use]')].every(c => c.checked === !['a:life', 'habits', 'matrix', 'a:review'].includes(c.dataset.use)) /* 2.44.0 (#1187): areas; Time with the focus timer */ && d.querySelector('[data-su-preset="team"]').classList.contains('on') && !d.querySelector('[data-su-preset="me"]').classList.contains('on'), 'Team: all ticked but Family, habits, focus timer, matrix, statistics (2.25.0)');
   click(w, d.querySelector('[data-su="go"]')); await sleep(800);
   st = await api(jar, 'GET', '/api/state');
   check(st.collab_all === true && st.time_all === true && ['collab', 'time', 'kanban', 'timeline', 'deps', 'fields', 'progress'].every(f => feats(st).includes(f)) && !['habits', 'pomo', 'matrix', 'stats'].some(f => feats(st).includes(f)), 'Team: switches + modules on, only what the name promises (2.25.0, UX-25)');
@@ -140,10 +140,10 @@ const feats = st => st.settings.features.split(',');
   jar = {}; w = await open(jar); d = w.document;
   await step1(w);
   click(w, d.querySelector('[data-su-preset="me"]')); await sleep(100);
-  check(d.querySelector('[data-use="cal"]').checked && ['timeline', 'kanban', 'matrix', 'habits', 'pomo', 'stats', 'progress', 'deps', 'fields', 'collab', 'time', 'family'].every(k => !d.querySelector(`[data-use="${k}"]`).checked), 'For me: only the calendar ticked');
+  check(d.querySelector('[data-use="cal"]').checked && ['timeline', 'kanban', 'matrix', 'habits', 'a:review', 'progress', 'deps', 'fields', 'collab', 'a:time', 'a:life'].every(k => !d.querySelector(`[data-use="${k}"]`).checked), 'For me: only the calendar ticked');  // 2.44.0 (#1187): areas
   check(d.querySelector('[data-su-preset="me"]').classList.contains('on') && d.querySelector('[data-su-preset="me"] .i'), 'For me highlighted (with its icon)');
   // fine-tuning back to a preset highlights it again
-  const hb = d.querySelector('[data-use="pomo"]'); hb.checked = true; hb.dispatchEvent(new w.Event('change', {bubbles: true}));  // 2.22.0: habits = Home
+  const hb = d.querySelector('[data-use="a:review"]'); hb.checked = true; hb.dispatchEvent(new w.Event('change', {bubbles: true}));  // 2.22.0: habits = Home; 2.44.0 (#1187): Review (was the focus timer)
   check(!d.querySelector('.supreset.on'), 'one extra module: no preset matches');
   hb.checked = false; hb.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(d.querySelector('[data-su-preset="me"]').classList.contains('on'), 'back to the preset: highlighted again');
@@ -163,7 +163,7 @@ const feats = st => st.settings.features.split(',');
   click(w, d.querySelector('[data-su-lang="de"]')); await sleep(600);
   check(/Wofür nutzt du Kalmido\?/.test(d.querySelector('.setupcard').textContent) && /Für mich/.test(d.querySelector('.setupcard').textContent) && /Womit starten\?/.test(d.querySelector('.setupcard').textContent), 'language switch: step 2 in German');
   click(w, d.querySelector('[data-su-preset="me"]')); await sleep(100);
-  for (const k of ['time']) { const c = d.querySelector(`[data-use="${k}"]`); c.checked = !c.checked; c.dispatchEvent(new w.Event('change', {bubbles: true})); }
+  for (const k of ['a:time']) { const c = d.querySelector(`[data-use="${k}"]`); c.checked = !c.checked; c.dispatchEvent(new w.Event('change', {bubbles: true})); }
   check(!d.querySelector('.supreset.on'), 'custom choice: no preset highlighted');
   click(w, d.querySelector('[data-su="go"]')); await sleep(800);
   st = await api(jar, 'GET', '/api/state');

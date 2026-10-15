@@ -37,9 +37,10 @@ const FEAT = 'cal,comments,collab,clients';
   check(w.eval('officeOn()') === false, 'off: officeOn() false');
   // Settings > Modules: the group with the switch
   w.eval(`settingsModal('modules')`); await until(() => d.querySelector('.smodal'));
-  const grp = [...d.querySelectorAll('.smodal .modgrp')].find(g => /Office & finance/.test(g.querySelector('.mgn')?.textContent || ''));
+  // 2.44.0 (#1187): Office & finance is a part of the area Office (group Areas), its own switch below the area's
+  const grp = d.querySelector('.smodal [data-mgrow="office"]');
   const sw = grp && grp.querySelector('[data-feat="office"]');
-  check(!!grp && !!sw, 'Settings > Modules: group "Office & finance" with the switch');
+  check(!!grp && !!sw && /Office & finance/.test(grp.textContent), 'Settings > Modules: the area Office with the switch "Office & finance"');
   check(w.eval(`PURPOSES.some(p => p[0] === 'office' && /Office & finance/.test(p[2])) && PURPOSE_EXTRA.office.includes('office')`), 'the purpose "Office & finance" exists and switches the module on');
   if (sw) { sw.click(); await until(() => w.eval(`feat('office')`)); }
   check(w.eval(`feat('office')`), 'the switch turns the module on');
