@@ -120,6 +120,27 @@ const sec = (d, k) => d.querySelector(`#achat .cwin[data-cw="${k}"]`);
   check(!d.querySelector('#achat.cwsplit') && d.querySelector('#achat > .chath') && !d.getElementById('achat').classList.contains('hidden') && w.eval('S.chat.aid') === A1, '#1720: Esc closes only that window; one left = the panel as before');
   check(d.getElementById('chat-in')?.value === 'draft one', '#1720: ... with its draft');
 
+  // ================= the team view and a team window in the panel at once: one of them holds the live ids
+  const DM = (await call('POST', '/api/team/dm', {user_id: BOB})).id;
+  await call('POST', `/api/team/rooms/${DM}/messages`, {body: 'Hi Bob'});
+  w.eval(`cw_split('t:${RID}')`);
+  await until(() => sec(d, 't:' + RID)?.querySelector('#tc-in'));
+  w.location.hash = 'team/' + DM;
+  await until(() => d.querySelector('#view .tcroom')?.textContent.includes('Hi Bob'));
+  check(d.querySelectorAll('#tc-in').length === 1 && !!d.querySelector('#view #tc-in') && w.eval('S.tc.rid') === DM, '#1720: the team view opens a conversation: it is live, the panel window parks');
+  pe(w, sec(d, 't:' + RID).querySelector('.chmsgs'), 'pointerdown');
+  check(d.querySelectorAll('#tc-in').length === 1 && !!sec(d, 't:' + RID).querySelector('#tc-in') && w.eval('S.tc.rid') === RID, '#1720: a pointer in the panel window makes it live (the team view parks)');
+  w.eval('renderView()'); await sleep(300);
+  check(d.querySelector('#view .tcroom')?.textContent.includes('Hi Bob') && !d.querySelector('#view #tc-in') && d.querySelectorAll('#tc-in').length === 1, '#1720: the team view drawn again keeps its own conversation (no second #tc-in)');
+  pe(w, d.querySelector('#view .tcroom .chmsgs'), 'pointerdown');
+  check(w.eval('S.tc.rid') === DM && !!d.querySelector('#view #tc-in') && !!sec(d, 't:' + RID).querySelector('[data-cwid="tc-in"]'), '#1720: a pointer in the team view takes its conversation back');
+  pe(w, sec(d, 't:' + RID).querySelector('.chmsgs'), 'pointerdown');
+  w.location.hash = 'l/' + L;
+  await sleep(800);
+  check(w.eval('S.tc.rid') === RID && !!sec(d, 't:' + RID).querySelector('#tc-in') && sec(d, 't:' + RID).textContent.includes('Hello studio'), '#1720: leaving the team view keeps the live panel window');
+  w.eval(`cw_close('t:${RID}')`);
+  await sleep(100);
+
   // ================= more windows than fit fold (768 px: three open)
   for (const k of [`a:${A2}`, `a:${A3}`, `t:${RID}`]) w.eval(`cw_split('${k}')`);
   await sleep(600);
