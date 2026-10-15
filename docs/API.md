@@ -376,6 +376,10 @@ participants, and get its reminders), `stars` (what a kid account gets for compl
 `family`: `shopping`, `meals`, `birthdays`, `household`, `packing` or `null`. A kid account takes part in shared lists
 only as a participant; it can complete / reopen what it sees, ask for rewards and change its own account, every other
 change answers `403`.
+A parent can give a kid account a PIN (2.49.0, in the app only: Family > the kid's card > PIN; 4 to 6 digits, stored only as
+a hash). With a PIN the kid needs it in the app to change its account and settings or to log out; ticking off and asking
+for rewards stay free. Five wrong PINs lock it for 15 minutes and the parents get a push. Agents never see or set the
+PIN; `GET /family/kids` shows only `pin: true|false`.
 
 ## Events (2.21.0)
 

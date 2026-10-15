@@ -234,6 +234,8 @@ APP_ONLY = [
      "is called by the error service, not by a client", ("* /api/lists/{}/error-hook", "POST /api/hooks/issues/")),
     ("external calendar subscriptions and the calendar feed link: personal settings", ("* /api/calendars", "* /api/ical")),
     ("2.19.0: address books (CardDAV) for birthdays: their passwords are entered by people, like calendar subscriptions", ("* /api/family/contacts",)),
+    ("2.49.0 (#1551): the parents' PIN of a child account: a secret people type in the app (the parent sets it, the child opens "
+     "its settings with it), never an agent", ("* /api/family/kids/{}/pin", "* /api/me/pin/")),
     ("the app's personal settings, onboarding and sample data", ("PATCH /api/settings", "POST /api/briefing/read", "POST /api/onboarding", "* /api/sample")),
     ("2.32.0 (#1063, #983): how a person arranges their views and the project page: people only, never agents", ("* /api/lists/{}/layout",)),
     ("the focus timer is a personal on-screen timer; time is tracked with /time/timer", ("* /api/pomo/",)),
