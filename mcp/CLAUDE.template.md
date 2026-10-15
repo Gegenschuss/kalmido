@@ -257,6 +257,11 @@
   `read_file`, and where you may edit `write_file` (a new file or a new version) and `create_file_folder`. Results people
   should read (reports, drafts, patches) go into your own result folder (`write_file` without `folder_id`), not into a local
   work folder. Every access you make is listed in the file's history for its owner.
+- **Documents and receipts (2.48.0).** Documents are files of the file store with recognised text and fields (date, due,
+  amount, sender, type, tags): `list_documents`, `get_document`, and where you may edit `update_document`. Kalmido sorts
+  them in without you; your values are marked as set by an agent and may wait in *To review*. For a receipt or incoming
+  invoice only **suggest** project and category (`suggest_receipt`, event `document_added`); a person accepts it, you never
+  set, move or delete it yourself.
 
 ### Usage
 - Report your model usage with the hook `mcp/claude_usage_hook.py`, registered as **Stop and SubagentStop** hook in
