@@ -6158,7 +6158,6 @@ html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5re
 .oimfl .dpw,.oimfl .dpbtn{width:100%;min-height:2.75rem}  /* 2.39.1 (#1182): the app's date picker, like the neighbours */
 .oimfl.chkl{flex-direction:row;align-items:center;min-height:2.75rem}
 .oimraw pre{white-space:pre-wrap;font-size:var(--fs-s);margin:.25rem 0}
-.oimfoot{position:sticky;bottom:0;background:var(--bg);padding:.5rem 0;gap:.5rem;flex-wrap:wrap}
 .oimctr{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:space-between}
 .oimctr p{margin:.25rem 0}
 .oimrun{display:flex;align-items:center;gap:.5rem;padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);min-height:2.75rem}
@@ -6659,3 +6658,14 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .rohint.ovbar span{flex:1 1 12rem}
 .rohint.ovbar .btn{min-height:2.25rem}
 .shr.ovmark{opacity:.6}
+/* 2.46.2 D (#1647 #1662) the import's action bar over the full width of the view (outside a modal .foot is no flex row, so the
+   spacer did nothing); the paid tick is a plain checkbox at its label; the section name is the drop target of an empty section */
+.oimfoot{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;flex-wrap:wrap;position:sticky;bottom:calc(var(--tabs-h) + var(--safe-b));z-index:2;margin:1rem -1.75rem 0;padding:.75rem 1.75rem calc(.75rem + var(--safe-b));background:var(--bg2);border-top:1px solid var(--line2);box-shadow:0 -.5rem 1rem -.5rem rgba(0,0,0,.5)}
+.oimfoot .aerr{flex:1 1 12rem;min-width:0}
+.oimfoot .spacer{flex:1 1 0}
+@media (max-width:899px){ .oimfoot{margin-inline:-.75rem;padding-inline:.75rem} }
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] .oimfoot{box-shadow:0 -.5rem 1rem -.5rem rgba(0,0,0,.14)} }
+:root[data-theme="light"] .oimfoot{box-shadow:0 -.5rem 1rem -.5rem rgba(0,0,0,.14)}
+.oimfl.chkl input[type=checkbox]{width:auto;min-height:0;flex:none}
+@media (max-width:420px){ .oimgrid{grid-template-columns:minmax(0,1fr)} .oimfl.w2{grid-column:auto} }
+.ghead.drop{background:color-mix(in srgb,var(--accent) 14%,transparent);box-shadow:inset 0 0 0 2px var(--accent);border-radius:var(--radius)}
