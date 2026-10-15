@@ -654,6 +654,8 @@ def openapi_spec():
     stale_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#266)
     from ..personal.timegaps import timegaps_spec
     timegaps_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#269)
+    from ..files.v1 import files_spec
+    files_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1207)
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",

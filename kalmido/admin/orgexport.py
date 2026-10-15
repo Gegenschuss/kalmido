@@ -194,6 +194,11 @@ OX_AREAS = (
     ("comments.json", "comments", f"task_id IN ({TSQ})"),
     ("comments/reactions.json", "comment_reactions", f"comment_id IN (SELECT id FROM comments WHERE task_id IN ({TSQ}))"),
     ("attachments.json", "attachments", f"task_id IN ({TSQ})"),
+    # 2.48.0 (#1207): the organisation's file store (folders, files, versions, shares, history; the trash too)
+    ("store/nodes.json", "fs_nodes", "org_id=?"),
+    ("store/versions.json", "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
+    ("store/shares.json", "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
+    ("store/history.json", "fs_log", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
     ("chat/channels.json", "tchat_rooms", f"kind='list' AND list_id IN ({LSQ})"),
     ("chat/messages.json", "tchat_msgs", f"room_id IN (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id IN ({LSQ}))"),
     ("calendars.json", "ev_cals", "org_id=?"),
@@ -313,6 +318,12 @@ def ox_build(c, oid, out, by=None):
             full = _under(ATT_DIR, r.get("path"))
             if full:
                 _put_bytes(zf, man, f"files/list_files/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
+        if "fs_versions" in have:  # 2.48.0 (#1207): every version of the file store's files (decrypted like the attachments)
+            for r in _rows(c, oid, "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)", (oid,)):
+                full = _under(ATT_DIR, r.get("path"))
+                nm = c.execute("SELECT name FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
+                if full and nm:
+                    _put_bytes(zf, man, f"files/store/{int(r['node_id'])}-v{int(r['no'])}-{_safe_part(nm[0])}", _read(c, full))
         odir = os.path.join(OFFICE_DIR, str(int(oid)))
         if os.path.isdir(odir):
             for root, dirs, files in os.walk(odir):

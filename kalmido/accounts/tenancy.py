@@ -51,6 +51,12 @@ CHECKS = {
     # an agent of an organisation that is gone, or a personal agent working in an organisation its owner is not in
     "agent": ("SELECT a.user_id, a.owner_id FROM agents a WHERE a.org_id IS NOT NULL AND (NOT EXISTS (SELECT 1 FROM orgs o WHERE o.id=a.org_id) "
               "OR (a.owner_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=a.org_id AND om.user_id=a.owner_id)))"),
+    # 2.48.0 (#1207): a file store share of an organisation's folder / file with a person outside it, or with an agent of
+    # another workspace (the read layer ignores both: files/store.py fs_role)
+    "file_person": ("SELECT s.node_id, s.user_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id JOIN users u ON u.id=s.user_id "
+                    "WHERE n.org_id IS NOT NULL AND " + _PERSON.format(o="n", m="s")),
+    "file_agent": ("SELECT s.node_id, s.agent_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id JOIN agents a ON a.user_id=s.agent_id "
+                   "WHERE COALESCE(a.org_id,0)!=COALESCE(n.org_id,0)"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
@@ -75,7 +81,8 @@ def boundary_check(c):
 # object from them, and moving the agent to the right workspace brings its access back. Owners outside their organisation
 # and agents whose owner left stay counted as before.
 REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", "list_id"),
-          "cal_person": ("ev_cal_members", "cal_id"), "book_person": ("book_members", "book_id")}
+          "cal_person": ("ev_cal_members", "cal_id"), "book_person": ("book_members", "book_id"),
+          "file_person": ("fs_shares", "node_id")}  # 2.48.0 (#1207)
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Administration > Organisations")
 
 

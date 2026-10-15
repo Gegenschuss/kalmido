@@ -6814,3 +6814,69 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 /* 2.46.7 (#1708): touch targets of the Lists summary and the workspace button (device test) */
 .aglists>summary{min-height:2.75rem}
 @media (pointer:coarse){.agnm .avws{min-height:2.75rem}}
+/* 2.48.0 A (#1207) the file store "Ablage" (ablage.js): spaces on the left (a row of buttons on phones), the path, the list */
+.abview{display:grid;grid-template-columns:13rem minmax(0,1fr);gap:1rem;align-items:start;min-height:12rem;border-radius:var(--r,10px);transition:box-shadow .15s}
+.abview.abdrop{box-shadow:inset 0 0 0 2px var(--accent)}
+.abspaces{display:flex;flex-direction:column;gap:.125rem;position:sticky;top:0}
+.abspace{display:flex;align-items:center;gap:.5rem;min-height:2.5rem;padding:0 .75rem;border:0;border-radius:8px;background:none;color:inherit;text-align:left;cursor:pointer}
+.abspace span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.abspace:hover{background:var(--bg2)}
+.abspace.on{background:var(--accent-soft);font-weight:600}
+.abmain{min-width:0}
+.abtitle{margin:.25rem 0 .5rem}
+.abcrumbs{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;margin:.25rem 0 .5rem;font-size:1.05rem}
+.abcrumbs .linkbtn{min-height:2.25rem;padding:0 .25rem;border-radius:6px}
+.abcrumbs .linkbtn.abdrop{background:var(--accent-soft)}
+.abccur{font-weight:600;padding:0 .25rem}
+.abcsep{color:var(--muted)}
+.abtools{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-bottom:.75rem}
+.ablist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.abrow{display:flex;align-items:center;gap:.5rem;min-height:3rem;padding:0 .25rem 0 0;border-top:1px solid var(--line)}
+.abrow:first-child{border-top:0}
+.abrow:hover{background:var(--bg2)}
+.abrow[draggable="true"]{cursor:grab}
+.abopen{display:flex;align-items:center;gap:.625rem;flex:1 1 auto;min-width:0;min-height:3rem;padding:0 .75rem;border:0;background:none;color:inherit;text-align:left;cursor:pointer;border-radius:8px}
+.abopen.abdrop{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
+.abname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.abmeta{flex:0 1 auto;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:16rem}
+.abbadges{display:inline-flex;align-items:center;gap:.25rem;color:var(--muted)}
+.abbadge{display:inline-flex}
+.abver{font-size:.75rem;padding:0 .375rem;border:1px solid var(--line);border-radius:999px}
+.abempty{padding:2rem 1rem}
+.abhint{font-size:.85rem;margin-top:.75rem}
+.abpath{margin:-.25rem 0 .5rem;font-size:.85rem}
+.abfacts{display:flex;flex-wrap:wrap;gap:.25rem .75rem;margin-bottom:.75rem;color:var(--muted);font-size:.9rem}
+.abvers,.ablog{display:flex;flex-direction:column;gap:.125rem;max-height:16rem;overflow:auto}
+.abvrow,.ablrow{display:flex;align-items:center;gap:.5rem;min-height:2.5rem;padding:0 .25rem;border-bottom:1px solid var(--line)}
+.ablrow.abag{color:var(--accent)}
+.ablrow.abag b{color:var(--fg,inherit)}
+.abshsum{display:flex;flex-wrap:wrap;gap:.375rem;margin-bottom:.5rem}
+.abshp{display:inline-flex;align-items:center;gap:.25rem;padding:.25rem .625rem;border:1px solid var(--line);border-radius:999px;font-size:.9rem}
+.abshadd{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.75rem 0}
+.abshadd select{flex:1 1 12rem;min-height:2.5rem}
+.abexp{display:inline-flex;align-items:center;gap:.375rem}
+.abexp input{min-height:2.5rem}
+.abinh{opacity:.8}
+@media (max-width:899px){
+  .abview{grid-template-columns:1fr;gap:.5rem}
+  .abspaces{flex-direction:row;overflow-x:auto;scrollbar-width:none;position:static;gap:.375rem;padding-bottom:.25rem}
+  .abspaces::-webkit-scrollbar{display:none}
+  .abspace{flex:0 0 auto;min-height:2.75rem;border:1px solid var(--line);border-radius:999px}
+  .abmeta{display:none}
+  .abrow{min-height:3.25rem}
+  .abtools .btn{min-height:2.75rem}
+  .abrow .iconbtn{width:2.75rem;height:2.75rem}
+}
+@media (prefers-reduced-motion:reduce){.abview{transition:none}}
+/* 2.48.0 A (#1207) "Show in the file store" on file tiles: next to the remove button (shown like it: hover, always on touch) */
+.att .attlink{right:1.875rem}
+.att .attlink:only-of-type{right:.25rem}
+.att:focus-within .attlink{opacity:1}
+.povf .povlk{position:relative}
+@media (pointer:coarse){.povf .povlk{min-width:2.75rem;min-height:2.75rem}}
+.abtree{padding-left:calc(.75rem + var(--ablvl,1) * .75rem);font-size:.95rem}
+.abtree.abdrop{background:var(--accent-soft)}
+@media (max-width:899px){.abtree{display:none}}
+.abtxt{display:flex;flex-direction:column;min-width:0}
+.abmeta2{display:none;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:899px){.abmeta2{display:block}}

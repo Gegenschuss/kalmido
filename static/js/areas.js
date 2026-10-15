@@ -12,7 +12,10 @@ const MG_AREAS = [
     ['contacts', 'users', N_('Contacts'), () => feat('contacts'), () => ['contacts']], ['clients', 'brief', N_('Clients'), () => clientsOn(), () => ['clients']]]],
   ['time', 'clock', N_('Time|area'), [['time', 'clock', N_('Time tracking'), () => timeOn(), () => ['time']], ['pomo', 'timer', N_('Focus timer'), () => feat('pomo'), () => ['pomo']]]],
   ['review', 'journal', N_('Review|area'), [['review', 'journal', N_('Review & journal'), () => feat('review'), () => ['review']], ['stats', 'chart', N_('Statistics'), () => feat('stats'), () => ['stats']]]],
-  ['life', 'home', N_('Home|area'), [['life', 'home', N_('Home & life'), () => lifeOn(), () => LIFE_MODS], ['family', 'family', N_('Family'), () => famOn(), () => ['family']]]]];
+  ['life', 'home', N_('Home|area'), [['life', 'home', N_('Home & life'), () => lifeOn(), () => LIFE_MODS], ['family', 'family', N_('Family'), () => famOn(), () => ['family']]]],
+  // 2.48.0 (#1207, #1111): the file store with its parts files (ablage.js) and documents (docs.js)
+  ['ablage', 'folder', N_('File store|area'), [['ablage', 'folder', N_('Files'), () => ab_on(), () => ['files']],
+    ['docs', 'file', N_('Documents'), () => typeof viewDocs === 'function' && feat('docs'), () => ['docs']]]]];
 const MG_IDS = MG_AREAS.map(a => a[0]);
 const mg_area = id => MG_AREAS.find(a => a[0] === id) || null;
 const mg_areaOf = mod => MG_AREAS.find(a => a[3].some(p => p[0] === mod)) || null;
@@ -66,7 +69,8 @@ const mg_featOn = k => k.startsWith('a:') ? mg_on(k.slice(2)) : feat(k);
 const MG_DESC = {office: N_('Office & finance (quotations, services, documents; needs an organisation), your contacts and the clients'),
   time: N_('Time tracking on tasks with reports, and the focus timer; finished focus sessions can count as time entries'),
   review: N_('Your day and week in review with a private journal, and the statistics'),
-  life: N_('Home & life (contracts, devices, staying in touch, health, trips, read later) and family')};
+  life: N_('Home & life (contracts, devices, staying in touch, health, trips, read later) and family'),
+  ablage: N_('Folders and files of your own and of your organisation, shared with people and agents, with versions')};  // 2.48.0 (#1207)
 function mg_modAreaHtml(id, partRow) {
   const a = mg_area(id), on = mg_on(id), ks = a[3].flatMap(p => p[4]());
   return `<div class="modrow mgarea ${on ? '' : 'off'}" data-mgrow="${id}"><label class="mmain"><span class="swc"><input type="checkbox" data-mgarea="${id}" ${on ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(a[2])}</b><small class="muted">${tr(MG_DESC[id])}</small></span></label>

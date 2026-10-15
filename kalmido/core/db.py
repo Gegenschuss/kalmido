@@ -20,6 +20,10 @@ from ..core.schema import (
 from ..core.i18n import LANGS, tr
 
 
+# 2.48.0 (#1207): modules of 2.48 that are on for everyone once (features_rev 11)
+FEATS_2480 = ("files",)
+
+
 def now_utc():
     return datetime.now(timezone.utc)
 
@@ -411,6 +415,11 @@ def init_db(guard=True, load=None):
             d = [x for x in (gsetting(c, "default_features") or "").split(",") if x]
             gset(c, "default_features", ",".join(d + [f for f in ("events", "contacts") if f not in d]))
         gset(c, "migr_feat10", "1")
+        # features_rev 11 (2.48.0, #1207): the new modules of 2.48 in the setup's default too
+        if dfs and gsetting(c, "migr_feat11") != "1":
+            d = [x for x in (gsetting(c, "default_features") or "").split(",") if x]
+            gset(c, "default_features", ",".join(d + [f for f in FEATS_2480 if f not in d]))
+        gset(c, "migr_feat11", "1")
         # 2.22.0 (#752), once: one organisation (named after the instance's domain, e.g. kalmido.example.com -> "Example")
         # with every account (agents too); people see only people of their organisations
         if gsetting(c, "migr_orgs2220") != "1":
@@ -517,6 +526,11 @@ def init_db(guard=True, load=None):
                 fs += [f for f in ("events", "contacts") if f not in fs]
                 uset(c, uid, "features", ",".join(fs))
                 uset(c, uid, "features_rev", "10")
+            # features_rev 11 (2.48.0, #1207): the file store ("Ablage") -> on for everyone (switched off in Settings > Modules)
+            if rev < 11:
+                fs += [f for f in FEATS_2480 if f not in fs]
+                uset(c, uid, "features", ",".join(fs))
+                uset(c, uid, "features_rev", "11")
         # 2.15.0 (#479), once: fine scopes. Old read tokens could download files (now attachments:read), old agents had
         # read + write (stored "write" = every scope but admin-read, so they keep what they could do)
         if gsetting(c, "migr_scopes215") != "1":

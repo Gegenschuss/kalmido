@@ -401,6 +401,8 @@ def user_purge(c, uid):
     a = c.execute("SELECT webhook_id FROM agents WHERE user_id=?", (uid,)).fetchone()
     if a and a["webhook_id"]:
         c.execute("DELETE FROM webhooks WHERE id=?", (a["webhook_id"],))
+    from ..files.store import fs_user_purge
+    files += fs_user_purge(c, uid)  # 2.48.0 (#1207): the file store (organisation branches go to an admin, the own tree goes)
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     return files
 
