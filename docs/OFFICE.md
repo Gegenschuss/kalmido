@@ -5,9 +5,10 @@ The module **Office & finance** (`office`) turns an organisation's Kalmido into 
 media production (producing days, raw data, discount, transfer of rights) and a PDF of every document. Invoices,
 e-invoices and bookkeeping exports are planned for later stages.
 
-The module lives in the business area only: a person needs the module switched on (Settings > Modules > Office &
-finance, or the setup purpose "Office & finance") **and** a membership in an organisation. Everything the module stores
-belongs to that organisation; people of another organisation never see it. Agents (AI assistants with a token) and child
+A person needs the module switched on (Settings > Modules > Office & finance, or the setup purpose "Office & finance").
+Since 2.47.3 no organisation is needed: everybody also has a **personal office** of their own (see below). Everything the
+module stores belongs to one office area - an organisation's office or one person's personal office; people of another
+organisation, and everybody else in the case of a personal office, never see it. Agents (AI assistants with a token) and child
 accounts have no access at all in this stage - there is no `/api/v1` route and no MCP tool for the module yet.
 
 ## Roles
@@ -16,10 +17,41 @@ accounts have no access at all in this stage - there is no `/api/v1` route and n
 |---|---|
 | Organisation admin | module settings, master data, framework contracts, logo, import, delete documents |
 | Organisation member | read master data and settings, export the master data file, create / edit quotations, PDF |
+| Owner of a personal office | everything an organisation admin may, in the own personal office |
 | Agents, children | nothing (403) |
 
-Which organisation you work in follows the workspace switch at the top of the sidebar (`org:<id>`); people in exactly one
-organisation need not choose.
+Which office you work in follows the workspace switch at the top of the sidebar: an organisation's workspace (`org:<id>`)
+shows its office, **Private** shows your personal office. Without any organisation (a freelancer, or a server in the
+mode `shared`) there is no switch: the office is simply your personal one. With the switch on "All workspaces", a person
+in exactly one organisation works in that organisation's office (as before 2.47.3); with several organisations the
+office asks to choose one.
+
+## Personal office (2.47.3)
+
+Every person has a personal office: own master data (services, equipment, text blocks, framework contracts, freelancer
+roles, crew), own number series, settings, company fields, logo, quotations, invoices, payments and archive. The person
+is its admin (module settings, logo, import, delete, purchase prices and surplus). Its clients are the person's private
+clients (the clients without an organisation, which the workspace "Private" shows). The access log, e-invoices, the
+DATEV document inbox and sending by mail work as in an organisation's office.
+
+It is created on the first visit, invisible to everybody else - also to the server's admins: it never appears as an
+organisation (lists of organisations, workspaces, sharing, agents, organisation export). Technically it is a hidden row
+of the organisation table (`orgs.personal_of` = its owner) without members; row-level security lets only its owner reach
+its rows, and it has its own encryption key like an organisation.
+
+A person in an organisation who opens "Private" for the first time finds an empty personal office with a hint and a
+button to the organisation's office.
+
+**Moving into an organisation** (Settings tab, "Move into an organisation"; one way, after a confirmation): the personal
+office becomes a new organisation with its owner as admin - documents, numbers (no duplicates: it is the same area),
+settings, master data, files and the private clients go with it; "Private" is a new, empty personal office afterwards.
+Only where organisations can be created (an instance admin, not in the mode `shared`). Moving into an existing
+organisation is not offered yet. `POST /api/office/move` `{name, confirm: true}` -> `{org_id, name, clients}`.
+
+**Small business (section 19 UStG)**: the setting `small_business` (Settings tab, "Invoices"; a setting of every office
+area, also of an organisation): new quotations and invoices are made without VAT and with the note "Gemäß § 19 UStG
+wird keine Umsatzsteuer berechnet." (`vat_mode` `novat`, `vat_note` `small`); the e-invoice gets the tax category `E`
+with this exemption reason.
 
 ## Tabs
 
@@ -235,8 +267,10 @@ stops the finalising of an invoice instead of turning silently into `DE`.
 
 ## Web API
 
-All routes require a signed-in person with the module on and an organisation (`400` with a hint otherwise); writes
-need the organisation's admin. `GET/PUT /api/office/settings`, `GET /api/office/packs`, `GET /api/office/packs/<code>`,
+All routes require a signed-in person with the module on; they work in the office of the shown workspace (`400` with a
+hint only for "All workspaces" with several organisations); writes need the area's admin. `GET /api/office/settings`
+also returns `personal` (1 = the personal office); a personal office adds `can_move` (1 = `POST /api/office/move` is
+allowed) and `org_offices` (`[{id, name}]` while it is empty and the person has organisations: the hint). `GET/PUT /api/office/settings`, `GET /api/office/packs`, `GET /api/office/packs/<code>`,
 `POST /api/office/packs/validate`, `GET /api/office/number-preview?scheme=&kind=offer|invoice|credit|reminder` (the next number, `yearly` = the counter restarts every year, or a plain-language `error`), and for each of `services`, `equipment`,
 `sets`, `texts`, `contracts`, `roles`, `crew` (2.47.0): `GET /api/office/<kind>?q=&archived=1`, `POST /api/office/<kind>`,
 `GET/PATCH/DELETE /api/office/<kind>/<id>` (delete archives a row that documents, contracts or sets still use).

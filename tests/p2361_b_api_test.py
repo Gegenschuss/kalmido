@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """2.36.1 API tests, part B: Office & finance (#1021) -- module skeleton, country pack DE, master data; own container (start.sh).
  - the module needs the feature "office" and an organisation: 403 without the feature, 403 for kids and agent accounts,
-   400 with a readable hint for a person without an organisation (and with the workspace switch on "all" in several)
+   400 with a readable hint with the workspace switch on "all" in several organisations (2.47.3, #1360: a person without an
+   organisation works in the own personal office)
  - the organisation's admin edits settings and master data (services, equipment, sets, text blocks, framework contracts);
    a member reads them and is refused on writes (403); foreign ids are 404 for everyone
  - the first call seeds the DE pack's rights catalogue + intro / closing into the text blocks; the country packs are listed
@@ -282,9 +283,10 @@ BETA = r.json()["id"]
 check(A.patch(B + f"/api/admin/orgs/{ORG}", json={"admins": [ALICE]}).ok, "setup: alice is the first organisation's admin")
 r1, r2 = A.delete(B + f"/api/orgs/{ORG}/members/{CAROL}"), A.delete(B + f"/api/orgs/{ORG}/members/{DAVE}")
 check(r1.ok and r2.ok, f"setup: carol only in Beta, dave in no organisation {r1.status_code} {r2.status_code} {r1.text[:80]}")
+# 2.47.3 (#1360): a person without an organisation works in the own personal office (empty, nothing of the organisations)
 r = Da.get(B + O + "/settings")
-check(r.status_code == 400 and "organisation" in r.text.lower(), "tenant: a private person gets 400 with the hint " + r.text[:120])
-check(Da.get(B + O + "/services").status_code == 400 and Da.post(B + O + "/services", json={"name_de": "x"}).status_code == 400, "tenant: ... on every route")
+check(r.ok and r.json()["personal"] == 1 and r.json()["org_id"] not in (ORG, BETA) and r.json()["role"] == "admin", "tenant: a private person gets the own personal office " + r.text[:120])
+check(Da.get(B + O + "/services").json()["items"] == [] and Da.get(B + O + f"/services/{SV3}").status_code == 404, "tenant: ... with nothing of the organisations")
 r = Ca.get(B + O + "/settings")
 check(r.ok and r.json()["org_id"] == BETA and r.json()["role"] == "admin" and r.json()["settings"]["company"]["name"] == "", "tenant: carol works in Beta with fresh settings " + r.text[:200])
 check(Ca.get(B + O + "/services").json()["items"] == [], "tenant: Beta has no services of the first organisation")
