@@ -85,6 +85,18 @@ const PASS = 'correct horse battery staple';
     check(await ev(`!!document.querySelector('#d-ln .lnopen') && !document.querySelector('#d-ln-in')`), '#1642: "Lock now" hides the text');
     await ev(`(document.querySelector('#d-ln .lnopen').click(), 1)`);
     check(await waitFor(`(document.querySelector('#d-ln-in')?.value || '').includes('(moved)')`) && !(await ev(`!!document.querySelector('#e2e-pw')`)), '#1642: once per session: opening again needs no passphrase');
+    // 2.48.0 review (S3): "Lock encryption" / sign out: no decrypted locked note stays in the tab's memory
+    await ev(`(e2eLock(), 1)`); await sleep(300);
+    check(await ev(`Object.keys(LN.notes).length === 0 && LN.saveT === null && !document.querySelector('#d-ln-in') && !!document.querySelector('#d-ln .lnopen')`),
+      '#1642 review: locking the keys empties the decrypted notes and redraws the field');
+    // 2.48.0 review (L7): an edit conflict about the note goes with the lock; a waiting batch of the task blocks locking
+    check(await ev(`(() => { S.conflicts = [{tid: ${T}, field: 'content', server: 'a', mine: 'b', title: 'x'}, {tid: ${T}, field: 'title', server: 'c', mine: 'd'}]; ln_forget(${T});
+      return S.conflicts.length === 1 && !(localStorage.getItem('conflicts') || '').includes('"content"') && ln_outHit({url: '/api/tasks/batch', body: {ids: [${T}]}}, ${T}) && !ln_outHit({url: '/api/tasks/${T}9'}, ${T}); })()`),
+      '#1642 review: conflicts about the note go, waiting batches are seen');
+    await ev(`(() => { S.conflicts = []; LS.set('conflicts', []); return 1; })()`);
+    await ev(`(document.querySelector('#d-ln .lnopen').click(), 1)`);
+    if (await waitFor(`!!document.querySelector('#e2e-pw')`)) await ev(`(() => { document.getElementById('e2e-pw').value = ${JSON.stringify(PASS)}; document.querySelector('.e2edlg form').requestSubmit(); return 1; })()`);
+    check(await waitFor(`(document.querySelector('#d-ln-in')?.value || '').includes('(moved)')`, 160), '#1642 review: the passphrase opens it again');
     // remove the lock: a normal note again
     await ev(`(document.querySelector('#d-ln [data-ln="remove"]').click(), 1)`);
     await waitFor(`!!document.querySelector('.cdlg [data-cd="yes"]')`);
