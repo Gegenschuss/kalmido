@@ -77,7 +77,8 @@ const rowBox = el => { el.getBoundingClientRect = () => ({top: 100, bottom: 140,
   await until(() => d.querySelector('#toast button'));
   d.querySelector('#toast button').click();
   check(await until(async () => !((await taskOf(T3)).blockers || []).length), '#1330: Undo of the panel drop');
-  dnd(w, row(T2), 'dragstart'); await sleep(50);
+  await until(() => w.eval('!HIST.busy') && row(T2));  // 2.46.1: the undo redraw is over (slow CI runners)
+  dnd(w, row(T2), 'dragstart'); await until(() => zone('blocking'));
   dnd(w, zone('blocking'), 'dragover'); dnd(w, zone('blocking'), 'drop'); dnd(w, row(T2), 'dragend');
   check(await until(async () => ((await taskOf(T2)).blockers || []).includes(T3)), '#1330: "Blocking": the dragged Build waits on Ship');
   // the task menu: "Waiting on a task…" with the search
