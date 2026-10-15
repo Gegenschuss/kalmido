@@ -641,6 +641,21 @@ function inviteResult(j, name) {
     if (b.dataset.m === 'copy') { try { await navigator.clipboard.writeText(j.link); toast(tr('Copied')); } catch { $('#inv-link', md).select(); } }
   });
 }
+// 2.49.0 (#1553): the login page's backdrop (a soft violet gradient + a glow that pulses in CSS and follows the mouse: one
+// frame per movement, no loop; fixed on touch screens and with reduced motion) and the line under the card (survive innerHTML)
+function lg_decor(el) {
+  el.dataset.lgfoot = tr('Tasks, team and office in one place.');
+  if (!matchMedia('(hover: hover) and (pointer: fine)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let x = 0, y = 0, f = 0;
+  el.addEventListener('pointermove', e => {
+    x = e.clientX; y = e.clientY;
+    if (!f) f = requestAnimationFrame(() => { f = 0; el.style.setProperty('--lgx', x + 'px'); el.style.setProperty('--lgy', y + 'px'); });
+  }, {passive: true});
+}
+function lg_hello() {
+  const h = new Date().getHours();
+  return h >= 5 && h < 11 ? tr('Good morning, nice to have you here.') : h >= 18 || h < 5 ? tr('Good evening, nice to have you here.') : tr('Welcome back, nice to have you here.');
+}
 // 2.22.0 (#697): the page "Set up your account" (the link of an invitation or a password reset: /#invite/<token>)
 async function inviteScreen(tok) {
   history.replaceState(null, '', location.pathname);  // the token leaves the address bar (and the history) at once
@@ -649,6 +664,7 @@ async function inviteScreen(tok) {
   await i18nLoad(info.lang || uiLang());
   const el = document.createElement('div');
   el.className = 'modal authscreen';
+  lg_decor(el);  // 2.49.0 (#1553)
   const logo = `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`;
   if (info.error) {
     el.innerHTML = `<div class="card">${logo}<p role="alert">${esc(info.error)}</p><button class="btn pri" type="button" data-au="login">${tr('To the login')}</button></div>`;
@@ -703,6 +719,7 @@ async function authScreen(j) {
   const kind = info.setup ? 'setup' : j.auth;
   const el = document.createElement('div');
   el.className = 'modal authscreen';
+  lg_decor(el);  // 2.49.0 (#1553)
   // 2.14.0: the first account (welcome) shows the heron instead of the small mark
   const logo = kind === 'setup' ? `<div class="alogo hwelc">${heron('welcome', 'hwel')}<b>${APP_NAME}</b></div>` : `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b>${info.org ? `<small class="aorg">${esc(info.org)}</small>` : ''}</div>`;  // 2.22.0 (#752): the organisation
   if (kind === 'no_account' || kind === 'disabled') {
@@ -710,19 +727,19 @@ async function authScreen(j) {
   } else {
     const setup = kind === 'setup';
     el.innerHTML = `<div class="card">${logo}
+      ${setup ? '' : `<p class="lghello">${esc(lg_hello())}</p>`}${''/* 2.49.0 (#1553) */}
       ${setup ? `<p>${tr('Welcome! Create the first account, it becomes the admin.')}</p>${info.login ? `<p class="muted">${esc(tr('Signed in at the login proxy as “{0}”: the account is linked to it, a password is optional.', info.login))}</p>` : ''}` : ''}
       <form id="auth-form" autocomplete="on">
         ${setup && info.setup_code ? `<label class="aulab" for="au-code">${tr('Setup code')}</label><input id="au-code" autocapitalize="off" autocomplete="one-time-code" spellcheck="false" required aria-describedby="au-code-h"><div class="shint shcode" id="au-code-h">${tr('The server prints it into its log at start: {0}', '<code>docker compose logs kalmido</code>')}</div>` : ''}${''/* 2.45.0 (#1515) */}
         <label class="aulab" for="au-user">${tr('Username')}</label><input id="au-user" name="username" autocapitalize="off" autocomplete="username" required value="${setup && info.login ? esc(String(info.login).toLowerCase()) : ''}">
         ${setup ? `<label class="aulab" for="au-name">${tr('Display name')}</label><input id="au-name" maxlength="60" autocomplete="name" placeholder="${tr('optional')}">` : ''}
         <label class="aulab" for="au-pw">${tr('Password')}</label><span class="pwwrap"><input id="au-pw" name="password" type="password" autocomplete="${setup ? 'new-password' : 'current-password'}" ${setup && info.login ? '' : 'required'} ${setup ? `placeholder="${tr('at least {0} characters', 8)}"` : ''}><button type="button" class="iconbtn pweye" data-au="pwshow" aria-pressed="false" aria-label="${esc(tr('Show password'))}" title="${esc(tr('Show password'))}">${ic('eye', 's')}</button></span>
-        ${setup ? '' : `<label class="chkl"><input type="checkbox" id="au-rem" checked> ${tr('Stay logged in')}</label>`}
+        ${setup ? '' : `<div class="lgopts"><label class="chkl"><input type="checkbox" id="au-rem" checked> ${tr('Stay logged in')}</label>${info.forgot ? `<button type="button" class="linkbtn lgforgot" data-au="forgot">${tr('Forgot your password?')}</button>` : ''}</div>`}${''/* 2.49.0 (#1531, #1553): one row */}
         <div class="aerr" role="alert" id="au-err"></div>
         <button class="btn pri" type="submit">${setup ? tr('Create account') : tr('Log in')}</button>
         ${!setup && (info.oidc || (info.passkey_login && pkSupported())) ? `<div class="aor"><span>${tr('or')}</span></div>` : ''}
         ${!setup && info.oidc ? `<button type="button" class="btn" data-au="oidc">${ic('link', 's')} ${esc(tr('Log in with {0}', info.oidc.label))}</button>` : ''}
         ${!setup && info.passkey_login && pkSupported() ? `<button type="button" class="btn" data-au="passkey">${ic('key', 's')} ${tr('Log in with a passkey')}</button>` : ''}
-        ${!setup && info.forgot ? `<p class="aulink lgforgot"><button type="button" class="linkbtn" data-au="forgot">${tr('Forgot your password?')}</button></p>` : ''}${''/* 2.49.0 (#1531) */}
         ${!setup && info.signup ? `<p class="aulink">${tr('New here?')} <button type="button" class="linkbtn" data-au="signup">${tr('Create account')}</button></p>` : ''}
       </form></div>`;
     const le = (location.hash.match(/login-error=([a-z_]+)/) || [])[1];

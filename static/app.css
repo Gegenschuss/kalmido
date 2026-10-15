@@ -6814,3 +6814,24 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 /* 2.46.7 (#1708): touch targets of the Lists summary and the workspace button (device test) */
 .aglists>summary{min-height:2.75rem}
 @media (pointer:coarse){.agnm .avws{min-height:2.75rem}}
+/* 2.49.0 A (#1553) the login page (also invitation, setup, new password, sign-in link): a soft violet gradient, a glow that
+   pulses (CSS) and follows the mouse (account.js lg_decor sets --lgx/--lgy), a calmer card, a greeting, the line under the card */
+.modal.authscreen{--lg-g1:color-mix(in srgb,var(--accent) 16%,transparent);--lg-g2:color-mix(in srgb,color-mix(in srgb,var(--accent) 45%,#000) 24%,transparent);--lg-glow:color-mix(in srgb,var(--accent) 22%,transparent);--lg-card:color-mix(in srgb,var(--bg2) 92%,transparent);--lg-shadow:0 1.875rem 5rem rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.06)}
+:root[data-theme="light"] .modal.authscreen{--lg-g1:color-mix(in srgb,var(--accent) 12%,transparent);--lg-g2:color-mix(in srgb,var(--accent) 9%,transparent);--lg-glow:color-mix(in srgb,var(--accent) 15%,transparent);--lg-card:color-mix(in srgb,#fff 94%,transparent);--lg-shadow:0 1.875rem 4.375rem rgba(60,40,120,.14),0 0 0 1px rgba(20,10,60,.06)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] .modal.authscreen{--lg-g1:color-mix(in srgb,var(--accent) 12%,transparent);--lg-g2:color-mix(in srgb,var(--accent) 9%,transparent);--lg-glow:color-mix(in srgb,var(--accent) 15%,transparent);--lg-card:color-mix(in srgb,#fff 94%,transparent);--lg-shadow:0 1.875rem 4.375rem rgba(60,40,120,.14),0 0 0 1px rgba(20,10,60,.06)} }
+.modal.authscreen,:root[data-theme] .modal.authscreen{background:linear-gradient(150deg,var(--lg-g1) 0%,transparent 45%,var(--lg-g2) 100%),var(--bg);align-content:center;row-gap:1.125rem;overflow:hidden auto}
+.modal.authscreen::before{content:"";position:fixed;left:0;top:0;width:35rem;height:35rem;margin:-17.5rem 0 0 -17.5rem;border-radius:50%;pointer-events:none;background:radial-gradient(closest-side,var(--lg-glow),transparent);translate:var(--lgx,72vw) var(--lgy,30vh);transition:translate .6s ease-out;animation:lgpulse 5s ease-in-out infinite;will-change:translate,scale,opacity}
+@keyframes lgpulse{0%,100%{scale:.92;opacity:.75}50%{scale:1.06;opacity:1}}
+.modal.authscreen>.card{position:relative;z-index:1;background:var(--lg-card);border-radius:1.375rem;box-shadow:var(--lg-shadow)}
+.modal.authscreen>.card:not(.setupcard){width:min(25rem,100%);padding:2.125rem 1.875rem 1.625rem}
+.modal.authscreen[data-lgfoot]::after{content:attr(data-lgfoot);position:relative;z-index:1;font-size:.75rem;color:var(--muted);text-align:center}
+.modal.authscreen .alogo{justify-content:center;font-size:1.625rem;margin-bottom:1.25rem}
+.modal.authscreen .alogo b{font-weight:650;letter-spacing:-.02em}
+.authscreen .lghello{text-align:center;font-size:.9375rem;font-weight:550;color:var(--text2);margin:0 0 1rem}
+.authscreen input:not([type=checkbox]){border-radius:.75rem;background:var(--bg3);border:1px solid var(--line2)}
+.authscreen input:not([type=checkbox]):focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent);outline:none}
+.authscreen .btn{height:auto;min-height:2.75rem;border-radius:.75rem}
+.authscreen .btn.pri{min-height:2.875rem;border:0;font-weight:600;font-size:.9375rem;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 88%,#fff 12%),color-mix(in srgb,var(--accent) 85%,#4c1d95 15%));box-shadow:0 .5rem 1.375rem color-mix(in srgb,var(--accent) 30%,transparent)}
+.authscreen .lgopts{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0 .75rem;margin:-.25rem 0 -.375rem}
+.authscreen .lgforgot{min-height:2.75rem;font-size:.84375rem;text-decoration:none}
+@media (prefers-reduced-motion: reduce){ .modal.authscreen::before{animation:none;transition:none} }
