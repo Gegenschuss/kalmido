@@ -208,6 +208,8 @@ check(A.post(B + O + "/services", json={"name_de": "S3", "role_id": FREMD}).stat
 r = A.post(B + O + "/services", json={"name_de": "KSK-Test", "unit": "percent", "daily_rate": 5, "intext": "shooting"})
 check(r.status_code == 201 and r.json()["unit"] == "percent" and r.json()["intext"] == "shooting", "service: unit percent, kind shooting " + r.text[:200])
 A.delete(B + O + f"/services/{r.json()['id']}")
+A.post(B + O + "/services", json={"name_de": "Sprecher", "name_en": "Voice", "category": "Audio", "sort": 7, "daily_rate": 480, "hourly_rate": 60,
+                                  "raw_fee": 1, "producing": 1, "role": "Unbekannt"})  # only role_id empty, and that role exists nowhere
 r = A.post(B + O + "/services", json={"name_de": "Kamera", "daily_rate": 700})  # empty fields: the import fills them
 KAM = r.json()["id"]
 LK = A.post(B + "/api/office/equipment", json={"name": "Lichtkoffer", "daily_rate": 80}).json()["id"]
@@ -220,6 +222,7 @@ SERVICES = [["serviceDE", "serviceEN", "dailyrate", "hourlyrate", "rawfee", "pro
             ["Farbkorrektur", "Grading", 600, "", 1, 0, "", "", "", "intern"],
             ["---- AUDIO ----"],
             ["Tonmischung", "Sound mix", "", 85, 0, 1, 2, "", "", "extern"],
+            ["Sprecher", "Voice over", 480, "", 0, 0, 2, "", "Unbekannt", "extern"],
             ["---- OFFICE ----"],
             ["Künstlersozialkasse", "Artists' social insurance", 0.05, "", 0, 0, 3, "", "", "extern"],
             ["---- SHOOTING ----"],
@@ -234,7 +237,8 @@ r = A.post(B + L + "/preview", files={"file": ("KV.xlsx", XLSX)})
 check(r.ok, "preview " + r.text[:300])
 P = r.json()
 sv = {x["name_de"]: x for x in P.get("services", [])}
-check(list(sv) == ["Kamera", "Schnitt", "Farbkorrektur", "Tonmischung", "Künstlersozialkasse", "Drehtag Kamera"], f"preview: the table Services_2 is read {list(sv)}")
+check(list(sv) == ["Kamera", "Schnitt", "Farbkorrektur", "Tonmischung", "Sprecher", "Künstlersozialkasse", "Drehtag Kamera"], f"preview: the table Services_2 is read {list(sv)}")
+check(sv["Sprecher"]["action"] == "skip" and sv["Sprecher"]["fill"] == {}, f"preview: a role found neither in the file nor in the masters is nothing to fill {sv['Sprecher']}")
 k = sv.get("Kamera", {})
 check(k.get("action") == "fill" and k.get("fill") == {"name_en": "Camera", "category": "Video", "sort": k.get("sort"), "raw_fee": 1, "producing": 1,
                                                        "role": "Motion Designer", "role_id": "Motion Designer"},
