@@ -75,6 +75,13 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   w.location.hash = 'wiki/' + OTHER;
   const bl = await until(() => d.querySelector('#view .wkback a'));
   check(bl && bl.getAttribute('href') === '#wiki/' + START, 'Docs/Other lists the backlink from Docs/Start');
+  // a page that does not exist: the message, and no request loop
+  let gets = 0; const f0 = w.fetch; w.fetch = (u, o) => { if (/\/api\/wiki\/pages\/999999/.test(String(u))) gets++; return f0(u, o); };
+  w.location.hash = 'wiki/999999';
+  await until(() => /does not exist/.test(d.querySelector('#view .wkpage')?.textContent || ''));
+  w.eval('renderView(); renderView()'); await sleep(600);
+  check(/does not exist/.test(d.querySelector('#view .wkpage')?.textContent || '') && gets === 1, 'a missing page: the message, asked once (' + gets + ')');
+  w.fetch = f0;
   // Undo of "New page"
   const back0 = await call('GET', '/api/wiki/pages/' + START);
   check(back0.status === 200, 'page exists before undo');

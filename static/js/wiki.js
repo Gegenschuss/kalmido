@@ -34,8 +34,8 @@ async function wk_load(sp, force) {
 async function wk_loadPage(id, force) {
   if (WK.busy['p' + id] || (!force && WK.pg && WK.pg.id === id && (WK.pg._v === S.v || WK.dirty || WK.edit))) return;
   WK.busy['p' + id] = true;
-  try { const p = await rawFetch('GET', '/api/wiki/pages/' + id); p._v = S.v; if (WK.pg?.id !== id) { WK.edit = !!WK.editNext && WK.editNext === id; WK.editNext = null; } WK.pg = p; WK.pgErr = ''; WK.space = p.space; }
-  catch (e) { if (e.message === 'auth') return; WK.pgErr = e.status === 404 ? tr('This page does not exist or you cannot see it.') : e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; if (WK.pg?.id === id) WK.pg = null; }
+  try { const p = await rawFetch('GET', '/api/wiki/pages/' + id); p._v = S.v; WK.pgErrFor = null; if (WK.pg?.id !== id) { WK.edit = !!WK.editNext && WK.editNext === id; WK.editNext = null; } WK.pg = p; WK.pgErr = ''; WK.space = p.space; }
+  catch (e) { if (e.message === 'auth') return; WK.pgErrFor = id + ':' + S.v; WK.pgErr = e.status === 404 ? tr('This page does not exist or you cannot see it.') : e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; if (WK.pg?.id === id) WK.pg = null; }
   finally { WK.busy['p' + id] = false; }
   if (S.route.mod === 'wiki') viewSafeRender();
 }
@@ -70,7 +70,7 @@ function viewWiki() {
   const sp = wk_cur(), d = WK.idx[sp];
   if (!d || d.v !== S.v) wk_load(sp);
   const id = S.route.wid;
-  if (id && (!WK.pg || WK.pg.id !== id || WK.pg._v !== S.v)) wk_loadPage(id);
+  if (id && WK.pgErrFor !== id + ':' + S.v && (!WK.pg || WK.pg.id !== id || WK.pg._v !== S.v)) wk_loadPage(id);  // a page that failed: again only with new data
   const cur = id && WK.pg && WK.pg.id === id ? WK.pg : null, mob = isMobile();
   const pages = d?.pages || [], q = WK.q.trim().toLowerCase();
   const vis = q ? pages.filter(p => p.path.toLowerCase().includes(q)) : pages;
