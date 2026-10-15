@@ -643,6 +643,7 @@ fresh; run p2430_c_ui node p2430_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.43.0 part A: #1328 formula fields, sum row, key figures; #1331 a list like a spreadsheet
 fresh; run p2430_a_api "$PY" p2430_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2430_a_ui node p2430_a_ui.js "$KALMIDO_TEST_DATA"
+shard 6  # 2.46.3: the 2.44 / 2.45 suites run in shard 6 (shard 10 reached the 30 min CI job limit, shard 6 took 14 min)
 # 2.44.0 part B: #1443 outbox + looked-at images, #1445 jobs (agent_job.py), #1447 task events bundled (starter modules, no server)
 fresh; run p2440_b_launcher "$PY" p2440_b_launcher_test.py
 # 2.44.0 part A: the launcher's event runner core (approval-done, permission questions, approval lifecycle, resumed
@@ -670,6 +671,7 @@ fresh; run p2450_b_ui node p2450_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2451_a_api "$PY" p2451_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.45.1 part B: #1556 devices with a German and an English name (master data, legacy import Device DE / Device EN, undo)
 fresh; run p2451_b_api "$PY" p2451_b_api_test.py "$KALMIDO_TEST_DATA"
+shard 8  # 2.46.3: the 2.46 suites (and new ones after them) run in shard 8 (shard 10 full, shard 8 took 15 min)
 # 2.46.1 lead: #1634 subtasks typed fast (queue, the rebuilt field keeps the text)
 fresh; run p2461_l_ui node p2461_l_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.1 part C: #1554 several contacts at once (delete / move in one request, rights, birthdays, CardDAV, token API; the selection)
