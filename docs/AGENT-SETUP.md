@@ -434,6 +434,35 @@ chat messages of one person that arrive together: one run). It does what a hoste
   block goes back to the agent **once** in the same session: the complete answer again, this time with the block, no
   tools. Still without a block it is posted with a visible note that nothing happens without an explicit yes. Chat runs
   only; `KALMIDO_APPROVAL_CHECK=0` in `agent.env` switches it off.
+- **Approvals decided in words** (2.44.0): the open approval cards of a chat stand in its prompt (*Open approvals*, one
+  title per line). When the person decides one in words, the agent ends its answer with a block ` ```approval-done `
+  (alias ` ```freigabe-erledigt `): one line per decided card, the title exactly as listed, `No: ` in front for a no. The
+  runner then closes exactly those cards (withdrawn, or denied for a no), never as a yes; a line that matches no card or
+  several cards closes nothing.
+- **Approvals survive a restart** (2.44.0): open cards are kept in the state folder (`state.json` in `KALMIDO_STATE_DIR`);
+  after 2 hours the person gets one reminder (`KALMIDO_APPROVAL_REMIND`, seconds), after 7 days (`KALMIDO_APPROVAL_TTL`)
+  the card is withdrawn as expired and the next prompt of that chat tells the agent (a no). A press on an expired card
+  gets a short answer; the same answer twice (button and thumbs) counts once.
+- **Permission questions in the chat** (2.44.0, Claude Code only): a tool call outside the agent's allow list asks the
+  person in the chat (*Allow* / *Deny*, a thumbs up / down or *yes* / *no* while exactly one question is open). The runner
+  hands each run its own settings file with a `PermissionRequest` hook (`--settings`; your own settings stay untouched;
+  a command with its own `--settings` gets none). No answer in 9 minutes (`KALMIDO_PERM_TIMEOUT`, seconds) is a no; a
+  task run asks the agent's owner (or `KALMIDO_PERM_USER`). `KALMIDO_PERM_RELAY=0` switches it off; it needs a
+  permission mode that asks (`default`). See [AGENT-SECURITY.md](AGENT-SECURITY.md#4-claude-code-project-settings).
+- **One conversation per chat** (2.44.0, Claude Code only): the runs of one person's chat go on in the same
+  conversation (`--resume`) instead of starting fresh; task events and other commands still run fresh, and every person
+  has a conversation of their own. A new one starts after `KALMIDO_SESSION_MAX_TOKENS` (default 150000) tokens,
+  `KALMIDO_SESSION_MAX_RUNS` (60) runs, a pause of `KALMIDO_SESSION_IDLE_MIN` (120) minutes, on a new day, when the model
+  changes or after *Reset now*. Before the change the agent writes a short summary (one short extra run; not after a
+  reset) that the first prompt of the new conversation carries fenced as context only; the chat shows a notice *New
+  conversation (reason)*. A conversation that is gone starts fresh once. `KALMIDO_SESSION_RESUME=0`: a fresh run per
+  event as before.
+- **Robust runs** (2.44.0): an HTTP 429 of Kalmido is tried again after 5, 15, 30 and 60 seconds; a run ends after
+  `KALMIDO_RUN_TIMEOUT` seconds (default 3600, 0 = no limit) together with everything it started (its process group;
+  Windows `taskkill /T`). A failed run is tried once more only when it had not called a tool yet; then the chat gets a
+  short note with the reason (secrets masked). Events that arrive during a run wait in a queue in the state folder (a
+  restart answers them, never twice), and a lock there (`runner.lock`) keeps a second runner from starting on the same
+  folder (it exits with code 3; a stale lock never blocks).
 - **Suggestions** (2.40.0): a final block ` ```suggest ` (up to three short next steps, one per line) becomes answer
   buttons under the answer (servers without buttons: a numbered line). A pressed button comes back as `chat_choice`
   with its label; a next message that is only the number (`2`) picks that suggestion too.

@@ -279,6 +279,21 @@ configuration nor in the model's environment, and the settings below forbid read
 `dontAsk` means: anything not allowed is refused without a prompt, so an injected instruction cannot wait for someone
 to click *Allow*.
 
+**Permission questions in the chat (2.44.0, `perm_relay`).** In event mode with Claude Code and a mode that asks
+(`default`), the reference runner (`mcp/agent_run.py`) hands every run a settings file of its own with `--settings`
+(never the person's own settings): a `PermissionRequest` hook (`agent_run.py --perm-hook`) that asks the person in the
+chat before a tool outside the allow list runs (a permission question with *Allow* / *Deny*; a thumbs up / down or a plain
+*yes* / *no* counts only while exactly ONE question is open). It is **on** by default for Claude Code and off for other
+commands (they have no such hook); `KALMIDO_PERM_RELAY=0` switches it off. What it means:
+
+- The person is the last gate for everything the allow list does not cover: an injected instruction can now produce a
+  question in the chat. Read the command shown in the card before you allow it; when in doubt, deny.
+- No answer within `KALMIDO_PERM_TIMEOUT` (default 540 s = 9 minutes) is a **no**; when the runner is not running, the
+  hook denies at once; a late answer gets a note and changes nothing. The question shows the tool and its command or
+  file with secrets masked.
+- Only the person of that chat answers (task runs: the agent's owner, or `KALMIDO_PERM_USER`). `dontAsk` above never
+  asks anyone: keep it for agents that must never wait for a click.
+
 ### 5. Event loop with back-off
 
 `bin/events.sh` long-polls `GET /api/v1/agent/events?wait=60` and prints one line per event for the session to handle.
