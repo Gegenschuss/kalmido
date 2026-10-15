@@ -180,7 +180,7 @@ async function fg_askRoles(url, who) {
     let done = false;
     const md = modal(`<h3 id="fg-rq-t">${esc(tr('Replace the roles set per list?'))}</h3><div class="cdlg-b" id="fg-rq-b">${esc(trn('In {0} list {1} has a role of its own ({2}).', 'In {0} lists {1} has a role of its own ({2}).', ls.length, who, shown))}</div>
       <div class="foot fgrqf"><button type="button" class="btn" data-fgrq="x">${esc(tr('Cancel'))}</button><span class="spacer"></span><button type="button" class="btn" data-fgrq="new">${esc(tr('Only new lists'))}</button><button type="button" class="btn pri" data-fgrq="all">${esc(tr('Set everywhere'))}</button></div>`);
-    md.classList.add('cdlg');
+    md.classList.add('fgrqdlg');
     md.setAttribute('role', 'alertdialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'fg-rq-t'); md.setAttribute('aria-describedby', 'fg-rq-b');
     const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); };
     md.addEventListener('click', e => { const b = e.target.closest('[data-fgrq]'); if (b) fin(b.dataset.fgrq === 'all' ? true : b.dataset.fgrq === 'new' ? false : null); });

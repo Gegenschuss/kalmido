@@ -6500,5 +6500,10 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .authscreen .shint.shcode{margin:.25rem 0 .75rem}
 .shint.warn.shkey{color:var(--text);background:var(--bg3);border-left:.1875rem solid var(--danger);border-radius:var(--radius);padding:.625rem .75rem;margin:0 0 .75rem}
 .shint.warn.shkey b{color:var(--danger);display:block;margin-bottom:.125rem}
-/* 2.46.0 C (#1605): a group's picture in the chip of a task assigned to it */
+/* 2.46.0 C (#1606 / #1605): the question before a folder role replaces roles set per list (three buttons, wrap on a phone);
+   a group's picture in the chip of a task assigned to it */
+.modal.fgrqdlg{z-index:75}
+.modal.fgrqdlg .card{width:min(27rem,100%)}
+.modal.fgrqdlg h3{margin-bottom:.5rem;line-height:1.35}
+.fgrqf{flex-wrap:wrap;gap:.5rem}
 .gchip .fggimg{width:.875rem;height:.875rem;border-radius:50%;object-fit:cover;flex:none}
