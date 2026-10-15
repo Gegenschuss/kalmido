@@ -1,7 +1,7 @@
 // 2.46.2 UI tests of part D (own container, start.sh). jsdom:
 // - #1472 the month label of a client page is empty (not "Invalid Date") without a month
 // - #1662 an empty section has no "Drop tasks here" field any more, its name takes the drop; "+ New section" stays
-// - #1663 a locked vault and no note of mine: the encrypted-note field is gone; with a note of mine: "Unlock"
+// - #1663 encryption locked and no note of mine: the encrypted-note field is gone; with a note of mine: "Unlock"
 // - #1664 a subfolder on the upper half of a top folder becomes a top-level folder right before it; lower half = into it
 // - #1647 the import action bar is a flex row over the full width (the spacer works)
 const {execFileSync} = require('child_process');
