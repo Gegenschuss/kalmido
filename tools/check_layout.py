@@ -92,6 +92,10 @@ TENANT_EXEMPT = {
     "chat_saves": _OWN + " (2.37.0 #1159: which chat message a person saved as a task; the task itself keeps its list)",
     "kid_parents": _FAM, "kid_stars": _FAM, "kid_rewards": _FAM,
     "kid_pins": _FAM, "kid_pin_open": _OWN + " (2.49.0 #1551: the session of a kid)",
+    # 2.49.0 (#1106): finding people by e-mail is person to person, outside every workspace (accounts/discover.py)
+    "disc_profiles": _OWN, "disc_tokens": _OWN, "disc_quota": _OWN, "conn_blocks": _OWN,
+    "conn_requests": "2.49.0 (#1106): a request between two people (no workspace); only the two see it",
+    "conn_links": "2.49.0 (#1106): an accepted connection between two people, like a private shared list (no workspace)",
 }
 schema_src = re.sub(r"--[^\n]*", "", read("kalmido", "core", "schema.py"))
 tables = {m.group(1): m.group(2) for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\);", schema_src, re.S)}

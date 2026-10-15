@@ -626,7 +626,9 @@ workspace with it answers `409` ("… works in another workspace …"), *Share a
 agent works in its organisation; a personal agent starts private and its owner may move it into one of their
 organisations (`PATCH /api/my/agents/{id} {"org_id": …}`), refused while it still sits in lists of another workspace.
 An organisation's list is shared only with the organisation's members, so an agent in such a list can be sure that
-everybody who reads its comments belongs to the organisation. Agents that already sat in a list of another workspace
+everybody who reads its comments belongs to the organisation. Finding people by e-mail and connection requests (2.49.0)
+are for people only: there is no agent API and no MCP tool for them, agents are never found, and an agent cannot look
+accounts up. Agents that already sat in a list of another workspace
 before the update are kept and pointed out to the list's owner, who decides. Since 2.37.0 the database enforces this as well (row-level
 security): an agent **without** a workspace (`org_id: null`) that still sits in a list of an organisation no longer
 sees that list; the move report of the update and the organisation boundary check name these cases. Fix: assign the

@@ -242,6 +242,7 @@ function accountHtml() {
     <div class="row"><label id="a-col-h">${tr('Colour')}</label><div class="pfcol" id="a-col" role="group" aria-labelledby="a-col-h">${ac_pickHtml((S.colors || {})[m.id] || '', 'me')}</div></div>
     ${pw ? `<div class="row"><label for="a-cur">${tr('Password')}</label><input type="text" class="cfhid" hidden tabindex="-1" aria-hidden="true" autocomplete="username" value="${esc(S.me?.username || '')}" readonly><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>` : ''}
     ${storageHtml()}
+    ${dsc_rowHtml()}${''/* 2.49.0 (#1106): People: find, requests, findable by e-mail */}
     ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : ''}
     ${tfaHtml()}
     ${e2eHtml()}${''/* 2.42.0 (#828, #909) */}

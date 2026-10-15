@@ -6934,3 +6934,14 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 @media (pointer:coarse){.wkitem,.mmoi{min-height:2.75rem}.mmbar .btn,.mmbar .iconbtn,.mmbar .seg button{min-height:2.75rem;min-width:2.75rem}}
 /* 2.49.0 C (#1199): a task's "Mentioned in" (knowledge pages) */
 .wkmen{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;font-size:var(--fs-s)}
+
+/* 2.49.0 E (#1106) Find people: the search row, result / request rows, the link in the share dialog */
+.dscmodal .card{max-width:34rem}
+.dsc-find{display:flex;gap:.5rem;align-items:center}
+.dsc-find input{flex:1;min-width:0}
+.dsc-row{gap:.5rem}
+.dsc-row .btn,.dsc-row .iconbtn{flex:none}
+.dsc-st{font-size:.85rem;white-space:nowrap}
+.dsc-none,.dsc-check{margin:.25rem 0 .5rem}
+.dsc-sharelink{display:inline-block;margin:.25rem 0 .5rem}
+@media (pointer:coarse){.dsc-row .btn{min-height:2.75rem}}

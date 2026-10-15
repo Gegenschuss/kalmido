@@ -310,6 +310,8 @@ APP_ONLY = [
     # 2.44.0 (#1517): the setup script trades the one-time code for the token and signs a computer off with its own token
     ("2.44.0 (#1517): one-command agent setup on a computer (setup script, no session); not an agent tool",
      ("=POST /api/agent-setup/redeem", "=POST /api/agent-setup/remove")),
+    # 2.49.0 (#1106): finding people by e-mail is for people only -- agents must not look accounts up
+    ("2.49.0 (#1106): find people by e-mail, address book check, connection requests, blocks; not for agents", ("* /api/disc",)),
 ]
 
 

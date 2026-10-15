@@ -212,6 +212,8 @@ function newsText(it, U) {
       owner: tr('{0} handed the list {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);
     case 'unblock': return d.hidden ? tr('{0} completed a task you cannot see: your task is unblocked', who) : tr('{0} completed {1}: your task is unblocked', who, q(d.title || ''));
     case 'newtask': return tr('{0} added a task', who);
+    case 'connreq': return tr('{0} wants to connect with you', who);  // 2.49.0 (#1106)
+    case 'connok': return tr('{0} accepted your connection request', who);
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
     case 'approval': return tr('{0} is waiting for your approval', who);
     case 'apdecide': return {approved: tr('{0} approved {1}', who, q(it.task_title || '')), changes: tr('{0} asks for changes to {1}', who, q(it.task_title || '')),
@@ -377,6 +379,7 @@ async function newsOpen(i) {
   if (it.kind === 'evinvite' && it.data?.event_id) { evOpen(it.data.event_id); return; }  // 2.21.0 (#659 / #658)
   if (it.kind === 'evshare') { go('cal'); setTimeout(evCalsModal, 150); return; }
   if (it.kind === 'abshare') { go('contacts'); return; }
+  if (it.kind === 'connreq' || it.kind === 'connok') { dsc_open(); return; }  // 2.49.0 (#1106)
   if (it.kind === 'usage') { if (feat('agents') && agentsOn()) go('agents'); else settingsModal('usage'); return; }  // 2.1.1 (#326)
   if (it.kind === 'approval' && !it.task_id && feat('agents') && agentsOn()) { go('agents'); return; }
   if (it.kind === 'signup') { settingsModal('users'); return; }  // 2.23.0 (#711): approve it under Users  // 2.15.0 (#479): an agent's request
