@@ -35,7 +35,7 @@ def read(name):
 caps = json.loads(read("launcher_capabilities.json"))["capabilities"]
 ids = [c["id"] for c in caps]
 check(len(ids) == len(set(ids)) and len(ids) >= 9, f"capability ids unique, at least 9: {ids}")
-core = read("agent_run.py")
+core = read("agent_run.py") + read("agent_extras.py") + read("agent_job.py")  # 2.44.0 (#1443 #1445 #1447): the additions live in modules of their own
 for name in ("agent_launcher.sh", "agent_launcher.ps1"):
     src = read(name)
     named = set()
