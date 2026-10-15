@@ -420,7 +420,7 @@ check(r.ok and r.json()["ok"] and R.get(B + "/api/me").json()["username"] == "ma
 st = R.get(B + "/api/state").json()
 check([l for l in st["lists"] if not l["is_inbox"]] == [] and not st["me"]["is_admin"], "no list access, no admin")
 dom = dbx("SELECT org_id FROM org_members WHERE user_id=?", (u[0][0],))
-check(dom == [(ORG1,)], "the instance's first organisation (no domain match) " + str(dom))
+check(dom == [], "#1562: no organisation without a domain match " + str(dom))  # 2.46.0 (#1562): before: the instance's first one
 # approval mode (with mail): confirm -> waits; the admin approves
 A.patch(B + "/api/admin/settings", json={"signup_mode": "approval"})
 m1 = len(mails())
