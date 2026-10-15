@@ -7,6 +7,41 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.46.0] - 2026-10-15
+
+**In short:** **Organisations and rights**: one kind of server for everybody - organisations plus a private space -, an
+admin picks the organisation when adding a person, organisation lists can be open to the whole organisation, and folder
+sharing asks before it replaces roles set per list.
+
+### Security
+- Security fix (organisation boundary, sign-up) (#1562).
+
+### Changed
+- **One kind of server** (#1592): organisations and a private space everywhere (formerly the mode *workspaces*); there is
+  no automatic single-organisation mode any more and no membership is added at start. Existing memberships, roles and
+  lists stay as they are. Organisation admins can remove members (their lists go to the admin). The user management
+  still lists every account for instance admins. `KALMIDO_INSTANCE_MODE=organisation` is ignored; `shared` stays.
+  People outside your organisations are reached by sharing a private list by e-mail address; a server without any
+  organisation lets everyone see everyone. The login page names no organisation; open registration stays off on a server
+  with organisations. Clients follow the organisation boundary for instance admins too. Upgrading: one check at the first
+  start of 2.46.0 writes once what the old start-up sync wrote every time (everybody in the one organisation), nothing else.
+- **Folder sharing asks first** (#1606): changing a person's or group's role in a shared folder asks *Set everywhere* /
+  *Only new lists* when some lists have a role of their own.
+- **Organisation settings tidied up** (#1563): one heading and one info link for the encryption block; the boundary check
+  unfolds to the affected lists, calendars and address books with a *Clean up* button.
+
+### Added
+- **Organisation and role when adding a person** (#1561): *Administration > People > Add* offers the organisation (none or
+  one of them) and the role (member / admin); the API takes `orgs: [{id, role}]`.
+- **Everyone in the organisation** (#1603): an organisation list can be visible to all members of its organisation
+  (read-only until they join, or editable for all); agents only when invited; no notifications for readers.
+- **Group pictures** (#1605): a preset or an own photo per group, shown in the share dialogs, the group management and on
+  tasks assigned to a group; backups now include profile pictures, list icons and group pictures (a 2.45 server cannot
+  restore such a backup).
+
+### Fixed
+- Back button between the share dialog and the settings of a folder or a list, without stacking dialogs (#1604).
+
 ## [2.45.1] - 2026-10-15
 
 **In short:** fixes for contacts and office master data (no new features apart from the English device name).
