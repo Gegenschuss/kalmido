@@ -255,18 +255,20 @@ function licDim(hex) {  // the list colour 40 % towards the light theme's text c
   const h = hex.slice(1), x = h.length < 6 ? [...h.slice(0, 3)].map(c => c + c) : [h.slice(0, 2), h.slice(2, 4), h.slice(4, 6)];
   return '#' + x.map((v, i) => Math.round(parseInt(v, 16) * .6 + [19, 20, 24][i] * .4).toString(16).padStart(2, '0')).join('');
 }
+// 2.46.1 (#1636): a shopping list without its own icon (or an emoji in its name) shows the cart -- only shown, nothing stored
+const sb_kindIcon = l => l.family === 'shopping' ? 'cart' : '';
 function listIconHtml(l, opts = {}) {
   const {cls = '', full = true, emoji = false, pic = true} = opts;
   if (!l || l.is_inbox) return '';
   const sm = sbiMode(), col = cssColor(l.color), st = col ? ` style="--lc:${col};--lcl:${licDim(col)}"` : '', cc = col ? ' lcol' : '';
   if (l.icon) return pic && sm !== 'dot' ? `<span class="lic lict${cc} ${cls}" aria-hidden="true"${st}>${licon(l, 'licon')}</span>` : '';
-  const em = leadEmoji(l.name);
+  const em = leadEmoji(l.name), kic = !em && sb_kindIcon(l);
   if (sm === 'emoji') return em ? (emoji ? `<span class="lic lict lemo${cc} ${cls}" aria-hidden="true"${st}>${esc(em)}</span>` : '')
-    : full ? `<span class="lic${cc} ${cls}" aria-hidden="true"${st}>${ic('list')}</span>` : '';
-  if (!em && !full) return '';
+    : full || kic ? `<span class="lic${cc} ${cls}" aria-hidden="true"${st}>${ic(kic || 'list')}</span>` : '';
+  if (!em && !full && !kic) return '';
   const lk = em && sm === 'line' ? sbiIconFor(em) : '';
   if (sm === 'dot') return `<span class="lic ${cls}" aria-hidden="true"><span class="licd" style="${col ? 'background:' + col : ''}"></span></span>`;
-  return `<span class="lic${cc} ${cls}" aria-hidden="true"${st}>${ic(lk || 'list')}</span>`;
+  return `<span class="lic${cc} ${cls}" aria-hidden="true"${st}>${ic(lk || kic || 'list')}</span>`;
 }
 // 2.36.2 (#1139): an agent gets a small robot in a calm blue (--bot) wherever it writes or sends; people get no symbol
 const licBot = () => ic('bot', 's lbot');
@@ -315,9 +317,9 @@ function renderSide() {
     const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
     const active = fl.some(l => onTasks && k === 'l:' + l.id);
     const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the rest of the row folds
-    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() ? '' : 'draggable="true"'}>${S.listReorder ? `<span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>` : ''}<span class="sic" aria-hidden="true">${ic('folder', 's')}</span><span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span>${folderShrHtml(f) /* 2.41.0 (#1428) */}<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
+    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() ? '' : 'draggable="true"'}>${S.listReorder ? `<span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>` : ic('chev', 's fcar') /* 2.46.1 (#1607): the arrow before the folder icon */}<span class="sic" aria-hidden="true">${ic('folder', 's')}</span><span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span>${S.listReorder ? '' : `<span class="c" ${n ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${n || ''}</span>` /* 2.46.1 (#1607): the number right after the name, the share icon at the right like a list's */}${folderShrHtml(f) /* 2.41.0 (#1428) */}<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
       ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
-      : `<span class="c" ${n ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${n || ''}</span>${ic('chev', 's fcar')}<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
+      : `<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
   };
   const fempty = () => `<div class="fempty">${isMobile() ? tr('empty: assign lists in sort mode') : tr('empty: drag a list here')}</div>`;
   const wsAll = wsCur() === 'all';

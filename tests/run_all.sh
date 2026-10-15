@@ -681,6 +681,8 @@ fresh; run p2461_c_import_ui node p2461_c_import_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.1 part D: #1639 list channel for agents that listen in, #1361 favourites 4-7, #1422 folder default "Hide completed"
 fresh; run p2461_d_api "$PY" p2461_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2461_d_ui node p2461_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.46.1 part A: #1607 #1643 the folder row like a list row, #1612 a list to the very end, #1635 sections to the end / long press on a phone, #1636 the cart
+fresh; run p2461_a_ui node p2461_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
