@@ -6758,5 +6758,9 @@
   "Takes people out of the lists, calendars and address books of an organisation they do not belong to. Agents stay as they are. This cannot be undone here.": "Retire les personnes des listes, calendriers et carnets d'adresses d'une organisation à laquelle elles n'appartiennent pas. Les agents restent inchangés. Impossible d'annuler ici.",
   "Move the agent to the right workspace (Settings > Agents).": "Déplacer l'agent dans le bon espace de travail (Paramètres > Agents).",
   "{0} membership removed": ["{0} appartenance retirée", "{0} appartenances retirées"],
-  "Nothing to clean up": "Rien à nettoyer"
+  "Nothing to clean up": "Rien à nettoyer",
+  "Replace the roles set per list?": "Remplacer les rôles définis par liste ?",
+  "In {0} list {1} has a role of its own ({2}).": ["Dans {0} liste, {1} a un rôle propre ({2}).", "Dans {0} listes, {1} a un rôle propre ({2})."],
+  "Set everywhere": "Appliquer partout",
+  "No picture (group symbol)": "Pas d'image (symbole du groupe)"
 }

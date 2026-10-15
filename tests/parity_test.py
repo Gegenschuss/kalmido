@@ -240,6 +240,7 @@ APP_ONLY = [
      "tag (personal tags change with the task's tags), list owner lookup, icon pictures", (
         "POST /api/tasks/{}/undo", "POST /api/tasks/{}/seen", "POST /api/news/dismiss", "POST /api/lists/reorder", "* /api/tags/",
         "POST /api/lists/{}/tags/promote", "GET /api/lists/{}/owner", "* /api/lists/{}/icon", "GET /api/list-icon/", "GET /api/avatar/",
+        "GET /api/group-avatar/",  # 2.46.0 (#1605): group pictures, shown in the app
         "GET /api/admin/lists/orphaned", "GET /api/lists/{}/owner")),
     ("folder shares with groups: people only (sharing of a list with a group: /lists/{id}/groups)", ("* /api/folders/groups",)),
     ("2.22.0 (#740): sharing a whole folder with a person (and its future lists): people only; single lists: /lists/{id}/members",

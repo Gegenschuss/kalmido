@@ -245,7 +245,7 @@ const grpHtml = () => collab() ? `<h4 id="s-groups-h">${tr('Groups')}</h4>
 function grpDraw(md) {
   const box = $('#a-groups', md); if (!box) return;
   const gs = S.groups || [];
-  box.innerHTML = gs.length ? gs.map(g => `<div class="mrow" data-grow="${g.id}"><span class="avatar gav">${ic('users', 's')}</span><span class="n">${esc(g.name)} <span class="muted">${g.members.length ? esc(g.members.map(m => m.name).join(', ')) : tr('no members yet')}${g.synced ? ' · ' + esc(tr('sign-in group {0}', g.oidc_group)) : ''}</span></span><button class="iconbtn" data-grp="edit" data-gid="${g.id}" title="${esc(tr('Edit group'))}" aria-label="${esc(tr('Edit group {0}', g.name))}">${ic('edit', 's')}</button></div>`).join('')
+  box.innerHTML = gs.length ? gs.map(g => `<div class="mrow" data-grow="${g.id}">${fg_gav(g.id)}<span class="n">${esc(g.name)} <span class="muted">${g.members.length ? esc(g.members.map(m => m.name).join(', ')) : tr('no members yet')}${g.synced ? ' · ' + esc(tr('sign-in group {0}', g.oidc_group)) : ''}</span></span><button class="iconbtn" data-grp="edit" data-gid="${g.id}" title="${esc(tr('Edit group'))}" aria-label="${esc(tr('Edit group {0}', g.name))}">${ic('edit', 's')}</button></div>`).join('')
     : `<div class="muted mhint">${tr('No groups yet')}</div>`;
   if (md._grpWired) return;
   md._grpWired = true;
@@ -261,6 +261,7 @@ async function grpEdit(smd, gid) {
   const sel = new Set((g?.members || []).map(m => m.user_id)), synced = !!g?.oidc_group;
   const md = modal(`<h3>${g ? tr('Edit group') : tr('New group')}</h3>
     <div class="row"><label for="gr-name">${tr('Name')}</label><input id="gr-name" maxlength="60" value="${esc(g?.name || '')}" placeholder="${esc(tr('e.g. Office'))}"></div>
+    ${fg_pickRow(g)}
     <div class="row"><label for="gr-oidc">${tr('Sign-in group')}</label><input id="gr-oidc" maxlength="200" value="${esc(g?.oidc_group || '')}" placeholder="${esc(tr('optional · OIDC group name'))}"></div>
     <div class="shint">${tr('With a sign-in group the members come from the sign-in provider (OIDC): whoever has that group in their login is a member, checked at every login.')}</div>
     <h4 id="gr-mem-h">${tr('Members')}</h4>
@@ -270,6 +271,7 @@ async function grpEdit(smd, gid) {
   md.classList.add('grpmodal');
   const syncMem = () => { const on = !!$('#gr-oidc', md).value.trim(); $$('[data-gm]', md).forEach(x => { x.disabled = on; }); };
   $('#gr-oidc', md).addEventListener('input', syncMem);
+  const fgPend = fg_pickWire(md, g);  // 2.46.0 (#1605)
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
@@ -283,7 +285,7 @@ async function grpEdit(smd, gid) {
     if (!name) { need($('#gr-name', md)); return; }
     const q = {name, oidc_group: og, ...(og ? {} : {members: $$('[data-gm]', md).filter(x => x.checked).map(x => +x.dataset.gm)})};
     b.disabled = true;
-    try { await calReq(g ? 'PATCH' : 'POST', g ? `/api/admin/groups/${gid}` : '/api/admin/groups', q); } catch (x) { err.textContent = x.message; err.hidden = false; b.disabled = false; return; }
+    try { const j = await calReq(g ? 'PATCH' : 'POST', g ? `/api/admin/groups/${gid}` : '/api/admin/groups', q); await fg_pickSave(j?.id || gid, fgPend()); } catch (x) { err.textContent = x.message; err.hidden = false; b.disabled = false; return; }
     md.remove(); await load().catch(() => {}); render(); grpDraw(smd); toast(g ? tr('Group saved') : tr('Group created'));
   });
   if (!isTouch()) setTimeout(() => $('#gr-name', md)?.focus(), 50);  // 2.13.0: no keyboard popping up on touch
@@ -292,7 +294,7 @@ async function grpEdit(smd, gid) {
 function shareGroupsHtml(cur, mng, roleSel) {
   const gs = cur.groups || [], cand = (S.groups || []).filter(g => !gs.some(x => x.group_id === g.id && x.via === 'list'));
   if (!gs.length && !(mng && cand.length)) return '';
-  return gs.map(x => `<div class="mrow" data-gsh="${x.group_id}"><span class="avatar gav">${ic('users', 's')}</span><span class="n">${esc(x.name)}${x.via !== 'list' ? ` <span class="muted">${esc(tr('via the folder {0}', fDisp(x.via)))}</span>` : ''}</span>${mng && x.via === 'list'
+  return gs.map(x => `<div class="mrow" data-gsh="${x.group_id}">${fg_gav(x.group_id)}<span class="n">${esc(x.name)}${x.via !== 'list' ? ` <span class="muted">${esc(tr('via the folder {0}', fDisp(x.via)))}</span>` : ''}</span>${mng && x.via === 'list'
     ? `${roleSel(`data-grole="${x.group_id}"`, x.role, tr('Role of the group {0}', x.name))}<button class="iconbtn" data-grm="${x.group_id}" title="${esc(tr('Stop sharing with the group'))}" aria-label="${esc(tr('Stop sharing with the group {0}', x.name))}">${ic('x', 's')}</button>`
     : `<span class="muted" title="${esc(roleHelp(x.role))}">${esc(roleLabel(x.role))}</span>`}</div>`).join('')
     + (mng && cand.length ? `<div class="mrow madd"><select id="l-addgrp" aria-label="${esc(tr('Share with a group'))}"><option value="">${tr('Share with a group …')}</option>${cand.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select>${roleSel('id="l-grprole"', 'edit')}<button class="btn sm" data-m="share-grp">${ic('plus', 's')} ${tr('Add')}</button></div>` : '');

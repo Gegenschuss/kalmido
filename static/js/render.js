@@ -915,8 +915,8 @@ const grpName = gid => grpById(gid)?.name || tr('Group');
 const listGroups = lid => (listById(lid)?.groups || []);
 function grpChip(t) {
   const n = grpName(t.assignee_group_id), mine = myGroup(t.assignee_group_id), tip = esc(tr('Assigned to the group {0}: whoever has time takes it', n));
-  return canAssign(t) || mine ? `<button type="button" class="gchip ${mine ? 'me' : ''}" data-act="assign" title="${tip}" aria-label="${tip}" aria-haspopup="menu">${ic('users', 's')}<span>${esc(n)}</span></button>`
-    : `<span class="gchip" title="${tip}">${ic('users', 's')}<span>${esc(n)}</span></span>`;
+  return canAssign(t) || mine ? `<button type="button" class="gchip ${mine ? 'me' : ''}" data-act="assign" title="${tip}" aria-label="${tip}" aria-haspopup="menu">${fg_gico(t.assignee_group_id)}<span>${esc(n)}</span></button>`
+    : `<span class="gchip" title="${tip}">${fg_gico(t.assignee_group_id)}<span>${esc(n)}</span></span>`;  // 2.46.0 (#1605): + its picture
 }
 async function takeTask(id) {
   const t = taskById(id); if (!t) return;

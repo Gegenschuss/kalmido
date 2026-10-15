@@ -115,6 +115,7 @@ The most used helpers:
 | `core/state.py` | GET /api/state: everything the web client loads at start and after a change. |
 | `lists/lists.py` | Lists: create, change, share (people + agents), members, sidebar order. |
 | `lists/groups.py` | Groups of people (admin): materialized list memberships, tasks assigned to a group. |
+| `lists/grouppics.py` | Group pictures: a preset or an own photo per group, served with login to who may see the group (2.46.0). |
 | `lists/ownership.py` | Transferring the ownership of a list; orphaned lists (owner disabled or an agent). |
 | `lists/sections.py` | Saved filters, folders and sections (kanban columns). |
 | `tasks/validation.py` | Task activity log, input validation, repeat rules (RRULE) and task tree helpers. |

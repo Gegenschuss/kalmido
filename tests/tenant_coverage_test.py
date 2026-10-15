@@ -258,6 +258,7 @@ ROUTES = {
     "GET /api/folders/repos": "folder", "POST /api/folders/repos": "folder", "PUT /api/lists/{}/folder-repo": "list",  # 2.33.0 (#934)
     "GET /api/folders/notify-template": "folder", "PUT /api/folders/notify-template": "folder",  # 2.33.0 (#927)
     "GET /api/lists/{}/notify-template": "list", "PUT /api/lists/{}/notify-template": "list",
+    "GET /api/folders/people/diff": "folder", "GET /api/folders/groups/{}/diff": "folder",  # 2.46.0 (#1606): roles set per list
     "GET /api/v1/lists/{}/notify-template": "list", "POST /api/notify-templates/asked": "own",
     "GET /api/search/messages": "aggregate",  # 2.33.0 (#1080): only what the person may read (vis_sql, rooms, own agent chats)
     "GET /api/admin/client-ip": "admin",  # 2.33.0 (#834)
@@ -268,6 +269,8 @@ ROUTES = {
     # ---- group (6)
     "GET /api/v1/groups": "group", "GET /api/v1/groups/{}": "group", "GET /api/groups": "group",
     "POST /api/admin/groups": "group", "PATCH /api/admin/groups/{}": "group", "DELETE /api/admin/groups/{}": "group",
+    "PUT /api/admin/groups/{}/avatar": "group", "POST /api/admin/groups/{}/avatar": "group",  # 2.46.0 (#1605): group pictures
+    "DELETE /api/admin/groups/{}/avatar": "group", "GET /api/group-avatar/{}/{}.jpg": "group",  # (p2460_c_api_test.py: outside 404)
     # ---- ical (3)
     "GET /ical/{}.ics": "ical", "GET /api/ical": "ical", "POST /api/ical": "ical",
     # ---- list (100)
