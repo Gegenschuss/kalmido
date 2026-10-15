@@ -6740,5 +6740,8 @@
   "New task for today": "Nueva tarea para hoy",
   "Nothing due today.": "Hoy no hay nada pendiente.",
   "{0} task for today": ["Hoy {0} tarea", "Hoy {0} tareas"],
-  "{0} agent working": ["{0} agente trabajando", "{0} agentes trabajando"]
+  "{0} agent working": ["{0} agente trabajando", "{0} agentes trabajando"],
+  "contains the open view": "contiene la vista abierta",
+  "Message {0}": "Mensaje a {0}",
+  "New note in…": "Nueva nota en…"
 }

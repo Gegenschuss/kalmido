@@ -35,7 +35,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   let w = await boot({user: 'alice', hash: 'inbox', ls: {'tasks.sideOpenG': JSON.stringify(['views', 'areas'])}}), d = w.document;
   await sleep(500);
   const keys = sel => [...d.querySelectorAll(`#side ${sel} .srow.smod`)].map(b => b.dataset.mgside || b.dataset.go || (b.dataset.act || '').replace('side-', ''));
-  check(w.eval('SIDE_VIEW_KEYS.join()') === 'cal,timeline,matrix,overview,workload' && /^cal,timeline,matrix/.test(keys('.sg-views').join()), 'Views: calendar, timeline, matrix, project status, workload ' + keys('.sg-views').join());
+  check(w.eval('SIDE_VIEW_KEYS.join()') === 'cal,timeline,matrix,overview,workload,notes' /* 2.45.0 (#1516): + Notes */ && /^cal,timeline,matrix/.test(keys('.sg-views').join()), 'Views: calendar, timeline, matrix, project status, workload ' + keys('.sg-views').join());
   check(w.eval('SIDE_AREA_KEYS.join()') === 'office,time,habits,review,life,agents' && /^office,time,habits,review,life/.test(keys('.sg-areas').join()), 'Areas: office, time, habits, review, home, agents ' + keys('.sg-areas').join());
   const names = [...d.querySelectorAll('#side .sg-areas .srow .n')].map(x => x.textContent).join();
   check(/^Office,Time,Habits,Review,Home/.test(names), 'the area names ' + names);

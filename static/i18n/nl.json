@@ -6740,5 +6740,8 @@
   "New task for today": "Nieuwe taak voor vandaag",
   "Nothing due today.": "Vandaag staat er niets gepland.",
   "{0} task for today": ["Vandaag {0} taak", "Vandaag {0} taken"],
-  "{0} agent working": ["{0} agent aan het werk", "{0} agenten aan het werk"]
+  "{0} agent working": ["{0} agent aan het werk", "{0} agenten aan het werk"],
+  "contains the open view": "bevat de geopende weergave",
+  "Message {0}": "Bericht aan {0}",
+  "New note in…": "Nieuwe notitie in…"
 }

@@ -471,7 +471,6 @@ document.addEventListener('click', async e => {
     case 'side-fold': sideFold(!LS.get('sideFold', false)); break;  // 2.13.0 (#453 A15)
     case 'side-timeline': closeSide(); S.rmScrollReset = true; if (S.route.mod === 'tasks' && S.route.key === 'all') rmSet({v: 'timeline'}, 'all'); else { rmSet({v: 'timeline'}, 'none'); go('all'); } break;
     case 'team-agent': { closeSide(); const ag = agentById(a.dataset.aid); if (ag && ag.enabled) chatOpen(ag.id); else go('agents'); break; }
-    case 'side-tags': S.collapsed.has('side:tags-open') ? S.collapsed.delete('side:tags-open') : S.collapsed.add('side:tags-open'); LS.set('collapsed', [...S.collapsed]); renderSide(); break;
     case 'lists-reorder': S.listReorder = !S.listReorder; renderSide(); break;
     case 'side-more': closeSide(); settingsModal('sidebar'); break;  // 2.25.0 (UX-03 / UX-26)
     case 'list-menu': listMenu(a, id); break;

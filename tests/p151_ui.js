@@ -297,7 +297,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(!sarch().querySelector('.fcar') && !sarch().hasAttribute('aria-expanded') && !sarch().classList.contains('closed') && sarch().dataset.go === 'archived', 'plain row: no chevron, no fold, goes to #archived');
   const shape = r => [...r.children].map(x => x.tagName + '.' + [...x.classList].filter(c => c !== 'over').join(' ')).join().replace(/trash/g, 'archive');
   check(shape(sarch()) === shape(trashRow), 'same structure as the Trash row: ' + shape(sarch()) + ' / ' + shape(trashRow));
-  check(sarch().parentElement === trashRow.parentElement && sarch().previousElementSibling === trashRow, 'right below Trash in the footer');
+  check(sarch().parentElement === trashRow.parentElement && sarch().previousElementSibling === trashRow, 'right below Trash in the group More');  // 2.45.0 (#1502): the footer rows are the group "More"
   check(!archRow(), 'the archived list itself is never in the sidebar');
   check(!w.eval(`S.collapsed.has('side:arch-open')`) && !w.eval(`/side:arch-open|side-arch/.test(renderSide.toString())`), 'no fold state any more');
   click(w, sarch()); await sleep(400);

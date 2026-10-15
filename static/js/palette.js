@@ -16,16 +16,16 @@ const SHORTCUTS_ALL = [
     ['Space', N_('Complete the selected tasks (or X)')], ['m', N_('Move the selected tasks to a list')], ['d', N_('Change the date of the selected tasks')], ['Esc', N_('Clear the selection')]]],
   [N_('Calendar'), [['1', N_('Month')], ['2', N_('Week')], ['3', N_('Day')], ['4', N_('Timeline')], ['←', N_('Previous period')], ['→', N_('Next period')], ['.', N_('Jump to today')]]],
   [N_('Timeline'), [['Tab', N_('Focus a bar')], ['c', N_('Connect to the task it blocks')], ['Shift+F10', N_('Bar menu')], ['d', N_('Pick a date…')], ['Esc', N_('Cancel connecting')]]],
-  [N_('Go to'), [['g t', N_('Today')], ['g m', N_('Tomorrow')], ['g w', N_('Next 7 days')], ['g d', N_('Now doable')], ['g i', N_('Basket')], ['g a', N_('All')], ['g c', N_('Calendar')], ['g h', N_('Habits')], ['g f', N_('Focus timer')], ['g s', N_('Settings')]]],
+  [N_('Go to'), [['g t', N_('Today')], ['g m', N_('Tomorrow')], ['g w', N_('Next 7 days')], ['g d', N_('Now doable')], ['g i', N_('Basket')], ['g a', N_('All')], ['g c', N_('Calendar')], ['g h', N_('Habits')], ['g f', N_('Focus timer')], ['g n', N_('Messages')], ['g s', N_('Settings')]]],  // 2.45.0 (#1509): g n = Messages
 ];
 // only what the switched-on modules offer (the Timeline group needs the timeline with dependencies)
 const SC_MOD = {'g c': 'cal', 'g h': 'habits', 'g f': 'pomo'};
 const SHORTCUTS = () => SHORTCUTS_ALL.filter(([g]) => (g !== 'Timeline' || (feat('timeline') && depsOn())) && (g !== 'Calendar' || feat('cal')))
-  .map(([g, rows]) => [g, rows.filter(([k]) => (!SC_MOD[k] || feat(SC_MOD[k])) && !(g === 'Calendar' && k === '4' && !feat('timeline')))]);
+  .map(([g, rows]) => [g, rows.filter(([k]) => (!SC_MOD[k] || feat(SC_MOD[k])) && (k !== 'g n' || teamOn()) && !(g === 'Calendar' && k === '4' && !feat('timeline')))]);
 const CAL_KEYS = {1: 'month', 2: 'week', 3: 'day', 4: 'timeline'};
 // multi-select from the keyboard: the task rows of the view, the focused one (j / k), the multi bar's own buttons
 function kbSelect(ids) { for (const i of ids) S.multi.add(i); if (ids.length) S.multiLast = ids[ids.length - 1]; $$('#view .trow').forEach(r => r.classList.toggle('msel', S.multi.has(+r.dataset.id))); renderMultiBar(); }
-const GO_KEYS = {t: () => go('today'), m: () => go('tomorrow'), w: () => go('week'), d: () => go('doable'), i: () => go('inbox'), c: () => feat('cal') && go('cal'), h: () => feat('habits') && go('habits'), f: () => feat('pomo') && go('pomo'), s: () => settingsModal(), a: () => go('all')};
+const GO_KEYS = {t: () => go('today'), m: () => go('tomorrow'), w: () => go('week'), d: () => go('doable'), i: () => go('inbox'), c: () => feat('cal') && go('cal'), h: () => feat('habits') && go('habits'), f: () => feat('pomo') && go('pomo'), s: () => settingsModal(), a: () => go('all'), n: () => teamOn() && go('team')};
 S.kf = null;  // keyboard-focused task row (j / k)
 const rowIds = () => $$('#view .trow').map(r => +r.dataset.id).filter(Boolean);
 function kfocus(id) {

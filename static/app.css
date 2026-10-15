@@ -6485,3 +6485,17 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .lysix > .hpcol > .lh3 > :first-child{min-height:28rem}
 @media (pointer:fine){ .lysix > .hpcol > .lym > .dcard > h3{cursor:grab} }
 .dash .dtile b{font-family:inherit}
+/* 2.45.0 A (#1502 #1509 #1516) sidebar: a folded group holding the open view, the messenger rows, the notes overview */
+.sgh.sgon .sgt{color:var(--text);font-weight:600}
+.sgh.sgon .sgt::after{content:"";order:4;width:.375rem;height:.375rem;border-radius:50%;background:var(--accent)}
+#side .sbpw{position:relative}
+#side .sbpw>.srow{width:100%;padding-right:2.5rem}
+#side .sbpw .sbdm{position:absolute;right:.125rem;top:50%;transform:translateY(-50%);color:var(--muted);opacity:.7}
+#side .sbpw .sbdm:hover,#side .sbpw .sbdm:focus-visible{opacity:1;color:var(--text)}
+#side .sbconv .sbav{width:1.125rem;height:1.125rem;font-size:.5625rem;flex:none;margin:0 .0625rem}
+#side .sbconv.sbun .n{font-weight:600;color:var(--text)}
+@media (pointer:coarse){#side .sbpw .sbdm{min-width:2.75rem;min-height:2.75rem;opacity:1}}
+.sbnbar{flex-wrap:wrap}
+.sbnbar .sbnsel{flex:0 1 14rem;min-width:0;min-height:2.25rem}
+.sbncard .sbnl{display:inline-flex;align-items:center;gap:.25rem;color:var(--text2);font-weight:500}
+@media (max-width:640px){.sbnbar .ssearch{flex:1 1 100%}.sbnbar .sbnsel{flex:1 1 auto;min-height:2.75rem}}

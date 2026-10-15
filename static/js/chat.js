@@ -303,10 +303,12 @@ function trefOpen(e) {
 }
 document.addEventListener('click', trefOpen, true);
 function noteRoute(lid, id) {
+  if (!lid) { noteFlush(); S.nt = {...S.nt, lid: null, id: null, notes: null}; return; }  // 2.45.0 (#1516): the overview of all notes
   if (S.nt.lid !== lid) { S.nt = {...S.nt, lid, notes: null, err: null}; loadNotes(lid).then(() => { if (S.route.mod === 'notes') renderView(); }); }
   if (S.nt.id !== id) { noteFlush(); S.nt.id = id; S.nt.edit = !!id && S.nt.newId === id; S.nt.newId = null; }
 }
 function viewNotes() {
+  if (!S.nt.lid) return sb_notesView();  // 2.45.0 (#1516)
   const l = listById(S.nt.lid);
   if (!l) return heronEmpty('empty', tr('This list does not exist (any more).'));
   const ns = S.nt.notes;

@@ -154,7 +154,8 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   check(sm.includes('Move to the top') && sm.includes('Move to the bottom'), '#991: the sidebar menu has top / bottom ' + sm.join('|'));
   // #984 views above the lists, #1001 My tasks
   const grp = [...d.querySelectorAll('#side .sgroup')].map(x => [...x.classList].find(c => c.startsWith('sg-')));
-  check(grp.indexOf('sg-views') >= 0 && grp.indexOf('sg-views') < grp.indexOf('sg-lists'), '#984: Views above the lists ' + grp.join());
+  // 2.45.0 (#1503): the lists above Views again (right below Plan)
+  check(grp.indexOf('sg-views') >= 0 && grp.indexOf('sg-lists') < grp.indexOf('sg-views'), '#1503: the lists above Views ' + grp.join());
   check(/My tasks/.test(d.querySelector('#side [data-go="assigned"]')?.textContent || ''), '#1001: "My tasks"');
   w.close();
 
