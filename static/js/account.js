@@ -1141,7 +1141,7 @@ function bkRestore(md, src) {
     const m = modal(`<h3>${tr('Restore backup')}</h3>
       <p>${tr('This replaces <b>all data on this server</b> (every user’s lists, tasks, files and settings) with the state of {0}.', `<b>${esc(aaWhen(src.created_at) || '?')}</b>`)}</p>
       <p class="muted">${trn('{0} task', '{0} tasks', src.counts?.tasks || 0)}, ${trn('{0} file', '{0} files', src.attachment_files || 0)}, ${trn('{0} user', '{0} users', src.counts?.users || 0)}. ${tr('A safety backup of the current state is made first. Everyone else is logged out.')}</p>
-      <form class="pwform">${src.encrypted ? `<input type="password" id="bkr-pass" autocomplete="new-password" placeholder="${tr('Passphrase (empty = the saved one)')}">` : ''}
+      <form class="pwform">${src.encrypted ? `<input type="password" id="bkr-pass" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore placeholder="${tr('Passphrase (empty = the saved one)')}">` : ''}
       <label for="bkr-word">${tr('Type {0} to confirm', '<b>' + esc(src.word) + '</b>')}</label><input id="bkr-word" autocomplete="off" autocapitalize="characters" spellcheck="false">
       <div class="aerr" role="alert" id="bkr-err"></div>
       <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" type="submit" id="bkr-go" disabled>${tr('Restore')}</button></div></form>`);

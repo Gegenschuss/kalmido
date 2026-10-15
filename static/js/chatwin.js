@@ -31,7 +31,8 @@ const dw_target = e => {
   const r = e.target.closest?.('#view .tcrow[data-rid], [data-act="chat-open"][data-aid], a[href^="#agents/"], a[href^="#team/"]'); if (!r) return null;
   if (r.dataset.rid) return ['team', +r.dataset.rid];
   if (r.dataset.aid) return ['agents', +r.dataset.aid];
-  const k = dw_chatOf(r.getAttribute('href')); return k ? k.split('/') : null;
+  const h = r.getAttribute('href'); if (!/^#(agents|team)\/\d+(?:$|\?)/.test(h || '')) return null;  // not a sub page of the chat
+  const k = dw_chatOf(h); return k ? k.split('/') : null;
 };
 document.addEventListener('mousedown', e => { if (e.button === 1 && mw_ok() && dw_target(e)) e.preventDefault(); });  // no auto-scroll
 document.addEventListener('auxclick', e => {

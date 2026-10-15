@@ -374,7 +374,7 @@ async function sb_folderWsSave(p) {
 // does the folder (or one below it) belong to workspace ws by its own setting (an empty folder has no lists to tell)
 const sb_folderInWs = (f, ws = wsCur()) => folderNames().some(x => fUnder(x, f) && 'org_id' in folderEff(x) && (folderEff(x).org_id ? 'org:' + folderEff(x).org_id : 'private') === ws);
 // rename / move a folder (with its lists and subfolders) and delete it (lists and subfolders move up one level)
-async function folderMove(from, to, label) {
+async function folderMove(from, to, label, noReload) {
   if (!to || to === from) return;
   { const m = S.lists.find(l => l.mirrored && fUnder(l.folder, from)); if (m) { toast(mirroredMsg(m)); return; } }  // 2.27.0 (#988)
   if (folderNames().includes(to) && !await askConfirm(tr('Merge into “{0}”?', fDisp(to)), tr('A folder of that name exists: the lists go into it.'), {ok: tr('Merge')})) return;
@@ -389,6 +389,7 @@ async function folderMove(from, to, label) {
   };
   try { await optWrite(put, () => api('POST', '/api/folders/rename', {old: from, new: to})); } catch { return; }
   if (label) toast(label);
+  if (noReload) return true;  // 2.46.2 (#1664): the caller saves the order first, then reloads (no stale order from the reload)
   load().then(() => render()).catch(() => {});
 }
 function folderMenu(anchor, f) {
@@ -544,8 +545,9 @@ async function sideDrop(drag, t, after = false) {
     }
     if (kd === 'uptop') {  // 2.46.2 (#1664): one toast; the folder is renamed to a top-level one, then placed right before the target
       const to = t.dataset.folder, np = fName(from);
-      await folderMove(from, np, tr('{0} is a top-level folder now', qn(np)));
-      if (!folderNames().includes(from) && folderNames().includes(np)) { const arr = folderNames().filter(x => x !== np); arr.splice(arr.indexOf(to), 0, np); saveFolders(arr); }
+      if (!await folderMove(from, np, tr('{0} is a top-level folder now', qn(np)), true)) return;
+      if (!folderNames().includes(from) && folderNames().includes(np)) { const arr = folderNames().filter(x => x !== np); arr.splice(arr.indexOf(to), 0, np); await saveFolders(arr).catch(() => {}); }
+      load().then(() => render()).catch(() => {});
       return;
     }
     if (kd === 'top') { folderMove(from, fName(from), tr('{0} is a top-level folder now', qn(fName(from)))); return; }
