@@ -214,6 +214,21 @@ check(r.status_code == 404, f"#1554: v1: a foreign id -> 404 {r.status_code}")
 spec = requests.get(V + "/openapi.json", headers=tok(["read"])).json()
 check(spec["paths"].get("/contacts/bulk", {}).get("post", {}).get("x-kalmido-scope") == "contacts", "#1554: OpenAPI: /contacts/bulk needs contacts")
 
+# 2.46.1 review: an agent's bulk change of 10 or more contacts waits for a person's approval (202), a smaller one runs
+ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "contacts"], "username": "bookbot", "display_name": "Book bot"}).json()
+AGH = {"Authorization": "Bearer " + ag.get("token", "x")}
+AB = A.post(B + "/api/books", json={"name": "Agent book"}).json()["id"]
+for bid in (AB, A2):
+    A.put(B + f"/api/books/{bid}/members", json={"user_id": ag.get("id"), "role": "edit"})
+A.post(B + f"/api/books/{AB}/import", files={"file": ("ag.vcf", vcf("agb", 12).encode(), "text/vcard")})
+ag_ids = ids_of(A, AB)
+r = requests.post(V + "/contacts/bulk", headers=AGH, json={"action": "delete", "ids": ag_ids})
+check(r.status_code == 202 and len(ids_of(A, AB)) == 12, f"review: an agent deleting 12 contacts waits for approval {r.status_code} {r.text[:160]}")
+r = requests.post(V + "/contacts/bulk", headers=AGH, json={"action": "move", "ids": ag_ids, "book_id": A2})
+check(r.status_code == 202 and len(ids_of(A, AB)) == 12, f"review: an agent moving 12 contacts waits for approval {r.status_code}")
+r = requests.post(V + "/contacts/bulk", headers=AGH, json={"action": "delete", "ids": ag_ids[:2]})
+check(r.ok and len(ids_of(A, AB)) == 10, f"review: an agent deleting 2 contacts runs at once {r.status_code} {r.text[:160]}")
+
 print(f"p2461_c_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 time.sleep(0.1)
 sys.exit(1 if FAILS else 0)
