@@ -119,7 +119,7 @@ function tabOn(items) {
   return m ? m.id : null;
 }
 // 1.5.3: the "g …" shortcuts in the tooltips of what they open
-const GO_KEY = {today: 'g t', tomorrow: 'g m', week: 'g w', doable: 'g d', inbox: 'g i', all: 'g a', cal: 'g c', habits: 'g h', pomo: 'g f', settings: 'g s'};
+const GO_KEY = {team: 'g n', today: 'g t', tomorrow: 'g m', week: 'g w', doable: 'g d', inbox: 'g i', all: 'g a', cal: 'g c', habits: 'g h', pomo: 'g f', settings: 'g s'};
 function tabBtn(t, on, cls = '') {
   const tgt = t.go != null ? `data-go="${esc(t.go)}"` : `data-act="${t.act}"`;
   const nb = t.id === 'news' && S.news?.unread ? `<span class="nbadge">${S.news.unread > 99 ? '99+' : S.news.unread}</span>` : t.id === 'team' && t.n ? `<span class="nbadge">${t.n > 99 ? '99+' : t.n}</span>` : '';
@@ -192,20 +192,23 @@ function counts() {
 // account. Switched-off modules are left out. Each group folds (per device, LS sideGroups).
 // 2.24.0 (UX-01): "Views" starts folded and sits below the lists, so a person's own lists come right after Focus; groups
 // folded by default remember being opened (LS sideOpenG), the others being folded (LS sideGroups)
-const SIDE_FOLDED = ['views', 'areas'];  // 2.39.1 (#1185): "Areas" folds like "Views"
+const SIDE_FOLDED = ['views', 'areas', 'tags', 'more'];  // 2.39.1 (#1185): "Areas" folds like "Views"
+// 2.45.0 (#1502): "Tags" (was its own toggle, S.collapsed side:tags-open) and "More" (All, Completed, Trash, Archived) too
 // 2.25.0 (UX-03): the order of the groups and what is hidden is the person's (user setting "sidebar": json {order, hidden};
 // hidden: "g:<group>" or "e:<entry>"; the same on every device). "Lists" can be moved but not hidden.
 // 2.27.0 (#984): "Views" by default above the lists again (right below Plan, still folded); an own arrangement stays
 // 2.39.1 (#1185): "Views" (calendar-like ways to look at tasks) and "Areas" (the modules) instead of one grown list
 // 2.44.0 (#1187): the clients are a tab of the area Office (no own group any more)
-const SIDE_GROUPS = ['focus', 'views', 'areas', 'lists', 'filters', 'tags', 'team'];
-const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Lists'), filters: N_('Filters'), tags: N_('Tags'), views: N_('Views'), areas: N_('Areas|nav'), team: N_('Conversations|nav')};
-const SIDE_VIEW_KEYS = ['cal', 'timeline', 'matrix', 'overview', 'workload'];
+// 2.45.0 (#1503): the lists right below Plan again (they are what a person opens most; #984 had put Views above them)
+// 2.45.0 (#1502): "More" (All, Completed, Trash, Archived) is a group like the others, at the end; Settings stays alone below
+const SIDE_GROUPS = ['focus', 'lists', 'views', 'areas', 'filters', 'tags', 'team', 'more'];
+const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Lists'), filters: N_('Filters'), tags: N_('Tags'), views: N_('Views'), areas: N_('Areas|nav'), team: N_('Conversations|nav'), more: N_('More')};
+const SIDE_VIEW_KEYS = ['cal', 'timeline', 'matrix', 'overview', 'workload', 'notes'];  // 2.45.0 (#1516): + the notes of all lists
 const SIDE_AREA_KEYS = ['office', 'time', 'habits', 'review', 'life', 'agents'];  // 2.44.0 (#1187): office, time, review, life = areas (areas.js)
 const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['stale', N_('Lying idle')], ['assigned', N_('My tasks')], ['byme', N_('Assigned by me')]];
 const sideModEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
   ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
-  ['workload', N_('Workload'), workloadOn()], ['office', N_('Office & finance'), officeOn()], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()]].filter(x => x[2]);
+  ['workload', N_('Workload'), workloadOn()], ['office', N_('Office & finance'), officeOn()], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()], ['notes', N_('Notes'), sb_notesShown()]].filter(x => x[2]);
 const sideViewEntries = () => SIDE_VIEW_KEYS.map(k => sideModEntries().find(x => x[0] === k)).filter(Boolean);
 const sideAreaEntries = () => SIDE_AREA_KEYS.map(k => MG_IDS.includes(k) ? mg_sideEntry(k) : sideModEntries().find(x => x[0] === k)).filter(Boolean);
 function sidePref() {
@@ -283,7 +286,8 @@ function renderSide() {
   const row = (key, icon, name, n, extra = '', after = '') =>
     `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}">${n || ''}</span>${after}</button>`;
   const mrow = (mod, icon, name, after = '', attrs = '') => `<button class="srow smod ${S.route.mod === mod ? 'on' : ''}" data-go="${mod}" ${GO_KEY[mod] && !isTouch() ? `title="${esc(kt(name, GO_KEY[mod]))}"` : ''} ${attrs}>${ic(icon)}<span class="n">${esc(name)}</span>${after}</button>`;
-  const head = (g, label, acts = '', n = '', tip = '') => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
+  // 2.45.0 (#1502): on = a folded group holds the open view (its header shows it, like a folded folder)
+  const head = (g, label, acts = '', n = '', tip = '', on = false) => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'} ${on ? 'sgon' : ''}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}${on ? `<span class="sr"> ${esc(tr('contains the open view'))}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
   const lists = S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));  // 2.28.0 (#935): the shown workspace
   const listRow = l => {
     // 2.23.0 (#794): ONE fixed icon column for a picture, an emoji (taken from the name) or the dot, so the names line up
@@ -317,8 +321,9 @@ function renderSide() {
   };
   const fempty = () => `<div class="fempty">${isMobile() ? tr('empty: assign lists in sort mode') : tr('empty: drag a list here')}</div>`;
   const wsAll = wsCur() === 'all';
-  for (const f of folderNames().filter(x => !fParent(x) && (wsAll || lists.some(l => fUnder(l.folder, x))))) {  // 2.28.0: folders with lists here
-    const top = fhead(f), subs = folderSubs(f).filter(sf => wsAll || lists.some(l => fUnder(l.folder, sf)));
+  // 2.45.0 (#1532): + a folder set to this workspace (a new, still empty one)
+  for (const f of folderNames().filter(x => !fParent(x) && (wsAll || lists.some(l => fUnder(l.folder, x)) || sb_folderInWs(x)))) {  // 2.28.0: folders with lists here
+    const top = fhead(f), subs = folderSubs(f).filter(sf => wsAll || lists.some(l => fUnder(l.folder, sf)) || sb_folderInWs(sf));
     lh += top.html;
     if (top.closed) continue;
     let body = lists.filter(l => l.folder === f).map(listRow).join('');
@@ -330,7 +335,6 @@ function renderSide() {
   }
   const archived = S.lists.filter(l => l.archived && inWs(l));
   const tags = Object.keys(c.tags).sort((a, b) => a.localeCompare(b, 'de'));
-  const tagsOpen = S.collapsed.has('side:tags-open') || tags.some(t => onTasks && k === 'tag:' + t);
   // Focus: the smart lists
   // 2.25.0 (UX-03 / UX-49): Plan (the smart lists) as [key, html]: each entry can be hidden in Settings > Appearance > Sidebar;
   // (UX-47) the team chat and News moved to the group "Conversations" with the people and agents
@@ -346,7 +350,7 @@ function renderSide() {
   const planHidden = plan.filter(([x, h]) => h && hid('e:' + x) && !(onTasks && k === x)).length;
   const focus = plan.filter(([x, h]) => h && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')
     + (planHidden ? `<button class="srow smore" data-act="side-more" title="${esc(tr('Settings > Appearance > Sidebar'))}">${ic('plus')}<span class="n">${esc(trn('{0} more view', '{0} more views', planHidden))}</span></button>` : '');
-  const convo = [teamOn() && (hasSharing() || S.team?.unread) ? `<button class="srow ${S.route.mod === 'team' ? 'on' : ''}" data-go="team">${ic('comment')}<span class="n">${tr('Team chat')}</span><span class="c ${S.team?.unread ? 'nunread' : ''}">${S.team?.unread ? `${S.team.unread}<span class="sr"> ${esc(tr('unread'))}</span>` : ''}</span></button>` : '',  // 2.17.0 (#419)
+  const convo = [sb_msgRows(),  // 2.45.0 (#1509): "Messages" (always while the team chat is on) + the last conversations (sbnav.js)
     collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news" title="${esc(tr('Assignments, @mentions, comments and follow-ups for you'))}">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${bellCount() ? 'nunread' : ''}">${bellCount() || ''}</span></button>` : ''].join('');  // 2.28.0 (#987): the number = "For you"
   // Views: every switched-on module (the rail's old job)
   const aw = (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread + (x.approvals_open || 0), 0);  // 2.35.0 (#1103): open approvals
@@ -363,7 +367,8 @@ function renderSide() {
     feat('review') ? mrow('review', 'journal', tr('Review & journal')) : '',
     famOn() ? mrow('family', 'family', tr('Family'), (S.kids || []).some(k => (k.requests || 0) > 0) ? `<span class="c nunread">${(S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)}</span>` : '') : '',
     overviewOn() ? mrow('overview', 'pulse', tr('Project status'), `<span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span>`, `title="${esc(tr('Where is it stuck?'))}"`) : '',
-    agentsTab() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : ''].filter(h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return !m || !hid('e:' + (m[1] || m[2])) || S.route.mod === m[1]; });
+    agentsTab() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : '',
+    sb_notesShown() ? mrow('notes', 'note', tr('Notes'), `<span class="c">${sb_noteCount() || ''}</span>`) : ''].filter(h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return !m || !hid('e:' + (m[1] || m[2])) || S.route.mod === m[1]; });
   // 2.39.1 (#1185): split into "Views" and "Areas", each in its fixed order
   const modKey = h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return m ? m[1] || m[2] : ''; };
   const modIn = keys => keys.map(x => MG_IDS.includes(x) ? mg_sideRow(x, hid) : modRows.find(h => modKey(h) === x) || '').join('');  // 2.44.0 (#1187): one row per area
@@ -374,35 +379,35 @@ function renderSide() {
   const grps = collab() ? (S.groups || []).filter(gr => myGroup(gr.id) || [...S.tasks.values()].some(t => t.status === 0 && t.assignee_group_id === gr.id)) : [];
   const gcount = gid => [...S.tasks.values()].filter(t => t.status === 0 && !t.deleted_at && t.assignee_group_id === gid).length;
   const team = convo + [...grps.map(gr => `<button class="srow steam sgrp ${onTasks && k === 'grp:' + gr.id ? 'on' : ''}" data-go="grp/${gr.id}" title="${esc(tr('Tasks of the group {0}', gr.name))}">${ic('users')}<span class="n">${esc(gr.name)}</span><span class="sk">${tr('Group')}</span>${gcount(gr.id) ? `<span class="c">${gcount(gr.id)}</span>` : ''}</button>`),
-    ...ppl.map(p => `<button class="srow steam ${onTasks && k === 'who:' + p.id ? 'on' : ''}" data-go="who/${p.id}" title="${esc(tr('Tasks of {0}', p.name))}"><span class="sdot"><i class="pdot"></i></span><span class="n">${esc(p.name)}</span></button>`),  // 2.24.0 (UX-08): no "Person" under every name
+    ...ppl.map(p => sb_personRow(p, onTasks && k === 'who:' + p.id)),  // 2.24.0 (UX-08): no "Person" under every name; 2.45.0 (#1509): + a bubble for a direct message
     ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot">${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.approvals_open ? `<span class="c apvc" title="${esc(apvCount(a.approvals_open))}">${ic('lock', 's')}${a.approvals_open}<span class="sr"> ${esc(apvCount(a.approvals_open))}</span></span>` : ''}${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`)].join('');
   // a group folded by default (Views) keeps its rows in the page, hidden: what they show (a running timer's dot, a count)
   // stays current and the keyboard / screen readers skip them until it is opened
-  const grp = (g, label, body, acts = '', n = '', tip = '') => `<div class="sgroup sg-${g}">${head(g, label, acts, n, tip)}${sideOpen(g) ? body : SIDE_FOLDED.includes(g) ? `<div class="sgfold" hidden>${body}</div>` : ''}</div>`;
+  const grp = (g, label, body, acts = '', n = '', tip = '') => `<div class="sgroup sg-${g}">${head(g, label, acts, n, tip, !sideOpen(g) && /class="srow[^"]*\bon\b/.test(body))}${sideOpen(g) ? body : SIDE_FOLDED.includes(g) ? `<div class="sgfold" hidden>${body}</div>` : ''}</div>`;
   // 2.13.3 (#478 follow-up, Fold): one search entry in the sidebar / drawer: the command-bar field (search, commands and the
   // "Search" view inside); no separate "Search" row any more (it doubled the field in the drawer, the field was missing on
   // an unfolded Fold)
+  // 2.45.0 (#1502): All, Completed, Trash, Archived (was the footer)
+  const moreRows = row('all', ic('all'), tr('All'), c.all) + row('done', ic('done'), tr('Completed'), '') + row('trash', ic('trash'), tr('Trash'), S.counts.trash || '') +
+    (archived.length ? (() => {  // 1.6.1: one plain row like Trash; opens the "Archived" view (lit while an archived list is open too)
+      const on = onTasks && (k === 'archived' || archived.some(l => k === 'l:' + l.id));
+      return `<button class="srow sarch ${on ? 'on' : ''}" data-go="archived">${ic('archive')}<span class="n">${tr('Archived')}</span><span class="c">${archived.length}</span></button>`;
+    })() : '');
   const SB = {
     focus: `${grp('focus', tr('Plan|nav'), focus)}`,
     lists: `<div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${S.listReorder ? `<div class="sreobar" role="group" aria-label="${esc(tr('Sort lists'))}"><span class="sreot"><b>${tr('Sort lists')}</b><small>${esc(tr('Drag by the handle on the left, or use “…”'))}</small></span><button type="button" class="btn sm pri" data-act="lists-reorder">${tr('Done')}</button></div>` : ''}${sideOpen('lists') || S.listReorder ? (lh && favListsHtml(lh, lists)) || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>`,
     filters: `${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine lists, dates, priorities, tags'))}`,
-    tags: `${tags.length ? `<div class="sgroup"><button class="shead stoggle ${tagsOpen ? '' : 'closed'}" data-act="side-tags" aria-expanded="${tagsOpen}">${ic('chev', 's fcar')}<span class="spacer">${tr('Tags')}</span><span class="c">${tagsOpen ? '' : tags.length}</span></button>${tagsOpen ? tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join('') : ''}</div>` : ''}`,
+    tags: `${tags.length ? grp('tags', tr('Tags'), tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join(''), '', tags.length) : ''}`,  // 2.45.0 (#1502): a header like the others
     views: `${views ? grp('views', tr('Views'), views, '', (views.match(/class="srow smod/g) || []).length) : ''}`,
     areas: `${areas ? grp('areas', tr('Areas|nav'), areas, '', (areas.match(/class="srow smod/g) || []).length) : ''}`,
-    team: `${team ? grp('team', tr('Conversations|nav'), team, '', ppl.length + ags.length + grps.length + (convo.match(/class="srow/g) || []).length) : ''}`};
+    team: `${team ? grp('team', tr('Conversations|nav'), team, '', ppl.length + ags.length + grps.length + (convo.match(/class="srow/g) || []).length) : ''}`,
+    more: grp('more', tr('More'), moreRows, '', (moreRows.match(/class="srow/g) || []).length)};
   $('#side').innerHTML = `
     <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span class="sbtxt"><span>${esc(APP_NAME)}</span>${S.me?.orgs?.[0] && S.me.orgs[0].trim().toLowerCase() !== APP_NAME.toLowerCase() ? `<small class="sborg">${esc(S.me.orgs[0])}</small>` : ''}</span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${kbFoldAllBtn()}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
     ${wsBarHtml()}
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
     ${favSideHtml(lists, listRow, head)}${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => SB[g] || '').join('')}
     <div class="sgroup sfoot">
-      ${row('all', ic('all'), tr('All'), c.all)}
-      ${row('done', ic('done'), tr('Completed'), '')}
-      ${row('trash', ic('trash'), tr('Trash'), S.counts.trash || '')}
-      ${archived.length ? (() => {  // 1.6.1: one plain row like Trash; opens the "Archived" view (lit while an archived list is open too)
-        const on = onTasks && (k === 'archived' || archived.some(l => k === 'l:' + l.id));
-        return `<button class="srow sarch ${on ? 'on' : ''}" data-go="archived">${ic('archive')}<span class="n">${tr('Archived')}</span><span class="c">${archived.length}</span></button>`;
-      })() : ''}
       <button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
     </div>`;
   sideRove();
@@ -435,7 +440,7 @@ function renderTop() { return keepFocus($('#top'), renderTop0); }
 function renderTop0() {
   const m = S.route.mod, k = S.route.key;
   const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload')};
-  let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
+  let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? (S.nt.lid ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : tr('Notes')) : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
   if (mg_title(m) && !S.me?.kid) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below
   let acts = '';

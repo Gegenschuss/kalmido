@@ -353,9 +353,25 @@ async function newFolder(thenList, parent = '') {
   if (folderNames().includes(p)) { toast(tr('Folder already exists')); return; }
   const arr = folderNames();
   if (parent) { const subs = folderSubs(parent), at = arr.indexOf(subs.length ? subs[subs.length - 1] : parent); arr.splice(at + 1, 0, p); } else arr.push(p);
+  sb_folderWs(p);
   await saveFolders(arr);
+  await sb_folderWsSave(p);
   if (thenList) setListFolder(thenList, p);
 }
+// 2.45.0 (#1532): a new folder belongs to the shown workspace (its folder setting "Workspace", private = 0), so it shows there
+// at once while still empty; a subfolder of a folder with a workspace inherits it
+function sb_folderWs(p) {
+  const ws = wsCur(); if (ws === 'all' || 'org_id' in folderEff(p)) return null;
+  const org = ws === 'private' ? 0 : +ws.slice(4);
+  S.folderProps = {...(S.folderProps || {}), [p]: {...((S.folderProps || {})[p] || {}), org_id: org}};
+  return org;
+}
+async function sb_folderWsSave(p) {
+  const v = (S.folderProps || {})[p]?.org_id; if (v === undefined || !wsOn()) return;
+  try { await api('PUT', '/api/folders/props', {folder: p, props: {org_id: v}, apply: 'new'}); } catch { /* offline: the folder still shows under All */ }
+}
+// does the folder (or one below it) belong to workspace ws by its own setting (an empty folder has no lists to tell)
+const sb_folderInWs = (f, ws = wsCur()) => folderNames().some(x => fUnder(x, f) && 'org_id' in folderEff(x) && (folderEff(x).org_id ? 'org:' + folderEff(x).org_id : 'private') === ws);
 // rename / move a folder (with its lists and subfolders) and delete it (lists and subfolders move up one level)
 async function folderMove(from, to, label) {
   if (!to || to === from) return;

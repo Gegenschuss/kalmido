@@ -2,9 +2,18 @@
 
 // ---- #1185: the sidebar - one button folds / unfolds every group and folder at once (stored like a single fold)
 // A person who had "Views" open before 2.39.1 finds "Areas" (the modules that were in "Views") open too
+// 2.45.0 (#1502): "More" starts folded; a device that ran Kalmido before keeps it open unless every group was folded ("Fold all");
+// an open "Tags" (S.collapsed side:tags-open) becomes an open group. Runs before the "Areas" step below, which marks a used device
+(() => {
+  if (LS.get('sbMoreMig', 0)) return;
+  const o = new Set(LS.get('sideOpenG', []) || []), sg = LS.get('sideGroups', []) || [];
+  if (LS.get('kbAreasMig', 0) && !['focus', 'lists', 'filters', 'team'].every(g => sg.includes(g))) o.add('more');
+  if ((LS.get('collapsed', []) || []).includes('side:tags-open')) o.add('tags');
+  LS.set('sideOpenG', [...o]); LS.set('sbMoreMig', 1);
+})();
 (() => { if (LS.get('kbAreasMig', 0)) return; const o = LS.get('sideOpenG', []) || []; if (o.includes('views') && !o.includes('areas')) LS.set('sideOpenG', [...o, 'areas']); LS.set('kbAreasMig', 1); })();
 const kbSideGroups = () => sideGroupOrder().filter(g => !sideHidden('g:' + g) || g === 'lists');
-const kbSideAnyOpen = () => kbSideGroups().some(g => sideOpen(g)) || folderNames().some(f => !foldClosed(f)) || S.collapsed.has('side:tags-open');
+const kbSideAnyOpen = () => kbSideGroups().some(g => sideOpen(g)) || folderNames().some(f => !foldClosed(f));  // 2.45.0 (#1502): Tags is a group now
 function kbSideSetAll(closed) {
   for (const g of SIDE_GROUPS) {
     const key = SIDE_FOLDED.includes(g) ? 'sideOpenG' : 'sideGroups', x = new Set(LS.get(key, []) || []);
@@ -12,8 +21,6 @@ function kbSideSetAll(closed) {
     LS.set(key, [...x]);
   }
   for (const f of folderNames()) if (foldClosed(f) !== closed) foldSet(f, closed);
-  if (closed) S.collapsed.delete('side:tags-open'); else S.collapsed.add('side:tags-open');
-  LS.set('collapsed', [...S.collapsed]);
   renderSide();
 }
 function kbFoldAllBtn() {
