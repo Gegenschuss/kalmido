@@ -71,7 +71,9 @@ const partOf = j => Array.isArray(j?.parts) ? j.parts.filter(p => p.kind === 'sh
     sheet = box.querySelector('.dksheet');
   }
   const root = sheet.parentElement;
-  const S = () => root.querySelector('.dksheet');
+  // 2.47.0: the live sheet -- loading master data (the crew picker) draws the office view again and replaces the box
+  const S = () => d.querySelector(`.tpsheet .dksheet[data-pid="${PID}"]`) || root.querySelector('.dksheet');
+  await sleep(300);  // the editor wires the sheet right after drawing it
   check(S().querySelectorAll('[data-dk^="head."]').length === 13, 'head: 13 values');
   check(S().querySelectorAll('[data-dk$=".qty"][data-dk^="staff."]').length === 2, 'two crew rows');
   check(S().querySelector('[data-dk="staff.1.markup_pct"]')?.value === '10', 'admin: the markup of the role');
@@ -84,7 +86,7 @@ const partOf = j => Array.isArray(j?.parts) ? j.parts.filter(p => p.kind === 'sh
   check(/3[.,]250[.,]00/.test(S().textContent), 'camera 2 x 1,625 shown');
   // add crew from the master data
   click(w, S().querySelector('[data-dka="role"]'));
-  const md = await until(() => d.querySelector('.modal.ofdpick [data-rid]'), 40);
+  const md = await until(() => d.querySelector('.modal.ofdpick [data-rid]'), 80);
   check(md && /Camera|Kamera/.test(d.querySelector('.modal.ofdpick')?.textContent || ''), 'crew picker lists the roles');
   if (md) click(w, d.querySelector(`.modal.ofdpick [data-rid="${cam.id}"]`));
   await until(() => S()?.querySelectorAll('[data-dk^="staff."][data-dk$=".qty"]').length === 3, 40);

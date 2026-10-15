@@ -60,11 +60,14 @@ s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": "password123"}).ok
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"lang": "en", "modules": ["cal", "comments"]})
+UID = {}
 for u, n in (("bob", "Bob Member"), ("carol", "Carol Other")):
     r = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "email": f"{u}@example.com"})
     assert r.ok, r.text
+    UID[u] = r.json()["id"]
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
-CAROL = next(u["id"] for u in A.get(B + "/api/users").json()["users"] if u.get("username") == "carol")
+# 2.47.0: the id from the create answer (mode workspaces lists only the people an admin shares an organisation with)
+CAROL = UID["carol"]
 Bo, Ca = sess("bob"), sess("carol")
 for s in (A, Bo, Ca):
     s.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
