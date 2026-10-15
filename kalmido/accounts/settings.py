@@ -29,13 +29,15 @@ SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "areas", "team")  # 2.25.0 (UX-03); 2.39.1 (#1185): areas
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family")  # 2.17.0 (#475), 2.19.0
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "celebrate", "cal_today",
-                  "date_confirm", "digest_mail", "mail_from_me", "today_inbox", "agent_push",  # 2.28.0 (#987): agent_push
+                  "date_confirm", "digest_mail", "mail_from_me", "mail_trim_fwd", "mail_trim_eml",  # 2.49.0 (#971)
+                  "today_inbox", "agent_push",  # 2.28.0 (#987): agent_push
                   "detail_cm_fold",  # 2.31.0 (#344)
                   "list_emoji",  # 2.32.0 (#1077)
                   "side_progress",  # 2.36.0 (#1117)
                   "cal_tasks",  # 2.36.1 (#1127)
                   "agent_steps_live", "agent_steps_always",  # 2.32.0 (#1081)
                   "show_done_default",  # 2.39.1 (#1214): "Hide completed" as the default of every view (0 = hide)
+                  "show_done_new",  # 2.49.0 (#1535): new lists hide completed tasks
                   "fav_only",  # 2.40.0 (#1361): the sidebar shows only the favourites
                   "fav_quiet", "fav_suggest",  # 2.46.1 (#1361): quieter pushes from lists without a star; favourite suggestions
                   "person_colors",  # 2.47.1 (#1721): people in their account colour (0 = only agents coloured)

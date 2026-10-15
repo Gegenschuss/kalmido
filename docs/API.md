@@ -959,6 +959,9 @@ default, else `show_done_default`. `apply: all` drops the own choice of every li
 whose view changes; `dry_run` too); an own choice that differs from the folder marks the list (`folder_own` contains
 `hide_done`, *This list differs*) until `POST /api/lists/{id}/folder-reset`; `apply: new` and `hide_done: null` keep what each
 existing list shows (as its own choice).
+2.49.0 (#1535): a NEW account starts with `show_done_default` `"0"` (existing accounts keep their value), and a new list gets an own
+entry `"l:<id>": 0` in `show_done_views` (hidden) while the person's setting `show_done_new` (`"1"` default, `"0"` off) is on; a folder
+default `hide_done` goes first and existing lists are never touched. Settings > Appearance > *Hide completed tasks in new lists*.
 
 ## Playbook (2.39.0)
 

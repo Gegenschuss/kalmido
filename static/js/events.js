@@ -100,13 +100,15 @@ function toast(msg, undo, ms, label) {  // label: the button's text instead of "
   const el = $('#toast');
   announce(msg + (undo ? ' · ' + (label || tr('Undo')) + (isTouch() ? '' : ' (' + kbText('Mod+Z') + ')') : ''));
   if (!undo || label) HIST.toastE = null;  // any other message ends the toast's shortcut (the history keeps the step)
-  el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button>${esc(label || tr('Undo'))}</button>${isMobile() || isTouch() || label ? '' : kb('Mod+Z')}` : ''}`;
+  el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button>${esc(label || tr('Undo'))}</button>${isMobile() || isTouch() || label ? '' : kb('Mod+Z')}` : ''}${undo || (ms || 2500) > 2500 ? `<button class="tx" type="button" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x', 's')}</button>` : ''}`;  // 2.49.0 (#1769): a small x closes it without the action
   el.classList.toggle('one', !!undo); el.title = undo ? msg : '';  // 2.46.4 (#1755): one line, the name is cut with an ellipsis, the button stays whole
   el.classList.remove('hidden');
   toastPlace(el);
   if (undo) el.querySelector('button').onclick = () => { el.classList.add('hidden'); undo(); };
   clearTimeout(toastTimer);
   const hide = () => { el.classList.add('hidden'); if (undo) HIST.toastE = null; };
+  const tx = el.querySelector('button.tx'); if (tx) tx.onclick = () => { clearTimeout(toastTimer); hide(); };
+  el.onkeydown = e => { if (e.key === 'Escape' && !el.classList.contains('hidden')) { e.stopPropagation(); clearTimeout(toastTimer); hide(); } };  // 2.49.0 (#1769)
   const wait = ms || (undo ? 6000 : 2500);
   toastTimer = setTimeout(hide, wait);
   // 2.16.0 (#473, WCAG 2.2.1): the toast stays while the pointer or the keyboard focus is on it

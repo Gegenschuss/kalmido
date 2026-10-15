@@ -110,6 +110,7 @@ ORDER = (
     "collab.chatsave",  # 2.37.0 (#1159)
     "collab.cchoice",  # 2.41.0 (#1383): answer buttons / approval cards in comments
     "collab.e2e",  # 2.42.0 (#828, #909): end-to-end encryption (keys, encrypted notes / files / DMs)
+    "integrations.mailtrim",  # 2.49.0 (#971)
     "integrations.mail",
     "accounts.invite",
     "family.family",

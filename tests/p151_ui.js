@@ -25,7 +25,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
 (async () => {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
-  await call('PATCH', '/api/settings', {features: 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields'});
+  await call('PATCH', '/api/settings', {features: 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields', show_done_default: '1', show_done_new: '0'});  // 2.49.0 (#1535): the old defaults (completed stay visible)
   const T0 = today(), T1 = addD(T0, 1);
   const WORK = (await call('POST', '/api/lists', {name: 'Work'})).id;
   const OLD = (await call('POST', '/api/lists', {name: 'Old'})).id;
@@ -382,6 +382,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   // ================= (k) "Delete completed…" on the Completed view
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   const BK = await login('bob');
+  await call('PATCH', '/api/settings', {show_done_default: '1', show_done_new: '0'}, BK);  // 2.49.0 (#1535): the old defaults
   const BL = (await call('POST', '/api/lists', {name: 'Bob list'}, BK)).id;
   await call('PUT', `/api/lists/${BL}/members`, {user_id: 1, role: 'view'}, BK);
   const bt = (await call('POST', '/api/tasks', {title: 'Bob done', list_id: BL}, BK)).id;

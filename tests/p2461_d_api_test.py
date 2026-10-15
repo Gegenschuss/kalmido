@@ -72,6 +72,8 @@ A.patch(B + "/api/settings", json={"lang": "en"})
 r = A.post(B + "/api/users", json={"orgs": [1], "username": "bob", "display_name": "Bob", "password": "password123", "email": "bob@example.com"})
 BOB = r.json()["id"]
 Bo = sess("bob")
+for _s in (A, Bo):  # 2.49.0 (#1535): the old defaults (completed stay visible, new lists get no own entry)
+    _s.patch(B + "/api/settings", json={"show_done_default": "1", "show_done_new": "0"})
 ME = A.get(B + "/api/state").json()["me"]
 ALICE, ORG = ME["id"], ME["workspaces"][0]["id"]
 AG = {}

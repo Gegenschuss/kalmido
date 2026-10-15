@@ -1032,6 +1032,22 @@ def list_created(c, uid, lid, agents=True):
     # people (the list stays uid's)
     folder_list_arrived(c, lid, keep=g.pop("list_keep", ()) if has_request_context() else ())
     folder_member_created(c, uid, lid)
+    md_hide_done_new(c, uid, lid)
+
+
+def md_hide_done_new(c, uid, lid):
+    """2.49.0 (#1535): a new list of uid hides its completed tasks (own entry in show_done_views) when the person keeps
+    "Hide completed in new lists" on; a folder default (hide_done) goes first, existing lists are never touched."""
+    from ..lists.folders import folder_effective, lc_done_put, lc_done_views
+    if usettings(c, uid).get("show_done_new") == "0":
+        return
+    r = c.execute("SELECT folder, owner_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if not r or r["owner_id"] != uid or "hide_done" in folder_effective(c, uid, r["folder"] or "")[0]:
+        return
+    views = lc_done_views(c, uid)
+    if f"l:{lid}" not in views:
+        views[f"l:{lid}"] = 0
+        lc_done_put(c, uid, views)
 
 
 @app.put("/api/agents/<int:aid>/autoshare")

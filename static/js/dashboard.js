@@ -459,7 +459,10 @@ function mailHtml(j) {
     ${j.lists.map(x => row(x.name, x.address, x.list_id)).join('')}
     ${own.length ? `<div class="row"><label for="mail-list">${tr('For a list')}</label><select id="mail-list" data-native>${own.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select><button type="button" class="btn sm" data-mail="newlist">${ic('plus', 's')} ${tr('Create')}</button></div>` : ''}
     <div class="shint">${tr('Subject = title, the text = description, attachments become files. Keep the address secret: whoever knows it can add tasks.')}</div>
-    <div class="row"><label></label>${mchk('s-mailme', j.from_me, tr('Mails from my own address ({0}) to {1} go to my basket', j.email || tr('none set'), j.plain))}</div>`
+    <div class="row"><label></label>${mchk('s-mailme', j.from_me, tr('Mails from my own address ({0}) to {1} go to my basket', j.email || tr('none set'), j.plain))}</div>
+    <div class="row"><label></label>${mchk('s-mailtrim', j.trim_fwd, tr('Shorten forwarded mails'))}</div>
+    <div class="row"><label></label>${mchk('s-mailtrimeml', j.trim_eml, tr('Keep the original mail as an attachment'))}</div>
+    <div class="shint">${tr('A forwarded mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.')}</div>`
     : `<div class="shint">${S.me?.is_admin ? tr('Not set up on this server: an admin sets KALMIDO_MAIL_ADDRESS and KALMIDO_IMAP_* (see the README).') : tr('Not set up on this server yet. Ask your admin.')}</div>`;  // 2.25.0 (UX-20): server details only for admins
 }
 function mailDigestHtml(j) {
@@ -484,6 +487,7 @@ async function mailWire(md) {
     if (k === 'test') { try { const r = await api('POST', '/api/me/mail/test'); toast(tr('Sent to {0}', r.to)); } catch { /* api() said it */ } }
   });
   md.addEventListener('change', async e => {
+    if (e.target.id === 's-mailtrim' || e.target.id === 's-mailtrimeml') { const k = e.target.id === 's-mailtrim' ? 'mail_trim_fwd' : 'mail_trim_eml'; await api('PATCH', '/api/settings', {[k]: e.target.checked ? '1' : '0'}).catch(() => {}); S.settings[k] = e.target.checked ? '1' : '0'; }  // 2.49.0 (#971)
     if (e.target.id === 's-mailme') { await api('PATCH', '/api/settings', {mail_from_me: e.target.checked ? '1' : '0'}).catch(() => {}); S.settings.mail_from_me = e.target.checked ? '1' : '0'; }
     if (e.target.id === 's-digmail') { await api('PATCH', '/api/settings', {digest_mail: e.target.checked ? '1' : '0'}).catch(() => {}); S.settings.digest_mail = e.target.checked ? '1' : '0'; }
   });

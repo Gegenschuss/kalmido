@@ -30,7 +30,7 @@ const task = async id => (await state()).tasks.find(t => t.id === id);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ALL.split(',').filter(x => !['collab', 'time'].includes(x))});
-  await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
+  await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done', show_done_default: '1', show_done_new: '0'});  // 2.49.0 (#1535): the old defaults (completed stay visible)
   const L = (await call('POST', '/api/lists', {name: 'App', kind: 'project', tickets: 1})).id;
   const LK = (await call('POST', '/api/lists', {name: 'Board', kind: 'project', view: 'kanban'})).id;
   const MS = (await call('POST', '/api/tasks', {title: 'Release 1.0', list_id: L, ms: 1, due: day(3)})).id;

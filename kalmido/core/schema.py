@@ -1405,6 +1405,8 @@ USER_DEFAULTS = {
     "digest_sent": "",
     "digest_mail": "0",         # 2.17.0 (#443): the daily summary also by e-mail (at digest_time; needs SMTP + an address)
     "digest_mail_sent": "",
+    "mail_trim_fwd": "0",       # 2.49.0 (#971): forwarded mails shrink to one header line (off: nothing changes for existing people)
+    "mail_trim_eml": "1",       # 2.49.0 (#971): ... and the original stays attached as .eml
     "mail_from_me": "0",        # 2.17.0 (#443): mails from my own address to the plain task address land in my inbox
     # 2.17.0 (#475): the dashboard behind the logo, json {"order": [widget keys], "hidden": [widget keys]} ('' = default)
     "dashboard": "",
@@ -1433,6 +1435,7 @@ USER_DEFAULTS = {
     "show_done_views": "{}",
     "wgstd_hide": "{}",         # 2.46.2 (#1726): per view the signature of the arrangement whose "differs from the standard" note was dismissed
     "mods_all": "1",            # 2.46.1 (#1591): "Switch on all modules" under "What do you use Kalmido for?" (0 = lists and tasks only)
+    "show_done_new": "1",       # 2.49.0 (#1535): a new list hides its completed tasks (own entry in show_done_views at creation)
     "show_done_default": "1",   # 2.39.1 (#1214): views without an own entry (and without a folder default) show completed tasks
     "group_order": "{}",        # 2.39.1 (#1221): json route key -> [group ids], the own order of a view's groups (all devices)
     # modules that can be switched off in the settings (hidden from nav, data stays)

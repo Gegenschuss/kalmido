@@ -78,6 +78,8 @@ for u in ("bob", "carol", "dave"):
     uid[u] = r.json()["id"]
 BOB, CAROL, DAVE = uid["bob"], uid["carol"], uid["dave"]
 Bo, Ca, Da = sess("bob"), sess("carol"), sess("dave")
+for _s in (A, Bo, Ca, Da):  # 2.49.0 (#1535): the old defaults (completed stay visible, new lists get no own entry)
+    _s.patch(B + "/api/settings", json={"show_done_default": "1", "show_done_new": "0"})
 for s in (Bo, Ca, Da):
     s.patch(B + "/api/settings", json={"lang": "en"})
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]

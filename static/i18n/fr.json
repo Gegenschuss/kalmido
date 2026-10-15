@@ -7141,5 +7141,10 @@
   "You switched on that people at {0} can find you by this e-mail address. Confirm it with the button; the link works for {1} days. Not you? Ignore this mail and nothing changes.": "Tu as activé que les gens sur {0} puissent te trouver par cette adresse e-mail. Confirme-la avec le bouton ; le lien est valable {1} jours. Ce n’était pas toi ? Ignore cet e-mail, rien ne change.",
   "Accept|connection": "Accepter",
   "Decline|connection": "Refuser",
-  "Block|person": "Bloquer"
+  "Block|person": "Bloquer",
+  "Hide completed tasks in new lists": "Masquer les tâches terminées dans les nouvelles listes",
+  "A new list hides its completed tasks; the list’s “…” menu shows them again. A folder default goes first, existing lists stay as they are. For all your devices.": "Une nouvelle liste masque ses tâches terminées ; le menu « … » de la liste les affiche à nouveau. Un réglage de dossier est prioritaire ; les listes existantes ne changent pas. Pour tous vos appareils.",
+  "Shorten forwarded mails": "Raccourcir les e-mails transférés",
+  "Keep the original mail as an attachment": "Garder l’e-mail d’origine en pièce jointe",
+  "A forwarded mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.": "Un e-mail transféré devient le titre (sans « Fwd: ») avec une ligne « De … , date » au-dessus du message ; signatures, mentions légales et anciennes réponses citées sont supprimées. Vos propres mots au-dessus du transfert restent."
 }

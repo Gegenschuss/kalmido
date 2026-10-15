@@ -589,6 +589,9 @@ Trigger every alert once on purpose after setting it up, the dead man's switch t
 
 - **Give *Tasks by e-mail* its own mailbox.** Kalmido marks every mail it reads as read and imports it as a task; a
   mailbox you also use yourself gets mixed up.
+- **Shorten forwarded mails (optional, per person).** Settings > Integrations > *Tasks by e-mail* > *Shorten forwarded mails*: the
+  forwarding header becomes one line, signatures, legal notices and older quoted replies are cut, the original mail stays
+  attached as `.eml`. Off by default.
 - **Deliver directly, do not forward.** Many forwarding rules drop the plus part of an address (`tasks+token@…`), and
   then Kalmido cannot tell whose task it is.
 - **Sender domain:** for the daily summary over SMTP, set up SPF, DKIM and DMARC for the sender domain, or the mails land
