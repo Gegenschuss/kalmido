@@ -45,6 +45,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   row.querySelector('[data-ab="open"]').click();
   await until(() => w.location.hash === '#ablage/' + FID && d.querySelector('.abcrumbs'));
   check(/Invoices/.test(d.querySelector('.abcrumbs')?.textContent || ''), 'opening the folder: the path shows it');
+  check(/Invoices/.test(d.querySelector('.abtree.on')?.textContent || ''), 'the tree on the left marks the open folder below its space');
 
   // ================= upload (twice the same name = a new version)
   await w.eval(`ab_upload([new File(['first'], 'note.txt', {type: 'text/plain'})], ${FID})`);
@@ -96,13 +97,31 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   d.querySelector('.abspace[data-sp="private"]').click();
   await until(() => d.querySelector(`.abrow[data-abid="${FID}"]`));
   check(d.querySelector(`.abrow[data-abid="${FID}"]`), 'back in My files');
+  // ================= "Show in the file store" on a task file: a link, no copy
+  const inbox = (st.lists || []).find(l => l.is_inbox)?.id;
+  const TID = (await call('POST', '/api/tasks', {title: 'With a file', list_id: inbox})).id;
+  const fd = new FormData(); fd.append('file', new Blob(['task file']), 'brief.txt');
+  await fetch(B + `api/tasks/${TID}/attachments`, {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: CK}, body: fd});
+  await w.eval(`refreshNow()`);
+  await sleep(600);
+  w.eval(`openDetail(${TID})`);
+  const lb = await until(() => d.querySelector('#detail .att [data-ablink], .att [data-ablink]'));
+  check(lb && /^att:\d+:$/.test(lb.dataset.ablink), 'a task file has "Show in the file store" ' + (lb?.dataset.ablink || ''));
+  if (lb) {
+    lb.click();
+    await sleep(700);
+    const top = await call('GET', '/api/files?space=private');
+    const link = (top.items || []).find(x => x.kind === 'link' && x.name === 'brief.txt');
+    check(link, 'the link is at the top of My files');
+    check(w.eval(`/brief\.txt/.test(HIST.undo[HIST.undo.length - 1].label)`), 'one undo step');
+  }
   w.close();
 
   // ================= phone width
   const m = await boot({user: 'alice', hash: 'ablage', mobile: true}), md2 = m.document;
   await until(() => md2.querySelector('#view .abview'));
   check(md2.querySelector('.abspaces'), 'phone: the spaces as a row on top');
-  const mb = md2.querySelector(`.abrow[data-abid="${FID}"] [data-ab="menu"]`);
+  const mb = await until(() => md2.querySelector(`.abrow[data-abid="${FID}"] [data-ab="menu"]`));
   check(mb, 'phone: the row has the actions button');
   if (mb) {
     mb.click();
