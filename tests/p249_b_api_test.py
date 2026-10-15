@@ -70,7 +70,8 @@ def ntfy():
         return []
 
 
-r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)
+r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True,
+                   env=dict(os.environ, KALMIDO_ONBOARDING="1"))  # a new account starts with onboard / tour pending
 assert r.returncode == 0, r.stdout + r.stderr
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
