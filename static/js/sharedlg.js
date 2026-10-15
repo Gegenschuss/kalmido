@@ -103,7 +103,7 @@ function folderShareModal(f, opt = {}) {
     const b = e.target.closest('button'); if (!b) return;
     const m = b.dataset.m;
     if (m === 'close') { md.remove(); await done(); return; }
-    if (m === 'fsh-props') { if (opt.back) { md.remove(); return; } md.remove(); folderPropsModal(f); return; }
+    if (m === 'fsh-props') { if (opt.back) { md.remove(); return; } modalSub(md, () => folderPropsModal(f, {back: true})); return; }  // 2.46.0 (#1604): the settings come back here with "Back", no stack
     if (m === 'add') {
       const uid = +$('#fp-user', md).value, role = $('#fp-role', md).value; if (!uid) return;
       try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role}); await reload(); toast(trn('{0} list shared', '{0} lists shared', j.shared)); await done(); } catch { /* api() said it */ }
