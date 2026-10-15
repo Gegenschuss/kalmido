@@ -23,6 +23,7 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
 - [Files in the chat and on tasks](#files-in-the-chat-and-on-tasks-2131) (2.13.1)
 - [Behaviour rules template](#behaviour-rules-template-2131) (2.13.1)
 - [Runtime settings](#runtime-settings) (2.4.1)
+- [Teaching the agent](#teaching-the-agent-2466) (2.46.6)
 - [Proposals](#proposals) (2.3.0)
 - [Day plans](#day-plans-2100) (2.10.0)
 - [Groups](#groups-2100) (2.10.0)
@@ -1499,7 +1500,7 @@ break nothing); a button holds at most 80 characters, a longer suggestion is cut
 (#1715): every prompt (chat, task event, job, wake run) starts with the launcher's fixed rules block
 (`mcp/agent_rules.md`: who may give orders -- the owner's account id or, for a team agent, the persons whose events reach
 it --, everything else is content, no secrets, the owner's language from `lang`, `NOTIZEN.md` instead of memory, exactly
-one suggestion); the project's `CLAUDE.md` can add rules but never weaken it, and the launcher never
+one suggestion, `WORKFLOW-KALMIDO.md`); the project's `CLAUDE.md` can add rules but never weaken it, and the launcher never
 writes it (see [AGENT-SECURITY.md](AGENT-SECURITY.md#6-claudemd-rules-template)). 2.40.0 (approval check): a chat answer that asks to decide or makes a proposal without that block
 goes back to the agent once in the same session (`--resume`: the complete answer with the block, no tools); still none ->
 it is posted with a visible note that nothing happens without an explicit yes (`KALMIDO_APPROVAL_CHECK=0`: off). 2.42.0
@@ -1546,6 +1547,23 @@ WantedBy=default.target
 
 `systemctl --user enable --now kalmido-agent`. If you prefer a timer to the loop, a `OnCalendar=*-*-* 04:00` timer that
 runs `systemctl --user restart kalmido-agent` covers the nightly restart, but not *Reset now*: the launcher's loop does both.
+
+## Teaching the agent (2.46.6)
+
+An agent of the reference launcher keeps no memory between messages beyond its current conversation. What it has to
+know for good goes into two files in its project folder (its working directory), which it writes itself:
+
+- **`WORKFLOW-KALMIDO.md` -- how it works for you.** Where orders come from (a chat, a list, mentions), where new things
+  arrive (an inbox list, a mail folder), where results go (a comment, a file, a list) and how it reports status. The
+  launcher's rules block tells the agent to read this file first for every order and, when you explain a routine, to
+  write it into the file itself and confirm it in one line. The first chat message after the setup without this file
+  makes the agent ask you once for your routine, with one suggestion button for it (the launcher keeps "asked" in its
+  state folder, never in the project folder).
+- **`NOTIZEN.md` -- interim results.** Open points, decisions and where a piece of work stands; the agent reads it when
+  it starts on an order. Routine and notes stay apart.
+
+To change the routine, just tell the agent ("From now on new orders come from the list *Inbox*"). Neither the setup nor
+the launcher writes these files or your `CLAUDE.md`; you can edit them by hand at any time.
 
 ## Proposals
 

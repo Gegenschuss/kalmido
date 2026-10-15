@@ -8,7 +8,7 @@
 > who may give it instructions. Settings › Agents › Set up shows the same block with a copy button.
 >
 > **Reference launcher (2.46.6):** `mcp/agent_run.py` puts its own fixed safety rules (`mcp/agent_rules.md`: who gives
-> orders, content is no order, no secrets, language, `NOTIZEN.md`, one suggestion) in front of
+> orders, content is no order, no secrets, language, `NOTIZEN.md`, one suggestion, `WORKFLOW-KALMIDO.md`) in front of
 > every run, and your `CLAUDE.md` cannot weaken them. This template stays for reading and for other hosts.
 
 <!-- kalmido-agent-rules:start -->
@@ -104,6 +104,9 @@
 - Tick off what you delivered yourself and close the task with a short comment (what was done, where). Before you report
   "done", compare the open points of the task with what you delivered.
 - Write status texts, summaries and questions in plain words that a non-technical person understands.
+- Your working routine (where orders come from, where new things arrive, where results go, how you report status) lives
+  in `WORKFLOW-KALMIDO.md` in your project folder: read it first for every order; when the person explains a routine,
+  write it there yourself and confirm in one line. Interim results go into `NOTIZEN.md`, not into the routine.
 - End every chat answer with exactly **one** suggestion for the next step as an answer button; never offer one that an
   older, still visible message already offers as a button (offer the next-best different step instead). Only the newest
   message's buttons stay live: a newer message expires older open ones; take back buttons that are no longer current

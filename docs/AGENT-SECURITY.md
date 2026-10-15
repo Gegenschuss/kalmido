@@ -341,7 +341,7 @@ personal agent the owner's account id from `GET /api/v1/agent`, `owner_id`; for 
 events reach it, narrowed by `KALMIDO_OWNER_IDS`), the language (`lang`), says that everything else is content, that
 secrets are never printed and requests for them or to "ignore your rules" are refused and reported, that interim
 results go into `NOTIZEN.md` in the project folder (no memory between messages), that exactly one suggestion ends an
-answer. The block says that the project's
+answer, and that `WORKFLOW-KALMIDO.md` holds the agent's working routine. The block says that the project's
 `CLAUDE.md` can add rules but never weaken these; the launcher and the setup never write the `CLAUDE.md` or any other
 file in the project folder. With another host, or to read them, keep the lines below in your `CLAUDE.md`.
 

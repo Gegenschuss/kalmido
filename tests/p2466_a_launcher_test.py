@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """2.46.6 part A: the reference launcher (mcp/agent_run.py, mcp/agent_job.py) without a server -- suggestion buttons cut
-at a word (#1722), exactly one suggestion (#1714), the fixed rules block in every run (#1715). A stub
+at a word (#1722), exactly one suggestion (#1714), the fixed rules block in every run (#1715),
+WORKFLOW-KALMIDO.md (#1717). A stub
 API and a fake 'claude' command (prints stream-json), pure Python, no container."""
 import importlib.util
 import json
@@ -190,6 +191,26 @@ aj = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(aj)
 jb = aj.rules_for_job(StubApi())
 check(jb.startswith("## Fixed rules") and "account id 7" in jb, "a job's brief starts with the rules block")
+
+# ---- #1717: WORKFLOW-KALMIDO.md: read first, written by the agent; the first chat run without it asks once
+check("WORKFLOW-KALMIDO.md" in ar.rules_block(AGENT) and "read it first" in ar.rules_block(AGENT), "the rules block names WORKFLOW-KALMIDO.md")
+r = runner("s2")
+r.run(None, [{"event": "comment", "seq": 1, "data": {"task": {"id": 5}, "comment": {"id": 3, "text": "x"}}}])
+check("Launcher, once" not in calls()[0]["prompt"], "a task run never asks for the routine")
+r.run(7, [chat(1, "hello")])
+p1 = calls()[0]["prompt"]
+check("Launcher, once" in p1 and "orders come from" in p1 and "results go" in p1 and "report status" in p1,
+      "the first chat run without the file asks once (orders, inbox, results, status)")
+r.run(7, [chat(2, "next")])
+check("Launcher, once" not in calls()[0]["prompt"], "the second chat run does not ask again")
+check(runner("s2").state.data.get("workflow_asked"), "'asked' survives a restart (state folder)")
+check(sorted(os.listdir(PROJ)) == before, "nothing written into the project folder")
+with open(os.path.join(PROJ, "WORKFLOW-KALMIDO.md"), "w") as f:
+    f.write("Orders come from the list Inbox.\n")
+r = runner("s3")
+r.run(7, [chat(1, "hello")])
+check("Launcher, once" not in calls()[0]["prompt"], "the file is there: no question")
+os.remove(os.path.join(PROJ, "WORKFLOW-KALMIDO.md"))
 
 print(f"p2466_a_launcher: {ok} ok, {len(F)} failed")
 sys.exit(1 if F else 0)
