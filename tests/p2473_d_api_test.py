@@ -3,6 +3,8 @@
  - #1738: Google photo links in a vCard file are fetched at the FILE import (allowlist *.googleusercontent.com, https only,
    size limit, SSRF guard, Google's placeholders skipped); importing again adds missing pictures without doubles; the fetch is
    replaced by a fake inside the server process (no internet in tests)
+ - #1764: POST /api/v1/agent/chats/{uid} takes job_parent (only with job_id, a job of the same agent, not the job itself);
+   the message shows job_id + job_parent; unknown / foreign / alone: 400
 usage: p2473_d_api_test.py <datadir>"""
 import os
 import subprocess
@@ -113,6 +115,36 @@ out, err = py('from kalmido.contacts.model import parse_vcard as p\nv = p("BEGIN
 check(out == f"'' {GOOD} True", f"parse keeps the link in extra and does not fetch: {out} {err}")
 out, err = py("from kalmido.contacts.model import photo_url_ok as o\nprint([o(u) for u in ['https://lh3.googleusercontent.com/x','http://lh3.googleusercontent.com/x','https://googleusercontent.com/x','https://lh3.googleusercontent.com.evil.test/x','https://lh3.googleusercontent.com:8443/x','https://a:b@lh3.googleusercontent.com/x','https://x/a.googleusercontent.com/y']])")
 check(out == "[True, False, False, False, False, False, False]", f"URL allowlist: {out} {err}")
+
+# ================================================================== #1764 job_parent on a chat message
+r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "leadbot", "display_name": "Lead bot"})
+AGT, AH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"], "X-Requested-With": "kalmido"}
+ALICE = A.get(B + "/api/state").json()["me"]["id"]
+LST = A.post(B + "/api/lists", json={"name": "Jobs"}).json()["id"]
+A.put(B + f"/api/lists/{LST}/members", json={"user_id": AGT, "role": "edit"})
+V = B + "/api/v1"
+
+
+def job(title):
+    return requests.post(V + "/agent/jobs", headers=AH, json={"title": title, "user_id": ALICE, "state": "running"}).json()["id"]
+
+
+def say(body, **kw):
+    return requests.post(V + f"/agent/chats/{ALICE}", headers=AH, json={"body": body, **kw})
+
+
+J1, J2 = job("Leader"), job("Part")
+r = say("Job #%d: part speaks" % J2, job_id=J2, job_parent=J1)
+check(r.status_code == 201 and r.json().get("job_id") == J2 and r.json().get("job_parent") == J1, f"job_parent is stored and returned {r.status_code} {r.text[:200]}")
+r = say("Job #%d: leader speaks" % J1, job_id=J1)
+check(r.status_code == 201 and r.json().get("job_parent") is None, "without job_parent: null")
+check(say("x", job_parent=J1).status_code == 400, "job_parent alone (no job_id): 400")
+check(say("x", job_id=J2, job_parent=J2).status_code == 400, "a job is not its own leader: 400")
+check(say("x", job_id=J2, job_parent=999999).status_code == 400, "an unknown leader: 400")
+check(say("x", job_id=J2, job_parent="abc").status_code == 400, "a bad number: 400")
+m = [x for x in A.get(B + f"/api/agents/{AGT}/chat").json().get("messages", []) if x.get("job_parent")]
+check(m and m[0]["job_parent"] == J1 and m[0]["job_id"] == J2, f"the person's chat shows job_parent {m[:1]}")
+check(say("a note", kind="notice", job_id=J2, job_parent=J1).status_code == 400, "a notice takes no job fields: 400")
 
 print(f"p2473_d_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

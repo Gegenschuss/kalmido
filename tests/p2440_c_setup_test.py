@@ -86,7 +86,7 @@ for b in BASHES:
 
 # ---- a stub Kalmido
 TOKEN = "abk_stub_secret_token_4711"
-ST = {"status": [], "redeem": [], "remove": [], "enabled": True}
+ST = {"status": [], "redeem": [], "remove": [], "enabled": True, "remove_code": 200}  # 2.47.3 (#1729): remove_code 401 = the key is already revoked
 
 
 class Stub(BaseHTTPRequestHandler):
@@ -133,6 +133,8 @@ class Stub(BaseHTTPRequestHandler):
                                     "agent": {"id": 9, "name": "Helper", "username": "helper"}, "starter_base": f"{URL}/mcp/"})
         if self.path == "/api/agent-setup/remove":
             ST["remove"].append(self.headers.get("Authorization"))
+            if ST["remove_code"] != 200:
+                return self._json(ST["remove_code"], {"error": "Missing or invalid API token"})
             return self._json(200, {"ok": True})
         self._json(404, {})
 
@@ -266,6 +268,16 @@ for b in BASHES:
     r = subprocess.run([b, SETUP_SH, "--uninstall", "--dir", "~/my project"], env=env, capture_output=True, text=True, timeout=60)
     check(r.returncode == 0 and ST["remove"] == ["Bearer " + TOKEN] and not os.path.exists(inst) and os.path.isdir(proj),
           f"{b}: --uninstall revokes the token, removes the instance, keeps the project: {ST['remove']} {r.stderr[-300:]}")
+    # 2.47.3 (#1729): --uninstall after the key was revoked (agent deleted): a hint, the cleanup still runs through (dry run + real)
+    r = subprocess.run([b, SETUP_SH, "--url", URL, "--code", "ks_good_code", "--dir", "~/my project", "--cmd", "fakeagent", "--no-autostart"], env=env, capture_output=True, text=True, timeout=120)
+    insts = os.listdir(os.path.join(home, ".kalmido", "agents")) if os.path.isdir(os.path.join(home, ".kalmido", "agents")) else []
+    inst = os.path.join(home, ".kalmido", "agents", insts[0]) if insts else home
+    ST["remove_code"] = 401
+    ST["remove"].clear()
+    r = subprocess.run([b, SETUP_SH, "--uninstall", "--lang", "en", "--dir", "~/my project"], env=env, capture_output=True, text=True, timeout=60)
+    ST["remove_code"] = 200
+    check(r.returncode == 0 and len(ST["remove"]) == 1 and not os.path.exists(inst) and os.path.isdir(proj) and "already revoked" in r.stdout and "Done" in r.stdout,
+          f"{b}: --uninstall with a revoked key: hint only, files removed, project kept: {r.returncode} {r.stdout[-300:]} {r.stderr[-200:]}")
     # missing prerequisites are named
     r = subprocess.run([b, SETUP_SH, "--url", URL, "--code", "x", "--dir", "/tmp/x", "--cmd", "claude-not-here"], env=env, capture_output=True, text=True, timeout=60)
     check(r.returncode == 1 and "missing on this computer" in r.stderr and "claude-not-here" in r.stderr, f"{b}: a missing agent command is named: {r.stderr[-300:]}")
