@@ -6,11 +6,14 @@
 // - fold, double-click on the divider shares the height evenly, close one window (its X, Esc), back to one = as before
 // - more windows than fit (220 px each) fold to their header; the windows come back after a reload
 // - phone: no split, a row of the open chats above the chat switches between them
+// - Firefox (real layout, 1366 x 768): three windows share the height, every message box inside its window, the divider
+//   follows the pointer, a double-click evens the heights, a fourth window folds one to its header
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const firefox = require('./ff')({tag: 'p247c_a_ui', check, shots: 'P247C_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
@@ -179,6 +182,35 @@ const sec = (d, k) => d.querySelector(`#achat .cwin[data-cw="${k}"]`);
   await until(() => /#team\//.test(w.location.hash) && d.querySelector('#view .tcroom .cwsw'));
   check(w.location.hash === '#team/' + RID && !!d.querySelector('#view .tcroom .cwsw .cwswb.on[data-cwsw="t:' + RID + '"]'), '#1720 phone: a tap switches to the conversation (the row stays)');
   w.close();
+
+  // ================= Firefox: the real layout
+  await call('PATCH', `/api/admin/agents/${A3}`, {enabled: true});
+  await firefox(async ({cmd, ev, nav, ctx, shot, drag}) => {
+    await nav(B + 'static/icon.svg');
+    await ev(`(() => { localStorage.clear(); return 1; })()`);
+    check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1366, height: 768}});
+    await nav(B + '#l/' + L);
+    for (let i = 0; i < 30 && !(await ev('!!(window.S && S.booted)').catch(() => false)); i++) await sleep(300);
+    await ev(`(chatOpen(${A1}), 1)`); await sleep(1200);
+    await ev(`(cw_split('a:${A2}'), cw_split('t:${RID}'), 1)`); await sleep(1800);
+    const LAY = `(() => { const p = document.getElementById('achat'); return {ph: p.clientHeight, sh: p.scrollHeight, ss: [...p.querySelectorAll('.cwin')].map(s => { const r = s.getBoundingClientRect(), c = s.querySelector('.chcomp')?.getBoundingClientRect(); return {h: Math.round(r.height), c: s.classList.contains('cwc'), comp: c ? Math.round(r.bottom - c.bottom) : -1}; })}; })()`;
+    let m = await ev(LAY);
+    check(m.ss.length === 3 && Math.max(...m.ss.map(x => x.h)) - Math.min(...m.ss.map(x => x.h)) <= 2 && m.sh <= m.ph + 1, '#1720 Firefox: three windows share the height evenly, nothing overflows ' + JSON.stringify(m));
+    check(m.ss.every(x => x.comp >= 0), '#1720 Firefox: every message box sits inside its window ' + JSON.stringify(m.ss));
+    await shot('p247c-a-three.png');
+    const sp = await ev(`(() => { const r = document.querySelector('#achat .cwsep').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`);
+    await drag(sp.x, sp.y, 0, 30); await sleep(300);
+    const m2 = await ev(LAY);
+    check(Math.abs(m2.ss[0].h - m.ss[0].h - 30) <= 3 && Math.abs(m2.ss[1].h - m.ss[1].h + 30) <= 3, '#1720 Firefox: the divider follows the pointer ' + JSON.stringify(m2.ss.map(x => x.h)));
+    await ev(`(document.querySelector('#achat .cwsep').dispatchEvent(new MouseEvent('dblclick', {bubbles: true})), 1)`); await sleep(200);
+    m = await ev(LAY);
+    check(Math.max(...m.ss.map(x => x.h)) - Math.min(...m.ss.map(x => x.h)) <= 2, '#1720 Firefox: a double-click evens the heights ' + JSON.stringify(m.ss.map(x => x.h)));
+    await ev(`(cw_split('a:${A3}'), 1)`); await sleep(1500);
+    m = await ev(LAY);
+    check(m.ss.length === 4 && m.ss.filter(x => x.c).length === 1 && m.ss.filter(x => !x.c).every(x => x.h >= 219 && x.comp >= 0) && m.sh <= m.ph + 1, '#1720 Firefox: four windows at 768 px: one folds to its header, three keep 220 px ' + JSON.stringify(m));
+    await shot('p247c-a-four.png');
+  }, false);
 
   console.log(`p247c_a_ui: ${ok} passed, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
