@@ -78,7 +78,8 @@ const rowBox = el => { el.getBoundingClientRect = () => ({top: 100, bottom: 140,
   d.querySelector('#toast button').click();
   check(await until(async () => !((await taskOf(T3)).blockers || []).length), '#1330: Undo of the panel drop');
   await until(() => w.eval('!HIST.busy') && row(T2));  // 2.46.1: the undo redraw is over (slow CI runners)
-  dnd(w, row(T2), 'dragstart'); await until(() => zone('blocking'));
+  // 2.46.5: a redraw right after the undo may swallow the first dragstart on slow CI runners: start the drag again
+  for (let i = 0; i < 3 && !zone('blocking'); i++) { dnd(w, row(T2), 'dragstart'); await until(() => zone('blocking')); }
   dnd(w, zone('blocking'), 'dragover'); dnd(w, zone('blocking'), 'drop'); dnd(w, row(T2), 'dragend');
   check(await until(async () => ((await taskOf(T2)).blockers || []).includes(T3)), '#1330: "Blocking": the dragged Build waits on Ship');
   // the task menu: "Waiting on a task…" with the search
