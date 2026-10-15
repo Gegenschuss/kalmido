@@ -337,6 +337,8 @@ def init_db(guard=True, load=None):
             c.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT DO NOTHING", (k, v))
         from ..admin.hosting import quota_backfill
         quota_backfill(c)  # 2.24.0 (#910): who uploaded the files from before
+        from ..accounts.colors import ac_assign
+        ac_assign(c)  # 2.47c (#1721): the accounts from before get their fixed colour (agents first)
         _COLLAB_ALL["on"] = gsetting(c, "collab_all") != "0"
         _TIME_ALL["on"] = gsetting(c, "time_all") != "0"
         # migration of a single-user install: its data belongs to the bootstrap admin

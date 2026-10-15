@@ -8,6 +8,7 @@ from ..core.i18n import languages, tr
 from ..core.db import ag_cursor, ag_cursor_parse, db, err, gsetting, inbox_names, iso, like_escape, local_now, now_utc, usettings
 from ..accounts.session import me, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
+from ..accounts.colors import ac_color_map
 from ..core.access import (
     acx_lists_sql, collab_all, Denied, health_hidden, need_task, plists, time_all, tvis, vis_sql, wr_sql, WRITE_ROLES,
 )
@@ -284,6 +285,7 @@ def state():
         languages=languages(),
         news={"unread": sum(1 for x in nitems if not x["read"]), "unread_me": news_unread_me(c, uid, s, nitems), "sig": news_sig(c, uid)},  # 2.28.0 (#987): + "For you"
         avatars=avatar_map(c, uid),
+        colors=ac_color_map(c, uid),  # 2.47c (#1721): {user id: fixed account colour} of the accounts I see
         templates=[dict(r) for r in c.execute("SELECT id, kind, name FROM templates WHERE user_id=? ORDER BY lower(name), id",
                                               (uid,))],
         timer=time_running(c, uid) if time_all() else None,

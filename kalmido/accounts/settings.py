@@ -38,6 +38,7 @@ SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "tim
                   "show_done_default",  # 2.39.1 (#1214): "Hide completed" as the default of every view (0 = hide)
                   "fav_only",  # 2.40.0 (#1361): the sidebar shows only the favourites
                   "fav_quiet", "fav_suggest",  # 2.46.1 (#1361): quieter pushes from lists without a star; favourite suggestions
+                  "person_colors",  # 2.47c (#1721): people in their account colour (0 = only agents coloured)
                   "mods_all")  # 2.46.1 (#1591): "Switch on all modules" with the purpose
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),

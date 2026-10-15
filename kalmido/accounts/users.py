@@ -423,6 +423,11 @@ def me_update():
     u = g.user
     if "display_name" in b:
         c.execute("UPDATE users SET display_name=? WHERE id=?", ((b["display_name"] or "").strip()[:60] or u["username"], u["id"]))
+    if "color" in b:  # 2.47c (#1721): the own fixed colour (only colours of the palette)
+        from .colors import ac_valid
+        if not ac_valid(b["color"]):
+            return err(tr("Invalid data"))
+        c.execute("UPDATE users SET color=? WHERE id=?", (b["color"].lower(), u["id"]))
     if "password" in b:
         keys = _rate_keys(u["username"])
         if _rate_blocked(keys):

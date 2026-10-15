@@ -6864,5 +6864,11 @@
   "What notifies you as an admin": "Waarover je als admin meldingen krijgt",
   "Updates": "Updates",
   "The server asks GitHub once a day for the latest release; nothing is installed automatically and the browser never contacts GitHub. The result shows below.": "De server vraagt GitHub één keer per dag naar de nieuwste versie; er wordt niets automatisch geïnstalleerd en de browser neemt nooit contact op met GitHub. Het resultaat staat hieronder.",
-  "Server-wide rules for every agent. Agents themselves are created under Settings > Agents: Status (team) or Set up (personal).": "Regels voor elke agent op de server. Agents zelf maak je aan onder Instellingen > Agents: Status (team) of Instellen (persoonlijk)."
+  "Server-wide rules for every agent. Agents themselves are created under Settings > Agents: Status (team) or Set up (personal).": "Regels voor elke agent op de server. Agents zelf maak je aan onder Instellingen > Agents: Status (team) of Instellen (persoonlijk).",
+  "Teal": "Blauwgroen",
+  "Pink": "Roze",
+  "Sky blue": "Hemelsblauw",
+  "Brown": "Bruin",
+  "Show colours for people": "Kleuren voor personen tonen",
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Elke persoon en elke agent heeft een vaste kleur: de cirkel achter de initialen, een dunne ring om een foto. Uit: alleen agenten zijn gekleurd."
 }

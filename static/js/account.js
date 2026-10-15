@@ -13,6 +13,19 @@ function avPickHtml(cur = S.me?.avatar || '', own = true, name = S.me?.display_n
     (own ? `<button type="button" class="avopt up ${cur.startsWith('/api/avatar/') ? 'on' : ''}" data-av="upload" title="${esc(tr('Upload a photo…'))}" aria-label="${esc(tr('Upload a photo…'))}">${cur.startsWith('/api/avatar/') ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>` : '') +
     `<button type="button" class="avopt none ${cur ? '' : 'on'}" data-av="none" title="${esc(tr('No picture (initials)'))}" aria-label="${esc(tr('No picture (initials)'))}" aria-pressed="${!cur}">${esc(initials(name))}</button>`;
 }
+// 2.47c (#1721): the palette of the fixed account colours as round buttons (the own colour here, an agent's in its settings)
+const AC_NAMES = [N_('Blue'), N_('Orange'), N_('Green'), N_('Purple'), N_('Red'), N_('Teal'), N_('Yellow'), N_('Pink'), N_('Sky blue'), N_('Brown'), N_('Violet'), N_('Lime')];
+const ac_pickHtml = (cur, who) => AC_COLORS.map((c, i) => `<button type="button" data-accol="${c}" data-acwho="${esc(String(who))}" style="--acol:${c}" title="${esc(tr(AC_NAMES[i]))}" aria-label="${esc(tr(AC_NAMES[i]))}" aria-pressed="${cur === c}"></button>`).join('');
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('[data-accol]'); if (!b) return;
+  e.preventDefault();
+  const c = b.dataset.accol, who = b.dataset.acwho, aid = who === 'me' ? 0 : +who;
+  try { await api('PATCH', aid ? `/api/agents/${aid}/color` : '/api/me', {color: c}); } catch { return; }  // the error is shown
+  (S.colors ||= {})[aid || S.me.id] = c;
+  for (const x of b.parentElement.children) x.setAttribute('aria-pressed', String(x === b));
+  const acct = $('.acct'); if (acct && !aid) acct.firstElementChild.outerHTML = av(S.me.id, S.me.display_name);
+  render();
+});
 async function avSet(j) {
   S.me.avatar = j.avatar || '';
   if (j.avatar) (S.avatars ||= {})[S.me.id] = j.avatar; else if (S.avatars) delete S.avatars[S.me.id];
@@ -226,6 +239,7 @@ function accountHtml() {
     <div class="row"><label>${tr('Logged in as')}</label><span class="acct">${av(m.id, m.display_name)}<b>${esc(m.display_name)}</b> <span class="muted">${esc(m.username)}${m.auth === 'proxy' ? ' · ' + tr('via single sign-on') : ''}</span></span></div>
     <div class="row"><label for="a-name">${tr('Display name')}</label><input id="a-name" value="${esc(m.display_name)}" maxlength="60" autocomplete="name" enterkeyhint="done"></div>
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="a-avpick">${avPickHtml()}</div></div>
+    <div class="row"><label id="a-col-h">${tr('Colour')}</label><div class="pfcol" id="a-col" role="group" aria-labelledby="a-col-h">${ac_pickHtml((S.colors || {})[m.id] || '', 'me')}</div></div>
     ${pw ? `<div class="row"><label for="a-cur">${tr('Password')}</label><input type="text" class="cfhid" hidden tabindex="-1" aria-hidden="true" autocomplete="username" value="${esc(S.me?.username || '')}" readonly><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>` : ''}
     ${storageHtml()}
     ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : ''}

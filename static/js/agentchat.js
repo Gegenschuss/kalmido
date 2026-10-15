@@ -1170,6 +1170,7 @@ async function agDraw(md) {
   }
   let j; try { [j] = await Promise.all([api('GET', '/api/admin/agents'), us]); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j; S.agOffer = j.scopes; S.agDefScopes = j.default_scopes;  // 2.15.0 (#479)
+  for (const a of j.agents || []) if (a.color) (S.colors ||= {})[a.id] = a.color;  // 2.47c (#1721): the admin sees every agent in its colour
   if (!box.isConnected) return;
   // 2.28.0 (#1011): grouped -- team agents, my personal agents, other people's personal agents (name + kill switch only)
   const team = j.agents.filter(a => !a.owner), mine = j.agents.filter(a => a.owner && a.owner.id === S.me?.id), other = j.agents.filter(a => a.owner && a.owner.id !== S.me?.id);
@@ -1223,6 +1224,7 @@ function agModal(a, done, o = {}) {
     <div class="shint keep" id="ag-userhint" hidden></div>
     ${a ? `<div class="shint keep">${tr('a-z, 0-9, . - _ · its API tokens keep working after a rename; @mentions use the new name')}</div>` : ''}
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="ag-avpick">${avPickHtml(a ? a.avatar || '' : '/static/avatars/robot.svg', !!a, a?.name || 'AI')}</div></div>
+    ${a ? `<div class="row"><label id="ag-col-h">${tr('Colour')}</label><div class="pfcol" role="group" aria-labelledby="ag-col-h">${ac_pickHtml(a.color || (S.colors || {})[a.id] || '', a.id)}</div></div>` : ''}${''/* 2.47c (#1721): saved at once */}
     <div class="row"><label for="ag-note">${tr('Note')}</label><input id="ag-note" value="${esc(a?.note || '')}" maxlength="2000" placeholder="${tr('What it is for (only admins see this)')}"></div>
     <div class="row"><label for="ag-prov">${tr('Where it runs')}</label><input id="ag-prov" value="${esc(a?.provider || '')}" maxlength="80" placeholder="${esc(tr('e.g. Claude (Anthropic, USA)'))}"></div>
     <div class="row"><label for="ag-prop">${tr('Proposals for')}</label><select id="ag-prop">${[['shared', N_('People who share a list with it')], ['all', N_('Everyone')], ['off', N_('Nobody')]].map(([k, n]) => `<option value="${k}" ${(a?.proposals || 'shared') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>

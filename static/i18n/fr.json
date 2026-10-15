@@ -6864,5 +6864,11 @@
   "What notifies you as an admin": "Ce qui vous notifie en tant qu’admin",
   "Updates": "Mises à jour",
   "The server asks GitHub once a day for the latest release; nothing is installed automatically and the browser never contacts GitHub. The result shows below.": "Le serveur demande une fois par jour à GitHub la dernière version ; rien n’est installé automatiquement et le navigateur ne contacte jamais GitHub. Le résultat s’affiche plus bas.",
-  "Server-wide rules for every agent. Agents themselves are created under Settings > Agents: Status (team) or Set up (personal).": "Règles pour tous les agents du serveur. Les agents eux-mêmes se créent sous Paramètres > Agents : Statut (équipe) ou Configurer (personnel)."
+  "Server-wide rules for every agent. Agents themselves are created under Settings > Agents: Status (team) or Set up (personal).": "Règles pour tous les agents du serveur. Les agents eux-mêmes se créent sous Paramètres > Agents : Statut (équipe) ou Configurer (personnel).",
+  "Teal": "Sarcelle",
+  "Pink": "Rose",
+  "Sky blue": "Bleu ciel",
+  "Brown": "Marron",
+  "Show colours for people": "Afficher les couleurs des personnes",
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Chaque personne et chaque agent a une couleur fixe : le cercle derrière les initiales, un fin anneau autour d’une photo. Désactivé : seuls les agents sont colorés."
 }

@@ -6725,3 +6725,17 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .ad-tag{padding:.0625rem .4375rem;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:999px;color:var(--accent);white-space:nowrap}
 .ad-mark .ad-open{font-size:var(--fs-xs)}
 @media (pointer:coarse){ .ad-mark .ad-open{min-height:2.75rem;padding:0 .5rem} }
+
+/* 2.47c B (#1721) fixed account colours (agents and people): the fill behind the initials, a thin ring around a photo;
+   "me" in a task row keeps its accent mark. Colour is never the only sign: the name stays in the tooltip, agents keep the robot */
+.acol:not(.pic):not(.me){background:var(--acol);color:#fff}
+.acol.acdk:not(.pic):not(.me){color:#16181d}
+.acol.pic:not(.me){box-shadow:0 0 0 1.5px var(--acol)}
+.avb:hover .acol.pic:not(.me),button.whob:hover .acol.pic:not(.me){box-shadow:0 0 0 2px var(--accent)}
+#side .steam .sdot[data-acol] .pdot{background:var(--acol)}
+#side .steam .sdot[data-acol] .hdot{box-shadow:0 0 0 2px var(--acol)}
+.acjob{display:inline-block;width:.5rem;height:.5rem;margin-right:.3125rem;border-radius:50%;background:var(--acol);vertical-align:baseline}
+.pfcol{display:flex;flex-wrap:wrap;gap:.375rem}
+.pfcol button{width:1.75rem;height:1.75rem;padding:0;border:0;border-radius:50%;background:var(--acol);cursor:pointer}
+.pfcol button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--acol)}
+@media (pointer:coarse){ .pfcol{gap:.5rem} .pfcol button{width:2.25rem;height:2.25rem} }

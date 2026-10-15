@@ -419,7 +419,7 @@ function rmWhoMenu(anchor) {
   const w = rmWho();
   menu(anchor, [{label: tr('Everyone'), on: !w, fn: () => rmSet({who: ''})}, {label: tr('Me'), icon: 'user', on: w === 'me', fn: () => rmSet({who: 'me'})},
     {label: tr('Unassigned'), on: w === 'none', fn: () => rmSet({who: 'none'})}, ...(rmPeople().length ? ['-'] : []),
-    ...rmPeople().map(p => ({label: p.name, icon: 'user', on: w === String(p.user_id), fn: () => rmSet({who: String(p.user_id)})}))]);
+    ...rmPeople().map(p => ({label: p.name, ...ac_mi(p.user_id), on: w === String(p.user_id), fn: () => rmSet({who: String(p.user_id)})}))]);
 }
 // ---- summary bar: drag (mouse / pen), long-press (touch), click / Enter = menu
 let rmDrag = null, rmDragged = false;

@@ -384,7 +384,7 @@ function renderSide() {
   const gcount = gid => [...S.tasks.values()].filter(t => t.status === 0 && !t.deleted_at && t.assignee_group_id === gid).length;
   const team = convo + [...grps.map(gr => `<button class="srow steam sgrp ${onTasks && k === 'grp:' + gr.id ? 'on' : ''}" data-go="grp/${gr.id}" title="${esc(tr('Tasks of the group {0}', gr.name))}">${ic('users')}<span class="n">${esc(gr.name)}</span><span class="sk">${tr('Group')}</span>${gcount(gr.id) ? `<span class="c">${gcount(gr.id)}</span>` : ''}</button>`),
     ...ppl.map(p => sb_personRow(p, onTasks && k === 'who:' + p.id)),  // 2.24.0 (UX-08): no "Person" under every name; 2.45.0 (#1509): + a bubble for a direct message
-    ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot">${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.approvals_open ? `<span class="c apvc" title="${esc(apvCount(a.approvals_open))}">${ic('lock', 's')}${a.approvals_open}<span class="sr"> ${esc(apvCount(a.approvals_open))}</span></span>` : ''}${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`)].join('');
+    ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot"${ac_mk(a.id)}>${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.approvals_open ? `<span class="c apvc" title="${esc(apvCount(a.approvals_open))}">${ic('lock', 's')}${a.approvals_open}<span class="sr"> ${esc(apvCount(a.approvals_open))}</span></span>` : ''}${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`)].join('');
   // a group folded by default (Views) keeps its rows in the page, hidden: what they show (a running timer's dot, a count)
   // stays current and the keyboard / screen readers skip them until it is opened
   const grp = (g, label, body, acts = '', n = '', tip = '') => `<div class="sgroup sg-${g}">${head(g, label, acts, n, tip, !sideOpen(g) && /class="srow[^"]*\bon\b/.test(body))}${sideOpen(g) ? body : SIDE_FOLDED.includes(g) ? `<div class="sgfold" hidden>${body}</div>` : ''}</div>`;
@@ -1037,7 +1037,7 @@ function assignMenu(anchor, id) {
   menu(anchor, [...take, ...(take.length ? ['-'] : []), ...(t.assignee_id ? [{label: tr('Show {0}', cur || '?'), icon: 'user', cls: 'mshow', fn: () => personCard(anchor, t.assignee_id)}, '-'] : []),  // 2.7.2 (#418)
     {label: tr('Nobody'), icon: 'x', on: !t.assignee_id && !t.assignee_group_id, fn: () => set(null)}, '-',
     ...listPeople(listById(t.list_id)).filter(p => listById(t.list_id)?.agents_open !== false || !(p.agent || agentById(p.user_id)) || p.user_id === t.assignee_id).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : '') + (p.role === 'participant' ? ' · ' + tr('Participant') : p.role === 'view' ? ' · ' + tr('Viewer') : ''),
-      icon: 'user', on: p.user_id === t.assignee_id, fn: () => set(p.user_id)})),
+      ...ac_mi(p.user_id), on: p.user_id === t.assignee_id, fn: () => set(p.user_id)})),  // 2.47c (#1721): + the person's colour
     ...(gs.length ? ['-', ...gs.map(g => ({label: g.name + ' · ' + tr('Group'), icon: 'users', on: g.group_id === t.assignee_group_id, fn: () => setG(g.group_id)}))] : [])]);
 }
 // ---- custom fields: display (chips on the rows, columns, detail panel)

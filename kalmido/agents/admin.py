@@ -10,6 +10,7 @@ from ..core.i18n import tr, trn
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, usettings, write_lock
 from ..accounts.session import _token_hash, me
 from ..accounts.pictures import avatar_drop_file, AVATAR_PRESETS
+from ..accounts.colors import ac_assign
 from ..accounts.login import seal, unseal
 from ..core.access import Denied
 from ..core.serializers import unlink_files
@@ -46,6 +47,7 @@ def agent_admin_dict(c, a):
             "runtime": agent_runtime(a),  # 2.4.1 (#377)
             "owner": ({"id": a["owner_id"], "name": user_names(c, [a["owner_id"]]).get(a["owner_id"], "")} if a["owner_id"] else None),  # 2.7.2 (#420)
             "admin_paused": bool(a["admin_paused"]),
+            "color": c.execute("SELECT color FROM users WHERE id=?", (a["user_id"],)).fetchone()[0],  # 2.47c (#1721)
             **agent_scope_dict(c, a),  # 2.15.0 (#479): scopes, effective_scopes, allowed_ips
             "lists": [{"id": d["id"], "name": d["name"], "role": d["role"]} for d in visible_lists(c, a["user_id"]) if not d["is_inbox"]],
             # 2.30.0 (#919): limited to these lists ([] = all), the lists it connects although their people differ
@@ -194,6 +196,7 @@ def admin_agent_create():
             c.rollback()
             raise
         tok = agent_token_new(c, uid)
+        ac_assign(c, [uid])  # 2.47c (#1721): its fixed colour (the least used one of its organisation)
         bump(c)
         c.commit()
         print("agent", username, "(id", uid, ") created by", g.user["username"], flush=True)
@@ -609,6 +612,7 @@ def my_agent_create():
     uset(c, uid, "lang", usettings(c, me())["lang"])
     ensure_inbox(c, uid)
     tok = agent_token_new(c, uid)
+    ac_assign(c, [uid])  # 2.47c (#1721)
     bump(c)
     c.commit()
     print("personal agent", username, "(id", uid, ") created by", g.user["username"], flush=True)
@@ -679,6 +683,30 @@ def my_agent_update(aid):
     bump(c)
     c.commit()
     return jsonify(agent_admin_dict(c, agent_row(c, aid)))
+
+
+@app.patch("/api/agents/<int:aid>/color")
+def ac_agent_color(aid):
+    """2.47c (#1721): {color} -- the fixed colour of an agent (a colour of the palette). Instance admins, the owner of a
+    personal agent and the admins of the agent's organisation change it; nobody else (404, like an unknown agent)."""
+    from ..accounts.colors import ac_valid
+    from ..accounts.orgs import is_org_admin
+    c = db()
+    if is_agent(g.user):
+        raise Denied(404)
+    with system_ctx(c):  # the instance admin reaches agents of every organisation (structure, no content)
+        a = agent_row(c, aid)
+    uid = me()
+    if not a or not (g.user["is_admin"] or a["owner_id"] == uid or (a["org_id"] and is_org_admin(c, uid, a["org_id"]))):
+        raise Denied(404)
+    v = body().get("color")
+    if not ac_valid(v):
+        return err(tr("Invalid value: {0}", "color"))
+    with system_ctx(c):  # the instance admin may change any agent (checked above); one column, no content
+        c.execute("UPDATE users SET color=? WHERE id=?", (v.lower(), aid))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, color=v.lower())
 
 
 @app.post("/api/my/agents/<int:aid>/token")

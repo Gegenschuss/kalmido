@@ -206,7 +206,23 @@ const avUrl = id => (id && ((S.avatars || {})[id] || (S.me && +id === S.me.id ? 
 function av(id, name, cls = 'avatar', attrs = '', inner = '') {
   const u = avUrl(id), ag = id ? agentDot(id) : '';  // 2.0.0: agents get a status dot
   if (ag || (id && isAgentUser(id))) { cls += ' agent'; inner += ag + botBadge(); }  // 2.28.0 (#985): + the robot badge
+  const col = id ? ac_color(id) : '';  // 2.47c (#1721): the fixed account colour: the fill behind the initials, a ring around a photo
+  if (col) { cls += ' acol' + (ac_darkInk(col) ? ' acdk' : ''); attrs += ` style="--acol:${col}"`; }
   return `<span class="${cls}${u ? ' pic' : ''}" ${attrs}>${u ? `<img src="${esc(u)}" alt="" loading="lazy" decoding="async" draggable="false">` : esc(initials(name))}${inner}</span>`;
+}
+// 2.47c (#1721): the fixed colour of an account (S.colors from /api/state, one of the palette below = AC_COLORS in
+// kalmido/accounts/colors.py), '' = none: unknown, or a person while "Show colours for people" is off (agents keep theirs)
+const AC_COLORS = ['#3e63dd', '#f76b15', '#30a46c', '#a43cb4', '#cf3539', '#12a594', '#e2a336', '#c2307f', '#2aa7dc', '#8d5f3e', '#6e56cf', '#99b13a'];
+function ac_color(uid) {
+  const c = uid ? (S.colors || {})[uid] || '' : '';
+  if (!c || !/^#[0-9a-f]{6}$/i.test(c)) return '';
+  return S.settings?.person_colors === '0' && !isAgentUser(uid) ? '' : c;
+}
+const ac_mi = uid => { const c = ac_color(uid); return c ? {swc: c} : {icon: 'user'}; };  // a menu entry: the person's colour, else the person icon
+const ac_mk = uid => { const c = ac_color(uid); return c ? ` data-acol style="--acol:${c}"` : ''; };  // a sidebar dot / job card mark in the colour
+function ac_darkInk(c) {  // light colours carry dark initials (contrast >= 4.5 either way for the palette)
+  const l = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255).map(x => x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4);
+  return .2126 * l[0] + .7152 * l[1] + .0722 * l[2] > .18;
 }
 // 2.7.2 (#418): a person's picture as a button: a tap / click opens the person card (agents: status, chat, current task;
 // people: their tasks, mention). The capture handler below takes the click before the row / dialog under it.
@@ -541,7 +557,7 @@ function applyState(j) {
   }
   S.lists = j.lists; S.inboxNames = j.inbox_names || []; S.sections = j.sections; S.habits = j.habits; S.pomo = j.pomo;
   S.notes = j.notes || []; S.team = j.team || {enabled: false, unread: 0};  // 2.17.0 (#442 #419)
-  S.pomoToday = j.pomo_today; S.avatars = j.avatars || {}; S.share = j.share || null; S.settings = j.settings; S.mineOrder = moFromState(j); S.languages = j.languages || [{code: 'en', name: 'English'}]; LS.set('lang', j.settings.lang || 'en'); document.documentElement.lang = j.settings.lang || 'en'; S.counts = j.counts; S.v = j.v; S.ntfyUrl = j.ntfy_url;
+  S.pomoToday = j.pomo_today; S.avatars = j.avatars || {}; S.colors = j.colors || {}; S.share = j.share || null; S.settings = j.settings; S.mineOrder = moFromState(j); S.languages = j.languages || [{code: 'en', name: 'English'}]; LS.set('lang', j.settings.lang || 'en'); document.documentElement.lang = j.settings.lang || 'en'; S.counts = j.counts; S.v = j.v; S.ntfyUrl = j.ntfy_url;
   foldSync();  // 2.4.0 (#361): folded folders follow the user (all devices)
   S.tasks = new Map(j.tasks.map(t => [t.id, t]));
   S.filters = j.filters || [];

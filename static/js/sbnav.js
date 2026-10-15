@@ -25,7 +25,7 @@ function sb_msgRows() {
 }
 // a person row: the row opens their tasks (who/<id>), the bubble next to it the direct message
 function sb_personRow(p, on) {
-  const row = `<button class="srow steam ${on ? 'on' : ''}" data-go="who/${p.id}" title="${esc(tr('Tasks of {0}', p.name))}"><span class="sdot"><i class="pdot"></i></span><span class="n">${esc(p.name)}</span></button>`;
+  const row = `<button class="srow steam ${on ? 'on' : ''}" data-go="who/${p.id}" title="${esc(tr('Tasks of {0}', p.name))}"><span class="sdot"${ac_mk(p.id)}><i class="pdot"></i></span><span class="n">${esc(p.name)}</span></button>`;
   if (!teamOn()) return row;
   const lab = tr('Message {0}', p.name);
   return `<div class="sbpw">${row}<button type="button" class="iconbtn sbdm" data-sb="dm" data-uid="${p.id}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('comment', 's')}</button></div>`;
