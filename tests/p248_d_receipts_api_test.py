@@ -95,13 +95,13 @@ def agent(owner, org=None, name="bot"):
 
 
 def project(s, name, org=None):
-    r = s.post(B + "/api/lists", json={"name": name, "kind": "project", **({"org_id": org} if org else {})})
+    r = s.post(B + "/api/lists", json={"name": name, "kind": "project", "org_id": org})
     assert r.ok, r.text
     return r.json()["id"]
 
 
 def member(lid, uid):
-    dbx("INSERT INTO list_members(list_id,user_id,role) VALUES(?,?,'edit') ON CONFLICT DO NOTHING", (lid, uid), write=True)
+    dbx("INSERT INTO list_members(list_id,user_id,role,added_at) VALUES(?,?,'edit','2026-01-01T00:00:00+00:00') ON CONFLICT DO NOTHING", (lid, uid), write=True)
 
 
 subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL)
@@ -214,7 +214,7 @@ check(Bo.post(B + f"/api/files/nodes/{OD}/shares", json={"agent_id": OAG, "role"
 BP = project(Bo, "Bob private")
 member(BP, OAG)
 r = OAGS.post(V + f"/documents/{OD}/receipt-suggestion", json={"project_id": BP})
-check(r.status_code == 400, f"a private project for an organisation's document: refused ({r.status_code})")
+check(dbx("SELECT org_id FROM lists WHERE id=?", (BP,))[0][0] is None and r.status_code == 400, f"a private project for an organisation's document: refused ({r.status_code})")
 r = OAGS.post(V + f"/documents/{OD}/receipt-suggestion", json={"project_id": P1})
 check(r.status_code == 400, "a project of another workspace: refused")
 dbx("UPDATE agents SET list_ids=? WHERE user_id=?", (str(BP), OAG), write=True)
