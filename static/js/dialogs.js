@@ -284,12 +284,12 @@ function fl_nameLive(id, name) {
   let p = FL_LIVE.get(id);
   if (!p) { p = {v: null, put: () => { const l = listById(id); if (l) { if (p.v == null) delete l._live; else l._live = p.v; } }}; FL_LIVE.set(id, p); OPT.add(p); }
   p.v = name || null; p.put();
-  cancelAnimationFrame(fl_liveRaf); fl_liveRaf = requestAnimationFrame(() => { renderSide(); renderTop(); });
+  clearTimeout(fl_liveRaf); fl_liveRaf = setTimeout(() => { renderSide(); renderTop(); }, 16);
 }
 function fl_nameEnd(id) {
   const p = FL_LIVE.get(id); if (!p) return;
   OPT.delete(p); FL_LIVE.delete(id); const l = listById(id); if (l) delete l._live;
-  cancelAnimationFrame(fl_liveRaf); renderSide(); renderTop();
+  clearTimeout(fl_liveRaf); renderSide(); renderTop();
 }
 async function listPatch(id, body, label, o = {}) {
   const l = listById(id); if (!l) return false;

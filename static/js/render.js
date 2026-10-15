@@ -711,19 +711,18 @@ function fl_onAdded(fn) { FL.hooks.push(fn); }
 // 2.46.2 (#1718): a part of a view drawn again: morphed when it has content (kept nodes, no flash), built when empty
 function fl_set(el, html) { const prev = morphRoot; if (el.firstChild) morphRoot = el; try { setHtml(el, html); } finally { morphRoot = prev; } }
 // 2.46.2 (#1718): live redraws of the view (job steps, the jobs list, agent status, the agent band) are gathered: at most one
-// every 400 ms, in an animation frame. raw = renderView (else viewSafeRender: a busy field waits); mod = only while that
+// every 400 ms (the first after ~one frame). raw = renderView (else viewSafeRender: a busy field waits); mod = only while that
 // module is shown. A redraw in between (a click) restarts the 400 ms.
 function fl_viewSoon(raw, mod) {
   FL.vraw = FL.vraw || !!raw; if (mod !== undefined) FL.vmod = FL.vt && FL.vmod !== mod ? null : mod;
   if (FL.vt) return;
-  const raf = window.requestAnimationFrame || (f => setTimeout(f, 16));
   const run = () => {
     FL.vt = 0; const r = FL.vraw, m = FL.vmod; FL.vraw = false; FL.vmod = undefined;
     if (m && S.route.mod !== m) return;
     if (r) renderView(); else viewSafeRender();
   };
   const wait = Math.max(0, (FL.vlast || 0) + 400 - Date.now());
-  FL.vt = wait ? setTimeout(() => raf(run), wait) : (raf(run), 1);
+  FL.vt = setTimeout(run, Math.max(16, wait));  // a timer, not a frame: a page that goes away takes it along
 }
 function setHtml(el, html) {
   const fg = typeof fgKeep === 'function' ? fgKeep(el) : null;  // 2.40.0 (#1371): unsaved form input survives the redraw
@@ -792,10 +791,14 @@ function morphKids(a, b) {
     if (o === cur) cur = cur.nextSibling; else a.insertBefore(o, cur);
     if (o.nodeType !== 1) { if (o.data !== n.data) o.data = n.data; continue; }
     if (fl_hold(o)) continue;
+    // 2.46.2 (#1718): a field with typed, unsaved text keeps it unless its saved value changed (the view's own restore after a
+    // rebuild only ran on a new node)
+    const tf = (o.nodeName === 'TEXTAREA' || (o.nodeName === 'INPUT' && !/^(checkbox|radio|file)$/.test(o.type))), dv = tf ? o.defaultValue : null, dirty = tf && o.value !== dv;
+    const nv = tf || o.nodeName === 'SELECT' ? n.value : null, nc = o.nodeName === 'INPUT' ? n.checked : null;  // before the children move over
     fl_attrs(o, n);
     if (o.hasAttribute('data-fl-fill') && !n.firstChild) continue;  // filled after the render (Office quotations): keeps its content
     if (!o.isEqualNode(n)) morphKids(o, n);
-    if (/^(INPUT|SELECT|TEXTAREA)$/.test(o.nodeName) && o !== document.activeElement) { if (o.type === 'checkbox' || o.type === 'radio') o.checked = n.checked; else if (o.type !== 'file' && o.value !== n.value) o.value = n.value; }
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(o.nodeName) && o !== document.activeElement && !(dirty && o.defaultValue === dv)) { if (o.type === 'checkbox' || o.type === 'radio') o.checked = nc; else if (o.type !== 'file' && o.value !== nv) o.value = nv; }
   }
   while (cur) { const x = cur; cur = cur.nextSibling; if (!fl_ib(x)) x.remove(); }
 }
