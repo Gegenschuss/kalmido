@@ -6500,3 +6500,23 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .authscreen .shint.shcode{margin:.25rem 0 .75rem}
 .shint.warn.shkey{color:var(--text);background:var(--bg3);border-left:.1875rem solid var(--danger);border-radius:var(--radius);padding:.625rem .75rem;margin:0 0 .75rem}
 .shint.warn.shkey b{color:var(--danger);display:block;margin-bottom:.125rem}
+/* 2.46.1 A (#1607 #1643) the folder row reads like a list row: the arrow before the folder icon, the number right after the
+   name, the share icon at the right in the lists' share column (the "…" takes that place on hover, the row does not move),
+   the height of a list row and no extra room between folders (open or folded); the lists inside start under the folder icon */
+#side .fhead,#side .fhead.fsub{position:relative;padding:0 .5rem}
+#side .fhead:not(.fsub),#side .fhead.fsub{margin:0}  /* #1643: no extra room before a folder (also when only folders follow) */
+#side .fhead .fcar{order:0;width:.875rem;height:.875rem;margin:0 -.125rem 0 -.25rem;flex:none}
+#side .fhead .c{order:0;margin-right:auto}
+#side .fhead .fshr{margin-left:0;gap:.125rem;align-items:center;transition:opacity .12s}
+#side .fhead .fmenu{order:0;position:absolute;right:.3125rem;top:50%;transform:translateY(-50%)}
+#side .fhead .fmenu:focus-visible{opacity:1}
+#side .fbody{margin-left:2rem}
+@media (min-width:900px) and (hover:hover){ #side .fhead:is(:hover,:focus-within) .fshr{opacity:0} }
+/* phone / touch: the "…" stays visible at the end, the share icon sits right before it */
+@media (max-width:899px),(hover:none){ #side .fhead .fmenu{position:static;transform:none;margin-right:-.25rem} }
+/* 2.46.1 A (#1635) sections: dropped past the last one = at the end (a line below it / right of the last column); the dragged
+   section folds (only its header stays) */
+#view .group.dropafter{box-shadow:inset 0 -2px 0 var(--accent)}
+.kcol.dropafter{box-shadow:inset -.1875rem 0 0 var(--accent)}
+#view .group.sb-secfold>:not(.ghead){display:none}
+.sb-secghost{display:flex;align-items:center}
