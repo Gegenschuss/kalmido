@@ -198,7 +198,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
           links: document.querySelectorAll('#pov-links .povl').length, ms: document.querySelectorAll('#pov-ms .povm').length}; })()`);
         check(lay.n >= 5 && lay.links === 2 && lay.ms === 2, `${vw}px: overview rendered ${JSON.stringify(lay)}`);
         check(lay.sw <= lay.cw + 1 && !lay.out.length, `${vw}px: no horizontal overflow ${JSON.stringify(lay)}`);
-        check(vw >= 1100 ? lay.cols === 2 : lay.cols === 1, `${vw}px: ${vw >= 1100 ? 'two columns' : 'one column'} ${JSON.stringify(lay)}`);
+        // 2.43.0 (#1452): a computer has columns of six (half blocks side by side), a phone one column
+        check(vw >= 900 ? lay.cols === 6 : lay.cols === 1, `${vw}px: ${vw >= 900 ? 'columns of six' : 'one column'} ${JSON.stringify(lay)}`);
         if (touch) {
           // 2.31.0 (#1053): the view switch is 36 px high on phones (checked in p2310_a_ui / p2130_ui), not 44
           const small = (await ev(SMALL('#view .pov button, #view .pov .povup, #view .povl a, #view .povf > a'))).filter(x => !(x[3] >= 35.5 && ['Project', 'List', 'Kanban', 'Timeline'].includes(x[1])));

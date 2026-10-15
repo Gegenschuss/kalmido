@@ -61,19 +61,23 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   check(/\/api\/list-files\//.test(d.querySelector('.lightbox img')?.getAttribute('src') || ''), '#983: a tap opens it large');
   d.querySelector('.lightbox')?.remove();
   // × hides for me, "+ Block" brings it back
-  check(d.querySelector('#pov-links [data-act="ly-hide"]'), '#983: every block has a small ×');
-  click(w, d.querySelector('#pov-links [data-act="ly-hide"]'));
+  // 2.43.0 (#1452): the × is gone, every block hides from its "…" menu
+  check(d.querySelector('.lyb[data-lyk="links"] [data-act="wg-more"]'), '#983: every block has its "…" menu');
+  click(w, d.querySelector('.lyb[data-lyk="links"] [data-act="wg-more"]'));
+  await until(() => d.querySelector('#pop [role="menuitem"]'));
+  click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(x => x.textContent.trim() === 'Hide'));
   await until(() => !d.querySelector('#pov-links'));
   check(!d.querySelector('#pov-links') && d.querySelector('[data-act="ly-add"][data-lyv="project"]'), '#983: × hides it, "+ Block" appears');
   let y = await until(async () => { const x = await lay(); return x.mine && JSON.parse(x.mine).hidden?.includes('links') ? x : null; });
   check(y && y.std === '', '#983: stored as my own arrangement, the standard untouched ' + JSON.stringify(y));
   click(w, d.querySelector('[data-act="ly-add"][data-lyv="project"]'));
   await until(() => d.querySelector('#pop [role="menuitem"]'));
+  // 2.43.0 (#1346): "+ Block" also offers a new notepad, so it stays after the hidden block is back
   const mi = [...d.querySelectorAll('#pop [role="menuitem"]')];
-  check(mi.length === 1 && /Key links/.test(mi[0].textContent), '#983: "+ Block" lists the hidden block ' + mi.map(x => x.textContent).join('|'));
+  check(mi.length === 2 && /Key links/.test(mi[0].textContent) && /Notepad/.test(mi[1].textContent), '#983: "+ Block" lists the hidden block ' + mi.map(x => x.textContent).join('|'));
   click(w, mi[0]);
   await until(() => d.querySelector('#pov-links'));
-  check(d.querySelector('#pov-links') && !d.querySelector('[data-act="ly-add"][data-lyv="project"]'), '#983: ... and brings it back');
+  check(d.querySelector('#pov-links'), '#983: ... and brings it back');
   // Customize as the owner: standard for everyone
   click(w, d.querySelector('[data-act="ly-custom"][data-lyv="project"]'));
   await until(() => d.querySelector('.lyed[data-lyed="project"]'));
@@ -226,7 +230,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
     const one = await ev(`(() => [...document.querySelectorAll('.povs.povs-empty')].map(s => Math.round(s.getBoundingClientRect().height)))()`);
     check(one.length >= 3 && one.every(h => h <= 64), `${tag}: #1061 empty blocks are one line (<= 64 px) ${JSON.stringify(one)}`);
     check(await ev(`document.documentElement.scrollWidth <= 390`), `${tag}: no sideways scrolling`);
-    const tgt = await ev(`(() => [...document.querySelectorAll('.povs-empty .povh .btn, .lyx')].filter(b => b.offsetWidth).map(b => Math.round(b.getBoundingClientRect().height)))()`);
+    const tgt = await ev(`(() => [...document.querySelectorAll('.povs-empty .povh .btn, .lymore')].filter(b => b.offsetWidth).map(b => Math.round(b.getBoundingClientRect().height)))()`);
     check(tgt.length && tgt.every(h => h >= 43.5), `${tag}: touch targets >= 44 px ${JSON.stringify(tgt)}`);
     await shot('p2320a-390-project.png');
     await ev(`(() => { lyOpen('project', true); return 1; })()`); await sleep(700);
@@ -240,7 +244,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
     await o.nav(B + '#l/' + P); await ready(ev);
     const g = await ev(`(() => { const g = document.querySelector('.pov .lygrid'), f = document.querySelector('.lyb[data-lyk="files"]').getBoundingClientRect(), s = document.querySelector('.lyb[data-lyk="status"]').getBoundingClientRect(), m = document.querySelector('.lyb[data-lyk="ms"]').getBoundingClientRect();
       return {cols: getComputedStyle(g).gridTemplateColumns.split(' ').length, fw: f.width, sw: s.width, side: Math.abs(s.top - m.top) < 2 && m.left > s.left}; })()`);
-    check(g.cols === 2 && g.fw > g.sw * 1.8 && g.side, `${tag}: two columns, "half" blocks side by side, "full" over both ${JSON.stringify(g)}`);
+    check(g.cols === 6 && g.fw > g.sw * 1.8 && g.side, `${tag}: 2.43.0 (#1452): columns of six, "half" blocks side by side, "full" over both ${JSON.stringify(g)}`);
     await shot('p2320a-1440-project.png');
   }, false);
 

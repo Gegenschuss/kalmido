@@ -244,7 +244,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // ================= German
   w = await boot({user: 'carol', hash: 'home'}); d = w.document; await sleep(400);
   check(d.querySelector('#top h1')?.textContent.includes('Start'), 'German: the dashboard title');
-  check(d.querySelector('[data-act="dash-custom"]')?.textContent.includes('Anpassen'), 'German: Anpassen');
+  // 2.43.0 (#1452): the button is a small icon now (the blocks are changed at their "…" menu); its name says it
+  check(d.querySelector('[data-act="dash-custom"]')?.getAttribute('aria-label') === 'Bausteine ordnen …', 'German: Bausteine ordnen …');
   w.close();
 
   // ================= Firefox
