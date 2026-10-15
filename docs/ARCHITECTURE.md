@@ -300,6 +300,7 @@ registering the ones of its area.
 | `contacts.js` | Contacts (module "contacts"): the view, the editor, the card, links between contacts and tasks, import / export. |
 | `clients.js` | Clients, the workload view, approvals in the task panel, forms of a list, sign-in links with a QR code. |
 | `life.js` | Home & life: the view, its dialogs (contract, device, upkeep, health, trip, Karakeep), the review + journal, staying in touch on a contact's card. |
+| `areas.js` | 2.44.0 (#1187): the areas Office, Time, Review and Home: one sidebar row / tab each, the tabs of their parts on top of the page (each part keeps its route), one switch per area in Settings > Modules. |
 | `main.js` | Start-up: loading the state, polling, the service worker. Loaded last. |
 
 ### Adding a client file
