@@ -90,7 +90,6 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   check(/Client/.test(card.querySelector('.mstag-cl')?.textContent || '') && card.querySelector('.mscav'), '#1734: the card carries the tag Client and the briefcase');
   check(/Hourly rate/.test(card.textContent) && /90/.test(card.textContent) && /20 h/.test(card.textContent) && /Max Example/.test(card.querySelector('.msclks')?.textContent || ''), '#1734: rate, budget, contact persons on the card');
   check(!!card.querySelector('[data-act="client-edit"]') && !!card.querySelector('.cldetail .sttiles'), '#1734: Edit (the full dialog) and the hours on the card');
-  // TODO-2473-privat: the card of a person without an organisation (personal office of part A): open invoices section shown
   // search
   typeIn(w, d.querySelector('#mscl-q'), 'beta'); await sleep(250);
   check(d.querySelectorAll('#view .msclients .ctrow').length === 1, '#1734: the search narrows the list');
@@ -155,6 +154,39 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   await until(() => d.querySelector('#view .ctlistw'), 40);
   check(!!d.querySelector('#view .ctlistw'), '#1734: back to the list');
   w.close();
+
+  // ================= #1360: the card of a person without an organisation (personal office) shows the open invoices
+  const mk = await call('POST', '/api/users', {username: 'dora', display_name: 'Dora Frei', password: 'password123', email: 'dora@example.com'});
+  check(mk.http < 300, 'dora created');
+  const CKD = await login('dora');
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,collab,contacts,office,clients,time'}, CKD);
+  const dcl = (await call('POST', '/api/clients', {name: 'Privatkunde Eins'}, CKD)).id;
+  check(!!dcl, 'a client of the person without an organisation');
+  w = await boot({user: 'dora', hash: 'clients'}); d = w.document;
+  await until(() => d.querySelectorAll('#view .msclients .ctrow').length === 1, 60);
+  d.querySelector('#view .msclients .ctrow').click();
+  await until(() => d.querySelector('#view #mscl-h'), 40);
+  await until(() => [...d.querySelectorAll('#view .msclcard .ctsec h4')].some(h => h.textContent === 'Open invoices'), 40);
+  check([...d.querySelectorAll('#view .msclcard .ctsec h4')].some(h => h.textContent === 'Open invoices') && /No open invoices/.test(d.querySelector('#view .msclcard').textContent),
+        '#1360/#1734: the card of a person without an organisation shows the open invoices section');
+  w.close();
+
+  // ================= #1360: the clients page follows the workspace of the sidebar (a private and an organisation client)
+  const pc = (await call('POST', '/api/clients', {name: 'Privat Eins', org_id: null})).id;
+  check(!!pc, 'a private client of the person with an organisation');
+  const names = () => [...d.querySelectorAll('#view .msclients .ctrow')].map(x => x.textContent);
+  const seen = async (ws, want) => {
+    await call('PATCH', '/api/settings', {workspace: ws});
+    w = await boot({hash: 'clients'}); d = w.document;
+    await until(() => d.querySelectorAll('#view .msclients .ctrow').length === want, 60);
+    const t = names().join('|'); w.close(); return t;
+  };
+  let t = await seen('private', 1);
+  check(/Privat Eins/.test(t) && !/Alpha GmbH/.test(t), '#1360: workspace Private shows only the private client: ' + t);
+  t = await seen('org:' + ORG, 1);
+  check(/Alpha GmbH/.test(t) && !/Privat Eins/.test(t), '#1360: workspace of the organisation shows only its client: ' + t);
+  t = await seen('all', 2);
+  check(/Alpha GmbH/.test(t) && /Privat Eins/.test(t), '#1360: All shows both: ' + t);
 
   console.log(`p2473_c_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
