@@ -1075,12 +1075,16 @@ FK_VALUE_RE = re.compile(
     r"|[A-Z]{2} ?\d[\d ]{7,11}"  # VAT id
     r"|(?:[\w-]+\.)+[a-z]{2,})$")  # a bare domain
 FK_BANKNAME_RE = re.compile(r"\b(?:sparkasse|volksbank|raiffeisenbank|postbank|commerzbank|[a-zäöüß]*bank)\b", re.I)
+FK_SALUTATION_RE = re.compile(r"^(?:sehr geehrte|liebe[rs]?|hallo|guten tag|dear|hello)\b", re.I)
 FK_FORM_RE = re.compile(r"\b(?:gmbh|ag|kg|ohg|gbr|ug|se|eg|e\.?\s?v\.?|\w*gesellschaft)\b", re.I)
 
 
 def fk_value_line(ln):
-    """True for a line that is a bank or contact value (IBAN, BIC, phone, tax / VAT number, bare domain, a bank's name)."""
+    """True for a line that is no recipient line: a bank or contact value (IBAN, BIC, phone, tax / VAT number, bare domain, a bank's
+    name) or the salutation."""
     t = ln.strip()
+    if FK_SALUTATION_RE.match(t):
+        return True
     if FK_VALUE_RE.match(t) and (sum(ch.isdigit() for ch in t) >= 7 or re.match(r"^[A-Z]{6}", t) or "." in t):
         return True
     return bool(FK_BANKNAME_RE.search(t)) and not FK_FORM_RE.search(t)
