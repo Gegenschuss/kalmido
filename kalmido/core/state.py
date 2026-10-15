@@ -105,7 +105,7 @@ def visible_lists(c, uid):
     viewer_admin = bool((c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone() or [0])[0])
     # 2.46.6 (#1680): a personal agent in a list: its owner's name (only the owner can address it, whatever agent_members says)
     pown = {r[0]: r[1] for r in c.execute("SELECT a.user_id, COALESCE(NULLIF(u.display_name, ''), u.username) FROM agents a "
-                                          "JOIN users u ON u.id=a.owner_id WHERE a.owner_id IS NOT NULL")} if members else {}
+                                          "JOIN users u ON u.id=a.owner_id WHERE a.owner_id IS NOT NULL")} if members and uid not in ag else {}  # agents do not need it
     for ms in members.values():
         for m in ms:
             if m["user_id"] in ag:
