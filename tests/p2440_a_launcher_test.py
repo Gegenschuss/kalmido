@@ -302,6 +302,7 @@ try:
 except ar.ApiError as e:
     check(e.status == 429 and len(n429) == 5, f"429: 5 tries (after 5 / 15 / 30 / 60 s), then the error: {len(n429)}")
 check(api.soft("PUT", "/agent/status", {}) == 429 and len(n429) == 6, "cosmetic calls never wait for 429")
+check(api.notice(7, "x") is False and len(n429) == 7, "a notice never waits for 429 either")
 r = runner("s5")
 ar.RUN_TIMEOUT_S = 2
 child = os.path.join(TMP, "child.pid")

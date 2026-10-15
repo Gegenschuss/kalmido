@@ -215,7 +215,8 @@ class Api:
         if self.notice_ok is False or not uid:
             return False
         try:
-            self.req("POST", f"/agent/chats/{uid}", {"body": " ".join(str(text).split())[:200], "kind": "notice"}, timeout=10)
+            self.req("POST", f"/agent/chats/{uid}", {"body": " ".join(str(text).split())[:200], "kind": "notice"}, timeout=10,
+                     retry=False)  # 2.44.0: a 429 loses only this line, never waits
         except ApiError as e:
             if not self.notice_ok and (e.status == 404 or (e.status == 400 and "Unknown field" in e.body)):
                 self.notice_ok = False
