@@ -1098,7 +1098,7 @@ def fk_value_line(ln, near=()):
                                  or re.match(r"^[A-Z]{6}", t) and (not t.isalpha() or t.endswith("XXX"))):
         return True
     if FK_BANKNAME_RE.search(t) and not FK_FORM_RE.search(t) and not PERSON_RE.match(t) and not ATTN_RE.match(t):
-        return any(fk_value_line(x) or FK_STOP_RE.search(x) for x in near if x)
+        return any(fk_value_line(x) for x in near if x)
     return False
 
 
