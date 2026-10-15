@@ -227,7 +227,7 @@ def org_public(c, r, roles=True):
 
 
 def org_label(c, uid=None):
-    """The organisation name to show next to the app name: the person's first one; before a login only in the mode
+    """The organisation name to show next to the app name: the person's first one; before a login only on a server set to the mode
     organisation its main organisation (never otherwise: a server names no organisation on its login page)."""
     m = instance_mode(c)
     if uid:
@@ -235,9 +235,9 @@ def org_label(c, uid=None):
             return ""
         n = org_names(c, uid)
         return n[0] if n else ""
-    # 2.45.0 (#1552): before a login only the mode organisation names its organisation; a server with exactly one
-    # organisation in another mode no longer shows that name to every visitor of the login page
-    if m != "organisation":
+    # 2.45.0 (#1552): before a login only a server set to the mode organisation (KALMIDO_INSTANCE_MODE) names its
+    # organisation; a server that merely has exactly one organisation no longer shows that name to every visitor
+    if INSTANCE_ENV != "organisation":
         return ""
     with system_ctx(c):  # 2.37.0 (#1150): before a login: the instance's own name
         r = c.execute("SELECT name FROM orgs WHERE id=?", (main_org(c),)).fetchone()
