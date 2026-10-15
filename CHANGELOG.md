@@ -7,6 +7,42 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.44.0] - 2026-10-15
+
+**In short:** **Agent starter**: set up a project agent on a **Mac, Windows or Linux computer with one command**, the
+reference starter runs on macOS **without PowerShell**, and it learns what a hosted agent service does (permission
+questions in the chat, approvals decided in words, files at the answer, long work as a job, a conversation that goes on,
+bundled task events, robust runs). The sidebar gets four **areas**: Office, Time, Review, Home.
+
+### Added
+- **Set up an agent with one command** (#1517): Settings > Agents > *Set up on a computer*: pick Mac, Windows or Linux and
+  the project folder, copy ONE command with a one-time code (15 minutes, used once, stored as a hash, rate-limited). The
+  setup script checks python3 and the agent command, stores the token readable only for you, fetches the starter of this
+  version and sets up autostart (launchd, Task Scheduler without admin rights, systemd --user), one instance per project
+  folder; `--uninstall` removes it. The agent shows its computers (green dot, name, last contact); *Remove computer*
+  revokes that computer's token.
+- **Permission questions in the chat** (#1442): with Claude Code a tool outside the allow list asks the person in the chat
+  (*Allow* / *Deny*, a thumb or yes/no while exactly one question is open); no answer in 9 minutes = no.
+- **Approvals decided in words** (#1441): open approval cards are listed in the prompt; an ```approval-done block closes
+  exactly the named cards (never as a yes). Open approvals survive a restart, get one reminder after 2 hours and expire
+  after 7 days (#1444).
+- **Files at the answer** (#1443): files the agent puts into `KALMIDO_OUTBOX` and images it looks at come with the chat answer.
+- **Long work as a job** (#1445): `mcp/agent_job.py` runs a background job that survives a restart of the runner, reports
+  progress to a Kalmido job, waits for a plan limit and goes on.
+- **A conversation that goes on** (#1446): a chat continues one session instead of a fresh run per message; a new one
+  starts by size, age, day, model change or reset, with a fenced summary of the old one.
+- **Bundled task events** (#1447): task events of lists the agent listens in are collected for 2 minutes and handled in one run.
+- **Robust runs** (#1448): HTTP 429 retried, a time limit per run that ends everything the command started, two tries with
+  a clear message, a queue on disk and a lock against a second runner.
+
+### Changed
+- **Areas** (#1187): Office (Office & finances, contacts, clients), Time (time tracking, focus timer), Review (review &
+  journal, statistics) and Home (home & life, family) are one sidebar entry each with tabs; the sidebar shows *Views*
+  (calendar, timeline, matrix, project status, workload) and *Areas*. One switch per area in Settings > Modules, the
+  parts stay switchable one by one; old links open the right tab; nothing is lost.
+- **macOS without PowerShell** (#962): `agent_launcher.sh` runs with the stock bash 3.2 and python3 (no GNU date, no
+  setsid); the guide recommends it with a LaunchAgent.
+
 ## [2.43.1] - 2026-10-15
 
 **In short:** fixes for the checks of 2.43.0 (no new features).

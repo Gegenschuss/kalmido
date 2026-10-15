@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.44.0** (2026-10-15): **agent starter**: set up a project agent on a **Mac, Windows or Linux computer with one
+  command** (one-time code, autostart, connected status), the starter runs on macOS without PowerShell and asks for
+  permissions in the chat, takes approvals decided in words, attaches files, runs long work as a job and keeps the
+  conversation; the sidebar gets four **areas** (Office, Time, Review, Home).
 - **2.43.0** (2026-10-15): **project pro**: lists with columns work like a **spreadsheet** (keyboard, paste ranges,
   fill down), **formula fields**, a totals row and **key figures** on the project page, **dependencies and subtasks by
   dragging** (several tasks at once), **blocks adjusted in place** with a **pinboard** project page (colours, notepads),
