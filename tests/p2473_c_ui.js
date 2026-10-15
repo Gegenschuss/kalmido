@@ -114,6 +114,7 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   // archive + undo
   await until(() => d.querySelector('[data-mscl="pick"]'), 20);
   d.querySelector('[data-mscl="pick"]').click(); await sleep(50);
+  await until(() => crow('Beta AG'), 40);  // 2.47.3: the list is drawn again after the undo (slow CI runner)
   crow('Beta AG').click(); await sleep(30);
   d.querySelector('#ct-sbar [data-clb="arch"]').click();
   await until(async () => (await call('GET', `/api/clients/${cl[1]}`)).archived, 40);
