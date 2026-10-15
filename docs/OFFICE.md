@@ -38,6 +38,9 @@ It is created on the first visit, invisible to everybody else - also to the serv
 organisation (lists of organisations, workspaces, sharing, agents, organisation export). Technically it is a hidden row
 of the organisation table (`orgs.personal_of` = its owner) without members; row-level security lets only its owner reach
 its rows, and it has its own encryption key like an organisation.
+Going back to a version before 2.47.3 keeps working, but such a version does not know these rows and lists them as
+organisations named `private-<id>` without members (admin dialog). Leave them alone there: do not add members, rename or
+delete them - members added there would reach the personal office.
 
 A person in an organisation who opens "Private" for the first time finds an empty personal office with a hint and a
 button to the organisation's office.
