@@ -32,7 +32,9 @@
 #             file {at, rate_limits}), KALMIDO_STATE_DIR (event cursor), KALMIDO_APPROVAL_CHECK=0 (2.40.0: no check of
 #             chat answers that ask to decide without an ```approval block), KALMIDO_NOTICE_COMPACTED (2.41.0: the notice
 #             in the chat when a run compacts its conversation, {0} = the time). Without --events: the command runs as it is.
-# Needs: bash, curl, python3 (JSON), GNU date, setsid (util-linux). See docs/AGENTS.md "Runtime settings" for a systemd unit.
+# Needs: bash (3.2 is enough, the macOS one), curl, python3 (JSON, time zones, a new process group). 2.44.0 (#962): no GNU
+# date, setsid or other GNU-only tools any more, so it runs on macOS and Linux alike. /agent-setup.sh of your Kalmido sets it up with an
+# autostart (launchd LaunchAgent / systemd --user); see docs/AGENTS.md "Runtime settings" for a hand-made systemd unit.
 set -uo pipefail
 
 ENV_FILE=./kalmido-agent.env
@@ -44,7 +46,7 @@ while [[ $# -gt 0 ]]; do
     --once) ONCE=1; shift ;;
     --events) EVENTS=1; shift ;;
     --) shift; break ;;
-    -h|--help) sed -n '2,35p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,37p' "$0"; exit 0 ;;
     *) break ;;
   esac
 done
@@ -65,6 +67,11 @@ if [[ $EVENTS == 1 ]]; then
   [[ -r "$RUNNER" ]] || { echo "agent_launcher: $RUNNER missing (event mode)" >&2; exit 2; }
   CMD=("${KALMIDO_PYTHON:-python3}" "$RUNNER" -- "${CMD[@]}")
 fi
+PY=${KALMIDO_PYTHON:-python3}
+# 2.44.0 (#962): an own process group without util-linux setsid (macOS has none): python3 starts a new session and
+# replaces itself with the command (same pid, so "kill -- -PID" ends all of it)
+if command -v setsid >/dev/null 2>&1; then NEWSESS=(setsid)
+else NEWSESS=("$PY" -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])'); fi
 POLL=${KALMIDO_POLL:-60}
 RESTART_DELAY=${KALMIDO_RESTART_DELAY:-10}
 log() { printf '%s agent_launcher: %s\n' "$(date '+%F %T')" "$*" >&2; }
@@ -99,7 +106,8 @@ start() {  # start the command with the current settings (its own process group,
   if [[ $ONCE == 1 ]]; then echo "env ${envs[*]:-} ${args[*]}"; return; fi
   local acs=off; [[ "$AC" == 1 ]] && acs="on at ${PCT/#-/the default }%"
   log "starting (fresh session): ${args[0]}, model ${MODEL/#-/default}, auto-compact $acs"
-  env -u DISABLE_AUTO_COMPACT -u CLAUDE_AUTOCOMPACT_PCT_OVERRIDE "${envs[@]}" setsid "${args[@]}" &
+  # ${envs[@]+...}: bash 3.2 calls an empty array unbound under set -u
+  env -u DISABLE_AUTO_COMPACT -u CLAUDE_AUTOCOMPACT_PCT_OVERRIDE ${envs[@]+"${envs[@]}"} "${NEWSESS[@]}" "${args[@]}" &
   PID=$!
   STARTED=$(date +%s)
 }
@@ -113,6 +121,14 @@ stop() {
 }
 trap 'stop; exit 0' TERM INT
 
+# epoch_at DAY HH:MM ZONE -> unix time of that wall-clock time in the IANA zone (2.44.0 #962: python3 instead of GNU date -d)
+epoch_at() {
+  "$PY" -c 'import sys, datetime
+from zoneinfo import ZoneInfo
+y, m, d = (int(x) for x in sys.argv[1].split("-")); hh, mm = (int(x) for x in sys.argv[2].split(":")[:2])
+print(int(datetime.datetime(y, m, d, hh, mm, tzinfo=ZoneInfo(sys.argv[3])).timestamp()))' "$1" "$2" "$3" 2>/dev/null
+}
+
 line=$(fetch) || { log "cannot read the runtime settings from $KALMIDO_URL"; exit 1; }
 IFS=$'\t' read -r MODEL AC PCT NIGHTLY SEQ TZNAME ENABLED <<< "$line"
 if [[ $ONCE == 1 ]]; then start; exit 0; fi
@@ -123,7 +139,8 @@ nightly_due() {
   local day at
   day=$(TZ="$TZNAME" date +%F)
   [[ "$DONE_DAY" != "$day" ]] || return 1
-  at=$(TZ="$TZNAME" date -d "$day $NIGHTLY" +%s 2>/dev/null) || return 1
+  at=$(epoch_at "$day" "$NIGHTLY" "$TZNAME") || return 1
+  [[ -n "$at" ]] || return 1
   (( $(date +%s) >= at )) || return 1
   DONE_DAY=$day
   (( STARTED < at ))  # started before tonight's time -> restart now
