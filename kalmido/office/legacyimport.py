@@ -242,7 +242,7 @@ CO_RE = re.compile(r"^c\s?/\s?o\b\.?\s*", re.I)
 POBOX_RE = re.compile(r"^(?:postfach|p\.?\s?o\.?\s?box|postbox|case postale|boîte postale|bp)\b", re.I)
 PERSON_RE = re.compile(r"^(?:herrn?|frau|mr\.?|mrs\.?|ms\.?|dr\.?|prof\.?)\s+\S", re.I)
 LEGAL_RE = re.compile(r"\b(?:gmbh|mbh|ag|kg|ohg|gbr|ug|se|e\.?\s?v\.?|e\.?\s?k\.?|ltd\.?|limited|inc\.?|llc|llp|plc|corp\.?|s\.?a\.?r?\.?l?\.?|b\.?v\.?|"
-                      r"s\.?r\.?l\.?|sas|oy|ab|as|aps|& co\.?|co\. kg|gesellschaft|agentur|studio|verlag|stiftung|verein|institut|universität|"
+                      r"s\.?r\.?l\.?|sas|oy|ab|as|aps|& co\.?|co\. kg|\w*gesellschaft|agentur|studio|verlag|stiftung|verein|institut|universität|"
                       r"hochschule|ministerium|amt|bank|group|media|medien|film|production|productions)\b", re.I)
 STREET_RE = re.compile(r"(?:\d+\s*[a-zA-Z]?(?:\s*[-/]\s*\d+\s*[a-zA-Z]?)?\s*$|^\d+[a-zA-Z]?\s+\S|str\.|straße|strasse|weg\b|platz\b|allee\b|"
                        r"gasse\b|ring\b|damm\b|ufer\b|chaussee\b|markt\b|street|road|avenue|lane|rue\b|via\b|calle\b|laan\b|straat\b)", re.I)
@@ -351,7 +351,8 @@ def fi_split_address(text):
     if head:
         first = head[0]
         others = head[1:]
-        if PERSON_RE.match(first) and others and LEGAL_RE.search(others[0]):  # "Frau X" above "Firma GmbH"
+        # 2.46.2 (#1646): a first line without a legal form above one with it (also without "Frau"/"Herr") is the person
+        if (PERSON_RE.match(first) or not LEGAL_RE.search(first)) and others and LEGAL_RE.search(others[0]) and not PERSON_RE.match(others[0]):  # "Frau X" above "Firma GmbH"
             contacts.insert(0, first)
             first, others = others[0], others[1:]
         out["name"] = first
@@ -1064,6 +1065,27 @@ FK_STOP_RE = re.compile(r"(?:\btel\b|telefon|phone|\bfax\b|e-?mail|www\.|https?:
                         r"rechnung|angebot|kostenvoranschlag|gutschrift|invoice|quotation|offer\b|datum|date\b|seite|page\b|kunden-?nr|customer)", re.I)
 FK_SENDER_RE = re.compile(r"[·•|]|\s[-–]\s.*\d{4,5}")
 FK_ZIPLINE_RE = re.compile(r"^(?:[A-Z]{1,2}\s?[-–]\s?)?\d{4,5}\s+\S")
+# 2.46.2 (#1646): bank and contact VALUES without their label (a template prints the labels in a column of their own and the
+# values above the recipient): the walk up from the postcode line stops at them
+FK_VALUE_RE = re.compile(
+    r"^(?:[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){2,7}\s?[A-Z0-9]{1,4}"  # IBAN
+    r"|[A-Z]{4}(?:DE|AT|CH|NL|BE|LU|FR|IT|ES|PT|GB|IE|DK|SE|NO|FI|PL|CZ|US)[A-Z0-9]{2}(?:[A-Z0-9]{3})?"  # BIC
+    r"|\+?[\d ()/.-]{7,}"  # phone
+    r"|\d{2,3}/\d{3,4}/\d{4,5}"  # tax number
+    r"|[A-Z]{2} ?\d[\d ]{7,11}"  # VAT id
+    r"|(?:[\w-]+\.)+[a-z]{2,})$")  # a bare domain
+FK_BANKNAME_RE = re.compile(r"\b(?:sparkasse|volksbank|raiffeisenbank|postbank|commerzbank|[a-zäöüß]*bank)\b", re.I)
+FK_FORM_RE = re.compile(r"\b(?:gmbh|ag|kg|ohg|gbr|ug|se|eg|e\.?\s?v\.?|\w*gesellschaft)\b", re.I)
+
+
+def fk_value_line(ln):
+    """True for a line that is a bank or contact value (IBAN, BIC, phone, tax / VAT number, bare domain, a bank's name)."""
+    t = ln.strip()
+    if FK_VALUE_RE.match(t) and (sum(ch.isdigit() for ch in t) >= 7 or re.match(r"^[A-Z]{6}", t) or "." in t):
+        return True
+    return bool(FK_BANKNAME_RE.search(t)) and not FK_FORM_RE.search(t)
+
+
 FK_PDF_LINES = 45  # lines of the first page looked at
 
 
@@ -1090,7 +1112,7 @@ def fk_pdf_block(text, own):
         top = i
         while top > 0 and i - top < 5:
             up = lines[top - 1]
-            if FK_SENDER_RE.search(up) or FK_STOP_RE.search(up) and not ATTN_RE.match(up) or own_line(up) or len(up) > 70:
+            if FK_SENDER_RE.search(up) or FK_STOP_RE.search(up) and not ATTN_RE.match(up) or own_line(up) or len(up) > 70 or fk_value_line(up):
                 break
             top -= 1
         if top == i:
