@@ -206,11 +206,11 @@ const avUrl = id => (id && ((S.avatars || {})[id] || (S.me && +id === S.me.id ? 
 function av(id, name, cls = 'avatar', attrs = '', inner = '', eager = false) {  // 2.47.0 (#1654): eager = always visible (sidebar), no lazy load
   const u = avUrl(id), ag = id ? agentDot(id) : '';  // 2.0.0: agents get a status dot
   if (ag || (id && isAgentUser(id))) { cls += ' agent'; inner += ag + botBadge(); }  // 2.28.0 (#985): + the robot badge
-  const col = id ? ac_color(id) : '';  // 2.47c (#1721): the fixed account colour: the fill behind the initials, a ring around a photo
+  const col = id ? ac_color(id) : '';  // 2.47.1 (#1721): the fixed account colour: the fill behind the initials, a ring around a photo
   if (col) { cls += ' acol' + (ac_darkInk(col) ? ' acdk' : ''); attrs += ` style="--acol:${col}"`; }
   return `<span class="${cls}${u ? ' pic' : ''}" ${attrs}>${u ? `<img src="${esc(u)}" alt="" ${eager ? 'decoding="sync"' : 'loading="lazy" decoding="async"'} draggable="false">` : esc(initials(name))}${inner}</span>`;
 }
-// 2.47c (#1721): the fixed colour of an account (S.colors from /api/state, one of the palette below = AC_COLORS in
+// 2.47.1 (#1721): the fixed colour of an account (S.colors from /api/state, one of the palette below = AC_COLORS in
 // kalmido/accounts/colors.py), '' = none: unknown, or a person while "Show colours for people" is off (agents keep theirs)
 const AC_COLORS = ['#3e63dd', '#f76b15', '#30a46c', '#a43cb4', '#cf3539', '#12a594', '#e2a336', '#c2307f', '#2aa7dc', '#8d5f3e', '#6e56cf', '#99b13a'];
 function ac_color(uid) {

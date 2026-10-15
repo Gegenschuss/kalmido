@@ -1,4 +1,4 @@
-// 2.47c UI tests, part A (#1720 several chats in the chat panel, one above the other), own container (start.sh), jsdom:
+// 2.47.1 UI tests, part A (#1720 several chats in the chat panel, one above the other), own container (start.sh), jsdom:
 // - one agent chat = the panel as before (no window frame, no extra header buttons)
 // - Ctrl + click / "Open in split window" adds a window; one window is live (the usual ids), the others are parked
 //   (ids renamed); a pointer in a parked window makes it live, every window keeps its own draft

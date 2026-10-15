@@ -423,7 +423,7 @@ def me_update():
     u = g.user
     if "display_name" in b:
         c.execute("UPDATE users SET display_name=? WHERE id=?", ((b["display_name"] or "").strip()[:60] or u["username"], u["id"]))
-    if "color" in b:  # 2.47c (#1721): the own fixed colour (only colours of the palette)
+    if "color" in b:  # 2.47.1 (#1721): the own fixed colour (only colours of the palette)
         from .colors import ac_valid
         if (u["kind"] or "user") == "agent":  # an agent's colour is set by its admin / owner (PATCH /api/agents/<aid>/color)
             return err(tr("Not allowed"), 403)

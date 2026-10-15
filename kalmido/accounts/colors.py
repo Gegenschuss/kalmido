@@ -1,4 +1,4 @@
-"""2.47c (#1721): a fixed colour per account (agents and people), the same everywhere: the fill behind the initials, a thin
+"""2.47.1 (#1721): a fixed colour per account (agents and people), the same everywhere: the fill behind the initials, a thin
 ring around a photo. users.color = a colour of ACCOUNT_COLORS ('' = not given yet). It is given once and then kept: at
 the start for the accounts from before, later the first time somebody's state lists the account. Per organisation the
 agents come first, then the people, each gets the colour used least among its organisation (ties: palette order). Every

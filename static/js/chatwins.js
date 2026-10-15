@@ -1,4 +1,4 @@
-/* Kalmido web client: several chats at once in the chat side panel, one above the other (2.47c, #1720).
+/* Kalmido web client: several chats at once in the chat side panel, one above the other (2.47.1, #1720).
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 

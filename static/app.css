@@ -6773,7 +6773,7 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .ad-mark .ad-open{font-size:var(--fs-xs)}
 @media (pointer:coarse){ .ad-mark .ad-open{min-height:2.75rem;padding:0 .5rem} }
 
-/* 2.47c B (#1721) fixed account colours (agents and people): the fill behind the initials, a thin ring around a photo;
+/* 2.47.1 B (#1721) fixed account colours (agents and people): the fill behind the initials, a thin ring around a photo;
    "me" in a task row keeps its accent mark. Colour is never the only sign: the name stays in the tooltip, agents keep the robot */
 .acol:not(.pic):not(.me){background:var(--acol);color:#fff}
 .acol.acdk:not(.pic):not(.me){color:#16181d}
@@ -6786,7 +6786,7 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .pfcol button{width:1.75rem;height:1.75rem;padding:0;border:0;border-radius:50%;background:var(--acol);cursor:pointer}
 .pfcol button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--acol)}
 @media (pointer:coarse){ .pfcol{gap:.5rem} .pfcol button{width:2.25rem;height:2.25rem} }
-/* 2.47c A (#1720) several chats in the chat panel, one above the other (chatwins.js); phones: a row of the open chats */
+/* 2.47.1 A (#1720) several chats in the chat panel, one above the other (chatwins.js); phones: a row of the open chats */
 #achat.cwsplit .cwin{display:flex;flex-direction:column;flex:1 1 0;min-height:13.75rem;overflow:hidden;position:relative;background:var(--bg2)}
 #achat.cwsplit .cwin .chmsgs{min-height:0}
 #achat.cwsplit .cwin.cwc{flex:0 0 auto!important;min-height:0}

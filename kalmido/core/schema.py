@@ -1310,7 +1310,7 @@ MIGRATIONS = [
     # lists that exist get it on; later the person may switch it off and it stays off
     ("lists", "tap_done", "ALTER TABLE lists ADD COLUMN tap_done BIGINT NOT NULL DEFAULT 0"),
     ("lists", "tap_done", "UPDATE lists SET tap_done=1 WHERE family IN ('shopping', 'packing')"),
-    # 2.47c (#1721): the fixed colour of an account (agents and people; accounts/colors.py, '' = not given yet)
+    # 2.47.1 (#1721): the fixed colour of an account (agents and people; accounts/colors.py, '' = not given yet)
     ("users", "color", "ALTER TABLE users ADD COLUMN color TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
@@ -1442,7 +1442,7 @@ USER_DEFAULTS = {
     "list_emoji": "1",          # 2.32.0 (#1077): a new list suggests an icon from its name (0 = off)
     "side_icons": "line",       # 2.36.0 (#1117): the sidebar's list icons: line (grey line icon for the name's emoji) | emoji | dot
     "prio_bg": "",              # 2.40.0 (#1416): tasks with a priority tinted in its colour: '' (off) | soft | strong
-    "person_colors": "1",       # 2.47c (#1721): people in their account colour ('0' = only agents coloured)
+    "person_colors": "1",       # 2.47.1 (#1721): people in their account colour ('0' = only agents coloured)
     "side_progress": "1",       # 2.36.0 (#1117): progress bars of projects in the sidebar (0 = hidden)
     "cal_today": "1",           # "Events today" block on Today (external calendar subscriptions)
     "cal_tasks": "1",           # 2.36.1 (#1127): tasks with a date in the calendar views (0 = events only; Today, search, feeds unchanged)

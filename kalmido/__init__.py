@@ -19,7 +19,7 @@ ORDER = (
     "accounts.session",
     "accounts.setupcode",  # 2.45.0 (#1515): one-time code for the first setup
     "accounts.pictures",
-    "accounts.colors",  # 2.47c (#1721)
+    "accounts.colors",  # 2.47.1 (#1721)
     "accounts.login",
     "accounts.oidc",
     "core.access",

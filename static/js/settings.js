@@ -190,7 +190,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-brief': ['brief_time', N_('Morning briefing at'), 'time'],  // 2.34.0 (#264)
   's-lemo': ['list_emoji', N_('Suggest icons for new lists'), 'chk'],  // 2.32.0 (#1077)
   's-prbg': ['prio_bg', N_('Priority as background'), 'sel'],  // 2.40.0 (#1416)
-  's-pcol': ['person_colors', N_('Show colours for people'), 'chk'],  // 2.47c (#1721)
+  's-pcol': ['person_colors', N_('Show colours for people'), 'chk'],  // 2.47.1 (#1721)
   's-sideic': ['side_icons', N_('List icons'), 'sel'], 's-sideprog': ['side_progress', N_('Progress in the sidebar'), 'chk'],  // 2.36.0 (#1117)
   's-sdd': ['show_done_default', N_('Completed tasks'), 'sel'],  // 2.39.1 (#1214)
   's-favq': ['fav_quiet', N_('Quieter pushes from lists without a star'), 'chk'], 's-favs': ['fav_suggest', N_('Suggest favourites'), 'chk'],  // 2.46.1 (#1361)
@@ -439,7 +439,7 @@ async function agSetupDraw(md) {
   let j;
   try { j = await api('GET', '/api/my/agents'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j;
-  for (const a of j.agents || []) if (a.color) (S.colors ||= {})[a.id] = a.color;  // 2.47c (#1721)
+  for (const a of j.agents || []) if (a.color) (S.colors ||= {})[a.id] = a.color;  // 2.47.1 (#1721)
   const row = a => `<div class="mrow agsrow ${a.enabled ? '' : 'off'}" data-myag="${a.id}">${avBtn(a.id, a.name)}<span class="n"><span class="agnm"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span>${av_wsBtn(a)}</span>
       <small class="muted agfacts">${hdot(agentHst(a))}${((t) => `<span class="agft" title="${esc(t)}">${esc(t)}</span>`)([a.enabled ? agentSt(a) : a.admin_paused ? tr('paused by an admin') : tr('paused'), trn('{0} list', '{0} lists', (a.lists || []).length), scopeSummary(a.effective_scopes || a.scopes)].join(' · '))}</small></span>
     <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>

@@ -47,7 +47,7 @@ def agent_admin_dict(c, a):
             "runtime": agent_runtime(a),  # 2.4.1 (#377)
             "owner": ({"id": a["owner_id"], "name": user_names(c, [a["owner_id"]]).get(a["owner_id"], "")} if a["owner_id"] else None),  # 2.7.2 (#420)
             "admin_paused": bool(a["admin_paused"]),
-            "color": c.execute("SELECT color FROM users WHERE id=?", (a["user_id"],)).fetchone()[0],  # 2.47c (#1721)
+            "color": c.execute("SELECT color FROM users WHERE id=?", (a["user_id"],)).fetchone()[0],  # 2.47.1 (#1721)
             **agent_scope_dict(c, a),  # 2.15.0 (#479): scopes, effective_scopes, allowed_ips
             "lists": [{"id": d["id"], "name": d["name"], "role": d["role"]} for d in visible_lists(c, a["user_id"]) if not d["is_inbox"]],
             # 2.30.0 (#919): limited to these lists ([] = all), the lists it connects although their people differ
@@ -196,7 +196,7 @@ def admin_agent_create():
             c.rollback()
             raise
         tok = agent_token_new(c, uid)
-        ac_assign(c, [uid])  # 2.47c (#1721): its fixed colour (the least used one of its organisation)
+        ac_assign(c, [uid])  # 2.47.1 (#1721): its fixed colour (the least used one of its organisation)
         bump(c)
         c.commit()
         print("agent", username, "(id", uid, ") created by", g.user["username"], flush=True)
@@ -612,7 +612,7 @@ def my_agent_create():
     uset(c, uid, "lang", usettings(c, me())["lang"])
     ensure_inbox(c, uid)
     tok = agent_token_new(c, uid)
-    ac_assign(c, [uid])  # 2.47c (#1721)
+    ac_assign(c, [uid])  # 2.47.1 (#1721)
     bump(c)
     c.commit()
     print("personal agent", username, "(id", uid, ") created by", g.user["username"], flush=True)
@@ -687,7 +687,7 @@ def my_agent_update(aid):
 
 @app.patch("/api/agents/<int:aid>/color")
 def ac_agent_color(aid):
-    """2.47c (#1721): {color} -- the fixed colour of an agent (a colour of the palette). Instance admins, the owner of a
+    """2.47.1 (#1721): {color} -- the fixed colour of an agent (a colour of the palette). Instance admins, the owner of a
     personal agent and the admins of the agent's organisation change it; nobody else (404, like an unknown agent)."""
     from ..accounts.colors import ac_valid
     from ..accounts.orgs import is_org_admin

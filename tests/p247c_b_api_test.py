@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.47c API tests, part B (#1721): a fixed colour per account (agents and people). Invented names only.
+"""2.47.1 API tests, part B (#1721): a fixed colour per account (agents and people). Invented names only.
  - users.color is given once and kept: per organisation the agents first, then the people, all different
  - everybody changes their own colour (PATCH /api/me), only colours of the palette; nobody changes another person's
  - an agent's colour (PATCH /api/agents/<id>/color): instance admins, the organisation's admins, the owner of a personal

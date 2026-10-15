@@ -42,7 +42,7 @@ async function teamChanged() {
   if (S.route.mod === 'team' && S.tc.rid) await loadRoom(S.tc.rid);
   if (S.route.mod === 'team' && !editingTeam()) renderView();
   else if (S.route.mod === 'team') tcPatch();
-  if (typeof cw_teamLive === 'function') cw_teamLive();  // 2.47c (#1720): the team chats in the chat panel
+  if (typeof cw_teamLive === 'function') cw_teamLive();  // 2.47.1 (#1720): the team chats in the chat panel
   renderSide(); renderTabs(); renderTop();
 }
 // 2.18.0 (review): a one-line preview without Markdown markers ("```js", `code`, **bold**, headings, list markers, links ->
@@ -56,7 +56,7 @@ const editingTeam = () => document.activeElement?.id === 'tc-in' || document.act
 const roomName = r => r ? (r.kind === 'dm' ? (r.name || '?') : lname(listById(r.list_id)) || r.name || '?') : '';
 const roomIcon = r => r.kind === 'dm' ? av(r.user_id, r.name, 'avatar') : `<span class="tcico">${licon(listById(r.list_id), 'licon') || ic('users', 's')}</span>`;
 function viewTeam() {
-  if (typeof cw_tcHome === 'function' && S.cw.lt) return cw_tcHome(viewTeam);  // 2.47c (#1720): a conversation live in the chat panel (chatwins.js)
+  if (typeof cw_tcHome === 'function' && S.cw.lt) return cw_tcHome(viewTeam);  // 2.47.1 (#1720): a conversation live in the chat panel (chatwins.js)
   if (!teamOn()) return `<div class="empty">${tr('The team chat needs collaboration (Settings > Modules).')}</div>`;
   if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'team') renderView(); }); }
   // 2.27.0 (#986): only conversations that have messages (newest first); an empty one shows once it is opened / written in
@@ -218,7 +218,7 @@ async function dmWhy(kind, msg, name) {
 }
 // the open conversation follows the route; switching rooms loads it
 function teamRoute(rid) {
-  if (typeof cw_route === 'function' && cw_route(rid)) return;  // 2.47c (#1720): the phone's row of open chats / a conversation live in the chat panel
+  if (typeof cw_route === 'function' && cw_route(rid)) return;  // 2.47.1 (#1720): the phone's row of open chats / a conversation live in the chat panel
   if (S.tc.rid !== rid) { S.tc.rid = rid; S.tc.room = null; S.tc.msgs = []; S.tc.more = false; S.tc.edit = null; if (rid) loadRoom(rid).then(() => { if (S.route.mod === 'team' && S.tc.rid === rid) { renderView(); teamFit(); } }); }
 }
 document.addEventListener('keydown', e => {

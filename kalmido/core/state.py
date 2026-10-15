@@ -285,7 +285,7 @@ def state():
         languages=languages(),
         news={"unread": sum(1 for x in nitems if not x["read"]), "unread_me": news_unread_me(c, uid, s, nitems), "sig": news_sig(c, uid)},  # 2.28.0 (#987): + "For you"
         avatars=avatar_map(c, uid),
-        colors=ac_color_map(c, uid),  # 2.47c (#1721): {user id: fixed account colour} of the accounts I see
+        colors=ac_color_map(c, uid),  # 2.47.1 (#1721): {user id: fixed account colour} of the accounts I see
         templates=[dict(r) for r in c.execute("SELECT id, kind, name FROM templates WHERE user_id=? ORDER BY lower(name), id",
                                               (uid,))],
         timer=time_running(c, uid) if time_all() else None,

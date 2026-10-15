@@ -747,10 +747,10 @@ fresh; run p2470_b_parts_api "$PY" p2470_b_parts_api_test.py "$KALMIDO_TEST_DATA
 fresh; run p2470_b_parts_ui node p2470_b_parts_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.0 part F: review follow-ups (#1216 no purchase in the cached shoot totals, #1649 percent positions in invoices from parts)
 fresh; run p2470_f_review_api "$PY" p2470_f_review_api_test.py "$KALMIDO_TEST_DATA"
-# 2.47c part B: fixed colour per account (#1721)
+# 2.47.1 part B: fixed colour per account (#1721)
 fresh; run p247c_b_api "$PY" p247c_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p247c_b_ui node p247c_b_ui.js "$KALMIDO_TEST_DATA"
-# 2.47c part A: several chats in the chat panel (#1720)
+# 2.47.1 part A: several chats in the chat panel (#1720)
 fresh; run p247c_a_ui node p247c_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi

@@ -13,7 +13,7 @@ function avPickHtml(cur = S.me?.avatar || '', own = true, name = S.me?.display_n
     (own ? `<button type="button" class="avopt up ${cur.startsWith('/api/avatar/') ? 'on' : ''}" data-av="upload" title="${esc(tr('Upload a photo…'))}" aria-label="${esc(tr('Upload a photo…'))}">${cur.startsWith('/api/avatar/') ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>` : '') +
     `<button type="button" class="avopt none ${cur ? '' : 'on'}" data-av="none" title="${esc(tr('No picture (initials)'))}" aria-label="${esc(tr('No picture (initials)'))}" aria-pressed="${!cur}">${esc(initials(name))}</button>`;
 }
-// 2.47c (#1721): the palette of the fixed account colours as round buttons (the own colour here, an agent's in its settings)
+// 2.47.1 (#1721): the palette of the fixed account colours as round buttons (the own colour here, an agent's in its settings)
 const AC_NAMES = [N_('Blue'), N_('Orange'), N_('Green'), N_('Purple'), N_('Red'), N_('Teal'), N_('Yellow'), N_('Pink'), N_('Sky blue'), N_('Brown'), N_('Violet'), N_('Lime')];
 const ac_pickHtml = (cur, who) => AC_COLORS.map((c, i) => `<button type="button" data-accol="${c}" data-acwho="${esc(String(who))}" style="--acol:${c}" title="${esc(tr(AC_NAMES[i]))}" aria-label="${esc(tr(AC_NAMES[i]))}" aria-pressed="${cur === c}"></button>`).join('');
 document.addEventListener('click', async e => {

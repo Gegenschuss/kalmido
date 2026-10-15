@@ -22,7 +22,7 @@ try { screen.orientation?.addEventListener('change', () => { clearTimeout(chatRe
 S.chat = {aid: null, msgs: [], err: null};
 function chatOpen(aid, o = {}) {
   tch_overlaysClose();  // 2.38.0 (#1155): no quick-add sheet or stale scrim stays over the chat
-  if (typeof cw_note === 'function') cw_note('a:' + +aid, o);  // 2.47c (#1720): the list of open chats (chatwins.js)
+  if (typeof cw_note === 'function') cw_note('a:' + +aid, o);  // 2.47.1 (#1720): the list of open chats (chatwins.js)
   if (chatFull()) { if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); return; }
   const fl = o.float ?? chatFloatOn();
   if (!fl && document.body.classList.contains('chat-yield') && S.sel) closeDetail();  // 2.13.2 (#478 N1): the chat takes its place back
@@ -359,7 +359,7 @@ document.addEventListener('dragleave', e => { if (hasFiles(e) && (!e.relatedTarg
 document.addEventListener('drop', e => {
   if (!hasFiles(e)) return;
   const z = e.target.closest?.('#achat:not(.hidden), #view .chview'); if (!z || !S.chat.aid) return;
-  const cwk = e.target.closest?.('#achat .cwin[data-cw]')?.dataset.cw;  // 2.47c (#1720): the window it was dropped on
+  const cwk = e.target.closest?.('#achat .cwin[data-cw]')?.dataset.cw;  // 2.47.1 (#1720): the window it was dropped on
   if (cwk && cwk[0] !== 'a') { z.classList.remove('filedrop'); return; }
   if (cwk && typeof cw_act === 'function') cw_act(cwk);
   e.preventDefault(); e.stopImmediatePropagation(); z.classList.remove('filedrop'); chatAddFiles(e.dataTransfer.files); $('#chat-in')?.focus();
@@ -672,11 +672,11 @@ function chatInner(aid) {
 }
 function chatViewHtml(aid) {
   if (S.chat.aid !== +aid) { S.chat = {aid: +aid, msgs: [], err: null}; setTimeout(chatLoad, 0); }
-  return `<div class="chview" data-aid="${+aid}">${typeof cw_switchHtml === 'function' ? cw_switchHtml('a:' + +aid) : ''}${chatInner(aid)}</div>`;  // 2.47c (#1720): the open chats
+  return `<div class="chview" data-aid="${+aid}">${typeof cw_switchHtml === 'function' ? cw_switchHtml('a:' + +aid) : ''}${chatInner(aid)}</div>`;  // 2.47.1 (#1720): the open chats
 }
 function chatDraw(o = {}) {
   const p = $('#achat');
-  if (typeof cw_frame === 'function' && cw_frame(p)) o = {bottom: true};  // 2.47c (#1720): several chats one above the other (chatwins.js)
+  if (typeof cw_frame === 'function' && cw_frame(p)) o = {bottom: true};  // 2.47.1 (#1720): several chats one above the other (chatwins.js)
   if (p && !p.classList.contains('hidden') && !p.classList.contains('cwsplit') && S.chat.aid && !chatFull() && (p.dataset.aid !== String(S.chat.aid) || !$('#chat-msgs', p))) {
     const d = S.drafts['chat:' + S.chat.aid] = $('#chat-in', p)?.value ?? S.drafts['chat:' + S.chat.aid]; p.innerHTML = chatInner(S.chat.aid); p.dataset.aid = S.chat.aid; if (d !== undefined) $('#chat-in', p).value = d;
     o = {bottom: true};
@@ -700,7 +700,7 @@ function chatPatch(o = {}) {
   if (o.keep) box.scrollTop = top + box.scrollHeight - h;
   else if (near || o.bottom) { box.scrollTop = box.scrollHeight; chatNewPill(false); S.chat.pin = true; }
   else { if (box.scrollTop !== top) box.scrollTop = top; if (last && nl > last && ms.some(m => m.id > last && m.from === 'agent' && m.kind !== 'notice')) chatNewPill(true); }
-  const on = !!a?.enabled, ci = $('#chat-in'), sb = ci?.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]');  // paused / resumed: the same box; 2.47c (#1720): the live window's button
+  const on = !!a?.enabled, ci = $('#chat-in'), sb = ci?.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]');  // paused / resumed: the same box; 2.47.1 (#1720): the live window's button
   if (ci && ci.disabled === on) ci.disabled = !on;
   if (sb && sb.disabled === on && !S.chat.sending) sb.disabled = !on;
 }
@@ -772,8 +772,8 @@ async function chatSend() {
   const rto = replyTo('a:' + aid);  // 2.33.0 (#1076)
   let payload = {body, ...(rto ? {reply_to: rto} : {})};
   if (files.length) { payload = new FormData(); if (body) payload.append('body', body); if (rto) payload.append('reply_to', rto); files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
-  const btn = ta.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]'); if (btn) btn.disabled = true;  // 2.47c (#1720): this window's button
-  const st = S.chat; let sent = false; st.sending = true;  // 2.47c (#1720): another window may become live during the POST
+  const btn = ta.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]'); if (btn) btn.disabled = true;  // 2.47.1 (#1720): this window's button
+  const st = S.chat; let sent = false; st.sending = true;  // 2.47.1 (#1720): another window may become live during the POST
   if (files.length) toast(files.length === 1 ? tr('Uploading…') : tr('Uploading {0} files…', files.length));
   try { const m = await rawFetch('POST', `/api/agents/${aid}/chat`, payload); st.msgs.push(m); ta.value = ''; delete S.drafts['chat:' + aid]; delete S.chatFiles[aid]; replySent('a:' + aid); const fb = $('#chat-files'); if (fb) fb.innerHTML = ''; sent = true; }
   catch (e) { toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); }
@@ -1175,7 +1175,7 @@ async function agDraw(md) {
   }
   let j; try { [j] = await Promise.all([api('GET', '/api/admin/agents'), us]); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j; S.agOffer = j.scopes; S.agDefScopes = j.default_scopes;  // 2.15.0 (#479)
-  for (const a of j.agents || []) if (a.color) (S.colors ||= {})[a.id] = a.color;  // 2.47c (#1721): the admin sees every agent in its colour
+  for (const a of j.agents || []) if (a.color) (S.colors ||= {})[a.id] = a.color;  // 2.47.1 (#1721): the admin sees every agent in its colour
   if (!box.isConnected) return;
   // 2.28.0 (#1011): grouped -- team agents, my personal agents, other people's personal agents (name + kill switch only)
   const team = j.agents.filter(a => !a.owner), mine = j.agents.filter(a => a.owner && a.owner.id === S.me?.id), other = j.agents.filter(a => a.owner && a.owner.id !== S.me?.id);
@@ -1229,7 +1229,7 @@ function agModal(a, done, o = {}) {
     <div class="shint keep" id="ag-userhint" hidden></div>
     ${a ? `<div class="shint keep">${tr('a-z, 0-9, . - _ · its API tokens keep working after a rename; @mentions use the new name')}</div>` : ''}
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="ag-avpick">${avPickHtml(a ? a.avatar || '' : '/static/avatars/robot.svg', !!a, a?.name || 'AI')}</div></div>
-    ${a ? `<div class="row"><label id="ag-col-h">${tr('Colour')}</label><div class="pfcol" role="group" aria-labelledby="ag-col-h">${ac_pickHtml(a.color || (S.colors || {})[a.id] || '', a.id)}</div></div>` : ''}${''/* 2.47c (#1721): saved at once */}
+    ${a ? `<div class="row"><label id="ag-col-h">${tr('Colour')}</label><div class="pfcol" role="group" aria-labelledby="ag-col-h">${ac_pickHtml(a.color || (S.colors || {})[a.id] || '', a.id)}</div></div>` : ''}${''/* 2.47.1 (#1721): saved at once */}
     <div class="row"><label for="ag-note">${tr('Note')}</label><input id="ag-note" value="${esc(a?.note || '')}" maxlength="2000" placeholder="${tr('What it is for (only admins see this)')}"></div>
     <div class="row"><label for="ag-prov">${tr('Where it runs')}</label><input id="ag-prov" value="${esc(a?.provider || '')}" maxlength="80" placeholder="${esc(tr('e.g. Claude (Anthropic, USA)'))}"></div>
     <div class="row"><label for="ag-prop">${tr('Proposals for')}</label><select id="ag-prop">${[['shared', N_('People who share a list with it')], ['all', N_('Everyone')], ['off', N_('Nobody')]].map(([k, n]) => `<option value="${k}" ${(a?.proposals || 'shared') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>

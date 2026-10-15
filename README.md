@@ -20,6 +20,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.47.1** (2026-10-15): **several chats at once**: agent chats, team channels and direct messages open one above the
+  other in the chat panel (Ctrl/Cmd+click or *Open in split window*), each with its own draft and unread dot, a movable
+  divider and the open windows kept per device; phones switch between them in a row at the top. **Fixed colours**:
+  every agent and colleague has one colour everywhere (task rows, sidebar, chat), changeable in the profile and the agent
+  settings, people's colours can be switched off.
 - **2.47.0** (2026-10-15): Office & finance: **quotation parts** (sub pages with a title page, invoice from them in
   three forms), a **shoot calculation** for film and video (industry pack), **crew and freelancer roles** with purchase
   prices and the **surplus per position** for admins, producing and raw data **switched per quotation**, and the legacy
@@ -1051,6 +1056,13 @@ docs/API.md); agents cannot open direct messages.
 on a computer); the answer shows a small quote that jumps to the original, and its author is notified. The same works
 in comments and the agent chat. **Search** (#1080): the magnifier in a chat's header searches that conversation; the
 search page and the command field find messages and comments everywhere you may read them.
+
+**Several chats at once** (#1720): Ctrl/Cmd+click a chat (or *Open in split window* in its right-click menu or the person
+card) opens it below the chat that is open; agent chats, channels and direct messages share the panel, each window keeps
+its draft and unread dot, a header folds, moves or closes it, the divider between two windows moves (double-click: equal
+heights). On phones a row of the open chats at the top switches between them. Every agent and person has a **fixed
+colour** (#1721) in avatars everywhere; change yours under *Settings > Account*, an agent's in its settings, and switch
+people's colours off under *Settings > Appearance*.
 
 ## Notes
 

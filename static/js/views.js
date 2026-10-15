@@ -264,7 +264,7 @@ function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks
   if (v.group === 'person') {  // 2.36.2 (#1138): one group per assignee, by name
     const g = new Map();
     for (const t of arr) { if (!g.has(t.assignee_id)) g.set(t.assignee_id, []); g.get(t.assignee_id).push(t); }
-    return [...g.entries()].map(([id, ts]) => ({id: 'p:' + id, name: personName(ts[0].list_id, id) || personNameAny(id) || '?', tasks: ts, color: ac_color(id)}))  // 2.47c (#1721): + colour
+    return [...g.entries()].map(([id, ts]) => ({id: 'p:' + id, name: personName(ts[0].list_id, id) || personNameAny(id) || '?', tasks: ts, color: ac_color(id)}))  // 2.47.1 (#1721): + colour
       .sort((a, b) => a.name.localeCompare(b.name, LOCALE()));
   }
   return [{id: 'all', name: '', tasks: arr}];

@@ -7,6 +7,28 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.47.1] - 2026-10-15
+
+**In short:** **several chats at once** in the chat panel, one above the other, and a **fixed colour for every agent
+and colleague**, the same everywhere.
+
+### Added
+- **Split chat panel** (#1720): Ctrl/Cmd+click or *Open in split window* (right click, person card) opens another agent
+  chat, team channel or direct message below the open one; each window keeps its own messages, draft, scroll position
+  and unread dot. Header: fold, menu (move up / down, own browser window), close; drag a header to reorder, drag the
+  divider (arrow keys too), double-click it to share the height evenly. At least about 220 px per window, more fold to
+  their header. Open windows and heights are kept per device. Phones and tablets do not split: a row of the open chats
+  at the top switches between them. A normal click still replaces the active chat.
+- **Fixed colour per account** (#1721): every agent and person gets a colour of a 12-colour palette, per organisation
+  agents first and as different as possible. Without a photo the initials sit on it, a photo gets a thin ring; agents
+  keep the robot badge and "me" its accent mark. Shown in task rows, the *Assigned* column, the sidebar, the agents page,
+  job cards, the chat header, the split windows, the assign menu and grouping by assignee. Change your own colour in
+  *Settings > Account*; admins (and owners of personal agents) change an agent's colour in its settings
+  (`PATCH /api/agents/<id>/color`). *Settings > Appearance > Show colours for people* off = only agents in colour.
+
+### Notes
+- Additive database change (`users.color`, default empty); the previous version runs on with it.
+
 ## [2.47.0] - 2026-10-15
 
 **In short:** **Office & finance: calculation and master data import**: quotations with sub pages (parts), a shoot

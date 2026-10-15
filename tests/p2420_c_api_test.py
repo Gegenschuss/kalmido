@@ -245,7 +245,7 @@ check("kenc1:" not in text, "no encrypted field value left")
 mem = json.loads(z.read("members.json"))
 check({m["id"]: m["role"] for m in mem}.get(ALICE) == "admin" and {m["id"] for m in mem} >= {ALICE, ids["bob"]} and ids["carol"] not in {m["id"] for m in mem},
       f"members with roles: {mem}")
-# 2.47c (#1721): + color (the fixed account colour)
+# 2.47.1 (#1721): + color (the fixed account colour)
 check(all(set(m) <= {"id", "username", "display_name", "email", "kind", "disabled", "color", "role"} for m in mem), "members: no other user fields")
 secrets_db = [x[0] for x in dbx("SELECT password_hash FROM users WHERE password_hash IS NOT NULL")] + [x[0] for x in dbx("SELECT token_hash FROM sessions")] \
     + [x[0] for x in dbx("SELECT token_hash FROM api_tokens")]

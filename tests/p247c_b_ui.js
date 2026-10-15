@@ -1,4 +1,4 @@
-// 2.47c UI tests of part B (#1721, own container, start.sh). jsdom:
+// 2.47.1 UI tests of part B (#1721, own container, start.sh). jsdom:
 // - the assignee avatar in a task row carries the account colour (class acol + --acol): a fill without a photo, a ring with one
 // - "me" keeps the accent mark (the colour rules skip .me)
 // - "Show colours for people" off: only agents stay coloured (the robot badge stays)
