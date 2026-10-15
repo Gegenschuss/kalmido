@@ -174,6 +174,7 @@ ROUTES = {
     # ---- client (13)
     "GET /api/clients": "client", "GET /api/clients/{}": "client", "POST /api/clients": "client",
     "PATCH /api/clients/{}": "client", "DELETE /api/clients/{}": "client", "GET /api/v1/clients": "client",
+    "POST /api/clients/bulk": "client", "POST /api/v1/clients/bulk": "client",  # 2.47.3 (#1733): every id checked first (p2473_c_api_test.py)
     "POST /api/v1/clients": "client", "GET /api/v1/clients/{}": "client", "PATCH /api/v1/clients/{}": "client",
     "DELETE /api/v1/clients/{}": "client", "GET /api/v1/workload": "client", "GET /api/workload": "client",
     "PUT /api/workload/capacity/{}": "client",

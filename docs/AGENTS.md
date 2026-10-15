@@ -2166,7 +2166,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
 `add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
-`add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_contacts`, `chat_typing`, `check_in_habit`,
+`add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`, `chat_typing`, `check_in_habit`,
 `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `create_address_book`, `create_client`,
 `create_contact`, `create_event`, `create_event_calendar`, `create_field`, `create_filter`, `create_form`,
 `create_habit`, `create_job`, `create_list`, `create_list_tag`, `create_note`, `create_packing_list`,
