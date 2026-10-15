@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.46.4** (2026-10-15): **contacts sync, share labels, shopping lists**: the **Mac Contacts app** can change and delete
+  contacts over CardDAV again (and contacts no longer all reload after an update), **Share dialogs** say whether an item
+  belongs to an organisation or is private, a **tap ticks off** in shopping lists (switch per list), and the undo
+  message fits small screens.
 - **2.46.3** (2026-10-15): fixes for 2.46.2 (table cells after editing, focus after dialogs, the new-message pills).
 - **2.46.2** (2026-10-15): **fixes and polish**: **no flicker** on live updates, renames and list settings **show at
   once**, new chat messages and comments **fade in** (with "New message ↓"), **dialogs move** on the desktop, a chat in

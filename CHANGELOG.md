@@ -7,6 +7,30 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.46.4] - 2026-10-15
+
+**In short:** **Contacts sync, share labels, shopping lists**: the Mac Contacts app can change and delete contacts over
+CardDAV again, contacts of a deleted address book leave the list at once, Share dialogs say which workspace an item
+belongs to, a tap in shopping lists ticks off instead of opening the details, and the undo message fits small screens.
+
+### Added
+- **"Tap does not open details"** (#1751): a switch in the list settings; on, a tap on a task ticks it off or back on
+  (with undo), the details stay one step away (row menu "Open details", long press > More on a phone, Enter). On for new
+  shopping and packing lists; existing shopping and packing lists get it on once (switch it off any time).
+- **Workspace line in Share dialogs** (#1737): lists, folders, calendars and address books show "Belongs to:
+  <organisation> (organisation)" or "Private" with a sentence on what that means and a link to change the workspace;
+  people outside the organisation are greyed out with the reason instead of failing after sending.
+
+### Fixed
+- **CardDAV writes from macOS Contacts** (#1736): the address book home now reports full rights to its owner, so the
+  Mac app sends changes and deletions again (creating address books from a device stays off).
+- **Stable contact ETags** (#1736): a card's ETag no longer depends on the app version, so an update no longer makes
+  every client reload all contacts or drop a change made before the update. After this update clients reload once.
+- **Deleted address book** (#1732): its contacts, an open card, a selection and a filter on it leave the contacts view
+  at once (also when another device deletes it), not only after a reload.
+- **Undo message on small screens** (#1755): with the keyboard open it sits above the input field or the keyboard,
+  it never jumps over the header or into the content, and it stays on one line (the name is shortened, "Undo" stays).
+
 ## [2.46.3] - 2026-10-15
 
 **In short:** fixes for 2.46.2 found by the automatic tests and the device check.
