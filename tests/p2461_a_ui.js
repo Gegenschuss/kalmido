@@ -134,7 +134,7 @@ window.__secs = lid => secIds(lid).map(i => S.sections.find(s => s.id === i).nam
     // #1635: sections (list) and board columns: to the end and back to the start
     for (const k of ['list', 'board']) {
       await ev(`(() => { location.hash = '#l/${SEC[k]}'; return 1; })()`); await ready(ev, k === 'list' ? '#view .ghead[data-section]' : '#view .kcol[data-kcol]');
-      const go = async (name, where) => ev(`(async () => { const LID = ${SEC[k]}, kan = ${k === 'board'}, sid = S.sections.find(s => s.list_id === LID && s.name === '${name}').id;
+      const go = async (name, where) => ev(`(async () => { const LID = ${SEC[k]}, kan = ${k === 'board'}, where = '${where}', sid = S.sections.find(s => s.list_id === LID && s.name === '${name}').id;
         const dt = new DataTransfer(), h = document.querySelector('[data-sdrag="' + sid + '"]'); __fire('dragstart', h, 0, 0, dt); await new Promise(r => setTimeout(r, 120));
         const els = sb_secEls().filter(e => kan ? e.dataset.kcol : e.querySelector('.ghead').dataset.section), r = (where === 'end' ? els[els.length - 1] : els[0]).getBoundingClientRect();
         const x = kan ? (where === 'end' ? r.right + 8 : r.left + 6) : r.left + 60, y = kan ? r.top + 30 : (where === 'end' ? r.bottom + 8 : r.top + 3), t = document.elementFromPoint(x, y) || document.body;
@@ -176,7 +176,7 @@ window.__secs = lid => secIds(lid).map(i => S.sections.find(s => s.id === i).nam
       const els = sb_secEls(), lr = els[els.length - 1].getBoundingClientRect(), ty = Math.min(lr.bottom + 8, innerHeight - 90);
       for (let i = 1; i <= 6; i++) { tev('touchmove', h, x, y + (ty - y) * i / 6); await sl(40); }
       out.mark = (document.querySelector('#view .dropafter, #view .dropbefore') || {}).className || '';
-      tev('touchend', h, x, ty); await sl(900);
+      tev('touchend', h, x, ty); await sl(1500);
       out.now = __secs(LID); out.clean = !document.querySelector('.sb-secghost, #view .sb-secfold');
       const h2 = document.querySelector('#view .ghead[data-section="' + sec('Gamma') + '"]'), r2 = h2.getBoundingClientRect();
       tev('touchstart', h2, r2.left + 60, r2.top + 6); await sl(650); tev('touchend', h2, r2.left + 60, r2.top + 6); await sl(300);
