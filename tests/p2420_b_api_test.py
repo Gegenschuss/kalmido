@@ -164,7 +164,8 @@ check(A.get(B + O + "/contracts").json()["items"][0]["rates"] == {str(SV): 700.0
 d = A.get(B + O + f"/docs/{D}").json()
 check([x["cost"] for x in d["items"]] == [321.5] and d["totals"].get("costs") in (643, "643.00", 643.0), f"API admin: purchase price + costs ({d['totals'].get('costs')})")
 d = Bo.get(B + O + f"/docs/{D}").json()
-check([x["cost"] for x in d["items"]] == [None] and "costs" not in d["totals"], "API member: no purchase prices (unchanged rule)")
+# 2.47.0 (#1649): the member gets no purchase field at all (was None)
+check(all("cost" not in x and "margin" not in x for x in d["items"]) and "costs" not in d["totals"], "API member: no purchase prices (unchanged rule)")
 lg = A.get(B + O + "/log").json()["log"]
 check(any("321.5" in json.dumps(x["detail"]) for x in lg), "API office log: the change of the purchase price readable")
 
