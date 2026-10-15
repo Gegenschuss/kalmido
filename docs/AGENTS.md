@@ -682,6 +682,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `message_edited` | 2.39.0 (#1179): a person edited a message the agent already had: their chat message after the agent fetched (`delivered_at`) or answered it, a comment the agent got as `comment` / `mention` / `assigned`, a team chat message it got as `team_message`. Only to the agent(s) that had it, only while they still see the task / room (health lists never). A chat message not fetched yet is simply replaced (the queued `chat` event carries the new text, no `message_edited`). Comments and team messages count as had while the original event is still in your event history (30 days). Treat it as a correction: confirm briefly, keep your running work, adjust only what the change affects | `kind`: `chat` \| `comment` \| `team`, `old`, `new`, `user` `{id, name}`; chat: `message` `{id, user_id, task_id, created_at, edited_at}`, `answered` (you wrote after it); comment: `comment` `{id, task_id, created_at, edited_at}`, `task`, `list`, `list_id`; team: `room` `{id, kind, list_id}`, `message` |
 | `playbook_proposal` | 2.39.0 (#1168): a person applied or discarded the agent's proposed change of a list's [Playbook](#playbook-2390) | `list_id`, `proposal_id`, `state`: `applied` or `discarded`, `version` (applied: the new version of the list's part), `note` (yours), `by` `{id, name}`, `hint`; like every event of the list it carries the current `playbook` |
 | `file_shared` | 2.48.0 (#1207): the owner shared a folder or file of the [file store](#file-store-2480) with the agent (only for a new share, not for a changed role) | `node` `{id, name, kind}`, `role`: `view` \| `edit` |
+| `document_added` | 2.48.0 (#1356): a new document was recognised (once, after its first recognition) in a folder or file of the file store the agent sees (a share or its own result folder); read it with `get_document`, e.g. to [suggest project and category of a receipt](#receipts-suggest-project-and-category-2480) | `document` `{id, name, state, date, url}` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1461,6 +1462,22 @@ workspace leaves a feature to an agent (level *Left to an agent* in the document
 waits as a suggestion in *To review* until a person accepts it. Agents never move a document and never see documents of
 another workspace.
 
+### Receipts: suggest project and category (2.48.0)
+
+An incoming invoice or receipt can be assigned to a **project** (a list of kind project of the document's workspace) and
+a **category** (short text such as *Travel*, *Material*, *Software*). Only people set it. An agent the document is shared
+with suggests, a person accepts (also with changed values) or rejects it in the document's sheet:
+
+| What | Endpoint | MCP |
+|---|---|---|
+| Suggest `project_id` and / or `category` (`note` = why) | `POST /api/v1/documents/{id}/receipt-suggestion` | `suggest_receipt` |
+| Your suggestions and what became of them (`state=open\|accepted\|rejected\|all`) | `GET /api/v1/receipt-suggestions` | `list_receipt_suggestions` |
+
+Flow *assign a receipt*: `list_documents` (e.g. `review=1`) -> `get_document` (text, sender, amount) -> `list_lists` (the
+projects you can see) -> `suggest_receipt`. The project must be one you can see, in the document's workspace and within
+your list restriction (else `400`); a new suggestion replaces your open one. The document then waits in *To review*. You
+can never set, move or delete it yourself.
+
 ## Behaviour rules template (2.13.1)
 
 `mcp/CLAUDE.template.md` ("Kalmido agent behaviour rules", English with a German note) is the rule block every agent's
@@ -2231,7 +2248,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `list_attachments`, `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`,
 `list_event_calendars`, `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`,
 `list_habits`, `list_jobs`, `list_kids`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`,
-`list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_repos`, `list_schedules`,
+`list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
@@ -2242,7 +2259,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `search_contacts`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
 `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
-`stop_timer`, `submit_proposal`, `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`,
+`stop_timer`, `submit_proposal`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`,
 `unshare_address_book`, `unshare_event_calendar`, `unshare_list`, `unshare_list_from_group`, `update_address_book`,
 `update_client`, `update_comment`, `update_contact`, `update_document`, `update_event`, `update_event_calendar`, `update_field`,
 `update_filter`, `update_form`, `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`,

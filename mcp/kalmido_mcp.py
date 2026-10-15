@@ -1429,6 +1429,19 @@ TOOLS += [
      _obj({"document_id": S_ID, **_DOC}, ["document_id"]),
      lambda api, a: api.call("PATCH", f"/documents/{int(a['document_id'])}", body=_pick(a, tuple(_DOC)))),
 ]
+
+# 2.48.0 (#1356): receipts -- an agent suggests project and category of a document shared with it; a person confirms
+TOOLS += [
+    ("suggest_receipt", "2.48.0: suggest the project (project_id: a project list you can see, in the document's workspace) and / or "
+                        "the category (short text, e.g. Travel, Material, Software) of a receipt or incoming invoice shared with you, "
+                        "note = why. It waits in To review until a person accepts or rejects it; you never set it yourself. "
+                        "A new suggestion replaces your open one.",
+     _obj({"document_id": S_ID, "project_id": S_ID, "category": {"type": "string", "maxLength": 60}, "note": {"type": "string"}}, ["document_id"]),
+     lambda api, a: api.call("POST", f"/documents/{int(a['document_id'])}/receipt-suggestion", body=_pick(a, ("project_id", "category", "note")))),
+    ("list_receipt_suggestions", "2.48.0: your receipt suggestions and what became of them (state open, accepted, rejected or all).",
+     _obj({"state": {"type": "string", "enum": ["open", "accepted", "rejected", "all"]}}),
+     lambda api, a: api.call("GET", "/receipt-suggestions", _pick(a, ("state",)))),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -1461,7 +1474,7 @@ TOOL_SCOPES = {
                  "unshare_address_book", "import_vcards", "export_vcards", "search_contacts", "get_contact", "create_contact", "update_contact",
                  "delete_contact", "bulk_contacts", "link_contact", "unlink_contact", "set_contact_care"),
     "private": ("add_health_entry", "write_journal"),
-    "files:read": ("list_files", "read_file"),  # 2.48.0 (#1207)
+    "files:read": ("list_files", "read_file", "suggest_receipt", "list_receipt_suggestions"),  # 2.48.0 (#1207, #1356)
     "files:write": ("write_file", "create_file_folder"),
 }
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read

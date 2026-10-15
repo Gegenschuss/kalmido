@@ -324,6 +324,12 @@ APP_ONLY = [
     # 2.44.0 (#1517): the setup script trades the one-time code for the token and signs a computer off with its own token
     ("2.44.0 (#1517): one-command agent setup on a computer (setup script, no session); not an agent tool",
      ("=POST /api/agent-setup/redeem", "=POST /api/agent-setup/remove")),
+    ("2.48.0 (#1152): the Paperless-ngx connection of a workspace (self-hosted only): its API token is entered by an admin / the "
+     "person, the import runs in the background; agents read the imported documents through the documents API",
+     ("* /api/paperless",)),
+    ("2.48.0 (#1356): a receipt's project / category is set and agents' suggestions are accepted / rejected / reopened by people "
+     "only; agents suggest with POST /documents/{id}/receipt-suggestion",
+     ("* /api/docs/{}/receipt", "* /api/receipt-suggestions/")),
 ]
 
 

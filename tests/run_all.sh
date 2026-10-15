@@ -760,6 +760,10 @@ fresh; run p248_c_lock_ui node p248_c_lock_ui.js "$KALMIDO_TEST_DATA"
 # 2.48.0 part A: the file store "Ablage" (#1207): rights, organisation boundary, agents, versions, trash, links, backup; the UI
 fresh; run p248_a_api "$PY" p248_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p248_a_ui node p248_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.48.0 part D: #1152 Paperless-ngx connection + import (fake Paperless-ngx in the container), #1356 agents suggest project / category of receipts
+fresh; run p248_d_paperless_api "$PY" p248_d_paperless_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p248_d_receipts_api "$PY" p248_d_receipts_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p248_d_ui node p248_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.48.0 part B: #1111 documents (recognition without a server; API with OCR, mail, agents, the boundary; the area)
        run p248_b_unit "$PY" p248_b_unit_test.py
 fresh; run p248_b_api "$PY" p248_b_api_test.py "$KALMIDO_TEST_DATA"

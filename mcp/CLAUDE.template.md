@@ -315,6 +315,11 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `playbook_proposal`: people applied or discarded your proposed change of a list's Playbook
 - `message_edited`: a person changed a chat message, comment or team message you already had (a correction)
 - `file_shared`: a folder or file of the file store was shared with you (`node`, `role` view | edit)
+- `document_added`: a new document was recognised in a folder / file shared with you (`document`); a receipt? see *assign a receipt* below
+
+Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get_document` (text, sender, amount) ->
+`list_lists` (the projects you can see) -> `suggest_receipt` with project and / or category and a short note why. A person
+accepts or rejects it; you never set it yourself (`list_receipt_suggestions` shows what became of it).
 
 The MCP tools of the Kalmido MCP server (it lists only the ones your token may use; each tool describes itself):
 
@@ -338,7 +343,7 @@ The MCP tools of the Kalmido MCP server (it lists only the ones your token may u
 `list_attachments`, `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`,
 `list_event_calendars`, `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`,
 `list_habits`, `list_jobs`, `list_kids`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`,
-`list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_repos`, `list_schedules`,
+`list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
@@ -349,7 +354,7 @@ The MCP tools of the Kalmido MCP server (it lists only the ones your token may u
 `search_contacts`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
 `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
-`stop_timer`, `submit_proposal`, `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`,
+`stop_timer`, `submit_proposal`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`,
 `unshare_address_book`, `unshare_event_calendar`, `unshare_list`, `unshare_list_from_group`, `update_address_book`,
 `update_client`, `update_comment`, `update_contact`, `update_document`, `update_event`, `update_event_calendar`, `update_field`,
 `update_filter`, `update_form`, `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`,
