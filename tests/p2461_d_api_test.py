@@ -66,8 +66,10 @@ s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True, "modules": ["agents", "comments"]})
+# 2.46.0 (#1592): no organisation from the start any more: create the one these tests use, bob joins it
+assert A.post(B + "/api/admin/orgs", json={"name": "Kalmido"}).ok
 A.patch(B + "/api/settings", json={"lang": "en"})
-r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123", "email": "bob@example.com"})
+r = A.post(B + "/api/users", json={"orgs": [1], "username": "bob", "display_name": "Bob", "password": "password123", "email": "bob@example.com"})
 BOB = r.json()["id"]
 Bo = sess("bob")
 ME = A.get(B + "/api/state").json()["me"]
