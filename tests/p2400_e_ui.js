@@ -103,12 +103,13 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(`(() => { document.getElementById('os-prod-on').click(); document.querySelector('#ofc-set > .fgbar [data-fgb="discard"]')?.click(); return 1; })()`);
     await ev(`(() => { ofcModal('services', {...(ofcRow('services', ${SV}) || {id: ${SV}, name_de: 'Dreh'}), producing: 0, raw_fee: 0}); return 1; })()`);
     await ready(ev, `!!document.querySelector('.modal.ofcdlg #of-name_de')`);
-    check(await ev(`(() => { const p = document.querySelector('.modal.ofcdlg #of-producing'); const q = document.querySelector('.modal.ofcdlg #of-raw_fee'); return !!p && p.closest('.row').hidden && !!q && q.closest('.row').hidden; })()`), '#1379 off: the service dialog hides the unset producing / raw data flags');
+    check(await ev(`(() => { const p = document.querySelector('.modal.ofcdlg #of-producing'); const q = document.querySelector('.modal.ofcdlg #of-raw_fee'); return !!p && !p.closest('.row').hidden && !!q && !q.closest('.row').hidden; })()`), '#1645: the service dialog always shows the producing / raw data flags');  // 2.47.0 (#1645): was hidden while off
     await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
     await ev(`(() => { location.hash = '#office/offers/${offer.id}'; return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.ofdeditor .ofdits')`, 60), 'the quotation editor');
-    check(await ev(`!document.querySelector('#ofd-raw_mode') && !document.querySelector('#ofd-prod_quotient') && !document.querySelector('.ofdautos .ofdauto') && !document.querySelector('.ofdeditor [data-k="producing"]') && !document.querySelector('.ofdeditor [data-k="raw_fee"]')`),
-      '#1379 off: no producing / raw data line, fields or flags in the quotation');
+    // 2.47.0 (#1645): the switches of the quotation and the flags are always shown; off = no automatic line
+    check(await ev(`!!document.querySelector('#ofd-raw_mode') && !!document.querySelector('#ofd-producing_on') && !document.querySelector('#ofd-producing_on').checked && !document.querySelector('#ofd-prod_quotient') && !document.querySelector('.ofdautos .ofdauto') && !!document.querySelector('.ofdeditor [data-k="producing"]') && !!document.querySelector('.ofdeditor [data-k="raw_fee"]')`),
+      '#1645 off: no producing / raw data line, the switches and flags are there');
     await shot('p2400-e-editor-off.png');
 
     // ================= #1377 + #1382 on the settings page

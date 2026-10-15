@@ -43,7 +43,11 @@ organisation need not choose.
   them (services, positions, contracts with raw data included) keeps both on, once, so switching off later stays off.
   Off means: no automatic producing / raw data line in new quotations (raw data "none"), the flags of the catalogue are
   not taken over, the fields, flags and the contract's "raw data included" are hidden, the spreadsheet import ignores
-  those columns; existing and finalised documents keep what they hold. The company data choose the word before the
+  those columns; existing and finalised documents keep what they hold. Since 2.47 both are only the default of a new
+  quotation: every quotation has its own switches (`producing_on` 0/1, raw data via `raw_mode`, "none" = off), always
+  shown; the flags of services and positions are always kept, a framework contract always presets raw data; documents of
+  2.46 and older get `producing_on` once at start-up (1 when a position counts towards producing, else the default), so
+  their sums stay. The company data choose the word before the
   management's names in the footer (`md_label`: Geschäftsführung, Gesellschafter, Inhaber, Inhaberin, Vorstand, Partner;
   German or English by the document's language). Unsaved input of these pages survives a change of the view and live
   updates until it is saved or discarded.
@@ -244,6 +248,16 @@ choosing a framework contract presets raw data, rights and closing unless `apply
 print model as JSON: all texts, labels and amounts already in the document's language and format),
 `POST /api/office/docs/<id>/finalize`, `GET /api/office/docs/<id>/log` and `GET /api/office/log?limit=` (organisation
 admins). The head also carries the period of service (`service_from`, `service_to`, dates; printed as one line).
+
+Purchase and surplus (2.47): a new position of a service takes the purchase (`cost`) of the service's freelancer role
+for its unit (day / hour); a later change of the role's price reaches only new positions; the admin can change it per
+position. Admins get the surplus of every position (`items[].margin` = total minus purchase x quantity) and their sum
+(`items_margin`); members get neither `cost` nor `margin` (the fields are absent), and neither appears in the print model
+or the PDF. A position of unit `percent` (e.g. the artists' social insurance) is its rate in percent of the positions
+marked `extern` on the same sheet; its quantity does not count; an invoice made from the quotation turns it into a plain
+amount. When a quotation becomes "accepted" its purchase is stored for the cash flow (`office_purchases`: one row per
+position with a purchase and per part, amount encrypted at rest, dated at the start of the period of service, else the
+day of acceptance), stored anew when the accepted quotation changes and removed when it leaves that status.
 
 ## Finalising
 
