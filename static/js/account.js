@@ -673,6 +673,7 @@ async function inviteScreen(tok) {
         const r = await fetch('/api/auth/invite/accept', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({token: tok, password: pw})});
         const res = await r.json().catch(() => ({}));
         if (!r.ok) { errEl.textContent = res.error || tr('Error {0}', r.status); return; }
+        if (res.twofa) { await authTwofa(el, logo, res.methods || ['totp']); return; }  // 2.49.0 (#1531): two-factor stays required after a reset
         if (res.enrol) { await authEnrol(el, logo); return; }
         if (res.pending) { $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Thank you!')}</h2><p role="status">${tr('Your account waits for an admin to approve it. You can log in once it is approved.')}</p><button class="btn pri" type="button" data-au="login">${tr('To the login')}</button>`; return; }  // 2.23.0 (#711)
         if ($('#inv-2fa', el).checked) LS.set('after2fa', true);
@@ -721,6 +722,7 @@ async function authScreen(j) {
         ${!setup && (info.oidc || (info.passkey_login && pkSupported())) ? `<div class="aor"><span>${tr('or')}</span></div>` : ''}
         ${!setup && info.oidc ? `<button type="button" class="btn" data-au="oidc">${ic('link', 's')} ${esc(tr('Log in with {0}', info.oidc.label))}</button>` : ''}
         ${!setup && info.passkey_login && pkSupported() ? `<button type="button" class="btn" data-au="passkey">${ic('key', 's')} ${tr('Log in with a passkey')}</button>` : ''}
+        ${!setup && info.forgot ? `<p class="aulink lgforgot"><button type="button" class="linkbtn" data-au="forgot">${tr('Forgot your password?')}</button></p>` : ''}${''/* 2.49.0 (#1531) */}
         ${!setup && info.signup ? `<p class="aulink">${tr('New here?')} <button type="button" class="linkbtn" data-au="signup">${tr('Create account')}</button></p>` : ''}
       </form></div>`;
     const le = (location.hash.match(/login-error=([a-z_]+)/) || [])[1];
@@ -731,6 +733,7 @@ async function authScreen(j) {
       if (b.dataset.au === 'oidc') location.href = '/api/auth/oidc/start?remember=' + (rem ? 1 : 0);
       if (b.dataset.au === 'passkey') authPasskey($('#au-err', el), rem);
       if (b.dataset.au === 'signup') signupScreen(el, logo, info);  // 2.23.0 (#711)
+      if (b.dataset.au === 'forgot') lg_forgotScreen(el, logo, $('#au-user', el).value.trim());  // 2.49.0 (#1531)
       if (b.dataset.au === 'back') { el.remove(); $('#app')?.removeAttribute('inert'); authScreen(j); }
       if (b.dataset.au === 'pwshow') { const i = $('#au-pw', el), on = i.type === 'password'; i.type = on ? 'text' : 'password'; b.setAttribute('aria-pressed', String(on)); i.focus(); }  // 2.13.0 (#453 P7)
     });
@@ -1020,6 +1023,30 @@ document.addEventListener('change', async e => {
   } catch { if (id === 's-signup') e.target.value = S.about?.signup_mode || 'off'; }
 });
 // the form "Create account" on the login page (#711)
+// 2.49.0 (#1531): "Forgot your password?": e-mail address or user name -> a one-time link by mail (the answer is always the same)
+function lg_forgotScreen(el, logo, pre = '') {
+  el.innerHTML = `<div class="card">${logo}
+    <h2 class="invh">${tr('Forgot your password?')}</h2>
+    <p class="muted">${tr('Enter the e-mail address or user name of your account. We send a link to set a new password to the address stored for it.')}</p>
+    <form id="fg-form" autocomplete="on">
+      <label class="aulab" for="fg-login">${tr('E-mail or user name')}</label><input id="fg-login" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="200" required value="${esc(pre)}">
+      <div class="aerr" role="alert" id="fg-err"></div>
+      <button class="btn pri" type="submit">${tr('Send the link')}</button>
+      <button class="linkbtn" type="button" data-au="back">${tr('Back to the login')}</button>
+    </form></div>`;
+  el.querySelector('#fg-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const errEl = $('#fg-err', el), btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/auth/forgot', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({login: $('#fg-login', el).value.trim()})});
+      const res = await r.json().catch(() => ({}));
+      if (!r.ok) { errEl.textContent = res.error || tr('Error {0}', r.status); btn.disabled = false; return; }
+      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Check your inbox')}</h2><p role="status" class="lgsent">${tr('If an account with a stored e-mail address matches, a link to set a new password is on its way.')}</p><p class="muted">${tr('No mail after a few minutes? Look in the spam folder or ask an admin.')}</p><button class="btn" type="button" data-au="back">${tr('Back to the login')}</button>`;
+    } catch { errEl.textContent = tr('Server not reachable.'); btn.disabled = false; }
+  });
+  setTimeout(() => $('#fg-login', el)?.focus(), 50);
+}
 function signupScreen(el, logo, info) {
   const pw = !!info.signup?.password;
   el.innerHTML = `<div class="card">${logo}

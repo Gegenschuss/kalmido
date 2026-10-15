@@ -104,6 +104,8 @@ def invite_mail(c, u, link, kind, inviter):
     elif kind == "reset":
         subject = t(N_("Set a new password for {0}"), APP_NAME)
         head, intro, button = t(N_("Hello {0},"), name), t(N_("{0} sent you a link to set a new password for {1}."), inviter or t(N_("An admin")), APP_NAME), t(N_("Set a new password"))
+        if not inviter:  # 2.49.0 (#1531): asked for on the login page ("Forgot your password?")
+            intro = t(N_("Someone asked for a link to set a new password for {0} – hopefully you. If it was not you, ignore this e-mail: your password stays as it is."), APP_NAME)
     else:
         subject = t(N_("Welcome to {0}, {1}"), APP_NAME, name)
         head = t(N_("Hello {0}, welcome to {1}!"), name, APP_NAME)
@@ -219,11 +221,14 @@ def invite_accept():
     c.commit()
     u = c.execute("SELECT * FROM users WHERE id=?", (u["id"],)).fetchone()
     print("account set up with an invitation link:", u["username"], "from", client_ip(), flush=True)
+    from ..accounts.login import twofa_methods
+    methods = twofa_methods(c, u)
+    if methods:  # 2.49.0 (#1531): a reset link is no way around two-factor sign-in: the second step follows as at the login
+        tok = pend_new("2fa", u["id"], remember=True)
+        return pend_cookie(jsonify(ok=False, twofa=True, methods=methods), tok)
     if gsetting(c, "twofa_required") == "1":
-        from ..accounts.login import twofa_methods
-        if not twofa_methods(c, u):
-            tok = pend_new("enrol", u["id"], remember=True)
-            return pend_cookie(jsonify(ok=False, enrol=True, methods=["totp", "passkey"]), tok)
+        tok = pend_new("enrol", u["id"], remember=True)
+        return pend_cookie(jsonify(ok=False, enrol=True, methods=["totp", "passkey"]), tok)
     return finish_login(c, u, True, "invite")
 
 

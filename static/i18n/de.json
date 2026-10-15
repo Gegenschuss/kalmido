@@ -6984,5 +6984,14 @@
   "Sky blue": "Himmelblau",
   "Brown": "Braun",
   "Show colours for people": "Farben für Personen anzeigen",
-  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Jede Person und jeder Agent hat eine feste Farbe: der Kreis hinter den Initialen, ein dünner Ring um ein Foto. Aus: nur Agenten sind farbig."
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Jede Person und jeder Agent hat eine feste Farbe: der Kreis hinter den Initialen, ein dünner Ring um ein Foto. Aus: nur Agenten sind farbig.",
+  "Please enter your e-mail address or user name": "Bitte gib deine E-Mail-Adresse oder deinen Benutzernamen ein",
+  "Someone asked for a link to set a new password for {0} – hopefully you. If it was not you, ignore this e-mail: your password stays as it is.": "Jemand hat einen Link angefordert, um ein neues Passwort für {0} festzulegen – hoffentlich du. Warst du es nicht, ignoriere diese E-Mail: Dein Passwort bleibt, wie es ist.",
+  "Forgot your password?": "Passwort vergessen?",
+  "Enter the e-mail address or user name of your account. We send a link to set a new password to the address stored for it.": "Gib die E-Mail-Adresse oder den Benutzernamen deines Kontos ein. Wir schicken einen Link für ein neues Passwort an die dort hinterlegte Adresse.",
+  "E-mail or user name": "E-Mail oder Benutzername",
+  "Send the link": "Link schicken",
+  "Check your inbox": "Schau in dein Postfach",
+  "If an account with a stored e-mail address matches, a link to set a new password is on its way.": "Wenn ein Konto mit hinterlegter E-Mail-Adresse passt, ist ein Link für ein neues Passwort unterwegs.",
+  "No mail after a few minutes? Look in the spam folder or ask an admin.": "Nach ein paar Minuten keine Mail? Schau im Spam-Ordner nach oder frag einen Admin."
 }

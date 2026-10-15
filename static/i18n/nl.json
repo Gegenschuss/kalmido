@@ -6984,5 +6984,14 @@
   "Sky blue": "Hemelsblauw",
   "Brown": "Bruin",
   "Show colours for people": "Kleuren voor personen tonen",
-  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Elke persoon en elke agent heeft een vaste kleur: de cirkel achter de initialen, een dunne ring om een foto. Uit: alleen agenten zijn gekleurd."
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Elke persoon en elke agent heeft een vaste kleur: de cirkel achter de initialen, een dunne ring om een foto. Uit: alleen agenten zijn gekleurd.",
+  "Please enter your e-mail address or user name": "Vul je e-mailadres of gebruikersnaam in",
+  "Someone asked for a link to set a new password for {0} – hopefully you. If it was not you, ignore this e-mail: your password stays as it is.": "Iemand heeft een link aangevraagd om een nieuw wachtwoord voor {0} in te stellen – hopelijk jij. Was jij het niet, negeer dan deze e-mail: je wachtwoord blijft zoals het is.",
+  "Forgot your password?": "Wachtwoord vergeten?",
+  "Enter the e-mail address or user name of your account. We send a link to set a new password to the address stored for it.": "Vul het e-mailadres of de gebruikersnaam van je account in. We sturen een link voor een nieuw wachtwoord naar het opgeslagen adres.",
+  "E-mail or user name": "E-mail of gebruikersnaam",
+  "Send the link": "Link sturen",
+  "Check your inbox": "Kijk in je inbox",
+  "If an account with a stored e-mail address matches, a link to set a new password is on its way.": "Als er een account met een opgeslagen e-mailadres overeenkomt, is er een link voor een nieuw wachtwoord onderweg.",
+  "No mail after a few minutes? Look in the spam folder or ask an admin.": "Na een paar minuten geen mail? Kijk in de spammap of vraag het een beheerder."
 }

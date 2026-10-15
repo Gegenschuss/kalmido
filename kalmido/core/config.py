@@ -319,6 +319,7 @@ OPEN_PATHS = {"/", "/sw.js", "/manifest.json", "/robots.txt", "/api/health", "/d
               "/api/auth/passkey/options", "/api/auth/passkey", "/api/auth/oidc/start", "/api/auth/oidc/callback",
               "/api/auth/invite/check", "/api/auth/invite/accept",  # 2.22.0 (#697): the "Set up your account" page
               "/api/auth/signup", "/api/auth/link",  # 2.23.0 (#711 / #444): self-registration, a sign-in link (QR)
+              "/api/auth/forgot",  # 2.49.0 (#1531): "Forgot your password?"
               "/api/agent-setup/redeem", "/api/agent-setup/remove", "/agent-setup.sh", "/agent-setup.ps1"}  # 2.44.0 (#1517): the setup code / the token is the credential
 PROXY_IGNORE = {"/drop", "/drop/drop", "/manifest.json", "/sw.js", "/robots.txt", "/api/health"}
 ICAL_PREFIX = "/ical/"  # calendar feed: the secret token in the path is the only credential (never the proxy header)

@@ -47,7 +47,13 @@ def auth_info():
                    login_errors={k: tr(v) for k, v in OIDC_ERRORS.items()} if oidc_cfg(c)["on"] else {},
                    org=_org_label(c),  # 2.22.0 (#752): the instance's organisation (only when there is exactly one)
                    signup=_signup_info(c),  # 2.23.0 (#711): registration on the login page (None = off)
-                   setup_code=setup and _setup_code_required(c))  # 2.45.0 (#1515): the setup page asks for the code from the log
+                   setup_code=setup and _setup_code_required(c),  # 2.45.0 (#1515): the setup page asks for the code from the log
+                   forgot=not setup and _forgot_on())  # 2.49.0 (#1531): the link "Forgot your password?"
+
+
+def _forgot_on():
+    from ..accounts.pwreset import pw_forgot_on
+    return pw_forgot_on()
 
 
 def _setup_code_required(c):

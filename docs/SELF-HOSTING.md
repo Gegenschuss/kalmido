@@ -585,6 +585,13 @@ Trigger every alert once on purpose after setting it up, the dead man's switch t
   then Kalmido cannot tell whose task it is.
 - **Sender domain:** for the daily summary over SMTP, set up SPF, DKIM and DMARC for the sender domain, or the mails land
   in spam.
+- **Forgot your password? (2.49):** the login page shows the link only when outgoing mail (SMTP) is set up. A person
+  enters their e-mail address or user name and gets the same one-time link an admin can send (*Settings > Users >
+  Send a link to set a new password*): valid for 7 days, used once, only its hash is stored, built from `PUBLIC_URL`
+  (never from the request's host). The page answers the same whether the account exists or not, at most one link per
+  account in five minutes, rate limited per address and sender. Kid accounts, agents, disabled accounts and accounts
+  without a password (single sign-on only) get no link: their parents or an admin reset them. Two-factor sign-in stays
+  required: after the new password the second step follows, and all other sessions of the account end.
 
 ## Moving to a new server
 

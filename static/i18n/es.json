@@ -6984,5 +6984,14 @@
   "Sky blue": "Azul cielo",
   "Brown": "Marrón",
   "Show colours for people": "Mostrar colores para personas",
-  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Cada persona y cada agente tiene un color fijo: el círculo detrás de las iniciales, un anillo fino alrededor de una foto. Desactivado: solo los agentes tienen color."
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Cada persona y cada agente tiene un color fijo: el círculo detrás de las iniciales, un anillo fino alrededor de una foto. Desactivado: solo los agentes tienen color.",
+  "Please enter your e-mail address or user name": "Introduce tu dirección de correo o tu nombre de usuario",
+  "Someone asked for a link to set a new password for {0} – hopefully you. If it was not you, ignore this e-mail: your password stays as it is.": "Alguien ha pedido un enlace para establecer una nueva contraseña en {0}, esperamos que tú. Si no fuiste tú, ignora este correo: tu contraseña no cambia.",
+  "Forgot your password?": "¿Has olvidado la contraseña?",
+  "Enter the e-mail address or user name of your account. We send a link to set a new password to the address stored for it.": "Introduce la dirección de correo o el nombre de usuario de tu cuenta. Enviamos un enlace para una nueva contraseña a la dirección guardada en ella.",
+  "E-mail or user name": "Correo o nombre de usuario",
+  "Send the link": "Enviar el enlace",
+  "Check your inbox": "Mira tu bandeja de entrada",
+  "If an account with a stored e-mail address matches, a link to set a new password is on its way.": "Si coincide una cuenta con dirección de correo guardada, va en camino un enlace para una nueva contraseña.",
+  "No mail after a few minutes? Look in the spam folder or ask an admin.": "¿Ningún correo tras unos minutos? Mira en la carpeta de spam o pregunta a un administrador."
 }

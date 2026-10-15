@@ -174,6 +174,7 @@ The most used helpers:
 | `integrations/mail.py` | Tasks by e-mail (IMAP) and the daily summary by e-mail (SMTP). |
 | `accounts/orgs.py` | Organisations (#752): people in 1..n organisations and whom a person may see (all / own organisation / own contacts). |
 | `accounts/invite.py` | Invitations and reset links (#697): a one-time link by e-mail with which a person sets their own password. |
+| `accounts/pwreset.py` | 2.49.0 (#1531): *Forgot your password?* on the login page: the reset link of `invite.py` by e-mail, the same answer for every address, rate limited. |
 | `family/family.py` | The module "Family": family fields of tasks, kid stars, occasions, shopping, packing lists, setup purpose, overview. |
 | `family/web.py` | Family: the web API. |
 | `family/carddav.py` | Family: birthdays and anniversaries from CardDAV contacts. |
