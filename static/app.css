@@ -6500,6 +6500,153 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .authscreen .shint.shcode{margin:.25rem 0 .75rem}
 .shint.warn.shkey{color:var(--text);background:var(--bg3);border-left:.1875rem solid var(--danger);border-radius:var(--radius);padding:.625rem .75rem;margin:0 0 .75rem}
 .shint.warn.shkey b{color:var(--danger);display:block;margin-bottom:.125rem}
+
+/* 2.46.1 C (#1554): several contacts at once - the selection bar (looks like the tasks' #mbar), a tick per row */
+#ct-sbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.25rem + var(--tabs-h) + var(--safe-b));z-index:44;background:var(--bg3);border:1px solid var(--line2);border-radius:var(--r-l);padding:.375rem .5rem;display:flex;align-items:center;gap:2px;box-shadow:0 .75rem 1.875rem rgba(0,0,0,.45);max-width:calc(100vw - 1.25rem);overflow-x:auto;scrollbar-width:none}
+#ct-sbar .mcount{font:var(--fs-s) var(--mono);padding:0 .5rem;white-space:nowrap;color:var(--accent)}
+#ct-sbar .mbb{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:.125rem;min-width:2.75rem;min-height:2.75rem;padding:.125rem .375rem;border:0;border-radius:var(--radius);background:none;color:var(--text2);font:inherit;font-size:var(--fs-xs);line-height:1.1;cursor:pointer;flex:none}
+#ct-sbar .mbb:hover:not(:disabled){background:var(--bg4);color:var(--text)}
+#ct-sbar .mbb:disabled{opacity:.45;cursor:default}
+#ct-sbar .mbb.danger{color:var(--danger)}
+#ct-sbar .mbb .mbl{white-space:nowrap}
+#ct-sbar .mbx{flex:none}
+@media (max-width:899px){ #ct-sbar{left:.625rem;right:.625rem;transform:none;justify-content:space-between;gap:0;padding:.25rem .375rem} #ct-sbar .mcount{padding:0 .25rem;font-size:var(--fs-xs)} #ct-sbar .mbb{flex:1 1 0;min-width:3.25rem} }
+.ctpicking .ctlistw{padding-bottom:5rem}
+.ctrow .ctchk{width:1.25rem;height:1.25rem;border:1.5px solid var(--line2);border-radius:.375rem;display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--bg)}
+.ctrow .ctchk.on{background:var(--accent);border-color:var(--accent)}
+.ctrow.picked{background:var(--bg3)}
+.ctrow.ctro{opacity:.5}
+.ctpicking .ctrow{-webkit-touch-callout:none;user-select:none}
+.ctrow{-webkit-touch-callout:none}
+
+/* 2.46.1 C (#1557): legacy import - a switch per area in the preview, undo per area in the import runs */
+.oimarea{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.75rem 0 .25rem}
+.oimarea h4{margin:0;display:flex;align-items:baseline;gap:.375rem}
+.oimarea h4 .muted{font-weight:400;font-size:var(--fs-s)}
+.oimarea.off h4{color:var(--text2)}
+.oimrun{flex-wrap:wrap}
+.oimrunareas{flex-basis:100%;display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
+/* 2.46.1 A (#1607 #1643) the folder row reads like a list row: the arrow before the folder icon, the number right after the
+   name, the share icon at the right in the lists' share column (the "…" takes that place on hover, the row does not move),
+   the height of a list row and no extra room between folders (open or folded); the lists inside start under the folder icon */
+#side .fhead,#side .fhead.fsub{position:relative;padding:0 .5rem}
+#side .fhead:not(.fsub),#side .fhead.fsub{margin:0}  /* #1643: no extra room before a folder (also when only folders follow) */
+#side .fhead .fcar{order:0;width:.875rem;height:.875rem;margin:0 -.125rem 0 -.25rem;flex:none}
+#side .fhead .c{order:0;margin-right:auto}
+#side .fhead .fshr{margin-left:0;gap:.125rem;align-items:center;transition:opacity .12s}
+#side .fhead .fmenu{order:0;position:absolute;right:.3125rem;top:50%;transform:translateY(-50%)}
+#side .fhead .fmenu:focus-visible{opacity:1}
+#side .fbody{margin-left:2rem}
+@media (min-width:900px) and (hover:hover){ #side .fhead:is(:hover,:focus-within) .fshr{opacity:0} }
+/* phone / touch: the "…" stays visible at the end, the share icon sits right before it */
+@media (max-width:899px),(hover:none){ #side .fhead .fmenu{position:static;transform:none;margin-right:-.25rem} }
+/* 2.46.1 A (#1635) sections: dropped past the last one = at the end (a line below it / right of the last column); the dragged
+   section folds (only its header stays) */
+#view .group.dropafter{box-shadow:inset 0 -2px 0 var(--accent)}
+.kcol.dropafter{box-shadow:inset -.1875rem 0 0 var(--accent)}
+#view .group.sb-secfold>:not(.ghead){display:none}
+.sb-secghost{display:flex;align-items:center}
+/* 2.46.1 B (#1591, #1602) "Switch on all modules" / "Create a sample project" under "What do you use Kalmido for?" */
+.pmsw{display:flex;gap:.75rem;align-items:flex-start;margin:.75rem 0 .25rem;cursor:pointer;color:var(--text);font-size:var(--fs-b);min-height:2.75rem}
+.pmsw>span:last-child{display:flex;flex-direction:column;gap:.125rem;min-width:0}
+.pmsw b{font-weight:600}
+.pmsw small{font-size:var(--fs-s);line-height:1.4}
+/* 2.46.1 B (#1641) Administration > Encryption: "Encrypted" / "Not encrypted" */
+.pmcsw{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:.75rem;margin:.75rem 0}
+.pmcs{background:var(--bg3);border-radius:var(--radius);padding:.625rem .75rem;font-size:var(--fs-s);color:var(--text)}
+.pmcs b{display:block;margin-bottom:.25rem;font-weight:600}
+.pmcs.off b{color:var(--text2)}
+.pmcs ul{margin:0;padding-left:1.125rem}
+.pmcs li{line-height:1.5}
+/* 2.46.1 E (#1622) inline title edit: the field is a block on the circle's line (no inline baseline / strut offset), the frame
+   ends before the columns, row-mode rows centre it instead of baseline-aligning to the meta */
+.trow.iedit .ttl{display:block;line-height:1.45;min-height:calc(var(--row-fs) * 1.45)}
+.trow.iedit .ttlin{display:block;height:calc(var(--row-fs) * 1.45);line-height:inherit;margin:0;vertical-align:top}
+@media (min-width:600px){
+  .trow.hascols.iedit:not(.haslc) .tmain{align-items:center}
+  .trow.hascols.iedit .ttl{flex:1 1 auto;min-width:0}
+  .trow.hascols.iedit .meta{flex:0 1 auto}
+}
+@media (min-width:900px){
+  .trow.hascols.iedit .ttl{flex:1 1 0;min-width:0}
+  .trow.hascols.iedit .meta{flex:0 1 auto}
+}
+
+/* 2.46.1 E (#1637) Office: three tab levels, calmer and flush left -- area tabs as pills, the module's tabs underlined,
+   the document kinds as small segment switches; search field and filter share one height; no heading above the tabs */
+.mgtabs{background:none;border:0;padding:0;gap:.25rem}
+.mgtabs button{flex:none;border-radius:9rem;padding:.25rem .875rem}
+.seg.ofctabs{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;width:100%;background:none;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0;gap:.25rem;margin-bottom:.75rem}
+.seg.ofctabs::-webkit-scrollbar{display:none}
+.seg.ofctabs button{flex:none;white-space:nowrap;border-radius:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:.375rem .75rem}
+.seg.ofctabs button.on{background:none;border-bottom-color:var(--accent);color:var(--text)}
+.ofdkinds{font-size:var(--fs-s);margin-bottom:.5rem}
+.ofdkinds button{padding:.1875rem .5rem;min-height:1.75rem}
+.ofdbar .ctsearch,.ofdbar select,.ofdbar .btn{min-height:2.25rem;box-sizing:border-box}
+.office .ofchead{margin-bottom:.375rem}.office .ofchead:empty{display:none}
+
+/* 2.46.1 E (#1558) phones: sheets and dialogs fold up from the bottom (220 ms) and fold away (180 ms) while the dimming layer
+   fades; only transform-like `translate` and opacity. sheetmotion.js keeps the leaving node (class an-out) for the exit.
+   "Reduce motion" is the central rule above (durations ~0); sheetmotion.js then does not wait at all. */
+@keyframes an_up{from{translate:0 100%}to{translate:0 0}}
+@keyframes an_down{from{translate:0 0}to{translate:0 100%}}
+@keyframes an_fadein{from{opacity:0}to{opacity:1}}
+@keyframes an_fadeout{from{opacity:1}to{opacity:0}}
+@media (max-width:899px){
+  #pop.sheet:not(.hidden),.dpop.sheet,.modal:not(.smodal):not(.authscreen):not(.shopmode):not(.palette)>.card{animation:an_up .22s cubic-bezier(.2,.8,.2,1)}
+  .modal:not(.smodal):not(.authscreen):not(.shopmode):not(.palette){animation:an_fadein .2s ease-out}
+  #pop.sheet.an-out,.dpop.sheet.an-out,.modal.an-out:not(.smodal):not(.authscreen):not(.shopmode):not(.palette)>.card{animation:an_down .18s ease-in forwards}
+  .modal.an-out:not(.smodal):not(.authscreen):not(.shopmode):not(.palette){animation:an_fadeout .18s ease-in forwards}
+  #pop.hidden.an-out{display:block!important}
+  #scrim:not(.hidden){animation:an_fadein .2s ease-out}
+  #scrim.hidden.an-out{display:block!important;animation:an_fadeout .18s ease-in forwards}
+  .an-out{pointer-events:none}
+}
+@media (max-width:899px),(min-width:900px) and (pointer:coarse){
+  .qadd.sheet{animation:an_up .22s cubic-bezier(.2,.8,.2,1)}
+  .qadd.sheet.an-out{animation:an_down .18s ease-in forwards;pointer-events:none}
+}
+
+/* 2.46.1 E (#1559) phones: nothing jumps on and off. Rows that leave fade out and slide a little (class an-rowout, set by
+   sheetmotion.js, the redraw waits ~180 ms), new / opened rows fade in (an-rowin); the dimming layer, the + button and the
+   selection bar fade / slide in and out (an-out keeps a switched-off layer for its exit); hint texts fade in. opacity + transform only. */
+@keyframes an_rowin{from{opacity:0;transform:translateY(-.375rem)}to{opacity:1;transform:none}}
+@keyframes an_pop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+@keyframes an_popout{from{opacity:1;transform:none}to{opacity:0;transform:scale(.8)}}
+@keyframes an_hint{from{opacity:0}to{opacity:1}}
+.trow.an-rowout{opacity:0;transform:translateX(.75rem);transition:opacity .18s ease-in,transform .18s ease-in;pointer-events:none}
+.trow.an-rowin{animation:an_rowin .2s ease-out}
+@media (max-width:899px){
+  #fab:not(.gone){animation:an_pop .2s ease-out}
+  #fab.gone.an-out{display:grid!important;animation:an_popout .18s ease-in forwards;pointer-events:none}
+  #mbar:not(.hidden){animation:an_up .22s cubic-bezier(.2,.8,.2,1)}
+  #mbar.hidden.an-out{display:flex!important;animation:an_down .18s ease-in forwards;pointer-events:none}
+}
+.calerr:not([hidden]),.fsprev:not([hidden]),.ferr:not(:empty){animation:an_hint .2s ease-out}
+
+/* 2.46.1 E (#1560) phones: view changes are not a hard swap. A new route fades the view in (an-v1 / an-v2 alternate so the
+   animation restarts), the calendar glides its page in from the side it comes from (an-cn / an-cp, Today and the mode switch
+   fade: an-cs), the tab bar's underline slides in, an empty-state hint fades in, the full-screen search drops in. opacity + transform only. */
+@keyframes an_view1{from{opacity:0}to{opacity:1}}  /* opacity only: a transform on #view would re-anchor the fixed dock inside it */
+@keyframes an_view2{from{opacity:0}to{opacity:1}}
+@keyframes an_next1{from{opacity:0;transform:translateX(1.5rem)}to{opacity:1;transform:none}}
+@keyframes an_next2{from{opacity:0;transform:translateX(1.5rem)}to{opacity:1;transform:none}}
+@keyframes an_prev1{from{opacity:0;transform:translateX(-1.5rem)}to{opacity:1;transform:none}}
+@keyframes an_prev2{from{opacity:0;transform:translateX(-1.5rem)}to{opacity:1;transform:none}}
+@keyframes an_fade1{from{opacity:0}to{opacity:1}}
+@keyframes an_fade2{from{opacity:0}to{opacity:1}}
+@keyframes an_line{from{opacity:0;transform:scaleX(.2)}to{opacity:1;transform:none}}
+@keyframes an_drop{from{opacity:0;transform:translateY(-.5rem)}to{opacity:1;transform:none}}
+.an-v1{animation:an_view1 .18s ease-out}.an-v2{animation:an_view2 .18s ease-out}
+#view.an-cn1>.calbar~*{animation:an_next1 .2s ease-out}#view.an-cn2>.calbar~*{animation:an_next2 .2s ease-out}
+#view.an-cp1>.calbar~*{animation:an_prev1 .2s ease-out}#view.an-cp2>.calbar~*{animation:an_prev2 .2s ease-out}
+#view.an-cs1>.calbar~*{animation:an_fade1 .18s ease-out}#view.an-cs2>.calbar~*{animation:an_fade2 .18s ease-out}
+#tabs button.an-tabin::before{animation:an_line .2s ease-out}
+.an-hintin{animation:an_hint .25s ease-out}
+@media (max-width:899px){
+  .modal.palette{animation:an_fadein .18s ease-out}
+  .modal.palette>.card{animation:an_drop .2s ease-out}
+}
 /* 2.46.0 C (#1606 / #1605): the question before a folder role replaces roles set per list (three buttons, wrap on a phone);
    a group's picture in the chip of a task assigned to it */
 .modal.fgrqdlg{z-index:75}
