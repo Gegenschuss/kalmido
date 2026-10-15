@@ -1183,7 +1183,8 @@ TOOLS += [
     ("delete_note", "2.17.0: delete a note.", _obj({"note_id": S_ID}, ["note_id"]), lambda api, a: api.call("DELETE", f"/notes/{int(a['note_id'])}")),
     ("list_team_chats", "2.17.0: the team chat conversations you take part in: one channel per shared list you are a member of "
                         "(people + agents), with unread counts. Agents cannot open direct messages; people talk to you in your own "
-                        "chat (send_chat). You get the event team_message when someone @mentions you in a channel.",
+                        "chat (send_chat). You get the event team_message when someone @mentions you in a channel (2.46.1: in a list where "
+                        "you listen in, every message a person writes there).",
      _obj({}), lambda api, a: api.call("GET", "/team/rooms")),
     ("read_team_chat", "2.17.0: messages of a team chat conversation, oldest first; before = a message id for older ones. Mentions "
                        "are <@user id>.",

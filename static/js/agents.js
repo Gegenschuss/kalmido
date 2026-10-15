@@ -371,15 +371,17 @@ function tidyRowHtml(l) {
 // wake reach it); a switch in every list. Tidying is its own setting above.
 const listenOn = l => listAgents(l).some(a => (l.listen_agent_ids || []).includes(a.id));
 const listenLabel = l => listenOn(l) ? tr('Agent listens in') : tr('Agent only via @');
+// 2.46.1 (#1639): listening includes the list's team chat channel (when the team chat is on)
+const lc_teamHint = () => teamOn() ? ' ' + tr("This includes the messages people write in the list's team chat.") : '';
 function listenRowHtml(l, ags, may) {
   const on = new Set(l.listen_agent_ids || []);
   const dflt = l.listen_default ? tr('Default for software projects: on.') : tr('Default for this kind of list: off, the agent reacts only to an @mention, an assignment or a wake.');
   // 2.27.0 (#964): one agent per list: a plain switch like the two above (lists from before 2.26 with several agents keep the boxes)
   if (ags.length === 1) return `<div class="lsnrow lsn1"><label class="chkl swl agacc lsnag"><span class="swc"><input type="checkbox" role="switch" data-lsn="${ags[0].id}" ${on.has(ags[0].id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${tr('Agent listens in')}</span></label></div>
-    <div class="shint aghint">${tr('{0} gets every new or moved task and every comment people write in this list, without an @mention (only tasks it can see).', esc(ags[0].name))} ${esc(dflt)}</div>`;
+    <div class="shint aghint">${tr('{0} gets every new or moved task and every comment people write in this list, without an @mention (only tasks it can see).', esc(ags[0].name))}${lc_teamHint()} ${esc(dflt)}</div>`;
   return `<div class="row lsnrow" role="group" aria-labelledby="l-lsn-h"><span class="lbl" id="l-lsn-h">${tr('Agent listens in')}</span><div class="lsnags">${ags.map(a =>
     `<label class="lsnag"><input type="checkbox" data-lsn="${a.id}" ${on.has(a.id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span>${esc(a.name)}</span></label>`).join('')}</div></div>
-    <div class="shint lhint">${tr('The checked agents get every new or moved task and every comment people write in this list, without an @mention (only tasks they can see).')} ${esc(dflt)}</div>`;
+    <div class="shint lhint">${tr('The checked agents get every new or moved task and every comment people write in this list, without an @mention (only tasks they can see).')}${lc_teamHint()} ${esc(dflt)}</div>`;
 }
 function tidyWire(md, lid) {
   md.addEventListener('change', async e => {

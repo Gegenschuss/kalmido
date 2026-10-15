@@ -245,7 +245,10 @@ document.addEventListener('click', e => {
 async function listChat(lid) {
   if (!teamOn()) return;
   if (S.tc.rooms === null) await loadTeam();
-  const r = (S.tc.rooms || []).find(x => x.kind === 'list' && x.list_id === lid);
+  const find = () => (S.tc.rooms || []).find(x => x.kind === 'list' && x.list_id === lid);
+  // 2.46.1 (#1639): a list shared (with a person or an agent that listens in) since the rooms were loaded: load them again
+  let r = find();
+  if (!r) { await loadTeam(); r = find(); }
   if (r) go('team/' + r.id); else toast(tr('Share the list with someone to chat about it.'));
 }
 
