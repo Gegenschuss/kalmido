@@ -61,8 +61,9 @@ const firefox = require('./ff')({tag: 'p221_ui', check, shots: 'P221_SHOTS'});  
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   w.eval(`settingsModal('activity')`);
   const box = await until(() => d.querySelector('#s-aud .audr:not(.audh)') && d.querySelector('#s-aud'));
-  check(box && !d.querySelector('#aisp-log').hidden && d.querySelector('[data-aisub="log"]')?.getAttribute('aria-selected') === 'true', 'Settings > AI colleague: the sub-tab Log (2.5.1)');
-  check(d.querySelector('.spane:not(.hidden)')?.dataset.pane === 'ai', 'focus activity opens AI colleague');
+  // 2.46.6 (#1710): the log moved to Settings > Administration > Agents
+  check(box && !d.querySelector('#admp-agents').hidden && d.querySelector('[data-admsub="agents"]')?.getAttribute('aria-selected') === 'true', 'Settings > Administration: the sub-tab Agents with the log');
+  check(d.querySelector('.spane:not(.hidden)')?.dataset.pane === 'users', 'focus activity opens Administration');
   let rs = [...d.querySelectorAll('#s-aud .audr:not(.audh)')];
   check(rs.length === 20, 'first page: 20 rows (2.5.1): ' + rs.length);
   const top = rs[0];
@@ -109,13 +110,13 @@ const firefox = require('./ff')({tag: 'p221_ui', check, shots: 'P221_SHOTS'});  
   // ================= member: nothing; German
   w = await boot({user: 'bob', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('activity')`); await sleep(1200);
-  check(!d.querySelector('#s-aud') && !d.querySelector('[data-aisub="log"]'), 'member: no activity log');
+  check(!d.querySelector('#s-aud') && !d.querySelector('[data-aisub="log"]') && !d.querySelector('[data-admsub]'), 'member: no activity log');  // 2.46.6 (#1710): + no Administration
   w.close();
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'today', mobile: true}); d = w.document;
   w.eval(`settingsModal('activity')`);
   await until(() => d.querySelector('#s-aud .audr:not(.audh)'));
-  check(/Aktivitätsprotokoll/.test(d.querySelector('#s-aud')?.getAttribute('aria-label') || '') && /Protokoll/.test(d.querySelector('[data-aisub="log"]')?.textContent || '') && /Wird 90 Tage aufbewahrt/.test(d.querySelector('#aud-keep')?.textContent || '')
+  check(/Aktivitätsprotokoll/.test(d.querySelector('#s-aud')?.getAttribute('aria-label') || '') && /Agenten/.test(d.querySelector('[data-admsub="agents"]')?.textContent || '') && /Protokoll/.test(d.querySelector('#s-adlog-h')?.textContent || '') && /Wird 90 Tage aufbewahrt/.test(d.querySelector('#aud-keep')?.textContent || '')
     && [...d.querySelectorAll('#aud-st option')].some(o => o.textContent === 'Abgelehnt (401 / 403 / 429)'), 'German texts');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
@@ -165,8 +166,9 @@ const firefox = require('./ff')({tag: 'p221_ui', check, shots: 'P221_SHOTS'});  
       for (let i = 0; i < 40 && !n; i++) { n = await ev(`document.querySelectorAll('#s-aud .audr:not(.audh)').length`); if (!n) await sleep(250); }
       check(n > 0, `${W}px: rows`);
       await sleep(600);
-      const top0 = await ev(`Math.round(document.querySelector('#aisp-log').getBoundingClientRect().top - document.querySelector('.spanes').getBoundingClientRect().top)`);
-      check(top0 >= 0 && top0 <= 120, `${W}px: opened on the sub-tab Log, right below the sub-tabs (${top0})`);
+      // 2.46.6 (#1710): Administration > Agents, scrolled to the log heading
+      const top0 = await ev(`Math.round(document.querySelector('#s-adlog-h').getBoundingClientRect().top - document.querySelector('.spanes').getBoundingClientRect().top)`);
+      check(top0 >= -2 && top0 <= 120, `${W}px: opened on the log, at the top (${top0})`);
       const m = await ev(`(() => {
         const t = document.querySelector('#s-aud'), r = t.getBoundingClientRect(), row = t.querySelector('.audr.den') || t.querySelector('.audr:not(.audh)');
         const rt = row.querySelector('.audrt').getBoundingClientRect(), tm = row.querySelector('.audt').getBoundingClientRect(), hd = t.querySelector('.audh');

@@ -125,7 +125,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   click(w, it[0]); await sleep(600);
   check(w.eval('S.route.mod') === 'agents', 'opening it shows the Agents view');
   w.eval(`settingsModal('notify')`); await sleep(700);
-  check(d.querySelector('[data-nm="usage"][data-ch="push"]')?.checked && d.querySelector('[data-nm="usage"][data-ch="news"]')?.checked, 'admin: the notification row "usage"');
+  // 2.46.6 (#1710): the admins' row sits under Settings > Administration > Agents, not among the own notifications
+  check(d.querySelector('#admp-agents [data-nm="usage"][data-ch="push"]')?.checked && d.querySelector('#admp-agents [data-nm="usage"][data-ch="news"]')?.checked && !d.querySelector('#sp-notify [data-nm="usage"]'), 'admin: the notification row "usage"');
   w.close();
   w = await boot({user: 'bob', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('notify')`); await sleep(700);

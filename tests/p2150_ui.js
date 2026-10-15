@@ -89,8 +89,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
 
   // ================= Settings > Agents > Set up: the admin's limit, the admin's agent dialog
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(500);
-  await w.eval(`aiSubShow(document.querySelector('.smodal'), 'admin', false)  /* 2.29.0 (#1024): the limit sits under Administration */`);
+  w.eval(`settingsModal('agentpolicy')`); await sleep(500);  // 2.46.6 (#1710): the limit sits under Settings > Administration > Agents
   await until(() => d.querySelector('#s-sclim .sclim'));
   const lim = [...d.querySelectorAll('#s-sclim .sclim')];
   check(lim.length === 2 && !lim[0].querySelector('[data-scope="account"]') && lim[1].querySelector('[data-scope="account"]'), 'limit: agents (no account) + personal tokens');
@@ -240,8 +239,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
     await ev(`(() => { [...document.querySelectorAll('.modal')].pop().querySelector('[data-m="close"]').click(); document.querySelector('.smodal [data-m="close"], .smodal .mclose')?.click(); return 1; })()`); await sleep(300);
     // the admin's limit grids
     await nav(B + '#today'); await ready(ev);
-    await ev(`(() => { settingsModal('ai'); return 1; })()`); await sleep(600);
-    await ev(`(() => { aiSubShow(document.querySelector('.smodal'), 'admin', false); return 1; })()`);
+    await ev(`(() => { settingsModal('agentpolicy'); return 1; })()`); await sleep(600);  // 2.46.6 (#1710): Administration > Agents
     for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('#s-sclim .sclim')`)); i++) await sleep(300);
     const lm = await ev(`(() => { const rows = [...document.querySelectorAll('#s-sclim .chkl')].map(x => x.getBoundingClientRect()); return {n: rows.length, over: document.documentElement.scrollWidth - innerWidth, out: rows.filter(x => x.right > innerWidth + 1).length, minH: Math.round(Math.min(...rows.map(x => x.height)))}; })()`);
     check(lm.n === 24 &&  // 2.41.0 (#1476): the agents grid no longer offers "private" (25 -> 24)

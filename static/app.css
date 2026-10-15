@@ -6706,3 +6706,8 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 /* 2.46.4 C (#1755) the message with a button is one line: the text is cut with an ellipsis, the button stays whole */
 #toast.one>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #toast.one button,#toast.one kbd{flex:none}
+/* 2.46.6 C (#1710) an admin switch next to the own setting: small mark "Admin · applies to everyone" + jump to Administration */
+.modrow .ad-mark{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:.25rem .5rem;flex-basis:100%;font-size:var(--fs-xs)}
+.ad-tag{padding:.0625rem .4375rem;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:999px;color:var(--accent);white-space:nowrap}
+.ad-mark .ad-open{font-size:var(--fs-xs)}
+@media (pointer:coarse){ .ad-mark .ad-open{min-height:2.75rem;padding:0 .5rem} }

@@ -40,8 +40,7 @@ const FEAT = 'comments,collab,agents';
   // ================= #1476: calendar / contacts / private have names in the limit grid and the token overview
   await call('POST', '/api/me/tokens', {name: 'Cal script', scopes: ['read', 'calendar', 'contacts']});
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(500);
-  await w.eval(`aiSubShow(document.querySelector('.smodal'), 'admin', false)`);
+  w.eval(`settingsModal('agentpolicy')`); await sleep(500);  // 2.46.6 (#1710): the limit sits under Settings > Administration > Agents
   await until(() => d.querySelector('#s-sclim .sclim'));
   const lim = [...d.querySelectorAll('#s-sclim .sclim')];
   const raw = lim.flatMap(f => [...f.querySelectorAll('.chkl span')]).filter(s => /^[a-z:-]+$/.test(s.textContent.trim()));
