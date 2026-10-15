@@ -91,11 +91,12 @@ s0.headers.update(H)
 r = s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"})
 assert r.ok, r.text
 A = sess("alice")
-A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True, "time_all": True, "modules": ["cal", "comments"]})
+# 2.46.0 (#1592): no organisation from the start any more: the setup creates the one these tests use (id 1), new people join it
+A.post(B + "/api/admin/setup", json={"org_name": "Kalmido", "lang": "en", "collab_all": True, "time_all": True, "modules": ["cal", "comments"]})
 A.patch(B + "/api/settings", json={"lang": "en"})
 ids = {}
 for u in ("bob", "carol", "dave"):
-    r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123", "email": f"{u}@example.com"})
+    r = A.post(B + "/api/users", json={"orgs": [1], "username": u, "display_name": u.title(), "password": "password123", "email": f"{u}@example.com"})
     assert r.ok, r.text
     ids[u] = r.json()["id"]
 BOB, CAROL, DAVE = ids["bob"], ids["carol"], ids["dave"]
@@ -317,7 +318,9 @@ check(seen(Da) == {DAVE, CAROL}, "workspaces: dave sees Beta only " + str(seen(D
 check(1 not in seen(Ca) and BOB not in seen(Ca), "workspaces: carol does not see the first organisation's people")
 check(CAROL not in seen(A) and DAVE not in seen(A), "workspaces: the instance admin does not see Beta's people " + str(seen(A)))
 check(A.get(B + "/api/users").json().get("others") == 2, "workspaces: ... only how many there are")
-check(A.patch(B + f"/api/users/{DAVE}", json={"display_name": "X"}).status_code == 404 and A.delete(B + f"/api/users/{DAVE}").status_code == 404, "workspaces: an instance admin manages only people it sees")
+# 2.46.0 (#1592): the user management (?all=1, edit) covers every account; sharing etc. stay limited (above)
+check(DAVE in {u["id"] for u in A.get(B + "/api/users?all=1").json()["users"]} and A.patch(B + f"/api/users/{DAVE}", json={"display_name": "X"}).status_code == 404,
+      "#1592: the user management lists every account; members of another organisation stay with its admins")
 check(A.get(B + "/api/admin/orgs").json()["creatable"] is True and len(A.get(B + "/api/admin/orgs").json()["orgs"]) == 2, "workspaces: the instance admin sees every organisation (names, counts)")
 # sharing across the boundary
 LB = Ca.post(B + "/api/lists", json={"name": "Beta plan", "org_id": BETA}).json()

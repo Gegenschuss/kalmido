@@ -6780,5 +6780,11 @@
   "You joined “{0}”": "Tu as rejoint « {0} »",
   "Only lists of an organisation can be visible to the whole organisation": "Seules les listes d’une organisation peuvent être visibles par toute l’organisation",
   "You are already a member of this list": "Tu es déjà membre de cette liste",
-  "Make the list “{0}” visible to everyone in the organisation": "Rendre la liste « {0} » visible par tout le monde dans l’organisation"
+  "Make the list “{0}” visible to everyone in the organisation": "Rendre la liste « {0} » visible par tout le monde dans l’organisation",
+  "None (private space only)": "Aucune (espace privé uniquement)",
+  "Role in the organisation": "Rôle dans l'organisation",
+  "Admin of the organisation": "Administrateur de l'organisation",
+  "This server has organisations: open registration is not possible (only their e-mail domains or with approval).": "Ce serveur a des organisations : l'inscription ouverte n'est pas possible (uniquement leurs domaines e-mail ou avec approbation).",
+  "A kid account cannot be an admin of an organisation": "Un compte enfant ne peut pas être administrateur d'une organisation",
+  "Unknown organisation": "Organisation inconnue"
 }

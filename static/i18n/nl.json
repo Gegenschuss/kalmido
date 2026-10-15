@@ -6780,5 +6780,11 @@
   "You joined “{0}”": "Je bent lid van ‘{0}’",
   "Only lists of an organisation can be visible to the whole organisation": "Alleen lijsten van een organisatie kunnen voor de hele organisatie zichtbaar zijn",
   "You are already a member of this list": "Je bent al lid van deze lijst",
-  "Make the list “{0}” visible to everyone in the organisation": "De lijst ‘{0}’ zichtbaar maken voor iedereen in de organisatie"
+  "Make the list “{0}” visible to everyone in the organisation": "De lijst ‘{0}’ zichtbaar maken voor iedereen in de organisatie",
+  "None (private space only)": "Geen (alleen privéruimte)",
+  "Role in the organisation": "Rol in de organisatie",
+  "Admin of the organisation": "Beheerder van de organisatie",
+  "This server has organisations: open registration is not possible (only their e-mail domains or with approval).": "Deze server heeft organisaties: open registratie is niet mogelijk (alleen hun e-maildomeinen of met goedkeuring).",
+  "A kid account cannot be an admin of an organisation": "Een kinderaccount kan geen beheerder van een organisatie zijn",
+  "Unknown organisation": "Onbekende organisatie"
 }

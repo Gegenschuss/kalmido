@@ -223,12 +223,10 @@ def admin_setup():
     if lang:
         gset(c, "default_lang", lang)
         uset(c, me(), "lang", lang)
-    if b.get("org_name"):  # 2.23.0 (#799): the first-run setup asks once for the organisation's name (unless configured)
-        from ..accounts.orgs import instance_mode, main_org, ORG_NAME_ENV
-        import re as _re
-        nm = _re.sub(r"\s+", " ", str(b["org_name"])).strip()[:60]
-        if nm and instance_mode(c) == "organisation" and not ORG_NAME_ENV and main_org(c):
-            c.execute("UPDATE orgs SET name=? WHERE id=?", (nm, main_org(c)))
+    # 2.23.0 (#799): the first-run setup asks once for the organisation's name (unless configured). 2.46.0 (#1592): a name
+    # (or KALMIDO_ORG_NAME) creates the first organisation with the setting-up admin as its admin (empty: private only)
+    from ..accounts.orgs import om_setup_org
+    om_setup_org(c, me(), b.get("org_name"))
     pt = b.get("project_type")  # 2.4.0 (#243): "Start with a project" of a built-in type
     if pt not in (None, "") and pt not in PTYPES:
         return err(tr("Invalid value: {0}", "project_type"))

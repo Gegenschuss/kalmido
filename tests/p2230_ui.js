@@ -165,7 +165,8 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   await until(() => d.querySelector('.qrbox img'));
   check(d.querySelector('.qrbox img')?.getAttribute('src').startsWith('data:image/svg+xml') && /#signin\//.test(d.querySelector('#qr-link')?.value || ''), 'the sign-in link with its QR code');
   [...d.querySelectorAll('.modal:not(.smodal)')].forEach(m => m.remove());
-  check(/Organisation/.test(d.querySelector('.smodal #a-orgs-h')?.textContent || '') && !d.querySelector('.smodal #a-vis') && !d.querySelector('.smodal [data-acc="org-new"]'), '#799: the organisation is shown, no switch, no "New organisation"');
+  // 2.46.0 (#1592): one kind of instance: the instance admin creates organisations here
+  check(/Organisation/.test(d.querySelector('.smodal #a-orgs-h')?.textContent || '') && !d.querySelector('.smodal #a-vis') && d.querySelector('.smodal [data-acc="org-new"]'), '#799 / #1592: organisations shown, no visibility switch, "New organisation"');
   const ss = d.querySelector('.smodal #s-signup');
   check(ss && ss.value === 'off' && ss.querySelector('option[value="open"]').disabled, '#711: registration off; "open" not offered for an organisation');
   change(w, ss, 'approval'); await sleep(500);

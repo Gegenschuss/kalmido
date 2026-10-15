@@ -42,10 +42,11 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['comments']});
+  // 2.46.0 (#1592): no organisation from the start any more: the setup creates the one these tests use (id 1), new people join it
+  await call('POST', '/api/admin/setup', {org_name: 'Kalmido', lang: 'en', collab_all: true, modules: ['comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const st0 = await call('GET', '/api/state'), ME = st0.me, ORG = ME.workspaces[0].id, INBOX = st0.lists.find(l => l.is_inbox).id;
-  const bob = await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'});
+  const bob = await call('POST', '/api/users', {orgs: [1], username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'});
   const HOME = (await call('POST', '/api/lists', {name: 'Household', org_id: ORG})).id;
   const SOLO = (await call('POST', '/api/lists', {name: 'Garden', org_id: ORG, folder: 'Private'})).id;
   await call('PATCH', `/api/lists/${SOLO}`, {folder: 'Private'});

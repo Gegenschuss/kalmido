@@ -25,9 +25,10 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'comments']});
+  // 2.46.0 (#1592): no organisation from the start any more: the setup creates the one these tests use (id 1), new people join it
+  await call('POST', '/api/admin/setup', {org_name: 'Kalmido', lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
-  const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob Baker', password: 'password123'})).id;
+  const BOB = (await call('POST', '/api/users', {orgs: [1], username: 'bob', display_name: 'Bob Baker', password: 'password123'})).id;
   const ORG = (await call('GET', '/api/state')).me.workspaces[0].id;
   await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'claude', display_name: 'Claude'});
   const L = (await call('POST', '/api/lists', {name: 'Long list', org_id: ORG})).id;

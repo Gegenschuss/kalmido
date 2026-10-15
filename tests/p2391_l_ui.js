@@ -26,11 +26,12 @@ const labels = (w, id) => w.eval(`listMenuItems(${id}, document.body).filter(x =
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
+  // 2.46.0 (#1592): no organisation from the start any more: the setup creates the one these tests use (id 1), new people join it
+  await call('POST', '/api/admin/setup', {org_name: 'Kalmido', lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const ME = (await call('GET', '/api/state')).me, ORG = ME.workspaces[0].id;
   const uid = {};
-  for (const u of ['bob', 'carol']) uid[u] = (await call('POST', '/api/users', {username: u, display_name: u[0].toUpperCase() + u.slice(1), password: 'password123', email: u + '@example.com'})).id;
+  for (const u of ['bob', 'carol']) uid[u] = (await call('POST', '/api/users', {orgs: [1], username: u, display_name: u[0].toUpperCase() + u.slice(1), password: 'password123', email: u + '@example.com'})).id;
   const CB = await login('bob'), CC = await login('carol');
   for (const c of [CB, CC]) await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, c);
   const SH = (await call('POST', '/api/lists', {name: 'Fair stand', org_id: ORG, folder: 'Events'}, CB)).id;
