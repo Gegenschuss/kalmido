@@ -181,6 +181,8 @@ old = os.umask(0o077)
 with open(e["KALMIDO_SETUP_ENV"] + ".new", "w", encoding="utf-8") as f:
     f.write("# Kalmido agent %s (%s), set up by agent-setup.sh -- keep this file private\n" % (r["agent"]["name"], r["agent"]["username"]))
     f.write("KALMIDO_URL=%s\nKALMIDO_TOKEN=%s\nKALMIDO_EVENTS=1\n" % (e["KALMIDO_SETUP_URL"], r["token"]))  # the address that worked here
+    # one state folder per instance (event cursor, approvals, lock): two project folders on one computer never share one
+    f.write("KALMIDO_STATE_DIR=%s\n" % os.path.join(os.path.dirname(e["KALMIDO_SETUP_ENV"]), "state"))
 os.umask(old)
 os.chmod(e["KALMIDO_SETUP_ENV"] + ".new", 0o600)
 os.replace(e["KALMIDO_SETUP_ENV"] + ".new", e["KALMIDO_SETUP_ENV"])

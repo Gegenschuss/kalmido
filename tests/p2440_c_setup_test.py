@@ -242,6 +242,7 @@ for b in BASHES:
     ef = os.path.join(inst, "kalmido-agent.env")
     check(os.path.isfile(ef) and stat.S_IMODE(os.stat(ef).st_mode) == 0o600 and f"KALMIDO_TOKEN={TOKEN}" in read(ef) and f"KALMIDO_URL={URL}" in read(ef),
           f"{b}: env file mode 600 with the token and the address that worked")
+    check(f"KALMIDO_STATE_DIR={os.path.join(inst, 'state')}" in read(ef), f"{b}: a state folder of its own per instance")
     for need in ("agent_launcher.sh", "agent_run.py", "kalmido_mcp.py", "starter_files.txt", "mcp.json"):
         check(os.path.isfile(os.path.join(inst, need)), f"{b}: {need} in the instance folder")
     mj = json.loads(read(os.path.join(inst, "mcp.json"))) if os.path.isfile(os.path.join(inst, "mcp.json")) else {}

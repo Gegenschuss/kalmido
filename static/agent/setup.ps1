@@ -141,7 +141,8 @@ else {
     Die "Kalmido refused the code or is not reachable: $(if ($msg) { $msg } else { $_.Exception.Message }) (nothing was installed)"
   }
   $lines = @("# Kalmido agent $($r.agent.name) ($($r.agent.username)), set up by agent-setup.ps1 -- keep this file private",
-             "KALMIDO_URL=$Url", "KALMIDO_TOKEN=$($r.token)", 'KALMIDO_EVENTS=1')
+             "KALMIDO_URL=$Url", "KALMIDO_TOKEN=$($r.token)", 'KALMIDO_EVENTS=1',
+             "KALMIDO_STATE_DIR=$(Join-Path $Inst 'state')")  # one state folder per instance (cursor, approvals, lock)
   [IO.File]::WriteAllLines($EnvF, $lines)
   $script:Redeemed = $true
   $StarterBase = [string]$r.starter_base
