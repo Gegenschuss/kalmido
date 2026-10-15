@@ -752,6 +752,10 @@ fresh; run p247c_b_api "$PY" p247c_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p247c_b_ui node p247c_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.1 part A: several chats in the chat panel (#1720)
 fresh; run p247c_a_ui node p247c_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.48.0 part B: #1111 documents (recognition without a server; API with OCR, mail, agents, the boundary; the area)
+       run p248_b_unit "$PY" p248_b_unit_test.py
+fresh; run p248_b_api "$PY" p248_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p248_b_ui node p248_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
