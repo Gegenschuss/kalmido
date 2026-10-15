@@ -262,7 +262,7 @@ function cw_tcPark() {
 // teamRoute(): the phone keeps its row of open chats; the desktop's team view takes its conversation back when it opens one
 // (true: leaving the team view while a panel window is live only clears the kept state, the live window stays as it is)
 function cw_route(rid) {
-  if (chatFull()) { if (rid) cw_note('t:' + rid); return false; }
+  if (chatFull()) { cw_tcPark(); if (rid) cw_note('t:' + rid); return false; }  // park first: the room opened now must not land in the live window's state
   if (!rid && S.cw.lt) { S.cw.home = {rid: null, room: null, msgs: [], more: false, edit: null}; return true; }
   cw_tcPark(); return false;
 }
@@ -364,7 +364,7 @@ document.addEventListener('keydown', e => {
 // Esc in a window of the split panel closes only that window (window capture: before agentchat.js closes the whole panel)
 window.addEventListener('keydown', e => {
   if (e.key !== 'Escape' || e.defaultPrevented || isMobile() || e.isComposing) return;
-  const s = e.target.closest?.('#achat.cwsplit .cwin[data-cw]'); if (!s || !e.target.matches('textarea:not(.tc-edit)') || $('.modal, .pop:not(.hidden), .mpick:not(.hidden)')) return;
+  const s = e.target.closest?.('#achat.cwsplit .cwin[data-cw]'); if (!s || !e.target.matches('#chat-in, #tc-in, [data-cwid="chat-in"], [data-cwid="tc-in"]') || $('.modal, .pop:not(.hidden), .mpick:not(.hidden)')) return;
   e.preventDefault(); e.stopPropagation(); cw_close(s.dataset.cw);
 }, true);
 // drag a window by its header to another place (the menu has Move up / down for the keyboard)

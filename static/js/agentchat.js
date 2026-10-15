@@ -359,6 +359,9 @@ document.addEventListener('dragleave', e => { if (hasFiles(e) && (!e.relatedTarg
 document.addEventListener('drop', e => {
   if (!hasFiles(e)) return;
   const z = e.target.closest?.('#achat:not(.hidden), #view .chview'); if (!z || !S.chat.aid) return;
+  const cwk = e.target.closest?.('#achat .cwin[data-cw]')?.dataset.cw;  // 2.47c (#1720): the window it was dropped on
+  if (cwk && cwk[0] !== 'a') { z.classList.remove('filedrop'); return; }
+  if (cwk && typeof cw_act === 'function') cw_act(cwk);
   e.preventDefault(); e.stopImmediatePropagation(); z.classList.remove('filedrop'); chatAddFiles(e.dataTransfer.files); $('#chat-in')?.focus();
 }, true);
 // 2.7.2 (#421): reactions on a chat message. 2.13.0 (#453 A2): the quick 👍 / 👎 / ❤️ no longer sit as three empty circles
@@ -697,7 +700,7 @@ function chatPatch(o = {}) {
   if (o.keep) box.scrollTop = top + box.scrollHeight - h;
   else if (near || o.bottom) { box.scrollTop = box.scrollHeight; chatNewPill(false); S.chat.pin = true; }
   else { if (box.scrollTop !== top) box.scrollTop = top; if (last && nl > last && ms.some(m => m.id > last && m.from === 'agent' && m.kind !== 'notice')) chatNewPill(true); }
-  const on = !!a?.enabled, ci = $('#chat-in'), sb = $('[data-act="chat-send"]');  // paused / resumed: the same box
+  const on = !!a?.enabled, ci = $('#chat-in'), sb = ci?.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]');  // paused / resumed: the same box; 2.47c (#1720): the live window's button
   if (ci && ci.disabled === on) ci.disabled = !on;
   if (sb && sb.disabled === on && !S.chat.sending) sb.disabled = !on;
 }
@@ -769,12 +772,12 @@ async function chatSend() {
   const rto = replyTo('a:' + aid);  // 2.33.0 (#1076)
   let payload = {body, ...(rto ? {reply_to: rto} : {})};
   if (files.length) { payload = new FormData(); if (body) payload.append('body', body); if (rto) payload.append('reply_to', rto); files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
-  const btn = $('[data-act="chat-send"]'); if (btn) btn.disabled = true;
-  let sent = false; S.chat.sending = true;
+  const btn = ta.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]'); if (btn) btn.disabled = true;  // 2.47c (#1720): this window's button
+  const st = S.chat; let sent = false; st.sending = true;  // 2.47c (#1720): another window may become live during the POST
   if (files.length) toast(files.length === 1 ? tr('Uploading…') : tr('Uploading {0} files…', files.length));
-  try { const m = await rawFetch('POST', `/api/agents/${aid}/chat`, payload); S.chat.msgs.push(m); ta.value = ''; delete S.drafts['chat:' + aid]; delete S.chatFiles[aid]; replySent('a:' + aid); const fb = $('#chat-files'); if (fb) fb.innerHTML = ''; sent = true; }
+  try { const m = await rawFetch('POST', `/api/agents/${aid}/chat`, payload); st.msgs.push(m); ta.value = ''; delete S.drafts['chat:' + aid]; delete S.chatFiles[aid]; replySent('a:' + aid); const fb = $('#chat-files'); if (fb) fb.innerHTML = ''; sent = true; }
   catch (e) { toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); }
-  finally { S.chat.sending = false; if (btn) btn.disabled = false; }
+  finally { st.sending = false; if (btn) btn.disabled = false; }
   chatDraw({bottom: sent});
   // 2.13.2 (#478 N9, replaces #320): sending never closes the keyboard (back and forth like a messenger); the box keeps
   // its focus where it had it (a tap on Send does not take it, see below), a desktop always types on
