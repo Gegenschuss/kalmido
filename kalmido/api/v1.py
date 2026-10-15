@@ -705,8 +705,10 @@ def v1_lists():
     for r in visible_sections(c, me()):  # 2.0.8 (#333): every list with its sections [{id, name}]
         secs.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"]})
     fl = v1_list_fields(c)
-    return jsonify(data=[{**v1_list(d), "sections": secs.get(d["id"], []), "fields": fl.get(d["id"], [])} for d in visible_lists(c, me())],
-                   next_cursor=None)
+    from ..lists.favorites import lc_fav_of
+    fav = lc_fav_of(c, me())  # 2.46.1 (#1361): favourite of the person (an agent: of its owner)
+    return jsonify(data=[{**v1_list(d), "sections": secs.get(d["id"], []), "fields": fl.get(d["id"], []), "favorite": d["id"] in fav}
+                         for d in visible_lists(c, me())], next_cursor=None)
 
 
 def v1_list_fields(c, lid=None):
@@ -812,11 +814,13 @@ def v1_list_get(lid):
     d = next((x for x in visible_lists(c, me()) if x["id"] == lid), None)
     if not d:
         raise Denied(404)
+    from ..lists.favorites import lc_fav_of
     from ..lists.playbook import pb_effective
     pb = pb_effective(c, lid)  # 2.39.0 (#1168): the effective Playbook (null = none; never of a health list)
     return jsonify({**v1_list(d), "sections": [{"id": r["id"], "name": r["name"], "sort": r["sort"]}
                                                for r in visible_sections(c, me()) if r["list_id"] == lid],
                     "fields": v1_list_fields(c, lid).get(lid, []),
+                    "favorite": lid in lc_fav_of(c, me()),  # 2.46.1 (#1361)
                     "playbook": pb["text"] if pb and pb["text"] and pb["life"] != "health" else None})
 
 

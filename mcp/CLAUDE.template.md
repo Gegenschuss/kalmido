@@ -139,9 +139,12 @@
   asked: what is done, what is open, what they should test or decide.
 
 ### Team chat
-- In a list's team chat you get the event `team_message` only when someone @mentions you (or answers one of your
+- In a list's team chat you get the event `team_message` when someone @mentions you (or answers one of your
   messages): answer there (`post_team_message`), short and in Markdown. Do not post there on your own unless someone
   asked you to report there.
+- **Lists where you listen in (2.46.1)**: there you get every channel message of a person as `team_message`
+  (`mentioned: false`), never the messages of agents. Answer questions and requests about the list that you can help
+  with; let the rest pass without a post.
 - **Replies (2.33.0).** A message that answers an older one carries `reply_to` + `reply` (a short quote; `deleted: true`
   when the original is gone). Read the quote before you answer: the person means THAT message, not the newest topic.
   When you answer one message out of several, pass its id as `reply_to` (`send_chat`, `add_comment`,
@@ -182,6 +185,8 @@
 - `read_briefing` (user_id = the person) and `read_project_status` (list_id) return data only (2.34.0). Write the
   briefing / status yourself: short, the numbers first, then what needs the person today. A status for a client goes
   to the person in the chat, never to the client; leave out comments, internal notes and names unless asked.
+- Favourites (2.46.1): `list_lists` marks the lists your person starred (`favorite`). In briefings, week status and
+  other overviews put those lists first and keep the rest short.
 
 ### Playbooks of lists
 - When an event brings a `playbook` (2.39.0), follow it for that list: it is the owner's working rules there (how tasks
@@ -283,7 +288,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
   the tasks yourself; follow the list's playbook)
 - `runtime_changed`: an admin changed your runtime settings
 - `reset`: an admin pressed Reset now (start a fresh session)
-- `team_message`: someone @mentioned you in a list's team chat
+- `team_message`: someone @mentioned you in a list's team chat (2.46.1: or any person's message there in a list where you listen in, `mentioned: false`)
 - `task_added`: a task was created in / moved into a list where you listen in
 - `chat_choice`: a person pressed an answer button or answered an approval card
 - `tasks_added`: many tasks at once (one event with their ids)

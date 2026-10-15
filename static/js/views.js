@@ -125,7 +125,7 @@ async function setShowDone(on, key = S.route.key) {
   const put = async v => {  // only this view's entry changes: a choice made for another view meanwhile stays
     const o = doneViews(); if (v === undefined) delete o[key]; else o[key] = v;
     for (const x of Object.keys(o)) if ((x.startsWith('l:') && !listById(+x.slice(2))) || (x.startsWith('f:') && !S.filters.some(f => f.id === +x.slice(2)))) delete o[x];  // gone lists / filters
-    S.settings.show_done_views = JSON.stringify(o); render();
+    S.settings.show_done_views = JSON.stringify(o); lc_doneOwnSync(key); render();  // 2.46.1 (#1422): lc_doneOwnSync
     try { await api('PATCH', '/api/settings', {show_done_views: S.settings.show_done_views}); } catch { try { await load(); } catch { /* offline */ } render(); }
     return {skipped: []};
   };

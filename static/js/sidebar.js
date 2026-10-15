@@ -686,7 +686,7 @@ async function folderPropsModal(f, opt = {}) {
       ${fsw('fs-al', 'agent_listen', tr('Agent listens in'), tr('Off: the agent reacts only to an @mention, an assignment or a wake. Per agent in the Share dialog.'))}` : ''}
     <h4>${tr('Completed')}</h4>
     ${fsw('fs-hd', 'hide_done', tr('Hide completed'), '')}
-    <div class="shint lhint fshdhint">${tr('Hide completed: for your own lists in this folder, at once for all of them (also with “Only new lists”). A list where you chose to show or hide completed yourself keeps that choice until “Completed: like the default” in its menu.')}</div>
+    <div class="shint lhint fshdhint">${tr('Hide completed: the default for your own lists in this folder, applied like the settings above (with “Only new lists” the existing lists keep what they show). Shared lists of others keep their setting. A list where you show or hide completed yourself differs from the folder until “Back to the folder” in its dialog.')}</div>
     ${typeof timeOn === 'function' && timeOn() ? `<h4>${tr('Time tracking')}</h4>${fsw('fs-tt', 'time_tracking', tr('Time tracking'), '')}` : ''}
     ${collab() ? `<div class="row"><label>${tr('People')}</label><button type="button" class="btn sm" data-m="people">${ic('users', 's')} ${tr('Share…')}</button></div>` : ''}
     <div class="row"><label>${tr('Repository')}</label><button type="button" class="btn sm" data-m="repos">${ic('git', 's')} ${tr('Repository…')}</button></div>
@@ -721,6 +721,7 @@ async function folderPropsModal(f, opt = {}) {
     er.hidden = !bad.length;
     saved(undo ? () => put(k, prev, false) : null);
     if (v === null && nL) toast(tr('Not set: the lists keep the value they have.'));
+    else if (r.changed) toast(trn('{0} list changed', '{0} lists changed', r.changed));  // 2.46.1 (#1422): the counter
     await load(); render();
   };
   md.addEventListener('change', e => {

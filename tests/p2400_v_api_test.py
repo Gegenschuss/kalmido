@@ -98,7 +98,8 @@ AGH = {"Authorization": "Bearer " + ag.get("token", "x")}
 A.put(B + f"/api/lists/{TEAM}/members", json={"user_id": ag.get("id"), "role": "edit"})
 check(requests.put(B + f"/api/lists/{TEAM}/favorite", headers={**AGH, **H}, json={}).status_code in (401, 403, 404), "#1361: an agent has no favourites")
 lv1 = requests.get(B + "/api/v1/lists", headers=AGH).json()
-check("fav" not in json.dumps(lv1), "#1361: the agent API shows no stars")
+# 2.46.1 (#1361): the agent API marks the favourites of the agent's person ("favorite"); alice has none starred here
+check(all(l.get("favorite") is False for l in lv1["data"]) and "fav_lists" not in json.dumps(lv1), "#1361: the agent API shows no stars")
 
 # ================= #1344 My tasks in an own order
 mk = lambda s, title, lid, **kw: s.post(B + "/api/tasks", json={"title": title, "list_id": lid, **kw}).json()["id"]

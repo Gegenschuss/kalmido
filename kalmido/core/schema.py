@@ -1364,6 +1364,9 @@ USER_DEFAULTS = {
     # 2.40.0 (#1361): favourites (personal): comma list of starred list ids; fav_only = the sidebar shows only them (the other
     # lists fold under "More lists"); fav_views = comma list of view keys (today, assigned, ...) filtered to favourites
     "fav_lists": "", "fav_only": "0", "fav_views": "",
+    # 2.46.1 (#1361): fav_quiet = lists without a star push only @mentions / assignments; fav_suggest = offer a busy list as a
+    # favourite once (fav_asked = the lists already offered)
+    "fav_quiet": "0", "fav_suggest": "1", "fav_asked": "",
     # 2.40.0 (#1344): "My tasks": own = the person's own order (user_task_order, default), lists = grouped by list as before
     "mine_view": "own",
     # 2.6.1 (#401): 1 = date, time, repeat and reminder changes wait for OK (default: they apply at once, with Undo)

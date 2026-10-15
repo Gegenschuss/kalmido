@@ -645,7 +645,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `runtime_changed` | 2.4.1: an admin changed the agent's [runtime settings](#runtime-settings) | `runtime` |
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
 | `ping` | the "Send test" button in the admin settings | `message` |
-| `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it) | `room` `{id, kind, list_id}`, `message` `{id, text, user_id, task_id, created_at, reply_to, reply}`, `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message-2330)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
+| `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it); 2.46.1: in a list where the agent listens in, every message of a person in its channel, without an @mention (`mentioned` false; never a message of an agent) | `room` `{id, kind, list_id}`, `mentioned`, `listening` (2.46.1), `message` `{id, text, user_id, task_id, created_at, reply_to, reply}`, `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message-2330)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
 | `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}`; 2.39.0 kind `cleanup` ([Tidy up a list](#tidy-up-a-list-2390)): + `list_id` (and the list's `playbook`) |
 | `task_added` | 2.23.0 (#795): a top-level task was created in, or moved into, a list shared with the agent (not for its own tasks); 2.30.0: only when the agent [listens in](#agent-listens-in-2300) there | `task`, `list`, `how`: `created` or `moved`, `moved_from` `{id, name}` (only when the agent sees that list), `source`: `form`, `mail`, `errors`, `proposal` (when not made in the app) |
 | `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction`; 2.35.0 approval requests (`request_chat_approval`): `approval`, `approval_request` `{title, what}`, `via` |
@@ -891,6 +891,10 @@ client". Kalmido writes no prose itself: you get the data and formulate the text
   assignee in their own lists: `kinds` `assigned` / `comment` / `status` / `due`, `by`, `at`) and `stale` (their tasks
   lying idle, see `GET /stale`). `since` is the moment the person last marked the briefing read in the app (on an
   earlier day), else 18:00 yesterday, never more than 7 days back; `?since=` overrides it. Reading marks nothing read.
+- **Favourites of your person (2.46.1, #1361)**: `GET /lists` (MCP `list_lists`) and `GET /lists/{id}` carry `favorite`:
+  `true` for the lists your person (a personal agent's owner) starred, only among the lists you see anyway; a team agent
+  without an owner gets `false`. In a briefing, a week status or any overview put the favourite lists first (the rows
+  carry `list_id`) and keep the rest short.
 - **Status report of a list** `GET /lists/{id}/status-report?days=7` (or `from` / `to`, `lang`; MCP
   `read_project_status`, scope read). Only lists shared with you. `done` (completed in the period), `in_progress`
   (open main tasks with a change, comment or time entry in the period), `blocked`, `overdue`, `upcoming` (due from today
@@ -1403,7 +1407,8 @@ the setup guide show the same block with a *Copy rules* button. In short:
   (`202`) are not repeated, the result comes as a `job` event;
 - usage hook as Stop and SubagentStop hook;
 - park blockers with a note instead of stalling;
-- team chat (2.17): answer in a list's channel when @mentioned (`team_message`), short, Markdown;
+- team chat (2.17): answer in a list's channel when @mentioned (`team_message`), short, Markdown; 2.46.1: in lists where
+  it listens in every person's channel message comes as `team_message` with `mentioned: false`;
 - read attachments through the API when someone asks about a screenshot;
 - 2.30.0: refusals that confirm nothing and one note to the owner; never ask for secrets in chat; one token = one event
   queue, no second post of an answer a service already posts; denied permissions are a no; 429 back-off; `usage_limit`
@@ -2194,7 +2199,9 @@ them (participants do not), owner, list admins and members write them. `#123` in
 
 **Team chat**: people write to each other directly and in one channel per shared list. An agent is a member of the
 channel of every list shared with it (role member / admin / viewer), reads it and writes there; it gets the event
-`team_message` only when someone @mentions it. Agents cannot open direct messages (403): people talk to an agent in its
+`team_message` when someone @mentions it, and (2.46.1) in a list where it listens in for every message a person writes in
+the channel (`mentioned: false`, `listening: true`; messages of agents never, so two agents cannot talk in a loop). A list
+shared only with its owner's agent has a channel too. Agents cannot open direct messages (403): people talk to an agent in its
 own chat.
 
 | Call | MCP tool | Scope |

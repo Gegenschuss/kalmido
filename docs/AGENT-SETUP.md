@@ -507,6 +507,10 @@ chat messages of one person that arrive together: one run). It does what a hoste
   `KALMIDO_OWNER_IDS=1,5` (user ids) the events of anyone else count as information too. Task events with a task (a comment, a mention)
   also carry the task text. Chat messages are never held back. The collected events live in the state folder (`bundle.json`),
   a restart loses nothing.
+- **Team chat** (2.46.1): a `team_message` (an @mention in a list's channel, or -- in a list where the agent listens in -- any
+  message a person writes there, `mentioned: false`) is its own run without delay: the prompt carries the message fenced, the room
+  and the rule to answer in that channel with `post_team_message` (the final text of the run is posted nowhere); when the agent
+  only listens in, it answers questions and requests about the list and lets the rest pass. Messages of agents never come.
 - **Older servers** (before 2.32 / 2.33 / 2.35): what the server does not know yet is switched off once; the rest runs as
   before.
 

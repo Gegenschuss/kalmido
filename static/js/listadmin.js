@@ -95,6 +95,18 @@ function lmDoneDefault(key) {
   return S.settings?.show_done_default !== '0';
 }
 const lmDoneOwn = key => { try { return key in JSON.parse(S.settings.show_done_views || '{}'); } catch { return false; } };
+// 2.46.1 (#1422): an own choice on my list in a folder with "Hide completed" differs from the folder (the server marks
+// folder_own the same way): the list dialog then says "This list differs" with "Back to the folder"
+function lc_doneOwnSync(key) {
+  const m = /^l:(\d+)$/.exec(key || ''), l = m && listById(+m[1]);
+  if (!l || !isOwner(l) || !l.folder || typeof folderEff !== 'function') return;
+  const e = folderEff(l.folder); if (!('hide_done' in e)) return;
+  let own = []; try { own = JSON.parse(l.folder_own || '[]'); } catch { /* none */ }
+  const v = doneViews()[key];
+  own = own.filter(k => k !== 'hide_done');
+  if (v !== undefined && !!+v === !!e.hide_done) own.push('hide_done');
+  l.folder_own = JSON.stringify(own.sort());
+}
 function lmDoneResetItems(key = S.route.key) {
   if (!lmDoneOwn(key)) return [];
   return [{label: tr('Completed: like the default ({0})', lmDoneDefault(key) ? tr('shown') : tr('hidden')), icon: 'undo', cls: 'mdonedef', fn: () => lmDoneReset(key)}];
@@ -103,7 +115,7 @@ async function lmDoneReset(key) {
   const was = doneViews()[key];
   const put = async v => {
     const o = doneViews(); if (v === undefined) delete o[key]; else o[key] = v;
-    S.settings.show_done_views = JSON.stringify(o); render();
+    S.settings.show_done_views = JSON.stringify(o); lc_doneOwnSync(key); render();
     try { await api('PATCH', '/api/settings', {show_done_views: S.settings.show_done_views}); } catch { try { await load(); } catch { /* offline */ } render(); }
     return {skipped: []};
   };
