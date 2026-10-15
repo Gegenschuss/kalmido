@@ -6823,5 +6823,6 @@
   "This server has organisations: open registration is not possible (only their e-mail domains or with approval).": "Dieser Server hat Organisationen: offene Registrierung ist nicht möglich (nur deren E-Mail-Domains oder mit Freigabe).",
   "A kid account cannot be an admin of an organisation": "Ein Kinderkonto kann nicht Admin einer Organisation sein",
   "Unknown organisation": "Unbekannte Organisation",
-  "Hide this note": "Hinweis ausblenden"
+  "Hide this note": "Hinweis ausblenden",
+  "First line taken as the contact person: please check": "Erste Zeile als Ansprechpartner übernommen: bitte prüfen"
 }

@@ -113,8 +113,9 @@ ok, a, j = addr(template(["Beispiel Energie GmbH", "Testweg 6", "50676 K\u00f6ln
 check(ok and got(a) == ("Beispiel Energie GmbH", "", "Testweg 6", "50676", "K\u00f6ln") and not j.get("unsure"),
       f"#1646: bank and contact values above the recipient are not part of it {j}")
 ok, a, j = addr(template(["Lena Muster", "Musterversicherung Aktiengesellschaft", "Allee 10-20", "51067 K\u00f6ln"], "t2"))
-check(ok and got(a) == ("Musterversicherung Aktiengesellschaft", "Lena Muster", "Allee 10-20", "51067", "K\u00f6ln") and not j.get("unsure"),
-      f"#1646: the person above the company (legal form on the second line) is the contact {j}")
+# 2.46.2 (#1646, review): the swap without "Frau"/"Herr" is a guess -> marked unsure with its reason
+check(ok and got(a) == ("Musterversicherung Aktiengesellschaft", "Lena Muster", "Allee 10-20", "51067", "K\u00f6ln") and j.get("unsure")
+      and "person_swap" in (a.get("flags") or []), f"#1646: the person above the company (legal form on the second line) is the contact {j}")
 ok, a, j = addr(template(["Theater Beispiel e.V.", "Lindenstra\u00dfe 72", "50679 K\u00f6ln"], "t3"))
 check(ok and got(a) == ("Theater Beispiel e.V.", "", "Lindenstra\u00dfe 72", "50679", "K\u00f6ln"), f"#1646: a club (e.V.) is no value line {j}")
 # the newer template: the address under the salutation, firm / person / street / city, nothing bank-like above it
@@ -126,6 +127,15 @@ check(ok and got(a) == ("Beispiel Partner GmbH", "Jana Probe", "Kreisweg 6-20 (H
 # a bank as the recipient keeps its name (it has a legal form)
 ok, a, j = addr(template(["Beispiel Bank AG", "Kontorstra\u00dfe 1", "60311 Frankfurt"], "t5"))
 check(ok and got(a)[0] == "Beispiel Bank AG" and got(a)[2] == "Kontorstra\u00dfe 1", f"#1646: a recipient that is a bank (with its legal form) keeps its name {j}")
+
+# 2.46.2 (#1646, review): a company name on two lines stays one name; a savings bank without bank values around it is the
+# recipient; a company name starting with a greeting word is no salutation
+ok, a, j = addr(text_pdf([SENDER, "Rechnung", "Musterfirma", "GmbH & Co. KG", "Hauptweg 3", "50667 K\u00f6ln"], "t6"))
+check(ok and got(a)[:2] == ("Musterfirma GmbH & Co. KG", ""), f"#1646: a company name on two lines is not split into person + company {j}")
+ok, a, j = addr(text_pdf([SENDER, "Rechnung", "Sparkasse Beispielstadt", "Hahnenweg 57", "50667 K\u00f6ln"], "t7"))
+check(ok and got(a)[0] == "Sparkasse Beispielstadt" and got(a)[2] == "Hahnenweg 57", f"#1646: a savings bank as the recipient keeps its name {j}")
+ok, a, j = addr(text_pdf([SENDER, "Rechnung", "Hallo Pizza GmbH", "Testweg 9", "50667 K\u00f6ln"], "t8"))
+check(ok and got(a)[0] == "Hallo Pizza GmbH", f"#1646: a company named with a greeting word is no salutation {j}")
 
 print(f"p2462_d_api_test: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
