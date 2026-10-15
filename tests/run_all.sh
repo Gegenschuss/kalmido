@@ -648,6 +648,10 @@ fresh; run p2440_b_launcher "$PY" p2440_b_launcher_test.py
 # 2.44.0 part A: the launcher's event runner core (approval-done, permission questions, approval lifecycle, resumed
 # conversations, robust runs) against a stub API and a fake command (pure Python: no container needed)
 run p2440_a_launcher "$PY" p2440_a_launcher_test.py
+# 2.44.0 part C: #1517 set up an agent on a computer with one command (one-time code, computers, setup scripts), #962 agent_launcher.sh on macOS
+fresh; run p2440_c_api "$PY" p2440_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2440_c_ui node p2440_c_ui.js "$KALMIDO_TEST_DATA"
+       run p2440_c_setup "$PY" p2440_c_setup_test.py
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

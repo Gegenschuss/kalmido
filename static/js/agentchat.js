@@ -950,7 +950,7 @@ const AG_GUIDES = {
       [N_('Egress firewall'), N_('pf rules for the agent user only: DNS, Kalmido and public HTTPS allowed, the local network blocked. Check them again after macOS updates.'), 'sudo pfctl -f /etc/pf.conf && sudo pfctl -e'],
       [N_('Claude Code and the MCP server'), N_('Install Claude Code as the agent user and log in once. A small wrapper reads the env file and starts the MCP server, so the token is never in a configuration.'), 'curl -fsSL https://claude.ai/install.sh | bash\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido\ncd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"'],
       AG_S.rules,
-      [N_('Launcher as a service'), N_('A LaunchDaemon with UserName kalmido-agent runs mcp/agent_launcher.ps1 with PowerShell 7 (the shell version needs GNU tools that macOS lacks).'), 'brew install --cask powershell\nsudo launchctl bootstrap system /Library/LaunchDaemons/com.kalmido.agent.plist'],
+      [N_('Launcher as a service'), N_('A LaunchDaemon with UserName kalmido-agent runs mcp/agent_launcher.sh (since 2.44 it runs on macOS as it is, no PowerShell needed).'), 'sudo launchctl bootstrap system /Library/LaunchDaemons/com.kalmido.agent.plist'],  // 2.44.0 (#962)
       AG_S.test],
     win: [AG_S.create, AG_S.share, AG_S.safe,
       [N_('A user without admin rights'), N_('A standard local account, member of Users only, never Administrators. Sign in once to create its profile.'), '$pw = Read-Host -AsSecureString\nNew-LocalUser -Name kalmido-agent -Password $pw -PasswordNeverExpires\nAdd-LocalGroupMember -Group Users -Member kalmido-agent'],
@@ -971,7 +971,7 @@ const AG_GUIDES = {
       [N_('Install Claude Code and the MCP server'), N_('Log in to Claude Code once. Put the token into an env file only you can read; a small wrapper starts the MCP server with it.'), 'curl -fsSL https://claude.ai/install.sh | bash\nxcode-select --install\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido\nmkdir -p ~/.config/kalmido ~/agent && (umask 077; nano ~/.config/kalmido/agent.env)\ncd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"'],
       AG_S.ownShare, AG_S.safe, AG_S.ownRules,
       [N_('Usage hook'), N_('In .claude/settings.json as Stop and SubagentStop hook (the same command): reports token usage to Kalmido, subagents included, never text.'), 'python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env'],
-      [AG_S.ownRun[0], AG_S.ownRun[1], 'brew install --cask powershell\npwsh -File ~/kalmido/mcp/agent_launcher.ps1 -e ~/.config/kalmido/agent.env --events --once -- claude --mcp-config ~/agent/.mcp.json']],
+      [AG_S.ownRun[0], AG_S.ownRun[1], '~/kalmido/mcp/agent_launcher.sh -e ~/.config/kalmido/agent.env --events --once -- claude --mcp-config ~/agent/.mcp.json']],  // 2.44.0 (#962): no PowerShell on a Mac
     win: [AG_S.ownAllowed, AG_S.ownCreate,
       [N_('Install Claude Code and the MCP server'), N_('Log in to Claude Code once. Put the token into an env file only you can read; the wrapper run.ps1 starts the MCP server with it.'), 'winget install Python.Python.3.12 Git.Git Microsoft.PowerShell\nirm https://claude.ai/install.ps1 | iex\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git $HOME\\kalmido\nnotepad $HOME\\.config\\kalmido\\agent.env\ncd $HOME\\agent; claude mcp add -s local kalmido -- pwsh -NoProfile -File "$HOME\\kalmido\\mcp\\run.ps1"'],
       AG_S.ownShare, AG_S.safe, AG_S.ownRules,
@@ -986,6 +986,7 @@ function agSetupHtml(guide, os) {
     : tr('A personal agent runs on your own computer and belongs to you: it sees only the lists you share with it, and only you can chat with it.');
   const steps = AG_GUIDES[g][o].map(([h, t, cmd]) => `<li><b>${tr(h)}</b><span>${tr(t)}</span>${cmd ? `<pre class="agcmd">${esc(cmd)}</pre>` : ''}</li>`).join('');
   return `<div class="shint">${esc(intro)} ${esc(tr('Kalmido never starts or downloads an AI: you run the agent yourself.'))}</div>
+    ${g === 'own' ? `<div class="shint keep">${esc(tr('Quickest on your own computer: the download button in your agent’s row (Set up on a computer) installs it with one command.'))}</div>` : ''}
     <ol class="agsteps agb">${steps}</ol>
     <div class="shint">${esc(tr('Recommended since 2.35: start the launcher with --events. It then runs the agent once per event (headless) and shows its steps, model, permission mode, plan usage and approval cards in the chat; the agent command needs no prompt.'))}</div>
     <div class="shint">${esc(tr('Headless prompt for the launcher:'))} <code>${esc(AG_HEADLESS)}</code></div>
@@ -1225,7 +1226,7 @@ function agModal(a, done, o = {}) {
     ${a ? `<div class="row"><label>${tr('Lists')}</label>${listCapHtml(a.list_ids, a.lists, 'ag-lcap')}</div>${bridgesHtml(a)}` : ''}
     <div class="row"><label for="ag-url">${tr('Webhook URL')}</label><input id="ag-url" type="url" value="${esc(a?.webhook?.url || '')}" placeholder="${tr('optional: https://… (empty = the agent polls)')}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
     <div class="shint">${tr('With a webhook every event is POSTed there at once, signed like the webhooks. Without one the agent fetches its events: GET /api/v1/agent/events (with ?wait=60 it gets them within seconds).')}</div>
-    ${a ? `<div class="row"><label></label><button class="btn sm" data-m="token">${ic('key', 's')} ${tr('New API token')}</button>${a.webhook ? `<button class="btn sm" data-m="secret">${ic('key', 's')} ${tr('New signing secret')}</button>` : ''}</div>
+    ${a ? `<div class="row"><label></label><button class="btn sm" data-m="ains-setup">${ic('download', 's')} ${tr('Set up on a computer')}</button><button class="btn sm" data-m="token">${ic('key', 's')} ${tr('New API token')}</button>${a.webhook ? `<button class="btn sm" data-m="secret">${ic('key', 's')} ${tr('New signing secret')}</button>` : ''}</div>
     <div class="shint keep">${esc(trn('{0} list shared with it', '{0} lists shared with it', a.lists.length))}${a.lists.length ? ': ' + esc(a.lists.map(l => l.name).join(', ')) : ''}</div>` : ''}
     ${aiuLimFields(a)}
     ${agRtFields(a)}
@@ -1256,6 +1257,7 @@ function agModal(a, done, o = {}) {
     if (m === 'close') { md.remove(); return; }
     try {
       if (m === 'token') { agTokenModal(a, `/api/admin/agents/${a.id}/token`); return; }
+      if (m === 'ains-setup') { ains_setupModal(a, `/api/admin/agents/${a.id}`); return; }  // 2.44.0 (#1517)
       if (m === 'secret') {
         if (!await askConfirm(tr('Create a new signing secret?'), tr('The receiver must use the new one from now on.'), {ok: tr('New secret'), danger: true})) return;
         const r = await calReq('POST', `/api/admin/agents/${a.id}/secret`);

@@ -49,9 +49,29 @@ for c in caps:
     for pat in c.get("core") or []:
         check(pat in core, f"agent_run.py has {pat!r} ({c['id']})")
     check(c.get("what") and c.get("since"), f"{c['id']}: what + since")
+launcher_only = {c["id"] for c in caps if c.get("launcher")}  # 2.44.0 (#1517): done by the launchers themselves (host_name)
 for cid in ids:
-    if cid != "runtime":
+    if cid != "runtime" and cid not in launcher_only:
         check(re.search(r"kalmido-capability:[^\n]*\b" + cid + r"\b", core) is not None, f"agent_run.py marks {cid}")
+
+# ---- 2.44.0 (#1517): the setup scripts (static/agent/setup.sh | setup.ps1) do the same steps in the same order, and the
+# starter file list they fetch names every starter module (a new one missing there would be absent on a set-up computer)
+STATIC = os.path.join(HERE, "..", "static", "agent")
+steps = {}
+for name in ("setup.sh", "setup.ps1"):
+    with open(os.path.join(STATIC, name), encoding="utf-8") as f:
+        steps[name] = re.findall(r"#\s*kalmido-setup-step:\s*([a-z_]+)", f.read())
+check(len(steps["setup.sh"]) >= 8 and steps["setup.sh"] == steps["setup.ps1"], f"setup.sh and setup.ps1 mark the same steps: {steps}")
+for sid in ("prereq", "redeem", "starter_files", "mcp_config", "autostart", "uninstall"):
+    check(sid in steps["setup.sh"], f"setup step {sid}")
+listed = [ln.split("#")[0].strip() for ln in read("starter_files.txt").split("\n")]
+listed = [x for x in listed if x]
+check(len(listed) == len(set(listed)) and all("/" not in x and "\\" not in x for x in listed), f"starter_files.txt: plain unique names {listed}")
+for fn in sorted(os.listdir(MCP)):
+    if re.match(r"(agent_[a-z_]+\.py|agent_launcher\.(sh|ps1)|kalmido_mcp\.py|launcher_capabilities\.json)$", fn):
+        check(fn in listed, f"starter_files.txt lists {fn}")
+for fn in ("agent_launcher.sh", "agent_launcher.ps1", "agent_run.py", "kalmido_mcp.py"):
+    check(os.path.isfile(os.path.join(MCP, fn)) and fn in listed, f"required starter file {fn}")
 
 # ---- the runner itself, without a server
 spec = importlib.util.spec_from_file_location("agent_run", os.path.join(MCP, "agent_run.py"))

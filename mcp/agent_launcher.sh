@@ -32,7 +32,10 @@
 #             file {at, rate_limits}), KALMIDO_STATE_DIR (event cursor), KALMIDO_APPROVAL_CHECK=0 (2.40.0: no check of
 #             chat answers that ask to decide without an ```approval block), KALMIDO_NOTICE_COMPACTED (2.41.0: the notice
 #             in the chat when a run compacts its conversation, {0} = the time). Without --events: the command runs as it is.
-# Needs: bash, curl, python3 (JSON), GNU date, setsid (util-linux). See docs/AGENTS.md "Runtime settings" for a systemd unit.
+#   KALMIDO_HOST  the computer name shown in Kalmido (2.44.0; default: hostname without the domain), sent once at start
+# Needs: bash (3.2 is enough, the macOS one), curl, python3 (JSON, time zones, a new process group). 2.44.0 (#962): no GNU
+# date, setsid or other GNU-only tools any more, so it runs on macOS and Linux alike. /agent-setup.sh of your Kalmido sets it up with an
+# autostart (launchd LaunchAgent / systemd --user); see docs/AGENTS.md "Runtime settings" for a hand-made systemd unit.
 set -uo pipefail
 
 ENV_FILE=./kalmido-agent.env
@@ -44,12 +47,13 @@ while [[ $# -gt 0 ]]; do
     --once) ONCE=1; shift ;;
     --events) EVENTS=1; shift ;;
     --) shift; break ;;
-    -h|--help) sed -n '2,35p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
     *) break ;;
   esac
 done
 CMD=("$@")
 [[ ${#CMD[@]} -gt 0 ]] || CMD=(claude)
+AGENT0=${CMD[0]}  # the agent command itself (event mode puts python3 agent_run.py in front)
 [[ -r "$ENV_FILE" ]] || { echo "agent_launcher: cannot read $ENV_FILE" >&2; exit 2; }
 [[ "$ENV_FILE" == */* ]] || ENV_FILE=./$ENV_FILE  # "." would search PATH for a bare name
 set -a
@@ -68,6 +72,11 @@ if [[ $EVENTS == 1 ]]; then
   [[ -r "$RUNNER" ]] || { echo "agent_launcher: $RUNNER missing (event mode)" >&2; exit 2; }
   CMD=("${KALMIDO_PYTHON:-python3}" "$RUNNER" -- "${CMD[@]}")
 fi
+PY=${KALMIDO_PYTHON:-python3}
+# 2.44.0 (#962): an own process group without util-linux setsid (macOS has none): python3 starts a new session and
+# replaces itself with the command (same pid, so "kill -- -PID" ends all of it)
+if command -v setsid >/dev/null 2>&1; then NEWSESS=(setsid)
+else NEWSESS=("$PY" -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])'); fi
 POLL=${KALMIDO_POLL:-60}
 RESTART_DELAY=${KALMIDO_RESTART_DELAY:-10}
 log() { printf '%s agent_launcher: %s\n' "$(date '+%F %T')" "$*" >&2; }
@@ -102,7 +111,8 @@ start() {  # start the command with the current settings (its own process group,
   if [[ $ONCE == 1 ]]; then echo "env ${envs[*]:-} ${args[*]}"; return; fi
   local acs=off; [[ "$AC" == 1 ]] && acs="on at ${PCT/#-/the default }%"
   log "starting (fresh session): ${args[0]}, model ${MODEL/#-/default}, auto-compact $acs"
-  env -u DISABLE_AUTO_COMPACT -u CLAUDE_AUTOCOMPACT_PCT_OVERRIDE "${envs[@]}" setsid "${args[@]}" &
+  # ${envs[@]+...}: bash 3.2 calls an empty array unbound under set -u
+  env -u DISABLE_AUTO_COMPACT -u CLAUDE_AUTOCOMPACT_PCT_OVERRIDE ${envs[@]+"${envs[@]}"} "${NEWSESS[@]}" "${args[@]}" &
   PID=$!
   STARTED=$(date +%s)
 }
@@ -116,6 +126,27 @@ stop() {
 }
 trap 'stop; exit 0' TERM INT
 
+# epoch_at DAY HH:MM ZONE -> unix time of that wall-clock time in the IANA zone (2.44.0 #962: python3 instead of GNU date -d)
+epoch_at() {
+  "$PY" -c 'import sys, datetime
+from zoneinfo import ZoneInfo
+y, m, d = (int(x) for x in sys.argv[1].split("-")); hh, mm = (int(x) for x in sys.argv[2].split(":")[:2])
+print(int(datetime.datetime(y, m, d, hh, mm, tzinfo=ZoneInfo(sys.argv[3])).timestamp()))' "$1" "$2" "$3" 2>/dev/null
+}
+
+# kalmido-capability: host_name
+# 2.44.0 (#1517): which computer this is (PUT /api/v1/agent/status {status: idle, host}); a missing agent command is
+# reported as the agent's error. Older servers refuse the field (400): nothing happens.
+report_host() {
+  local h=${KALMIDO_HOST:-$(hostname 2>/dev/null || uname -n)} st=idle txt=""
+  h=${h%%.*}
+  if ! command -v "$AGENT0" >/dev/null 2>&1; then st=error; txt="agent command not found on ${h:-this computer}: $AGENT0"; log "$txt"; fi
+  printf 'header = "Authorization: Bearer %s"\n' "$KALMIDO_TOKEN" |
+    curl -sS --max-time 20 --config - -o /dev/null -X PUT -H 'Content-Type: application/json' \
+      --data "$("$PY" -c 'import json, sys; print(json.dumps({"status": sys.argv[1], "text": sys.argv[2], "host": sys.argv[3][:80]}))' "$st" "$txt" "$h")" \
+      "${KALMIDO_URL%/}/api/v1/agent/status" 2>/dev/null || true
+}
+
 line=$(fetch) || { log "cannot read the runtime settings from $KALMIDO_URL"; exit 1; }
 IFS=$'\t' read -r MODEL AC PCT NIGHTLY SEQ TZNAME ENABLED <<< "$line"
 if [[ $ONCE == 1 ]]; then start; exit 0; fi
@@ -126,11 +157,13 @@ nightly_due() {
   local day at
   day=$(TZ="$TZNAME" date +%F)
   [[ "$DONE_DAY" != "$day" ]] || return 1
-  at=$(TZ="$TZNAME" date -d "$day $NIGHTLY" +%s 2>/dev/null) || return 1
+  at=$(epoch_at "$day" "$NIGHTLY" "$TZNAME") || return 1
+  [[ -n "$at" ]] || return 1
   (( $(date +%s) >= at )) || return 1
   DONE_DAY=$day
   (( STARTED < at ))  # started before tonight's time -> restart now
 }
+[[ "$ENABLED" == 1 ]] && report_host
 [[ "$ENABLED" == 1 ]] && start || log "the agent is paused in Kalmido; waiting"
 STARTED=${STARTED:-$(date +%s)}
 nightly_due >/dev/null || true  # a start after tonight's time already counts as the nightly restart

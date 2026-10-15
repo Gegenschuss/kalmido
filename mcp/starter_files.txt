@@ -1,0 +1,12 @@
+# 2.44.0 (#1517): the files of the reference starter, one per line. The setup scripts (static/agent/setup.sh | setup.ps1)
+# fetch exactly these into the agent's instance folder; a new starter module goes here, else a set-up computer lacks it.
+# Required: agent_launcher.sh, agent_run.py, kalmido_mcp.py (the setup stops without them); others are skipped when missing.
+agent_launcher.sh
+agent_launcher.ps1
+agent_run.py
+kalmido_mcp.py
+launcher_capabilities.json
+CLAUDE.template.md
+claude_usage_hook.py
+agent_extras.py
+agent_job.py

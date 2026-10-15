@@ -6427,3 +6427,10 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .sgpt tbody th{font-weight:500;color:var(--text2)}
 .sgpt .sgbad{background:color-mix(in srgb,var(--p5) 16%,transparent);color:var(--p5)}
 .sgpmd .sgpn{font-size:var(--fs-s)}
+/* 2.44.0 C (#1517): set up an agent on a computer -- the command to copy, the computers of the agent */
+.ainscmd{width:100%;font-family:var(--mono,ui-monospace,monospace);font-size:var(--fs-s);line-height:1.4;resize:vertical;word-break:break-all;margin:.25rem 0}
+.ainscmd.off{opacity:.45;text-decoration:line-through}
+.ainsbar{gap:.5rem;align-items:center}
+.ainsm .n small{display:block;overflow:hidden;text-overflow:ellipsis}
+.ainsm .n{white-space:normal}
+@media (max-width:600px){.ainsm .btn{width:100%;justify-content:center}}

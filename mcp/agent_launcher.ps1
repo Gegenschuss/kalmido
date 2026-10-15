@@ -43,6 +43,7 @@ for ($i = 0; $i -lt $args.Count; $i++) {
 }
 $ErrorActionPreference = 'Stop'
 if ($Command.Count -eq 0) { $Command = @('claude') }
+$Agent0 = $Command[0]  # the agent command itself (event mode puts Python + agent_run.py in front)
 $OnWindows = ($env:OS -eq 'Windows_NT')
 
 function Log([string]$m) { [Console]::Error.WriteLine("$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') agent_launcher: $m") }
@@ -104,6 +105,21 @@ function Fetch {
   $tz = if ($rt -and $rt.timezone) { [string]$rt.timezone } else { 'UTC' }
   $en = if ($null -ne $a.enabled) { [bool]$a.enabled } else { $true }
   return [pscustomobject]@{model = $model; ac = $ac; pct = $pct; nightly = $nightly; seq = $seq; tz = $tz; enabled = $en}
+}
+
+# kalmido-capability: host_name
+# 2.44.0 (#1517): which computer this is (PUT /api/v1/agent/status {status: idle, host}); a missing agent command is
+# reported as the agent's error. Older servers refuse the field (400): nothing happens.
+function Report-Host {
+  $h = if ($env:KALMIDO_HOST) { $env:KALMIDO_HOST } else { [Environment]::MachineName }
+  $h = ($h -split '\.')[0]
+  $st = 'idle'; $txt = ''
+  if (-not (Get-Command $Agent0 -ErrorAction SilentlyContinue)) { $st = 'error'; $txt = "agent command not found on ${h}: $Agent0"; Log $txt }
+  $b = @{ status = $st; text = $txt; host = $(if ($h.Length -gt 80) { $h.Substring(0, 80) } else { $h }) } | ConvertTo-Json -Compress
+  try {
+    Invoke-WebRequest -Uri ($env:KALMIDO_URL.TrimEnd('/') + '/api/v1/agent/status') -Method Put -Body $b -ContentType 'application/json' `
+      -Headers @{ Authorization = "Bearer $($env:KALMIDO_TOKEN)" } -TimeoutSec 20 -UseBasicParsing | Out-Null
+  } catch { }
 }
 
 function Quote([string]$s) {  # one argument for a Windows / .NET command line
@@ -173,7 +189,7 @@ if (-not $s) { Log "cannot read the runtime settings from $($env:KALMIDO_URL)"; 
 $script:Seq = $s.seq
 if ($Once) { Start-Agent $s; exit 0 }
 $sig = "$($s.model)|$($s.ac)|$($s.pct)"
-if ($s.enabled) { Start-Agent $s } else { Log 'the agent is paused in Kalmido; waiting' }
+if ($s.enabled) { Report-Host; Start-Agent $s } else { Log 'the agent is paused in Kalmido; waiting' }
 [void](Nightly-Due $s)  # a start after tonight's time already counts as the nightly restart
 try {
   while ($true) {

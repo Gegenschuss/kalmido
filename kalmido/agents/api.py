@@ -51,13 +51,13 @@ def v1_agent():
 @app.put("/api/v1/agent/status")
 @v1_view
 def v1_agent_status():
-    """{status: idle|working|waiting|error, text?, task_id?, model?, permission_mode?, host_permission_mode?} -- shown as the dot on the agent's avatar and in the header chip;
+    """{status: idle|working|waiting|error, text?, task_id?, model?, permission_mode?, host_permission_mode?, host? (2.44.0)} -- shown as the dot on the agent's avatar and in the header chip;
     while "working", the task_id's panel (else every task of its lists) shows "<agent> is working on it" (2.0.2; "is writing
     ..." only with a typing signal since 2.13.2)."""
     v1_args(())
     aid = need_agent()
     b = v1_json()
-    unknown = sorted(k for k in b if k not in ("status", "text", "task_id", "model", "permission_mode", "host_permission_mode"))
+    unknown = sorted(k for k in b if k not in ("status", "text", "task_id", "model", "permission_mode", "host_permission_mode", "host"))
     if unknown:
         raise UnknownFields(unknown)
     from ..agents.steps import host_info_in, host_info_set, steps_end
@@ -77,6 +77,9 @@ def v1_agent_status():
     c.execute("UPDATE agents SET status=?, status_text=?, status_at=?, status_task=? WHERE user_id=?",
               (b["status"], text.strip()[:STATUS_TEXT_MAX], iso(now_utc()), tid, aid))
     hchg = host_info_set(c, old, hinfo)
+    if "host" in b:  # 2.44.0 (#1517): the computer name the starter reports, kept on the token it uses
+        from ..agents.setup import ains_host_set
+        hchg = ains_host_set(c, g.get("token"), b["host"]) or hchg
     if b["status"] in ("idle", "error", "paused"):
         steps_end(c, aid)  # 2.32.0 (#1081): a run without a chat answer leaves no live steps behind
     if hchg or (old["status"], old["status_text"], old["status_task"]) != (b["status"], text.strip()[:STATUS_TEXT_MAX], tid):
