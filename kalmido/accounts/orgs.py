@@ -538,6 +538,24 @@ def orgs_get():
                        boundary=boundary_summary(c))  # 2.30.0 (#1036): memberships across the workspace boundary (0 = clean)
 
 
+@app.post("/api/admin/orgs/boundary/repair")
+def oa_boundary_repair():
+    """2.46.0 (#1563): the button "Clean up" of the boundary check: takes out the memberships of people (not agents) in an
+    organisation's lists / calendars / address books that are not members of the organisation (tenancy.boundary_repair)."""
+    _need_admin()
+    from ..accounts.tenancy import boundary_repair, boundary_summary
+    c = db()
+    with system_ctx(c):
+        done = boundary_repair(c)
+        if done:
+            bump(c)
+    c.commit()
+    n = sum(len(v) for v in done.values())
+    if n:
+        print(f"boundary check (#1563): {n} memberships across the workspace boundary removed by an admin", flush=True)
+    return jsonify(removed=n, kinds={k: len(v) for k, v in done.items()}, boundary=boundary_summary(c))
+
+
 def _no_change():
     raise Denied(403, tr("Organisations are set by the server's configuration (KALMIDO_INSTANCE_MODE, KALMIDO_ORG_NAME)"))
 

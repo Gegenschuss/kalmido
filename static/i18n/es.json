@@ -6752,5 +6752,11 @@
   "KALMIDO_SECRET_FILE lies inside the data or backup folder and was ignored. Put it on its own volume.": "KALMIDO_SECRET_FILE está dentro de la carpeta de datos o de copias y se ignoró. Ponlo en un volumen propio.",
   "The key file KALMIDO_SECRET_FILE cannot be read or written, see the server log. After an update: create the folder secret next to data and give it to the user 1000 (mkdir secret && chown 1000 secret), then restart.": "No se puede leer ni escribir el archivo de clave KALMIDO_SECRET_FILE, consulta el registro del servidor. Tras una actualización: crea la carpeta secret junto a data y dásela al usuario 1000 (mkdir secret && chown 1000 secret), luego reinicia.",
   "Without KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE no access token can be stored and organisation data stays unencrypted. See SELF-HOSTING.md.": "Sin KALMIDO_SECRET_KEY ni KALMIDO_SECRET_FILE no se pueden guardar tokens de acceso y los datos de la organización quedan sin cifrar. Consulta SELF-HOSTING.md.",
-  "The server key is kept in the key file. Keep a copy of it apart from the backups: without it the encrypted data of a backup cannot be read.": "La clave del servidor está en el archivo de clave. Guarda una copia aparte de las copias de seguridad: sin ella no se pueden leer los datos cifrados de una copia."
+  "The server key is kept in the key file. Keep a copy of it apart from the backups: without it the encrypted data of a backup cannot be read.": "La clave del servidor está en el archivo de clave. Guarda una copia aparte de las copias de seguridad: sin ella no se pueden leer los datos cifrados de una copia.",
+  "Clean up": "Limpiar",
+  "Clean up the boundary?": "¿Limpiar el límite?",
+  "Takes people out of the lists, calendars and address books of an organisation they do not belong to. Agents stay as they are. This cannot be undone here.": "Quita a las personas de las listas, calendarios y libretas de direcciones de una organización a la que no pertenecen. Los agentes no cambian. Aquí no se puede deshacer.",
+  "Move the agent to the right workspace (Settings > Agents).": "Mover el agente al espacio de trabajo correcto (Ajustes > Agentes).",
+  "{0} membership removed": ["{0} pertenencia quitada", "{0} pertenencias quitadas"],
+  "Nothing to clean up": "Nada que limpiar"
 }

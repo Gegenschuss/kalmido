@@ -143,13 +143,42 @@ def boundary_tick(c):
     c.commit()
 
 
+# 2.46.0 (#1563): what each finding is, for the administration (kind prefix -> (type, table of the object))
+OA_OBJ = {"list": ("list", "lists"), "group": ("list", "lists"), "cal": ("calendar", "ev_cals"), "book": ("book", "books")}
+OA_DETAIL_MAX = 100
+
+
+def oa_details(c, limit=OA_DETAIL_MAX):
+    """[{kind, type (list | calendar | book | agent), id, name, user_id, user, agent, fixable}] for the findings (at most
+    limit). Same rows as boundary_check; fixable = a person's membership that boundary_repair takes out. Admin only (the caller)."""
+    out = []
+    for k, sql in CHECKS.items():
+        if len(out) >= limit:
+            break
+        ot, table = OA_OBJ.get(k.split("_")[0], ("agent", None))
+        for r in c.execute(sql + " ORDER BY 1, 2").fetchall()[:limit - len(out)]:
+            oid_, uid = r[0], r[1]
+            if table:
+                row = c.execute(f"SELECT name FROM {table} WHERE id=?", (oid_,)).fetchone()
+                name, who, ag = (row[0] if row else ""), uid, "agent" in k
+            else:  # an agent of an organisation that is gone / whose owner left: (agent, owner)
+                row = c.execute("SELECT display_name FROM users WHERE id=?", (oid_,)).fetchone()
+                name, who, ag = (row[0] if row else ""), oid_, True
+            u = c.execute("SELECT display_name FROM users WHERE id=?", (who,)).fetchone()
+            out.append({"kind": k, "type": ot, "id": oid_, "name": name, "user_id": who, "user": u[0] if u else "", "agent": ag,
+                        "fixable": k in REPAIR})
+    return out
+
+
 def boundary_summary(c):
     """For GET /api/admin/orgs: the live count + when the nightly check ran last."""
     from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): counts and ids over every organisation, no content
         res = boundary_check(c)
+        details = oa_details(c) if res["n"] else []  # 2.46.0 (#1563): names of the objects and people, for the admin
     last = boundary_last(c)
-    return {"violations": res["n"], "kinds": res["kinds"], "sample": res["sample"], "checked_at": last.get("at") or None}
+    return {"violations": res["n"], "kinds": res["kinds"], "sample": res["sample"], "checked_at": last.get("at") or None,
+            "details": details}
 
 
 # ---------------------------------------------------------------- the workspace of calendars and address books, once
