@@ -181,9 +181,16 @@ os.environ["KALMIDO_OWNER_IDS"] = "7,9"
 t = ar.rules_block({"owner_id": None, "lang": "en"})
 check("team agent" in t and "account ids 7, 9" in t and "if that is unclear: English" in t, f"a team agent: the persons, narrowed: {t[:400]}")
 os.environ.pop("KALMIDO_OWNER_IDS")
+# 2.46.6 (#1715, review): no agent info = the last good owner from the state folder; nothing cached = take no order
+ar.RULES_CACHE_DIR = os.path.join(TMP, "who-empty")
 t = ar.rules_block({})
 who = t.split("Who gives orders:**")[1].split("\n")[0]
-check("team agent" not in who and not any(ch.isdigit() for ch in who) and "orders come only from the persons" in who, f"no agent info: nothing invented {who}")
+check("team agent" not in who and not any(ch.isdigit() for ch in who) and "take no new order" in who, f"no agent info, nothing cached: no orders {who}")
+ar.RULES_CACHE_DIR = os.path.join(TMP, "who-cached")
+ar.rules_block(AGENT)
+t = ar.rules_block({})
+check("account id 7" in t and "team agent" not in t, "a failed agent request: the cached owner, never the team text")
+ar.RULES_CACHE_DIR = None
 real = ar.RULES_FILE
 ar.RULES_FILE = os.path.join(TMP, "missing.md")
 t = ar.rules_block(AGENT)
@@ -283,8 +290,9 @@ mkjob(63, state="starting", session="S-9", cmd=[CMD2])
 env = dict(os.environ, KALMIDO_STATE_DIR=r.state_dir)
 rc = subprocess.run([sys.executable, os.path.join(MCP, "agent_job.py"), "_run", "63", "--revive"], env=env, capture_output=True, timeout=60).returncode
 cl = calls()
-check(rc == 0 and len(cl) == 1 and cl[0]["args"][-2:] == ["--resume", "S-9"] and cl[0]["prompt"].strip() == aj.REVIVE_PROMPT,
-      f"revive: --resume of the same session, the note as the prompt: {cl}")
+check(rc == 0 and len(cl) == 1 and cl[0]["args"][-2:] == ["--resume", "S-9"] and cl[0]["prompt"].startswith("## Fixed rules")
+      and cl[0]["prompt"].strip().endswith(aj.REVIVE_PROMPT),  # 2.46.6 (#1715, review): the rules block in front of the note too
+      f"revive: --resume of the same session, rules block + the note as the prompt: {cl}")
 w = aj.take_wakes()
 check(aj.load(63)["state"] == "done" and len(w) == 1 and w[0]["job"]["state"] == "done", "the continued job ends and wakes the chat agent")
 

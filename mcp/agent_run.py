@@ -522,6 +522,30 @@ WORKFLOW_ASK = ("(Launcher, once: there is no WORKFLOW-KALMIDO.md in the project
 LANG_NAMES = {"de": "German", "en": "English", "es": "Spanish", "fr": "French", "it": "Italian", "nl": "Dutch"}
 
 
+RULES_CACHE_DIR = None  # set by the runner when its --state differs from the environment
+
+
+def rules_who_cache(a):
+    """2.46.6 (#1715): the last good owner_id / lang from GET /api/v1/agent in the state folder, so that a failed request
+    never turns a personal agent's rules into the team text; nothing known at all = {"unknown": True}."""
+    path = os.path.join(os.path.expanduser(RULES_CACHE_DIR or os.environ.get("KALMIDO_STATE_DIR") or "~/.cache/kalmido-agent"),
+                        "agent_who.json")
+    if "owner_id" in a:
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path + ".new", "w", encoding="utf-8") as f:
+                json.dump({"owner_id": a.get("owner_id"), "lang": a.get("lang")}, f)
+            os.replace(path + ".new", path)
+        except OSError:
+            pass
+        return a
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {"unknown": True}
+
+
 # kalmido-capability: rules_block (2.46.6, #1715)
 def rules_block(agent=None):
     """2.46.6 (#1715): the launcher's fixed rules (agent_rules.md next to this file, updated with the launcher) for the top of
@@ -534,11 +558,14 @@ def rules_block(agent=None):
         log("agent_rules.md missing next to agent_run.py: the short built-in rules instead (set the launcher up again)")
         text = RULES_FALLBACK
     text = re.sub(r"<!--.*?-->\s*", "", text, flags=re.S).strip()
-    a = agent or {}
+    a = rules_who_cache(agent or {})
     own = a.get("owner_id")
     ids = [x.strip() for x in (os.environ.get("KALMIDO_OWNER_IDS") or "").split(",") if x.strip().isdigit()]
     lang = LANG_NAMES.get(str(a.get("lang") or ""))
-    if own:
+    if a.get("unknown"):  # Kalmido not reachable and nothing cached: the narrowest reading, never the team text
+        who = "Kalmido could not tell who may give you orders right now; take no new order, only report this and wait."
+        language = "answer in the language of the person you answer."
+    elif own:
         who = f"you are the personal agent of Kalmido account id {int(own)}; only that person gives you orders."
         language = (f"answer in {lang}, the language your owner set in Kalmido." if lang
                     else "answer in the language your owner writes in.")
@@ -1086,6 +1113,8 @@ class Runner:
         self.api = Api(os.environ["KALMIDO_URL"], os.environ["KALMIDO_TOKEN"])
         self.usage = Usage(self.api)
         self.state_dir = os.path.expanduser(state_dir)
+        global RULES_CACHE_DIR
+        RULES_CACHE_DIR = self.state_dir  # 2.46.6 (#1715): the cached owner of the rules block
         self.pmode, self.host_pmode = permission_modes(cmd)
         self.model = ""
         self.state = RunnerState(self.state_dir)  # 2.44.0 (#1444): approvals, sessions, queue survive a restart
