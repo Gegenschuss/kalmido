@@ -103,10 +103,15 @@ def visible_lists(c, uid):
     ltags = ltags_of_lists(c, ids)
     ag = agent_ids(c)
     viewer_admin = bool((c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone() or [0])[0])
+    # 2.46.6 (#1680): a personal agent in a list: its owner's name (only the owner can address it, whatever agent_members says)
+    pown = {r[0]: r[1] for r in c.execute("SELECT a.user_id, COALESCE(NULLIF(u.display_name, ''), u.username) FROM agents a "
+                                          "JOIN users u ON u.id=a.owner_id WHERE a.owner_id IS NOT NULL")} if members else {}
     for ms in members.values():
         for m in ms:
             if m["user_id"] in ag:
                 m["agent"] = True
+                if m["user_id"] in pown:
+                    m["agent_owner"] = pown[m["user_id"]]
     snames = user_names(c, [r["status_by"] for r in rows])
     bells = {r[0]: (r[1], r[2]) for r in c.execute("SELECT list_id, mode, custom FROM list_bell WHERE user_id=?", (uid,))}
     repos = git_repos_of_lists(c, ids)  # 2.2.0 (#271)

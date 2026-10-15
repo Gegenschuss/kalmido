@@ -6706,3 +6706,17 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 /* 2.46.4 C (#1755) the message with a button is one line: the text is cut with an ellipsis, the button stays whole */
 #toast.one>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #toast.one button,#toast.one kbd{flex:none}
+/* 2.46.6 B (#1708 #1709): an agent's lists on its card, the workspace in the row of a personal agent, the setup offer */
+.agcard .aglists{flex-basis:100%;min-width:0;border-top:1px solid var(--line2);padding-top:.375rem}
+.aglists>summary{cursor:pointer;display:flex;align-items:center;gap:.375rem;min-height:2.25rem;font-size:.875rem;list-style:none}
+.aglists>summary::-webkit-details-marker{display:none}
+.aglists .avtop{margin:.25rem 0}
+.avls{display:flex;flex-direction:column;gap:.125rem}
+.avlrow{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;width:100%;min-height:2.75rem;padding:.375rem .5rem;border:0;border-radius:var(--r-m,.5rem);background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.avlrow:hover,.avlrow:focus-visible{background:var(--bg3)}
+.avln{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.agnm .avws{display:inline-flex;align-items:center;gap:.25rem;margin-left:.375rem;font-size:.8125rem;min-height:1.75rem}
+.avtok{margin:.5rem 0}
+.avwhich{margin:.375rem 0}
+.avwhich>summary{cursor:pointer;display:flex;align-items:center;gap:.375rem;min-height:2.25rem;font-size:.875rem;color:var(--text2)}
+.avwhich ul{margin:.25rem 0 0;padding-left:1.25rem;display:flex;flex-direction:column;gap:.25rem}
