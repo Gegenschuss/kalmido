@@ -85,6 +85,38 @@ Shape (see `de.json`):
 Labels and default texts come from the pack and the **document's** language, not from the app language of the person
 who writes the document.
 
+## Shoot calculation and industry packs (2.47)
+
+A quotation part of kind `shoot` is a **shoot calculation sheet** (Drehkalkulation), printed for the client on its own
+page. Three layers, no code plugin:
+
+- **Core** (`kalmido/office/sheet.py`): head values and rows with fixed rules. Head: shooting days, travel days (share of
+  the day rate), preparation days (share of the day rate), nights x price per night, meal rates (full day / part day),
+  Saturdays and Sundays / holidays with a surcharge in percent.
+  - crew row: day rate x (shooting days + travel days x share + [with preparation] preparation days x share + Saturdays x
+    surcharge + Sundays x surcharge), times the number of people; an optional markup raises the price, not the purchase
+  - producing: a share (for example 0.2) of the crew sum, internal
+  - car: km x rate x trips; meals: people x (travel days x part-day rate + shooting days x full-day rate, the full-day
+    rate only with more than one night); hotel: people x nights x price per night (only with nights); all external
+  - equipment set: days (default = the shooting days; another value shows "differs from n shooting days") x the price
+    per day (the sum of its devices) x (1 - discount). Picking a set copies its devices and discount into the sheet;
+    devices can be added or removed there, the master set stays as it is
+  - additional costs: free rows (text, quantity, price, external by default) or a service of the kind `shooting`
+    (such services appear only here, never among the positions of a quotation)
+  - sum, discount in percent rounded to whole units, net total (the part's net on the title page); third-party costs =
+    the purchase of the external rows (internal rows are no cost)
+- **Crew master data** (`office_roles` kind `crew`): function DE / EN, day rate (the client's price), internal / external,
+  optional markup in percent. A row copies name, rate, internal / external and markup when it is added; changing the
+  role later affects new rows only.
+- **Industry pack** (`kalmido/office/packs/industry/<code>.json`, `film` = Film & Video): data only, checked like the
+  country packs (`dk_pack_validate`) - labels DE / EN, print order of the blocks, defaults (meal rates 28 / 14,
+  surcharges 25 / 75 %, producing share 0.2, km rate 0.35), suggested crew functions. Switched on per organisation in
+  the office settings (`industry_packs: ["film"]`); without a pack there is no shoot calculation.
+
+Purchase, surplus, markup and internal / external are for the organisation's admins only: members edit the sheet but
+get none of these values (the price of a row with a markup is shown including it) and cannot set them; the server keeps
+the stored values. The printed page has no internal / external, purchase or markup column.
+
 ## Import and export of master data
 
 Settings > Office & finance > "Export" downloads one JSON file with the settings and all master data (no documents, no
