@@ -13,7 +13,8 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 const CT = process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test';
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore',
-  env: {...process.env, EXTRA: (process.env.EXTRA || '') + ' -e KALMIDO_CALENDAR_ALLOW_HOSTS=127.0.0.1:8098'}});
+  // 2.48.0 (#1152): the token is always sealed with a key derived from KALMIDO_SECRET_KEY (review S2) -> the container needs one
+  env: {...process.env, EXTRA: (process.env.EXTRA || '') + ' -e KALMIDO_CALENDAR_ALLOW_HOSTS=127.0.0.1:8098 -e KALMIDO_SECRET_KEY=AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='}});
 let CK;
 const call = async (method, url, body, ck = CK, extra = {}) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...(ck ? {Cookie: ck} : {}), ...extra}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
