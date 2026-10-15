@@ -56,14 +56,15 @@ const FAM = 'cal,habits,comments,collab,family';
   click(w, d.querySelector('.smodal [data-purpose="family"]'));
   check(await until(() => exOff !== null, 40) && exOff, 'the purpose dialog: switch "Create a sample project", off by default');
   w.confirm = () => true;
-  check(await until(() => w.eval(`feat('family')`) && (w.eval('S.lists') || []).filter(l => l.family).length === 4, 60), 'purpose Family: the module on, four starter lists');
+  check(await until(() => w.eval(`feat('family')`) && (w.eval('S.lists') || []).filter(l => l.family).length === 2, 60), 'purpose Family: the module on, two starter lists (2.46.1 #1615)');
   await until(() => d.querySelector('.smodal [data-purpose="family"].on'), 40);
   check(d.querySelector('.smodal [data-purpose="family"]')?.getAttribute('aria-checked') === 'true', 'the chosen purpose is marked');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove()); w.close();
   let st = await call('GET', '/api/state');
   const L = Object.fromEntries(st.lists.filter(l => l.family).map(l => [l.family, l.id]));
-  for (const k of ['shopping', 'household', 'meals']) { await call('PUT', `/api/lists/${L[k]}/members`, {user_id: BOB, role: 'edit'}); await call('PUT', `/api/lists/${L[k]}/members`, {user_id: LINA, role: 'edit'}); }
-  const chores = st.tasks.filter(t => t.list_id === L.household);
+  L.household = L.meals = L.family;  // 2.46.1 (#1615): one list "Family" with sections instead of Household / Meal plan
+  for (const k of ['shopping', 'family']) { await call('PUT', `/api/lists/${L[k]}/members`, {user_id: BOB, role: 'edit'}); await call('PUT', `/api/lists/${L[k]}/members`, {user_id: LINA, role: 'edit'}); }
+  const chores = st.tasks.filter(t => t.list_id === L.household && t.repeat);
   const BD = await call('POST', '/api/family/occasions', {name: 'Grandma Erika', date: '1946-' + day(5).slice(5), gifts: ['Book', 'Scarf']});
   await call('POST', '/api/family/deadlines', {type: 'passport', who: 'Lina', expires: day(40)});
   await call('PATCH', `/api/tasks/${chores[0].id}`, {rotation: {who: [1, BOB, LINA], mode: 'done'}});
@@ -132,7 +133,7 @@ const FAM = 'cal,habits,comments,collab,family';
   // a meal for tomorrow (the prompt) + its ingredients
   w.prompt = () => 'Lasagne';
   click(w, d.querySelector(`#view [data-act="fam-meal"][data-day="${day(1)}"]`) || d.querySelectorAll('#view [data-act="fam-meal"]')[0]);
-  check(await until(async () => (await call('GET', '/api/state')).tasks.some(t => t.title === 'Lasagne' && t.list_id === L.meals)), 'a meal added to the meal plan');
+  check(await until(async () => (await call('GET', '/api/state')).tasks.some(t => t.title === 'Lasagne' && t.list_id === L.meals && t.fam?.kind === 'meal' && t.section_id)), 'a meal added to the meal plan (2.46.1: list Family, marked, in its section)');
   const meal = (await call('GET', '/api/state')).tasks.find(t => t.list_id === L.meals && /Spaghetti/.test(t.title));
   click(w, d.querySelector(`#view [data-act="fam-ingr"][data-id="${meal.id}"]`));
   check(await until(async () => (await call('GET', '/api/state')).tasks.filter(t => t.list_id === L.shopping && t.status === 0).length === 7), 'ingredients on the shopping list (3 + 4)');
@@ -182,7 +183,7 @@ const FAM = 'cal,habits,comments,collab,family';
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   w.eval('listModal()'); await sleep(200);
   md = d.querySelector('.modal.lnew');
-  check(md.querySelector('#l-fam') && md.querySelector('#l-fam').options.length === 6, 'new list: "Used for" with six choices');
+  check(md.querySelector('#l-fam') && md.querySelector('#l-fam').options.length === 7, 'new list: "Used for" with seven choices (2.46.1 #1615: Family)');
   md.querySelector('#l-name').value = 'Weekend shop';
   change(w, md.querySelector('#l-fam'), 'shopping');
   check(md.querySelector('#l-dab').checked, 'a shopping list: done at the bottom ticked');
@@ -194,7 +195,7 @@ const FAM = 'cal,habits,comments,collab,family';
   check(!d.querySelector('#view .ghead[data-section]'), 'empty shop areas are not listed in the list view');
   w.eval(`listModal(${L.household})`); await sleep(200);
   md = d.querySelector('.modal.lmodal');
-  check(md.querySelector('#l-fam').value === 'household', 'edit list: "Used for" Household');
+  check(md.querySelector('#l-fam').value === 'family', 'edit list: "Used for" Family (2.46.1 #1615)');
   md.remove(); w.close();
 
   // ================= jsdom: shopping mode
