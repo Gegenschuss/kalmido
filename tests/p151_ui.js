@@ -270,7 +270,9 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(!!d.querySelector('.tvrun.idle') && /No timer running/.test(d.querySelector('.tvrun').textContent), 'nothing running: short hint');
   await w.eval(`timerStart({task_id: ${tt}})`); await sleep(300);
   const card = () => d.querySelector('#view .tvrun:not(.idle)');
-  check(!!card() && d.querySelector('#view').firstElementChild.firstElementChild === card(), 'running: card on top of the page');
+  // 2.44.0 (#1187): the area tabs (Time: time tracking / focus timer) may stand above the page; the card is the first thing below them
+  const top = [...d.querySelector('#view').children].find(x => !x.classList.contains('mgtabs'));
+  check(!!card() && top && top.firstElementChild === card(), 'running: card on top of the page');
   check(/Write offer/.test(card().querySelector('.tvr-task').textContent) && /Client X/.test(card().querySelector('.tvr-list').textContent) && /since \d\d:\d\d/.test(card().textContent), 'card: task, project, start time');
   w.eval(`S.timer.start = new Date(Date.now() - 3723e3).toISOString()`); await sleep(1300);
   check(/1:02:0\d/.test(card().querySelector('[data-timer-live]').textContent), 'card: live time ticks: ' + card().querySelector('[data-timer-live]').textContent);

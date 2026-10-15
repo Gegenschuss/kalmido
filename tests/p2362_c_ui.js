@@ -80,7 +80,9 @@ const FEAT = 'cal,events,comments,collab,office,agents';
   // the typing line of an agent
   check(!!new w.DOMParser().parseFromString(w.typingHtml([{name: 'Claude', typing: 0, busy: false}], 'chat-typing'), 'text/html').querySelector('.ttx svg.lbot'), 'typing line: robot before the agent');
   // "More" on the phone: Office & finance
-  check(w.tabOverflow().more.some(t => t.id === 'office') || w.tabOverflow().shown.some(t => t.id === 'office'), 'More offers Office & finance: ' + w.tabOverflow().more.map(t => t.id).join(','));
+  // 2.44.0 (#1187): Office & finance is part of the area Office (id a:office)
+  const isOff = t => t.id === 'office' || t.id === 'a:office';
+  check(w.tabOverflow().more.some(isOff) || w.tabOverflow().shown.some(isOff), 'More offers Office & finance: ' + w.tabOverflow().more.map(t => t.id).join(','));
   // "Emoji": as before
   await call('PATCH', '/api/settings', {side_icons: 'emoji'});
   w.close();
