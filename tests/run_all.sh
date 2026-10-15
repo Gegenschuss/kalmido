@@ -670,6 +670,9 @@ fresh; run p2450_b_ui node p2450_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2451_a_api "$PY" p2451_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.45.1 part B: #1556 devices with a German and an English name (master data, legacy import Device DE / Device EN, undo)
 fresh; run p2451_b_api "$PY" p2451_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.46.1 part C: #1554 several contacts at once (delete / move in one request, rights, birthdays, CardDAV, token API; the selection)
+fresh; run p2461_c_api "$PY" p2461_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2461_c_ui node p2461_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
