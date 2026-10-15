@@ -36,7 +36,7 @@ const rowBox = el => { el.getBoundingClientRect = () => ({top: 100, bottom: 140,
   // ================= #1330 desktop (alice)
   let w = await boot({user: 'alice', hash: 'l/' + P, ls: {hintsSeen: ['dgmulti']}}); let d = w.document;
   const row = id => d.querySelector(`#view .trow[data-id="${id}"]`);
-  check(await until(() => row(T1) && row(T3)), 'the project list renders');
+  check(await until(() => row(T1) && row(T2) && row(T3)), 'the project list renders');  // 2.46.1: T2 too (it is dragged next; slow CI runners)
   let calls = spy(w);
   // first drag: the hint once
   dnd(w, row(T2), 'dragstart'); await sleep(50);
