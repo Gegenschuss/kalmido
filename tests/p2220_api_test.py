@@ -509,38 +509,38 @@ fs = Bo.post(B + "/api/me/purpose", json={"purpose": "team", "examples": False})
 check(not {"contracts", "home", "travel", "health"} & set(fs), "#741: Team without Home & life")
 
 # ================================================================== #752: organisations
+# 2.46.0 (#1592): no organisation from the start (workspaces); the instance admin creates them, nobody joins one by default
 j = A.get(B + "/api/admin/orgs").json()
-check(len(j["orgs"]) == 1 and j["orgs"][0]["name"] == "Kalmido" and j["visibility"] == "org" and 1 in j["orgs"][0]["members"] and BOB in j["orgs"][0]["members"],
-      "#752: one organisation from the start (named after the domain), everyone in it, visibility org " + json.dumps(j)[:200])
-O1 = j["orgs"][0]["id"]
-# 2.45.0 (#1552): the login page names an organisation only in the mode organisation (not for the only one of the server)
+check(j["orgs"] == [] and j["visibility"] == "org" and j["mode"] == "workspaces", "#1592: no organisation from the start " + json.dumps(j)[:200])
+PEOPLE = [u["id"] for u in A.get(B + "/api/users?all=1").json()["users"] if u.get("kind") != "agent"]
+r = A.post(B + "/api/admin/orgs", json={"name": "Kalmido"})
+check(r.status_code == 201, "#1592: the instance admin creates an organisation " + r.text[:200])
+O1 = r.json()["id"]
+check(A.patch(B + f"/api/admin/orgs/{O1}", json={"members": PEOPLE, "admins": [1]}).ok, "#1592: its members")
+# 2.45.0 (#1552): the login page names no organisation
 check(A.get(B + "/api/auth/info").json()["org"] == "" and A.get(B + "/api/state").json()["me"]["orgs"] == ["Kalmido"], "#752/#1552: no name on the login page, the name in the state")
-# 2.23.0 (#799): organisations are no longer created in the app: a second one is set up in the database (an instance that
-# kept several from 2.22 = "multi", where members and visibility stay editable)
-check(A.post(B + "/api/admin/orgs", json={"name": "Other Co", "icon": "🏭"}).status_code == 403, "#799: no new organisation in the app")
-O2 = dbx("INSERT INTO orgs(name,icon,created_at) VALUES('Other Co','🏭','2026-10-05T00:00:00Z') RETURNING id")[0][0]
+r = A.post(B + "/api/admin/orgs", json={"name": "Other Co", "icon": "🏭"})
+check(r.status_code == 201, "#1592: a second organisation in the app")
+O2 = r.json()["id"]
 ZOE = A.post(B + "/api/users", json={"username": "zoe", "display_name": "Zoe", "password": "password123", "orgs": [O2], "email": "zoe@other.test"}).json()["id"]
 Zo = sess("zoe")
-check(set(next(u for u in A.get(B + "/api/users").json()["users"] if u["id"] == ZOE)["orgs"]) == {O2}, "#752: a new person in the chosen organisation")
+check(set(next(u for u in A.get(B + "/api/users?all=1").json()["users"] if u["id"] == ZOE)["orgs"]) == {O2}, "#752: a new person in the chosen organisation")
 seen_b = {u["id"] for u in Bo.get(B + "/api/users").json()["users"]}
 seen_z = {u["id"] for u in Zo.get(B + "/api/users").json()["users"]}
-check(ZOE not in seen_b and BOB not in seen_z and 1 not in seen_z and ZOE in seen_z, "#752: people see only their organisation " + str((seen_b, seen_z)))
-check(len(A.get(B + "/api/users").json()["users"]) >= 5 and ZOE in {u["id"] for u in A.get(B + "/api/users").json()["users"]}, "#752: admins see everyone")
+# 2.46.0 (#1592): the admin who created "Other Co" is its first member (and admin)
+check(ZOE not in seen_b and BOB not in seen_z and ZOE in seen_z, "#752: people see only their organisation " + str((seen_b, seen_z)))
+check(EVE not in {u["id"] for u in Zo.get(B + "/api/users").json()["users"]} and {ZOE, EVE} <= {u["id"] for u in A.get(B + "/api/users?all=1").json()["users"]},
+      "#1592: the user management (?all=1) lists everyone")
 BL = Bo.post(B + "/api/lists", json={"name": "Bob's list", "org_id": None}).json()["id"]  # 2.28.0: a private list (an organisation's list is shared only inside it)
 check(Bo.put(B + f"/api/lists/{BL}/members", json={"user_id": ZOE, "role": "edit"}).status_code == 404, "#752: sharing with someone outside: like an unknown user (404)")
 check(Bo.put(B + "/api/folders/people", json={"folder": "X", "user_id": ZOE}).status_code in (400, 404), "#752: … also a folder")
 check(Bo.post(B + "/api/events", json={"title": "Meet", "start": D(1) + "T10:00", "attendees": [{"user_id": ZOE}]}).status_code in (400, 409), "#752: … also as an attendee")
-# own contacts
-A.put(B + "/api/admin/orgs/visibility", json={"mode": "contacts"})
-check(A.get(B + "/api/state").json()["people_visibility"] == "contacts", "#752: mode own contacts")
-seen_b = {u["id"] for u in Bo.get(B + "/api/users").json()["users"]}
-check(1 in seen_b and ZOE not in seen_b and EVE not in seen_b, "#752: contacts: only people one shares a list with " + str(seen_b))
+check(A.put(B + "/api/admin/orgs/visibility", json={"mode": "contacts"}).status_code == 403, "#1592: no visibility switch")
 r = Bo.put(B + f"/api/lists/{BL}/members", json={"email": "nobody@nowhere.test", "role": "edit"})
 r2 = Bo.put(B + f"/api/lists/{BL}/members", json={"email": "ZOE@other.test", "role": "edit"})
 check(r.ok and r2.ok and r.json() == r2.json() == {"ok": True, "by_email": True}, "#752: share by e-mail: the same answer whether or not the address has an account")
 check(BL in {l["id"] for l in Zo.get(B + "/api/state").json()["lists"]} and BOB in {u["id"] for u in Zo.get(B + "/api/users").json()["users"]},
       "#752: … the list is shared, now they are connected")
-A.put(B + "/api/admin/orgs/visibility", json={"mode": "org"})
 check(A.patch(B + f"/api/admin/orgs/{O2}", json={"name": "Other Company", "members": [ZOE, BOB]}).ok and BOB in {u["id"] for u in Zo.get(B + "/api/users").json()["users"]},
       "#752: rename + members")
 check(Bo.get(B + "/api/admin/orgs").status_code == 403, "#752: organisations are for admins")
