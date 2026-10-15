@@ -188,7 +188,46 @@ check(Ca.get(B + T).json()["trips"] == [], "#1022: another organisation sees no 
 check(Ca.patch(B + T + f"/{TRB['id']}", json={"dest": "x"}).status_code == 404 and Ca.delete(B + T + f"/{TRB['id']}").status_code == 404
       and Ca.post(B + f"{T}/{TRB['id']}/items", json={"amount": 1}).status_code == 404, "#1022: another organisation reaches nothing (404)")
 check(Ca.post(B + f"{T}/bill", json={"doc_id": Q["id"], "item_ids": [TRB["items"][0]["id"]]}).status_code == 404, "#1022: another organisation cannot bill foreign receipts")
-# TODO-2473-privat: the same trip flow in a personal office (person without organisation), once #1360 (part A) is merged
+# the same trip flow in a personal office (person without organisation, part A) + a second person sees nothing
+for u, n in (("dora", "Dora Frei"), ("erik", "Erik Frei")):
+    r = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "email": f"{u}@example.com"})
+    assert r.ok, r.text
+Do, Er = sess("dora"), sess("erik")
+for s in (Do, Er):
+    s.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
+DORA = Do.get(B + "/api/state").json()["me"]["id"]
+check(Do.get(B + O + "/settings").json().get("role") == "admin", "#1360: a person without organisation is admin of their own office")
+Do.put(B + O + "/settings", json={"company_fields": {"name": "Dora Film", "street": "Musterweg 2", "zip": "12345", "city": "Musterstadt", "country": "DE"}})
+CLP = Do.post(B + "/api/clients", json={"name": "Privatkunde Eins"}).json()["id"]
+r = Do.post(B + T, json={"date_from": "2025-09-03", "dest": "Hamburg", "people": [{"id": DORA}, {"name": "Externe Person"}], "purpose": "job", "client_id": CLP,
+                         "items": [{"date": "2025-09-03", "category": "train", "amount": "100,00"},
+                                   {"date": "2025-09-03", "category": "hotel", "amount": 220, "currency": "USD", "fx_rate": "1.10"}]})
+check(r.status_code == 201 and r.json()["total"] == "300.00", "#1360/#1022: a trip in the personal office " + r.text[:200])
+PT = r.json()
+check(Do.post(B + T, json={"date_from": "2025-09-01", "people": [{"id": ALICE}]}).status_code == 400, "#1360/#1022: a person outside the area is refused (personal office)")
+check(Do.post(B + T, json={"date_from": "2025-09-01", "client_id": CL}).status_code == 400, "#1360/#1022: a client of an organisation is refused (personal office)")
+j = Do.get(B + f"{T}/report?by=person").json()
+check({g["label"]: g["amount"] for g in j["rows"]} == {"Dora Frei": "150.00", "Externe Person": "150.00"}, f"#1360/#1022: by person in the personal office {j['rows']}")
+Pq = Do.post(B + D, json={"project_title": "Privatfilm", "client_id": CLP}).json()
+r = Do.post(B + f"{T}/bill", json={"doc_id": Pq["id"], "item_ids": [x["id"] for x in PT["items"]], "markup_pct": 0})
+check(r.ok and len(r.json()["positions"]) == 2, "#1360/#1022: billed on to a quotation of the personal office " + r.text[:160])
+PB = r.json()
+check(Do.post(B + f"{T}/bill", json={"doc_id": Pq["id"], "item_ids": [PT["items"][0]["id"]]}).status_code == 409, "#1360/#1022: never billed twice (personal office)")
+r = Do.post(B + f"{T}/unbill", json={"item_ids": PB["items"], "positions": PB["positions"]})
+check(r.ok and r.json()["removed"] == 2, "#1360/#1022: the undo takes the positions back out (personal office)")
+r = Do.delete(B + T + f"/{PT['id']}")
+old = r.json()["trip"]
+r = Do.post(B + T, json=old)
+check(r.status_code == 201 and r.json()["total"] == "300.00", "#1360/#1022: delete + post back (personal office)")
+PT = r.json()
+rows = sql("SELECT amount FROM office_trip_items WHERE trip_id=?", (PT["id"],))
+check(rows and all(str(r_[0]).startswith("kenc1:") for r_ in rows), "#1360/#1022: amounts encrypted at rest (personal office)")
+# nobody else reaches it: another person without organisation, a member of an organisation, an organisation admin
+check(Er.get(B + T).json()["trips"] == [] and Ca.get(B + T).json()["trips"] == [] and A.get(B + T).json()["trips"] != [], "#1360/#1022: the trips of a personal office stay private")
+check(all(x.status_code == 404 for x in (Er.patch(B + T + f"/{PT['id']}", json={"dest": "x"}), Er.delete(B + T + f"/{PT['id']}"), Ca.post(B + f"{T}/{PT['id']}/items", json={"amount": 1}))),
+      "#1360/#1022: other people reach nothing of a personal office (404)")
+check(Er.post(B + f"{T}/bill", json={"doc_id": Pq["id"], "item_ids": [PT["items"][0]["id"]]}).status_code == 404, "#1360/#1022: others cannot bill foreign receipts")
+check(not any(t["id"] == PT["id"] for t in A.get(B + T).json()["trips"]), "#1360/#1022: not even an admin of an organisation sees it")
 
 # ---------------------------------------------------------------- #1652 cash flow
 F = O + "/fixed-costs"
@@ -260,7 +299,30 @@ check(Bo.get(B + O + "/cashflow").status_code == 403 and Bo.get(B + F).status_co
 cf2 = Ca.get(B + O + f"/cashflow?from={M0}&months=6").json()
 check(cf2["entries"] == [] and Ca.get(B + F).json()["items"] == [], "#1652: another organisation sees nothing")
 check(Ca.patch(B + f"{F}/{FM + 1}", json={"label": "x"}).status_code == 404, "#1652: another organisation cannot change fixed costs")
-# TODO-2473-privat: the cash flow of a personal office (person without organisation), once #1360 (part A) is merged
+# the cash flow of a personal office (person without organisation, part A) + a second person sees nothing
+PF = Do.post(B + F, json={"label": "Atelier", "amount": "400", "start": M0 + "-01", "repeat": "monthly"})
+check(PF.status_code == 201 and PF.json()["amount"] == "400.00", "#1360/#1652: a fixed cost in the personal office " + PF.text[:120])
+PFI = PF.json()["id"]
+Pq2 = Do.post(B + D, json={"project_title": "Privatfilm zwei", "client_id": CLP, "service_from": M1 + "-02", "service_to": M1 + "-20"}).json()
+PG = Do.put(B + f"{D}/{Pq2['id']}/items", json={"items": [{"kind": "service", "title": "Dreh", "qty": 1, "unit": "day", "rate": 1000, "cost": 200, "intext": "extern"}]}).json()["totals"]["gross"]
+for st in ("sent", "accepted"):
+    Do.post(B + f"{D}/{Pq2['id']}/status", json={"status": st})
+Do.post(B + T, json={"date_from": TODAY, "dest": "Kurztrip", "items": [{"date": TODAY, "category": "taxi", "amount": 20}]})
+pcf = Do.get(B + O + f"/cashflow?from={M0}&months=6").json()
+PE = pcf["entries"]
+pby = lambda k: [e for e in PE if e["kind"] == k]
+check(len(pcf["rows"]) == 6 and pcf["rows"][0]["current"], "#1360/#1652: six months (personal office)")
+check([(e["month"], e["state"]) for e in pby("fixed")][:2] == [(M0, "actual"), (M1, "plan")] and len(pby("fixed")) == 6, f"#1360/#1652: the monthly fixed cost {pby('fixed')}")
+check(len(pby("offer")) == 1 and pby("offer")[0]["month"] == M1 and float(pby("offer")[0]["amount"]) == float(PG), f"#1360/#1652: the accepted quotation lands in its month {pby('offer')}")
+check([(e["month"], e["amount"]) for e in pby("purchase")] == [(M1, "200.00")], f"#1360/#1652: its purchase {pby('purchase')}")
+check([(e["month"], e["state"], e["amount"]) for e in pby("trip")] == [(M0, "actual", "20.00")], f"#1360/#1652: the travel receipt {pby('trip')}")
+check(str(sql("SELECT amount FROM office_fixed_costs WHERE id=?", (PFI,))[0][0]).startswith("kenc1:"), "#1360/#1652: fixed cost encrypted at rest (personal office)")
+ecf = Er.get(B + O + f"/cashflow?from={M0}&months=6").json()
+check(ecf["entries"] == [] and Er.get(B + F).json()["items"] == [], "#1360/#1652: another person sees none of it")
+check(Ca.get(B + F).json()["items"] == [] or all(i["label"] != "Atelier" for i in Ca.get(B + F).json()["items"]), "#1360/#1652: nor does a person of an organisation")
+check(Er.patch(B + f"{F}/{PFI}", json={"label": "x"}).status_code == 404 and Er.delete(B + f"{F}/{PFI}").status_code == 404, "#1360/#1652: others cannot change or delete it (404)")
+check(not any(e["label"] == "Atelier" for e in A.get(B + O + f"/cashflow?from={M0}&months=6").json()["entries"] if e["kind"] == "fixed"), "#1360/#1652: not in the cash flow of an organisation")
+check(Do.delete(B + f"{F}/{PFI}").status_code == 200, "#1360/#1652: the owner deletes it")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
