@@ -5,6 +5,7 @@
 // - #1664 a subfolder on the upper half of a top folder becomes a top-level folder right before it; lower half = into it
 // - #1647 the import action bar is a flex row over the full width (the spacer works)
 const {execFileSync} = require('child_process');
+const {webcrypto} = require('crypto');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
@@ -42,19 +43,20 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   check(await until(async () => (await call('GET', `/api/tasks/${T1}`)).section_id === C), '#1662: dropped on the name: the task is in the empty section');
 
   // ================= #1663
+  Object.defineProperty(w, 'crypto', {configurable: true, value: webcrypto});
+  check(!!w.crypto?.subtle, '#1663: WebCrypto in the test page');
   w.eval(`E2E.st = {set: true}`);
   check(w.eval(`e2eNoteHtml({id: 7, encrypted_note_mine: false})`) === '', '#1663: locked, no note of mine: no field at all');
   check(/note-unlock/.test(w.eval(`e2eNoteHtml({id: 7, encrypted_note_mine: true})`)), '#1663: locked, a note of mine: "Unlock" as before');
 
   // ================= #1664
   w.eval(`S.settings.folders = JSON.stringify(['Work', 'Work' + FSEP + 'Sub', 'Home'])`);
-  const fh = f => ({classList: {contains: () => false}, dataset: {folder: f}});
-  const sub = w.eval(`'Work' + FSEP + 'Sub'`);
-  check(w.eval(`folderDropKind('Work' + FSEP + 'Sub', ${JSON.stringify(fh('Home'))}, false)`) === 'uptop', '#1664: subfolder on the upper half of a top folder = top level before it');
-  check(w.eval(`folderDropKind('Work' + FSEP + 'Sub', ${JSON.stringify(fh('Home'))}, true)`) === 'into', '#1664: lower half = into it (as before)');
-  check(w.eval(`folderDropKind('Work' + FSEP + 'Sub', ${JSON.stringify(fh('Work'))}, false)`) === 'uptop' && w.eval(`folderDropKind('Work' + FSEP + 'Sub', ${JSON.stringify(fh('Work'))}, true)`) === null,
+  const fh = f => { const e = d.createElement('div'); e.className = 'fhead'; e.dataset.folder = f; w.__fh = w.__fh || {}; w.__fh[f] = e; return f; };  // real nodes, kept on the page for eval
+  check(w.eval(`folderDropKind('Work' + FSEP + 'Sub', __fh[${JSON.stringify(fh('Home'))}], false)`) === 'uptop', '#1664: subfolder on the upper half of a top folder = top level before it');
+  check(w.eval(`folderDropKind('Work' + FSEP + 'Sub', __fh[${JSON.stringify(fh('Home'))}], true)`) === 'into', '#1664: lower half = into it (as before)');
+  check(w.eval(`folderDropKind('Work' + FSEP + 'Sub', __fh[${JSON.stringify(fh('Work'))}], false)`) === 'uptop' && w.eval(`folderDropKind('Work' + FSEP + 'Sub', __fh[${JSON.stringify(fh('Work'))}], true)`) === null,
     '#1664: onto its own parent: upper half takes it out, lower half nothing');
-  await w.eval(`sideDrop({folder: 'Work' + FSEP + 'Sub'}, ${JSON.stringify(fh('Home'))}, false)`);
+  await w.eval(`sideDrop({folder: 'Work' + FSEP + 'Sub'}, __fh[${JSON.stringify(fh('Home'))}], false)`);
   await sleep(400);
   const fl = JSON.parse(w.eval(`S.settings.folders`));
   check(JSON.stringify(fl) === JSON.stringify(['Work', 'Sub', 'Home']), '#1664: the folder is now top-level, right before Home ' + JSON.stringify(fl));
