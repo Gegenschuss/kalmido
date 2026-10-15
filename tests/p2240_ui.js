@@ -163,7 +163,7 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   w.eval(`settingsModal('users')`); await sleep(500);
   let md = d.querySelector('.smodal');
   const subs = [...md.querySelectorAll('[data-admsub]')].map(b => b.dataset.admsub);
-  check(subs.join() === 'users,signin,org,server,log', '#826: Administration in five sub-tabs ' + subs.join());
+  check(subs.join() === 'users,signin,org,agents,server,log', '#826: Administration in sub-tabs ' + subs.join());  // 2.46.6 (#1710): + agents (the API is on here)
   check(!md.querySelector('[data-admp="users"]').hidden && md.querySelector('[data-admp="server"]').hidden && md.querySelector('[data-admp="server"] #s-quota'), '#826: People shown, Server hidden (but there)');
   click(w, md.querySelector('[data-admsub="server"]')); await sleep(100);
   check(!md.querySelector('[data-admp="server"]').hidden && w.__store['tasks.admSub'] === '"server"', '#826: a sub-tab opens and is remembered');
