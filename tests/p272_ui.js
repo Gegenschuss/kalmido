@@ -205,7 +205,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(!md.querySelector('#s-uag') && md.querySelector('#myag-user'), 'Bob: the create form, no admin switch');
   md.querySelector('#myag-user').value = 'bobs-claude'; md.querySelector('#myag-name').value = 'Bob\'s Claude';
   click(w, md.querySelector('[data-myag-act="new"]')); await sleep(900);
-  check(/^abk_/.test(d.querySelector('.modal:not(.smodal) #sec-val')?.value || ''), 'the token is shown once');
+  // 2.46.6 (#1709): "Set it up on a computer now?" first; the token only behind "Show the token for an own setup"
+  check(await until(() => d.querySelector('.modal:not(.smodal) [data-m="av-setup"]')), 'the setup is offered');
+  click(w, d.querySelector('.modal:not(.smodal) [data-m="av-tok"]')); await sleep(200);
+  check(/^abk_/.test(d.querySelector('.modal:not(.smodal) #av-tokv')?.value || ''), 'the token is shown once');
   check(await until(() => md.querySelector('[data-myag]')), 'his agent in the list');
   check((await call('GET', '/api/my/agents', null, CKB)).agents.length === 1, 'created on the server');
   w.close();
