@@ -3422,7 +3422,7 @@
   "A systemd user unit runs mcp/agent_launcher.sh: it applies the runtime settings from Kalmido and stops the agent while it is paused.": "Een systemd-user-unit draait mcp/agent_launcher.sh: die past de runtime-instellingen uit Kalmido toe en stopt de agent zolang hij gepauzeerd is.",
   "A standard account for the agent, hidden from the login window.": "Een standaardaccount voor de agent, verborgen in het inlogvenster.",
   "pf rules for the agent user only: DNS, Kalmido and public HTTPS allowed, the local network blocked. Check them again after macOS updates.": "pf-regels alleen voor de agentgebruiker: DNS, Kalmido en openbaar HTTPS toegestaan, het lokale netwerk geblokkeerd. Controleer ze opnieuw na macOS-updates.",
-  "A LaunchDaemon with UserName kalmido-agent runs mcp/agent_launcher.ps1 with PowerShell 7 (the shell version needs GNU tools that macOS lacks).": "Een LaunchDaemon met UserName kalmido-agent draait mcp/agent_launcher.ps1 met PowerShell 7 (de shellversie heeft GNU-tools nodig die macOS niet heeft).",
+  "A LaunchDaemon with UserName kalmido-agent runs mcp/agent_launcher.sh (since 2.44 it runs on macOS as it is, no PowerShell needed).": "Een LaunchDaemon met UserName kalmido-agent start mcp/agent_launcher.sh (sinds 2.44 werkt het zo op macOS, zonder PowerShell).",
   "A standard local account, member of Users only, never Administrators. Sign in once to create its profile.": "Een lokaal standaardaccount, alleen lid van Gebruikers, nooit van Administrators. Log één keer in om het profiel aan te maken.",
   "Windows Defender Firewall: block the local network for the programs the agent runs (Claude Code, Python). Block rules win, so leave a Kalmido in your network out of the ranges.": "Windows Defender Firewall: blokkeer het lokale netwerk voor de programma's die de agent draait (Claude Code, Python). Blokkeerregels gaan voor, dus laat een Kalmido in je netwerk buiten de bereiken.",
   "Install Python 3, Git, PowerShell 7 and Claude Code, log in once. The wrapper run.ps1 reads the env file and starts the MCP server.": "Installeer Python 3, Git, PowerShell 7 en Claude Code, log één keer in. Het wrapperscript run.ps1 leest het env-bestand en start de MCP-server.",
@@ -6717,5 +6717,6 @@
   "Computer removed": "Computer verwijderd",
   "Too many failed attempts, please wait a few minutes": "Te veel mislukte pogingen, wacht een paar minuten",
   "The API is switched off on this server": "De API is op deze server uitgeschakeld",
-  "This setup code is invalid, used or expired. Create a new one in Kalmido.": "Deze instelcode is ongeldig, al gebruikt of verlopen. Maak een nieuwe in Kalmido."
+  "This setup code is invalid, used or expired. Create a new one in Kalmido.": "Deze instelcode is ongeldig, al gebruikt of verlopen. Maak een nieuwe in Kalmido.",
+  "Quickest on your own computer: the download button in your agent’s row (Set up on a computer) installs it with one command.": "Het snelst op je eigen computer: de downloadknop in de rij van je agent (Op een computer instellen) installeert hem met één opdracht."
 }
