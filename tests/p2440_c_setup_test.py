@@ -226,7 +226,9 @@ for b in BASHES:
         check("<key>KeepAlive</key><true/>" in o and "<key>RunAtLoad</key><true/>" in o and "/bin/bash" in o and "--events" in o, f"{b}: LaunchAgent with KeepAlive / RunAtLoad")
     else:
         check("Restart=always" in o and "WantedBy=default.target" in o and "--events" in o and "--mcp-config" in o, f"{b}: systemd --user unit")
-    check(not ST["redeem"] and os.listdir(home) == [], f"{b}: the dry run redeems nothing and writes nothing: {os.listdir(home)}")
+    # (on macOS /usr/bin/python3, a developer-tools shim, may create ~/Library/Caches itself: only our files count)
+    left = [x for x in os.listdir(home) if x != "Library"] + (["Library/LaunchAgents"] if os.path.exists(os.path.join(home, "Library", "LaunchAgents")) else [])
+    check(not ST["redeem"] and not left, f"{b}: the dry run redeems nothing and writes nothing: {left}")
     # real run without autostart
     r = subprocess.run([b, SETUP_SH, "--url", URL, "--code", "ks_good_code", "--dir", "~/my project", "--cmd", "fakeagent", "--no-autostart"],
                        env=env, capture_output=True, text=True, timeout=120)
