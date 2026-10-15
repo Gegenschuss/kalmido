@@ -261,7 +261,8 @@ const TOUCH = `(() => {
   check(md && !md.querySelector('#l-members') && !md.querySelector('#l-pub') && !md.querySelector('#l-owner') && /Shared with 1 person · 1 agent/.test(md.querySelector('#l-shsum').textContent), 'list dialog: only a summary: ' + md?.querySelector('#l-shsum')?.textContent);
   click(w, md.querySelector('[data-m="share-open"]')); await sleep(600);
   md = await until(() => d.querySelector('.modal.shmodal'));
-  check(md && !d.querySelector('.modal.lmodal') && /Share “Website Relaunch Müller GmbH”/.test(md.querySelector('h3').textContent), 'Sharing > Share… opens the Share dialog');
+  // 2.46.0 (#1604): the list dialog waits hidden behind the Share dialog (Back returns to it) instead of closing
+  check(md && d.querySelector('.modal.lmodal')?.style.display === 'none' && /Share “Website Relaunch Müller GmbH”/.test(md.querySelector('h3').textContent), 'Sharing > Share… opens the Share dialog');
   await until(() => md.querySelector('#l-adduser'));
   const ppl = md.querySelector('#l-members');
   check(ppl.querySelector(`.mrow[data-uid="${BOB}"] [data-mrole="${BOB}"]`) && !ppl.querySelector(`.mrow[data-uid="${ag.id}"]`), 'people: Bob with his role, no agent');

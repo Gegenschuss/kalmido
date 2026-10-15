@@ -51,9 +51,11 @@ s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True})
+# 2.46.0 (#1592): no organisation from the start any more: create the one these tests use (id 1), new people join it
+assert A.post(B + "/api/admin/orgs", json={"name": "Kalmido"}).ok
 ids = {}
 for u in ("bob", "eve"):
-    r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123", "email": f"{u}@example.com"})
+    r = A.post(B + "/api/users", json={"orgs": [1], "username": u, "display_name": u.title(), "password": "password123", "email": f"{u}@example.com"})
     assert r.ok, r.text
     ids[u] = r.json()["id"]
 BOB, EVE = ids["bob"], ids["eve"]

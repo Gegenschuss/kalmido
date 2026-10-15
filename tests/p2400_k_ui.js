@@ -25,7 +25,8 @@ const typeIn = (w, el, v) => { el.focus(); el.dispatchEvent(new w.FocusEvent('fo
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
+  // 2.46.0 (#1592): no organisation from the start any more: the setup creates the one these tests use (id 1), new people join it
+  await call('POST', '/api/admin/setup', {org_name: 'Kalmido', lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,collab,office,clients'});
   const c1 = await call('POST', '/api/clients', {name: 'Muster Medien GmbH', contact: 'Erika Beispiel', zip: '50667', city: 'Köln', street: 'Lindenweg 4'});
   check(c1.http === 201 && c1.contacts?.length === 1, 'a client with its default contact person');

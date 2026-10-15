@@ -25,7 +25,8 @@ const FEAT = 'cal,comments,collab,office,clients';
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
+  // 2.46.0 (#1592): no organisation from the start any more: the setup creates the one these tests use (id 1), new people join it
+  await call('POST', '/api/admin/setup', {org_name: 'Kalmido', lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const st = await call('GET', '/api/office/settings');
   check(st.status === 200 && st.role === 'admin', 'office settings reachable, alice is the organisation admin ' + st.status);
