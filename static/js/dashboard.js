@@ -108,7 +108,11 @@ function lyRaw(v, std) {
   const j = x => { try { const o = JSON.parse(x || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
   const o = j(s);
   // 2.43.0 (#1452): without an own arrangement the standard for everyone (instance admins) shows, the own switches stay
-  if (!d.src && !std && !wgHasLayout(o) && S.lyStd?.[d.key]) return wgMerge(j(S.lyStd[d.key]), o);
+  // 2.45.0 (#1504): no standard set either -> the view's own default arrangement (d.def), e.g. the start page's two columns
+  if (!d.src && !wgHasLayout(o)) {
+    const sb = !std && S.lyStd?.[d.key] ? j(S.lyStd[d.key]) : null, b = sb && wgHasLayout(sb) ? sb : d.def?.();
+    if (b) return std ? b : wgMerge(b, o);
+  }
   return o;
 }
 function lyPref(v, o = {}) {
@@ -174,16 +178,20 @@ function lyHtml(v, parts, o = {}) {
   if (S.ly.view === v) return lyEditor(v, {...o, parts});  // 2.35.0 (#1097): the editor shows the blocks themselves
   // 2.43.0 (#1452): every block has its "…" menu (width, height, order, hide, settings) and on a computer a grip to resize
   // it; the hide button at the block is gone (the menu has it)
-  const pr = lyPref(v), bs = lyBlocks(v), out = [], m = o.canHide !== false;
+  const pr = lyPref(v), bs = lyBlocks(v), out = [], ws = [], m = o.canHide !== false;
   for (const k of order) {
     if (hidden.has(k)) continue;
     const b = bs.find(x => x[0] === k), p = parts[k], h = typeof p === 'function' ? p('') : p;
-    if (h) out.push(`<div class="lyb ly-${size(k)} lw${pr.w(k)} lh${pr.h(k)}${m ? ' lym' : ''}${wgColorCls(v, k)}" data-lyk="${k}">${h}${m ? wgBlockTools(v, k, b) : ''}</div>`);
+    if (h) { ws.push(pr.w(k)); out.push(`<div class="lyb ly-${size(k)} lw${pr.w(k)} lh${pr.h(k)}${m ? ' lym' : ''}${wgColorCls(v, k)}" data-lyk="${k}"${o.cols ? ` style="order:${out.length}"` : ''}>${h}${m ? wgBlockTools(v, k, b) : ''}</div>`); }
   }
+  // 2.45.0 (#1504): two columns (wide main, narrow side) while every block is two thirds or a third wide, each column stacks
+  // on its own; on narrower screens the columns are display:contents and the blocks keep their order (style order)
+  const cols = o.cols && ws.includes(4) && ws.includes(2) && ws.every(x => x === 2 || x === 4);
+  if (cols) out.splice(0, out.length, ...['hpl', 'hpr'].map((c, ci) => `<div class="hpcol ${c}">${out.filter((_, i) => (ws[i] === 4) === !ci).join('')}</div>`));
   const hid = bs.filter(b => hidden.has(b[0]) && parts[b[0]] !== undefined);
   const more = m ? (d.addItems?.() || []) : [];
   const add = m && (hid.length || more.length) ? `<div class="lyadd"><button type="button" class="btn sm" data-act="ly-add" data-lyv="${v}" aria-haspopup="menu">${ic('plus', 's')}<span>${tr('Block')}</span></button></div>` : '';
-  return `<div class="${d.grid || 'lygrid'} lysix" data-ly="${v}">${out.join('') || (o.empty ?? d.empty ?? `<p class="muted">${tr('Every block is hidden. “+ Block” brings them back.')}</p>`)}</div>${add}${m ? wgStdBar(v, o) : ''}`;
+  return `<div class="${d.grid || 'lygrid'} lysix${cols ? ' hpcols' : ''}" data-ly="${v}">${out.join('') || (o.empty ?? d.empty ?? `<p class="muted">${tr('Every block is hidden. “+ Block” brings them back.')}</p>`)}</div>${add}${m ? wgStdBar(v, o) : ''}`;
 }
 function lyEditor(v, o = {}) {
   const d = LY[v], pr = lyPref(v, {std: S.ly.std}), {order, hidden, size, fixed} = pr, bs = lyBlocks(v), A = lyAct(v), n = order.length;
@@ -297,46 +305,59 @@ LY.project = {quick: true, title: () => tr('Customize the project page'), blocks
     });
   }};
 // the start page (#475) on the view builder
-LY.home = {key: 'dashboard', grid: 'dgrid', title: () => tr('Customize the start page'), blocks: () => DASH.filter(d => d[0] !== 'family' || famOn()).map(d => [d[0], d[1], d[2], 'half', false, 2])};  // 2.43.0 (#1452): a third wide
+LY.home = {key: 'dashboard', grid: 'dgrid', title: () => tr('Customize the start page'), blocks: () => DASH.filter(d => d[0] !== 'family' || famOn()).map(d => [d[0], d[1], d[2], 'half', false, 2]),  // 2.43.0 (#1452): a third wide
+  // 2.45.0 (#1504): the default for accounts without an own arrangement (and no standard set by an admin): Today and News
+  // two thirds wide on the left, the rest a third on the right, the phone in this order; Search hidden
+  def: () => ({order: ['today', 'agents', 'news', 'projects', 'wait', 'pinned', 'chat', 'notes', 'stats', 'family', 'search'], hidden: ['search'], opts: {today: {lw: 4}, news: {lw: 4}}})};
 // 2.43.0 (#1452): the review (day / week) and its journal on the builder
 LY.review = {key: 'view_review', grid: 'dgrid', title: () => tr('Customize the review'), blocks: () => [['done', N_('Done'), 'done', 'half', false, 3], ['open', N_('Still open'), 'alert', 'half', false, 3],
   ['moved', N_('Moved'), 'skip', 'half', false, 3], ['next', N_('Coming up'), 'cal', 'half', false, 3], ['journal', N_('Journal'), 'journal', 'half', false, 3]]};
 function dashCard(k) {
   const [_, name, icon] = DASH.find(d => d[0] === k), t0 = today();
-  const card = (body, more = '', n = '') => `<section class="dcard dc-${k}" aria-labelledby="dh-${k}"><h3 id="dh-${k}">${ic(icon, 's')}<span>${tr(name)}</span>${n !== '' ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span>${more}</h3>${body}</section>`;
-  const tasksList = ts => ts.length ? `<ul class="dtl">${ts.slice(0, 6).map(t => `<li><button type="button" class="chk p${t.priority}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="false" aria-label="${esc(tr('Complete: {0}', mdPlain(t.title)))}"></button><a href="#t/${t.id}" class="dtt">${mdTitleNL(t.title)}</a>${t.due ? `<span class="dt ${dueClass(t)}">${esc(dayLabel(t.due))}${t.due_time ? ' ' + t.due_time : ''}</span>` : ''}</li>`).join('')}</ul>${ts.length > 6 ? `<p class="muted dmore">${tr('{0} more', ts.length - 6)}</p>` : ''}` : '';
+  const card = (body, more = '', n = '', title = tr(name)) => `<section class="dcard dc-${k}" aria-labelledby="dh-${k}"><h3 id="dh-${k}">${ic(icon, 's')}<span>${esc(title)}</span>${n !== '' ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span>${more}</h3>${body}</section>`;
+  // 2.45.0 (#1504): the list as a label after the title (not the basket), the date right: overdue = the day, else the time or the day
+  const hpDue = t => t.due < t0 ? dayLabel(t.due) : t.due_time || dayLabel(t.due);
+  const tasksList = (ts, n = 6) => ts.length ? `<ul class="dtl">${ts.slice(0, n).map(t => { const l = listById(t.list_id); return `<li><button type="button" class="chk p${t.priority}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="false" aria-label="${esc(tr('Complete: {0}', mdPlain(t.title)))}"></button><a href="#t/${t.id}" class="dtt">${mdTitleNL(t.title)}</a>${l && !l.is_inbox ? `<span class="hpll">${esc(lname(l))}</span>` : ''}${t.due ? `<span class="dt ${dueClass(t)}">${esc(hpDue(t))}</span>` : ''}</li>`; }).join('')}</ul>${ts.length > n ? `<p class="muted dmore">${tr('{0} more', ts.length - n)}</p>` : ''}` : '';
+  // 2.45.0 (#1504): an empty card is one slim line ("Waiting for you: nothing"), still a named section
+  const slim = (txt = tr('{0}: nothing', tr(name))) => `<section class="dcard dempty dc-${k}" aria-labelledby="dh-${k}"><h3 id="dh-${k}"><span>${esc(txt)}</span></h3></section>`;
   if (k === 'wait') {
     const js = waitJobs ? waitJobs() : [], ments = (S.nf.items || []).filter(it => !it.read && ['mention', 'assign', 'approval', 'proposal'].includes(it.kind));
     const rows = [...js.map(j => `<li><a href="#agents">${hdot('waiting')}<span class="dwt">${esc(tr('{0} waits for you', j.agent_name))}: ${esc(j.title)}</span></a></li>`),
       ...ments.slice(0, 5).map(it => `<li><a href="${it.task_id ? '#t/' + it.task_id : '#news'}">${ic(NEWS_ICON[it.kind] || 'bell', 's')}<span class="dwt">${newsText(it, S.nf.users)}${it.task_title ? ' · ' + esc(it.task_title) : ''}</span></a></li>`)];
-    return card(rows.length ? `<ul class="dwl">${rows.join('')}</ul>` : `<p class="muted">${tr('Nothing waits for you.')}</p>`, '', rows.length || '');
+    return rows.length ? card(`<ul class="dwl">${rows.join('')}</ul>`, '', rows.length) : slim();
   }
   if (k === 'today') {
     const ts = openTasks().filter(t => !t.parent_id && t.due && t.due <= t0).sort((a, b) => dueKey(a).localeCompare(dueKey(b)) || b.priority - a.priority);
-    const ev = (S.calToday || []).length;
-    return card(tasksList(ts) || `<p class="muted">${tr('Nothing left for today.')}</p>`, `<a class="linkbtn" href="#today">${tr('Open')}</a>`, ts.length || '') ;
+    // 2.45.0 (#1504): a box to add a task for today right here
+    const add = `<form class="hpadd" data-hpadd><input id="hp-add" type="text" placeholder="${esc(tr('New task for today …'))}" aria-label="${esc(tr('New task for today'))}" autocomplete="off" enterkeyhint="done" maxlength="500"></form>`;
+    return card(add + (tasksList(ts, 8) || `<p class="muted">${tr('Nothing left for today.')}</p>`), '', ts.length || '');  // 2.45.0 (#1504): no "Open" (the draft; Today is in the sidebar)
   }
   if (k === 'news') {
     if (S.nf.items === null || S.nf.sig !== (S.news?.sig ?? '')) { if (!S.nf.loading) loadNews().then(() => { if (S.route.mod === 'home') renderView(); }); }
     const vis = (S.nf.items || []).map((it, i) => [it, i]).filter(([it]) => !it.read);
-    const gs = newsGroups(vis).slice(0, 5);
-    return card(gs.length ? `<div class="dng">${gs.map(g => newsGroupHtml(g, false)).join('')}</div>` : `<p class="muted">${tr('No unread news')}</p>`, `<a class="linkbtn" href="#news">${tr('Show all')}</a>`, S.news?.unread || '');
+    // 2.45.0 (#1504): compact, at most 5, a bundle is one line (what needs me first), "All news" below
+    const all = newsGroups(vis), gs = [...all.filter(g => g.needs), ...all.filter(g => !g.needs)].slice(0, 5);
+    if (!gs.length) return slim(tr('News: nothing new'));
+    return card(`<ul class="dwl hpnl">${gs.map(hpNewsRow).join('')}</ul><a class="linkbtn hpall" href="#news">${tr('All news')}</a>`, '', S.news?.unread || '');
   }
   if (k === 'chat') {
     if (!teamOn()) return '';
     if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'home') renderView(); }); }
     const rs = (S.tc.rooms || []).filter(r => r.last).slice(0, 4);
-    return card(rs.length ? `<ul class="dwl">${rs.map(r => `<li><a href="#team/${r.id}">${roomIcon(r)}<span class="dwt"><b>${esc(roomName(r))}</b> ${esc(r.last.text)}</span>${r.unread ? `<span class="nbadge">${r.unread}</span>` : ''}</a></li>`).join('')}</ul>` : `<p class="muted">${tr('No messages yet')}</p>`, `<a class="linkbtn" href="#team">${tr('Open')}</a>`, S.team?.unread || '');
+    if (!rs.length) return slim();
+    return card(`<ul class="dwl">${rs.map(r => `<li><a href="#team/${r.id}">${roomIcon(r)}<span class="dwt"><b>${esc(roomName(r))}</b> ${esc(r.last.text)}</span>${r.unread ? `<span class="nbadge">${r.unread}</span>` : ''}</a></li>`).join('')}</ul>`, `<a class="linkbtn" href="#team">${tr('Open')}</a>`, S.team?.unread || '');
   }
   if (k === 'projects') {
-    const ps = S.lists.filter(l => l.kind === 'project' && !l.archived);
-    if (!ps.length) return '';
-    return card(`<ul class="dpl">${ps.slice(0, 6).map(l => { const all = [...S.tasks.values()].filter(t => t.list_id === l.id && !t.parent_id), dn = all.filter(t => t.status === 2).length, pc = all.length ? Math.round(dn / all.length * 100) : 0;
-      return `<li><a href="#l/${l.id}"><span class="dpn">${esc(lname(l))}</span><span class="dpb" role="img" aria-label="${esc(tr('{0} % done', pc))}"><i style="width:${pc}%"></i></span><span class="dpp">${pc} %</span></a></li>`; }).join('')}</ul>`, '', ps.length);
+    // 2.45.0 (#1504): only active projects (not complete, not on hold), at most 5; none at all = no card
+    const all = S.lists.filter(l => l.kind === 'project' && !l.archived && !l.is_inbox), ps = all.filter(l => !['complete', 'on_hold'].includes(l.status));
+    if (!all.length) return '';
+    if (!ps.length) return slim(tr('Active projects: nothing'));
+    return card(`<ul class="dpl">${ps.slice(0, 5).map(l => { const all = [...S.tasks.values()].filter(t => t.list_id === l.id && !t.parent_id), dn = all.filter(t => t.status === 2).length, pc = all.length ? Math.round(dn / all.length * 100) : 0;
+      return `<li><a href="#l/${l.id}"><span class="dpn">${esc(lname(l))}</span><span class="dpb" role="img" aria-label="${esc(tr('{0} % done', pc))}"><i style="width:${pc}%"></i></span><span class="dpp">${pc} %</span></a></li>`; }).join('')}</ul>${overviewOn() ? `<a class="linkbtn hpall" href="#overview">${tr('All projects')}</a>` : ''}`, '', ps.length, tr('Active projects'));
   }
   if (k === 'pinned') {
     const ts = openTasks().filter(t => t.pinned && !t.parent_id);
-    return ts.length ? card(tasksList(ts), `<a class="linkbtn" href="#pinned">${tr('Open')}</a>`, ts.length) : '';
+    return ts.length ? card(tasksList(ts), `<a class="linkbtn" href="#pinned">${tr('Open')}</a>`, ts.length) : slim();
   }
   if (k === 'notes') {
     const ns = (S.notes || []).slice(0, 5);
@@ -347,7 +368,10 @@ function dashCard(k) {
     // 2.43.0 (#1504): every running job under its agent (the header counts jobs, one line per agent hid the second one)
     if (ags.some(a => a.running)) bandJobsLoad();
     const jobs = a => a.running ? (S.bandJobs.items || []).filter(j => j.agent_id === a.id && j.state === 'running') : [];
-    return ags.length ? card(`<ul class="dwl">${ags.map(a => `<li><a href="#agents/${a.id}">${hdot(agentHst(a))}<span class="dwt">${esc(agentHstLine(a))}</span></a></li>${jobs(a).map(j => `<li class="djob"><a href="#agents/${a.id}">${hdot('working')}<span class="dwt">${esc(j.title)}</span></a></li>`).join('')}`).join('')}</ul>`) : '';
+    // 2.45.0 (#1504): every running job with "since HH:MM"; an agent only as a line while it needs a look (error, waits, paused)
+    const rows = ags.flatMap(a => [...(['error', 'waiting', 'paused'].includes(agentHst(a)) ? [`<li><a href="#agents/${a.id}">${hdot(agentHst(a))}<span class="dwt">${esc(agentHstLine(a))}</span></a></li>`] : []),
+      ...jobs(a).map(j => `<li class="djob"><a href="#agents/${a.id}">${hdot('working')}<span class="dwt">${esc(j.title)}</span>${j.created_at ? `<span class="hpt">${esc(hpSince(j.created_at))}</span>` : ''}</a></li>`)]);
+    return !ags.length ? '' : rows.length ? card(`<ul class="dwl">${rows.join('')}</ul>`) : slim(tr('Agents: all quiet'));
   }
   if (k === 'stats') {
     const done7 = [...S.tasks.values()].filter(t => t.status === 2 && t.completed_at && t.completed_at.slice(0, 10) >= addDays(t0, -6)).length;
@@ -362,7 +386,7 @@ function dashCard(k) {
     for (const t of d.occ.filter(x => daysTo(x.due) <= 14).slice(0, 3)) rows.push(`<li><a href="#t/${t.id}"><span aria-hidden="true">${t.fam.kind === 'birthday' ? '🎂' : '💍'}</span><span class="dwt"><b>${esc(t.fam.name || t.title)}</b> ${esc([occWhat(t), daysWord(daysTo(t.due))].filter(Boolean).join(' · '))}</span></a></li>`);
     for (const t of d.rots.filter(x => x.assignee_id === S.me?.id).slice(0, 3)) rows.push(`<li><a href="#t/${t.id}">${ic('turns', 's')}<span class="dwt">${esc(tr('Your turn: {0}', t.title))}</span></a></li>`);
     for (const t of d.meals.filter(x => x.due === t0x).slice(0, 2)) rows.push(`<li><a href="#t/${t.id}">${ic('meal', 's')}<span class="dwt">${esc(tr('Today: {0}', t.title))}</span></a></li>`);
-    return card(rows.length ? `<ul class="dwl">${rows.join('')}</ul>` : `<p class="muted">${tr('Nothing coming up.')}</p>`, `<a class="linkbtn" href="#family">${tr('Open')}</a>`);
+    return rows.length ? card(`<ul class="dwl">${rows.join('')}</ul>`, `<a class="linkbtn" href="#family">${tr('Open')}</a>`) : slim();
   }
   if (k === 'search') {
     return card(`<form class="dsearch" data-dsearch role="search"><input id="dash-q" type="search" placeholder="${esc(tr('Jump, create, ask an agent…'))}" aria-label="${esc(tr('Search and commands'))}" autocomplete="off"><button type="submit" class="btn sm">${ic('search', 's')}<span class="sr">${tr('Search')}</span></button></form>`);
@@ -378,12 +402,44 @@ function forMeBanner() {
   return `<section class="dtome" aria-labelledby="dtome-h"><h3 id="dtome-h">${ic('at', 's')}<span>${trn('{0} message for you', '{0} messages for you', n)}</span><span class="spacer"></span><a class="linkbtn" href="#news">${tr('Show all')}</a></h3>
     <ul class="dwl">${dms.map(r => `<li><a href="#team/${r.id}">${av(r.user_id, r.name, 'avatar')}<span class="dwt"><b>${esc(r.name)}</b> ${esc(r.last ? mdBrief(r.last.text) : '')}</span><span class="nbadge">${r.unread}</span></a></li>`).join('')}${its.map(([it, i]) => `<li><button type="button" class="dwb" data-act="news-open" data-i="${i}">${av(it.actor_id, uname(it.actor_id, S.nf.users), 'avatar')}<span class="dwt">${newsText(it, S.nf.users)}${it.task_title ? ' · ' + esc(it.task_title) : ''}</span></button></li>`).join('')}</ul></section>`;
 }
+// ---- 2.45.0 (#1504) the start page: one sentence on top, compact news lines, "since HH:MM" of a running job
+function hpSummary() {
+  const t0 = today(), ts = openTasks().filter(t => !t.parent_id && t.due && t.due <= t0), over = ts.filter(t => t.due < t0).length;
+  const ag = agentsOn() ? (S.agents || []).filter(a => agentHst(a) === 'working').length : 0;
+  const parts = [ts.length && trn('{0} task for today', '{0} tasks for today', ts.length), over && trn('{0} overdue', '{0} overdue', over), ag && trn('{0} agent working', '{0} agents working', ag)].filter(Boolean);
+  if (!parts.length) return `<p class="hpsum">${esc(tr('Nothing due today.'))}</p>`;
+  const x = parts.join(', ');
+  return `<p class="hpsum">${esc(x.charAt(0).toUpperCase() + x.slice(1) + '.').replace(/\d+/g, '<b>$&</b>')}</p>`;
+}
+function hpNewsRow(g) {
+  const [first, i] = g.items[0], task = first.task_id && !(first.tasks || []).length, lst = g.key[0] === 'l' && first.list_id;
+  const what = task || lst ? `${esc(task ? first.task_title || '' : newsListName(first))}<span class="muted"> · ${esc(newsSummaryLine(g))}</span>` : newsText(first, S.nf.users);
+  const inner = `<span class="dwt">${what}</span><time class="hpt">${esc(relTime(g.at))}</time>`;
+  return `<li class="${g.needs ? 'needs' : ''}">${g.items.length === 1 ? `<button type="button" class="dwb" data-act="news-open" data-i="${i}">${inner}</button>` : `<a href="${task ? '#t/' + first.task_id : '#news'}">${inner}</a>`}</li>`;
+}
+function hpSince(iso) {
+  const d = new Date(iso); if (isNaN(d)) return '';
+  const p = x => String(x).padStart(2, '0');
+  return tr('since {0}', d.toDateString() === new Date().toDateString() ? `${p(d.getHours())}:${p(d.getMinutes())}` : fmtDay('short', d));
+}
+document.addEventListener('submit', async e => {
+  if (!e.target.matches?.('[data-hpadd]')) return;
+  e.preventDefault();
+  const inp = e.target.querySelector('input'), txt = inp.value.trim(); if (!txt) return;
+  const r = parseQuick(txt, new Set()); if (!r.title) return;
+  const body = {title: r.title.slice(0, 500), due: r.due || today(), due_time: r.due_time, priority: r.priority ?? 0, tags: r.tags || [], repeat: r.repeat || ''};
+  if (r.list_id) body.list_id = r.list_id;  // else the server takes the basket
+  if (body.due_time && S.settings.default_reminder !== '') body.reminders = S.settings.default_reminder;
+  inp.value = '';
+  try { await createTask(body); } catch { const i = $('#hp-add'); if (i && !i.value) i.value = txt; return; }  // api() said it; createTask = one undo step
+  $('#hp-add')?.focus();
+});
 function viewHome() {
   const greet = (() => { const h = new Date().getHours(); return h < 11 ? tr('Good morning, {0}', S.me?.display_name || '') : h < 18 ? tr('Hello, {0}', S.me?.display_name || '') : tr('Good evening, {0}', S.me?.display_name || ''); })();
   const parts = Object.fromEntries(lyBlocks('home').map(b => [b[0], dashCard(b[0])]));
   if (S.ly.view === 'home') return `<div class="dash">${lyEditor('home', {parts})}</div>`;  // 2.35.0 (#1097): with the cards
   return `<div class="dash"><div class="dashhead"><h2>${esc(greet)}</h2><span class="muted">${esc(fmtDateLoc(today()))}</span><span class="spacer"></span>${lyCustomBtn('home')}</div>
-    ${forMeBanner()}${lyHtml('home', parts, {empty: `<p class="muted">${tr('Every block is hidden. “+ Block” brings them back.')}</p>`})}</div>`;
+    ${hpSummary()}${forMeBanner()}${lyHtml('home', parts, {cols: true, empty: `<p class="muted">${tr('Every block is hidden. “+ Block” brings them back.')}</p>`})}</div>`;
 }
 document.addEventListener('submit', e => {
   if (!e.target.matches?.('[data-dsearch]')) return;

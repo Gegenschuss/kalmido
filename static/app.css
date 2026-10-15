@@ -6442,3 +6442,46 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .mgtabs .recdot{margin-left:.125rem}
 .modrow.mgarea .mgparts>.modlist{margin:.375rem 0 0 .75rem;padding-left:.75rem;border-left:2px solid var(--line2)}
 @media (max-width:640px){.mgtabs{margin:.25rem 0 .75rem}.mgtabs button{min-height:2.75rem;padding:.25rem .5rem}}
+/* 2.45.0 D (#1504): the start page -- one sentence on top, Today with a box to add, compact News, slim empty cards, two
+   columns (wide main, narrow side; every column stacks on its own), the app font everywhere, links without underline */
+.hpsum{margin:-.5rem 0 1.125rem;color:var(--text2);font-size:var(--fs-b)}
+.hpsum b{color:var(--text);font-weight:600}
+.dash a,.dash .linkbtn{text-decoration:none}
+.dash .linkbtn{font-size:var(--fs-s)}
+.dash .linkbtn:hover{text-decoration:underline}
+.dash time,.dash .dtl .dt,.dash .dpp{font-family:inherit;font-size:var(--fs-s)}
+.dash .dcard > h3 > .i:first-child,.dash .dcard > h3 .dcn{display:none}
+.dash .dcard{padding:.875rem 1rem}
+.dcard.dempty{padding:.625rem 1rem}
+.dash .dcard.dempty > h3{margin:0;font-weight:400;color:var(--muted)}
+.hpadd{margin:0 0 .375rem}
+.hpadd input{width:100%;min-height:2.5rem;padding:.5rem .75rem;background:var(--bg)}
+.hpadd input:focus{border-color:var(--accent)}
+.dash .dtl li,.hpnl li{border-top:1px solid var(--line)}
+.dash .dtl li:first-child,.hpnl li:first-child{border-top:0}
+.dash .dtl .dtt{flex:0 1 auto}
+.dtl .hpll{flex:1;min-width:0;color:var(--muted);font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dash .dtl .dt{margin-left:auto;color:var(--muted);white-space:nowrap}
+.dash .dtl .dt.over{color:var(--p5)}
+.hpnl a,.hpnl .dwb{color:var(--text)}
+.hpnl b{font-weight:inherit}
+.hpnl li.needs .dwt{font-weight:500}
+.dwl .hpt{flex:none;color:var(--muted);font-size:var(--fs-s);white-space:nowrap}
+.hpall{display:inline-block;margin-top:.375rem}
+.dash .dpl a{grid-template-columns:minmax(0,max-content) minmax(3rem,1fr) 2.75rem}
+.dash .dpp{color:var(--muted);text-align:right}
+@media (pointer:coarse){ .hpadd input{min-height:2.75rem} .hpnl .dwb,.hpnl a{min-height:2.75rem} .dash .dtl li{min-height:calc(2.75rem + 1px)} }  /* + the row's line */
+.lysix.hpcols > .hpcol{display:contents}
+.lysix > .hpcol > .lyb{grid-column:1/-1}
+@media (min-width:900px){
+  .lysix > .hpcol > .lw2{grid-column:span 3}
+  .lysix > .hpcol > .lw4{grid-column:1/-1}
+}
+@media (min-width:1100px){
+  .dgrid.lysix.hpcols{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+  .lysix.hpcols > .hpcol{display:flex;flex-direction:column;gap:1rem;min-width:0}
+}
+.lysix > .hpcol > .lh1 > :first-child{max-height:15rem;overflow:auto}
+.lysix > .hpcol > .lh3 > :first-child{min-height:28rem}
+@media (pointer:fine){ .lysix > .hpcol > .lym > .dcard > h3{cursor:grab} }
+.dash .dtile b{font-family:inherit}
