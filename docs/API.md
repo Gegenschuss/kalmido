@@ -1067,6 +1067,6 @@ The web app's own routes (`/api/docs`, a signed-in person, never an agent): `GET
 `GET` / `PATCH /api/docs/{id}`, `POST /api/docs/{id}/accept` (take suggestions), `POST /api/docs/{id}/review`
 (`{done: true}` = checked; the models learn the current values), `POST /api/docs/{id}/redo`, `GET /api/docs/{id}/thumb`,
 `GET /api/docs/{id}/file`, `POST` / `DELETE /api/docs/{id}/task` (a task for the due date), `GET` / `PUT /api/docs/settings`
-(levels per feature, the inbox folder), `POST` / `PATCH` / `DELETE /api/docs/rules`, `PATCH` / `DELETE /api/docs/labels/{kind}/{id}`,
+(levels per feature, the inbox folder), `POST` / `PATCH` / `DELETE /api/docs/rules`, `PATCH` / `DELETE /api/docs/labels/{kind}/{id}` (the delete answers the documents it touched; `POST /api/docs/labels/{kind}` `{ws, name, ids}` is its undo),
 `POST` / `DELETE /api/docs/mail` (the forwarding address). Deleting and restoring use the file store
 (`DELETE /api/files/nodes/{id}`, `POST /api/files/nodes/{id}/restore`).

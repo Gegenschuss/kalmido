@@ -274,6 +274,16 @@ check(d and d["sender"] and d["sender"]["name"] == "Vermieter GmbH", f"regex rul
 check(d and d["folder"] and d["folder"]["name"] == "Energie", f"rule puts it into a folder of the same workspace ({d and d['folder']})")
 check(A.put(B + "/api/docs/settings", json={"ws": "private", "levels": {"type": "agent"}}).json()["levels"]["type"] == "agent", "level agent")
 
+# ---- labels: rename, delete + its undo (the documents get it back, no training)
+sid_ = A.get(B + f"/api/docs/{D1}").json()["sender"]["id"]
+check(A.patch(B + f"/api/docs/labels/sender/{sid_}", json={"name": "Versicherung Beispiel AG (neu)"}).ok and
+      A.get(B + f"/api/docs/{D1}").json()["sender"]["name"] == "Versicherung Beispiel AG (neu)", "rename a sender")
+r = A.delete(B + f"/api/docs/labels/sender/{sid_}")
+check(r.ok and D1 in r.json()["ids"] and A.get(B + f"/api/docs/{D1}").json()["sender"] is None, "delete a sender: the documents lose it")
+r = A.post(B + "/api/docs/labels/sender", json={"ws": "private", "name": r.json()["name"], "ids": r.json()["ids"]})
+check(r.status_code == 201 and A.get(B + f"/api/docs/{D1}").json()["sender"]["name"] == "Versicherung Beispiel AG (neu)", "undo: back on the documents")
+check(Bo.delete(B + f"/api/docs/labels/sender/{r.json()['id']}").status_code == 404, "another person cannot delete the label")
+
 # ---- task for the due date
 r = A.post(B + f"/api/docs/{D1}/task")
 check(r.status_code == 201, f"a task for the due date ({r.text[:120]})")

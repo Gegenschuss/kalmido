@@ -3,6 +3,7 @@
 // - opening a document (#docs/<id>): the sheet with its fields, changing the sender = one undo step (Undo restores it)
 // - a value set by a rule carries the "automatic" mark; one click on it puts the focus into the field
 // - "Checked" takes the document out of "To review" (one undo step); a document a rule sorted surely needs no review
+// - settings: a level per feature, renaming a type (one undo step); the share sheet offers "File as document"
 // - adding by the button (FormData) = one undo step; phone width: cards and the sheet work
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -105,6 +106,26 @@ const ready = id => until(async () => { const d = await call('GET', `/api/docs/$
     'To review: empty (one checked, the other sorted by a sure rule)');
   d.querySelector('[data-dc="all"]').click();
   await until(() => d.querySelectorAll('.dc-card').length === 2);
+
+  // ================= settings: rename a type (one undo step)
+  await w.eval(`dc_settings()`);
+  await until(() => d.querySelector('.dc-smd .dc-lbls'));
+  check(d.querySelectorAll('.dc-smd [data-dcl]').length === 4, 'settings: a level per feature');
+  const tid = (await call('GET', `/api/docs/${D2}`)).type?.id;
+  w.prompt = () => 'Monthly payment';
+  d.querySelector(`.dc-smd [data-dcs="lren:type:${tid}"]`)?.click();
+  await until(async () => (await call('GET', `/api/docs/${D2}`)).type?.name === 'Monthly payment');
+  check((await call('GET', `/api/docs/${D2}`)).type?.name === 'Monthly payment', 'rename a type in the settings');
+  await w.eval(`histStep('undo')`);
+  await until(async () => (await call('GET', `/api/docs/${D2}`)).type?.name === 'Abschlag');
+  check((await call('GET', `/api/docs/${D2}`)).type?.name === 'Abschlag', 'Undo: the old name');
+  d.querySelector('.dc-smd [data-dcs="close"]')?.click();
+  await sleep(300);
+  // the share sheet offers "File as document" when files come
+  w.eval(`shareDest([], true)`);
+  check(await until(() => d.querySelector('.modal [data-sd="doc"]')), 'share sheet: "File as document"');
+  d.querySelector('.modal [data-sd="task"]')?.click();
+  await sleep(200);
 
   // ================= add by the button
   await w.eval(`dc_upload([new File(['Notiz zum Vertrag 12.10.2026'], 'note.txt', {type: 'text/plain'})])`);
