@@ -26,28 +26,28 @@ function rk_cashflowHtml() {
   if (RKF.err) return `<div class="empty">${esc(RKF.err)}</div>`;
   if (!RKF.data || RKF.q !== `from=${RKF.from}&months=${RKF.months}`) { setTimeout(() => { if (RKF.q !== `from=${RKF.from}&months=${RKF.months}` || !RKF.data) rk_cfLoad(); }, 0); if (!RKF.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = RKF.data;
-  const bar = `<div class="ofcbar cfbar"><button class="iconbtn" data-rkf="prev" aria-label="${esc(tr('Earlier'))}">${ic('left', 's')}</button><b class="cfrange">${esc(rk_month(d.rows[0]?.month))} – ${esc(rk_month(d.rows[d.rows.length - 1]?.month))}</b><button class="iconbtn" data-rkf="next" aria-label="${esc(tr('Later'))}">${ic('right', 's')}</button>
+  const bar = `<div class="ofcbar rkcfbar"><button class="iconbtn" data-rkf="prev" aria-label="${esc(tr('Earlier'))}">${ic('left', 's')}</button><b class="rkcfrange">${esc(rk_month(d.rows[0]?.month))} – ${esc(rk_month(d.rows[d.rows.length - 1]?.month))}</b><button class="iconbtn" data-rkf="next" aria-label="${esc(tr('Later'))}">${ic('right', 's')}</button>
     ${RKF.from !== rk_ym() ? `<button class="btn sm ghost" data-rkf="now">${tr('Today')}</button>` : ''}<span class="spacer"></span>
     <div class="seg" role="group" aria-label="${esc(tr('Preview'))}">${[3, 6].map(n => `<button type="button" data-rkf="months" data-v="${n}" class="${RKF.months === n ? 'on' : ''}" aria-pressed="${RKF.months === n}">${esc(trn('{0} month', '{0} months', n))}</button>`).join('')}</div></div>`;
-  const val = (mo, dir, st, v, cls = '') => +v ? `<button type="button" class="cfv ${cls}" data-rkf="open" data-k="${mo}|${dir}|${st}" aria-expanded="${RKF.open === `${mo}|${dir}|${st}`}">${ofcMoney(v)}</button>` : `<span class="cfv cfz muted">–</span>`;
+  const val = (mo, dir, st, v, cls = '') => +v ? `<button type="button" class="rkcfv ${cls}" data-rkf="open" data-k="${mo}|${dir}|${st}" aria-expanded="${RKF.open === `${mo}|${dir}|${st}`}">${ofcMoney(v)}</button>` : `<span class="rkcfv rkcfz muted">–</span>`;
   const max = Math.max(1, ...d.rows.flatMap(r => [+r.in.actual + +r.in.plan, +r.out.actual + +r.out.plan]));
-  const bars = r => `<div class="cfbars" aria-hidden="true"><span class="cfbin" style="transform:scaleX(${((+r.in.actual + +r.in.plan) / max).toFixed(3)})"></span><span class="cfbout" style="transform:scaleX(${((+r.out.actual + +r.out.plan) / max).toFixed(3)})"></span></div>`;
+  const bars = r => `<div class="rkcfbars" aria-hidden="true"><span class="rkcfbin" style="transform:scaleX(${((+r.in.actual + +r.in.plan) / max).toFixed(3)})"></span><span class="rkcfbout" style="transform:scaleX(${((+r.out.actual + +r.out.plan) / max).toFixed(3)})"></span></div>`;
   const cards = d.rows.map(r => {
     const k = RKF.open?.startsWith(r.month + '|') ? RKF.open : null;
-    return `<section class="cfm ${r.current ? 'cur' : ''}" aria-label="${esc(rk_month(r.month))}"><header><b>${esc(rk_month(r.month))}</b>${r.current ? `<span class="rotag">${tr('this month')}</span>` : ''}<span class="spacer"></span>
-      <span class="cfbal ${+r.balance < 0 ? 'neg' : ''}">${tr('Balance')} ${ofcMoney(r.balance)}</span></header>${bars(r)}
-      <table class="cftab"><thead><tr><th></th><th class="num">${tr('Actual')}</th><th class="num">${tr('Planned')}</th></tr></thead><tbody>
+    return `<section class="rkcfm ${r.current ? 'cur' : ''}" aria-label="${esc(rk_month(r.month))}"><header><b>${esc(rk_month(r.month))}</b>${r.current ? `<span class="rotag">${tr('this month')}</span>` : ''}<span class="spacer"></span>
+      <span class="rkcfbal ${+r.balance < 0 ? 'neg' : ''}">${tr('Balance')} ${ofcMoney(r.balance)}</span></header>${bars(r)}
+      <table class="rkcftab"><thead><tr><th></th><th class="num">${tr('Actual')}</th><th class="num">${tr('Planned')}</th></tr></thead><tbody>
       <tr><th>${tr('In|cashflow')}</th><td class="num">${val(r.month, 'in', 'actual', r.in.actual)}</td><td class="num">${val(r.month, 'in', 'plan', r.in.plan, 'plan')}</td></tr>
       <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr></tbody></table>
       ${k ? rk_cfEntries(k) : ''}</section>`;
   }).join('');
-  return bar + `<div class="cfms">${cards}</div><p class="muted ofchint">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, accepted quotations not yet invoiced at the end of their period of service). Amounts of documents incl. VAT.')}</p>` + rk_fixedHtml();
+  return bar + `<div class="rkcfms">${cards}</div><p class="muted ofchint">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, accepted quotations not yet invoiced at the end of their period of service). Amounts of documents incl. VAT.')}</p>` + rk_fixedHtml();
 }
 function rk_cfEntries(k) {
   const [mo, dir, st] = k.split('|');
   const es = (RKF.data.entries || []).filter(e => e.month === mo && e.dir === dir && e.state === st);
   const go = e => e.doc_id ? `href="#office/offers/${e.doc_id}"` : e.trip_id ? `href="#office/travel" data-rkf="trip" data-id="${e.trip_id}"` : e.fixed_id ? `href="#" data-rkf="fixed" data-id="${e.fixed_id}"` : '';
-  return `<ul class="ofclist cfents" role="list">${es.map(e => `<li><a class="ofcrow" ${go(e)}><span class="ofcn"><b>${esc(tr(RK_CF_KINDS[e.kind] || e.kind))}${e.number ? ` ${esc(e.number)}` : ''}</b>
+  return `<ul class="ofclist rkcfents" role="list">${es.map(e => `<li><a class="ofcrow" ${go(e)}><span class="ofcn"><b>${esc(tr(RK_CF_KINDS[e.kind] || e.kind))}${e.number ? ` ${esc(e.number)}` : ''}</b>
     <small class="muted">${esc([fmtDateLoc(e.date), e.label, e.overdue ? tr('Overdue') : '', e.partial ? tr('the rest after part invoices') : ''].filter(Boolean).join(' · '))}</small></span><span class="rksum">${ofcMoney(e.amount)}</span>${ic('chev', 's')}</a></li>`).join('')}</ul>`;
 }
 function rk_fixedHtml() {
