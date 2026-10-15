@@ -309,6 +309,7 @@ ROUTES = {
     "GET /api/lists/{}/status": "list", "GET /api/lists/{}/overview": "list", "PATCH /api/lists/{}/overview": "list", "GET /api/lists/{}/layout": "list", "PUT /api/lists/{}/layout": "list",
     "POST /api/lists/{}/links": "list", "PATCH /api/lists/{}/links/{}": "list", "DELETE /api/lists/{}/links/{}": "list",
     "PUT /api/lists/{}/links/order": "list", "POST /api/lists/{}/milestones": "list",
+    "POST /api/lists/{}/join": "list", "POST /api/v1/lists/{}/join": "list",  # 2.46.0 (#1603): p2460_b_api checks the boundary
     # 2.43.0: key figures (#1328), notepads + block colours (#1346), all times of a project (#1434): need_list / need_note
     # on the list, foreign ids 404 (p2430_a_api_test.py, p2430_c_api_test.py, p2430_d_api_test.py)
     "GET /api/lists/{}/kpis": "list", "GET /api/v1/lists/{}/kpis": "list", "PUT /api/lists/{}/page-style": "list",

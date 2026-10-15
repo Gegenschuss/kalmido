@@ -97,6 +97,7 @@ APP_TO_API = {
     "POST /api/lists/{}/sections/order": ["PUT /lists/{}/sections/order"],
     "GET /api/lists/{}/overview": ["GET /lists/{}/overview"],
     "GET /api/lists/{}/kpis": ["GET /lists/{}/kpis"],  # 2.43.0 (#1328): key figures
+    "POST /api/lists/{}/join": ["POST /lists/{}/join"],  # 2.46.0 (#1603): join a list visible to the organisation
     "PATCH /api/lists/{}/overview": ["PATCH /lists/{}/overview"],
     "POST /api/lists/{}/links": ["POST /lists/{}/links"],
     "PATCH /api/lists/{}/links/{}": ["PATCH /lists/{}/links/{}"],
@@ -395,6 +396,7 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "POST /import/{}": "imports of other apps' files: people upload them (multipart) in the app or with the REST API",
     "POST /imports/{}/undo": "belongs to the import",
     "POST /lists/{}/owner": "transferring a list: never agents (403)",
+    "POST /lists/{}/join": "2.46.0 (#1603): joining a list seen through the organisation: people only (an agent never sees a list that way, 404)",
     "GET /admin/users": "admin-read: never for agents",
     "GET /admin/status": "admin-read: never for agents",
     "PUT /admin/announcement": "2.24.0: the server's notice: admins and operator scripts (account + admin-read, never agents)",

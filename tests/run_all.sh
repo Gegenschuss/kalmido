@@ -672,6 +672,9 @@ fresh; run p2460_d_ui node p2460_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.0 part C: #1606 a changed folder role asks before it replaces roles set per list, #1605 group pictures (+ backups hold the pictures)
 fresh; run p2460_c_api "$PY" p2460_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2460_c_ui node p2460_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.46.0 part B: "Everyone in the organisation" (#1603)
+fresh; run p2460_b_api "$PY" p2460_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2460_b_ui node p2460_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
