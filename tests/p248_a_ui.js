@@ -45,6 +45,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   row.querySelector('[data-ab="open"]').click();
   await until(() => w.location.hash === '#ablage/' + FID && d.querySelector('.abcrumbs'));
   check(/Invoices/.test(d.querySelector('.abcrumbs')?.textContent || ''), 'opening the folder: the path shows it');
+  check(/Invoices/.test(d.querySelector('.abtree.on')?.textContent || ''), 'the tree on the left marks the open folder below its space');
 
   // ================= upload (twice the same name = a new version)
   await w.eval(`ab_upload([new File(['first'], 'note.txt', {type: 'text/plain'})], ${FID})`);
