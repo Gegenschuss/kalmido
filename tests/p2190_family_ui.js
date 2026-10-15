@@ -199,7 +199,8 @@ const FAM = 'cal,habits,comments,collab,family';
   md.remove(); w.close();
 
   // ================= jsdom: shopping mode
-  check((await call('POST', `/api/lists/${L.shopping}/shop-areas`, {})).added === 8, '2.22.0 (#747): the shop areas switched on by hand, the items sorted in');
+  // 2.46.1 (#1615): the family's starter shopping list comes with its 8 shop areas (a new shopping list still without, #747)
+  check((await call('GET', '/api/state')).sections.filter(s => s.list_id === L.shopping).length === 8 && (await call('POST', `/api/lists/${L.shopping}/shop-areas`, {})).added === 0, '2.46.1 (#1615): the starter shopping list has its shop areas');
   await call('POST', '/api/tasks', {title: 'Birthday candles', list_id: L.shopping});  // nothing to guess from: "Other"
   w = await boot({user: 'alice', hash: 'l/' + L.shopping}); d = w.document;
   await until(() => d.querySelector('#view [data-act="shop-start"]'));
