@@ -36,6 +36,7 @@ function consistent(d) {
   const w = await boot({user: 'alice'}), d = w.document;
   await sleep(400);
   w.eval(`settingsModal('modules')`); await sleep(400);
+  check(d.querySelector('.smodal #s-modsall') && d.querySelector('.smodal #s-modsall').checked, '#1591: the switch under the purposes, on by default');
   check(consistent(d).length === 0, '#1601: counts match at the start ' + consistent(d));
   // ================= #1601: quick clicks between the purposes
   let asked = 0; w.confirm = () => { asked++; return true; };
@@ -51,6 +52,15 @@ function consistent(d) {
   const srv = (await call('GET', '/api/state')).settings.features;
   check(w.eval('S.settings.features') === srv, '#1601: the app has the server state ' + srv);
   check(d.querySelectorAll('.smodal').length === 1 && consistent(d).length === 0, '#1601: one after the other: still in step ' + consistent(d));
+  // ================= #1591: the switch off / on
+  const sw = d.querySelector('.smodal #s-modsall'); sw.checked = false; sw.dispatchEvent(new w.Event('change', {bubbles: true}));
+  await until(async () => (await call('GET', '/api/state')).settings.mods_all === '0', 40);
+  const st = (await call('GET', '/api/state')).settings;
+  check(!['cal', 'kanban', 'events', 'contacts', 'timeline'].some(k => st.features.split(',').includes(k)), '#1591: off = lists and tasks only ' + st.features);
+  await sleep(300);
+  check(consistent(d).length === 0 && !d.querySelector('.smodal [data-feat="cal"]')?.checked, '#1591: the switches follow ' + consistent(d));
+  await w.eval('histStep("undo")'); await until(async () => (await call('GET', '/api/state')).settings.mods_all === '1', 40);
+  check((await call('GET', '/api/state')).settings.features.split(',').includes('kanban'), '#1591: one undo step brings the modules back');
   w.close();
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
