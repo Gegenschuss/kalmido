@@ -1263,7 +1263,11 @@ MIGRATIONS = [
     # 2.46.0 (#1603): who sees an organisation list: '' = only the people it is shared with, 'org' = every member of its
     # organisation (read-only until they join; org_edit = 1: they may edit without joining)
     ("lists", "org_visibility", "ALTER TABLE lists ADD COLUMN org_visibility TEXT NOT NULL DEFAULT ''"),
-    ("lists", "org_edit", "ALTER TABLE lists ADD COLUMN org_edit BIGINT NOT NULL DEFAULT 0"),
+    ("lists", "org_edit", "ALTER TABLE lists ADD COLUMN org_edit BIGINT NOT NULL DEFAULT 0"),    # 2.46.X (#1751): "Tap does not open details": a tap on a task row ticks it off (owner / list admins; 0 / 1). The second
+    # entry runs once with the column's creation (the columns present are read before this loop): the shopping and packing
+    # lists that exist get it on; later the person may switch it off and it stays off
+    ("lists", "tap_done", "ALTER TABLE lists ADD COLUMN tap_done BIGINT NOT NULL DEFAULT 0"),
+    ("lists", "tap_done", "UPDATE lists SET tap_done=1 WHERE family IN ('shopping', 'packing')"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

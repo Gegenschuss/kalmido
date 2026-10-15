@@ -6824,5 +6824,11 @@
   "A kid account cannot be an admin of an organisation": "Un account bambino non può essere amministratore di un'organizzazione",
   "Unknown organisation": "Organizzazione sconosciuta",
   "Hide this note": "Nascondi questo avviso",
-  "First line taken as the contact person: please check": "Prima riga presa come referente: controlla"
+  "First line taken as the contact person: please check": "Prima riga presa come referente: controlla",
+  "Open details": "Apri i dettagli",
+  "Tap": "Tocco",
+  "Tap does not open details": "Il tocco non apre i dettagli",
+  "A tap on a task ticks it off. Details with a long press or the menu.": "Un tocco su un’attività la spunta. I dettagli con una pressione lunga o il menu.",
+  "A tap ticks the task off": "Un tocco spunta l’attività",
+  "A tap opens the details": "Un tocco apre i dettagli"
 }

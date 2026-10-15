@@ -710,6 +710,9 @@ fresh; run p2462_d_api "$PY" p2462_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2462_d_ui node p2462_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.2 part A: #1718 no flicker (the view is morphed on a redraw of the same route)
 fresh; run p2462_a_ui node p2462_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.46.X part B: #1751 the list switch "Tap does not open details" (a tap ticks off; on for shopping / packing lists)
+fresh; run p246d_b_api "$PY" p246d_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p246d_b_ui node p246d_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
