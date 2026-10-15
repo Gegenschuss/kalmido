@@ -148,14 +148,25 @@ OL = Do.post(B + "/api/lists", json={"name": "Org list"}).json()
 check(OL["org_id"] == ORG and "teambot" in seen(Do) and Do.put(B + f"/api/lists/{OL['id']}/members", json={"user_id": TB, "role": "edit"}).ok,
       "#1592: members see the team agent and share an organisation list with it")
 
+r = A.post(B + "/api/admin/agents", json={"username": "sparebot", "display_name": "Spare bot"})
+SB = r.json()["id"]
+check("sparebot" in members(ORG) and A.patch(B + f"/api/admin/agents/{SB}", json={"org_id": None}).ok and "sparebot" not in members(ORG),
+      "#1592 review: an agent made private leaves the organisation's members")
+
 # ================================================================== #1592: an organisation admin removes a member
 EMIL = db("SELECT id FROM users WHERE username='emil'")[0][0]
 Em = sess("emil")
 EL = Em.post(B + "/api/lists", json={"name": "Emil's org list"}).json()
 check(EL["org_id"] == ORG, "a member's list in the organisation")
+r = A.post(B + "/api/admin/agents", json={"username": "emilbot", "display_name": "Emil bot", "owner_id": EMIL})
+EB = r.json()["id"]
+check(r.status_code == 201 and "emilbot" in members(ORG) and Do.put(B + f"/api/lists/{OL['id']}/members", json={"user_id": EB, "role": "edit"}).ok,
+      "a member's personal agent in the organisation and in an organisation list")
 r = Do.delete(B + f"/api/orgs/{ORG}/members/{EMIL}")
 check(r.ok and r.json()["transferred"] == 1 and "emil" not in members(ORG), "#1592: an organisation admin removes a member " + r.text[:120])
 check(db("SELECT owner_id FROM lists WHERE id=?", (EL["id"],)) == [(db("SELECT id FROM users WHERE username='dora'")[0][0],)], "#1592: the list goes to the admin who removed")
+check("emilbot" not in members(ORG) and not db("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (OL["id"], EB))
+      and db("SELECT org_id FROM agents WHERE user_id=?", (EB,)) == [(None,)], "#1592 review: the removed member's agent leaves the organisation and its lists")
 
 # ================================================================== restarts: nobody is put back, the old mode is ignored
 start("-e KALMIDO_INSTANCE_MODE=organisation -e KALMIDO_ORG_NAME=Renamed", keep=True)
@@ -178,6 +189,15 @@ check(ines and not db("SELECT 1 FROM org_members WHERE user_id=?", (ines[0][0],)
 check(jan and db("SELECT org_id FROM org_members WHERE user_id=?", (jan[0][0],)) == [(ORG,)], "#1562: a registration with the organisation's domain joins it")
 check(ines and A.post(B + f"/api/users/{ines[0][0]}/approve").ok, "#1592: the instance admin approves a registration outside the organisation")
 
+# ================================================================== review: clients
+Gi = sess("gina")
+for s_ in (A, Gi):
+    s_.patch(B + "/api/settings", json={"features": "cal,comments,collab,clients"})
+r = Gi.post(B + "/api/clients", json={"name": "Gina's own client"})
+check(r.status_code == 201 and r.json().get("org_id") is None, "a private client of a person outside the organisation " + r.text[:120])
+check("Gina's own client" not in [x["name"] for x in A.get(B + "/api/clients").json().get("clients", [])],
+      "#1592 review: the instance admin does not see clients outside their organisations (one organisation, no mode set)")
+
 # ================================================================== the former mode organisation: synced once on the first start
 dbx.connect(DATA).execute("DELETE FROM settings WHERE key='migr_om2460'")
 dbx.connect(DATA).execute("UPDATE org_members SET role='member' WHERE user_id=1")
@@ -190,6 +210,11 @@ Do = sess("dora")
 EMIL_ORG = Do.delete(B + f"/api/orgs/{ORG}/members/{EMIL}")
 start(keep=True)
 check("emil" not in members(ORG), "former mode organisation: only once (a removed member stays removed)")
+
+# review: the organisation's name
+dbx.connect(DATA).execute("INSERT INTO orgs(name,icon,created_at) VALUES('Elsewhere','','2026-10-15T00:00:00Z')")
+check(A.patch(B + "/api/admin/settings", json={"org_name": "Renamed"}).status_code == 400 and db("SELECT name FROM orgs WHERE id=?", (ORG,)) == [("Northwind",)],
+      "#1592 review: the setting org_name renames nothing once there are two organisations (also one the admin is not in)")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
