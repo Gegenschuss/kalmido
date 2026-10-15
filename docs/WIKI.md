@@ -35,3 +35,28 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
 
 Organisation exports (Settings > Organisation) contain the pages (`wiki/pages.json`). Agents have no access to knowledge
 pages yet.
+
+## Mind map (2.49.0)
+
+Every list (not the inbox) can be shown as a **Mind map**, next to List, Kanban and Timeline (the view switch in the list
+header). The list's name is in the middle, its sections and tasks are the branches, subtasks the sub-branches. Every
+branch is a task: what you do in the map is done to the tasks, and it can be undone like any other change. In lists you
+may only view, the map only shows.
+
+| Key | |
+|---|---|
+| Enter | new branch next to the selected one |
+| Tab | new sub-branch (a subtask) |
+| Shift+Tab | one level up |
+| Delete / Backspace | delete the branch (with its sub-branches) |
+| Space | fold / unfold |
+| Arrow keys | move the selection |
+| F2, double click | rename |
+| O | open the task |
+
+Drag a branch onto another one to hang it there (it becomes a subtask, or moves to that section). On a phone drag the map
+with one finger and zoom with two; a tap selects a branch, a second tap opens its actions. The button next to the map
+switches to an **outline** (an indented list) of the same tree.
+
+The menu exports the map as a Markdown outline, as SVG or PNG, and imports an outline (Markdown list, OPML or FreeMind
+`.mm`) as tasks under the selected branch.
