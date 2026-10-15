@@ -181,7 +181,7 @@ async function bk_barAct(k, el) {
   const ids = [...CT.pick]; if (!ids.length) return;
   if (k === 'del') {
     if (!await askConfirm(trn('Delete {0} contact?', 'Delete {0} contacts?', ids.length), tr('They are also removed from the phones that sync these address books.'), {ok: tr('Delete'), danger: true})) return;
-    try { await api('POST', '/api/contacts/bulk', {action: 'delete', ids}); } catch { return; }
+    try { await bk_send({action: 'delete'}, ids); } catch { return; }
     toast(trn('{0} contact deleted', '{0} contacts deleted', ids.length));
     if (CT.pick && CT.sel && ids.includes(CT.sel)) { CT.sel = null; CT.card = null; }
     bk_end(); await load().catch(() => {}); ctLoad();
@@ -191,8 +191,13 @@ async function bk_barAct(k, el) {
     menu(el, books.map(b => ({label: b.name, icon: 'folder', fn: () => bk_move(ids, b)})), null, null, tr('Move'));
   }
 }
+async function bk_send(body, ids) {  // one request per 5000 (the server's limit; an address book holds up to 20000)
+  const out = {moved: 0, conflicts: []};
+  for (let i = 0; i < ids.length; i += 5000) { const j = await api('POST', '/api/contacts/bulk', {...body, ids: ids.slice(i, i + 5000)}); out.moved += j.moved || 0; out.conflicts.push(...(j.conflicts || [])); }
+  return out;
+}
 async function bk_move(ids, b) {
-  let j; try { j = await api('POST', '/api/contacts/bulk', {action: 'move', ids, book_id: b.id}); } catch { return; }
+  let j; try { j = await bk_send({action: 'move', book_id: b.id}, ids); } catch { return; }
   const conf = (j.conflicts || []).length;
   toast([trn('{0} contact moved to {1}', '{0} contacts moved to {1}', j.moved, b.name), conf ? trn('{0} was there already and stayed', '{0} were there already and stayed', conf) : ''].filter(Boolean).join(' · '));
   bk_end(); await load().catch(() => {}); ctLoad(); if (CT.sel) ctOpen(CT.sel);
