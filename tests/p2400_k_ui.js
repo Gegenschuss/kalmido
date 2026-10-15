@@ -36,7 +36,8 @@ const typeIn = (w, el, v) => { el.focus(); el.dispatchEvent(new w.FocusEvent('fo
   // ================= #1380 the client dialog
   let w = await boot({hash: `client/${CL}`}); let d = w.document;
   await until(() => d.querySelector('#view .cldetail'), 60);
-  check(d.querySelectorAll('#view .clklist li').length === 2 && /Max Probe/.test(d.querySelector('#view .clklist')?.textContent || ''), 'client page: the contact persons are listed');
+  // 2.47.3 (#1734): the contact persons sit on the client's card (list + card like the contacts)
+  check(d.querySelectorAll('#view .msclks li').length === 2 && /Max Probe/.test(d.querySelector('#view .msclks')?.textContent || ''), 'client page: the contact persons are listed');
   click(w, d.querySelector('[data-act="client-edit"]'));
   await until(() => d.querySelector('.modal.cldlg .clkc'), 30);
   let md = d.querySelector('.modal.cldlg');
