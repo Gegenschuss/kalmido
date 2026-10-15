@@ -6,9 +6,11 @@ const AINS_OS = [['mac', N_('Mac')], ['windows', N_('Windows')], ['linux', N_('L
 const ains_osGuess = () => /Mac|iPhone|iPad/.test(navigator.userAgent) ? 'mac' : /Win/.test(navigator.userAgent) ? 'windows' : 'linux';
 const ains_q = s => `'${String(s).replace(/'/g, "'\\''")}'`;   // POSIX shell single quotes
 const ains_pq = s => `'${String(s).replace(/'/g, "''")}'`;     // PowerShell single quotes
+// 2.46.6 (#1713): the language of the account goes along (--lang / -Lang): the script speaks German or English, anything else = English
+const ains_lang = () => (LS.get('lang') || S.settings?.lang || 'en').slice(0, 2).toLowerCase() === 'de' ? 'de' : 'en';
 function ains_command(os, url, code, folder) {
-  if (os === 'windows') return `& ([scriptblock]::Create((irm ${ains_pq(url + '/agent-setup.ps1')}))) -Url ${ains_pq(url)} -Code ${code} -Dir ${ains_pq(folder)}`;
-  return `curl -fsSL ${ains_q(url + '/agent-setup.sh')} | bash -s -- --url ${ains_q(url)} --code ${code} --dir ${ains_q(folder)}`;
+  if (os === 'windows') return `& ([scriptblock]::Create((irm ${ains_pq(url + '/agent-setup.ps1')}))) -Url ${ains_pq(url)} -Code ${code} -Dir ${ains_pq(folder)} -Lang ${ains_lang()}`;
+  return `curl -fsSL ${ains_q(url + '/agent-setup.sh')} | bash -s -- --url ${ains_q(url)} --code ${code} --dir ${ains_q(folder)} --lang ${ains_lang()}`;
 }
 const ains_folderHint = os => os === 'windows' ? '~\\projects\\website' : '~/projects/website';
 const ains_osName = os => tr((AINS_OS.find(x => x[0] === os) || ['', ''])[1]) || '';

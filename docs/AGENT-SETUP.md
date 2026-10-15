@@ -65,6 +65,8 @@ starts the agent at every login (launchd / Task Scheduler / systemd --user). Det
 [AGENTS.md, Set up on a computer with one command](AGENTS.md#set-up-on-a-computer-with-one-command-2440). The paths
 below are for a hardened server setup (own user, firewall) and for doing it by hand.
 
+2.46.6 (#1713): the command carries the language of your account (`--lang de` / `-Lang de`); the script's messages are then German, in every other language English.
+
 ## Path A: let Claude Code set it up
 
 If you already use Claude Code on that machine (as a user with sudo), it can do the whole setup for you. First create
