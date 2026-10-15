@@ -118,7 +118,7 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
   check(/Software/.test(md.querySelector('#l-pthint').textContent) || /Backlog to Done/.test(md.querySelector('#l-pthint').textContent), 'the hint describes the type');
   click(w, md.querySelector('[data-pto="add"]'));
   check(await until(() => w.eval(`S.sections.filter(s => s.list_id === ${EM}).length === 5`)), 'Add sections: the five sections exist');
-  check(!md.querySelector('.ptoffer'), 'the offer closes');
+  check(await until(() => !md.querySelector('.ptoffer')), 'the offer closes');  // 2.46.1: waits (slow CI runners)
   w.eval(`histStep('undo')`);
   check(await until(() => w.eval(`S.sections.filter(s => s.list_id === ${EM}).length === 0`)), 'Undo removes the added sections');
   await until(() => w.eval('!HIST.busy'));
