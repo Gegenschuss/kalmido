@@ -611,7 +611,8 @@ Each tool runs as a short-lived process with limits; tune them for small hosts:
 
 The recognised text, amounts, sender names, rules and the learnt models are sealed with the workspace's key when
 `KALMIDO_SECRET_KEY` is set (see [Encryption of organisation data](#encryption-of-organisation-data)); the search uses
-keyed hashes of the words, no plain index. With *Tasks by e-mail* set up, every person and organisation can create a
+keyed hashes of the words, no plain index. Without `KALMIDO_SECRET_KEY` the hash key of the word index is a fixed one
+(the same on every server): whoever reads the database can then test words against it -- set the server key. With *Tasks by e-mail* set up, every person and organisation can create a
 forwarding address for documents in the documents' settings: PDFs and images attached to mails sent there become
 documents.
 
@@ -634,7 +635,8 @@ once per workspace -- by an organisation's admin for the organisation, by a pers
 - **Network:** http/https only, timeouts, no redirects, at most `TASKS_MAX_FILE_MB` per file. An instance in the local
   network is an internal address: allow its host under *Settings > Administration > Advanced* (or
   `KALMIDO_CALENDAR_ALLOW_HOSTS=paperless.example.com:8000`), the same allow-list as for calendar subscriptions.
-- The token is sealed with the workspace's key and never shown again.
+- The token is always stored sealed with a key derived from `KALMIDO_SECRET_KEY` (also when the encryption of
+  organisation data is off) and never shown again. Without a server key the connection cannot be set up.
 
 ## Moving to a new server
 
