@@ -12,6 +12,7 @@ function folderShareModal(f, opt = {}) {
   const own = folderLists(f).some(l => isOwner(l)) || !folderLists(f).length;
   const md = modal(`<div class="lhdr"><h3>${esc(tr('Share folder “{0}”', fDisp(f)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="shint lhint keep">${tr('Every list in this folder is shared now, and every list you add to it later. With them the lists land in a folder of the same name; they can move them freely.')}</div>
+    <div class="shws" id="fsh-ws"></div>
     <h4 id="fsh-people-h">${tr('People')}</h4><div class="members fpl" id="fsh-members" aria-labelledby="fsh-people-h"><div class="muted mhint">${tr('Loading…')}</div></div>
     ${S.peopleVis === 'contacts' || S.instanceMode === 'workspaces' ? `<div class="row shmail"><input id="fsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="fsh-mail">${ic('send', 's')} ${tr('Add')}</button></div>` : ''}
     <details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>
@@ -32,11 +33,12 @@ function folderShareModal(f, opt = {}) {
   const agFits = u => !wsOn() || (u.org_id || null) === fws();  // the agents of the folder's workspace, as in a list (agFits)
   const drawPeople = () => {
     const box = $('#fsh-members', md); if (!box) return;
+    shWsFill($('#fsh-ws', md), fws(), own ? () => $('[data-m="fsh-props"]', md)?.click() : null);  // 2.46.X (#1737)
     const nm = p => p.name || users?.find(u => u.id === p.user_id)?.display_name || '?';
     const cand = (users || []).filter(u => !u.agent && u.id !== S.me?.id && !have.some(p => p.user_id === u.id));
     box.innerHTML = `<div class="mrow fshowner">${av(S.me?.id, S.me?.display_name || '')}<span class="n">${esc(S.me?.display_name || '')} ${tr('(me)')}</span><span class="muted">${tr('Owner')}</span></div>`
       + have.map(p => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, nm(p))}<span class="n"><span class="fpn">${esc(nm(p))}</span> <small class="muted">${tr('new lists too')}</small></span>${roleSel(`data-fprole="${p.user_id}"`, p.role, tr('Role of {0}', nm(p)))}<button class="iconbtn" data-rm="${p.user_id}" title="${esc(tr('Stop sharing'))}" aria-label="${esc(tr('Stop sharing with {0}', nm(p)))}">${ic('x', 's')}</button></div>`).join('')
-      + (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : cand.length ? `<div class="mrow madd"><select id="fp-user" aria-label="${esc(tr('Invite'))}"><option value="">${tr('Share with …')}</option>${cand.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select>${roleSel('id="fp-role"', 'edit')}<button class="btn sm" data-m="add">${ic('plus', 's')} ${tr('Add')}</button></div>`
+      + (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : cand.length ? `<div class="mrow madd"><select id="fp-user" aria-label="${esc(tr('Invite'))}"><option value="">${tr('Share with …')}</option>${shWsOptions(cand, fws())}</select>${roleSel('id="fp-role"', 'edit')}<button class="btn sm" data-m="add">${ic('plus', 's')} ${tr('Add')}</button></div>`
         : `<div class="muted mhint">${(users || []).filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : tr('No other users yet. An admin can add them in the settings.')}</div>`);
   };
   const drawGroups = async () => {
@@ -82,7 +84,7 @@ function folderShareModal(f, opt = {}) {
     st('own', S.me?.display_name || '');
   };
   const reload = async () => { try { have = (await api('GET', '/api/folders/people?folder=' + encodeURIComponent(f))).people; } catch { have = []; } drawPeople(); st('people', ''); };
-  api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled && S.me && u.id !== S.me.id).map(u => ({id: u.id, display_name: u.display_name, agent: !!(u.agent || u.kind === 'agent'), org_id: u.org_id ?? null})); drawPeople(); drawAgents(); }).catch(() => { users = []; drawPeople(); drawAgents(); });
+  api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled && S.me && u.id !== S.me.id).map(u => ({id: u.id, display_name: u.display_name, agent: !!(u.agent || u.kind === 'agent'), orgs: u.orgs || [], org_id: u.org_id ?? null})); drawPeople(); drawAgents(); }).catch(() => { users = []; drawPeople(); drawAgents(); });
   reload(); drawGroups(); if (agentsOn()) loadAgents(); if (S.publicLinks) loadPub(); drawOwn();
   ntfLoad($('#fp-ntf', md), 'folder', f, j => { st('ntf', ntfName(j.effective?.tpl)); if (opt.focus === 'ntf' && !md._ntfs) { md._ntfs = 1; $('#fp-sec-ntf', md)?.scrollIntoView?.({block: 'start'}); } });
   if (opt.focus === 'agents' || opt.focus === 'grp') setTimeout(() => $(opt.focus === 'grp' ? '#fsh-sec-grp' : '#fsh-sec-ag', md)?.scrollIntoView?.({block: 'start'}), 0);

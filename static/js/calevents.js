@@ -436,13 +436,20 @@ async function evCalsModal() {
   });
 }
 function evShareModal(c, users, done) {
-  const md = modal(`<h3>${tr('Share {0}', esc(c.name))}</h3><div id="evs-list"></div>
-    <div class="row"><label for="evs-user">${tr('Person')}</label><select id="evs-user" data-sheet-av>${users.filter(u => !(c.members || []).some(m => m.user_id === u.id)).map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select>
+  const md = modal(`<h3>${tr('Share {0}', esc(c.name))}</h3><div class="shws"></div><div id="evs-list"></div>
+    <div class="row"><label for="evs-user">${tr('Person')}</label><select id="evs-user" data-sheet-av>${shWsOptions(users, c.org_id || null, c.members)}</select>
       <select id="evs-role" aria-label="${esc(tr('Role'))}"><option value="view">${tr('can view')}</option><option value="edit">${tr('can edit')}</option></select><button class="btn sm pri" data-evs="add">${tr('Share')}</button></div>
     <div class="shint">${tr('People with “can view” see the events, with “can edit” they also change them. In their phone the calendar appears next to their own.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-evs="close">${tr('Done')}</button></div>`);
   const names = new Map(users.map(u => [u.id, u.display_name]));
   const draw = () => { $('#evs-list', md).innerHTML = (c.members || []).length ? `<ul class="evclist">${c.members.map(m => `<li class="evcrow">${av(m.user_id, names.get(m.user_id) || '')}<span class="evcn">${esc(names.get(m.user_id) || '?')} <span class="muted">· ${esc(m.role === 'edit' ? tr('can edit') : tr('can view'))}</span></span><button class="iconbtn" data-evsrm="${m.user_id}" aria-label="${esc(tr('Stop sharing with {0}', names.get(m.user_id) || ''))}">${ic('x', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('Not shared yet.')}</p>`; };
+  const wsDraw = () => {  // 2.46.X (#1737)
+    shWsFill($('.shws', md), c.org_id || null, a => wsMoveMenu(a, c.org_id, async org => {
+      try { await api('PATCH', `/api/evcals/${c.id}`, {org_id: org}); } catch { return; }
+      c.org_id = org; wsDraw(); $('#evs-user', md).innerHTML = shWsOptions(users, c.org_id || null, c.members); shWsPick($('#evs-user', md)); done();
+    }));
+  };
+  wsDraw(); shWsPick($('#evs-user', md));
   draw();
   md.addEventListener('click', async e => {
     const rm = e.target.closest('[data-evsrm]');

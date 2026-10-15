@@ -7,18 +7,26 @@ let toastTimer;
 // 2.6.0 (K18): the toast sits above whatever is docked at the bottom (the composer "Add task…", the tab bar, the + button),
 // never on top of it; measured each time it shows
 function toastPlace(el) {
-  let top = innerHeight;
+  // 2.46.X (#1755): with a real keyboard the visible area ends where the keyboard starts (visual viewport, in layout
+  // coordinates); the message sits above the lowest input field there (the comment field), else right above the keyboard
+  const vv = window.visualViewport, kb = typeof kbReal === 'function' && kbReal();
+  const vis = kb ? Math.round(vv.offsetTop + vv.height) : innerHeight;
+  let top = vis;
   for (const s of ['#view .qdock .qadd', '#tabs', '#fab:not(.gone)', '.mbar:not(.hidden)']) {
     const e = $(s); if (!e || !e.offsetWidth) continue;
-    const r = e.getBoundingClientRect(); if (r.top > innerHeight * .5 && r.top < top && r.bottom > innerHeight - 160) top = r.top;
+    const r = e.getBoundingClientRect(); if (r.top > vis * .5 && r.top < top && r.bottom > vis - 160) top = r.top;
   }
-  // 2.13.0 (#453 A12): an open bottom sheet (snooze, date, menus) is never covered: the toast sits above its top edge,
-  // or at the top of the screen when the sheet is that tall
+  if (kb) for (const f of $$('input:not([type=hidden]):not([type=checkbox]):not([type=radio]),textarea')) {
+    if (!f.offsetWidth) continue;
+    const r = f.getBoundingClientRect(); if (r.top > vis * .4 && r.bottom <= vis + 1 && r.top < top) top = r.top;
+  }
+  // 2.13.0 (#453 A12): an open bottom sheet (snooze, date, menus) is never covered: the toast sits above its top edge
   // 2.25.0 (UX-31): the phone's quick-add sheet too: the message sits above it, never over the field
+  // 2.46.X (#1755): a sheet taller than 70 % no longer sends the message to the top (over the header / the content): it stays at the bottom
   const sh = $('#pop.sheet:not(.hidden)') || $('.qadd.sheet'), sr = sh && sh.offsetHeight ? an_rect(sh) : null;  // 2.46.1 (#1558): an_rect = where the sheet will be, not where its entry animation is now
-  el.classList.toggle('totop', !!sr && sr.top < innerHeight * .3);
+  el.classList.remove('totop');
   if (sr && sr.top >= innerHeight * .3) top = Math.min(top, sr.top);
-  el.style.bottom = el.classList.contains('totop') ? '' : top < innerHeight ? Math.round(innerHeight - top + 12) + 'px' : '';
+  el.style.bottom = top < innerHeight ? Math.round(innerHeight - top + 12) + 'px' : '';
 }
 // 2.16.0 (#473): status messages for screen readers (WCAG 4.1.3): one polite live region (#srlive in index.html); the
 // text is set a moment after clearing it, so the same message twice is read twice
@@ -86,6 +94,7 @@ function toast(msg, undo, ms, label) {  // label: the button's text instead of "
   announce(msg + (undo ? ' · ' + (label || tr('Undo')) + (isTouch() ? '' : ' (' + kbText('Mod+Z') + ')') : ''));
   if (!undo || label) HIST.toastE = null;  // any other message ends the toast's shortcut (the history keeps the step)
   el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button>${esc(label || tr('Undo'))}</button>${isMobile() || isTouch() || label ? '' : kb('Mod+Z')}` : ''}`;
+  el.classList.toggle('one', !!undo); el.title = undo ? msg : '';  // 2.46.X (#1755): one line, the name is cut with an ellipsis, the button stays whole
   el.classList.remove('hidden');
   toastPlace(el);
   if (undo) el.querySelector('button').onclick = () => { el.classList.add('hidden'); undo(); };

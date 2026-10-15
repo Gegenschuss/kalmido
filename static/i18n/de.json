@@ -6830,5 +6830,11 @@
   "Tap does not open details": "Tippen öffnet keine Details",
   "A tap on a task ticks it off. Details with a long press or the menu.": "Ein Tipp auf eine Aufgabe hakt sie ab. Details über langes Drücken oder das Menü.",
   "A tap ticks the task off": "Ein Tipp hakt die Aufgabe ab",
-  "A tap opens the details": "Ein Tipp öffnet die Details"
+  "A tap opens the details": "Ein Tipp öffnet die Details",
+  "Belongs to: {0} (organisation)": "Gehört zu: {0} (Organisation)",
+  "Belongs to: {0}": "Gehört zu: {0}",
+  "Change workspace": "Arbeitsbereich ändern",
+  "Only members of the organisation can be invited. An agent of the organisation sees it only if it is shared with that agent.": "Nur Mitglieder der Organisation können eingeladen werden. Ein Agent der Organisation sieht es nur, wenn es mit ihm geteilt ist.",
+  "Only people you explicitly invite see it.": "Nur ausdrücklich eingeladene Personen sehen es.",
+  "Not in the organisation": "Nicht in der Organisation"
 }
