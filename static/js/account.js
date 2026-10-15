@@ -641,6 +641,21 @@ function inviteResult(j, name) {
     if (b.dataset.m === 'copy') { try { await navigator.clipboard.writeText(j.link); toast(tr('Copied')); } catch { $('#inv-link', md).select(); } }
   });
 }
+// 2.49.0 (#1553): the login page's backdrop (a soft violet gradient + a glow that pulses in CSS and follows the mouse: one
+// frame per movement, no loop; fixed on touch screens and with reduced motion) and the line under the card (survive innerHTML)
+function lg_decor(el) {
+  el.dataset.lgfoot = tr('Tasks, team and office in one place.');
+  if (!matchMedia('(hover: hover) and (pointer: fine)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let x = 0, y = 0, f = 0;
+  el.addEventListener('pointermove', e => {
+    x = e.clientX; y = e.clientY;
+    if (!f) f = requestAnimationFrame(() => { f = 0; el.style.setProperty('--lgx', x + 'px'); el.style.setProperty('--lgy', y + 'px'); });
+  }, {passive: true});
+}
+function lg_hello() {
+  const h = new Date().getHours();
+  return h >= 5 && h < 11 ? tr('Good morning, nice to have you here.') : h >= 18 || h < 5 ? tr('Good evening, nice to have you here.') : tr('Welcome back, nice to have you here.');
+}
 // 2.22.0 (#697): the page "Set up your account" (the link of an invitation or a password reset: /#invite/<token>)
 async function inviteScreen(tok) {
   history.replaceState(null, '', location.pathname);  // the token leaves the address bar (and the history) at once
@@ -649,6 +664,7 @@ async function inviteScreen(tok) {
   await i18nLoad(info.lang || uiLang());
   const el = document.createElement('div');
   el.className = 'modal authscreen';
+  lg_decor(el);  // 2.49.0 (#1553)
   const logo = `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`;
   if (info.error) {
     el.innerHTML = `<div class="card">${logo}<p role="alert">${esc(info.error)}</p><button class="btn pri" type="button" data-au="login">${tr('To the login')}</button></div>`;
@@ -673,6 +689,7 @@ async function inviteScreen(tok) {
         const r = await fetch('/api/auth/invite/accept', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({token: tok, password: pw})});
         const res = await r.json().catch(() => ({}));
         if (!r.ok) { errEl.textContent = res.error || tr('Error {0}', r.status); return; }
+        if (res.twofa) { await authTwofa(el, logo, res.methods || ['totp']); return; }  // 2.49.0 (#1531): two-factor stays required after a reset
         if (res.enrol) { await authEnrol(el, logo); return; }
         if (res.pending) { $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Thank you!')}</h2><p role="status">${tr('Your account waits for an admin to approve it. You can log in once it is approved.')}</p><button class="btn pri" type="button" data-au="login">${tr('To the login')}</button>`; return; }  // 2.23.0 (#711)
         if ($('#inv-2fa', el).checked) LS.set('after2fa', true);
@@ -702,6 +719,7 @@ async function authScreen(j) {
   const kind = info.setup ? 'setup' : j.auth;
   const el = document.createElement('div');
   el.className = 'modal authscreen';
+  lg_decor(el);  // 2.49.0 (#1553)
   // 2.14.0: the first account (welcome) shows the heron instead of the small mark
   const logo = kind === 'setup' ? `<div class="alogo hwelc">${heron('welcome', 'hwel')}<b>${APP_NAME}</b></div>` : `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b>${info.org ? `<small class="aorg">${esc(info.org)}</small>` : ''}</div>`;  // 2.22.0 (#752): the organisation
   if (kind === 'no_account' || kind === 'disabled') {
@@ -709,13 +727,14 @@ async function authScreen(j) {
   } else {
     const setup = kind === 'setup';
     el.innerHTML = `<div class="card">${logo}
+      ${setup ? '' : `<p class="lghello">${esc(lg_hello())}</p>`}${''/* 2.49.0 (#1553) */}
       ${setup ? `<p>${tr('Welcome! Create the first account, it becomes the admin.')}</p>${info.login ? `<p class="muted">${esc(tr('Signed in at the login proxy as “{0}”: the account is linked to it, a password is optional.', info.login))}</p>` : ''}` : ''}
       <form id="auth-form" autocomplete="on">
         ${setup && info.setup_code ? `<label class="aulab" for="au-code">${tr('Setup code')}</label><input id="au-code" autocapitalize="off" autocomplete="one-time-code" spellcheck="false" required aria-describedby="au-code-h"><div class="shint shcode" id="au-code-h">${tr('The server prints it into its log at start: {0}', '<code>docker compose logs kalmido</code>')}</div>` : ''}${''/* 2.45.0 (#1515) */}
         <label class="aulab" for="au-user">${tr('Username')}</label><input id="au-user" name="username" autocapitalize="off" autocomplete="username" required value="${setup && info.login ? esc(String(info.login).toLowerCase()) : ''}">
         ${setup ? `<label class="aulab" for="au-name">${tr('Display name')}</label><input id="au-name" maxlength="60" autocomplete="name" placeholder="${tr('optional')}">` : ''}
         <label class="aulab" for="au-pw">${tr('Password')}</label><span class="pwwrap"><input id="au-pw" name="password" type="password" autocomplete="${setup ? 'new-password' : 'current-password'}" ${setup && info.login ? '' : 'required'} ${setup ? `placeholder="${tr('at least {0} characters', 8)}"` : ''}><button type="button" class="iconbtn pweye" data-au="pwshow" aria-pressed="false" aria-label="${esc(tr('Show password'))}" title="${esc(tr('Show password'))}">${ic('eye', 's')}</button></span>
-        ${setup ? '' : `<label class="chkl"><input type="checkbox" id="au-rem" checked> ${tr('Stay logged in')}</label>`}
+        ${setup ? '' : `<div class="lgopts"><label class="chkl"><input type="checkbox" id="au-rem" checked> ${tr('Stay logged in')}</label>${info.forgot ? `<button type="button" class="linkbtn lgforgot" data-au="forgot">${tr('Forgot your password?')}</button>` : ''}</div>`}${''/* 2.49.0 (#1531, #1553): one row */}
         <div class="aerr" role="alert" id="au-err"></div>
         <button class="btn pri" type="submit">${setup ? tr('Create account') : tr('Log in')}</button>
         ${!setup && (info.oidc || (info.passkey_login && pkSupported())) ? `<div class="aor"><span>${tr('or')}</span></div>` : ''}
@@ -731,6 +750,7 @@ async function authScreen(j) {
       if (b.dataset.au === 'oidc') location.href = '/api/auth/oidc/start?remember=' + (rem ? 1 : 0);
       if (b.dataset.au === 'passkey') authPasskey($('#au-err', el), rem);
       if (b.dataset.au === 'signup') signupScreen(el, logo, info);  // 2.23.0 (#711)
+      if (b.dataset.au === 'forgot') lg_forgotScreen(el, logo, $('#au-user', el).value.trim());  // 2.49.0 (#1531)
       if (b.dataset.au === 'back') { el.remove(); $('#app')?.removeAttribute('inert'); authScreen(j); }
       if (b.dataset.au === 'pwshow') { const i = $('#au-pw', el), on = i.type === 'password'; i.type = on ? 'text' : 'password'; b.setAttribute('aria-pressed', String(on)); i.focus(); }  // 2.13.0 (#453 P7)
     });
@@ -1020,6 +1040,30 @@ document.addEventListener('change', async e => {
   } catch { if (id === 's-signup') e.target.value = S.about?.signup_mode || 'off'; }
 });
 // the form "Create account" on the login page (#711)
+// 2.49.0 (#1531): "Forgot your password?": e-mail address or user name -> a one-time link by mail (the answer is always the same)
+function lg_forgotScreen(el, logo, pre = '') {
+  el.innerHTML = `<div class="card">${logo}
+    <h2 class="invh">${tr('Forgot your password?')}</h2>
+    <p class="muted">${tr('Enter the e-mail address or user name of your account. We send a link to set a new password to the address stored for it.')}</p>
+    <form id="fg-form" autocomplete="on">
+      <label class="aulab" for="fg-login">${tr('E-mail or user name')}</label><input id="fg-login" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="200" required value="${esc(pre)}">
+      <div class="aerr" role="alert" id="fg-err"></div>
+      <button class="btn pri" type="submit">${tr('Send the link')}</button>
+      <button class="linkbtn" type="button" data-au="back">${tr('Back to the login')}</button>
+    </form></div>`;
+  el.querySelector('#fg-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const errEl = $('#fg-err', el), btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/auth/forgot', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({login: $('#fg-login', el).value.trim()})});
+      const res = await r.json().catch(() => ({}));
+      if (!r.ok) { errEl.textContent = res.error || tr('Error {0}', r.status); btn.disabled = false; return; }
+      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Check your inbox')}</h2><p role="status" class="lgsent">${tr('If an account with a stored e-mail address matches, a link to set a new password is on its way.')}</p><p class="muted">${tr('No mail after a few minutes? Look in the spam folder or ask an admin.')}</p><button class="btn" type="button" data-au="back">${tr('Back to the login')}</button>`;
+    } catch { errEl.textContent = tr('Server not reachable.'); btn.disabled = false; }
+  });
+  setTimeout(() => $('#fg-login', el)?.focus(), 50);
+}
 function signupScreen(el, logo, info) {
   const pw = !!info.signup?.password;
   el.innerHTML = `<div class="card">${logo}

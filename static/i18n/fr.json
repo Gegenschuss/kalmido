@@ -6984,5 +6984,18 @@
   "Sky blue": "Bleu ciel",
   "Brown": "Marron",
   "Show colours for people": "Afficher les couleurs des personnes",
-  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Chaque personne et chaque agent a une couleur fixe : le cercle derrière les initiales, un fin anneau autour d’une photo. Désactivé : seuls les agents sont colorés."
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Chaque personne et chaque agent a une couleur fixe : le cercle derrière les initiales, un fin anneau autour d’une photo. Désactivé : seuls les agents sont colorés.",
+  "Please enter your e-mail address or user name": "Saisis ton adresse e-mail ou ton nom d’utilisateur",
+  "Someone asked for a link to set a new password for {0} – hopefully you. If it was not you, ignore this e-mail: your password stays as it is.": "Quelqu’un a demandé un lien pour définir un nouveau mot de passe pour {0} – sans doute toi. Si ce n’était pas toi, ignore cet e-mail : ton mot de passe reste inchangé.",
+  "Forgot your password?": "Mot de passe oublié ?",
+  "Enter the e-mail address or user name of your account. We send a link to set a new password to the address stored for it.": "Saisis l’adresse e-mail ou le nom d’utilisateur de ton compte. Nous envoyons un lien pour un nouveau mot de passe à l’adresse enregistrée.",
+  "E-mail or user name": "E-mail ou nom d’utilisateur",
+  "Send the link": "Envoyer le lien",
+  "Check your inbox": "Regarde ta boîte de réception",
+  "If an account with a stored e-mail address matches, a link to set a new password is on its way.": "Si un compte avec une adresse e-mail enregistrée correspond, un lien pour un nouveau mot de passe est en route.",
+  "No mail after a few minutes? Look in the spam folder or ask an admin.": "Pas de mail après quelques minutes ? Regarde dans les spams ou demande à un admin.",
+  "Tasks, team and office in one place.": "Tâches, équipe et bureau au même endroit.",
+  "Good morning, nice to have you here.": "Bonjour, ravi de te voir.",
+  "Welcome back, nice to have you here.": "Bon retour, ravi de te voir.",
+  "Good evening, nice to have you here.": "Bonsoir, ravi de te voir."
 }

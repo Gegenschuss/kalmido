@@ -151,6 +151,7 @@ ORDER = (
     "team.forms",
     "team.v1",
     "accounts.signup",
+    "accounts.pwreset",  # 2.49.0 (#1531): "Forgot your password?"
     "admin.hosting",
     "admin.clientip",  # 2.33.0 (#834)
     "tasks.stale",  # 2.34.0 (#266)

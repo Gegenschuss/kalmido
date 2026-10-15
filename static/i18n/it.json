@@ -6984,5 +6984,18 @@
   "Sky blue": "Azzurro",
   "Brown": "Marrone",
   "Show colours for people": "Mostra i colori delle persone",
-  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Ogni persona e ogni agente ha un colore fisso: il cerchio dietro le iniziali, un anello sottile intorno a una foto. Disattivato: solo gli agenti sono colorati."
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Ogni persona e ogni agente ha un colore fisso: il cerchio dietro le iniziali, un anello sottile intorno a una foto. Disattivato: solo gli agenti sono colorati.",
+  "Please enter your e-mail address or user name": "Inserisci il tuo indirizzo e-mail o il tuo nome utente",
+  "Someone asked for a link to set a new password for {0} – hopefully you. If it was not you, ignore this e-mail: your password stays as it is.": "Qualcuno ha chiesto un link per impostare una nuova password per {0}, speriamo tu. Se non sei stato tu, ignora questa e-mail: la tua password resta invariata.",
+  "Forgot your password?": "Password dimenticata?",
+  "Enter the e-mail address or user name of your account. We send a link to set a new password to the address stored for it.": "Inserisci l’indirizzo e-mail o il nome utente del tuo account. Inviamo un link per una nuova password all’indirizzo salvato.",
+  "E-mail or user name": "E-mail o nome utente",
+  "Send the link": "Invia il link",
+  "Check your inbox": "Controlla la tua casella di posta",
+  "If an account with a stored e-mail address matches, a link to set a new password is on its way.": "Se corrisponde un account con un indirizzo e-mail salvato, un link per una nuova password è in arrivo.",
+  "No mail after a few minutes? Look in the spam folder or ask an admin.": "Nessuna e-mail dopo qualche minuto? Guarda nella cartella spam o chiedi a un admin.",
+  "Tasks, team and office in one place.": "Attività, team e ufficio in un unico posto.",
+  "Good morning, nice to have you here.": "Buongiorno, che bello vederti.",
+  "Welcome back, nice to have you here.": "Bentornato, che bello vederti.",
+  "Good evening, nice to have you here.": "Buonasera, che bello vederti."
 }
