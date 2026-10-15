@@ -12,7 +12,7 @@ function viewTasks() {
   // roots = matching tasks whose parent does not match too (a subtask due today shows up in "Heute"
   // even if its parent does not); children are rendered below their root
   const pick = (pred, group, extra = {}) => {
-    const m = open.filter(t => (!t.context || extra.list) && pred(t) && favKeep(t, k)), ids = new Set(m.map(t => t.id));  // 2.40.0 (#1361): only favourites
+    const m = open.filter(t => (!t.context || extra.list) && pred(t) && favKeep(t, k) && sgKeep(t, k)), ids = new Set(m.map(t => t.id));  // 2.40.0 (#1361): only favourites
     return {open: m.filter(t => !t.parent_id || !ids.has(t.parent_id)), group, ...extra};
   };
   // 1.5.1: every view has its own "Show completed" (list "…" menu), so every view offers its completed tasks
