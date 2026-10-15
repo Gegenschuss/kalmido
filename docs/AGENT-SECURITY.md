@@ -262,6 +262,14 @@ exec python3 "$(dirname "$0")/kalmido_mcp.py"
 Register it with `claude mcp add -s local kalmido -- ~/kalmido/mcp/run.sh`. The token is then neither in Claude Code's
 configuration nor in the model's environment, and the settings below forbid reading the file.
 
+**Set up on a computer with one command (2.44.0, #1517).** The copied command carries a one-time setup code, never the
+token: the code lives 15 minutes, works once, is stored only as a hash and is rate limited like a login, so the copy in
+the shell history is worthless afterwards. The script keeps the token in the instance folder's `kalmido-agent.env`
+(mode 600; on Windows a folder only the account can read) and never prints it. Every computer has its own token, so
+*Remove computer* (or `--uninstall` on the computer) revokes exactly that one. This convenience setup runs the agent as
+your own account, and the launcher passes the env file to the agent command like every launcher does: for an agent that
+must not see its token or your files, use the dedicated user, the firewall and the wrapper of this recipe instead.
+
 ### 4. Claude Code project settings
 
 `~kalmido-agent/kalmido/.claude/settings.json`:
