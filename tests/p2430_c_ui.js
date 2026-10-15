@@ -149,7 +149,24 @@ const item = (d, t) => items(d).find(x => (x.querySelector('.ml')?.firstChild?.t
       return {live, cls: n?.className, w: Math.round(n.getBoundingClientRect().width / col * 10) / 10};
     })()`);
     check(res.live && /\blw4\b/.test(res.cls) && res.w > 3.5 && res.w < 4.3, `${tag}: #1452 the grip snaps to two thirds ${JSON.stringify(res)}`);
+    // the header moves a block: "Milestones" dropped before "Description" (a line shows where)
+    const mv = await ev(`(async () => {
+      const h = document.querySelector('.lyb[data-lyk="ms"] .povh h3'), hr = h.getBoundingClientRect(), t = document.querySelector('.lyb[data-lyk="desc"]').getBoundingClientRect();
+      const pe = (el, ty, x, y) => el.dispatchEvent(new PointerEvent(ty, {bubbles: true, pointerType: 'mouse', button: 0, clientX: x, clientY: y}));
+      pe(h, 'pointerdown', hr.left + 5, hr.top + 5);
+      pe(document, 'pointermove', hr.left + 30, hr.top + 30);
+      pe(document, 'pointermove', t.left + 10, t.top + 40);
+      const line = !!document.querySelector('.wgline:not([hidden])');
+      pe(document, 'pointerup', t.left + 10, t.top + 40);
+      await new Promise(f => setTimeout(f, 1200));
+      return {line, order: [...document.querySelectorAll('.pov .lysix > .lyb')].map(b => b.dataset.lyk).slice(0, 3)};
+    })()`);
+    check(mv.line && mv.order.indexOf('ms') < mv.order.indexOf('desc'), `${tag}: #1452 the header moves a block, a line shows where ${JSON.stringify(mv)}`);
     await shot('p2430c-1440-project.png');
+    await ev(`(() => { document.querySelector('.lyb[data-lyk="desc"] [data-act="wg-more"]').click(); return 1; })()`); await sleep(500);
+    await shot('p2430c-1440-menu.png');
+    await ev(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); document.querySelector('#pop')?.classList.add('hidden'); return 1; })()`);
+    for (const h of ['home', 'today', 'review']) { await o.nav(B + '#' + h); await sleep(2500); await shot(`p2430c-1440-${h}.png`); }
   }, false);
   if (!process.env.NOFF) await firefox(async o => {
     const {cmd, ev, ctx, shot} = o, tag = '390';
