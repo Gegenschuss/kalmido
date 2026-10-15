@@ -559,6 +559,8 @@ def fi_preview(c, oid, raw):
             if li is not None and lang == "en" and rid_ and rid_ in by_id and not by_id[rid_]["name_en"]:
                 # the English row of a device listed before under the same id: only its second name (nothing guessed without both columns)
                 by_id[rid_]["name_en"] = nm[:200]
+                if nm.lower() in have or nm.lower() in names:  # 2.45.1 (#1556) review: the English name may already exist
+                    by_id[rid_]["dup"], by_id[rid_]["action"] = True, "skip"
                 names.add(nm.lower())
                 continue
             e = {"row": i + 2, "name": nm[:200], "name_en": en[:200], "category": (cell(row, cti) or cat)[:80],

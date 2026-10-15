@@ -184,6 +184,10 @@ X4 = make_xlsx({"Equipment": [["Device"], ["Kran"], ["Crane"]]})
 r = A.post(B + L + "/preview", files={"file": ("DATA.xlsx", X4)})
 check(r.ok and [(x["name"], x["name_en"]) for x in r.json()["equipment"]] == [("Kran", ""), ("Crane", "")],
       "preview: without an id and a language column nothing is joined (no guessing) " + r.text[:300])
+X5 = make_xlsx({"Equipment": [["Article no", "Language", "Device"], ["T-9", "DE", "Stativ neu"], ["T-9", "EN", "Big tripod"]]})
+r = A.post(B + L + "/preview", files={"file": ("DATA.xlsx", X5)})
+check(r.ok and [(x["name_en"], x["action"]) for x in r.json()["equipment"]] == [("Big tripod", "skip")],
+      "preview: a joined English row whose name exists already makes the device a duplicate (review) " + r.text[:300])
 
 # ---------------------------------------------------------------- undo
 r = A.post(B + L + f"/runs/{RUN}/undo")
