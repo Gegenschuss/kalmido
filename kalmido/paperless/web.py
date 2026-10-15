@@ -75,6 +75,8 @@ def pl_put_conn():
         tok = t.strip()
     if not tok:
         return err(tr("Please enter the API token"))
+    if not P._token_key(ws):  # 2.48.0 review (S2): the token is only ever stored sealed
+        return err(tr("The server key is missing: the API token cannot be stored safely"), 409)
     follow = r["follow"] if r else 0
     if "follow" in d:
         if not isinstance(d["follow"], bool):
@@ -90,7 +92,7 @@ def pl_put_conn():
             P.pl_check(c, url, tok)
         except P.PlError as e:
             return err(P.pl_err_text(e.stored()))
-    sealed = S.doc_seal(c, ws, "pl_sources.token", tok)
+    sealed = P.pl_seal_token(ws, tok)  # 2.48.0 review (S2): always sealed, never plain in the database
     ts = P._now()
     if r:
         c.execute("UPDATE pl_sources SET url=?, token=?, follow=?, every_min=?, error='', created_by=?, updated_at=? WHERE id=?",

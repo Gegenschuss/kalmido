@@ -142,6 +142,20 @@ for f in sorted(glob.glob(os.path.join(ROOT, "static", "js", "*.js"))):
             ERR.append(f"client: function {n} is defined in {_seen[n]} and {os.path.basename(f)} (one replaces the other)")
         _seen.setdefault(n, os.path.basename(f))
 
+# 2.48.0: the stylesheet's braces balance -- a lost "}" after a merge nests every later rule into the block before it
+# (the end of an @media print block made the rules of three parts apply only when printing)
+_css, _depth, _open = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group()), read("static", "app.css"), flags=re.S), 0, 0
+for _no, _line in enumerate(_css.split("\n"), 1):
+    for ch in _line:
+        _depth += (ch == "{") - (ch == "}")
+        if _depth < 0:
+            ERR.append(f"app.css line {_no}: a closing brace too many")
+            _depth = 0
+    if _depth == 0:
+        _open = _no
+if _depth:
+    ERR.append(f"app.css: {_depth} block(s) not closed -- the first after line {_open}")
+
 for e in ERR:
     print("ERROR:", e)
 print(f"check_layout: {len(tags)} client modules, {len(order)} server modules, {n_people} tables with people, {len(ERR)} error(s)")

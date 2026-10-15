@@ -106,6 +106,7 @@ const e2eIdbDel = () => e2eIdbDo('readwrite', s => s.delete('u' + S.me.id)).catc
 // logout (account.js): every remembered key of this browser goes
 async function e2eForget() {
   E2E.priv = E2E.ckey = E2E.own = null; E2E.badPub = false; E2E.dm = {}; E2E.dec = {}; E2E.notes = {};
+  if (typeof ln_wipe === 'function') ln_wipe();  // 2.48.0 review (S3): the decrypted locked notes too
   try { await new Promise(res => { const r = indexedDB.deleteDatabase('kalmido-e2e'); r.onsuccess = r.onerror = r.onblocked = () => res(); }); } catch { /* none */ }
 }
 
@@ -131,6 +132,7 @@ async function e2eLoad(force) {
 }
 function e2eLock() {
   E2E.priv = E2E.ckey = E2E.own = null; E2E.badPub = false; E2E.dm = {}; E2E.dec = {}; E2E.notes = {};
+  if (typeof ln_wipe === 'function') ln_wipe();  // 2.48.0 review (S3): the decrypted locked notes too (e2eRefresh redraws)
   e2eIdbDel();
   e2eRefresh(); toast(tr('Encryption locked'));
 }

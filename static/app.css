@@ -6860,6 +6860,7 @@ button.lnph:hover{border-color:var(--accent)}
   body.e2eprinting .e2eprint{display:block;color:#000;background:#fff;padding:2rem;font:12pt/1.5 sans-serif}
   .e2eprint h1{font-size:18pt;margin:0 0 .5rem}
   .e2eprint code{display:block;font:600 20pt/1.4 monospace;letter-spacing:.06em;margin:1.5rem 0;padding:1rem;border:1px solid #000;word-break:break-all}
+}
 /* 2.48.0 B (#1111): documents -- the list as cards with a preview, filters, the drop zone, the document sheet, settings */
 .dc-view{position:relative;max-width:1100px;margin:0 auto;padding:0 .75rem 5rem}
 .dc-up{min-height:2.75rem}

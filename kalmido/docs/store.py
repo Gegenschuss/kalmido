@@ -18,7 +18,7 @@ import json
 import re
 
 from ..core.config import SECRET_KEY
-from ..core.db import iso, now_utc
+from ..core.db import insert_id, iso, now_utc
 from ..core.i18n import N_
 from ..core.orgcrypt import OrgCryptError, PREFIX, oc_active, oc_dec_k, oc_enc_k, oc_key
 from . import classify as CL
@@ -285,6 +285,9 @@ def cfg_set(c, ws, data):
         if not re.fullmatch(ASN_PREFIX_RE, pre):
             raise ValueError("asn_prefix")
         cur["asn_prefix"] = pre
+    rid = root_id(c, ws)  # 2.48.0 review: the mark of the documents folder stays
+    if rid:
+        cur["root_id"] = rid
     c.execute("""INSERT INTO doc_cfg(ws, org_id, data, updated_at) VALUES(?,?,?,?)
                  ON CONFLICT(ws) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at""",
               (ws, ws_org(ws), json.dumps(cur), _now()))
@@ -354,12 +357,106 @@ def meta_set_json(c, nid, ws, col, value):
     c.execute(f"UPDATE doc_meta SET {col}=?, updated_at=? WHERE node_id=?", (v, _now(), nid))
 
 
+def root_id(c, ws):
+    """The documents folder of workspace ws: the one marked in doc_cfg (root_id; renaming keeps it), else (made before the
+    mark) the oldest folder "Dokumente" at the top of the workspace, or None."""
+    org = ws_org(ws)
+    r = c.execute("SELECT data FROM doc_cfg WHERE ws=?", (ws,)).fetchone()
+    try:
+        rid = int(json.loads(r[0]).get("root_id") or 0) if r else 0
+    except (ValueError, TypeError, AttributeError):
+        rid = 0
+    if rid:
+        n = c.execute("SELECT parent_id, kind, org_id, owner_id, deleted_at FROM fs_nodes WHERE id=?", (rid,)).fetchone()
+        if (n and n["parent_id"] is None and n["kind"] == "folder" and not n["deleted_at"]
+                and doc_ws(n["org_id"], n["owner_id"]) == ws):
+            return rid
+        return None if n and not n["deleted_at"] else _root_by_name(c, ws, org)
+    return _root_by_name(c, ws, org)
+
+
+def _root_by_name(c, ws, org):
+    if org:
+        r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND kind='folder' AND lower(name)=lower(?) "
+                      "AND deleted_at IS NULL AND agent_id IS NULL ORDER BY id LIMIT 1", (org, ROOT)).fetchone()
+    else:
+        r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? AND kind='folder' "
+                      "AND lower(name)=lower(?) AND deleted_at IS NULL AND agent_id IS NULL ORDER BY id LIMIT 1",
+                      (int(ws[1:]), ROOT)).fetchone()
+    return r[0] if r else None
+
+
+def root_mark(c, ws, nid):
+    """Mark nid as the documents folder of ws (doc_cfg.data root_id, the settings stay)."""
+    r = c.execute("SELECT data FROM doc_cfg WHERE ws=?", (ws,)).fetchone()
+    try:
+        d = json.loads(r[0]) if r else {}
+    except ValueError:
+        d = {}
+    d = d if isinstance(d, dict) else {}
+    d["root_id"] = int(nid)
+    c.execute("""INSERT INTO doc_cfg(ws, org_id, data, updated_at) VALUES(?,?,?,?)
+                 ON CONFLICT(ws) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at""",
+              (ws, ws_org(ws), json.dumps(d), _now()))
+
+
+def root_folder(c, uid, org_id):
+    """Find or make (and mark) the documents folder of workspace org_id (None: uid's own space) for an upload by uid.
+    An organisation's folder belongs to one of its admins, whoever adds the first document: members file their documents
+    into it as their own (fs_add_hooks, root_add_ok) and see only those and what is shared with them; admins see all."""
+    from ..files.store import fs_folder, _free_name
+    from ..core.access import Denied, acx_of
+    ws = doc_ws(org_id, uid)
+    rid = root_id(c, ws)
+    if rid:
+        if not doc_root_marked(c, ws, rid):
+            root_mark(c, ws, rid)
+        return rid
+    ctx = acx_of(c, uid)
+    if not org_id or ctx.role == "agent":
+        rid = fs_folder(c, uid, org_id, [ROOT])
+    else:
+        if int(org_id) not in ctx.org_ids:
+            raise Denied(404)
+        from ..core.pg import system_ctx
+        with system_ctx(c):  # the organisation's admins (members list; uid is a member, checked above)
+            a = c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=?
+                             AND COALESCE(u.kind, '')!='agent' ORDER BY (m.role='admin') DESC, (m.user_id=?) DESC, m.user_id
+                             LIMIT 1""", (int(org_id), uid)).fetchone()
+        owner = a[0] if a else uid
+        ts = _now()
+        rid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at)
+                              VALUES(NULL,'folder',?,?,?,?,?,?)""",
+                        (_free_name(c, None, owner, int(org_id), ROOT), owner, int(org_id), uid, ts, ts))
+    root_mark(c, doc_ws(org_id, uid), rid)
+    return rid
+
+
+def doc_root_marked(c, ws, rid):
+    r = c.execute("SELECT data FROM doc_cfg WHERE ws=?", (ws,)).fetchone()
+    try:
+        return bool(r) and int(json.loads(r[0]).get("root_id") or 0) == int(rid)
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+def root_add_ok(c, uid, chain):
+    """fs_add_hooks: a person who is a member of the organisation may add their own file directly into its documents folder."""
+    from ..core.access import acx_of
+    top = chain[0]
+    if len(chain) != 1 or top["kind"] != "folder" or not top["org_id"]:
+        return False
+    ctx = acx_of(c, uid)
+    return ctx.role != "agent" and top["org_id"] in ctx.org_ids and root_id(c, doc_ws(top["org_id"], None)) == top["id"]
+
+
 def docs_root(c, node):
-    """The id of the documents folder ("Dokumente" at the root) a node sits in, or None."""
+    """The id of the documents folder (the marked folder at the root of the workspace, root_id) a node sits in, or None."""
     from ..files.store import fs_chain
     chain = fs_chain(c, node["id"])
     top = chain[-1] if chain else None
-    if top and top["kind"] == "folder" and top["parent_id"] is None and top["name"].lower() == ROOT.lower() and top["id"] != node["id"]:
+    if top and top["kind"] == "folder" and top["parent_id"] is None and top["id"] != node["id"] \
+            and root_id(c, doc_ws(top["org_id"], top["owner_id"])) == top["id"]:
         return top["id"]
     return None
 
@@ -389,21 +486,31 @@ def move_to_folder(c, node, fid):
     """Move a document into folder fid of the same workspace (never across: checked by folder_ok)."""
     if not folder_ok(c, node, fid):
         return False
+    if node["org_id"]:  # 2.48.0 review: a member's document stays theirs in the organisation's documents folder
+        c.execute("UPDATE fs_nodes SET parent_id=?, updated_at=? WHERE id=?", (int(fid), _now(), node["id"]))
+        return True
     p = c.execute("SELECT owner_id FROM fs_nodes WHERE id=?", (int(fid),)).fetchone()
     c.execute("UPDATE fs_nodes SET parent_id=?, owner_id=?, updated_at=? WHERE id=?", (int(fid), p["owner_id"], _now(), node["id"]))
     return True
 
 
-def folder_by_name(c, node, uid, name):
-    """The folder `name` below the documents folder of node's workspace (made when missing), or None."""
-    from ..files.store import fs_folder
-    from ..core.access import Denied
-    if not docs_root(c, node):
+def folder_by_name(c, node, uid, name, create=True):
+    """The folder `name` directly below the documents folder of node's workspace (made when missing and create), or None.
+    A new folder belongs to the owner of the documents folder (2.48.0 review: never a second "Dokumente" elsewhere)."""
+    from ..files.store import safe_fs_name, _free_name
+    root = docs_root(c, node)
+    nm = safe_fs_name(str(name or "")[:NAME_MAX]).strip()
+    if not root or not nm or nm.lower() == INBOX.lower():
         return None
-    try:
-        return fs_folder(c, uid, node["org_id"], [ROOT, str(name)[:NAME_MAX]])
-    except (Denied, ValueError):
-        return None
+    r = c.execute("SELECT id FROM fs_nodes WHERE parent_id=? AND kind='folder' AND lower(name)=lower(?) AND deleted_at IS NULL "
+                  "ORDER BY id LIMIT 1", (root, nm)).fetchone()
+    if r or not create:
+        return r[0] if r else None
+    p = c.execute("SELECT owner_id, org_id FROM fs_nodes WHERE id=?", (root,)).fetchone()
+    ts = _now()
+    return insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at)
+                           VALUES(?,'folder',?,?,?,?,?,?)""",
+                     (root, _free_name(c, root, p["owner_id"], p["org_id"], nm), p["owner_id"], p["org_id"], uid, ts, ts))
 
 
 def current(c, m, node):
@@ -561,11 +668,44 @@ def thumb_store(c, m, node, data, kind):
     rel = os.path.join(THUMB_DIR, f"{int(node['id'])}-{uuid.uuid4().hex[:10]}.jpg")
     try:
         os.makedirs(os.path.join(ATT_DIR, THUMB_DIR), exist_ok=True)
-        oc_write_file(c, node["org_id"] or 0, os.path.join(ATT_DIR, rel), jpg)
+        if node["org_id"]:
+            oc_write_file(c, node["org_id"], os.path.join(ATT_DIR, rel), jpg)
+        else:  # 2.48.0 review (L3): a private document's preview is sealed like its text (the derived key of the space)
+            from ..core.orgcrypt import _write_atomic
+            _write_atomic(os.path.join(ATT_DIR, rel), thumb_seal(c, m["ws"], jpg))
     except OSError:
         return
     thumb_drop(m["thumb"])
     c.execute("UPDATE doc_meta SET thumb=? WHERE node_id=?", (rel, node["id"]))
+
+
+def _thumb_ctx(ws):
+    return b"kalmido-docs-thumb-v1|" + ws.encode()
+
+
+def thumb_seal(c, ws, data):
+    """The preview of a private document sealed with the space's derived key (unchanged: encryption off, no server key)."""
+    from ..core.orgcrypt import oc_seal_k
+    if ws_org(ws) or not oc_active(c):
+        return data
+    key = _ws_key(c, ws)
+    return oc_seal_k(key, 0, data, _thumb_ctx(ws)) if key else data
+
+
+def thumb_read(c, ws, path):
+    """The plain preview image: a private one with the space's key (header org 0), else like any stored file."""
+    from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file
+    with open(path, "rb") as f:
+        data = f.read()
+    if oc_file_org(data) == 0 and not ws_org(ws):
+        key = _ws_key(c, ws, create=False)
+        if key is None:
+            raise OSError("no key")
+        try:
+            return oc_open_k(key, data, _thumb_ctx(ws))
+        except OrgCryptError:
+            raise OSError("cannot open") from None
+    return oc_read_file(c, path)
 
 
 def thumb_drop(rel):

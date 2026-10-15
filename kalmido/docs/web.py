@@ -12,9 +12,9 @@ from ..core.config import app, ATT_DIR
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.i18n import tr
 from ..core.access import Denied, acx_of
-from ..core.orgcrypt import oc_read_file
+from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
-from ..files.store import fs_log_add, fs_visible_sql, fs_version_row, need_node
+from ..files.store import fs_log_add, fs_role, fs_visible_ids, fs_visible_sql, fs_version_row, need_node
 from . import store as S
 from .ingest import docs_ingest, docs_kick
 from .ocr import ocr_available
@@ -275,8 +275,11 @@ def _feature_value(c, ws, node, f, v, uid):
         if v in (None, ""):
             return ""
         if isinstance(v, int) and not isinstance(v, bool):
-            return str(v) if S.folder_ok(c, node, v) else None
-        fid = S.folder_by_name(c, node, uid, str(v))
+            # 2.48.0 review: only a folder the person sees (a member of an organisation: shared folders)
+            return str(v) if S.folder_ok(c, node, v) and fs_role(c, v, uid) else None
+        root = S.docs_root(c, node)
+        fid = S.folder_by_name(c, node, uid, str(v), create=bool(root) and fs_role(c, root, uid) in ("owner", "edit"))
+        fid = fid if fid and fs_role(c, fid, uid) else None
         return str(fid) if fid else None
     return None
 
@@ -453,8 +456,8 @@ def docs_thumb(nid):
     if not m["thumb"]:
         raise Denied(404)
     try:
-        data = oc_read_file(c, os.path.join(ATT_DIR, m["thumb"]))
-    except OSError:
+        data = S.thumb_read(c, m["ws"], os.path.join(ATT_DIR, m["thumb"]))  # 2.48.0 review (L3): private ones sealed
+    except (OSError, OrgCryptError):
         raise Denied(404) from None
     r = Response(data, mimetype="image/jpeg")
     r.headers["Cache-Control"] = "private, max-age=86400" if request.args.get("v") else "private, no-cache"
@@ -529,16 +532,11 @@ def _settings_json(c, ws, uid):
         from ..accounts.orgs import is_org_admin
         can = is_org_admin(c, uid, oid)
     tok = c.execute("SELECT token FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ?", (uid, oid)).fetchone()
-    root = None
-    if oid:
-        r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND kind='folder' AND lower(name)=lower(?) "
-                      "AND deleted_at IS NULL ORDER BY id LIMIT 1", (oid, S.ROOT)).fetchone()
-    else:
-        r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? AND kind='folder' "
-                      "AND lower(name)=lower(?) AND deleted_at IS NULL ORDER BY id LIMIT 1", (uid, S.ROOT)).fetchone()
-    root = r[0] if r else None
+    root = S.root_id(c, ws)  # 2.48.0 review: the marked documents folder; only the folders uid can see (L4)
+    vis = fs_visible_ids(c, uid) if root else set()
     folders = [{"id": x[0], "name": x[1]} for x in c.execute(
-        "SELECT id, name FROM fs_nodes WHERE parent_id=? AND kind='folder' AND deleted_at IS NULL ORDER BY lower(name)", (root,))] if root else []
+        "SELECT id, name FROM fs_nodes WHERE parent_id=? AND kind='folder' AND deleted_at IS NULL ORDER BY lower(name)", (root,))
+        if x[0] in vis] if root else []
     cfg = S.cfg_get(c, ws)
     return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "levels": cfg["levels"], "inbox": cfg["inbox"],
             "rules": S.rules_get(c, ws) if can else [], **_settings_labels(c, ws, uid, can), "folders": [f for f in folders if f["name"].lower() != S.INBOX.lower()],

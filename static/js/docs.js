@@ -84,7 +84,7 @@ function viewDocs() {
 }
 function dc_card(d) {
   const thumb = d.thumb ? `<img src="/api/docs/${d.id}/thumb?v=${esc(d.updated_at || '')}" alt="" loading="lazy">` : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`;
-  const st = d.state === 'done' ? '' : `<span class="dc-st ${d.state}">${esc(tr(DC_STATE[d.state] || d.state))}</span>`;
+  const st = d.state === 'done' ? '' : `<span class="dc-st ${esc(d.state)}">${esc(tr(DC_STATE[d.state] || d.state))}</span>`;
   const meta = [d.date ? dc_day(d.date) : '', d.type?.name || '', d.asn ? `${DC.set?.asn_prefix || 'ASN'} ${d.asn}` : ''].filter(Boolean).map(esc).join(' · ');
   return `<li class="dc-card${d.review ? ' rev' : ''}"><button type="button" data-dco="${d.id}" aria-label="${esc(d.name)}">
     <span class="dc-th">${thumb}</span><span class="dc-ct"><b class="dc-nm">${esc(d.sender?.name || d.name)}</b>
@@ -138,7 +138,7 @@ async function dc_open(id) {
 }
 function dc_auto(d, f) {
   const by = d.auto?.[f];
-  return by ? `<button type="button" class="dc-auto" data-dc="edit:${f}" title="${esc(tr(DC_BY[by] || by))}">${tr('automatic')}</button>` : '';
+  return by ? `<button type="button" class="dc-auto" data-dc="edit:${esc(f)}" title="${esc(tr(DC_BY[by] || by))}">${tr('automatic')}</button>` : '';
 }
 function dc_mdDraw(md) {
   const d = DC.doc; if (!d || !md) return;
@@ -149,7 +149,7 @@ function dc_mdDraw(md) {
   const sug = Object.entries(d.suggest || {});
   const sugHtml = d.review ? `<div class="dc-rev" role="group" aria-label="${esc(tr('To review'))}">
     <b>${tr('To review')}</b>
-    ${sug.map(([f, s]) => `<div class="dc-sug"><span>${esc(tr(DC_FEATS.find(x => x[0] === f)?.[1] || f))}: <b>${esc(s.label)}</b>${s.by === 'agent' ? ` <span class="muted">(${tr('from the agent')})</span>` : ''}</span>${w ? `<button type="button" class="btn sm" data-dc="take:${f}">${tr('Accept')}</button>` : ''}</div>`).join('')}
+    ${sug.map(([f, s]) => `<div class="dc-sug"><span>${esc(tr(DC_FEATS.find(x => x[0] === f)?.[1] || f))}: <b>${esc(s.label)}</b>${s.by === 'agent' ? ` <span class="muted">(${tr('from the agent')})</span>` : ''}</span>${w ? `<button type="button" class="btn sm" data-dc="take:${esc(f)}">${tr('Accept')}</button>` : ''}</div>`).join('')}
     ${sug.length ? '' : `<p class="muted">${tr('Check sender and type, then mark the document as checked.')}</p>`}
     ${w ? `<div class="dc-revact">${sug.length > 1 ? `<button type="button" class="btn sm" data-dc="takeall">${tr('Accept all')}</button>` : ''}<button type="button" class="btn sm pri" data-dc="checked">${ic('check', 's')} ${tr('Checked')}</button></div>` : ''}</div>` : '';
   const due = d.due && !d.task_id && w ? `<div class="dc-due">${ic('alarm', 's')} <span>${esc(tr('Due on {0}', dc_day(d.due)))}</span><button type="button" class="btn sm" data-dc="task">${tr('Create task')}</button></div>`
@@ -164,7 +164,7 @@ function dc_mdDraw(md) {
         ${d.parent_id ? `<a class="btn sm" href="#ablage/${d.parent_id}" data-dc="close">${ic('folder', 's')} ${tr('Show in the file store')}</a>` : ''}
         ${w ? `<button type="button" class="btn sm danger" data-dc="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}
       </div></div>
-    <p class="dc-state ${d.state}" role="status">${esc(tr(DC_STATE[d.state] || d.state))}${d.state === 'failed' && d.error_text ? `: ${esc(d.error_text)}` : ''}${d.method === 'ocr' ? ` · ${tr('text recognition')}` : ''}
+    <p class="dc-state ${esc(d.state)}" role="status">${esc(tr(DC_STATE[d.state] || d.state))}${d.state === 'failed' && d.error_text ? `: ${esc(d.error_text)}` : ''}${d.method === 'ocr' ? ` · ${tr('text recognition')}` : ''}
       ${w && (d.state === 'done' || d.state === 'failed') ? `<button type="button" class="linkbtn" data-dc="redo">${tr('Recognise again')}</button>` : ''}</p>
     ${sugHtml}${due}${typeof rc_slot === 'function' ? rc_slot(d) : ''}
     <div class="dc-form">

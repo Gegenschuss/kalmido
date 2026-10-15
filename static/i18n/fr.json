@@ -7294,5 +7294,6 @@
   "Agents only suggest: a person confirms": "Les agents ne font que suggérer : une personne confirme",
   "Choose a project of this workspace": "Choisis un projet de cet espace de travail",
   "This suggestion was already decided": "Cette suggestion a déjà été tranchée",
-  "Only agents suggest; people set the receipt directly in the app": "Seuls les agents suggèrent ; les personnes renseignent le justificatif directement dans l'app"
+  "Only agents suggest; people set the receipt directly in the app": "Seuls les agents suggèrent ; les personnes renseignent le justificatif directement dans l'app",
+  "The server key is missing: the API token cannot be stored safely": "La clé du serveur manque : le jeton d'API ne peut pas être enregistré en toute sécurité"
 }

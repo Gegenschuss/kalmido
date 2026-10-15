@@ -80,7 +80,7 @@ async function ln_lock(tid, again) {
   if (!again && !await ln_keys()) return;
   if (!e2eUnlocked()) return;
   if (typeof flushSaves === 'function') await flushSaves();  // the last typing reaches the server first
-  if (OUT.q.some(o => String(o.url || '').includes(`/api/tasks/${tid}`))) { toast(tr('Changes are still waiting to be sent. Try again when you are online.')); return; }
+  if (OUT.q.some(o => ln_outHit(o, tid))) { toast(tr('Changes are still waiting to be sent. Try again when you are online.')); return; }
   const text = taskById(tid)?.content || '';
   try { await rawFetch('PUT', `/api/tasks/${tid}/note-lock`, {body: await e2eSeal(E2E.ckey, e2eTEnc().encode(text), ln_aad(tid))}); }
   catch (x) { toast(x instanceof Offline ? tr('Locking needs a connection') : x.message); return; }
@@ -92,12 +92,26 @@ async function ln_lock(tid, again) {
   render();
   if (!again) toast(tr('Note locked'));
 }
+// 2.48.0 review (L7): a waiting write of this task -- its own URL (not /api/tasks/12 for 1) or a batch that carries it
+function ln_outHit(o, tid) {
+  const u = String(o.url || '');
+  return new RegExp(`^/api/tasks/${+tid}(/|\\?|$)`).test(u) || (u === '/api/tasks/batch' && (o.body?.ids || []).map(Number).includes(+tid));
+}
+// 2.48.0 review (S3): the keys were locked / the person signed out: no decrypted note stays in this tab, a waiting save goes
+function ln_wipe() {
+  LN.notes = {}; clearTimeout(LN.saveT); LN.saveT = null;
+}
 // no plain copy stays in this tab: undo steps that carry the old note of this task go (the lock itself is the one new step),
 // the offline copy of the state follows
 function ln_forget(tid) {
   const hit = e => !!e && ((e.parts || []).some(hit) || [...(e.snaps || []), ...(e.after || [])].some(s => s && s.id === tid) || (e.ids || []).includes(tid));
   HIST.undo = HIST.undo.filter(e => !hit(e)); HIST.redo = HIST.redo.filter(e => !hit(e));
   if (typeof renderHist === 'function') renderHist();
+  // 2.48.0 review (L7): an edit conflict about this note keeps both texts in localStorage: it goes
+  if (S.conflicts?.some(x => x.tid === tid && x.field === 'content')) {
+    S.conflicts = S.conflicts.filter(x => !(x.tid === tid && x.field === 'content')); LS.set('conflicts', S.conflicts);
+    if (typeof renderTop === 'function') renderTop();
+  }
   // the offline copy of the state (localStorage 'cache') gets the empty note at once, not only with the next delta
   const ct = Array.isArray(S.lpCache?.tasks) ? S.lpCache.tasks.find(x => x.id === tid) : null;
   if (ct) { Object.assign(ct, {content: '', note_locked: true, note_locked_mine: true}); if (typeof lpCacheSoon === 'function') lpCacheSoon(); }

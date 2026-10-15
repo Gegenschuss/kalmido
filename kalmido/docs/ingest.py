@@ -16,7 +16,7 @@ from datetime import timedelta
 from ..core.config import app
 from ..core.db import connect, iso, now_utc
 from ..core.pg import system_ctx
-from ..files.store import fs_folder, fs_on_delete, fs_put
+from ..files.store import fs_add_hooks, fs_on_delete, fs_put
 from . import store as S
 
 IDLE = 5             # s the queue sleeps when there is nothing to do (a new document wakes it at once)
@@ -47,7 +47,7 @@ def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=Non
         r = c.execute("SELECT node_id FROM doc_meta WHERE ws=? AND ext_id=?", (ws_guess, ext)).fetchone()
         if r:
             return r[0]
-    folder = fs_folder(c, uid, org_id, [S.ROOT])
+    folder = S.root_folder(c, uid, org_id)  # 2.48.0 review: the marked documents folder, members file in
     nid = fs_put(c, uid, folder, name, data, mime, org_id)
     node = c.execute("SELECT org_id, owner_id FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     doc_add(c, nid, node["org_id"], node["owner_id"], uid, source, ext, meta)
@@ -90,6 +90,7 @@ def doc_on_delete(c, nid):
 
 
 fs_on_delete.append(doc_on_delete)
+fs_add_hooks.append(S.root_add_ok)
 
 
 # ---- the queue ------------------------------------------------------------------------------------------------------------
@@ -175,8 +176,8 @@ def _after(c, nid):
                   "WHERE n.id=?", (nid,)).fetchone()
     if not n or not n["pparent"] or (n["pname"] or "").lower() != S.INBOX.lower():
         return
-    root = c.execute("SELECT id, parent_id, name FROM fs_nodes WHERE id=?", (n["pparent"],)).fetchone()
-    if root and root["parent_id"] is None and root["name"].lower() == S.ROOT.lower():
+    root = c.execute("SELECT id, parent_id, name, org_id, owner_id FROM fs_nodes WHERE id=?", (n["pparent"],)).fetchone()
+    if root and root["parent_id"] is None and S.root_id(c, S.doc_ws(root["org_id"], root["owner_id"])) == root["id"]:
         from ..files.store import _free_name
         c.execute("UPDATE fs_nodes SET parent_id=?, name=?, updated_at=? WHERE id=?",
                   (root["id"], _free_name(c, root["id"], n["owner_id"], n["org_id"], n["name"], skip=nid), _now(), nid))
@@ -184,7 +185,7 @@ def _after(c, nid):
 
 def inbox_scan(c):
     """Files put into an inbox folder ("Dokumente/Eingang" at the root of a workspace) become documents."""
-    rows = c.execute("""SELECT n.id, n.org_id, n.owner_id, n.created_by FROM fs_nodes n
+    rows = c.execute("""SELECT n.id, n.org_id, n.owner_id, n.created_by, r.id AS rid, r.owner_id AS rowner FROM fs_nodes n
                         JOIN fs_nodes f ON f.id=n.parent_id AND f.kind='folder' AND lower(f.name)=lower(?) AND f.deleted_at IS NULL
                         JOIN fs_nodes r ON r.id=f.parent_id AND r.parent_id IS NULL AND r.kind='folder' AND lower(r.name)=lower(?)
                           AND r.deleted_at IS NULL
@@ -197,6 +198,8 @@ def inbox_scan(c):
     added = 0
     for r in rows:
         ws = S.doc_ws(r["org_id"], r["owner_id"])
+        if S.root_id(c, S.doc_ws(r["org_id"], r["rowner"])) != r["rid"]:  # 2.48.0 review: only the marked documents folder
+            continue
         if not S.cfg_get(c, ws)["inbox"]:
             continue
         doc_add(c, r["id"], r["org_id"], r["owner_id"], r["created_by"] or r["owner_id"], "folder")

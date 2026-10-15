@@ -40,6 +40,9 @@ READ_ACTIONS = ("list", "read", "download", "text", "meta")
 
 # functions f(c, nid) called for every node removed for good (fs_purge), before its rows go
 fs_on_delete = []
+# 2.48.0 (#1111): functions f(c, uid, chain) -> bool: may person uid add a FILE of their own (owner = uid) to the folder
+# chain[0] without edit there (the documents folder of an organisation: members file in, they see only their own)
+fs_add_hooks = []
 
 
 def _now():
@@ -239,12 +242,15 @@ def _free_name(c, parent_id, owner_id, org_id, name, skip=None):
     return f"{stem[:120]} {uuid.uuid4().hex[:6]}{dot}{ext}"
 
 
-def _place(c, uid, parent_id, org_id, write_role=True):
+def _place(c, uid, parent_id, org_id, write_role=True, add_file=False):
     """(owner_id, org_id) of a new node below parent_id (None: the workspace root of org_id / uid's own space); checks the
-    right to add there (raises Denied)."""
+    right to add there (raises Denied). add_file: a file -- fs_add_hooks may let uid add it as its owner."""
     if parent_id:
         chain = fs_chain(c, parent_id)
         role = fs_role(c, parent_id, uid, chain=chain) if chain else None
+        if (add_file and role in (None, "view") and chain and not fs_deleted(chain) and len(chain) < DEPTH_MAX
+                and any(f(c, uid, chain) for f in fs_add_hooks)):
+            return uid, chain[0]["org_id"]
         if not role or fs_deleted(chain):
             raise Denied(404)
         if chain[0]["kind"] != "folder":
@@ -309,7 +315,7 @@ def fs_put(c, uid, parent_id, name, data, mime=None, org_id=None, agent_id=None)
             name, mime = unexec_name(name), "text/plain"
     data = bytes(data or b"")
     _check_data(name, data)
-    owner, org = _place(c, uid, parent_id, org_id)
+    owner, org = _place(c, uid, parent_id, org_id, add_file=True)
     quota_guard(c, uid, len(data))
     ts = _now()
     nid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,agent_id,mime,size,created_by,created_at,updated_at)

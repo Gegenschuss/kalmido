@@ -89,10 +89,16 @@ def pl_src(url):
 def pl_norm_url(u):
     """https?://host[:port][/path] without /api at the end, or None."""
     from ..calendars.subscriptions import cal_norm_url
-    u = cal_norm_url(u)
-    if not u or not u.lower().startswith(("http://", "https://")):
+    if not isinstance(u, str):  # 2.48.0 review (L6): null / a number -> 400, not 500
         return None
-    p = urllib.parse.urlsplit(u)
+    try:
+        u = cal_norm_url(u)
+        if not u or not u.lower().startswith(("http://", "https://")):
+            return None
+        p = urllib.parse.urlsplit(u)
+        p.port  # noqa: B018 -- raises ValueError on a bad port
+    except ValueError:
+        return None
     if p.query or p.fragment or p.username or p.password or not p.hostname:
         return None
     u = u.rstrip("/")
@@ -105,8 +111,52 @@ def pl_row(c, ws):
     return c.execute("SELECT * FROM pl_sources WHERE ws=?", (ws,)).fetchone()
 
 
+_TKEYS = {}
+
+
+def _token_key(ws):
+    """2.48.0 review (S2): the token is always sealed, also with the organisation's encryption off -- a key derived from the
+    server key per workspace (like docs/store.py _ws_key for private spaces). None without a server key."""
+    from ..core.config import SECRET_KEY
+    if not SECRET_KEY:
+        return None
+    k = _TKEYS.get(ws)
+    if k is None:
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+        k = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"kalmido-paperless-token-v1|" + ws.encode()).derive(SECRET_KEY)
+        _TKEYS[ws] = k
+    return k
+
+
+def pl_seal_token(ws, tok):
+    """The sealed token; None without a server key (then it is not stored at all)."""
+    from ..core.orgcrypt import oc_enc_k
+    key = _token_key(ws)
+    return oc_enc_k(key, S.ws_org(ws) or 0, f"pl_sources.token.v2|{ws}", tok) if key and tok else None
+
+
 def pl_token(c, r):
-    return S.doc_open(c, r["ws"], "pl_sources.token", r["token"]) if r["token"] else ""
+    """The plain token. A plain value from before 2.48.0's review (or sealed with the organisation's key) is sealed with the
+    server key right away (the caller's commit keeps it)."""
+    v = r["token"]
+    if not v:
+        return ""
+    if isinstance(v, str) and v.startswith(S.PREFIX):
+        key = _token_key(r["ws"])
+        if key:
+            from ..core.orgcrypt import OrgCryptError, oc_dec_k
+            try:
+                return oc_dec_k(key, S.ws_org(r["ws"]) or 0, f"pl_sources.token.v2|{r['ws']}", v)
+            except OrgCryptError:
+                pass
+        v = S.doc_open(c, r["ws"], "pl_sources.token", v)
+        if not v or v.startswith(S.PREFIX):
+            return ""
+    sealed = pl_seal_token(r["ws"], v)
+    if sealed:
+        c.execute("UPDATE pl_sources SET token=? WHERE id=?", (sealed, r["id"]))
+    return v
 
 
 def pl_mapping(c, r):
