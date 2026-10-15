@@ -19,6 +19,7 @@ subscription or API key. Kalmido provides:
 ## Contents
 
 - [Before you start](#before-you-start)
+- [Quickest: one command on your computer](#quickest-one-command-on-your-computer) (2.44.0)
 - [Path A: let Claude Code set it up](#path-a-let-claude-code-set-it-up)
 - [Path B: do it yourself](#path-b-do-it-yourself)
   1. [Create the agent in Kalmido](#1-create-the-agent-in-kalmido)
@@ -55,6 +56,14 @@ The examples use these names; change them if you like, but consistently:
 | Service | `kalmido-agent.service` | a systemd user unit |
 
 `~` always means the home directory of the agent user.
+
+## Quickest: one command on your computer
+
+2.44.0 (#1517): for a project agent on your own Mac, Windows PC or Linux computer, *Settings > Agents >* (agent) *> Set up
+on a computer* gives you one command with a one-time code; it installs the starter, keeps the token in a private file and
+starts the agent at every login (launchd / Task Scheduler / systemd --user). Details, uninstall and what it does:
+[AGENTS.md, Set up on a computer with one command](AGENTS.md#set-up-on-a-computer-with-one-command-2440). The paths
+below are for a hardened server setup (own user, firewall) and for doing it by hand.
 
 ## Path A: let Claude Code set it up
 
@@ -496,11 +505,12 @@ The model must then not post the same answer again with `send_chat`.
 The Linux steps 2-3 (own user, nftables firewall) have no one-to-one counterpart on a Mac; use a separate standard
 (non-admin) macOS account for the agent where you can. Differences:
 
-- `mcp/agent_launcher.sh` needs GNU `date` and `setsid`; on macOS use the PowerShell launcher
-  [`mcp/agent_launcher.ps1`](../mcp/agent_launcher.ps1) instead: `brew install --cask powershell`.
-- `events.sh` needs `jq`: `brew install jq`.
+- Standard (2.44.0, #962): [`mcp/agent_launcher.sh`](../mcp/agent_launcher.sh) runs on macOS as it is (the system
+  `/bin/bash` 3.2 and `python3` from the Xcode command line tools, no GNU tools, no PowerShell). *Set up on a computer*
+  ([above](#quickest-one-command-on-your-computer)) writes and loads the LaunchAgent for you.
+- `events.sh` needs `jq`: `brew install jq` (event mode with `--events` needs no `jq`).
 - A LaunchAgent replaces the systemd unit. Save as `~/Library/LaunchAgents/com.example.kalmido-agent.plist` (replace
-  `/Users/agent` with the agent account's home; `pwsh` lives in `/usr/local/bin` or `/opt/homebrew/bin`):
+  `/Users/agent` with the agent account's home):
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -511,8 +521,7 @@ The Linux steps 2-3 (own user, nftables firewall) have no one-to-one counterpart
   <key>WorkingDirectory</key><string>/Users/agent/agent</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/opt/homebrew/bin/pwsh</string><string>-NoProfile</string><string>-File</string>
-    <string>/Users/agent/kalmido/mcp/agent_launcher.ps1</string>
+    <string>/bin/bash</string><string>/Users/agent/kalmido/mcp/agent_launcher.sh</string>
     <string>-e</string><string>/Users/agent/.config/kalmido/agent.env</string><string>--events</string><string>--</string>
     <string>claude</string><string>--mcp-config</string><string>/Users/agent/agent/.mcp.json</string>
   </array>
@@ -534,6 +543,10 @@ launchctl print gui/$(id -u)/com.example.kalmido-agent | grep -E 'state|pid'
 tail -f ~/Library/Logs/kalmido-agent.log          # "starting (fresh session) ..."
 # stop / remove: launchctl bootout gui/$(id -u)/com.example.kalmido-agent
 ```
+
+- Alternative: the PowerShell launcher [`mcp/agent_launcher.ps1`](../mcp/agent_launcher.ps1) with PowerShell 7
+  (`brew install --cask powershell`): in the plist `/opt/homebrew/bin/pwsh`, `-NoProfile`, `-File`, `.../agent_launcher.ps1`
+  instead of `/bin/bash` and `.../agent_launcher.sh`.
 
 - **The Mac must stay awake and logged in.** A LaunchAgent runs only while its account is logged in; with macOS disk encryption on
   the Mac waits for a password after every restart, so the agent stays offline until someone logs in. Turn off sleep

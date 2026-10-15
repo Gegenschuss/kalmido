@@ -134,6 +134,44 @@ Two guides, each for Linux, macOS and Windows. The same steps are in the app: *S
 Linux walk-through with every command, the rules template and the test checklist is [AGENT-SETUP.md](AGENT-SETUP.md);
 the threat model is [AGENT-SECURITY.md](AGENT-SECURITY.md).
 
+### Set up on a computer with one command (2.44.0)
+
+The quickest way to run a **project agent** on a Mac, a Windows PC or a Linux computer: *Settings > Agents >* (agent) *>
+Set up on a computer* (the download button in the agent's row; admins: in the agent's dialog). Pick Mac / Windows / Linux
+and the project folder; Kalmido shows **one command** to copy, with a **one-time setup code** instead of the API token:
+
+```sh
+curl -fsSL https://tasks.example.com/agent-setup.sh | bash -s -- --url https://tasks.example.com --code ks_... --dir ~/projects/site
+```
+
+```powershell
+& ([scriptblock]::Create((irm https://tasks.example.com/agent-setup.ps1))) -Url https://tasks.example.com -Code ks_... -Dir "$HOME\projects\site"
+```
+
+The code lives 15 minutes and works once (only its hash is stored; *New code* makes another). The script, served by your
+own Kalmido (`/agent-setup.sh`, `/agent-setup.ps1`):
+
+1. checks what is needed (Python 3.9+, curl, the agent command, default `claude`) and names what is missing,
+2. trades the code for the agent's token (`POST /api/agent-setup/redeem`, no login, rate limited like logins) and keeps
+   it in `kalmido-agent.env` that only you can read (mode 600; on Windows a folder whose ACL allows only your account) --
+   the token is never printed,
+3. fetches the starter files listed in [`mcp/starter_files.txt`](../mcp/starter_files.txt) (from the release of your
+   server's version; `KALMIDO_STARTER_BASE` on the server points to a mirror; `--from DIR` / `-From DIR` takes a local copy),
+4. starts the agent in event mode (`agent_launcher.sh` / `.ps1 --events -- claude --mcp-config <instance>/mcp.json`)
+   at every login: a **launchd LaunchAgent** on macOS (RunAtLoad, KeepAlive), a **systemd --user** service on Linux
+   (`loginctl enable-linger` keeps it running after logout), a hidden **Task Scheduler** task at logon on Windows (no admin
+   rights; when the Task Scheduler refuses, an entry in your Startup folder).
+
+One instance per project folder (`~/.kalmido/agents/<folder>-<hash>/`, Windows `%LOCALAPPDATA%\Kalmido\agents\...`), so
+several agents can run on one computer. Every computer gets its own token: the dialog lists the agent's computers with a
+green dot while connected, the computer's name (the launcher reports it with `PUT /api/v1/agent/status {host}`), the last
+contact and the agent's last error (e.g. a missing `claude`). **Remove computer** revokes that computer's token at once
+(it cannot be undone; set the computer up again to use it). On the computer, the same command with `--uninstall --dir ...`
+(`-Uninstall -Dir ...`) stops and removes the autostart, revokes its token and deletes the instance folder (the project
+folder stays). `--dry-run` / `-DryRun` only shows what would happen; `--no-autostart` / `-NoAutostart` installs without
+the autostart. A *New API token* in the agent's settings still replaces every token of the agent, also the computers'.
+Behind a login proxy, let `/agent-setup.sh`, `/agent-setup.ps1` and `/api/agent-setup/` through like `/api/v1/`.
+
 | | Team agent (admin) | Personal agent (user) |
 |---|---|---|
 | Who creates it | an admin: *Settings > Agents > Status > Add agent* | any person, once an admin allowed it: *Settings > Agents > Set up > Create agent* |
@@ -148,13 +186,14 @@ Paths used below:
 | Kalmido copy (only `mcp/` is used) | `~/kalmido` | `%USERPROFILE%\kalmido` |
 | Env file (`KALMIDO_URL`, `KALMIDO_TOKEN`) | `~/.config/kalmido/agent.env` (mode 600) | `%USERPROFILE%\.config\kalmido\agent.env` (ACL: only the agent's account) |
 | MCP wrapper | `~/kalmido/mcp/run.sh` | `%USERPROFILE%\kalmido\mcp\run.ps1` |
-| Runtime launcher | `~/kalmido/mcp/agent_launcher.sh` (macOS: `agent_launcher.ps1`, see below) | `%USERPROFILE%\kalmido\mcp\agent_launcher.ps1` |
+| Runtime launcher | `~/kalmido/mcp/agent_launcher.sh` (2.44.0: also on macOS) | `%USERPROFILE%\kalmido\mcp\agent_launcher.ps1` |
 | Usage hook (Stop + SubagentStop) | `python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env` | `python C:/Users/<you>/kalmido/mcp/claude_usage_hook.py C:/Users/<you>/.config/kalmido/agent.env` |
 | Work directory | `~/agent` | `%USERPROFILE%\agent` |
 
-`agent_launcher.sh` needs GNU `date` and `setsid`, which macOS does not have: on a Mac use `agent_launcher.ps1` with
-PowerShell 7 (`brew install --cask powershell`, then `pwsh`). It does the same (model, auto-compact, nightly restart,
-*Reset now*, stops while paused) and is tested on Linux with PowerShell 7 (`tests/launcher_ps1_test.py`).
+2.44.0 (#962): `agent_launcher.sh` runs on macOS as it is (bash 3.2, BSD tools): the time and the own process group come
+from `python3` instead of GNU `date` and util-linux `setsid`. `agent_launcher.ps1` with PowerShell 7 stays an alternative
+(`brew install --cask powershell`); both do the same and are tested (`tests/p2440_c_setup_test.py` also on macOS
+`/bin/bash`, `tests/launcher_ps1_test.py`).
 
 ### Guide A: a shared team agent on a server (admins)
 
@@ -357,12 +396,11 @@ git clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido
 mkdir -p ~/.config/kalmido ~/agent && ( umask 077; nano ~/.config/kalmido/agent.env )
 # ~/kalmido/mcp/run.sh as on Linux, then:
 cd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"
-brew install --cask powershell                                   # for the launcher
-pwsh -File ~/kalmido/mcp/agent_launcher.ps1 -e ~/.config/kalmido/agent.env --once
+~/kalmido/mcp/agent_launcher.sh -e ~/.config/kalmido/agent.env --once   # dry run (2.44.0: no PowerShell needed)
 ```
 
-In the background: a LaunchAgent `~/Library/LaunchAgents/com.kalmido.agent.plist` like the LaunchDaemon in guide A,
-without `UserName`, with your own paths (a complete example: [AGENT-SETUP.md, macOS](AGENT-SETUP.md#macos)); load it
+Simplest: *Set up on a computer* (above) writes and loads the LaunchAgent for you. By hand: a LaunchAgent
+`~/Library/LaunchAgents/com.kalmido.agent.plist` like the LaunchDaemon in guide A, without `UserName`, with your own paths (a complete example: [AGENT-SETUP.md, macOS](AGENT-SETUP.md#macos)); load it
 with `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kalmido.agent.plist`. `events.sh` needs `jq`
 (`brew install jq`). The Mac must stay awake and logged in: a LaunchAgent runs only while you are logged in, and with
 macOS disk encryption on, nobody is after a restart until you type your password.
@@ -953,7 +991,8 @@ change its job (title, state, log: `409`). At most 20 requests wait per agent.
 ```
 PUT /api/v1/agent/status   {"status": "idle" | "working" | "waiting" | "error", "text": "short, max 200 chars",
                             "task_id": 51,
-                            "model": "Opus 5.5", "permission_mode": "auto", "host_permission_mode": "auto"}   (2.32.0, optional)
+                            "model": "Opus 5.5", "permission_mode": "auto", "host_permission_mode": "auto",   (2.32.0, optional)
+                            "host": "studio-mac"}   (2.44.0, optional: the computer, kept on the token in use)
 GET /api/v1/agent          -> {id, username, display_name, enabled, note, status, status_text, status_at, status_task,
                                job_tasks, jobs: {running, waiting}, webhook: {configured, enabled}, events_cursor,
                                online, last_poll_at, runtime (2.4.1)}
@@ -979,6 +1018,9 @@ people know it, e.g. "Opus 5.5"; max. 80 characters), `permission_mode` (`ask` |
 agent (`host` in the agent objects people get) and shows them in the chat header: the permission badge says
 "Host default (Auto)" instead of only "Host default", the model stands next to it, and a model set in the runtime settings
 that the host has not taken over yet shows both ("set: sonnet · runs: Opus 5.5"). Unknown fields stay as before.
+2.44.0 (#1517): `host` (max. 80 characters) names the computer; it is kept on the token the request came with, so
+*Set up on a computer* lists each computer by name (the reference launchers send it once at start, `KALMIDO_HOST` or the
+host name without the domain; older servers answer 400 and the launchers ignore that).
 
 **Steps between tool calls (2.32.0).** What an agent writes between its tool calls ("I read the tests first", "Tests
 run") can be shown to the person it works for:

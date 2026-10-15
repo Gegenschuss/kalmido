@@ -125,8 +125,11 @@ auto-compact, nightly fresh restart, *Reset now*), always in a fresh session, an
 
 The env file holds `KALMIDO_URL` and `KALMIDO_TOKEN`. Details and a systemd unit: [docs/AGENTS.md](../docs/AGENTS.md#runtime-settings).
 
-**Windows and macOS (2.7.2):** [`agent_launcher.ps1`](agent_launcher.ps1) is the same launcher in PowerShell (Windows
-PowerShell 5.1 or PowerShell 7; on macOS PowerShell 7, since `agent_launcher.sh` needs GNU `date` and `setsid`):
+**macOS (2.44.0, #962):** `agent_launcher.sh` runs on a Mac as it is (`/bin/bash` 3.2, `python3`; no GNU `date`, no
+`setsid`, no PowerShell).
+
+**Windows (2.7.2):** [`agent_launcher.ps1`](agent_launcher.ps1) is the same launcher in PowerShell (Windows
+PowerShell 5.1 or PowerShell 7; on macOS / Linux an alternative with PowerShell 7):
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File agent_launcher.ps1 -e $HOME\.config\kalmido\agent.env --once   # dry run
@@ -134,6 +137,13 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File agent_launcher.ps1 -e $HOME\.confi
 ```
 
 A scheduled task (Windows) and a launchd plist (macOS): [docs/AGENTS.md](../docs/AGENTS.md#set-up-an-agent).
+
+**Set up with one command (2.44.0, #1517):** *Settings > Agents > (agent) > Set up on a computer* shows one command with a
+one-time code. The setup script of your Kalmido (`/agent-setup.sh` for macOS / Linux, `/agent-setup.ps1` for Windows)
+trades the code for the agent's token (kept in a private file), fetches the files in [`starter_files.txt`](starter_files.txt)
+(a new starter module must be listed there) and sets up the autostart (launchd / systemd --user / Task Scheduler). Both
+scripts mark the same steps (`# kalmido-setup-step: <id>`, checked by `tests/launcher_parity_test.py`). Details:
+[docs/AGENTS.md](../docs/AGENTS.md#set-up-on-a-computer-with-one-command-2440).
 
 **Event mode (2.35.0):** with `--events` both launchers start [`agent_run.py`](agent_run.py) in front of the command: it
 waits for the agent's events and runs the command once per event, headless with stream-json, and sends steps, model,
