@@ -133,7 +133,9 @@ def docs(s, ws="private"):
     return s.get(B + f"/api/docs?ws={ws}").json().get("docs") or []
 
 
-env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_CALENDAR_ALLOW_HOSTS=127.0.0.1:8098")
+BASE_EXTRA = os.environ.get("EXTRA", "") + " -e KALMIDO_CALENDAR_ALLOW_HOSTS=127.0.0.1:8098"
+# 2.48.0 review (S2): the token is always sealed with a key derived from the server key -> the container has one
+env = dict(os.environ, EXTRA=BASE_EXTRA + " -e KALMIDO_SECRET_KEY=AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=")
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
 assert r.returncode == 0, r.stdout + r.stderr
 shutil.copy(os.path.join(N, "fake_paperless.py"), DATA)
@@ -189,6 +191,15 @@ check(r.ok and r.json()["conn"]["token_set"] is True and r.json()["conn"]["url"]
 check("pl-secret" not in r.text and "pl-secret" not in A.get(B + "/api/paperless?ws=private").text, "the token never comes back")
 check(A.put(B + "/api/paperless", json={"ws": "private", "foo": 1}).status_code == 400, "unknown field refused")
 check(A.put(B + "/api/paperless", json={"ws": "private", "every_min": 7}).status_code == 400, "only the offered intervals")
+# 2.48.0 review (S2, L6): sealed in the database (also with the encryption of organisations off); a plain value from
+# before is sealed on the next save; a null address is a 400
+tv = lambda: dbx("SELECT token FROM pl_sources WHERE ws='u1'")[0][0]
+check(tv().startswith("kenc1:") and "pl-secret" not in tv(), "the token is sealed in the database")
+dbx("UPDATE pl_sources SET token='pl-secret' WHERE ws='u1'", write=True)
+check(A.put(B + "/api/paperless", json={"ws": "private", "follow": False}).ok and tv().startswith("kenc1:"), "a plain token is sealed on the next save")
+check(A.put(B + "/api/paperless", json={"ws": "private", "url": None}).status_code == 400, "url null: 400")
+check(A.put(B + "/api/paperless", json={"ws": "private", "url": 5, "token": "pl-secret"}).status_code == 400, "url a number: 400")
+check(A.put(B + "/api/paperless", json={"ws": "private", "url": "http://[::1", "token": "pl-secret"}).status_code == 400, "a broken address: 400")
 
 # ---- preview
 p = A.get(B + "/api/paperless/preview?ws=private").json()
@@ -281,6 +292,12 @@ A = sess("alice")
 check(A.get(B + "/api/paperless?ws=private").status_code == 404, "hosted: GET 404")
 check(A.put(B + "/api/paperless", json={"ws": "private", "url": PL, "token": "pl-secret"}).status_code == 404, "hosted: PUT 404")
 check(A.post(B + "/api/paperless/import", json={"ws": "private"}).status_code == 404, "hosted: import 404")
+
+# ---- 2.48.0 review (S2): without a server key the token is not stored at all
+subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL, env={**env, "KEEP": "1", "EXTRA": BASE_EXTRA})
+A = sess("alice")
+r = A.put(B + "/api/paperless", json={"ws": "private", "url": PL, "token": "pl-secret"})
+check(r.status_code == 409 and "server key" in r.json().get("error", ""), f"no server key: 409 ({r.status_code} {r.text[:120]})")
 
 print(f"p248_d_paperless_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
