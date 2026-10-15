@@ -331,5 +331,25 @@ check(not dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (LK,)), "a link store
 q = dbx("SELECT COALESCE(SUM(size),0) FROM fs_versions WHERE created_by=1")[0][0]
 check(q > 0, "versions are counted per uploader")
 
+# ---- the backup archive has the file store's files (attachments/files/<node>/<file>)
+import time  # noqa: E402
+import zipfile  # noqa: E402
+n0 = len(A.get(B + "/api/admin/backups").json().get("items", []))
+r = A.post(B + "/api/admin/backups")
+check(r.status_code == 202, f"backup started ({r.status_code})")
+for _ in range(100):
+    j = A.get(B + "/api/admin/backups").json()
+    if not j.get("running") and (len(j.get("items", [])) > n0 or j.get("last_error")):
+        break
+    time.sleep(0.3)
+bdir = os.path.join(DATA, "backups")
+zips = sorted(f for f in os.listdir(bdir) if f.endswith(".zip")) if os.path.isdir(bdir) else []
+if zips:
+    names = zipfile.ZipFile(os.path.join(bdir, zips[-1])).namelist()
+    vp = dbx("SELECT path FROM fs_versions WHERE node_id=? ORDER BY no", (P1,))
+    check(vp and all("attachments/" + x[0] in names for x in vp), f"the backup has every version of a file ({[x[0] for x in vp]})")
+else:
+    check(False, f"a backup archive in {bdir}: {j.get('last_error')}")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

@@ -202,6 +202,9 @@ APP_TO_API = {
     "POST /api/lists/{}/forms": ["POST /lists/{}/forms"], "PATCH /api/forms/{}": ["PATCH /forms/{}"], "DELETE /api/forms/{}": ["DELETE /forms/{}"],
     # 2.48.0 (#1111): documents (agents read / set the fields of documents shared with them)
     "GET /api/docs": ["GET /documents"], "GET /api/docs/{}": ["GET /documents/{}"], "PATCH /api/docs/{}": ["PATCH /documents/{}"],
+    # 2.48.0 (#1207): the file store -- list, read, add files / folders, new versions
+    "GET /api/files": ["GET /files"], "GET /api/files/nodes/{}": ["GET /files/{}"], "GET /api/files/nodes/{}/content": ["GET /files/{}/content"],
+    "POST /api/files/folders": ["POST /files"], "POST /api/files/upload": ["POST /files"], "POST /api/files/nodes/{}/versions": ["POST /files/{}/versions"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
@@ -211,6 +214,11 @@ APP_ONLY = [
                                                    "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
                                                    "* /api/docs/mail")),
+    ("2.48.0 (#1207): managing the file store stays with people -- rename, move, trash, restore a version, shares, organisation-wide "
+     "access, links to task / project files, the move targets; agents list, read and write files where they may edit",
+     ("=PATCH /api/files/nodes/{}", "=DELETE /api/files/nodes/{}", "=POST /api/files/nodes/{}/restore", "=POST /api/files/nodes/{}/versions/{}/restore",
+      "=GET /api/files/nodes/{}/share-targets", "=POST /api/files/nodes/{}/shares", "* /api/files/shares/", "=POST /api/files/links",
+      "=GET /api/files/folders")),
     ("2.36.1 (#1021): Office & finance, stage 1 -- no agent API and no MCP tool before the security audit (#476); agents see only what is shared",
      ("* /api/office/",)),
     ("2.27.0 (#999): the web panel says a person edits a task (tidy-up waits); agents never edit in a panel", ("=POST /api/tasks/{}/editing",)),
@@ -383,6 +391,7 @@ def sample(schema):
 
 
 TOOL_VARIANTS = {  # extra arguments that reach other routes of the same tool
+    "list_files": [{"folder_id": 1}], "read_file": [{"as": "base64"}], "write_file": [{"file_id": 1}],  # 2.48.0 (#1207)
     "get_attachment": [{"source": "chat"}, {"source": "project", "list_id": 1}],
     "react": [{"remove": True}],
     "upload_attachment": [],
