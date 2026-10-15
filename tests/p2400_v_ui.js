@@ -145,7 +145,7 @@ const ORGNAME = 'Northwind Trading Company';
     const m = await ev(`(() => { const o = document.querySelector('#side .sbrand .sborg'), n = document.querySelector('#side .sbrand .sbtxt > span');
       if (!o) return null; const a = o.getBoundingClientRect(), b = n.getBoundingClientRect();
       return {cut: o.scrollWidth > o.clientWidth + 1, below: a.top >= b.bottom - 2, w: Math.round(a.width), txt: o.textContent}; })()`);
-    check(m === null, `${tag}: #1552 no organisation name below "Kalmido" ` + JSON.stringify(m));  // 2.45.0 (#1552)
+    check(m == null, `${tag}: #1552 no organisation name below "Kalmido" ` + JSON.stringify(m));  // 2.45.0 (#1552)
     if (ag.id) {
       await ev(`(() => { chatOpen(${ag.id}); return 1; })()`);
       for (let i = 0; i < 25 && !(await ev(`!!document.querySelector('.chath .chnm b')`).catch(() => false)); i++) await sleep(300);
