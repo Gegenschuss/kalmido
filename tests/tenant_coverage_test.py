@@ -63,6 +63,9 @@ KINDS = {
     "client": ("matrix", "p2300_tenant_test.py: clients by id, workload"),
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
     # one works in); foreign ids 404; agents and kids 403 before any query; a private person 400. No /api/v1, no MCP in stage 1
+    # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
+    # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
+    "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share"),
     "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive)"),
     "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
@@ -476,6 +479,15 @@ ROUTES = {
     "GET /api/admin/agents/{}/machines": "admin", "DELETE /api/admin/agents/{}/machines/{}": "admin",
     "POST /api/agent-setup/redeem": "auth", "POST /api/agent-setup/remove": "auth",
     "GET /agent-setup.sh": "public", "GET /agent-setup.ps1": "public",
+    # 2.48.0 (#1111): documents
+    "GET /api/docs": "document", "POST /api/docs": "document", "GET /api/docs/{}": "document", "PATCH /api/docs/{}": "document",
+    "POST /api/docs/{}/accept": "document", "POST /api/docs/{}/review": "document", "POST /api/docs/{}/redo": "document",
+    "GET /api/docs/{}/thumb": "document", "GET /api/docs/{}/file": "document", "POST /api/docs/{}/task": "document",
+    "DELETE /api/docs/{}/task": "document", "GET /api/docs/settings": "document", "PUT /api/docs/settings": "document",
+    "POST /api/docs/rules": "document", "PATCH /api/docs/rules/{}": "document", "DELETE /api/docs/rules/{}": "document",
+    "PATCH /api/docs/labels/{}/{}": "document", "DELETE /api/docs/labels/{}/{}": "document", "POST /api/docs/labels/{}": "document", "POST /api/docs/mail": "document",
+    "DELETE /api/docs/mail": "document", "GET /api/v1/documents": "document", "GET /api/v1/documents/{}": "document",
+    "PATCH /api/v1/documents/{}": "document",
 }
 
 # ---- 1. every route is classified, nothing stale

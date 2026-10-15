@@ -1062,3 +1062,23 @@ agents have none (`403`).
 `GET /api/state` carries it as `mine_order` (`{task id: position}`, 0 = on top). A task without a position (new, or newly
 assigned) stands above the placed ones, newest first; assigning a task to a person takes its old position away. The setting
 `mine_view` (`PATCH /api/settings`) is `own` (default) or `lists`.
+
+## Documents (2.48.0)
+
+Documents are files of the file store (`/files`) with recognised text and fields. Scopes `files:read` / `files:write`;
+a token sees only the documents whose file it may see (an agent: shared with it).
+
+| Call | Scope | What it does |
+|---|---|---|
+| `GET /documents` | files:read | `?q=` words of the text (whole words; words of 4+ letters also as a prefix), `review=1`, `state=wait\|run\|done\|failed`, `from` / `to` (document date), `limit`, `cursor` -> `{data: [Document], next_cursor}`, newest document date first |
+| `GET /documents/{id}` | files:read | One document: `date`, `due`, `amount` (decimal text), `currency`, `sender` / `type` / `folder` (`{id, name}` or null), `tags`, `auto` (feature -> `rule` \| `learn` \| `agent` \| `import`), `suggest` (feature -> a suggestion waiting for review), `review`, `state`, `error`, `method` (`pdf` \| `ocr` \| `text` \| `import`), `text` (the recognised text) |
+| `PATCH /documents/{id}` | files:write | Role *edit*: `{date?, due?, amount?, currency?, sender?, type?, tags?: [names], text?}` (`text` only while none was recognised). An agent's values are marked `agent`; a feature the workspace leaves to an agent becomes a suggestion in *To review*. Unknown fields: `400` |
+
+The web app's own routes (`/api/docs`, a signed-in person, never an agent): `GET /api/docs` (list with filters, the counter
+*To review*, the filter labels of visible documents), `POST /api/docs` (multipart `files`, `ws` = `private` \| `org:<id>`),
+`GET` / `PATCH /api/docs/{id}`, `POST /api/docs/{id}/accept` (take suggestions), `POST /api/docs/{id}/review`
+(`{done: true}` = checked; the models learn the current values), `POST /api/docs/{id}/redo`, `GET /api/docs/{id}/thumb`,
+`GET /api/docs/{id}/file`, `POST` / `DELETE /api/docs/{id}/task` (a task for the due date), `GET` / `PUT /api/docs/settings`
+(levels per feature, the inbox folder), `POST` / `PATCH` / `DELETE /api/docs/rules`, `PATCH` / `DELETE /api/docs/labels/{kind}/{id}` (the delete answers the documents it touched; `POST /api/docs/labels/{kind}` `{ws, name, ids}` is its undo),
+`POST` / `DELETE /api/docs/mail` (the forwarding address). Deleting and restoring use the file store
+(`DELETE /api/files/nodes/{id}`, `POST /api/files/nodes/{id}/restore`).
