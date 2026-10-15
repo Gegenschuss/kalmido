@@ -18,6 +18,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.45.0** (2026-10-15): a **friendlier start page** (one sentence on the day, Today with a box to add, compact news,
+  active projects, slim empty cards); the **sidebar** puts the lists right below Plan, folds All / Completed / Trash /
+  Archived into *More*, reaches the **messenger** directly (Messages, last conversations, a bubble at every person) and
+  shows **all notes** in one place; **self-hosting** gets a one-time setup code, a server key file, backups on, proxy
+  examples, a health check and the installer in the repository; reloading after an update waits for the server.
 - **2.44.0** (2026-10-15): **agent starter**: set up a project agent on a **Mac, Windows or Linux computer with one
   command** (one-time code, autostart, connected status), the starter runs on macOS without PowerShell and asks for
   permissions in the chat, takes approvals decided in words, attaches files, runs long work as a job and keeps the

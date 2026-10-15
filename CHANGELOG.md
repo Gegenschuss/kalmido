@@ -7,6 +7,49 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.45.0] - 2026-10-15
+
+**In short:** **Sidebar, start page, self-hosting**: the lists move right below Plan, the messenger and all notes are one
+click away, the start page is calmer and shows the day in one sentence, and a new server is safer out of the box
+(one-time setup code, server key file, backups on).
+
+### Added
+- **Messenger in the sidebar** (#1509): a fixed row *Messages* with the unread count in *Conversations*, below it the last
+  5 conversations (unread first and bold), a bubble at every person opens the direct message (the row still leads to the
+  tasks); shortcut `g n`.
+- **All notes in one place** (#1516): *Views > Notes* lists the notes of all lists and projects (pinned first, then
+  recently changed) with a list filter, search and *New note* with a list choice; rights as before.
+- **Setup code for a new server** (#1515): until the first account exists the server writes a one-time code to its log
+  (`docker compose logs kalmido`); the setup page asks for it, 10 wrong tries are rate-limited. Existing servers and the
+  login are unchanged. `KALMIDO_SETUP_CODE=off` (tests and automation only) switches it off.
+- **Server key file** (#1515): without `KALMIDO_SECRET_KEY` the key is created once in `KALMIDO_SECRET_FILE`
+  (docker-compose: `./secret/kalmido.key`, mode 0600, never inside the data or backup folder); the variable still wins.
+  *Administration > Whole server* warns when there is no key and reminds you to keep a copy of the key file.
+- **Self-hosting kit** (#1515): `install.sh` / `install.ps1` in the repository, proxy examples in `examples/` (Caddy, nginx,
+  Traefik), a health check in `docker-compose.yml`, requirements (RAM, CPU, disk, amd64/arm64, Raspberry Pi 4/5 with SSD)
+  in SELF-HOSTING.md.
+
+### Changed
+- **Start page** (#1504): a greeting with one sentence ("4 tasks for today, 1 overdue, 2 agents working"), *Today* with a
+  box to add a task for today, *News* compact (at most 5, a bundle is one line), *Active projects* (at most 5, with
+  progress), *Agents* with all running jobs, empty cards as a slim line, two columns (one on a phone), search card off by
+  default. Own arrangements keep their order.
+- **Sidebar order** (#1503): Plan, Lists, Views, Areas, Filters, Tags, Conversations by default; an own order stays.
+- **Sidebar group More** (#1502): All, Completed, Trash and Archived form a folding group like the others (folded on a new
+  device, follows *Fold all*); *Tags* has the same header as the other groups; a folded group that holds the open view
+  says so.
+- **No organisation name under the app name** (#1552) in the sidebar; the login page names an organisation only when the
+  server is set to `KALMIDO_INSTANCE_MODE=organisation`.
+- **Backups on for new servers** (#1515): daily, with the usual retention; existing servers keep their setting.
+- The install guide names no fixed version any more (#1515).
+
+### Fixed
+- **Blank page after an automatic reload** (#1529): the reload after an update waits until the page and the stylesheet
+  are served; a page that loads without styling reloads itself up to 3 times and then offers a *Reload* button; the
+  service worker keeps the old cache until the new one is complete and falls back to it while the server restarts.
+- **A new folder in a workspace** (#1532) shows up there at once (it belongs to the chosen workspace).
+- The self-hosting part of the README no longer mentions the SQLite check `PRAGMA quick_check` (#1515).
+
 ## [2.44.0] - 2026-10-15
 
 **In short:** **Agent starter**: set up a project agent on a **Mac, Windows or Linux computer with one command**, the
