@@ -26,6 +26,7 @@ function markDrop(el, id, y) {
 }
 document.addEventListener('dragover', e => {
   if (!dragId) return;
+  if (dgOver(e, dragId)) { e.preventDefault(); dsEdge(e.clientY); return; }  // 2.43.0 (#1330, #1003): Alt = dependency, a selection, the panel's drop fields
   if (markDrop(e.target, dragId, e.clientY)) e.preventDefault();
   dsEdge(e.clientY);
 });
@@ -44,6 +45,7 @@ document.addEventListener('drop', async e => {
   if (!dragId) return;
   e.preventDefault();
   const id = dragId; dragId = null;
+  if (dgDrop(e, id)) return;  // 2.43.0 (#1330, #1003): dragmulti.js
   dropTask(id, e.target, e.clientY);
 });
 // one drop = one history step (a subtask made standalone and moved counts once)

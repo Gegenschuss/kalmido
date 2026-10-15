@@ -6325,3 +6325,17 @@ html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5re
 html.mini-task #main,html.mini-task #top,html.mini-task .qdock,html.mini-task #detail .dclose,html.mini-task #detail .back,html.mini-task #detail [data-mwtask]{display:none!important}
 html.mini-task #app,html.mini-task #app.detail-open{grid-template-columns:minmax(0,1fr)}
 .mwgone{display:flex;flex-direction:column;align-items:center;gap:.75rem;padding:3rem 1.5rem;text-align:center;color:var(--muted)}
+/* 2.43.0 B (#1330, #1003): dependencies by dragging (Alt + drop, the panel's drop fields), several tasks at once */
+#view .trow.dgdep,#view .trow.dgonto,#view .trow.dgno{position:relative;box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-soft)}
+#view .trow.dgno{box-shadow:inset 0 0 0 2px var(--line2);background:none}
+#view .trow.dgdep::after,#view .trow.dgonto::after,#view .trow.dgno::after{content:attr(data-dg);position:absolute;right:.5rem;top:50%;transform:translateY(-50%);z-index:2;pointer-events:none;
+  padding:.125rem .5rem;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:.75rem;font-weight:600;white-space:nowrap;max-width:70%;overflow:hidden;text-overflow:ellipsis}
+#view .trow.dgno::after{background:var(--bg4);color:var(--text2)}
+.dgghost{position:fixed;top:-200px;left:-200px;padding:.3rem .75rem;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:.8125rem;font-weight:600;white-space:nowrap}
+.dgzones{display:flex;gap:.5rem;margin:.375rem 0 .5rem}
+.dgzone{flex:1;display:flex;flex-direction:column;gap:.125rem;padding:.625rem .75rem;border:2px dashed var(--line2);border-radius:var(--r-l);color:var(--text2);font-size:.8125rem;min-height:3.25rem}
+.dgzone b{color:var(--text);font-weight:600}
+.dgzone.drop{border-color:var(--accent);background:var(--accent-soft)}
+.dgzone.drop b{color:var(--accent)}
+.dgzone.dgoff{opacity:.45}
+.dgme .dgmeb{display:flex;flex-wrap:wrap;gap:.5rem}

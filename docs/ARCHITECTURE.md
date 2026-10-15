@@ -279,6 +279,7 @@ registering the ones of its area.
 | `events.js` | Toasts, quick add wiring and the global event handlers. |
 | `sidebar.js` | Multi-select bar, filter lists and the list order in the sidebar. |
 | `dnd.js` | Drag & drop (desktop) and swipe (touch). |
+| `dragmulti.js` | Dependencies by dragging (Alt + drop, drop fields in the task panel) and dragging several selected tasks (block, subtasks, sections). |
 | `palette.js` | Keyboard shortcuts, the command palette, the welcome tour. |
 | `agents.js` | Agents, reactions, shared list tags, tidy suggestions. |
 | `cleanup.js` | "Tidy up the list": the request to the list's tidy agent and the review of its cleanup proposal (2.39.0). |

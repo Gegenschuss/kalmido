@@ -633,6 +633,9 @@ fresh; run p2420_b_api "$PY" p2420_b_api_test.py "$KALMIDO_TEST_DATA"
 # 2.43.0 part D: #1434 delete all times of a project (preview, delete, restore), tracked-time window; #1500 a task in its own window
 fresh; run p2430_d_api "$PY" p2430_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2430_d_ui node p2430_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.43.0 part B: #1330 dependencies by dragging (Alt + drop, drop fields in the task panel), #1003 several tasks at once (subtasks, out of the parent, block)
+fresh; run p2430_b_api "$PY" p2430_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2430_b_ui node p2430_b_ui.js
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

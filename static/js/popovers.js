@@ -712,6 +712,7 @@ function taskMenu(anchor, id, o = {}) {
     // 2.16.0 (#473, WCAG 2.5.7): what dragging does, as menu items (also Alt+↑ / ↓)
     ...(open && t.id > 0 && S.route.mod === 'tasks' && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []),
     // waiting
+    ...(open && t.id > 0 && dFor(t) ? [{label: tr('Waiting on a task…'), icon: 'lock', fn: () => dgDepPick(id)}] : []),  // 2.43.0 (#1330): the phone's way to a dependency
     ...(open ? [t.waiting_at ? {label: tr('No longer waiting'), icon: 'hourglass', fn: () => waitClear(id)}
       : {label: tr('Waiting on someone…'), icon: 'hourglass', fn: () => waitDialog(id)}] : []),
     // 2.23.0 (#463): an approval (a person of the shared list decides)

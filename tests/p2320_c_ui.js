@@ -64,7 +64,8 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     await shot('p2320c-390-select.png');
     await ev(`(() => { document.querySelector('#mbar [data-act="mb-menu"]').click(); return 1; })()`); await sleep(300);
     const more = await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent).join('|')`);
-    check(more === 'Edit|Select all|Delete', '#1055: More = Edit, Select all, Delete ' + more);
+    // 2.43.0 (#1003): + "Subtasks of…" (the selection under another task)
+    check(more === 'Edit|Subtasks of…|Select all|Delete', '#1055: More = Edit, Subtasks of…, Select all, Delete ' + more);
     await ev(`(() => { closePop(); document.querySelector('#mbar [data-act="mb-move"]').click(); return 1; })()`); await sleep(300);
     const ids2 = await ev(`JSON.stringify([...S.multi])`);
     const mv = await ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => x.textContent === 'Other list'); if (b) b.click(); return !!b; })()`); await sleep(1200);

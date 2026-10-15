@@ -13,13 +13,13 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/icons.js', '/static/js/core.js', '/static/js/workspace.js', '/static/js/quickadd.js', '/static/js/views.js', '/static/js/render.js', '/static/js/calendar.js',
   '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/habits.js', '/static/js/detail.js', '/static/js/collab.js', '/static/js/attachments.js', '/static/js/mdtitle.js',
   '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js', '/static/js/settings.js', '/static/js/integrations.js', '/static/js/account.js',
-  '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/projtime.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/sharedlg.js', '/static/js/dnd.js',
+  '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/projtime.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/sharedlg.js', '/static/js/dnd.js', '/static/js/dragmulti.js',
   '/static/js/palette.js', '/static/js/agents.js', '/static/js/cleanup.js', '/static/js/dayplan.js', '/static/js/choicecard.js', '/static/js/agentchat.js', '/static/js/listedit.js', '/static/js/playbook.js', '/static/js/git.js',
   '/static/js/chat.js', '/static/js/richcopy.js', '/static/js/dashboard.js', '/static/js/family.js', '/static/js/calevents.js', '/static/js/contacts.js', '/static/js/life.js', '/static/js/formguard.js', '/static/js/liveparts.js', '/static/js/countries.js', '/static/js/clients.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_import.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/favorites.js', '/static/js/mineorder.js', '/static/js/tablecells.js', '/static/js/listadmin.js', '/static/js/orgexport.js', '/static/js/orgcrypt.js', '/static/js/sheetdrag.js', '/static/js/miniwin.js', '/static/js/e2e.js', '/static/js/main.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 // Android share sheet (share_target POST): keep the shared files in a cache and open the app,
-// which then creates the task + uploads with the normal (login) session.
+// which then creates the task + uploads with the normal (Authelia) session.
 async function handleShare(req) {
   try {
     const fd = await req.formData();
