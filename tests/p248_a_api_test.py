@@ -298,6 +298,7 @@ check(spec["paths"]["/files"]["post"]["x-kalmido-scope"] == "files:write" and sp
       "OpenAPI declares the scopes")
 
 # ---- organisation: boundary, admins, whole organisation
+# tenant-matrix: file
 OF = folder(Ca, "Team docs", space=f"org:{ORG}")
 r = up(Ca, "minutes.txt", b"org minutes", parent=OF)
 OFILE = r.json()["items"][0]["id"]

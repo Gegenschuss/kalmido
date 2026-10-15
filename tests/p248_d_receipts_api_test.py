@@ -247,6 +247,7 @@ dbx("UPDATE agents SET list_ids='' WHERE user_id=?", (OAG,), write=True)
 r = OAGS.post(V + f"/documents/{OD}/receipt-suggestion", json={"project_id": OP, "category": "Marketing"})
 check(r.status_code == 201, f"the org agent suggests the org project ({r.status_code} {r.text[:200]})")
 OS = r.json().get("id")
+# tenant-matrix: receipt
 check(Ca.get(B + f"/api/docs/{OD}/receipt").status_code == 404, "carol (document not shared with her) does not see it")
 check(A.post(B + f"/api/receipt-suggestions/{OS}/accept", json={}).status_code == 404, "alice (outside the organisation): 404")
 check(PAGS.get(V + "/receipt-suggestions?state=all").json()["data"] and all(x["document_id"] == D1 for x in PAGS.get(V + "/receipt-suggestions?state=all").json()["data"]),

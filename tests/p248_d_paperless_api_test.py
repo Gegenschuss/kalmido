@@ -268,6 +268,7 @@ j = Ca.get(B + f"/api/paperless?ws=org:{ORG}").json()
 check(j.get("can_manage") is False, "an organisation member sees the section, cannot manage")
 r = Ca.put(B + "/api/paperless", json={"ws": f"org:{ORG}", "url": PL, "token": "pl-secret"})
 check(r.status_code == 403, f"a member cannot connect the organisation ({r.status_code})")
+# tenant-matrix: paperless
 check(Er.get(B + f"/api/paperless?ws=org:{ORG}").status_code == 404, "not across workspaces: outsiders 404")
 r = Bo.put(B + "/api/paperless", json={"ws": f"org:{ORG}", "url": PL, "token": "pl-secret"})
 check(r.ok, f"the organisation's admin connects ({r.status_code} {r.text[:200]})")
