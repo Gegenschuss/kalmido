@@ -384,6 +384,32 @@ def folder_groups_get():
                                               (me(), f))])
 
 
+def fg_group_diff(c, owner, f, gid, role):
+    """2.46.0 (#1606): [{list_id, name, role}] of owner's lists in folder f shared with group gid directly with another role than
+    `role` -- only when the folder is shared with the group already and its role changes (a first share touches no list)."""
+    from ..lists.lists import _in_folder
+    prev = c.execute("SELECT role FROM group_shares WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (owner, f, gid)).fetchone()
+    if not prev or prev[0] == role:
+        return []
+    return [{"list_id": r["id"], "name": r["name"], "role": r["role"]} for r in c.execute(
+        """SELECT l.id, l.name, l.folder, s.role FROM lists l JOIN group_shares s ON s.list_id=l.id AND s.group_id=?
+           WHERE l.owner_id=? AND l.archived=0 AND l.is_inbox=0 ORDER BY lower(l.name), l.id""", (gid, owner)).fetchall()
+        if _in_folder(r["folder"], f) and r["role"] != role]
+
+
+@app.get("/api/folders/groups/<int:gid>/diff")
+def folder_group_diff(gid):
+    """?folder=&role=: the lists of my folder where that group role would replace the group's own role in the list (#1606)."""
+    need_collab()
+    c = db()
+    need_group(c, gid)
+    f = clean_folder(str(request.args.get("folder") or ""), False)
+    if not f:
+        return err(tr("Name missing"))
+    role = grp_role(request.args)
+    return jsonify(lists=fg_group_diff(c, me(), f, gid, role))
+
+
 @app.put("/api/folders/groups/<int:gid>")
 def folder_group_set(gid):
     """{folder, role}: share every own list in that folder (and its subfolders, also lists moved there later) with gid."""
@@ -404,6 +430,10 @@ def folder_group_set(gid):
                 if p:
                     return err(p, 409)
     if c.execute("SELECT 1 FROM group_shares WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (me(), f, gid)).fetchone():
+        # 2.46.0 (#1606): a changed folder role also replaces the group's own role in the lists of the folder, unless apply: false
+        if b.get("apply", True) is not False:
+            for x in fg_group_diff(c, me(), f, gid, role):
+                c.execute("UPDATE group_shares SET role=? WHERE list_id=? AND group_id=?", (role, x["list_id"], gid))
         c.execute("UPDATE group_shares SET role=? WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (role, me(), f, gid))
     else:
         c.execute("INSERT INTO group_shares(group_id,owner_id,folder,role,added_by,added_at) VALUES(?,?,?,?,?,?)",

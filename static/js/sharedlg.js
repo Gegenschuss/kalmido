@@ -90,9 +90,17 @@ function folderShareModal(f, opt = {}) {
   md.addEventListener('change', async e => {
     const t = e.target;
     const s = t.closest('[data-fprole]');
-    if (s) { const uid = +s.dataset.fprole; try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role: s.value}); have = have.map(x => x.user_id === uid ? {...x, role: s.value} : x); toast(j.updated ? trn('Role changed in {0} list', 'Role changed in {0} lists', j.updated) : tr('Saved')); } catch { drawPeople(); } return; }
+    if (s) {
+      const uid = +s.dataset.fprole, nm = have.find(x => x.user_id === uid)?.name || users?.find(x => x.id === uid)?.display_name || '?';
+      const ap = await fg_askRoles(`/api/folders/people/diff?folder=${encodeURIComponent(f)}&user_id=${uid}&role=${s.value}`, nm);  // 2.46.0 (#1606)
+      if (ap === null) { drawPeople(); return; }
+      try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role: s.value, ...(ap ? {} : {apply: false})}); have = have.map(x => x.user_id === uid ? {...x, role: s.value} : x); toast(j.updated ? trn('Role changed in {0} list', 'Role changed in {0} lists', j.updated) : tr('Saved')); } catch { drawPeople(); } return; }
     const gr = t.closest('[data-fgrole]');
-    if (gr) { try { await api('PUT', `/api/folders/groups/${gr.dataset.fgrole}`, {folder: f, role: gr.value}); await done(); drawGroups(); } catch { /* api() said it */ } return; }
+    if (gr) {
+      const ap = await fg_askRoles(`/api/folders/groups/${gr.dataset.fgrole}/diff?folder=${encodeURIComponent(f)}&role=${gr.value}`, (S.groups || []).find(x => x.id === +gr.dataset.fgrole)?.name || '?');  // 2.46.0 (#1606)
+      if (ap === null) { drawGroups(); return; }
+      try { await api('PUT', `/api/folders/groups/${gr.dataset.fgrole}`, {folder: f, role: gr.value, ...(ap ? {} : {apply: false})}); await done(); drawGroups(); } catch { /* api() said it */ } return;
+    }
     if (t.dataset.fshlisten) {
       const aid = +t.dataset.fshlisten, on = t.checked;
       try { ags = await api('PUT', '/api/folders/agents', {folder: f, agent_id: aid, listen: on}); drawAgents(); await done(); toast(on ? tr('Agent listens in') : tr('Agent only via @'), async () => { try { ags = await api('PUT', '/api/folders/agents', {folder: f, agent_id: aid, listen: !on}); drawAgents(); await done(); } catch { /* said */ } }); } catch { drawAgents(); }
@@ -159,6 +167,26 @@ function folderShareModal(f, opt = {}) {
   };
   if (!own) $('#fsh-members', md)?.insertAdjacentHTML('beforebegin', `<div class="shint keep">${ic('info', 's')} ${tr('Only your own lists can be shared')}</div>`);
   return md;
+}
+// ---- 2.46.0 (#1606): a changed folder role would replace roles set per list: ask first. -> true (everywhere), false (only
+// new lists / keep the own roles), null (cancel). No such list: true at once, as before.
+async function fg_askRoles(url, who) {
+  let ls = [];
+  try { ls = (await api('GET', url)).lists || []; } catch { return true; }
+  if (!ls.length) return true;
+  const rn = r => tr((ROLES.find(x => x[0] === r) || [r, r])[1]);
+  const shown = ls.slice(0, 4).map(x => `${x.name}: ${rn(x.role)}`).join(', ') + (ls.length > 4 ? ', …' : '');
+  return new Promise(res => {
+    let done = false;
+    const md = modal(`<h3 id="fg-rq-t">${esc(tr('Replace the roles set per list?'))}</h3><div class="cdlg-b" id="fg-rq-b">${esc(trn('In {0} list {1} has a role of its own ({2}).', 'In {0} lists {1} has a role of its own ({2}).', ls.length, who, shown))}</div>
+      <div class="foot fgrqf"><button type="button" class="btn" data-fgrq="x">${esc(tr('Cancel'))}</button><span class="spacer"></span><button type="button" class="btn" data-fgrq="new">${esc(tr('Only new lists'))}</button><button type="button" class="btn pri" data-fgrq="all">${esc(tr('Set everywhere'))}</button></div>`);
+    md.classList.add('cdlg');
+    md.setAttribute('role', 'alertdialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'fg-rq-t'); md.setAttribute('aria-describedby', 'fg-rq-b');
+    const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); };
+    md.addEventListener('click', e => { const b = e.target.closest('[data-fgrq]'); if (b) fin(b.dataset.fgrq === 'all' ? true : b.dataset.fgrq === 'new' ? false : null); });
+    onRemove(md, () => fin(null));
+    setTimeout(() => $('[data-fgrq="all"]', md)?.focus(), 30);
+  });
 }
 // the old entry points stay (notification question, older links): they open the one dialog
 function folderPeopleModal(f, opt = {}) { return folderShareModal(f, opt); }
