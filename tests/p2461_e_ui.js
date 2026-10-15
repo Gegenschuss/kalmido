@@ -29,6 +29,7 @@ const PH = {mobile: true};  // a phone for jsdom
   check(r.ok, 'setup');
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
+  await call('POST', '/api/admin/orgs', {name: 'Kalmido'});  // 2.46.0 (#1592): no organisation from the start any more (the office needs one)
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   const L = (await call('POST', '/api/lists', {name: 'Home'})).id;
