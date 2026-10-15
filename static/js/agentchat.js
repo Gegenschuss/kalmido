@@ -22,6 +22,7 @@ try { screen.orientation?.addEventListener('change', () => { clearTimeout(chatRe
 S.chat = {aid: null, msgs: [], err: null};
 function chatOpen(aid, o = {}) {
   tch_overlaysClose();  // 2.38.0 (#1155): no quick-add sheet or stale scrim stays over the chat
+  if (typeof cw_note === 'function') cw_note('a:' + +aid, o);  // 2.47c (#1720): the list of open chats (chatwins.js)
   if (chatFull()) { if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); return; }
   const fl = o.float ?? chatFloatOn();
   if (!fl && document.body.classList.contains('chat-yield') && S.sel) closeDetail();  // 2.13.2 (#478 N1): the chat takes its place back
@@ -29,12 +30,12 @@ function chatOpen(aid, o = {}) {
   LS.set('chatLast', +aid);  // 2.29.0 (#363): the pop-up button opens this one next time
   let p = $('#achat');
   if (!p) { p = document.createElement('aside'); p.id = 'achat'; p.setAttribute('aria-label', tr('Chat')); document.body.appendChild(p); }
-  if (p.classList.contains('float') !== fl) { p.innerHTML = ''; delete p.dataset.aid; }
+  if (p.classList.contains('float') !== fl) { p.innerHTML = ''; delete p.dataset.aid; delete p.dataset.cw; p.classList.remove('cwsplit'); }
   p.classList.toggle('float', fl); p.classList.remove('min'); document.body.classList.toggle('chat-float', fl); document.body.classList.toggle('chat-open', !fl);
   if (fl) chatFloatPlace(p); else p.style.left = p.style.top = p.style.right = p.style.bottom = '';
   p.classList.remove('hidden'); fitLayout(); chatDraw(); chatFabDraw(); chatLoad().then(() => $('#chat-in')?.focus());
 }
-function chatClose() { S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open', 'chat-float'); fitLayout(); chatFabDraw(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; go(b || 'agents'); } }
+function chatClose() { if (typeof cw_reset === 'function') cw_reset(); S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open', 'chat-float'); fitLayout(); chatFabDraw(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; go(b || 'agents'); } }
 // ---- 2.29.0 (#363) desktop: the chat as a pop-up window from anywhere -- the round button bottom right (the agent last
 // chatted with), the key A and "Chat as a window" in the command bar. The window stays open while you switch lists and views,
 // can be moved by its header, folded to the header and docked as the side panel again (remembered per device: chatFloat).
@@ -658,7 +659,7 @@ function chatInner(aid) {
   // 2.13.0 (#453): the note that used to sit under the input is behind the (i) next to the name
   const info = `<button type="button" class="ib" data-ii="chat-info" aria-describedby="chat-info" aria-expanded="false" aria-label="${esc(tr('More information'))}">${ic('info', 's')}</button><span class="shint iisrc" id="chat-info" data-ii="1">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the lists shared with it.', esc(a.name))}</span>`;
   return `<div class="chath">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}${info}${chatModeHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatModelHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>
-      ${msgSearchBtn('a', a.id)}${chatStepsTog()}${back ? '' : chatWinBtns()}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
+      ${msgSearchBtn('a', a.id)}${chatStepsTog()}${back ? '' : chatWinBtns()}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
     ${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div><div class="chmsgs" id="chat-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
     <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTypers(a), 'chat-typing')}
@@ -668,11 +669,12 @@ function chatInner(aid) {
 }
 function chatViewHtml(aid) {
   if (S.chat.aid !== +aid) { S.chat = {aid: +aid, msgs: [], err: null}; setTimeout(chatLoad, 0); }
-  return `<div class="chview" data-aid="${+aid}">${chatInner(aid)}</div>`;
+  return `<div class="chview" data-aid="${+aid}">${typeof cw_switchHtml === 'function' ? cw_switchHtml('a:' + +aid) : ''}${chatInner(aid)}</div>`;  // 2.47c (#1720): the open chats
 }
 function chatDraw(o = {}) {
   const p = $('#achat');
-  if (p && !p.classList.contains('hidden') && S.chat.aid && !chatFull() && (p.dataset.aid !== String(S.chat.aid) || !$('#chat-msgs', p))) {
+  if (typeof cw_frame === 'function' && cw_frame(p)) o = {bottom: true};  // 2.47c (#1720): several chats one above the other (chatwins.js)
+  if (p && !p.classList.contains('hidden') && !p.classList.contains('cwsplit') && S.chat.aid && !chatFull() && (p.dataset.aid !== String(S.chat.aid) || !$('#chat-msgs', p))) {
     const d = S.drafts['chat:' + S.chat.aid] = $('#chat-in', p)?.value ?? S.drafts['chat:' + S.chat.aid]; p.innerHTML = chatInner(S.chat.aid); p.dataset.aid = S.chat.aid; if (d !== undefined) $('#chat-in', p).value = d;
     o = {bottom: true};
   }
