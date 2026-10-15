@@ -113,9 +113,10 @@ const item = (d, t) => items(d).find(x => (x.querySelector('.ml')?.firstChild?.t
   // ================= #1504 the agents card, the review on the builder
   w = await boot({user: 'alice', hash: 'home'}); d = w.document;
   await until(() => d.querySelectorAll('.dc-agents .djob').length >= 2);
-  const jobs = [...d.querySelectorAll('.dc-agents .djob')].map(x => x.textContent.trim());
+  const jobs = [...d.querySelectorAll('.dc-agents .djob')].map(x => x.querySelector('.dwt').textContent.trim());  // 2.45.0 (#1504): + "since HH:MM" after the title
   check(jobs.length === 2 && jobs.includes('Build the sitemap') && jobs.includes('Check the links'), '#1504: the agents card lists both running jobs ' + JSON.stringify(jobs));
-  check(d.querySelector('.dgrid.lysix[data-ly="home"] > .lyb.lw2 [data-act="wg-more"]'), '#1452: start page cards are a third wide with their menu');
+  // 2.45.0 (#1504): the narrow cards sit in the right column (.hpcol) of the start page
+  check(d.querySelector('.dgrid.lysix[data-ly="home"] > .hpcol > .lyb.lw2 [data-act="wg-more"]'), '#1452: start page cards are a third wide with their menu');
   w.close();
   w = await boot({user: 'alice', hash: 'review'}); d = w.document;
   await until(() => d.querySelector('.lysix[data-ly="review"] .lyb'));

@@ -654,6 +654,8 @@ fresh; run p2440_c_ui node p2440_c_ui.js "$KALMIDO_TEST_DATA"
        run p2440_c_setup "$PY" p2440_c_setup_test.py
 # 2.44.0 part D: #1187 areas (Office, Time, Review, Home): sidebar, tabs, old links, one switch per area, setup
 fresh; run p2440_d_ui node p2440_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.45.0 part D: #1504 the start page as in the draft (sentence, Today with a box, compact News, active projects, slim empty cards, two columns)
+fresh; run p2450_d_ui node p2450_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

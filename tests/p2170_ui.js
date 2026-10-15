@@ -59,9 +59,10 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(logo && logo.dataset.go === 'home' && /^Kalmido: Start$/.test(logo.getAttribute('aria-label')), '#475: the logo opens the dashboard (its name starts with the visible "Kalmido")');
   click(w, logo); await sleep(600);
   check(w.location.hash === '#home' && d.querySelector('#top h1')?.textContent.includes('Start'), '#475: #home, titled Start (2.25.0)');
-  await until(() => d.querySelector('.dcard.dc-news .ngroup'));
+  await until(() => d.querySelector('.dcard.dc-news .hpnl li'));  // 2.45.0 (#1504): News compact, one line per bundle
   const cards = [...d.querySelectorAll('.dgrid .dcard')].map(c => [...c.classList].find(x => x.startsWith('dc-')));
-  check(['dc-wait', 'dc-today', 'dc-news', 'dc-chat', 'dc-projects', 'dc-pinned', 'dc-agents', 'dc-stats', 'dc-search'].every(c => cards.includes(c)), '#475: the cards ' + cards.join());
+  // 2.45.0 (#1504): Search is hidden by default
+  check(['dc-wait', 'dc-today', 'dc-news', 'dc-chat', 'dc-projects', 'dc-pinned', 'dc-agents', 'dc-stats'].every(c => cards.includes(c)) && !cards.includes('dc-search'), '#475: the cards ' + cards.join());
   check(!cards.includes('dc-notes'), 'no notes yet: the notes card stays away');
   check(d.querySelector('.dc-today').textContent.includes('Write the homepage text') && d.querySelector('.dc-today').textContent.includes('Call the printer'), 'today: due today and overdue');
   check(d.querySelector('.dc-pinned').textContent.includes('Pick the photos'), 'pinned tasks');
@@ -75,11 +76,12 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // customize
   click(w, d.querySelector('[data-act="dash-custom"]')); await sleep(200);
   const rows = [...d.querySelectorAll('.dcust li')];
-  check(rows.length === 10 && rows[0].dataset.k === 'wait' && d.activeElement?.closest('.dcust'), 'Customize: every card with ↑ ↓ and a switch, the focus in the list');
-  click(w, d.querySelector('.dcust [data-act="dash-mv"][data-k="today"][data-d="-1"]')); await sleep(300);
+  // 2.45.0 (#1504): the default order starts with Today, then Agents, News
+  check(rows.length === 10 && rows[0].dataset.k === 'today' && d.activeElement?.closest('.dcust'), 'Customize: every card with ↑ ↓ and a switch, the focus in the list');
+  click(w, d.querySelector('.dcust [data-act="dash-mv"][data-k="agents"][data-d="1"]')); await sleep(300);
   const sw = d.querySelector('.dcust [data-dshow="stats"]'); sw.checked = false; sw.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(300);
   const ds = JSON.parse((await call('GET', '/api/state')).settings.dashboard || '{}');
-  check(ds.order[0] === 'today' && ds.order[1] === 'wait' && ds.hidden.includes('stats'), '#475: order and hidden cards saved in the settings ' + JSON.stringify(ds));
+  check(ds.order[0] === 'today' && ds.order[1] === 'news' && ds.hidden.includes('stats'), '#475: order and hidden cards saved in the settings ' + JSON.stringify(ds));
   click(w, d.querySelector('[data-act="dash-done"]')); await sleep(300);
   check(d.querySelector('.dgrid .dcard').classList.contains('dc-today') && !d.querySelector('.dc-stats'), 'Today first now, Statistics hidden');
   w.close();
@@ -332,7 +334,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     const dg = await ev(`(() => { const cs = [...document.querySelectorAll('.dgrid .dcard')]; return {n: cs.length}; })()`);
     await o.nav(B + '#home'); await ready(ev);
     const cols = await ev(`(() => { const cs = [...document.querySelectorAll('.dgrid .dcard')].map(c => Math.round(c.getBoundingClientRect().left)); return new Set(cs).size; })()`);
-    check(cols >= 3, `${tag}: the dashboard uses the width (${cols} columns)`);
+    check(cols === 2, `${tag}: the dashboard uses the width (${cols} columns)`);  // 2.45.0 (#1504): a wide and a narrow column
     // 2.17.2 (review): a room opened by its address (reload, a push) shows the newest message
     await o.nav(B + '#team'); await ready(ev);
     await ev(`(() => { document.querySelector('.tclist .tcrow')?.click(); return 1; })()`); await sleep(1000);
