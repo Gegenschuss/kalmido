@@ -217,6 +217,7 @@ OX_AREAS = (
     ("office/documents.json", "office_docs", "org_id=?"),
     ("office/document_items.json", "office_doc_items", f"doc_id IN ({DSQ})"),
     ("office/document_parts.json", "office_doc_parts", "org_id=?"),  # 2.47.0 (#1215): the parts of quotations
+    ("office/purchases.json", "office_purchases", "org_id=?"),  # 2.47.0 (#1649): purchase of accepted quotations (amount decrypted)
     ("office/payments.json", "office_payments", "org_id=?"),
     ("office/archive.json", "office_archive", "org_id=?"),
     ("office/import_runs.json", "office_import_runs", "org_id=?"),
