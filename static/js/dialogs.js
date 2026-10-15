@@ -7,6 +7,7 @@ function modal(html) {
   const m = document.createElement('div');
   m.className = 'modal';
   m.innerHTML = `<div class="card">${html}</div>`;
+  an_flush(); m.remove = () => an_remove(m);  // 2.46.1 (#1558): phones: the dialog folds away before it leaves the page
   m.addEventListener('mousedown', e => { if (e.target === m) modalClose(m); });
   document.body.appendChild(m);
   document.body.classList.add('modal-open');  // 2.28.0 (#976): the grips step aside while a dialog is open

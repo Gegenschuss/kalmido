@@ -329,12 +329,18 @@ document.addEventListener('touchmove', e => {
 function swipeEnd(e) {
   if (!swipe) return;
   const {r, dx, lock} = swipe; swipe = null;
-  r.style.transition = 'transform .18s'; r.style.transform = ''; r.style.background = '';
+  // 2.46.1 (#1559): a swipe that completes the task carries the row on out to the right (like a dismissed news item) instead of snapping back
+  const going = lock === 'x' && dx > 90 && e?.type !== 'touchcancel' && an_on();
+  r.style.transition = going ? 'transform .18s ease-in, opacity .18s ease-in' : 'transform .18s'; r.style.transform = going ? 'translateX(110%)' : ''; r.style.background = going ? r.style.background : '';
+  if (going) r.style.opacity = '0';
   setTimeout(() => { r.style.transition = ''; }, 200);
   if (lock !== 'x' || e?.type === 'touchcancel') return;  // 2.13.4: a cancelled swipe snaps back and does nothing
   swiped = true; setTimeout(() => { swiped = false; }, 350);
   const id = +r.dataset.id;
-  if (dx > 90) toggleTask(id);
+  if (dx > 90) {
+    const back = () => { if (going && r.isConnected) { r.style.transition = 'transform .18s, opacity .18s'; r.style.transform = ''; r.style.opacity = ''; r.style.background = ''; setTimeout(() => { r.style.transition = ''; }, 200); } };
+    Promise.resolve(toggleTask(id)).then(back, back);  // the list redraws without the row; if it stayed (cancelled, error) it slides back
+  }
   // 2.24.0 (UX-09 / UX-14 / UX-37): the short menu names its task, keeps the order of the task menu (date, list, …) and ends
   // with "All…"; "Move to list…" sorts the inbox
   else if (dx < -90) {  // 2.25.0 (UX-37): emptying the inbox = putting tasks into lists: there "Move to list…" leads the menu

@@ -182,7 +182,7 @@ function oimArchiveListHtml(q) {
   const items = (OIM.list.items || []).filter(r => !q || [r.number, r.client, r.client_name, r.project].some(v => (v || '').toLowerCase().includes(q)));
   const sum = OIM.list.sum_invoices ? `<p class="muted oimsum">${esc(tr('Archived invoices: {0}, of which paid: {1}', ofcMoney(OIM.list.sum_invoices), ofcMoney(OIM.list.sum_paid)))}</p>` : '';
   const imp = ofcAdmin() ? `<a class="btn sm" href="#office/import">${ic('upload', 's')} ${tr('Import legacy data')}</a>` : '';
-  if (!items.length) return `<div class="empty">${ic('archive')}<span>${q ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Import legacy data.')}</span>${q ? '' : imp}</div>`;
+  if (!items.length) return `<div class="empty nempty eact">${ic('archive')}<span>${q ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Import legacy data.')}</span>${q ? '' : imp}</div>`;
   // 2.40.0 (#1366): the row shows the PDF in the browser, the button next to it downloads it
   return sum + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener">
     <span class="ofcn"><b>${esc(r.number || r.file_name)}${r.client || r.client_name ? ` · ${esc(r.client || r.client_name)}` : ''}</b><small class="muted">${esc([r.kind === 'offer' ? tr('Quotation') : tr('Invoice'), r.project, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>
