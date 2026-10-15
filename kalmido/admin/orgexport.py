@@ -222,6 +222,7 @@ OX_AREAS = (
     ("office/archive.json", "office_archive", "org_id=?"),
     ("office/import_runs.json", "office_import_runs", "org_id=?"),
     ("office/log.json", "office_doc_log", "org_id=?"),
+    ("wiki/pages.json", "wiki_pages", "org_id=?"),  # 2.49.0 (#1199): knowledge pages
 )
 OX_NOT_INCLUDED = (
     "private lists and private sharing of the members (lists without the organisation), other organisations",

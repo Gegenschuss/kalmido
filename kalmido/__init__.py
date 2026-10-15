@@ -103,6 +103,8 @@ ORDER = (
     "lists.orgvis",  # 2.46.0 (#1603): organisation lists visible to the whole organisation
     "api.scopes",
     "collab.notes",
+    "wiki.pages",  # 2.49.0 C (#1199): knowledge pages
+    "wiki.outline",  # 2.49.0 C (#1201): outline import of the mind map (no storage)
     "collab.teamchat",
     "collab.msgsearch",  # 2.33.0 (#1080)
     "collab.chatsave",  # 2.37.0 (#1159)
