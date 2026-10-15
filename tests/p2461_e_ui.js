@@ -30,7 +30,7 @@ const PH = {mobile: true};  // a phone for jsdom
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   await call('POST', '/api/admin/orgs', {name: 'Kalmido'});  // 2.46.0 (#1592): no organisation from the start any more (the office needs one)
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT, show_done_default: '1', show_done_new: '0'});  // 2.49.0 (#1535): completed stay visible here
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   const L = (await call('POST', '/api/lists', {name: 'Home'})).id;
   await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});
@@ -100,7 +100,7 @@ const PH = {mobile: true};  // a phone for jsdom
   const row0 = d.querySelector(`#view .trow[data-id="${T[0]}"]`);
   const done = w.eval(`toggleTask(${T[0]})`);
   await sleep(20);
-  check(row0.classList.contains('an-rowout'), '#1559: the row fades while the request runs');
+  check(row0.classList.contains('ui-strike') || row0.classList.contains('an-rowout'), '#1559: the row animates while the request runs');  // 2.49.0 (#1766): completing strikes the title first
   await done;
   const t0 = await (await fetch(B + `api/tasks/${T[0]}`, {headers: {...H, Cookie: CK}})).json();
   check(t0.status !== 0, '#1559: the task is completed on the server (status ' + t0.status + ')');
