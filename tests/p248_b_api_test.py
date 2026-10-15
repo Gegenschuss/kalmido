@@ -339,6 +339,29 @@ check(ws_rows == {"u1", f"o{ORG}"}, f"documents keep their workspace ({ws_rows})
 check(dbx("SELECT org_id FROM fs_nodes WHERE id=?", (DA,))[0][0] == ORG and dbx("SELECT org_id FROM fs_nodes WHERE id=?", (D1,))[0][0] is None,
       "never moved into another workspace")
 
+# ---- the organisation export holds the documents decrypted (not the models, not the word index, no mail token)
+r = Bo.post(B + f"/api/orgs/{ORG}/export")
+if r.status_code == 202:
+    j = until(lambda: (lambda x: x if x.get("state") != "running" else None)(Bo.get(B + f"/api/orgs/{ORG}/export").json()), 120)
+    arc = Bo.get(B + f"/api/orgs/{ORG}/export/file").content
+    rk = Bo.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
+    import tempfile
+    import zipfile
+    tmp = tempfile.mkdtemp(prefix="p248b-")
+    open(os.path.join(tmp, "a.kalmido-export"), "wb").write(arc)
+    out = subprocess.run([sys.executable, os.path.join(N, "..", "tools", "kalmido_export_decrypt.py"), os.path.join(tmp, "a.kalmido-export"),
+                          "-o", os.path.join(tmp, "o.zip")], input=rk + "\n", capture_output=True, text=True, timeout=300)
+    check(out.returncode == 0, f"export opens ({out.stderr[:200]})")
+    if out.returncode == 0:
+        z = zipfile.ZipFile(os.path.join(tmp, "o.zip"))
+        names = set(z.namelist())
+        meta = [x for x in names if x.endswith("documents/meta.json")]
+        body = z.read(meta[0]).decode() if meta else ""
+        check(meta and "Sonnenblume" in body and "kenc1:" not in body, "export: the documents with their text in plain")
+        check(not any("doc_models" in x or "doc_words" in x or "documents/mail" in x for x in names), "export: no models, no word index, no mail token")
+else:
+    check(False, f"org export could not start ({r.status_code} {r.text[:120]})")
+
 # ---- agents: only with a share
 check(AGS.get(B + "/api/v1/documents").ok and D1 not in [x["id"] for x in AGS.get(B + "/api/v1/documents").json()["data"]], "agent: nothing unshared")
 check(AGS.get(B + f"/api/v1/documents/{D1}").status_code == 404, "agent: 404 without a share")
