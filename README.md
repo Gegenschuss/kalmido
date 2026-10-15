@@ -465,11 +465,18 @@ folder with any web server, e.g. `python3 -m http.server` in it). CI builds it a
 
 ## Quick start
 
-Requirements: Docker with Compose.
+Requirements: Docker with Compose on a 64-bit system (linux/amd64 or linux/arm64, also macOS and Windows with Docker
+Desktop). Kalmido and its PostgreSQL 17 need about 250 MB of memory when idle: plan **1 GB RAM** at least, 2 GB for a
+team; 1 CPU core is enough, 2 make big imports and backups quicker. Disk: about 1.5 GB for the two images, plus your
+data and its backups (each backup holds the database and every attachment, see *Backups and restore*). A **Raspberry
+Pi 4 or 5** (4 GB or more, 64-bit OS) runs it well **from an SSD** (USB 3 or NVMe); keep the database off an SD card,
+it is slow and wears out under the constant small writes. Details: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md#requirements).
 
 **Installer** (macOS, Linux; Windows: `irm https://kalmido.com/install.ps1 | iex`): downloads the latest release,
 uses the prebuilt image (or builds it locally if that is not possible) and starts it on `http://localhost:3040`.
-It never uses sudo and writes an `update.sh` into the install folder (`~/kalmido`).
+It never uses sudo, writes an `update.sh` into the install folder (`~/kalmido`) and shows the one-time **setup
+code** for the first account at the end. The scripts are in this repository: [install.sh](install.sh),
+[install.ps1](install.ps1).
 
 ```sh
 curl -fsSL https://kalmido.com/install.sh | sh
@@ -478,19 +485,29 @@ curl -fsSL https://kalmido.com/install.sh | sh
 **By hand:**
 
 ```sh
-git clone --branch v2.5.0 https://github.com/Gegenschuss/kalmido.git   # or the latest tag, see Releases
+git clone https://github.com/Gegenschuss/kalmido.git
 cd kalmido
+git checkout "$(git tag --sort=-v:refname | head -n 1)"   # the latest release
 cp .env.example .env        # set TZ, PUBLIC_URL and POSTGRES_PASSWORD at least
+mkdir -p data secret        # create them yourself, so the container (user 1000) may write them
 docker compose up -d --build
+docker compose logs kalmido | grep "Setup code"
 ```
 
 Instead of building, you can use the prebuilt image (linux/amd64 and linux/arm64): put
-`KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:2.5.0` into `.env`, then `docker compose pull && docker compose up -d`.
+`KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:X.Y.Z` into `.env` (X.Y.Z = the release you checked out, `git describe
+--tags` without the `v`), then `docker compose pull && docker compose up -d`. On Linux with a user other than 1000,
+give the folders to the container's user (`sudo chown 1000:1000 data secret`) or set `user:` in a
+`docker-compose.override.yml`.
 
 Kalmido now listens on `http://127.0.0.1:3040`. The database runs in the `db` service (PostgreSQL 17, files in
-`./pgdata`), attachments and backups live in `./data`. Coming from 2.36 or older: [Upgrade to 2.37](docs/SELF-HOSTING.md#upgrade-to-237-postgresql-required).
-Open it: the first start shows a **setup page** that creates the first account (the admin). Do this right
-after installing, whoever gets there first becomes admin. A second step asks **what you want to use**, with three
+`./pgdata`), attachments and backups live in `./data`, the server key in `./secret` (see below).
+`docker compose ps` shows the service as *healthy* once it answers (`/api/health`). Coming from 2.36 or older: [Upgrade to 2.37](docs/SELF-HOSTING.md#upgrade-to-237-postgresql-required).
+Open it: the first start shows a **setup page** that creates the first account (the admin). It asks for the
+**one-time setup code** that only the server's log shows (`docker compose logs kalmido`, a framed block *Kalmido first
+setup*), so nobody else who reaches a fresh server first can make themselves its admin. The code works once; a
+restart prints a new one; wrong codes are rate limited like logins. For tests and automation only:
+`KALMIDO_SETUP_CODE=<fixed code>` or `KALMIDO_SETUP_CODE=off` in `.env`. A second step asks **what you want to use**, with three
 starting points:
 
 | Preset | For | On |
@@ -524,6 +541,13 @@ if you edited them, tasks you added yourself stay, and so does their list.
 > [!IMPORTANT]
 > Use HTTPS (a reverse proxy) for anything beyond your own machine: the login sends your password and
 > the session cookie is only marked `Secure` behind HTTPS.
+
+**Server key and backups (2.45.0).** Without `KALMIDO_SECRET_KEY` in `.env` the server creates its key on the first
+start in `./secret/kalmido.key` (mode 0600) and keeps using it; a key in `.env` always wins. It encrypts stored tokens
+and the organisation data, and it is deliberately **not** in `./data`, so a backup never carries the key next to the
+data it protects: keep a copy of the file somewhere safe (a password manager). Without any key, *Administration >
+Server* shows a warning. A new server makes an **automatic backup every day** (03:30, 14 daily and 8 weekly kept, in
+`./data/backups`; *Settings > Users > Whole server > Backups*); copy that folder to another disk too.
 
 ## Try it locally
 
@@ -1723,6 +1747,8 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `NTFY_INBOX_USER` | first admin | Username whose inbox receives the share inbox |
 | `NTFY_INBOX_PUBLIC` | | Public ntfy URL, if attachment links use a different address than `NTFY_INBOX_URL` |
 | `KALMIDO_SECRET_KEY` | | 2.1.0: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts (2.2.0) repository tokens and webhook secrets; without it none can be stored. Keep a copy outside the server: losing it means everyone enters their tokens again. Never in the database or backups. 2.42.0: also wraps the per-organisation keys (encryption at rest); without it or an organisation's recovery key, encrypted office data and files are lost |
+| `KALMIDO_SECRET_FILE` | `/secret/kalmido.key` (docker-compose.yml) | 2.45.0: without `KALMIDO_SECRET_KEY` the key is read from this file; a missing file is created once (32 random bytes, base64, mode 0600). Must not lie inside the data or backup folder (refused: a backup would carry the key). Keep a copy |
+| `KALMIDO_SETUP_CODE` | | 2.45.0: empty = while no account exists the server prints a one-time setup code into its log and the setup page asks for it. **Only for tests and automation:** a fixed code, or `off` (no code: whoever opens the page first becomes the admin) |
 | `TASKS_MAX_FILE_MB` | `50` | Maximum size per attachment (task and comment files) |
 | `KALMIDO_IMPORT_MAX_MB`, `KALMIDO_IMPORT_MAX_TASKS` | `20`, `20000` | Limits of one import (*Moving from other apps*) |
 | `KALMIDO_IMPORT_RATE` | `30` | Imports and previews per user within 10 minutes |
@@ -1893,7 +1919,7 @@ Regular users never get them. Each alert comes in the admin's language.
 | Watchdog errors | rows the background job had to skip (e.g. a reminder with a broken value), summed up per hour with their ids |
 | Integration problems | the ntfy share inbox was refused (guessable topic) or cannot reach its server for more than 15 minutes, five ntfy or Web Push deliveries in a row failed |
 | Security events | five or more failed logins within an hour and every login rate-limit trip (per user / IP), bursts of invalid `/drop` or calendar feed tokens, a new admin, a changed server switch (collaboration, time tracking, update check, admin alerts, admin topic) |
-| Storage and health | less than 5 % or 1 GB free on the data volume, a failed daily `PRAGMA quick_check`, the attachment folder not writable |
+| Storage and health | less than 5 % or 1 GB free on the data volume, data page checksum failures reported by PostgreSQL (daily check), the attachment folder not writable |
 
 Alerts only carry counts, ids, usernames, device labels, IP addresses and error classes, never task titles,
 comments, list names or file names; login names that do not exist are shown as `?` (it could be a password typed
@@ -1940,7 +1966,8 @@ address (without `/drop`, it adds that itself) and the token on import.
 - **Automatic backups:** once a day at a set time (default 03:30) Kalmido writes one archive into `data/backups/`
   (`KALMIDO_BACKUP_DIR`): `kalmido-backup-<date>-<time>-auto.zip` with `kalmido.dump` (a consistent `pg_dump` made while Kalmido
   keeps running), `attachments/` and `manifest.json` (app and schema version, counts,
-  size + SHA-256 of every file). Off until an admin turns it on. *Back up now* makes one at any time.
+  size + SHA-256 of every file). 2.45.0: on by default for a new server (the first automatic one the day after the
+setup); an existing server keeps its setting. *Back up now* makes one at any time.
 - **Retention:** everything from the last 24 hours, then the newest backup of each of the last 14 days that have one
   and the newest of each of the last 8 weeks (both adjustable); the last 3 safety backups. Other files in the folder
   (e.g. the database copies of the installer's `update.sh`) are never touched.
@@ -1983,7 +2010,7 @@ and, since 2.27.0, the version of the app in that window. A window that was open
 available – Reload* and reloads by itself once nothing is being typed.
 
 **Update check:** every 6 hours the server asks the GitHub API for the latest release and compares it with its own
-version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Help*, "v2.5.0 installed — v2.5.1
+version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Help*, "vX.Y.Z installed — vX.Y.Z+1
 available" with a link to the release notes. Nothing is downloaded or installed automatically, the container gets
 no Docker access, and the browser never contacts GitHub. Switch it off under *Settings > Administration > Whole server* or
 for good with `KALMIDO_UPDATE_CHECK=0` in `.env`.
@@ -1994,14 +2021,15 @@ How to update depends on how you installed:
 |---|---|
 | the installer | `~/kalmido/update.sh` (Windows: `update.ps1`): backs up the database to `data/backups/` (from 2.37 a `pg_dump`; Windows: in-app backups), adds a database password to `.env` if missing, then fetches the latest release and restarts |
 | prebuilt image (`KALMIDO_IMAGE`) | set the new version in `KALMIDO_IMAGE` (or use `:latest`), then `docker compose pull && docker compose up -d` |
-| git + local build | `git fetch --tags && git checkout v2.5.0 && docker compose up -d --build` |
+| git + local build | `git fetch --tags && git checkout "$(git tag --sort=-v:refname \| head -n 1)" && docker compose up -d --build` |
 
 Back up first (*Back up now*, see *Backups and restore*). The database migrates itself on start; migrations only add, so the data of
 an older version stays readable.
 
-**Installing a specific version:** with the installer `curl -fsSL https://kalmido.com/install.sh | KALMIDO_VERSION=v2.5.0 sh`
-(the same variable pins updates: `KALMIDO_VERSION=v2.5.0 ~/kalmido/update.sh`); by hand `git checkout v2.5.0` or
-`KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:2.5.0`.
+**Installing a specific version** (vX.Y.Z = a tag from the releases page): with the installer
+`curl -fsSL https://kalmido.com/install.sh | KALMIDO_VERSION=vX.Y.Z sh` (the same variable pins updates:
+`KALMIDO_VERSION=vX.Y.Z ~/kalmido/update.sh`); by hand `git checkout vX.Y.Z` or
+`KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:X.Y.Z`.
 
 ## Tech
 

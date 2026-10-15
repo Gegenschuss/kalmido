@@ -9,6 +9,8 @@ addresses and paths to your setup.
 
 ## Contents
 
+- [Requirements](#requirements)
+- [First setup and the server key](#first-setup-and-the-server-key)
 - [Reverse proxy and network](#reverse-proxy-and-network)
 - [Installed app (PWA) and push](#installed-app-pwa-and-push)
 - [Database (PostgreSQL)](#database-postgresql)
@@ -22,7 +24,68 @@ addresses and paths to your setup.
 - [Moving to a new server](#moving-to-a-new-server)
 - [Production updates](#production-updates)
 
+## Requirements
+
+Measured with an empty server, plus headroom for daily use. Kalmido is one Python process (waitress, 16 threads)
+next to PostgreSQL 17.
+
+| | Minimum | Recommended |
+|---|---|---|
+| Memory | 1 GB RAM in total (both containers use about 250 MB idle) | 2 GB or more for a team, big imports and restores |
+| CPU | 1 core | 2 cores or more (backups, imports and full-text search are quicker) |
+| Disk | 1.5 GB for the images (kalmido about 420 MB, postgres:17 about 650 MB) plus the data | an SSD; room for the backups (below) |
+| System | 64-bit Linux, macOS or Windows with Docker and Compose v2 | Linux with Docker Engine |
+| Architecture | linux/amd64 or linux/arm64 (prebuilt images for both) | |
+
+- **Backups take room.** Each automatic backup holds the database and every attachment; with the default retention (14
+  daily, 8 weekly) plan roughly 20 times the size of the data, or lower the retention, encrypt and move the folder
+  (`KALMIDO_BACKUP_DIR`) to another disk.
+- **Raspberry Pi.** A Pi 4 or 5 with 4 GB or more and a 64-bit OS (Raspberry Pi OS 64-bit, Debian or Ubuntu arm64)
+  runs Kalmido well for a household or a small team. Boot or at least keep `pgdata/` and `data/` on an **SSD** (USB 3
+  or NVMe on the Pi 5): PostgreSQL writes constantly in small pieces, which is slow on an SD card and wears it out. A
+  32-bit OS (armv7) is not supported. Use a good power supply: a power cut while writing is the usual way an SD card
+  or a cheap USB adapter loses data.
+
+## First setup and the server key
+
+**One-time setup code (2.45.0).** As long as no account exists, the server prints a code into its log at every start:
+
+```text
+================================================================
+  Kalmido first setup: no account exists yet.
+  Setup code: abcd-efgh-jkmn
+  ...
+```
+
+Read it with `docker compose logs kalmido` (the installer shows it at the end) and type it on the setup page. Only its
+hash is kept in memory; it works once, wrong codes count against a limit per address (like logins), a restart prints a
+new one. Blanks, dashes and capitals do not matter. Servers that already have an account are not affected, nor is the
+login. For tests and automation only: `KALMIDO_SETUP_CODE=<fixed code>` makes that the code (it is not printed),
+`KALMIDO_SETUP_CODE=off` switches the check off (whoever reaches the page first becomes the admin again).
+
+**The server key (`KALMIDO_SECRET_KEY`).** It seals stored tokens, the sign-on client secret, and wraps the keys of
+the organisations (encryption at rest, below). Two ways to provide it:
+
+1. In `.env`: `KALMIDO_SECRET_KEY=` followed by `openssl rand -base64 32`. Always wins.
+2. As a file (2.45.0, the default of `docker-compose.yml`): `KALMIDO_SECRET_FILE=/secret/kalmido.key`, mounted from
+   `./secret`. If the file is missing, the server creates it on the first start (32 random bytes, base64, mode 0600,
+   never overwritten) and uses it from then on. Create the folder yourself (`mkdir secret`; the installer does), so the
+   container's user may write it.
+
+The key must not live in the data folder: the in-app backups contain the data folder, and a backup that carries its
+own key protects nothing. A key file inside the data or backup folder is therefore refused (warning in the log and in
+the app). Keep a copy of the key apart from the backups (a password manager): backup + key restore everything, the
+backup alone does not reveal the encrypted data. Without any key *Administration > Server* shows a red warning, no
+token can be stored and organisation data stays unencrypted.
+
+A new key never makes data unreadable that was readable before: without a key nothing can be sealed. If you lose a key
+and the server creates a new one in the file, what was sealed with the old one stays lost (tokens are entered again,
+organisations need their recovery keys, see below); if the old key turns up, put it into `.env`, where it wins over the
+file.
+
 ## Reverse proxy and network
+
+Templates for Caddy, nginx and Traefik: [examples/](../examples/).
 
 **Let CardDAV past the login, too.** Besides `/dav` and `/.well-known/caldav`, contact apps look for
 `/.well-known/carddav`. Behind a login proxy add it to the paths that bypass the login, for example in Caddy:
@@ -293,8 +356,8 @@ docker compose up -d kalmido
   still be restored: the database file goes through the same move to PostgreSQL as an upgrade.
 
 - **Fail closed when the data disk is missing.** Keep the data folder on its own disk or volume and mount it so that
-  Docker refuses to start without it, instead of creating an empty folder (an empty start shows the setup page, and
-  whoever comes first becomes admin):
+  Docker refuses to start without it, instead of creating an empty folder (an empty start shows the setup page again;
+  since 2.45 it asks for the code from the log, but the data would still look gone):
 
   ```yaml
   volumes:
@@ -498,7 +561,7 @@ Trigger every alert once on purpose after setting it up, the dead man's switch t
 
 1. **Before:** lower the DNS TTL of the name a day ahead; make a backup (*Back up now*).
 2. **Copy:** the data folder (attachments, backups) and the database (`pg_dump`, see above, or the database folder
-   with PostgreSQL stopped), the `.env` and above all **`KALMIDO_SECRET_KEY`**:
+   with PostgreSQL stopped), the `.env` and above all **`KALMIDO_SECRET_KEY`** (or the file `secret/kalmido.key`):
    without it, stored secrets (repository tokens, sign-on client secret) cannot be decrypted and must be
    entered again.
 3. **Start** the new server and check the attachments (number and size, see above) and the counts (users, lists,
