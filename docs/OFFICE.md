@@ -101,12 +101,12 @@ Minimal file:
 {"kalmido_office": 1,
  "services": [{"name_de": "Kamera", "name_en": "Camera", "category": "Video", "unit": "day", "daily_rate": 980, "tax": "standard",
                "raw_fee": 1, "producing": 1}],
- "equipment": [{"name": "Kamera-Set A", "category": "Kamera", "daily_rate": 250}],
+ "equipment": [{"name": "Kamera-Set A", "name_en": "Camera kit A", "category": "Kamera", "daily_rate": 250}],
  "texts": [{"kind": "rights_time", "key": "unlimited", "text_de": "unbegrenzt", "text_en": "in perpetuity"}]}
 ```
 
 Tables and keys: `services` (name_de, name_en, category, sort, unit, daily_rate, hourly_rate, raw_fee, producing, intext,
-role, tax, archived), `equipment` (name, category, daily_rate, archived), `sets` (name, discount_pct, items
+role, tax, archived), `equipment` (name, name_en, category, daily_rate, archived), `sets` (name, discount_pct, items
 [{equipment_id, qty}], archived), `texts` (kind, key, text_de, text_en, sort, archived), `contracts` (name, date,
 raw_included, rights_time_id, rights_territory_id, rights_media_id, rights_note_de, rights_note_en, closing_de,
 closing_en, rates {service_id: rate}, note, archived), `settings` (the keys of the settings tab).
@@ -120,7 +120,11 @@ is guessed in the background and no language model is involved.
 - **Spreadsheet (.xlsx)**: read with the Python standard library only (no macros, no formulas evaluated, files with XML
   entities refused, at most 10 MB). Sheets or tables (Excel "Format as table") are found by name: `Contacts` (column
   `addresses`, one address text per cell), `Services` (`serviceDE`, `serviceEN`, `dailyrate`, `hourlyrate`, `rawfee`,
-  `producingfee`, `order`, `category`, `freelancer`, `intext`), `Equipment` (`device`, `category`, `dailyrate`). Separator
+  `producingfee`, `order`, `category`, `freelancer`, `intext`), `Equipment` (`device`, `category`, `dailyrate`; since 2.45.1
+  also `Device DE` / `Device EN`, `Gerät DE` / `Gerät EN`, `Name EN` - spaces, underscores and case do not matter). A device
+  whose German or English name exists already is a duplicate. DE and EN in separate rows become one device only when the
+  sheet has an id column (`id`, `nr`, `article no`, `sku`, ...) and a language column (`language` / `sprache`, value `en`);
+  otherwise every row stays a device of its own. Separator
   rows like `---- VIDEO ----` are the category of the rows below, not services. `Staff` and `Freelancer` are only counted:
   Kalmido has no master data for them yet.
 - **Addresses** are split by rules into company, contact person, street, postcode, city and country: German postcodes
@@ -438,6 +442,7 @@ keys `costs` / `margin` of `office_docs.totals`; office log entries with such va
 `office_doc_items.cost` (then 0) to the new nullable column `cost_enc`. Stored invoice PDFs / XML and archived PDFs are
 sealed on disk and served as the originals (same SHA-256 as recorded). The API answers in plain as before. Before going
 back to an older release run `python -m kalmido.admin.orgcrypt_cli decrypt-all`.
+Since 2.45.1 also the column `name_en` of `office_equipment` (text, default empty); 2.45.0 runs on with it.
 
 ## E-invoices (ZUGFeRD / XRechnung) and PDF/A-3
 
