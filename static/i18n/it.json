@@ -6755,5 +6755,6 @@
   "The server key is kept in the key file. Keep a copy of it apart from the backups: without it the encrypted data of a backup cannot be read.": "La chiave del server si trova nel file di chiave. Conservane una copia separata dai backup: senza di essa i dati cifrati di un backup non sono leggibili.",
   "Replace the roles set per list?": "Sostituire i ruoli impostati per lista?",
   "In {0} list {1} has a role of its own ({2}).": ["In {0} lista {1} ha un ruolo proprio ({2}).", "In {0} liste {1} ha un ruolo proprio ({2})."],
-  "Set everywhere": "Applica ovunque"
+  "Set everywhere": "Applica ovunque",
+  "No picture (group symbol)": "Nessuna immagine (simbolo del gruppo)"
 }

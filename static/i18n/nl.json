@@ -6755,5 +6755,6 @@
   "The server key is kept in the key file. Keep a copy of it apart from the backups: without it the encrypted data of a backup cannot be read.": "De serversleutel staat in het sleutelbestand. Bewaar een kopie los van de back-ups: zonder deze zijn de versleutelde gegevens van een back-up niet leesbaar.",
   "Replace the roles set per list?": "Per lijst ingestelde rollen vervangen?",
   "In {0} list {1} has a role of its own ({2}).": ["In {0} lijst heeft {1} een eigen rol ({2}).", "In {0} lijsten heeft {1} een eigen rol ({2})."],
-  "Set everywhere": "Overal instellen"
+  "Set everywhere": "Overal instellen",
+  "No picture (group symbol)": "Geen afbeelding (groepssymbool)"
 }

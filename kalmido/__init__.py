@@ -28,6 +28,7 @@ ORDER = (
     "core.state",
     "lists.lists",
     "lists.groups",
+    "lists.grouppics",  # 2.46.0 (#1605)
     "lists.ownership",
     "lists.sections",
     "lists.folders",

@@ -269,6 +269,8 @@ ROUTES = {
     # ---- group (6)
     "GET /api/v1/groups": "group", "GET /api/v1/groups/{}": "group", "GET /api/groups": "group",
     "POST /api/admin/groups": "group", "PATCH /api/admin/groups/{}": "group", "DELETE /api/admin/groups/{}": "group",
+    "PUT /api/admin/groups/{}/avatar": "group", "POST /api/admin/groups/{}/avatar": "group",  # 2.46.0 (#1605): group pictures
+    "DELETE /api/admin/groups/{}/avatar": "group", "GET /api/group-avatar/{}/{}.jpg": "group",  # (p2460_c_api_test.py: outside 404)
     # ---- ical (3)
     "GET /ical/{}.ics": "ical", "GET /api/ical": "ical", "POST /api/ical": "ical",
     # ---- list (100)

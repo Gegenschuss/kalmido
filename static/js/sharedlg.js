@@ -44,7 +44,7 @@ function folderShareModal(f, opt = {}) {
     let gs; try { gs = (await calReq('GET', '/api/folders/groups?folder=' + encodeURIComponent(f))).groups; } catch { box.innerHTML = ''; return; }
     if (!md.isConnected) return;
     const cand = (S.groups || []).filter(g => !gs.some(x => x.group_id === g.id));
-    box.innerHTML = gs.map(x => `<div class="mrow"><span class="avatar gav">${ic('users', 's')}</span><span class="n">${esc(x.name)}</span>${roleSel(`data-fgrole="${x.group_id}"`, x.role, tr('Role of the group {0}', x.name))}<button class="iconbtn" data-fgrm="${x.group_id}" title="${esc(tr('Stop sharing with the group'))}" aria-label="${esc(tr('Stop sharing with the group {0}', x.name))}">${ic('x', 's')}</button></div>`).join('')
+    box.innerHTML = gs.map(x => `<div class="mrow">${fg_gav(x.group_id)}<span class="n">${esc(x.name)}</span>${roleSel(`data-fgrole="${x.group_id}"`, x.role, tr('Role of the group {0}', x.name))}<button class="iconbtn" data-fgrm="${x.group_id}" title="${esc(tr('Stop sharing with the group'))}" aria-label="${esc(tr('Stop sharing with the group {0}', x.name))}">${ic('x', 's')}</button></div>`).join('')
       + (cand.length ? `<div class="mrow madd"><select id="fg-add" aria-label="${esc(tr('Share with a group'))}"><option value="">${tr('Share with a group …')}</option>${cand.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select>${roleSel('id="fg-role"', 'edit')}<button class="btn sm" data-m="fg-add">${ic('plus', 's')} ${tr('Add')}</button></div>` : '')
       || `<div class="muted mhint">${tr('No groups yet')}</div>`;
     st('grp', gs.length ? trn('{0} group', '{0} groups', gs.length) : '');
@@ -187,6 +187,51 @@ async function fg_askRoles(url, who) {
     onRemove(md, () => fin(null));
     setTimeout(() => $('[data-fgrq="all"]', md)?.focus(), 30);
   });
+}
+// ---- 2.46.0 (#1605): a group's picture (S.groups[].avatar: a preset SVG, an own photo, '' = the group symbol). fg_gav = the
+// round picture of a group wherever groups stand (share dialogs, group admin, a task assigned to a group).
+const fg_gUrl = gid => (S.groups || []).find(x => x.id === +gid)?.avatar || '';
+const fg_gav = (gid, cls = 'avatar gav') => { const u = fg_gUrl(gid); return `<span class="${cls}${u ? ' pic' : ''}">${u ? `<img src="${esc(u)}" alt="" loading="lazy" decoding="async" draggable="false">` : ic('users', 's')}</span>`; };
+const fg_gico = gid => { const u = fg_gUrl(gid); return u ? `<img class="fggimg" src="${esc(u)}" alt="" loading="lazy" decoding="async" draggable="false">` : ic('users', 's'); };
+// the picker of the group dialog: presets, an own photo, none; the choice is saved with the group (Save / Create)
+function fg_pickHtml(cur) {
+  const up = cur.startsWith('/api/group-avatar/');
+  return AV_PRESETS.map(([k, n]) => `<button type="button" class="avopt ${cur === `/static/avatars/${k}.svg` ? 'on' : ''}" data-fgav="${k}" title="${esc(tr(n))}" aria-label="${esc(tr(n))}" aria-pressed="${cur === `/static/avatars/${k}.svg`}"><img src="/static/avatars/${k}.svg" alt=""></button>`).join('')
+    + `<button type="button" class="avopt up ${up ? 'on' : ''}" data-fgav="upload" title="${esc(tr('Upload a photo…'))}" aria-label="${esc(tr('Upload a photo…'))}" aria-pressed="${up}">${up ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>`
+    + `<button type="button" class="avopt none ${cur ? '' : 'on'}" data-fgav="none" title="${esc(tr('No picture (group symbol)'))}" aria-label="${esc(tr('No picture (group symbol)'))}" aria-pressed="${!cur}">${ic('users', 's')}</button>`;
+}
+const fg_pickRow = g => `<div class="row avrow"><label>${tr('Picture')}</label><div class="avpick" id="gr-avpick">${fg_pickHtml(g?.avatar || '')}</div></div>`;
+function fg_pickWire(md, g) {  // -> () => the pending choice: null (unchanged) | {preset} | {none: true} | {blob, url}
+  let pend = null;
+  const box = $('#gr-avpick', md); if (!box) return () => null;
+  const show = cur => { box.innerHTML = fg_pickHtml(cur); };
+  box.addEventListener('click', e => {
+    const b = e.target.closest('[data-fgav]'); if (!b) return;
+    const k = b.dataset.fgav;
+    if (k === 'none') { pend = {none: true}; show(''); return; }
+    if (k !== 'upload') { pend = {preset: k}; show(`/static/avatars/${k}.svg`); return; }
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
+    inp.addEventListener('change', async () => {
+      const f = inp.files?.[0]; if (!f) return;
+      if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); return; }
+      const bl = await avCropModal(f); if (!bl || !md.isConnected) return;
+      if (pend?.url) URL.revokeObjectURL(pend.url);
+      pend = {blob: bl, url: URL.createObjectURL(bl)};
+      box.innerHTML = fg_pickHtml('/api/group-avatar/new');
+      const im = $('[data-fgav="upload"] img', box); if (im) im.src = pend.url;
+    });
+    inp.click();
+  });
+  onRemove(md, () => { if (pend?.url) URL.revokeObjectURL(pend.url); });
+  return () => pend;
+}
+async function fg_pickSave(gid, pend) {  // after Save / Create; a failed picture keeps the group (api() says why)
+  if (!pend || !gid) return;
+  try {
+    if (pend.none) await api('DELETE', `/api/admin/groups/${gid}/avatar`);
+    else if (pend.preset) await api('PUT', `/api/admin/groups/${gid}/avatar`, {preset: pend.preset});
+    else if (pend.blob) { const fd = new FormData(); fd.append('file', pend.blob, 'avatar.jpg'); await api('POST', `/api/admin/groups/${gid}/avatar`, fd); }
+  } catch { /* api() said it */ }
 }
 // the old entry points stay (notification question, older links): they open the one dialog
 function folderPeopleModal(f, opt = {}) { return folderShareModal(f, opt); }

@@ -4,10 +4,19 @@
    name the lists of the folder where the new role would replace a role of its own (nothing for a first share or the same
    role); PUT with apply: false keeps them ("Only new lists"), without it they are replaced ("Set everywhere"); a person or
    group one may not see gets 404, another person's folder shows nothing
+ - #1605 a group picture: a preset, an own photo (re-encoded JPEG without metadata, new token = new URL), removing it; only who
+   may manage the group changes it; GET /api/group-avatar/<gid>/<tok>.jpg for the members / admins (an old or wrong token 404,
+   not signed in 401, in the mode workspaces somebody outside 404); the backup holds the file (also profile pictures and list
+   icons: attachments/avatars|listicons) and a restore brings it back; deleting the group drops it
 usage: p2460_c_api_test.py <datadir>"""
+import io
 import os
+import struct
 import subprocess
 import sys
+import time
+import zipfile
+import zlib
 
 import requests
 
@@ -45,6 +54,21 @@ def dbx(sql, args=(), write=False):
         return r
     finally:
         c.close()
+
+
+def png(w=40, h=30):
+    """A small RGB PNG (with a text chunk as metadata that must not survive)."""
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
+    raw = b"".join(b"\x00" + b"".join(bytes((x * 5 % 256, y * 7 % 256, 90)) for x in range(w)) for y in range(h))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+            + chunk(b"tEXt", b"Comment\x00secret-gps-48.1") + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+
+
+def restart(extra):
+    e = dict(os.environ, KEEP="1", EXTRA=os.environ.get("EXTRA", "") + " " + extra)
+    p = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=e, capture_output=True, text=True)
+    assert p.returncode == 0, p.stderr
 
 
 def own_role(lid, uid):
@@ -138,6 +162,97 @@ check(r.ok, "group: set everywhere")
 check(dbx("SELECT role FROM group_shares WHERE list_id=? AND group_id=?", (L1, G))[0][0] == "participant", "Alpha: the group's own role replaced")
 check(own_role(L1, CAROL)[1] == "participant", f"Carol: participant in Alpha {own_role(L1, CAROL)}")
 check(dbx("SELECT COUNT(*) FROM group_shares WHERE group_id=?", (G2,))[0][0] == 0, "another group untouched")
+
+# ---- #1605 group pictures
+GA = B + f"/api/admin/groups/{G}/avatar"
+g_of = lambda s, gid: next((x for x in s.get(B + "/api/groups").json()["groups"] if x["id"] == gid), {})
+check(g_of(A, G).get("avatar") == "", f"no picture yet: {g_of(A, G).get('avatar')!r}")
+r = A.put(GA, json={"preset": "coffee"})
+check(r.ok and r.json()["avatar"] == "/static/avatars/coffee.svg", f"preset: {r.text[:200]}")
+check(g_of(Ca, G).get("avatar") == "/static/avatars/coffee.svg", "a member sees the preset in GET /api/groups")
+check(A.put(GA, json={"preset": "nope"}).status_code == 400, "unknown preset 400")
+check(Ca.put(GA, json={"preset": "plant"}).status_code == 403, "a member who may not manage groups: 403")
+check(Ca.post(GA, files={"file": ("a.png", png(), "image/png")}).status_code == 403, "... no upload either")
+check(Ca.delete(GA).status_code == 403, "... nor remove it")
+check(A.put(B + "/api/admin/groups/99999/avatar", json={"preset": "plant"}).status_code == 404, "unknown group 404")
+check(A.post(GA, files={"file": ("a.txt", b"no picture", "text/plain")}).status_code == 400, "not a picture: 400")
+r = A.post(GA, files={"file": ("a.png", png(), "image/png")})
+check(r.ok and r.json()["avatar"].startswith(f"/api/group-avatar/{G}/") and r.json()["avatar"].endswith(".jpg"), f"upload: {r.text[:200]}")
+URL1 = r.json()["avatar"] if r.ok else ""
+tok1 = URL1.rsplit("/", 1)[-1][:-4]
+r = Ca.get(B + URL1)
+check(r.ok and r.headers.get("Content-Type", "").startswith("image/jpeg") and r.content[:2] == b"\xff\xd8", f"a member gets the photo: {r.status_code}")
+check(b"secret-gps" not in r.content and b"Comment" not in r.content, "no metadata of the upload survives")
+check("immutable" in r.headers.get("Cache-Control", ""), f"cached for good: {r.headers.get('Cache-Control')}")
+check(A.get(B + URL1).ok, "the admin gets it")
+check(requests.get(B + URL1, headers=H).status_code == 401, "not signed in: 401")
+check(A.get(B + f"/api/group-avatar/{G}/AAAAAAAAAAAA.jpg").status_code == 404, "a wrong token: 404")
+check(A.get(B + f"/api/group-avatar/{G2}/{tok1}.jpg").status_code == 404, "the token of another group: 404")
+check(g_of(Bo, G).get("avatar") == URL1, "the share dialog of another person shows it (GET /api/groups)")
+r = A.get(B + "/api/state").json()
+check(next((x for x in r["groups"] if x["id"] == G), {}).get("avatar") == URL1, "in /api/state groups")
+
+# the backup holds the file
+n0 = len(A.get(B + "/api/admin/backups").json()["items"])
+r = A.post(B + "/api/admin/backups")
+check(r.status_code == 202, f"back up now: {r.status_code} {r.text[:120]}")
+t0, j = time.time(), {}
+while time.time() - t0 < 60:
+    j = A.get(B + "/api/admin/backups").json()
+    if not j["running"] and (len(j["items"]) > n0 or j["last_error"]):
+        break
+    time.sleep(0.4)
+check(len(j.get("items", [])) > n0 and not j.get("last_error"), f"backup done: {j.get('last_error')}")
+if j.get("items"):
+    z = A.get(B + f"/api/admin/backups/{j['items'][0]['name']}/download")
+    try:
+        names = zipfile.ZipFile(io.BytesIO(z.content)).namelist()
+    except zipfile.BadZipFile:
+        names = []
+    check(any(n.endswith(f"avatars/g{G}-{tok1}.jpg") for n in names), f"the backup holds the group picture: {[n for n in names if 'avatars' in n]}")
+
+# a new picture = a new URL, the old one is gone; removing it
+r = A.put(GA, json={"preset": "plant"})
+check(r.ok and A.get(B + URL1).status_code == 404, "after a change the old photo URL is 404")
+check(not dbx("SELECT 1 FROM groups WHERE id=? AND avatar LIKE 'u:%'", (G,)), "the photo is no longer the group's")
+r = A.post(GA, files={"file": ("a.png", png(64, 64), "image/png")})
+URL2 = r.json().get("avatar", "") if r.ok else ""
+check(URL2 and URL2 != URL1, "a second photo has a new URL")
+r = A.delete(GA)
+check(r.ok and r.json()["avatar"] == "" and g_of(A, G).get("avatar") == "", "removed: the group symbol again")
+check(A.get(B + URL2).status_code == 404, "the removed photo is 404")
+r = A.post(B + f"/api/admin/groups/{G2}/avatar", files={"file": ("a.png", png(), "image/png")})
+URL3 = r.json().get("avatar", "") if r.ok else ""
+tok3 = URL3.rsplit("/", 1)[-1][:-4]
+check(A.delete(B + f"/api/admin/groups/{G2}").ok, "delete the group Other")
+check(A.get(B + URL3).status_code == 404, "a deleted group's photo is gone")
+p3 = os.path.join(DATA, "attachments", "avatars", f"g{G2}-{tok3}.jpg")
+check(not os.path.exists(p3), "... and its file")
+
+# a restore of that backup brings the photo back (the file too, not only the database row)
+BKN = j["items"][0]["name"] if j.get("items") else ""
+r = A.post(B + "/api/admin/backups/restore", json={"name": BKN, "confirm": "RESTORE"})
+check(r.ok and r.json().get("ok"), f"restored: {r.text[:200]}")
+time.sleep(1.0)
+A, Ca = sess("alice"), sess("carol")
+check(g_of(A, G).get("avatar") == URL1, f"after the restore the group has the first photo again: {g_of(A, G).get('avatar')}")
+r = Ca.get(B + URL1)
+check(r.ok and r.content[:2] == b"\xff\xd8", f"... and it is served (the file came back): {r.status_code}")
+
+# mode workspaces: somebody outside the group's organisation does not get the picture
+if not os.environ.get("P2460C_RUNNING"):
+    r = A.post(GA, files={"file": ("a.png", png(), "image/png")})
+    URL4 = r.json().get("avatar", "") if r.ok else ""
+    restart("-e KALMIDO_INSTANCE_MODE=workspaces")
+    A, Bo, Ca = sess("alice"), sess("bob"), sess("carol")
+    EVE = A.post(B + "/api/users", json={"username": "eve", "display_name": "Eve", "password": "password123"}).json()["id"]
+    dbx("DELETE FROM org_members WHERE user_id=?", (EVE,), write=True)
+    Ev = sess("eve")
+    check(Ca.get(B + URL4).ok, "workspaces: a member gets the picture")
+    check(A.get(B + URL4).ok, "workspaces: the group's creator gets it")
+    r = Ev.get(B + URL4)
+    check(r.status_code in (403, 404), f"workspaces: a person outside the organisation does not: {r.status_code}")
+    check(Ev.put(GA, json={"preset": "plant"}).status_code in (403, 404), "workspaces: nor change it")
 
 print(f"p2460_c_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

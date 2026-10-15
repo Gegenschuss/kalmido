@@ -1256,6 +1256,8 @@ MIGRATIONS = [
     # project page (json list of tiles), both the same for everyone
     ("lists", "tb_sums", "ALTER TABLE lists ADD COLUMN tb_sums TEXT"),
     ("lists", "fx_kpis", "ALTER TABLE lists ADD COLUMN fx_kpis TEXT"),
+    # 2.46.0 (#1605): a group's picture ('' = the group symbol, p:<preset>, u:<token> = own photo; lists/grouppics.py)
+    ("groups", "avatar", "ALTER TABLE groups ADD COLUMN avatar TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

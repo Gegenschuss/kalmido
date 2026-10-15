@@ -151,7 +151,9 @@ def grp_dict(c, r, full=True):
     from ..collab.comments import user_names
     mem = grp_members(c, r["id"])
     names = user_names(c, mem)
+    from ..lists.grouppics import fg_avatar_url
     d = {"id": r["id"], "name": r["name"], "oidc_group": r["oidc_group"] or "", "synced": bool(r["oidc_group"]),
+         "avatar": fg_avatar_url(r),  # 2.46.0 (#1605)
          "members": [{"user_id": u, "name": names.get(u, "?")} for u in mem], "created_at": r["created_at"]}
     if full:
         d["shares"] = [{"list_id": s["list_id"], "folder": s["folder"], "owner_id": s["owner_id"], "role": s["role"]}
@@ -312,10 +314,13 @@ def group_delete(gid):
     c.execute("UPDATE tasks SET assignee_group_id=NULL WHERE assignee_group_id=?", (gid,))
     c.execute("DELETE FROM group_shares WHERE group_id=?", (gid,))
     c.execute("DELETE FROM group_members WHERE group_id=?", (gid,))
+    old = c.execute("SELECT avatar FROM groups WHERE id=?", (gid,)).fetchone()
     c.execute("DELETE FROM groups WHERE id=?", (gid,))
     grp_sync(c, lids)
     bump(c)
     c.commit()
+    from ..lists.grouppics import fg_drop_file
+    fg_drop_file(gid, old[0] if old else "")  # 2.46.0 (#1605)
     return jsonify(ok=True)
 
 
