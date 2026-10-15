@@ -104,8 +104,12 @@ const LY = {};
 S.ly = {view: null, phone: false, std: false};
 const lyBlocks = v => LY[v].blocks().filter(Boolean);
 function lyRaw(v, std) {
-  const d = LY[v]; let s = d.src ? d.src(std) : LY_PEND[d.key] ?? S.settings?.[d.key];  // a value still on its way wins over a reload
-  try { const o = JSON.parse(s || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; }
+  const d = LY[v]; let s = d.src ? d.src(std) : std ? S.lyStd?.[d.key] : LY_PEND[d.key] ?? S.settings?.[d.key];  // a value still on its way wins over a reload
+  const j = x => { try { const o = JSON.parse(x || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
+  const o = j(s);
+  // 2.43.0 (#1452): without an own arrangement the standard for everyone (instance admins) shows, the own switches stay
+  if (!d.src && !std && !wgHasLayout(o) && S.lyStd?.[d.key]) return wgMerge(j(S.lyStd[d.key]), o);
+  return o;
 }
 function lyPref(v, o = {}) {
   const raw = o.raw || lyRaw(v, o.std), bs = lyBlocks(v), keys = bs.map(b => b[0]);
@@ -118,14 +122,22 @@ function lyPref(v, o = {}) {
   keys.forEach((k, i) => { if (order.includes(k)) return; const nx = keys.slice(i + 1).find(x => order.includes(x)); order.splice(nx ? order.indexOf(nx) : order.length, 0, k); });
   const hidden = new Set((p.hidden || []).filter(k => keys.includes(k) && !fixed.has(k)));
   const size = k => (p.full || []).includes(k) ? 'full' : (p.half || []).includes(k) ? 'half' : (bs.find(b => b[0] === k)?.[3] || 'half');
-  return {raw, part: p, order, hidden, size, fixed, mobile: !!raw.mobile, opts: raw.opts || {}};
+  // 2.43.0 (#1452): the width in columns of six (2 = a third, 3 = half, 4 = two thirds, 6 = full) and the height (1 compact,
+  // 2 normal, 3 tall), kept in opts (lw / lh) so 2.42 reads and keeps them; half / full stay set for 2.42 (lyChange)
+  const lo = k => raw.opts?.[k] || {};
+  const w = k => WG_W.includes(lo(k).lw) ? lo(k).lw : size(k) === 'full' ? 6 : (bs.find(b => b[0] === k)?.[5] || 3);
+  const h = k => [1, 3].includes(lo(k).lh) ? lo(k).lh : 2;
+  return {raw, part: p, order, hidden, size, w, h, fixed, mobile: !!raw.mobile, opts: raw.opts || {}};
 }
 // change the arrangement being edited (the phone one when "Different on the phone" is on and it is chosen)
 function lyChange(v, fn) {
   const std = S.ly.view === v && S.ly.std, pr = lyPref(v, {std}), raw = JSON.parse(JSON.stringify(pr.raw));
   const tgt = (S.ly.view === v ? S.ly.phone : isMobile()) && raw.mobile ? raw.mobile : raw;
   const bs = lyBlocks(v), st = {order: pr.order.slice(), hidden: new Set(pr.hidden), sizes: Object.fromEntries(bs.map(b => [b[0], pr.size(b[0])]))};
+  st.ws = Object.fromEntries(bs.map(b => [b[0], pr.w(b[0])])); st.hs = Object.fromEntries(bs.map(b => [b[0], pr.h(b[0])]));
+  const sz0 = {...st.sizes}, ws0 = {...st.ws};
   fn(st, raw);
+  wgStoreSizes(bs, st, sz0, ws0, raw);  // 2.43.0 (#1452)
   tgt.order = st.order; tgt.hidden = [...st.hidden];
   tgt.half = bs.filter(b => b[3] !== 'half' && st.sizes[b[0]] === 'half').map(b => b[0]);
   tgt.full = bs.filter(b => b[3] !== 'full' && st.sizes[b[0]] === 'full').map(b => b[0]);
@@ -154,21 +166,24 @@ function lyOptSet(v, b, n, x) {
   S.settings[LY[v].key] = JSON.stringify(raw); lyPatch(LY[v].key, JSON.stringify(raw));
 }
 const lyAct = v => v === 'home' ? 'dash' : 'ly';
-const lyCustomBtn = v => `<button type="button" class="btn sm" data-act="${lyAct(v)}-custom" data-lyv="${v}">${ic('sliders', 's')}${tr('Customize')}</button>`;
+// 2.43.0 (#1452): the blocks are changed at their "…" menu; the arranging list stays for keyboards and screen readers
+const lyCustomBtn = v => `<button type="button" class="iconbtn lycust" data-act="${lyAct(v)}-custom" data-lyv="${v}" title="${esc(tr('Arrange blocks…'))}" aria-label="${esc(tr('Arrange blocks…'))}">${ic('sliders', 's')}</button>`;
 // the blocks of view v in the chosen order and widths; parts = {key: html | fn(closeButton) | ''} ('' = nothing to show now)
 function lyHtml(v, parts, o = {}) {
   const d = LY[v], {order, hidden, size} = lyPref(v);
   if (S.ly.view === v) return lyEditor(v, {...o, parts});  // 2.35.0 (#1097): the editor shows the blocks themselves
-  const xb = (k, n) => d.quick && o.canHide !== false ? `<button type="button" class="iconbtn lyx" data-act="ly-hide" data-lyv="${v}" data-k="${k}" title="${esc(tr('Hide {0}', tr(n)))}" aria-label="${esc(tr('Hide {0}', tr(n)))}">${ic('x', 's')}</button>` : '';
-  const bs = lyBlocks(v), out = [];
+  // 2.43.0 (#1452): every block has its "…" menu (width, height, order, hide, settings) and on a computer a grip to resize
+  // it; the hide button at the block is gone (the menu has it)
+  const pr = lyPref(v), bs = lyBlocks(v), out = [], m = o.canHide !== false;
   for (const k of order) {
     if (hidden.has(k)) continue;
-    const b = bs.find(x => x[0] === k), p = parts[k], h = typeof p === 'function' ? p(b[4] ? '' : xb(k, b[1])) : p;
-    if (h) out.push(`<div class="lyb ly-${size(k)}" data-lyk="${k}">${h}</div>`);
+    const b = bs.find(x => x[0] === k), p = parts[k], h = typeof p === 'function' ? p('') : p;
+    if (h) out.push(`<div class="lyb ly-${size(k)} lw${pr.w(k)} lh${pr.h(k)}${m ? ' lym' : ''}${wgColorCls(v, k)}" data-lyk="${k}">${h}${m ? wgBlockTools(v, k, b) : ''}</div>`);
   }
   const hid = bs.filter(b => hidden.has(b[0]) && parts[b[0]] !== undefined);
-  const add = d.quick && o.canHide !== false && hid.length ? `<div class="lyadd"><button type="button" class="btn sm" data-act="ly-add" data-lyv="${v}" aria-haspopup="menu">${ic('plus', 's')}<span>${tr('Block')}</span></button></div>` : '';
-  return `<div class="${d.grid || 'lygrid'}" data-ly="${v}">${out.join('') || (o.empty ?? d.empty ?? `<p class="muted">${tr('Every block is hidden. Customize brings them back.')}</p>`)}</div>${add}`;
+  const more = m ? (d.addItems?.() || []) : [];
+  const add = m && (hid.length || more.length) ? `<div class="lyadd"><button type="button" class="btn sm" data-act="ly-add" data-lyv="${v}" aria-haspopup="menu">${ic('plus', 's')}<span>${tr('Block')}</span></button></div>` : '';
+  return `<div class="${d.grid || 'lygrid'} lysix" data-ly="${v}">${out.join('') || (o.empty ?? d.empty ?? `<p class="muted">${tr('Every block is hidden. “+ Block” brings them back.')}</p>`)}</div>${add}${m ? wgStdBar(v, o) : ''}`;
 }
 function lyEditor(v, o = {}) {
   const d = LY[v], pr = lyPref(v, {std: S.ly.std}), {order, hidden, size, fixed} = pr, bs = lyBlocks(v), A = lyAct(v), n = order.length;
@@ -209,7 +224,7 @@ document.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   if (act === 'custom') lyOpen(v, true);
   else if (act === 'done') lyOpen(v, false);
-  else if (act === 'reset') { const raw = lyRaw(v, S.ly.std); lyStore(v, LY[v].src ? '' : (raw.opts ? {opts: raw.opts} : ''), S.ly.std); S.ly.phone = false; announce(tr('Reset')); }
+  else if (act === 'reset') { const raw = lyRaw(v, S.ly.std), so = wgSwitches(raw.opts); lyStore(v, LY[v].src ? '' : (so ? {opts: so} : ''), S.ly.std); S.ly.phone = false; announce(tr('Reset')); }
   else if (act === 'mv') {
     lyMove(v, a.dataset.k, +a.dataset.d);
     setTimeout(() => $(`#view .dcust [data-act$="-mv"][data-k="${a.dataset.k}"][data-d="${a.dataset.d}"]:not([disabled])`)?.focus() || $(`#view .dcust [data-act$="-mv"][data-k="${a.dataset.k}"]:not([disabled])`)?.focus(), 30);
@@ -220,7 +235,8 @@ document.addEventListener('click', e => {
   else if (act === 'hide') { const k = a.dataset.k, bl = lyBlocks(v).find(b => b[0] === k); S.ly.std = false; lyChange(v, st => st.hidden.add(k)); toast(tr('{0} hidden. “+ Block” brings it back.', tr(bl?.[1] || k))); setTimeout(() => $(`#view [data-act="ly-add"][data-lyv="${v}"]`)?.focus(), 30); }
   else if (act === 'add') {
     const {hidden} = lyPref(v);
-    menu(a, lyBlocks(v).filter(b => hidden.has(b[0])).map(b => ({label: tr(b[1]), icon: b[2], fn: () => { S.ly.std = false; lyChange(v, st => { st.hidden.delete(b[0]); }); }})));
+    const more = LY[v].addItems?.() || [];  // 2.43.0 (#1346): new blocks (a notepad on the project page)
+    menu(a, [...lyBlocks(v).filter(b => hidden.has(b[0])).map(b => ({label: tr(b[1]), icon: b[2], fn: () => { S.ly.std = false; lydragDo(v, st => { st.hidden.delete(b[0]); }, tr('{0} shown', tr(b[1]))); }})), ...(more.length ? ['-', ...more] : [])]);
   }
 });
 document.addEventListener('change', e => {
@@ -269,7 +285,8 @@ LY.agents = {key: 'view_agents', empty: '', title: () => tr('Customize the agent
 LY.projects = {key: 'view_projects', empty: '', title: () => tr('Customize the projects overview'), blocks: () => [['tiles', N_('Totals'), 'chart', 'full'], ['projects', N_('Projects'), 'brief', 'full', true],
   ['note', N_('Explanation'), 'info', 'full']]};
 // the project page (#983; its blocks: POV_BLOCKS in projects.js)
-LY.project = {quick: true, title: () => tr('Customize the project page'), blocks: () => POV_BLOCKS,
+LY.project = {quick: true, title: () => tr('Customize the project page'), blocks: () => [...POV_BLOCKS, ...wgPadBlocks()],  // 2.43.0 (#1346): + notepads
+  addItems: () => wgPadAddItems(), color: k => wgPadColor(k),
   src: std => { const y = S.povD[routeList()?.id]?.j?.layout || {}; return std ? y.std : (y.mine || y.std); },
   save: (v, std) => {
     const l = routeList(), d = l && S.povD[l.id]; if (!d?.j) return;
@@ -280,7 +297,10 @@ LY.project = {quick: true, title: () => tr('Customize the project page'), blocks
     });
   }};
 // the start page (#475) on the view builder
-LY.home = {key: 'dashboard', grid: 'dgrid', title: () => tr('Customize the start page'), blocks: () => DASH.filter(d => d[0] !== 'family' || famOn()).map(d => [d[0], d[1], d[2], 'half'])};
+LY.home = {key: 'dashboard', grid: 'dgrid', title: () => tr('Customize the start page'), blocks: () => DASH.filter(d => d[0] !== 'family' || famOn()).map(d => [d[0], d[1], d[2], 'half', false, 2])};  // 2.43.0 (#1452): a third wide
+// 2.43.0 (#1452): the review (day / week) and its journal on the builder
+LY.review = {key: 'view_review', grid: 'dgrid', title: () => tr('Customize the review'), blocks: () => [['done', N_('Done'), 'done', 'half', false, 3], ['open', N_('Still open'), 'alert', 'half', false, 3],
+  ['moved', N_('Moved'), 'skip', 'half', false, 3], ['next', N_('Coming up'), 'cal', 'half', false, 3], ['journal', N_('Journal'), 'journal', 'half', false, 3]]};
 function dashCard(k) {
   const [_, name, icon] = DASH.find(d => d[0] === k), t0 = today();
   const card = (body, more = '', n = '') => `<section class="dcard dc-${k}" aria-labelledby="dh-${k}"><h3 id="dh-${k}">${ic(icon, 's')}<span>${tr(name)}</span>${n !== '' ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span>${more}</h3>${body}</section>`;
@@ -324,7 +344,10 @@ function dashCard(k) {
   }
   if (k === 'agents') {
     const ags = (S.agents || []).filter(a => a.enabled);
-    return ags.length ? card(`<ul class="dwl">${ags.map(a => `<li><a href="#agents/${a.id}">${hdot(agentHst(a))}<span class="dwt">${esc(agentHstLine(a))}</span></a></li>`).join('')}</ul>`) : '';
+    // 2.43.0 (#1504): every running job under its agent (the header counts jobs, one line per agent hid the second one)
+    if (ags.some(a => a.running)) bandJobsLoad();
+    const jobs = a => a.running ? (S.bandJobs.items || []).filter(j => j.agent_id === a.id && j.state === 'running') : [];
+    return ags.length ? card(`<ul class="dwl">${ags.map(a => `<li><a href="#agents/${a.id}">${hdot(agentHst(a))}<span class="dwt">${esc(agentHstLine(a))}</span></a></li>${jobs(a).map(j => `<li class="djob"><a href="#agents/${a.id}">${hdot('working')}<span class="dwt">${esc(j.title)}</span></a></li>`).join('')}`).join('')}</ul>`) : '';
   }
   if (k === 'stats') {
     const done7 = [...S.tasks.values()].filter(t => t.status === 2 && t.completed_at && t.completed_at.slice(0, 10) >= addDays(t0, -6)).length;
@@ -360,7 +383,7 @@ function viewHome() {
   const parts = Object.fromEntries(lyBlocks('home').map(b => [b[0], dashCard(b[0])]));
   if (S.ly.view === 'home') return `<div class="dash">${lyEditor('home', {parts})}</div>`;  // 2.35.0 (#1097): with the cards
   return `<div class="dash"><div class="dashhead"><h2>${esc(greet)}</h2><span class="muted">${esc(fmtDateLoc(today()))}</span><span class="spacer"></span>${lyCustomBtn('home')}</div>
-    ${forMeBanner()}${lyHtml('home', parts, {empty: `<p class="muted">${tr('Every card is hidden. Customize brings them back.')}</p>`})}</div>`;
+    ${forMeBanner()}${lyHtml('home', parts, {empty: `<p class="muted">${tr('Every block is hidden. “+ Block” brings them back.')}</p>`})}</div>`;
 }
 document.addEventListener('submit', e => {
   if (!e.target.matches?.('[data-dsearch]')) return;

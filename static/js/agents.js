@@ -119,7 +119,7 @@ function bandJobsLoad() {
   S.bandJobs.busy = true; const v0 = S.v;  // 2.37.0 (#1161): the version the request was asked for (a newer one fetches again)
   api('GET', '/api/agents/jobs?state=open').then(j => { S.bandJobs.items = j.jobs || []; }).catch(() => {}).finally(() => {
     S.bandJobs.busy = false; const sig = JSON.stringify(S.bandJobs.items.map(x => x.id + x.state)); S.bandJobs.v = v0;
-    if (sig !== S.bandJobs.sig) { S.bandJobs.sig = sig; if ($('#view .agband')) renderView(); else if (S.route.key === 'today' && S.route.mod === 'tasks') viewSafeRender(); }  // 2.13.0: + the Today card
+    if (sig !== S.bandJobs.sig) { S.bandJobs.sig = sig; if ($('#view .agband')) renderView(); else if ((S.route.key === 'today' && S.route.mod === 'tasks') || S.route.mod === 'home') viewSafeRender(); }  // 2.13.0: + the Today card; 2.43.0 (#1504): + the start page
   });
 }
 // 2.13.0 (#453 A6): the jobs that wait for ME (approve / reject, or a proposal of mine that is ready), for the agent pill's

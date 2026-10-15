@@ -372,7 +372,7 @@ function viewReview() {
   const seg = `<div class="seg" role="radiogroup" aria-label="${esc(tr('Period'))}">${[['day', tr('Day')], ['week', tr('Week')]].map(([k, w]) => `<button type="button" role="radio" data-act="rv-period" data-p="${k}" class="${RV.period === k ? 'on' : ''}" aria-checked="${RV.period === k}">${esc(w)}</button>`).join('')}</div>`;
   const label = !r ? '' : r.from === r.to ? fmtDayAbs(r.from) : fmtDayAbs(r.from) + ' – ' + fmtDayAbs(r.to);
   const nav = `<span class="fwnav"><button type="button" class="iconbtn" data-act="rv-move" data-d="-1" aria-label="${esc(RV.period === 'week' ? tr('Previous week') : tr('Previous day'))}" title="${esc(RV.period === 'week' ? tr('Previous week') : tr('Previous day'))}">${ic('left', 's')}</button><b class="rvlab" aria-live="polite">${esc(label)}</b><button type="button" class="iconbtn" data-act="rv-move" data-d="1" aria-label="${esc(RV.period === 'week' ? tr('Next week') : tr('Next day'))}" title="${esc(RV.period === 'week' ? tr('Next week') : tr('Next day'))}">${ic('right', 's')}</button>${RV.date !== today() ? `<button type="button" class="btn sm" data-act="rv-today">${tr('Today')}</button>` : ''}</span>`;
-  const head = `<div class="dashhead rvhead">${seg}${nav}</div>`;
+  const head = `<div class="dashhead rvhead">${seg}${nav}<span class="spacer"></span>${lyCustomBtn('review')}</div>`;  // 2.43.0 (#1452)
   if (!r) return `<div class="dash review">${head}<p class="muted lempty">${tr('Loading…')}</p></div>`;
   const li = (arr, f) => arr.length ? `<ul class="flist">${arr.slice(0, 30).map(f).join('')}</ul>${arr.length > 30 ? `<p class="muted">${esc(trn('and {0} more', 'and {0} more', arr.length - 30))}</p>` : ''}` : '';
   const tl = x => `<a href="#t/${x.task_id}" class="frow"><span class="ft"><b>${esc(x.title)}</b><span class="muted">${esc(lname(listById(x.list_id)) || '')}</span></span>${x.due ? lifeWhen(x.due, 0) : ''}</a>`;
@@ -385,12 +385,13 @@ function viewReview() {
     <div class="rvmood" role="radiogroup" aria-label="${esc(tr('How was the day?'))}">${MOODS.map(([v, e, w]) => `<button type="button" role="radio" data-act="rv-mood" data-v="${v}" class="${je.mood === v ? 'on' : ''}" aria-checked="${je.mood === v}" title="${esc(tr(w))}" aria-label="${esc(tr(w))}">${e}</button>`).join('')}</div>
     <textarea id="rv-text" data-day="${jsel}" rows="6" maxlength="20000" placeholder="${esc(tr('What happened, what went well, what is on your mind?'))}" aria-label="${esc(tr('Journal of {0}', fmtDayAbs(jsel)))}">${esc(je.text)}</textarea>
     <p class="muted rvpriv">${ic('lock', 's')} ${tr('Only you can read your journal.')}</p></section>` : '';
-  return `<div class="dash fam review">${head}<div class="dgrid">
-    ${card('done', 'done', tr('Done'), li(r.done, x => `<li>${tl(x)}</li>`) || `<p class="muted">${tr('Nothing ticked off yet.')}</p>`, r.done.length)}
-    ${card('open', 'alert', tr('Still open'), li(r.open, x => `<li>${tl(x)}</li>`) || `<p class="muted">${tr('Nothing left over.')}</p>`, r.open.length)}
-    ${r.moved.length ? card('moved', 'skip', tr('Moved'), li(r.moved, x => `<li>${tl(x)}</li>`), r.moved.length) : ''}
-    ${card('next', 'cal', tr('Coming up'), li(r.next, x => `<li>${tl(x)}</li>`) || `<p class="muted">${tr('Nothing due in the next seven days.')}</p>`, r.next.length)}
-    ${journal}</div></div>`;
+  // 2.43.0 (#1452): the cards are blocks of the view builder (width, height, order, hide at their "…" menu)
+  return `<div class="dash fam review">${head}${lyHtml('review', {
+    done: card('done', 'done', tr('Done'), li(r.done, x => `<li>${tl(x)}</li>`) || `<p class="muted">${tr('Nothing ticked off yet.')}</p>`, r.done.length),
+    open: card('open', 'alert', tr('Still open'), li(r.open, x => `<li>${tl(x)}</li>`) || `<p class="muted">${tr('Nothing left over.')}</p>`, r.open.length),
+    moved: r.moved.length ? card('moved', 'skip', tr('Moved'), li(r.moved, x => `<li>${tl(x)}</li>`), r.moved.length) : '',
+    next: card('next', 'cal', tr('Coming up'), li(r.next, x => `<li>${tl(x)}</li>`) || `<p class="muted">${tr('Nothing due in the next seven days.')}</p>`, r.next.length),
+    ...(r.journal ? {journal} : {})})}</div>`;
 }
 async function rvSave(day, patch) {
   const r = RV.data; if (!r?.journal) return;

@@ -266,6 +266,7 @@ function viewProjOv() {
   const ts = timeSumHtml([l]);
   P.kpis = fxKpiPart(l);  // 2.43.0 (#1328): key figures (undefined = not offered)
   if (timeOn() && j.time) P.time = x => povSec('time', tr('Tracked time'), ts || '', x, emp(!ts, tr('No time tracked yet.')));
+  for (const p of j.layout?.pads || []) P['np' + p.id] = () => wgPadHtml(l, p, can);  // 2.43.0 (#1346): the notepads
   const y = j.layout || {}, cust = S.ly.view === 'project';
   const bar = `<div class="povlybar">${!cust && y.mine ? `<span class="muted">${tr('Your own arrangement')}</span>` : ''}<span class="spacer"></span>${cust ? '' : `<button type="button" class="btn sm" data-rpt="open" data-id="${l.id}">${ic('journal', 's')}${tr('Status report')}</button>` + lyCustomBtn('project')}</div>`;  // 2.34.0 (#265)
   return `<div class="pov">${head}${bar}${lyHtml('project', P, {canStd: !!y.can_std && !l.archived, override: true})}</div>`;
