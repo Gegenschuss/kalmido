@@ -23,6 +23,9 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,collab,office,clients'});
+  // 2.47.0: since 2.46.0 (#1592) nobody joins an organisation automatically: Office needs one
+  { const me = (await call('GET', '/api/state')).me; const org = await call('POST', '/api/admin/orgs', {name: 'Alpha', admin_id: me.id});
+    await call('PATCH', '/api/settings', {workspace: `org:${org.id}`}); }
   const ro = await call('POST', '/api/office/roles', {name_de: 'Cutter', cost_day: 500});
   check(ro.http === 201, 'role ' + ro.http);
   check((await call('POST', '/api/office/crew', {name_de: 'Beleuchter', name_en: 'Gaffer', rate_day: 350, intext: 'extern'})).http === 201, 'crew');

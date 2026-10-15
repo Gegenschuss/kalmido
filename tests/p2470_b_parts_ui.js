@@ -27,6 +27,9 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,collab,office,clients'});
+  // 2.47.0: since 2.46.0 (#1592) nobody joins an organisation automatically: Office needs one
+  { const me = (await call('GET', '/api/state')).me; const org = await call('POST', '/api/admin/orgs', {name: 'Alpha', admin_id: me.id});
+    await call('PATCH', '/api/settings', {workspace: `org:${org.id}`}); }
   const doc = await call('POST', '/api/office/docs', {kind: 'offer', lang: 'en', project_title: 'Campaign', items: [svc('Concept', 1, 800)]});
   check(doc.status === 201, 'a quotation ' + doc.status);
   const pa = await call('POST', `/api/office/docs/${doc.id}/parts`, {title: 'Module A'});
