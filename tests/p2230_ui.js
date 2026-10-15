@@ -50,11 +50,11 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   w.eval(`settingsModal('modules')`); await sleep(400);
   check(['clients', 'workload', 'forms'].every(k => d.querySelector(`.smodal [data-feat="${k}"]`) && !d.querySelector(`.smodal [data-feat="${k}"]`).checked), 'Settings > Modules: three switches, off');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
-  // #794: the icon column in the sidebar
+  // #794: the icon column in the sidebar (2.46.1 (#1607): the arrow moved before the folder icon)
   const sb = w.eval(`(() => { const f = [...document.querySelectorAll('#side .fhead')].find(x => /Work/.test(x.textContent)); const g = [...document.querySelectorAll('#side .srow[data-list]')].find(x => /Goals/.test(x.textContent));
-    return {fic: !!f?.querySelector('.sic svg'), chevLast: f && [...f.children].findIndex(x => x.classList?.contains('fcar')) > [...f.children].findIndex(x => x.classList?.contains('n')), emo: g?.querySelector('.sic .lemo')?.textContent || (g?.querySelector('.sic .lic svg') && !/🎯/.test(g.textContent) ? 'line' : ''), name: g?.querySelector('.n')?.textContent,
+    return {fic: !!f?.querySelector('.sic svg'), chevFirst: f && [...f.children].findIndex(x => x.classList?.contains('fcar')) < [...f.children].findIndex(x => x.classList?.contains('sic')), emo: g?.querySelector('.sic .lemo')?.textContent || (g?.querySelector('.sic .lic svg') && !/🎯/.test(g.textContent) ? 'line' : ''), name: g?.querySelector('.n')?.textContent,
       dots: [...document.querySelectorAll('#side .srow[data-list]')].every(r => r.querySelector('.sic'))}; })()`);
-  check(sb.fic && sb.chevLast && sb.emo === 'line' && sb.name === 'Goals' && sb.dots, '#794: folder icon in the icon column, the arrow at the end, the emoji as a line icon in the column (2.36.0, #1117), the name without it ' + JSON.stringify(sb));
+  check(sb.fic && sb.chevFirst && sb.emo === 'line' && sb.name === 'Goals' && sb.dots, '#794: folder icon in the icon column, the arrow before it (2.46.1, #1607), the emoji as a line icon in the column (2.36.0, #1117), the name without it ' + JSON.stringify(sb));
   w.close();
   await call('PATCH', '/api/settings', {features: BASE + ',clients,workload,forms'});
 
@@ -241,7 +241,9 @@ const BASE = 'cal,comments,collab,time,progress,agents';
       return {gHead: Math.round(r(kids[0]).top - r(f).bottom), gList: Math.round(r(kids[1]).top - r(kids[0]).bottom), hHead: Math.round(r(f).height), hList: Math.round(r(kids[0]).height),
         topIc: [...new Set(top.map(ic))], fIc: ic(f), kidIc: [...new Set(kids.map(ic))], before: Math.round(r(f).top - r(f.previousElementSibling).bottom)}; })()`);
     check(Math.abs(g.gHead - g.gList) <= 1 && Math.abs(g.hHead - g.hList) <= 1, `${tag}: #794: folder head -> first list = list -> list, same height ` + JSON.stringify(g));
-    check(g.topIc.length === 1 && Math.abs(g.fIc - g.topIc[0]) <= 1 && g.kidIc.length === 1 && g.before >= 8, `${tag}: #794: one icon column (top lists + folder), one inside the folder, room before the folder ` + JSON.stringify(g));
+    // 2.46.1 (#1607 #1643): the arrow sits before the folder icon (the icon moves right), the lists inside start further in
+    // (a tree), no extra room before a folder
+    check(g.topIc.length === 1 && g.fIc > g.topIc[0] && g.kidIc.length === 1 && g.kidIc[0] > g.fIc && Math.abs(g.before - g.gList) <= 1, `${tag}: #794 #1607: one icon column for the top lists, one inside the folder (further in than the folder icon), no extra room before the folder ` + JSON.stringify(g));
     await shot(`p2230-${vw}-${th}-side.png`);
     await ev(`(() => { document.querySelector('#side').classList.remove('open'); location.hash = '#clients'; return 1; })()`); await ready(ev, '#view .clcard');
     check(await sideways(ev) <= 0, `${tag}: clients: nothing sideways`);
