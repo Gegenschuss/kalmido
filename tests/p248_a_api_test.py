@@ -331,6 +331,21 @@ check(not dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (LK,)), "a link store
 q = dbx("SELECT COALESCE(SUM(size),0) FROM fs_versions WHERE created_by=1")[0][0]
 check(q > 0, "versions are counted per uploader")
 
+# ---- deleting a person: their branch of an organisation's tree goes to an admin, their own tree goes (files unlinked)
+up(Ca, "private.txt", b"carol's own", parent=MYF)
+own_paths = [r[0] for r in dbx("SELECT v.path FROM fs_versions v JOIN fs_nodes n ON n.id=v.node_id WHERE n.owner_id=? AND n.org_id IS NULL", (CAROL,))]
+dbx("INSERT INTO org_members(org_id,user_id,role) VALUES(?,1,'admin') ON CONFLICT DO NOTHING", (ORG,), write=True)  # the instance admin may delete her
+r = A.delete(B + f"/api/users/{CAROL}")
+check(r.ok, f"carol is deleted ({r.status_code} {r.text[:120]})")
+if r.ok:
+    check(dbx("SELECT owner_id FROM fs_nodes WHERE id=?", (OF,)) in ([(1,)], [(BOB,)]), "her organisation folder stays, now owned by an admin of the organisation")
+    check(Bo.get(B + f"/api/files/nodes/{OFILE}").ok, "its files stay readable for the organisation")
+    check(not dbx("SELECT 1 FROM fs_nodes WHERE id=?", (MYF,)), "her own tree is gone")
+    check(own_paths and not any(os.path.exists(os.path.join(DATA, "attachments", p)) for p in own_paths), "and its stored files are unlinked")
+# ---- an organisation with files is not deleted (the trash does not count)
+r = A.delete(B + f"/api/admin/orgs/{ORG}")
+check(r.status_code == 409, f"an organisation with a file store: 409 ({r.status_code})")
+
 # ---- the backup archive has the file store's files (attachments/files/<node>/<file>)
 import time  # noqa: E402
 import zipfile  # noqa: E402
