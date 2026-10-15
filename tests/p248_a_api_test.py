@@ -199,6 +199,12 @@ check(A.delete(B + f"/api/files/nodes/{F1}", params={"purge": "1"}).status_code 
 check(A.delete(B + f"/api/files/nodes/{F2}", params={"purge": "1"}).ok, "purge")
 check(not dbx("SELECT 1 FROM fs_nodes WHERE id IN (?,?)", (F2, P2)), "purged: the rows are gone")
 check(not dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (P2,)), "purged: the versions are gone")
+FX = folder(A, "Old stuff")
+PX = up(A, "old.txt", b"old", parent=FX).json()["items"][0]["id"]
+A.delete(B + f"/api/files/nodes/{FX}")
+check(A.delete(B + f"/api/files/nodes/{PX}", params={"purge": "1"}).ok, "purge a file inside a deleted folder")
+check(not dbx("SELECT 1 FROM fs_nodes WHERE id=?", (PX,)) and dbx("SELECT 1 FROM fs_nodes WHERE id=? AND deleted_at IS NOT NULL", (FX,)),
+      "only that file is gone, its folder stays in the trash")
 
 # ---- shares with a person: view / edit, inheritance, expiry
 check(Er.get(B + f"/api/files/nodes/{P1}").status_code == 404, "not shared: 404 for another person")
