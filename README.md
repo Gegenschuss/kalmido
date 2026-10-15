@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.46.1** (2026-10-15): **folder rows** like list rows, lists and sections **drag to the very end**, **several
+  contacts at once** (delete, move), the legacy import **per area**, a **list channel** for listening agents,
+  **favourites** for agents and Ctrl+K, a switch **all modules** and samples only on request, a simpler **family**
+  setup, and **soft animations** on the phone.
 - **2.46.0** (2026-10-15): **organisations and rights**: one kind of server - organisations plus a private space for
   everybody, new accounts join no organisation by themselves, organisation admins remove members, the admin picks the
   **organisation and role when adding a person**, organisation lists can be open to **everyone in the organisation**,
