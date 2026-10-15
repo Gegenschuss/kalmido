@@ -211,7 +211,8 @@ function povSec(id, title, body, extra = '', empty = '') {
   return `<section class="povs" id="pov-${id}"><div class="povh"><h3>${title}</h3><span class="spacer"></span>${extra}</div>${body}</section>`;
 }
 // 2.32.0 (#983, #1063): the project page on the view builder: the project's standard (owner / admins) or my own arrangement
-const POV_BLOCKS = [['desc', N_('Description'), 'edit', 'full'], ['status', N_('Status updates'), 'pulse', 'half'], ['ms', N_('Milestones'), 'flag', 'half'],
+// 2.43.0 (#1328): kpis = the key figures (formula.js fxKpiPart), on top once set up
+const POV_BLOCKS = [['kpis', N_('Key figures'), 'chart', 'full'], ['desc', N_('Description'), 'edit', 'full'], ['status', N_('Status updates'), 'pulse', 'half'], ['ms', N_('Milestones'), 'flag', 'half'],
   ['files', N_('Project files'), 'file', 'full'], ['links', N_('Key links'), 'link', 'half'], ['people', N_('Members'), 'users', 'half'],
   ['notes', N_('Notes'), 'journal', 'half'], ['chat', N_('Team chat'), 'comment', 'half'], ['time', N_('Tracked time'), 'clock', 'half']];
 function viewProjOv() {
@@ -263,6 +264,7 @@ function viewProjOv() {
       `<a class="btn sm" href="#notes/${l.id}">${ic('edit', 's')}<span>${notesOf(l.id).length ? tr('All notes') : tr('New note')}</span></a>` + x, emp(!ns.length, tr('Meeting notes, briefings, decisions: write them next to the tasks.'))); }
   if (teamOn() && l.shared) P.chat = x => povSec('chat', tr('Team chat'), '', `<button type="button" class="btn sm" data-act="list-chat" data-id="${l.id}">${ic('comment', 's')}<span>${tr('Open the list chat')}</span></button>` + x);
   const ts = timeSumHtml([l]);
+  P.kpis = fxKpiPart(l);  // 2.43.0 (#1328): key figures (undefined = not offered)
   if (timeOn() && j.time) P.time = x => povSec('time', tr('Tracked time'), ts || '', x, emp(!ts, tr('No time tracked yet.')));
   const y = j.layout || {}, cust = S.ly.view === 'project';
   const bar = `<div class="povlybar">${!cust && y.mine ? `<span class="muted">${tr('Your own arrangement')}</span>` : ''}<span class="spacer"></span>${cust ? '' : `<button type="button" class="btn sm" data-rpt="open" data-id="${l.id}">${ic('journal', 's')}${tr('Status report')}</button>` + lyCustomBtn('project')}</div>`;  // 2.34.0 (#265)
@@ -440,8 +442,8 @@ function depPicker(tid, dir) {
 const blockedNames = t => { const n = (t.blockers || []).map(id => S.tasks.get(id)?.title).filter(Boolean); const h = Math.max(0, (t.blocked || 0) - n.length); return [...n.map(x => tr('“{0}”|quoted', x)), ...(h ? [trn('{0} task you cannot see', '{0} tasks you cannot see', h)] : [])].join(', '); };
 
 // ------------------------------------------------------------------ custom fields (package 3)
-const FTYPES = [['text', N_('Text')], ['number', N_('Number')], ['select', N_('Selection')], ['date', N_('Date')], ['checkbox', N_('Checkbox')], ['person', N_('Person')], ['url', N_('Link')]];
-const FT_ICON = {text: 'edit', number: 'chart', select: 'list', date: 'cal', checkbox: 'check', person: 'user', url: 'link'};
+const FTYPES = [['text', N_('Text')], ['number', N_('Number')], ['select', N_('Selection')], ['date', N_('Date')], ['checkbox', N_('Checkbox')], ['person', N_('Person')], ['url', N_('Link')], ['formula', N_('Formula')]];  // 2.43.0 (#1328): + formula
+const FT_ICON = {text: 'edit', number: 'chart', select: 'list', date: 'cal', checkbox: 'check', person: 'user', url: 'link', formula: 'chart'};
 const ftLabel = t => tr((FTYPES.find(x => x[0] === t) || [0, t])[1]);
 // 2.40.0 (#1193): a select option shows as a filled chip in its colour, the text dark or light, whichever reads better
 function lrInk(hex) {
@@ -462,6 +464,7 @@ function fieldEditor(f, t, ro) {
     case 'number': c = `<span class="cfnum"><input id="${id}" data-cf="${f.id}" inputmode="decimal" value="${esc(v === '' ? '' : (+v).toLocaleString(LOCALE(), {useGrouping: false, maximumFractionDigits: 6}))}" ${ro ? 'readonly' : ''} placeholder="–">${f.options?.unit ? `<span class="muted">${esc(f.options.unit)}</span>` : ''}</span>`; break;
     case 'select': { const so = selOpt(f, v); c = `<select id="${id}" data-cf="${f.id}" class="cfsel${so ? lrSelFill(so) : ''}" ${so ? lrSelStyle(so) : ''} ${dis}><option value="">–</option>${(f.options?.options || []).map(o => `<option value="${esc(o.id)}" ${o.id === v ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`; break; }
     case 'date': c = dateIn(id, v, {attrs: `data-cf="${f.id}"`, ro, label: f.name, empty: '–'}); break;
+    case 'formula': c = `<output id="${id}" class="cfx" title="${esc(f.options?.formula || '')}">${esc(fieldText(f, v, t.list_id) || '–')}</output>`; break;  // 2.43.0 (#1328): computed
     case 'checkbox': c = `<span><input id="${id}" type="checkbox" data-cf="${f.id}" ${v === '1' ? 'checked' : ''} ${dis}></span>`; break;
     case 'person': c = `<select id="${id}" data-cf="${f.id}" ${dis}><option value="">–</option>${listPeople(listById(t.list_id)).map(p => `<option value="${p.user_id}" ${String(p.user_id) === v ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>`; break;
     case 'url': c = `<span class="cfurl"><input id="${id}" type="url" inputmode="url" data-cf="${f.id}" value="${esc(v)}" placeholder="https://…" ${ro ? 'readonly' : ''}>${v ? flkLink(v, 'iconbtn', ic(flkIs(v) ? 'folder' : 'link', 's'), true) : ''}</span>`; break;
@@ -497,6 +500,7 @@ function fieldModal(lid, f, done) {
     <div class="foot">${edit ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   const extra = () => {
     const x = $('#fd-extra', md);
+    if (st.type === 'formula') { x.innerHTML = fxModalExtra(lid, f); return; }  // 2.43.0 (#1328)
     if (st.type === 'number') x.innerHTML = `<div class="row"><label for="fd-unit">${tr('Unit')}</label><input id="fd-unit" value="${esc(f?.options?.unit || '')}" maxlength="12" placeholder="${tr('optional, e.g. € or h')}" style="max-width:8.75rem"></div>`;
     // 2.40.0 (#1193): a palette per option instead of cycling, a handle to drag (Alt+↑/↓), the Status template for a new field
     else if (st.type === 'select') x.innerHTML = `<h4>${tr('Options')}</h4>${edit ? '' : `<div class="row lrtpl"><button type="button" class="btn sm" data-m="opt-tpl" title="${esc(tr('Not started, In progress, Waiting, Done'))}">${ic('list', 's')} ${tr('Template “Status”')}</button><button type="button" class="btn sm" data-m="opt-empty">${tr('Start empty')}</button></div>`}<div class="optlist" role="list">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}" role="listitem"><span class="colh" data-oh="${i}" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span><button type="button" class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${tr('Color')}" aria-label="${esc(tr('Color'))}" aria-expanded="${st.pal === i}"></button><input data-oname="${i}" value="${esc(o.name)}" maxlength="60" placeholder="${tr('Option')}" title="${esc(tr('Alt+↑ / Alt+↓ moves the option'))}"><button type="button" class="iconbtn" data-orm="${i}" title="${tr('Remove')}">${ic('x', 's')}</button></div>${st.pal === i ? `<div class="colors lrpal" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, k) => `<button type="button" data-opal="${esc(c)}" style="background:${c || 'var(--bg4)'}" class="${(o.color || '') === c ? 'on' : ''}" aria-pressed="${(o.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', k) : tr('No color'))}"></button>`).join('')}</div>` : ''}`).join('')}</div><button class="btn sm" data-m="opt-add">${ic('plus', 's')} ${tr('Option')}</button>${edit ? `<div class="shint keep">${tr('Removing an option clears it in all tasks.')}</div>` : ''}`;
@@ -518,7 +522,7 @@ function fieldModal(lid, f, done) {
     if (a === 'del') {
       // 2.40.0 (#1192): the server counts every task with a value (also those not loaded here); the local count if offline
       const n = await api('GET', `/api/fields/${f.id}/count`).then(j => j.tasks, () => [...S.tasks.values()].filter(t => t.fields?.[f.id] != null).length);
-      if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Its values are deleted in all tasks.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : ''), {ok: tr('Delete'), danger: true})) return;
+      if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Its values are deleted in all tasks.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : '') + fxUsedWarn(f.id), {ok: tr('Delete'), danger: true})) return;
       try { await api('DELETE', '/api/fields/' + f.id); } catch { return; }
       md.remove(); await load(); render(); done && done(); return;
     }
@@ -526,6 +530,7 @@ function fieldModal(lid, f, done) {
       const name = $('#fd-name', md).value.trim(); if (!name) { need($('#fd-name', md)); return; }
       const options = st.type === 'number' ? {unit: $('#fd-unit', md).value.trim()} : st.type === 'select' ? {options: st.opts.filter(o => o.name.trim())} : {};
       const body = {name, options, pinned: $('#fd-pin', md).checked};
+      if (st.type === 'formula') Object.assign(body, fxModalBody(md));  // 2.43.0 (#1328): the server checks it (position / field name)
       try { await api(edit ? 'PATCH' : 'POST', edit ? '/api/fields/' + f.id : `/api/lists/${lid}/fields`, edit ? body : {...body, type: st.type}); } catch { return; }
       md.remove(); await load(); render(); done && done();
     }
@@ -589,7 +594,7 @@ function cfSortCmp(fid, desc = false) {  // 2.31.0 (#354): desc = the other way 
   if (!f) return bySort;
   const key = t => {
     const v = t.fields?.[fid]; if (v == null) return null;
-    if (f.type === 'number') return +v;
+    if (f.type === 'number' || f.type === 'formula') return +v;  // 2.43.0 (#1328): formulas sort as numbers
     if (f.type === 'select') return (f.options?.options || []).findIndex(o => o.id === v);
     if (f.type === 'checkbox') return 0;
     if (f.type === 'person') return (personName(t.list_id, +v) || '').toLowerCase();

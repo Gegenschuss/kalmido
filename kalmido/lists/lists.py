@@ -334,6 +334,12 @@ def list_update(lid):
             from ..lists.fields import tb_fields_module_on
             tb_col_on = tb_fields_module_on(c, lid)
         b = {k: v for k, v in b.items() if k != "columns"}
+    if "col_sums" in b or "kpis" in b:  # 2.43.0 (#1328): sum row + key figures (owner / list admins)
+        from ..lists.kpis import fx_list_patch
+        e = fx_list_patch(c, lid, role, b)
+        if e:
+            return e
+        b = {k: v for k, v in b.items() if k not in ("col_sums", "kpis")}
     conflicts = []
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
     if prev:  # D4 undo / redo: a setting changed elsewhere meanwhile stays (reported in conflicts)

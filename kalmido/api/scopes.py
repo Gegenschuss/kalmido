@@ -667,16 +667,17 @@ def v1_fields(lid):
     v1_args(())
     c = db()
     need_list(c, lid, write=False)
-    return jsonify(data=[field_dict(r) for r in c.execute("SELECT * FROM list_fields WHERE list_id=? ORDER BY sort, id", (lid,))],
+    return jsonify(data=[field_dict(r, c) for r in c.execute("SELECT * FROM list_fields WHERE list_id=? ORDER BY sort, id", (lid,)).fetchall()],
                    next_cursor=None)
 
 
 @app.post("/api/v1/lists/<int:lid>/fields")
 @v1_view
 def v1_field_create(lid):
-    """{name, type: text | number | date | select | person | url | checkbox ..., options?, pinned?} (owner; 2.39.1: any list)."""
+    """{name, type: text | number | date | select | person | url | checkbox | formula, options?, pinned?, formula?} (owner; 2.39.1: any
+    list; 2.43.0 (#1328): formula = the calculation with field names)."""
     v1_args(())
-    b = _v1_body(("name", "type", "options", "pinned"))
+    b = _v1_body(("name", "type", "options", "pinned", "formula"))
     return jsonify(v1_call(field_create, lid, body=b)), 201
 
 
@@ -684,7 +685,7 @@ def v1_field_create(lid):
 @v1_view
 def v1_field_update(fid):
     v1_args(())
-    b = _v1_body(("name", "options", "pinned", "sort"))
+    b = _v1_body(("name", "options", "pinned", "sort", "formula"))  # 2.43.0 (#1328): + formula
     return jsonify(v1_call(field_update, fid, body=b))
 
 
@@ -1193,11 +1194,15 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                        desc="2.39.1 (#1293): switches the module Custom fields on for the list's owner when it is off (never off); "
                             "the answer's modules_on names it ([\"fields\"] or []).",
                        scope="structure", body={"type": "object", "required": ["name", "type"], "properties": {
-                           "name": {"type": "string"}, "type": {"type": "string"}, "options": obj, "pinned": {"type": "boolean"}}})},
+                           "name": {"type": "string"}, "type": {"type": "string"}, "options": obj, "pinned": {"type": "boolean"},
+                           "formula": {"type": "string", "maxLength": 500, "description": "2.43.0 (#1328), type formula: + - * / ( ), numbers, "
+                                       "{Field name} of number / formula / checkbox fields, round(x, n). Computed by the server, read-only "
+                                       "in tasks; options.empty = blank leaves the result empty when a field is empty (default: 0)"}}})},
         "/fields/{id}": {
             "patch": op("Change a custom field (the type stays)", S, ok(ref("Field")) | errs("400", "403", "404"), [pid("id", "Field id")],
                         scope="structure", body={"type": "object", "properties": {"name": {"type": "string"}, "options": obj,
-                                                                                  "pinned": {"type": "boolean"}, "sort": {"type": "number"}}}),
+                                                                                  "pinned": {"type": "boolean"}, "sort": {"type": "number"},
+                                                                                  "formula": {"type": "string", "maxLength": 500}}}),
             "delete": op("Delete a custom field with its values", S, ok(obj) | acc | errs("403", "404"), [pid("id", "Field id")], scope="delete",
                          desc="Agents: waits for approval (202).")},
         "/templates": {

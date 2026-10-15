@@ -60,7 +60,7 @@ const TC_INPUT = ['number', 'text', 'url'];
 const tcField = k => k.startsWith('f:') ? fieldById(+k.slice(2)) : null;
 const tcOk = t => !!t && t.id > 0 && !isTouch() && canEdit(t);
 function tcAttr(k, t) {  // the attributes of an editable field cell (render.js lcCell row)
-  const f = tcField(k); if (!f || !tcOk(t)) return '';
+  const f = tcField(k); if (!f || !tcOk(t) || f.type === 'formula') return sgAttr(k, t);  // 2.43.0 (#1328): formulas are computed; (#1331): any cell takes the focus
   const v = t.fields?.[f.id], txt = fieldText(f, v, t.list_id);
   return ` data-fe="${f.id}" data-tid="${t.id}" tabindex="0" role="button" aria-label="${esc(f.name + ': ' + (txt || tr('empty')))}"`;
 }
@@ -92,13 +92,13 @@ function tcNext(tid, fid, dir) {  // Tab: the next editable cell of the row (aft
 }
 function tcEdit(cell) {
   const t = taskById(+cell.dataset.tid), f = fieldById(+cell.dataset.fe); if (!t || !f || !tcOk(t) || cell.querySelector('.tcin')) return;
-  const v = t.fields?.[f.id] ?? null;
-  if (f.type === 'checkbox') { tcSave(t.id, f.id, v === '1' ? null : '1'); return; }
-  if (f.type === 'date') { dpOpen(cell, {kind: 'date', value: v || '', label: f.name, onPick: d => tcSave(t.id, f.id, d || null)}); return; }
+  const v = t.fields?.[f.id] ?? null, put = x => sgMultiPut('f:' + f.id, x) || tcSave(t.id, f.id, x);  // 2.43.0 (#1331): a range takes the pick
+  if (f.type === 'checkbox') { put(v === '1' ? null : '1'); return; }
+  if (f.type === 'date') { dpOpen(cell, {kind: 'date', value: v || '', label: f.name, onPick: d => put(d || null)}); return; }
   if (f.type === 'select' || f.type === 'person') {
-    const opts = f.type === 'select' ? (f.options?.options || []).map(o => ({label: o.name, swc: o.color || '', on: v === o.id, fn: () => tcSave(t.id, f.id, o.id)}))
-      : listPeople(listById(t.list_id)).map(p => ({label: p.name, icon: 'user', on: String(p.user_id) === v, fn: () => tcSave(t.id, f.id, String(p.user_id))}));
-    menu(cell, [{label: f.name, dis: true, cls: 'mhead'}, '-', ...opts, ...(v != null ? ['-', {label: tr('Empty the field'), icon: 'x', fn: () => tcSave(t.id, f.id, null)}] : [])]);
+    const opts = f.type === 'select' ? (f.options?.options || []).map(o => ({label: o.name, swc: o.color || '', on: v === o.id, fn: () => put(o.id)}))
+      : listPeople(listById(t.list_id)).map(p => ({label: p.name, icon: 'user', on: String(p.user_id) === v, fn: () => put(String(p.user_id))}));
+    menu(cell, [{label: f.name, dis: true, cls: 'mhead'}, '-', ...opts, ...(v != null || sgMulti() ? ['-', {label: tr('Empty the field'), icon: 'x', fn: () => put(null)}] : [])]);
     return;
   }
   const shown = v == null ? '' : f.type === 'number' ? (+v).toLocaleString(LOCALE(), {useGrouping: false, maximumFractionDigits: 6}) : v;
@@ -152,7 +152,7 @@ async function tcFieldAct(l, b, resync) {
   const f = fieldById(+(b.dataset.colfe || b.dataset.colfd)); if (!f) return;
   if (b.dataset.colfe) { fieldModal(l.id, f, () => resync(null, 'f:' + f.id)); return; }
   const n = [...S.tasks.values()].filter(t => t.fields?.[f.id] != null).length;
-  if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Its values are deleted in all tasks.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : ''), {ok: tr('Delete'), danger: true})) return;
+  if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Its values are deleted in all tasks.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : '') + fxUsedWarn(f.id), {ok: tr('Delete'), danger: true})) return;
   try { await api('DELETE', '/api/fields/' + f.id); } catch { return; }
   await load(); render(); resync();
 }

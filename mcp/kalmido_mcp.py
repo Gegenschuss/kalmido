@@ -1011,16 +1011,22 @@ TOOLS += [
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/fields")),
     ("create_field", "Create a custom field in a list (owner / list admins; 2.39.1: any list, switches the module Custom fields on for the "
                      "list's owner, the answer's modules_on names it): type text | number | date | select | person | url | checkbox "
-                     "...; options for select: {options: [{id?, name, color?}]}.",
+                     "| formula; options for select: {options: [{id?, name, color?}]}. 2.43.0: type formula + formula = a calculation "
+                     "with + - * / ( ), numbers, {Field name} of number / formula / checkbox fields and round(x, n); the server computes "
+                     "it, tasks show it in fields, nobody sets it (options.empty = blank: empty when a field is empty, default 0).",
      _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "type": {"type": "string"}, "options": {"type": "object"},
-           "pinned": {"type": "boolean"}}, ["list_id", "name", "type"]),
+           "pinned": {"type": "boolean"}, "formula": {"type": "string"}}, ["list_id", "name", "type"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/fields", body=_without(a, "list_id"))),
-    ("update_field", "Change a custom field (name, options, pinned, sort); the type stays.",
-     _obj({"field_id": S_ID, "name": {"type": "string"}, "options": {"type": "object"}, "pinned": {"type": "boolean"}, "sort": {"type": "number"}},
-          ["field_id"]),
+    ("update_field", "Change a custom field (name, options, pinned, sort; 2.43.0: formula of a formula field); the type stays.",
+     _obj({"field_id": S_ID, "name": {"type": "string"}, "options": {"type": "object"}, "pinned": {"type": "boolean"}, "sort": {"type": "number"},
+           "formula": {"type": "string"}}, ["field_id"]),
      lambda api, a: api.call("PATCH", f"/fields/{_id(a, 'field_id')}", body=_without(a, "field_id"))),
     ("delete_field", "Delete a custom field with all its values." + APPROVAL_NOTE, _obj({"field_id": S_ID}, ["field_id"]),
      lambda api, a: api.call("DELETE", f"/fields/{_id(a, 'field_id')}")),
+    ("get_key_figures", "2.43.0: the key figures of a list shared with you (tiles of its project page set up by people: sum, count, "
+                        "average or ratio in % of number / formula fields, maybe only open / done tasks or a choice): [{id, title, agg, "
+                        "value, unit, n}] over the tasks you may see. Read-only.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/kpis")),
     # ---- list tags (shared by the members)
     ("create_list_tag", "Create a shared tag of a list.", _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "color": {"type": "string"}},
                                                               ["list_id", "name"]),

@@ -83,7 +83,7 @@ const curTask = () => { const id = S.sel || (S.kf && $(`#view .trow[data-id="${S
 const typing = t => t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable);
 let gPending = 0;
 window.addEventListener('keydown', e => {
-  if (e.defaultPrevented || e.isComposing) return;
+  if (e.defaultPrevented || e.isComposing || sgOwns(e)) return;  // 2.43.0 (#1331): an active cell of the list's table has the keys
   const k = e.key;
   // 2.0.6 (#191): Ctrl/Cmd+A selects every task row of the view (outside text fields and dialogs)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === 'a' && !typing(e.target) && !$('.modal') && !$('.palette') && $('#view .trow')) {

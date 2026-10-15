@@ -96,6 +96,7 @@ APP_TO_API = {
     "DELETE /api/sections/{}": ["DELETE /sections/{}"],
     "POST /api/lists/{}/sections/order": ["PUT /lists/{}/sections/order"],
     "GET /api/lists/{}/overview": ["GET /lists/{}/overview"],
+    "GET /api/lists/{}/kpis": ["GET /lists/{}/kpis"],  # 2.43.0 (#1328): key figures
     "PATCH /api/lists/{}/overview": ["PATCH /lists/{}/overview"],
     "POST /api/lists/{}/links": ["POST /lists/{}/links"],
     "PATCH /api/lists/{}/links/{}": ["PATCH /lists/{}/links/{}"],

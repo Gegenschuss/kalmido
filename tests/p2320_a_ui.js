@@ -82,13 +82,15 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   click(w, d.querySelector('[data-act="ly-custom"][data-lyv="project"]'));
   await until(() => d.querySelector('.lyed[data-lyed="project"]'));
   const ed = d.querySelector('.lyed');
-  check(ed.querySelectorAll('.dcust li').length === 9 && ed.querySelector('[data-act="ly-scope"][data-k="std"]') && ed.querySelector('[data-lyphone="project"]'), '#1063: the editor: every block, "Standard for everyone", "Different on the phone"');
+  // 2.43.0 (#1328): + the block "Key figures" (10 blocks; it shows on the page only once key figures are set up)
+  check(ed.querySelectorAll('.dcust li').length === 10 && ed.querySelector('[data-act="ly-scope"][data-k="std"]') && ed.querySelector('[data-lyphone="project"]'), '#1063: the editor: every block, "Standard for everyone", "Different on the phone"');
   await sleep(150);
   check(d.activeElement?.closest('.dcust'), '#1063: the focus lands in the list');
   click(w, ed.querySelector('[data-act="ly-scope"][data-k="std"]')); await sleep(100);
   click(w, d.querySelector('.dcust [data-act="ly-mv"][data-k="ms"][data-d="-1"]'));
   y = await until(async () => { const x = await lay(); return x.std ? x : null; });
-  check(y && JSON.parse(y.std).order.slice(0, 3).join() === 'desc,ms,status', '#983: the owner moved Milestones up in the standard ' + y?.std);
+  // 2.43.0 (#1328): the block "Key figures" stands first in the order (shown only once key figures are set up)
+  check(y && JSON.parse(y.std).order.filter(k => k !== 'kpis').slice(0, 3).join() === 'desc,ms,status', '#983: the owner moved Milestones up in the standard ' + y?.std);
   click(w, d.querySelector('.dcust [data-act="ly-size"][data-k="ms"]'));
   y = await until(async () => { const x = await lay(); return JSON.parse(x.std || '{}').full?.includes('ms') ? x : null; });
   check(y, '#1063: width Full saved');

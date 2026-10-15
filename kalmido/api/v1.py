@@ -378,6 +378,9 @@ def task_for(c, row, uid):
     tags = [r[0] for r in c.execute("SELECT tag FROM task_tags WHERE task_id=? AND user_id=? ORDER BY tag", (row["id"], uid))]
     fields = {str(r[0]): r[1] for r in c.execute("""SELECT v.field_id, v.value FROM task_field_values v JOIN list_fields f
                                                     ON f.id=v.field_id WHERE v.task_id=? AND f.list_id=?""", (row["id"], row["list_id"]))}
+    if row["list_id"]:  # 2.43.0 (#1328): formula fields are computed (read-only for agents too)
+        from ..lists.formula import fx_fill
+        fields = fx_fill(c, {row["id"]: fields}, {row["id"]: row["list_id"]}).get(row["id"], fields)
     out = {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"])}
     if c.execute("SELECT 1 FROM task_enc_notes WHERE task_id=? LIMIT 1", (row["id"],)).fetchone():
         out["encrypted_note"] = True  # 2.42.0 (#828): agents learn only that there is an encrypted note

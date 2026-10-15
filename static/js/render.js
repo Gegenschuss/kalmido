@@ -950,7 +950,7 @@ const selOpt = (f, v) => (f.options?.options || []).find(o => o.id === v);
 function fieldText(f, v, lid) {
   if (v == null || v === '') return '';
   switch (f.type) {
-    case 'number': return numFmt(v) + (f.options?.unit ? ' ' + f.options.unit : '');
+    case 'number': case 'formula': return numFmt(v) + (f.options?.unit ? ' ' + f.options.unit : '');  // 2.43.0 (#1328): + formula
     case 'select': return selOpt(f, v)?.name || '';
     case 'date': return dayLabel(v);
     case 'checkbox': return v === '1' ? tr('yes') : '';
@@ -1167,6 +1167,7 @@ function lcMenu(c) {
   const pick = m => { LS.del('sortback.' + S.route.key); sortSet(m); };
   menu(c, [{label: colName(l, k), dis: true, cls: 'mhead'}, '-',
     ...[p[0], p[1]].map(m => ({label: dirName(m), icon: 'sort', on: cur === m, fn: () => pick(m)})),
+    ...sgColMenu(l, k, c),  // 2.43.0 (#1331): filter by a value of the column
     '-', ...(canManage(l) ? [{label: tr('Hide column'), icon: 'eyeoff', fn: () => colSave(l.id, lc.filter(x => x !== k))}] : []),
     {label: tr('Shown fields…'), icon: 'columns', fn: () => colModal(l.id)}]);
 }
@@ -1362,6 +1363,7 @@ function viewListBody() {
   const tdc = S.route.key === 'today' ? {brief: briefCard(), wait: waitCard(), review: reviewCard(), overdue: odHead ? '' : overdueBanner(), events: cevTodayBlock()} : null;  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
   if (tdc) h += '\u0001';
   h += favViewNote();  // 2.40.0 (#1361): a view filtered to favourites says so
+  h += sgFilterNote(rl);  // 2.43.0 (#1331): a column filter of the list says so (sheetgrid.js)
   if (rl && sortOwn()) h += `<div class="onehint sortown">${ic('sort', 's')}<span>${esc(tr('You see your own sort of this shared list.'))}</span><button type="button" class="btn sm" data-act="sort-shared">${tr('Back to the shared sort')}</button></div>`;  // 2.27.0 (#988)
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks block each other in a circle; they are ordered by date.'))}</div>`;
   if (lc && total0(groups)) h += lcHead(rl, lc);
@@ -1396,6 +1398,7 @@ function viewListBody() {
     if (!closed && g.section !== undefined && !g.tasks.length && !ro) h += `<div class="sdrop" data-section="${g.section ?? ''}">${tr('Drop tasks here')}</div>`;  // shown while a task is dragged
     if (g.name) h += '</div>';
   }
+  if (lc && rl && total) h += fxSumRow(rl, lc, groups.flatMap(g => g.tasks));  // 2.43.0 (#1328): the sum row (formula.js)
   if (tin.length) { if (tdc) tdc.inbox = todayInboxHtml(tin); else h += todayInboxHtml(tin); }
   // 2.19.0 (#667): the end of a list takes a dragged task into a new section
   if (rl && !ro && !rl.is_inbox && total && canEditList(rl.id)) h += `<div class="sdrop snew" data-newsec="1">${ic('plus', 's')}<span>${tr('New section')}</span></div>`;

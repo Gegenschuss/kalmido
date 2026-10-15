@@ -168,6 +168,8 @@ def visible_lists(c, uid):
         d["trip"] = _jtrip(r["trip"])  # 2.22.0 (#663): {from, to, where} of a trip list, else null
         d["playbook"] = bool(pbs.get(r["id"]))  # 2.39.0 (#1168): the list has an effective Playbook (its own or a folder's)
         d.pop("col_cfg", None)
+        from ..lists.kpis import fx_list_out
+        fx_list_out(d, r)  # 2.43.0 (#1328): col_sums + kpis
         out.append(d)
     # 2.27.0 (#988): lists placed by their owner (mirrored) come first in their order, then the viewer's own (two numberings)
     out.sort(key=lambda d: (-d["is_inbox"], 0 if d.get("mirrored") else 1, d["sort"], d["id"]))
@@ -254,8 +256,8 @@ def state():
         filters=[{**dict(r), "rules": json.loads(r["rules"] or "{}")}
                  for r in c.execute("SELECT * FROM filters WHERE user_id=? ORDER BY sort, id", (uid,))],
         sections=visible_sections(c, uid),
-        fields=[field_dict(r) for r in c.execute(f"SELECT * FROM list_fields WHERE list_id IN {vis_sql()} ORDER BY sort, id",
-                                                 (uid, uid))],
+        fields=[field_dict(r, c) for r in c.execute(f"SELECT * FROM list_fields WHERE list_id IN {vis_sql()} ORDER BY sort, id",
+                                                    (uid, uid)).fetchall()],  # 2.43.0 (#1328): c = formula text with names
         tasks=tasks,
         habits=habits,
         pomo=running_pomo(c),

@@ -459,6 +459,10 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=
                         (lid, fd["name"], fd["type"], json.dumps(fd.get("options") or {}, ensure_ascii=False), fd.get("pinned") or 0,
                          i + 1, iso(now_utc())))
         fmap.append(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone())
+    if any(f["type"] == "formula" for f in fmap):  # 2.43.0 (#1328): formulas with the new field ids
+        from ..lists.fields import fx_tpl_fix
+        fx_tpl_fix(c, lid)
+        fmap = [c.execute("SELECT * FROM list_fields WHERE id=?", (f["id"],)).fetchone() for f in fmap]
     made = {}
     for i, n in enumerate(d.get("tasks") or []):
         si = n.get("section")

@@ -6339,3 +6339,89 @@ html.mini-task #app,html.mini-task #app.detail-open{grid-template-columns:minmax
 .dgzone.drop b{color:var(--accent)}
 .dgzone.dgoff{opacity:.45}
 .dgme .dgmeb{display:flex;flex-wrap:wrap;gap:.5rem}
+/* 2.43.0 C (#1452): widgets changed right in the view -- columns of six, three heights, the "…" menu and the grip at
+   every block, the line where a moved block lands, "standard for everyone" */
+.lygrid.lysix,.dgrid.lysix{grid-template-columns:minmax(0,1fr)}
+.lysix > .lyb{grid-column:1/-1}
+@media (min-width:900px){
+  .lygrid.lysix,.dgrid.lysix{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .lysix > .lw2,.lysix > .lw3{grid-column:span 3}
+  .lysix > .lw4,.lysix > .lw6{grid-column:1/-1}
+}
+@media (min-width:1100px){
+  .lysix > .lw2{grid-column:span 2}
+  .lysix > .lw3{grid-column:span 3}
+  .lysix > .lw4{grid-column:span 4}
+}
+.lysix > .lh1 > :first-child{max-height:15rem;overflow:auto}
+.lysix > .lh3 > :first-child{min-height:28rem}
+.lyb.lym{position:relative}
+.lymore{position:absolute;top:.55rem;right:.4rem;opacity:.55;background:var(--bg2);border-radius:var(--radius)}
+.lymore:hover,.lymore:focus-visible,.lyb:hover > .lymore{opacity:1}
+@media (pointer:coarse){ .lymore{opacity:.8;min-width:2.75rem;min-height:2.75rem;justify-content:center} }
+.lyb.lym .povh,.lyb.lym > .dcard > h3,.lyb.lym > .dcard > h2{padding-right:2rem}
+.pov .lysix{margin-top:.75rem;row-gap:.75rem}
+.pov .lysix > .lyb > .povs{margin-top:0;height:100%}
+.lygrip{position:absolute;right:1px;bottom:1px;width:14px;height:14px;cursor:nwse-resize;opacity:0;transition:opacity .15s;
+  background:linear-gradient(135deg,transparent 45%,var(--faint) 45%,var(--faint) 55%,transparent 55%,transparent 70%,var(--faint) 70%,var(--faint) 80%,transparent 80%)}
+.lyb:hover > .lygrip,body.wgresizing .lygrip{opacity:.8}
+body.wgresizing,body.wgresizing *{cursor:nwse-resize!important;user-select:none}
+@media (pointer:fine){ .lysix > .lym .povh,.lysix > .lym > .dcard > h3,.lysix > .lym > .dcard > h2{cursor:grab} }
+body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
+.lyb.wgdrag{opacity:.45}
+.wgline{position:fixed;z-index:96;background:var(--accent);border-radius:2px;pointer-events:none}
+.lycust{margin-left:.25rem}
+.wgstd{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.75rem;padding:.5rem .75rem;border:1px dashed var(--line2);border-radius:var(--r-l)}
+/* 2.43.0 C (#1346): the project page as a pin board -- a quiet tint per block (light and dark), the colour row of the
+   "…" menu, notepads */
+.lyc-yellow{--wgc:#d6a54a}.lyc-green{--wgc:#4fb477}.lyc-blue{--wgc:#79a3dc}.lyc-red{--wgc:#e5776e}.lyc-purple{--wgc:#a78bfa}.lyc-grey{--wgc:#9497a0}
+.lyb.lyc > :first-child{background:color-mix(in srgb,var(--wgc) 11%,var(--bg2));border-color:color-mix(in srgb,var(--wgc) 40%,var(--line))}
+.wgcols button{flex:0 0 auto;min-width:2rem;padding:.35rem}
+.wgcols .wgsw .ml{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.wgcols .wgsw::before{content:"";width:1.1rem;height:1.1rem;border-radius:50%;background:var(--wgc,transparent);border:1px solid var(--line2)}
+.wgsw-yellow{--wgc:#d6a54a}.wgsw-green{--wgc:#4fb477}.wgsw-blue{--wgc:#79a3dc}.wgsw-red{--wgc:#e5776e}.wgsw-purple{--wgc:#a78bfa}.wgsw-grey{--wgc:#9497a0}
+.wgcols .wgsw-none::before{background:linear-gradient(135deg,transparent 45%,var(--danger) 45%,var(--danger) 55%,transparent 55%)}
+.wgpadmd[data-wgpadedit]{cursor:text;border-radius:var(--radius);min-height:2.5rem}
+.wgpadmd[data-wgpadedit]:hover{background:color-mix(in srgb,var(--text) 4%,transparent)}
+.wgpadin{width:100%;min-height:8rem;resize:vertical}
+.wgpadh{margin:.25rem 0 0;font-size:.85em}
+/* 2.43.0 A (#1328): formula fields, the sum row under number columns, key figure tiles (formula.js) */
+.lc-f.t-formula{justify-content:flex-end}
+.cfx{display:inline-flex;align-items:center;min-height:2rem;color:var(--text2);font-variant-numeric:tabular-nums}
+.fxrow textarea{font:var(--fs-s)/1.4 var(--mono);width:100%;resize:vertical}
+.fxins{display:flex;flex-wrap:wrap;gap:.25rem;margin:.25rem 0 .5rem}
+.fxsum{display:flex;align-items:center;gap:.75rem;padding:.25rem .5rem .25rem .75rem;border-top:1px solid var(--line);margin-top:2px;font:var(--fs-s)/1.2 var(--sans);color:var(--text2);font-variant-numeric:tabular-nums}
+.fxsum .spacer{flex:1;min-width:0}
+.fxsum .fxsn{font:500 var(--fs-xs)/1.2 var(--mono);color:var(--muted)}
+.fxsum .lc-f{justify-content:flex-end}
+.fxsb{display:inline-flex;align-items:baseline;gap:.25rem;max-width:100%;min-height:1.5rem;padding:0 .25rem;margin:0 -.25rem;border:0;border-radius:var(--r-s);background:none;color:var(--text);font:600 var(--fs-s)/1.2 var(--sans);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fxsb i{font:500 var(--fs-xs)/1.2 var(--mono);font-style:normal;color:var(--muted)}
+.fxsb:hover{background:var(--bg3)}.fxsb:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (max-width:899px){ .fxsum{display:none} }
+@container lrows (max-width:48rem){ .fxsum{display:none} }
+.fxkpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(10rem,1fr));gap:.5rem}
+.fxk{display:flex;flex-direction:column;gap:.25rem;padding:.625rem .75rem;border:1px solid var(--line);border-radius:var(--r-m,.5rem);background:var(--bg2)}
+.fxkt{font-size:var(--fs-xs);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fxkv{font:600 1.25rem/1.2 var(--sans);font-variant-numeric:tabular-nums;color:var(--text)}
+.fxkls{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.5rem}
+.fxkr{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;padding:.5rem;border:1px solid var(--line);border-radius:var(--r-s)}
+.fxkr input{flex:1 1 9rem;min-width:7rem}
+.fxkr select{max-width:12rem}
+/* 2.43.0 A (#1331): a list like a spreadsheet (sheetgrid.js): the active cell, a selected range, the fill handle, the
+   new row under the last one, the paste preview */
+#view .lcols .lc[tabindex],#view .trow .tmain .ttl.sgact{outline:none}
+#view .lcols .lc[data-sgk]{align-self:stretch;min-height:1.25rem}  /* an empty due / assignee cell is still a target */
+#view .sgact{position:relative;box-shadow:inset 0 0 0 2px var(--accent);border-radius:var(--r-s)}
+#view .lcols .lc.sgsel{position:relative;background:color-mix(in srgb,var(--accent) 14%,transparent);border-radius:0}
+#view .lcols .lc.sgact.sgsel{border-radius:var(--r-s)}
+.sgfill{position:absolute;right:0;bottom:0;width:7px;height:7px;background:var(--accent);border:1px solid var(--bg);cursor:ns-resize;border-radius:1px}
+.sgnew{display:flex;align-items:center;padding:.25rem .5rem .25rem 2.25rem;border-bottom:1px solid var(--line)}
+.sgnew .sgin{flex:1;min-width:0;border:0;border-radius:var(--r-s);box-shadow:inset 0 0 0 2px var(--accent);padding:.25rem .5rem;background:var(--bg);color:var(--text);font:inherit}
+.sgpmd{max-width:min(56rem,96vw)}
+.sgpt{max-height:50vh;overflow:auto;margin-top:.5rem;border:1px solid var(--line);border-radius:var(--r-s)}
+.sgpt table{border-collapse:collapse;width:100%;font-size:var(--fs-s)}
+.sgpt th,.sgpt td{padding:.25rem .5rem;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;max-width:14rem;overflow:hidden;text-overflow:ellipsis}
+.sgpt thead th{position:sticky;top:0;background:var(--bg2);z-index:1}
+.sgpt tbody th{font-weight:500;color:var(--text2)}
+.sgpt .sgbad{background:color-mix(in srgb,var(--p5) 16%,transparent);color:var(--p5)}
+.sgpmd .sgpn{font-size:var(--fs-s)}

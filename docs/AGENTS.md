@@ -2017,7 +2017,9 @@ with the scope it needs). The tools:
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
 - dependencies and fields: `get_dependencies`, `add_dependency`, `remove_dependency`, `list_fields`, `create_field`,
   `update_field`, `delete_field` (2.39.1, #1293: custom fields in every list, not only projects; creating a field or
-  showing it with `set_list_columns` switches the module *Custom fields* on for the list's owner, the answer's `modules_on` names it)
+  showing it with `set_list_columns` switches the module *Custom fields* on for the list's owner, the answer's `modules_on` names it;
+  2.43.0, #1328: type `formula` with `formula` = a calculation over number fields, computed by the server and read-only in
+  tasks), `get_key_figures` (2.43.0: the key figures of a list, `GET /api/v1/lists/{id}/kpis`, read-only, never of a health list)
 - list tags: `list_list_tags`, `create_list_tag`, `update_list_tag`, `delete_list_tag`
 - templates and filters: `list_templates`, `create_template`, `update_template`, `delete_template`, `apply_template`,
   `list_filters`, `create_filter`, `update_filter`, `delete_filter`

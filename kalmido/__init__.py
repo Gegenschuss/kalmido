@@ -56,6 +56,7 @@ ORDER = (
     "lists.templates",
     "tasks.dependencies",
     "lists.projects",
+    "lists.formula",  # 2.43.0 (#1328): the formula parser (no routes; used by lists.fields)
     "lists.fields",
     "personal.stats",
     "calendars.icalfeed",
@@ -94,6 +95,7 @@ ORDER = (
     "integrations.gitfolder",  # 2.33.0 (#934)
     "integrations.errorreports",
     "api.projects",
+    "lists.kpis",  # 2.43.0 (#1328): sum row + key figures (web + token API)
     "api.scopes",
     "collab.notes",
     "collab.teamchat",
