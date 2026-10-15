@@ -205,6 +205,9 @@ APP_TO_API = {
 APP_ONLY = [
     ("2.36.1 (#1021): Office & finance, stage 1 -- no agent API and no MCP tool before the security audit (#476); agents see only what is shared",
      ("* /api/office/",)),
+    ("2.49.0 (#1199, #1201): knowledge pages, stage 1 -- no agent access yet (shares of pages / folders for organisation agents with "
+     "scopes wiki:read / wiki:write come as their own step); the outline parser only serves the mind map import of the web app",
+     ("* /api/wiki", "=POST /api/outline/parse")),
     ("2.27.0 (#999): the web panel says a person edits a task (tidy-up waits); agents never edit in a panel", ("=POST /api/tasks/{}/editing",)),
     ("2.42.0 (#1376): the web app's live updates (only the tasks changed since its state); agents follow their events and GET /tasks",
      ("=GET /api/state/delta",)),
