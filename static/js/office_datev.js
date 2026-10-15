@@ -41,8 +41,8 @@ const dx_iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
 function dx_dialog() {
   const n = new Date(), from = new Date(n.getFullYear(), n.getMonth() - 1, 1), to = new Date(n.getFullYear(), n.getMonth(), 0);
   const md = ofdDlg(tr('DATEV export'), `<p class="muted ofchint">${tr('Finalised invoices, credit notes and payments of the period as a DATEV booking batch (CSV) for your tax advisor.')}</p>
-    <div class="row"><label for="dx-from">${tr('From')}</label><input id="dx-from" type="date" value="${dx_iso(from)}"></div>
-    <div class="row"><label for="dx-to">${tr('To')}</label><input id="dx-to" type="date" value="${dx_iso(to)}"></div>
+    <div class="row"><label id="dx-fl">${tr('From')}</label>${dateIn('dx-from', dx_iso(from), {label: tr('From'), clear: false})}</div>
+    <div class="row"><label id="dx-tl">${tr('To')}</label>${dateIn('dx-to', dx_iso(to), {label: tr('To'), clear: false})}</div>
     <p class="muted" id="dx-res" aria-live="polite"></p>`, tr('Download'), async m => {
     const q = `from=${encodeURIComponent($('#dx-from', m).value)}&to=${encodeURIComponent($('#dx-to', m).value)}`;
     const j = await api('GET', `/api/office/datev/extf?${q}&check=1`);

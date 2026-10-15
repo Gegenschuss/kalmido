@@ -6849,7 +6849,7 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .jpart .jobtag i{background:color-mix(in srgb,var(--jcol) 65%,#fff)}
 /* 2.47.3 B (#1022, #1652): travel expenses and cash flow in the office */
 .rkbar select{min-height:2.25rem}
-.rkbadge{display:inline-block;min-width:1.25rem;padding:0 .3rem;border-radius:999px;background:var(--accent);color:var(--on-accent,#fff);font-size:.75rem;line-height:1.25rem;text-align:center}
+.rkbadge{display:inline-block;min-width:1.25rem;padding:0 .3rem;border-radius:999rem;background:var(--accent);color:var(--on-accent,#fff);font-size:.75rem;line-height:1.25rem;text-align:center}
 .rksum{font-variant-numeric:tabular-nums;white-space:nowrap}
 .rkmiss{color:var(--accent)}
 .rkhead{margin:.25rem 0 .75rem}.rkhead h3{margin:0 0 .25rem}.rkhead p{margin:.125rem 0}
@@ -6872,7 +6872,7 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .rkcfm header{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .5rem;min-height:2rem}
 .rkcfbal{font-variant-numeric:tabular-nums;white-space:nowrap}.rkcfbal.neg{color:var(--danger,#c0392b)}
 .rkcfbars{display:flex;flex-direction:column;gap:2px;margin:.25rem 0}
-.rkcfbars span{display:block;height:4px;border-radius:2px;transform-origin:left center;transition:transform .2s ease}
+.rkcfbars span{display:block;height:.25rem;border-radius:2px;transform-origin:left center;transition:transform .2s ease}
 .rkcfbin{background:var(--accent)}.rkcfbout{background:var(--accent);opacity:.35}
 .rkcftab td,.rkcftab th{padding:0 .25rem;vertical-align:middle}
 .rkcftab td .rkcfv{display:inline-flex;align-items:center;justify-content:flex-end;margin:0;min-height:2.75rem;min-width:4rem;padding:0 .25rem;background:none;border:0;color:var(--text);font:inherit;font-variant-numeric:tabular-nums;cursor:pointer;border-radius:var(--radius)}
@@ -6887,3 +6887,7 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 @media (pointer:coarse){.dxbar .btn{min-height:2.75rem}}
 /* 2.47.3 E (#1460): the DATEV export settings block */
 .dxset .lacts .numin{max-width:7rem}
+
+/* 2.47.3 G (#1382): the (i) buttons of the quotation editor fields are 24 px targets (every control there >= 24 px) */
+.ofdeditor .ib:not(.ibl),.ofdhead .ib:not(.ibl){width:1.5rem;height:1.5rem}
+.ofdeditor .ib.ibl,.ofdhead .ib.ibl{min-height:1.5rem}
