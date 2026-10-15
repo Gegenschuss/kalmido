@@ -176,8 +176,9 @@ function ticketTplModal(lid) {
     if (b.dataset.m === 'save') {
       // 2.46.2 (#1659): at once (optimistic), no reload of the whole state; an error puts the old templates back
       const tpl = {bug: $('#tt-bug', md).value, feature: $('#tt-feature', md).value};
-      md.remove(); toast(tr('Saved'));
-      optWrite(optSet(() => listById(lid), {ticket_tpl: JSON.stringify(tpl)}), () => api('PATCH', '/api/lists/' + lid, {ticket_tpl: tpl})).catch(() => {});
+      // the dialog closes once the server has it: on an error the typed texts are still there
+      optWrite(optSet(() => listById(lid), {ticket_tpl: JSON.stringify(tpl)}), () => api('PATCH', '/api/lists/' + lid, {ticket_tpl: tpl}))
+        .then(() => { md.remove(); toast(tr('Saved')); }).catch(() => {});
     }
   });
 }

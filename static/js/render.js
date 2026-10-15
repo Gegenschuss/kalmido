@@ -714,7 +714,7 @@ function fl_set(el, html) { const prev = morphRoot; if (el.firstChild) morphRoot
 // every 400 ms (the first after ~one frame). raw = renderView (else viewSafeRender: a busy field waits); mod = only while that
 // module is shown. A redraw in between (a click) restarts the 400 ms.
 function fl_viewSoon(raw, mod) {
-  FL.vraw = FL.vraw || !!raw; if (mod !== undefined) FL.vmod = FL.vt && FL.vmod !== mod ? null : mod;
+  FL.vraw = FL.vraw || !!raw; if (mod !== undefined) FL.vmod = FL.vt && FL.vmod !== mod ? null : mod; else if (FL.vt) FL.vmod = null;  // any module
   if (FL.vt) return;
   const run = () => {
     FL.vt = 0; const r = FL.vraw, m = FL.vmod; FL.vraw = false; FL.vmod = undefined;
@@ -740,7 +740,7 @@ const mkey = n => n.nodeType !== 1 ? null : ['data-k', 'data-id', 'data-cid', 'd
 // morph keeps these instead of dropping and re-adding them on every redraw
 const fl_iiId = o => o.nodeType === 1 && o.hasAttribute('data-ii') && /^ii\d+$/.test(o.id);
 const fl_ib = o => o.nodeType === 1 && o.nodeName === 'BUTTON' && o.classList.contains('ib') && o.hasAttribute('data-ii');
-const fl_key = n => { if (n.nodeType !== 1) return null; const id = fl_iiId(n) ? '' : n.id; if (id) return '#' + id; const k = mkey(n); return k == null ? null : n.nodeName + ':' + k; };
+const fl_key = n => { if (n.nodeType !== 1) return null; const id = fl_iiId(n) ? '' : n.id; if (id) return '#' + id + ':' + n.nodeName; const k = mkey(n); return k == null ? null : n.nodeName + ':' + k; };
 function fl_iiTidy(root) { for (const b of root.querySelectorAll('button.ib[data-ii]')) if (!document.getElementById(b.dataset.ii) && !root.querySelector('#' + CSS.escape(b.dataset.ii))) b.remove(); }
 // what code sets after the render (calFit / chatFit heights, the phone chat's keyboard fix, a drag, the sheet grid's cells)
 // stays on a kept node; the code that set it also takes it away

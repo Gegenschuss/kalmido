@@ -7,6 +7,46 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.46.2] - 2026-10-15
+
+**In short:** **Fixes and polish**: views no longer flicker on live updates, renames and list settings show at once,
+new chat messages and comments fade in, dialogs move on the desktop, a chat opens in its own window, and a round of
+smaller fixes (customers, PDF import, import bar, empty sections, encrypted notes, folders, copying comments).
+
+### Added
+- **Dialogs move on the desktop** (#1665): drag any dialog (settings, sharing, list and folder settings, questions) by
+  its header; it stays inside the window, a double click centres it again, new dialogs open centred. Phones unchanged.
+- **A chat in its own window** (#1719): a button in the head of an agent chat, a team room or a direct message (and a
+  middle click) opens just that conversation in a small browser window; the same chat comes back to its window.
+- **"New message ↓" / "New comment ↓"** (#1660) in the team chat and on tasks when you scrolled up and something new
+  arrives; new messages and comments fade in briefly (off with reduced motion).
+- **Copy a comment** (#1666): *Copy* and *Copy as Markdown* on every comment, also on others' and in read-only lists.
+- **Dismiss the "differs from the standard" note** (#1726) on Home and project pages; it comes back when your layout or
+  the standard changes (synced across devices).
+
+### Changed
+- **No flicker on live updates** (#1718): a view that is redrawn (live updates, running agent jobs, calendar, timeline,
+  roadmap, agents page) keeps the parts that did not change instead of rebuilding the page; pictures do not reload,
+  scroll position, focus, open logs and typed text stay; redraws during busy agent jobs are bundled (at most every 0.4 s).
+- **Renames and list settings show at once** (#1659): the list name follows each keystroke in the sidebar and header
+  (still one undo step), calendars and address books rename at once, a list moves to its folder or the archive at once,
+  ticket templates and key figures save without a reload, a deleted list is gone at once; an error puts the old state back.
+- **Empty sections** (#1662): the section name is the one drop target; the extra "Drop tasks here" field is gone.
+- **Subfolder to top level by drag** (#1664): drop a subfolder on the upper half of a top folder to make it a top-level
+  folder right before it; the lower half still moves it inside.
+- **Archive import bar** (#1647): the bottom bar spans the width with a clear edge, buttons on the right; *Paid* is a
+  normal check box and date / number are no longer cut off on narrow screens.
+
+### Fixed
+- **Customers** (#1472): a customer without a linked list showed "Invalid Date" instead of the month.
+- **Legacy PDF import** (#1646): bank and contact values of a template (IBAN, BIC, phone, tax numbers, a bank's name)
+  no longer end up in the recipient address; a person above the company becomes the contact (marked for checking);
+  a company name on two lines stays together.
+- **Settings search** (#1651): browsers no longer fill a saved user name into the search field; secret fields are no
+  longer read as a login form.
+- **Encrypted note** (#1663): while encrypted notes are locked and the task has no note of your own, the field is hidden.
+- **"New API token" button** (#1712): readable again (a danger button instead of red on the accent colour).
+
 ## [2.46.1] - 2026-10-15
 
 **In short:** **Lists, sidebar, phone animations**: folder rows read like list rows, lists and sections can be dragged to
