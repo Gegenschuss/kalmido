@@ -49,8 +49,9 @@ for c in caps:
     for pat in c.get("core") or []:
         check(pat in core, f"agent_run.py has {pat!r} ({c['id']})")
     check(c.get("what") and c.get("since"), f"{c['id']}: what + since")
+launcher_only = {c["id"] for c in caps if c.get("launcher")}  # 2.44.0 (#1517): done by the launchers themselves (host_name)
 for cid in ids:
-    if cid != "runtime":
+    if cid != "runtime" and cid not in launcher_only:
         check(re.search(r"kalmido-capability:[^\n]*\b" + cid + r"\b", core) is not None, f"agent_run.py marks {cid}")
 
 # ---- the runner itself, without a server
