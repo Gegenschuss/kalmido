@@ -70,9 +70,11 @@ s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
 A.patch(B + "/api/settings", json={"lang": "en"})
+# 2.46.0 (#1592): no organisation from the start any more: the #910 pool needs one with alice, bob and carol
+ORG = A.post(B + "/api/admin/orgs", json={"name": "Kalmido"}).json()["id"]
 ids = {"alice": 1}
 for u in ("bob", "carol"):
-    r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123"})
+    r = A.post(B + "/api/users", json={"orgs": [ORG], "username": u, "display_name": u.title(), "password": "password123"})
     assert r.ok, r.text
     ids[u] = r.json()["id"]
 Bo, Ca = sess("bob"), sess("carol")
