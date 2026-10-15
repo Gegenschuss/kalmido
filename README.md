@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.46.3** (2026-10-15): fixes for 2.46.2 (table cells after editing, focus after dialogs, the new-message pills).
 - **2.46.2** (2026-10-15): **fixes and polish**: **no flicker** on live updates, renames and list settings **show at
   once**, new chat messages and comments **fade in** (with "New message ↓"), **dialogs move** on the desktop, a chat in
   **its own window**, copy comments, a dismissible layout note, and fixes for customers, the PDF import, empty sections,

@@ -6358,6 +6358,10 @@ html.mini-task #app,html.mini-task #app.detail-open{grid-template-columns:minmax
 @media (pointer:coarse){ .lymore{opacity:.8;min-width:2.75rem;min-height:2.75rem;justify-content:center} }
 .lyb.lym .povh,.lyb.lym > .dcard > h3,.lyb.lym > .dcard > h2{padding-right:2rem}
 .lyb.lym .agjh{padding-right:2.25rem}  /* the … button must not cover the Open / All switch of the agents view (axe target-size) */
+/* 2.46.2 (#1452): the evening review card (only after the end of the working hours) keeps its "Hide for today" x clear of the … button */
+.lyb.lym > .rvcard > .rvhd{padding-right:1.5rem}
+.lyb.lym > .rvcard.fold{padding-right:2rem}
+@media (pointer:coarse){ .lyb.lym > .rvcard > .rvhd{padding-right:2.5rem} .lyb.lym > .rvcard.fold{padding-right:3.25rem} }
 .pov .lysix{margin-top:.75rem;row-gap:.75rem}
 .pov .lysix > .lyb > .povs{margin-top:0;height:100%}
 .lygrip{position:absolute;right:1px;bottom:1px;width:.875rem;height:.875rem;cursor:nwse-resize;opacity:0;transition:opacity .15s;
@@ -6681,7 +6685,7 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 @keyframes cfin{from{opacity:0;transform:translateY(.375rem)}to{opacity:1;transform:none}}
 .cfin{animation:cfin .18s ease-out}
 @media (prefers-reduced-motion:reduce){ .cfin{animation:none} }
-.chnew.cmnew{position:sticky;bottom:.75rem;margin:0 auto;width:max-content}
+.chnew.cmnew{position:sticky;bottom:calc(3.5rem + var(--safe-b, 0px));z-index:3;margin:0 auto;width:max-content}  /* above the sticky task foot (.dfoot) */
 .chnew.cmnew.hidden{display:none}
 /* 2.46.2 D (#1647 #1662) the import's action bar over the full width of the view (outside a modal .foot is no flex row, so the
    spacer did nothing); the paid tick is a plain checkbox at its label; the section name is the drop target of an empty section */

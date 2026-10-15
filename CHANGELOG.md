@@ -7,6 +7,18 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.46.3] - 2026-10-15
+
+**In short:** fixes for 2.46.2 found by the automatic tests and the device check.
+
+### Fixed
+- **Redraws** (#1718): a table cell shows its new value after editing (Esc cancels again), the header keeps its buttons
+  on a redraw so a closed dialog gives the focus back to where it was opened, no script error in older test browsers.
+- **"New message ↓" / "New comment ↓"** (#1660): the team room shows the pill on a live update too, and the comment pill
+  sits above the task's foot on phones.
+- **Evening review on Home** (#1452): its *Hide for today* x no longer sits under the block's *...* button.
+- **Settings** (#1651): the helper user name field for password managers is fully hidden.
+
 ## [2.46.2] - 2026-10-15
 
 **In short:** **Fixes and polish**: views no longer flicker on live updates, renames and list settings show at once,

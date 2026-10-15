@@ -24,7 +24,13 @@ function cf_visible(el) {
 }
 const cf_pill = (id, on) => { const b = document.getElementById(id); if (b && b.classList.contains('hidden') === on) b.classList.toggle('hidden', !on); };
 // a full redraw of the team view (a message arrived while nobody types): the new ones still fade in
-function cf_view() { const box = $('#tc-msgs'); if (box) cf_after(box, 't:' + S.tc.rid); }
+function cf_view() {
+  const box = $('#tc-msgs'); if (!box) return;
+  const added = cf_after(box, 't:' + S.tc.rid);
+  // scrolled up (the distance to the end without the new messages) -> "New message ↓", as in tcPatch
+  const gap = box.scrollHeight - box.scrollTop - box.clientHeight - added.reduce((h, n) => h + n.offsetHeight, 0);
+  if (added.length && gap >= 80) cf_pill('tc-new', true);
+}
 // the comments of the open task: the box is patched in drawTimeline; `wasSeen` = the last comment was in view before
 function cf_comments(box, wasSeen) {
   const added = cf_after(box, 'c:' + S.tl?.id);

@@ -108,6 +108,7 @@ function tcEdit(cell) {
   let done = false;
   const fin = (save, dir) => {
     if (done) return; done = true;
+    cell.classList.remove('tcon');  // 2.46.2 (#1718): the redraw morphs an open (.tcon) cell not; a closed one shows the new value
     if (save) { tcSave(t.id, f.id, tcVal(f, inp.value)).then(() => { if (dir) tcNext(t.id, f.id, dir); }); }
     else { render(); setTimeout(() => tcCells(t.id).find(c => +c.dataset.fe === f.id)?.focus({preventScroll: true}), 0); }
   };
