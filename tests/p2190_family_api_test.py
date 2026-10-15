@@ -89,7 +89,7 @@ today = date.today()
 
 # ================================================================== the setup: "What do you use Kalmido for?" = Family (German)
 r = A.post(B + "/api/admin/setup", json={"lang": "de", "collab_all": True, "time_all": True,
-                                          "modules": ["cal", "habits", "comments", "family"], "purpose": "family"})
+                                          "modules": ["cal", "habits", "comments", "family"], "purpose": "family", "examples": True})  # 2.46.1 (#1602)
 check(r.ok, "setup with purpose family " + r.text[:200])
 A.patch(B + "/api/settings", json={"tour": "done"})
 st = A.get(B + "/api/state").json()
@@ -118,9 +118,11 @@ r = A.post(B + "/api/me/purpose", json={"purpose": "family"})
 check(r.ok and r.json()["created"] == [] and len([l for l in A.get(B + "/api/state").json()["lists"] if l["family"]]) == 4,
       "purpose family again: no second set of lists")
 r = A.post(B + "/api/me/purpose", json={"purpose": "software"})
+check(r.ok and r.json()["created"] == [], "2.46.1 (#1602): no sample project without examples")
+r = A.post(B + "/api/me/purpose", json={"purpose": "software", "examples": True})
 fs = r.json()["features"].split(",")
 check(r.ok and len(r.json()["created"]) == 1 and "family" not in fs and {"kanban", "deps", "time", "timeline"} <= set(fs), f"purpose software: a project, the modules {fs}")
-check(A.post(B + "/api/me/purpose", json={"purpose": "software"}).json()["created"] == [], "… once")
+check(A.post(B + "/api/me/purpose", json={"purpose": "software", "examples": True}).json()["created"] == [], "… once")
 r = A.post(B + "/api/me/purpose", json={"purpose": "me"})
 check(set(r.json()["features"].split(",")) <= {"cal", "paperless", "agents", "events", "contacts"} and "cal" in r.json()["features"].split(","),
       "purpose me: the simple start (2.21: with events + contacts) " + r.json()["features"])
