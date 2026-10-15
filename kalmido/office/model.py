@@ -55,7 +55,9 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "industry_packs": [],
                      # 2.47.0 (#1215): an invoice from a quotation with parts: "full" (like the quotation), "title" (the title
                      # page with its positions) or "summary" (one position per tax rate with this title)
-                     "parts_invoice_mode": "full", "parts_summary_title_de": "Filmherstellung", "parts_summary_title_en": "Film production"}
+                     "parts_invoice_mode": "full", "parts_summary_title_de": "Filmherstellung", "parts_summary_title_en": "Film production",
+                     # 2.47.3 (#1460): the DATEV booking batch export (office.datev: advisor / client number, chart, accounts)
+                     "datev_extf": {}}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -312,6 +314,9 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = v
         elif k in ("parts_summary_title_de", "parts_summary_title_en"):
             out[k] = re.sub(r"[\x00-\x1f\x7f]", "", v or "").strip()[:300] if isinstance(v, str) else ""
+        elif k == "datev_extf":  # 2.47.3 (#1460)
+            from .datev import dx_settings_clean
+            out[k] = dx_settings_clean(v, out.get(k) or {})
         elif k == "offer_number_at":
             if v not in ("create", "finalize"):
                 raise BadInput(tr("Invalid value: {0}", k))

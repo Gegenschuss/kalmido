@@ -473,8 +473,23 @@ the PDF button downloads as before. Archive PDFs of the legacy import open inlin
 
 DATEV: the settings hold one e-mail address of the DATEV document inbox (`datev_email`); `datev: true` in the send
 body, the setting `datev_auto` or `POST /api/office/docs/<id>/datev` mail the PDF + XML of an invoice or credit note
-there (`datev_sent_at`). No credentials, no bookkeeping export (a booking batch export is a later step). Every send is
+there (`datev_sent_at`). No credentials; the booking batch export follows below. Every send is
 in the office log (`send`, `datev`), payments as `payment` / `payment_delete`.
+
+DATEV booking batch (2.47.3, #1460): `GET /api/office/datev/extf?from=YYYY-MM-DD&to=YYYY-MM-DD` (admin; default the
+previous month; `check=1` answers `{count, from, to, file}` only) downloads the finalised invoices, credit notes and the
+payments of the period as a DATEV EXTF file (format 700, category 21 "Buchungsstapel", format version 13): header line
+with 31 fields, 125 column names, one booking line per tax rate of a document (gross, debtor against the revenue account
+of that rate; credit notes H) and per payment (bank or cash account against the debtor, S). Windows-1252, semicolons,
+decimal comma, document date DDMM, CRLF; the period must lie within one fiscal year. Settings `datev_extf`:
+`advisor_no` (4-7 digits), `client_no` (1-5 digits, both required for the export), `fy_start` (month), `acct_len`
+(4-8), `chart` (`SKR03` / `SKR04`, default accounts per case: 8400 / 8300 / 8100 / 8337 / 8338 / 8195 resp. 4400 /
+4300 / 4100 / 4337 / 4338 / 4185, collective debtor 10000, bank 1200 / 1800, cash 1000 / 1600, stretched to the ledger
+length), `accounts` / `bu` (own account / tax key per case `standard`, `reduced`, `exempt`, `reverse`, `abroad`,
+`small`), `debtor`, `bank`, `cash`. A client's customer number is its debtor when it is a debtor number (digits, ledger
+length + 1, first digit 1-6). Documents without VAT go by their VAT note (reverse charge, abroad, small business; small
+business never with a tax key). Foreign currency documents are booked in EUR by the document's rate. The export is in
+the office log (`export`, target `datev`).
 
 Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit_scheme`, `reminder_scheme`,
 `payment_days` (14), `reminder_fee` (0), `reminder_deadline_days` (10), `einvoice_format`, `datev_email`, `datev_auto`,

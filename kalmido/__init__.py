@@ -150,6 +150,7 @@ ORDER = (
     "office.parts",  # 2.47.0 (#1215): parts of a quotation (Teilangebote): routes, title page calculation, invoice modes
     "office.travel",  # 2.47.3 (#1022, part B): travel expenses (trips, receipts, evaluation, billing on)
     "office.cashflow",  # 2.47.3 (#1652, part B): cash flow per month + fixed costs
+    "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
     "team.approvals",
     "team.forms",
     "team.v1",
