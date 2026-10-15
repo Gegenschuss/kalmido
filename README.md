@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.47.2** (2026-10-15): CI fixes for 2.47.0 and 2.47.1 (both go live with this version).
 - **2.47.1** (2026-10-15): **several chats at once**: agent chats, team channels and direct messages open one above the
   other in the chat panel (Ctrl/Cmd+click or *Open in split window*), each with its own draft and unread dot, a movable
   divider and the open windows kept per device; phones switch between them in a row at the top. **Fixed colours**:
