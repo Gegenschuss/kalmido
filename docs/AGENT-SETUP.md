@@ -494,14 +494,19 @@ chat messages of one person that arrive together: one run). It does what a hoste
   build, an audit, a full test run) the agent starts with `python3 agent_job.py start --title "..." [--worktree] -` (the brief on
   stdin). The job is an own background run of the same command (it survives a restart of the runner), shows as a job in the Agents
   tab with its steps and progress lines (`agent_job.py progress ID "..."`), and posts its complete result, with the files in its own
-  outbox, into the chat. The next chat run gets a note that the job is done. *Stop* on the job stops the process. When the plan
+  outbox, into the chat. 2.46.6: then it **wakes the chat agent** -- exactly one chat run for that person with the outcome and the
+  start of the result, in which the agent goes on (the next step or a short note); a stopped job wakes it with the hint not to
+  restart it, a failed one with what went wrong (a job without a chat person leaves a note for the next run). *Stop* on the job stops the process. When the plan
   limit ends a run, the job waits for the reset (+ 2 minutes) and continues the **same session** (`--resume`, at most 3 times).
   `--worktree` gives it its own `git worktree` and branch `job/<id>` (at most `KALMIDO_JOB_WORKTREES` open, default 2); `list`,
   `status ID` and `stop ID` do what they say; `KALMIDO_JOB_TIMEOUT_H` (default 6) ends a job that runs too long. After the
   command compacted its conversation (`compact_boundary`) the brief is played in again -- this needs an agent command that
   takes a stream of user messages (Claude Code: `--input-format stream-json`, used automatically for a command named `claude`);
   other commands cannot be reminded. Stop, resume and the brief survive because everything lives in the state folder
-  (`jobs/<id>/`). Without Claude Code's session id there is no resume: a limit ends the job with its error.
+  (`jobs/<id>/`). Without Claude Code's session id there is no resume: a limit ends the job with its error. 2.46.6: after a
+  restart of the computer the runner finds a job whose process is gone and continues it **once** in the same session
+  (`--resume` with a short note instead of the brief); without a session, or when it is lost a second time, it stays lost
+  (the Kalmido job is set to failed) and the chat agent is woken with the hint to offer a new start. Never an endless restart.
 - **Task events bundled** (2.44.0): new or moved tasks (`task_added`, `tasks_added`, `tidy`; the server sends them only to agents that
   listen in) are collected for 2 minutes (`KALMIDO_BUNDLE_S`) and handled in **one** run that only answers, checks or asks on the
   tasks -- never builds. The run carries each task with its description and the latest comments. Pure information (`missed`,

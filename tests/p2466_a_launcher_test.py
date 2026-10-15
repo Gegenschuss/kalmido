@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """2.46.6 part A: the reference launcher (mcp/agent_run.py, mcp/agent_job.py) without a server -- suggestion buttons cut
 at a word (#1722), exactly one suggestion (#1714), the fixed rules block in every run (#1715),
-WORKFLOW-KALMIDO.md (#1717). A stub
+WORKFLOW-KALMIDO.md (#1717), a wake run after a job and a lost job continued once (#1445). A stub
 API and a fake 'claude' command (prints stream-json), pure Python, no container."""
 import importlib.util
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MCP = os.path.join(HERE, "..", "mcp")
@@ -211,6 +214,79 @@ r = runner("s3")
 r.run(7, [chat(1, "hello")])
 check("Launcher, once" not in calls()[0]["prompt"], "the file is there: no question")
 os.remove(os.path.join(PROJ, "WORKFLOW-KALMIDO.md"))
+
+# ---- #1445: a job that ended wakes the chat agent with exactly ONE chat run
+r = runner("s4")
+aj.STATE_DIR = r.state_dir
+
+
+def mkjob(jid, **kw):
+    j = {"id": jid, "kalmido_job": jid, "title": f"Build {jid}", "state": "running", "cmd": [FAKE], "task": None, "chat_user": 7,
+         "timeout_s": 600, "resumes": 0, "created": time.time() - 3600, "cwd": PROJ, "worktree": None, "session": "", **kw}
+    aj.save(j)
+    with open(os.path.join(aj.job_dir(jid), "brief.txt"), "w") as f:
+        f.write("Build the release.")
+    return j
+
+
+j = mkjob(50, state="done")
+check(aj.add_wake(j, "done", "All built. Tests green.") and not aj.add_wake(aj.load(50), "done", "again"), "one wake file per job, never two")
+check(r.job_watch() == 1 and r.job_watch() == 0, "the runner takes the wake once")
+q = list(r.state.data["queue"])
+check(len(q) == 1 and q[0]["event"] == "job_wake" and r.chat_uid(q[0]) == 7, f"queued as a chat run for the job's person: {q}")
+r.handle(q, save=True)
+r.queue_drop(q)
+cl = calls()
+check(len(cl) == 1 and 'Job #50 "Build 50"' in cl[0]["prompt"] and "is done" in cl[0]["prompt"] and "All built" in cl[0]["prompt"],
+      "exactly one wake run with the job's outcome and result")
+check(cl and cl[0]["prompt"].startswith("## Fixed rules") and "Launcher, once" not in cl[0]["prompt"], "the wake run has the rules block, no routine question")
+check(r.api.posts and r.api.posts[-1]["uid"] == 7, "its answer goes into the person's chat")
+check(not r.state.data["queue"] and r.job_watch() == 0 and calls() == [], "nothing left: no second wake run")
+j = mkjob(51, state="stopped")
+aj.add_wake(j, "stopped", hint="It was stopped by a person.")
+r.job_watch()
+q = list(r.state.data["queue"])
+r.handle(q, save=True)
+r.queue_drop(q)
+p = calls()[0]["prompt"]
+check("was stopped" in p and "Do not start it again" in p, "a stopped job: a wake run with the hint not to restart it")
+j = mkjob(52, state="done", chat_user=None)
+check(not aj.add_wake(j, "done", "x") and not os.path.exists(os.path.join(r.state_dir, "wakes", "52.json")), "no chat person: no wake run")
+check(any("Job #52" in n for n in r.extras.take_notes()) if r.extras else True, "... a note for the next run instead")
+
+# ---- #1445: after a restart a lost job is continued ONCE in the same session
+spawned = []
+real_spawn = aj.spawn_run
+aj.spawn_run = lambda j, extra=None: spawned.append((j["id"], list(extra or [])))
+mkjob(60, runner_pid=999999, session="S-9")
+mkjob(61, runner_pid=999999)
+check(aj.revive_lost(None) == [60] and spawned == [(60, ["--revive"])], f"a lost job with a session goes on once: {spawned}")
+check(aj.load(60)["state"] == "starting" and aj.load(61)["state"] == "lost", "the one without a session stays lost")
+w = aj.take_wakes()
+check(len(w) == 1 and w[0]["job"]["id"] == 61 and w[0]["job"]["state"] == "lost", f"... and wakes the chat agent: {w}")
+j = aj.load(60)
+j["revived"] = time.time() - 120  # its new process is gone too
+aj.save(j)
+check(aj.revive_lost(None) == [] and spawned == [(60, ["--revive"])], "lost again: never continued a second time")
+w = aj.take_wakes()
+check(aj.load(60)["state"] == "lost" and len(w) == 1 and "interrupted again" in w[0]["hint"], f"... it stays lost and wakes the chat agent: {w}")
+check(aj.revive_lost(None) == [] and aj.take_wakes() == [], "nothing more after that")
+aj.spawn_run = real_spawn
+mkjob(62, state="starting", created=time.time())
+check(aj.revive_lost(None) == [] and aj.load(62)["state"] == "starting", "a job that is just being started is not lost")
+
+# the continued run itself: the same session (--resume) with the note instead of the brief
+CMD2 = os.path.join(TMP, "bin", "agentcmd")  # not named claude: no stream input
+shutil.copy(FAKE, CMD2)
+os.chmod(CMD2, 0o755)
+mkjob(63, state="starting", session="S-9", cmd=[CMD2])
+env = dict(os.environ, KALMIDO_STATE_DIR=r.state_dir)
+rc = subprocess.run([sys.executable, os.path.join(MCP, "agent_job.py"), "_run", "63", "--revive"], env=env, capture_output=True, timeout=60).returncode
+cl = calls()
+check(rc == 0 and len(cl) == 1 and cl[0]["args"][-2:] == ["--resume", "S-9"] and cl[0]["prompt"].strip() == aj.REVIVE_PROMPT,
+      f"revive: --resume of the same session, the note as the prompt: {cl}")
+w = aj.take_wakes()
+check(aj.load(63)["state"] == "done" and len(w) == 1 and w[0]["job"]["state"] == "done", "the continued job ends and wakes the chat agent")
 
 print(f"p2466_a_launcher: {ok} ok, {len(F)} failed")
 sys.exit(1 if F else 0)
