@@ -60,7 +60,8 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   await sleep(400);
   const fl = JSON.parse(w.eval(`S.settings.folders`));
   check(JSON.stringify(fl) === JSON.stringify(['Work', 'Sub', 'Home']), '#1664: the folder is now top-level, right before Home ' + JSON.stringify(fl));
-  check(JSON.stringify(JSON.parse((await call('GET', '/api/settings')).folders || '[]')) === JSON.stringify(fl), '#1664: the order is saved');
+  const sv = JSON.parse(((await call('GET', '/api/state')).settings || {}).folders || '[]');
+  check(JSON.stringify(sv) === JSON.stringify(fl), '#1664: the order is saved ' + JSON.stringify(sv));
 
   // ================= #1647
   const css = require('fs').readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
