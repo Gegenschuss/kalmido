@@ -56,7 +56,7 @@ characters, the permissions, the expiry and when it was last used; its lock butt
 addresses later (`PATCH /api/me/tokens/{id}` `{scopes?, allowed_ips?, name?}`). Revoking works immediately. A disabled or deleted user's
 tokens stop working at once.
 
-An admin can **limit** what personal tokens and agents may get at all (Settings > Agents > Set up > Permission limit,
+An admin can **limit** what personal tokens and agents may get at all (Settings > Administration > Agents > Permission limit,
 `PUT /api/admin/agent-policy` `{scope_limit: {agents?, tokens?}}`); a scope outside the limit stops counting at once for
 every token and comes back when it is allowed again. `GET /api/v1/me` shows `token.effective_scopes` (what counts now).
 

@@ -638,7 +638,7 @@ needs no entry in the agent's allow list.
 ### 11. Test checklist
 
 Run it before you let colleagues talk to the agent. Use a **test user** (not an admin) who shares one **test list**
-with the agent; delete both afterwards. Watch the answers and *Settings > Agents > Log*.
+with the agent; delete both afterwards. Watch the answers and *Settings > Administration > Agents* (the log).
 
 **Basics**
 

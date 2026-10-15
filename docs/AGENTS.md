@@ -1867,7 +1867,7 @@ bodies), status code, the task / list id when the path or the body names one, an
 too: 401 (expired token), 403 (paused, wrong scope, a list it does not see) and 429 (rate or usage limit). Requests of
 people's tokens and invalid tokens are not.
 
-- **Settings > Agents > Log** (admins only): newest first, 20 rows and *Load more* (+50), filter by agent, status
+- **Settings > Administration > Agents > Log** (admins only): newest first, 20 rows and *Load more* (+50), filter by agent, status
   class (2xx, 4xx, 5xx, *Denied*) and day (on phones behind *Filter*), *CSV* exports everything that matches (up to
   20,000 rows). Event polling (`GET /api/v1/agent/events`) is hidden by default (switch *Hide event polling*); a summary
   line shows today's requests and denied calls. Rows name the task / list where you can see it. Denied calls are marked
