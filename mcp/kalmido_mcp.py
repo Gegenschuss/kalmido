@@ -882,7 +882,7 @@ def _q(v):
 TASK_PLACE = {"list_id": S_ID, "section_id": {"type": ["integer", "null"]}, "parent_id": {"type": ["integer", "null"]},
               "before_id": S_ID, "after_id": S_ID, "position": {"type": "string", "enum": ["top", "bottom"]}}
 LIST_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "folder": {"type": "string", "description": "path, e.g. Clients/Acme"},
-              "view": {"type": "string", "enum": ["list", "kanban", "timeline"]}, "kind": {"type": "string", "enum": ["list", "project"]},
+              "view": {"type": "string", "enum": ["list", "kanban", "timeline", "mindmap"]}, "kind": {"type": "string", "enum": ["list", "project"]},
               "done_at_bottom": {"type": "boolean"}, "nag": {"type": "string"}, "day_hours": {"type": ["number", "null"]},
               "time_tracking": {"type": "boolean", "description": "2.41.0: time tracking on for this list (any type, default off)"}}
 HABIT_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer", "minimum": 1},

@@ -61,7 +61,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // ================= the view switch
   let w = await boot({user: 'alice', hash: 'l/' + P}), d = w.document;
   const seg = () => [...d.querySelectorAll('#top .vseg button')].map(b => b.dataset.act);
-  check(seg().join() === 'view-overview,view-list,view-kanban,view-timeline', 'project (2.13.0: the overview first): Project overview / List / Kanban / Timeline: ' + seg());
+  check(seg().join() === 'view-overview,view-list,view-kanban,view-timeline,view-mindmap', 'project (2.13.0: the overview first): Project overview / List / Kanban / Timeline / Mind map: ' + seg());  // 2.49.0 (#1201): + Mind map
   check(d.querySelector('#top [data-act="view-overview"]').title === 'Project page', 'tab title "Project page" (2.25.0)');
   w.eval(`go('l/${PL}')`); await sleep(300);
   check(!seg().includes('view-overview'), 'a plain list has no overview tab: ' + seg());
