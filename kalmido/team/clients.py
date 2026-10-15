@@ -167,7 +167,13 @@ def client_stats(c, uid, cid, lids, month=None):
     """Hours, amounts, estimate of client cid as uid sees it: total and in the month (YYYY-MM, default: this one)."""
     from ..personal.timetrack import time_report
     if not lids:
-        return {"seconds": 0, "rounded": 0, "amount": 0.0, "month_seconds": 0, "month_amount": 0.0, "estimate_min": 0,
+        # 2.46.2 (#1472): the month is part of the answer also for a client without lists
+        m0 = month or local_now().date().strftime("%Y-%m")
+        try:
+            date.fromisoformat(m0 + "-01")
+        except ValueError:
+            raise BadInput(tr("Invalid value: {0}", "month")) from None
+        return {"seconds": 0, "rounded": 0, "amount": 0.0, "month": m0, "month_seconds": 0, "month_amount": 0.0, "estimate_min": 0,
                 "estimated": 0, "open": 0, "done": 0}
     q = ",".join("?" * len(lids))
     csv = ",".join(str(x) for x in lids)
