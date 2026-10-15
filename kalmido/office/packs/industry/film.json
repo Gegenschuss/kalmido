@@ -1,0 +1,52 @@
+{
+  "code": "film",
+  "kind": "industry",
+  "version": 1,
+  "name": {"de": "Film & Video", "en": "Film & Video"},
+  "part_kind": "shoot",
+  "blocks": ["staff", "share", "km", "meals", "hotel", "set", "free"],
+  "defaults": {
+    "shoot_days": 1, "travel_days": 0, "travel_share": 1, "prep_days": 0, "prep_share": 1, "nights": 0, "night_rate": 100,
+    "meal_large": 28, "meal_small": 14, "sat_days": 0, "sat_pct": 25, "sun_days": 0, "sun_pct": 75,
+    "producing_share": 0.2, "km": 0, "km_rate": 0.35, "km_trips": 2
+  },
+  "roles": [
+    {"de": "Regie", "en": "Director", "intext": "intern"},
+    {"de": "Kamera", "en": "Camera", "intext": "intern"},
+    {"de": "Kameraassistenz", "en": "Camera assistant", "intext": "intern"},
+    {"de": "Ton", "en": "Sound", "intext": "extern"},
+    {"de": "Oberbeleuchter", "en": "Gaffer", "intext": "extern"},
+    {"de": "Beleuchter", "en": "Lighting technician", "intext": "extern"},
+    {"de": "Set-Aufnahmeleitung", "en": "Set manager", "intext": "extern"},
+    {"de": "Maske", "en": "Make-up", "intext": "extern"},
+    {"de": "Kostüm", "en": "Costume", "intext": "extern"},
+    {"de": "Komparse", "en": "Extra", "intext": "extern"},
+    {"de": "Drohnen-Operator", "en": "Drone operator", "intext": "extern"}
+  ],
+  "labels": {
+    "de": {
+      "title": "Drehkostenkalkulation", "shoot_days": "Drehtage", "travel_days": "Reisetage", "travel_share": "Anteil Tagesgage",
+      "prep_days": "Vorbereitung", "prep_share": "Anteil Tagesgage", "nights": "Übernachtungen", "night_rate": "Preis pro Nacht",
+      "meal_large": "Verpflegung groß", "meal_small": "Verpflegung klein", "sat_days": "Samstage", "sat_pct": "Zuschlag Samstag",
+      "sun_days": "Sonn-/Feiertage", "sun_pct": "Zuschlag Sonn-/Feiertag",
+      "staff": "Personal", "share": "Producing", "km": "KFZ-Kilometer", "meals": "Verpflegung", "hotel": "Hotelkosten",
+      "set": "Equipment", "free": "Zusatzkosten", "item": "Posten", "qty": "Menge", "rate": "Preis", "total": "Gesamt",
+      "sum": "Summe", "discount": "Rabatt", "net": "Summe Netto", "costs": "Fremdkosten", "margin": "Überschuss",
+      "prep": "inkl. Vorbereitung", "set_days_note": "abweichend von {days} Drehtagen", "set_discount": "{pct} % Rabatt",
+      "km_detail": "{km} km x {rate} x {trips} Fahrten", "share_detail": "{pct} % der Personalkosten",
+      "meals_detail": "{n} Personen", "hotel_detail": "{n} Nächte"
+    },
+    "en": {
+      "title": "Shoot cost calculation", "shoot_days": "Shooting days", "travel_days": "Travel days", "travel_share": "Share of the day rate",
+      "prep_days": "Preparation", "prep_share": "Share of the day rate", "nights": "Nights", "night_rate": "Price per night",
+      "meal_large": "Meals full day", "meal_small": "Meals part day", "sat_days": "Saturdays", "sat_pct": "Saturday surcharge",
+      "sun_days": "Sundays / holidays", "sun_pct": "Sunday / holiday surcharge",
+      "staff": "Crew", "share": "Producing", "km": "Car mileage", "meals": "Meals", "hotel": "Hotel",
+      "set": "Equipment", "free": "Additional costs", "item": "Item", "qty": "Qty", "rate": "Price", "total": "Total",
+      "sum": "Total", "discount": "Discount", "net": "Net total", "costs": "Third-party costs", "margin": "Surplus",
+      "prep": "incl. preparation", "set_days_note": "differs from {days} shooting days", "set_discount": "{pct} % discount",
+      "km_detail": "{km} km x {rate} x {trips} trips", "share_detail": "{pct} % of the crew costs",
+      "meals_detail": "{n} people", "hotel_detail": "{n} nights"
+    }
+  }
+}

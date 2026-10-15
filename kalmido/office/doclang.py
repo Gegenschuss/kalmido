@@ -177,7 +177,8 @@ def fd_lang_swap(c, oid, cur, b, f):
     titles = {}
     if old_lang != new_lang:
         hand = 0
-        for it in doc_items(c, cur["id"], oid):
+        from .parts import tp_part_items_all  # 2.47.0 (#1215): the positions of the parts too
+        for it in doc_items(c, cur["id"], oid) + tp_part_items_all(c, oid, cur["id"]):
             if not it.get("service_id") or it.get("kind") != "service":
                 continue
             sv = c.execute("SELECT name_de, name_en FROM office_services WHERE id=? AND org_id=?", (it["service_id"], oid)).fetchone()

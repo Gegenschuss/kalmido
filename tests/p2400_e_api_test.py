@@ -150,10 +150,14 @@ Q1 = A.post(B + D, json={"project_title": "Film", "client_id": CL}).json()
 check(Q1.get("raw_mode") == "none", "#1379 off: a new quotation has no raw data line " + str(Q1.get("raw_mode")))
 j = A.put(B + f"{D}/{Q1['id']}/items", json={"items": [{"kind": "service", "service_id": SV, "qty": 6}]}).json()
 kinds = [x["kind"] for x in j["totals"]["lines"]]
-check(kinds == ["item"] and j["totals"]["net"] == 6000 and j["items"][0]["producing"] == 0 and j["items"][0]["raw_fee"] == 0,
-      f"#1379 off: no producing / raw data, the catalogue flags are not taken over {kinds} {j['totals']['net']}")
+# 2.47.0 (#1645): the catalogue flags are always taken over; the switches of the quotation (producing_on 0, raw_mode none) decide
+check(kinds == ["item"] and j["totals"]["net"] == 6000 and j["items"][0]["producing"] == 1 and j["items"][0]["raw_fee"] == 1 and Q1.get("producing_on") == 0,
+      f"#1379 off: no producing / raw data, the flags stay on the position {kinds} {j['totals']['net']}")
 j = A.patch(B + f"{D}/{Q1['id']}", json={"contract_id": CTR}).json()
-check(j.get("raw_mode") == "none", "#1379 off: a contract with raw data included leaves the mode alone " + str(j.get("raw_mode")))
+# 2.47.0 (#1645): the contract always presets raw data; switched back off on this quotation
+check(j.get("raw_mode") == "included", "#1645: a contract with raw data included presets the mode " + str(j.get("raw_mode")))
+j = A.patch(B + f"{D}/{Q1['id']}", json={"raw_mode": "none"}).json()
+check(j.get("raw_mode") == "none" and [x["kind"] for x in j["totals"]["lines"]] == ["item"], "#1645: raw data off on the quotation")
 r = A.post(B + f"{D}/{Q1['id']}/invoice")
 check(r.status_code == 201 and [x["title"] for x in r.json()["items"]] == ["Dreh"], "#1379 off: the invoice from the quotation has only the position " + r.text[:120])
 INV = r.json()["id"]

@@ -406,14 +406,17 @@ function renderSide() {
     areas: `${areas ? grp('areas', tr('Areas|nav'), areas, '', (areas.match(/class="srow smod/g) || []).length) : ''}`,
     team: `${team ? grp('team', tr('Conversations|nav'), team, '', ppl.length + ags.length + grps.length + (convo.match(/class="srow/g) || []).length) : ''}`,
     more: grp('more', tr('More'), moreRows, '', (moreRows.match(/class="srow/g) || []).length)};
+  const oldAcct = $('#side .sbacct');  // 2.47.0 (#1654): keep the account node (same <img>) when nothing about it changed
   $('#side').innerHTML = `
-    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span class="sbtxt"><span>${esc(APP_NAME)}</span></span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${kbFoldAllBtn()}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
+    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span class="sbtxt"><span>${esc(APP_NAME)}</span></span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${kbFoldAllBtn()}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
     ${wsBarHtml()}
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
     ${favSideHtml(lists, listRow, head)}${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => SB[g] || '').join('')}
     <div class="sgroup sfoot">
       <button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
     </div>`;
+  const newAcct = $('#side .sbacct');
+  if (oldAcct && newAcct && oldAcct.innerHTML === newAcct.innerHTML && oldAcct.title === newAcct.title) newAcct.replaceWith(oldAcct);
   sideRove();
 }
 // 2.13.0 (#453 A9): the sidebar is ONE tab stop (roving tabindex): Tab lands on the open view's row (or the first one),

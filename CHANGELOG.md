@@ -7,6 +7,61 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.47.0] - 2026-10-15
+
+**In short:** **Office & finance: calculation and master data import**: quotations with sub pages (parts), a shoot
+calculation for film and video, purchase prices with the surplus per position (admins only), producing and raw data
+switched per quotation, and a legacy Excel import that fills gaps instead of skipping.
+
+### Added
+- **Quotation parts** (#1215): a quotation can have any number of parts, each its own page in the usual layout
+  (positions, producing, raw data, net total). The title page picks parts like services, with a quantity
+  (*Interactive module ×5*); sum, raw data and purchase of a part times its quantity flow into the title page. A part can
+  be left out of the PDF and still count. An invoice from a quotation with parts offers three forms: the title page with
+  its positions, everything summed up in one position per VAT rate (title editable, default *Film production*), or
+  complete like the quotation; the default per organisation is set in the office settings (app default: complete).
+- **Shoot calculation** (#1216): a part of the kind *shoot calculation* with the rules of a film shoot sheet: shoot,
+  travel and preparation days, overnight stays, meals, Saturday / Sunday surcharges, crew × count with the daily rate
+  projected, producing as a share of the crew, car kilometres, an equipment set per shoot day with its discount, extra
+  costs. Printed for the client without internal / external or purchase. The industry pack **Film & video** (data only,
+  labels in German and English, default rates) is switched on per organisation in the office settings.
+- **Crew and freelancer roles** (#1649, #1216): two new master data lists below the services. *Freelancer roles* hold
+  the purchase price per day and per hour; a service points to its role, and a new position takes the role's price as
+  its purchase. *Crew* holds the daily rate for the client, internal / external and an optional markup for the shoot
+  calculation. Purchase prices and markups are encrypted at rest and only admins of the organisation see them.
+- **Surplus per position** (#1649): admins see the purchase and the surplus of every position and the sum; never in the
+  PDF, the print model or for members. Accepting a quotation stores its purchase with amount and date (for the cash flow
+  overview that follows).
+- **Percent positions** (#1649): a service with the unit *Percent* (e.g. the artists' social insurance at 5 %) is that
+  share of the external positions on the same page.
+
+### Changed
+- **Producing and raw data per quotation** (#1645): every quotation has its own switches *Calculate producing* and raw
+  data; the office settings only set the default for new quotations. The flags of services and positions are always
+  kept and shown, a framework contract always presets raw data. Existing documents keep their sums.
+- **Legacy Excel import fills gaps** (#1648, #1649): a service, device or role that exists already gets its empty fields
+  filled from the file (*Fill empty fields*, the new default; nothing is overwritten), the preview lists them, and the
+  undo (whole run or per area) empties them again. The blocks *Freelancer* and *Crew* of the sheet are imported in one
+  way into the new role lists; a service's freelancer column points to its role; the raw data / producing columns are
+  always read; the category order of the sheet orders the services.
+
+### Fixed
+- **Account picture in the sidebar** (#1654) no longer blinks away while moving through the app.
+
+### Notes
+- Database: new tables `office_roles`, `office_doc_parts`, `office_purchases`; new columns `office_services.role_id`,
+  `office_doc_items.part_id` / `ref_part_id`, `office_docs.producing_on` (filled once at start-up). 2.46.3 keeps running
+  with the new database, but quotations with parts made in 2.47 show their parts flat (and a too high sum) under 2.46: roll
+  back only with a database restore, or do not edit such quotations there.
+
+## [2.46.7] - 2026-10-15
+
+**In short:** fixes for 2.46.6 from the device test.
+
+### Fixed
+- **Long press on "Yes" or a suggestion button on Android** (#1711): "Yes, but: ..." is inserted once, not twice.
+- **Touch targets** (#1708): the agent's "Lists" summary and the workspace button are 44 px high on touch screens.
+
 ## [2.46.6] - 2026-10-15
 
 **In short:** **agent launcher and settings**: the reference launcher brings its own safety rules to every run, one

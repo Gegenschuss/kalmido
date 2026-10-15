@@ -23,9 +23,10 @@ OFFICE_FEAT = "office"
 OFFICE_NO_ORG = N_("Office & finance belongs to an organisation: choose your organisation's workspace at the top")
 OFFICE_ADMIN_ONLY = N_("Only an admin of this organisation can do this")
 OFFICE_OFF = N_("Office & finance is turned off in your settings")
-UNITS = ("day", "hour", "piece", "minute", "flat")
+UNITS = ("day", "hour", "piece", "minute", "flat", "percent")  # 2.47.0 (#1649): percent = a rate on the external fees (KSK)
 TAXES = ("standard", "reduced", "exempt")
-INTEXT = ("intern", "extern")
+INTEXT = ("intern", "extern", "shooting")  # 2.47.0 (#1216): shooting = only in the shoot calculation
+CREW_INTEXT = ("intern", "extern")  # 2.47.0 (#1649): the Drehpersonal
 TEXT_KINDS = ("rights_time", "rights_territory", "rights_media", "intro", "closing", "note", "block", "raw_note")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|date|initials)\}")
@@ -46,7 +47,12 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "invoice_closing_de": "", "invoice_closing_en": "", "reminder_text_de": "", "reminder_text_en": "",
                      # 2.40.0 (#1379): producing (markup by production days) and the raw data surcharge are switched on per
                      # organisation; new organisations start without them, fe_office_rules_migrate keeps them for those using them
-                     "producing_on": 0, "raw_on": 0}
+                     "producing_on": 0, "raw_on": 0,
+                     # 2.47.0 (#1216): industry packs switched on (office/packs/industry/<code>.json; "film" = shoot calculation)
+                     "industry_packs": [],
+                     # 2.47.0 (#1215): an invoice from a quotation with parts: "full" (like the quotation), "title" (the title
+                     # page with its positions) or "summary" (one position per tax rate with this title)
+                     "parts_invoice_mode": "full", "parts_summary_title_de": "Filmherstellung", "parts_summary_title_en": "Film production"}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -213,10 +219,19 @@ def office_settings_clean(c, oid, b, cur):
             if v and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = v[:200]
+        elif k == "industry_packs":  # 2.47.0 (#1216)
+            from .sheet import dk_packs_clean
+            out[k] = dk_packs_clean(v)
         elif k in ("datev_auto", "producing_on", "raw_on"):  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "reminder_text_de", "reminder_text_en"):
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""
+        elif k == "parts_invoice_mode":  # 2.47.0 (#1215)
+            if v not in ("full", "title", "summary"):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
+        elif k in ("parts_summary_title_de", "parts_summary_title_en"):
+            out[k] = re.sub(r"[\x00-\x1f\x7f]", "", v or "").strip()[:300] if isinstance(v, str) else ""
         elif k == "offer_number_at":
             if v not in ("create", "finalize"):
                 raise BadInput(tr("Invalid value: {0}", k))
@@ -363,7 +378,8 @@ MD = {
                  "cols": {"name_de": ("str", True, NAME_MAX), "name_en": ("str", False, NAME_MAX), "category": ("str", False, 80), "sort": ("num", False, None),
                           "unit": ("choice", False, UNITS), "daily_rate": ("num0", False, None), "hourly_rate": ("num0", False, None),
                           "raw_fee": ("int01", False, None), "producing": ("int01", False, None), "intext": ("choice", False, INTEXT),
-                          "role": ("str", False, 80), "tax": ("choice", False, TAXES), "archived": ("int01", False, None)}},
+                          "role": ("str", False, 80), "tax": ("choice", False, TAXES), "archived": ("int01", False, None),
+                          "role_id": ("role", False, "freelancer")}},  # 2.47.0 (#1649): the freelancer role (purchase price)
     "equipment": {"table": "office_equipment", "order": "lower(category), lower(name), id", "label": "name",
                   "cols": {"name": ("str", True, NAME_MAX), "name_en": ("str", False, NAME_MAX), "category": ("str", False, 80),  # 2.45.1 (#1556): name_en
                            "daily_rate": ("num0", False, None), "archived": ("int01", False, None)}},
@@ -380,8 +396,19 @@ MD = {
                            "rights_note_de": ("str", False, TEXT_MAX), "rights_note_en": ("str", False, TEXT_MAX),
                            "closing_de": ("str", False, TEXT_MAX), "closing_en": ("str", False, TEXT_MAX), "rates": ("rates", False, None),
                            "note": ("str", False, TEXT_MAX), "archived": ("int01", False, None)}},
+    # 2.47.0 (#1649): the two masters of office_roles (one table, kind fixed per master). cost_day / cost_hour = the
+    # purchase price, kept in the encrypted JSON column costs; admin_cols never reach members (sr_public)
+    "roles": {"table": "office_roles", "kind": "freelancer", "order": "sort, lower(name_de), id", "label": "name_de",
+              "admin_cols": ("cost_day", "cost_hour"),
+              "cols": {"name_de": ("str", True, NAME_MAX), "name_en": ("str", False, NAME_MAX), "cost_day": ("cost", False, None),
+                       "cost_hour": ("cost", False, None), "sort": ("num", False, None), "archived": ("int01", False, None)}},
+    "crew": {"table": "office_roles", "kind": "crew", "order": "sort, lower(name_de), id", "label": "name_de", "admin_cols": ("markup_pct",),
+             "cols": {"name_de": ("str", True, NAME_MAX), "name_en": ("str", False, NAME_MAX), "rate_day": ("num0", False, None),
+                      "intext": ("choice", False, CREW_INTEXT), "markup_pct": ("num0", False, None), "sort": ("num", False, None),
+                      "archived": ("int01", False, None)}},
 }
 MD_KINDS = tuple(MD)
+SR_COSTS = {"cost_day": "day", "cost_hour": "hour"}  # 2.47.0 (#1649): field -> key in office_roles.costs
 JSON_COLS = {"items", "rates"}
 
 
@@ -389,7 +416,22 @@ def _row_dict(kind, r, c=None, oid=None):
     if c is not None and kind == "contracts":  # 2.42.0 (#828): the special rates are encrypted at rest
         from ..core.orgcrypt import oc_dec_fields
         r = oc_dec_fields(c, oid, "office_contracts", r)
+    if c is not None and MD.get(kind, {}).get("table") == "office_roles":  # 2.47.0 (#1649): costs -> cost_day / cost_hour
+        from ..core.orgcrypt import oc_dec_fields
+        r = oc_dec_fields(c, oid, "office_roles", r)
     d = dict(r)
+    if "costs" in d:
+        try:
+            j = json.loads(d.pop("costs") or "{}")
+        except ValueError:
+            j = {}
+        j = j if isinstance(j, dict) else {}
+        if kind == "roles":
+            for f, k in SR_COSTS.items():
+                d[f] = j.get(k)
+    if kind == "roles":  # the crew's columns are not part of a freelancer role
+        for k in ("rate_day", "intext", "markup_pct"):
+            d.pop(k, None)
     for k in ("items", "rates"):
         if k in d:
             try:
@@ -406,6 +448,9 @@ def office_rows(c, oid, kind, archived=True, q=""):
     m = MD[kind]
     sql = f"SELECT * FROM {m['table']} WHERE org_id=?"
     args = [oid]
+    if m.get("kind"):  # 2.47.0 (#1649): office_roles holds two masters
+        sql += " AND kind=?"
+        args.append(m["kind"])
     if not archived:
         sql += " AND archived=0"
     if q:
@@ -415,6 +460,9 @@ def office_rows(c, oid, kind, archived=True, q=""):
             args += [like, like, like]
         elif kind == "equipment":  # 2.45.1 (#1556): also the English name
             sql += " AND (name ILIKE ? ESCAPE '\\' OR name_en ILIKE ? ESCAPE '\\')"
+            args += [like, like]
+        elif kind in ("roles", "crew"):  # 2.47.0 (#1649)
+            sql += " AND (name_de ILIKE ? ESCAPE '\\' OR name_en ILIKE ? ESCAPE '\\')"
             args += [like, like]
         elif kind == "texts":
             sql += " AND (key ILIKE ? ESCAPE '\\' OR text_de ILIKE ? ESCAPE '\\' OR text_en ILIKE ? ESCAPE '\\')"
@@ -432,7 +480,7 @@ def office_row(c, oid, kind, rid):
     except (TypeError, ValueError):
         raise Denied(404)
     r = c.execute(f"SELECT * FROM {MD[kind]['table']} WHERE id=? AND org_id=?", (rid, oid)).fetchone()
-    if not r:
+    if not r or (MD[kind].get("kind") and r["kind"] != MD[kind]["kind"]):  # 2.47.0 (#1649): a crew id is no freelancer role
         raise Denied(404)
     return _row_dict(kind, r, c, oid)
 
@@ -471,6 +519,18 @@ def _clean_col(c, oid, kind, k, v):
             if not c.execute("SELECT 1 FROM clients WHERE id=? AND org_id=?", (i, oid)).fetchone():
                 raise BadInput(tr("Invalid value: {0}", k))
         elif not c.execute(f"SELECT 1 FROM {spec} WHERE id=? AND org_id=?", (i, oid)).fetchone():
+            raise BadInput(tr("Invalid value: {0}", k))
+        return i
+    if typ == "cost":  # 2.47.0 (#1649): a purchase price (stored by _sr_costs)
+        return _num(v, k, 0, 1e9, allow_none=True)
+    if typ == "role":  # 2.47.0 (#1649): a role of this organisation and kind (archived: kept, it then has no price)
+        if v in (None, "", 0, "0"):
+            return None
+        try:
+            i = int(v)
+        except (TypeError, ValueError):
+            raise BadInput(tr("Invalid value: {0}", k))
+        if not c.execute("SELECT 1 FROM office_roles WHERE id=? AND org_id=? AND kind=?", (i, oid, spec)).fetchone():
             raise BadInput(tr("Invalid value: {0}", k))
         return i
     if typ == "date":
@@ -528,6 +588,9 @@ def office_create(c, oid, kind, b):
         if k in b or req:
             cols.append(k)
             vals.append(_clean_col(c, oid, kind, k, b.get(k)))
+    if m.get("kind"):  # 2.47.0 (#1649)
+        _sr_costs(c, oid, cols, vals, {})
+        cols.append("kind"), vals.append(m["kind"])
     if kind == "texts" and not b.get("key"):
         cols.append("key"), vals.append("")
     ts = iso(now_utc())
@@ -545,8 +608,11 @@ def office_update(c, oid, kind, rid, b):
     for k, v in b.items():
         if k not in m["cols"]:
             continue
-        sets.append(f"{k}=?")
+        sets.append(k)
         vals.append(_clean_col(c, oid, kind, k, v))
+    if m.get("kind"):  # 2.47.0 (#1649)
+        _sr_costs(c, oid, sets, vals, {f: r.get(f) for f in SR_COSTS})
+    sets = [f"{k}=?" for k in sets]
     if sets:
         if "updated_at" in _cols(c, m["table"]):
             sets.append("updated_at=?")
@@ -554,6 +620,55 @@ def office_update(c, oid, kind, rid, b):
         vals += [r["id"], oid]
         c.execute(f"UPDATE {m['table']} SET {', '.join(sets)} WHERE id=? AND org_id=?", vals)
     return office_row(c, oid, kind, rid)
+
+
+def _sr_costs(c, oid, cols, vals, cur):
+    """2.47.0 (#1649): the cost fields of cols / vals (in place) -> one encrypted column costs {"day", "hour"}; cur = the
+    row's current values (a partial update keeps the other one)."""
+    if not any(f in cols for f in SR_COSTS):
+        return
+    j = {}
+    for f, k in SR_COSTS.items():
+        v = cur.get(f)
+        if f in cols:
+            i = cols.index(f)
+            v = vals[i]
+            del cols[i], vals[i]
+        if v is not None:
+            j[k] = v
+    from ..core.orgcrypt import oc_enc_fields
+    cols.append("costs")
+    vals.append(oc_enc_fields(c, oid, "office_roles", {"costs": json.dumps(j)})["costs"])
+
+
+def sr_public(kind, row, admin):
+    """2.47.0 (#1649): a master data row for the person: members never get the purchase price / markup (admin_cols)."""
+    if admin:
+        return row
+    return {k: v for k, v in row.items() if k not in MD.get(kind, {}).get("admin_cols", ())}
+
+
+def sr_role_cost(c, oid, role_id, unit):
+    """2.47.0 (#1649): the purchase price of freelancer role role_id of organisation oid for unit ('day' | 'hour') as a
+    Decimal, or None (no role, archived, another kind / organisation, no price for that unit)."""
+    from decimal import Decimal, InvalidOperation
+    k = {"day": "day", "hour": "hour"}.get(unit)
+    try:
+        rid = int(role_id)
+    except (TypeError, ValueError):
+        return None
+    if not k:
+        return None
+    r = c.execute("SELECT * FROM office_roles WHERE id=? AND org_id=? AND kind='freelancer' AND archived=0", (rid, oid)).fetchone()
+    if not r:
+        return None
+    v = _row_dict("roles", r, c, oid).get("cost_" + k)
+    if v in (None, ""):
+        return None
+    try:
+        return Decimal(str(v))
+    except InvalidOperation:
+        return None
 
 
 def office_in_use(c, kind, rid, oid):
@@ -574,6 +689,8 @@ def office_in_use(c, kind, rid, oid):
         return False
     if kind == "contracts":
         return bool(c.execute("SELECT 1 FROM office_docs WHERE contract_id=? AND org_id=? LIMIT 1", (rid, oid)).fetchone())
+    if kind == "roles":  # 2.47.0 (#1649): a role services point to is archived (the services then have none)
+        return bool(c.execute("SELECT 1 FROM office_services WHERE role_id=? AND org_id=? LIMIT 1", (rid, oid)).fetchone())
     return False
 
 
@@ -617,17 +734,20 @@ def _cols(c, table):
 
 
 # ---------------------------------------------------------------- import / export (JSON, master data only)
-EXPORT_KINDS = ("services", "equipment", "sets", "texts", "contracts")
+EXPORT_KINDS = ("roles", "crew", "services", "equipment", "sets", "texts", "contracts")  # 2.47.0 (#1649): roles before services (role_id)
 
 
-def office_export(c, oid):
-    """The master data + settings of the organisation as one JSON-able dict (no documents, no logo file)."""
+def office_export(c, oid, admin=True):
+    """The master data + settings of the organisation as one JSON-able dict (no documents, no logo file).
+    2.47.0 (#1649): admin=False leaves out the purchase prices / markups of the roles (sr_public)."""
     s = office_settings(c, oid)
     out = {"kalmido_office": 1, "exported_at": iso(now_utc()), "settings": s}
     for k in EXPORT_KINDS:
-        rows = office_rows(c, oid, k)
+        rows = [sr_public(k, r, admin) for r in office_rows(c, oid, k)]
         for r in rows:
             r.pop("org_id", None)
+            if k in ("roles", "crew"):
+                r.pop("kind", None)
         out[k] = rows
     return out
 
@@ -691,6 +811,8 @@ def office_import(c, oid, d, overwrite=False):
                     if b.get(f) is not None:
                         b[f] = mapped("texts", b[f], where, f)
                 b.pop("client_id", None)  # clients are not part of the master data file
+            if kind == "services" and b.get("role_id") is not None:  # 2.47.0 (#1649)
+                b["role_id"] = mapped("roles", b["role_id"], where, "role_id")
             k = key_of(kind, b)
             cur = existing.get(k)
             if cur and not overwrite:

@@ -262,7 +262,8 @@ check([x["name_de"] for x in sv] == ["Kamera", "Schnitt", "Tonmischung", "Sprech
 check(sv[0]["category"] == "Video" and sv[2]["category"] == "Audio" and sv[3]["category"] == "Audio", "preview: category from the separator row")
 check(sv[0]["daily_rate"] == 650 and sv[2]["unit"] == "hour" and sv[2]["hourly_rate"] == 85 and sv[0]["raw_fee"] == 1 and sv[2]["intext"] == "extern", f"preview: rates, unit, flags {sv[2]}")
 check(len(P["equipment"]) == 3 and P["equipment"][0]["daily_rate"] == 250, "preview: equipment")
-check(P["other"].get("staff") == 2 and P["other"].get("freelancer") == 1, f"preview: staff / freelancers counted only {P['other']}")
+# 2.47.0 (#1649): staff / freelancers are imported now (areas crew / roles), no longer only counted
+check(len(P["crew"]) == 2 and len(P["roles"]) == 1 and P["roles"][0]["cost_day"] == 500, f"preview: staff / freelancers as areas crew / roles {P['crew']} {P['roles']}")
 check(dbx("SELECT COUNT(*) FROM clients WHERE org_id=?", (ORG,))[0][0] == 2, "preview stores nothing")
 check(A.post(B + L + "/preview", files={"file": ("x.xlsx", b"PK\x03\x04 not a zip")}).status_code == 400, "preview: a broken file = 400")
 check(A.post(B + L + "/preview", files={"file": ("x.xlsx", mini_pdf("x"))}).status_code == 400, "preview: a PDF is no spreadsheet = 400")

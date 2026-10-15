@@ -729,6 +729,24 @@ fresh; run p2466_b_api "$PY" p2466_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2466_b_ui node p2466_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.6 part C: #1710 Settings: the admin parts gathered under Administration ("Admin"), mark "Admin · applies to everyone"
 fresh; run p2466_c_ui node p2466_c_ui.js "$KALMIDO_TEST_DATA"
+shard 5  # 2.47.0: the 2.47 suites run in shard 5 (shard 8 with the 2.46 suites took 24 min, shard 5 17 min)
+# 2.47.0 part C: #1216 shoot calculation sheet (core without server; API + UI need the part routes of #1215)
+       run p2470_c_sheet "$PY" p2470_c_sheet_test.py
+fresh; run p2470_c_sheet_api "$PY" p2470_c_sheet_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2470_c_sheet_ui node p2470_c_sheet_ui.js "$KALMIDO_TEST_DATA"
+# 2.47.0 part E: #1654 account node survives renderSide, sidebar avatar not lazy
+fresh; run p2470_e_avatar_ui node p2470_e_avatar_ui.js "$KALMIDO_TEST_DATA"
+# 2.47.0 part D: #1645 producing / raw data per quotation (default, migration), #1649 purchase from the role, surplus per position (admins only), percent position, purchases of accepted quotations
+fresh; run p2470_d_cost_api "$PY" p2470_d_cost_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2470_d_cost_ui node p2470_d_cost_ui.js "$KALMIDO_TEST_DATA"
+# 2.47.0 part A: #1648 fill instead of skip, #1649 masters Freelancer-Rollen / Drehpersonal + their import, #1645 import columns
+fresh; run p2470_a_import_api "$PY" p2470_a_import_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2470_a_roles_ui node p2470_a_roles_ui.js "$KALMIDO_TEST_DATA"
+# 2.47.0 part B: #1215 parts of a quotation (title page calculation, rights, PDF pages, invoice forms; the editor)
+fresh; run p2470_b_parts_api "$PY" p2470_b_parts_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2470_b_parts_ui node p2470_b_parts_ui.js "$KALMIDO_TEST_DATA"
+# 2.47.0 part F: review follow-ups (#1216 no purchase in the cached shoot totals, #1649 percent positions in invoices from parts)
+fresh; run p2470_f_review_api "$PY" p2470_f_review_api_test.py "$KALMIDO_TEST_DATA"
 # 2.47c part B: fixed colour per account (#1721)
 fresh; run p247c_b_api "$PY" p247c_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p247c_b_ui node p247c_b_ui.js "$KALMIDO_TEST_DATA"

@@ -19,6 +19,7 @@ builds on yet (a client with a list, document, contract or archived document sta
 document) and says what stayed. Only the organisation's admins (the stricter of "master data" and "clients"); agent
 tokens and kids are stopped by office_gate."""
 import hashlib
+import hmac
 import io
 import json
 import os
@@ -38,7 +39,8 @@ from ..core.pg import insert_id, write_lock
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
-from .model import office_create, office_gate, office_in_use, office_number_format, office_org, office_role, office_scheme_period, office_settings
+from .model import (MD, office_create, office_gate, office_in_use, office_number_format, office_org, office_role, office_rows, office_scheme_period,
+                    office_settings, office_update)
 
 FI_XLSX_MAX = 10 * 1024 * 1024  # the uploaded spreadsheet
 FI_XLSX_UNZIPPED_MAX = 80 * 1024 * 1024  # all members unpacked (zip bomb guard)
@@ -473,9 +475,126 @@ def _col(head, *names):
     return None
 
 
+# 2.47.0 (#1648): a duplicate of an existing row is completed ("fill"): only its EMPTY fields take the file's value, set
+# values are never overwritten. Empty = '' / NULL; for the flags and the order also 0. The run keeps what it filled
+# (detail {"filled": {area: {id: {field: value}}}}); the undo empties a field again while it still holds that value.
+SR_FILL = {"services": ("name_en", "category", "sort", "daily_rate", "hourly_rate", "raw_fee", "producing", "role", "role_id"),
+           "equipment": ("name_en", "category", "daily_rate"),
+           "roles": ("name_en", "cost_day", "cost_hour"), "crew": ("name_en", "rate_day")}  # 2.47.0 (#1649)
+SR_ZERO = ("raw_fee", "producing", "sort")  # 0 counts as empty
+SR_ERR_RE = re.compile(r"^#(?:NV|N/A|REF!|VALUE!|DIV/0!|NAME\?|NUM!|NULL!|BEZUG!|WERT!|ZAHL!)$", re.I)  # Excel error cells = empty
+
+
+def _sr_empty(f, v):
+    return v is None or v == "" or (f in SR_ZERO and not v)
+
+
+def sr_fill(kind, cur, new):
+    """{field: the file's value} for every empty field of the existing row cur the file row new has a value for."""
+    return {f: new[f] for f in SR_FILL[kind] if f in new and not _sr_empty(f, new[f]) and _sr_empty(f, cur.get(f))}
+
+
+def sr_cell(v):
+    """A cell as text; Excel error values (#NV, #REF! ...) are empty."""
+    v = str(v if v is not None else "").strip()
+    return "" if SR_ERR_RE.match(v) else v
+
+
+def sr_table(book, *names):
+    """_table, also for Excel's renamed copies of a table ("Services_2")."""
+    t = _table(book, *names)
+    if t is not None:
+        return t
+    for n in names:
+        for k in sorted(book):
+            if re.fullmatch(re.escape(n) + r"_\d{1,3}", k):
+                return _table(book, k)
+    return None
+
+
+def sr_have(c, oid, kind, *cols):
+    """{lower-case name: row} of the organisation's rows of kind (every name column in cols)."""
+    have = {}
+    for r in office_rows(c, oid, kind):
+        for col in cols:
+            v = (r.get(col) or "").strip().lower()
+            if v:
+                have.setdefault(v, r)
+    return have
+
+
+def sr_cat_orders(book):
+    """2.47.0 (#1648): {lower-case category: order} from a table category / order of the file ({} without one)."""
+    t = sr_table(book, "category", "categories", "kategorie", "kategorien")
+    if not t:
+        return {}
+    head, rows = t
+    ci, oi = _col(head, "category", "kategorie"), _col(head, "order", "sort", "reihenfolge")
+    out = {}
+    for row in rows:
+        cat = sr_cell(row[ci]) if ci is not None and ci < len(row) else ""
+        o = _num(sr_cell(row[oi])) if oi is not None and oi < len(row) else None
+        if cat and o is not None:
+            out.setdefault(cat.strip().title().lower(), o)
+    return out
+
+
+# 2.47.0 (#1649): the blocks Freelancer (-> master "roles", the purchase price) and Staff / Crew (-> master "crew"): ONE
+# way for both, only the column map differs. Variants like "Kamera (Premium)" are roles of their own.
+SR_BLOCKS = {"roles": {"tables": ("freelancer", "freelancers", "freelancer-rollen"),
+                       "cols": {"name_de": ("jobtitle", "jobtitlede", "rolle", "role"), "name_en": ("jobtitleen",),
+                                "cost_day": ("dailyrate", "tagessatz"), "cost_hour": ("hourlyrate", "stundensatz")}},
+             "crew": {"tables": ("staff", "crew", "drehpersonal"),
+                      "cols": {"name_de": ("jobtitlede", "jobtitle", "funktion"), "name_en": ("jobtitleen",),
+                               "rate_day": ("dailyrate", "tagessatz"), "intext": ("intext",)}}}
+SR_NUMS = ("cost_day", "cost_hour", "rate_day")
+
+
+def sr_role_rows(c, oid, book, kind):
+    """The preview rows of block kind (roles | crew) of the file, or None without the block."""
+    spec = SR_BLOCKS[kind]
+    t = sr_table(book, *spec["tables"])
+    if t is None:
+        return None
+    head, rows = t
+    head = [eq_head(h) for h in head]
+    ix = {f: _col(head, *n) for f, n in spec["cols"].items()}
+    if ix["name_de"] is None:
+        return []
+    have = sr_have(c, oid, kind, "name_de", "name_en")
+    out, names = [], set()
+    for i, row in enumerate(rows):
+        get = lambda f: sr_cell(row[ix[f]]) if ix[f] is not None and ix[f] < len(row) else ""  # noqa: E731
+        nm = get("name_de")
+        if not nm or SEP_RE.match(nm):
+            continue
+        e = {"row": i + 2, "name_de": nm[:200]}
+        for f in spec["cols"]:
+            if f in SR_NUMS:
+                e[f] = _num(get(f))
+            elif f == "intext":
+                e[f] = "intern" if get(f).lower().startswith("int") else "extern"
+            elif f != "name_de":
+                e[f] = get(f)[:200]
+        keys = {nm.lower(), (e.get("name_en") or "").lower()} - {""}
+        cur = next((have[k] for k in keys if k in have), None)
+        e["dup"] = bool(cur) or any(k in names for k in keys)
+        e["fill"] = sr_fill(kind, cur, e) if cur else {}
+        e["action"] = "fill" if e["fill"] else ("skip" if e["dup"] else "new")
+        names |= keys
+        out.append(e)
+    return out
+
+
+def sr_intext(v):
+    """2.47.0 (#1649): intern / extern / shooting of a service from the file."""
+    v = (v or "").lower()
+    return "intern" if v.startswith("int") else ("shooting" if v.startswith(("shoot", "dreh")) else "extern")
+
+
 def fi_preview(c, oid, raw):
     book = fi_xlsx_read(raw)
-    out = {"sheets": sorted(book), "clients": [], "services": [], "equipment": [], "other": {}}
+    out = {"sheets": sorted(book), "clients": [], "roles": [], "crew": [], "services": [], "equipment": [], "other": {}}
     t = _table(book, "contacts", "kontakte", "kunden", "adressen")
     if t:
         head, rows = t
@@ -508,22 +627,19 @@ def fi_preview(c, oid, raw):
                 a["action"] = "contact"  # 2.40.0 (#1380): same company + postcode, another contact person: add them to the client
             a["reasons"] = [tr(FI_REASONS[f]) for f in a["flags"]]
             out["clients"].append(a)
-    t = _table(book, "services", "leistungen")
+    t = sr_table(book, "services", "leistungen")
     if t:
         head, rows = t
-        have = {r["name_de"].strip().lower() for r in c.execute("SELECT name_de FROM office_services WHERE org_id=?", (oid,))}
+        have = sr_have(c, oid, "services", "name_de")
         ix = {k: _col(head, *v) for k, v in {"de": ("servicede", "service", "leistung"), "en": ("serviceen",), "day": ("dailyrate", "tagessatz"),
                                               "hour": ("hourlyrate", "stundensatz"), "raw": ("rawfee",), "prod": ("producingfee", "producing"),
                                               "order": ("order", "sort"), "cat": ("category", "kategorie"), "role": ("freelancer", "role"),
                                               "ie": ("intext",)}.items()}
-        cell = lambda row, k: str(row[ix[k]]).strip() if ix[k] is not None and ix[k] < len(row) else ""  # noqa: E731
-        rules = office_settings(c, oid)  # 2.40.0 (#1379): the raw data / producing columns only while their switch is on
-        if not rules.get("raw_on"):
-            ix["raw"] = None
-        if not rules.get("producing_on"):
-            ix["prod"] = None
+        cell = lambda row, k: sr_cell(row[ix[k]]) if ix[k] is not None and ix[k] < len(row) else ""  # noqa: E731
+        # 2.47.0 (#1645): the raw data / producing columns are always read (the switches of the office are only defaults now)
         cat = ""
         names = set()
+        orders, last = sr_cat_orders(book), 0
         for i, row in enumerate(rows):
             de = cell(row, "de")
             m = SEP_RE.match(de)
@@ -535,26 +651,40 @@ def fi_preview(c, oid, raw):
             day, hour = _num(cell(row, "day")), _num(cell(row, "hour"))
             s = {"row": i + 2, "name_de": de[:200], "name_en": cell(row, "en")[:200], "category": (cell(row, "cat") or cat)[:80],
                  "daily_rate": day, "hourly_rate": hour, "unit": "hour" if hour is not None and day is None else "day",
-                 "raw_fee": _flag01(cell(row, "raw")), "producing": _flag01(cell(row, "prod")), "sort": _num(cell(row, "order")) or 0,
-                 "role": cell(row, "role")[:80], "intext": "intern" if cell(row, "ie").lower().startswith("int") else "extern"}
+                 "raw_fee": _flag01(cell(row, "raw")), "producing": _flag01(cell(row, "prod")),
+                 "role": cell(row, "role")[:80], "intext": sr_intext(cell(row, "ie"))}  # 2.47.0 (#1649): also shooting
+            if "künstlersozialkasse" in de.lower():  # 2.47.0 (#1649): a rate in percent of the external fees (0.05 -> 5 %)
+                v = day if day is not None else hour
+                s.update(unit="percent", hourly_rate=None, daily_rate=None if v is None else (round(v * 100, 4) if abs(v) < 1 else v), percent=True)
+            # 2.47.0 (#1648): the column order is the order of the CATEGORY (a table category / order wins); inside a
+            # category the rows keep the file's order -> sort = category order * 10000 + row
+            o = orders.get(s["category"].lower())
+            if o is None:
+                o = _num(cell(row, "order"))
+                o = last if o is None else o
+                if s["category"]:
+                    orders.setdefault(s["category"].lower(), o)
+            last = o
+            s["sort"] = float(o) * 10000 + i + 1
             key = de.lower()
             s["dup"] = key in have or key in names
-            s["action"] = "skip" if s["dup"] else "new"
+            s["fill"] = sr_fill("services", have[key], s) if key in have else {}  # 2.47.0 (#1648)
+            if key in have and s["role"] and not have[key].get("role_id"):  # 2.47.0 (#1649): the role (resolved at the import)
+                s["fill"]["role_id"] = s["role"]
+            s["action"] = "fill" if s["fill"] else ("skip" if s["dup"] else "new")
             names.add(key)
             out["services"].append(s)
     t = _table(book, "equipment", "geräte", "technik")
     if t:
         head, rows = t
-        have = set()
-        for r in c.execute("SELECT name, name_en FROM office_equipment WHERE org_id=?", (oid,)):
-            have |= {v.strip().lower() for v in (r["name"], r["name_en"] or "") if v.strip()}
+        have = sr_have(c, oid, "equipment", "name", "name_en")  # 2.47.0 (#1648): name -> row (to fill)
         # 2.45.1 (#1556): "Device DE" / "Device EN" (spaces, underscores, hyphens and case do not matter); DE before the plain names
         head = [eq_head(h) for h in head]
         ni = _col(head, "devicede", "gerätde", "geraetde", "namede", "device", "name", "gerät", "geraet")
         ei = _col(head, "deviceen", "geräten", "geraeten", "nameen")
         cti, di = _col(head, "category", "kategorie"), _col(head, "dailyrate", "tagessatz")
         ii, li = _col(head, *EQ_ID_COLS), _col(head, "language", "lang", "sprache")
-        cell = lambda row, j: str(row[j]).strip() if j is not None and j < len(row) else ""  # noqa: E731
+        cell = lambda row, j: sr_cell(row[j]) if j is not None and j < len(row) else ""  # noqa: E731
         cat, names, by_id = "", set(), {}
         for i, row in enumerate(rows):
             nm = cell(row, ni)
@@ -571,22 +701,32 @@ def fi_preview(c, oid, raw):
                 by_id[rid_]["name_en"] = nm[:200]
                 if nm.lower() in have or nm.lower() in names:  # 2.45.1 (#1556) review: the English name may already exist
                     by_id[rid_]["dup"], by_id[rid_]["action"] = True, "skip"
+                    cur = have.get(nm.lower()) or have.get(by_id[rid_]["name"].lower())
+                    by_id[rid_]["fill"] = sr_fill("equipment", cur, by_id[rid_]) if cur else {}  # 2.47.0 (#1648)
+                    by_id[rid_]["action"] = "fill" if by_id[rid_]["fill"] else "skip"
                 names.add(nm.lower())
                 continue
             e = {"row": i + 2, "name": nm[:200], "name_en": en[:200], "category": (cell(row, cti) or cat)[:80],
-                 "daily_rate": _num(row[di]) if di is not None and di < len(row) else None}
+                 "daily_rate": _num(sr_cell(row[di])) if di is not None and di < len(row) else None}
             e["dup"] = any(v in have or v in names for v in {nm.lower(), en.lower()} - {""})  # 2.45.1 (#1556): either name
-            e["action"] = "skip" if e["dup"] else "new"
+            cur = have.get(nm.lower()) or have.get(en.lower())
+            e["fill"] = sr_fill("equipment", cur, e) if cur else {}  # 2.47.0 (#1648)
+            e["action"] = "fill" if e["fill"] else ("skip" if e["dup"] else "new")
             names.add(nm.lower())
             if en:
                 names.add(en.lower())
             if rid_ and rid_ not in by_id:
                 by_id[rid_] = e
             out["equipment"].append(e)
-    for key, names in (("staff", ("staff", "crew")), ("freelancer", ("freelancer", "freelancers"))):
-        t = _table(book, *names)
-        if t:
-            out["other"][key] = sum(1 for r in t[1] if any(str(x).strip() for x in r) and not SEP_RE.match(str(r[0]) if r else ""))
+    for kind in ("roles", "crew"):  # 2.47.0 (#1649): imported now (were only counted in out["other"])
+        out[kind] = sr_role_rows(c, oid, book, kind) or []
+    known = {k for k, r in sr_have(c, oid, "roles", "name_de", "name_en").items() if not r.get("archived")}
+    known |= {x["name_de"].lower() for x in out["roles"]}
+    for s in out["services"]:  # a role the import cannot find is no fill
+        if "role_id" in s.get("fill", {}) and s["role"].lower() not in known:
+            del s["fill"]["role_id"]
+            if not s["fill"]:
+                s["action"] = "skip"
     return out
 
 
@@ -679,14 +819,15 @@ def fi_import(c, oid, uid, b):
     from ..team.clients import clean_client
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    lists = {k: b.get(k) or [] for k in ("clients", "services", "equipment")}
-    if not all(isinstance(v, list) for v in lists.values()) or sum(len(v) for v in lists.values()) > 3 * FI_ROWS_MAX:
+    lists = {k: b.get(k) or [] for k in FI_AREAS}
+    if not all(isinstance(v, list) for v in lists.values()) or sum(len(v) for v in lists.values()) > 5 * FI_ROWS_MAX:
         raise BadInput(tr("Invalid data"))
     areas = bk_areas(b.get("areas"))  # 2.46.1 (#1557): only the areas switched on (absent: all); the others are not even checked
     lists = {k: v if k in areas else [] for k, v in lists.items()}
     rid = _run_new(c, oid, uid, "data")
-    counts = {"clients": 0, "merged": 0, "contacts": 0, "services": 0, "equipment": 0, "skipped": 0}
-    merged = {}
+    counts = {"clients": 0, "merged": 0, "contacts": 0, "services": 0, "equipment": 0, "skipped": 0, "services_filled": 0, "equipment_filled": 0,
+              "roles": 0, "roles_filled": 0, "crew": 0, "crew_filled": 0}
+    merged, filled = {}, {}
     made = {}
     ts = iso(now_utc())
     for x in lists["clients"]:
@@ -694,26 +835,95 @@ def fi_import(c, oid, uid, b):
             _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made)
         except BadInput as e:  # say which row: the preview can be long
             raise BadInput(tr("Row {0}: {1}", x.get("row") if isinstance(x, dict) and isinstance(x.get("row"), int) else "?", str(e))) from None
+    # 2.47.0 (#1649): roles and crew first, so the column freelancer of a service finds its (new or existing) role
+    for kind in ("roles", "crew"):
+        sr_import_rows(c, oid, rid, kind, lists[kind], tuple(SR_BLOCKS[kind]["cols"]), counts, filled)
+    roles = sr_have(c, oid, "roles", "name_de", "name_en")
+
+    def role_of(vals):
+        r = roles.get(str(vals.get("role") or "").strip().lower())
+        return {**vals, "role_id": r["id"]} if r and not r.get("archived") else vals
+
     for kind, cols in (("services", ("name_de", "name_en", "category", "sort", "unit", "daily_rate", "hourly_rate", "raw_fee", "producing", "intext", "role")),
                        ("equipment", ("name", "name_en", "category", "daily_rate"))):  # 2.45.1 (#1556): name_en
-        for x in lists[kind]:
-            if not isinstance(x, dict):
-                raise BadInput(tr("Invalid data"))
-            if (x.get("action") or "new") == "skip":
+        sr_import_rows(c, oid, rid, kind, lists[kind], cols, counts, filled, role_of if kind == "services" else None)
+    c.execute("UPDATE office_import_runs SET counts=?, detail=? WHERE id=? AND org_id=?",
+              (json.dumps(counts), json.dumps({"merged": merged, "filled": filled, "areas": list(areas)}), rid, oid))
+    return rid, counts
+
+
+SR_NAMES = {"services": ("name_de",), "equipment": ("name", "name_en"), "roles": ("name_de", "name_en"), "crew": ("name_de", "name_en")}
+
+
+def sr_mark(oid, rid, f, v):
+    """2.47.0 (#1648): what the run keeps of a filled value (compared at the undo); 2.47.0 (#1649): a purchase price only
+    as a keyed hash (the run's detail is not encrypted)."""
+    if f in ("cost_day", "cost_hour"):
+        msg = f"{oid}:{rid}:{f}:{v!r}".encode()
+        key = sr_mark_key()
+        if key:  # 2.47.0 (#1649): keyed with the server secret, a day rate cannot be guessed back from the run's detail
+            return "k:" + hmac.new(key, msg, hashlib.sha256).hexdigest()[:24]
+        return "h:" + hashlib.sha256(msg).hexdigest()[:24]  # no server secret: nothing is encrypted at rest anyway
+    return v
+
+
+_SR_MARK_KEY = []
+
+
+def sr_mark_key():
+    """The key of sr_mark: derived from the server secret (KALMIDO_SECRET_KEY / secret file), None without one."""
+    if not _SR_MARK_KEY:
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+        from ..core import config
+        m = getattr(config, "SECRET_KEY", None)
+        _SR_MARK_KEY.append(HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"kalmido-import-mark-v1").derive(m) if m else None)
+    return _SR_MARK_KEY[0]
+
+
+def sr_import_rows(c, oid, rid, kind, rows, cols, counts, filled, resolve=None):
+    """2.47.0 (#1648): the rows of one master data area: new -> created with the run id, fill -> the empty fields of the
+    existing row of that name filled (recomputed here, never taken from the client), skip -> nothing. resolve(values)
+    may complete the values (the role of a service)."""
+    have = sr_have(c, oid, kind, *SR_NAMES[kind])
+    for x in rows:
+        if not isinstance(x, dict):
+            raise BadInput(tr("Invalid data"))
+        act = x.get("action") or "new"
+        if act == "skip":
+            counts["skipped"] += 1
+            continue
+        vals = {k: x[k] for k in cols if k in x and x[k] is not None}
+        if resolve:
+            vals = resolve(vals)
+        if act == "fill":
+            names = [str(x.get(n) or "").strip().lower() for n in SR_NAMES[kind]]
+            cur = next((have[n] for n in names if n and n in have), None)
+            if not cur:
+                raise BadInput(tr("Row {0}: {1}", x.get("row") if isinstance(x.get("row"), int) else "?", tr("Invalid value: {0}", "action")))
+            f = sr_fill(kind, cur, vals)
+            if not f:
                 counts["skipped"] += 1
                 continue
-            row = office_create(c, oid, kind, {k: x[k] for k in cols if k in x and x[k] is not None})
-            c.execute(f"UPDATE {'office_services' if kind == 'services' else 'office_equipment'} SET import_run_id=? WHERE id=? AND org_id=?", (rid, row["id"], oid))
-            counts[kind] += 1
-    c.execute("UPDATE office_import_runs SET counts=?, detail=? WHERE id=? AND org_id=?",
-              (json.dumps(counts), json.dumps({"merged": merged, "areas": list(areas)}), rid, oid))
-    return rid, counts
+            new = office_update(c, oid, kind, cur["id"], f)
+            done = filled.setdefault(kind, {}).setdefault(str(cur["id"]), {})
+            done.update({k: sr_mark(oid, cur["id"], k, new.get(k)) for k in f})
+            for n in names:
+                if n in have:
+                    have[n] = new
+            counts[kind + "_filled"] = counts.get(kind + "_filled", 0) + 1
+            continue
+        if act != "new":
+            raise BadInput(tr("Invalid value: {0}", "action"))
+        row = office_create(c, oid, kind, vals)
+        c.execute(f"UPDATE {MD[kind]['table']} SET import_run_id=? WHERE id=? AND org_id=?", (rid, row["id"], oid))
+        counts[kind] += 1
 
 
 # 2.46.1 (#1557): the areas of a data import, each imported and undone on its own. The run keeps per area when it was
 # undone in its detail JSON ({"undone": {"equipment": "<iso>"}}, no new column); undone_at = the whole run (every area
 # with entries undone, or the whole undo).
-FI_AREAS = ("clients", "services", "equipment")
+FI_AREAS = ("clients", "roles", "crew", "services", "equipment")  # 2.47.0 (#1649): roles, crew
 
 
 def bk_areas(v, empty_ok=True):
@@ -726,8 +936,9 @@ def bk_areas(v, empty_ok=True):
 
 def bk_area_counts(counts):
     """{area: number of entries the run made / changed in it} (only areas with entries)."""
-    n = {"clients": sum(int(counts.get(k) or 0) for k in ("clients", "merged", "contacts")),
-         "services": int(counts.get("services") or 0), "equipment": int(counts.get("equipment") or 0)}
+    n = {"clients": sum(int(counts.get(k) or 0) for k in ("clients", "merged", "contacts"))}
+    for k in FI_AREAS[1:]:  # 2.47.0 (#1648): new + filled rows
+        n[k] = int(counts.get(k) or 0) + int(counts.get(k + "_filled") or 0)
     return {k: v for k, v in n.items() if v}
 
 
@@ -764,8 +975,8 @@ def fi_undo(c, oid, uid, rid, kinds=None):
         if any(k in undone for k in kinds):
             raise Denied(409, tr("This part of the import has already been undone"))
     todo = [k for k in (kinds or FI_AREAS) if k not in undone]
-    removed = {"clients": 0, "services": 0, "equipment": 0, "archive": 0, "merged": 0, "contacts": 0}
-    kept = {"clients": 0, "services": 0, "equipment": 0}
+    removed = {"clients": 0, "services": 0, "equipment": 0, "archive": 0, "merged": 0, "contacts": 0, "filled": 0, "roles": 0, "crew": 0}
+    kept = {"clients": 0, "services": 0, "equipment": 0, "roles": 0, "crew": 0}
     kept_ids = set()
     for row in (c.execute("SELECT id FROM clients WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall() if "clients" in todo else []):
         if _client_used(c, oid, row["id"], rid):
@@ -775,10 +986,13 @@ def fi_undo(c, oid, uid, rid, kinds=None):
         c.execute("DELETE FROM clients WHERE id=? AND org_id=?", (row["id"], oid))
         removed["clients"] += 1
     s = office_settings(c, oid)
-    for kind, table in (("services", "office_services"), ("equipment", "office_equipment")):
+    sr_unfill(c, oid, detail, todo, removed)  # 2.47.0 (#1648): first, so a service lets go of the run's role
+    for kind in ("services", "equipment", "roles", "crew"):  # 2.47.0 (#1649): roles after the services that point to them
         if kind not in todo:
             continue
-        for row in c.execute(f"SELECT id FROM {table} WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall():
+        table = MD[kind]["table"]
+        extra = " AND kind=?" if MD[kind].get("kind") else ""
+        for row in c.execute(f"SELECT id FROM {table} WHERE org_id=? AND import_run_id=?{extra}", (oid, rid, *((MD[kind]["kind"],) if extra else ()))).fetchall():
             if office_in_use(c, kind, row["id"], oid) or (kind == "services" and s.get("producing_service_id") == row["id"]):
                 kept[kind] += 1
                 continue
@@ -823,6 +1037,36 @@ def fi_undo(c, oid, uid, rid, kinds=None):
     if kinds is None or all(k in undone for k in bk_area_counts(counts if isinstance(counts, dict) else {})):
         c.execute("UPDATE office_import_runs SET undone_at=?, undone_by=? WHERE id=? AND org_id=?", (ts, uid, rid, oid))
     return removed, kept, files
+
+
+def sr_unfill(c, oid, detail, todo, removed):
+    """2.47.0 (#1648): the fields a run filled (areas in todo) emptied again while they still hold the imported value."""
+    filled = detail.get("filled") if isinstance(detail.get("filled"), dict) else {}
+    for kind in todo:
+        rows = filled.get(kind)
+        if kind not in SR_FILL or not isinstance(rows, dict):
+            continue
+        for rid_, fields in rows.items():
+            row = sr_row(c, oid, kind, rid_)
+            if row is None or not isinstance(fields, dict):  # deleted since (or another organisation's id: 404 -> None)
+                continue
+            back = {f: sr_blank(f) for f, v in fields.items() if f in SR_FILL[kind] and sr_mark(oid, row["id"], f, row.get(f)) == v}
+            if back:
+                office_update(c, oid, kind, row["id"], back)
+                removed["filled"] += 1
+
+
+def sr_blank(f):
+    """The empty value of a fillable field."""
+    return 0 if f in SR_ZERO else (None if f in ("daily_rate", "hourly_rate", "role_id", "cost_day", "cost_hour", "rate_day") else "")
+
+
+def sr_row(c, oid, kind, rid):
+    from .model import office_row
+    try:
+        return office_row(c, oid, kind, rid)
+    except Denied:
+        return None
 
 
 def _unlink_files(oid, files):

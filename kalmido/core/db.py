@@ -333,6 +333,8 @@ def init_db(guard=True, load=None):
         fk_migrate(c)  # 2.40.0 (#1380): the contact field of a client becomes its default contact person
         from ..office.model import fe_office_rules_migrate
         fe_office_rules_migrate(c)  # 2.40.0 (#1379): producing / raw data stay on where they are used
+        from ..office.costs import ek_producing_migrate
+        ek_producing_migrate(c)  # 2.47.0 (#1645): producing per document, older documents keep how they compute
         for k, v in GLOBAL_DEFAULTS.items():
             c.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT DO NOTHING", (k, v))
         from ..admin.hosting import quota_backfill

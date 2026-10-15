@@ -659,8 +659,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # -- blocks: (height, draw(page, y), keep_next, keep_prev, table)
     blocks = []
 
-    def block(h, fn, keep_next=False, keep_prev=False, table=False):
-        blocks.append({"h": h, "draw": fn, "keep_next": keep_next, "keep_prev": keep_prev, "table": table})
+    def block(h, fn, keep_next=False, keep_prev=False, table=False, brk=False):  # 2.47.0 (#1215): brk = starts a new page
+        blocks.append({"h": h, "draw": fn, "keep_next": keep_next, "keep_prev": keep_prev, "table": table, "brk": brk})
 
     body = 9.6
     lh = body * 1.42
@@ -756,57 +756,61 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     lines = [x for x in (m.get("lines") or []) if isinstance(x, dict)]
     have_table = False
     last_item_idx = None
-    for i, ln in enumerate(lines):
-        k = ln.get("kind") or "item"
-        if k == "heading":
-            t = str(ln.get("title") or "")
-            block(22, lambda p, y, t=t: p.text(x_title + 3, y + 11, t.upper(), 8, True, accent, spacing=0.8), keep_next=True, table=True)
-            have_table = True
-        elif k == "text":
-            tw = c_title + c_qty + c_rate + c_vat + c_tot - 6
-            wrapped = pdf_wrap(str(ln.get("text") or ""), body, tw)
-            for part in (wrapped[q:q + 40] for q in range(0, max(1, len(wrapped)), 40)):  # a very long block may break (40 lines each)
-                block(len(part) * lh + 10, lambda p, y, part=part: [p.text(x_title + 3, y + 4 + q * lh, s_, body) for q, s_ in enumerate(part)],
-                      table=True)
-        elif k in ("item", "producing", "raw", "discount"):
-            if k == "raw" and ln.get("optional"):
-                continue  # the option is printed below the totals
-            t = str(ln.get("title") or (L["producing"] if k == "producing" else L["discount"] if k == "discount" else ""))
-            if k == "discount" and ln.get("pct") not in (None, "", 0):
-                t = f"{t} {pdf_num(ln['pct'], lang, fmt)} %"
-            detail = str(ln.get("detail") or "")
-            qty = ln.get("qty")
-            unit = str(ln.get("unit") or "")
-            unit = str(ln.get("unit_text") or ln.get("unit") or "")
-            if "qty_text" in ln:
-                qty_s = (str(ln.get("qty_text") or "") + (" " + unit if unit and ln.get("qty_text") else "")).strip()
-            else:
-                qty_s = (pdf_num(qty, lang, fmt) + (" " + unit if unit else "")) if qty not in (None, "") else ""
-            rate_s = str(ln.get("rate_text") or "") if "rate_text" in ln else (money(ln["rate"]) if ln.get("rate") not in (None, "") else "")
-            vat_s = (pdf_num(ln["tax_pct"], lang, fmt) + " %") if ln.get("tax_pct") not in (None, "") else ""
-            tot_s = str(ln.get("total_text") or "") if ln.get("total_text") else money(ln.get("total") or 0)
-            pos_s = str(ln.get("pos") or "") if k == "item" else ""
-            t_lines = pdf_wrap(t, body, c_title - 6)
-            d_lines = pdf_wrap(detail, 8.4, c_title + c_qty + c_rate + c_vat + c_tot - 6) if detail else []
-            h = 8 + len(t_lines) * lh + (len(d_lines) * 8.4 * 1.42 + 2 if d_lines else 0)
 
-            def draw_row(p, y, t_lines=t_lines, d_lines=d_lines, pos_s=pos_s, qty_s=qty_s, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s, h=h):
-                yy = y + 4
-                p.text(x_pos + 3, yy + 1, pos_s, 8, False, C_INK2)
-                for j, s in enumerate(t_lines):
-                    p.text(x_title + 3, yy + j * lh, s, body)
-                p.text(x_qty, yy, qty_s, 8.8, align="r", width=c_qty - 3)
-                p.text(x_rate, yy, rate_s, 8.8, align="r", width=c_rate - 3)
-                p.text(x_vat, yy + 1, vat_s, 8, False, C_INK2, align="c", width=c_vat)
-                p.text(x_tot, yy, tot_s, 8.8, align="r", width=c_tot - 3)
-                dy = yy + len(t_lines) * lh
-                for s in d_lines:
-                    p.text(x_title + 3, dy, s, 8.4, False, C_INK2)
-                    dy += 8.4 * 1.42
-                p.line(PDF_L, y + h - 0.5, PDF_L + PDF_CW, y + h - 0.5, 0.5, C_RULE2)
-            block(h, draw_row, table=True)
-            have_table = True
-            last_item_idx = len(blocks) - 1
+    def table_rows(lines):  # 2.47.0 (#1215): the rows of the title page and of every printed part
+        nonlocal have_table, last_item_idx
+        for i, ln in enumerate(lines):
+            k = ln.get("kind") or "item"
+            if k == "heading":
+                t = str(ln.get("title") or "")
+                block(22, lambda p, y, t=t: p.text(x_title + 3, y + 11, t.upper(), 8, True, accent, spacing=0.8), keep_next=True, table=True)
+                have_table = True
+            elif k == "text":
+                tw = c_title + c_qty + c_rate + c_vat + c_tot - 6
+                wrapped = pdf_wrap(str(ln.get("text") or ""), body, tw)
+                for part in (wrapped[q:q + 40] for q in range(0, max(1, len(wrapped)), 40)):  # a very long block may break (40 lines each)
+                    block(len(part) * lh + 10, lambda p, y, part=part: [p.text(x_title + 3, y + 4 + q * lh, s_, body) for q, s_ in enumerate(part)],
+                          table=True)
+            elif k in ("item", "producing", "raw", "discount"):
+                if k == "raw" and ln.get("optional"):
+                    continue  # the option is printed below the totals
+                t = str(ln.get("title") or (L["producing"] if k == "producing" else L["discount"] if k == "discount" else ""))
+                if k == "discount" and ln.get("pct") not in (None, "", 0):
+                    t = f"{t} {pdf_num(ln['pct'], lang, fmt)} %"
+                detail = str(ln.get("detail") or "")
+                qty = ln.get("qty")
+                unit = str(ln.get("unit") or "")
+                unit = str(ln.get("unit_text") or ln.get("unit") or "")
+                if "qty_text" in ln:
+                    qty_s = (str(ln.get("qty_text") or "") + (" " + unit if unit and ln.get("qty_text") else "")).strip()
+                else:
+                    qty_s = (pdf_num(qty, lang, fmt) + (" " + unit if unit else "")) if qty not in (None, "") else ""
+                rate_s = str(ln.get("rate_text") or "") if "rate_text" in ln else (money(ln["rate"]) if ln.get("rate") not in (None, "") else "")
+                vat_s = (pdf_num(ln["tax_pct"], lang, fmt) + " %") if ln.get("tax_pct") not in (None, "") else ""
+                tot_s = str(ln.get("total_text") or "") if ln.get("total_text") else money(ln.get("total") or 0)
+                pos_s = str(ln.get("pos") or "") if k == "item" else ""
+                t_lines = pdf_wrap(t, body, c_title - 6)
+                d_lines = pdf_wrap(detail, 8.4, c_title + c_qty + c_rate + c_vat + c_tot - 6) if detail else []
+                h = 8 + len(t_lines) * lh + (len(d_lines) * 8.4 * 1.42 + 2 if d_lines else 0)
+
+                def draw_row(p, y, t_lines=t_lines, d_lines=d_lines, pos_s=pos_s, qty_s=qty_s, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s, h=h):
+                    yy = y + 4
+                    p.text(x_pos + 3, yy + 1, pos_s, 8, False, C_INK2)
+                    for j, s in enumerate(t_lines):
+                        p.text(x_title + 3, yy + j * lh, s, body)
+                    p.text(x_qty, yy, qty_s, 8.8, align="r", width=c_qty - 3)
+                    p.text(x_rate, yy, rate_s, 8.8, align="r", width=c_rate - 3)
+                    p.text(x_vat, yy + 1, vat_s, 8, False, C_INK2, align="c", width=c_vat)
+                    p.text(x_tot, yy, tot_s, 8.8, align="r", width=c_tot - 3)
+                    dy = yy + len(t_lines) * lh
+                    for s in d_lines:
+                        p.text(x_title + 3, dy, s, 8.4, False, C_INK2)
+                        dy += 8.4 * 1.42
+                    p.line(PDF_L, y + h - 0.5, PDF_L + PDF_CW, y + h - 0.5, 0.5, C_RULE2)
+                block(h, draw_row, table=True)
+                have_table = True
+                last_item_idx = len(blocks) - 1
+    table_rows(lines)
     # 2.38.0 (#1021): a payment reminder lists the open invoices (number, date, due, open amount) instead of positions
     rem = m.get("reminder") if isinstance(m.get("reminder"), dict) else None
     if rem and isinstance(rem.get("rows"), list) and rem["rows"]:
@@ -984,6 +988,36 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             p.text(PDF_L + half + 28, yl + 3, L["sign"], 7.6, False, C_INK2)
         block(16 + 40 + 16, draw_accept)
 
+    # -- 2.47.0 (#1215): every printed part of a quotation on its own page(s): part title + number, its rows, its sums
+    for part in m.get("parts") or []:
+        if not isinstance(part, dict):
+            continue
+        ptitle = str(part.get("title") or "")
+        psub = " · ".join(x for x in (f"{L['number']} {number}" if number else "", str(m.get("project_title") or "")) if x)
+
+        def draw_part_head(p, y, ptitle=ptitle, psub=psub):
+            p.text(PDF_L, y + 6, ptitle.upper(), 14, True, C_INK, spacing=0.8)
+            p.line(PDF_L, y + 6 + 20, PDF_L + 14 * MM, y + 6 + 20, 1.6, accent)
+            if psub:
+                p.text(PDF_L + PDF_CW, y + 8, psub, 8.6, False, C_INK2, align="r")
+        block(34, draw_part_head, keep_next=True, brk=True)
+        for hr in part.get("head") or []:
+            if isinstance(hr, (list, tuple)) and len(hr) >= 2:
+                block(lh, lambda p, y, a=str(hr[0]), b=str(hr[1]): (p.text(PDF_L, y, a, 9, False, C_INK2), p.text(PDF_L + 112, y, b, 9)), keep_next=True)
+        table_rows([x for x in (part.get("lines") or []) if isinstance(x, dict)])
+        prow = [(str(r[0]), str(r[1])) for r in ((part.get("totals") or {}).get("rows") or []) if isinstance(r, (list, tuple)) and len(r) >= 2]
+        if prow:
+            def draw_part_sum(p, y, prow=prow):
+                yy = y + 8
+                for j, (lab, val) in enumerate(prow):
+                    if j == 0:
+                        p.line(PDF_L + PDF_CW - 190, yy, PDF_L + PDF_CW, yy, 1.1, C_INK)
+                        yy += 5
+                    p.text(PDF_L + PDF_CW - 190, yy, lab, 10.4 if j == 0 else 9, j == 0)
+                    p.text(PDF_L + PDF_CW - 190, yy, val, 10.4 if j == 0 else 8.8, j == 0, align="r", width=190)
+                    yy += (10.4 if j == 0 else 9) * 1.5
+            block(14 + sum((10.4 if j == 0 else 9) * 1.5 for j in range(len(prow))) + 5, draw_part_sum, keep_prev=True)
+
     # -- lay the blocks out on pages
     pages = []
     page = _Page()
@@ -995,6 +1029,13 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     n_blocks = len(blocks)
     while i < n_blocks:
         b = blocks[i]
+        if b.get("brk") and not first_on_page:  # 2.47.0 (#1215): a part starts on a new page
+            page = _Page()
+            draw_small_head(page)
+            pages.append(page)
+            y = PDF_NEXT_TOP
+            first_on_page = True
+            continue
         # the group that must stay together with b: keep_next chains forward, keep_prev of the follower
         j = i
         while j + 1 < n_blocks and (blocks[j]["keep_next"] or blocks[j + 1]["keep_prev"]):

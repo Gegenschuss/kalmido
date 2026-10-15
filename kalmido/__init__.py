@@ -134,6 +134,8 @@ ORDER = (
     "office.model",  # 2.36.1 (#1021): office & finance (B); C/D append office.calc, office.docs, office.pdf
     "office.web",
     "office.calc",  # 2.36.1 (#1021): the quotation calculator (C, no imports)
+    "office.sheet",  # 2.47.0 (#1216): the shoot calculation sheet + industry packs (C, imports office.calc)
+    "office.costs",  # 2.47.0 (#1645, #1649): producing per document, purchases of accepted quotations (part D, no routes)
     "office.docs",  # 2.36.1 (#1021): quotations (C)
     "office.pdf",  # 2.36.1 (#1021): the PDF writer (D, no kalmido imports)
     "office.einvoice",  # 2.38.0 (#1021 P5, F2): e-invoice XML (CII EN 16931 / XRechnung) from the snapshot, used by office.pdfweb
@@ -144,6 +146,7 @@ ORDER = (
     "office.countries",  # 2.40.0 (#1372): the ISO 3166-1 alpha-2 list (no routes)
     "office.contacts_cl",  # 2.40.0 (#1380): contact persons of a client (no routes; used by team.clients, office.docs, legacyimport)
     "office.legacyimport",  # 2.39.1 (#1182): legacy import (clients / services / equipment from .xlsx, archive of old PDFs)
+    "office.parts",  # 2.47.0 (#1215): parts of a quotation (Teilangebote): routes, title page calculation, invoice modes
     "team.approvals",
     "team.forms",
     "team.v1",

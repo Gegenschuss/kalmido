@@ -5,7 +5,7 @@
 const OFC = {tab: '', data: {}, loading: {}, seq: 0, q: '', arch: false, info: null, infoErr: null, infoLoading: false};
 const OFC_TABS = [['offers', 'receipt', N_('Quotes & invoices')], ['services', 'list', N_('Services')], ['equipment', 'camera', N_('Equipment')],
   ['texts', 'note', N_('Text blocks')], ['contracts', 'file', N_('Framework contracts')], ['settings', 'gear', N_('Settings')]];
-const OFC_UNITS = [['day', N_('Day|unit')], ['hour', N_('Hour|unit')], ['piece', N_('Piece|unit')], ['minute', N_('Minute|unit')], ['flat', N_('Flat rate|unit')]];
+const OFC_UNITS = [['day', N_('Day|unit')], ['hour', N_('Hour|unit')], ['piece', N_('Piece|unit')], ['minute', N_('Minute|unit')], ['flat', N_('Flat rate|unit')], ['percent', N_('Percent|unit')]];  // 2.47.0 (#1649): percent (KSK)
 const OFC_TAXES = [['standard', N_('standard rate')], ['reduced', N_('reduced rate')], ['exempt', N_('exempt')]];
 const OFC_TEXT_KINDS = [['rights_time', N_('Rights: duration')], ['rights_territory', N_('Rights: territory')], ['rights_media', N_('Rights: media')],
   ['intro', N_('Introduction')], ['closing', N_('Closing')], ['note', N_('Note|office')], ['block', N_('Text block between positions')], ['raw_note', N_('Raw data note')]];
@@ -80,15 +80,30 @@ function ofcListHtml(kind) {
     ${kind === 'equipment' && adm ? `<button class="btn sm" data-ofc="new" data-kind="sets">${ic('plus', 's')}<span>${tr('New set')}</span></button>` : ''}</div>`;
   const rows = d.filter(r => hit(r) && (OFC.arch || !r.archived));
   let list;
-  if (kind === 'services') list = ofcGrouped(rows, r => r.category || tr('No category'), r => ofcRowBtn('services', r, r.name_de, [r.name_en, r.unit === 'hour' && r.hourly_rate != null ? `${ofcMoney(r.hourly_rate)}/${tr('h|unit')}` : r.daily_rate != null ? `${ofcMoney(r.daily_rate)}/${tr('Day|unit')}` : '', ofcTax(r.tax), r.raw_fee ? tr('raw data') : '', r.producing ? tr('producing') : '', r.intext === 'intern' ? tr('internal') : ''].filter(Boolean).join(' · ')));
+  if (kind === 'services') list = ofcGrouped(rows, r => r.category || tr('No category'), r => ofcRowBtn('services', r, r.name_de, [r.name_en, r.unit === 'percent' && r.daily_rate != null ? `${fmtNum(r.daily_rate, 2)} %` : r.unit === 'hour' && r.hourly_rate != null ? `${ofcMoney(r.hourly_rate)}/${tr('h|unit')}` : r.daily_rate != null ? `${ofcMoney(r.daily_rate)}/${tr('Day|unit')}` : '', ofcTax(r.tax), r.raw_fee ? tr('raw data') : '', r.producing ? tr('producing') : '', r.intext === 'intern' ? tr('internal') : r.intext === 'shooting' ? tr('Shoot') : ''].filter(Boolean).join(' · ')));
   else if (kind === 'equipment') {
     list = ofcGrouped(rows, r => r.category || tr('No category'), r => ofcRowBtn('equipment', r, r.name, [r.name_en, r.daily_rate != null ? `${ofcMoney(r.daily_rate)}/${tr('Day|unit')}` : ''].filter(Boolean).join(' · ')));  // 2.45.1 (#1556): + English name
     const sets = ofcRows('sets').filter(r => hit(r) && (OFC.arch || !r.archived));
     list += `<h3 class="ofcgrp">${tr('Sets')}</h3>` + (sets.length ? `<ul class="ofclist" role="list">${sets.map(r => ofcRowBtn('sets', r, r.name, [trn('{0} device', '{0} devices', (r.items || []).length), r.discount_pct ? tr('{0} % discount', fmtNum(r.discount_pct, 1)) : ''].filter(Boolean).join(' · '))).join('')}</ul>` : `<p class="muted lempty">${tr('No sets yet. A set bundles devices with one discount.')}</p>`);
   } else if (kind === 'texts') list = ofcGrouped(rows, r => tr(OFC_TEXT_KINDS.find(k => k[0] === r.kind)?.[1] || r.kind), r => ofcRowBtn('texts', r, r.key || (r.text_de || r.text_en).slice(0, 60), (r.text_de && !r.text_en ? tr('no English text stored') + ' · ' : '') + (r.key ? [r.text_de, r.text_en].filter(Boolean).join(' / ').slice(0, 120) : (r.text_en || '').slice(0, 80))), OFC_TEXT_KINDS.map(k => tr(k[1])));
-  else list = rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn('contracts', r, r.name, [r.date ? fmtDateLoc(r.date) : '', r.raw_included && ofcRawOn() ? tr('raw data included') : '', r.client_id && (S.clients || []).find(c => c.id === r.client_id)?.name].filter(Boolean).join(' · '))).join('')}</ul>` : '';
+  else list = rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn('contracts', r, r.name, [r.date ? fmtDateLoc(r.date) : '', r.raw_included ? tr('raw data included') : '', r.client_id && (S.clients || []).find(c => c.id === r.client_id)?.name].filter(Boolean).join(' · '))).join('')}</ul>` : '';
   if (!rows.length && !list) list = `<div class="empty nempty eact">${ic(kind === 'texts' ? 'note' : 'list')}<span>${q ? tr('Nothing matches.') : adm ? tr('Nothing here yet. Add the first entry or import a file under Settings.') : tr('Nothing here yet.')}</span></div>`;
-  return bar + list;
+  return bar + list + (kind === 'services' ? sr_roleSections(hit) : '');  // 2.47.0 (#1649)
+}
+// 2.47.0 (#1649): the masters Freelancer-Rollen (purchase price per day / hour, a service points to its role) and
+// Drehpersonal (for the shoot calculation) below the services, like the sets below the equipment. Members get no prices.
+function sr_roleSections(hit) {
+  for (const k of ['roles', 'crew']) if (!OFC.data[k] && !OFC.loading[k]) setTimeout(() => ofcLoad(k), 0);
+  const adm = ofcAdmin(), day = v => v != null ? `${ofcMoney(v)}/${tr('Day|unit')}` : '';
+  const sec = (k, title, hint, sub) => {
+    const rows = ofcRows(k).filter(r => hit(r) && (OFC.arch || !r.archived));
+    return `<h3 class="ofcgrp srhead">${esc(title)}<span class="c muted">${rows.length}</span>${adm ? `<button type="button" class="btn sm ghost" data-ofc="new" data-kind="${k}">${ic('plus', 's')}<span>${tr('Add')}</span></button>` : ''}</h3><p class="muted ofchint">${esc(hint)}</p>`
+      + (rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn(k, r, r.name_de, sub(r))).join('')}</ul>` : `<p class="muted lempty">${tr('Nothing here yet.')}</p>`);
+  };
+  return sec('roles', tr('Freelancer roles'), tr('Purchase price per day and hour; a service points to its role.'),
+    r => [r.name_en, r.cost_day != null ? `${tr('Purchase')} ${day(r.cost_day)}` : '', r.cost_hour != null ? `${ofcMoney(r.cost_hour)}/${tr('h|unit')}` : ''].filter(Boolean).join(' · '))
+    + sec('crew', tr('Crew'), tr('For the shoot calculation: daily rate for the client, internal or external.'),
+      r => [r.name_en, day(r.rate_day), r.intext === 'intern' ? tr('internal') : tr('external'), r.markup_pct ? tr('{0} % markup', fmtNum(r.markup_pct, 1)) : ''].filter(Boolean).join(' · '));
 }
 function ofcGrouped(rows, keyOf, rowHtml, order) {
   const g = new Map();
@@ -103,16 +118,13 @@ const ofcSel = (id, cur, opts, empty) => `<select id="${id}">${empty != null ? `
 const ofcIn = (id, v, o = {}) => `<input id="${id}" value="${esc(v ?? '')}" maxlength="${o.max || 200}" ${o.num ? 'inputmode="decimal" class="numin"' : ''} ${o.ph ? `placeholder="${esc(o.ph)}"` : ''} ${o.list ? `list="${o.list}"` : ''}>`;
 const ofcRowF = (id, label, field, hint) => `<div class="row"><label for="${id}">${esc(label)}</label>${field}${hint ? `<span class="muted ofchint">${esc(hint)}</span>` : ''}</div>`;
 const ofcChk = (id, label, on) => `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${esc(label)}</label></div>`;
-// 2.40.0 (#1379): producing and raw data are switched on per organisation (Settings); off = their fields stay hidden
-// (a value already set stays visible, so nothing changes unseen)
-const ofcProdOn = () => !!OFC.info?.settings?.producing_on, ofcRawOn = () => !!OFC.info?.settings?.raw_on;
-const ofcChkIf = (show, id, label, on) => show || on ? ofcChk(id, label, on) : ofcChk(id, label, on).replace('<div class="row">', '<div class="row" hidden>');
 // 2.40.0 (#1381): the choice shows the text in the field's language (lg); a block without English text says so
 const ofcTextOpts = (kind, lg) => ofcRows('texts').filter(t => t.kind === kind && !t.archived).map(t => [t.id, (t.key ? t.key + ': ' : '') + (lg === 'en' ? (t.text_en ? t.text_en.slice(0, 70) : tr('(no English text)') + ' ' + (t.text_de || '').slice(0, 50)) : (t.text_de || t.text_en).slice(0, 70))]);
 function ofcModal(kind, r) {
   const adm = ofcAdmin(), rate = v => v != null ? fmtNum(v, 2) : '';
   const titles = {services: [N_('New service'), N_('Edit service')], equipment: [N_('New device'), N_('Edit device')], sets: [N_('New set'), N_('Edit set')],
-    texts: [N_('New text block'), N_('Edit text block')], contracts: [N_('New contract'), N_('Edit contract')]};
+    texts: [N_('New text block'), N_('Edit text block')], contracts: [N_('New contract'), N_('Edit contract')],
+    roles: [N_('New freelancer role'), N_('Edit freelancer role')], crew: [N_('New crew role'), N_('Edit crew role')]};  // 2.47.0 (#1649)
   let f = '';
   if (kind === 'services') {
     const cats = [...new Set(ofcRows('services').map(x => x.category).filter(Boolean))];
@@ -121,9 +133,22 @@ function ofcModal(kind, r) {
       + ofcRowF('of-unit', tr('Unit'), ofcSel('of-unit', r?.unit || 'day', OFC_UNITS.map(([v, n]) => [v, tr(n)])))
       + ofcRowF('of-daily_rate', tr('Daily rate'), ofcIn('of-daily_rate', rate(r?.daily_rate), {num: true}), ofcCur()) + ofcRowF('of-hourly_rate', tr('Hourly rate'), ofcIn('of-hourly_rate', rate(r?.hourly_rate), {num: true}), ofcCur())
       + ofcRowF('of-tax', tr('VAT'), ofcSel('of-tax', r?.tax || 'standard', OFC_TAXES.map(([v, n]) => [v, `${tr(n)} (${ofcTax(v)})`])))
-      + ofcChkIf(ofcRawOn(), 'of-raw_fee', tr('Counts towards the raw data amount'), r?.raw_fee) + ofcChkIf(ofcProdOn(), 'of-producing', tr('Counts towards the producing days'), r?.producing)
+      + ofcChk('of-raw_fee', tr('Counts towards the raw data amount'), r?.raw_fee) + ofcChk('of-producing', tr('Counts towards the producing days'), r?.producing)  // 2.47.0 (#1645): always shown
+      + ofcRowF('of-intext', tr('Internal / external'), ofcSel('of-intext', r?.intext || 'extern', [['extern', tr('external')], ['intern', tr('internal')], ['shooting', tr('Shoot')]]),
+        r?.intext === 'shooting' ? tr('Only in the shoot calculation, never among the positions') : '')  // 2.47.0 (#1216)
+      // 2.47.0 (#1649): the freelancer role (its purchase price is the default of a position); the old text role only while it holds a value
+      + ofcRowF('of-role_id', tr('Freelancer role'), ofcSel('of-role_id', r?.role_id, ofcRows('roles').filter(x => !x.archived || x.id === r?.role_id).map(x => [x.id, x.name_de]), tr('none')))
+      + (r?.role ? ofcRowF('of-role', tr('Role'), ofcIn('of-role', r.role, {max: 80})) : `<input type="hidden" id="of-role" value="">`) + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
+  } else if (kind === 'roles') {  // 2.47.0 (#1649): purchase prices only for admins (members do not get them)
+    f = ofcRowF('of-name_de', tr('Name (German)'), ofcIn('of-name_de', r?.name_de)) + ofcRowF('of-name_en', tr('Name (English)'), ofcIn('of-name_en', r?.name_en))
+      + (adm ? ofcRowF('of-cost_day', tr('Purchase per day'), ofcIn('of-cost_day', rate(r?.cost_day), {num: true}), ofcCur()) + ofcRowF('of-cost_hour', tr('Purchase per hour'), ofcIn('of-cost_hour', rate(r?.cost_hour), {num: true}), ofcCur()) : '')
+      + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
+  } else if (kind === 'crew') {
+    f = ofcRowF('of-name_de', tr('Name (German)'), ofcIn('of-name_de', r?.name_de)) + ofcRowF('of-name_en', tr('Name (English)'), ofcIn('of-name_en', r?.name_en))
+      + ofcRowF('of-rate_day', tr('Daily rate'), ofcIn('of-rate_day', rate(r?.rate_day), {num: true}), ofcCur())
       + ofcRowF('of-intext', tr('Internal / external'), ofcSel('of-intext', r?.intext || 'extern', [['extern', tr('external')], ['intern', tr('internal')]]))
-      + ofcRowF('of-role', tr('Role'), ofcIn('of-role', r?.role, {max: 80, ph: tr('optional')})) + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
+      + (adm ? ofcRowF('of-markup_pct', tr('Markup'), ofcIn('of-markup_pct', r?.markup_pct != null ? fmtNum(r.markup_pct, 1) : '', {num: true, ph: tr('optional')}), '%') : '')
+      + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
   } else if (kind === 'equipment') {
     const cats = [...new Set(ofcRows('equipment').map(x => x.category).filter(Boolean))];
     // 2.45.1 (#1556): German + English name, like a service
@@ -145,7 +170,7 @@ function ofcModal(kind, r) {
     f = ofcRowF('of-name', tr('Name'), ofcIn('of-name', r?.name, {ph: tr('e.g. framework contract with Beispielkunde AG')}))
       + (cl.length ? ofcRowF('of-client_id', tr('Client'), ofcSel('of-client_id', r?.client_id, cl, tr('none'))) : '')
       + `<div class="row"><label id="of-datel">${tr('Date')}</label>${dateIn('of-date', r?.date || '', {label: tr('Date'), empty: tr('optional')})}</div>`
-      + ofcChkIf(ofcRawOn(), 'of-raw_included', tr('Raw data always included (no option line)'), r?.raw_included)
+      + ofcChk('of-raw_included', tr('Raw data always included (no option line)'), r?.raw_included)  // 2.47.0 (#1645): always shown
       + ofcRowF('of-rights_time_id', tr('Rights: duration'), ofcSel('of-rights_time_id', r?.rights_time_id, ofcTextOpts('rights_time'), tr('none')))
       + ofcRowF('of-rights_territory_id', tr('Rights: territory'), ofcSel('of-rights_territory_id', r?.rights_territory_id, ofcTextOpts('rights_territory'), tr('none')))
       + ofcRowF('of-rights_media_id', tr('Rights: media'), ofcSel('of-rights_media_id', r?.rights_media_id, ofcTextOpts('rights_media'), tr('none')))
@@ -177,7 +202,9 @@ function ofcModal(kind, r) {
       }
       const v = id => $(id, md)?.value ?? '';
       const body = {};
-      if (kind === 'services') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), category: v('#of-category'), unit: v('#of-unit'), daily_rate: ofcNum(v('#of-daily_rate')), hourly_rate: ofcNum(v('#of-hourly_rate')), tax: v('#of-tax'), raw_fee: $('#of-raw_fee', md).checked ? 1 : 0, producing: $('#of-producing', md).checked ? 1 : 0, intext: v('#of-intext'), role: v('#of-role'), sort: ofcNum(v('#of-sort')) ?? 0});
+      if (kind === 'services') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), category: v('#of-category'), unit: v('#of-unit'), daily_rate: ofcNum(v('#of-daily_rate')), hourly_rate: ofcNum(v('#of-hourly_rate')), tax: v('#of-tax'), raw_fee: $('#of-raw_fee', md).checked ? 1 : 0, producing: $('#of-producing', md).checked ? 1 : 0, intext: v('#of-intext'), role: v('#of-role'), role_id: +v('#of-role_id') || null, sort: ofcNum(v('#of-sort')) ?? 0});
+      else if (kind === 'roles') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), cost_day: ofcNum(v('#of-cost_day')), cost_hour: ofcNum(v('#of-cost_hour')), sort: ofcNum(v('#of-sort')) ?? 0});  // 2.47.0 (#1649)
+      else if (kind === 'crew') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), rate_day: ofcNum(v('#of-rate_day')), intext: v('#of-intext'), markup_pct: ofcNum(v('#of-markup_pct')), sort: ofcNum(v('#of-sort')) ?? 0});
       else if (kind === 'equipment') Object.assign(body, {name: v('#of-name'), name_en: v('#of-name_en'), category: v('#of-category'), daily_rate: ofcNum(v('#of-daily_rate'))});
       else if (kind === 'sets') Object.assign(body, {name: v('#of-name'), discount_pct: ofcNum(v('#of-discount_pct')), items: $$('.ofcitem', md).map(it => ({equipment_id: +$('select', it).value, qty: ofcNum($('input', it).value) ?? 1})).filter(it => it.equipment_id)});
       else if (kind === 'texts') Object.assign(body, {kind: v('#of-kind'), key: v('#of-key'), text_de: v('#of-text_de'), text_en: v('#of-text_en'), sort: ofcNum(v('#of-sort')) ?? 0});
@@ -230,6 +257,7 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-paydays', tr('Payment terms'), `<span class="lacts"><input id="os-paydays" value="${esc(String(s.payment_days ?? 14))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`, tr('a client\'s own payment terms win'))}${ofcII('paydays')}
     ${ofcRowF('os-rmfee', tr('Reminder fee'), `<span class="lacts"><input id="os-rmfee" value="${esc(fmtNum(s.reminder_fee ?? 0, 2))}" inputmode="decimal" class="numin" ${dis}><span class="muted">${ofcCur() === 'USD' ? '$' : '€'}</span></span>`)}
     ${ofcRowF('os-rmdays', tr('Payment deadline'), `<span class="lacts"><input id="os-rmdays" value="${esc(String(s.reminder_deadline_days ?? 10))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`, tr('on reminders'))}${ofcII('rmdays')}
+    ${typeof tpSettingsHtml === 'function' ? tpSettingsHtml(s, dis) : ''}
     ${ofcRowF('os-einv', tr('E-invoice format'), ofcSel('os-einv', s.einvoice_format || 'zugferd', [['zugferd', 'ZUGFeRD (PDF with XML)'], ['xrechnung', 'XRechnung (XML)']]), tr('clients with a buyer reference get XRechnung proposed'))}${ofcII('einv')}
     ${ofcRowF('os-datev', tr('DATEV inbox'), `<input id="os-datev" type="email" value="${esc(s.datev_email || '')}" maxlength="200" placeholder="${esc(tr('e-mail address of the document inbox'))}" ${dis}>`, tr('finalised invoices are mailed there as PDF + XML'))}${ofcII('datev')}
     ${ofcChk('os-datev-auto', tr('Send every invoice to the DATEV inbox when it is sent'), s.datev_auto)}
@@ -249,6 +277,7 @@ function ofcSettingsHtml() {
     <div class="ofcrule" data-rule="raw">
     ${ofcRowF('os-rf', tr('Raw data factor'), `<input id="os-rf" value="${esc(fmtNum(s.raw_factor, 2))}" inputmode="decimal" class="numin" ${dis}>`, tr('raw data amount = sum of the raw data positions × factor'))}${ofcII('rf')}
     </div>
+    ${ofcChk('os-ind-film', tr('Industry pack Film & Video (shoot calculation in quotations)'), (s.industry_packs || []).includes('film'))}
     <h3>${tr('Default texts')}</h3>
     ${ofcRowF('os-intro-de', tr('Introduction (German)'), ofcSel('os-intro-de', s.intro_text_id?.de, ofcTextOpts('intro'), tr('none')))}
     ${ofcRowF('os-intro-en', tr('Introduction (English)'), ofcSel('os-intro-en', s.intro_text_id?.en, ofcTextOpts('intro', 'en'), tr('none')))}
@@ -347,11 +376,13 @@ async function ofcSaveSettings(form) {
     color: v('#os-color').trim(), lang: v('#os-lang'), currency: v('#os-currency'), fx_usd: ofcNum(v('#os-fx')), offer_scheme: v('#os-scheme'), offer_valid_days: ofcNum(v('#os-valid')),
     prod_quotient: ofcNum(v('#os-pq')), producing_service_id: +v('#os-ps') || null, producing_rate: ofcNum(v('#os-pr')), raw_factor: ofcNum(v('#os-rf')),
     producing_on: $('#os-prod-on', form)?.checked ? 1 : 0, raw_on: $('#os-raw-on', form)?.checked ? 1 : 0,
+    industry_packs: $('#os-ind-film', form)?.checked ? ['film'] : [],  // 2.47.0 (#1216)
     intro_text_id: {de: +v('#os-intro-de') || null, en: +v('#os-intro-en') || null}, closing_text_id: {de: +v('#os-closing-de') || null, en: +v('#os-closing-en') || null},
     rights_default: {time_id: +v('#os-rt') || null, territory_id: +v('#os-rr') || null, media_id: +v('#os-rm') || null}, pack: v('#os-pack'),
     invoice_scheme: v('#os-inv-scheme'), credit_scheme: v('#os-cr-scheme'), reminder_scheme: v('#os-rm-scheme'), payment_days: ofcNum(v('#os-paydays')), reminder_fee: ofcNum(v('#os-rmfee')),
     reminder_deadline_days: ofcNum(v('#os-rmdays')), einvoice_format: v('#os-einv'), datev_email: v('#os-datev').trim(), datev_auto: $('#os-datev-auto', form)?.checked ? 1 : 0,
     invoice_closing_de: v('#os-inv-close-de'), invoice_closing_en: v('#os-inv-close-en'), reminder_text_de: v('#os-rm-text-de'), reminder_text_en: v('#os-rm-text-en')};
+  if (typeof tpSettingsBody === 'function') Object.assign(body, tpSettingsBody(form));  // 2.47.0 (#1215)
   try { const j = await api('PUT', '/api/office/settings', body); OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null; fgDone(form.dataset.fg); toast(tr('Saved')); ofcDraw(); }
   catch (x) { const el = $('.aerr', form); if (el) el.textContent = x.message || ''; }
 }

@@ -46,7 +46,9 @@ function oimPreviewHtml() {
   const otherNames = {staff: N_('Staff'), freelancer: N_('Freelancers')};
   return `<div class="oimpv">
     ${cl.length ? `${bk_areaHead(p, 'clients', tr('Clients'))}${bk_off(p, 'clients') ? '' : `${chips}<ul class="oimcards" role="list">${rows.map(([c, i]) => oimClientCard(c, i)).join('')}</ul>`}` : `<p class="muted">${tr('No sheet Contacts found.')}</p>`}
-    ${(p.services || []).length ? `${bk_areaHead(p, 'services', tr('Services'))}${bk_off(p, 'services') ? '' : `<ul class="oimcards" role="list">${p.services.map((s, i) => oimSimpleCard('services', s, i, s.name_de, [s.category, s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : '', s.hourly_rate != null ? `${ofcMoney(s.hourly_rate)}/${tr('h|unit')}` : ''])).join('')}</ul>`}` : ''}
+    ${sr_area(p, 'roles', tr('Freelancer roles'), s => [s.cost_day != null ? `${tr('Purchase')} ${ofcMoney(s.cost_day)}/${tr('Day|unit')}` : '', s.cost_hour != null ? `${ofcMoney(s.cost_hour)}/${tr('h|unit')}` : ''])}
+    ${sr_area(p, 'crew', tr('Crew'), s => [s.name_en, s.rate_day != null ? `${ofcMoney(s.rate_day)}/${tr('Day|unit')}` : '', s.intext === 'intern' ? tr('internal') : tr('external')])}
+    ${(p.services || []).length ? `${bk_areaHead(p, 'services', tr('Services'))}${bk_off(p, 'services') ? '' : `<ul class="oimcards" role="list">${p.services.map((s, i) => oimSimpleCard('services', s, i, s.name_de, [s.category, s.unit === 'percent' ? (s.daily_rate != null ? `${fmtNum(s.daily_rate, 2)} %` : '') : s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : '', s.unit !== 'percent' && s.hourly_rate != null ? `${ofcMoney(s.hourly_rate)}/${tr('h|unit')}` : '', s.intext === 'shooting' ? tr('Shoot') : ''])).join('')}</ul>`}` : ''}
     ${(p.equipment || []).length ? `${bk_areaHead(p, 'equipment', tr('Equipment'))}${bk_off(p, 'equipment') ? '' : `<ul class="oimcards" role="list">${p.equipment.map((s, i) => oimSimpleCard('equipment', s, i, s.name, [s.name_en, s.category, s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : ''])).join('')}</ul>`}` : ''}
     ${other.length ? `<p class="muted">${esc(tr('Not imported (Kalmido has no master data for them yet): {0}', other.map(([k, v]) => `${tr(otherNames[k] || k)} (${v})`).join(', ')))}</p>` : ''}
     <div class="foot stfoot oimfoot"><span class="aerr" role="alert"></span><span class="spacer"></span><button type="button" class="btn" data-oim="cancel">${tr('Cancel')}</button><button type="button" class="btn pri" data-oim="import" ${n && !OIM.busy ? '' : 'disabled'}>${esc(trn('Import {0} entry', 'Import {0} entries', n))}</button></div></div>`;
@@ -54,7 +56,7 @@ function oimPreviewHtml() {
 
 // 2.46.1 (#1557): every area (clients, services, equipment) has a switch "Take over" and "Skip all"; an area switched off
 // folds away, is not sent and not checked (a later import of the same file with only the equipment needs no address work)
-const BK_AREAS = ['clients', 'services', 'equipment'];
+const BK_AREAS = ['clients', 'roles', 'crew', 'services', 'equipment'];  // 2.47.0 (#1649): + roles, crew
 const bk_off = (p, k) => !!p.off?.[k];
 const bk_areasOn = p => BK_AREAS.filter(k => (p[k] || []).length && !bk_off(p, k));
 function bk_areaHead(p, k, title) {
@@ -63,7 +65,7 @@ function bk_areaHead(p, k, title) {
     ${on && (!allSkip || list.some(x => bk_back(x) !== 'skip')) ? `<button type="button" class="btn sm ghost" data-oim="area-skip" data-area="${k}">${esc(allSkip ? tr('Take over all') : tr('Skip all'))}</button>` : ''}
     <label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" data-oim-area="${k}" ${on ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${esc(tr('Take over'))}</span></label></div>`;
 }
-const bk_back = x => x.was && x.was !== 'skip' ? x.was : x.dup ? 'skip' : 'new';  // a duplicate stays skipped unless it was chosen before
+const bk_back = x => x.was && x.was !== 'skip' ? x.was : x.dup ? sr_fillAct(x) : 'new';  // a duplicate stays skipped unless it was chosen before
 function bk_skipAll(k) {  // "Skip all" of an area (and back: every row gets the action it had before, a duplicate its proposal)
   const list = OIM.pv?.[k] || [], any = list.some(s => s.action !== 'skip');
   for (const x of list) {
@@ -86,8 +88,24 @@ function oimClientCard(c, i) {
 
 function oimSimpleCard(kind, s, i, title, sub) {
   const on = s.action !== 'skip';
-  return `<li class="oimcard sm ${on ? '' : 'off'}"><div class="oimhd"><label class="chkl"><input type="checkbox" data-oim-on="${kind}" data-i="${i}" ${on ? 'checked' : ''}> <b>${esc(title)}</b></label>${s.dup ? `<span class="rotag">${tr('exists already')}</span>` : ''}</div><small class="muted">${esc(sub.filter(Boolean).join(' · '))}</small></li>`;
+  return `<li class="oimcard sm ${on ? '' : 'off'}"><div class="oimhd"><label class="chkl"><input type="checkbox" data-oim-on="${kind}" data-i="${i}" ${on ? 'checked' : ''}> <b>${esc(title)}</b></label>${s.dup ? `<span class="rotag">${tr('exists already')}</span>` : ''}</div><small class="muted">${esc(sub.filter(Boolean).join(' · '))}</small>${sr_fillHtml(kind, s, i)}</li>`;
 }
+// 2.47.0 (#1648): an existing entry with empty fields: "Fill empty fields" (the default) or "Skip"; the card says which
+// fields get which value (the server decides again at the import and never overwrites a set value)
+const SR_FILL_LABELS = {name_en: N_('Name (English)'), category: N_('Category'), sort: N_('Order'), daily_rate: N_('Daily rate'), hourly_rate: N_('Hourly rate'),
+  raw_fee: N_('raw data'), producing: N_('producing'), role: N_('Freelancer role'), role_id: N_('Freelancer role'), cost_day: N_('Purchase per day'),
+  cost_hour: N_('Purchase per hour'), rate_day: N_('Daily rate')};
+const sr_fillAct = x => Object.keys(x.fill || {}).length ? 'fill' : 'skip';
+function sr_fillHtml(kind, s, i) {
+  if (!s.dup || !s.fill) return '';
+  const f = Object.entries(s.fill).filter(([k]) => !(k === 'role_id' && 'role' in s.fill));
+  if (!f.length) return `<p class="muted oimfill">${esc(tr('Nothing to fill: every field is set already'))}</p>`;
+  const val = (k, v) => ['raw_fee', 'producing', 'sort'].includes(k) ? '' : ['daily_rate', 'hourly_rate', 'cost_day', 'cost_hour', 'rate_day'].includes(k) ? `: ${s.unit === 'percent' ? fmtNum(v, 2) + ' %' : ofcMoney(v)}` : `: ${v}`;
+  return `<div class="oimfill"><select data-oim-sact="${kind}" data-i="${i}" aria-label="${esc(tr('What to do'))}"><option value="fill" ${s.action === 'fill' ? 'selected' : ''}>${esc(tr('Fill empty fields'))}</option><option value="skip" ${s.action === 'skip' ? 'selected' : ''}>${esc(tr('Skip'))}</option></select>
+    <small class="muted">${esc(tr('Fills: {0}', f.map(([k, v]) => tr(SR_FILL_LABELS[k] || k) + val(k, v)).join(' · ')))}</small></div>`;
+}
+// 2.47.0 (#1649): the blocks Freelancer and Staff of the file = the areas roles and crew
+const sr_area = (p, k, title, sub) => (p[k] || []).length ? `${bk_areaHead(p, k, title)}${bk_off(p, k) ? '' : `<ul class="oimcards" role="list">${p[k].map((s, i) => oimSimpleCard(k, s, i, s.name_de, sub(s))).join('')}</ul>`}` : '';
 
 function oimArchHtml() {
   const a = OIM.arch;
@@ -151,8 +169,9 @@ function oimCounterHtml() {
 }
 
 // 2.46.1 (#1557): a data import with more than one area: undo one area alone ("Only undo the equipment"); an area undone shows so
-const BK_UNDO = {clients: N_('Only undo the clients'), services: N_('Only undo the services'), equipment: N_('Only undo the equipment')};
-const BK_UNDONE = {clients: N_('Clients undone'), services: N_('Services undone'), equipment: N_('Equipment undone')};
+const BK_UNDO = {clients: N_('Only undo the clients'), services: N_('Only undo the services'), equipment: N_('Only undo the equipment'),
+  roles: N_('Only undo the freelancer roles'), crew: N_('Only undo the crew')};  // 2.47.0 (#1649)
+const BK_UNDONE = {clients: N_('Clients undone'), services: N_('Services undone'), equipment: N_('Equipment undone'), roles: N_('Freelancer roles undone'), crew: N_('Crew undone')};
 function bk_runAreas(x) {
   const a = Object.entries(x.areas || {});
   if (x.undone_at || a.length < 2) return '';
@@ -210,10 +229,11 @@ async function oimImport() {
   OIM.busy = true; ofcDraw();
   try {
     const areas = bk_areasOn(p), pick = k => areas.includes(k) ? (k === 'clients' ? cl : p[k] || []) : [];
-    const j = await api('POST', '/api/office/legacy/import', {clients: pick('clients'), services: pick('services'), equipment: pick('equipment'), areas});
-    const c = j.counts || {};
-    toast(tr('Imported: {0} clients, {1} services, {2} devices', c.clients || 0, c.services || 0, c.equipment || 0) + (c.contacts ? ' · ' + trn('{0} contact person added', '{0} contact persons added', c.contacts) : ''));
-    OIM.pv = null; ofcReload('services'); ofcReload('equipment');
+    const j = await api('POST', '/api/office/legacy/import', {clients: pick('clients'), roles: pick('roles'), crew: pick('crew'), services: pick('services'), equipment: pick('equipment'), areas});
+    const c = j.counts || {}, roles = (c.roles || 0) + (c.crew || 0), filled = ['services', 'equipment', 'roles', 'crew'].reduce((a, k) => a + (c[k + '_filled'] || 0), 0);
+    toast(tr('Imported: {0} clients, {1} services, {2} devices', c.clients || 0, c.services || 0, c.equipment || 0) + (c.contacts ? ' · ' + trn('{0} contact person added', '{0} contact persons added', c.contacts) : '')
+      + (roles ? ' · ' + trn('{0} role', '{0} roles', roles) : '') + (filled ? ' · ' + trn('{0} entry completed', '{0} entries completed', filled) : ''));  // 2.47.0 (#1648, #1649)
+    OIM.pv = null; ofcReload('services'); ofcReload('equipment'); ofcReload('roles'); ofcReload('crew');
     await oimLoad();
   } catch (x) { const el = $('.oimpv .aerr'); if (el) el.textContent = x.message || ''; else toast(x.message || ''); }
   OIM.busy = false; ofcDraw();
@@ -274,9 +294,9 @@ document.addEventListener('click', async e => {
     if (!await askConfirm(kind ? tr(BK_UNDO[kind]) + '?' : tr('Undo this import?'), kind ? tr('Only the entries of this area are removed, except what is in use by now. The rest of the import stays.') : tr('Everything it added is removed, except what is in use by now (a client with a quotation, a list or an archived document; a service in a document). Clients that were merged lose the fields the import filled in.'), {ok: tr('Undo'), danger: true})) return;
     try {
       const j = await api('POST', `/api/office/legacy/runs/${b.dataset.id}/undo`, kind ? {kinds: [kind]} : undefined);
-      const k = j.kept || {}, kept = (k.clients || 0) + (k.services || 0) + (k.equipment || 0);
+      const k = j.kept || {}, kept = (k.clients || 0) + (k.services || 0) + (k.equipment || 0) + (k.roles || 0) + (k.crew || 0);
       toast(tr('Import undone') + (kept ? ' · ' + trn('{0} entry stays because it is in use', '{0} entries stay because they are in use', kept) : ''));
-      OIM.list = null; ofcReload('services'); ofcReload('equipment'); await oimLoad();
+      OIM.list = null; ofcReload('services'); ofcReload('equipment'); ofcReload('roles'); ofcReload('crew'); await oimLoad();
     } catch (x) { toast(x.message || ''); }
   }
 });
@@ -285,7 +305,9 @@ document.addEventListener('change', e => {
   if (t.dataset?.oimArea && OIM.pv) { OIM.pv.off = {...OIM.pv.off, [t.dataset.oimArea]: !t.checked}; ofcDraw(); return; }  // 2.46.1 (#1557)
   if (t.dataset?.oimOn && OIM.pv) {
     const list = t.dataset.oimOn === 'c' ? OIM.pv.clients : OIM.pv[t.dataset.oimOn], x = list?.[+t.dataset.i];
-    if (x) { if (!t.checked) { x.was = x.action; x.action = 'skip'; } else x.action = x.was && x.was !== 'skip' ? x.was : (x.dup && (x.contact || '').trim() ? 'contact' : 'new'); ofcDraw(); }
+    if (x) { if (!t.checked) { x.was = x.action; x.action = 'skip'; } else x.action = x.was && x.was !== 'skip' ? x.was : x.dup && Object.keys(x.fill || {}).length ? 'fill' : (x.dup && (x.contact || '').trim() ? 'contact' : 'new'); ofcDraw(); }
+  } else if (t.dataset?.oimSact && OIM.pv) {  // 2.47.0 (#1648): fill / skip of an existing entry
+    const x = OIM.pv[t.dataset.oimSact]?.[+t.dataset.i]; if (x) { x.action = t.value; ofcDraw(); }
   } else if (t.dataset?.oimAct && OIM.pv) {
     const x = OIM.pv.clients[+t.dataset.oimAct]; if (x) { x.action = t.value; ofcDraw(); }
   } else if (t.dataset?.oimP) {

@@ -6529,6 +6529,53 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .oimarea.off h4{color:var(--text2)}
 .oimrun{flex-wrap:wrap}
 .oimrunareas{flex-basis:100%;display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
+/* 2.47.0 C (#1216) shoot calculation sheet (office_sheet.js): boxes stacked, head values as a two-column grid on the
+   phone, wider on larger screens; rows reuse .ofdit / .ofdnums of the quotation editor */
+.dksheet{display:flex;flex-direction:column;gap:.75rem}
+.dkbox{border:1px solid var(--line2);border-radius:10px;padding:.625rem .75rem}
+.dkbox>summary,.dkbox>h4{margin:0 0 .5rem;font-weight:600;cursor:default}
+.dkbox>summary{cursor:pointer;min-height:2.25rem;display:flex;align-items:center}
+.dkgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem .75rem;align-items:end}
+@media (min-width:720px){.dkgrid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.dkf{display:flex;flex-direction:column;gap:.25rem;font-size:var(--fs-s);color:var(--text2);min-width:0}
+.dkf input,.dkf select{min-height:2.5rem;width:100%}
+.dkrow .dkn{display:block;min-width:0;overflow-wrap:anywhere}
+.dkmk{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-s)}
+.dkmk input{width:4.5rem}
+.dksum{display:flex;justify-content:space-between;gap:.75rem;margin:.375rem 0 0;align-items:baseline}
+.dksum small{display:inline}
+.dkstrong{font-weight:600}
+.dkhint{margin:.375rem 0 0;font-size:var(--fs-s);color:var(--accent)}
+.dkset .row{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem}
+.dktotals .dksum b{font-variant-numeric:tabular-nums}
+/* 2.47.0 D (#1649) the surplus per position (admins) and the percent position in the quotation editor */
+.ofdit .ofdmargin{color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ofdit .ofdmargin.neg{color:var(--danger)}
+.ofdit .ofdpctof{font-size:var(--fs-s);white-space:nowrap}
+.ofdtotals .ofdmsum{margin-top:0}
+/* 2.47.0 A (#1648, #1649): the masters Freelancer-Rollen / Drehpersonal below the services, "fill" in the import preview */
+.srhead .btn{margin-left:auto;text-transform:none;letter-spacing:0}
+.srhead + .ofchint{margin:0 0 .25rem;font-size:var(--fs-s)}
+.oimfill{margin:.25rem 0 0;display:flex;flex-wrap:wrap;gap:.375rem;align-items:center;font-size:var(--fs-s)}
+.oimfill select{min-height:2.25rem}
+/* 2.47.0 B (#1215): parts of a quotation - the section "Parts", a part line on the title page, an open part, the invoice choice */
+.tplist .tprow{display:flex;align-items:center;gap:.5rem}
+.tpopen{flex:1;min-width:0;display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.375rem .5rem;text-align:left;border-radius:var(--radius);background:none;border:1px solid transparent;color:var(--text);text-decoration:none}
+.tpopen:hover,.tpopen:focus-visible{border-color:var(--accent)}
+.tpopen .ofcn{flex:1;min-width:0;display:flex;flex-direction:column}
+.tpopen .ofcn b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tpopen .ofcn small{font-size:var(--fs-s)}
+.tpunused{color:var(--accent);font-size:var(--fs-s)}
+.tpprint{white-space:nowrap}
+.tppl .ofdflags .btn{margin-left:auto}
+.tphead{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .75rem}
+.tphead .tptitle{flex:1;min-width:12rem;font-size:var(--fs-l);font-weight:500}
+.tptotals{margin-top:.5rem}
+.tpmodes{border:0;padding:0;margin:0 0 .75rem;display:flex;flex-direction:column;gap:.375rem}
+.tpmode{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75rem;padding:.5rem .625rem;border:1px solid var(--line2);border-radius:var(--radius);cursor:pointer}
+.tpmode:has(input:checked){border-color:var(--accent)}
+.tpmode input{margin-top:.2rem}
+@media (max-width:599px){ .tplist .tprow{flex-wrap:wrap} .tplist .tpopen{flex-basis:100%} .tphead .tptitle{flex-basis:100%} }
 /* 2.46.1 A (#1607 #1643) the folder row reads like a list row: the arrow before the folder icon, the number right after the
    name, the share icon at the right in the lists' share column (the "…" takes that place on hover, the row does not move),
    the height of a list row and no extra room between folders (open or folded); the lists inside start under the folder icon */
@@ -6722,7 +6769,7 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .avwhich ul{margin:.25rem 0 0;padding-left:1.25rem;display:flex;flex-direction:column;gap:.25rem}
 /* 2.46.6 C (#1710) an admin switch next to the own setting: small mark "Admin · applies to everyone" + jump to Administration */
 .modrow .ad-mark{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:.25rem .5rem;flex-basis:100%;font-size:var(--fs-xs)}
-.ad-tag{padding:.0625rem .4375rem;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:999px;color:var(--accent);white-space:nowrap}
+.ad-tag{padding:.0625rem .4375rem;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:99rem;color:var(--accent);white-space:nowrap}
 .ad-mark .ad-open{font-size:var(--fs-xs)}
 @media (pointer:coarse){ .ad-mark .ad-open{min-height:2.75rem;padding:0 .5rem} }
 
@@ -6764,3 +6811,6 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .cwswb.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
 .cwswb .tcico{display:inline-flex}
 .cwswx{flex:0 0 auto;width:2.75rem;height:2.75rem;margin-left:-.25rem}
+/* 2.46.7 (#1708): touch targets of the Lists summary and the workspace button (device test) */
+.aglists>summary{min-height:2.75rem}
+@media (pointer:coarse){.agnm .avws{min-height:2.75rem}}

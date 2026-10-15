@@ -16,6 +16,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
+from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
 from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, RAW_MODES, TAX_KEYS, dec, fmt_money, inv_calc, office_calc
 from .packs import office_pack
 from .model import (NAME_MAX, TEXT_MAX, UNITS, office_gate, office_org, office_number_next, office_role, office_settings,
@@ -117,10 +118,12 @@ def doc_row(c, oid, did):
     return oc_dec_fields(c, oid, "office_docs", r)  # 2.42.0 (#828): sender / internal costs encrypted at rest
 
 
-def doc_items(c, did, oid):
-    """The positions of document did; oid (the organisation) is required: 2.36.2 (#1142) every read filters by it."""
+def doc_items(c, did, oid, part=None):
+    """The positions of document did; oid (the organisation) is required: 2.36.2 (#1142) every read filters by it.
+    2.47.0 (#1215): the title page's (part_id NULL); part = the positions of that part (office/parts.py)."""
+    psql, pargs = (" AND part_id IS NULL", ()) if part is None else (" AND part_id=?", (part,))
     return [oc_dec_fields(c, oid, "office_doc_items", r)  # 2.42.0 (#828): cost from cost_enc
-            for r in c.execute("SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=? ORDER BY sort, id", (did, oid))]
+            for r in c.execute("SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=?" + psql + " ORDER BY sort, id", (did, oid, *pargs))]
 
 
 def _texts(c, oid, kind=None):
@@ -253,7 +256,7 @@ def fk_doc_contact_clean(c, oid, b, cur, f):
 def _calc_doc(r):
     return {"lang": r["lang"], "currency": r["currency"], "fx_rate": r["fx_rate"], "vat_mode": r["vat_mode"], "raw_mode": r["raw_mode"],
             "raw_factor": r["raw_factor"], "prod_quotient": r["prod_quotient"], "producing_rate": r["producing_rate"],
-            "discount_pct": r["discount_pct"]}
+            "discount_pct": r["discount_pct"], "producing_on": dict(r).get("producing_on")}  # 2.47.0 (#1645)
 
 
 def doc_totals(c, oid, r, items=None):
@@ -262,6 +265,12 @@ def doc_totals(c, oid, r, items=None):
     if r["kind"] == "reminder":  # 2.38.0: a reminder has no positions, its lines are the invoices it lists
         return inv_reminder_totals(c, oid, r, pack)
     calc = inv_calc if r["kind"] in ("invoice", "credit") else office_calc
+    if r["kind"] == "offer":  # 2.47.0 (#1215): a quotation with parts (None: it has none, computed as before)
+        from .parts import tp_doc_totals
+        t = tp_doc_totals(c, oid, r, items if items is not None else doc_items(c, r["id"], oid), pack)
+        if t is not None:
+            t.pop("_part_calcs", None)
+            return t
     return calc(_calc_doc(r), items if items is not None else doc_items(c, r["id"], oid), pack)
 
 
@@ -271,9 +280,14 @@ def recalc(c, oid, did):
     r = doc_row(c, oid, did)
     if ofx_locked(r):
         return _j(r["totals"], {})
+    if r["kind"] == "offer":  # 2.47.0 (#1215): the parts' cached totals and the rates of their title page lines
+        from .parts import tp_recalc
+        tp_recalc(c, oid, r)
     t = doc_totals(c, oid, r)
     c.execute("UPDATE office_docs SET totals=?, updated_at=? WHERE id=? AND org_id=?",
               (json.dumps(oc_json_store(c, oid, "office_docs", "totals", t), ensure_ascii=False), iso(now_utc()), did, oid))  # 2.42.0 (#828)
+    if r["kind"] == "offer" and r["status"] == "accepted":
+        ek_purchases_write(c, oid, did)  # 2.47.0 (#1649): a changed accepted quotation writes its purchase anew
     return t
 
 
@@ -309,8 +323,15 @@ def doc_public(c, oid, r, admin, items=True):
         for it in its:
             it["discountable"] = int(it.get("discountable") or 0)
             if not admin:
-                it["cost"] = None
+                it.pop("cost", None)  # 2.47.0 (#1649): members get no purchase at all (was None)
+                it.pop("cost_enc", None)
+        if admin:
+            ek_item_margins(d, its)  # 2.47.0 (#1649): the surplus per position, computed here (never stored in plain)
         d["items"] = its
+        if r["kind"] == "offer":  # 2.47.0 (#1215): the parts (purchase side only for admins)
+            from .parts import tp_public, tp_shoot_ok
+            d["parts"] = tp_public(c, oid, r, admin)
+            d["parts_shoot"] = tp_shoot_ok(c, oid)
         from .contacts_cl import fk_contacts
         d["client_contacts"] = fk_contacts(c, r["client_id"]) if r["client_id"] else []  # 2.40.0 (#1380): the choice of contact_id
         d["contract"] = _contract(c, oid, d.get("contract_id"))
@@ -450,8 +471,7 @@ def _default_text(c, oid, s, kind, lang):
 
 def _apply_contract(c, oid, f, ct, lang, cur_rights):
     """The preset of a framework contract: raw data included, its rights, its closing (each only when it has one)."""
-    if office_settings(c, oid).get("raw_on"):  # 2.40.0 (#1379): raw data switched off = the document keeps its mode
-        f["raw_mode"] = "included" if ct.get("raw_included") else "optional"
+    f["raw_mode"] = "included" if ct.get("raw_included") else "optional"  # 2.47.0 (#1645): always, the switch is per document
     rights = dict(cur_rights or {})
     rights.update(_rights_from_contract(c, oid, ct, lang))
     f["rights"] = json.dumps(rights, ensure_ascii=False)
@@ -514,6 +534,8 @@ def clean_doc(c, oid, b, cur, admin):
         raise BadInput(tr("The period of service ends before it starts"))
     if "raw_mode" in b:
         f["raw_mode"] = _choice(b.get("raw_mode"), "raw_mode", RAW_MODES)
+    if "producing_on" in b:  # 2.47.0 (#1645): producing per document (the office setting is only the default)
+        f["producing_on"] = 0 if b.get("producing_on") in (0, False, "0", "false", None, "") else 1
     for k, lo, hi, dflt in (("raw_factor", 0, 10, 0.25), ("prod_quotient", 0.01, 1000, 3), ("producing_rate", 0, 1e7, 600), ("discount_pct", 0, 100, 0)):
         if k in b:
             v = _num(b.get(k), k, lo, hi)
@@ -536,7 +558,7 @@ def clean_doc(c, oid, b, cur, admin):
     return f
 
 
-def clean_items(c, oid, r, items, admin):
+def clean_items(c, oid, r, items, admin, part=None):
     """The whole list of positions: [{kind, service_id, title, detail, qty, unit, rate, tax, raw_fee, producing, intext,
     cost, discountable}]. A service_id fills what the position leaves empty (title in the document's language, rate from
     the framework contract or the catalogue, tax and flags). cost only by the admin (others keep the stored value)."""
@@ -544,13 +566,16 @@ def clean_items(c, oid, r, items, admin):
         raise BadInput(tr("Invalid value: {0}", "items"))
     lang = r["lang"]
     ct = _contract(c, oid, r["contract_id"])
-    rules = office_settings(c, oid)  # 2.40.0 (#1379): a service's flags count only while their switch is on
-    old = {it["id"]: it for it in doc_items(c, r["id"], oid)}
+    old = {it["id"]: it for it in doc_items(c, r["id"], oid, part)}  # 2.47.0 (#1215): part = the positions of that part
     out = []
     for i, it in enumerate(items):
         if not isinstance(it, dict):
             raise BadInput(tr("Invalid value: {0}", "items"))
         kind = it.get("kind") or "service"
+        if kind == "part" and r["kind"] == "offer" and part is None:  # 2.47.0 (#1215): a part on the title page
+            from .parts import tp_clean_item
+            out.append(tp_clean_item(c, oid, r, it, i, old.get(it.get("id")) if it.get("id") else None))
+            continue
         _choice(kind, "items.kind", ITEM_KINDS if r["kind"] == "offer" else INV_ITEM_KINDS)  # 2.38.0: discount positions on invoices
         row = {"sort": i, "kind": kind, "service_id": None, "title": _text(it.get("title"), "items.title", 500),
                "detail": _text(it.get("detail"), "items.detail", 4000), "qty": 1, "unit": "day", "rate": 0, "tax": "standard",
@@ -578,8 +603,8 @@ def clean_items(c, oid, r, items, admin):
                         rate = ct["rates"][str(sv["id"])]
                     else:
                         rate = sv["hourly_rate"] if unit == "hour" and sv["hourly_rate"] is not None else sv["daily_rate"]
-                it = {**{"unit": unit, "tax": sv["tax"], "raw_fee": sv["raw_fee"] if rules.get("raw_on") else 0,
-                         "producing": sv["producing"] if rules.get("producing_on") else 0, "intext": sv["intext"]},
+                # 2.47.0 (#1645): the flags are always taken over; the switches of the document decide what counts
+                it = {**{"unit": unit, "tax": sv["tax"], "raw_fee": sv["raw_fee"], "producing": sv["producing"], "intext": sv["intext"]},
                       **{k: v for k, v in it.items() if v not in (None, "")}, "rate": rate}
             row["qty"] = _num(it.get("qty"), "items.qty", 0, 1e6)
             if row["qty"] is None:
@@ -589,17 +614,14 @@ def clean_items(c, oid, r, items, admin):
             row["tax"] = _choice(it.get("tax") or "standard", "items.tax", TAX_KEYS)
             row["raw_fee"] = 1 if it.get("raw_fee") in (1, True, "1", "true") else 0
             row["producing"] = 1 if it.get("producing") in (1, True, "1", "true") else 0
-            # 2.40.0 (#1379, review): a switched-off rule also holds for flags sent through the API; positions that
-            # already carried the flag keep it (existing documents stay as they are)
-            for fk, on in (("producing", "producing_on"), ("raw_fee", "raw_on")):
-                if not rules.get(on) and not (prev or {}).get(fk):
-                    row[fk] = 0
             row["intext"] = _choice(it.get("intext") or "intern", "items.intext", ("intern", "extern"))
             row["discountable"] = 0 if it.get("discountable") in (0, False, "0", "false") else 1
             if admin:
                 row["cost"] = _num(it.get("cost"), "items.cost", 0, 1e8) or 0
             else:
                 row["cost"] = (prev or {}).get("cost") or 0
+            if sv and not prev and it.get("cost") in (None, ""):  # 2.47.0 (#1649): a new position takes the purchase of the service's role
+                row["cost"] = ek_role_cost(c, oid, sv, row["unit"])
         elif not row["title"] and not row["detail"]:
             raise BadInput(tr("Invalid value: {0}", "items.title"))
         out.append(row)
@@ -646,6 +668,7 @@ def doc_create(c, oid, uid, b, admin):
            "fx_rate": s.get("fx_usd") or 1.09, "vat_mode": "vat", "client_id": None, "recipient": json.dumps({"name": "", "lines": []}),
            "project_title": "", "project_ref": "", "date": today.isoformat(),
            "valid_until": (today + timedelta(days=int(s.get("offer_valid_days") or 30))).isoformat(), "contract_id": None,
+           "producing_on": 1 if s.get("producing_on") else 0,  # 2.47.0 (#1645): the office setting is the default of a new quotation
            "raw_mode": "optional" if s.get("raw_on") else "none", "raw_factor": s.get("raw_factor") if s.get("raw_factor") is not None else 0.25,
            "prod_quotient": s.get("prod_quotient") or 3, "producing_rate": prod_rate, "discount_pct": 0,
            "intro": _default_text(c, oid, s, "intro", lang), "closing": _default_text(c, oid, s, "closing", lang),
@@ -702,7 +725,7 @@ def _initials(c, uid):
 
 def _put_items(c, oid, r, items, admin):
     rows = clean_items(c, oid, r, items, admin)
-    c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id=?", (r["id"], oid))
+    c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL", (r["id"], oid))  # 2.47.0 (#1215): not the parts'
     c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id IS NULL", (r["id"],))  # rows of an older version
     for row in rows:
         row["doc_id"] = r["id"]
@@ -803,6 +826,9 @@ def odoc_render(c, doc_id, oid):
         "valid_note": valid_note, "fields": _j(r["fields"], []), "labels": labels, "formats": pack.get("formats") or {},
         "internal": {"costs": t["costs"], "margin": t["margin"]} if role == "admin" else None,
     }
+    if r["kind"] == "offer":  # 2.47.0 (#1215): the printed parts as own pages
+        from .parts import tp_render
+        tp_render(c, oid, r, m, pack, lang, locked)
     if r["kind"] != "offer":  # 2.38.0 (#1021, F1): the invoice words on top (title, due date, tax lines, reminder table, payment info)
         inv_render(c, oid, r, m, t, pack, L, lang, _fmt_date)
     return m
@@ -957,6 +983,8 @@ def odoc_status(did):
         c.execute("UPDATE office_docs SET paid_at=CASE WHEN status='paid' THEN COALESCE(paid_at, ?) ELSE NULL END WHERE id=? AND org_id=?", (ts, did, oid))
     if st != r["status"]:
         ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": st}})
+        if r["kind"] == "offer":
+            ek_purchases_write(c, oid, did)  # 2.47.0 (#1649): accepted = its purchase is written, left = removed
     bump(c)
     c.commit()
     return jsonify(doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin", items=False))
@@ -990,6 +1018,9 @@ def odoc_duplicate(did):
         it["org_id"] = oid
         it = oc_item_store(c, oid, it)  # 2.42.0 (#828)
         c.execute(f"INSERT INTO office_doc_items({','.join(it)}) VALUES({','.join('?' * len(it))})", list(it.values()))
+    if r["kind"] == "offer":  # 2.47.0 (#1215): the parts with their positions
+        from .parts import tp_duplicate
+        tp_duplicate(c, oid, did, nid)
     if not ofx_number_at_finalize(s, r["kind"]):
         _assign_number(c, oid, nid, s)
     recalc(c, oid, nid)

@@ -203,12 +203,12 @@ const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => 
 // 1.9.0 profile pictures: S.avatars = {user id: URL} (me + everybody sharing a list with me, from /api/state; the News
 // answer adds its people). av() = the round picture, or the initials as before. cls/attrs: the caller's classes + title.
 const avUrl = id => (id && ((S.avatars || {})[id] || (S.me && +id === S.me.id ? S.me.avatar : ''))) || '';
-function av(id, name, cls = 'avatar', attrs = '', inner = '') {
+function av(id, name, cls = 'avatar', attrs = '', inner = '', eager = false) {  // 2.47.0 (#1654): eager = always visible (sidebar), no lazy load
   const u = avUrl(id), ag = id ? agentDot(id) : '';  // 2.0.0: agents get a status dot
   if (ag || (id && isAgentUser(id))) { cls += ' agent'; inner += ag + botBadge(); }  // 2.28.0 (#985): + the robot badge
   const col = id ? ac_color(id) : '';  // 2.47c (#1721): the fixed account colour: the fill behind the initials, a ring around a photo
   if (col) { cls += ' acol' + (ac_darkInk(col) ? ' acdk' : ''); attrs += ` style="--acol:${col}"`; }
-  return `<span class="${cls}${u ? ' pic' : ''}" ${attrs}>${u ? `<img src="${esc(u)}" alt="" loading="lazy" decoding="async" draggable="false">` : esc(initials(name))}${inner}</span>`;
+  return `<span class="${cls}${u ? ' pic' : ''}" ${attrs}>${u ? `<img src="${esc(u)}" alt="" ${eager ? 'decoding="sync"' : 'loading="lazy" decoding="async"'} draggable="false">` : esc(initials(name))}${inner}</span>`;
 }
 // 2.47c (#1721): the fixed colour of an account (S.colors from /api/state, one of the palette below = AC_COLORS in
 // kalmido/accounts/colors.py), '' = none: unknown, or a person while "Show colours for people" is off (agents keep theirs)
@@ -292,7 +292,7 @@ async function rawFetch0(method, url, body) {
   if (OUT.down) { OUT.down = false; if (S.booted && !OUT.online) renderTop(); }
   setOnline(true);
   if (r.type === 'opaqueredirect' || (r.headers.get('content-type') || '').includes('text/html')) {
-    location.reload();  // login session expired -> login page
+    location.reload();  // Authelia session expired -> login page
     throw new Error('auth');
   }
   const j = await r.json().catch(() => ({}));
