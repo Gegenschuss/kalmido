@@ -90,6 +90,7 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   check(/Client/.test(card.querySelector('.mstag-cl')?.textContent || '') && card.querySelector('.mscav'), '#1734: the card carries the tag Client and the briefcase');
   check(/Hourly rate/.test(card.textContent) && /90/.test(card.textContent) && /20 h/.test(card.textContent) && /Max Example/.test(card.querySelector('.msclks')?.textContent || ''), '#1734: rate, budget, contact persons on the card');
   check(!!card.querySelector('[data-act="client-edit"]') && !!card.querySelector('.cldetail .sttiles'), '#1734: Edit (the full dialog) and the hours on the card');
+  // TODO-2473-privat: the card of a person without an organisation (personal office of part A): open invoices section shown
   // search
   typeIn(w, d.querySelector('#mscl-q'), 'beta'); await sleep(250);
   check(d.querySelectorAll('#view .msclients .ctrow').length === 1, '#1734: the search narrows the list');
