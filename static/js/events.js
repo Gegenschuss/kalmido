@@ -754,13 +754,14 @@ document.addEventListener('keydown', async e => {
     if (t.id === 'd-sub' && t.value.trim()) {
       // 2.46.1 (#1634): queued, so a fast second Enter waits its turn; the rebuilt field keeps what was typed meanwhile
       e.preventDefault();
-      const p = taskById(S.sel), v = t.value; t.value = '';
+      const p = taskById(S.sel), v = t.value; if (!p) return;
+      t.value = '';
       subAddQ = subAddQ.then(async () => {
         const r = parseQuick(v.trim(), new Set());
         const nt = await api('POST', '/api/tasks', {title: r.title || v, parent_id: p.id, list_id: p.list_id, due: r.due, due_time: r.due_time, priority: r.priority || 0});
         await load(); renderKeepField('#d-sub', () => { renderDetail(); render(); });
         if (nt?.id) histCreate(tr('Subtask {0} added', qn(String(nt.title || r.title || v).slice(0, 40))), nt);
-      }).catch(() => {});
+      }).catch(() => { const f = $('#d-sub'); if (f && !f.value) f.value = v; });  // not saved: the text comes back (api() showed why)
       return;
     }
     if (t.id === 'd-tag' && t.value.trim()) {
