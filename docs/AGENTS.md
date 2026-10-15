@@ -1414,6 +1414,25 @@ curl -H "Authorization: Bearer $KALMIDO_TOKEN" -o shot.png "$KALMIDO_URL/api/v1/
 curl -H "Authorization: Bearer $KALMIDO_TOKEN" -F body="Here is the fixed layout" -F file=@after.png "$KALMIDO_URL/api/v1/agent/chats/1"
 ```
 
+## Documents (2.48.0)
+
+*Documents* are files of the file store with recognised text and fields: date, due date, amount, sender, document type,
+tags and folder. Kalmido recognises them itself (text layer, local text recognition, rules and a classifier that learns
+from the people's corrections); no agent is needed. An agent is an optional extra: it sees only documents whose file (or
+a folder above it) is shared with it, and every access is written into the file's history.
+
+| What | Endpoint | MCP |
+|---|---|---|
+| Documents shared with you (`q` = words of the text, `review=1` = waiting in *To review*) | `GET /api/v1/documents` | `list_documents` |
+| One document with its fields, open suggestions and the recognised text | `GET /api/v1/documents/{id}` | `get_document` |
+| Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names) | `PATCH /api/v1/documents/{id}` | `update_document` |
+| The file itself | `GET /api/v1/files/{id}/content` | -- |
+
+Scopes: `files:read` / `files:write` (the file store's). Values an agent sets are marked *set by an agent*. Where the
+workspace leaves a feature to an agent (level *Left to an agent* in the documents' settings), the value is not set but
+waits as a suggestion in *To review* until a person accepts it. Agents never move a document and never see documents of
+another workspace.
+
 ## Behaviour rules template (2.13.1)
 
 `mcp/CLAUDE.template.md` ("Kalmido agent behaviour rules", English with a German note) is the rule block every agent's
