@@ -101,7 +101,7 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   check(!d.querySelector('#top [data-act="refresh"]'), 'no refresh button on a private list');
 
   // ---- delete a tag from the sidebar
-  w.eval(`S.collapsed.add('side:tags-open'); renderSide()`); await sleep(200);
+  w.eval(`if (!sideOpen('tags')) sideGroupToggle('tags')`); await sleep(200);  // 2.45.0 (#1502): Tags is a sidebar group like the others
   const trow = d.querySelector('#side .srow[data-drop="tag:old"]');
   check(!!trow, 'tag row in the sidebar');
   trow.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true})); await sleep(200);
