@@ -8,8 +8,12 @@ function ccApvHead(ap, open) {
     + (ap ? `<div class="apvt">${esc(ap.title)}</div>${ap.what ? `<div class="apvw">${esc(tr('If yes: {0}', ap.what))}</div>` : ''}` : '');
 }
 const ccApvLbl = (ch, id) => { const ap = ch.approval, c = (ch.choices || []).find(x => x.id === id); return ap?.std || !c ? (id === 'yes' ? tr('Yes, go ahead') : tr('No')) : c.label; };
-function ccApvBtns(ch, attrs) {
-  return `<div class="cchoices cperm apvbtns" role="group" aria-label="${esc(tr('Approval needed'))}"><button type="button" class="cchb st-primary cpermb" ${attrs('yes')}>${thumbIc(true)}<span>${esc(ccApvLbl(ch, 'yes'))}</span></button><button type="button" class="cchb cpermb" ${attrs('no')}>${thumbIc(false)}<span>${esc(ccApvLbl(ch, 'no'))}</span></button></div>`;
+// 2.46.6 (#1711): pen = the attributes of the pen next to "Yes" ('' = none): "Yes, but: <card text>" into the message box
+const ccApvEditText = ch => tr('Yes, but:') + ' ' + (ch.approval?.title || '');
+function ccApvBtns(ch, attrs, pen = '') {
+  const yes = `<button type="button" class="cchb st-primary cpermb" ${attrs('yes')}>${thumbIc(true)}<span>${esc(ccApvLbl(ch, 'yes'))}</span></button>`;
+  const pb = pen ? `<button type="button" class="cchpen" ${pen} title="${esc(tr('Edit before sending'))}" aria-label="${esc(tr('Edit before sending: {0}', ccApvLbl(ch, 'yes')))}">${ic('edit', 's')}</button>` : '';
+  return `<div class="cchoices cperm apvbtns" role="group" aria-label="${esc(tr('Approval needed'))}">${pen ? `<span class="cchw">${yes}${pb}</span>` : yes}<button type="button" class="cchb cpermb" ${attrs('no')}>${thumbIc(false)}<span>${esc(ccApvLbl(ch, 'no'))}</span></button></div>`;
 }
 // the line of a decided / closed approval card; t = the text of an answered one (the chat: "Approved by … at …")
 function ccApvState(ch, ans, st, t) {
@@ -47,7 +51,7 @@ function ccCommentHtml(c, ro = false) {
   if (ch.approval) {
     const open = st === 'open', who = ans?.user_name || '';
     const t = ans ? ((ans.ids || []).includes('yes') ? tr('{0} from {1}, {2}', ccApvLbl(ch, 'yes'), who, ccWhen(ans.at)) : tr('{0} from {1}, {2}', ccApvLbl(ch, 'no'), who, ccWhen(ans.at))) : '';
-    return `<div class="cccard apv${open ? ' apvopen' : ''}" role="group" aria-label="${esc(tr('Approval needed'))}">${ccApvHead(ch.approval, open)}${open ? (can ? ccApvBtns(ch, attrs) : `<div class="cpermst exp"><span>${esc(tr('Waiting for an answer'))}</span></div>`) : ccApvState(ch, ans, st, t)}</div>`;
+    return `<div class="cccard apv${open ? ' apvopen' : ''}" role="group" aria-label="${esc(tr('Approval needed'))}">${ccApvHead(ch.approval, open)}${open ? (can ? ccApvBtns(ch, attrs, `data-ccpen="${c.id}" data-ch="yes"`) : `<div class="cpermst exp"><span>${esc(tr('Waiting for an answer'))}</span></div>`) : ccApvState(ch, ans, st, t)}</div>`;
   }
   if (st !== 'open' && st !== 'answered') return '';  // expired / withdrawn: gone, as in the chat
   if (st === 'open' && !can) return '';
@@ -70,7 +74,7 @@ async function ccAnswer(cid, id, send = false) {
 }
 // the pen: the suggestion into the comment box (not sent), after the text already there
 function ccToBox(cid, id) {
-  const c = tlComment(cid), x = (c?.choices?.choices || []).find(y => String(y.id) === String(id)), ta = $('#c-input');
+  const c = tlComment(cid), x = c?.choices?.approval && id === 'yes' ? {label: ccApvEditText(c.choices)} : (c?.choices?.choices || []).find(y => String(y.id) === String(id)), ta = $('#c-input');  // 2.46.6 (#1711)
   if (!x || !ta) return;
   const v = ta.value.replace(/\s+$/, '');
   ta.value = v ? v + (/\n/.test(v) ? '\n' : ' ') + x.label : x.label;
@@ -85,3 +89,21 @@ document.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   ccAnswer(+b.dataset.cid, b.dataset.ch, b.dataset.cc === 'send');
 });
+// 2.46.6 (#1711): "Yes" of an approval card in a comment: Alt+click / right click (desktop) and a long press (touch) = the pen
+const CC_APV_ED = '.cccard.apv .cchw .cchb[data-cc="pick"]';
+let ccLong = null, ccLongDone = 0;
+document.addEventListener('click', e => {
+  const b = e.target.closest?.(CC_APV_ED); if (!b || b.disabled) return;
+  if (e.altKey || Date.now() - ccLongDone < 600) { e.preventDefault(); e.stopPropagation(); if (e.altKey) ccToBox(+b.dataset.cid, 'yes'); }
+}, true);
+document.addEventListener('contextmenu', e => {
+  const b = e.target.closest?.(CC_APV_ED); if (!b || b.disabled) return;
+  e.preventDefault(); if (Date.now() - ccLongDone > 600) ccToBox(+b.dataset.cid, 'yes');
+});
+document.addEventListener('pointerdown', e => {
+  const b = e.pointerType === 'touch' && e.target.closest?.(CC_APV_ED); if (!b || b.disabled) return;
+  const x = e.clientX, y = e.clientY; clearTimeout(ccLong?.t);
+  ccLong = {x, y, t: setTimeout(() => { ccLong = null; ccLongDone = Date.now(); ccToBox(+b.dataset.cid, 'yes'); }, 500)};
+});
+document.addEventListener('pointermove', e => { if (ccLong && Math.hypot(e.clientX - ccLong.x, e.clientY - ccLong.y) > 10) { clearTimeout(ccLong.t); ccLong = null; } });
+for (const ev of ['pointerup', 'pointercancel']) document.addEventListener(ev, () => { if (ccLong) { clearTimeout(ccLong.t); ccLong = null; } });

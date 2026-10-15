@@ -1153,6 +1153,8 @@ reaction (`approval: null`). Act **once per `message_id`**. When the host decide
 own time limit), it closes the question with `{"outcome": "allowed" | "denied" | "expired"}` on `…/withdraw`; the app
 then shows that outcome instead of the buttons.
 
+Since 2.46.6 the approval card has a pen next to *Yes*: it writes "Yes, but: <card text>" into the message box (nothing is sent). An answer starting with "Yes, but:" is the decision in words: carry out the changed version and close the card yourself with `withdraw_chat_choices`.
+
 The person's answer arrives as the event **`chat_choice`**: `data.message_id`, `data.choice_ids` (in the buttons'
 order), `data.labels`, `data.message` (the whole message), `data.user` and, when the message was about a task, the task
 as in a chat event. Only the chat's person answers (the web app, or `POST /api/v1/agents/{agent_id}/chat/{message_id}/choice

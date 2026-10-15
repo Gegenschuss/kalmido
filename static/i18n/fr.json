@@ -6836,5 +6836,6 @@
   "Change workspace": "Changer d’espace de travail",
   "Only members of the organisation can be invited. An agent of the organisation sees it only if it is shared with that agent.": "Seuls les membres de l’organisation peuvent être invités. Un agent de l’organisation ne le voit que si c’est partagé avec lui.",
   "Only people you explicitly invite see it.": "Seules les personnes invitées explicitement le voient.",
-  "Not in the organisation": "Pas dans l’organisation"
+  "Not in the organisation": "Pas dans l’organisation",
+  "Yes, but:": "Oui, mais :"
 }

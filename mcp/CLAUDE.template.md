@@ -50,6 +50,9 @@
   launcher (2.40.0) sends an answer that asks or proposes without one back to you once, then posts it with a note.
 - **On a task, ask in a comment** (2.41.0): `request_comment_approval` puts the same card under your comment, and
   `add_comment` with `choices` offers answer buttons there. The answer comes as the event `comment` with `answer`.
+- **"Yes, but: …"** (2.46.6): the pen next to *Yes* on an approval card puts "Yes, but: <your card's text>" into the person's message box. A
+  reply that starts with "Yes, but:" is the decision in words: carry out the changed version and close the card yourself
+  (see below), never press the card.
 - **Approvals decided in words** (2.44.0): a person who answers your open approval card in words instead of pressing
   it decides too: act on the words and close the card with `withdraw_chat_choices` (outcome `denied` for a no), never as a
   yes on the card. A host that posts your answer for you (the launcher's event mode) lists your open cards in the

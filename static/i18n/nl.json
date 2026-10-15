@@ -6836,5 +6836,6 @@
   "Change workspace": "Werkruimte wijzigen",
   "Only members of the organisation can be invited. An agent of the organisation sees it only if it is shared with that agent.": "Alleen leden van de organisatie kunnen worden uitgenodigd. Een agent van de organisatie ziet het alleen als het met hem is gedeeld.",
   "Only people you explicitly invite see it.": "Alleen uitdrukkelijk uitgenodigde personen zien het.",
-  "Not in the organisation": "Niet in de organisatie"
+  "Not in the organisation": "Niet in de organisatie",
+  "Yes, but:": "Ja, maar:"
 }
