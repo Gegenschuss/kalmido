@@ -231,6 +231,39 @@ and deleting answer `409` with a reason; the status of a quotation can still cha
 (a new version) without the snapshot. Quotations do not have to be finalised; it is an optional step for them. Since
 2.38.0 a quotation with status "sent" is locked the same way (a business letter is kept as sent; a new version = duplicate).
 
+## Parts of a quotation
+
+(2.47.0.) A quotation may have **parts**: own pages behind the title page, each with its own positions and calculation
+(producing, raw data, sum net / incl. raw data), e.g. one page per module or per shooting day. The title page lists a part
+like a service: a position of kind `part` with a quantity ("Interactive module x 5"); the title page can also have direct
+positions. A part may stand on the title page several times or not at all (then it counts nothing and is not printed; the
+editor marks it).
+
+- **Calculation**: a part line = the part's net x quantity; its tax bases per rate x quantity (a part with 7 % and 19 %
+  positions stays exact), its raw data x quantity (optional stays optional, included stays included) and its external
+  costs x quantity flow into the title page. Producing on the title page counts its direct positions only; the title
+  page's discount applies to part lines marked discountable. A part takes the quotation's calculation values unless its
+  `settings` set their own (`raw_mode`, `raw_factor`, `prod_quotient`, `producing_rate`, `producing_on`, `discount_pct`;
+  the quotation's discount is not applied inside a part). The stored rate of a title page part line is the part's net.
+- **Printing**: the title page as before (part lines with title x quantity and amount), then every part with "Print in the
+  PDF" on its own page (part title, quotation number, its positions and sums). A part with printing off still counts.
+  External costs and surplus never appear in the PDF.
+- **Invoice**: "Create invoice" on a quotation with parts asks for the form - `full` (like the quotation: the title
+  page's direct positions, then per printed part a heading and its positions with quantity x part quantity, its producing /
+  raw data / discount as positions; a part not printed stays one line), `title` (the title page; a part becomes a
+  position with its amount, one per tax rate) or `summary` (one position per tax rate with a title, default
+  "Filmherstellung" / "Film production"). Net and gross equal the quotation's in every form. The preset is an office
+  setting (`parts_invoice_mode`: `full` default, `title`, `summary`; `parts_summary_title_de`, `parts_summary_title_en`).
+- A quotation without parts computes, looks and prints exactly as before.
+
+Routes (members of the organisation like the positions; external costs only for its admin; a finalised or sent quotation
+answers `409`): `POST /api/office/docs/<id>/parts` (`{kind: items|shoot, title, print, add_to_title}`; the new part is put
+on the title page once unless `add_to_title: false`), `PATCH /api/office/docs/<id>/parts/<pid>` (`{title, print, sort,
+settings, sheet}`), `DELETE /api/office/docs/<id>/parts/<pid>` (with its positions and its title page lines),
+`PUT /api/office/docs/<id>/parts/<pid>/items` (the whole list of the part's positions, like `PUT .../items`).
+`GET /api/office/docs/<id>` carries `parts: [{id, kind, title, print, sort, settings, items, totals, used}]`;
+`POST /api/office/docs/<id>/invoice` takes `{parts_mode, parts_title}`. Duplicating copies the parts.
+
 ## Invoices and credit notes
 
 (2.38.0, stage 2.) The documents tab lists quotations, invoices, credit notes and reminders (`kind` = `offer`, `invoice`,

@@ -196,6 +196,9 @@ ROUTES = {
     "POST /api/office/docs/reminder": "office", "GET /api/office/docs/{}/payments": "office", "POST /api/office/docs/{}/payments": "office",
     "DELETE /api/office/docs/{}/payments/{}": "office", "POST /api/office/docs/{}/send": "office", "POST /api/office/docs/{}/fee": "office", "POST /api/office/docs/{}/datev": "office",
     "GET /api/office/mail-status": "office", "GET /api/office/docs/{}/xml": "office",  # F2: the e-invoice XML of a finalised document
+    # 2.47.0 (#1215): the parts of a quotation
+    "POST /api/office/docs/{}/parts": "office", "PATCH /api/office/docs/{}/parts/{}": "office", "DELETE /api/office/docs/{}/parts/{}": "office",
+    "PUT /api/office/docs/{}/parts/{}/items": "office",
     # ---- office (2.39.1 #1182): legacy import (preview, split, import, runs + undo, archive of old PDFs, counter) (13)
     "POST /api/office/legacy/preview": "office", "POST /api/office/legacy/split": "office", "POST /api/office/legacy/import": "office",
     "GET /api/office/legacy/runs": "office", "POST /api/office/legacy/runs/{}/undo": "office", "POST /api/office/legacy/archive/parse": "office",
