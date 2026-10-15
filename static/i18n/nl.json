@@ -6984,5 +6984,18 @@
   "Sky blue": "Hemelsblauw",
   "Brown": "Bruin",
   "Show colours for people": "Kleuren voor personen tonen",
-  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Elke persoon en elke agent heeft een vaste kleur: de cirkel achter de initialen, een dunne ring om een foto. Uit: alleen agenten zijn gekleurd."
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Elke persoon en elke agent heeft een vaste kleur: de cirkel achter de initialen, een dunne ring om een foto. Uit: alleen agenten zijn gekleurd.",
+  "Fit to width": "Aan breedte aanpassen",
+  "Next page": "Volgende pagina",
+  "Previous page": "Vorige pagina",
+  "Open in new tab": "In nieuw tabblad openen",
+  "Page {0}": "Pagina {0}",
+  "Page {0} of {1}": "Pagina {0} van {1}",
+  "The preview could not be loaded.": "Het voorbeeld kon niet worden geladen.",
+  "The preview needs a connection. You can download the file when you are online again.": "Het voorbeeld heeft een verbinding nodig. Zodra je weer online bent, kun je het bestand downloaden.",
+  "This PDF is protected with a password and cannot be shown here.": "Deze pdf is met een wachtwoord beveiligd en kan hier niet worden getoond.",
+  "This file cannot be shown as a PDF.": "Dit bestand kan niet als pdf worden getoond.",
+  "This page could not be shown": "Deze pagina kon niet worden getoond",
+  "Zoom in": "Inzoomen",
+  "Zoom out": "Uitzoomen"
 }

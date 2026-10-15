@@ -67,6 +67,14 @@ package 5.3.0) is Copyright 2020 Braille Institute of America, Inc., and license
 Version 1.1. The full license text ships next to the fonts as `static/fonts/OFL-AtkinsonHyperlegible.txt`.
 It is only downloaded when chosen under Settings > Appearance, and served by Kalmido itself.
 
+## pdf.js (PDF preview)
+
+The in-app PDF preview (2.48.0) uses [pdf.js](https://mozilla.github.io/pdf.js/) by the Mozilla Foundation, from the
+[`pdfjs-dist`](https://www.npmjs.com/package/pdfjs-dist) package 6.4.299, licensed under the Apache License, Version 2.0.
+Unchanged copies of `build/pdf.min.mjs` and `build/pdf.worker.min.mjs` ship in `static/vendor/pdfjs/` together with the
+full license text (`LICENSE`) and a `README` with the source and checksums. They are served by Kalmido itself and only
+loaded when a PDF is opened; the browser never loads them from a third party.
+
 ## Python packages (installed at build time, not bundled)
 
 - Flask (BSD-3-Clause)

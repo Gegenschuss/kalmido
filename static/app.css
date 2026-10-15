@@ -6814,3 +6814,25 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 /* 2.46.7 (#1708): touch targets of the Lists summary and the workspace button (device test) */
 .aglists>summary{min-height:2.75rem}
 @media (pointer:coarse){.agnm .avws{min-height:2.75rem}}
+/* 2.48.0 C (#1367) PDF preview (pdfview.js): the text viewer's box, wider, pages on a neutral ground */
+.pvbox{width:min(64rem,100%);height:100%}
+.pvbar .pvnav,.pvbar .pvzoom{display:flex;align-items:center;gap:.125rem;flex:none}
+.pvbar [hidden]{display:none}
+.pvno{font-size:var(--fs-s);color:var(--text2);font-variant-numeric:tabular-nums;min-width:5.5rem;text-align:center;white-space:nowrap}
+.pvpct{font-size:var(--fs-s);color:var(--text2);font-variant-numeric:tabular-nums;min-width:3.5rem;padding:.375rem .25rem;border-radius:.375rem;background:none;border:0;cursor:pointer}
+.pvpct:hover{background:var(--bg3);color:var(--text)}
+.pvbody{padding:.75rem;background:var(--bg3);touch-action:pan-x pan-y;scrollbar-gutter:stable}
+.pvpages{display:flex;flex-direction:column;align-items:center;gap:.75rem;transform-origin:top center;min-width:min-content}
+.pvpage{flex:none;background:#fff;box-shadow:var(--shadow);border-radius:.125rem;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.pvpage canvas{display:block;width:100%;height:100%}
+.pvperr{color:#555;font-size:var(--fs-s);padding:1rem;text-align:center}
+.pvfail{display:flex;flex-direction:column;align-items:center;gap:.75rem;text-align:center;padding:3rem 1rem;color:var(--text2);max-width:28rem;margin:0 auto}
+.pvfail>svg{width:2.5rem;height:2.5rem;color:var(--muted)}
+.pvfail .btn{display:inline-flex;align-items:center;gap:.375rem}
+@media (max-width:899px){
+  .pvbox{height:100%}
+  .pvbar .pvnav{order:8}
+  .pvbar .pvzoom{order:9}
+  .pvbar .pvnav,.pvbar .pvzoom{flex:1 1 auto;justify-content:center}
+  .pvbody{padding:.5rem .5rem calc(.5rem + var(--safe-b))}
+}

@@ -6984,5 +6984,18 @@
   "Sky blue": "Himmelblau",
   "Brown": "Braun",
   "Show colours for people": "Farben für Personen anzeigen",
-  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Jede Person und jeder Agent hat eine feste Farbe: der Kreis hinter den Initialen, ein dünner Ring um ein Foto. Aus: nur Agenten sind farbig."
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Jede Person und jeder Agent hat eine feste Farbe: der Kreis hinter den Initialen, ein dünner Ring um ein Foto. Aus: nur Agenten sind farbig.",
+  "Fit to width": "An Breite anpassen",
+  "Next page": "Nächste Seite",
+  "Previous page": "Vorige Seite",
+  "Open in new tab": "In neuem Tab öffnen",
+  "Page {0}": "Seite {0}",
+  "Page {0} of {1}": "Seite {0} von {1}",
+  "The preview could not be loaded.": "Die Vorschau konnte nicht geladen werden.",
+  "The preview needs a connection. You can download the file when you are online again.": "Die Vorschau braucht eine Verbindung. Sobald du wieder online bist, kannst du die Datei herunterladen.",
+  "This PDF is protected with a password and cannot be shown here.": "Dieses PDF ist mit einem Passwort geschützt und kann hier nicht angezeigt werden.",
+  "This file cannot be shown as a PDF.": "Diese Datei lässt sich nicht als PDF anzeigen.",
+  "This page could not be shown": "Diese Seite konnte nicht angezeigt werden",
+  "Zoom in": "Vergrößern",
+  "Zoom out": "Verkleinern"
 }

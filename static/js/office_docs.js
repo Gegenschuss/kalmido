@@ -120,7 +120,7 @@ function ofdEditorHtml() {
     ${stSel}<span class="spacer"></span>
     <span class="ofdsave muted" aria-live="polite">${OFD.saving ? tr('Saving…') : OFD.err ? esc(OFD.err) : ''}</span>${acts.join('')}
     ${lk || ro ? '' : `<button type="button" class="btn sm ofdfin" data-ofd="finalize" title="${esc(tr('Freeze number, positions, sums, sender and tax rates'))}">${ic('lock', 's')}<span>${tr('Finalise')}</span></button>`}
-    <a class="btn sm ofdpdf" href="${ofdPdfUrl(d.id, true)}" target="_blank" rel="noopener" data-ofd="pdf" aria-label="${esc(tr('Open PDF'))}" title="${esc(tr('Open PDF'))}">${ic('pdf', 's')}<span class="ofdpdft">PDF</span></a>
+    <a class="btn sm ofdpdf" href="${ofdPdfUrl(d.id, true)}" target="_blank" rel="noopener" data-ofd="pdf"${typeof pv_attr === 'function' ? pv_attr({url: ofdPdfUrl(d.id, true), name: (d.number || tr('Document')) + '.pdf', dlUrl: ofdPdfUrl(d.id)}) : ''} aria-label="${esc(tr('Open PDF'))}" title="${esc(tr('Open PDF'))}">${ic('pdf', 's')}<span class="ofdpdft">PDF</span></a>
     <a class="btn sm ofddl" href="${ofdPdfUrl(d.id)}" download data-ofd="pdf" aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}<span class="ofdpdft">${tr('Download')}</span></a>
     <button type="button" class="btn sm" data-ofd="more" aria-haspopup="menu" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>`;
   const invFields = inv && kind !== 'reminder' ? `
@@ -401,7 +401,7 @@ async function ofdClick(e) {
   if (a === 'more') {
     menu(b, [
       {label: tr('Duplicate'), icon: 'copy', fn: async () => { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } }},
-      {label: tr('Preview (PDF)'), icon: 'eye', fn: () => window.open(ofdPdfUrl(d.id, true), '_blank', 'noopener')},  // 2.40.0 (#1364): the PDF, not the JSON print model
+      {label: tr('Preview (PDF)'), icon: 'eye', fn: () => typeof pdfView === 'function' ? pdfView({url: ofdPdfUrl(d.id, true), name: (d.number || tr('Document')) + '.pdf', dlUrl: ofdPdfUrl(d.id)}) : window.open(ofdPdfUrl(d.id, true), '_blank', 'noopener')},  // 2.40.0 (#1364): the PDF, not the JSON print model
       ofdIsInv(d) && d.kind !== 'reminder' && d.locked ? {label: tr('E-invoice XML'), icon: 'download', fn: () => window.open(`/api/office/docs/${d.id}/xml`, '_blank', 'noopener')} : null,
       ofdIsInv(d) && d.kind !== 'reminder' && d.locked ? {label: tr('Send to the DATEV inbox'), icon: 'send', fn: async () => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/datev`); if (j) toast(tr('Sent to the DATEV inbox')); }} : null,
       d.can_delete ? '-' : null,

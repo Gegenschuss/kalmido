@@ -269,6 +269,7 @@ registering the ones of its area.
 | `countries.js` | 2.40.0: the country picker (names from the browser, ISO 3166 alpha-2 codes) of the client card, company data and import preview. |
 | `collab.js` | News and comments + activity (module "collab"). |
 | `attachments.js` | Attachments and the share target. |
+| `pdfview.js` | 2.48.0 (#1367): the PDF preview `pdfView({url, name, size, dlUrl})` (lightbox: pages drawn on demand, turn pages, zoom, swipe, a clear message offline or for a damaged file) for attachments, project files, office documents and archive PDFs; links carry `data-pview`. Uses the bundled pdf.js (`static/vendor/pdfjs/`, loaded on first use, `isEvalSupported: false`, no scripting). |
 | `undo.js` | Undo / redo history. |
 | `popovers.js` | Popovers (date, priority, list, tags, reminders, repeat ...). |
 | `dialogs.js` | Modals: the app's own dialogs, the list dialog and the share dialog. |
