@@ -19,7 +19,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 // Android share sheet (share_target POST): keep the shared files in a cache and open the app,
-// which then creates the task + uploads with the normal (Authelia) session.
+// which then creates the task + uploads with the normal (login) session.
 async function handleShare(req) {
   try {
     const fd = await req.formData();
