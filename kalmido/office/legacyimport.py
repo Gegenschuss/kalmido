@@ -448,6 +448,14 @@ def _flag01(v):
 SEP_RE = re.compile(r"^\s*[-=*#_]{2,}\s*(.*?)\s*[-=*#_]{2,}\s*$")
 
 
+EQ_ID_COLS = ("id", "nr", "no", "number", "artikel", "artikelnr", "artikelnummer", "article", "articleno", "itemno", "sku", "inventarnr")
+
+
+def eq_head(h):
+    """2.45.1 (#1556): a header cell without spaces, underscores, hyphens, dots ("Device DE" -> "devicede")."""
+    return re.sub(r"[\s_.\-]+", "", str(h or "").lower())
+
+
 def _col(head, *names):
     for n in names:
         if n in head:
@@ -527,22 +535,43 @@ def fi_preview(c, oid, raw):
     t = _table(book, "equipment", "geräte", "technik")
     if t:
         head, rows = t
-        have = {r["name"].strip().lower() for r in c.execute("SELECT name FROM office_equipment WHERE org_id=?", (oid,))}
-        ni, cti, di = _col(head, "device", "name", "gerät"), _col(head, "category", "kategorie"), _col(head, "dailyrate", "tagessatz")
-        cat, names = "", set()
+        have = set()
+        for r in c.execute("SELECT name, name_en FROM office_equipment WHERE org_id=?", (oid,)):
+            have |= {v.strip().lower() for v in (r["name"], r["name_en"] or "") if v.strip()}
+        # 2.45.1 (#1556): "Device DE" / "Device EN" (spaces, underscores, hyphens and case do not matter); DE before the plain names
+        head = [eq_head(h) for h in head]
+        ni = _col(head, "devicede", "gerätde", "geraetde", "namede", "device", "name", "gerät", "geraet")
+        ei = _col(head, "deviceen", "geräten", "geraeten", "nameen")
+        cti, di = _col(head, "category", "kategorie"), _col(head, "dailyrate", "tagessatz")
+        ii, li = _col(head, *EQ_ID_COLS), _col(head, "language", "lang", "sprache")
+        cell = lambda row, j: str(row[j]).strip() if j is not None and j < len(row) else ""  # noqa: E731
+        cat, names, by_id = "", set(), {}
         for i, row in enumerate(rows):
-            nm = str(row[ni]).strip() if ni is not None and ni < len(row) else ""
+            nm = cell(row, ni)
             m = SEP_RE.match(nm)
             if m:
                 cat = m.group(1).strip().title()
                 continue
             if not nm:
                 continue
-            e = {"row": i + 2, "name": nm[:200], "category": ((str(row[cti]).strip() if cti is not None and cti < len(row) else "") or cat)[:80],
+            en = cell(row, ei)
+            rid_, lang = cell(row, ii).lower(), cell(row, li).lower()[:2]
+            if li is not None and lang == "en" and rid_ and rid_ in by_id and not by_id[rid_]["name_en"]:
+                # the English row of a device listed before under the same id: only its second name (nothing guessed without both columns)
+                by_id[rid_]["name_en"] = nm[:200]
+                if nm.lower() in have or nm.lower() in names:  # 2.45.1 (#1556) review: the English name may already exist
+                    by_id[rid_]["dup"], by_id[rid_]["action"] = True, "skip"
+                names.add(nm.lower())
+                continue
+            e = {"row": i + 2, "name": nm[:200], "name_en": en[:200], "category": (cell(row, cti) or cat)[:80],
                  "daily_rate": _num(row[di]) if di is not None and di < len(row) else None}
-            e["dup"] = nm.lower() in have or nm.lower() in names
+            e["dup"] = any(v in have or v in names for v in {nm.lower(), en.lower()} - {""})  # 2.45.1 (#1556): either name
             e["action"] = "skip" if e["dup"] else "new"
             names.add(nm.lower())
+            if en:
+                names.add(en.lower())
+            if rid_ and rid_ not in by_id:
+                by_id[rid_] = e
             out["equipment"].append(e)
     for key, names in (("staff", ("staff", "crew")), ("freelancer", ("freelancer", "freelancers"))):
         t = _table(book, *names)
@@ -654,7 +683,7 @@ def fi_import(c, oid, uid, b):
         except BadInput as e:  # say which row: the preview can be long
             raise BadInput(tr("Row {0}: {1}", x.get("row") if isinstance(x, dict) and isinstance(x.get("row"), int) else "?", str(e))) from None
     for kind, cols in (("services", ("name_de", "name_en", "category", "sort", "unit", "daily_rate", "hourly_rate", "raw_fee", "producing", "intext", "role")),
-                       ("equipment", ("name", "category", "daily_rate"))):
+                       ("equipment", ("name", "name_en", "category", "daily_rate"))):  # 2.45.1 (#1556): name_en
         for x in lists[kind]:
             if not isinstance(x, dict):
                 raise BadInput(tr("Invalid data"))

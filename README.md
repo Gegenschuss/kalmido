@@ -13,11 +13,15 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 <p align="center"><b><a href="https://kalmido.com/demo/">Try it in your browser</a></b>: no account, no server, your data stays in your browser.</p>
 
+<p align="center"><b>Coming soon: Kalmido hosted.</b> No server of your own, we run it for you, on servers in Germany and GDPR-compliant. Self-hosting stays free.</p>
+
 > **Language:** the interface is **English** by default, with **German** included and **French, Spanish, Italian and Dutch** in beta (machine-translated, corrections welcome); switch under *Settings > General > Language*. More languages are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md#translations) and [TRANSLATING.md](TRANSLATING.md). Kalmido = calm + the Japanese -do (道, “the way”, as in aikido or judo): the calm way of getting things done.
 > Kalmido is an independent project and not affiliated with any other task app.
 
 ## What's new
 
+- **2.45.1** (2026-10-15): **vCard import** with ß and old vCard 2.1 files (quoted-printable) arrives complete and
+  readable; **devices** get an English name, and the legacy Excel import reads *Device DE* / *Device EN*.
 - **2.45.0** (2026-10-15): a **friendlier start page** (one sentence on the day, Today with a box to add, compact news,
   active projects, slim empty cards); the **sidebar** puts the lists right below Plan, folds All / Completed / Trash /
   Archived into *More*, reaches the **messenger** directly (Messages, last conversations, a bubble at every person) and
@@ -191,7 +195,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **One app instead of three.** Tasks, habits, focus timer and real time tracking with rates and timesheets, plus the team essentials: sharing, assignment, comments, activity, a News inbox, dependencies, project status and custom fields.
 - **Simple when you want it.** Switch *Collaboration* off and it is a quiet personal list again.
 - **Yours.** Runs on your own server, no vendor account, no telemetry (the optional update check only asks GitHub for the latest version number), open source under the AGPL-3.0. Fits a self-hosted setup: single sign-on through your proxy, Web Push or ntfy notifications, a calendar feed.
-- **Honest trade-offs.** No native apps or widgets (it is an installable web app), no location-based reminders, and it is a hobby project, not a company with a support desk.
+- **Honest trade-offs.** No native apps or widgets (it is an installable web app), no location-based reminders, and no support desk yet.
 
 ## Features
 
@@ -2058,7 +2062,7 @@ Python (Flask, waitress, python-dateutil, cryptography for Web Push, the stored 
 
 ## Limits
 
-Kalmido is built for one person, a household or a small team, not as a hosted service for many accounts.
+One Kalmido instance is built for one person, a household or a small team. Many separate groups run best as one instance each, not as thousands of accounts on a single instance.
 
 - **Tasks:** every device loads all open tasks plus the last 14 days of completed ones (and a year of habit
   history) in one request and re-renders from it. A few thousand open tasks per user feel instant; around

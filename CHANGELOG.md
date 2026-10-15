@@ -7,6 +7,22 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.45.1] - 2026-10-15
+
+**In short:** fixes for contacts and office master data (no new features apart from the English device name).
+
+### Fixed
+- **vCard import with ß** (#1555): a file with an ß (or another letter whose capital form is longer) before a card no
+  longer cuts every following card in the wrong place; large address book exports now arrive complete.
+- **vCard 2.1 in quoted-printable** (#1555): names, organisations and notes in `ENCODING=QUOTED-PRINTABLE` (with
+  `CHARSET`, soft line breaks) are decoded instead of arriving as `M=C3=BCller`; an unknown charset no longer stops the import.
+
+### Changed
+- **Devices in two languages** (#1556): a device has a *Name (English)* like services; the device list shows it and the
+  search finds it. The legacy Excel import reads *Device DE* / *Device EN* (also *Gerät*, *Name EN* …) as both names,
+  shows both in the preview and takes them along on import and undo; separate DE and EN rows are joined only when the
+  sheet has an id and a language column. Database: one new column (`office_equipment.name_en`), 2.45.0 keeps running.
+
 ## [2.45.0] - 2026-10-15
 
 **In short:** **Sidebar, start page, self-hosting**: the lists move right below Plan, the messenger and all notes are one

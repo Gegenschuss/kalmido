@@ -666,6 +666,10 @@ fresh; run p2450_b_api "$PY" p2450_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2450_b_ui node p2450_b_ui.js "$KALMIDO_TEST_DATA"
        run p2450_b_lint "$PY" p2450_b_lint_test.py
        run p2450_l_secretfile "$PY" p2450_l_secretfile_test.py  # 2.45.0 (#1515): review: key file edge cases (no server)
+# 2.45.1 part A: vCard import with ß / quoted-printable (#1555)
+fresh; run p2451_a_api "$PY" p2451_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.45.1 part B: #1556 devices with a German and an English name (master data, legacy import Device DE / Device EN, undo)
+fresh; run p2451_b_api "$PY" p2451_b_api_test.py "$KALMIDO_TEST_DATA"
 # 2.46.0 part D: #1604 Back between the Share dialog and the settings (folder, list), #1563 encryption block + boundary check details
 fresh; run p2460_d_api "$PY" p2460_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2460_d_ui node p2460_d_ui.js "$KALMIDO_TEST_DATA"
