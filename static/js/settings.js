@@ -1321,7 +1321,7 @@ async function adminSwitch(md, el, fromHist) {
   await load(); render();
   if ((key === 'collab_all' || key === 'time_all') && md.isConnected) {
     const sec = $('.snav [data-sec].on', md)?.dataset.sec || LS.get('settingsSec', 'modules'), sc = $('.spanes', md)?.scrollTop || 0; md._noflush = true; md.remove();  // 2.46.6 (#1710): sec = the area shown
-    const n = settingsModal(sec === 'users' ? 'server' : sec), p = $('.spanes', n);  // 2.46.6 (#1710): back on Administration > Server if (p) p.scrollTop = sc;
+    const n = settingsModal(sec === 'users' ? 'server' : sec), p = $('.spanes', n); if (p) p.scrollTop = sc;  // 2.46.6 (#1710): back on Administration > Server
     if (!fromHist) setSaved(HIST.undo[HIST.undo.length - 1]);
   }
 }

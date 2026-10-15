@@ -20,6 +20,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.46.6** (2026-10-15): **agent launcher and settings**: the reference launcher gives every run its **fixed
+  safety rules** itself, offers **exactly one suggestion** (cut at a word, 80 characters), learns the working routine in
+  `WORKFLOW-KALMIDO.md`, wakes the chat agent after a **job** and resumes a job once after a restart; the **agent view**
+  shows an agent's lists and who can use it, a new personal agent offers **Set up on a computer** right away, the setup
+  command speaks the account's language; **admin settings** gathered under *Administration* (German: *Admin*), and a
+  pen on **approval cards** writes "Yes, but: ..." into the message box.
 - **2.46.5** (2026-10-15): the undo message with the keyboard open sits above the field you type in.
 - **2.46.4** (2026-10-15): **contacts sync, share labels, shopping lists**: the **Mac Contacts app** can change and delete
   contacts over CardDAV again (and contacts no longer all reload after an update), **Share dialogs** say whether an item
@@ -415,7 +421,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   `429` until the next day / month or a higher limit). A Claude Code Stop hook ([mcp/claude_usage_hook.py](mcp/claude_usage_hook.py))
   reports a session's usage by itself, and as SubagentStop hook (2.11.0) the usage of its subagents too
 - **Activity log** (2.2.1): every API request an agent makes (route, status, task / list, duration; never content) in
-  *Settings > Agents > Log* for admins, filtered by agent, status and day, event polling hidden by default, denied calls marked, CSV export;
+  *Settings > Administration > Agents* for admins (2.46.6; before *Settings > Agents > Log*), filtered by agent, status and day, event polling hidden by default, denied calls marked, CSV export;
   kept `KALMIDO_AUDIT_DAYS` days (default 90)
 - **Git integration** (2.2.0, 2.18.0): connect a project list to GitHub, GitLab, Gitea / Forgejo or Bitbucket Cloud; pull requests (state, CI), commits
   and branches show up at their tasks (`#123`, `kalmido-123`), `fixes #123` in a merged pull request completes the
@@ -1182,7 +1188,7 @@ is served at `/api/v1/openapi.json`.
 
 Agents are external programs (Claude Code, Codex, n8n, a local model, a script) that work in Kalmido like a team
 member: an admin creates them under *Settings > Agents* (or turns an existing user into an agent), shares lists
-with them and gives them a token. When an admin allows it (*Settings > Agents > Set up > Users may create their own
+with them and gives them a token. When an admin allows it (*Settings > Administration > Agents > Users may create their own
 agents*, off by default, a limit per person), everyone can create **personal agents** (2.7.2): owned by their creator,
 seeing only the lists the creator shares with them, chatting only with the creator, never admins. Since 2.28.0 (#965)
 **admins reach agents like everyone** -- only through lists they are in (as the owner / a list admin, or where *Members
@@ -1192,6 +1198,9 @@ agent into a person's personal agent. Every agent works in **one workspace** (pr
 *Workspaces*) and joins only its lists. A small **robot badge** marks agents wherever people appear (#985). Kalmido
 itself never starts an AI or any other process; the agent runs wherever you like and talks to Kalmido through the REST
 API, webhooks or the MCP server.
+
+**Which agent?** A personal agent runs on your computer with your Claude access and only you give it orders; a team
+agent runs on a shared, always-on computer and colleagues give it orders. See [Which agent when?](docs/AGENTS.md#which-agent-when-2466).
 
 **Everyday helpers** (2.34.0): Kalmido collects the data, the agent writes. The **morning briefing** (#264, top of
 *Today*, optional push at a time you choose) and the **project status report** (#265, *Status report* on the project
@@ -2048,7 +2057,7 @@ stays empty. Otherwise the server creates a key once and from then on encrypts o
 (*Administration > Whole server* reminds you).
 
 **Update check:** every 6 hours the server asks the GitHub API for the latest release and compares it with its own
-version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Help*, "vX.Y.Z installed — vX.Y.Z+1
+version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Administration > Server* (since 2.46.6; before *Settings > Help*), "vX.Y.Z installed — vX.Y.Z+1
 available" with a link to the release notes. Nothing is downloaded or installed automatically, the container gets
 no Docker access, and the browser never contacts GitHub. Switch it off under *Settings > Administration > Whole server* or
 for good with `KALMIDO_UPDATE_CHECK=0` in `.env`.

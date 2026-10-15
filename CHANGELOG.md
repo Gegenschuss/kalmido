@@ -7,6 +7,39 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.46.6] - 2026-10-15
+
+**In short:** **agent launcher and settings**: the reference launcher brings its own safety rules to every run, one
+suggestion per answer, a working-routine file and a wake run after jobs; the agent view shows an agent's lists, setup is
+offered right after creating an agent and speaks your language; admin settings live together under Administration.
+
+### Added
+- **Fixed safety rules in every launcher run** (#1715): `mcp/agent_rules.md` is updated with the launcher and put in
+  front of every chat, task, job and wake run (who gives orders and the language come from Kalmido, `GET /api/v1/agent`
+  now returns `lang`); the project's CLAUDE.md is never touched and cannot weaken them.
+- **WORKFLOW-KALMIDO.md** (#1717): the agent reads it first for every order and writes a routine you explain into it;
+  without it, the first chat after setup asks once. Interim notes go to `NOTIZEN.md`. Help: "Teaching the agent".
+- **Wake run after a job** (#1445): a finished, failed, stopped or lost job starts one chat run so the chat agent can go
+  on; a job lost to a restart is resumed once in the same session.
+- **An agent's lists** (#1708): the agent card lists its lists with folder, who can address it there and whether it
+  listens; personal agents show their workspace in their row and can change it (with undo).
+- **Set up right after creating** (#1709): a new personal agent (and a new team agent) offers *Set up on a computer*;
+  the token only on request. The row shows "Set up" until a computer connected.
+- **Pen on approval cards** (#1711): writes "Yes, but: <card>" into the message box (chat and comments), nothing is
+  sent; Alt+click, right click, long press. Not on permission requests.
+- **"Which agent when?"** (#1716): team or personal agent, in the add dialogs and in `docs/AGENTS.md`.
+
+### Changed
+- **Exactly one suggestion** (#1714) per launcher answer, at most 80 characters, never one already offered.
+- **Suggestion buttons cut at a word** with "…" at 80 characters (#1722), no longer mid-word.
+- **Setup command in the account language** (#1713): `--lang de|en` / `-Lang de|en`, all messages of `setup.sh` and
+  `setup.ps1` in German or English.
+- **Administration gathers the admin parts** (#1710): the agent rules, the API log and the admins' usage alert under
+  *Administration > Agents*, the update check result under *Administration > Server*; the German tab is called *Admin*;
+  switches that stay next to your own settings (Modules) carry "Admin · applies to everyone" and a link. Old links land
+  in the new place.
+- **Members switch with a personal agent** (#1680): a hint under the switch says that only its owner can address it.
+
 ## [2.46.5] - 2026-10-15
 
 **In short:** the undo message with the keyboard open now sits above the field you type in.
