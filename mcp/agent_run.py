@@ -49,6 +49,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+try:  # 2.44.0 B (#1443 #1445 #1447): outbox, jobs, task bundling live in a module of their own; without it all works as before
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import agent_extras
+except ImportError:
+    agent_extras = None
+
 STEP_GAP_S = 2.0          # at most one step every 2 s (the server allows 60 a minute)
 STEP_CHARS = 500
 TYPING_EVERY_S = 8
@@ -345,6 +351,7 @@ class Stream:
         self.send_step, self.on_model, self.on_usage, self.on_compact = send_step, on_model, on_usage, on_compact
         self.text, self.pending, self.last_sent = "", "", 0.0
         self.result, self.model, self.last_text = None, "", ""
+        self.on_event = None  # 2.44.0 B (#1443): called with every parsed event (images the command looks at)
         self.session_id = ""  # for the one approval_check follow-up in the same session
         self._lock = threading.Lock()  # tick() runs from the reader and from the ticker thread
 
@@ -357,6 +364,8 @@ class Stream:
         except ValueError:
             return
         t = ev.get("type")
+        if self.on_event:  # 2.44.0 B (#1443)
+            self.on_event(ev)
         if ev.get("session_id") and not self.session_id:
             self.session_id = str(ev["session_id"])
         if t == "system" and ev.get("subtype") == "init":
@@ -711,6 +720,7 @@ class Runner:
         self.pmode, self.host_pmode = permission_modes(cmd)
         self.model = ""
         self.approvals = {}  # message id -> {uid, title, what, at}: the approval requests this runner posted
+        self.extras = agent_extras.Extras(self.api, self.state_dir, cmd) if agent_extras else None  # 2.44.0 B (#1443 #1445 #1447)
         self.suggestions = {}  # chat user id -> the suggestions of the last answer (2.40.0: a typed number picks one)
 
     def host(self):
@@ -765,6 +775,8 @@ class Runner:
     def groups(self, evs):
         """Events -> runs: chat messages of one person in a row = one run; every other event its own run."""
         out = []
+        if self.extras:  # 2.44.0 B (#1447): task events wait in a bundle (one run later), information becomes a note
+            evs = self.extras.intake(evs) + (self.extras.take_bundle() if self.extras.due() else [])
         for ev in evs:
             self.mark_approval(ev)
             if ev.get("event") in SKIP_EVENTS:
@@ -791,7 +803,7 @@ class Runner:
 
     def run(self, uid, evs):
         self.pick_suggestion(uid, evs)
-        prompt = build_prompt(evs, uid)
+        prompt = self.extras.build(build_prompt, evs, uid) if self.extras else build_prompt(evs, uid)  # 2.44.0 B (#1443 #1445 #1447)
         args = list(self.cmd)
         if "-p" not in args and "--print" not in args:
             args.append("-p")
@@ -803,6 +815,8 @@ class Runner:
             print(json.dumps({"args": args, "chat_user_id": uid, "prompt": prompt}, ensure_ascii=False))
             return
         what = "Answering in the chat" if uid else "Working on an event"
+        if self.extras:  # 2.44.0 B (#1443): a fresh outbox folder for a chat run
+            self.extras.begin_run(uid, not uid)
         tid = None if uid else task.get("id")
         self.api.status("working", what, task_id=tid, host=self.host())
         st, rc = self._exec(args, prompt, uid, what, tid)
@@ -821,6 +835,8 @@ class Runner:
                     sugg = []
                 ids = [int((e.get("data") or {}).get("message", {}).get("id") or 0) for e in evs if e.get("event") == "chat"]
                 reply_to = ids[-1] if len(ids) > 1 and ids[-1] else None  # several messages: say which one it answers
+                if self.extras:  # 2.44.0 B (#1443): files of the outbox and looked-at images, before the answer
+                    self.extras.send_outbox(uid, reply_to)
                 parts = chunks(body) or ([""] if appr or sugg else [])
                 self.suggestions[uid] = sugg  # a typed number in the next message picks one
                 try:
@@ -908,12 +924,14 @@ class Runner:
                 self.api.notice(uid, NOTICE_COMPACTED.replace("{0}", time.strftime("%H:%M")))
 
         st = Stream((lambda t: self.api.progress(t, uid)) if uid and steps else (lambda t: False), on_model, on_usage, on_compact)
+        st.on_event = self.extras.watch if self.extras else None  # 2.44.0 B (#1443)
         typing()
         exe = shutil.which(args[0]) or args[0]  # Windows: claude.exe / claude.cmd (PATHEXT); a .cmd runs through cmd.exe
         run_args = (["cmd.exe", "/d", "/c", exe] if os.name == "nt" and exe.lower().endswith((".cmd", ".bat")) else [exe]) + args[1:]
         try:
             p = subprocess.Popen(run_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                 text=True, encoding="utf-8", errors="replace", bufsize=1)
+                                 text=True, encoding="utf-8", errors="replace", bufsize=1,
+                                 env=self.extras.env() if self.extras else None)  # 2.44.0 B (#1443 #1445)
         except OSError as e:
             log(f"cannot start {args[0]}: {type(e).__name__}")
             return None, -1
@@ -978,7 +996,7 @@ class Runner:
         backoff = 0
         while True:
             try:
-                d = self.api.req("GET", "/agent/events", query={"since": cur, "wait": 50}, timeout=80)
+                d = self.api.req("GET", "/agent/events", query={"since": cur, "wait": self.extras.wait_s(50) if self.extras else 50}, timeout=80)
                 backoff = 0
             except ApiError as e:
                 log(f"events: HTTP {e.status}; waiting 60 s")  # 403 = paused, the launcher stops us
@@ -990,7 +1008,7 @@ class Runner:
                 time.sleep(backoff)
                 continue
             evs = d.get("data") or []
-            if evs:
+            if evs or (self.extras and self.extras.due()):  # 2.44.0 B (#1447): a bundle that is due runs without a new event
                 self.handle(evs, save=True)
             c = d.get("cursor")
             if c is not None and int(c) != self.cur:
@@ -1027,6 +1045,9 @@ def main(argv):
     if once:
         with open(once, encoding="utf-8") as f:
             r.handle([json.loads(l) for l in f if l.strip()])
+        if r.extras and r.extras.pending:  # 2.44.0 B (#1447): a test run does not wait for the bundle
+            r.extras.gather_s = 0
+            r.handle([])
         return 0
     try:
         r.loop()
