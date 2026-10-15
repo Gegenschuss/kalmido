@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """2.46.1 API tests (part B), own container (start.sh).
 
+ - #1591: the switch "Switch on all modules": off = lists and tasks only whatever the purpose, on = every module (Office
+   adds its business modules), stored as mods_all; without the field the purpose's own set as before
  - #1641: Administration > Encryption lists what is encrypted and what not; every encrypted field of orgcrypt (FIELDS,
    JSON_KEYS) has its category, the list comes with the same rights as the encryption state
 """
@@ -66,6 +68,27 @@ if orgs:
     st = A.get(B + f"/api/orgs/{orgs[0]['id']}/encryption").json()
     check((st.get("scope") or {}).get("plain", [None])[0] == "Tasks", "#1641: the organisation's state carries the lists too")
 check(Bo.get(B + "/api/admin/orgcrypt").status_code == 403, "#1641: not for a non-admin")
+
+# ================================================================== #1591: "Switch on all modules"
+ALLM = {"cal", "timeline", "matrix", "kanban", "habits", "pomo", "stats", "comments", "collab", "time", "progress", "deps", "fields",
+        "family", "events", "contacts", "contracts", "home", "care", "health", "review", "travel", "reading"}
+for p in ("me", "family", "team", "office"):
+    r = Bo.post(B + "/api/me/purpose", json={"purpose": p, "all_modules": False})
+    fs = set(r.json()["features"].split(",")) - {""}
+    check(r.ok and not fs & (ALLM | {"clients", "workload", "forms", "office"}), f"#1591: {p} + switch off = lists and tasks only {fs}")
+st = Bo.get(B + "/api/state").json()["settings"]
+check(st["mods_all"] == "0" and st["purpose"] == "office", "#1591: the switch is stored (mods_all)")
+r = Bo.post(B + "/api/me/purpose", json={"purpose": "me", "all_modules": True})
+fs = set(r.json()["features"].split(","))
+check(ALLM <= fs and not {"clients", "office"} & fs, f"#1591: switch on = every module (the business ones only with Office) {fs}")
+fs = set(Bo.post(B + "/api/me/purpose", json={"purpose": "office", "all_modules": True}).json()["features"].split(","))
+check(ALLM | {"clients", "workload", "forms", "office"} <= fs, "#1591: Office + switch on adds the business modules")
+check(Bo.get(B + "/api/state").json()["settings"]["mods_all"] == "1", "#1591: stored on")
+fs = set(Bo.post(B + "/api/me/purpose", json={"purpose": "me"}).json()["features"].split(","))
+check("cal" in fs and "kanban" not in fs, f"#1591: without the field the purpose's own set (as before) {fs}")
+check(Bo.post(B + "/api/me/purpose", json={"purpose": "me", "all_modules": "yes"}).status_code == 400, "#1591: all_modules must be a boolean")
+check(Bo.patch(B + "/api/settings", json={"mods_all": "0", "features": "cal"}).ok and Bo.get(B + "/api/state").json()["settings"]["mods_all"] == "0",
+      "#1591: the settings switch (PATCH, one step with the modules)")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
