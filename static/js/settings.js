@@ -497,7 +497,7 @@ function agSetupWire(md) {
         await load(); render();
       }
       if (k === 'del') {
-        if (!await askConfirm(tr('Delete the agent “{0}”?', a.name), tr('Its tokens, events, jobs and chats are deleted; lists it owns come to you. Its comments stay.'), {ok: tr('Delete'), danger: true})) return;
+        if (!await ains_askRemove(`/api/my/agents/${a.id}`, tr('Delete the agent “{0}”?', a.name), tr('Its tokens, events, jobs and chats are deleted; lists it owns come to you. Its comments stay.'), {ok: tr('Delete'), danger: true})) return;  // 2.47.3 (#1729): shows the uninstall commands of its computers
         await api('DELETE', `/api/my/agents/${a.id}`); toast(tr('Deleted'));
         await load(); render();
       }

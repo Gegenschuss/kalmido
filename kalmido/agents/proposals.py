@@ -1015,10 +1015,10 @@ def v1_agent_chat_post(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or is_agent(u) or not agent_shares(c, aid, uid):
         raise Denied(404)
-    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to", "approval", "offer_save", "kind"))
+    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to", "approval", "offer_save", "kind"))
     b = fb if fb is not None else v1_json()
     # 2.28.0 (#1005): answer buttons; 2.30.0 (#1041): permission questions (permission, expires_in)
-    unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to",
+    unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to",
                                                "approval", "offer_save", "kind"))  # 2.33.0: reply_to; 2.35.0 (#1103): approval; 2.37.0 (#1159): offer_save
     if unknown:
         raise UnknownFields(unknown)
@@ -1045,13 +1045,20 @@ def v1_agent_chat_post(uid):
         jr = c.execute("SELECT user_id FROM agent_jobs WHERE id=? AND agent_id=?", (jid, aid)).fetchone()
         if not jr or jr["user_id"] != uid:
             raise BadInput(tr("Invalid value: {0}", "job_id"))
-    b = {k: v for k, v in b.items() if k != "job_id"}
+    # 2.47.3 (#1764): job_parent = the leading job of a part job (a job of this agent); with job_id only. The app colours the
+    # messages of a job by its number and gives a part job the colour of its leader
+    jpar = None
+    if b.get("job_parent") not in (None, ""):
+        jpar = as_int(b["job_parent"], "job_parent", 1)
+        if not jid or jpar == jid or not c.execute("SELECT 1 FROM agent_jobs WHERE id=? AND agent_id=?", (jpar, aid)).fetchone():
+            raise BadInput(tr("Invalid value: {0}", "job_parent"))
+    b = {k: v for k, v in b.items() if k not in ("job_id", "job_parent")}
     if fb is not None and isinstance(b.get("multi"), str):
         b["multi"] = b["multi"].lower() in ("1", "true", "yes")
     r = chat_post(c, aid, uid, "agent", b, files)
     from ..agents.steps import steps_take
     if jid or offer:
-        c.execute("UPDATE agent_chat SET job_id=?, offer_save=? WHERE id=?", (jid, 1 if offer else 0, r["id"]))
+        c.execute("UPDATE agent_chat SET job_id=?, job_parent=?, offer_save=? WHERE id=?", (jid, jpar, 1 if offer else 0, r["id"]))
         r = c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()
     if not b.get("permission"):  # 2.32.0 (#1081): the answer takes the live steps of the run along (a permission question: the run goes on)
         steps_take(c, aid, uid, r["id"])
