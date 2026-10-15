@@ -6498,5 +6498,5 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 @media (max-width:640px){.sbnbar .ssearch{flex:1 1 100%}.sbnbar .sbnsel{flex:1 1 auto;min-height:2.75rem}}
 /* 2.45.0 B (#1515) self-hosting: setup code field, missing server key */
 .authscreen .shint.shcode{margin:.25rem 0 .75rem}
-.shint.warn.shkey{color:var(--text);background:var(--bg3);border-left:3px solid var(--danger);border-radius:var(--radius);padding:.625rem .75rem;margin:0 0 .75rem}
+.shint.warn.shkey{color:var(--text);background:var(--bg3);border-left:.1875rem solid var(--danger);border-radius:var(--radius);padding:.625rem .75rem;margin:0 0 .75rem}
 .shint.warn.shkey b{color:var(--danger);display:block;margin-bottom:.125rem}

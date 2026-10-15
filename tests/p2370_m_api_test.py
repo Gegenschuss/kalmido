@@ -117,9 +117,9 @@ def report():
 def cli(*args):
     r = subprocess.run(["docker", "exec", CT, "python", "app.py", "migrate-sqlite", *args], capture_output=True, text=True, timeout=600)
     out = r.stdout + r.stderr
-    i = out.find("\n{")
+    i = r.stdout.find("\n{")  # 2.45.0 (#1515): start warnings go to stderr, the report is the end of stdout
     try:
-        rep = json.loads(out[i + 1:]) if i >= 0 else {}
+        rep = json.loads(r.stdout[i + 1:]) if i >= 0 else {}
     except ValueError:
         rep = {}
     return r.returncode, out, rep

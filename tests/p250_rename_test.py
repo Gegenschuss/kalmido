@@ -51,7 +51,8 @@ check(man.get("name") == "Kalmido" and man.get("short_name") == "Kalmido", f"man
 sw = requests.get(B + "/static/sw.js").text
 check("d.title || 'Kalmido'" in sw, "service worker: notification fallback title Kalmido")
 check(len(re.findall(r"const CACHE = '[a-z-]+-v\d+';", sw)) == 1, "service worker: one versioned shell cache")
-check("ks.filter(k => k !== CACHE).map(k => caches.delete(k))" in sw, "service worker: activate deletes every other (older) cache")
+# 2.45.0 (#1529): activate deletes the older caches only once the new one holds the shell (swCleanup)
+check("swCleanup()" in sw and "if (k !== CACHE && k !== 'tasks-share') await caches.delete(k)" in sw, "service worker: activate deletes every other (older) cache")
 check("'X-Requested-With': 'kalmido'" in sw, "service worker: CSRF header value kalmido")
 # 2.20.0 (#646): the client = static/js/*.js in the order of the script tags in index.html
 js = "\n".join(requests.get(B + "/static/js/" + f).text

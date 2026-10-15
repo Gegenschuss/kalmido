@@ -192,7 +192,7 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   const cb = md.querySelector('#s-2fareq'); cb.checked = true; cb.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
   check((await api(w, 'GET', '/api/about')).twofa_required === true, 'switch applied at once');
   cb.checked = false; cb.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
-  check(md.querySelector('#s-bk-h')?.textContent === 'Backups' && !md.querySelector('#bk-on').checked && md.querySelector('#bk-time').value === '03:30', 'backups section: off, 03:30');
+  check(md.querySelector('#s-bk-h')?.textContent === 'Backups' && md.querySelector('#bk-on').checked && md.querySelector('#bk-time').value === '03:30', 'backups section: on, 03:30');  // 2.45.0 (#1515): backups on for a new server
   check(/No backups yet/.test(md.querySelector('#s-bk').textContent), 'no backups yet');
   const bon = md.querySelector('#bk-on'); bon.checked = true; bon.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
   const bd = md.querySelector('#bk-daily'); bd.value = '7'; bd.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);

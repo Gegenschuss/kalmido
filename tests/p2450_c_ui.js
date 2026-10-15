@@ -11,6 +11,7 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const SRC = process.env.KMT_SRC || path.join(__dirname, '..');
 const read = f => fs.readFileSync(path.join(SRC, 'static', f), 'utf8');
+const CUR = read('sw.js').match(/const CACHE = '([^']+)'/)[1];  // the cache name of this version (not a fixed one)
 
 class FakeCache {
   constructor() { this.m = new Map(); }
@@ -49,14 +50,14 @@ const lifecycle = (env, t) => new Promise(res => { let p; env.listeners[t]({wait
   let r = await fetchEvent(env, '/static/app.css');
   check(r.tag === 'net200', 'sw: online -> the network answer');
   await sleep(20);
-  check((await (await env.caches.open('tasks-shell-v132')).match('/static/app.css'))?.tag === 'net200', 'sw: a 200 is cached');
+  check((await (await env.caches.open(CUR)).match('/static/app.css'))?.tag === 'net200', 'sw: a 200 is cached');
   env.fetchImpl = async () => fresh(502, false);
   r = await fetchEvent(env, '/static/app.css');
   check(r.tag === 'net200', 'sw: 502 -> falls back to the cached copy');
   r = await fetchEvent(env, '/static/other.js');
   check(r.tag === 'net502', 'sw: 502 and nothing cached -> the answer as is');
   await sleep(20);
-  check(!(await (await env.caches.open('tasks-shell-v132')).match('/static/other.js')), 'sw: a 502 is never cached');
+  check(!(await (await env.caches.open(CUR)).match('/static/other.js')), 'sw: a 502 is never cached');
   env.fetchImpl = async () => { throw new TypeError('offline'); };
   r = await fetchEvent(env, '/static/app.css');
   check(r.tag === 'net200', 'sw: network error -> cached copy');
@@ -71,7 +72,7 @@ const lifecycle = (env, t) => new Promise(res => { let p; env.listeners[t]({wait
   // install / activate
   env = swEnv();
   await (await env.caches.open('tasks-shell-v1')).put('/', {status: 200});
-  const cur = await env.caches.open('tasks-shell-v132'); cur.fail = true;
+  const cur = await env.caches.open(CUR); cur.fail = true;
   check(await lifecycle(env, 'install') === 'failed', 'sw: install fails when a shell file fails');
   await lifecycle(env, 'activate');
   check((await env.caches.keys()).includes('tasks-shell-v1'), 'sw: incomplete new cache -> the old cache stays');
