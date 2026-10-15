@@ -290,6 +290,13 @@ APP_ONLY = [
     ("2.30.0 (#919): what people see about agents in their lists: the access log of a list (list menu > Agent access) and the "
      "lists an agent connects although their people differ; an agent's own token reads neither (GET /me shows its list_ids)",
      ("GET /api/lists/{}/agent-access", "GET /api/agents/{}/bridges")),
+    # 2.43.0 (#1452, #1346, #1434): page layout, notepads and wiping a project's time are things people do in the web app
+    ("2.43.0 (#1452): the default arrangement of a view for everyone (instance admins); layout only, nothing for an agent",
+     ("=GET /api/layouts/std", "=PUT /api/layouts/std/{}")),
+    ("2.43.0 (#1346): project page colours and notepads; not shared with agents in 2.43 (open decision)",
+     ("=PUT /api/lists/{}/page-style", "=POST /api/lists/{}/notepads", "=PATCH /api/notepads/{}", "=DELETE /api/notepads/{}")),
+    ("2.43.0 (#1434): delete all times of a project (typed confirmation, restore); agents get 403 by design",
+     ("=GET /api/lists/{}/time/delete-all", "=POST /api/lists/{}/time/delete-all", "=POST /api/lists/{}/time/restore")),
 ]
 
 

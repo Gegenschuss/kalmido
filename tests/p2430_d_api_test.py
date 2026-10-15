@@ -119,6 +119,10 @@ r = Da.post(B + f"/api/lists/{P}/time/restore", json={"entries": j["entries"]})
 check(r.ok and r.json()["restored"] == 5, f"admin restore {r.status_code}")
 rows = dbx("SELECT user_id, task_id FROM time_entries WHERE list_id=?", (P,))
 check(len(rows) == 6 and sum(1 for x in rows if x[0] == ids["bob"]) == 2 and sum(1 for x in rows if x[1] == T) == 3, f"restored with owners and tasks {rows}")
+# review V1: restore never creates entries for people outside the list, nor with end before start
+e0 = j["entries"][0]
+r = Da.post(B + f"/api/lists/{P}/time/restore", json={"entries": [{**e0, "user_id": ids["carol"]}, {**e0, "start": e0["end"], "end": e0["start"]}]})
+check(r.ok and r.json()["restored"] == 0, f"restore: outsider / reversed times ignored {r.status_code} {r.text[:200]}")
 
 # agents: 403
 ag = A.post(B + "/api/agents", json={"name": "Helper"})

@@ -259,7 +259,7 @@ registering the ones of its area.
 | `multiedit.js` | 2.26.0: several selected tasks edited at once in the task panel (common values, "Mixed", one undo step). |
 | `sheetdrag.js` | 2.39.1: bottom sheets on phones (menus, date picker, quick add, dialogs) dragged taller / shorter at their grip and swiped down to close. |
 | `e2e.js` | 2.42.0 (#828, #909): end-to-end encryption with WebCrypto: set up / unlock / lock / change / reset the keys (Settings > Account), the encrypted note in the task detail, encrypted files (*Attach encrypted*), encrypted DMs (lock in the DM head, safety number). |
-| `miniwin.js` | 2.39.1: a list in its own small browser window (double / middle click in the sidebar, list menu); the window (`/?mini=1#l/<id>`) shows only the list and keeps its UI state to itself. |
+| `miniwin.js` | 2.39.1: a list in its own small browser window (double / middle click in the sidebar, list menu); the window (`/?mini=1#l/<id>`) shows only the list and keeps its UI state to itself. 2.43.0 (#1500): a task in its own window too (`/?mini=1#t/<id>`, middle click on the row, task menu, button in the task panel). |
 | `favorites.js` | 2.40.0: favourite lists (#1361): the star, the *Favourites* section of the sidebar, *Only favourites* and the favourites filter of views. |
 | `mineorder.js` | 2.40.0: your own order of *My tasks* (#1344), kept per person on the server (`user_task_order`). |
 | `mdtitle.js` | 2.40.0: inline Markdown in task titles (`mdTitle`) and the plain text for attributes, tabs and notifications (`mdPlain`). |
@@ -289,6 +289,11 @@ registering the ones of its area.
 | `playbook.js` | The Playbook of a list or folder (2.39.0): the area in the list and folder dialogs, editor with preview, versions with a line diff and restore, agents' proposals, regular checks, the help examples. |
 | `git.js` | Git integration of project lists: repositories, pull requests + CI, agents' merge requests. |
 | `chat.js` | Team chat and notes of a list / project. |
+| `sheetgrid.js` | 2.43.0 (#1331): lists with columns work like a spreadsheet: active cell, arrow keys / Tab / Enter, paste ranges with a preview, fill down, select several cells, column filter. |
+| `formula.js` | 2.43.0 (#1328): formula fields in the client, the totals row under number columns and the key figures on the project page (server side `kalmido/lists/formula.py`, `kalmido/lists/kpis.py`). |
+| `widgets.js` | 2.43.0 (#1452): blocks adjusted in place (… menu, width 1/3 to full, height, resize handle, move by the header, default for everyone / reset). |
+| `pinboard.js` | 2.43.0 (#1346): project page as a pinboard: a colour per block and notepads (Markdown) for everyone in the project. |
+| `projtime.js` | 2.43.0 (#1434): tracked time of a project in a window (by person and task, period, CSV) and deleting all of its times with Undo. |
 | `dashboard.js` | News bundled per task, the view builder (2.32.0: blocks per view, "Customize", project page standard + own arrangement; server side `kalmido/accounts/layouts.py`), the start page (dashboard) and Settings > Tasks by e-mail. |
 | `family.js` | The module "Family". |
 | `calevents.js` | Events (module "events"): the editor and popover, the agenda, creating in the week grid, calendars, the phone setup. |
