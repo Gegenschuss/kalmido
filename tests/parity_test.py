@@ -186,6 +186,7 @@ APP_TO_API = {
     "DELETE /api/books/{}/members/{}": ["DELETE /address-books/{}/members/{}"], "POST /api/books/{}/import": ["POST /address-books/{}/import"],
     "GET /api/books/{}/export.vcf": ["GET /address-books/{}/export"], "GET /api/contacts": ["GET /contacts"], "POST /api/contacts": ["POST /contacts"],
     "GET /api/contacts/{}": ["GET /contacts/{}"], "PATCH /api/contacts/{}": ["PATCH /contacts/{}"], "DELETE /api/contacts/{}": ["DELETE /contacts/{}"],
+    "POST /api/contacts/bulk": ["POST /contacts/bulk"],  # 2.46.1 (#1554)
     "POST /api/tasks/{}/contacts": ["POST /tasks/{}/contacts"], "DELETE /api/tasks/{}/contacts/{}": ["DELETE /tasks/{}/contacts/{}"],
     # 2.22.0 (#663): Home & life
     "GET /api/life": ["GET /life"], "GET /api/life/upkeep-presets": ["GET /life/upkeep-presets"], "POST /api/life/contracts": ["POST /life/contracts"],

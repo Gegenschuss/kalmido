@@ -6752,5 +6752,14 @@
   "KALMIDO_SECRET_FILE lies inside the data or backup folder and was ignored. Put it on its own volume.": "KALMIDO_SECRET_FILE está dentro de la carpeta de datos o de copias y se ignoró. Ponlo en un volumen propio.",
   "The key file KALMIDO_SECRET_FILE cannot be read or written, see the server log. After an update: create the folder secret next to data and give it to the user 1000 (mkdir secret && chown 1000 secret), then restart.": "No se puede leer ni escribir el archivo de clave KALMIDO_SECRET_FILE, consulta el registro del servidor. Tras una actualización: crea la carpeta secret junto a data y dásela al usuario 1000 (mkdir secret && chown 1000 secret), luego reinicia.",
   "Without KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE no access token can be stored and organisation data stays unencrypted. See SELF-HOSTING.md.": "Sin KALMIDO_SECRET_KEY ni KALMIDO_SECRET_FILE no se pueden guardar tokens de acceso y los datos de la organización quedan sin cifrar. Consulta SELF-HOSTING.md.",
-  "The server key is kept in the key file. Keep a copy of it apart from the backups: without it the encrypted data of a backup cannot be read.": "La clave del servidor está en el archivo de clave. Guarda una copia aparte de las copias de seguridad: sin ella no se pueden leer los datos cifrados de una copia."
+  "The server key is kept in the key file. Keep a copy of it apart from the backups: without it the encrypted data of a backup cannot be read.": "La clave del servidor está en el archivo de clave. Guarda una copia aparte de las copias de seguridad: sin ella no se pueden leer los datos cifrados de una copia.",
+  "Choose at least one contact": "Elige al menos un contacto",
+  "At most {0} contacts at once": "Como máximo {0} contactos a la vez",
+  "Tap contacts": "Toca contactos",
+  "Delete {0} contact?": ["¿Eliminar {0} contacto?", "¿Eliminar {0} contactos?"],
+  "They are also removed from the phones that sync these address books.": "También se quitan de los teléfonos que sincronizan estas libretas de direcciones.",
+  "{0} contact deleted": ["{0} contacto eliminado", "{0} contactos eliminados"],
+  "No address book you may change": "Ninguna libreta de direcciones que puedas cambiar",
+  "{0} contact moved to {1}": ["{0} contacto movido a {1}", "{0} contactos movidos a {1}"],
+  "{0} was there already and stayed": ["{0} ya estaba allí y se queda", "{0} ya estaban allí y se quedan"]
 }
