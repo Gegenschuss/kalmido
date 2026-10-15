@@ -140,7 +140,7 @@ const sec = (d, k) => d.querySelector(`#achat .cwin[data-cw="${k}"]`);
   pe(w, sec(d, 't:' + RID).querySelector('.chmsgs'), 'pointerdown');
   w.location.hash = 'l/' + L;
   await sleep(800);
-  check(w.eval('S.tc.rid') === RID && !!sec(d, 't:' + RID).querySelector('#tc-in') && sec(d, 't:' + RID).textContent.includes('Hello studio'), '#1720: leaving the team view keeps the live panel window');
+  check(w.eval('S.tc.rid') === RID && !!sec(d, 't:' + RID).querySelector('#tc-in') && sec(d, 't:' + RID).textContent.includes('Hello studio'), '#1720: leaving the team view keeps the live panel window ' + JSON.stringify({rid: w.eval('S.tc.rid'), RID, DM, lt: w.eval('S.cw.lt'), inp: !!sec(d, 't:' + RID)?.querySelector('#tc-in'), n: d.querySelectorAll('#tc-in').length, txt: (sec(d, 't:' + RID)?.textContent || '').slice(0, 80), hash: w.location.hash}));
   w.eval(`cw_close('t:${RID}')`);
   await sleep(100);
 
