@@ -23,6 +23,7 @@ addresses and paths to your setup.
 - [Intrusion alerts](#intrusion-alerts)
 - [Mail](#mail)
 - [Documents: text recognition](#documents-text-recognition)
+  - [Import from Paperless-ngx (2.48)](#import-from-paperless-ngx-248)
 - [Moving to a new server](#moving-to-a-new-server)
 - [Production updates](#production-updates)
 
@@ -610,6 +611,27 @@ The recognised text, amounts, sender names, rules and the learnt models are seal
 keyed hashes of the words, no plain index. With *Tasks by e-mail* set up, every person and organisation can create a
 forwarding address for documents in the documents' settings: PDFs and images attached to mails sent there become
 documents.
+
+### Import from Paperless-ngx (2.48)
+
+Only on a self-hosted server (a hosted server shows nothing of it): an existing Paperless-ngx instance can be connected
+once per workspace -- by an organisation's admin for the organisation, by a person for their own space -- under
+*Documents > Settings > Paperless-ngx* with its address and an API token (Paperless-ngx: *My profile > API auth token*).
+
+- **Read only:** Kalmido only sends GET requests. Nothing in Paperless-ngx is changed, moved or deleted.
+- **Preview first:** the number of documents and how tags, correspondents and document types are taken over: a tag
+  becomes a tag, a folder of the documents or is left out; correspondents become senders, document types types (names can be
+  changed in the preview).
+- **What comes along:** the original file, the recognised text (no new recognition), the date, tags, correspondent, type,
+  and custom fields, notes and the archive serial number as text below the document's text.
+- **Never twice:** a document already imported (Paperless-ngx id per instance address) or the same file already in the
+  workspace (checksum) is left out, also when the import runs again.
+- **In the background:** progress and *Stop* in the settings; optionally *Bring in new documents automatically* every
+  15 minutes up to once a day (only Paperless-ngx -> Kalmido).
+- **Network:** http/https only, timeouts, no redirects, at most `TASKS_MAX_FILE_MB` per file. An instance in the local
+  network is an internal address: allow its host under *Settings > Administration > Advanced* (or
+  `KALMIDO_CALENDAR_ALLOW_HOSTS=paperless.example.com:8000`), the same allow-list as for calendar subscriptions.
+- The token is sealed with the workspace's key and never shown again.
 
 ## Moving to a new server
 
