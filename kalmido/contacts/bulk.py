@@ -6,7 +6,7 @@ the contacts follow (bk_occ_drop), CardDAV clients see the change through the ad
 from flask import jsonify
 
 from ..core.config import app
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
@@ -55,6 +55,13 @@ def bk_ids(b):
     return list(out)
 
 
+def bk_gate(c, title, n):
+    """2.46.1 review: an agent's bulk change of APPROVAL_BATCH_MIN or more contacts waits for a person (202), like task batches."""
+    from ..api.scopes import APPROVAL_BATCH_MIN, need_approval
+    if n >= APPROVAL_BATCH_MIN:
+        need_approval(c, title, (n,))
+
+
 def op_contacts_bulk(c, uid, b):
     """{ids: [...], action: delete | move, book_id (move)} -> {action, deleted} | {action, moved, unchanged, conflicts: [ids]}."""
     bad = sorted(k for k in b if k not in ("ids", "action", "book_id"))
@@ -76,6 +83,7 @@ def op_contacts_bulk(c, uid, b):
     if any(books[rows[i]["book_id"]] not in ("owner", "edit") for i in ids):
         raise Denied(403, tr("You can only read this address book"))
     if action == "delete":
+        bk_gate(c, N_("Delete {0} contacts at once"), len(ids))
         for blk in bk_blocks(ids):
             bk_occ_drop(c, uid, blk)
             c.execute(f"DELETE FROM contacts WHERE id IN ({bk_in(blk)})", blk)
@@ -86,6 +94,7 @@ def op_contacts_bulk(c, uid, b):
         return {"action": "delete", "deleted": len(ids)}
     nb = as_int(b.get("book_id"), "book_id", 1)
     bk, _ = need_book(c, nb, write=True, uid=uid)
+    bk_gate(c, N_("Move {0} contacts at once"), len(ids))
     seen = {(r["uid"], "u") for r in c.execute("SELECT uid FROM contacts WHERE book_id=?", (nb,)).fetchall()}
     seen |= {(r["href"], "h") for r in c.execute("SELECT href FROM contacts WHERE book_id=?", (nb,)).fetchall()}
     mv, conflicts, same = [], [], 0

@@ -72,7 +72,7 @@ const favViewNote = () => favViewOn() && favAny() ? `<div class="favnote muted">
 // suggestion of a busy list (default on)
 const lc_favSetHtml = (chk, hint) => `<h4 id="s-fav-h">${tr('Favourites')}</h4>
       <div class="row">${chk('s-favq', S.settings?.fav_quiet === '1', tr('Quieter pushes from lists without a star'))}</div>
-      ${hint(tr('While you have favourites, lists without a star send pushes only for @mentions, assignments, reminders and approvals. The News stay complete; a list bell set to All wins.'))}
+      ${hint(tr('While you have favourites, lists without a star send pushes only for @mentions, replies to you, assignments, reminders and approvals. The News stay complete; a list bell set to All wins.'))}
       <div class="row">${chk('s-favs', S.settings?.fav_suggest !== '0', tr('Suggest favourites'))}</div>
       ${hint(tr('After two weeks of much work in a list without a star, Kalmido asks once whether to add it to your favourites. It never sets a star by itself.'))}`;
 // once per start of the app: a busy list without a star is offered (the server asks about each list only once)

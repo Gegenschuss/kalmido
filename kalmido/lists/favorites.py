@@ -62,7 +62,7 @@ def vw_list_favorite(lid):
 # 2.46.1 (#1361 point 4): "Quieter pushes from lists without a star" (user setting fav_quiet, default off): while the person has
 # at least one favourite, a list without a star pushes only what concerns them directly (@mentions, assignments) and what
 # they must not miss (reminders, approvals, shares, ...); the News stay complete, an explicit list bell (all / custom) wins
-LC_FAV_QUIET_ROWS = ("comment", "reply", "follow", "newtask", "complete", "status", "unblock", "chat")
+LC_FAV_QUIET_ROWS = ("comment", "follow", "newtask", "complete", "status", "unblock", "chat")  # 2.46.1 review: a reply to you always comes
 
 
 def lc_fav_quiet(c, uid, lid, row):
