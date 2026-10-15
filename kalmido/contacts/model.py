@@ -2,6 +2,7 @@
 import base64
 import hashlib
 import json
+import quopri
 import re
 import secrets
 from datetime import date
@@ -252,7 +253,44 @@ def vc_split(s, sep):
 
 
 def vc_unfold(text):
-    return re.sub(r"\r?\n[ \t]", "", str(text or "").replace("\r\n", "\n").replace("\r", "\n")).split("\n")
+    text = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
+    if "QUOTED-PRINTABLE" in text.upper():
+        text = vc_qp_join(text)
+    return re.sub(r"\n[ \t]", "", text).split("\n")
+
+
+def vc_qp_join(text):
+    """2.45.1 (#1555): vCard 2.1 quoted-printable values: a line ending in '=' (soft line break) goes on in the next line;
+    joined before the normal unfolding (that next line has no leading blank)."""
+    out, cur = [], None
+    for ln in text.split("\n"):
+        if cur is not None:
+            cur += ln
+        elif VC_QP_RE.match(ln):
+            cur = ln
+        else:
+            out.append(ln)
+            continue
+        if cur.endswith("="):
+            cur = cur[:-1]
+        else:
+            out.append(cur)
+            cur = None
+    if cur is not None:
+        out.append(cur)
+    return "\n".join(out)
+
+
+def vc_qp_decode(val, params):
+    """2.45.1 (#1555): a quoted-printable value (vCard 2.1) -> text in its CHARSET (UTF-8 by default, else Latin-1)."""
+    raw = quopri.decodestring(val.encode("utf-8"))
+    cs = (params.get("CHARSET") or ["utf-8"])[0].strip() or "utf-8"
+    for enc in (cs, "utf-8", "latin-1"):
+        try:
+            return raw.decode(enc).replace("\r\n", "\n")
+        except (LookupError, UnicodeDecodeError):
+            continue
+    return val
 
 
 def vc_fold(line):
@@ -271,6 +309,7 @@ def vc_fold(line):
     return "\r\n ".join(out)
 
 
+VC_QP_RE = re.compile(r"^[^:]*;[^:]*QUOTED-PRINTABLE[^:]*:", re.I)
 LINE_RE = re.compile(r"^(?:([A-Za-z0-9-]+)\.)?([A-Za-z0-9-]+)((?:;(?:[^:\"]|\"[^\"]*\")*)?):(.*)$")
 
 
@@ -291,11 +330,13 @@ def vc_line(line):
         if k == "TYPE":
             vals = [x.lower() for x in vals]
         params.setdefault(k, []).extend(vals)
+    if "QUOTED-PRINTABLE" in (x.upper() for x in params.get("ENCODING", []) + params.get("TYPE", [])):  # 2.45.1 (#1555)
+        val = vc_qp_decode(val, params)
     return grp, name, params, val
 
 
 def _types(params):
-    t = [x for x in params.get("TYPE", []) if x and x not in ("internet", "x400", "pref", "voice")]
+    t = [x for x in params.get("TYPE", []) if x and x not in ("internet", "x400", "pref", "voice", "quoted-printable", "base64", "8bit")]
     pref = "pref" in params.get("TYPE", []) or params.get("PREF", ["100"])[0] == "1"
     return t[:4], pref
 
@@ -806,19 +847,24 @@ def occ_sync(c, cid):
 
 
 # ---- import: vCard files and the external CardDAV accounts of the Family module
+VC_BEGIN_RE = re.compile("BEGIN:VCARD", re.I)
+VC_END_RE = re.compile("END:VCARD", re.I)
+
+
 def split_vcards(text):
     """Every BEGIN:VCARD ... END:VCARD block, in one linear pass (a regex scan was quadratic on cards without an END)."""
-    text = str(text or "").replace("\r\n", "\n")
-    up, out, pos = text.upper(), [], 0
+    # 2.45.1 (#1555): searched case-insensitively in the text itself - 'ß'.upper() is 'SS', so positions found in text.upper()
+    # slid off the original after the first ß and almost every card after it was cut in the wrong place
+    text, out, pos = str(text or "").replace("\r\n", "\n"), [], 0
     while True:
-        a = up.find("BEGIN:VCARD", pos)
-        if a < 0:
+        a = VC_BEGIN_RE.search(text, pos)
+        if not a:
             break
-        b = up.find("END:VCARD", a)
-        if b < 0:
+        b = VC_END_RE.search(text, a.end())
+        if not b:
             break
-        out.append(text[a:b + 9])
-        pos = b + 9
+        out.append(text[a.start():b.end()])
+        pos = b.end()
     return out
 
 
