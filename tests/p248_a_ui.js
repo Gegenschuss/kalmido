@@ -7,6 +7,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const firefox = require('./ff')({tag: 'p248_a_ui', check: (c, w) => check(c, w), shots: 'P248A_SHOTS'});
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -131,6 +132,32 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
     check(md2.querySelector('#pop .tch-sh'), 'phone: the menu is a sheet with a head');
   }
   m.close();
+
+  // ================= the real layout (Firefox): phone 390 px dark, desktop 1440 px light
+  const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(700); };
+  for (const [vw, vh, touch, th] of [[390, 844, true, 'dark'], [1440, 900, false, 'light']]) await firefox(async o => {
+    const {cmd, ev, ctx, nav, shot} = o, tag = String(vw);
+    await nav(B + 'static/icon.svg');
+    await ev(`(() => { localStorage.setItem('tasks.theme', '"${th}"'); return 1; })()`);
+    check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, tag + ': login');
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
+    await nav(B + '#ablage/' + FID); await ready(ev);
+    for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('.abrow')`)); i++) await sleep(300);
+    const L = await ev(`(() => { const rows = [...document.querySelectorAll('.abrow')].map(x => x.getBoundingClientRect()), sp = [...document.querySelectorAll('.abspace:not(.abtree)')].map(x => x.getBoundingClientRect());
+      const btn = [...document.querySelectorAll('.abrow [data-ab="menu"]')].map(x => x.getBoundingClientRect());
+      return {over: document.documentElement.scrollWidth - innerWidth, n: rows.length, minH: Math.round(Math.min(...rows.map(x => x.height))), out: rows.filter(x => x.right > innerWidth + 1).length,
+        spH: Math.round(Math.min(...sp.map(x => x.height))), btnW: Math.round(Math.min(...btn.map(x => x.width))), tree: !!document.querySelector('.abtree.on') && getComputedStyle(document.querySelector('.abtree.on')).display !== 'none'}; })()`);
+    check(L.n >= 1 && L.over <= 1 && L.out === 0, `${tag}: the list fits ` + JSON.stringify(L));
+    if (touch) check(L.minH >= 44 && L.spH >= 44 && L.btnW >= 44, `${tag}: rows, spaces and the actions button at least 44 px ` + JSON.stringify(L));
+    else check(L.tree, `${tag}: the tree on the left shows the open folder`);
+    await shot(`p248a-${tag}-folder.png`);
+    await ev(`(() => { ab_share(${FID}); return 1; })()`);
+    for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('.abshdlg')`)); i++) await sleep(300);
+    await sleep(300);
+    const M = await ev(`(() => { const m = document.querySelector('.abshdlg .card') || document.querySelector('.abshdlg'), r = m.getBoundingClientRect(); return {over: document.documentElement.scrollWidth - innerWidth, l: Math.round(r.left), r: Math.round(innerWidth - r.right)}; })()`);
+    check(M.over <= 1 && M.l >= 0 && M.r >= 0, `${tag}: the Share dialog fits ` + JSON.stringify(M));
+    await shot(`p248a-${tag}-share.png`);
+  }, touch);
 
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
