@@ -15,7 +15,7 @@ function toastPlace(el) {
   // 2.13.0 (#453 A12): an open bottom sheet (snooze, date, menus) is never covered: the toast sits above its top edge,
   // or at the top of the screen when the sheet is that tall
   // 2.25.0 (UX-31): the phone's quick-add sheet too: the message sits above it, never over the field
-  const sh = $('#pop.sheet:not(.hidden)') || $('.qadd.sheet'), sr = sh && sh.offsetHeight ? sh.getBoundingClientRect() : null;
+  const sh = $('#pop.sheet:not(.hidden)') || $('.qadd.sheet'), sr = sh && sh.offsetHeight ? an_rect(sh) : null;  // 2.46.1 (#1558): an_rect = where the sheet will be, not where its entry animation is now
   el.classList.toggle('totop', !!sr && sr.top < innerHeight * .3);
   if (sr && sr.top >= innerHeight * .3) top = Math.min(top, sr.top);
   el.style.bottom = el.classList.contains('totop') ? '' : top < innerHeight ? Math.round(innerHeight - top + 12) + 'px' : '';
@@ -176,6 +176,7 @@ async function submitQuick(input, extra = {}) {
 }
 function openQuickSheet(prefill = '', preset = {}) {
   S.quickPreset = preset;
+  an_flush();  // 2.46.1 (#1558): a sheet that is still folding away is gone now
   let q = $('.qadd.sheet');
   if (!q) {
     q = document.createElement('div');
@@ -187,7 +188,7 @@ function openQuickSheet(prefill = '', preset = {}) {
   }
   $('#scrim').classList.remove('hidden');
   document.body.classList.add('qsheet-open');  // 2.13.0 (#453 P8): the + button does not peek out behind the sheet
-  popOnClose = () => { q.remove(); S.quickPreset = {}; S.qMoved = false; document.body.classList.remove('qsheet-open'); };
+  popOnClose = () => { an_remove(q); S.quickPreset = {}; S.qMoved = false; document.body.classList.remove('qsheet-open'); };
   const nf = preset.files?.length || 0;
   const hint = [preset.due ? dayLabel(preset.due) + (preset.due_time ? ' ' + preset.due_time : '') : '', preset.content ? tr('Link as description') : '', preset.url ? tr('Link: {0}', urlHost(preset.url)) : '',
     nf ? (nf === 1 ? tr('Attachment: {0}', preset.files[0].name) : tr('{0} attachments', nf)) : ''].filter(Boolean).join(' · ');
@@ -427,7 +428,7 @@ document.addEventListener('click', async e => {
     case 'close-detail': closeDetail(); break;
     case 'collapse': {
       if (e.target.closest('.gact, .shandle') || secHeld) break;
-      const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); renderView(); break;
+      const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); an_rowsIn(renderView); break;  // 2.46.1 (#1559): opened rows fade in
     }
     case 'palette': closeSide(); openPalette(); break;
     case 'new-task': { const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); break; }
@@ -557,7 +558,7 @@ document.addEventListener('click', async e => {
     case 'cvx-tlhide': cvxTlHide(a.dataset.key, a.dataset.name); break;
     case 'cvx-tlmenu': e.stopPropagation(); cvxTlMenu(a, a.dataset.key, a.dataset.name); break;
     case 'cvx-today-menu': e.stopPropagation(); cvxTodayMenu(a); break;
-    case 'cal-mode': S.calMode = a.dataset.k; LS.set('calMode', S.calMode); if (S.calMode === 'month') S.calMonth = S.calSel.slice(0, 7); renderView(); break;
+    case 'cal-mode': S.calMode = a.dataset.k; LS.set('calMode', S.calMode); if (S.calMode === 'month') S.calMonth = S.calSel.slice(0, 7); renderView(); an_calSlide(0); break;
     case 'tl-pick-cancel': tlPickEnd(); break;
     case 'rm-view': if (a.dataset.k !== (isRoadmap() ? 'timeline' : 'list')) { S.rmScrollReset = true; rmSet({v: a.dataset.k}, 'all'); } break;
     case 'rm-zoom': if (a.dataset.k !== rmZoom()) { S.rmScrollReset = true; rmSet({z: a.dataset.k}); } break;
@@ -630,9 +631,9 @@ document.addEventListener('click', async e => {
       else if (S.calMode === 'agenda') S.calSel = addDays(S.calSel, 14 * dir);  // 2.21.0 (#659)
       else if (S.calMode === 'timeline') S.tlStart = addDays(S.tlStart, 14 * dir);
       else { const [y, m] = S.calMonth.split('-').map(Number); S.calMonth = ds(new Date(y, m - 1 + dir, 1)).slice(0, 7); }
-      renderView(); break;
+      renderView(); an_calSlide(dir); break;  // 2.46.1 (#1560): the page glides in from the side it comes from
     }
-    case 'cal-today': S.calMonth = today().slice(0, 7); S.calSel = today(); S.tlStart = addDays(weekStartOf(today()), -7); renderView(); break;
+    case 'cal-today': S.calMonth = today().slice(0, 7); S.calSel = today(); S.tlStart = addDays(weekStartOf(today()), -7); renderView(); an_calSlide(0); break;
     case 'habit-new': habitModal(); break;
     case 'habit-open': habitModal(id); break;
     case 'habit-tick': {

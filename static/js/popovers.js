@@ -15,7 +15,7 @@ let popOnClose = null;
 // that nothing needs any more (no drawer, menu or sheet: e.g. the drawer was opened over the quick-add sheet on Android and
 // took its close hook) goes, so it never stays over the new view catching taps
 function tch_overlaysClose() {
-  if ($('.qadd.sheet')) { const q = $('.qadd.sheet'); if (popOnClose && !$('#side.open')) closePop(); if (q.isConnected) { q.remove(); S.quickPreset = {}; S.qMoved = false; document.body.classList.remove('qsheet-open'); } }
+  if ($('.qadd.sheet')) { const q = $('.qadd.sheet'); if (popOnClose && !$('#side.open')) closePop(); if (q.isConnected) { an_remove(q); S.quickPreset = {}; S.qMoved = false; document.body.classList.remove('qsheet-open'); } }
   const sc = $('#scrim');
   if (sc && !sc.classList.contains('hidden') && !$('#side.open') && $('#pop').classList.contains('hidden') && !$('.qadd.sheet')) {
     sc.classList.add('hidden'); sc.classList.remove('clear', 'overmodal'); if (popOnClose === closeSide) popOnClose = null;
@@ -416,12 +416,12 @@ function dpSet(inp, v) {
 const DP = {el: null, anchor: null, st: null};
 function dpClose(focusBack = true) {
   if (!DP.el) return;
-  const a = DP.anchor; DP.el.remove(); DP.el = null; DP.st = null; DP.anchor = null;
+  const a = DP.anchor; an_remove(DP.el); DP.el = null; DP.st = null; DP.anchor = null;  // 2.46.1 (#1558): the sheet folds away first
   if (a) { a.setAttribute?.('aria-expanded', 'false'); if (focusBack && a.isConnected) a.focus?.({preventScroll: true}); }
 }
 // open a picker: from a field button, or directly (dpOpen(anchor, {kind, value, min, max, label, onPick}))
 function dpOpen(anchor, o) {
-  dpClose(false);
+  dpClose(false); an_flush();
   const el = document.createElement('div');
   el.id = 'dpop'; el.className = 'dpop ' + o.kind; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', o.label || (o.kind === 'date' ? tr('Choose a date') : tr('Choose a time')));
   document.body.appendChild(el);

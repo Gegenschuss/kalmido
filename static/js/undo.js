@@ -302,7 +302,9 @@ async function toggleTask(id) {
   if (!canEdit(t)) { roToast(); return; }
   const snaps = withKids(id), n = qn(t.title.slice(0, 40));
   if (t.status !== 0) {
-    const r = await api('POST', `/api/tasks/${id}/reopen`);
+    const fade = an_rowOut([id]);  // 2.46.1 (#1559): the row fades while the request runs; the redraw waits for it
+    let r; try { r = await api('POST', `/api/tasks/${id}/reopen`); } catch (x) { an_rowsBack([id]); throw x; }
+    await fade;
     const {undo, ...rt} = r; putTask(rt);
     if (S.extra) S.extra = S.extra.filter(x => x.id !== id);
     render();
@@ -313,7 +315,9 @@ async function toggleTask(id) {
   // optimistic: fade the row, then sync
   $$(`.trow[data-id="${id}"] .chk`).forEach(c => { c.classList.add('on'); c.innerHTML = ic('check'); });
   const cs = celeSnap([id]);
-  const j = await api('POST', `/api/tasks/${id}/complete`, t.repeat && t.due ? {expect_due: t.due} : undefined);
+  const fade = an_rowOut([id]);  // 2.46.1 (#1559): the row fades while the request runs; the redraw waits for it
+  let j; try { j = await api('POST', `/api/tasks/${id}/complete`, t.repeat && t.due ? {expect_due: t.due} : undefined); } catch (x) { an_rowsBack([id]); throw x; }
+  await fade;
   wpCloseLocal([id]);
   await load();
   render();
@@ -324,8 +328,9 @@ async function toggleTask(id) {
 }
 async function wontDo(id) {
   const snaps = withKids(id), t = taskById(id);
-  const j = await api('POST', `/api/tasks/${id}/complete`, {status: -1});
-  await load(); render();
+  const fade = an_rowOut([id]);  // 2.46.1 (#1559)
+  let j; try { j = await api('POST', `/api/tasks/${id}/complete`, {status: -1}); } catch (x) { an_rowsBack([id]); throw x; }
+  await fade; await load(); render();
   offerUndo(tr("Won't do: {0}", qn((t?.title || '').slice(0, 40))), histDone(tr("Won't do: {0}", qn((t?.title || '').slice(0, 40))), [id], snaps, j, -1));
 }
 const canDelete = t => !!t && canEditList(t.list_id);  // 1.10.0: participants complete or discard, they never delete
@@ -333,7 +338,9 @@ async function deleteTask(id) {
   const t = taskById(id);
   if (t && !canDelete(t)) { roToast(); return; }
   const snaps = withKids(id);
-  const r = await api('DELETE', '/api/tasks/' + id);
+  const fade = an_rowOut([id]);  // 2.46.1 (#1559)
+  let r; try { r = await api('DELETE', '/api/tasks/' + id); } catch (x) { an_rowsBack([id]); throw x; }
+  await fade;
   if (S.sel === id) closeDetail();
   await load(); render();
   offerUndo(tr('“{0}” deleted', t ? t.title.slice(0, 30) : ''), histTrash(tr('Deleted {0}', qn((t?.title || '').slice(0, 40))), [id], snaps, r));
@@ -347,6 +354,6 @@ async function createTask(body) {
   const t = await api('POST', '/api/tasks', body);
   putTask(t); render();
   histCreate(t.parent_id ? tr('Subtask {0} added', qn(String(t.title).slice(0, 40))) : tr('Created {0}', qn(String(t.title).slice(0, 40))), t);
-  requestAnimationFrame(() => { const r = $(`#view .trow[data-id="${t.id}"]`); if (r) { r.classList.add('flash'); r.scrollIntoView({block: 'nearest'}); } });
+  requestAnimationFrame(() => { const r = $(`#view .trow[data-id="${t.id}"]`); if (r) { r.classList.add('flash'); if (an_on()) r.classList.add('an-rowin'); r.scrollIntoView({block: 'nearest'}); } });
   return t;
 }

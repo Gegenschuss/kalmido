@@ -14,6 +14,7 @@ function renderMultiBar() {
   if (!b) { b = document.createElement('div'); b.id = 'mbar'; document.body.appendChild(b); }
   const n = S.multi.size;
   b.classList.toggle('hidden', !(S.multiMode || n));
+  an_watch(b);  // 2.46.1 (#1559): the bar slides in and out (watched after its first state is set)
   document.body.classList.toggle('msel', !!(S.multiMode || n));  // 2.26.0: the docked quick add steps back while selecting
   $('#fab').classList.toggle('gone', fabOff() || S.multiMode || n > 0 || (!!$('#view .qdock') && (tabletDock() || !isMobile())));
   // 2.26.0 (#936): the selection is edited in the task panel (from two tasks: their common fields, see multiedit.js); the

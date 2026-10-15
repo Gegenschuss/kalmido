@@ -6500,3 +6500,93 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .authscreen .shint.shcode{margin:.25rem 0 .75rem}
 .shint.warn.shkey{color:var(--text);background:var(--bg3);border-left:.1875rem solid var(--danger);border-radius:var(--radius);padding:.625rem .75rem;margin:0 0 .75rem}
 .shint.warn.shkey b{color:var(--danger);display:block;margin-bottom:.125rem}
+
+/* 2.46.1 E (#1622) inline title edit: the field is a block on the circle's line (no inline baseline / strut offset), the frame
+   ends before the columns, row-mode rows centre it instead of baseline-aligning to the meta */
+.trow.iedit .ttl{display:block;line-height:1.45;min-height:calc(var(--row-fs) * 1.45)}
+.trow.iedit .ttlin{display:block;height:calc(var(--row-fs) * 1.45);line-height:inherit;margin:0;vertical-align:top}
+@media (min-width:600px){
+  .trow.hascols.iedit:not(.haslc) .tmain{align-items:center}
+  .trow.hascols.iedit .ttl{flex:1 1 auto;min-width:0}
+  .trow.hascols.iedit .meta{flex:0 1 auto}
+}
+@media (min-width:900px){
+  .trow.hascols.iedit .ttl{flex:1 1 0;min-width:0}
+  .trow.hascols.iedit .meta{flex:0 1 auto}
+}
+
+/* 2.46.1 E (#1637) Office: three tab levels, calmer and flush left -- area tabs as pills, the module's tabs underlined,
+   the document kinds as small segment switches; search field and filter share one height; no heading above the tabs */
+.mgtabs{background:none;border:0;padding:0;gap:.25rem}
+.mgtabs button{flex:none;border-radius:9rem;padding:.25rem .875rem}
+.seg.ofctabs{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;width:100%;background:none;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0;gap:.25rem;margin-bottom:.75rem}
+.seg.ofctabs::-webkit-scrollbar{display:none}
+.seg.ofctabs button{flex:none;white-space:nowrap;border-radius:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:.375rem .75rem}
+.seg.ofctabs button.on{background:none;border-bottom-color:var(--accent);color:var(--text)}
+.ofdkinds{font-size:var(--fs-s);margin-bottom:.5rem}
+.ofdkinds button{padding:.1875rem .5rem;min-height:1.75rem}
+.ofdbar .ctsearch,.ofdbar select,.ofdbar .btn{min-height:2.25rem;box-sizing:border-box}
+.office .ofchead{margin-bottom:.375rem}.office .ofchead:empty{display:none}
+
+/* 2.46.1 E (#1558) phones: sheets and dialogs fold up from the bottom (220 ms) and fold away (180 ms) while the dimming layer
+   fades; only transform-like `translate` and opacity. sheetmotion.js keeps the leaving node (class an-out) for the exit.
+   "Reduce motion" is the central rule above (durations ~0); sheetmotion.js then does not wait at all. */
+@keyframes an_up{from{translate:0 100%}to{translate:0 0}}
+@keyframes an_down{from{translate:0 0}to{translate:0 100%}}
+@keyframes an_fadein{from{opacity:0}to{opacity:1}}
+@keyframes an_fadeout{from{opacity:1}to{opacity:0}}
+@media (max-width:899px){
+  #pop.sheet:not(.hidden),.dpop.sheet,.modal:not(.smodal):not(.authscreen):not(.shopmode):not(.palette)>.card{animation:an_up .22s cubic-bezier(.2,.8,.2,1)}
+  .modal:not(.smodal):not(.authscreen):not(.shopmode):not(.palette){animation:an_fadein .2s ease-out}
+  #pop.sheet.an-out,.dpop.sheet.an-out,.modal.an-out:not(.smodal):not(.authscreen):not(.shopmode):not(.palette)>.card{animation:an_down .18s ease-in forwards}
+  .modal.an-out:not(.smodal):not(.authscreen):not(.shopmode):not(.palette){animation:an_fadeout .18s ease-in forwards}
+  #pop.hidden.an-out{display:block!important}
+  #scrim:not(.hidden){animation:an_fadein .2s ease-out}
+  #scrim.hidden.an-out{display:block!important;animation:an_fadeout .18s ease-in forwards}
+  .an-out{pointer-events:none}
+}
+@media (max-width:899px),(min-width:900px) and (pointer:coarse){
+  .qadd.sheet{animation:an_up .22s cubic-bezier(.2,.8,.2,1)}
+  .qadd.sheet.an-out{animation:an_down .18s ease-in forwards;pointer-events:none}
+}
+
+/* 2.46.1 E (#1559) phones: nothing jumps on and off. Rows that leave fade out and slide a little (class an-rowout, set by
+   sheetmotion.js, the redraw waits ~180 ms), new / opened rows fade in (an-rowin); the dimming layer, the + button and the
+   selection bar fade / slide in and out (an-out keeps a switched-off layer for its exit); hint texts fade in. opacity + transform only. */
+@keyframes an_rowin{from{opacity:0;transform:translateY(-.375rem)}to{opacity:1;transform:none}}
+@keyframes an_pop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+@keyframes an_popout{from{opacity:1;transform:none}to{opacity:0;transform:scale(.8)}}
+@keyframes an_hint{from{opacity:0}to{opacity:1}}
+.trow.an-rowout{opacity:0;transform:translateX(.75rem);transition:opacity .18s ease-in,transform .18s ease-in;pointer-events:none}
+.trow.an-rowin{animation:an_rowin .2s ease-out}
+@media (max-width:899px){
+  #fab:not(.gone){animation:an_pop .2s ease-out}
+  #fab.gone.an-out{display:grid!important;animation:an_popout .18s ease-in forwards;pointer-events:none}
+  #mbar:not(.hidden){animation:an_up .22s cubic-bezier(.2,.8,.2,1)}
+  #mbar.hidden.an-out{display:flex!important;animation:an_down .18s ease-in forwards;pointer-events:none}
+}
+.calerr:not([hidden]),.fsprev:not([hidden]),.ferr:not(:empty){animation:an_hint .2s ease-out}
+
+/* 2.46.1 E (#1560) phones: view changes are not a hard swap. A new route fades the view in (an-v1 / an-v2 alternate so the
+   animation restarts), the calendar glides its page in from the side it comes from (an-cn / an-cp, Today and the mode switch
+   fade: an-cs), the tab bar's underline slides in, an empty-state hint fades in, the full-screen search drops in. opacity + transform only. */
+@keyframes an_view1{from{opacity:0}to{opacity:1}}  /* opacity only: a transform on #view would re-anchor the fixed dock inside it */
+@keyframes an_view2{from{opacity:0}to{opacity:1}}
+@keyframes an_next1{from{opacity:0;transform:translateX(1.5rem)}to{opacity:1;transform:none}}
+@keyframes an_next2{from{opacity:0;transform:translateX(1.5rem)}to{opacity:1;transform:none}}
+@keyframes an_prev1{from{opacity:0;transform:translateX(-1.5rem)}to{opacity:1;transform:none}}
+@keyframes an_prev2{from{opacity:0;transform:translateX(-1.5rem)}to{opacity:1;transform:none}}
+@keyframes an_fade1{from{opacity:0}to{opacity:1}}
+@keyframes an_fade2{from{opacity:0}to{opacity:1}}
+@keyframes an_line{from{opacity:0;transform:scaleX(.2)}to{opacity:1;transform:none}}
+@keyframes an_drop{from{opacity:0;transform:translateY(-.5rem)}to{opacity:1;transform:none}}
+.an-v1{animation:an_view1 .18s ease-out}.an-v2{animation:an_view2 .18s ease-out}
+#view.an-cn1>.calbar~*{animation:an_next1 .2s ease-out}#view.an-cn2>.calbar~*{animation:an_next2 .2s ease-out}
+#view.an-cp1>.calbar~*{animation:an_prev1 .2s ease-out}#view.an-cp2>.calbar~*{animation:an_prev2 .2s ease-out}
+#view.an-cs1>.calbar~*{animation:an_fade1 .18s ease-out}#view.an-cs2>.calbar~*{animation:an_fade2 .18s ease-out}
+#tabs button.an-tabin::before{animation:an_line .2s ease-out}
+.an-hintin{animation:an_hint .25s ease-out}
+@media (max-width:899px){
+  .modal.palette{animation:an_fadein .18s ease-out}
+  .modal.palette>.card{animation:an_drop .2s ease-out}
+}

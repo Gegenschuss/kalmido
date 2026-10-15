@@ -145,6 +145,7 @@ function renderTabs() {
   document.body.classList.toggle('tab-search', shown.some(t => t.id === 'search'));
   $('#tabs').innerHTML = shown.map(t => tabBtn(t, t.id === on)).join('') +
     (more.length ? `<button class="${moreOn ? 'on' : ''}" data-act="tabs-more"><span class="tico">${ic('dots', 'l')}</span><span>${tr('More')}</span></button>` : '');
+  an_tabs();  // 2.46.1 (#1560): the underline of the tab that became active slides in
 }
 const sideOpenDrawer = () => { S.sideToLists = true; $('#top [data-act="side"]')?.click(); };  // 2.24.0 (UX-36): "Lists" in "More"
 // 2.31.0 (#1057, audit N5): the drawer opened by the tab "Lists" starts at the group Lists (Plan and Views stay above it)
@@ -736,7 +737,8 @@ function keepFocus(root, fn) {
   if (n && n.offsetParent !== null && !n.disabled) n.focus({preventScroll: true});
   return r;
 }
-function renderView() { return td_rcRun(() => { const r = keepFocus($('#view'), renderView0); rowRove(); rowMoreWatch(); td_lcSweep(); return r; }); }
+function renderView() { return td_rcRun(() => { const r = an_view(() => keepFocus($('#view'), renderView0));  // 2.46.1 (#1560): a view change / a new empty hint fades in
+    rowRove(); rowMoreWatch(); td_lcSweep(); return r; }); }
 function renderView0() {
   const m = S.route.mod, el = $('#view');
   // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
