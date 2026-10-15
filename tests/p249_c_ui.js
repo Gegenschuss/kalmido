@@ -66,6 +66,9 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   const lk = await until(() => d.querySelector('#wk-md a.wklink'));
   check(lk && lk.getAttribute('href') === '#wiki/' + OTHER, '[[link]] becomes a link to the page');
   check(d.querySelectorAll('#wk-md .mmblock svg [data-mmn]').length === 3, 'the ```mindmap block is drawn (3 branches)');
+  const rh = w.eval(`wk_render({space: '${SP}', body: 'A \\x60[[Docs/Other]]\\x60 and [x](https://example.com/[[Docs/Other]]) and [[Docs/Other|<b>bold</b>]]'})`);
+  const rd = d.createElement('div'); rd.innerHTML = rh;
+  check(!rd.querySelector('code a') && rd.querySelector('code')?.textContent === '[[Docs/Other]]' && !rd.querySelector('b') && [...rd.querySelectorAll('a')].every(x => !x.querySelector('a') && !/wiki/.test(x.getAttribute('href')) === !x.classList.contains('wklink')), '[[links]] only in text (not in code, not inside a link), labels stay text: ' + rh);
   w.location.hash = 'wiki/' + OTHER;
   const bl = await until(() => d.querySelector('#view .wkback a'));
   check(bl && bl.getAttribute('href') === '#wiki/' + START, 'Docs/Other lists the backlink from Docs/Start');

@@ -115,7 +115,11 @@ function wk_render(p) {
   const mms = [];
   const src = wk_bodyStrip(p.body).replace(/^```mindmap[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm, (_, t) => { mms.push(t); return `\nMM${mms.length - 1}\n`; });
   let h = mdTaskRefs(renderMd(src, true));
-  h = h.replace(/\[\[([^\[\]|#\n<>]{1,250})(#[^\[\]|\n<>]*)?(?:\|([^\[\]\n<>]*))?\]\]/g, (m, path, _a, label) => {
+  // [[links]] only in text: every tag is passed whole (no match inside an attribute), nothing inside code / pre / links
+  let skip = 0;
+  h = h.replace(/<(\/?)([a-zA-Z][\w-]*)[^>]*>|\[\[([^\[\]|#\n<>]{1,250})(#[^\[\]|\n<>]*)?(?:\|([^\[\]\n<>]*))?\]\]/g, (m, cl, tag, path, _a, label) => {
+    if (tag) { if (/^(code|pre|a)$/i.test(tag)) skip = Math.max(0, skip + (cl ? -1 : 1)); return m; }
+    if (skip > 0) return m;
     const t = path.trim(), pg = wk_byPath(p.space, wk_unesc(t)), lb = label ? label : t;  // t is HTML already
     return pg ? `<a href="#wiki/${pg.id}" class="wklink">${lb}</a>` : `<a href="#wiki" class="wklink wkmissing" data-wk="create" data-path="${t}" title="${esc(tr('Create this page'))}">${lb}</a>`;
   });
