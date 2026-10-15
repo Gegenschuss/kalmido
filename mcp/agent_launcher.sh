@@ -135,7 +135,7 @@ print(int(datetime.datetime(y, m, d, hh, mm, tzinfo=ZoneInfo(sys.argv[3])).times
 # 2.44.0 (#1517): which computer this is (PUT /api/v1/agent/status {status: idle, host}); a missing agent command is
 # reported as the agent's error. Older servers refuse the field (400): nothing happens.
 report_host() {
-  local h=${KALMIDO_HOST:-$(hostname 2>/dev/null)} st=idle txt=""
+  local h=${KALMIDO_HOST:-$(hostname 2>/dev/null || uname -n)} st=idle txt=""
   h=${h%%.*}
   if ! command -v "$AGENT0" >/dev/null 2>&1; then st=error; txt="agent command not found on ${h:-this computer}: $AGENT0"; log "$txt"; fi
   printf 'header = "Authorization: Bearer %s"\n' "$KALMIDO_TOKEN" |
