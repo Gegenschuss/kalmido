@@ -6814,3 +6814,9 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 /* 2.46.7 (#1708): touch targets of the Lists summary and the workspace button (device test) */
 .aglists>summary{min-height:2.75rem}
 @media (pointer:coarse){.agnm .avws{min-height:2.75rem}}
+/* 2.47.3 E (#1727): marked lists in the sidebar (Shift / Cmd-click, long-press "Select") and the bar of their view */
+#side .srow[data-mark]{background:var(--accent-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent);color:var(--text)}
+.dxbar{display:inline-flex;gap:.4rem;align-items:center}
+@media (pointer:coarse){.dxbar .btn{min-height:2.75rem}}
+/* 2.47.3 E (#1460): the DATEV export settings block */
+.dxset .lacts .numin{max-width:7rem}

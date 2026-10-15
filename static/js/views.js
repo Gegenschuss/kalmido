@@ -53,6 +53,10 @@ function viewTasks() {
     const ids = new Set(folderLists(k.slice(7)).map(l => l.id));
     return {...pick(t => ids.has(t.list_id), 'list', {folder: k.slice(7)}), done: doneRecent.filter(t => ids.has(t.list_id))};
   }
+  if (k.startsWith('lists:')) {  // 2.47.3 (#1727): the marked lists, grouped by list like a folder
+    const ids = new Set(dx_listIds(k));
+    return {...pick(t => ids.has(t.list_id), 'list'), done: doneRecent.filter(t => ids.has(t.list_id))};
+  }
   if (k.startsWith('f:')) {
     const f = S.filters.find(x => x.id === +k.slice(2));
     return f ? {...pick(t => filterMatch(t, f.rules), 'date'), done: doneRecent.filter(t => filterMatch(t, f.rules))} : {open: [], done: [], group: 'none'};
@@ -277,6 +281,7 @@ function titleFor(k) {
   if (k.startsWith('grp:')) return tr('Group {0}', grpName(+k.slice(4)));
   if (k.startsWith('f:')) return (S.filters.find(f => f.id === +k.slice(2)) || {}).name || tr('Filters');
   if (k.startsWith('folder:')) return fDisp(k.slice(7));
+  if (k.startsWith('lists:')) return trn('{0} list', '{0} lists', dx_listIds(k).length);  // 2.47.3 (#1727)
   if (k === 'cal') return tr('Calendar');
   return '';
 }
@@ -294,7 +299,8 @@ function quickDefaults() {
     if (l) d.list_id = l.id; else d.noList = true;
   }
   if (k.startsWith('tag:')) d.tags = [k.slice(4)];
-  if (k.startsWith('folder:')) { const fl = folderLists(k.slice(7)).filter(l => canEditList(l.id)); if (fl.length) d.list_id = fl[0].id; }  // the folder's first list (~list picks another)
+  if (k.startsWith('folder:')) { const fl = folderLists(k.slice(7)).filter(l => canEditList(l.id)); if (fl.length) d.list_id = fl[0].id; }
+  if (k.startsWith('lists:')) { const fl = dx_listIds(k).filter(id => canEditList(id)); if (fl.length) d.list_id = fl[0]; }  // 2.47.3 (#1727)  // the folder's first list (~list picks another)
   if (S.route.mod === 'cal') d.due = S.calSel;
   if (k.startsWith('f:')) {  // new task in a filter view should show up in it
     const r = (S.filters.find(f => f.id === +k.slice(2)) || {}).rules || {};
