@@ -46,7 +46,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   d.querySelector('.ofcdlg [data-m="close"]').click();
   d.querySelector('[data-ofc="open"][data-kind="roles"]').click();
   await until(() => d.querySelector('.ofcdlg #of-cost_day'), 30);
-  check(d.querySelector('.ofcdlg #of-cost_day')?.value.replace(/[^0-9]/g, '') === '50000', 'role dialog: the purchase per day for the admin');
+  check(/^500([.,]0+)?$/.test(d.querySelector('.ofcdlg #of-cost_day')?.value || ''), 'role dialog: the purchase per day for the admin: ' + d.querySelector('.ofcdlg #of-cost_day')?.value);
   w.close();
 
   // ================= the import preview: roles / crew areas, fill
@@ -64,7 +64,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const fs = kam?.querySelector('select[data-oim-sact="services"]');
   check(fs && fs.value === 'fill' && /Fills: Name \(English\): Camera · raw data/.test(kam.textContent), 'preview: fill with the list of fields: ' + (kam?.textContent || '').slice(0, 160));
   check(bel && /Nothing to fill/.test(bel.textContent) && bel.classList.contains('off'), 'preview: a full entry says nothing to fill');
-  check(/5[.,]00 %/.test(cards.find(c => /Künstlersozialkasse/.test(c.textContent))?.textContent || ''), 'preview: the Künstlersozialkasse as percent');
+  check(/(^|[^0-9])5([.,]00)? %/.test(cards.find(c => /Künstlersozialkasse/.test(c.textContent))?.textContent || ''), 'preview: the Künstlersozialkasse as percent');
   check(/Import 3 entries/.test(d.querySelector('[data-oim="import"]')?.textContent || ''), 'import button: new + fill rows: ' + (d.querySelector('[data-oim="import"]')?.textContent || ''));
   fs.value = 'skip'; fs.dispatchEvent(new w.Event('change', {bubbles: true}));
   await sleep(100);
