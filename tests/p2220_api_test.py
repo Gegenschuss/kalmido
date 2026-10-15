@@ -513,7 +513,8 @@ j = A.get(B + "/api/admin/orgs").json()
 check(len(j["orgs"]) == 1 and j["orgs"][0]["name"] == "Kalmido" and j["visibility"] == "org" and 1 in j["orgs"][0]["members"] and BOB in j["orgs"][0]["members"],
       "#752: one organisation from the start (named after the domain), everyone in it, visibility org " + json.dumps(j)[:200])
 O1 = j["orgs"][0]["id"]
-check(A.get(B + "/api/auth/info").json()["org"] == "Kalmido" and A.get(B + "/api/state").json()["me"]["orgs"] == ["Kalmido"], "#752: the name on the login page and in the state")
+# 2.45.0 (#1552): the login page names an organisation only in the mode organisation (not for the only one of the server)
+check(A.get(B + "/api/auth/info").json()["org"] == "" and A.get(B + "/api/state").json()["me"]["orgs"] == ["Kalmido"], "#752/#1552: no name on the login page, the name in the state")
 # 2.23.0 (#799): organisations are no longer created in the app: a second one is set up in the database (an instance that
 # kept several from 2.22 = "multi", where members and visibility stay editable)
 check(A.post(B + "/api/admin/orgs", json={"name": "Other Co", "icon": "🏭"}).status_code == 403, "#799: no new organisation in the app")

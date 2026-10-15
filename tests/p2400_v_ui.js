@@ -59,9 +59,8 @@ const ORGNAME = 'Northwind Trading Company';
   check(await until(() => !d.querySelector('#view .lhead .lprog')), '#1190: "Hide progress" switches it off again');
 
   // ================= #1345 the organisation under the app name
-  const org = d.querySelector('#side .sbrand .sbhome .sbtxt .sborg');
-  if (HASORG) check(org && org.textContent === ON && org.previousElementSibling?.textContent === 'Kalmido', '#1345: the organisation as the second line under "Kalmido" ' + d.querySelector('#side .sbrand')?.innerHTML.slice(0, 300));
-  else console.log('#1345: no organisation in this instance mode, the org line check is skipped');
+  // 2.45.0 (#1552): no organisation line under the app name any more, only the logo and "Kalmido"
+  check(!d.querySelector('#side .sbrand .sborg') && d.querySelector('#side .sbrand .sbtxt > span')?.textContent === 'Kalmido', '#1552: no organisation under "Kalmido" ' + d.querySelector('#side .sbrand')?.innerHTML.slice(0, 300));
 
   // ================= #1361 favourites
   const star = () => d.querySelector('#top .hfav');
@@ -146,7 +145,7 @@ const ORGNAME = 'Northwind Trading Company';
     const m = await ev(`(() => { const o = document.querySelector('#side .sbrand .sborg'), n = document.querySelector('#side .sbrand .sbtxt > span');
       if (!o) return null; const a = o.getBoundingClientRect(), b = n.getBoundingClientRect();
       return {cut: o.scrollWidth > o.clientWidth + 1, below: a.top >= b.bottom - 2, w: Math.round(a.width), txt: o.textContent}; })()`);
-    if (HASORG) check(m && !m.cut && m.below, `${tag}: the organisation name stands whole below "Kalmido" ` + JSON.stringify(m));
+    check(m === null, `${tag}: #1552 no organisation name below "Kalmido" ` + JSON.stringify(m));  // 2.45.0 (#1552)
     if (ag.id) {
       await ev(`(() => { chatOpen(${ag.id}); return 1; })()`);
       for (let i = 0; i < 25 && !(await ev(`!!document.querySelector('.chath .chnm b')`).catch(() => false)); i++) await sleep(300);
