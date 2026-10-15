@@ -18,6 +18,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.45.1** (2026-10-15): **vCard import** with ß and old vCard 2.1 files (quoted-printable) arrives complete and
+  readable; **devices** get an English name, and the legacy Excel import reads *Device DE* / *Device EN*.
 - **2.45.0** (2026-10-15): a **friendlier start page** (one sentence on the day, Today with a box to add, compact news,
   active projects, slim empty cards); the **sidebar** puts the lists right below Plan, folds All / Completed / Trash /
   Archived into *More*, reaches the **messenger** directly (Messages, last conversations, a bubble at every person) and
