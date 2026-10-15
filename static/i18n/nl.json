@@ -6824,5 +6824,11 @@
   "A kid account cannot be an admin of an organisation": "Een kinderaccount kan geen beheerder van een organisatie zijn",
   "Unknown organisation": "Onbekende organisatie",
   "Hide this note": "Deze melding verbergen",
-  "First line taken as the contact person: please check": "Eerste regel als contactpersoon overgenomen: controleer dit"
+  "First line taken as the contact person: please check": "Eerste regel als contactpersoon overgenomen: controleer dit",
+  "Belongs to: {0} (organisation)": "Hoort bij: {0} (organisatie)",
+  "Belongs to: {0}": "Hoort bij: {0}",
+  "Change workspace": "Werkruimte wijzigen",
+  "Only members of the organisation can be invited. An agent of the organisation sees it only if it is shared with that agent.": "Alleen leden van de organisatie kunnen worden uitgenodigd. Een agent van de organisatie ziet het alleen als het met hem is gedeeld.",
+  "Only people you explicitly invite see it.": "Alleen uitdrukkelijk uitgenodigde personen zien het.",
+  "Not in the organisation": "Niet in de organisatie"
 }

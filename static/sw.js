@@ -10,7 +10,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/fonts/AtkinsonHyperlegible-Regular.woff2', '/static/fonts/AtkinsonHyperlegible-Bold.woff2',
   // 2.20.0 (#646): the web client in modules, the same list and order as the script tags in index.html
   // (tools/check_layout.py compares them)
-  '/static/js/reloadguard.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/workspace.js', '/static/js/quickadd.js', '/static/js/views.js', '/static/js/render.js', '/static/js/calendar.js',
+  '/static/js/reloadguard.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/workspace.js', '/static/js/sharews.js', '/static/js/quickadd.js', '/static/js/views.js', '/static/js/render.js', '/static/js/calendar.js',
   '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/habits.js', '/static/js/detail.js', '/static/js/collab.js', '/static/js/attachments.js', '/static/js/mdtitle.js',
   '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js', '/static/js/dlgmove.js', '/static/js/settings.js', '/static/js/integrations.js', '/static/js/account.js',
   '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/projtime.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/sharedlg.js', '/static/js/dnd.js', '/static/js/secdrag.js', '/static/js/dragmulti.js',

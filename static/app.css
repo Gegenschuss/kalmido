@@ -6694,3 +6694,11 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .oimfl.chkl input[type=checkbox]{width:auto;min-height:0;flex:none}
 @media (max-width:420px){ .oimgrid{grid-template-columns:minmax(0,1fr)} .oimfl.w2{grid-column:auto} }
 .ghead.drop{background:color-mix(in srgb,var(--accent) 14%,transparent);box-shadow:inset 0 0 0 2px var(--accent);border-radius:var(--radius)}
+/* 2.46.X C (#1737) the workspace line of the Share dialogs */
+.shws:empty{display:none}
+.shwsl{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .75rem;margin:0 0 .25rem;font-size:.875rem}
+.shwsn{font-weight:600}
+.shwsh{margin-top:0}
+/* 2.46.X C (#1755) the message with a button is one line: the text is cut with an ellipsis, the button stays whole */
+#toast.one>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#toast.one button,#toast.one kbd{flex:none}

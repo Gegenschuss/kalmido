@@ -419,12 +419,20 @@ async function ctBooksModal() {
   });
 }
 function ctShareModal(b, users, names, done) {
-  const md = modal(`<h3>${tr('Share {0}', esc(b.name))}</h3><div id="cbs-list"></div>
-    <div class="row"><label for="cbs-user">${tr('Person')}</label><select id="cbs-user" data-sheet-av>${users.filter(u => !(b.members || []).some(m => m.user_id === u.id)).map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select>
+  const bOrg = () => b.imported || b.src_id ? null : b.org_id || null;  // 2.46.X (#1737): a book mirrored from a connected account is always private
+  const md = modal(`<h3>${tr('Share {0}', esc(b.name))}</h3><div class="shws"></div><div id="cbs-list"></div>
+    <div class="row"><label for="cbs-user">${tr('Person')}</label><select id="cbs-user" data-sheet-av>${shWsOptions(users, bOrg(), b.members)}</select>
       <select id="cbs-role" aria-label="${esc(tr('Role'))}"><option value="view">${tr('can view')}</option><option value="edit">${tr('can edit')}</option></select><button class="btn sm pri" data-cbs="add">${tr('Share')}</button></div>
     <div class="shint">${tr('Contacts are personal data: share an address book only with people who may see all of it.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-cbs="close">${tr('Done')}</button></div>`);
   const draw = () => { $('#cbs-list', md).innerHTML = (b.members || []).length ? `<ul class="evclist">${b.members.map(m => `<li class="evcrow">${av(m.user_id, names.get(m.user_id) || '')}<span class="evcn">${esc(names.get(m.user_id) || '?')} <span class="muted">· ${esc(m.role === 'edit' ? tr('can edit') : tr('can view'))}</span></span><button class="iconbtn" data-cbsrm="${m.user_id}" aria-label="${esc(tr('Stop sharing with {0}', names.get(m.user_id) || ''))}">${ic('x', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('Not shared yet.')}</p>`; };
+  const wsDraw = () => {  // 2.46.X (#1737)
+    shWsFill($('.shws', md), bOrg(), b.imported || b.src_id ? null : a => wsMoveMenu(a, b.org_id, async org => {
+      try { await api('PATCH', `/api/books/${b.id}`, {org_id: org}); } catch { return; }
+      b.org_id = org; wsDraw(); $('#cbs-user', md).innerHTML = shWsOptions(users, bOrg(), b.members); shWsPick($('#cbs-user', md)); done();
+    }));
+  };
+  wsDraw(); shWsPick($('#cbs-user', md));
   draw();
   md.addEventListener('click', async e => {
     const rm = e.target.closest('[data-cbsrm]');
