@@ -194,7 +194,7 @@ check([p["title"] for p in rd.get("parts", [])] == ["Interactive module"], f"pri
 pg = pdf_pages(A.get(B + f"{D}/{DOC}/pdf").content)
 if pg is not None and PLAIN_PAGES is not None:
     check(len(pg) == PLAIN_PAGES + 1, f"PDF: one page more for the printed part ({len(pg)} vs {PLAIN_PAGES})")
-    check("Interactive module" in pg[-1] and "Animation" in pg[-1] and "Booklet" in pg[-1], "PDF: the part's page has its positions")
+    check("interactive module" in pg[-1].lower() and "Animation" in pg[-1] and "Booklet" in pg[-1], "PDF: the part's page has its positions (title in capitals)")
     check(not any("Alternative" in x for x in pg) and not any("Extra shoot" in x for x in pg), "PDF: parts not printed / not used are left out")
     check("Interactive module" in pg[0] and "6,000.00" in pg[0].replace("€", ""), "PDF: the title page has the part line x 5")
     check(not any("1,250.00" in x and "urchase" in x for x in pg), "PDF: no purchase")
@@ -219,6 +219,16 @@ for mode in ("full", "title", "summary"):
     if mode == "title":
         check(not any(x["title"] == "Animation" for x in it["items"]) and sum(1 for x in it["items"] if x["title"] == "Interactive module") == 2,
               "title: the part as positions with its amount (two tax rates)")
+# with a discount on the title page AND inside the part (per tax rate), producing on the title page
+A.patch(B + f"{D}/{DOC}", json={"discount_pct": 10})
+A.patch(B + f"{D}/{DOC}/parts/{P1}", json={"settings": {"discount_pct": 5}})
+off2 = A.get(B + f"{D}/{DOC}").json()["totals"]
+for mode in ("full", "title", "summary"):
+    it = A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": mode}).json()
+    check(abs(float(it["totals"]["net"]) - off2["net"]) < 0.005 and abs(float(it["totals"]["gross"]) - off2["gross"]) < 0.005,
+          f"invoice {mode} with discounts: net / gross = the quotation's ({it['totals'].get('net')} / {it['totals'].get('gross')} vs {off2['net']} / {off2['gross']})")
+A.patch(B + f"{D}/{DOC}", json={"discount_pct": 0})
+A.patch(B + f"{D}/{DOC}/parts/{P1}", json={"settings": {"discount_pct": None}})
 r = A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": "summary", "parts_title": "Production"})
 check(r.ok and {x["title"] for x in r.json()["items"]} == {"Production"}, "summary: own title")
 check(A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": "bogus"}).status_code == 400, "bad mode -> 400")

@@ -94,6 +94,18 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
   check(!errs.length, 'no script errors ' + errs.join(' | ')); errs.splice(0);
   w.close();
 
+  // ================= a sent quotation: its parts can still be opened (read only)
+  await call('POST', `/api/office/docs/${doc.id}/status`, {status: 'sent'});
+  w = await boot({user: 'alice', hash: `office/offers/${doc.id}`}); d = w.document;
+  await until(() => d.querySelector('.ofdeditor .tppl [data-ofd="tp-open"]'));
+  click(w, d.querySelector('.ofdeditor .tppl [data-ofd="tp-open"]'));
+  await until(() => d.querySelector('.tphead .tptitle'));
+  check(d.querySelector('.tphead .tptitle') && d.querySelector('.tpsec .ofdits [data-k="qty"]')?.closest('fieldset')?.disabled, 'sent quotation: a part opens read only');
+  click(w, d.querySelector('[data-ofd="tp-back"]'));
+  await until(() => d.querySelector('.tppl'));
+  check(!!d.querySelector('.tppl'), 'sent quotation: back to the title page');
+  w.close();
+
   // ================= the office settings
   w = await boot({user: 'alice', hash: 'office/settings'}); d = w.document;
   await until(() => d.querySelector('#os-parts-inv'));
