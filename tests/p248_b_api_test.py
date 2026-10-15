@@ -98,8 +98,19 @@ def text_pdf(lines):
 
 
 def scan_pdf(lines):
-    """An image-only PDF (a "scan"): black text drawn on a white page with Pillow, no text layer."""
-    from PIL import Image, ImageDraw, ImageFont
+    """An image-only PDF (a "scan"): black text drawn on a white page with Pillow, no text layer. Without Pillow on this
+    machine it is drawn inside the test container (the image has Pillow)."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        import base64
+        import json
+        code = ("import base64, io, json, sys\nfrom PIL import Image, ImageDraw, ImageFont\nf = ImageFont.load_default(size=44)\n"
+                "im = Image.new('L', (1654, 2339), 255)\nd = ImageDraw.Draw(im)\n"
+                "for i, ln in enumerate(json.loads(sys.argv[1])):\n    d.text((150, 200 + i * 90), ln, fill=0, font=f)\n"
+                "b = io.BytesIO()\nim.save(b, 'PDF', resolution=200)\nprint(base64.b64encode(b.getvalue()).decode())")
+        out = subprocess.run(["docker", "exec", CT, "python", "-c", code, json.dumps(lines)], capture_output=True, text=True, check=True)
+        return base64.b64decode(out.stdout)
     font = None
     for p in ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf",
               "/Library/Fonts/Arial.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf", "/System/Library/Fonts/Helvetica.ttc"):
