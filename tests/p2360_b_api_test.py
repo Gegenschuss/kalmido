@@ -68,10 +68,11 @@ s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True, "time_all": True, "modules": ["cal", "comments"]})
+# 2.46.0 (#1592): no organisation from the start any more: the setup creates the one these tests use (id 1), new people join it
+A.post(B + "/api/admin/setup", json={"org_name": "Kalmido", "lang": "en", "collab_all": True, "time_all": True, "modules": ["cal", "comments"]})
 A.patch(B + "/api/settings", json={"lang": "en"})
-BOB = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123", "email": "bob@example.com"}).json()["id"]
-CAROL = A.post(B + "/api/users", json={"username": "carol", "display_name": "Carol", "password": "password123", "email": "carol@example.com"}).json()["id"]
+BOB = A.post(B + "/api/users", json={"orgs": [1], "username": "bob", "display_name": "Bob", "password": "password123", "email": "bob@example.com"}).json()["id"]
+CAROL = A.post(B + "/api/users", json={"orgs": [1], "username": "carol", "display_name": "Carol", "password": "password123", "email": "carol@example.com"}).json()["id"]
 Bo, Ca = sess("bob"), sess("carol")
 for s in (Bo, Ca):
     s.patch(B + "/api/settings", json={"lang": "en"})

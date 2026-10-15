@@ -13,7 +13,7 @@ function folderShareModal(f, opt = {}) {
   const md = modal(`<div class="lhdr"><h3>${esc(tr('Share folder “{0}”', fDisp(f)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="shint lhint keep">${tr('Every list in this folder is shared now, and every list you add to it later. With them the lists land in a folder of the same name; they can move them freely.')}</div>
     <h4 id="fsh-people-h">${tr('People')}</h4><div class="members fpl" id="fsh-members" aria-labelledby="fsh-people-h"><div class="muted mhint">${tr('Loading…')}</div></div>
-    ${S.peopleVis === 'contacts' ? `<div class="row shmail"><input id="fsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="fsh-mail">${ic('send', 's')} ${tr('Add')}</button></div>` : ''}
+    ${S.peopleVis === 'contacts' || S.instanceMode === 'workspaces' ? `<div class="row shmail"><input id="fsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="fsh-mail">${ic('send', 's')} ${tr('Add')}</button></div>` : ''}
     <details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>
     ${(S.groups || []).length ? fshSec('grp', tr('Groups'), `<div class="members" id="fsh-grp"><div class="muted mhint">${tr('Loading…')}</div></div>`, opt.focus === 'grp') : ''}
     ${agentsOn() ? fshSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the lists shared with it, nothing else. Stopping the sharing ends its access at once.')} ${tr('A list has at most one agent: the lists get the first one (the default), the others can be chosen per list in its Share dialog.')}</div><div id="fsh-ag"><div class="muted mhint">${tr('Loading…')}</div></div>
@@ -44,7 +44,7 @@ function folderShareModal(f, opt = {}) {
     let gs; try { gs = (await calReq('GET', '/api/folders/groups?folder=' + encodeURIComponent(f))).groups; } catch { box.innerHTML = ''; return; }
     if (!md.isConnected) return;
     const cand = (S.groups || []).filter(g => !gs.some(x => x.group_id === g.id));
-    box.innerHTML = gs.map(x => `<div class="mrow"><span class="avatar gav">${ic('users', 's')}</span><span class="n">${esc(x.name)}</span>${roleSel(`data-fgrole="${x.group_id}"`, x.role, tr('Role of the group {0}', x.name))}<button class="iconbtn" data-fgrm="${x.group_id}" title="${esc(tr('Stop sharing with the group'))}" aria-label="${esc(tr('Stop sharing with the group {0}', x.name))}">${ic('x', 's')}</button></div>`).join('')
+    box.innerHTML = gs.map(x => `<div class="mrow">${fg_gav(x.group_id)}<span class="n">${esc(x.name)}</span>${roleSel(`data-fgrole="${x.group_id}"`, x.role, tr('Role of the group {0}', x.name))}<button class="iconbtn" data-fgrm="${x.group_id}" title="${esc(tr('Stop sharing with the group'))}" aria-label="${esc(tr('Stop sharing with the group {0}', x.name))}">${ic('x', 's')}</button></div>`).join('')
       + (cand.length ? `<div class="mrow madd"><select id="fg-add" aria-label="${esc(tr('Share with a group'))}"><option value="">${tr('Share with a group …')}</option>${cand.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select>${roleSel('id="fg-role"', 'edit')}<button class="btn sm" data-m="fg-add">${ic('plus', 's')} ${tr('Add')}</button></div>` : '')
       || `<div class="muted mhint">${tr('No groups yet')}</div>`;
     st('grp', gs.length ? trn('{0} group', '{0} groups', gs.length) : '');
@@ -90,9 +90,17 @@ function folderShareModal(f, opt = {}) {
   md.addEventListener('change', async e => {
     const t = e.target;
     const s = t.closest('[data-fprole]');
-    if (s) { const uid = +s.dataset.fprole; try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role: s.value}); have = have.map(x => x.user_id === uid ? {...x, role: s.value} : x); toast(j.updated ? trn('Role changed in {0} list', 'Role changed in {0} lists', j.updated) : tr('Saved')); } catch { drawPeople(); } return; }
+    if (s) {
+      const uid = +s.dataset.fprole, nm = have.find(x => x.user_id === uid)?.name || users?.find(x => x.id === uid)?.display_name || '?';
+      const ap = await fg_askRoles(`/api/folders/people/diff?folder=${encodeURIComponent(f)}&user_id=${uid}&role=${s.value}`, nm);  // 2.46.0 (#1606)
+      if (ap === null) { drawPeople(); return; }
+      try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role: s.value, ...(ap ? {} : {apply: false})}); have = have.map(x => x.user_id === uid ? {...x, role: s.value} : x); toast(j.updated ? trn('Role changed in {0} list', 'Role changed in {0} lists', j.updated) : tr('Saved')); } catch { drawPeople(); } return; }
     const gr = t.closest('[data-fgrole]');
-    if (gr) { try { await api('PUT', `/api/folders/groups/${gr.dataset.fgrole}`, {folder: f, role: gr.value}); await done(); drawGroups(); } catch { /* api() said it */ } return; }
+    if (gr) {
+      const ap = await fg_askRoles(`/api/folders/groups/${gr.dataset.fgrole}/diff?folder=${encodeURIComponent(f)}&role=${gr.value}`, (S.groups || []).find(x => x.id === +gr.dataset.fgrole)?.name || '?');  // 2.46.0 (#1606)
+      if (ap === null) { drawGroups(); return; }
+      try { await api('PUT', `/api/folders/groups/${gr.dataset.fgrole}`, {folder: f, role: gr.value, ...(ap ? {} : {apply: false})}); await done(); drawGroups(); } catch { /* api() said it */ } return;
+    }
     if (t.dataset.fshlisten) {
       const aid = +t.dataset.fshlisten, on = t.checked;
       try { ags = await api('PUT', '/api/folders/agents', {folder: f, agent_id: aid, listen: on}); drawAgents(); await done(); toast(on ? tr('Agent listens in') : tr('Agent only via @'), async () => { try { ags = await api('PUT', '/api/folders/agents', {folder: f, agent_id: aid, listen: !on}); drawAgents(); await done(); } catch { /* said */ } }); } catch { drawAgents(); }
@@ -103,7 +111,7 @@ function folderShareModal(f, opt = {}) {
     const b = e.target.closest('button'); if (!b) return;
     const m = b.dataset.m;
     if (m === 'close') { md.remove(); await done(); return; }
-    if (m === 'fsh-props') { if (opt.back) { md.remove(); return; } md.remove(); folderPropsModal(f); return; }
+    if (m === 'fsh-props') { if (opt.back) { md.remove(); return; } modalSub(md, () => folderPropsModal(f, {back: true})); return; }  // 2.46.0 (#1604): the settings come back here with "Back", no stack
     if (m === 'add') {
       const uid = +$('#fp-user', md).value, role = $('#fp-role', md).value; if (!uid) return;
       try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role}); await reload(); toast(trn('{0} list shared', '{0} lists shared', j.shared)); await done(); } catch { /* api() said it */ }
@@ -159,6 +167,71 @@ function folderShareModal(f, opt = {}) {
   };
   if (!own) $('#fsh-members', md)?.insertAdjacentHTML('beforebegin', `<div class="shint keep">${ic('info', 's')} ${tr('Only your own lists can be shared')}</div>`);
   return md;
+}
+// ---- 2.46.0 (#1606): a changed folder role would replace roles set per list: ask first. -> true (everywhere), false (only
+// new lists / keep the own roles), null (cancel). No such list: true at once, as before.
+async function fg_askRoles(url, who) {
+  let ls = [];
+  try { ls = (await api('GET', url)).lists || []; } catch { return true; }
+  if (!ls.length) return true;
+  const rn = r => tr((ROLES.find(x => x[0] === r) || [r, r])[1]);
+  const shown = ls.slice(0, 4).map(x => `${x.name}: ${rn(x.role)}`).join(', ') + (ls.length > 4 ? ', …' : '');
+  return new Promise(res => {
+    let done = false;
+    const md = modal(`<h3 id="fg-rq-t">${esc(tr('Replace the roles set per list?'))}</h3><div class="cdlg-b" id="fg-rq-b">${esc(trn('In {0} list {1} has a role of its own ({2}).', 'In {0} lists {1} has a role of its own ({2}).', ls.length, who, shown))}</div>
+      <div class="foot fgrqf"><button type="button" class="btn" data-fgrq="x">${esc(tr('Cancel'))}</button><span class="spacer"></span><button type="button" class="btn" data-fgrq="new">${esc(tr('Only new lists'))}</button><button type="button" class="btn pri" data-fgrq="all">${esc(tr('Set everywhere'))}</button></div>`);
+    md.classList.add('fgrqdlg');
+    md.setAttribute('role', 'alertdialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'fg-rq-t'); md.setAttribute('aria-describedby', 'fg-rq-b');
+    const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); };
+    md.addEventListener('click', e => { const b = e.target.closest('[data-fgrq]'); if (b) fin(b.dataset.fgrq === 'all' ? true : b.dataset.fgrq === 'new' ? false : null); });
+    onRemove(md, () => fin(null));
+    setTimeout(() => $('[data-fgrq="all"]', md)?.focus(), 30);
+  });
+}
+// ---- 2.46.0 (#1605): a group's picture (S.groups[].avatar: a preset SVG, an own photo, '' = the group symbol). fg_gav = the
+// round picture of a group wherever groups stand (share dialogs, group admin, a task assigned to a group).
+const fg_gUrl = gid => (S.groups || []).find(x => x.id === +gid)?.avatar || '';
+const fg_gav = (gid, cls = 'avatar gav') => { const u = fg_gUrl(gid); return `<span class="${cls}${u ? ' pic' : ''}">${u ? `<img src="${esc(u)}" alt="" loading="lazy" decoding="async" draggable="false">` : ic('users', 's')}</span>`; };
+const fg_gico = gid => { const u = fg_gUrl(gid); return u ? `<img class="fggimg" src="${esc(u)}" alt="" loading="lazy" decoding="async" draggable="false">` : ic('users', 's'); };
+// the picker of the group dialog: presets, an own photo, none; the choice is saved with the group (Save / Create)
+function fg_pickHtml(cur) {
+  const up = cur.startsWith('/api/group-avatar/');
+  return AV_PRESETS.map(([k, n]) => `<button type="button" class="avopt ${cur === `/static/avatars/${k}.svg` ? 'on' : ''}" data-fgav="${k}" title="${esc(tr(n))}" aria-label="${esc(tr(n))}" aria-pressed="${cur === `/static/avatars/${k}.svg`}"><img src="/static/avatars/${k}.svg" alt=""></button>`).join('')
+    + `<button type="button" class="avopt up ${up ? 'on' : ''}" data-fgav="upload" title="${esc(tr('Upload a photo…'))}" aria-label="${esc(tr('Upload a photo…'))}" aria-pressed="${up}">${up ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>`
+    + `<button type="button" class="avopt none ${cur ? '' : 'on'}" data-fgav="none" title="${esc(tr('No picture (group symbol)'))}" aria-label="${esc(tr('No picture (group symbol)'))}" aria-pressed="${!cur}">${ic('users', 's')}</button>`;
+}
+const fg_pickRow = g => `<div class="row avrow"><label>${tr('Picture')}</label><div class="avpick" id="gr-avpick">${fg_pickHtml(g?.avatar || '')}</div></div>`;
+function fg_pickWire(md, g) {  // -> () => the pending choice: null (unchanged) | {preset} | {none: true} | {blob, url}
+  let pend = null;
+  const box = $('#gr-avpick', md); if (!box) return () => null;
+  const show = cur => { box.innerHTML = fg_pickHtml(cur); };
+  box.addEventListener('click', e => {
+    const b = e.target.closest('[data-fgav]'); if (!b) return;
+    const k = b.dataset.fgav;
+    if (k === 'none') { pend = {none: true}; show(''); return; }
+    if (k !== 'upload') { pend = {preset: k}; show(`/static/avatars/${k}.svg`); return; }
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
+    inp.addEventListener('change', async () => {
+      const f = inp.files?.[0]; if (!f) return;
+      if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); return; }
+      const bl = await avCropModal(f); if (!bl || !md.isConnected) return;
+      if (pend?.url) URL.revokeObjectURL(pend.url);
+      pend = {blob: bl, url: URL.createObjectURL(bl)};
+      box.innerHTML = fg_pickHtml('/api/group-avatar/new');
+      const im = $('[data-fgav="upload"] img', box); if (im) im.src = pend.url;
+    });
+    inp.click();
+  });
+  onRemove(md, () => { if (pend?.url) URL.revokeObjectURL(pend.url); });
+  return () => pend;
+}
+async function fg_pickSave(gid, pend) {  // after Save / Create; a failed picture keeps the group (api() says why)
+  if (!pend || !gid) return;
+  try {
+    if (pend.none) await api('DELETE', `/api/admin/groups/${gid}/avatar`);
+    else if (pend.preset) await api('PUT', `/api/admin/groups/${gid}/avatar`, {preset: pend.preset});
+    else if (pend.blob) { const fd = new FormData(); fd.append('file', pend.blob, 'avatar.jpg'); await api('POST', `/api/admin/groups/${gid}/avatar`, fd); }
+  } catch { /* api() said it */ }
 }
 // the old entry points stay (notification question, older links): they open the one dialog
 function folderPeopleModal(f, opt = {}) { return folderShareModal(f, opt); }

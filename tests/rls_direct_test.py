@@ -81,10 +81,12 @@ s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
+# 2.46.0 (#1592): no organisation from the start any more: the admin creates the one these tests use (id 1), new people join it
 A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True, "time_all": True})
+A.post(B + "/api/admin/orgs", json={"name": "Kalmido"})
 ids = {}
 for u in ("bob", "carol"):
-    r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123", "email": f"{u}@example.com"})
+    r = A.post(B + "/api/users", json={"orgs": [1], "username": u, "display_name": u.title(), "password": "password123", "email": f"{u}@example.com"})
     assert r.ok, r.text
     ids[u] = r.json()["id"]
 BOB, CAROL = ids["bob"], ids["carol"]
@@ -188,7 +190,9 @@ check(count("orgs", "true", role="user", orgs=str(BETA), uid=CAROL) == 1, "orgs:
 check(count("orgs", "true") == 0 and count("orgs", "true", role="system") >= 2, "orgs: none without a context, all as system")
 check(count("org_members", f"org_id={ALPHA}", role="user", orgs=str(BETA), uid=CAROL) == 0, "org_members: no rows of a foreign organisation")
 check(count("org_members", f"user_id={CAROL}", role="user", orgs="", uid=CAROL) == 1, "org_members: the own rows (also without the organisation)")
-check(count("org_members", f"org_id={ALPHA}", role="user", orgs=str(ALPHA), uid=BOB) == 2, "org_members: every row of the own organisation")
+# 2.46.0 (#1592): + the agents placed in Alpha (an organisation's agent is its member)
+check(count("org_members", f"org_id={ALPHA}", role="user", orgs=str(ALPHA), uid=BOB) == sql("SELECT COUNT(*) FROM org_members WHERE org_id=?", (ALPHA,))[0][0] >= 2,
+      "org_members: every row of the own organisation")
 check(count("lists", f"org_id IS NULL AND owner_id={CAROL}", role="user", orgs=str(BETA), uid=CAROL) >= 1, "lists: private rows (org_id NULL) stay visible")
 
 # ---- writing

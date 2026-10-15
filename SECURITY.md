@@ -16,7 +16,7 @@ Helpful to include:
 
 ## What to expect
 
-Kalmido is a hobby project maintained by one person, not a company with a security team. Realistically:
+Kalmido is a young project without a dedicated security team. Realistically:
 
 - an answer within about a week (usually sooner)
 - a fix for serious issues as fast as possible, released as a new patch version with a note in

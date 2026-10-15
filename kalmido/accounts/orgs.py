@@ -40,10 +40,15 @@ ORG_NAME_MAX = 60
 #                                       admin (the operator); each has its own admins (org_members.role = admin) who manage
 #                                       its members, name and e-mail domains. Private sharing stays invisible to the
 #                                       organisation. The login page names no organisation.
-#   not set                             organisation while the instance has at most one organisation (every instance up to
-#                                       2.22, the work Pi included); an instance that made several in 2.22 keeps them
-#                                       ("multi": members and visibility stay editable, but nobody creates or deletes any)
-# The admin API creates or deletes organisations only in the mode "workspaces" (else 403).
+#   not set                             workspaces
+# 2.46.0 (#1592): the modes "organisation" and "multi" are gone: every instance is "workspaces" (organisations + everyone's
+# private space) unless KALMIDO_INSTANCE_MODE=shared is set. Whom a person sees: the members of their organisations + their
+# connections (a person outside every organisation: only their connections; sharing by e-mail address / user name reaches
+# others without telling whether the account exists). An instance without any organisation (a household): everyone sees
+# everyone, as before. KALMIDO_INSTANCE_MODE=organisation is ignored (a hint at
+# start-up); nobody is put into an organisation automatically any more, memberships and roles stay as they are.
+# KALMIDO_ORG_NAME only names the organisation the first-run setup creates. The admin API creates or deletes organisations
+# in the mode "workspaces" (403 in shared).
 #
 # WORKSPACES (2.28.0, #935), in every mode with organisations (organisation, multi, workspaces): every list belongs to a
 # workspace -- its owner's private space (lists.org_id NULL) or one of the owner's organisations (lists.org_id). An
@@ -52,7 +57,7 @@ ORG_NAME_MAX = 60
 # in; NULL = private). "Used for" (family / household) and Home & life lists are private only. The owner changes a list's
 # workspace in the list dialog (refused while people or agents in it do not fit the new one). The app shows one workspace
 # at a time (the sidebar's switch, setting "workspace"): the lists, tasks, News, agents and team chats of that workspace.
-INSTANCE_MODES = ("organisation", "shared", "workspaces")
+INSTANCE_MODES = ("shared", "workspaces")  # 2.46.0 (#1592): "organisation" is ignored
 INSTANCE_ENV = os.environ.get("KALMIDO_INSTANCE_MODE", "").strip().lower()
 ORG_NAME_ENV = re.sub(r"\s+", " ", os.environ.get("KALMIDO_ORG_NAME", "")).strip()[:ORG_NAME_MAX]
 ORG_ROLES = ("member", "admin")
@@ -67,11 +72,9 @@ WS_MSG_AGENT_OBJ = N_("{0} works in another workspace ({1}): an agent joins only
 WS_MSG_PRIVATE_ONLY = N_("Family, household and Home & life lists are private: they cannot belong to an organisation")
 
 
-def instance_mode(c):
-    if INSTANCE_ENV in INSTANCE_MODES:
-        return INSTANCE_ENV
-    with system_ctx(c):  # 2.37.0 (#1150): instance structure (a count), the same for everybody under row-level security
-        return "multi" if c.execute("SELECT COUNT(*) FROM orgs").fetchone()[0] > 1 else "organisation"
+def instance_mode(c=None):
+    """2.46.0 (#1592): shared when set so explicitly, else workspaces (no automatic mode by the number of organisations)."""
+    return "shared" if INSTANCE_ENV == "shared" else "workspaces"
 
 
 def main_org(c):
@@ -89,43 +92,52 @@ def has_workspaces(c):
 
 
 def instance_sync(c):
-    """At every start (init_db): the organisation mode has its one organisation (named by KALMIDO_ORG_NAME when set) with
-    every account in it; nothing to do for shared / multi / workspaces. The caller commits."""
-    if instance_mode(c) != "organisation":
+    """At every start (init_db). 2.46.0 (#1592): puts nobody into an organisation and changes no roles or names any more;
+    only says that a former mode setting is ignored. Once, on the first start of 2.46: a server that was in the former
+    automatic mode "organisation" (one organisation, no mode set) gets the last sync it did at every start (every account
+    a member, the instance's admins its admins), so everybody keeps exactly what they saw; nothing after that."""
+    if INSTANCE_ENV and INSTANCE_ENV not in ("shared", "workspaces"):
+        print(f"KALMIDO_INSTANCE_MODE={INSTANCE_ENV} is deprecated and ignored: organisations + private spaces (workspaces)", flush=True)
+    if gsetting(c, "migr_om2460") == "1":
         return
-    oid = main_org(c)
-    if oid is None:
-        from ..core.config import PUBLIC_URL
-        host = PUBLIC_URL.split("://", 1)[-1].split("/")[0].split(":")[0]
-        parts = [p for p in host.split(".") if p and not p.isdigit()]
-        name = ORG_NAME_ENV or (parts[-2] if len(parts) >= 2 else (parts[0] if parts else "Kalmido")).capitalize()
-        oid = insert_id(c, "INSERT INTO orgs(name,icon,created_at) VALUES(?,?,?)", (name, "", iso(now_utc())))
-    elif ORG_NAME_ENV:
-        c.execute("UPDATE orgs SET name=? WHERE id=? AND name!=?", (ORG_NAME_ENV, oid, ORG_NAME_ENV))
-    c.execute("INSERT INTO org_members(org_id,user_id) SELECT ?, id FROM users ON CONFLICT DO NOTHING", (oid,))
-    # 2.28.0 (#935): the instance's admins administer its one organisation
-    c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id IN (SELECT id FROM users WHERE is_admin=1 AND kind!='agent')", (oid,))
+    gset(c, "migr_om2460", "1")
+    if INSTANCE_ENV not in ("", "organisation"):
+        return
+    with system_ctx(c):  # instance structure
+        oids = [r[0] for r in c.execute("SELECT id FROM orgs ORDER BY id LIMIT 2")]
+        if len(oids) != 1:
+            return
+        n = c.execute("INSERT INTO org_members(org_id,user_id) SELECT ?, id FROM users ON CONFLICT DO NOTHING", (oids[0],)).rowcount
+        n += c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND role!='admin' AND user_id IN (SELECT id FROM users WHERE is_admin=1 AND kind!='agent')", (oids[0],)).rowcount
+    print(f"organisations (#1592): the former mode organisation synced once ({n} rows)", flush=True)
+
+
+def om_setup_org(c, uid, name):
+    """2.46.0 (#1592): the first-run setup creates the instance's first organisation (name given, else KALMIDO_ORG_NAME)
+    with the setting-up admin as its admin; nothing when there is one already, no name or the mode shared. The caller
+    commits. Returns the new id or None."""
+    nm = re.sub(r"\s+", " ", str(name or "")).strip()[:ORG_NAME_MAX] or ORG_NAME_ENV
+    if not nm or instance_mode(c) == "shared":
+        return None
+    with system_ctx(c):  # instance structure: is there an organisation at all
+        if c.execute("SELECT 1 FROM orgs LIMIT 1").fetchone():
+            return None
+        oid = insert_id(c, "INSERT INTO orgs(name,icon,created_at) VALUES(?,?,?)", (nm, "", iso(now_utc())))
+        org_member_add(c, oid, uid, "admin")
+    return oid
 
 
 def vis_mode(c):
     m = instance_mode(c)
     if m == "shared":
         return "contacts"
-    if m == "organisation":
-        return "org"
-    if m == "workspaces":
-        return "org"
-    v = gsetting(c, "people_visibility")
-    return v if v in VIS_MODES else "all"
+    return "org"  # 2.46.0 (#1592): workspaces
 
 
 def user_orgs(c, uid):
     m = instance_mode(c)
     if m == "shared":
         return []
-    if m == "organisation":
-        oid = main_org(c)
-        return [oid] if oid else []
     with system_ctx(c):  # 2.37.0 (#1150): memberships are structure the access rules need (also of other people)
         return [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (uid,))]
 
@@ -148,11 +160,7 @@ def org_role(c, uid, oid):
         return None
     with system_ctx(c):  # 2.37.0 (#1150): membership structure (also asked for other people)
         r = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
-    if instance_mode(c) == "organisation":  # the one organisation: the instance's admins administer it
-        a = c.execute("SELECT is_admin FROM users WHERE id=? AND kind!='agent'", (uid,)).fetchone()
-        if a and a[0]:
-            return "admin"
-    return (r["role"] if r and r["role"] in ORG_ROLES else "member") if r or instance_mode(c) == "organisation" else None
+    return (r["role"] if r["role"] in ORG_ROLES else "member") if r else None
 
 
 def is_org_admin(c, uid, oid):
@@ -188,23 +196,12 @@ def _visible_people(c, uid):
         if orgs:
             q = ",".join("?" * len(orgs))
             ids = {r[0] for r in c.execute(f"SELECT user_id FROM org_members WHERE org_id IN ({q})", orgs)}
+        elif not c.execute("SELECT 1 FROM orgs LIMIT 1").fetchone():
+            return None  # 2.46.0 (#1592): an instance without any organisation (a household): everyone, as before
         return ids | _connections(c, uid) | {uid}
     if u[0]:
-        return None
-    mode = vis_mode(c)
-    if mode == "all":
-        return None
-    if mode == "org" and m == "organisation":
-        return None  # everyone is in the one organisation
-    if mode == "org":
-        orgs = user_orgs(c, uid)
-        if not orgs:  # somebody outside every organisation sees the others outside too
-            ids = {r[0] for r in c.execute("SELECT id FROM users WHERE id NOT IN (SELECT user_id FROM org_members)")}
-        else:
-            q = ",".join("?" * len(orgs))
-            ids = {r[0] for r in c.execute(f"SELECT user_id FROM org_members WHERE org_id IN ({q})", orgs)}
-        return ids | {uid}
-    return _connections(c, uid) | {uid}
+        return None  # shared: admins see everyone
+    return _connections(c, uid) | {uid}  # shared: contacts
 
 
 def may_see(c, uid, other):
@@ -227,21 +224,9 @@ def org_public(c, r, roles=True):
 
 
 def org_label(c, uid=None):
-    """The organisation name to show next to the app name: the person's first one; before a login only on a server set to the mode
-    organisation its main organisation (never otherwise: a server names no organisation on its login page)."""
-    m = instance_mode(c)
-    if uid:
-        if m == "workspaces":
-            return ""
-        n = org_names(c, uid)
-        return n[0] if n else ""
-    # 2.45.0 (#1552): before a login only a server set to the mode organisation (KALMIDO_INSTANCE_MODE) names its
-    # organisation; a server that merely has exactly one organisation no longer shows that name to every visitor
-    if INSTANCE_ENV != "organisation":
-        return ""
-    with system_ctx(c):  # 2.37.0 (#1150): before a login: the instance's own name
-        r = c.execute("SELECT name FROM orgs WHERE id=?", (main_org(c),)).fetchone()
-    return r[0] if r else ""
+    """The organisation name to show next to the app name. 2.46.0 (#1592): none -- workspaces show the switch instead, and
+    the login page names no organisation (#1552)."""
+    return ""
 
 
 # ---------------------------------------------------------------- 2.28.0 (#935): workspaces of lists and agents
@@ -429,10 +414,6 @@ def ws_migrate(c):
     org_of = {}
     for r in c.execute("SELECT user_id, MIN(org_id) AS oid FROM org_members GROUP BY user_id"):  # pg-ok: alias, not the system column
         org_of[r["user_id"]] = r["oid"]
-    if instance_mode(c) == "organisation":
-        mo = main_org(c)
-        for (uid,) in c.execute("SELECT id FROM users"):
-            org_of.setdefault(uid, mo)
     n_org = n_priv = 0
     for r in c.execute("SELECT id, owner_id, folder, family, life, is_inbox FROM lists WHERE org_id IS NULL").fetchall():
         oid = org_of.get(r["owner_id"])
@@ -444,7 +425,7 @@ def ws_migrate(c):
         n_org += 1
     for a in c.execute("SELECT a.user_id, a.owner_id FROM agents a JOIN users u ON u.id=a.user_id WHERE u.kind='agent' AND a.org_id IS NULL").fetchall():
         if a["owner_id"] is None:  # a team agent: its organisation (the organisation mode: the one)
-            oid = org_of.get(a["user_id"]) or (main_org(c) if instance_mode(c) == "organisation" else None)
+            oid = org_of.get(a["user_id"])
         else:  # the workspace most of its lists are in
             cnt = {}
             for (lo,) in c.execute("""SELECT l.org_id FROM lists l WHERE l.is_inbox=0 AND (l.owner_id=? OR l.id IN
@@ -530,12 +511,29 @@ def orgs_get():
     c = db()
     with system_ctx(c):  # 2.37.0 (#1150): instance admin: organisation structure (names, members, counts) of every organisation, no content
         m = instance_mode(c)
-        rows = [] if m == "shared" else c.execute("SELECT * FROM orgs" + (" WHERE id=?" if m == "organisation" else "") + " ORDER BY lower(name), id",
-                                                  (main_org(c),) if m == "organisation" else ()).fetchall()
+        rows = [] if m == "shared" else c.execute("SELECT * FROM orgs ORDER BY lower(name), id").fetchall()
         from ..accounts.tenancy import boundary_summary
-        return jsonify(orgs=[org_public(c, r) for r in rows], visibility=vis_mode(c), mode=m, editable=m in ("multi", "workspaces"),
+        return jsonify(orgs=[org_public(c, r) for r in rows], visibility=vis_mode(c), mode=m, editable=m == "workspaces",
                        creatable=m == "workspaces", name_env=bool(ORG_NAME_ENV),
                        boundary=boundary_summary(c))  # 2.30.0 (#1036): memberships across the workspace boundary (0 = clean)
+
+
+@app.post("/api/admin/orgs/boundary/repair")
+def oa_boundary_repair():
+    """2.46.0 (#1563): the button "Clean up" of the boundary check: takes out the memberships of people (not agents) in an
+    organisation's lists / calendars / address books that are not members of the organisation (tenancy.boundary_repair)."""
+    _need_admin()
+    from ..accounts.tenancy import boundary_repair, boundary_summary
+    c = db()
+    with system_ctx(c):
+        done = boundary_repair(c)
+        if done:
+            bump(c)
+    c.commit()
+    n = sum(len(v) for v in done.values())
+    if n:
+        print(f"boundary check (#1563): {n} memberships across the workspace boundary removed by an admin", flush=True)
+    return jsonify(removed=n, kinds={k: len(v) for k, v in done.items()}, boundary=boundary_summary(c))
 
 
 def _no_change():
@@ -574,7 +572,7 @@ def org_update(oid):
     _need_admin()
     c, b = db(), body()
     with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
-        if instance_mode(c) not in ("multi", "workspaces"):
+        if instance_mode(c) != "workspaces":
             _no_change()
         if not c.execute("SELECT 1 FROM orgs WHERE id=?", (oid,)).fetchone():
             return err(tr("Not found"), 404)
@@ -644,18 +642,10 @@ def oc_drop_office_dir(oid):
 
 @app.put("/api/admin/orgs/visibility")
 def org_visibility():
-    """{mode: all | org | contacts}: whom people see (admins always everyone)."""
+    """{mode: all | org | contacts}: whom people see. 2.46.0 (#1592): fixed (the members of one's organisations +
+    connections; shared: own contacts) -- always 403, like the former modes organisation / workspaces."""
     _need_admin()
-    c, b = db(), body()
-    with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
-        if instance_mode(c) != "multi":
-            _no_change()
-        if b.get("mode") not in VIS_MODES:
-            return err(tr("Invalid value: {0}", "mode"))
-        gset(c, "people_visibility", b["mode"])
-        bump(c)
-        c.commit()
-        return jsonify(visibility=b["mode"])
+    _no_change()
 
 
 # ---------------------------------------------------------------- 2.28.0 (#935): my organisations, their admins
@@ -693,7 +683,7 @@ def orgs_mine():
     oids = user_orgs(c, uid)
     rows = c.execute(f"SELECT * FROM orgs WHERE id IN ({','.join('?' * len(oids)) or 'NULL'}) ORDER BY id", oids).fetchall()
     m = instance_mode(c)
-    return jsonify(orgs=[org_mine_dict(c, r, uid) for r in rows], mode=m, manage=m in ("multi", "workspaces"), workspaces=has_workspaces(c),
+    return jsonify(orgs=[org_mine_dict(c, r, uid) for r in rows], mode=m, manage=m == "workspaces", workspaces=has_workspaces(c),
                    mismatches={str(k): v for k, v in ws_mismatches(c, uid).items()})
 
 
@@ -703,7 +693,7 @@ def org_mine_update(oid):
     workspaces; in the mode organisation the name comes from the configuration or the instance admin)."""
     c, b = db(), body()
     _need_org_admin(c, oid)
-    if instance_mode(c) not in ("multi", "workspaces"):
+    if instance_mode(c) != "workspaces":
         _no_change()
     _org_patch(c, oid, b)
     bump(c)
@@ -717,7 +707,7 @@ def org_member_put(oid):
     e-mail address: the answer never says whether the address has an account) or changes a member's role."""
     c, b = db(), body()
     _need_org_admin(c, oid)
-    if instance_mode(c) not in ("multi", "workspaces"):
+    if instance_mode(c) != "workspaces":
         _no_change()
     role = b.get("role", "member")
     if role not in ORG_ROLES:
@@ -781,6 +771,14 @@ def org_leave(c, oid, uid, heir):
             else:
                 c.execute(f"UPDATE {table} SET org_id=NULL WHERE id=?", (xid,))
         c.execute(f"DELETE FROM {mt} WHERE user_id=? AND {key} IN (SELECT id FROM {table} WHERE org_id=?)", (uid, oid))
+    # 2.46.0 (#1592, review fix): the leaver's personal agents leave the organisation with them -- its lists, calendars,
+    # address books and the membership (an agent of an organisation is one of its members)
+    ags = [r[0] for r in c.execute("SELECT user_id FROM agents WHERE owner_id=?", (uid,)).fetchall()]
+    for aid in ags:
+        c.execute("DELETE FROM list_members WHERE user_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=?)", (aid, oid))
+        for table, mt, key in (("ev_cals", "ev_cal_members", "cal_id"), ("books", "book_members", "book_id")):
+            c.execute(f"DELETE FROM {mt} WHERE user_id=? AND {key} IN (SELECT id FROM {table} WHERE org_id=?)", (aid, oid))
+        c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, aid))
     c.execute("UPDATE agents SET org_id=NULL WHERE owner_id=? AND org_id=?", (uid, oid))
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
     from ..core.access import acx_drop
@@ -798,7 +796,7 @@ def org_member_remove(oid, uid):
         _need_org_admin(c, oid)
     elif not org_role(c, me(), oid):
         raise Denied(404)
-    if instance_mode(c) not in ("multi", "workspaces"):
+    if instance_mode(c) != "workspaces":
         _no_change()
     if not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone():
         return err(tr("unknown"), 404)

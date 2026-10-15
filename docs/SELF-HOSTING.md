@@ -11,6 +11,7 @@ addresses and paths to your setup.
 
 - [Requirements](#requirements)
 - [First setup and the server key](#first-setup-and-the-server-key)
+  - [Organisations and private spaces (2.46)](#organisations-and-private-spaces-246)
 - [Reverse proxy and network](#reverse-proxy-and-network)
 - [Installed app (PWA) and push](#installed-app-pwa-and-push)
 - [Database (PostgreSQL)](#database-postgresql)
@@ -82,6 +83,22 @@ A new key never makes data unreadable that was readable before: without a key no
 and the server creates a new one in the file, what was sealed with the old one stays lost (tokens are entered again,
 organisations need their recovery keys, see below); if the old key turns up, put it into `.env`, where it wins over the
 file.
+
+### Organisations and private spaces (2.46)
+
+Every server works the same way: each person has a private space, and organisations are shared workspaces with their own
+admins. A new server has no organisation; the first-run setup creates one when you give it a name (you become its admin),
+and an instance admin creates further ones under *Settings > Administration > Organisations*. Nobody joins an organisation
+by themselves: an admin picks it when adding a person, a registration joins one only through its e-mail domains, and an
+organisation admin adds and removes members. A server without any organisation lets everyone see everyone (one household);
+once there is one, people see the members of their organisations and the people they share something with; private lists
+reach anybody else by e-mail address.
+
+`KALMIDO_INSTANCE_MODE` is deprecated: `organisation` (and an empty value) are ignored, only `shared` (no organisations,
+people see only their own contacts) still applies. `KALMIDO_ORG_NAME` only names the organisation the first-run setup
+creates. On the update from a server in the former mode *organisation* (one organisation, no variable), the first start
+makes every account a member and the instance's admins its admins once, exactly as every start did before; nothing changes
+for anybody.
 
 ## Reverse proxy and network
 
@@ -254,9 +271,9 @@ Set `DATABASE_URL` in `.env` and remove the `db` service and the `depends_on` bl
   GRANT kalmido_app TO kalmido;
   ```
 
-  Without that role row-level security cannot be enforced. In the modes *workspaces* and *multi* Kalmido then refuses to
-  start (exit code 3, the log says what to do); in the single mode it starts, but raises a security alert on every
-  start and shows a notice under *Settings > Users > Whole server > Admin alerts*.
+  Without that role row-level security cannot be enforced. With several organisations (or `KALMIDO_INSTANCE_MODE=workspaces`
+  set) Kalmido then refuses to start (exit code 3, the log says what to do); with at most one it starts, but raises a
+  security alert on every start and shows a notice under *Settings > Users > Whole server > Admin alerts*.
 - **One role for several databases.** `kalmido_app` belongs to the whole server; several Kalmido databases on one
   server share it, which is fine (the policies depend on the session, not on the role).
 

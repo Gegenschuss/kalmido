@@ -97,6 +97,7 @@ APP_TO_API = {
     "POST /api/lists/{}/sections/order": ["PUT /lists/{}/sections/order"],
     "GET /api/lists/{}/overview": ["GET /lists/{}/overview"],
     "GET /api/lists/{}/kpis": ["GET /lists/{}/kpis"],  # 2.43.0 (#1328): key figures
+    "POST /api/lists/{}/join": ["POST /lists/{}/join"],  # 2.46.0 (#1603): join a list visible to the organisation
     "PATCH /api/lists/{}/overview": ["PATCH /lists/{}/overview"],
     "POST /api/lists/{}/links": ["POST /lists/{}/links"],
     "PATCH /api/lists/{}/links/{}": ["PATCH /lists/{}/links/{}"],
@@ -241,6 +242,7 @@ APP_ONLY = [
      "tag (personal tags change with the task's tags), list owner lookup, icon pictures", (
         "POST /api/tasks/{}/undo", "POST /api/tasks/{}/seen", "POST /api/news/dismiss", "POST /api/lists/reorder", "* /api/tags/",
         "POST /api/lists/{}/tags/promote", "GET /api/lists/{}/owner", "* /api/lists/{}/icon", "GET /api/list-icon/", "GET /api/avatar/",
+        "GET /api/group-avatar/",  # 2.46.0 (#1605): group pictures, shown in the app
         "GET /api/admin/lists/orphaned", "GET /api/lists/{}/owner")),
     ("folder shares with groups: people only (sharing of a list with a group: /lists/{id}/groups)", ("* /api/folders/groups",)),
     ("2.22.0 (#740): sharing a whole folder with a person (and its future lists): people only; single lists: /lists/{id}/members",
@@ -396,6 +398,7 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "POST /import/{}": "imports of other apps' files: people upload them (multipart) in the app or with the REST API",
     "POST /imports/{}/undo": "belongs to the import",
     "POST /lists/{}/owner": "transferring a list: never agents (403)",
+    "POST /lists/{}/join": "2.46.0 (#1603): joining a list seen through the organisation: people only (an agent never sees a list that way, 404)",
     "GET /admin/users": "admin-read: never for agents",
     "GET /admin/status": "admin-read: never for agents",
     "PUT /admin/announcement": "2.24.0: the server's notice: admins and operator scripts (account + admin-read, never agents)",

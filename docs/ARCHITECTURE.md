@@ -115,6 +115,7 @@ The most used helpers:
 | `core/state.py` | GET /api/state: everything the web client loads at start and after a change. |
 | `lists/lists.py` | Lists: create, change, share (people + agents), members, sidebar order. |
 | `lists/groups.py` | Groups of people (admin): materialized list memberships, tasks assigned to a group. |
+| `lists/grouppics.py` | Group pictures: a preset or an own photo per group, served with login to who may see the group (2.46.0). |
 | `lists/ownership.py` | Transferring the ownership of a list; orphaned lists (owner disabled or an agent). |
 | `lists/sections.py` | Saved filters, folders and sections (kanban columns). |
 | `tasks/validation.py` | Task activity log, input validation, repeat rules (RRULE) and task tree helpers. |
@@ -385,6 +386,15 @@ cross-tenant matrix (`tests/p2280_api_test.py`, `tests/p2300_tenant_test.py`) wi
 fails for every route that is neither in the matrix nor listed with a reason; the nightly boundary check in the watchdog
 (`boundary_tick`: every membership across the boundary, an admin alert, the count in `GET /api/admin/orgs`); and the schema
 rule in `tools/check_layout.py` (a new table with a person in it carries `org_id` / `list_id` or a reason in `TENANT_EXEMPT`).
+2.46.0 (#1592): one kind of instance. `instance_mode()` is `workspaces` unless `KALMIDO_INSTANCE_MODE=shared`; the modes
+`organisation` / `multi` are gone (`organisation` is ignored with a start-up hint). `instance_sync` puts nobody into an
+organisation any more (once, `migr_om2460`, it repeats the former start-up sync on a server that was in the automatic mode
+organisation); `create_user` joins no organisation (#1562), `POST /api/users` takes `orgs: [{id, role}]` (#1561). The
+boundary (`_boundary_on` / `_boundary_sql` in `core/access.py`, `_org_boundary` for clients) applies on every instance but
+a shared one. `visible_people()`: the members of one's organisations + connections; an instance without any organisation:
+everyone. The instance admin's user management (`GET /api/users?all=1`, `om_admin_all`) lists every account and changes
+the admin's own people, accounts outside all organisations and pending registrations. An agent placed in an organisation is
+one of its members (`org_members`).
 
 ## Access layer and request context (2.36.2)
 

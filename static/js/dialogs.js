@@ -466,14 +466,14 @@ function shareModal(id, opt = {}) {
   const own = isOwner(l0), hint = t => `<div class="shint lhint">${t}</div>`;
   const md = modal(`<div class="lhdr"><h3>${esc(tr(collab() ? N_('Share “{0}”') : N_('Owner of “{0}”'), lname(l0)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     ${collab() ? `<h4 id="sh-people-h">${tr('People')}</h4><div class="members" id="l-members" aria-labelledby="sh-people-h"></div>` : ''}
-    ${collab() && S.peopleVis === 'contacts' && canManage(l0) ? `<div class="row shmail"><input id="sh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="share-mail">${ic('send', 's')} ${tr('Share')}</button></div>` : ''}
+    ${collab() && (S.peopleVis === 'contacts' || S.instanceMode === 'workspaces') && canManage(l0) ? `<div class="row shmail"><input id="sh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="share-mail">${ic('send', 's')} ${tr('Share')}</button></div>` : ''}
     ${collab() ? shSec('grp', tr('Groups'), `<div id="sh-grpwrap"></div>`, true) : ''}
     ${collab() && agentsOn() ? shSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the lists shared with it, nothing else. Stopping the sharing ends its access at once.')}</div><div id="sh-agwrap"></div>`, true) : ''}
     ${own && collab() ? shSec('ntf', tr('Notifications for members'), `<div id="sh-ntf"><div class="muted mhint">${tr('Loading…')}</div></div>`, false, opt.focus === 'ntf') : ''}
     ${!own && collab() ? ntfMemberHint(l0) : ''}
     ${own && S.publicLinks ? shSec('pub', tr('Public link'), `<div id="l-pub"><div class="muted mhint">${tr('Loading…')}</div></div>`) : ''}
     ${shSec('own', tr('Owner'), `<div id="sh-ownwrap"><div class="muted mhint" id="sh-owner"></div><div id="l-owner"></div></div>`, false, !collab())}
-    <div class="foot"><button class="btn" data-m="list-edit">${ic('edit', 's')} ${tr('List settings…')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
+    <div class="foot"><button class="btn" data-m="list-edit">${ic('edit', 's')} ${tr('List settings…')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${opt.back ? ic('back', 's') + ' ' + tr('Back') : tr('Done')}</button></div>`);
   md.classList.add('shmodal');
   let users = null;
   const shSecSet = (k, show, st) => { const sec = $('#sh-sec-' + k, md); if (!sec) return; sec.hidden = !show; const e = $('#sh-st-' + k, md); if (e) e.textContent = st || ''; };
@@ -547,7 +547,7 @@ function shareModal(id, opt = {}) {
     const b = e.target.closest('button'); if (!b) return;
     const m = b.dataset.m;
     if (m === 'close') { md.remove(); return; }
-    if (m === 'list-edit') { md.remove(); listModal(id); return; }
+    if (m === 'list-edit') { if (opt.back) { md.remove(); return; } modalSub(md, () => listModal(id, '', {back: true})); return; }  // 2.46.0 (#1604): back to here, no stack
     if (m === 'share-mail') {  // 2.22.0 (#752): mode "own contacts": share by address; the answer never says whether it has an account
       const em = $('#sh-email', md).value.trim(); if (!em) { $('#sh-email', md).focus(); return; }
       try { await api('PUT', `/api/lists/${id}/members`, {email: em, role: 'edit'}); } catch { return; }
@@ -717,6 +717,7 @@ function listModal(id, folder = '', o = {}) {
     ${wsOn() && !l.is_inbox && (own || id) ? `<div class="row lwsrow"><label for="l-ws">${tr('Workspace')}</label>${own ? wsSelectHtml('l-ws', id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) : `<span class="muted">${esc(wsLabel(l.org_id))}</span>`}</div>
     <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
     ${id && (S.wsMismatches || {})[String(id)] ? `<div class="shint keep lhint">${ic('alert', 's')} ${esc(tr('An agent of another workspace is in this list (from before the workspaces): take it out in the Share dialog, or keep it on purpose.'))}</div>` : ''}` : ''}
+    ${id ? ovRowHtml(l) : ''}
     <div class="lfolderhint" id="l-fhint" role="note" ${folderHintHtml(l, id, folder) ? '' : 'hidden'}>${folderHintHtml(l, id, folder)}</div>
     ${listDlgTeamHtml(l, id)}
     <div class="row"><label for="l-view">${tr('View')}</label><select id="l-view"><option value="list">${tr('List')}</option>${feat('kanban') ? `<option value="kanban" ${l.view === 'kanban' ? 'selected' : ''}>${tr('Kanban')}</option>` : ''}${feat('timeline') ? `<option value="timeline" ${l.view === 'timeline' ? 'selected' : ''}>${tr('Timeline')}</option>` : ''}</select></div>
@@ -758,7 +759,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>${isOwner(l) ? '' : ntfMemberHint(l)}
     <div class="row" id="l-bellc" ${l.bell === 'custom' ? '' : 'hidden'}><span class="spacer"></span><button type="button" class="btn sm" data-m="bell-custom">${ic('sliders', 's')} ${tr('Choose events…')}</button></div>` : ''}
     ${id && !l.is_inbox && collab() ? `<h4>${tr('List tags')}</h4><div class="shint lhint">${tr('Tags of this list: everyone in it sees them, with their colour. Personal tags (with the person icon) stay yours.')}${l.shared ? '' : ' ' + tr('They become visible to everyone as soon as you share the list.')}</div><div class="members" id="l-ltags">${ltagsBoxHtml(l)}</div>` : ''}
-    <div class="foot">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore list from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete list permanently…')}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your lists; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive list')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave list')}</button>` : ''}${id ? `<button class="btn" data-m="tpl" title="${tr('Save the sections and open tasks as a template')}">${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}<span class="spacer"></span>${id ? '' : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`);
+    <div class="foot">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore list from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete list permanently…')}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your lists; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive list')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave list')}</button>` : ''}${id ? `<button class="btn" data-m="tpl" title="${tr('Save the sections and open tasks as a template')}">${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}<span class="spacer"></span>${id ? (o.back ? `<button class="btn pri" data-m="close">${ic('back', 's')} ${tr('Back')}</button>` : '') : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`);
   if (id) md.classList.add('lmodal'); else md.classList.add('lnew');
   if (!id && tplOf('list').length) api('GET', '/api/templates').then(j => {  // 2.4.0 (#328): what each own template brings
     for (const tp of j.templates || []) { const el = $(`[data-ptd="${tp.id}"]`, md); if (el) el.textContent = tp.data?.rel ? tr('Dates from the project start · {0} days', tp.data.span || 0) : trn('{0} task', '{0} tasks', tp.count); }
@@ -770,6 +771,7 @@ function listModal(id, folder = '', o = {}) {
   $('#l-bell', md)?.addEventListener('change', async e => { e.stopPropagation(); if (e.target.value === 'custom') { bellHint('custom'); bellCustomModal(id); return; } await bellSet(id, e.target.value); bellHint(e.target.value); });
   $('#l-bell', md)?.addEventListener('bell-sync', e => bellHint(e.target.value));
   $('#l-stale', md)?.addEventListener('change', e => { e.stopPropagation(); staleDaysSet(id, e.target); });  // 2.34.0 (#266)
+  if (id) ovWire(md, id);  // 2.46.0 (#1603): "Everyone in the organisation"
   $('#l-dsx', md)?.addEventListener('change', e => { e.stopPropagation(); dsxSet(id, e.target.checked).then(() => { const x = listById(id), c = $('#l-dsx', md); if (x && c) c.checked = dsxOn(x); }); });  // 2.36.2 (#1136)
   $('[data-m="bell-custom"]', md)?.addEventListener('click', e => { e.stopPropagation(); bellCustomModal(id); });
   // ---- autosave (existing lists)
@@ -916,7 +918,7 @@ function listModal(id, folder = '', o = {}) {
       try { await optWrite(put, async () => { await api('PATCH', '/api/fields/' + a.id, {sort: sa}); await api('PATCH', '/api/fields/' + z.id, {sort: sz}); }, () => { render(); drawFields(); }); } catch { load().then(() => { render(); drawFields(); }).catch(() => {}); }
       return;
     }
-    if (b.dataset.m === 'share-open') { await autosave(); md.remove(); shareModal(id); return; }  // 2.6.0 (K12)
+    if (b.dataset.m === 'share-open') { await autosave(); if (o.back) { md.remove(); return; } modalSub(md, () => shareModal(id, {back: true})); return; }  // 2.6.0 (K12); 2.46.0 (#1604): back, no stack
     if (b.dataset.m === 'tt-tpl') { await autosave(); ticketTplModal(id); return; }
     if (b.dataset.pt !== undefined) {  // 2.4.0 (#243 / #328): what the new project starts from
       $$('.ptcard', md).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
@@ -1006,6 +1008,7 @@ function listModal(id, folder = '', o = {}) {
     if (m) { emo = m[1]; $('#l-emo', md).innerHTML = emo; $$('#l-emogrid button', md).forEach(x => x.classList.remove('on')); if (id) later(e.target); }
   });
   if (!isTouch()) setTimeout(() => $('#l-name', md).focus(), 50);  // 2.13.0: touch: no keyboard popping up on open
+  return md;
 }
 // 2.1.2 (#349): hand a list to another person. j = GET /api/lists/{id}/owner (mode owner | takeover, candidates: active
 // people, members first with their role). Two steps: pick the person, then confirm.

@@ -103,7 +103,8 @@ def tchat_list_room(c, lid, create=True):
 def tchat_shared_lists(c, uid):
     """The lists of uid that have a channel: shared (another person or an agent sees the whole list), not archived."""
     out = []
-    for l in c.execute(f"SELECT id, name, is_inbox FROM lists WHERE id IN {vis_sql()} AND archived=0 ORDER BY lower(name)", (uid, uid)):
+    # 2.46.0 (#1603): channels of the joined lists (not of those seen only through "Everyone in the organisation")
+    for l in c.execute(f"SELECT id, name, is_inbox FROM lists WHERE id IN {vis_sql(ov=False)} AND archived=0 ORDER BY lower(name)", (uid, uid)):
         if list_role(c, l["id"], uid) not in FULL_ROLES:
             continue
         if len(tchat_list_members(c, l["id"])) >= 2:
@@ -151,10 +152,10 @@ def tchat_sig(c, uid):
     if not collab_all():
         return ""
     r = c.execute("""SELECT COALESCE(MAX(m.id),0), COUNT(m.id) FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
-                     WHERE (r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN """ + vis_sql() + ")",
+                     WHERE (r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN """ + vis_sql(ov=False) + ")",
                   (uid, uid, uid, uid)).fetchone()
     e = c.execute("SELECT COALESCE(MAX(edited_at),'') FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id WHERE "
-                  "(r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN " + vis_sql() + ")", (uid, uid, uid, uid)).fetchone()[0]
+                  "(r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN " + vis_sql(ov=False) + ")", (uid, uid, uid, uid)).fetchone()[0]
     rd = c.execute("SELECT COALESCE(SUM(last_id),0) FROM tchat_reads WHERE user_id=?", (uid,)).fetchone()[0]
     return f"{r[0]}.{r[1]}.{rd}.{e[-6:] if e else ''}"
 

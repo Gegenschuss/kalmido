@@ -519,6 +519,7 @@ def dav_lists(c, u):
                          ORDER BY l.is_inbox DESC, COALESCE(m.sort, l.sort), l.id""", (u["id"], u["id"], u["id"])).fetchall()
     out = {}
     for r in rows:
+        # 2.46.0 (#1603): no member row = only a reader through "Everyone in the organisation": a calendar after joining
         role = "owner" if r["owner_id"] == u["id"] else r["m_role"]
         if role:
             out[r["id"]] = {**dict(r), "role": role}

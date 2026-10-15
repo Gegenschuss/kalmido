@@ -28,11 +28,12 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   await sleep(600);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ALL.split(',').filter(x => !['collab', 'time'].includes(x))});
+  // 2.46.0 (#1592): no organisation from the start any more: the setup creates the one these tests use (id 1), new people join it
+  await call('POST', '/api/admin/setup', {org_name: 'Kalmido', lang: 'en', collab_all: true, time_all: true, modules: ALL.split(',').filter(x => !['collab', 'time'].includes(x))});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: ALL});
   const ALICE = (await call('GET', '/api/state')).me.id;
-  const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
-  const CAR = (await call('POST', '/api/users', {username: 'carol', display_name: 'Carol', password: 'password123'})).id;
+  const BOB = (await call('POST', '/api/users', {orgs: [1], username: 'bob', display_name: 'Bob', password: 'password123'})).id;
+  const CAR = (await call('POST', '/api/users', {orgs: [1], username: 'carol', display_name: 'Carol', password: 'password123'})).id;
   const CB = await login('bob'), CC = await login('carol');
   for (const ck of [CB, CC]) await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: ALL}, ck);
   const WEB = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;

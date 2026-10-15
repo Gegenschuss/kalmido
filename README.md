@@ -13,11 +13,18 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 <p align="center"><b><a href="https://kalmido.com/demo/">Try it in your browser</a></b>: no account, no server, your data stays in your browser.</p>
 
+<p align="center"><b>Coming soon: Kalmido hosted.</b> No server of your own, we run it for you, on servers in Germany and GDPR-compliant. Self-hosting stays free.</p>
+
 > **Language:** the interface is **English** by default, with **German** included and **French, Spanish, Italian and Dutch** in beta (machine-translated, corrections welcome); switch under *Settings > General > Language*. More languages are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md#translations) and [TRANSLATING.md](TRANSLATING.md). Kalmido = calm + the Japanese -do (道, “the way”, as in aikido or judo): the calm way of getting things done.
 > Kalmido is an independent project and not affiliated with any other task app.
 
 ## What's new
 
+- **2.46.0** (2026-10-15): **organisations and rights**: one kind of server - organisations plus a private space for
+  everybody, new accounts join no organisation by themselves, organisation admins remove members, the admin picks the
+  **organisation and role when adding a person**, organisation lists can be open to **everyone in the organisation**,
+  folder sharing **asks before it replaces roles** set per list, **group pictures**, a Back button between sharing and
+  settings, a tidier organisation page with the boundary check in detail.
 - **2.45.1** (2026-10-15): **vCard import** with ß and old vCard 2.1 files (quoted-printable) arrives complete and
   readable; **devices** get an English name, and the legacy Excel import reads *Device DE* / *Device EN*.
 - **2.45.0** (2026-10-15): a **friendlier start page** (one sentence on the day, Today with a box to add, compact news,
@@ -193,7 +200,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **One app instead of three.** Tasks, habits, focus timer and real time tracking with rates and timesheets, plus the team essentials: sharing, assignment, comments, activity, a News inbox, dependencies, project status and custom fields.
 - **Simple when you want it.** Switch *Collaboration* off and it is a quiet personal list again.
 - **Yours.** Runs on your own server, no vendor account, no telemetry (the optional update check only asks GitHub for the latest version number), open source under the AGPL-3.0. Fits a self-hosted setup: single sign-on through your proxy, Web Push or ntfy notifications, a calendar feed.
-- **Honest trade-offs.** No native apps or widgets (it is an installable web app), no location-based reminders, and it is a hobby project, not a company with a support desk.
+- **Honest trade-offs.** No native apps or widgets (it is an installable web app), no location-based reminders, and no support desk yet.
 
 ## Features
 
@@ -887,23 +894,26 @@ private; nobody loses access). A **nightly boundary check** counts every members
 
 ## Organisations and invitations
 
-2.23.0: the kind of server is set when it is set up, not in the app (`KALMIDO_INSTANCE_MODE`):
+2.46.0: **one kind of server** - organisations plus a private space for everybody. People see the members of their
+organisations and the people they are connected with (a list or group in common, their kids, their agents); on a server
+without any organisation everyone sees everyone (a household). People outside your organisations are reached by sharing
+a private list by e-mail address (the answer never says whether the address has an account).
 
-- **`organisation`** (the default): one company or family. Everyone is a member and sees the others; the name comes from
-  `KALMIDO_ORG_NAME` or is asked once in the first-run setup, and shows on the login page, in the sidebar and in the
-  invitation mail. Admins see it under *Settings > Administration*, but nobody creates or deletes organisations in the app.
-- **`shared`**: a shared server of many households or companies: no organisations and no directory; people see only the
-  people they are connected with and share lists by e-mail address.
-- **`workspaces`** (2.28.0): one account, several workspaces: organisations are workspaces on a shared server. People see
-  the members of their organisations and the people they are connected with (a list or group in common, their kids, their
-  agents) -- nobody else, instance admins included: *Users* shows an admin only the people it sees and how many others
-  there are, and it manages only those. The instance admin (the operator) creates organisations with a first admin and
-  deletes empty ones; **organisation admins** manage their members (add by e-mail address -- the answer never says
-  whether the address has an account --, roles, removal), name and e-mail domains under *Settings > Account >
-  Workspaces*, without being admins of the server. Registrations join the organisation of their e-mail domain. The
-  login page names no organisation.
-- Without the variable, a server with at most one organisation runs as `organisation`; a server that made several
-  organisations in 2.22.0 keeps them (members, e-mail domains and *People see* stay editable, new ones cannot be made).
+- The **instance admin** (the operator) creates organisations with a first admin and deletes empty ones; *Users* lists
+  every account. When adding a person the admin picks the organisation (none, or one of them) and the role (member /
+  admin); with exactly one organisation it is preselected.
+- **Organisation admins** manage their members (add by e-mail address, roles, removal - the removed person's lists of the
+  organisation go to the admin), name and e-mail domains under *Settings > Account > Workspaces*, without being admins of
+  the server.
+- New accounts join no organisation by themselves: registrations join the organisation of their e-mail domain, or one
+  that invited them. The login page names no organisation.
+- The first-run setup asks for an optional organisation name (or takes `KALMIDO_ORG_NAME`): with a name the server starts
+  with that organisation and you as its admin, without one only with private spaces.
+- **Organisation lists** are shared with invited people only, or (2.46.0) with *everyone in the organisation*: members see
+  them read-only until they join (or may edit, when the list allows it); agents only when invited.
+- Upgrading from 2.45 or older: memberships, roles and lists stay as they are; nobody is added to an organisation at a
+  start any more. `KALMIDO_INSTANCE_MODE=organisation` is ignored (a log line says so); `shared` (no organisations, people
+  see only their own contacts) still works when set explicitly.
 
 **Registration** (*Settings > Administration > Sign-in*, off by default): *Create account* on the login page for addresses
 of certain e-mail domains, for anyone after an admin approves it, or (shared servers) for anyone with a confirmed
@@ -1768,8 +1778,8 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_IMAP_HOST`, `KALMIDO_IMAP_PORT`, `KALMIDO_IMAP_SSL`, `KALMIDO_IMAP_USER`, `KALMIDO_IMAP_PASSWORD`, `KALMIDO_IMAP_FOLDER`, `KALMIDO_IMAP_INTERVAL` | `993`, `1`, `INBOX`, `60` | The mailbox Kalmido polls for new tasks (unread mails; marked read afterwards) |
 | `KALMIDO_SMTP_HOST`, `KALMIDO_SMTP_PORT`, `KALMIDO_SMTP_TLS`, `KALMIDO_SMTP_USER`, `KALMIDO_SMTP_PASSWORD`, `KALMIDO_MAIL_FROM` | `587`, `starttls` | Sending the daily summary by e-mail (`TLS`: `starttls`, `ssl` or `none`) |
 | `KALMIDO_IOS_SHORTCUT_URL` | empty | Link to a signed generic iOS shortcut for *Share from your phone* (asks for address and token on import); empty = the button is hidden |
-| `KALMIDO_INSTANCE_MODE` | *(empty)* | 2.23.0: `organisation` (one organisation, everyone in it) or `shared` (no organisations, people see only their own contacts); 2.28.0: `workspaces` (several organisations as workspaces on a shared server, each with its own admins; people see only their organisations and connections); empty: `organisation` unless the server kept several organisations from 2.22 |
-| `KALMIDO_ORG_NAME` | *(empty)* | 2.23.0: the organisation's name in the mode `organisation` (else asked once in the first-run setup) |
+| `KALMIDO_INSTANCE_MODE` | *(empty)* | 2.46.0: only `shared` (no organisations, people see only their own contacts) is still read; everything else, `organisation` included, means organisations + private spaces (2.23.0-2.45: `organisation` / `workspaces`) |
+| `KALMIDO_ORG_NAME` | *(empty)* | the name of the organisation the first-run setup creates (else asked once in the setup); 2.46.0: never renames an existing one |
 | `KALMIDO_STORAGE_QUOTA_MB` | `0` | 2.24.0: storage per person in MB (0 = unlimited); admins can change it in *Administration > Server* |
 | `KALMIDO_SUPPORT_EMAIL` | *(empty)* | 2.24.0: where *Contact support* writes to when storage is full (else the admin setting, else the first admin's address) |
 | `KALMIDO_HOSTED` | `0` | 2.24.0: `1` = a server run as a service for others: integrations only reach public HTTPS addresses |
@@ -1972,7 +1982,7 @@ address (without `/drop`, it adds that itself) and the token on import.
 
 - **Automatic backups:** once a day at a set time (default 03:30) Kalmido writes one archive into `data/backups/`
   (`KALMIDO_BACKUP_DIR`): `kalmido-backup-<date>-<time>-auto.zip` with `kalmido.dump` (a consistent `pg_dump` made while Kalmido
-  keeps running), `attachments/` and `manifest.json` (app and schema version, counts,
+  keeps running), `attachments/` (2.46.0: with the profile pictures, list icons and group pictures) and `manifest.json` (app and schema version, counts,
   size + SHA-256 of every file). 2.45.0: on by default for a new server (the first automatic one the day after the
 setup); an existing server keeps its setting. *Back up now* makes one at any time.
 - **Retention:** everything from the last 24 hours, then the newest backup of each of the last 14 days that have one
@@ -1990,7 +2000,7 @@ setup); an existing server keeps its setting. *Back up now* makes one at any tim
 **Restore** a listed backup or an uploaded file (larger files: copy them into the backup folder, they show up in the
 list). You type `RESTORE` to confirm. Kalmido then:
 
-1. checks the archive completely: only the expected members (`manifest.json`, `kalmido.dump`, `attachments/<task>/<file>`;
+1. checks the archive completely: only the expected members (`manifest.json`, `kalmido.dump`, `attachments/<task>/<file>`, 2.46.0: `attachments/avatars|listicons/<file>` - a 2.45 server refuses such an archive;
    no paths outside, no links, no folders), size and member limits (`KALMIDO_BACKUP_MAX_MB`), compression ratio (zip
    bombs), free disk space, every SHA-256 while extracting, the dump's table of contents and statements (only tables,
    data, sequences, indexes, constraints and plain defaults are taken; functions, triggers and access rules are always
@@ -2060,7 +2070,7 @@ Python (Flask, waitress, python-dateutil, cryptography for Web Push, the stored 
 
 ## Limits
 
-Kalmido is built for one person, a household or a small team, not as a hosted service for many accounts.
+One Kalmido instance is built for one person, a household or a small team. Many separate groups run best as one instance each, not as thousands of accounts on a single instance.
 
 - **Tasks:** every device loads all open tasks plus the last 14 days of completed ones (and a year of habit
   history) in one request and re-renders from it. A few thousand open tasks per user feel instant; around

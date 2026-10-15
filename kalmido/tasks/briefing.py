@@ -35,7 +35,7 @@ def _lname(r):
 def brief_lists(c, uid, agent_id=None):
     """The (not archived) list ids the briefing of uid draws from: what uid sees; with agent_id only the lists that are
     also shared with that agent (its token's list limit and the agent's own list choice included)."""
-    lids = [r[0] for r in c.execute(f"SELECT id FROM lists WHERE archived=0 AND id IN {vis_sql()}", (uid, uid))]
+    lids = [r[0] for r in c.execute(f"SELECT id FROM lists WHERE archived=0 AND id IN {vis_sql(ov=False)}", (uid, uid))]  # 2.46.0 (#1603)
     if agent_id is None:
         return lids
     from ..agents.core import agent_row
