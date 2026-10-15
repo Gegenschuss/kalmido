@@ -156,6 +156,11 @@ def pb_cl_sql(c, oid, col="org_id", by="created_by"):
     return f"{col}={int(oid)}"
 
 
+def pb_cl_where(c, oid, col="org_id", by="created_by"):
+    """(sql, args) form of pb_cl_sql (announced in iface.txt for the other parts' modules)."""
+    return pb_cl_sql(c, oid, col, by), ()
+
+
 def pb_info(c, uid, oid):
     """The fields of GET /api/office/settings about the area: personal (1 = the person's own office) and, while that
     office is still empty, the organisations of the person (their offices are in their workspaces: the hint + switch)."""
