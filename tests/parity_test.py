@@ -200,9 +200,17 @@ APP_TO_API = {
     "PATCH /api/clients/{}": ["PATCH /clients/{}"], "DELETE /api/clients/{}": ["DELETE /clients/{}"], "GET /api/workload": ["GET /workload"],
     "POST /api/tasks/{}/approval": ["POST /tasks/{}/approval"], "GET /api/lists/{}/forms": ["GET /lists/{}/forms"],
     "POST /api/lists/{}/forms": ["POST /lists/{}/forms"], "PATCH /api/forms/{}": ["PATCH /forms/{}"], "DELETE /api/forms/{}": ["DELETE /forms/{}"],
+    # 2.48.0 (#1111): documents (agents read / set the fields of documents shared with them)
+    "GET /api/docs": ["GET /documents"], "GET /api/docs/{}": ["GET /documents/{}"], "PATCH /api/docs/{}": ["PATCH /documents/{}"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.48.0 (#1111): documents -- a person's own steps (upload by hand / share sheet, review and accept, recognise again, the "
+     "preview image, a task for the due date, the workspace's levels / rules / labels / mail address); agents read and set fields "
+     "with /documents and add files with /files", ("=POST /api/docs", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",
+                                                   "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
+                                                   "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
+                                                   "* /api/docs/mail")),
     ("2.36.1 (#1021): Office & finance, stage 1 -- no agent API and no MCP tool before the security audit (#476); agents see only what is shared",
      ("* /api/office/",)),
     ("2.27.0 (#999): the web panel says a person edits a task (tidy-up waits); agents never edit in a panel", ("=POST /api/tasks/{}/editing",)),

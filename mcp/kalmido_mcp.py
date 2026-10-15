@@ -1358,6 +1358,27 @@ TOOLS += [
     ("delete_form", "2.23.0: delete a form (tasks it created stay).", _obj({"form_id": S_ID}, ["form_id"]),
      lambda api, a: api.call("DELETE", f"/forms/{int(a['form_id'])}")),
 ]
+
+# 2.48.0 (#1111): documents (files of the file store with recognised text, date, amount, sender, type, tags)
+_DOC = {"date": D, "due": D, "amount": {"type": "string", "description": "Decimal text, e.g. 119.00"},
+        "currency": {"type": "string"}, "sender": {"type": "string"}, "type": {"type": "string", "description": "Document type"},
+        "tags": {"type": "array", "items": {"type": "string"}}, "text": {"type": "string", "description": "Only while none was recognised"}}
+TOOLS += [
+    ("list_documents", "2.48.0: documents shared with you (scanned letters, invoices, contracts) with date, amount, sender, type, "
+                       "tags and their state. q = words of the text; review = only those waiting in To review.",
+     _obj({"q": {"type": "string"}, "review": {"type": "boolean"}, "state": {"type": "string", "enum": ["wait", "run", "done", "failed"]},
+           "from": D, "to": D, "limit": {"type": "integer"}, "cursor": {"type": "string"}}),
+     lambda api, a: api.call("GET", "/documents", {**_pick(a, ("q", "state", "from", "to", "limit", "cursor")),
+                                                   **({"review": "1"} if a.get("review") else {})})),
+    ("get_document", "2.48.0: one document with its fields, open suggestions and the recognised text (OCR / text layer).",
+     _obj({"document_id": S_ID}, ["document_id"]),
+     lambda api, a: api.call("GET", f"/documents/{int(a['document_id'])}")),
+    ("update_document", "2.48.0: set fields of a document (needs edit): date, due, amount, currency, sender, type, tags. Your values "
+                        "are marked as set by an agent; where the workspace leaves a feature to an agent they become suggestions "
+                        "in To review for a person to accept. Never moves a document.",
+     _obj({"document_id": S_ID, **_DOC}, ["document_id"]),
+     lambda api, a: api.call("PATCH", f"/documents/{int(a['document_id'])}", body=_pick(a, tuple(_DOC)))),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 

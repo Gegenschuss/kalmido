@@ -1414,6 +1414,25 @@ curl -H "Authorization: Bearer $KALMIDO_TOKEN" -o shot.png "$KALMIDO_URL/api/v1/
 curl -H "Authorization: Bearer $KALMIDO_TOKEN" -F body="Here is the fixed layout" -F file=@after.png "$KALMIDO_URL/api/v1/agent/chats/1"
 ```
 
+## Documents (2.48.0)
+
+*Documents* are files of the file store with recognised text and fields: date, due date, amount, sender, document type,
+tags and folder. Kalmido recognises them itself (text layer, local text recognition, rules and a classifier that learns
+from the people's corrections); no agent is needed. An agent is an optional extra: it sees only documents whose file (or
+a folder above it) is shared with it, and every access is written into the file's history.
+
+| What | Endpoint | MCP |
+|---|---|---|
+| Documents shared with you (`q` = words of the text, `review=1` = waiting in *To review*) | `GET /api/v1/documents` | `list_documents` |
+| One document with its fields, open suggestions and the recognised text | `GET /api/v1/documents/{id}` | `get_document` |
+| Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names) | `PATCH /api/v1/documents/{id}` | `update_document` |
+| The file itself | `GET /api/v1/files/{id}/content` | -- |
+
+Scopes: `files:read` / `files:write` (the file store's). Values an agent sets are marked *set by an agent*. Where the
+workspace leaves a feature to an agent (level *Left to an agent* in the documents' settings), the value is not set but
+waits as a suggestion in *To review* until a person accepts it. Agents never move a document and never see documents of
+another workspace.
+
 ## Behaviour rules template (2.13.1)
 
 `mcp/CLAUDE.template.md` ("Kalmido agent behaviour rules", English with a German note) is the rule block every agent's
@@ -2177,11 +2196,11 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`, `delete_task`, `delete_team_message`,
 `delete_template`, `delete_time_entry`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`,
 `export_vcards`, `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`,
-`get_day_review`, `get_dependencies`, `get_event`, `get_family`, `get_group`, `get_job`, `get_life`, `get_list`,
+`get_day_review`, `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_life`, `get_list`,
 `get_me`, `get_milestone`, `get_note`, `get_plan_usage`, `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`,
 `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`, `get_usage`, `get_workload`, `give_stars`,
 `import_ics`, `import_vcards`, `ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`,
-`list_attachments`, `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`,
+`list_attachments`, `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`,
 `list_event_calendars`, `list_events`, `list_fields`, `list_filters`, `list_folders`, `list_forms`, `list_groups`,
 `list_habits`, `list_jobs`, `list_kids`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`,
 `list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_repos`, `list_schedules`,
@@ -2197,7 +2216,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`,
 `unshare_address_book`, `unshare_event_calendar`, `unshare_list`, `unshare_list_from_group`, `update_address_book`,
-`update_client`, `update_comment`, `update_contact`, `update_event`, `update_event_calendar`, `update_field`,
+`update_client`, `update_comment`, `update_contact`, `update_document`, `update_event`, `update_event_calendar`, `update_field`,
 `update_filter`, `update_form`, `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`,
 `update_note`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
 `upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_journal`

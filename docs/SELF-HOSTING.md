@@ -22,6 +22,7 @@ addresses and paths to your setup.
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
 - [Mail](#mail)
+- [Documents: text recognition](#documents-text-recognition)
 - [Moving to a new server](#moving-to-a-new-server)
 - [Production updates](#production-updates)
 
@@ -585,6 +586,30 @@ Trigger every alert once on purpose after setting it up, the dead man's switch t
   then Kalmido cannot tell whose task it is.
 - **Sender domain:** for the daily summary over SMTP, set up SPF, DKIM and DMARC for the sender domain, or the mails land
   in spam.
+
+## Documents: text recognition
+
+The area *Documents* (2.48.0) reads the text of uploaded PDFs and images: the text layer of a PDF, and for scans the
+local text recognition Tesseract (German and English) with `pdftoppm` -- both are part of the image (about 120 MB more).
+Nothing leaves the server, no external service and no language model is involved. An image without them (an older own
+build) keeps working: such documents show *Text recognition is not available on this server*.
+
+Each tool runs as a short-lived process with limits; tune them for small hosts:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KALMIDO_OCR_PARALLEL` | `1` | Documents recognised at the same time |
+| `KALMIDO_OCR_PAGES` | `30` | Pages of one document recognised at most |
+| `KALMIDO_OCR_PAGE_S` | `60` | Seconds per page (raster + recognition) |
+| `KALMIDO_OCR_MEM_MB` | `1024` | Memory of one tool |
+| `KALMIDO_OCR_LANGS` | `deu+eng` | Tesseract languages (installed ones only) |
+| `KALMIDO_DOCS_SCAN_S` | `60` | Seconds between two looks into the inbox folders "Dokumente/Eingang" |
+
+The recognised text, amounts, sender names, rules and the learnt models are sealed with the workspace's key when
+`KALMIDO_SECRET_KEY` is set (see [Encryption of organisation data](#encryption-of-organisation-data)); the search uses
+keyed hashes of the words, no plain index. With *Tasks by e-mail* set up, every person and organisation can create a
+forwarding address for documents in the documents' settings: PDFs and images attached to mails sent there become
+documents.
 
 ## Moving to a new server
 
