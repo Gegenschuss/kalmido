@@ -190,7 +190,9 @@ check(count("orgs", "true", role="user", orgs=str(BETA), uid=CAROL) == 1, "orgs:
 check(count("orgs", "true") == 0 and count("orgs", "true", role="system") >= 2, "orgs: none without a context, all as system")
 check(count("org_members", f"org_id={ALPHA}", role="user", orgs=str(BETA), uid=CAROL) == 0, "org_members: no rows of a foreign organisation")
 check(count("org_members", f"user_id={CAROL}", role="user", orgs="", uid=CAROL) == 1, "org_members: the own rows (also without the organisation)")
-check(count("org_members", f"org_id={ALPHA}", role="user", orgs=str(ALPHA), uid=BOB) == 2, "org_members: every row of the own organisation")
+# 2.46.0 (#1592): + the agents placed in Alpha (an organisation's agent is its member)
+check(count("org_members", f"org_id={ALPHA}", role="user", orgs=str(ALPHA), uid=BOB) == sql("SELECT COUNT(*) FROM org_members WHERE org_id=?", (ALPHA,))[0][0] >= 2,
+      "org_members: every row of the own organisation")
 check(count("lists", f"org_id IS NULL AND owner_id={CAROL}", role="user", orgs=str(BETA), uid=CAROL) >= 1, "lists: private rows (org_id NULL) stay visible")
 
 # ---- writing
