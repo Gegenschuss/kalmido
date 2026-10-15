@@ -6761,5 +6761,16 @@
   "{0} contact deleted": ["{0} Kontakt gelöscht", "{0} Kontakte gelöscht"],
   "No address book you may change": "Kein Adressbuch, das du ändern darfst",
   "{0} contact moved to {1}": ["{0} Kontakt nach {1} verschoben", "{0} Kontakte nach {1} verschoben"],
-  "{0} was there already and stayed": ["{0} war dort schon und bleibt, wo er ist", "{0} waren dort schon und bleiben, wo sie sind"]
+  "{0} was there already and stayed": ["{0} war dort schon und bleibt, wo er ist", "{0} waren dort schon und bleiben, wo sie sind"],
+  "This part of the import has already been undone": "Dieser Teil des Imports ist schon zurückgenommen",
+  "not taken over": "wird nicht übernommen",
+  "Take over all": "Alle übernehmen",
+  "Skip all": "Alle überspringen",
+  "Only undo the clients": "Nur Kunden zurücknehmen",
+  "Only undo the services": "Nur Leistungen zurücknehmen",
+  "Only undo the equipment": "Nur Equipment zurücknehmen",
+  "Clients undone": "Kunden zurückgenommen",
+  "Services undone": "Leistungen zurückgenommen",
+  "Equipment undone": "Equipment zurückgenommen",
+  "Only the entries of this area are removed, except what is in use by now. The rest of the import stays.": "Nur die Einträge dieses Bereichs werden entfernt, außer was inzwischen verwendet wird. Der Rest des Imports bleibt."
 }

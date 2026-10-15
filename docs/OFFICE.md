@@ -160,8 +160,10 @@ is guessed in the background and no language model is involved.
 
 Routes (organisation admin; members only read the archive): `POST /api/office/legacy/preview` (multipart `file`, stores
 nothing), `POST /api/office/legacy/split` `{address}`, `POST /api/office/legacy/import` `{clients, services, equipment}`
-(the preview's rows with `action` new / merge / skip and `merge_id`), `GET /api/office/legacy/runs`,
-`POST /api/office/legacy/runs/<id>/undo`, `POST /api/office/legacy/archive/parse` `{names}`,
+(the preview's rows with `action` new / merge / skip and `merge_id`; 2.46.1: `areas` = only these of clients / services /
+equipment, the others are neither written nor checked), `GET /api/office/legacy/runs` (2.46.1: a data run lists its
+`areas` with `count` and `undone_at`), `POST /api/office/legacy/runs/<id>/undo` (2.46.1: `{kinds: [...]}` undoes only these
+areas of a data run, `409` for an area undone already; the whole undo afterwards takes the areas left), `POST /api/office/legacy/archive/parse` `{names}`,
 `POST /api/office/legacy/archive/run`, `POST /api/office/legacy/archive` (multipart `file` + `run_id`, `kind`, `number`,
 `project_no`, `project`, `client_id`, `client_name`, `date`, `amount`, `paid`; 409 for a used number or the same PDF
 twice), `GET /api/office/legacy/archive?kind=`, `PATCH /api/office/legacy/archive/<id>` (only `amount`, `paid`,

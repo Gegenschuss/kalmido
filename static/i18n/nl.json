@@ -6761,5 +6761,16 @@
   "{0} contact deleted": ["{0} contact verwijderd", "{0} contacten verwijderd"],
   "No address book you may change": "Geen adresboek dat je mag wijzigen",
   "{0} contact moved to {1}": ["{0} contact verplaatst naar {1}", "{0} contacten verplaatst naar {1}"],
-  "{0} was there already and stayed": ["{0} stond er al en blijft staan", "{0} stonden er al en blijven staan"]
+  "{0} was there already and stayed": ["{0} stond er al en blijft staan", "{0} stonden er al en blijven staan"],
+  "This part of the import has already been undone": "Dit deel van de import is al teruggedraaid",
+  "not taken over": "wordt niet overgenomen",
+  "Take over all": "Alles overnemen",
+  "Skip all": "Alles overslaan",
+  "Only undo the clients": "Alleen klanten terugdraaien",
+  "Only undo the services": "Alleen diensten terugdraaien",
+  "Only undo the equipment": "Alleen apparatuur terugdraaien",
+  "Clients undone": "Klanten teruggedraaid",
+  "Services undone": "Diensten teruggedraaid",
+  "Equipment undone": "Apparatuur teruggedraaid",
+  "Only the entries of this area are removed, except what is in use by now. The rest of the import stays.": "Alleen de items van dit onderdeel worden verwijderd, behalve wat inmiddels in gebruik is. De rest van de import blijft."
 }
