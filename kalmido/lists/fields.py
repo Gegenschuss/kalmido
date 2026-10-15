@@ -55,7 +55,9 @@ def field_clean_def(b, old=None):
         if unit:
             opts["unit"] = unit
     if ftype == "formula":  # 2.43.0 (#1328): expr = stored with field ids (fx_compile in create / update); empty fields = 0 or blank
-        opts["expr"] = str(raw.get("expr") or "")[:2000]
+        opts["expr"] = str(raw.get("expr") or (json.loads(old["options"] or "{}").get("expr") if old else "") or "")[:2000]
+        if raw.get("formula"):  # a template carries the formula with names (fx_tpl_fix compiles it in the new list)
+            opts["formula"] = str(raw["formula"])[:500]
         if raw.get("empty") == "blank":
             opts["empty"] = "blank"
     if ftype == "select":
@@ -81,10 +83,10 @@ def field_clean_def(b, old=None):
 def fx_set(c, lid, b, opts, fid=None):
     """2.43.0 (#1328): the typed formula (b["formula"], field names) -> opts["expr"] with field ids; checks names, types
     and circular references (BadInput with the position / field name)."""
-    if "formula" not in b and opts.get("expr"):
-        return
     fs = c.execute("SELECT id, name, type, options FROM list_fields WHERE list_id=?", (lid,)).fetchall()
-    expr, refs = fx_compile(b.get("formula") or "", fs, fid)
+    # the typed formula, else the stored one again (an options-only change; a client's own expr is checked the same way)
+    expr, refs = fx_compile(b["formula"] if "formula" in b else opts.get("expr") or "", fs, fid)
+    opts.pop("formula", None)
     if fid is not None:
         fx_check_cycles(fs, fid, refs)
     opts["expr"] = expr
@@ -315,7 +317,13 @@ def search_field_ids(c, uid, q):
 def tpl_fields_of(c, lid):
     """List template: the field definitions (in order) + {field id: index}."""
     rows = c.execute("SELECT * FROM list_fields WHERE list_id=? ORDER BY sort, id", (lid,)).fetchall()
-    return ([{"name": r["name"], "type": r["type"], "options": json.loads(r["options"] or "{}"), "pinned": int(r["pinned"] or 0)} for r in rows],
+
+    def opts(r):  # 2.43.0 (#1328): a formula travels with field names (the new list's ids differ)
+        o = json.loads(r["options"] or "{}")
+        if r["type"] == "formula":
+            o = {**{k: v for k, v in o.items() if k != "expr"}, "formula": fx_display(o.get("expr"), rows)}
+        return o
+    return ([{"name": r["name"], "type": r["type"], "options": opts(r), "pinned": int(r["pinned"] or 0)} for r in rows],
             {r["id"]: i for i, r in enumerate(rows)}, {r["id"]: r["type"] for r in rows})
 
 
@@ -335,3 +343,19 @@ def tpl_clean_fields(defs):
         if pins > FIELD_PINNED_MAX:
             d["pinned"] = 0
     return out
+
+
+def fx_tpl_fix(c, lid):
+    """2.43.0 (#1328): formula fields made from a template (options.formula = names) get their expr with the new list's
+    field ids; a formula that does not fit stays empty (no error: the template may be old)."""
+    fs = c.execute("SELECT id, name, type, options FROM list_fields WHERE list_id=?", (lid,)).fetchall()
+    for f in fs:
+        o = json.loads(f["options"] or "{}")
+        if f["type"] != "formula" or "formula" not in o:
+            continue
+        try:
+            o["expr"], _ = fx_compile(o["formula"], fs, f["id"])
+        except BadInput:
+            o["expr"] = ""
+        o.pop("formula", None)
+        c.execute("UPDATE list_fields SET options=? WHERE id=?", (json.dumps(o, ensure_ascii=False), f["id"]))

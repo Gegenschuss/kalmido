@@ -130,6 +130,21 @@ fs = {f["id"]: f for f in A.get(B + "/api/state").json()["fields"]}
 check(fs[FO["id"]]["options"]["formula"] == "{Amount total} - {Refunded}", f"#1328: renaming shows the new name in the formula {fs[FO['id']]['options']}")
 r = A.patch(B + f"/api/tasks/{T2['id']}", json={"fields": {str(FA["id"]): "60"}})
 check(r.ok and r.json()["fields"].get(fo) == "10", "#1328: and still computes")
+r = A.patch(B + f"/api/fields/{FO['id']}", json={"options": {"unit": "USD"}})
+check(r.ok and r.json()["options"].get("expr") == f"{{#{FA['id']}}} - {{#{FR['id']}}}" and r.json()["options"].get("unit") == "USD",
+      f"#1328: changing only the options keeps the formula {r.text[:200]}")
+r = A.patch(B + f"/api/fields/{FO['id']}", json={"options": {"unit": "EUR", "expr": "{#999999} + 1"}})
+check(r.status_code == 400, f"#1328: an own expr is checked like a typed formula {r.status_code}")
+A.patch(B + f"/api/fields/{FO['id']}", json={"options": {"unit": "EUR"}})
+# a list template carries the formula with names: the copy computes with its own field ids
+tp = A.post(B + "/api/templates", json={"kind": "list", "list_id": L, "name": "Claims template"})
+ap = A.post(B + f"/api/templates/{tp.json().get('id')}/apply", json={"name": "Claims 2"}) if tp.ok else tp
+L2 = (ap.json().get("list_id") or ap.json().get("id")) if ap.ok else None
+st2 = A.get(B + "/api/state").json()
+f2 = {f["name"]: f for f in st2["fields"] if f["list_id"] == L2}
+ok2 = f2.get("Outstanding", {}).get("options", {})
+check(ap.ok and ok2.get("formula") == "{Amount total} - {Refunded}" and ok2.get("expr") == f"{{#{f2['Amount total']['id']}}} - {{#{f2['Refunded']['id']}}}",
+      f"#1328: a list from a template keeps its formulas with the new field ids {tp.status_code} {ap.status_code} {ok2}")
 r = A.get(B + f"/api/fields/{FR['id']}/count")
 check(r.ok and set(r.json().get("used_by", [])) >= {"Outstanding", "Rate"}, f"#1328: the delete count names the formulas that use it {r.text[:200]}")
 r = A.get(B + f"/api/fields/{FT['id']}/count")
