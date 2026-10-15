@@ -18,7 +18,8 @@ document.addEventListener('error', e => {
 }, true);
 function attHtml(a) {
   const t = taskById(S.sel);
-  const del = !canEdit(t) ? '' : `<button class="attdel" data-act="att-del" data-att="${a.id}" title="${tr('Remove')}">${ic('x', 's')}</button>`;
+  const del = (!canEdit(t) ? '' : `<button class="attdel" data-act="att-del" data-att="${a.id}" title="${tr('Remove')}">${ic('x', 's')}</button>`)
+    + (!a.enc && typeof ab_linkBtn === 'function' ? ab_linkBtn('att', a.id, listById(t?.list_id)?.org_id, 'attdel attlink') : '');  // 2.48.0 (#1207): "Show in the file store"
   if (a.enc) return e2eAttHtml(a, del);  // 2.42.0 (#828): encrypted in the browser (e2e.js): only its uploader opens it
   if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="att-view" data-att="${a.id}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${del}</div>`;
   if (a.size === 0) return `<div class="att file broken"><span class="attx">${ic('file')}<span class="atxt"><span class="an">${esc(a.name)}</span><span class="as">${esc(tr('File damaged or missing'))}</span></span></span>${del}</div>`;  // 2.13.2 (#478 N6): an old 0-byte file says so

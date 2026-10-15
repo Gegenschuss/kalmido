@@ -109,6 +109,9 @@ ORDER = (
     "collab.cchoice",  # 2.41.0 (#1383): answer buttons / approval cards in comments
     "collab.e2e",  # 2.42.0 (#828, #909): end-to-end encryption (keys, encrypted notes / files / DMs)
     "collab.notelock",  # 2.48.0 (#1642): a task's note locked with one's own password (needs collab.e2e)
+    "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
+    "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
+    "files.v1",  # 2.48.0 (#1207): the file store in the REST API (files:read / files:write)
     "integrations.mail",
     "accounts.invite",
     "family.family",

@@ -681,6 +681,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `scheduled_job` | 2.34.0 (#272): a [planned job](#planned-jobs-2340) of a person is due (once per due time; after an outage only the one missed run, `late: true`), or the person pressed *Run now* (`manual: true`). Answer in your chat with `by.id` | `schedule_id`, `title`, `prompt` (the person's words: what to do), `list_id` + `list` (or `null`), `by` / `user` `{id, name}`, `chat_with` (= `by.id`), `rhythm` `{freq, days, time, tz}`, `due_at`, `late`, `manual`, `manual_by` (`{id, name}` when a manager of the agent pressed *Run now* on another person's plan, else `null`; you still answer `by.id`), `hint`; 2.39.0: a [scheduled check of a list](#playbook-2390) adds `list_check: true`, `open_task_ids`, `open_tasks_more` (and the `playbook`) |
 | `message_edited` | 2.39.0 (#1179): a person edited a message the agent already had: their chat message after the agent fetched (`delivered_at`) or answered it, a comment the agent got as `comment` / `mention` / `assigned`, a team chat message it got as `team_message`. Only to the agent(s) that had it, only while they still see the task / room (health lists never). A chat message not fetched yet is simply replaced (the queued `chat` event carries the new text, no `message_edited`). Comments and team messages count as had while the original event is still in your event history (30 days). Treat it as a correction: confirm briefly, keep your running work, adjust only what the change affects | `kind`: `chat` \| `comment` \| `team`, `old`, `new`, `user` `{id, name}`; chat: `message` `{id, user_id, task_id, created_at, edited_at}`, `answered` (you wrote after it); comment: `comment` `{id, task_id, created_at, edited_at}`, `task`, `list`, `list_id`; team: `room` `{id, kind, list_id}`, `message` |
 | `playbook_proposal` | 2.39.0 (#1168): a person applied or discarded the agent's proposed change of a list's [Playbook](#playbook-2390) | `list_id`, `proposal_id`, `state`: `applied` or `discarded`, `version` (applied: the new version of the list's part), `note` (yours), `by` `{id, name}`, `hint`; like every event of the list it carries the current `playbook` |
+| `file_shared` | 2.48.0 (#1207): the owner shared a folder or file of the [file store](#file-store-2480) with the agent (only for a new share, not for a changed role) | `node` `{id, name, kind}`, `role`: `view` \| `edit` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1345,6 +1346,29 @@ the queued `chat` event. After that the agent gets the event `message_edited` (o
 Treat it as a correction: confirm it briefly in the chat, do not throw away running work and do not restart it, adjust
 only what the change affects. Edited task comments and team chat messages reach the agents that got them as an event
 the same way (`kind: comment` with `comment`, `task`, `list`; `kind: team` with `room`), never a new push to people.
+
+## File store (2.48.0)
+
+The file store ("Ablage", #1207) holds folders and files of a person and of an organisation. People share a folder or a
+file with an agent on purpose (role *view* or *edit*, optionally until a date; a folder's share covers everything below
+it). An agent sees exactly that, plus its **own result folder**: created on first use at the top of its owner's space (an
+organisation's agent: of the organisation), named like the agent; the agent may write there without a share and its owner
+(an organisation's admins) sees it. Put results people should read there instead of a local work folder. Every access of
+an agent (listing, reading, downloading, writing) is written into the file's history, which its owner sees. Nothing
+crosses a workspace: an organisation's folder is never shared with a private agent or an agent of another organisation.
+Scopes: `files:read` (list, read) and `files:write` (add files and folders, new versions); new agents get both.
+
+| What | Endpoint | MCP |
+|---|---|---|
+| The top: what is shared with you + your own folder | `GET /api/v1/files` | `list_files` |
+| A folder's children (`?parent_id=`) / one node with its children or versions | `GET /api/v1/files?parent_id=<id>`, `GET /api/v1/files/{id}` | `list_files` with `folder_id` |
+| A file's bytes (`?version=` an older one) | `GET /api/v1/files/{id}/content` | `read_file` with `as: "base64"` |
+| A file as text (UTF-8, PDF text layer) | `GET /api/v1/files/{id}/text` | `read_file` |
+| A new file / folder (`{parent_id?, name, content \| content_base64, mime?, kind?}`; without `parent_id`: your own folder) | `POST /api/v1/files` | `write_file`, `create_file_folder` |
+| A new version of a file (`{content \| content_base64}`, role edit; the older versions stay) | `POST /api/v1/files/{id}/versions` | `write_file` with `file_id` |
+
+A name that is taken gets " (2)"; an agent's executable ending gets ".txt" (#380). Renaming, moving, the trash and shares
+stay with people. Without a share the answer is 404 (the file does not exist for you); a view share answers 403 on writes.
 
 ## Files in the chat and on tasks (2.13.1)
 
@@ -2172,7 +2196,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
 `add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_contacts`, `chat_typing`, `check_in_habit`,
 `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `create_address_book`, `create_client`,
-`create_contact`, `create_event`, `create_event_calendar`, `create_field`, `create_filter`, `create_form`,
+`create_contact`, `create_event`, `create_event_calendar`, `create_field`, `create_file_folder`, `create_filter`, `create_form`,
 `create_habit`, `create_job`, `create_list`, `create_list_tag`, `create_note`, `create_packing_list`,
 `create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`, `decide_reward`,
 `delete_address_book`, `delete_attachment`, `delete_chat_attachment`, `delete_client`, `delete_comment`,
@@ -2186,13 +2210,13 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`, `get_usage`, `get_workload`, `give_stars`,
 `import_ics`, `import_vcards`, `ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`,
 `list_attachments`, `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`,
-`list_event_calendars`, `list_events`, `list_fields`, `list_filters`, `list_folders`, `list_forms`, `list_groups`,
+`list_event_calendars`, `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`,
 `list_habits`, `list_jobs`, `list_kids`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`,
 `list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
-`read_attachment`, `read_briefing`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
+`read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
 `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`,
 `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`,
@@ -2204,7 +2228,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `update_client`, `update_comment`, `update_contact`, `update_event`, `update_event_calendar`, `update_field`,
 `update_filter`, `update_form`, `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`,
 `update_note`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
-`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_journal`
+`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`, `write_journal`
 <!-- kalmido-tool-index:end -->
 
 ## Use agents safely (2.30.0)

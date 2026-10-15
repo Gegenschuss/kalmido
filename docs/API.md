@@ -34,6 +34,8 @@ Create a token under **Settings > Account > API tokens**:
   | `delete` | move tasks to the trash, restore, empty the trash, undo an import; delete sections, lists, fields, templates, habits, filters (list tags, links and milestones: `structure`) |
   | `attachments:read` | download files of tasks, comments and projects (their names come with `read`) |
   | `attachments:write` | upload and remove them |
+  | `files:read` (2.48.0) | the file store: list and read the folders and files shared with the token's account (agents: plus their own result folder) |
+  | `files:write` (2.48.0) | the file store: add files and folders, upload new versions where the account may edit; new agents get both `files:` scopes |
   | `time` | the timer and time entries |
   | `export` | `GET /export` |
   | `calendar` (2.21.0) | events and event calendars, reading included: `/event-calendars…`, `/events…`, `/tasks/{id}/events` |
@@ -249,6 +251,9 @@ had been made in the app. Webhooks fire too.
 | `POST /tasks/{id}/attachments` | attachments:write | 2.15.0: upload files (multipart, field `file`, repeatable; the server's size limit, no empty files) |
 | `POST /tasks/{id}/attachments/text` | attachments:write | 2.30.0: a text file from JSON `{name, content}` (Markdown, plain text, HTML / CSS / JS, JSON / CSV, code; UTF-8, at most 1 MB). An ending that is not a text type (`.sh`, `.ps1`, `.bat`, `.exe` …) gets `.txt` appended; a name the task already has becomes a new version next to it (`report (v2).md`, the old file stays). Answer `201` `{id, task_id, name, mime, size, created_at, version, replaces, url}` |
 | `DELETE /attachments/{id}` | attachments:write | 2.15.0: remove a file of a task (or of your comment) |
+| `GET /files` · `GET /files/{id}` | files:read | 2.48.0 (#1207): the file store: without `parent_id` the top of what is shared with you (agents: plus their own result folder), `?parent_id=` a folder's children; one node with `children` (folder) or `versions` (file) and `path`. Each item: `{id, parent_id, kind: folder \| file \| link, name, org_id, owner_id, agent_id, mime, size, version, role: owner \| edit \| view, url, content_url}` |
+| `GET /files/{id}/content` · `GET /files/{id}/text` | files:read | 2.48.0: the bytes (`?version=` an older one; always a download) / the text (UTF-8, the text layer of a PDF; like `/attachments/{id}/text`) |
+| `POST /files` · `POST /files/{id}/versions` | files:write | 2.48.0: a new file `{parent_id?, name, content \| content_base64, mime?}` or folder (`kind: "folder"`) in a folder with role edit (agents without `parent_id`: their own folder); a new version of a file `{content \| content_base64}` (the older ones stay). A taken name gets " (2)". Every access of an agent is in the file's history |
 | `PATCH /comments/{id}` · `DELETE …` | comments | 2.15.0: edit your comment `{body}`; delete (author, list owner / admins) |
 | `GET /folders` · `POST /folders/rename` · `POST /folders/delete` | read · structure | 2.15.0: your folders `{path, lists}`; rename / move `{old, new}`; remove `{name}` (its lists move up). Agents: approval |
 | `DELETE /lists/{id}` | delete | 2.15.0: delete an archived list for good (owner; 2.39.1: also a list admin, the owner is told; archive it with `PATCH {archived: true}` first, else `409`); its tasks go to the owner's trash. Agents: approval |

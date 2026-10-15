@@ -194,7 +194,7 @@ A.patch(B + f"/api/me/tokens/{R['id']}", json={"allowed_ips": ""})
 # ================================================================== the OpenAPI document = the enforcement
 spec = requests.get(V + "/openapi.json").json()
 ALLOWED = {"read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "account",
-           "admin-read", "agent", "calendar", "contacts", "private"}  # 2.21.0: calendar, contacts; 2.22.0: private
+           "admin-read", "agent", "calendar", "contacts", "private", "files:read", "files:write"}  # 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0 (#1207): files
 ops = [(m.upper(), p, op["x-kalmido-scope"]) for p, ms in spec["paths"].items() for m, op in ms.items()]
 check(all(sc in ALLOWED for _, _, sc in ops), "every operation: a known scope")
 for pth in ("/lists/{id}/sections", "/sections/{id}", "/lists/{id}/sections/order", "/tasks/{id}/move", "/tasks/batch", "/tasks/{id}/skip",
@@ -228,8 +228,10 @@ check(spec["paths"]["/attachments/{id}"]["get"]["x-kalmido-scope"] == "attachmen
 r = A.post(B + "/api/admin/agents", json={"username": "claude", "display_name": "Claude"})
 AG, cl_tok = r.json()["id"], r.json()["token"]
 cl = Api(cl_tok)
-check(r.json()["scopes"] == ["comments", "read", "tasks:write"] and r.json()["effective_scopes"] == ["read", "tasks:write", "comments"],
-      f"new agent: read + tasks:write + comments {r.json().get('scopes')}")
+# 2.48.0 (#1207): + files:read / files:write (the file store; an agent sees only what is shared with it there)
+check(r.json()["scopes"] == ["comments", "files:read", "files:write", "read", "tasks:write"]
+      and r.json()["effective_scopes"] == ["read", "tasks:write", "comments", "files:read", "files:write"],
+      f"new agent: read + tasks:write + comments + files:read + files:write {r.json().get('scopes')}")
 assert A.put(B + f"/api/lists/{L}/members", json={"user_id": AG, "role": "edit"}).ok
 check(cl.post("/tasks", {"title": "by agent", "list_id": L}).status_code == 201 and cl.post(f"/tasks/{T[1]}/comments", {"body": "hi"}).status_code == 201,
       "agent (default): tasks + comments")

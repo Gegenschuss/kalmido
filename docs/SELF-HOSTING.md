@@ -370,7 +370,9 @@ docker compose up -d kalmido
 - **In-app backups (2.37.0).** *Back up now* and the automatic backups write a zip with a `pg_dump` of the database
   (`kalmido.dump`), the attachments, the office files and a manifest with checksums (format 2); restoring runs in
   maintenance mode with a safety backup first. Backups from before 2.37 (SQLite, a `tasks.db` in the zip) can
-  still be restored: the database file goes through the same move to PostgreSQL as an upgrade.
+  still be restored: the database file goes through the same move to PostgreSQL as an upgrade. Since 2.48 the archive
+  also holds the file store (`attachments/files/<id>/`, every version) and the project files (`attachments/lists/<id>/`,
+  which earlier archives left out); a server before 2.48 restores such an archive without them.
 
 - **Fail closed when the data disk is missing.** Keep the data folder on its own disk or volume and mount it so that
   Docker refuses to start without it, instead of creating an empty folder (an empty start shows the setup page again;
@@ -462,8 +464,9 @@ and download is written to the office log (who, when, size).
   (subtasks, field values, dependencies, history, the trash), comments, attachments, time entries on those lists, the
   team chat channels of those lists, the organisation's calendars with their events, its address books with their
   contacts, its clients, the whole office (company data, services, equipment, packages, texts, framework contracts,
-  quotations / invoices / credit notes with positions, payments, PDF and XML files, the archive, the office log) and the
-  members with their roles (name, user name, e-mail address).
+  quotations / invoices / credit notes with positions, payments, PDF and XML files, the archive, the office log), its
+  file store (2.48: folders, files with every version, shares, the access history, the trash; `store/*.json`,
+  `files/store/`) and the members with their roles (name, user name, e-mail address).
 - **What is not in it.** Lists outside the organisation (the members' private space), other organisations, passwords,
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
   personal data (settings, own tags, filters, templates, direct messages, agent chats).
