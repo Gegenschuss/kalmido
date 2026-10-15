@@ -25,6 +25,8 @@ const FEAT = 'cal,comments,collab';
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const LID = (await call('POST', '/api/lists', {name: 'Plans', folder: 'Team'})).id;
+  const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'})).id;
+  await call('PUT', '/api/folders/people', {folder: 'Team', user_id: BOB, role: 'edit'});
   const w = await boot({user: 'alice'}), d = w.document;
   await until(() => d.querySelector('#side .fhead[data-folder="Team"]'));
   const vis = () => [...d.querySelectorAll('.modal')].filter(m => m.style.display !== 'none');
@@ -34,17 +36,17 @@ const FEAT = 'cal,comments,collab';
 
   // ================= #1604 folder: Share -> settings -> Share -> settings, Back each time
   w.eval(`LS.set('agSafeSeen', true); folderShareModal('Team')`);
-  let md = await until(() => d.querySelector('.modal.fshmodal #fsh-members [data-m="add"]')?.closest('.modal'));
+  let md = await until(() => d.querySelector('.modal.fshmodal #fsh-members .mrow[data-uid]')?.closest('.modal'));
   check(md && !back(md), '#1604: the Share dialog opened on its own says "Done"');
   click(w, footBtn(md, '[data-m="fsh-props"]'));
-  let pr = await until(() => d.querySelector('.modal.fsmodal #fs-am')?.closest('.modal'));
+  let pr = await until(() => [...d.querySelectorAll('.modal.fsmodal')].find(m => m.style.display !== 'none'));
   check(pr && back(pr), '#1604: the folder settings opened from Share say "Back"');
   check(vis().length === 1 && hid().length === 1, '#1604: one visible dialog, the Share dialog hidden under it');
   click(w, footBtn(pr, '[data-m="people"]'));
   await sleep(300);
   check(vis().length === 1 && vis()[0] === md && hid().length === 0 && !pr.isConnected, '#1604: "Share…" in the settings goes back to the Share dialog, no stack');
   click(w, footBtn(md, '[data-m="fsh-props"]'));
-  pr = await until(() => d.querySelector('.modal.fsmodal #fs-am')?.closest('.modal'));
+  pr = await until(() => [...d.querySelectorAll('.modal.fsmodal')].find(m => m.style.display !== 'none'));
   click(w, footBtn(pr, '.btn.pri'));
   await sleep(300);
   check(vis().length === 1 && vis()[0] === md && hid().length === 0, '#1604: "Back" of the settings shows the Share dialog again');
@@ -54,10 +56,10 @@ const FEAT = 'cal,comments,collab';
 
   // folder settings first -> Share (Back) -> settings (still no stack)
   w.eval(`folderPropsModal('Team')`);
-  pr = await until(() => d.querySelector('.modal.fsmodal #fs-am')?.closest('.modal'));
+  pr = await until(() => [...d.querySelectorAll('.modal.fsmodal')].find(m => m.style.display !== 'none'));
   check(pr && !back(pr), '#1604: the folder settings on their own say "Done"');
   click(w, footBtn(pr, '[data-m="people"]'));
-  md = await until(() => d.querySelector('.modal.fshmodal #fsh-members [data-m="add"]')?.closest('.modal'));
+  md = await until(() => d.querySelector('.modal.fshmodal #fsh-members .mrow[data-uid]')?.closest('.modal'));
   check(md && back(md) && vis().length === 1 && hid().length === 1, '#1604: Share from the settings says "Back"');
   click(w, footBtn(md, '[data-m="fsh-props"]'));
   await sleep(300);
@@ -94,8 +96,40 @@ const FEAT = 'cal,comments,collab';
   await sleep(400);
   check(vis().length === 1 && vis()[0] === le, '#1604: its "Back" shows the list settings again');
 
-  // @@1563@@
+  // ================= #1563 encryption block: one heading, one "More information"
+  const html = w.eval(`ocBoxHtml({id: 7}, {title: ''}) + '|' + ocBoxHtml({id: 7}) + '|' + ocStateHtml({enabled: true, active: true, key_ok: true, password: true})`).split('|');
+  check(!/<h5/.test(html[0]) && /<h5>Encryption<\/h5>/.test(html[1]), '#1563: no extra heading in the administration box, "Encryption" elsewhere');
+  const stBox = d.createElement('div'); stBox.innerHTML = html[2]; d.body.appendChild(stBox);
+  w.eval('infoize(document.body)');
+  check(stBox.querySelectorAll('.shint').length === 1 && d.querySelectorAll('.ib[data-ii]').length >= 1 && stBox.querySelectorAll('.shint[data-ii="1"]').length === 1 && /recovery key/.test(stBox.textContent), '#1563: the state is one text with one More information link');
+  const sid = stBox.querySelector('.shint').id;
+  check([...d.querySelectorAll('.ib[data-ii]')].filter(x => x.dataset.ii === sid).length === 1, '#1563: exactly one link for it');
+  stBox.remove();
+
+  // ================= #1563 boundary check: unfolds to kind, object, person / agent; Clean up asks first
+  const det = [{kind: 'list_person', type: 'list', id: 3, name: 'Team plans', user_id: 5, user: 'Eve', agent: false, fixable: true},
+    {kind: 'cal_agent', type: 'calendar', id: 4, name: 'Mixed', user_id: 9, user: 'Helper', agent: true, fixable: false}];
+  const bh = d.createElement('div'); bh.innerHTML = w.eval(`oa_boundaryHtml(${JSON.stringify({violations: 2, details: det})})`); d.body.appendChild(bh);
+  const bd = bh.querySelector('details#a-orgs-bd');
+  check(bd && bd.querySelectorAll('.mrow').length === 2 && /List: Team plans/.test(bd.textContent) && /Eve/.test(bd.textContent) && /Calendar: Mixed/.test(bd.textContent) && /Helper Agent/.test(bd.textContent), '#1563: unfoldable with kind, object name and person / agent');
+  check(bd && bd.querySelector('[data-oa="repair"]') && /Move the agent to the right workspace/.test(bd.textContent), '#1563: Clean up for people, the hint for agents');
+  const bh2 = d.createElement('div'); bh2.innerHTML = w.eval(`oa_boundaryHtml(${JSON.stringify({violations: 1, details: [det[1]]})})`);
+  check(!bh2.querySelector('[data-oa="repair"]') && /Move the agent/.test(bh2.textContent), '#1563: only agents: no Clean up button, the hint');
+  check(/nothing crosses/.test(w.eval('oa_boundaryHtml({violations: 0})')), '#1563: clean: the short line');
+  w.eval(`window.__calls = []; window.__api0 = api; api = async (m, u) => { __calls.push(m + ' ' + u); return {removed: 2, boundary: {violations: 0}}; }; window.orgsDraw = () => {};`);
+  click(w, bd.querySelector('[data-oa="repair"]'));
+  const dlg = await until(() => d.querySelector('.cdlg-f'));
+  check(dlg && w.eval('__calls.length') === 0, '#1563: asks first, nothing sent yet');
+  dlg?.querySelector('[data-cd="no"]')?.click();
+  await sleep(300);
+  check(w.eval('__calls.length') === 0, '#1563: Cancel sends nothing');
+  click(w, bd.querySelector('[data-oa="repair"]'));
+  const dlg2 = await until(() => d.querySelector('.cdlg-f'));
+  dlg2?.querySelector('button[type="submit"]')?.click();
+  check(await until(() => w.eval('__calls.join()') === 'POST /api/admin/orgs/boundary/repair'), '#1563: confirmed: POST the repair');
+  w.eval('api = window.__api0');
+  bh.remove();
 
   console.log(`p2460_d_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
-})().catch(e => { console.log('FAIL: crashed', e); process.exit(1); });
+})().catch(e => { console.log('FAIL: crashed', e && e.stack); process.exit(1); });
