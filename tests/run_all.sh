@@ -679,6 +679,9 @@ fresh; run p2470_e_avatar_ui node p2470_e_avatar_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.0 part D: #1645 producing / raw data per quotation (default, migration), #1649 purchase from the role, surplus per position (admins only), percent position, purchases of accepted quotations
 fresh; run p2470_d_cost_api "$PY" p2470_d_cost_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2470_d_cost_ui node p2470_d_cost_ui.js "$KALMIDO_TEST_DATA"
+# 2.47.0 part A: #1648 fill instead of skip, #1649 masters Freelancer-Rollen / Drehpersonal + their import, #1645 import columns
+fresh; run p2470_a_import_api "$PY" p2470_a_import_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2470_a_roles_ui node p2470_a_roles_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

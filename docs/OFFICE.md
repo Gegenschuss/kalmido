@@ -27,7 +27,13 @@ organisation need not choose.
 - **Services** - what you sell: name in German and English, category (free text such as Video, Audio, Office), unit
   (day, hour, piece, minute, flat), daily and hourly rate, tax class (standard, reduced, exempt), the flags "raw data fee"
   (the position counts towards the raw data amount) and "producing" (the position's quantity counts towards the
-  producing days), internal / external, role. Search box, archive.
+  producing days), internal / external, role. Search box, archive. 2.47.0: the unit "percent" (a rate on the external
+  fees, e.g. the Künstlersozialkasse), the kind "shoot" (only in the shoot calculation, never in the position picker)
+  and the freelancer role the service points to (`role_id`). Below the services two masters: **Freelancer roles**
+  (name DE / EN, purchase price per day and per hour; the role's price is the default purchase price of a new position)
+  and **Crew** (Drehpersonal of the shoot calculation: name DE / EN, daily rate = the client's price, internal /
+  external, an optional markup in percent). Purchase prices and markups reach only the organisation's admins: members
+  get the rows without them (also in the export), never in a PDF.
 - **Equipment** - devices with a daily rate, and **sets** (a bundle of devices with a discount in percent).
 - **Text blocks** - reusable texts in German and English, grouped by kind: the rights catalogue (`rights_time`,
   `rights_territory`, `rights_media`), introduction, closing, note, free block between positions, raw data note.
@@ -42,12 +48,11 @@ organisation need not choose.
   (`producing_on`, `raw_on`): new organisations start without them; at the first start of 2.40 an organisation that uses
   them (services, positions, contracts with raw data included) keeps both on, once, so switching off later stays off.
   Off means: no automatic producing / raw data line in new quotations (raw data "none"), the flags of the catalogue are
-  not taken over, the fields, flags and the contract's "raw data included" are hidden, the spreadsheet import ignores
-  those columns; existing and finalised documents keep what they hold. Since 2.47 both are only the default of a new
-  quotation: every quotation has its own switches (`producing_on` 0/1, raw data via `raw_mode`, "none" = off), always
-  shown; the flags of services and positions are always kept, a framework contract always presets raw data; documents of
-  2.46 and older get `producing_on` once at start-up (1 when a position counts towards producing, else the default), so
-  their sums stay. The company data choose the word before the
+  not taken over. Since 2.47 both are only the default of a new quotation: every quotation has its own switches
+  (`producing_on` 0/1, raw data via `raw_mode`, "none" = off), always shown; the flags of services and positions are
+  always kept, the spreadsheet import always reads those columns, a framework contract always presets raw data;
+  existing and finalised documents keep what they hold, documents of 2.46 and older get `producing_on` once at start-up
+  (1 when a position counts towards producing, else the default), so their sums stay. The company data choose the word before the
   management's names in the footer (`md_label`: Geschäftsführung, Gesellschafter, Inhaber, Inhaberin, Vorstand, Partner;
   German or English by the document's language). Unsaved input of these pages survives a change of the view and live
   updates until it is saved or discarded.
@@ -142,7 +147,8 @@ Minimal file:
 ```
 
 Tables and keys: `services` (name_de, name_en, category, sort, unit, daily_rate, hourly_rate, raw_fee, producing, intext,
-role, tax, archived), `equipment` (name, name_en, category, daily_rate, archived), `sets` (name, discount_pct, items
+role, role_id, tax, archived), `roles` (2.47.0: name_de, name_en, cost_day, cost_hour, sort, archived), `crew` (2.47.0:
+name_de, name_en, rate_day, intext, markup_pct, sort, archived), `equipment` (name, name_en, category, daily_rate, archived), `sets` (name, discount_pct, items
 [{equipment_id, qty}], archived), `texts` (kind, key, text_de, text_en, sort, archived), `contracts` (name, date,
 raw_included, rights_time_id, rights_territory_id, rights_media_id, rights_note_de, rights_note_en, closing_de,
 closing_en, rates {service_id: rate}, note, archived), `settings` (the keys of the settings tab).
@@ -161,8 +167,18 @@ is guessed in the background and no language model is involved.
   whose German or English name exists already is a duplicate. DE and EN in separate rows become one device only when the
   sheet has an id column (`id`, `nr`, `article no`, `sku`, ...) and a language column (`language` / `sprache`, value `en`);
   otherwise every row stays a device of its own. Separator
-  rows like `---- VIDEO ----` are the category of the rows below, not services. `Staff` and `Freelancer` are only counted:
-  Kalmido has no master data for them yet.
+  rows like `---- VIDEO ----` are the category of the rows below, not services. 2.47.0: `Freelancer` (`jobtitle`,
+  `dailyrate`, `hourlyrate`) becomes the master "Freelancer roles" (purchase price per day / hour) and `Staff` / `Crew`
+  (`jobtitleDE`, `jobtitleEN`, `dailyrate`, `intext`) the master "Crew" of the shoot calculation, both through the same
+  way; they are imported before the services, so the column `freelancer` of a service points to its role (`role_id`).
+  The column `order` is the order of the category (a table `category` / `order` wins); inside a category the rows keep
+  the file's order. Excel error values like `#NV` count as empty; `intext` may be `intern`, `extern` or `shooting`; a
+  service named "Künstlersozialkasse" becomes a rate in percent (`0.05` -> 5 %). `rawfee` / `producingfee` are always
+  read. A table renamed by Excel (`Services_2`) is found too.
+- **Fill instead of skip (2.47.0)**: a service, device, role or crew row whose name exists already is proposed as "fill":
+  only the EMPTY fields of the existing entry take the file's value (empty = no text / no number; for the flags and the
+  order also 0), set values are never overwritten. The preview lists the fields per row (`fill`); with nothing to fill
+  the row is skipped. The undo empties the filled fields again while they still hold the imported value.
 - **Addresses** are split by rules into company, contact person, street, postcode, city and country: German postcodes
   have 5 digits, Austrian and Swiss 4 (without a country line the split is marked unsure), `D-` / `A-` / `CH-` prefixes and
   a country line set the country, "z. Hd." / "Attn." / "Herr" / "Frau" and `c/o` lines go to the contact, a P.O. box is
@@ -195,8 +211,8 @@ is guessed in the background and no language model is involved.
   stayed. Fields a merge filled are emptied again while they still hold the imported value.
 
 Routes (organisation admin; members only read the archive): `POST /api/office/legacy/preview` (multipart `file`, stores
-nothing), `POST /api/office/legacy/split` `{address}`, `POST /api/office/legacy/import` `{clients, services, equipment}`
-(the preview's rows with `action` new / merge / skip and `merge_id`), `GET /api/office/legacy/runs`,
+nothing), `POST /api/office/legacy/split` `{address}`, `POST /api/office/legacy/import` `{clients, roles, crew, services, equipment}`
+(the preview's rows with `action` new / merge / fill / skip and `merge_id`), `GET /api/office/legacy/runs`,
 `POST /api/office/legacy/runs/<id>/undo`, `POST /api/office/legacy/archive/parse` `{names}`,
 `POST /api/office/legacy/archive/run`, `POST /api/office/legacy/archive` (multipart `file` + `run_id`, `kind`, `number`,
 `project_no`, `project`, `client_id`, `client_name`, `date`, `amount`, `paid`; 409 for a used number or the same PDF
@@ -220,7 +236,7 @@ stops the finalising of an invoice instead of turning silently into `DE`.
 All routes require a signed-in person with the module on and an organisation (`400` with a hint otherwise); writes
 need the organisation's admin. `GET/PUT /api/office/settings`, `GET /api/office/packs`, `GET /api/office/packs/<code>`,
 `POST /api/office/packs/validate`, `GET /api/office/number-preview?scheme=&kind=offer|invoice|credit|reminder` (the next number, `yearly` = the counter restarts every year, or a plain-language `error`), and for each of `services`, `equipment`,
-`sets`, `texts`, `contracts`: `GET /api/office/<kind>?q=&archived=1`, `POST /api/office/<kind>`,
+`sets`, `texts`, `contracts`, `roles`, `crew` (2.47.0): `GET /api/office/<kind>?q=&archived=1`, `POST /api/office/<kind>`,
 `GET/PATCH/DELETE /api/office/<kind>/<id>` (delete archives a row that documents, contracts or sets still use).
 `GET /api/office/export`, `POST /api/office/import?overwrite=1` (JSON body or multipart `file`). Documents: see
 `/api/office/docs` below. 2.38.0 adds `POST /api/office/docs/<id>/invoice`, `POST /api/office/docs/<id>/credit`,
