@@ -7048,5 +7048,6 @@
   "A page with this name already exists": "Une page portant ce nom existe déjà",
   "This is not a ZIP file": "Ce n'est pas un fichier ZIP",
   "Too many files (at most {0})": "Trop de fichiers (au plus {0})",
-  "The archive is too large": "L'archive est trop volumineuse"
+  "The archive is too large": "L'archive est trop volumineuse",
+  "Mentioned in": "Mentionnée dans"
 }

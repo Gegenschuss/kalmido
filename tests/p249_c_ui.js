@@ -123,6 +123,15 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   check(await until(async () => !(await tasks()).some(t => t.id === sec.id)), 'Del deletes the branch (task)');
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await tasks()).some(t => t.id === sec.id)), 'Undo brings it back');
+  // the task names the pages that mention it; the command field finds pages
+  await call('POST', '/api/wiki/pages', {space: SP, path: 'Docs/Mentions', body: `About #${T1}`});
+  w.eval(`WK.men = {}; openDetail(${T1})`);
+  const men = await until(() => d.querySelector('#detail .wkmen a.wklink'));
+  check(men && men.textContent === 'Docs/Mentions', 'the task shows "Mentioned in" the page');
+  w.eval(`closeDetail()`);
+  await w.eval(`(async () => { for (const sp of wk_spaces()) await wk_load(sp, true); })()`);
+  const pal = w.eval(`(() => { const out = []; wk_palAdd((id, k, label) => out.push(id + ':' + label)); return out.join('|'); })()`);
+  check(/wk:\d+:Other/.test(pal) && /wk:\d+:Mentions/.test(pal), 'the command field lists the pages: ' + pal);
   // outline
   d.querySelector('#view [data-mm="as-outline"]').click();
   await sleep(200);

@@ -253,6 +253,26 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); WK.ac = null; box?.classList.add('hidden'); }
 }, true);
 document.addEventListener('focusout', e => { if (e.target.id === 'wk-body') wk_flush(); });
+// ---- the command field: the pages of every space (their indexes load once in the background, the next opening has them)
+function wk_palAdd(add) {
+  if (!feat('wiki')) return;
+  for (const sp of wk_spaces()) {
+    if (!WK.idx[sp]) { wk_load(sp); continue; }
+    for (const p of wk_pages(sp)) add('wk:' + p.id, 'note', wk_base(p.path), 'book', () => go('wiki/' + p.id), {sub: [wk_spaceName(sp), p.path.includes('/') ? p.path.split('/').slice(0, -1).join('/') : ''].filter(Boolean).join(' · ')});
+  }
+}
+// ---- a task's "Mentioned in": the pages I may read that name #id (asked once per change of the data)
+WK.men = {};
+function wk_mentionHtml(t) {
+  if (!feat('wiki') || !(t.id > 0)) return '';
+  const m = WK.men[t.id];
+  if (!m || m.v !== S.v) {
+    if (!m?.busy) { WK.men[t.id] = {...(m || {}), busy: true}; wk_mentions(t.id).then(ps => { WK.men[t.id] = {v: S.v, pages: ps}; if (S.sel === t.id && ps.length !== (m?.pages || []).length) renderDetail(); }); }
+    if (!m?.pages) return '';
+  }
+  const ps = (WK.men[t.id].pages || m?.pages || []); if (!ps.length) return '';
+  return `<div class="dsec wkmen">${ic('book', 's')}<span class="muted">${tr('Mentioned in')}</span>${ps.map(p => `<a href="#wiki/${p.id}" class="wklink">${esc(p.path)}</a>`).join('<span class="muted">,</span>')}</div>`;
+}
 // ---- search / command field: pages of every space ("Knowledge page")
 async function wk_search(q) {
   if (!feat('wiki') || !q || q.length < 2) return [];

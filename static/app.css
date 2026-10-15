@@ -6884,3 +6884,5 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 @media (prefers-reduced-motion:no-preference){
   .mmnode rect{transition:stroke .15s}
 }
+/* 2.49.0 C (#1199): a task's "Mentioned in" (knowledge pages) */
+.wkmen{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;font-size:var(--fs-s)}
