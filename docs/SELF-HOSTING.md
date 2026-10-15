@@ -94,6 +94,14 @@ organisation admin adds and removes members. A server without any organisation l
 once there is one, people see the members of their organisations and the people they share something with; private lists
 reach anybody else by e-mail address.
 
+**Finding people by e-mail (2.49).** Under *Settings > Account > Find people* a person can find someone by their full
+e-mail address and send a connection request; once it is accepted, both see each other like after sharing a list. Only
+accounts that switched on *Findable by e-mail* (off by default) and confirmed their address with a mailed link can be
+found, so the server needs mail (SMTP, see *Mail*) for anyone to become findable. A search never shows whether an address
+has an account: everything that is not findable gets the same answer. The address book check matches the addresses of the
+person's own contacts on the server (they never leave it). Limits: 30 searches and 300 checked addresses per account and
+day, plus a brake per client address (`KALMIDO_DISC_PER_IP`, default 60 per 15 minutes). Agents and kid accounts cannot search and are never found.
+
 `KALMIDO_INSTANCE_MODE` is deprecated: `organisation` (and an empty value) are ignored, only `shared` (no organisations,
 people see only their own contacts) still applies. `KALMIDO_ORG_NAME` only names the organisation the first-run setup
 creates. On the update from a server in the former mode *organisation* (one organisation, no variable), the first start

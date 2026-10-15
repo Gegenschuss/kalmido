@@ -754,6 +754,9 @@ fresh; run p247c_b_ui node p247c_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p247c_a_ui node p247c_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.49.0 lead: the fixed sign Private / organisation in the list header, the filter follows the list (#1770)
 fresh; run p249_l_ui node p249_l_ui.js "$KALMIDO_TEST_DATA"
+# 2.49.0 part E: #1106 find people by e-mail (opt-in, confirmed), address book check, connection requests, blocks
+fresh; run p249_e_api "$PY" p249_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p249_e_ui node p249_e_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

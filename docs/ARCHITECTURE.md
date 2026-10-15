@@ -363,7 +363,8 @@ everyone. The modes match the two ways Kalmido is run:
 
 - **own organisation** (`org`, the default): one company or family per instance, as on a self-hosted server.
 - **own contacts** (`contacts`): a shared, hosted instance of many households and companies: no directory; a person sees
-  only the people they are connected with (a list or group in common, their kids / parents, their own agents) and shares
+  only the people they are connected with (a list or group in common, their kids / parents, their own agents, an accepted
+  connection request -- `conn_links`, 2.49.0, `accounts/discover.py`) and shares
   by e-mail address (the answer never says whether the address has an account); new people come by invitation (#697).
 
 A new account joins the instance's first organisation (or the ones the admin picks); on the update to 2.22 one

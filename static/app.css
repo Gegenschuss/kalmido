@@ -6822,3 +6822,14 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 #top h1 .wsbadge{flex:none}
 #top.tl4 .wsbadge span{display:none}
 @media (max-width:599px){ .wsbadge{max-width:7.5rem;padding:.0625rem .4375rem;margin-left:.375rem} }
+
+/* 2.49.0 E (#1106) Find people: the search row, result / request rows, the link in the share dialog */
+.dscmodal .card{max-width:34rem}
+.dsc-find{display:flex;gap:.5rem;align-items:center}
+.dsc-find input{flex:1;min-width:0}
+.dsc-row{gap:.5rem}
+.dsc-row .btn,.dsc-row .iconbtn{flex:none}
+.dsc-st{font-size:.85rem;white-space:nowrap}
+.dsc-none,.dsc-check{margin:.25rem 0 .5rem}
+.dsc-sharelink{display:inline-block;margin:.25rem 0 .5rem}
+@media (pointer:coarse){.dsc-row .btn{min-height:2.75rem}}

@@ -151,6 +151,7 @@ ORDER = (
     "team.forms",
     "team.v1",
     "accounts.signup",
+    "accounts.discover",  # 2.49.0 (#1106): finding people by e-mail, connection requests
     "admin.hosting",
     "admin.clientip",  # 2.33.0 (#834)
     "tasks.stale",  # 2.34.0 (#266)

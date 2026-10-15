@@ -168,13 +168,16 @@ def is_org_admin(c, uid, oid):
 
 
 def _connections(c, uid):
-    """The people uid is connected with: a list / group in common, their kids / parents, their own agents, their chats."""
+    """The people uid is connected with: a list / group in common, their kids / parents, their own agents, their chats, an
+    accepted connection request (2.49.0, #1106, accounts/discover.py)."""
     rows = c.execute("""SELECT m2.user_id FROM list_members m1 JOIN list_members m2 ON m2.list_id=m1.list_id WHERE m1.user_id=?
                         UNION SELECT l.owner_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=?
                         UNION SELECT m.user_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE l.owner_id=?
                         UNION SELECT g2.user_id FROM group_members g1 JOIN group_members g2 ON g2.group_id=g1.group_id WHERE g1.user_id=?
                         UNION SELECT parent_id FROM kid_parents WHERE kid_id=? UNION SELECT kid_id FROM kid_parents WHERE parent_id=?
-                        UNION SELECT user_id FROM agents WHERE owner_id=?""", (uid,) * 7).fetchall()
+                        UNION SELECT user_id FROM agents WHERE owner_id=?
+                        UNION SELECT b_id FROM conn_links WHERE a_id=? AND deleted_at IS NULL
+                        UNION SELECT a_id FROM conn_links WHERE b_id=? AND deleted_at IS NULL""", (uid,) * 9).fetchall()  # 2.49.0 (#1106): accepted requests
     return {r[0] for r in rows}
 
 
