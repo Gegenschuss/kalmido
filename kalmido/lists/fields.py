@@ -16,6 +16,7 @@ from ..lists.lists import COL_MAX, columns_out
 from ..tasks.validation import log_act
 from ..collab.comments import user_names
 from ..personal.timetrack import BadInput
+from .formula import fx_check_cycles, fx_compile, fx_display
 
 
 # ---------------------------------------------------------------- custom fields, package 3
@@ -24,15 +25,18 @@ from ..personal.timetrack import BadInput
 # values, but only the fields of its current list are shown / filtered (moving it back brings them back).
 # Deleting a field deletes its values. Values are stored as text: number canonical ("12.5"), select =
 # option id, date = YYYY-MM-DD, checkbox = "1" (unchecked = no row), person = user id (a member of the list).
-FIELD_TYPES = ("text", "number", "select", "date", "checkbox", "person", "url")
+FIELD_TYPES = ("text", "number", "select", "date", "checkbox", "person", "url", "formula")  # 2.43.0 (#1328): + formula
 FIELD_MAX = 20          # per list
 FIELD_PINNED_MAX = 2    # chips on the task rows
 COLOR_RE = re.compile(r"#[0-9a-fA-F]{3,8}")
 
 
-def field_dict(r):
-    return {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "type": r["type"],
-            "options": json.loads(r["options"] or "{}"), "pinned": int(r["pinned"] or 0), "sort": r["sort"]}
+def field_dict(r, c=None):
+    d = {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "type": r["type"],
+         "options": json.loads(r["options"] or "{}"), "pinned": int(r["pinned"] or 0), "sort": r["sort"]}
+    if r["type"] == "formula" and c is not None:  # 2.43.0 (#1328): the formula with today's field names
+        d["options"]["formula"] = fx_display(d["options"].get("expr"), c.execute("SELECT id, name FROM list_fields WHERE list_id=?", (r["list_id"],)).fetchall())
+    return d
 
 
 def field_clean_def(b, old=None):
@@ -46,10 +50,14 @@ def field_clean_def(b, old=None):
     raw = b.get("options") if "options" in b else (json.loads(old["options"] or "{}") if old else {})
     raw = raw if isinstance(raw, dict) else {}
     opts = {}
-    if ftype == "number":
+    if ftype in ("number", "formula"):
         unit = str(raw.get("unit") or "").strip()[:12]
         if unit:
             opts["unit"] = unit
+    if ftype == "formula":  # 2.43.0 (#1328): expr = stored with field ids (fx_compile in create / update); empty fields = 0 or blank
+        opts["expr"] = str(raw.get("expr") or "")[:2000]
+        if raw.get("empty") == "blank":
+            opts["empty"] = "blank"
     if ftype == "select":
         items, seen = [], set()
         for o in (raw.get("options") if isinstance(raw.get("options"), list) else [])[:50]:
@@ -70,6 +78,18 @@ def field_clean_def(b, old=None):
     return name, ftype, opts
 
 
+def fx_set(c, lid, b, opts, fid=None):
+    """2.43.0 (#1328): the typed formula (b["formula"], field names) -> opts["expr"] with field ids; checks names, types
+    and circular references (BadInput with the position / field name)."""
+    if "formula" not in b and opts.get("expr"):
+        return
+    fs = c.execute("SELECT id, name, type, options FROM list_fields WHERE list_id=?", (lid,)).fetchall()
+    expr, refs = fx_compile(b.get("formula") or "", fs, fid)
+    if fid is not None:
+        fx_check_cycles(fs, fid, refs)
+    opts["expr"] = expr
+
+
 def fmt_num(x):
     s = ("%.6f" % x).rstrip("0").rstrip(".")
     return "0" if s in ("-0", "") else s
@@ -82,6 +102,8 @@ def field_value(c, f, v, lid):
         return None
     if isinstance(v, (dict, list)):
         raise BadInput(tr("{0}: invalid value", name))
+    if t == "formula":  # 2.43.0 (#1328): computed by the server, never written
+        raise BadInput(tr("{0} is calculated and cannot be set", name))
     if t == "text":
         return str(v).strip()[:1000] or None
     if t == "url":
@@ -195,6 +217,8 @@ def field_create(lid):
     if c.execute("SELECT COUNT(*) FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0] >= FIELD_MAX:
         return err(tr("At most {0} fields per list", FIELD_MAX))
     name, ftype, opts = field_clean_def(b)
+    if ftype == "formula":
+        fx_set(c, lid, b, opts)  # a new field: nothing can use it yet (no cycle)
     pinned = 1 if b.get("pinned") else 0
     if pinned and not fields_pinned_ok(c, lid):
         return err(tr("At most {0} fields can be shown on the task rows", FIELD_PINNED_MAX))
@@ -209,7 +233,7 @@ def field_create(lid):
     on = tb_fields_module_on(c, lid)  # 2.39.1 (#1293)
     bump(c)
     c.commit()
-    return jsonify({**field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone()), "modules_on": on})
+    return jsonify({**field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c), "modules_on": on})
 
 
 @app.patch("/api/fields/<int:fid>")
@@ -220,6 +244,8 @@ def field_update(fid):
     c = db()
     r = need_field(c, fid)
     name, _, opts = field_clean_def(b, r)
+    if r["type"] == "formula":
+        fx_set(c, r["list_id"], b, opts, fid)
     if "pinned" in b:
         pinned = 1 if b["pinned"] else 0
         if pinned and not r["pinned"] and not fields_pinned_ok(c, r["list_id"], fid):
@@ -238,7 +264,7 @@ def field_update(fid):
     c.execute("UPDATE list_fields SET name=?, options=? WHERE id=?", (name, json.dumps(opts, ensure_ascii=False), fid))
     bump(c)
     c.commit()
-    return jsonify(field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone()))
+    return jsonify(field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c))
 
 
 @app.get("/api/fields/<int:fid>/count")
@@ -246,7 +272,17 @@ def field_count(fid):
     """2.40.0 (#1192): how many tasks hold a value of the field (for the delete confirmation); owner and list admins."""
     c = db()
     need_field(c, fid)
-    return jsonify(tasks=c.execute("SELECT COUNT(DISTINCT task_id) FROM task_field_values WHERE field_id=?", (fid,)).fetchone()[0])
+    return jsonify(tasks=c.execute("SELECT COUNT(DISTINCT task_id) FROM task_field_values WHERE field_id=?", (fid,)).fetchone()[0],
+                   used_by=fx_used_by(c, fid))
+
+
+def fx_used_by(c, fid):
+    """2.43.0 (#1328): names of the formula fields that read field fid (the delete confirmation warns)."""
+    r = c.execute("SELECT list_id FROM list_fields WHERE id=?", (fid,)).fetchone()
+    if not r:
+        return []
+    return [f["name"] for f in c.execute("SELECT name, options FROM list_fields WHERE list_id=? AND type='formula' AND id<>?", (r[0], fid))
+            if "{#%d}" % fid in (json.loads(f["options"] or "{}").get("expr") or "")]
 
 
 @app.delete("/api/fields/<int:fid>")

@@ -95,6 +95,8 @@ def load_tasks(c, where, args=(), full_snips=False):
                               JOIN tasks t ON t.id=v.task_id WHERE f.list_id=t.list_id"""):
             if r["task_id"] in ids:
                 fvs.setdefault(r["task_id"], {})[str(r["field_id"])] = r["value"]
+        from ..lists.formula import fx_fill
+        fx_fill(c, fvs, {r["id"]: r["list_id"] for r in rows if r["list_id"]})  # 2.43.0 (#1328): formula fields, computed
         for r in c.execute(f"""SELECT d.task_id, d.blocker_id, b.list_id FROM task_deps d JOIN tasks b ON b.id=d.blocker_id
                               JOIN tasks w ON w.id=d.task_id
                               WHERE b.status=0 AND b.deleted_at IS NULL AND b.list_id IN {PROJ_SQL} AND w.list_id IN {PROJ_SQL}"""):

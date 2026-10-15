@@ -32,7 +32,7 @@ function reverseOf(before, after, fields = UNDO_FIELDS) {
   for (const k of fields) {
     if (k === 'fields') {
       const bf = before.fields || {}, af = after.fields || {}, fb = {}, fp = {};
-      for (const f of new Set([...Object.keys(bf), ...Object.keys(af)])) if (nv(bf[f]) !== nv(af[f])) { fb[f] = nv(bf[f]); fp[f] = nv(af[f]); }
+      for (const f of new Set([...Object.keys(bf), ...Object.keys(af)])) if (nv(bf[f]) !== nv(af[f]) && fieldById(+f)?.type !== 'formula') { fb[f] = nv(bf[f]); fp[f] = nv(af[f]); }  // 2.43.0 (#1328): formulas follow their fields
       if (Object.keys(fb).length) { back.fields = fb; prev.fields = fp; }
       continue;
     }

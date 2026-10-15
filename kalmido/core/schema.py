@@ -1234,6 +1234,10 @@ MIGRATIONS = [
     ("org_keys", "kek_check_prev", "ALTER TABLE org_keys ADD COLUMN kek_check_prev TEXT"),
     # 2.42.0 (#1376): a change that matters to one person only (their own read mark, task_seen); NULL = everyone who sees the task
     ("dl_changes", "user_id", "ALTER TABLE dl_changes ADD COLUMN user_id BIGINT"),
+    # 2.43.0 (#1328): the sum row of a list's number columns ({column key: sum|avg|count|min|max}) and the key figures of a
+    # project page (json list of tiles), both the same for everyone
+    ("lists", "tb_sums", "ALTER TABLE lists ADD COLUMN tb_sums TEXT"),
+    ("lists", "fx_kpis", "ALTER TABLE lists ADD COLUMN fx_kpis TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
