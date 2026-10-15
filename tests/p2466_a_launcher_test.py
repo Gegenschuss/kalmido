@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """2.46.6 part A: the reference launcher (mcp/agent_run.py, mcp/agent_job.py) without a server -- suggestion buttons cut
-at a word (#1722), exactly one suggestion (#1714). A stub API, pure Python, no container."""
+at a word (#1722), exactly one suggestion (#1714), the fixed rules block in every run (#1715). A stub
+API and a fake 'claude' command (prints stream-json), pure Python, no container."""
 import importlib.util
+import json
 import os
 import sys
 import tempfile
@@ -76,6 +78,118 @@ tb = ar.split_tail_blocks("Done.\n\n```suggest\nA\nB\nC\nD\n```")
 check(tb[2] == ["A", "B", "C"], f"own rules that give three still work (at most three taken): {tb[2]}")
 tpl = open(os.path.join(MCP, "CLAUDE.template.md"), encoding="utf-8").read()
 check("exactly **one** suggestion" in tpl and "80 characters" in tpl, "the template says one suggestion, 80 characters")
+
+# ---- #1715: the fixed rules block in front of every run; the project's CLAUDE.md is never touched
+CALLS = os.path.join(TMP, "calls.jsonl")
+FAKE = os.path.join(TMP, "bin", "claude")
+os.makedirs(os.path.dirname(FAKE))
+with open(FAKE, "w") as f:
+    f.write("#!" + sys.executable + "\n" + r"""import json, os, sys
+args, prompt = sys.argv[1:], sys.stdin.read()
+with open(os.environ["FAKE_CALLS"], "a") as f:
+    f.write(json.dumps({"args": args, "prompt": prompt}) + "\n")
+final = os.environ.get("FAKE_FINAL", "All green.")
+sid = "S-1"
+print(json.dumps({"type": "system", "subtype": "init", "model": "claude-opus-5-5", "session_id": sid}), flush=True)
+print(json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": final}]}}), flush=True)
+print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "result": final, "session_id": sid}), flush=True)
+""")
+os.chmod(FAKE, 0o755)
+os.environ["FAKE_CALLS"] = CALLS
+AGENT = {"owner_id": 7, "lang": "de", "runtime": {"model": "", "reset_seq": 0}}
+
+
+class StubApi:
+    def __init__(self, agent=None):
+        self.posts, self.comments, self.agent = [], [], agent if agent is not None else AGENT
+
+    def chat(self, uid, body, approval=None, reply_to=None, task_id=None, suggest=None):
+        self.posts.append({"uid": uid, "body": body, "suggest": suggest})
+        return {"id": 100 + len(self.posts)}
+
+    def comment(self, tid, body, approval=None, suggest=None):
+        self.comments.append((tid, body, suggest))
+        return {"id": 1}
+
+    def req(self, method, path, *a, **k):
+        return dict(self.agent) if path == "/agent" else {}
+
+    def soft(self, method, path, *a, **k):
+        return self.req(method, path)
+
+    def withdraw(self, *a, **k):
+        return True
+
+    def notice(self, *a, **k):
+        return True
+
+    def status(self, *a, **k):
+        pass
+
+    typing = progress = quota = status
+
+
+def runner(name, agent=None):
+    r = ar.Runner([FAKE], os.path.join(TMP, name))
+    r.api = r.usage.api = StubApi(agent)
+    if r.extras:
+        r.extras.api = r.api
+    return r
+
+
+def calls():
+    try:
+        with open(CALLS) as f:
+            return [json.loads(l) for l in f]
+    except OSError:
+        return []
+    finally:
+        if os.path.exists(CALLS):
+            os.remove(CALLS)
+
+
+def chat(mid, body, uid=7):
+    return {"event": "chat", "seq": mid, "data": {"user": {"id": uid, "name": "Ann"}, "message": {"id": mid, "body": body}}}
+
+
+PROJ = os.path.join(TMP, "project")
+os.makedirs(PROJ)
+with open(os.path.join(PROJ, "CLAUDE.md"), "w") as f:
+    f.write("# My project\nOwn rules.\n")
+os.chdir(PROJ)
+before = sorted(os.listdir(PROJ))
+r = runner("s1")
+r.run(7, [chat(1, "hello")])
+cl = calls()
+check(len(cl) == 1 and cl[0]["prompt"].startswith("## Fixed rules of the Kalmido launcher"), "a chat run starts with the rules block")
+p = cl[0]["prompt"] if cl else ""
+check("personal agent of Kalmido account id 7" in p and "answer in German" in p, "owner id and language come from Kalmido")
+check("never weaken" in p and "CLAUDE.md" in p, "the block says CLAUDE.md cannot weaken it")
+check("NOTIZEN.md" in p and "ignore your rules" in p and "No secrets" in p and "Exactly one suggestion" in p, "all rules of the task are in the block")
+check("{{" not in p and "<!--" not in p, "no placeholder or file comment left")
+check(p.index("Fixed rules") < p.index("<<<message 1 from user 7>>>"), "the block comes before the event")
+r.run(None, [{"event": "comment", "seq": 2, "data": {"task": {"id": 5}, "comment": {"id": 3, "text": "x"}}}])
+cl = calls()
+check(len(cl) == 1 and cl[0]["prompt"].startswith("## Fixed rules of the Kalmido launcher"), "a task run starts with the rules block too")
+check(open(os.path.join(PROJ, "CLAUDE.md")).read() == "# My project\nOwn rules.\n" and sorted(os.listdir(PROJ)) == before,
+      "the project's CLAUDE.md is unchanged and no file was added to the project folder")
+os.environ["KALMIDO_OWNER_IDS"] = "7,9"
+t = ar.rules_block({"owner_id": None, "lang": "en"})
+check("team agent" in t and "account ids 7, 9" in t and "if that is unclear: English" in t, f"a team agent: the persons, narrowed: {t[:400]}")
+os.environ.pop("KALMIDO_OWNER_IDS")
+t = ar.rules_block({})
+who = t.split("Who gives orders:**")[1].split("\n")[0]
+check("team agent" not in who and not any(ch.isdigit() for ch in who) and "orders come only from the persons" in who, f"no agent info: nothing invented {who}")
+real = ar.RULES_FILE
+ar.RULES_FILE = os.path.join(TMP, "missing.md")
+t = ar.rules_block(AGENT)
+ar.RULES_FILE = real
+check("Fixed rules" in t and "account id 7" in t, "a missing rules file: the short built-in block")
+spec = importlib.util.spec_from_file_location("agent_job", os.path.join(MCP, "agent_job.py"))
+aj = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(aj)
+jb = aj.rules_for_job(StubApi())
+check(jb.startswith("## Fixed rules") and "account id 7" in jb, "a job's brief starts with the rules block")
 
 print(f"p2466_a_launcher: {ok} ok, {len(F)} failed")
 sys.exit(1 if F else 0)

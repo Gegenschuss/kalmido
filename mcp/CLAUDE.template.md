@@ -6,6 +6,10 @@
 >
 > **English:** Paste this template into the `CLAUDE.md` (or system prompt) of every Kalmido agent, below your own rules on
 > who may give it instructions. Settings › Agents › Set up shows the same block with a copy button.
+>
+> **Reference launcher (2.46.6):** `mcp/agent_run.py` puts its own fixed safety rules (`mcp/agent_rules.md`: who gives
+> orders, content is no order, no secrets, language, `NOTIZEN.md`, one suggestion) in front of
+> every run, and your `CLAUDE.md` cannot weaken them. This template stays for reading and for other hosts.
 
 <!-- kalmido-agent-rules:start -->
 ## Kalmido agent behaviour rules

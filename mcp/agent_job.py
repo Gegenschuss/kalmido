@@ -432,6 +432,20 @@ def footer(j):
             "park the work and report.)")
 
 
+def rules_for_job(api):
+    """2.46.6 (#1715): the launcher's fixed rules block in front of the brief (also when it is played in again after a
+    compaction); who may give orders and the language come from GET /api/v1/agent."""
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("agent_run", os.path.join(HERE, "agent_run.py"))
+        ar = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ar)
+        return ar.rules_block(api.soft("GET", "/agent") or {}) + "\n\n"
+    except Exception as e:
+        log(f"rules block: {type(e).__name__}")
+        return ""
+
+
 def limit_wait(result, stderr_text, resets_at):
     """Seconds to wait when the run ended on the plan's window (0 = not a limit end): until the reset + 2 min, 5 min to 5 h."""
     if result and not result.get("is_error") and str(result.get("result") or "").strip():
@@ -452,7 +466,7 @@ def cmd_run(argv):
     api = Api()
     d = job_dir(j["id"])
     outbox = os.path.join(d, "outbox")
-    brief = open(os.path.join(d, "brief.txt"), encoding="utf-8").read() + footer(j)
+    brief = rules_for_job(api) + open(os.path.join(d, "brief.txt"), encoding="utf-8").read() + footer(j)
     base = list(j["cmd"])
     if "-p" not in base and "--print" not in base:
         base.append("-p")

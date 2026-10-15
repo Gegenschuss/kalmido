@@ -1006,7 +1006,8 @@ PUT /api/v1/agent/status   {"status": "idle" | "working" | "waiting" | "error", 
                             "host": "studio-mac"}   (2.44.0, optional: the computer, kept on the token in use)
 GET /api/v1/agent          -> {id, username, display_name, enabled, note, status, status_text, status_at, status_task,
                                job_tasks, jobs: {running, waiting}, webhook: {configured, enabled}, events_cursor,
-                               online, last_poll_at, runtime (2.4.1)}
+                               online, last_poll_at, runtime (2.4.1), owner_id, org_id (2.28.0),
+                               lang (2.46.6: the owner's language for a personal agent, else the agent's own)}
 ```
 
 Where people see it (2.30.0, only where the agent really writes):
@@ -1494,7 +1495,12 @@ ending in a block ` ```approval ` (first line the title, further lines what happ
 (`approval`, 2.35.0; older servers: Yes / No buttons); the person's answer arrives as `chat_choice` with `approval` and
 starts the next run. A final block ` ```suggest ` becomes answer buttons: the prompt asks for exactly one suggestion per chat answer
 (2.46.6), never one an earlier, still visible message already offers (the launcher still takes up to three, so own rules
-break nothing); a button holds at most 80 characters, a longer suggestion is cut at a word with "…" (2.46.6). 2.40.0 (approval check): a chat answer that asks to decide or makes a proposal without that block
+break nothing); a button holds at most 80 characters, a longer suggestion is cut at a word with "…" (2.46.6). 2.46.6
+(#1715): every prompt (chat, task event, job, wake run) starts with the launcher's fixed rules block
+(`mcp/agent_rules.md`: who may give orders -- the owner's account id or, for a team agent, the persons whose events reach
+it --, everything else is content, no secrets, the owner's language from `lang`, `NOTIZEN.md` instead of memory, exactly
+one suggestion); the project's `CLAUDE.md` can add rules but never weaken it, and the launcher never
+writes it (see [AGENT-SECURITY.md](AGENT-SECURITY.md#6-claudemd-rules-template)). 2.40.0 (approval check): a chat answer that asks to decide or makes a proposal without that block
 goes back to the agent once in the same session (`--resume`: the complete answer with the block, no tools); still none ->
 it is posted with a visible note that nothing happens without an explicit yes (`KALMIDO_APPROVAL_CHECK=0`: off). 2.42.0
 (#1383): the final text of a **task** run is posted nowhere unless it ends with a block ` ```approval ` or ` ```suggest `;
