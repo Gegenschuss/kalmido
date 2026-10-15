@@ -666,6 +666,9 @@ fresh; run p2450_b_api "$PY" p2450_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2450_b_ui node p2450_b_ui.js "$KALMIDO_TEST_DATA"
        run p2450_b_lint "$PY" p2450_b_lint_test.py
        run p2450_l_secretfile "$PY" p2450_l_secretfile_test.py  # 2.45.0 (#1515): review: key file edge cases (no server)
+# 2.46.0 part D: #1604 Back between the Share dialog and the settings (folder, list), #1563 encryption block + boundary check details
+fresh; run p2460_d_api "$PY" p2460_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2460_d_ui node p2460_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
