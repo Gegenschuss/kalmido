@@ -15,14 +15,27 @@ services:
       # 2.37.0: the data lives in PostgreSQL (service "db" below). An own / managed server instead: set DATABASE_URL in
       # .env and remove the db service and depends_on (docs/SELF-HOSTING.md). Use letters and digits for the password.
       DATABASE_URL: ${DATABASE_URL:-postgresql://kalmido:${POSTGRES_PASSWORD}@db:5432/kalmido}
+      # 2.45.0: without KALMIDO_SECRET_KEY in .env the server key is created once in this file (own folder ./secret,
+      # never inside ./data: a backup must not carry the key next to the data it protects). Keep a copy of it.
+      KALMIDO_SECRET_FILE: ${KALMIDO_SECRET_FILE:-/secret/kalmido.key}
     depends_on:
       db:
         condition: service_healthy
     volumes:
       # attachments, backups, office files; an old tasks.db here moves to PostgreSQL on the first start of 2.37
       - ./data:/data
+      # the server key (see KALMIDO_SECRET_FILE above); create the folder yourself (mkdir secret) so the container can write it
+      - ./secret:/secret
+    healthcheck:
+      # 2.45.0: python3 is in the image (no curl); "docker compose ps" shows healthy / unhealthy
+      test: ["CMD", "python3", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/api/health' % os.environ.get('PORT', '3040'), timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
     ports:
-      # Built-in login by default (setup page on the first start). Keep it on localhost behind a
+      # Built-in login by default (setup page on the first start, with the one-time code from
+      # "docker compose logs kalmido"). Keep it on localhost behind a
       # reverse proxy with HTTPS for use outside your network.
       - "127.0.0.1:3040:3040"
       # Single sign-on via a trusted proxy header (see .env.example / README): map the proxy port

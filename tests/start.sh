@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # start.sh [datadir] -- (re)start a FRESH test container with a stub ntfy server inside it.
 # The data dir is wiped first unless KEEP=1. Extra docker run arguments: $EXTRA (word-split).
+# 2.45.0 (#1515): KALMIDO_SETUP_CODE=off unless set (the first setup needs no code from the log); KALMIDO_SETUP_CODE= tests the code.
 # 2.37.0 (#1150): the database is Postgres. A database container "<container>-db" (postgres:17, data in RAM, no published port)
 # is started once and kept; every data dir gets its OWN database in it (name from the path), so a data dir and its database
 # belong together like tasks.db did: without KEEP both start empty, with KEEP=1 both stay. The app reaches it via --link
@@ -67,6 +68,7 @@ docker run -d --name "$NAME" --network bridge --user "$(id -u):$(id -g)" --secur
   -e TZ=Europe/Berlin -e TASKS_DB=/data/tasks.db -e PUBLIC_URL=https://kalmido.example \
   --link "$DBC:db" -e DATABASE_URL="postgresql://$DBU:kalmido@db/$DBN" \
   -e AUTH_PROXY_HEADER=Remote-User -e AUTH_TRUSTED_PROXIES="$GW" -e AUTH_PROXY_PORT=3045 \
+  -e KALMIDO_SETUP_CODE="${KALMIDO_SETUP_CODE-off}" \
   -e KALMIDO_UPDATE_CHECK=0 -e KALMIDO_ONBOARDING="${KALMIDO_ONBOARDING:-0}" -e KALMIDO_ADMIN_ALERTS="${KALMIDO_ADMIN_ALERTS:-0}" -e NTFY_URL=http://127.0.0.1:9999 -e TASKS_PUSH_GAP=3 -e TASKS_WATCHDOG_INTERVAL=1 -e KALMIDO_TIDY_QUIET_S=${KALMIDO_TIDY_QUIET_S:-0} -e KALMIDO_NOTIF_TEMPLATE=${KALMIDO_NOTIF_TEMPLATE:-all} -e TASKS_MAX_FILE_MB=1 \
   -p "127.0.0.1:$PPORT:3045" -p "127.0.0.1:$PORT:3040" -v "$D":/data ${EXTRA:-} "$IMG" 2>&1 >/dev/null | { grep -v "Links on the default bridge" >&2 || true; }
 [[ ${PIPESTATUS[0]} -eq 0 ]] || exit 1  # (the --link deprecation warning is noise here)

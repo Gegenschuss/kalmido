@@ -1141,9 +1141,11 @@ function impInit(md) {
   });
 }
 // Settings > Administration: the instance-wide switches, applied at once
+// 2.45.0 (#1515): no server key = tokens, the sign-on secret and organisation encryption cannot be stored: say so loudly
+const shKeyWarn = a => a.secret_key === false ? `<div class="shint warn shkey" role="alert"><b>${tr('The server key is missing')}</b> ${esc(a.secret_key_problem === 'invalid' ? tr('KALMIDO_SECRET_KEY (or the key file) is not valid: it must be 32 random bytes, base64.') : a.secret_key_problem === 'file_in_data' ? tr('KALMIDO_SECRET_FILE lies inside the data or backup folder and was ignored. Put it on its own volume.') : a.secret_key_problem === 'file_error' ? tr('The key file KALMIDO_SECRET_FILE cannot be read or written, see the server log.') : tr('Without KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE no access token can be stored and organisation data stays unencrypted. See SELF-HOSTING.md.'))}</div>` : '';
 function instanceHtml(chk, hint) {
   const a = S.about || {};
-  return `<h4 id="s-instance-h">${tr('Whole server')}</h4>
+  return `${shKeyWarn(a)}<h4 id="s-instance-h">${tr('Whole server')}</h4>
     ${hint(tr('Apply to every user at once. Nothing is deleted: switched back on, everything is there again.') + ' ' + tr('Collaboration and time tracking for everyone: Settings > Modules.'))}
     <div class="featgrid">
       <label class="wide"><input type="checkbox" id="s-publinks" ${a.public_links !== false && a.public_links_env !== false ? 'checked' : ''} ${a.public_links_env === false ? 'disabled' : ''}><span>${tr('Public links to lists')}<small class="muted">${a.public_links_env === false ? `<span title="KALMIDO_PUBLIC_LINKS=0">${tr('Switched off by the server operator.')}</span>` : tr('List owners can share a list with people without an account through a secret link (view only or tick off). Off: every public link stops working at once; nothing is deleted.')}</small></span></label>

@@ -17,6 +17,7 @@ ORDER = (
     "core.orgcrypt",  # 2.42.0 (#828): keys per organisation, encryption at rest
     "admin.migrate",  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite), used by init_db
     "accounts.session",
+    "accounts.setupcode",  # 2.45.0 (#1515): one-time code for the first setup
     "accounts.pictures",
     "accounts.login",
     "accounts.oidc",

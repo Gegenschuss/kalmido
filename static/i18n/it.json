@@ -6743,5 +6743,13 @@
   "{0} agent working": ["{0} agente al lavoro", "{0} agenti al lavoro"],
   "contains the open view": "contiene la vista aperta",
   "Message {0}": "Messaggio a {0}",
-  "New note in…": "Nuova nota in…"
+  "New note in…": "Nuova nota in…",
+  "Setup code": "Codice di configurazione",
+  "The server prints it into its log at start: {0}": "Il server lo scrive nel suo log all’avvio: {0}",
+  "Wrong setup code. It is in the server log (docker compose logs kalmido).": "Codice di configurazione errato. Si trova nel log del server (docker compose logs kalmido).",
+  "The server key is missing": "Manca la chiave del server",
+  "KALMIDO_SECRET_KEY (or the key file) is not valid: it must be 32 random bytes, base64.": "KALMIDO_SECRET_KEY (o il file della chiave) non è valido: devono essere 32 byte casuali in base64.",
+  "KALMIDO_SECRET_FILE lies inside the data or backup folder and was ignored. Put it on its own volume.": "KALMIDO_SECRET_FILE si trova nella cartella dei dati o dei backup ed è stato ignorato. Mettilo su un volume a parte.",
+  "The key file KALMIDO_SECRET_FILE cannot be read or written, see the server log.": "Il file della chiave KALMIDO_SECRET_FILE non può essere letto o scritto, vedi il log del server.",
+  "Without KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE no access token can be stored and organisation data stays unencrypted. See SELF-HOSTING.md.": "Senza KALMIDO_SECRET_KEY o KALMIDO_SECRET_FILE non si possono salvare token di accesso e i dati dell’organizzazione restano non cifrati. Vedi SELF-HOSTING.md."
 }

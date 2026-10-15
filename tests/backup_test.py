@@ -198,8 +198,12 @@ check(requests.post(B + "/api/admin/backups/restore", json={"name": "x", "confir
 
 # ---- defaults + validation
 j = state()
-check(j["env"] and not j["on"] and j["time"] == "03:30" and j["keep_daily"] == 14 and j["keep_weekly"] == 8 and not j["encrypt"]
-      and j["items"] == [] and j["confirm_word"] == "RESTORE", f"defaults: off, 03:30, 14 + 8, unencrypted: {j}")
+# 2.45.0 (#1515): a new server (first setup) backs up daily by default; the first automatic one is tomorrow
+check(j["env"] and j["on"] and j["time"] == "03:30" and j["keep_daily"] == 14 and j["keep_weekly"] == 8 and not j["encrypt"]
+      and j["items"] == [] and j["confirm_word"] == "RESTORE", f"defaults: on, 03:30, 14 + 8, unencrypted: {j}")
+check(dbx("SELECT value FROM settings WHERE key='bk_last_day'")[0][0] == datetime.now(TZ).date().isoformat(),
+      "on from the first setup: no automatic backup of the empty server today")
+check(A.patch(B + "/api/admin/backups", json={"on": False}).ok and not state()["on"], "switched off (the steps below switch it on)")
 for bad in ({"on": "yes"}, {"time": "25:00"}, {"keep_daily": 0}, {"keep_daily": 400}, {"keep_weekly": -1}, {"keep_daily": True},
             {"encrypt": True}, {"passphrase": "short"}, {"encrypt": "1"}):
     check(A.patch(B + "/api/admin/backups", json=bad).status_code == 400, f"invalid setting rejected: {bad}")

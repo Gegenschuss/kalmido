@@ -1,0 +1,23 @@
+# Kalmido behind Traefik 2 / 3 (built-in login), via Docker labels.
+# Copy this file next to docker-compose.yml as docker-compose.override.yml (Compose reads it automatically) and adjust:
+#   - "proxy" = the external Docker network Traefik is in (docker network create proxy, once)
+#   - "websecure" = Traefik's HTTPS entry point, "letsencrypt" = its certificate resolver
+#   - KALMIDO_TRUSTED_PROXIES in .env: the gateway of that network (docker network inspect proxy, field "Gateway"),
+#     so Kalmido believes Traefik's X-Forwarded-For / -Proto / -Host
+# WebSockets are not needed. Long polling (up to 60 s) works with Traefik's defaults (no read timeout on the
+# entry point unless you set respondingTimeouts.readTimeout; keep it above 120s if you do).
+services:
+  kalmido:
+    ports: !reset []   # Traefik reaches the container directly; nothing published on the host
+    networks: [default, proxy]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.kalmido.rule=Host(`kalmido.example.com`)
+      - traefik.http.routers.kalmido.entrypoints=websecure
+      - traefik.http.routers.kalmido.tls.certresolver=letsencrypt
+      - traefik.http.services.kalmido.loadbalancer.server.port=3040
+
+networks:
+  proxy:
+    external: true

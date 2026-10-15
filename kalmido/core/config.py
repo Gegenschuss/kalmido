@@ -28,6 +28,7 @@ import secrets
 import shutil
 import smtplib
 import socket
+import sys
 import ssl
 import struct
 import tempfile
@@ -111,21 +112,86 @@ INLINE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/avi
 # 2.36.0 (#1116): the Paperless connection is removed; PAPERLESS_* variables that are still set are ignored.
 
 
+def _secret_key_parse(raw):
+    try:
+        k = base64.b64decode(raw + "=" * (-len(raw) % 4), altchars=b"-_" if ("-" in raw or "_" in raw) else None, validate=True)
+    except (ValueError, TypeError):
+        return None
+    return k if len(k) == 32 else None
+
+
 def _secret_key_env():
     """2.1.0 (#180): KALMIDO_SECRET_KEY = 32 random bytes, base64 (standard or URL-safe). Encrypts stored
     tokens (repositories, read-later, sign-on client secret). It never lives in the database or the data directory (so a
     backup alone never reveals a token); without it no token can be stored. Losing it means everyone enters their tokens again. Returns (key or None, problem)."""
     raw = os.environ.get("KALMIDO_SECRET_KEY", "").strip()
     if not raw:
+        return sh_secret_file()
+    k = _secret_key_parse(raw)
+    return (k, "") if k else (None, "invalid")
+
+
+# 2.45.0 (#1515): without KALMIDO_SECRET_KEY the key comes from KALMIDO_SECRET_FILE (docker-compose: its own volume
+# /secret, never the data directory or the backup folder, see above). A missing file is created once (32 random
+# bytes, base64, mode 0600) and reused on every start; the variable always wins. Nothing sealed can exist without a
+# key, so a new key never makes stored data unreadable that was readable before (a lost old key stays lost; set it
+# as KALMIDO_SECRET_KEY again and it wins over the file). Messages go to stderr: the container log shows them, scripts that
+# import the app and read its stdout stay clean.
+SECRET_FILE = os.environ.get("KALMIDO_SECRET_FILE", "").strip()
+SECRET_KEY_SRC = "env" if os.environ.get("KALMIDO_SECRET_KEY", "").strip() else ""
+
+
+def _sh_inside(path, folder):
+    a, b = os.path.realpath(path), os.path.realpath(folder)
+    return a == b or a.startswith(b.rstrip(os.sep) + os.sep)
+
+
+def sh_secret_file():
+    global SECRET_KEY_SRC
+    if not SECRET_FILE:
         return None, "unset"
+    data = os.path.dirname(os.path.abspath(DB))
+    bk = os.environ.get("KALMIDO_BACKUP_DIR", "").strip()
+    if _sh_inside(SECRET_FILE, data) or (bk and _sh_inside(SECRET_FILE, bk)):
+        print(f"KALMIDO_SECRET_FILE {SECRET_FILE} lies inside the data or backup folder: ignored (a backup would carry "
+              "the key next to the data it protects). Put it on its own volume, e.g. /secret/kalmido.key.", file=sys.stderr, flush=True)
+        return None, "file_in_data"
     try:
-        k = base64.b64decode(raw + "=" * (-len(raw) % 4), altchars=b"-_" if ("-" in raw or "_" in raw) else None, validate=True)
-    except (ValueError, TypeError):
-        return None, "invalid"
-    return (k, "") if len(k) == 32 else (None, "invalid")
+        with open(SECRET_FILE, encoding="ascii") as f:
+            k = _secret_key_parse(f.read().strip())
+        if not k:
+            print(f"KALMIDO_SECRET_FILE {SECRET_FILE} holds no valid key (32 bytes, base64): no server key.", file=sys.stderr, flush=True)
+            return None, "invalid"
+        SECRET_KEY_SRC = "file"
+        return k, ""
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        print(f"KALMIDO_SECRET_FILE {SECRET_FILE} cannot be read ({e.strerror}): no server key.", file=sys.stderr, flush=True)
+        return None, "file_error"
+    raw = base64.b64encode(secrets.token_bytes(32)).decode()
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(SECRET_FILE)), exist_ok=True)
+        fd = os.open(SECRET_FILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)  # never overwrites (two starts at once)
+        with os.fdopen(fd, "w", encoding="ascii") as f:
+            f.write(raw + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+    except FileExistsError:
+        return sh_secret_file()
+    except OSError as e:
+        print(f"KALMIDO_SECRET_FILE {SECRET_FILE} cannot be written ({e.strerror}): no server key.", file=sys.stderr, flush=True)
+        return None, "file_error"
+    print(f"A new server key was created in {SECRET_FILE}. Keep a copy of it apart from the backups: without it "
+          "encrypted data in a backup cannot be read.", file=sys.stderr, flush=True)
+    SECRET_KEY_SRC = "file"
+    return _secret_key_parse(raw), ""
 
 
 SECRET_KEY, SECRET_KEY_PROBLEM = _secret_key_env()
+if not SECRET_KEY and SECRET_KEY_PROBLEM == "unset":
+    print("WARNING: no server key (KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE): access tokens cannot be stored and "
+          "organisation data is not encrypted. See SELF-HOSTING.md.", file=sys.stderr, flush=True)
 
 # Optional share inbox: every message on an ntfy topic becomes an inbox task (files as attachments).
 # Needs a token with read access to that topic (NTFY_INBOX_TOKEN).

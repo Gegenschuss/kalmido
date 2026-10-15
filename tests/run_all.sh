@@ -660,6 +660,11 @@ fresh; run p2450_c_ui node p2450_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2450_d_ui node p2450_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.45.0 part A: #1502 #1503 #1509 #1516 the sidebar (group More, the order, the messenger, the notes of all lists)
 fresh; run p2450_a_ui node p2450_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.45.0 part B: #1515 self-hosting (one-time setup code, server key file, backups on for a new server; install script,
+# docker-compose and proxy templates linted without a container)
+fresh; run p2450_b_api "$PY" p2450_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2450_b_ui node p2450_b_ui.js "$KALMIDO_TEST_DATA"
+       run p2450_b_lint "$PY" p2450_b_lint_test.py
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
