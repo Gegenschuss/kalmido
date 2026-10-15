@@ -39,7 +39,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   const head = sid => d.querySelector(`#view .ghead[data-section="${sid}"]`);
   const row = id => d.querySelector(`#view .trow[data-id="${id}"]`);
   check(head(A)?.querySelector('.shandle[draggable="true"]') && head(C)?.querySelector('.shandle') && !head('')?.querySelector('.shandle'), 'a drag handle on every named section header');
-  check(d.querySelector(`.sdrop[data-section="${C}"]`) && !d.body.classList.contains('tdrag'), 'empty section: drop zone rendered, hidden until a task is dragged');
+  check(!d.querySelector(`.sdrop[data-section="${C}"]`) && head(C) && !d.body.classList.contains('tdrag'), 'empty section: stays visible, no drop field (2.46.2 #1662)');
   // ---- a task onto a header: top of that section
   dnd(w, row(t4), 'dragstart'); await sleep(20);  // 2.19.0 (#667): set right after dragstart, not inside it
   check(d.body.classList.contains('tdrag'), 'while dragging: body.tdrag (drop zones show)');
@@ -56,8 +56,8 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   // ---- into an empty section via its drop zone
   await sleep(200);
   dnd(w, row(t5), 'dragstart');
-  const zone = d.querySelector(`.sdrop[data-section="${C}"]`);
-  check(dnd(w, zone, 'dragover').defaultPrevented && zone.classList.contains('drop'), 'empty section: the drop zone accepts the task');
+  const zone = head(C);  // 2.46.2 (#1662): the section name takes the drop
+  check(dnd(w, zone, 'dragover').defaultPrevented && zone.classList.contains('drop'), 'empty section: the name accepts the task');
   dnd(w, zone, 'drop');
   check(await until(async () => (await taskOf(t5)).section_id === C), 'dropped into the empty section "Later"');
   check(!d.body.classList.contains('tdrag'), 'drop zones hidden again');

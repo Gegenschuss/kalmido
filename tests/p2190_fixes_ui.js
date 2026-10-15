@@ -39,7 +39,7 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   await until(() => d.querySelector('#view .trow'));
   const nz = () => d.querySelector('#view .sdrop.snew[data-newsec]');
-  check(nz() && /New section/.test(nz().textContent) && d.querySelector(`#view .sdrop[data-section="${C}"]`), 'drop zones: the empty section and "+ New section" at the end');
+  check(nz() && /New section/.test(nz().textContent) && !d.querySelector(`#view .sdrop[data-section="${C}"]`) && d.querySelector(`#view .ghead[data-section="${C}"]`), 'drop zones: "+ New section" at the end, no drop field under the empty section (2.46.2 #1662)');
   w.prompt = () => 'Phase 2';
   dnd(w, d.querySelector(`#view .trow[data-id="${T2}"]`), 'dragstart'); await sleep(20);
   check(d.body.classList.contains('tdrag'), 'while dragging the zones show (set right after dragstart)');
@@ -52,8 +52,8 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   // the empty section's zone (jsdom)
   await until(() => d.querySelector(`#view .trow[data-id="${T2}"]`));
   dnd(w, d.querySelector(`#view .trow[data-id="${T2}"]`), 'dragstart');
-  const ez = d.querySelector(`#view .sdrop[data-section="${C}"]`);
-  check(dnd(w, ez, 'dragover').defaultPrevented, 'the empty section\'s zone takes a task');
+  const ez = d.querySelector(`#view .ghead[data-section="${C}"]`);  // 2.46.2 (#1662): the section name takes the drop
+  check(dnd(w, ez, 'dragover').defaultPrevented, 'the empty section\'s name takes a task');
   dnd(w, ez, 'drop');
   check(await until(async () => (await call('GET', `/api/tasks/${T2}`)).section_id === C), 'dropped into the empty section');
   // a plain drop on another task still reorders (the new zone's check once threw over a row)
@@ -136,10 +136,10 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
     await ffLogin(o);
     await nav(B + '#l/' + L); await sleep(2500);
     const pos = sel => ev(`(() => { document.body.classList.add('tdrag'); const e = document.querySelector('${sel}'); const b = e.getBoundingClientRect(); document.body.classList.remove('tdrag'); return {x: b.left + Math.min(60, b.width / 2), y: b.top + b.height / 2}; })()`);
-    const to1 = await pos(`#view .sdrop[data-section="${C}"]`);
+    const to1 = await pos(`#view .ghead[data-section="${C}"]`);  // 2.46.2 (#1662): the section name
     const from = await ev(`(() => { const b = document.querySelector('#view .trow[data-id="${T2}"] .ttl').getBoundingClientRect(); return {x: b.left + 30, y: b.top + b.height / 2}; })()`);
     await tapDrag(o, from, to1);
-    check(await until(async () => (await call('GET', `/api/tasks/${T2}`)).section_id === C), 'touch: dropped on "Drop tasks here" of an empty section: moved (#667)');
+    check(await until(async () => (await call('GET', `/api/tasks/${T2}`)).section_id === C), 'touch: dropped on the name of an empty section: moved (#667)');
     await sleep(2500);
     await ev(`(() => { document.querySelector('#toast')?.classList.add('hidden'); return 1; })()`);  // the Undo toast sits right over the zone
     await ev(`(() => { document.body.classList.add('tdrag'); const v = document.getElementById('view'); v.scrollTop = v.scrollHeight; document.body.classList.remove('tdrag'); return 1; })()`); await sleep(300);
