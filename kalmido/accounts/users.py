@@ -80,10 +80,24 @@ def _storage(c, uid):
 
 
 def admin_sees(c, uid):
-    """2.28.0 (#935): in the mode workspaces an instance admin manages only the people they may see (their organisations and
-    connections); elsewhere every account."""
-    from ..accounts.orgs import instance_mode, may_see
-    return instance_mode(c) != "workspaces" or may_see(c, me(), uid)
+    """2.28.0 (#935): in the mode workspaces an instance admin sees only the people they may see (their organisations and
+    connections) -- groups, agents. 2.46.0 (#1592): every instance; the user management itself: om_admin_all."""
+    from ..accounts.orgs import may_see
+    return may_see(c, me(), uid)
+
+
+def om_admin_all(c, uid):
+    """2.46.0 (#1592): what the user management of an instance admin may change (edit, disable, delete, invite, approve,
+    sign-in link): the people the admin sees, every account outside all organisations (private space only) and every
+    registration that waits for an admin's approval; the members of an organisation the admin is not in stay with that
+    organisation's own admins. Listing: GET /api/users?all=1."""
+    if not g.user["is_admin"]:
+        return False
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # membership structure
+        in_org = c.execute("SELECT 1 FROM org_members WHERE user_id=? LIMIT 1", (uid,)).fetchone()
+        pending = c.execute("SELECT 1 FROM users WHERE id=? AND signup='pending'", (uid,)).fetchone()
+    return not in_org or bool(pending) or admin_sees(c, uid)
 
 
 def user_orgs_public(c, uid):
@@ -94,12 +108,12 @@ def user_orgs_public(c, uid):
 @app.get("/api/users")
 def users_list():
     """Everyone: enabled users (for sharing). Admins: all users with account details (2.28.0, mode workspaces: only the
-    people they may see, plus the number of the others)."""
+    people they may see, plus the number of the others; 2.46.0 (#1592): ?all=1 = the user management, every account)."""
     c = db()
     from ..accounts.orgs import visible_people
     if g.user["is_admin"]:
         from ..integrations.mail import MAIL_OUT_ON
-        vis = visible_people(c, me())
+        vis = None if request.args.get("all") == "1" else visible_people(c, me())
         rows = c.execute("SELECT * FROM users ORDER BY id").fetchall()
         return jsonify(users=[user_admin_dict(c, u) for u in rows if vis is None or u["id"] in vis], mail_out=MAIL_OUT_ON,
                        others=sum(1 for u in rows if vis is not None and u["id"] not in vis))
@@ -115,6 +129,32 @@ def users_list():
                             (SELECT user_id FROM agents WHERE owner_id IS NOT NULL AND owner_id!=?) ORDER BY id""", (mine,)).fetchall()
     return jsonify(users=[{**user_public(u), "orgs": user_orgs_public(c, u["id"]), **({"org_id": ag_org.get(u["id"])} if u["id"] in ag_org else {})}
                           for u in rows if vis is None or u["id"] in vis])
+
+
+def om_orgs_arg(c, b):
+    """2.46.0 (#1561): body field orgs of POST /api/users -> [(org id, role)], or an error text. Items: {id, role?: member |
+    admin} (an organisation id alone = member). Every organisation must exist; a kid account is never an organisation's
+    admin; the mode shared has none."""
+    from ..accounts.orgs import ORG_ROLES, instance_mode
+    v = b.get("orgs")
+    if v is None:
+        return []
+    bad = tr("Invalid value: {0}", "orgs")
+    if not isinstance(v, list) or len(v) > 50 or (v and instance_mode(c) == "shared"):
+        return bad
+    out = {}
+    for x in v:
+        oid, role = (x, "member") if not isinstance(x, dict) else (x.get("id"), x.get("role", "member"))
+        if not isinstance(oid, int) or isinstance(oid, bool) or role not in ORG_ROLES:
+            return bad
+        if role == "admin" and b.get("kid") is True:
+            return tr("A kid account cannot be an admin of an organisation")
+        out[oid] = role
+    with system_ctx(c):  # the instance admin: which organisations exist (structure)
+        for oid in out:
+            if not c.execute("SELECT 1 FROM orgs WHERE id=?", (oid,)).fetchone():
+                return tr("Unknown organisation")
+    return sorted(out.items())
 
 
 def _proxy_taken(c, login, uid=None):
@@ -148,6 +188,9 @@ def user_create():
     topic = str(b.get("ntfy_topic") or "").strip()
     if topic and not NTFY_TOPIC_RE.fullmatch(topic):
         return err(tr("ntfy topic: 1-64 characters a-z, A-Z, 0-9, dash, underscore"))
+    orgs = om_orgs_arg(c, b)  # 2.46.0 (#1561): checked before the account exists
+    if isinstance(orgs, str):
+        return err(orgs)
     uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, pw or None, proxy,
                       bool(b.get("is_admin")), ntfy_topic=topic or None, onboard=True)
     email = str(b.get("email") or "").strip()[:200]
@@ -173,22 +216,12 @@ def user_create():
         if e:
             c.rollback()
             return err(e)
-    # 2.22.0 (#752): the organisations of the new person: given, else the creating admin's (else the instance's first)
-    orgs = b.get("orgs")
-    from ..accounts.orgs import instance_mode, org_member_add
-    if instance_mode(c) not in ("multi", "workspaces"):  # 2.23.0 (#799): organisation = the one (create_user), shared = none
-        orgs = []
-    if orgs is None:
-        orgs = [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=?", (me(),))]
-    if not isinstance(orgs, list) or not all(isinstance(x, int) for x in orgs):
-        c.rollback()
-        return err(tr("Invalid value: {0}", "orgs"))
+    # 2.46.0 (#1561 / #1562): the organisations the admin chose for the new person (none given = none, never the
+    # admin's own or the instance's first)
+    from ..accounts.orgs import org_member_add
     with system_ctx(c):  # 2.37.0 (#1150): the instance admin places the new account (organisation structure, no content)
-        known = [x for x in orgs if c.execute("SELECT 1 FROM orgs WHERE id=?", (x,)).fetchone()]
-        if known:
-            c.execute("DELETE FROM org_members WHERE user_id=?", (uid,))
-            for o in known:
-                org_member_add(c, o, uid)
+        for o, role in orgs:
+            org_member_add(c, o, uid, role)
     inv = None
     if b.get("invite") is True and not pw:  # 2.22.0 (#697): no password: a one-time link to set it (by e-mail when possible)
         from ..accounts.invite import invite_new
@@ -212,10 +245,10 @@ def user_update(uid):
     b = body()
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    if not u or not admin_sees(c, uid):  # 2.28.0 (#935): mode workspaces: only people the admin may see
+    if not u or not om_admin_all(c, uid):  # 2.46.0 (#1592): the user management: every account
         return err(tr("unknown user"), 404)
     from ..accounts.orgs import instance_mode
-    if "orgs" in b and instance_mode(c) in ("multi", "workspaces"):  # 2.22.0 (#752): the person's organisations (replaces them); 2.23.0: multi only; 2.28.0: + workspaces
+    if "orgs" in b and instance_mode(c) == "workspaces":  # 2.22.0 (#752): the person's organisations (replaces them); 2.23.0: multi only; 2.28.0: + workspaces
         if not isinstance(b["orgs"], list) or not all(isinstance(x, int) for x in b["orgs"]):
             return err(tr("Invalid value: {0}", "orgs"))
         from ..accounts.orgs import org_leave, org_member_add
@@ -332,7 +365,7 @@ def user_delete(uid):
     need_admin()
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    if not u or not admin_sees(c, uid):  # 2.28.0 (#935)
+    if not u or not om_admin_all(c, uid):  # 2.46.0 (#1592)
         return err(tr("unknown user"), 404)
     if uid == me():
         return err(tr("You cannot delete yourself"))
@@ -528,8 +561,7 @@ def avatar_get(uid, tok):
     u = c.execute("SELECT id, avatar FROM users WHERE id=?", (uid,)).fetchone()
     if not u or u["avatar"] != "u:" + tok or not re.fullmatch(r"[A-Za-z0-9_-]{8,40}", tok):
         raise Denied(404)
-    from .orgs import instance_mode
-    admin_ok = g.user["is_admin"] and instance_mode(c) != "workspaces"  # 2.30.0 (#1036): workspaces -> admins no exception
+    admin_ok = bool(g.user["is_admin"])  # 2.46.0 (#1592): the user management shows every account, with its photo
     if uid != me() and not admin_ok and not c.execute(
             f"""SELECT 1 FROM lists WHERE id IN {vis_sql()} AND (owner_id=? OR id IN (SELECT list_id FROM list_members WHERE user_id=?))
                 LIMIT 1""", (me(), me(), uid, uid)).fetchone():

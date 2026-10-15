@@ -46,11 +46,7 @@ def _org_boundary(c):
     """2.39.0 (#1209 audit M3): organisations are separate (modes workspaces / multi, unset mode: more than one org) -- then
     the instance admin sees and moves only the clients of their own organisations, like everybody else."""
     from ..accounts.orgs import INSTANCE_ENV
-    if INSTANCE_ENV in ("workspaces", "multi"):
-        return True
-    if INSTANCE_ENV in ("shared", "organisation"):
-        return False
-    return c.execute("SELECT kalmido_org_count()").fetchone()[0] > 1  # counts all orgs also under row-level security
+    return INSTANCE_ENV != "shared"  # 2.46.0 (#1592, review fix): always, as core/access.py _boundary_on
 
 
 def client_rows(c, uid, archived=True):

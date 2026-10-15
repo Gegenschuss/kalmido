@@ -195,13 +195,8 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
     for k, v in vals.items():
         c.execute("INSERT INTO user_settings(user_id,key,value) VALUES(?,?,?) "
                   "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value", (uid, k, v))
-    # 2.22.0 (#752): every new account belongs to an organisation: the instance's first one (the caller may change it)
-    from ..accounts.orgs import instance_mode
-    from .pg import system_ctx
-    with system_ctx(c):  # 2.37.0 (#1150): a new account is not in any organisation yet (setup / sign-up run without one)
-        first = c.execute("SELECT id FROM orgs ORDER BY id LIMIT 1").fetchone()
-        if first and instance_mode(c) in ("organisation", "multi"):  # 2.28.0 (#935): mode workspaces: by domain / an admin, never by default
-            c.execute("INSERT INTO org_members(org_id,user_id) VALUES(?,?) ON CONFLICT DO NOTHING", (first[0], uid))
+    # 2.46.0 (#1562): a new account joins no organisation by itself -- only by its e-mail domain, an invitation or the
+    # admin who creates it (the callers)
     return uid
 
 
@@ -416,7 +411,8 @@ def init_db(guard=True, load=None):
         # with every account (agents too); people see only people of their organisations
         if gsetting(c, "migr_orgs2220") != "1":
             from ..accounts.orgs import INSTANCE_ENV
-            if not c.execute("SELECT 1 FROM orgs").fetchone() and INSTANCE_ENV != "shared":
+            # 2.46.0 (#1592): only an existing instance from before 2.22 (accounts, no organisation); a new one starts without
+            if not c.execute("SELECT 1 FROM orgs").fetchone() and INSTANCE_ENV != "shared" and c.execute("SELECT 1 FROM users LIMIT 1").fetchone():
                 from ..core.config import PUBLIC_URL
                 host = PUBLIC_URL.split("://", 1)[-1].split("/")[0].split(":")[0]
                 parts = [p for p in host.split(".") if p and not p.isdigit()]
@@ -428,7 +424,7 @@ def init_db(guard=True, load=None):
                 print("organisations:", name, "with every account", flush=True)
             gset(c, "migr_orgs2220", "1")
         from ..accounts.orgs import instance_sync, ws_migrate
-        instance_sync(c)  # 2.23.0 (#799): the organisation mode's one organisation with every account
+        instance_sync(c)  # 2.46.0 (#1592): only the hint on a former mode setting
         ws_migrate(c)  # 2.28.0 (#935), once: every list and agent gets its workspace
         from ..accounts.tenancy import ws_migrate_objs
         ws_migrate_objs(c)  # 2.30.0 (#1036), once: every calendar and address book gets its workspace
@@ -586,11 +582,10 @@ def init_db(guard=True, load=None):
         from .rls import apply as rls_apply, OFF_HELP
         rls_on = rls_apply(c)  # 2.37.0 (#1150): row-level security per organisation (policies + the app role)
         if not rls_on and guard:  # 2.37.0 (review W2-2): several organisations rely on it -> no start without it
-            from ..accounts.orgs import instance_mode
-            mode = instance_mode(c)
-            if mode in ("workspaces", "multi"):
-                print(f"FATAL: {OFF_HELP} The instance mode {mode!r} (several organisations) needs it. Refusing to start.",
-                      flush=True)
+            from ..accounts.orgs import INSTANCE_ENV
+            # 2.46.0 (#1592): needed with several organisations (or the mode workspaces set explicitly, as before)
+            if INSTANCE_ENV == "workspaces" or c.execute("SELECT COUNT(*) FROM orgs").fetchone()[0] > 1:
+                print(f"FATAL: {OFF_HELP} Several organisations need it. Refusing to start.", flush=True)
                 raise DataDirError(3)
         c.execute("INSERT INTO kalmido_meta(key,value) VALUES('schema_version',?) ON CONFLICT(key) DO UPDATE SET value="
                   "CASE WHEN CAST(kalmido_meta.value AS BIGINT) < CAST(excluded.value AS BIGINT) THEN excluded.value "

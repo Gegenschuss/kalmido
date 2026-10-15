@@ -157,18 +157,14 @@ def system_ctx():
 
 
 def _boundary_on():
-    """Organisation boundaries may exist: not in the modes shared (no organisations) and organisation (one organisation,
-    everybody in it). Without KALMIDO_INSTANCE_MODE the number of organisations decides (see _boundary_sql)."""
+    """Organisation boundaries may exist: not in the mode shared (no organisations). 2.46.0 (#1592): always otherwise."""
     from ..accounts.orgs import INSTANCE_ENV
-    return INSTANCE_ENV not in ("shared", "organisation")
+    return INSTANCE_ENV != "shared"
 
 
 def _boundary_sql():
-    """SQL condition that is true when the boundary applies (mode workspaces / multi; unset mode: more than one org)."""
-    from ..accounts.orgs import INSTANCE_ENV
-    # 2.37.0 (#1150): kalmido_org_count() counts as "system" (core/rls.py) -- under row-level security a person sees only
-    # their own organisations, but whether the boundary applies is a property of the instance
-    return "1=1" if INSTANCE_ENV in ("workspaces", "multi") else "kalmido_org_count() > 1"
+    """SQL condition that is true when the boundary applies. 2.46.0 (#1592): always (no longer only with several organisations)."""
+    return "1=1"
 
 
 def _orgs_of(c, uid):
@@ -312,9 +308,6 @@ def acx_org_ok(c, uid, org_id):
     membership row: former members lose access even where a membership row was left behind."""
     if not org_id or not uid or not _boundary_on():
         return True
-    from ..accounts.orgs import instance_mode
-    if instance_mode(c) == "organisation":
-        return True  # one organisation, everybody in it (user_orgs)
     ctx = acx_of(c, uid)
     if ctx.role == "agent" and ctx.agent_org_id is None:
         return True  # a private agent: its list memberships decide (as before; the boundary check counts mismatches)

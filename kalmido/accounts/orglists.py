@@ -14,7 +14,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, my_inbox
-from ..accounts.orgs import _need_org_admin, instance_mode, user_orgs
+from ..accounts.orgs import _need_org_admin, user_orgs
 
 OL_LOG_MAX = 50
 
@@ -64,8 +64,6 @@ def _ol_out(c, oid):
     log = c.execute("SELECT * FROM org_list_log WHERE org_id=? ORDER BY id DESC LIMIT ?", (oid, OL_LOG_MAX)).fetchall()
     people = c.execute("""SELECT u.id FROM org_members m JOIN users u ON u.id=m.user_id
                           WHERE m.org_id=? AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'""", (oid,)).fetchall()
-    if instance_mode(c) == "organisation":  # the one organisation holds every account
-        people = c.execute("SELECT id FROM users WHERE disabled=0 AND COALESCE(kind,'user')!='agent'").fetchall()
     ids = {r["owner_id"] for r in rows} | {x for r in log for x in (r["by_id"], r["owner_id"], r["to_id"]) if x} | {r[0] for r in people}
     names = user_names(c, list(ids))
     agents = {r[0] for r in c.execute(f"SELECT id FROM users WHERE kind='agent' AND id IN ({','.join(str(int(i)) for i in ids) or 'NULL'})")}

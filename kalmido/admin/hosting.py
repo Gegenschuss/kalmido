@@ -356,7 +356,11 @@ def hosting_settings(c, b):
     if "org_name" in b:  # 2.24.0 (UX-23): the organisation of an "organisation" server can be renamed (unless KALMIDO_ORG_NAME)
         from ..accounts.orgs import instance_mode, main_org, ORG_NAME_ENV
         nm = re.sub(r"\s+", " ", str(b["org_name"] or "")).strip()[:60]
-        if not nm or instance_mode(c) != "organisation" or ORG_NAME_ENV or not main_org(c):
+        # 2.46.0 (#1592): renames the instance's only organisation (several: the organisation dialog)
+        from ..core.pg import system_ctx
+        with system_ctx(c):  # 2.46.0 (#1592, review fix): every organisation counts, not only the admin's own
+            n_orgs = c.execute("SELECT COUNT(*) FROM orgs").fetchone()[0]
+        if not nm or instance_mode(c) == "shared" or ORG_NAME_ENV or not main_org(c) or n_orgs != 1:
             return err(tr("Invalid value: {0}", "org_name"))
         c.execute("UPDATE orgs SET name=? WHERE id=?", (nm, main_org(c)))
     if "announce" in b:

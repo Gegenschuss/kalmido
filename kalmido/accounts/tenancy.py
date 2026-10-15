@@ -10,7 +10,7 @@ import os
 
 from ..core.i18n import N_
 from ..core.db import gset, gsetting, iso, local_now, now_utc
-from ..accounts.orgs import PRIVATE_FOLDER_RE, has_workspaces, instance_mode, main_org
+from ..accounts.orgs import PRIVATE_FOLDER_RE, has_workspaces
 
 # when the check runs: once a day at this local hour or later; KALMIDO_TENANT_CHECK=always = at every watchdog tick (tests)
 TENANT_CHECK_HOUR = int(os.environ.get("KALMIDO_TENANT_CHECK_HOUR", "3") or 3)
@@ -179,14 +179,14 @@ def ws_migrate_objs(c):
     commits."""
     if gsetting(c, "migr_ws2300") == "1":
         return
-    if not has_workspaces(c):
+    from ..accounts.orgs import INSTANCE_ENV
+    if not has_workspaces(c) and INSTANCE_ENV == "shared":
         return  # no flag yet: a server that gets organisations later (mode switch) still migrates then
+    # 2.46.0 (#1592): a server without organisations is done at once (its first organisation later moves nothing)
     gset(c, "migr_ws2300", "1")
+    if not has_workspaces(c):
+        return
     org_of = {r["user_id"]: r["oid"] for r in c.execute("SELECT user_id, MIN(org_id) AS oid FROM org_members GROUP BY user_id")}  # pg-ok: alias
-    if instance_mode(c) == "organisation":
-        mo = main_org(c)
-        for (uid,) in c.execute("SELECT id FROM users"):
-            org_of.setdefault(uid, mo)
     for (u, o) in c.execute("SELECT user_id, org_id FROM agents WHERE org_id IS NOT NULL").fetchall():
         org_of[u] = o  # an agent's calendar / address book: its own workspace
     for u in [r[0] for r in c.execute("SELECT user_id FROM agents WHERE org_id IS NULL")]:

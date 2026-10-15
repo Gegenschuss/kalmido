@@ -35,6 +35,16 @@ def _mail_on():
     return MAIL_OUT_ON
 
 
+def om_has_orgs(c):
+    """2.46.0 (#1592): the instance has at least one organisation (then open registration is off: domains or approval)."""
+    from ..accounts.orgs import instance_mode
+    from ..core.pg import system_ctx
+    if instance_mode(c) == "shared":
+        return False
+    with system_ctx(c):  # instance structure, also before a login
+        return bool(c.execute("SELECT 1 FROM orgs LIMIT 1").fetchone())
+
+
 def signup_mode(c):
     """The effective mode: domain / open need outgoing e-mail (else off)."""
     from ..accounts.orgs import instance_mode
@@ -43,7 +53,7 @@ def signup_mode(c):
         return "off"
     if m in ("domain", "open") and not _mail_on():
         return "off"
-    if m == "open" and instance_mode(c) == "organisation":  # 2.23.0 (#799): an organisation: only its domains or with approval
+    if m == "open" and om_has_orgs(c):  # 2.23.0 (#799) / 2.46.0 (#1592): with an organisation only its domains or with approval
         return "off"
     return m
 
@@ -54,8 +64,8 @@ def _domains(v):
 
 def org_for_email(c, email):
     from ..accounts.orgs import instance_mode
-    if instance_mode(c) not in ("multi", "workspaces"):  # 2.28.0 (#935): workspaces join by domain too
-        return None  # organisation: the one organisation anyway (create_user); shared: none
+    if instance_mode(c) != "workspaces":  # 2.28.0 (#935): workspaces join by domain too
+        return None  # shared: none
     dom = email.rsplit("@", 1)[-1].lower()
     from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): before a login: which organisation an address belongs to (instance structure)
@@ -164,7 +174,6 @@ def auth_signup():
     if oid:
         from ..core.pg import system_ctx
         with system_ctx(c):  # 2.37.0 (#1150): the new account joins its organisation before anybody is signed in
-            c.execute("DELETE FROM org_members WHERE user_id=?", (uid,))
             from ..accounts.orgs import org_member_add
             org_member_add(c, oid, uid)
     from ..core.schema import USER_DEFAULTS
@@ -185,7 +194,7 @@ def auth_signup():
 @app.post("/api/users/<int:uid>/approve")
 def user_approve(uid):
     """Admins: a registration that waits for approval becomes an active account (declining = deleting it)."""
-    from ..accounts.users import admin_sees, need_admin, user_admin_dict
+    from ..accounts.users import om_admin_all as admin_sees, need_admin, user_admin_dict  # 2.46.0 (#1592)
     need_admin()
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
@@ -206,8 +215,7 @@ def signup_settings(c, b):
             return err(tr("Invalid value: {0}", "signup_mode"))
         if b["signup_mode"] in ("domain", "open") and not _mail_on():
             return err(tr("This mode needs e-mail sending (SMTP); without it only “with approval by an admin” works"), 409)
-        from ..accounts.orgs import instance_mode
-        if b["signup_mode"] == "open" and instance_mode(c) == "organisation":
+        if b["signup_mode"] == "open" and om_has_orgs(c):  # 2.46.0 (#1592): any instance with an organisation
             return err(tr("An organisation's server allows registrations only for its e-mail domains or with approval by an admin"), 409)
         gset(c, "signup_mode", b["signup_mode"])
     if "signup_domains" in b:
@@ -220,7 +228,7 @@ def signup_settings(c, b):
 def signup_admin(c):
     from ..accounts.orgs import instance_mode
     from ..accounts.orgs import ORG_NAME_ENV
-    return {"instance_mode": instance_mode(c), "org_name_env": bool(ORG_NAME_ENV), "signup_mode": gsetting(c, "signup_mode") if gsetting(c, "signup_mode") in SIGNUP_MODES else "off",
+    return {"instance_mode": instance_mode(c), "org_name_env": bool(ORG_NAME_ENV), "has_orgs": om_has_orgs(c), "signup_mode": gsetting(c, "signup_mode") if gsetting(c, "signup_mode") in SIGNUP_MODES else "off",
             "signup_domains": gsetting(c, "signup_domains"), "signup_effective": signup_mode(c), "mail_out": _mail_on()}
 
 
@@ -231,7 +239,7 @@ def signup_admin(c):
 # older one stops when a new one is made. Two-factor accounts still need their second step.
 def _may_link(c, uid):
     from ..family.family import parent_of
-    from ..accounts.users import admin_sees
+    from ..accounts.users import om_admin_all as admin_sees  # 2.46.0 (#1592): the user management
     t = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not t or (t["kind"] or "user") == "agent" or not (admin_sees(c, uid) or parent_of(c, me(), uid)):  # 2.28.0 (#935)
         raise Denied(404)
