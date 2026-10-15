@@ -40,8 +40,9 @@ const FEAT = 'cal,comments,collab,office,clients';
   // ================= jsdom: the empty tab, a new quotation
   let w = await boot({hash: 'office/offers'}); let d = w.document;
   await until(() => d.querySelector('.office .ofcbody .ofdbar'));
-  check(!!d.querySelector('.office .ofdbar [data-ofd="new"]') && /No quotations yet/.test(d.querySelector('.office .ofcbody')?.textContent || ''), 'the tab shows the search bar, New and the empty hint');
-  d.querySelector('.office .ofdbar [data-ofd="new"]').click();
+  // 2.46.1 (#1637): an empty tab shows New once, as the big button in the empty state (not in the bar)
+  check(d.querySelectorAll('.office [data-ofd="new"]').length === 1 && !!d.querySelector('.office .empty [data-ofd="new"]') && /No quotations yet/.test(d.querySelector('.office .ofcbody')?.textContent || ''), 'the tab shows the search bar, New and the empty hint');
+  d.querySelector('.office [data-ofd="new"]').click();
   await until(() => d.querySelector('.ofdeditor'), 60);
   let doc = (await call('GET', '/api/office/docs')).docs?.[0];
   check(!!doc && /office\/offers\/\d+/.test(w.location.hash) && /^KVA-\d{4}-001$/.test(doc.number), 'New creates a draft on the server and opens it: ' + w.location.hash + ' ' + doc?.number);
