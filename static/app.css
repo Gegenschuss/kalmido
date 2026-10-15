@@ -6500,3 +6500,15 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .authscreen .shint.shcode{margin:.25rem 0 .75rem}
 .shint.warn.shkey{color:var(--text);background:var(--bg3);border-left:.1875rem solid var(--danger);border-radius:var(--radius);padding:.625rem .75rem;margin:0 0 .75rem}
 .shint.warn.shkey b{color:var(--danger);display:block;margin-bottom:.125rem}
+/* 2.46.1 B (#1591, #1602) "Switch on all modules" / "Create a sample project" under "What do you use Kalmido for?" */
+.pmsw{display:flex;gap:.75rem;align-items:flex-start;margin:.75rem 0 .25rem;cursor:pointer;color:var(--text);font-size:var(--fs-b);min-height:2.75rem}
+.pmsw>span:last-child{display:flex;flex-direction:column;gap:.125rem;min-width:0}
+.pmsw b{font-weight:600}
+.pmsw small{font-size:var(--fs-s);line-height:1.4}
+/* 2.46.1 B (#1641) Administration > Encryption: "Encrypted" / "Not encrypted" */
+.pmcsw{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:.75rem;margin:.75rem 0}
+.pmcs{background:var(--bg3);border-radius:var(--radius);padding:.625rem .75rem;font-size:var(--fs-s);color:var(--text)}
+.pmcs b{display:block;margin-bottom:.25rem;font-weight:600}
+.pmcs.off b{color:var(--text2)}
+.pmcs ul{margin:0;padding-left:1.125rem}
+.pmcs li{line-height:1.5}

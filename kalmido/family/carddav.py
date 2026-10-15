@@ -20,7 +20,7 @@ from ..calendars.subscriptions import (
     cal_http, cal_norm_url, CAL_ON, cal_rate, cal_seal, CAL_TICK, cal_unseal, cal_url_hint, CalError, DAV_NS, need_cal, pgb_heal,
 )
 from ..family.family import (
-    _jparse, CONTACT_CARDS_MAX, CONTACT_EVERY_MIN, CONTACT_SRCS_MAX, FAM_LEAD_MAX, fam_list, FAM_NAME_MAX, occ_create,
+    _jparse, CONTACT_CARDS_MAX, CONTACT_EVERY_MIN, CONTACT_SRCS_MAX, FAM_LEAD_MAX, FAM_NAME_MAX, occ_create, pm_fam_target,
     occ_next, occ_rule,
 )
 
@@ -194,7 +194,7 @@ def contacts_sync(c, sid):
                     cards.append(card)
             lid = s["list_id"]
             if not lid or list_role(c, lid, s["user_id"]) not in WRITE_ROLES:
-                lid = fam_list(c, s["user_id"], "birthdays", create=False)
+                lid = pm_fam_target(c, s["user_id"], "birthdays", create=False)[0]  # 2.46.1 (#1615): or the list "Family"
                 if not lid:
                     raise CalError("no_list")
                 c.execute("UPDATE contact_srcs SET list_id=? WHERE id=?", (lid, sid))
@@ -294,7 +294,7 @@ def family_contacts_add():
         lid = as_int(lid, "list_id", 1)
         need_list(c, lid)
     else:
-        lid = fam_list(c, uid, "birthdays")
+        lid = pm_fam_target(c, uid, "birthdays")[0]  # 2.46.1 (#1615): an old list Birthdays, else the list "Family"
     lead = as_int(b.get("lead_days", 7), "lead_days", 0, FAM_LEAD_MAX)
     name = b.get("name") if isinstance(b.get("name"), str) and b["name"].strip() else (urllib.parse.urlsplit(url).hostname or "CardDAV")
     if not cal_rate(uid):

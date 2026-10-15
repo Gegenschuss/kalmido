@@ -35,7 +35,8 @@ SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "tim
                   "cal_tasks",  # 2.36.1 (#1127)
                   "agent_steps_live", "agent_steps_always",  # 2.32.0 (#1081)
                   "show_done_default",  # 2.39.1 (#1214): "Hide completed" as the default of every view (0 = hide)
-                  "fav_only")  # 2.40.0 (#1361): the sidebar shows only the favourites
+                  "fav_only",  # 2.40.0 (#1361): the sidebar shows only the favourites
+                  "mods_all")  # 2.46.1 (#1591): "Switch on all modules" with the purpose
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)

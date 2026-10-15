@@ -19,7 +19,7 @@ async function ocLoad(box) {
   const oid = +box.dataset.ocorg, st = $('.ocst', box);
   let j; try { j = await api('GET', `/api/orgs/${oid}/encryption`); } catch { st.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j;
-  st.innerHTML = ocStateHtml(j);
+  st.innerHTML = ocStateHtml(j) + (st.closest('.ocadm') ? '' : pm_cryptScopeHtml(j.scope));  // 2.46.1 (#1641): once per page
 }
 async function ocShowRecovery(oid, needPw) {
   let pw = '';
@@ -58,6 +58,7 @@ async function ocAdminDraw(md) {
   let j, o; try { [j, o] = await Promise.all([api('GET', '/api/admin/orgcrypt'), api('GET', '/api/orgs')]); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box.innerHTML = j.enabled ? `<div class="featgrid"><label class="wide"><input type="checkbox" id="s-orgenc-on" ${j.org_encrypt ? 'checked' : ''}><span>${tr('Encrypt organisation data')}<small class="muted">${tr('Recommended. Existing data is encrypted in the background.')}</small></span></label></div>`
     : `<div class="shint keep">${ic('alert', 's')} ${esc(tr('Off: the server has no key (KALMIDO_SECRET_KEY). Bank and tax data, purchase prices and files are stored unencrypted, see SELF-HOSTING.md.'))}</div>`;
+  box.insertAdjacentHTML('beforeend', pm_cryptScopeHtml(j.scope));  // 2.46.1 (#1641): what is encrypted, what not
   const adm = $('.ocadm', box.parentNode);
   if (adm && j.enabled) { adm.innerHTML = (o.orgs || []).filter(x => x.role === 'admin').map(x => `<div class="ocorg"><b>${esc(x.name)}</b>${ocBoxHtml(x)}</div>`).join(''); ocDraw(adm); }
   if (!box._ocWired) {
