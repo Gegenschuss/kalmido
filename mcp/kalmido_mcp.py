@@ -1358,6 +1358,56 @@ TOOLS += [
     ("delete_form", "2.23.0: delete a form (tasks it created stay).", _obj({"form_id": S_ID}, ["form_id"]),
      lambda api, a: api.call("DELETE", f"/forms/{int(a['form_id'])}")),
 ]
+
+
+# ---- 2.48.0 (#1207): the file store ("Ablage"): folders and files people share with the agent, plus its own result folder
+def t_list_files(api, a):
+    """Without folder_id: the top of what is shared with you (and your own result folder); with it: that folder and its children."""
+    if a.get("folder_id"):
+        return api.call("GET", f"/files/{int(a['folder_id'])}")
+    return api.call("GET", "/files")
+
+
+def t_read_file(api, a):
+    """as text (default): UTF-8 text / the text layer of a PDF; as base64: the bytes (at most max_bytes, default 5 MB); an image
+    comes back as base64 so you can look at it."""
+    fid = int(a["file_id"])
+    if a.get("as") != "base64":
+        out = api.call("GET", f"/files/{fid}/text")
+        if not (isinstance(out, dict) and out.get("kind") == "image"):
+            return out
+    cap = int(a.get("max_bytes") or ATT_CAP_DEFAULT)
+    r = api.call("GET", f"/files/{fid}/content", {"version": a.get("version")}, binary_cap=cap)
+    return {"id": fid, "name": r["name"], "mime": r["mime"], "size": len(r["bytes"]), "base64": base64.b64encode(r["bytes"]).decode()}
+
+
+def t_write_file(api, a):
+    """file_id: a new version of that file; else a new file in folder_id (default: your own result folder)."""
+    body = _pick(a, ("content", "mime"))
+    if a.get("base64") is not None:
+        body["content_base64"] = a["base64"]
+    if a.get("file_id"):
+        return api.call("POST", f"/files/{int(a['file_id'])}/versions", body=body)
+    return api.call("POST", "/files", body={**body, "name": a.get("name") or "", **({"parent_id": int(a["folder_id"])} if a.get("folder_id") else {})})
+
+
+TOOLS += [
+    ("list_files", "2.48.0: the file store (\"Ablage\"): without folder_id the folders / files people shared with you plus your own result "
+                   "folder; with folder_id that folder's children. role = what you may do (view / edit). Every access is shown to the owner.",
+     _obj({"folder_id": S_ID}), t_list_files),
+    ("read_file", "2.48.0: read a file of the file store: as text (default; PDFs: the text layer) or as base64 (as \"base64\", "
+                  "version = an older version, max_bytes).",
+     _obj({"file_id": S_ID, "as": {"type": "string", "enum": ["text", "base64"]}, "version": {"type": "integer", "minimum": 1},
+           "max_bytes": {"type": "integer", "minimum": 1}}, ["file_id"]), t_read_file),
+    ("write_file", "2.48.0: put a file into the file store: name + content (UTF-8 text) or base64, into folder_id (role edit) or, "
+                   "without it, your own result folder (reports, drafts, patches people should read). file_id instead: a new version of "
+                   "that file (the older ones stay).",
+     _obj({"name": {"type": "string"}, "folder_id": S_ID, "file_id": S_ID, "content": {"type": "string"}, "base64": {"type": "string"},
+           "mime": {"type": "string"}}), t_write_file),
+    ("create_file_folder", "2.48.0: a new folder in the file store, in folder_id (role edit) or in your own result folder.",
+     _obj({"name": {"type": "string", "minLength": 1}, "folder_id": S_ID}, ["name"]),
+     lambda api, a: api.call("POST", "/files", body={"name": a["name"], "kind": "folder", **({"parent_id": int(a["folder_id"])} if a.get("folder_id") else {})})),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -1390,10 +1440,12 @@ TOOL_SCOPES = {
                  "unshare_address_book", "import_vcards", "export_vcards", "search_contacts", "get_contact", "create_contact", "update_contact",
                  "delete_contact", "bulk_contacts", "link_contact", "unlink_contact", "set_contact_care"),
     "private": ("add_health_entry", "write_journal"),
+    "files:read": ("list_files", "read_file"),  # 2.48.0 (#1207)
+    "files:write": ("write_file", "create_file_folder"),
 }
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
-              "private")
+              "private", "files:read", "files:write")  # 2.48.0 (#1207): + files
 _ME = {"at": 0.0, "v": None}
 ME_TTL = 300  # s: a changed scope shows in tools/list within 5 minutes (a call is refused by the server at once anyway)
 
