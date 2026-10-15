@@ -24,8 +24,28 @@ function ctDate(v) {  // '1980-05-12' / '--05-12' -> "12 May 1980" / "12 May"
   if (v.startsWith('--')) { const d = new Date(2000, +v.slice(2, 4) - 1, +v.slice(5, 7)); try { return d.toLocaleDateString(LOCALE(), {day: 'numeric', month: 'long'}); } catch { return v.slice(2); } }  // no year: no weekday either
   return fmtDay('year', pd(v));
 }
+// 2.46.X (#1732): an address book that is gone (deleted, left, or so on another device): its contacts, a filter on it, an open card
+// and selected ids of it leave the view at once - before, ctLoad failed on the filter and kept the old items until a reload
+let ct_seenBooks = null;
+function ct_prune() {
+  if (!Array.isArray(S.books)) return;
+  const now = new Set(S.books.map(b => b.id)), was = ct_seenBooks; ct_seenBooks = now;
+  if (CT.book && !now.has(+CT.book)) CT.book = '';
+  const gone = was ? new Set([...was].filter(id => !now.has(id))) : new Set();
+  if (!gone.size) return;
+  if (CT.items) {
+    const out = CT.items.filter(c => gone.has(c.book_id));
+    if (CT.pick) for (const c of out) CT.pick.delete(c.id);
+    CT.items = CT.items.filter(c => !gone.has(c.book_id)); CT.total = Math.max(0, CT.total - out.length);
+  }
+  if (CT.card && gone.has(CT.card.book_id)) {
+    CT.sel = null; CT.card = null;
+    if (S.route.mod === 'contacts' && S.route.contact) setTimeout(() => go('contacts'), 0);
+  }
+}
 async function ctLoad() {
   const seq = ++CT.seq;
+  ct_prune();
   CT.loading = true;
   const qs = new URLSearchParams({q: CT.q, limit: '500'});
   if (CT.group) qs.set('group', CT.group);
@@ -34,7 +54,10 @@ async function ctLoad() {
     const j = await api('GET', '/api/contacts?' + qs);
     if (seq !== CT.seq) return;
     CT.items = j.items; CT.total = j.total; CT.groups = j.groups || [];
-  } catch { if (seq === CT.seq) CT.items = CT.items || []; }
+  } catch (e) {
+    if (seq === CT.seq && e?.status === 404 && CT.book) { CT.book = ''; CT.loading = false; return ctLoad(); }  // 2.46.X (#1732): the filtered book is gone
+    if (seq === CT.seq) CT.items = CT.items || [];
+  }
   CT.loading = false;
   if (S.route.mod === 'contacts') ctDraw();
 }
@@ -50,6 +73,7 @@ async function ctOpen(id) {
 function ctDraw() { if (S.route.mod === 'contacts') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('contacts', viewContacts()))); } }
 function viewContacts() {
   if (CT.items === null && !CT.loading) setTimeout(ctLoad, 0);
+  ct_prune();  // 2.46.X (#1732): also after a live update
   const books = (S.books || []).filter(b => wsObjIn(b));  // 2.30.0 (#1036): the address books of the shown workspace
   const items = CT.items === null ? null : CT.items.filter(c => !ctBook(c.book_id) || wsObjIn(ctBook(c.book_id)));
   const mob = isMobile(), showCard = CT.card && (!mob || CT.sel);
