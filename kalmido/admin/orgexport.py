@@ -288,7 +288,7 @@ def ox_build(c, oid, out, by=None):
     org = c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone()
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         _put_json(zf, man, "organisation.json", [_clean(c, oid, "orgs", org)])
-        members = c.execute("""SELECT u.id, u.username, u.display_name, u.email, COALESCE(u.kind,'user') AS kind, u.disabled, m.role
+        members = c.execute("""SELECT u.id, u.username, u.display_name, u.email, COALESCE(u.kind,'user') AS kind, u.disabled, u.color, m.role
                                FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY u.id""", (oid,)).fetchall()
         from ..accounts.orgs import org_role
         _put_json(zf, man, "members.json", ({**dict(r), "role": org_role(c, r["id"], oid) or r["role"]} for r in members))

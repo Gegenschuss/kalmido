@@ -87,12 +87,13 @@ Da = sess("dave")
 check(Da.put(B + f"/api/orgs/{ORG2}/members", json={"email": "erin@example.com"}).ok, "setup: erin joins Beta")
 dbx("DELETE FROM org_members WHERE (org_id=? AND user_id NOT IN (?,?)) OR (org_id=? AND user_id NOT IN (?,?))",
     (ORG, BOB, CAROL, ORG2, DAVE, ERIN), write=True)
-AG = []
+AG, AGTOK = [], []
 for n in ("alphabot", "alphahelper"):
-    r = A.post(B + "/api/admin/agents", json={"username": n, "display_name": n.title()})
+    r = A.post(B + "/api/admin/agents", json={"username": n, "display_name": n.title(), "scopes": ["write"]})
     assert r.status_code == 201, r.text
     check(r.json().get("color") in PAL, f"a new agent gets a colour at once ({r.json().get('color')})")
     AG.append(r.json()["id"])
+    AGTOK.append(r.json().get("token") or "")
     dbx("UPDATE agents SET org_id=? WHERE user_id=?", (ORG, AG[-1]), write=True)
     dbx("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'member') ON CONFLICT DO NOTHING", (ORG, AG[-1]), write=True)
 r = A.post(B + "/api/admin/agents", json={"username": "betabot", "display_name": "Beta bot"})
@@ -141,6 +142,11 @@ A.patch(B + f"/api/users/{CAROL}", json={"color": PAL[0]})
 check(color(CAROL) == PAL[8], "the admin's user route does not change a person's colour")
 
 # ---- an agent's colour
+# review: an agent does not change its own colour through PATCH /api/me (that is its admin's / owner's call)
+was = color(AG[0])
+r = requests.patch(B + "/api/me", json={"color": PAL[3] if was != PAL[3] else PAL[2]},
+                   headers={**H, "Authorization": "Bearer " + AGTOK[0]})
+check(r.status_code == 403 and color(AG[0]) == was, f"an agent's own PATCH /api/me color: refused ({r.status_code})")
 check(Bo.patch(B + f"/api/agents/{AG[0]}/color", json={"color": PAL[9]}).ok and color(AG[0]) == PAL[9],
       "the organisation's admin changes its agent's colour")
 check(Ca.patch(B + f"/api/agents/{AG[0]}/color", json={"color": PAL[10]}).status_code == 404 and color(AG[0]) == PAL[9],
@@ -161,6 +167,8 @@ if r.status_code == 201:
           "somebody else's personal agent (another organisation's admin): 404")
     check(Ca.patch(B + f"/api/agents/{PA}/color", json={"color": PAL[5]}).status_code == 404, "a stranger: 404")
     check(str(PA) in colors(Er), "the owner sees the colour of the personal agent")
+    # review: somebody else's personal agent is not in the colour map (not even within the organisation)
+    check(str(PA) not in colors(Da), "the organisation's admin does not get the colour of a member's personal agent")
 else:
     check(False, f"setup: erin creates a personal agent ({r.status_code} {r.text[:120]})")
 
