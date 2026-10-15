@@ -324,6 +324,8 @@ function omNewOrgRows() {
 }
 async function orgModal(o, done) {
   let us = []; try { us = (await api('GET', '/api/users?all=1')).users.filter(u => !u.disabled && u.kind !== 'agent'); } catch { return; }
+  // 2.46.0 (#1561): fresh members (people added since the list was drawn), else saving would drop them
+  if (o) { try { S.orgs = (await api('GET', '/api/admin/orgs')).orgs; o = S.orgs.find(x => x.id === o.id) || o; } catch { return; } }
   const mem = new Set(o?.members || []), adm = new Set(o?.admins || []);  // 2.28.0 (#935): + the organisation's admins
   const md = modal(`<h3>${o ? tr('Edit organisation') : tr('New organisation')}</h3>
     <div class="row"><label for="og-name">${tr('Name')}</label><input id="og-name" maxlength="60" value="${esc(o?.name || '')}"></div>
