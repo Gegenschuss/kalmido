@@ -134,6 +134,21 @@ r = Bo.patch(B + f"/api/wiki/pages/{P1}", json={"path": "Processes/Shoot day/Che
 check(r.ok and r.json().get("relinked") == 0 and "[[Processes/Shoot/Checklist]]" in Bo.get(B + f"/api/wiki/pages/{HOME}").json()["body"], "relink false: links stay")
 Bo.patch(B + f"/api/wiki/pages/{P1}", json={"path": "Processes/Shoot/Checklist"})
 
+# ---- rename a folder: every page under it moves, links follow; taken names: 409
+pa = Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": "Proj/A"}).json()["id"]
+pb = Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": "Proj/Sub/B"}).json()["id"]
+pl = Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": "Index", "body": "[[Proj/A]] [[Proj/Sub/B|b]]"}).json()["id"]
+r = Ca.post(B + "/api/wiki/move", json={"space": SP, "from": "Proj", "to": "Projects/2026"})
+check(r.ok and len(r.json().get("moved", [])) == 2 and r.json().get("relinked") == 2, f"folder renamed: two pages, links changed ({r.text[:200]})")
+check(Bo.get(B + f"/api/wiki/pages/{pb}").json()["path"] == "Projects/2026/Sub/B", "the page under the folder moved")
+check(Bo.get(B + f"/api/wiki/pages/{pl}").json()["body"] == "[[Projects/2026/A]] [[Projects/2026/Sub/B|b]]", "links to the moved pages follow")
+Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": "Other/A"})
+r = Bo.post(B + "/api/wiki/move", json={"space": SP, "from": "Projects/2026", "to": "Other"})
+check(r.status_code == 409 and r.json().get("taken") == ["Other/A"], f"a taken name: 409 with the names ({r.text[:200]})")
+check(Bo.get(B + f"/api/wiki/pages/{pa}").json()["path"] == "Projects/2026/A", "after the 409 nothing moved")
+check(Da.post(B + "/api/wiki/move", json={"space": SP, "from": "Projects", "to": "X"}).status_code == 404, "another organisation cannot move folders")
+check(Bo.post(B + "/api/wiki/move", json={"space": SP, "from": "Projects", "to": "Projects/inner"}).status_code == 400, "a folder cannot move into itself")
+
 # ---- templates
 r = Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": "Templates/Meeting", "body": "## Agenda\n- \n"})
 TPL = r.json()["id"]

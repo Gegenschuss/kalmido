@@ -176,6 +176,18 @@ async function wk_rename(p) {
     undo: async () => { await ren(old); return {skipped: []}; }, redo: async () => { await ren(r.path); return {skipped: []}; }});
   histToast(r.relinked ? trn('Renamed, {0} link changed', 'Renamed, {0} links changed', r.relinked) : tr('Renamed'), e);
 }
+async function wk_moveFolder(p) {  // the folder of the page (and everything under it) gets another name
+  await wk_flush();
+  const from = p.path.split('/').slice(0, -1).join('/'); if (!from) return;
+  const to = await askPrompt(tr('Rename folder'), from, {input: {max: 200}, ok: tr('Rename')});
+  if (!to || !to.trim() || to.trim() === from) return;
+  const mv = async (a, b) => { const r = await rawFetch('POST', '/api/wiki/move', {space: p.space, from: a, to: b}); wk_after(p.space); return r; };
+  let r; try { r = await mv(from, to.trim()); } catch (e) { toast(e.message); return; }
+  const nf = to.trim().split('/').filter(Boolean).join('/');
+  const e = histAdd({label: tr('Renamed {0}', qn(from)), ids: [], snaps: [], lids: [],
+    undo: async () => { await mv(nf, from); return {skipped: []}; }, redo: async () => { await mv(from, nf); return {skipped: []}; }});
+  histToast(trn('{0} page moved', '{0} pages moved', r.moved.length), e);
+}
 async function wk_delete(p) {
   await wk_flush();
   try { await rawFetch('DELETE', '/api/wiki/pages/' + p.id); } catch (e) { toast(e.message); return; }
@@ -237,6 +249,7 @@ document.addEventListener('click', async e => {
   else if (k === 'ac') { e.preventDefault(); wk_acPick(+a.dataset.i); }
   else if (k === 'menu') menu(a, [{label: tr('Export as ZIP'), icon: 'download', fn: wk_export}, ...(WK.idx[wk_cur()]?.mayWrite !== false ? [{label: tr('Import ZIP…'), icon: 'upload', fn: wk_import}] : [])]);
   else if (k === 'pmenu' && p) menu(a, [{label: tr('Rename…'), icon: 'edit', fn: () => wk_rename(p)},
+    ...(p.path.includes('/') ? [{label: tr('Rename folder…'), icon: 'folder', fn: () => wk_moveFolder(p)}] : []),
     {label: tr('Copy link'), icon: 'link', fn: () => { navigator.clipboard?.writeText(`${location.origin}${location.pathname}#wiki/${p.id}`).then(() => toast(tr('Link copied'))); }},
     {label: tr('Copy as [[link]]'), icon: 'copy', fn: () => { navigator.clipboard?.writeText(`[[${p.path}]]`).then(() => toast(tr('Link copied'))); }},
     '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => wk_delete(p)}]);

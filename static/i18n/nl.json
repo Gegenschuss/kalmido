@@ -7049,5 +7049,7 @@
   "This is not a ZIP file": "Dit is geen ZIP-bestand",
   "Too many files (at most {0})": "Te veel bestanden (hoogstens {0})",
   "The archive is too large": "Het archief is te groot",
-  "Mentioned in": "Genoemd in"
+  "Mentioned in": "Genoemd in",
+  "Rename folder…": "Map hernoemen…",
+  "{0} page moved": ["{0} pagina verplaatst", "{0} pagina's verplaatst"]
 }

@@ -276,6 +276,39 @@ def wiki_update(pid):
     return jsonify(d)
 
 
+@app.post("/api/wiki/move")
+def wiki_move():
+    """{space, from, to} -- renames a folder: every page at or under "from" moves under "to" (the links to them follow).
+    409 with the names that are taken; one transaction."""
+    c = db()
+    uid = me()
+    b = body()
+    oid = wiki_space(c, uid, b.get("space"), write=True)
+    src, dst = wiki_clean_path(b.get("from")), wiki_clean_path(b.get("to"))
+    if dst.lower() == src.lower() or dst.lower().startswith(src.lower() + "/"):
+        raise BadInput(tr("Invalid value: {0}", "to"))
+    w, a = wiki_space_sql(oid, uid)
+    rows = c.execute(f"SELECT * FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND (lower(path)=? OR lower(path) LIKE ? ESCAPE '\\')",
+                     [*a, src.lower(), src.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%"]).fetchall()
+    if not rows:
+        raise Denied(404)
+    moves = [(r, wiki_clean_path(dst + r["path"][len(src):])) for r in rows]
+    mine = {r["id"] for r in rows}
+    taken = [n for _, n in moves if (x := c.execute(f"SELECT id FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND lower(path)=?", [*a, n.lower()]).fetchone()) and x["id"] not in mine]
+    if taken:
+        return jsonify(error=tr("A page with this name already exists"), taken=taken[:20]), 409
+    ts, n = iso_ms(now_utc()), 0
+    for r, new in moves:  # first to a free name, then to the target (pages of the folder may swap names among themselves)
+        c.execute("UPDATE wiki_pages SET path=? WHERE id=?", (f".moving/{r['id']}", r["id"]))
+    for r, new in moves:
+        c.execute("UPDATE wiki_pages SET path=?, updated_by=?, updated_at=? WHERE id=?", (new, uid, ts, r["id"]))
+    for r, new in moves:
+        n += wiki_relink(c, r, r["path"], new, uid, ts)
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, moved=[{"id": r["id"], "from": r["path"], "to": new} for r, new in moves], relinked=n)
+
+
 @app.delete("/api/wiki/pages/<int:pid>")
 def wiki_delete(pid):
     """To the trash (the app's Undo brings it back: POST /api/wiki/restore)."""

@@ -14,7 +14,8 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   task get a link; nobody else sees its title).
 - **Links between pages.** `[[Processes/Shoot day/Checklist]]` (or `[[…|label]]`) links another page of the same space.
   While typing `[[` the app suggests pages. A link to a page that does not exist yet is shown dashed; a tap creates it.
-  Below each page, *Linked from* lists the pages that link to it. Renaming a page changes the links to it.
+  Below each page, *Linked from* lists the pages that link to it. Renaming a page changes the links to it;
+  *Rename folder…* in the menu of a page moves every page of its folder (the links follow as well).
 - **Frontmatter.** A leading block of `key: value` lines between `---` lines is shown as small fields above the text.
 - **Templates.** Pages under `Templates/` are offered as the start of a new page.
 - **Saving** is automatic. When someone else saved the page in between, you choose which version stays.

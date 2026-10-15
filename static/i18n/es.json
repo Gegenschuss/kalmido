@@ -7049,5 +7049,7 @@
   "This is not a ZIP file": "Esto no es un archivo ZIP",
   "Too many files (at most {0})": "Demasiados archivos (como máximo {0})",
   "The archive is too large": "El archivo es demasiado grande",
-  "Mentioned in": "Mencionada en"
+  "Mentioned in": "Mencionada en",
+  "Rename folder…": "Renombrar carpeta…",
+  "{0} page moved": ["{0} página movida", "{0} páginas movidas"]
 }
