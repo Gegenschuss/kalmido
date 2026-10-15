@@ -116,6 +116,16 @@ function qMismatch(r) {
     || (p.FREQ === 'MONTHLY' && p.BYMONTHDAY && !p.BYMONTHDAY.split(',').map(Number).includes(d.getDate()));
   return off ? `<span class="qnote" role="note">${ic('alert', 's')}${esc(tr('first on {0}, then {1}', dayLabel(r.due), repeatLabelBase(rrBase(r.repeat))))}</span>` : '';
 }
+// 2.46.1 (#1634): a render that rebuilds an input keeps its text, caret and focus (typing goes on while a save runs)
+let subAddQ = Promise.resolve();
+function renderKeepField(sel, fn) {
+  const o = $(sel), v = o?.value || '', a = o?.selectionStart ?? v.length, b = o?.selectionEnd ?? v.length;
+  const f = !o || document.activeElement === o || document.activeElement === document.body;
+  fn();
+  const n = $(sel); if (!n) return;
+  if (n !== o) n.value = v;
+  if (f) { n.focus(); try { n.setSelectionRange(a, b); } catch { /* not a text field */ } }
+}
 async function submitQuick(input, extra = {}) {
   const cap = input.id === 'qsheet' && S.quickPreset.capture;  // 2.4.0 (#187): a capture ignores the view (inbox unless ~list)
   const d = {...(cap ? {} : quickDefaults()), ...(input.id === 'qsheet' ? S.quickPreset : {}), ...extra};
@@ -741,12 +751,15 @@ document.addEventListener('keydown', async e => {
     if (t.dataset?.cf !== undefined && t.tagName === 'INPUT') { e.preventDefault(); t.blur(); return; }
     if (t.classList?.contains('nitem')) { e.preventDefault(); newsOpen(+t.dataset.i); return; }
     if (t.id === 'd-sub' && t.value.trim()) {
-      const p = taskById(S.sel);
-      const r = parseQuick(t.value.trim(), new Set());
-      const v = t.value; t.value = '';
-      const nt = await api('POST', '/api/tasks', {title: r.title || v, parent_id: p.id, list_id: p.list_id, due: r.due, due_time: r.due_time, priority: r.priority || 0});
-      await load(); renderDetail(); render(); $('#d-sub').focus();
-      if (nt?.id) histCreate(tr('Subtask {0} added', qn(String(nt.title || r.title || v).slice(0, 40))), nt);
+      // 2.46.1 (#1634): queued, so a fast second Enter waits its turn; the rebuilt field keeps what was typed meanwhile
+      e.preventDefault();
+      const p = taskById(S.sel), v = t.value; t.value = '';
+      subAddQ = subAddQ.then(async () => {
+        const r = parseQuick(v.trim(), new Set());
+        const nt = await api('POST', '/api/tasks', {title: r.title || v, parent_id: p.id, list_id: p.list_id, due: r.due, due_time: r.due_time, priority: r.priority || 0});
+        await load(); renderKeepField('#d-sub', () => { renderDetail(); render(); });
+        if (nt?.id) histCreate(tr('Subtask {0} added', qn(String(nt.title || r.title || v).slice(0, 40))), nt);
+      }).catch(() => {});
       return;
     }
     if (t.id === 'd-tag' && t.value.trim()) {
