@@ -264,9 +264,13 @@ def vc_qp_join(text):
     joined before the normal unfolding (that next line has no leading blank)."""
     out, cur = [], None
     for ln in text.split("\n"):
+        if cur is not None and ln.strip().upper() == "END:VCARD":  # a dangling soft break must not swallow the end of the card
+            out.extend((cur, ln))
+            cur = None
+            continue
         if cur is not None:
             cur += ln
-        elif VC_QP_RE.match(ln):
+        elif vc_is_qp(ln):
             cur = ln
         else:
             out.append(ln)
@@ -281,6 +285,12 @@ def vc_qp_join(text):
     return "\n".join(out)
 
 
+def vc_is_qp(ln):
+    """A property line with a QUOTED-PRINTABLE parameter (no regex: two [^:]* around ';' were quadratic on long lines)."""
+    head = ln.split(":", 1)[0]
+    return ":" in ln and ";" in head and "QUOTED-PRINTABLE" in head.upper()
+
+
 def vc_qp_decode(val, params):
     """2.45.1 (#1555): a quoted-printable value (vCard 2.1) -> text in its CHARSET (UTF-8 by default, else Latin-1)."""
     raw = quopri.decodestring(val.encode("utf-8"))
@@ -288,7 +298,7 @@ def vc_qp_decode(val, params):
     for enc in (cs, "utf-8", "latin-1"):
         try:
             return raw.decode(enc).replace("\r\n", "\n")
-        except (LookupError, UnicodeDecodeError):
+        except (LookupError, UnicodeError, ValueError):  # e.g. CHARSET=undefined raises a bare UnicodeError
             continue
     return val
 
@@ -309,7 +319,6 @@ def vc_fold(line):
     return "\r\n ".join(out)
 
 
-VC_QP_RE = re.compile(r"^[^:]*;[^:]*QUOTED-PRINTABLE[^:]*:", re.I)
 LINE_RE = re.compile(r"^(?:([A-Za-z0-9-]+)\.)?([A-Za-z0-9-]+)((?:;(?:[^:\"]|\"[^\"]*\")*)?):(.*)$")
 
 

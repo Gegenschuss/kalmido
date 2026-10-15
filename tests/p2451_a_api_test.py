@@ -111,6 +111,17 @@ check(c1.get("org") == "Bäckerei Weiß", f"#1555: CHARSET=ISO-8859-1 is respect
 check(c1.get("note") == "Zeile eins\nZeile zwei", f"#1555: a QP line break becomes a line break {c1.get('note')!r}")
 check([p.get("type") for p in c1.get("phones", [])] == [["home"]], f"#1555: the bare 2.1 types stay {c1.get('phones')}")
 
+# 2.45.1 (#1555) review: a long line with many ';' is no regex trap, an unknown CHARSET and a soft break right before END do not break the card
+bad = "\r\n".join(["BEGIN:VCARD", "VERSION:2.1", "FN;CHARSET=undefined;ENCODING=QUOTED-PRINTABLE:Gr=C3=BC=C3=9Fmann",
+                    "NOTE;QUOTED-PRINTABLE:" + "a;" * 2, "a;" * 40000, "END:VCARD",
+                    "BEGIN:VCARD", "VERSION:2.1", "FN;ENCODING=QUOTED-PRINTABLE:Strau=C3=9F=", "END:VCARD", ""])
+BR = A.post(B + "/api/books", json={"name": "QP2"}).json()["id"]
+t0 = time.time()
+r = A.post(B + f"/api/books/{BR}/import", files={"file": ("bad.vcf", bad.encode("ascii"), "text/vcard")})
+check(r.ok and r.json().get("created") == 2 and r.json().get("errors") == 0 and time.time() - t0 < 10,
+      f"#1555: long ';' line, CHARSET=undefined, soft break before END import fine {r.status_code} {r.text[:200]} {time.time() - t0:.1f}s")
+check(names(BR) == ["Grüßmann", "Strauß"], f"#1555: names of the odd cards {names(BR)}")
+
 print(f"p2451_a_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 time.sleep(0.1)
 sys.exit(1 if FAILS else 0)
