@@ -243,5 +243,26 @@ check(txt.split("\r\n")[0].split(";")[12] == "20250701", "fiscal year start of M
 log = dbx("SELECT action, target FROM office_doc_log WHERE target='datev'")
 check(len(log) >= 1 and log[0]["action"] == "export", "the export is in the office log")
 
+# ---------------------------------------------------------------- #1727: archiving several lists (the client sends one
+# PATCH /api/lists/<id> {archived} per marked list and keeps them as one undo step; the rights are the single list's)
+LA = A.post(B + "/api/lists", json={"name": "Mark one"}).json()["id"]
+LB = A.post(B + "/api/lists", json={"name": "Mark two"}).json()["id"]
+LC = Bo.post(B + "/api/lists", json={"name": "Bob shares to view"}).json()["id"]
+LD = Bo.post(B + "/api/lists", json={"name": "Bob shares as admin"}).json()["id"]
+check(Bo.put(B + f"/api/lists/{LC}/members", json={"user_id": ALICE, "role": "view"}).ok and Bo.put(B + f"/api/lists/{LD}/members", json={"user_id": ALICE, "role": "admin"}).ok,
+      "#1727 setup: Bob shares one list to view, one as list admin")
+res = {lid: A.patch(B + f"/api/lists/{lid}", json={"archived": 1}).status_code for lid in (LA, LB, LC, LD)}
+check(res[LA] == 200 and res[LB] == 200 and res[LD] == 200, f"#1727: own lists and a list admin's list are archived: {res}")
+check(res[LC] == 403, f"#1727: a view-only list is refused (skipped and named by the client): {res[LC]}")
+arch = lambda s, lid: next((x["archived"] for x in s.get(B + "/api/state").json()["lists"] if x["id"] == lid), None)
+check(arch(A, LA) and arch(A, LB) and arch(Bo, LD) and not arch(Bo, LC), "#1727: archived exactly the lists with the right")
+# the undo step: archived 0 with _prev (a list restored elsewhere meanwhile is reported, not touched)
+Bo.patch(B + f"/api/lists/{LD}", json={"archived": 0})
+r = {lid: A.patch(B + f"/api/lists/{lid}", json={"archived": 0, "_prev": {"archived": 1}}).json() for lid in (LA, LB, LD)}
+check(not arch(A, LA) and not arch(A, LB) and not arch(Bo, LD), "#1727: the undo brings all of them back")
+check(not r[LA].get("conflicts") and not r[LB].get("conflicts"), f"#1727: no conflicts on the lists nobody touched: {r[LA].get('conflicts')} {r[LB].get('conflicts')}")
+ra = requests.patch(B + f"/api/lists/{LA}", json={"archived": 1}, headers=AGH)
+check(ra.status_code in (401, 403, 404), f"#1727: an agent without access cannot archive: {ra.status_code} {ra.text[:120]}")
+
 print(f"p2473_e_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
