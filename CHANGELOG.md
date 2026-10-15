@@ -7,6 +7,15 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.47.4] - 2026-10-16
+
+**In short:** the checks of 2.47.3 green again; no new functions.
+
+### Fixed
+- The DATEV export dialog uses the app's date picker (#1460); the (i) buttons in the quotation editor are big enough to
+  tap (#1382); sizes of the new travel and cash flow elements follow the text size (#1022, #1652).
+- Tests: the office now has eight tabs, and three date-dependent tests no longer fail shortly after midnight.
+
 ## [2.47.3] - 2026-10-16
 
 **In short:** **Office & finance without an organisation** (a personal office for freelancers), **travel expenses**, a
