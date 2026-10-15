@@ -269,6 +269,17 @@ log = A.get(B + f"/api/files/nodes/{P1}").json().get("log", [])
 acts = {x["action"] for x in log if x["agent"]}
 check({"download", "version"} <= acts, f"the history has the agent's accesses ({sorted(acts)})")
 check(not any(x["action"] == "download" and not x["agent"] for x in log), "people's reads are not logged")
+# review: an agent never writes a new version of an executable file; the API path shows only visible folders
+SH_ = up(A, "deploy.sh", b"echo ok", parent=F1).json()["items"][0]["id"]
+check(AGS.post(B + f"/api/v1/files/{SH_}/versions", json={"content": "rm -rf /"}).status_code == 403, "no new version of a .sh by an agent")
+SUB = folder(A, "Deep", parent=F1)
+A.post(B + f"/api/files/nodes/{SUB}/shares", json={"user_id": DAVE, "role": "view"})
+Dv = sess("dave")
+check(Dv.get(B + f"/api/files", params={"parent": SUB}).json().get("crumbs") == [{"id": SUB, "name": "Deep"}], "crumbs: only the shared folder, not the one above")
+# expiry with an offset is compared in UTC
+A.patch(B + f"/api/files/shares/{SH}", json={"expires_at": "2000-01-01T10:00+05:00"})
+check(dbx("SELECT expires_at FROM fs_shares WHERE id=?", (SH,))[0][0] == "2000-01-01T05:00:00+00:00", "expiry stored in UTC")
+A.patch(B + f"/api/files/shares/{SH}", json={"expires_at": None})
 pdf = tiny_pdf("Quarterly figures")
 r = AGS.post(B + "/api/v1/files", json={"parent_id": F1, "name": "q.pdf", "content_base64": base64.b64encode(pdf).decode(), "mime": "application/pdf"})
 check(r.status_code == 201, f"the agent stores a PDF ({r.text[:120]})")
@@ -332,6 +343,13 @@ check(content(A, LK).content == b"original text", "the link opens the original")
 check(content(Er, LK).status_code == 404, "erin (edit on the folder) but not on the task: the link stays closed")
 check(Er.post(B + "/api/files/links", json={"ref_kind": "att", "ref_id": AID}).status_code == 404, "no link to a file one cannot see")
 check(not dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (LK,)), "a link stores no copy")
+lst = Er.get(B + "/api/files", params={"parent": F1}).json()["items"]
+lk = [x for x in lst if x["id"] == LK]
+check(lk and lk[0].get("no_access") and lk[0]["name"] != "contract.txt" and lk[0].get("ref_id") is None, "a link erin may not open shows nothing of its original")
+# trashed: details only for who may restore
+A.delete(B + f"/api/files/nodes/{LK}")
+check(Er.get(B + f"/api/files/nodes/{LK}").status_code == 404 and A.get(B + f"/api/files/nodes/{LK}").ok, "a trashed node: details only for the owner")
+A.post(B + f"/api/files/nodes/{LK}/restore")
 
 # ---- quota counts the file store
 q = dbx("SELECT COALESCE(SUM(size),0) FROM fs_versions WHERE created_by=1")[0][0]
