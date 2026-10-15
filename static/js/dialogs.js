@@ -174,8 +174,10 @@ function ticketTplModal(lid) {
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.m === 'reset') { $('#tt-bug', md).value = ''; $('#tt-feature', md).value = ''; return; }
     if (b.dataset.m === 'save') {
-      try { await api('PATCH', '/api/lists/' + lid, {ticket_tpl: {bug: $('#tt-bug', md).value, feature: $('#tt-feature', md).value}}); } catch { return; }
-      md.remove(); await load(); render(); toast(tr('Saved'));
+      // 2.46.2 (#1659): at once (optimistic), no reload of the whole state; an error puts the old templates back
+      const tpl = {bug: $('#tt-bug', md).value, feature: $('#tt-feature', md).value};
+      md.remove(); toast(tr('Saved'));
+      optWrite(optSet(() => listById(lid), {ticket_tpl: JSON.stringify(tpl)}), () => api('PATCH', '/api/lists/' + lid, {ticket_tpl: tpl})).catch(() => {});
     }
   });
 }
@@ -274,6 +276,21 @@ async function staleDaysSet(lid, sel) {
 const LIST_HIST = ['name', 'color', 'folder', 'view', 'kind', 'dep_shift', 'rate', 'archived', 'tickets', 'nag', 'day_hours', 'checklist'];  // 2.7.0: nag, day_hours; 2.7.2: checklist = "Show completed at the bottom"
 const LIST_LOCAL = ['name', 'color', 'view', 'dep_shift', 'rate', 'tickets', 'nag', 'day_hours', 'checklist', 'sort_mode', 'done_in_section', 'columns', 'stale_days'];  // 2.41.2 (#1501)
 const lv = (k, v) => k === 'dep_shift' || k === 'archived' || k === 'tickets' || k === 'checklist' ? (v ? 1 : 0) : k === 'rate' || k === 'day_hours' ? (v === '' || v == null ? null : +String(v).replace(',', '.')) : v ?? '';
+// 2.46.2 (#1659): the list name while it is typed: sidebar and header show it at once (l._live, read by licName); it is
+// saved after the 0.9 s pause as before (one undo step); a state that arrives meanwhile gets it again (OPT, like optWrite)
+const FL_LIVE = new Map();
+let fl_liveRaf = 0;
+function fl_nameLive(id, name) {
+  let p = FL_LIVE.get(id);
+  if (!p) { p = {v: null, put: () => { const l = listById(id); if (l) { if (p.v == null) delete l._live; else l._live = p.v; } }}; FL_LIVE.set(id, p); OPT.add(p); }
+  p.v = name || null; p.put();
+  clearTimeout(fl_liveRaf); fl_liveRaf = setTimeout(() => { renderSide(); renderTop(); }, 16);
+}
+function fl_nameEnd(id) {
+  const p = FL_LIVE.get(id); if (!p) return;
+  OPT.delete(p); FL_LIVE.delete(id); const l = listById(id); if (l) delete l._live;
+  clearTimeout(fl_liveRaf); renderSide(); renderTop();
+}
 async function listPatch(id, body, label, o = {}) {
   const l = listById(id); if (!l) return false;
   const before = {}, after = {};
@@ -283,8 +300,9 @@ async function listPatch(id, body, label, o = {}) {
   if (Object.keys(body).every(k => LIST_LOCAL.includes(k))) {
     const vals = Object.fromEntries(Object.keys(body).map(k => [k, LIST_HIST.includes(k) ? lv(k, body[k]) : body[k]]));
     try { await optWrite(optSet(() => listById(id), vals), () => api('PATCH', '/api/lists/' + id, body)); } catch { return false; }
-  } else {
-    try { await api('PATCH', '/api/lists/' + id, body); } catch { return false; }
+  } else {  // 2.46.2 (#1659): folder, type, archive, time tracking show at once too; the reload for the side effects runs behind
+    const vals = Object.fromEntries(Object.keys(body).filter(k => !k.startsWith('_') && k !== 'folder_adopt').map(k => [k, LIST_HIST.includes(k) ? lv(k, body[k]) : body[k]]));
+    try { await optWrite(optSet(() => listById(id), vals), () => api('PATCH', '/api/lists/' + id, body)); } catch { return false; }
     await load(); render();
   }
   if (!Object.keys(before).length) return null;
@@ -442,11 +460,22 @@ async function listDeleteForGood(id) {
   const ok = await askConfirm(tr('Delete “{0}” permanently?', lname(l)), '', {danger: true, ok: tr('Delete permanently'),
     html: `<p>${tr('This cannot be undone. Lost for good:')}</p><ul class="cdlg-l">${lost.map(x => `<li>${esc(x)}</li>`).join('')}</ul>${isOwner(l) ? '' : lmDeleteNotes(l, all.length, open)}<p class="muted" ${isOwner(l) ? '' : 'hidden'}>${all.length ? trn('Its {0} task goes to the trash of your basket ({1} open) and can be restored from there.', 'Its {0} tasks go to the trash of your inbox ({1} open) and can be restored from there.', all.length, open) : tr('The list has no tasks.')}</p>${isOwner(l) ? lmDeleteNotes(l, all.length, open) : ''}`});
   if (!ok) return false;
-  if (!l.archived) { try { await api('PATCH', '/api/lists/' + id, {archived: 1}); } catch { return false; } }
-  try { await api('DELETE', '/api/lists/' + id); } catch { return false; }
+  // 2.46.2 (#1659): the list (and its tasks) leave the screen at once; archive + delete + the reload run behind it, an
+  // error brings the list back (optWrite: a state that arrives meanwhile gets it removed again)
+  const nm = lname(l);
   if (S.route.key === 'l:' + id) go(START_KEY);
-  await load(); render(); toast(tr('“{0}” deleted', lname(l)));
-  return true;
+  const put = () => {
+    const i = S.lists.findIndex(x => x.id === id); if (i < 0) return null;
+    const [x] = S.lists.splice(i, 1), ts = [...S.tasks.values()].filter(t => t.list_id === id);
+    for (const t of ts) S.tasks.delete(t.id);
+    return () => { if (!listById(id)) S.lists.splice(Math.min(i, S.lists.length), 0, x); for (const t of ts) if (!S.tasks.has(t.id)) S.tasks.set(t.id, t); };
+  };
+  optWrite(put, async () => {
+    if (!l.archived) await api('PATCH', '/api/lists/' + id, {archived: 1});
+    await api('DELETE', '/api/lists/' + id);
+  }).then(() => toast(tr('“{0}” deleted', nm)), () => {})  // an error: api() said why, the list is back
+    .then(() => load()).then(render, () => {});  // half done (archived, not deleted) shows the real state
+  return true;  // gone from the screen: the dialog closes at once
 }
 // ---- 2.6.0 (K12): the Share dialog, out of the long list dialog: people + roles and inviting, the agents of the list (share /
 // stop sharing, the tidy agent), the public link, transferring the ownership. From the list's "…" menu, the header's Share
@@ -835,14 +864,14 @@ function listModal(id, folder = '', o = {}) {
       const e = await listPatch(id, diff, null, {post: lsync});
       if (e === false) { lsync(); return; }
       lsaved(e);
-    }).catch(() => {});
+    }).catch(() => {}).then(() => { if (!pend.size) fl_nameEnd(id); });  // 2.46.2 (#1659): saved (or not): the live name ends
     return saving;
   };
   const later = el => { clearTimeout(pend.get(el.id)); pend.set(el.id, setTimeout(autosave, 900)); };
   if (id) {
-    md.addEventListener('input', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) later(e.target); });
+    md.addEventListener('input', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) later(e.target); if (e.target.id === 'l-name') fl_nameLive(id, formBody().name); });  // 2.46.2 (#1659)
     md.addEventListener('focusout', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) { const empty = e.target.id === 'l-name' && !e.target.value.trim().replace(EMO_RE, ''); autosave().then(() => { if (empty) lsync(true); }); } });
-    onRemove(md, () => { if (pend.size) autosave(); });
+    onRemove(md, () => { if (pend.size) autosave(); else fl_nameEnd(id); });
   }
   md.addEventListener('change', e => {
     if (e.target.id === 'l-kindp' || e.target.id === 'l-kindl') {  // 2.25.0 (UX-52); 2.27.0 (#977): Type = Simple list | Project

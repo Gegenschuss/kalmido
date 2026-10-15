@@ -109,11 +109,11 @@ async function lpDelta(v, ch, n) {
 }
 // the view redrawn by morphing unless a field / form in it is busy (then marked stale, drawn later like viewSafeRender)
 function lpViewSafe() { if ((editing() && $('#view')?.contains(document.activeElement)) || lpFormBusy($('#view'))) { S.viewStale = true; return; } lpMorphView(); }
-// the view redrawn by morphing: unchanged rows keep their nodes (views that wire their DOM after rendering are rebuilt)
+// the view redrawn by morphing: unchanged rows keep their nodes (2.46.2 #1718: calendar and timeline too)
 function lpMorphView() {
   const el = $('#view'); if (!el) return;
   const prev = morphRoot;
-  morphRoot = S.route.mod === 'cal' || $('#tlscroll', el) ? null : el;
+  morphRoot = el;
   try { S.viewStale = false; renderView(); } finally { morphRoot = prev; }
 }
 // the offline start cache (the last full state) follows the delta, written at most every 30 s

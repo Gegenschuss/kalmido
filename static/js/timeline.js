@@ -171,7 +171,7 @@ function viewTimeline(listId, inCal) {
       ${rows || `<div class="tl-row"><div class="tl-name muted">${tr('No dated tasks')}</div><div class="tl-track"></div></div>`}
       <i class="tl-now" style="left:calc(var(--tl-name) + ${todayX + DW / 2}px)"></i>
       ${listId ? msIn(listById(listId) || {}).map(m => `<i class="tl-msl" style="left:calc(var(--tl-name) + ${diffDays(start, m.day) * DW + DW / 2}px)"></i>`).join('') : ''}
-      ${deps ? '<svg class="tl-deps" id="tl-deps" aria-hidden="true"></svg>' : ''}
+      ${deps ? '<svg class="tl-deps" id="tl-deps" aria-hidden="true" data-fl-fill></svg>' : ''}
     </div></div>
     ${hintOnce('tlrange', tr('Set a date range via “Start” in the date dialog.'))}<div class="muted tl-foot">${chint ? chint + ' ' : ''}${hint} ${dhint ? dhint + ' ' : ''}${undated && !ndOn ? ' ' + trn('{0} task without a date is not shown.', '{0} tasks without a date are not shown.', undated) : ''}</div></div>`;
 }
@@ -222,7 +222,7 @@ function tlArrows() {
   if (isRoadmap()) { rmRows(); rmArrows(); return; }  // D3: computed from the model, rows virtualised
   const svg = $('#tl-deps');
   if (!svg || !S.tlL) return;
-  if (!depsOn()) { svg.innerHTML = ''; return; }
+  if (!depsOn()) { svg.innerHTML = ''; svg._flh = ''; return; }
   if (S.depAll.v !== S.v) loadDepAll();
   // one read pass (row positions, bar geometry from the inline style = also mid-drag), then one write
   const geo = new Map();
@@ -247,7 +247,8 @@ function tlArrows() {
     out += `<g class="dep ${kind}${W && B ? '' : ' stub'}" data-dep="${w}:${b}"><title>${esc(tip)}</title><path class="hit" d="${d}"/><path class="ln" d="${d}" marker-end="url(#tl-ah-${kind})"/>${W && B ? '' : `<circle class="st" cx="${W ? Math.max(0, W.x - 20) : B.x + B.w + 20}" cy="${W ? W.y : B.y}" r="2.5"/>`}</g>`;
   }
   const mk = k => `<marker id="tl-ah-${k}" class="ah ${k}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0.5L7.5,4L0,7.5z"/></marker>`;
-  svg.innerHTML = `<defs>${mk('ok')}${mk('conf')}${mk('done')}</defs>${out}<path class="rubber" d=""/>`;
+  const h = `<defs>${mk('ok')}${mk('conf')}${mk('done')}</defs>${out}<path class="rubber" d=""/>`;
+  if (svg._flh !== h || !svg.firstChild) { svg.innerHTML = h; svg._flh = h; }  // 2.46.2 (#1718): the arrows stay when nothing moved
 }
 // re-layout when the timeline's box changes (window, font size, sidebar); scrolling moves the overlay with the bars
 const tlRO = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => tlArrowsSoon()) : null;
@@ -261,7 +262,7 @@ function tlFocKeep() {
 }
 function tlAfterRender(el) {  // renderView: a new timeline is in the DOM
   tlFocKeep();
-  if (tlRO && !el.__ro) { el.__ro = 1; tlRO.observe(el.firstElementChild || el); }
+  const ro = el.firstElementChild || el; if (tlRO && el.__ro !== ro) { if (el.__ro?.nodeType) tlRO.unobserve(el.__ro); el.__ro = ro; tlRO.observe(ro); }  // 2.46.2 (#1718): a morph may bring another first child
   tlArrows();
 }
 

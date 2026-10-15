@@ -91,7 +91,7 @@ async function chatLoad() {
     if (jobSideSig(a) !== sg) setTimeout(renderSide, 0);  // 2.36.2 (#1123): an approval answered in the chat leaves the sidebar's counter at once
   }
   catch (e) { S.chat.err = e instanceof Offline ? tr('Only available online.') : e.message; }
-  chatDraw(); renderTop(); if (S.route.mod === 'agents' && !S.route.agent) renderView();
+  chatDraw(); renderTop(); if (S.route.mod === 'agents' && !S.route.agent) fl_viewSoon(true, 'agents');  // 2.46.2 (#1718): gathered
 }
 function chatMsgs() {
   const a = agentById(S.chat.aid);
@@ -593,10 +593,10 @@ function stepsAlways() {
   const on = !stepsAlwaysOn(); stepsSet('agent_steps_always', on); S.jobOpen = {};
   $$('.chstog').forEach(b => { b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
   toast(on ? tr('Steps are shown above every answer') : tr('Steps are shown only while the agent works'));
-  jobStepsRedraw();
+  jobStepsRedraw(true);
 }
 function stepsLive(on) {
-  stepsSet('agent_steps_live', on); jobStepsRedraw();
+  stepsSet('agent_steps_live', on); jobStepsRedraw(true);
   if (!on) $('#chat-in')?.focus({preventScroll: true});
 }
 // a tap on the typing dots brings hidden steps back
@@ -624,15 +624,16 @@ async function jobStepsLoad(jid) {
   finally { jobStepsBusy.delete(jid); }
   jobStepsRedraw();
 }
-function jobStepsRedraw() {
+// 2.46.2 (#1718): a click redraws at once (now), steps that arrive are gathered (fl_viewSoon)
+function jobStepsRedraw(now) {
   if ($('#chat-msgs')) chatPatch({});
-  if (S.route.mod === 'agents' && !(S.route.agent && chatFull())) renderView();
+  if (S.route.mod === 'agents' && !(S.route.agent && chatFull())) { if (now) renderView(); else fl_viewSoon(true, 'agents'); }
 }
 // the summary toggles through the state (a redraw keeps it): click, Enter, Space
 document.addEventListener('click', e => {
   const sm = e.target.closest?.('details.jobv > summary'); if (!sm) return;
   e.preventDefault(); const jid = +sm.parentElement.dataset.jv;
-  S.jobOpen[jid] = !jobOpenIs(jid); jobStepsRedraw();
+  S.jobOpen[jid] = !jobOpenIs(jid); jobStepsRedraw(true);
   setTimeout(() => $(`details.jobv[data-jv="${jid}"] > summary`)?.focus({preventScroll: true}), 0);
 });
 // /api/version said a new step arrived for me: the open chat fetches, open histories load again

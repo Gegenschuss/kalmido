@@ -406,7 +406,7 @@ document.addEventListener('input', e => {
     S.nt.q = e.target.value; const r = $('#nt-res'), ns = S.nt.notes || [], q = S.nt.q.trim().toLowerCase();
     if (!r) return;
     const vis = q ? ns.filter(n => (n.title + ' ' + n.body + ' ' + n.tags.join(' ')).toLowerCase().includes(q)) : ns;
-    setHtml(r, ntCardsHtml(vis, q, S.nt.id && ns.find(n => n.id === S.nt.id)));
+    fl_set(r, ntCardsHtml(vis, q, S.nt.id && ns.find(n => n.id === S.nt.id)));
     clearTimeout(S.nt.qT); S.nt.qT = setTimeout(() => { if (document && q) announce(trn('{0} note', '{0} notes', vis.length)); }, 600);
     return;
   }
@@ -598,7 +598,7 @@ function msgSecHtml() {
     <div class="mslist">${m.err ? `<div class="muted mhint">${esc(m.err)}</div>` : m.hits.length ? m.hits.map((h, i) => msgHitHtml(h, i, 'ms-hit')).join('') : m.busy ? `<div class="muted mhint">${tr('Searching…')}</div>` : `<div class="muted mhint">${tr('No messages found.')}</div>`}</div>
     ${m.next != null ? `<button type="button" class="btn sm msmore" data-act="ms-more">${tr('Show more')}</button>` : ''}</section>`;
 }
-function msgSecDraw() { const el = $('#smsgs'); if (el) el.innerHTML = msgSecHtml(); }
+function msgSecDraw() { const el = $('#smsgs'); if (el) fl_set(el, msgSecHtml()); }  // 2.46.2 (#1718): morphed
 async function msgSecRun(q, more = false) {
   const m = S.msg;
   if (q !== m.q) { m.senders = {}; m.sender = ''; }

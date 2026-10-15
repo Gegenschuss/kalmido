@@ -222,7 +222,7 @@ function viewRoadmap() {
       <div class="tl-row tl-headrow"><div class="tl-name rm-hname">${esc(trn('{0} list', '{0} lists', M.nGroups))}</div><div class="tl-track tl-headtrack"><div class="tl-months">${mt}</div><div class="tl-days">${mb}</div></div></div>
       <div id="rm-rows"></div>
       ${todayX >= 0 && todayX < G.days * G.dw ? `<i class="tl-now" style="left:calc(var(--tl-name) + ${todayX + G.dw / 2}px)"></i>` : ''}
-      <svg class="tl-deps" id="tl-deps" aria-hidden="true"></svg>
+      <svg class="tl-deps" id="tl-deps" aria-hidden="true" data-fl-fill></svg>
     </div></div>
     <div class="muted tl-foot">${hint}</div></div>`;
 }
@@ -241,7 +241,7 @@ function rmRows(force) {
   S.tlL = {bars: new Map()};
   let html = '';
   for (let i = a; i < b; i++) html += rmRowHtml(G, M, M.rows[i]);
-  box.innerHTML = html;
+  fl_set(box, html);  // 2.46.2 (#1718)
   if (focusSel) $(focusSel, box)?.focus({preventScroll: true});
   tlFocKeep();
 }
@@ -261,7 +261,7 @@ let rmRaf = 0;
 function rmArrows() {
   const svg = $('#tl-deps'), V = S.rmV;
   if (!svg || !V || !isRoadmap()) return;
-  if (!depsOn()) { svg.innerHTML = ''; return; }
+  if (!depsOn()) { svg.innerHTML = ''; svg._flh = ''; return; }
   if (S.depAll.v !== S.v) loadDepAll();
   const {G, M} = V, W = G.days * G.dw, cache = new Map();
   const drag = $('.tl-bar.drag');
@@ -312,7 +312,8 @@ function rmArrows() {
     out += `<g class="dep ${kind}${both ? '' : ' stub'}${Wn?.agg || Bn?.agg ? ' agg' : ''}" ${attr}><title>${esc(tip)}</title><path class="hit" d="${d}"/><path class="ln" d="${d}" marker-end="url(#tl-ah-${kind})"/>${both ? '' : `<circle class="st" cx="${Wn ? Math.max(-8, Wn.x - 20) : Math.min(W + 8, Bn.x + Bn.w + 20)}" cy="${(Wn || Bn).y}" r="2.5"/>`}${badge}</g>`;
   }
   const mk = k => `<marker id="tl-ah-${k}" class="ah ${k}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0.5L7.5,4L0,7.5z"/></marker>`;
-  svg.innerHTML = `<defs>${mk('ok')}${mk('conf')}${mk('done')}</defs>${out}<path class="rubber" d=""/>`;
+  const h = `<defs>${mk('ok')}${mk('conf')}${mk('done')}</defs>${out}<path class="rubber" d=""/>`;
+  if (svg._flh !== h || !svg.firstChild) { svg.innerHTML = h; svg._flh = h; }  // 2.46.2 (#1718): the arrows stay when nothing moved
 }
 function rmDepPop(g) {
   const pairs = g.dataset.rmdep.split(',').map(p => p.split(':').map(Number));

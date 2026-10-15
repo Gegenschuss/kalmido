@@ -708,6 +708,8 @@ fresh; run p2462_c_ui node p2462_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.2 part D: #1472 #1662 #1663 #1664 #1647 #1646 client month, empty section drop, locked note, subfolder to top level, import bar, PDF address block
 fresh; run p2462_d_api "$PY" p2462_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2462_d_ui node p2462_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.46.2 part A: #1718 no flicker (the view is morphed on a redraw of the same route)
+fresh; run p2462_a_ui node p2462_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
