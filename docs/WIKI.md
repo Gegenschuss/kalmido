@@ -55,7 +55,8 @@ may only view, the map only shows.
 | O | open the task |
 
 Drag a branch onto another one to hang it there (it becomes a subtask, or moves to that section). On a phone drag the map
-with one finger and zoom with two; a tap selects a branch, a second tap opens its actions. The button next to the map
+with one finger and zoom with two; a tap selects a branch, a second tap opens its actions, a long press lifts the
+branch so the finger can hang it somewhere else. The button next to the map
 switches to an **outline** (an indented list) of the same tree.
 
 The menu exports the map as a Markdown outline, as SVG or PNG, and imports an outline (Markdown list, OPML or FreeMind

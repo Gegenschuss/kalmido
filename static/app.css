@@ -6864,6 +6864,7 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 .mmnode.done .mmt{text-decoration:line-through}
 .mmnode.sel rect{stroke:var(--accent);stroke-width:2.5}
 .mmnode.drop rect{stroke:var(--accent);stroke-dasharray:4 3;stroke-width:2.5}
+.mmnode.lift rect{stroke:var(--accent);stroke-width:3;fill:var(--accent-soft)}
 .mmfold circle{fill:var(--accent)}
 .mmfold text{fill:#fff;font-size:10px}
 .mmedit{position:absolute;z-index:3;padding:0 .5rem;border:2px solid var(--accent);border-radius:9px;background:var(--bg);color:var(--text)}

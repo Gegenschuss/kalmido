@@ -6995,7 +6995,7 @@
   "Outline": "Gliederung",
   "Fit to screen": "An Bildschirm anpassen",
   "Mind map of {0}": "Mindmap von {0}",
-  "Tap a branch to select it, tap again for its actions. Drag with one finger, zoom with two.": "Ast antippen zum Auswählen, nochmal antippen für Aktionen. Mit einem Finger verschieben, mit zwei zoomen.",
+  "Tap a branch to select it, tap again for its actions, hold it to rehang it. Drag the map with one finger, zoom with two.": "Ast antippen zum Auswählen, nochmal antippen für Aktionen, gedrückt halten zum Umhängen. Karte mit einem Finger verschieben, mit zwei zoomen.",
   "Enter: branch · Tab: sub-branch · Shift+Tab: up a level · Del: delete · Space: fold · F2: rename · drag to rehang": "Enter: Ast · Tab: Unterast · Umschalt+Tab: eine Ebene hoch · Entf: löschen · Leertaste: auf-/zuklappen · F2: umbenennen · ziehen zum Umhängen",
   "New branch": "Neuer Ast",
   "New sub-branch": "Neuer Unterast",

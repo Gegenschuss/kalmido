@@ -119,10 +119,11 @@ function viewMindmap(l) {
     <button type="button" class="iconbtn" data-mm="more" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   if (MM.outline) return `<div class="mmwrap mmout" data-lid="${l.id}">${bar}${mm_outlineHtml(tree, ro)}</div>`;
   if (!MM.pan) MM.pan = mm_fitPan(L);
+  setTimeout(mm_bind, 0);
   return `<div class="mmwrap" data-lid="${l.id}">${bar}<div class="mmstage" tabindex="0" role="tree" aria-label="${esc(tr('Mind map of {0}', lname(l)))}" aria-activedescendant="mm-n-${MM.sel}">
     <div class="mmcanvas" style="transform:translate(${MM.pan.x}px,${MM.pan.y}px) scale(${MM.pan.k})">${mm_svg(L, {live: true})}</div>
     ${MM.edit ? mm_editHtml(L) : ''}</div>
-    <p class="mmhint muted">${isTouch() ? tr('Tap a branch to select it, tap again for its actions. Drag with one finger, zoom with two.') : tr('Enter: branch · Tab: sub-branch · Shift+Tab: up a level · Del: delete · Space: fold · F2: rename · drag to rehang')}</p></div>`;
+    <p class="mmhint muted">${isTouch() ? tr('Tap a branch to select it, tap again for its actions, hold it to rehang it. Drag the map with one finger, zoom with two.') : tr('Enter: branch · Tab: sub-branch · Shift+Tab: up a level · Del: delete · Space: fold · F2: rename · drag to rehang')}</p></div>`;
 }
 function mm_fitPan(L, box) {
   const w = box?.clientWidth || Math.min(innerWidth, 1100), h = box?.clientHeight || Math.max(260, innerHeight - 260);
@@ -375,7 +376,13 @@ document.addEventListener('pointerdown', e => {
     MM.drag = null; return;
   }
   const g = e.target.closest('[data-mmn]'), n = g && mm_node(g.dataset.mmn);
-  MM.drag = {id: n?.id || null, sx: e.clientX, sy: e.clientY, px: MM.pan.x, py: MM.pan.y, moved: false, over: null, was: MM.sel};
+  MM.drag = {id: n?.id || null, sx: e.clientX, sy: e.clientY, px: MM.pan.x, py: MM.pan.y, moved: false, over: null, was: MM.sel, lift: false};
+  // touch: a long press on a branch lifts it (then the finger rehangs it instead of moving the map)
+  const l = listById(MM.lid);
+  if (e.pointerType !== 'mouse' && n && n.kind === 'task' && l && !mm_ro(l)) {
+    const dd = MM.drag;
+    dd.lt = setTimeout(() => { if (MM.drag !== dd || dd.moved) return; dd.lift = true; $(`.mmstage [data-mmn="${dd.id}"]`)?.classList.add('lift'); try { navigator.vibrate?.(10); } catch { /* none */ } }, 450);
+  }
   if (!isTouch()) st.focus({preventScroll: true});
 });
 document.addEventListener('pointermove', e => {
@@ -389,9 +396,9 @@ document.addEventListener('pointermove', e => {
   }
   const d = MM.drag; if (!d) return;
   if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 6) return;
-  d.moved = true;
-  const l = listById(MM.lid), can = d.id && d.id.startsWith('t') && l && !mm_ro(l) && e.pointerType === 'mouse';
-  if (can) {  // a branch is dragged (mouse; on touch one finger pans the map, the sheet has "Up a level" and the drag is the list's)
+  d.moved = true; clearTimeout(d.lt);
+  const l = listById(MM.lid), can = d.id && d.id.startsWith('t') && l && !mm_ro(l) && (e.pointerType === 'mouse' || d.lift);
+  if (can) {  // a branch is dragged (mouse; on touch after a long press, else one finger moves the map)
     st.classList.add('mmdragging');
     const h = mm_hit(mm_pt(e)), over = h && h.id !== d.id ? h.id : null;
     if (over !== d.over) { $$('.mmnode.drop', st).forEach(x => x.classList.remove('drop')); d.over = over; if (over) $(`[data-mmn="${over}"]`, st)?.classList.add('drop'); }
@@ -404,7 +411,9 @@ function mm_up(e) {
   MM.ptr.delete(e.pointerId);
   if (MM.pinch) { if (MM.ptr.size < 2) MM.pinch = null; MM.drag = null; return; }
   const d = MM.drag; MM.drag = null; if (!d) return;
+  clearTimeout(d.lt); $$('.mmstage .lift').forEach(x => x.classList.remove('lift'));
   $('.mmstage')?.classList.remove('mmdragging');
+  if (d.lift && !d.moved) { mm_select(d.id); return; }
   if (d.moved) { if (d.over && e.type === 'pointerup') mm_rehang(d.id, d.over); else $$('.mmnode.drop').forEach(x => x.classList.remove('drop')); return; }
   if (e.type !== 'pointerup' || !d.id) return;
   if (isTouch() && d.was === d.id) { const g = $(`.mmstage [data-mmn="${d.id}"]`), n = mm_node(d.id); if (g && n) mm_nodeMenu(g, n); return; }
@@ -412,8 +421,9 @@ function mm_up(e) {
 }
 document.addEventListener('pointerup', mm_up);
 document.addEventListener('pointercancel', mm_up);
-document.addEventListener('wheel', e => {
-  const st = e.target.closest?.('.mmstage'); if (!st || !MM.pan) return;
+// bound on the stage itself (a non-passive wheel listener on the whole document would slow every scroll of the app)
+function mm_wheel(e) {
+  const st = e.currentTarget; if (!MM.pan) return;
   e.preventDefault();
   if (e.ctrlKey || e.metaKey) {  // zoom around the pointer (also the trackpad pinch)
     const r = st.getBoundingClientRect(), cx = e.clientX - r.left, cy = e.clientY - r.top, k0 = MM.pan.k;
@@ -421,7 +431,8 @@ document.addEventListener('wheel', e => {
     MM.pan = {k, x: cx - (cx - MM.pan.x) * k / k0, y: cy - (cy - MM.pan.y) * k / k0};
   } else { MM.pan.x -= e.deltaX; MM.pan.y -= e.deltaY; }
   mm_applyPan();
-}, {passive: false});
+}
+function mm_bind() { const st = $('.mmstage'); if (st && !st.dataset.wb) { st.dataset.wb = '1'; st.addEventListener('wheel', mm_wheel, {passive: false}); } }
 // ---- a ```mindmap block in a knowledge page (display only)
 function mm_blockHtml(text) {
   const t = mm_mdTree(text);

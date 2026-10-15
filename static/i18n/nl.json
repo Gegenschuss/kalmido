@@ -6995,7 +6995,7 @@
   "Outline": "Overzicht",
   "Fit to screen": "Aan scherm aanpassen",
   "Mind map of {0}": "Mindmap van {0}",
-  "Tap a branch to select it, tap again for its actions. Drag with one finger, zoom with two.": "Tik op een tak om hem te kiezen, tik nogmaals voor acties. Verschuif met één vinger, zoom met twee.",
+  "Tap a branch to select it, tap again for its actions, hold it to rehang it. Drag the map with one finger, zoom with two.": "Tik op een tak om hem te kiezen, tik nogmaals voor acties, houd hem vast om hem te verhangen. Verschuif de kaart met één vinger, zoom met twee.",
   "Enter: branch · Tab: sub-branch · Shift+Tab: up a level · Del: delete · Space: fold · F2: rename · drag to rehang": "Enter: tak · Tab: subtak · Shift+Tab: niveau omhoog · Del: verwijderen · Spatie: inklappen · F2: hernoemen · slepen om te verhangen",
   "New branch": "Nieuwe tak",
   "New sub-branch": "Nieuwe subtak",
