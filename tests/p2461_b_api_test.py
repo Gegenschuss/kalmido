@@ -4,6 +4,9 @@
  - #1591: the switch "Switch on all modules": off = lists and tasks only whatever the purpose, on = every module (Office
    adds its business modules), stored as mods_all; without the field the purpose's own set as before
  - #1602: POST /api/me/purpose creates the sample project only with examples true (off by default)
+ - #1615: Family starts with the shopping list (areas) + ONE list Family (sections Household, Birthdays, Meal plan,
+   Deadlines); birthdays / deadlines without a list go to its sections, meals are marked on the task (any list counts);
+   old lists of the kinds Birthdays / Household / Meal plan stay the targets
  - #1641: Administration > Encryption lists what is encrypted and what not; every encrypted field of orgcrypt (FIELDS,
    JSON_KEYS) has its category, the list comes with the same rights as the encryption state
 """
@@ -98,6 +101,44 @@ r = A.post(B + "/api/me/purpose", json={"purpose": "software", "examples": False
 check(r.json()["created"] == [], "#1602: software, examples false: no project")
 r = A.post(B + "/api/me/purpose", json={"purpose": "software", "examples": True})
 check(len(r.json()["created"]) == 1, "#1602: examples true: the software project")
+
+# ================================================================== #1615: the list Family with sections
+from datetime import date, timedelta  # noqa: E402
+for u in ("carol", "dave"):
+    check(A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123"}).ok, u)
+Ca, Da = sess("carol"), sess("dave")
+Ca.patch(B + "/api/settings", json={"lang": "de"})
+r = Ca.post(B + "/api/me/purpose", json={"purpose": "family"})
+st = Ca.get(B + "/api/state").json()
+fl = {l["family"]: l for l in st["lists"] if l["family"]}
+check(r.ok and len(r.json()["created"]) == 2 and set(fl) == {"shopping", "family"}, f"#1615: two starter lists without the switch {sorted(fl)}")
+FAM, SHOP = fl["family"]["id"], fl["shopping"]["id"]
+check(fl["family"]["name"] == "Familie" and fl["family"]["color"] == "" and fl["shopping"]["color"] == "", "#1615/#1608: named, no colour")
+fsec = {x["name"]: x["id"] for x in st["sections"] if x["list_id"] == FAM}
+check(list(fsec) == ["Haushalt", "Geburtstage", "Essensplan", "Fristen"], f"#1615: the four sections {list(fsec)}")
+check(len([x for x in st["sections"] if x["list_id"] == SHOP]) == 8 and fl["shopping"]["checklist"] == 1, "#1615: the shopping list with its areas, done at the bottom")
+check(not [t for t in st["tasks"] if t["list_id"] in (FAM, SHOP)], "#1602: no example entries without the switch")
+O = Ca.post(B + "/api/family/occasions", json={"name": "Oma", "date": "1950-03-04"}).json()
+check(O["list_id"] == FAM and O["section_id"] == fsec["Geburtstage"], "#1615: a birthday without a list: Familie / Geburtstage")
+D = Ca.post(B + "/api/family/deadlines", json={"type": "passport", "who": "Kim", "expires": (date.today() + timedelta(days=400)).isoformat()}).json()
+check(D["list_id"] == FAM and D["section_id"] == fsec["Fristen"], "#1615: a deadline without a list: Familie / Fristen")
+O2 = Ca.post(B + "/api/family/occasions", json={"name": "Opa", "date": "--05-06", "list_id": FAM}).json()
+check(O2["section_id"] == fsec["Geburtstage"], "#1615: the list Familie chosen: in its section")
+OTHER = Ca.post(B + "/api/lists", json={"name": "Wochenende"}).json()["id"]
+M = Ca.post(B + "/api/tasks", json={"title": "Pizza", "list_id": OTHER, "due": date.today().isoformat(), "fam": {"kind": "meal"}}).json()
+check(M.get("fam") == {"kind": "meal"}, f"#1615: a task marked as a meal {M.get('fam')}")
+check(Ca.post(B + "/api/tasks", json={"title": "x", "list_id": OTHER, "fam": {"kind": "meal", "x": 1}}).status_code == 400, "#1615: a meal mark takes nothing else")
+ov = Ca.get(B + "/api/family").json()
+check(M["id"] in {m["task_id"] for m in ov["meals"]}, "#1615: a meal in any list counts in the week plan")
+check(Ca.post(B + "/api/me/purpose", json={"purpose": "family"}).json()["created"] == [], "#1615: once")
+# an old list Birthdays stays the target (existing data unchanged)
+OLD = Da.post(B + "/api/lists", json={"name": "Geburtstage alt", "family": "birthdays"}).json()["id"]
+Da.post(B + "/api/me/purpose", json={"purpose": "family"})
+check(not [l for l in Da.get(B + "/api/state").json()["lists"] if l["family"] == "family"], "#1615: an old family list: no list Family")
+check(Da.post(B + "/api/family/occasions", json={"name": "X", "date": "--01-02"}).json()["list_id"] == OLD, "#1615: the old Birthdays list stays the target")
+MP = Da.post(B + "/api/lists", json={"name": "Essen", "family": "meals"}).json()["id"]
+T = Da.post(B + "/api/tasks", json={"title": "Suppe", "list_id": MP, "due": date.today().isoformat()}).json()
+check(T["id"] in {m["task_id"] for m in Da.get(B + "/api/family").json()["meals"]}, "#1615: an old Meal plan list still counts")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
