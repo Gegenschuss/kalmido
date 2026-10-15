@@ -218,7 +218,7 @@ async function dmWhy(kind, msg, name) {
 }
 // the open conversation follows the route; switching rooms loads it
 function teamRoute(rid) {
-  if (typeof cw_route === 'function') cw_route(rid);  // 2.47c (#1720): the phone's row of open chats / the panel gives the conversation back
+  if (typeof cw_route === 'function' && cw_route(rid)) return;  // 2.47c (#1720): the phone's row of open chats / a conversation live in the chat panel
   if (S.tc.rid !== rid) { S.tc.rid = rid; S.tc.room = null; S.tc.msgs = []; S.tc.more = false; S.tc.edit = null; if (rid) loadRoom(rid).then(() => { if (S.route.mod === 'team' && S.tc.rid === rid) { renderView(); teamFit(); } }); }
 }
 document.addEventListener('keydown', e => {

@@ -14,7 +14,7 @@ function sb_rooms() {
 }
 function sb_msgRows() {
   if (!teamOn()) return '';
-  const rs = sb_rooms(), rid = S.route.mod === 'team' ? S.tc.rid : null, lit = rs.some(r => r.id === rid);
+  const rs = sb_rooms(), rid = S.route.mod === 'team' ? (S.cw?.lt ? S.cw.home?.rid : S.tc.rid) : null, lit = rs.some(r => r.id === rid);  // 2.47c (#1720): the team view's conversation, not one live in the chat panel
   const n = S.team?.unread || 0, lab = tr('Messages');
   const head = `<button class="srow sbmsg ${S.route.mod === 'team' && !lit ? 'on' : ''}" data-go="team" ${isTouch() ? '' : `title="${esc(kt(lab, 'g n'))}"`}>${ic('comment')}<span class="n">${esc(lab)}</span><span class="c ${n ? 'nunread' : ''}">${n ? `${n}<span class="sr"> ${esc(tr('unread'))}</span>` : ''}</span></button>`;
   return head + rs.map(r => {

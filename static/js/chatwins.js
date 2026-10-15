@@ -43,7 +43,12 @@ function cw_with(k, fn) {
 }
 
 // ---- remembered per device (the open chats and their heights) for the account that opened them
-function cw_save() { if (S.me) LS.set('cwins', {u: S.me.id, open: !!S.cw.wins.length && cw_docked(), wins: S.cw.wins.map(w => ({k: w.k, h: Math.round((w.h || 1) * 100) / 100, c: w.c === true}))}); }
+let cw_saved = '';
+function cw_save() {
+  if (!S.me) return;
+  const o = JSON.stringify({u: S.me.id, open: !!S.cw.wins.length && cw_docked(), wins: S.cw.wins.map(w => ({k: w.k, h: Math.round((w.h || 1) * 100) / 100, c: w.c === true}))});
+  if (o !== cw_saved) { cw_saved = o; LS.set('cwins', JSON.parse(o)); }
+}
 async function cw_restore() {
   const o = LS.get('cwins', null); if (!o || o.u !== S.me?.id || !Array.isArray(o.wins) || !o.wins.length) return;
   if (o.wins.some(w => /^t:/.test(w.k)) && teamOn() && S.tc.rooms === null) await loadTeam();
@@ -53,7 +58,8 @@ async function cw_restore() {
   if (!wins.length || S.cw.wins.length) return;
   S.cw.wins = wins; S.cw.act = wins[0].k;
   if (chatFull()) { cw_swSync(); return; }  // the phone's row of open chats
-  if (!o.open || chatFull() || chatFloatOn() || $('#achat:not(.hidden)')) return;
+  // the panel opens again only with window frames (one agent chat: as before, it stays closed after a reload)
+  if (!o.open || !cw_framed() || chatFloatOn() || $('#achat:not(.hidden)')) return;
   const a = wins.find(w => w.k[0] === 'a');
   if (a) chatOpen(cw_id(a.k)); else cw_show();
 }
@@ -113,6 +119,7 @@ function cw_close(k) {
 
 // ---- drawing. chatDraw() asks first: true = the frames are drawn (the live agent window is then patched as usual)
 function cw_frame(p) {
+  cw_save();  // the panel was opened / closed (only written when something changed)
   if (!p || p.classList.contains('hidden') || p.classList.contains('float') || chatFull()) return false;
   if (!cw_framed()) {
     const w = S.cw.wins[0];  // back to one agent window: it is the live one (drawn as before)
@@ -147,7 +154,7 @@ const cw_sepHtml = i => `<div class="cwsep" role="separator" aria-orientation="h
 function cw_draw() {
   const p = $('#achat'); if (!p) return;
   cw_pick(); cw_fit(S.cw.act);
-  p.classList.add('cwsplit'); delete p.dataset.aid; p.dataset.cw = S.cw.wins.map(w => w.k).join(',');
+  p.classList.add('cwsplit'); p.classList.toggle('cwmany', S.cw.wins.length > 1); delete p.dataset.aid; p.dataset.cw = S.cw.wins.map(w => w.k).join(',');
   p.innerHTML = S.cw.wins.map((w, i) => (i ? cw_sepHtml(i) : '') + cw_winHtml(w)).join('');
   for (const b of p.querySelectorAll('.cwin .chmsgs')) b.scrollTop = b.scrollHeight;
   for (const w of S.cw.wins) cw_loadIf(w.k);
@@ -238,6 +245,7 @@ async function cw_teamLive() {
 }
 // the team view draws its own conversation (viewTeam asks): while a panel window is live, from the kept state, without ids
 function cw_tcHome(fn) {
+  if (!cw_docked()) { cw_tcPark(); return fn(); }  // the panel closed / floating / the phone: the team view has its state back
   const keep = cw_tcGet(), lt = S.cw.lt; cw_tcPut(S.cw.home); S.cw.lt = '';
   try { return cw_noIds(fn()); } finally { S.cw.home = cw_tcGet(); cw_tcPut(keep); S.cw.lt = lt; }
 }
@@ -248,8 +256,13 @@ function cw_tcPark() {
   cw_tcPut(S.cw.home); S.cw.home = null; S.cw.lt = '';
   cw_idsOn($('#view .tcroom'));
 }
-// teamRoute(): the phone keeps its row of open chats; the desktop's team view takes its conversation back
-function cw_route(rid) { if (chatFull()) { if (rid) cw_note('t:' + rid); } else cw_tcPark(); }
+// teamRoute(): the phone keeps its row of open chats; the desktop's team view takes its conversation back when it opens one
+// (true: leaving the team view while a panel window is live only clears the kept state, the live window stays as it is)
+function cw_route(rid) {
+  if (chatFull()) { if (rid) cw_note('t:' + rid); return false; }
+  if (!rid && S.cw.lt) { S.cw.home = {rid: null, room: null, msgs: [], more: false, edit: null}; return true; }
+  cw_tcPark(); return false;
+}
 
 // ---- activating: the first pointer / focus in a parked window makes it the live one
 function cw_act(k) {
@@ -309,7 +322,10 @@ function cw_menu(anchor, k) {
   menu(anchor, [{label: tr('Move up'), icon: 'up', dis: i === 0, fn: () => cw_move(k, -1)},
     {label: tr('Move down'), icon: 'down', dis: i === W.length - 1, fn: () => cw_move(k, 1)},
     {label: w.c ? tr('Unfold') : tr('Fold'), icon: 'chev', fn: () => cw_fold(k)},
-    {label: tr('Share the height evenly'), icon: 'menu', fn: cw_even}, '-',
+    {label: tr('Share the height evenly'), icon: 'menu', fn: cw_even},
+    // the header buttons hidden in the split panel (app.css): a window of the browser, the floating chat window
+    ...(typeof dw_chatOpen === 'function' && mw_ok() ? [{label: tr('Open in its own window'), icon: 'panel', fn: () => dw_chatOpen(k[0] === 'a' ? 'agents' : 'team', cw_id(k))}] : []),
+    ...(k[0] === 'a' ? [{label: tr('Open as a window'), icon: 'expand', fn: () => { cw_act(k); chatDock(true); }}] : []), '-',
     {label: tr('Close'), icon: 'x', fn: () => cw_close(k)}]);
 }
 // the open windows above and below a divider (folded ones in between are skipped)
@@ -318,19 +334,18 @@ function cw_sepPair(sep) {
   const up = secs.slice(0, at).reverse().find(s => !s.classList.contains('cwc')), dn = secs.slice(at).find(s => !s.classList.contains('cwc'));
   return up && dn ? [up, dn] : null;
 }
-function cw_resize(up, dn, dy) {  // moves the border between two open windows by dy px (each keeps CW_MIN at least, if it can)
-  const hu = up.getBoundingClientRect().height, hd = dn.getBoundingClientRect().height, tot = hu + hd;
-  const lo = Math.min(CW_MIN, tot / 2), nu = Math.max(lo, Math.min(tot - lo, hu + dy));
+// moves the border between two open windows by dy px from where it was at the start (each keeps CW_MIN at least, if it can)
+function cw_resizer(up, dn) {
+  const hu = up.getBoundingClientRect().height, tot = hu + dn.getBoundingClientRect().height, lo = Math.min(CW_MIN, tot / 2);
   const wu = cw_win(up.dataset.cw), wd = cw_win(dn.dataset.cw), sum = (wu.h || 1) + (wd.h || 1);
-  wu.h = sum * nu / tot; wd.h = sum - wu.h;
-  up.style.flexGrow = wu.h; dn.style.flexGrow = wd.h;
+  return dy => { wu.h = sum * Math.max(lo, Math.min(tot - lo, hu + dy)) / tot; wd.h = sum - wu.h; up.style.flexGrow = wu.h; dn.style.flexGrow = wd.h; };
 }
 document.addEventListener('pointerdown', e => {
   const sep = e.target.closest?.('#achat .cwsep'); if (!sep || e.button !== 0) return;
   const pr = cw_sepPair(sep); if (!pr) return;
   e.preventDefault(); sep.setPointerCapture?.(e.pointerId); sep.classList.add('on');
-  let y = e.clientY;
-  const mv = ev => { cw_resize(pr[0], pr[1], ev.clientY - y); y = ev.clientY; };
+  const y0 = e.clientY, rs = cw_resizer(pr[0], pr[1]);
+  const mv = ev => rs(ev.clientY - y0);
   const up = () => { sep.removeEventListener('pointermove', mv); sep.removeEventListener('pointerup', up); sep.removeEventListener('pointercancel', up); sep.classList.remove('on'); cw_save(); };
   sep.addEventListener('pointermove', mv); sep.addEventListener('pointerup', up); sep.addEventListener('pointercancel', up);
 });
@@ -339,7 +354,7 @@ document.addEventListener('keydown', e => {
   const sep = e.target.closest?.('#achat .cwsep');
   if (sep && ['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
     const pr = cw_sepPair(sep); if (!pr) return;
-    e.preventDefault(); cw_resize(pr[0], pr[1], {ArrowUp: -24, ArrowDown: 24, Home: -9999, End: 9999}[e.key]); cw_save(); return;
+    e.preventDefault(); cw_resizer(pr[0], pr[1])({ArrowUp: -24, ArrowDown: 24, Home: -9999, End: 9999}[e.key]); cw_save(); return;
   }
   if (sep && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); cw_even(); }
 });
