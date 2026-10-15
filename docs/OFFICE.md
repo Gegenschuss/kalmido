@@ -142,7 +142,7 @@ is guessed in the background and no language model is involved.
   `<project>_<client>_KV<n>_<date>_<initials>.pdf` a quotation; dates as `dd.mm.yy`, `dd.mm.yyyy`, `yyyy-mm-dd` or
   `yyyymmdd`. The client is proposed by name and can be changed; amount and "paid" are entered by hand. The number is the
   file name without `.pdf`. An archived document is read-only: the original PDF is stored unchanged (folder 0700, file
-  0600, part of every backup) and is never re-rendered, renumbered, sent or turned into an e-invoice. The documents tab
+  0600, part of every backup) and is never re-rendered, renumbered, sent or turned into an e-invoice. The Quotes & invoices tab
   lists it under "Archive" with the sum of the archived invoices and of the paid ones; the other lists and the reminders
   do not count it. 2.40.0: Kalmido also reads the recipient's address from the text layer of page 1 (not the own sender
   line; split like a spreadsheet address, unsure splits marked) and proposes, each only with a tick: a new client (no
@@ -233,7 +233,7 @@ and deleting answer `409` with a reason; the status of a quotation can still cha
 
 ## Invoices and credit notes
 
-(2.38.0, stage 2.) The documents tab lists quotations, invoices, credit notes and reminders (`kind` = `offer`, `invoice`,
+(2.38.0, stage 2.) The Quotes & invoices tab lists quotations, invoices, credit notes and reminders (`kind` = `offer`, `invoice`,
 `credit`, `reminder`). An invoice starts in one of three ways:
 
 - **from a quotation** ("Create invoice" on the quotation, `POST /api/office/docs/<id>/invoice`): every line of the
