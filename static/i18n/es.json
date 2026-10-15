@@ -2107,7 +2107,6 @@
   "{0} day later": ["{0} día después", "{0} días después"],
   "{0} day earlier": ["{0} día antes", "{0} días antes"],
   "no change": "sin cambios",
-  "Drop tasks here": "Suelta las tareas aquí",
   "Move to folder…": "Mover a carpeta…",
   "Moved to folder {0}": "Movida a la carpeta {0}",
   "Removed from folder": "Sacada de la carpeta",
@@ -6929,5 +6928,7 @@
   "Admin of the organisation": "Administrador de la organización",
   "This server has organisations: open registration is not possible (only their e-mail domains or with approval).": "Este servidor tiene organizaciones: el registro abierto no es posible (solo sus dominios de correo o con aprobación).",
   "A kid account cannot be an admin of an organisation": "Una cuenta infantil no puede ser administradora de una organización",
-  "Unknown organisation": "Organización desconocida"
+  "Unknown organisation": "Organización desconocida",
+  "Hide this note": "Ocultar este aviso",
+  "First line taken as the contact person: please check": "Primera línea tomada como persona de contacto: compruébalo"
 }

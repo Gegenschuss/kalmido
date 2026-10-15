@@ -745,7 +745,7 @@ function settingsModal(focus) {
   let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: 'ai', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
-  const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
+  const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" name="kalmido-settings-search" data-1p-ignore data-lpignore="true" data-bwignore readonly placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
@@ -868,6 +868,12 @@ function settingsModal(focus) {
     [['sidebar', 'seitenleiste'], '#s-side-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort'], '#a-cur'],
     [['speicher', 'storage', 'quota', 'kontingent'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme'], '#s-lookin h4'], [['sprache', 'language'], '#s-lang-h']];
   const shown = el => !el.closest('[hidden]') || el.closest('[data-admp], [data-aisp]');
+  // 2.46.2 (#1651): readonly until focus keeps password managers out; a value nobody typed is cleared
+  const sq = $('#s-search', md);
+  sq.addEventListener('focus', () => sq.removeAttribute('readonly'));
+  sq.addEventListener('pointerdown', () => sq.removeAttribute('readonly'));
+  setTimeout(() => { if (sq.value && !sq._typed) sq.value = ''; }, 300);
+  sq.addEventListener('input', () => { sq._typed = true; });
   $('#s-search', md).addEventListener('input', e => {
     const q = e.target.value.trim().toLowerCase(), sb = $('.sbody', md);
     if (!q) { sres.classList.add('hidden'); sres.innerHTML = ''; sb.classList.remove('snores'); return; }

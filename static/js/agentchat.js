@@ -6,7 +6,7 @@
 // 2.13.0 (#453, Fold screenshots): the side panel only where sidebar + list + panel fit (>= 1000 px); below (phones, an
 // unfolded Fold, tablets in portrait) the chat is a full page with Back. Decided again on every resize / rotation
 // (chatRelayout), keeping the draft, the focus and the newest message in view.
-const chatFull = () => isMobile() || innerWidth < 1000;
+const chatFull = () => isMobile() || innerWidth < 1000 || (typeof dw_chatMini === 'function' && dw_chatMini());  // 2.46.2 (#1719): the chat's own window (chatwin.js)
 let chatRelT = 0;
 function chatRelayout() {
   if (!S.booted || imeOn || !S.chat.aid) return;
@@ -91,7 +91,7 @@ async function chatLoad() {
     if (jobSideSig(a) !== sg) setTimeout(renderSide, 0);  // 2.36.2 (#1123): an approval answered in the chat leaves the sidebar's counter at once
   }
   catch (e) { S.chat.err = e instanceof Offline ? tr('Only available online.') : e.message; }
-  chatDraw(); renderTop(); if (S.route.mod === 'agents' && !S.route.agent) renderView();
+  chatDraw(); renderTop(); if (S.route.mod === 'agents' && !S.route.agent) fl_viewSoon(true, 'agents');  // 2.46.2 (#1718): gathered
 }
 function chatMsgs() {
   const a = agentById(S.chat.aid);
@@ -593,10 +593,10 @@ function stepsAlways() {
   const on = !stepsAlwaysOn(); stepsSet('agent_steps_always', on); S.jobOpen = {};
   $$('.chstog').forEach(b => { b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
   toast(on ? tr('Steps are shown above every answer') : tr('Steps are shown only while the agent works'));
-  jobStepsRedraw();
+  jobStepsRedraw(true);
 }
 function stepsLive(on) {
-  stepsSet('agent_steps_live', on); jobStepsRedraw();
+  stepsSet('agent_steps_live', on); jobStepsRedraw(true);
   if (!on) $('#chat-in')?.focus({preventScroll: true});
 }
 // a tap on the typing dots brings hidden steps back
@@ -624,15 +624,16 @@ async function jobStepsLoad(jid) {
   finally { jobStepsBusy.delete(jid); }
   jobStepsRedraw();
 }
-function jobStepsRedraw() {
+// 2.46.2 (#1718): a click redraws at once (now), steps that arrive are gathered (fl_viewSoon)
+function jobStepsRedraw(now) {
   if ($('#chat-msgs')) chatPatch({});
-  if (S.route.mod === 'agents' && !(S.route.agent && chatFull())) renderView();
+  if (S.route.mod === 'agents' && !(S.route.agent && chatFull())) { if (now) renderView(); else fl_viewSoon(true, 'agents'); }
 }
 // the summary toggles through the state (a redraw keeps it): click, Enter, Space
 document.addEventListener('click', e => {
   const sm = e.target.closest?.('details.jobv > summary'); if (!sm) return;
   e.preventDefault(); const jid = +sm.parentElement.dataset.jv;
-  S.jobOpen[jid] = !jobOpenIs(jid); jobStepsRedraw();
+  S.jobOpen[jid] = !jobOpenIs(jid); jobStepsRedraw(true);
   setTimeout(() => $(`details.jobv[data-jv="${jid}"] > summary`)?.focus({preventScroll: true}), 0);
 });
 // /api/version said a new step arrived for me: the open chat fetches, open histories load again
@@ -644,7 +645,8 @@ function stepsChanged() {
 // 2.29.0 (#363): window <-> side panel, fold (window only)
 function chatWinBtns() {
   const fl = !!$('#achat.float');
-  return (fl ? `<button class="iconbtn" data-act="chat-min" title="${esc(tr('Fold'))}" aria-label="${esc(tr('Fold'))}" aria-expanded="true">${ic('chev', 's')}</button>` : '')
+  return (typeof dw_winBtn === 'function' ? dw_winBtn('agents', S.chat.aid) : '')  // 2.46.2 (#1719)
+    + (fl ? `<button class="iconbtn" data-act="chat-min" title="${esc(tr('Fold'))}" aria-label="${esc(tr('Fold'))}" aria-expanded="true">${ic('chev', 's')}</button>` : '')
     + `<button class="iconbtn" data-act="chat-dock" data-fl="${fl ? 0 : 1}" title="${esc(fl ? tr('Dock as side panel') : tr('Open as a window'))}" aria-label="${esc(fl ? tr('Dock as side panel') : tr('Open as a window'))}">${ic(fl ? 'panel' : 'expand', 's')}</button>`;
 }
 function chatInner(aid) {
@@ -683,6 +685,7 @@ function chatPatch(o = {}) {
   const box = $('#chat-msgs'); if (!box) return;
   const a = agentById(S.chat.aid), near = chatNear(box), top = box.scrollTop, h = box.scrollHeight, last = +(box.dataset.last || 0);
   patchKids(box, chatMsgs());
+  cf_after(box, 'a:' + S.chat.aid, o.keep);  // 2.46.2 (#1660): new messages fade in (older pages and the first fill stay quiet)
   apvPinSync();  // 2.35.0 (#1103)
   chatHeadSync(a);  // 2.32.0 (#1079): the host may report another model / mode while the chat is open
   const sl = $('#chat-steps'), slh = chatStepsLiveHtml(); if (sl && sl._h !== slh && sl.outerHTML !== slh) { sl.outerHTML = slh; const n = $('#chat-steps'); if (n) n._h = slh; }

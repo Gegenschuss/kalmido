@@ -129,7 +129,7 @@ function repoWire(md, lid, folder) {
         <span class="rst rst-${esc(r.status)}">${esc(r.status === 'error' ? r.error : r.status === 'new' ? tr('Waiting for the first check') : tr('Checked {0}', relTime(r.polled_at)))}</span></span>
         <button class="iconbtn" data-rp="refresh" title="${esc(tr('Check the repository now'))}" aria-label="${esc(tr('Check the repository now'))}">${ic('sync', 's')}</button>
         ${j.may ? `<button class="iconbtn" data-rp="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div>
-      ${edit === r.id ? `<div class="mrow repoedit"><input id="rp-tok2" type="password" autocomplete="off" placeholder="${esc(tr('New access token (empty = remove)'))}" aria-label="${esc(tr('Access token'))}"><button class="btn sm" data-rp="tok-save">${tr('Save')}</button></div>` : ''}
+      ${edit === r.id ? `<div class="mrow repoedit"><input id="rp-tok2" type="password" autocomplete="new-password" placeholder="${esc(tr('New access token (empty = remove)'))}" aria-label="${esc(tr('Access token'))}"><button class="btn sm" data-rp="tok-save">${tr('Save')}</button></div>` : ''}
       ${secret && secret.id === r.id ? `<div class="shint lhint rpsec">${esc(tr('Webhook: payload URL {0}, content type JSON, secret (shown only now):', r.hook_url))} <code>${esc(secret.s)}</code></div>` : ''}`).join('');
     const add = j.may && j.repos.length < j.max ? `<div class="repoadd">
         <div class="row"><label for="rp-prov">${tr('Provider')}</label>${provSel}</div>
@@ -137,7 +137,7 @@ function repoWire(md, lid, folder) {
         <div class="row"><label for="rp-base">${tr('Server')}</label><input id="rp-base" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('empty = github.com'))}"></div>
         <div class="row"><label for="rp-name">${tr('Repository')}</label><input id="rp-name" autocomplete="off" aria-describedby="rp-cerr" placeholder="${esc(tr('owner/name or its web address'))}"></div>
         <div class="shint keep lhint rpself" id="rp-self" hidden>${esc(tr('This looks like a self-hosted server: pick its provider (GitLab, Gitea / Forgejo or Bitbucket) above.'))}</div>
-        <div class="row"><label for="rp-tok">${tr('Access token')}</label><input id="rp-tok" type="password" autocomplete="off" placeholder="${esc(tr('read-only is enough; empty for a public repository'))}" ${j.key ? '' : 'disabled'}></div>
+        <div class="row"><label for="rp-tok">${tr('Access token')}</label><input id="rp-tok" type="password" autocomplete="new-password" placeholder="${esc(tr('read-only is enough; empty for a public repository'))}" ${j.key ? '' : 'disabled'}></div>
         ${j.key ? '' : `<div class="shint keep lhint">${esc(tr('Set KALMIDO_SECRET_KEY on the server to store repository tokens (32 random bytes, base64)'))}</div>`}
         <div class="rpcerr" id="rp-cerr" role="alert"></div>
         <div class="row rprow"><span class="spacer"></span><button class="btn sm pri" data-rp="add">${ic('plus', 's')} ${tr('Connect')}</button></div></div>` : '';

@@ -17,7 +17,7 @@ const clientOfList = l => l && l.client_id ? clientById(l.client_id) : null;
 const clientIco = c => c.icon ? `<span class="sic semo" aria-hidden="true">${esc(c.icon)}</span>` : `<span class="sic" aria-hidden="true"><span class="sw" style="${cssColor(c.color) ? 'background:' + cssColor(c.color) : ''}"></span></span>`;
 const BUDGET_TXT = {ok: N_('within budget'), warn: N_('80 % of the budget used'), over: N_('over budget')};
 const fmtHours = sec => fmtNum(sec / 3600, 1) + ' h';
-const monthLabel = m => { try { return new Date(m + '-01T12:00:00').toLocaleDateString(LOCALE(), {month: 'long', year: 'numeric'}); } catch { return m; } };
+const monthLabel = m => { if (!m) return ''; try { const d = new Date(m + '-01T12:00:00'); return isNaN(d) ? '' : d.toLocaleDateString(LOCALE(), {month: 'long', year: 'numeric'}); } catch { return ''; } }; // 2.46.2 (#1472): no 'Invalid Date'
 
 // ---- the sidebar: clients above the lists
 function clientsSideHtml(onTasks) {

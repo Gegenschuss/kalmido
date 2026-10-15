@@ -2107,7 +2107,6 @@
   "{0} day later": ["{0} dag later", "{0} dagen later"],
   "{0} day earlier": ["{0} dag eerder", "{0} dagen eerder"],
   "no change": "geen wijziging",
-  "Drop tasks here": "Taken hier neerzetten",
   "Move to folder…": "Naar map verplaatsen…",
   "Moved to folder {0}": "Verplaatst naar map {0}",
   "Removed from folder": "Uit de map gehaald",
@@ -6929,5 +6928,7 @@
   "Admin of the organisation": "Beheerder van de organisatie",
   "This server has organisations: open registration is not possible (only their e-mail domains or with approval).": "Deze server heeft organisaties: open registratie is niet mogelijk (alleen hun e-maildomeinen of met goedkeuring).",
   "A kid account cannot be an admin of an organisation": "Een kinderaccount kan geen beheerder van een organisatie zijn",
-  "Unknown organisation": "Onbekende organisatie"
+  "Unknown organisation": "Onbekende organisatie",
+  "Hide this note": "Deze melding verbergen",
+  "First line taken as the contact person: please check": "Eerste regel als contactpersoon overgenomen: controleer dit"
 }

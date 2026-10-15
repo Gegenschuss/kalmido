@@ -60,6 +60,7 @@ FI_REASONS = {
     "long_name": N_("Name shortened"),
     "one_line": N_("Only one line"),
     "foreign": N_("Address abroad: please check the fields"),
+    "person_swap": N_("First line taken as the contact person: please check"),
 }
 
 
@@ -242,9 +243,10 @@ US_ZIP_RE = re.compile(r"^(?P<city>.+?),?\s+(?P<st>[A-Z]{2})\s+(?P<zip>\d{5}(?:-
 ATTN_RE = re.compile(r"^(?:z\.\s?h(?:d|än)?\.?|zu\s+händen|zh\.?|attn\.?:?|attention:?|to the attention of)\s*:?\s*", re.I)
 CO_RE = re.compile(r"^c\s?/\s?o\b\.?\s*", re.I)
 POBOX_RE = re.compile(r"^(?:postfach|p\.?\s?o\.?\s?box|postbox|case postale|boîte postale|bp)\b", re.I)
+FI_NAME_RE = re.compile(r"^(?:[A-ZÄÖÜ][a-zäöüß'’.-]+\s+){1,3}[A-ZÄÖÜ][a-zäöüß'’-]+$")  # 2.46.2 (#1646): "Lena Muster"
 PERSON_RE = re.compile(r"^(?:herrn?|frau|mr\.?|mrs\.?|ms\.?|dr\.?|prof\.?)\s+\S", re.I)
 LEGAL_RE = re.compile(r"\b(?:gmbh|mbh|ag|kg|ohg|gbr|ug|se|e\.?\s?v\.?|e\.?\s?k\.?|ltd\.?|limited|inc\.?|llc|llp|plc|corp\.?|s\.?a\.?r?\.?l?\.?|b\.?v\.?|"
-                      r"s\.?r\.?l\.?|sas|oy|ab|as|aps|& co\.?|co\. kg|gesellschaft|agentur|studio|verlag|stiftung|verein|institut|universität|"
+                      r"s\.?r\.?l\.?|sas|oy|ab|as|aps|& co\.?|co\. kg|\w*gesellschaft|agentur|studio|verlag|stiftung|verein|institut|universität|"
                       r"hochschule|ministerium|amt|bank|group|media|medien|film|production|productions)\b", re.I)
 STREET_RE = re.compile(r"(?:\d+\s*[a-zA-Z]?(?:\s*[-/]\s*\d+\s*[a-zA-Z]?)?\s*$|^\d+[a-zA-Z]?\s+\S|str\.|straße|strasse|weg\b|platz\b|allee\b|"
                        r"gasse\b|ring\b|damm\b|ufer\b|chaussee\b|markt\b|street|road|avenue|lane|rue\b|via\b|calle\b|laan\b|straat\b)", re.I)
@@ -353,9 +355,17 @@ def fi_split_address(text):
     if head:
         first = head[0]
         others = head[1:]
-        if PERSON_RE.match(first) and others and LEGAL_RE.search(others[0]):  # "Frau X" above "Firma GmbH"
+        # 2.46.2 (#1646): a plain person's name (also without "Frau"/"Herr") above a whole company name with a legal form is
+        # the person; a company name on two lines ("Musterfirma" / "GmbH & Co. KG") stays together
+        swap = others and LEGAL_RE.search(others[0]) and not PERSON_RE.match(others[0])
+        if swap and PERSON_RE.match(first):  # "Frau X" above "Firma GmbH"
             contacts.insert(0, first)
             first, others = others[0], others[1:]
+        elif swap and FI_NAME_RE.match(first) and not LEGAL_RE.match(others[0]) and not others[0].startswith("&") \
+                and len(others[0].split()) > 1:
+            contacts.insert(0, first)
+            first, others = others[0], others[1:]
+            flags.append("person_swap")
         out["name"] = first
         for ln in others:
             if LEGAL_RE.search(ln) and not PERSON_RE.match(ln) and len(out["name"]) + len(ln) < FI_NAME_MAX:
@@ -1308,6 +1318,34 @@ FK_STOP_RE = re.compile(r"(?:\btel\b|telefon|phone|\bfax\b|e-?mail|www\.|https?:
                         r"rechnung|angebot|kostenvoranschlag|gutschrift|invoice|quotation|offer\b|datum|date\b|seite|page\b|kunden-?nr|customer)", re.I)
 FK_SENDER_RE = re.compile(r"[·•|]|\s[-–]\s.*\d{4,5}")
 FK_ZIPLINE_RE = re.compile(r"^(?:[A-Z]{1,2}\s?[-–]\s?)?\d{4,5}\s+\S")
+# 2.46.2 (#1646): bank and contact VALUES without their label (a template prints the labels in a column of their own and the
+# values above the recipient): the walk up from the postcode line stops at them
+FK_VALUE_RE = re.compile(
+    r"^(?:[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){2,7}\s?[A-Z0-9]{1,4}"  # IBAN
+    r"|[A-Z]{4}(?:DE|AT|CH|NL|BE|LU|FR|IT|ES|PT|GB|IE|DK|SE|NO|FI|PL|CZ|US)[A-Z0-9]{2}(?:[A-Z0-9]{3})?"  # BIC
+    r"|\+?[\d ()/.-]{7,}"  # phone
+    r"|\d{2,3}/\d{3,4}/\d{4,5}"  # tax number
+    r"|[A-Z]{2} ?U?\d[\d ]{7,11}"  # VAT id (ATU12345678)
+    r"|(?:[\w-]+\.)+[a-z]{2,})$")  # a bare domain
+FK_BANKNAME_RE = re.compile(r"\b(?:sparkasse|volksbank|raiffeisenbank|postbank|commerzbank|[a-zäöüß]*bank)\b", re.I)
+FK_SALUTATION_RE = re.compile(r"^(?:sehr geehrte|guten tag|(?:liebe[rs]?|hallo|dear|hello)\b(?=.*[,!]$|\s+(?:herr|frau|mr|ms|mrs)\b))", re.I)
+FK_FORM_RE = re.compile(r"\b(?:gmbh|ag|kg|ohg|gbr|ug|se|eg|e\.?\s?v\.?|\w*gesellschaft)\b", re.I)
+
+
+def fk_value_line(ln, near=()):
+    """True for a line that is no recipient line: a bank or contact value (IBAN, BIC, phone, tax / VAT number, bare domain) or the
+    salutation; a bank's name only next to such a value (a savings bank can be the recipient itself). near: the neighbour lines."""
+    t = ln.strip()
+    if FK_SALUTATION_RE.match(t) and not LEGAL_RE.search(t):
+        return True
+    if FK_VALUE_RE.match(t) and (sum(ch.isdigit() for ch in t) >= 7 or "." in t
+                                 or re.match(r"^[A-Z]{6}", t) and (not t.isalpha() or t.endswith("XXX"))):
+        return True
+    if FK_BANKNAME_RE.search(t) and not FK_FORM_RE.search(t) and not PERSON_RE.match(t) and not ATTN_RE.match(t):
+        return any(fk_value_line(x) for x in near if x)
+    return False
+
+
 FK_PDF_LINES = 45  # lines of the first page looked at
 
 
@@ -1334,7 +1372,7 @@ def fk_pdf_block(text, own):
         top = i
         while top > 0 and i - top < 5:
             up = lines[top - 1]
-            if FK_SENDER_RE.search(up) or FK_STOP_RE.search(up) and not ATTN_RE.match(up) or own_line(up) or len(up) > 70:
+            if FK_SENDER_RE.search(up) or FK_STOP_RE.search(up) and not ATTN_RE.match(up) or own_line(up) or len(up) > 70 or fk_value_line(up, (lines[top - 2] if top > 1 else "", lines[top])):
                 break
             top -= 1
         if top == i:

@@ -240,7 +240,8 @@ const sbiProg = () => S.settings?.side_progress !== '0';
 // with "Line" / "Dot" the name's leading emoji is not shown (the name itself stays as it is), a grey line icon with the dot
 // in the list colour (or a round dot) stands for it; with "Emoji" everything stays as before 2.36.0
 function licName(l) {
-  const nm = listName(l?.name), em = l && !l.icon && sbiMode() !== 'emoji' ? leadEmoji(l.name) : '';
+  const n0 = l?._live ?? l?.name;  // 2.46.2 (#1659): the name being typed in the list dialog
+  const nm = listName(n0), em = l && !l.icon && sbiMode() !== 'emoji' ? leadEmoji(n0) : '';
   return em ? nm.slice(em.length).trim() || nm : nm;
 }
 function licMark(l, cls = '', full = false) {  // full: a list without an emoji gets its icon too (header, archive, menus)
@@ -296,10 +297,10 @@ function renderSide() {
     // 2.23.0 (#794): ONE fixed icon column for a picture, an emoji (taken from the name) or the dot, so the names line up
     // 2.36.0 (#1117): what the column shows follows Settings > Appearance > Sidebar: a grey line icon for the name's emoji with its
     // dot in the list colour (default), the emoji itself, or only a round dot; a list's own picture stays (not with "Dot")
-    const em = !l.icon && leadEmoji(l.name);
+    const em = !l.icon && leadEmoji(l._live ?? l.name);  // 2.46.2 (#1659): _live = the name being typed
     // 2.38.0 (#1174): the icon itself in the list colour (listIconHtml), no extra dot
     const sw = `<span class="sic" aria-hidden="true">${listIconHtml(l, {emoji: true})}</span>`;
-    const nmOf = x => em ? listName(x.name).slice(em.length).trim() : listName(x.name);
+    const nmOf = x => em ? listName(x._live ?? x.name).slice(em.length).trim() : listName(x._live ?? x.name);
     // 2.25.0 (UX-07): one number per row (the open tasks); a project's progress is a thin bar along the row's bottom
     const pg = progressFor(l) && l.progress?.total && sbiProg() && !progHidden(l.id) ? `<span class="sprog" role="img" style="--p:${pct(l.progress)}%" aria-label="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}" title="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}"></span>` : '';
     const shr = (l.status && statusFor(l) ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
@@ -706,35 +707,116 @@ function focusSig(el) {
 // key match, only attributes / text change), so the focused node itself stays in place: browsers keep their Tab position
 // only on the same node (Firefox went back to the previous element after a refocus on a new copy).
 let morphRoot = null;
+// 2.46.2 (#1718): what a morph inserted as new nodes (top-level of each inserted subtree), for hooks like the fade-in of new
+// chat messages / comments: fl_onAdded(fn) -> fn(root, nodes) after every morph of root (nodes = [] when nothing was new)
+const FL = {hooks: [], added: null, vsig: null, ins: 0};
+function fl_onAdded(fn) { FL.hooks.push(fn); }
+// 2.46.2 (#1718): a part of a view drawn again: morphed when it has content (kept nodes, no flash), built when empty
+function fl_set(el, html) { const prev = morphRoot; if (el.firstChild) morphRoot = el; try { setHtml(el, html); } finally { morphRoot = prev; } }
+// 2.46.2 (#1718): live redraws of the view (job steps, the jobs list, agent status, the agent band) are gathered: at most one
+// every 400 ms (the first after ~one frame). raw = renderView (else viewSafeRender: a busy field waits); mod = only while that
+// module is shown. A redraw in between (a click) restarts the 400 ms.
+function fl_viewSoon(raw, mod) {
+  FL.vraw = FL.vraw || !!raw; if (mod !== undefined) FL.vmod = FL.vt && FL.vmod !== mod ? null : mod; else if (FL.vt) FL.vmod = null;  // any module
+  if (FL.vt) return;
+  const run = () => {
+    FL.vt = 0; const r = FL.vraw, m = FL.vmod; FL.vraw = false; FL.vmod = undefined;
+    if (m && S.route.mod !== m) return;
+    if (r) renderView(); else viewSafeRender();
+  };
+  const wait = Math.max(0, (FL.vlast || 0) + 400 - Date.now());
+  FL.vt = setTimeout(run, Math.max(16, wait));  // a timer, not a frame: a page that goes away takes it along
+}
 function setHtml(el, html) {
   const fg = typeof fgKeep === 'function' ? fgKeep(el) : null;  // 2.40.0 (#1371): unsaved form input survives the redraw
   if (morphRoot !== el) el.innerHTML = html;
-  else { const t = document.createElement('template'); t.innerHTML = html; morphKids(el, t.content); if (typeof infoize === 'function') infoize(el); }  // 2.40.0 (#1382): (i) buttons back after a morph
+  else {
+    const t = document.createElement('template'); t.innerHTML = html;
+    const outer = FL.added; FL.added = [];
+    try { morphKids(el, t.content); fl_iiTidy(el); if (typeof infoize === 'function') infoize(el); }  // 2.40.0 (#1382): (i) buttons back after a morph
+    finally { const add = FL.added; FL.added = outer; if (outer) outer.push(...add); FL.ins += add.length; for (const h of FL.hooks) try { h(el, add); } catch (e) { console.error(e); } }
+  }
   if (fg) fg();
 }
 const mkey = n => n.nodeType !== 1 ? null : ['data-k', 'data-id', 'data-cid', 'data-aid', 'data-jid', 'data-mid', 'data-key', 'data-section'].map(k => n.getAttribute(k)).find(v => v != null) ?? null;
-function morphKids(a, b) {
-  const an = [...a.childNodes], bn = [...b.childNodes];
-  bn.forEach((n, i) => {
-    const o = an[i];
-    if (!o) { a.appendChild(n); return; }
-    if (o.nodeType !== n.nodeType || o.nodeName !== n.nodeName || (o.nodeType === 1 && (o.id !== n.id || mkey(o) !== mkey(n)))) { a.replaceChild(n, o); return; }
-    if (o.nodeType !== 1) { if (o.data !== n.data) o.data = n.data; return; }
-    for (const x of [...o.attributes]) if (!n.hasAttribute(x.name)) o.removeAttribute(x.name);
-    for (const x of [...n.attributes]) if (o.getAttribute(x.name) !== x.value) o.setAttribute(x.name, x.value);
-    if (!o.isEqualNode(n)) morphKids(o, n);
-    if (/^(INPUT|SELECT|TEXTAREA)$/.test(o.nodeName) && o !== document.activeElement) { if (o.type === 'checkbox' || o.type === 'radio') o.checked = n.checked; else if (o.type !== 'file' && o.value !== n.value) o.value = n.value; }
-  });
-  for (let i = an.length - 1; i >= bn.length; i--) an[i].remove();
+// 2.46.2 (#1718): infoize() adds an (i) button (.ib[data-ii]) next to a hint and gives the hint an id / data-ii / .iisrc; a
+// morph keeps these instead of dropping and re-adding them on every redraw
+const fl_iiId = o => o.nodeType === 1 && o.hasAttribute('data-ii') && /^ii\d+$/.test(o.id);
+const fl_ib = o => o.nodeType === 1 && o.nodeName === 'BUTTON' && o.classList.contains('ib') && o.hasAttribute('data-ii');
+const fl_key = n => { if (n.nodeType !== 1) return null; const id = fl_iiId(n) ? '' : n.id; if (id) return '#' + id + ':' + n.nodeName; const k = mkey(n); return k == null ? null : n.nodeName + ':' + k; };
+function fl_iiTidy(root) { for (const b of root.querySelectorAll('button.ib[data-ii]')) if (!document.getElementById(b.dataset.ii) && !root.querySelector('#' + CSS.escape(b.dataset.ii))) b.remove(); }
+// what code sets after the render (calFit / chatFit heights, the phone chat's keyboard fix, a drag, the sheet grid's cells)
+// stays on a kept node; the code that set it also takes it away
+const FL_RTC = ['vvfix', 'dragging', 'sgact', 'sgsel'];
+const fl_rtStyle = o => o.id === 'wbody' || o.classList.contains('chview');
+// a <details> the person opened by hand stays open when the view's HTML does not decide it (the views that keep the state
+// themselves write "open" from it); _flSet marks a toggle that came from a morph, not from the person
+document.addEventListener('toggle', e => { const d = e.target; if (d?.nodeName !== 'DETAILS') return; if (d._flSet) d._flSet = false; else d._flUser = d.open; }, true);
+function fl_attrs(o, n) {
+  if (o.nodeName === 'DETAILS' && o.open !== n.hasAttribute('open')) { if (o.open && o._flUser === true) n.setAttribute('open', ''); else o._flSet = true; }
+  for (const x of [...o.attributes]) if (!n.hasAttribute(x.name) && !(x.name === 'data-ii' || (x.name === 'id' && fl_iiId(o)) || (x.name === 'style' && fl_rtStyle(o)))) o.removeAttribute(x.name);
+  const rc = [...FL_RTC, ...(o.hasAttribute('data-ii') ? ['iisrc'] : [])].filter(c => o.classList.contains(c));
+  for (const x of [...n.attributes]) if (o.getAttribute(x.name) !== x.value) o.setAttribute(x.name, x.value);
+  for (const c of rc) if (!o.classList.contains(c)) o.classList.add(c);
 }
+// nodes in the middle of an edit are left alone: the row with the inline title field, a table cell with its editor open
+function fl_hold(o) {
+  if (o.classList.contains('iedit') && S.ie && o.dataset.id === String(S.ie.id) && o.querySelector('.ttlin')) return true;
+  return o.classList.contains('tcon') && o.contains(document.activeElement);
+}
+// 2.46.2 (#1718): children are matched by key (id or data-k / data-id / …), so an inserted, removed or moved row keeps all
+// other rows' nodes (before, everything after it was replaced); unkeyed nodes match by position among the unkeyed ones
+function morphKids(a, b) {
+  const an = [...a.childNodes], bn = [...b.childNodes], nk = new Set(), km = new Map();
+  for (const n of bn) { const k = fl_key(n); if (k != null) nk.add(k); }
+  for (const o of an) { const k = fl_key(o); if (k != null && nk.has(k) && !km.has(k)) km.set(k, o); }
+  let cur = a.firstChild;
+  const skip = () => {  // stale keyed nodes go at once, (i) buttons stay where they are
+    while (cur) {
+      if (fl_ib(cur)) { cur = cur.nextSibling; continue; }
+      const k = fl_key(cur);
+      if (k != null && km.get(k) !== cur) { const x = cur; cur = cur.nextSibling; x.remove(); continue; }
+      break;
+    }
+  };
+  for (const n of bn) {
+    skip();
+    const k = fl_key(n);
+    let o = null;
+    if (k != null) { o = km.get(k) || null; if (o) km.delete(k); }
+    else if (cur && fl_key(cur) == null && cur.nodeType === n.nodeType && cur.nodeName === n.nodeName) o = cur;
+    if (!o) {
+      if (cur && k == null && fl_key(cur) == null) { const x = cur; cur = cur.nextSibling; a.replaceChild(n, x); }  // same place, other kind of node
+      else a.insertBefore(n, cur);
+      if (n.nodeType === 1 && FL.added) FL.added.push(n);
+      continue;
+    }
+    if (o === cur) cur = cur.nextSibling; else a.insertBefore(o, cur);
+    if (o.nodeType !== 1) { if (o.data !== n.data) o.data = n.data; continue; }
+    if (fl_hold(o)) continue;
+    // 2.46.2 (#1718): a field with typed, unsaved text keeps it unless its saved value changed (the view's own restore after a
+    // rebuild only ran on a new node)
+    const tf = (o.nodeName === 'TEXTAREA' || (o.nodeName === 'INPUT' && !/^(checkbox|radio|file)$/.test(o.type))), dv = tf ? o.defaultValue : null, dirty = tf && o.value !== dv;
+    const nv = tf || o.nodeName === 'SELECT' ? n.value : null, nc = o.nodeName === 'INPUT' ? n.checked : null;  // before the children move over
+    fl_attrs(o, n);
+    if (o.hasAttribute('data-fl-fill') && !n.firstChild) continue;  // filled after the render (Office quotations): keeps its content
+    if (!o.isEqualNode(n)) morphKids(o, n);
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(o.nodeName) && o !== document.activeElement && !(dirty && o.defaultValue === dv)) { if (o.type === 'checkbox' || o.type === 'radio') o.checked = nc; else if (o.type !== 'file' && o.value !== nv) o.value = nv; }
+  }
+  while (cur) { const x = cur; cur = cur.nextSibling; if (!fl_ib(x)) x.remove(); }
+}
+// 2.46.2 (#1718): the view is morphed whenever it is drawn again for the same route (live updates, a job step, a click that
+// redraws); only a change of the view (another module / list / tab / view mode) builds it from scratch. Calendar, timeline
+// and roadmap morph too (their handlers are delegated, the after-render steps are guarded).
+const fl_sig = () => { const l = S.route.mod === 'tasks' ? routeList() : null; return [S.route.mod, S.route.key, S.route.tab, S.route.agent, l ? listView(l) + (isRoadmap() ? 'r' : '') + (isOverview() ? 'o' : '') : ''].join('|'); };
 function keepFocus(root, fn) {
-  const a = document.activeElement;
-  if (!root || !a || a === document.body || !root.contains(a) || editFocused()) return fn();
+  const a = document.activeElement, isView = !!root && root.id === 'view', vs = isView ? fl_sig() : null;
+  const same = isView && FL.vsig === vs && !!root.firstChild;
+  if (!root || ((!a || a === document.body || !root.contains(a) || editFocused()) && !same)) { try { return fn(); } finally { if (isView) FL.vsig = vs; } }
   let sig = null, i = 0;
-  try { sig = focusSig(a); i = [...root.querySelectorAll(sig)].indexOf(a); } catch { sig = null; }
-  // views that wire their DOM after rendering (calendar, timeline, roadmap) are always rebuilt
-  const prev = morphRoot; morphRoot = root.id === 'view' && /^(cal)$/.test(S.route.mod) || $('#tlscroll', root) ? null : root;
-  let r; try { r = fn(); } finally { morphRoot = prev; }
+  if (a && a !== document.body && root.contains(a) && !editFocused()) try { sig = focusSig(a); i = [...root.querySelectorAll(sig)].indexOf(a); } catch { sig = null; }
+  const prev = morphRoot; morphRoot = root;
+  let r; try { r = fn(); } finally { morphRoot = prev; if (isView) FL.vsig = vs; }
   if (!sig || (a.isConnected && document.activeElement === a)) return r;
   const cur = document.activeElement;
   if (cur && cur !== document.body && cur !== a) return r;  // the render moved the focus on purpose
@@ -742,7 +824,7 @@ function keepFocus(root, fn) {
   if (n && n.offsetParent !== null && !n.disabled) n.focus({preventScroll: true});
   return r;
 }
-function renderView() { return td_rcRun(() => { const r = an_view(() => keepFocus($('#view'), renderView0));  // 2.46.1 (#1560): a view change / a new empty hint fades in
+function renderView() { FL.vlast = Date.now(); return td_rcRun(() => { const r = an_view(() => keepFocus($('#view'), renderView0));  // 2.46.1 (#1560): a view change / a new empty hint fades in
     rowRove(); rowMoreWatch(); td_lcSweep(); return r; }); }
 function renderView0() {
   const m = S.route.mod, el = $('#view');
@@ -770,7 +852,7 @@ function renderView0() {
   else if (m === 'time') setHtml(el, mg_wrap(m, viewTime()));  // 2.44.0 (#1187): mg_wrap = the area's tabs on top
   else if (m === 'overview') setHtml(el, viewOverview());
   else if (m === 'agents') setHtml(el, viewAgents());
-  else if (m === 'team') { setHtml(el, viewTeam()); if (S.tc.fitUntil > Date.now()) teamFit(true); }  // 2.17.0 (#419); 2.17.2: a room opened by its address ends at the newest message
+  else if (m === 'team') { setHtml(el, viewTeam()); cf_view(); if (S.tc.fitUntil > Date.now()) teamFit(true); }  // 2.17.0 (#419); 2.17.2: a room opened by its address ends at the newest message
   else if (m === 'notes') setHtml(el, viewNotes());  // 2.17.0 (#442)
   else if (m === 'home') setHtml(el, viewHome());  // 2.17.0 (#475)
   else if (m === 'family') setHtml(el, mg_wrap(m, viewFamily()));  // 2.19.0 (#653)
@@ -1410,7 +1492,7 @@ function viewListBody() {
     // when some open task shown here waits on something; without dependencies the badge would say nothing)
     const nx = flow && flowDeps ? g.tasks.find(t => t.status === 0 && !t.context && !(t.blocked && dFor(t)))?.id : 0;
     if (!closed) { const n = Math.max(0, Math.min(g.tasks.length, budget)); h += g.tasks.slice(0, n).map((t, i) => (g.byList && (!i || g.tasks[i - 1].list_id !== t.list_id) ? mtListHead(t.list_id) : '') + taskRow(t, {showList: showList && !g.lic, tree: true, cols, lc, tcols: {list: showList && !g.lic && !moOwn()}, next: t.id === nx, crd, inToday: S.route.key === 'today', ...(v.dsx ? {dsx: showDone(), ...(t.status ? {drag: false} : {})} : {})})).join(''); budget -= n; cut += g.tasks.length - n; }
-    if (!closed && g.section !== undefined && !g.tasks.length && !ro) h += `<div class="sdrop" data-section="${g.section ?? ''}">${tr('Drop tasks here')}</div>`;  // shown while a task is dragged
+    // 2.46.2 (#1662): no drop field under an empty section any more; the section name takes the drop (.ghead.drop)
     if (g.name) h += '</div>';
   }
   if (lc && rl && total) h += fxSumRow(rl, lc, groups.flatMap(g => g.tasks));  // 2.43.0 (#1328): the sum row (formula.js)

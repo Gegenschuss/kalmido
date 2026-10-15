@@ -397,7 +397,7 @@ async function ctBooksModal() {
     if (m) {
       const b = ctBook(+m.dataset.cbmenu); if (!b) return;
       const own = b.role === 'owner';
-      menu(m, [own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the address book'), b.name, {input: {max: 100}}); if (n && n.trim()) { try { await api('PATCH', `/api/books/${b.id}`, {name: n.trim()}); } catch { return; } refresh(); } }},
+      menu(m, [own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the address book'), b.name, {input: {max: 100}}); if (n && n.trim()) { const nm = n.trim(); optWrite(optSet(() => ctBook(b.id), {name: nm}), () => api('PATCH', `/api/books/${b.id}`, {name: nm}), () => { draw(); ctDraw(); }).catch(() => {}); } }},  // 2.46.2 (#1659): at once
         own && wsOn() && {label: tr('Workspace…'), icon: 'brief', fn: () => wsMoveMenu(m, b.org_id, async org => { try { await api('PATCH', `/api/books/${b.id}`, {org_id: org}); } catch { return; } refresh(); })},
         own && collab() && {label: tr('Share…'), icon: 'users', fn: () => ctShareModal(b, users, names, refresh)},
         own && famOn() && !b.imported && {label: tr('Birthdays as tasks…'), icon: 'cake', fn: () => ctBdayModal(b, refresh)},

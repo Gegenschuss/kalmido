@@ -42,7 +42,7 @@ function sb_notesView() {
       ${sb_noteWritable().length ? `<button type="button" class="btn sm pri" data-sb="note-new" aria-haspopup="menu">${ic('plus', 's')}${tr('New note')}</button>` : ''}</div>
     <div id="sbn-res">${sb_noteCardsHtml()}</div></div></div></div>`;
 }
-function sb_notesPatch() { const r = $('#sbn-res'); if (r) setHtml(r, sb_noteCardsHtml()); }
+function sb_notesPatch() { const r = $('#sbn-res'); if (r) fl_set(r, sb_noteCardsHtml()); }  // 2.46.2 (#1718)
 function sb_notesSearch() {
   clearTimeout(S.sbn.qT);
   const q = S.sbn.q.trim(); if (!q) { S.sbn.hits = null; sb_notesPatch(); return; }

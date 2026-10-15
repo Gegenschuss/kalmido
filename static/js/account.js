@@ -124,7 +124,7 @@ function shareHtml(hint) {
     ${ios ? `<div class="row"><a class="btn sm" href="${esc(ios)}" target="_blank" rel="noopener noreferrer">${ic('plus', 's')} ${tr('Add the Kalmido shortcut')}</a></div>` : ''}
     <div class="row"><label for="s-dropurl">${tr('Server address')}</label><input id="s-dropurl" readonly value="${esc(dropBase(sh))}"><button class="btn sm" data-m="drop-copy-url">${ic('copy', 's')} ${tr('Copy')}</button></div>
     <div class="shint">${tr('Without /drop: the shortcut adds it. (An address ending in /drop works too.)')}</div>
-    <div class="row"><label for="s-droptok">${tr('Upload token')}</label><input id="s-droptok" readonly type="password" value="••••••••••••" autocomplete="off"><button class="btn sm" data-m="drop-copy-tok">${ic('copy', 's')} ${tr('Copy')}</button><button class="btn sm" data-m="drop-new-tok" title="${esc(tr('The old token stops working'))}">${ic('key', 's')} ${tr('New token')}</button></div>
+    <div class="row"><label for="s-droptok">${tr('Upload token')}</label><input id="s-droptok" readonly type="password" value="••••••••••••" autocomplete="new-password"><button class="btn sm" data-m="drop-copy-tok">${ic('copy', 's')} ${tr('Copy')}</button><button class="btn sm" data-m="drop-new-tok" title="${esc(tr('The old token stops working'))}">${ic('key', 's')} ${tr('New token')}</button></div>
     ${hint(tr('After a new token: paste it into the iPhone shortcut (or set the shortcut up again) and download the HTTP Shortcuts import again.'))}
     <details class="shelp sdet"><summary>${tr('Set it up in the Shortcuts app')}</summary><ol class="slist">
       ${ios ? `<li>${tr('Easiest: tap “Add the Kalmido shortcut” above, then Add Shortcut. It asks two questions: paste the server address (without /drop), then the upload token (copy them here first).')}</li>` : ''}
@@ -223,7 +223,7 @@ function accountHtml() {
     <div class="row"><label>${tr('Logged in as')}</label><span class="acct">${av(m.id, m.display_name)}<b>${esc(m.display_name)}</b> <span class="muted">${esc(m.username)}${m.auth === 'proxy' ? ' · ' + tr('via single sign-on') : ''}</span></span></div>
     <div class="row"><label for="a-name">${tr('Display name')}</label><input id="a-name" value="${esc(m.display_name)}" maxlength="60" autocomplete="name" enterkeyhint="done"></div>
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="a-avpick">${avPickHtml()}</div></div>
-    ${pw ? `<div class="row"><label for="a-cur">${tr('Password')}</label><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>` : ''}
+    ${pw ? `<div class="row"><label for="a-cur">${tr('Password')}</label><input type="text" class="cfhid" tabindex="-1" aria-hidden="true" autocomplete="username" value="${esc(S.me?.username || '')}" readonly><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>` : ''}
     ${storageHtml()}
     ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : ''}
     ${tfaHtml()}
@@ -1141,7 +1141,7 @@ function bkRestore(md, src) {
     const m = modal(`<h3>${tr('Restore backup')}</h3>
       <p>${tr('This replaces <b>all data on this server</b> (every user’s lists, tasks, files and settings) with the state of {0}.', `<b>${esc(aaWhen(src.created_at) || '?')}</b>`)}</p>
       <p class="muted">${trn('{0} task', '{0} tasks', src.counts?.tasks || 0)}, ${trn('{0} file', '{0} files', src.attachment_files || 0)}, ${trn('{0} user', '{0} users', src.counts?.users || 0)}. ${tr('A safety backup of the current state is made first. Everyone else is logged out.')}</p>
-      <form class="pwform">${src.encrypted ? `<input type="password" id="bkr-pass" autocomplete="off" placeholder="${tr('Passphrase (empty = the saved one)')}">` : ''}
+      <form class="pwform">${src.encrypted ? `<input type="password" id="bkr-pass" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore placeholder="${tr('Passphrase (empty = the saved one)')}">` : ''}
       <label for="bkr-word">${tr('Type {0} to confirm', '<b>' + esc(src.word) + '</b>')}</label><input id="bkr-word" autocomplete="off" autocapitalize="characters" spellcheck="false">
       <div class="aerr" role="alert" id="bkr-err"></div>
       <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" type="submit" id="bkr-go" disabled>${tr('Restore')}</button></div></form>`);

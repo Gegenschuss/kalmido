@@ -24,6 +24,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   three forms), a **shoot calculation** for film and video (industry pack), **crew and freelancer roles** with purchase
   prices and the **surplus per position** for admins, producing and raw data **switched per quotation**, and the legacy
   Excel import **fills empty fields** instead of skipping.
+- **2.46.2** (2026-10-15): **fixes and polish**: **no flicker** on live updates, renames and list settings **show at
+  once**, new chat messages and comments **fade in** (with "New message ↓"), **dialogs move** on the desktop, a chat in
+  **its own window**, copy comments, a dismissible layout note, and fixes for customers, the PDF import, empty sections,
+  encrypted notes and folders.
 - **2.46.1** (2026-10-15): **folder rows** like list rows, lists and sections **drag to the very end**, **several
   contacts at once** (delete, move), the legacy import **per area**, a **list channel** for listening agents,
   **favourites** for agents and Ctrl+K, a switch **all modules** and samples only on request, a simpler **family**

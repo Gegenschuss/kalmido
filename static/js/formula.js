@@ -159,10 +159,10 @@ function fxKpiModal(lid, add) {  // add = a new tile to start with (from the sum
     }
   });
 }
+// 2.46.2 (#1659): the key figures show at once (optimistic, an error puts the old ones back), their values follow behind
 async function fxKpiSave(lid, v) {
-  try { const r = await api('PATCH', '/api/lists/' + lid, {kpis: v}); if (r?.kpis) Object.assign(listById(lid) || {}, {kpis: r.kpis}); }
+  try { await optWrite(optSet(() => listById(lid), {kpis: v}), async () => { const r = await api('PATCH', '/api/lists/' + lid, {kpis: v}); if (r?.kpis) Object.assign(listById(lid) || {}, {kpis: r.kpis}); }); }
   catch { return false; }
-  try { await load(); } catch { /* offline */ }
-  await fxKpiLoad(lid, true); render();
+  fxKpiLoad(lid, true).then(() => render(), () => {});
   return true;
 }

@@ -571,7 +571,8 @@ function commentHtml(c, U, ro = false) {
   // 2.42.0 (#1383): "Save as task" under an agent's comment (who may add tasks in its list); a saved one shows "Saved"
   const agc = !ro && !mine && isAgentUser(c.user_id), cs = agc && !c.saved_task_id && !editing && canEditList(taskById(c.task_id || S.sel)?.list_id);
   const csv = agc && c.saved_task_id ? `<button type="button" class="csaved" data-act="cm-saved" data-tid="${c.saved_task_id}" title="${esc(tr('Saved as a task: open it'))}">${ic('bookmark', 's')}<span>${tr('Saved')}</span></button>` : '';
-  const acts = ro ? '' : `<span class="cacts">${editing ? '' : replyBtn()}${cs ? `<button class="iconbtn" data-act="cm-save" data-cid="${c.id}" title="${esc(tr('Save as task'))}" aria-label="${esc(tr('Save as task'))}">${ic('bookmark', 's')}</button>` : ''}${mine ? `<button class="iconbtn" data-act="c-edit" data-cid="${c.id}" title="${tr('Edit')}">${ic('edit', 's')}</button>` : ''}${mine || S.tl.moderator ? `<button class="iconbtn" data-act="c-del" data-cid="${c.id}" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</span>`;
+  const cpb = editing || c.deleted ? '' : `<button type="button" class="iconbtn" data-act="cm-copy" data-cid="${c.id}" title="${esc(tr('Copy'))}" aria-label="${esc(tr('Copy'))}" aria-haspopup="menu">${ic('copy', 's')}</button>`;  // 2.46.2 (#1666)
+  const acts = ro ? (cpb ? `<span class="cacts">${cpb}</span>` : '') : `<span class="cacts">${editing ? '' : replyBtn()}${cpb}${cs ? `<button class="iconbtn" data-act="cm-save" data-cid="${c.id}" title="${esc(tr('Save as task'))}" aria-label="${esc(tr('Save as task'))}">${ic('bookmark', 's')}</button>` : ''}${mine ? `<button class="iconbtn" data-act="c-edit" data-cid="${c.id}" title="${tr('Edit')}">${ic('edit', 's')}</button>` : ''}${mine || S.tl.moderator ? `<button class="iconbtn" data-act="c-del" data-cid="${c.id}" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</span>`;
   const files = c.attachments?.length ? `<div class="atts catts">${c.attachments.map(a => cattHtml(a, c.id, editing)).join('')}</div>` : '';
   const main = editing ? `<div class="cedit"><textarea class="c-edit-input" data-cid="${c.id}" rows="2">${esc(decodeMentions(c.body, U))}</textarea><div class="mpick hidden"></div>${files}<div class="cbar"><span class="spacer"></span><button class="btn sm" data-act="c-edit-cancel">${tr('Cancel')}</button><button class="btn sm pri" data-act="c-edit-save" data-cid="${c.id}">${tr('Save')}</button></div></div>`
     : `${ro ? '' : replyQuoteHtml(c, 'c')}${c.body ? `<div class="cbody">${commentBody(c.body, U, taskById(c.task_id || S.sel)?.list_id)}</div>` : ''}${files}${sugHtml(c, ro)}${ccCommentHtml(c, ro)}${reactHtml(c, ro)}`;
@@ -610,7 +611,7 @@ function timelineHtml(t) {
   // 2.31.0 (#1054): order and history sit in a small "…" menu (were two big switches); "Comments only" says so in the head.
   // (#344) the desktop split folds its area with the arrow at the end
   return `<h5 class="cmhead"><span>${tr('Comments')}</span><span class="c" id="d-tl-count">${n || ''}</span>${soc && !showAct() ? `<span class="cmmode">${tr('Comments only')}</span>` : ''}<span class="spacer"></span><button type="button" class="iconbtn cmmenu" data-act="tl-menu" aria-haspopup="menu" aria-label="${esc(tr('Comment options'))}" title="${esc(tr('Comment options'))}">${ic('dots', 's')}</button>${split ? `<button type="button" class="iconbtn dsfoldb" data-act="cm-fold" aria-controls="d-cpane" aria-expanded="${!dsFold()}" aria-label="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}" title="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}">${ic('chev', 's')}</button>` : ''}</h5>
-    ${top ? cmComposer(t, true) : ''}<div class="cms" id="d-tl-items">${S.tl.id === t.id ? timelineItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div>
+    ${top ? cmComposer(t, true) : ''}<div class="cms" id="d-tl-items">${S.tl.id === t.id ? timelineItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div><button type="button" class="chnew cmnew hidden" id="cm-new">${tr('New comment')} <span aria-hidden="true">↓</span></button>
     ${soc ? typingHtml(taskTypers(t), 'd-typing') : ''}`;
 }
 // 2.0.6: the comment box at the bottom edge of the task panel, visible while scrolling (sticky with the
@@ -625,7 +626,8 @@ function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the bo
 function drawTimeline() {
   if (S.tl.id !== S.sel) return;
   const sc = cmxScrollGet();  // 2.36.0 (#1120): who reads the newest comments at the end stays there when one arrives
-  const box = $('#d-tl-items'); if (box) patchKids(box, timelineItems());  // 2.12.2 (#451): only changed / new comments
+  const box = $('#d-tl-items'), seen = !box?.lastElementChild || cf_visible(box.lastElementChild);
+  if (box) { patchKids(box, timelineItems()); cf_comments(box, seen); }  // 2.46.2 (#1660)  // 2.12.2 (#451): only changed / new comments
   const hb = $('#d-hist-items'); if (hb) hb.innerHTML = histItems();
   const n = $('#d-tl-count'); if (n) n.textContent = S.tl.comments?.length || '';
   const n2 = $('#d-jump-count'); if (n2) n2.textContent = S.tl.comments?.length || '';
