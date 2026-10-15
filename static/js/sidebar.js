@@ -97,6 +97,7 @@ function multiMoreMenu(a) {
   const ids = [...S.multi], one = ids.length === 1 ? taskById(ids[0]) : null;
   menu(a, [
     ...(ids.length >= 2 ? [{label: tr('Edit'), icon: 'edit', fn: () => { ME.sheet = true; meSync(); }}] : []),
+    ...tp_menuItems(one, a),  // 2.46.4 (#1751): "Open details" in a list where a tap ticks off
     ...(one && one.id > 0 && canEdit(one) ? [{label: tr('More actions'), icon: 'dots', fn: () => taskMenu($(`#view .trow[data-id="${one.id}"] .ttl`) || a, one.id)}] : []),
     ...(ids.length && ids.some(i => canEdit(taskById(i))) ? dgMenuItems(ids) : []),  // 2.43.0 (#1003): Subtasks of… / Out of the parent task
     {label: tr('Select all'), icon: 'all', fn: () => { $$('#view .trow').forEach(r => S.multi.add(+r.dataset.id)); render(); }},

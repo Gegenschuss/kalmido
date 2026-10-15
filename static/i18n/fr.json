@@ -6930,5 +6930,17 @@
   "A kid account cannot be an admin of an organisation": "Un compte enfant ne peut pas être administrateur d'une organisation",
   "Unknown organisation": "Organisation inconnue",
   "Hide this note": "Masquer cette note",
-  "First line taken as the contact person: please check": "Première ligne prise comme interlocuteur : à vérifier"
+  "First line taken as the contact person: please check": "Première ligne prise comme interlocuteur : à vérifier",
+  "Open details": "Ouvrir les détails",
+  "Tap": "Toucher",
+  "Tap does not open details": "Toucher n’ouvre pas les détails",
+  "A tap on a task ticks it off. Details with a long press or the menu.": "Un toucher sur une tâche la coche. Les détails par un appui long ou le menu.",
+  "A tap ticks the task off": "Un toucher coche la tâche",
+  "A tap opens the details": "Un toucher ouvre les détails",
+  "Belongs to: {0} (organisation)": "Appartient à : {0} (organisation)",
+  "Belongs to: {0}": "Appartient à : {0}",
+  "Change workspace": "Changer d’espace de travail",
+  "Only members of the organisation can be invited. An agent of the organisation sees it only if it is shared with that agent.": "Seuls les membres de l’organisation peuvent être invités. Un agent de l’organisation ne le voit que si c’est partagé avec lui.",
+  "Only people you explicitly invite see it.": "Seules les personnes invitées explicitement le voient.",
+  "Not in the organisation": "Pas dans l’organisation"
 }

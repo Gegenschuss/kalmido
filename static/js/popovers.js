@@ -692,6 +692,7 @@ function taskMenu(anchor, id, o = {}) {
   menu(anchor, [
     // 2.25.0 (UX-11): opened by a long press: the title on top, then "Select" (more tasks follow with a tap)
     ...(o.select ? [{label: t.title.length > 60 ? t.title.slice(0, 59) + '…' : t.title, cls: 'mhead', dis: true, fn: () => {}}, {label: tr('Select'), icon: 'select', fn: () => { S.multiMode = true; S.multi.add(id); S.multiLast = id; render(); }}, '-'] : []),
+    ...tp_menuItems(t, anchor),  // 2.46.4 (#1751): "Open details" in a list where a tap ticks off
     {head: tr('Plan|nav')},
     // date
     ...(inPanel ? [] : [quickDueRow(id), {label: tr('New date…'), icon: 'clock', keys: 's', fn: () => snoozeSheet(id, anchor)}]),

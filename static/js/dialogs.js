@@ -35,6 +35,10 @@ function modalA11y(m) {
   const h = card && card.querySelector('h1,h2,h3,h4');
   if (h && !m.hasAttribute('aria-labelledby')) { if (!h.id) h.id = 'mh-' + Math.random().toString(36).slice(2, 8); m.setAttribute('aria-labelledby', h.id); }
   const prev = document.activeElement;
+  // 2.46.2 (#1659 #1718): a redraw while the dialog is open (an optimistic save draws the header again) can replace the opener;
+  // the focus then goes to its new copy (same signature and position as in keepFocus)
+  let psig = null, pi = 0;
+  if (prev && prev !== document.body) try { psig = focusSig(prev); pi = [...document.querySelectorAll(psig)].indexOf(prev); } catch { psig = null; }
   m.addEventListener('keydown', e => {
     if (e.key !== 'Tab' || e.defaultPrevented) return;
     const f = focusables(m).filter(x => x.tabIndex >= 0 || x === document.activeElement); e.preventDefault(); if (!f.length) return;
@@ -50,7 +54,9 @@ function modalA11y(m) {
   onRemove(m, () => {
     if (!document) return;  // the window is gone
     const a = document.activeElement;
-    if (prev && prev.isConnected && prev !== document.body && (!a || a === document.body || !a.isConnected)) { try { prev.focus({preventScroll: true}); } catch { /* gone */ } }
+    let t = prev;
+    if (t && !t.isConnected && psig) try { const all = document.querySelectorAll(psig); t = all[Math.max(0, Math.min(pi, all.length - 1))] || null; } catch { t = null; }
+    if (t && t.isConnected && t !== document.body && (!a || a === document.body || !a.isConnected)) { try { t.focus({preventScroll: true}); } catch { /* gone */ } }
   });
 }
 // ---- UX1 (U12): the app's own dialogs instead of window.confirm / window.prompt. askConfirm resolves true / false,
@@ -495,6 +501,7 @@ function shareModal(id, opt = {}) {
   const l0 = listById(id); if (!shareOk(l0)) return;
   const own = isOwner(l0), hint = t => `<div class="shint lhint">${t}</div>`;
   const md = modal(`<div class="lhdr"><h3>${esc(tr(collab() ? N_('Share “{0}”') : N_('Owner of “{0}”'), lname(l0)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
+    ${collab() ? `<div class="shws" id="sh-ws"></div>` : ''}
     ${collab() ? `<h4 id="sh-people-h">${tr('People')}</h4><div class="members" id="l-members" aria-labelledby="sh-people-h"></div>` : ''}
     ${collab() && (S.peopleVis === 'contacts' || S.instanceMode === 'workspaces') && canManage(l0) ? `<div class="row shmail"><input id="sh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="share-mail">${ic('send', 's')} ${tr('Share')}</button></div>` : ''}
     ${collab() ? shSec('grp', tr('Groups'), `<div id="sh-grpwrap"></div>`, true) : ''}
@@ -518,11 +525,11 @@ function shareModal(id, opt = {}) {
     const box = $('#l-members', md);
     if (box) {
       const ppl = people.filter(p => !isAg(p));
-      // 2.28.0 (#935): an organisation's list is shared only with its members
-      const fits = u => !cur.org_id || (u.orgs || []).includes(cur.org_id);
-      const cand = users && users.filter(u => !u.agent && u.id !== S.me?.id && !people.some(p => p.user_id === u.id) && fits(u));
+      // 2.28.0 (#935): an organisation's list is shared only with its members; 2.46.4 (#1737): the others are greyed out with the reason
+      const cand = users && users.filter(u => !u.agent && u.id !== S.me?.id && !people.some(p => p.user_id === u.id));
+      shWsFill($('#sh-ws', md), cur.org_id || null, own && !cur.is_inbox ? () => $('[data-m="list-edit"]', md)?.click() : null);
       box.innerHTML = ppl.map(p => row(cur, p, mng)).join('') +
-        (mng ? (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : cand.length ? `<div class="mrow madd"><select id="l-adduser" aria-label="${esc(tr('Invite'))}"><option value="">${tr('Share with …')}</option>${cand.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select>${roleSel('id="l-addrole"', 'edit')}<button class="btn sm" data-m="share">${ic('plus', 's')} ${tr('Add')}</button></div>`
+        (mng ? (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : cand.length ? `<div class="mrow madd"><select id="l-adduser" aria-label="${esc(tr('Invite'))}"><option value="">${tr('Share with …')}</option>${shWsOptions(cand, cur.org_id || null)}</select>${roleSel('id="l-addrole"', 'edit')}<button class="btn sm" data-m="share">${ic('plus', 's')} ${tr('Add')}</button></div>`
           : `<div class="muted mhint">${users.filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : tr('No other users yet. An admin can add them in the settings.')}</div>`) + `<details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>`
           : `<div class="muted mhint olock"><span>${esc(tr('Owner'))}: ${esc(cur.owner_name)}</span><button type="button" class="iconbtn" data-m="owner-info" title="${esc(tr('Owner: {0}. The owner and list admins rename and archive this list and manage who is in it; the rest of its settings stays with the owner.', cur.owner_name))}" aria-label="${esc(tr('Owner: {0}. The owner and list admins rename and archive this list and manage who is in it; the rest of its settings stays with the owner.', cur.owner_name))}">${ic('lock', 's')}</button></div>`);
     }
@@ -780,6 +787,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="shint lhint">${ic('cart', 's')} ${tr('What you tick off stays visible at the bottom and comes back with one tap: handy for shopping and packing lists.')}</div>` : ''}
     ${id && own && !l.is_inbox ? `<div class="row ldsxrow"><span></span><label class="chkl"><input type="checkbox" id="l-dsx" ${dsxOn(l) ? 'checked' : ''} ${dsxFixedOff(l) ? 'disabled' : ''}> ${tr('Keep completed in their section')}</label></div>
     <div class="shint lhint" id="l-dsxhint">${tr('Completed tasks stay at their place in their section, crossed out, with their subtasks. For everyone in the list. Not with “Show completed at the bottom” or for shopping lists.')}</div>` : ''}
+    ${id ? tp_rowHtml(l) : ''}
     <div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint">${tr('Default for the tasks of this list with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>
     ${id && ['owner', 'admin'].includes(l.role || 'owner') && !l.family && !l.life ? staleRowHtml(l) : ''}
@@ -802,6 +810,7 @@ function listModal(id, folder = '', o = {}) {
   $('#l-bell', md)?.addEventListener('bell-sync', e => bellHint(e.target.value));
   $('#l-stale', md)?.addEventListener('change', e => { e.stopPropagation(); staleDaysSet(id, e.target); });  // 2.34.0 (#266)
   if (id) ovWire(md, id);  // 2.46.0 (#1603): "Everyone in the organisation"
+  if (id) tp_wire(md, id);  // 2.46.4 (#1751): "Tap does not open details"
   $('#l-dsx', md)?.addEventListener('change', e => { e.stopPropagation(); dsxSet(id, e.target.checked).then(() => { const x = listById(id), c = $('#l-dsx', md); if (x && c) c.checked = dsxOn(x); }); });  // 2.36.2 (#1136)
   $('[data-m="bell-custom"]', md)?.addEventListener('click', e => { e.stopPropagation(); bellCustomModal(id); });
   // ---- autosave (existing lists)
@@ -846,6 +855,7 @@ function listModal(id, folder = '', o = {}) {
     if ($('#l-dab', md)) $('#l-dab', md).checked = !!x.checklist;
     if ($('#l-fam', md)) $('#l-fam', md).value = x.family || '';
     if ($('#l-dsx', md)) { $('#l-dsx', md).checked = dsxOn(x); $('#l-dsx', md).disabled = dsxFixedOff(x); }  // 2.36.2 (#1136)
+    tp_sync(md, x);  // 2.46.4 (#1751)
   };
   let saving = Promise.resolve();
   const autosave = () => {

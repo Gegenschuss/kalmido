@@ -323,6 +323,14 @@ def list_update(lid):
             return err(tr("Invalid value: {0}", "done_in_section"))
         c.execute("UPDATE lists SET done_in_section=? WHERE id=?", (None if dv in (None, "") else int(dv), lid))
         b = {k: v for k, v in b.items() if k != "done_in_section"}
+    if "tap_done" in b:  # 2.46.4 (#1751): "Tap does not open details" (owner / list admins; 0 / 1)
+        if role not in MANAGE_ROLES:
+            return err(tr("Only the owner and list admins can change this setting"), 403)
+        tv = b["tap_done"]
+        if isinstance(tv, float) or tv not in (0, 1, "0", "1"):  # True / False compare equal to 1 / 0
+            return err(tr("Invalid value: {0}", "tap_done"))
+        c.execute("UPDATE lists SET tap_done=? WHERE id=?", (int(tv), lid))
+        b = {k: v for k, v in b.items() if k != "tap_done"}
     if "columns" in b:  # 2.14.0 (#425): the list's columns, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and list admins can change the shown fields"), 403)

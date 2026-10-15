@@ -546,6 +546,11 @@ r = iph.req("PROPFIND", "/dav/addressbooks/alice/", '<?xml version="1.0"?><d:pro
 abh = ms(r.text)[0]
 check(r.status_code == 207 and AB in abh and abh[AB]["{DAV:}resourcetype"].find("{urn:ietf:params:xml:ns:carddav}addressbook") is not None
       and len(abh[AB]["{urn:ietf:params:xml:ns:carddav}supported-address-data"]) == 2, "the address book home: the book, vCard 3 + 4")
+# 2.46.4 (#1736): the own home reports full rights (macOS Contacts takes the home as the account and stays read only otherwise)
+hp = abh["/dav/addressbooks/alice/"]["{DAV:}current-user-privilege-set"]
+hpv = {x.tag.split("}")[1] for pr in hp for x in pr}
+check({"read", "write", "write-content", "bind", "unbind"} <= hpv, f"the own address book home: write, bind, unbind {hpv}")
+check(iph.req("MKCOL", "/dav/addressbooks/alice/bnew/").status_code in (403, 405), "MKCOL in the home: still refused")
 r = iph.req("REPORT", AB, '<?xml version="1.0"?><d:sync-collection xmlns:d="DAV:"><d:sync-token/><d:sync-level>1</d:sync-level><d:prop><d:getetag/>'
             '</d:prop></d:sync-collection>', Depth="1")
 cards0, _, ctok = ms(r.text)
@@ -602,7 +607,19 @@ check(f"/dav/addressbooks/bob/b{BK}/" in ms(r.text)[0], "Bob's address book home
 check(bob.req("PUT", f"/dav/addressbooks/bob/b{BK}/b.vcf", V4.replace("v4-1", "b-1"), **{"Content-Type": "text/vcard"}).status_code == 403, "view only: PUT 403")
 check(eve.req("GET", AB.replace("alice", "eve") + "IOS-CARD-1.vcf").status_code == 404, "Eve: the book does not exist for her")
 check(iph.req("PUT", AB + "bad.vcf", "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:x\r\nEND:VCARD\r\n", **{"Content-Type": "text/vcard"}).status_code == 400, "a card without a UID: 400")
-check(iph.req("DELETE", AB + "v4-1.vcf").status_code == 204 and not A.get(B + "/api/contacts", params={"q": "bakery"}).json()["items"], "DELETE a card")
+# 2.46.4 (#1736): the ETag ignores the PRODID line (it carries the app version) - an update keeps every ETag and sync token
+import hashlib
+import re as _re
+r = dx.req("GET", AB + "v4-1.vcf")
+vet = r.headers["ETag"]
+check("PRODID:" in r.text and vet == '"' + hashlib.sha1(_re.sub(r"(?im)^PRODID[:;][^\r\n]*\r?\n", "", r.text).encode(), usedforsecurity=False).hexdigest()[:24] + '"',
+      f"the ETag is built without the PRODID line {vet}")
+r = dx.req("PUT", AB + "v4-1.vcf", V4.replace("+49 30 5555", "+49 30 5556"), **{"Content-Type": "text/vcard", "If-Match": vet})
+check(r.status_code == 204, f"PUT with If-Match (a change made on the Mac): 204 {r.status_code}")
+vet = dx.req("GET", AB + "v4-1.vcf").headers["ETag"]
+check(dx.req("DELETE", AB + "v4-1.vcf", **{"If-Match": '"0000"'}).status_code == 412, "DELETE with a stale If-Match: 412")
+check(dx.req("DELETE", AB + "v4-1.vcf", **{"If-Match": vet}).status_code == 204, "DELETE with If-Match: 204")
+check(iph.req("DELETE", AB + "v4-1.vcf").status_code == 404 and not A.get(B + "/api/contacts", params={"q": "bakery"}).json()["items"], "DELETE a card")
 
 # ================================================================== API v1 + scopes + OpenAPI
 def tok(scopes):
