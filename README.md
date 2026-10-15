@@ -193,7 +193,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **One app instead of three.** Tasks, habits, focus timer and real time tracking with rates and timesheets, plus the team essentials: sharing, assignment, comments, activity, a News inbox, dependencies, project status and custom fields.
 - **Simple when you want it.** Switch *Collaboration* off and it is a quiet personal list again.
 - **Yours.** Runs on your own server, no vendor account, no telemetry (the optional update check only asks GitHub for the latest version number), open source under the AGPL-3.0. Fits a self-hosted setup: single sign-on through your proxy, Web Push or ntfy notifications, a calendar feed.
-- **Honest trade-offs.** No native apps or widgets (it is an installable web app), no location-based reminders, and it is a hobby project, not a company with a support desk.
+- **Honest trade-offs.** No native apps or widgets (it is an installable web app), no location-based reminders, and no support desk yet.
 
 ## Features
 
