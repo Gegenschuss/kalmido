@@ -227,22 +227,21 @@ def org_public(c, r, roles=True):
 
 
 def org_label(c, uid=None):
-    """The organisation name to show next to the app name: the person's first one; before a login the instance's only one
-    (never in the mode workspaces: a shared server names no organisation on its login page)."""
+    """The organisation name to show next to the app name: the person's first one; before a login only in the mode
+    organisation its main organisation (never otherwise: a server names no organisation on its login page)."""
     m = instance_mode(c)
     if uid:
         if m == "workspaces":
             return ""
         n = org_names(c, uid)
         return n[0] if n else ""
-    if m in ("shared", "workspaces"):
+    # 2.45.0 (#1552): before a login only the mode organisation names its organisation; a server with exactly one
+    # organisation in another mode no longer shows that name to every visitor of the login page
+    if m != "organisation":
         return ""
-    with system_ctx(c):  # 2.37.0 (#1150): before a login: the instance's own name (only when it has exactly one organisation)
-        if m == "organisation":
-            r = c.execute("SELECT name FROM orgs WHERE id=?", (main_org(c),)).fetchone()
-            return r[0] if r else ""
-        rows = c.execute("SELECT name FROM orgs ORDER BY id LIMIT 2").fetchall()
-    return rows[0][0] if len(rows) == 1 else ""
+    with system_ctx(c):  # 2.37.0 (#1150): before a login: the instance's own name
+        r = c.execute("SELECT name FROM orgs WHERE id=?", (main_org(c),)).fetchone()
+    return r[0] if r else ""
 
 
 # ---------------------------------------------------------------- 2.28.0 (#935): workspaces of lists and agents

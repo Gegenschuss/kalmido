@@ -4773,7 +4773,6 @@ button.lkchip:hover{border-color:var(--accent)}
 .fpl .mrow .n > *{display:block;overflow-wrap:anywhere}
 .fpl .mrow .n small{font-size:var(--fs-s)}
 /* 2.22.0 (#752): the organisation next to the app name (sidebar, login) */
-.sbhome .sborg{font-size:var(--fs-xs);font-weight:400;color:var(--muted);margin-left:.375rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:8rem}
 .alogo .aorg{display:block;font-size:var(--fs-s);font-weight:400;color:var(--muted);margin-top:.125rem}
 .shmail{display:flex;gap:.375rem;margin:.5rem 0}
 .shmail input{flex:1;min-width:0}
@@ -4939,7 +4938,6 @@ button.lkchip:hover{border-color:var(--accent)}
 .sbrand .sbhome{min-width:0;flex:0 1 auto;overflow:hidden}
 .sbrand .sbhome > span{flex:none}
 .sbrand .sbhome > svg{flex:none}
-.sbrand .sborg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sbrand .sbacct{flex:none}
 /* UX-16: nothing found: one clear line in the middle of the dialog */
 .sbody.snores{position:relative}
@@ -6195,7 +6193,6 @@ html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5re
    the agent chat header: the permission badge moves into the second line (with state and model), the name keeps the first */
 .sbrand .sbhome > .sbtxt{flex:0 1 auto;min-width:0;display:flex;flex-direction:column;align-items:flex-start;line-height:1.2}
 .sbrand .sbhome > .sbtxt > span{white-space:nowrap}
-.sbrand .sbtxt .sborg{margin:0;max-width:100%;line-height:1.2}
 @media not all and (pointer:coarse) and (max-width:37.5rem){
   .chath .chn{flex-direction:row;flex-wrap:wrap;align-items:center;column-gap:0;row-gap:.0625rem}
   .chath .chnm{display:contents}
