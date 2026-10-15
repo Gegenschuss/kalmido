@@ -224,11 +224,18 @@ def contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "one in a read-only address book -> 403, and nothing changes. move: book_id = the target (write access); a contact the target "
         "has already (same UID) is left where it is and listed in conflicts. Birthday tasks follow (deleted contacts: to the trash).", K,
         ok({"type": "object", "properties": {"action": {"type": "string"}, "deleted": {"type": "integer"}, "moved": {"type": "integer"},
-                                             "unchanged": {"type": "integer"}, "conflicts": {"type": "array", "items": {"type": "integer"}}}})
+                                             "unchanged": {"type": "integer"}, "conflicts": {"type": "array", "items": {"type": "integer"}},
+                                             "changed": {"type": "integer"}, "skipped": {"type": "integer"},
+                                             "undo": {"type": "array", "items": {"type": "object"}, "description": "set: the old values (send them back with restore)"}}})
         | errs("400", "403", "404", "409"),
-        body={"type": "object", "required": ["ids", "action"], "properties": {
-            "ids": {"type": "array", "items": {"type": "integer"}}, "action": {"type": "string", "enum": ["delete", "move"]},
-            "book_id": {"type": "integer", "description": "move: the target address book"}}}, scope=S)}
+        body={"type": "object", "required": ["action"], "properties": {
+            "ids": {"type": "array", "items": {"type": "integer"}}, "action": {"type": "string", "enum": ["delete", "move", "set", "restore"]},
+            "book_id": {"type": "integer", "description": "move: the target address book"},
+            # 2.47.3 (#1731): set changes properties of many contacts (read-only / imported address books: skipped and counted)
+            "groups_add": {"type": "array", "items": {"type": "string"}}, "groups_remove": {"type": "array", "items": {"type": "string"}},
+            "org": {"type": "string", "description": "set: the company (empty = remove)"}, "dept": {"type": "string"},
+            "kind": {"type": "string", "enum": ["individual", "org"]}, "note_append": {"type": "string", "description": "set: appended to the note"},
+            "items": {"type": "array", "items": {"type": "object"}, "description": "restore: the undo of a set answer"}}}, scope=S)}
     paths["/tasks/{id}/contacts"] = {"post": op(
         "Link a contact to a task: waiting (the task waits on them), responsible (they do it, outside Kalmido) or about (needs tasks:write too)", K,
         ok({"type": "object", "properties": {"items": {"type": "array", "items": {"type": "object"}}}}) | errs("400", "403", "404"), [pid()],

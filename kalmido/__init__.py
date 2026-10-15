@@ -129,6 +129,7 @@ ORDER = (
     "life.web",
     "life.v1",
     "team.clients",
+    "team.clients_bulk",  # 2.47.3 (#1733): several clients at once
     "team.workload",
     "office.packs",  # 2.36.1 (#1021): country packs (data), used by office.model
     "office.model",  # 2.36.1 (#1021): office & finance (B); C/D append office.calc, office.docs, office.pdf
