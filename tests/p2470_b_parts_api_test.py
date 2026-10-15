@@ -174,7 +174,7 @@ A.patch(B + f"{D}/{DOC}", json={"discount_pct": 0})
 r = Bo.get(B + f"{D}/{DOC}")
 check(r.ok and len(r.json()["parts"]) == 3, "member: reads the parts " + r.text[:200])
 mp = r.json()["parts"]
-check(all("costs" not in p["totals"] and "margin" not in p["totals"] for p in mp) and all(it["cost"] is None for p in mp for it in p["items"])
+check(all("costs" not in p["totals"] and "margin" not in p["totals"] for p in mp) and all(it.get("cost") is None for p in mp for it in p["items"])
       and "costs" not in r.json()["totals"], "member: no purchase / surplus in parts, positions and totals")
 r = Bo.put(B + f"{D}/{DOC}/parts/{P2}/items", json={"items": [svc("Extra shoot", 1, 300, cost=999)]})
 check(r.ok and "costs" not in r.json()["part"]["totals"], "member: edits a part, the answer has no purchase")

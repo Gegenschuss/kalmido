@@ -56,7 +56,7 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
   check(its.length === 1 && its[0].querySelector('[data-k="title"]')?.value === 'Animation', 'the open part: the position editor with its positions');
   check(!d.querySelector('.tppl') && !d.querySelector('details[data-sec="parts"]'), 'the open part replaces the title page positions');
   change(w, its[0].querySelector('[data-k="qty"]'), '3');
-  const net = await until(async () => { const x = await call('GET', `/api/office/docs/${doc.id}`); const p = (x.parts || []).find(q => q.id === PA); return p && p.totals.net === 1500 ? x : null; });
+  const net = await until(async () => { const x = await call('GET', `/api/office/docs/${doc.id}`); const p = (x.parts || []).find(q => q.id === PA); return p && p.totals.net === 1500 && x.totals.net === 2300 ? x : null; });  // (both written by one save)
   check(net && net.totals.net === 2300, 'a change in the part goes to the part: part 1,500, quotation 2,300 ' + (net && net.totals.net));
   check((net?.items || []).length === 2, 'the title page keeps its two positions');
   await until(() => /1,500\.00/.test(d.querySelector('.tptotals')?.textContent || ''));
