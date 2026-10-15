@@ -6235,7 +6235,7 @@
   "Unknown country code: {0} (two letters, ISO 3166-1, e.g. DE, AT, CH)": "Code pays inconnu : {0} (deux lettres, ISO 3166-1, p. ex. DE, AT, CH)",
   "valid country of the company (ISO code, now {0})": "pays valide de l'entreprise (code ISO, actuellement {0})",
   "valid country of the client (ISO code, now {0})": "pays valide du client (code ISO, actuellement {0})",
-  "Hide completed: for your own lists in this folder, at once for all of them (also with “Only new lists”). A list where you chose to show or hide completed yourself keeps that choice until “Completed: like the default” in its menu.": "Masquer les terminées : pour tes propres listes de ce dossier, aussitôt pour toutes (même avec « Seulement les nouvelles listes »). Une liste où tu as choisi toi-même d'afficher ou de masquer les terminées garde ce choix jusqu'à « Terminées : comme par défaut » dans son menu.",
+  "Hide completed: the default for your own lists in this folder, applied like the settings above (with “Only new lists” the existing lists keep what they show). Shared lists of others keep their setting. A list where you show or hide completed yourself differs from the folder until “Back to the folder” in its dialog.": "Masquer les tâches terminées : la valeur par défaut pour vos propres listes de ce dossier, appliquée comme les réglages ci-dessus (avec « Nouvelles listes uniquement », les listes existantes continuent d'afficher ce qu'elles affichent). Les listes partagées par d'autres gardent leur réglage. Une liste où vous affichez ou masquez vous-même les tâches terminées s'écarte du dossier jusqu'à « Revenir au dossier » dans sa fenêtre.",
   "Settled": "Réglé",
   "Only the fee of a finalised reminder can be waived or marked as paid": "Seuls les frais d'une relance finalisée peuvent être annulés ou marqués comme payés",
   "fee open: {0}": "frais ouverts : {0}",
@@ -6758,5 +6758,6 @@
   "Suggest favourites": "Suggérer des favoris",
   "While you have favourites, lists without a star send pushes only for @mentions, assignments, reminders and approvals. The News stay complete; a list bell set to All wins.": "Tant que vous avez des favoris, les listes sans étoile n'envoient des notifications push que pour les @mentions, les attributions, les rappels et les validations. Les nouveautés restent complètes ; une cloche de liste réglée sur « Tout » l'emporte.",
   "After two weeks of much work in a list without a star, Kalmido asks once whether to add it to your favourites. It never sets a star by itself.": "Après deux semaines de travail intense dans une liste sans étoile, Kalmido demande une fois s'il faut l'ajouter à vos favoris. Il ne met jamais d'étoile de lui-même.",
-  "You worked a lot in “{0}” these two weeks. Add it to your favourites?": "Vous avez beaucoup travaillé dans « {0} » ces deux dernières semaines. L'ajouter à vos favoris ?"
+  "You worked a lot in “{0}” these two weeks. Add it to your favourites?": "Vous avez beaucoup travaillé dans « {0} » ces deux dernières semaines. L'ajouter à vos favoris ?",
+  "{0} list changed": ["{0} liste modifiée", "{0} listes modifiées"]
 }

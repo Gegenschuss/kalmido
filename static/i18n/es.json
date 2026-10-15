@@ -6235,7 +6235,7 @@
   "Unknown country code: {0} (two letters, ISO 3166-1, e.g. DE, AT, CH)": "Código de país desconocido: {0} (dos letras, ISO 3166-1, p. ej. DE, AT, CH)",
   "valid country of the company (ISO code, now {0})": "país válido de la empresa (código ISO, ahora {0})",
   "valid country of the client (ISO code, now {0})": "país válido del cliente (código ISO, ahora {0})",
-  "Hide completed: for your own lists in this folder, at once for all of them (also with “Only new lists”). A list where you chose to show or hide completed yourself keeps that choice until “Completed: like the default” in its menu.": "Ocultar completadas: para tus propias listas de esta carpeta, a la vez para todas (también con «Solo listas nuevas»). Una lista en la que tú mismo elegiste mostrar u ocultar las completadas conserva esa elección hasta «Completadas: como el valor predeterminado» en su menú.",
+  "Hide completed: the default for your own lists in this folder, applied like the settings above (with “Only new lists” the existing lists keep what they show). Shared lists of others keep their setting. A list where you show or hide completed yourself differs from the folder until “Back to the folder” in its dialog.": "Ocultar completadas: el valor predeterminado para tus propias listas de esta carpeta, aplicado como los ajustes de arriba (con «Solo listas nuevas» las listas existentes siguen mostrando lo que muestran). Las listas compartidas de otros conservan su ajuste. Una lista en la que muestras u ocultas tú mismo las completadas se aparta de la carpeta hasta «Volver a la carpeta» en su diálogo.",
   "Settled": "Liquidado",
   "Only the fee of a finalised reminder can be waived or marked as paid": "Solo la tasa de un recordatorio finalizado puede condonarse o marcarse como pagada",
   "fee open: {0}": "tasa pendiente: {0}",
@@ -6758,5 +6758,6 @@
   "Suggest favourites": "Sugerir favoritos",
   "While you have favourites, lists without a star send pushes only for @mentions, assignments, reminders and approvals. The News stay complete; a list bell set to All wins.": "Mientras tengas favoritos, las listas sin estrella solo envían avisos push por @menciones, asignaciones, recordatorios y aprobaciones. Las novedades siguen completas; una campana de lista en «Todo» tiene prioridad.",
   "After two weeks of much work in a list without a star, Kalmido asks once whether to add it to your favourites. It never sets a star by itself.": "Tras dos semanas de mucho trabajo en una lista sin estrella, Kalmido pregunta una vez si añadirla a tus favoritos. Nunca pone una estrella por sí solo.",
-  "You worked a lot in “{0}” these two weeks. Add it to your favourites?": "Has trabajado mucho en «{0}» estas dos semanas. ¿Añadirla a tus favoritos?"
+  "You worked a lot in “{0}” these two weeks. Add it to your favourites?": "Has trabajado mucho en «{0}» estas dos semanas. ¿Añadirla a tus favoritos?",
+  "{0} list changed": ["{0} lista cambiada", "{0} listas cambiadas"]
 }

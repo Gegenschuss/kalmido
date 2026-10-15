@@ -352,6 +352,9 @@ def settings_update():
             v = clean_setting(k, v)  # BadInput: 400, nothing stored
             if v is not None:
                 vals[k] = v
+    if "show_done_views" in vals:  # 2.46.1 (#1422): an own choice against a folder's "Hide completed" is marked
+        from ..lists.folders import lc_done_sync
+        lc_done_sync(c, me(), usettings(c, me()).get("show_done_views"), vals["show_done_views"])
     for k, v in vals.items():
         uset(c, me(), k, v)
     bump(c)

@@ -6235,7 +6235,7 @@
   "Unknown country code: {0} (two letters, ISO 3166-1, e.g. DE, AT, CH)": "Onbekende landcode: {0} (twee letters, ISO 3166-1, bijv. DE, AT, CH)",
   "valid country of the company (ISO code, now {0})": "geldig land van het bedrijf (ISO-code, nu {0})",
   "valid country of the client (ISO code, now {0})": "geldig land van de klant (ISO-code, nu {0})",
-  "Hide completed: for your own lists in this folder, at once for all of them (also with “Only new lists”). A list where you chose to show or hide completed yourself keeps that choice until “Completed: like the default” in its menu.": "Voltooide verbergen: voor je eigen lijsten in deze map, meteen voor allemaal (ook bij ‘Alleen nieuwe lijsten’). Een lijst waarin je zelf voltooide taken hebt getoond of verborgen, houdt die keuze tot ‘Voltooide: zoals standaard’ in het menu.",
+  "Hide completed: the default for your own lists in this folder, applied like the settings above (with “Only new lists” the existing lists keep what they show). Shared lists of others keep their setting. A list where you show or hide completed yourself differs from the folder until “Back to the folder” in its dialog.": "Voltooide verbergen: de standaard voor je eigen lijsten in deze map, toegepast zoals de instellingen hierboven (bij ‘Alleen nieuwe lijsten’ blijven de bestaande lijsten tonen wat ze tonen). Gedeelde lijsten van anderen houden hun instelling. Een lijst waarin je voltooide taken zelf toont of verbergt, wijkt af van de map tot ‘Terug naar de map’ in het venster ervan.",
   "Settled": "Afgehandeld",
   "Only the fee of a finalised reminder can be waived or marked as paid": "Alleen de kosten van een definitieve aanmaning kunnen worden kwijtgescholden of als betaald gemarkeerd",
   "fee open: {0}": "kosten open: {0}",
@@ -6758,5 +6758,6 @@
   "Suggest favourites": "Favorieten voorstellen",
   "While you have favourites, lists without a star send pushes only for @mentions, assignments, reminders and approvals. The News stay complete; a list bell set to All wins.": "Zolang je favorieten hebt, sturen lijsten zonder ster alleen pushmeldingen bij @vermeldingen, toewijzingen, herinneringen en goedkeuringen. Het nieuws blijft volledig; een lijstbel op ‘Alles’ gaat voor.",
   "After two weeks of much work in a list without a star, Kalmido asks once whether to add it to your favourites. It never sets a star by itself.": "Na twee weken veel werk in een lijst zonder ster vraagt Kalmido één keer of hij naar je favorieten moet. Kalmido zet nooit zelf een ster.",
-  "You worked a lot in “{0}” these two weeks. Add it to your favourites?": "Je hebt de afgelopen twee weken veel in ‘{0}’ gewerkt. Toevoegen aan je favorieten?"
+  "You worked a lot in “{0}” these two weeks. Add it to your favourites?": "Je hebt de afgelopen twee weken veel in ‘{0}’ gewerkt. Toevoegen aan je favorieten?",
+  "{0} list changed": ["{0} lijst gewijzigd", "{0} lijsten gewijzigd"]
 }

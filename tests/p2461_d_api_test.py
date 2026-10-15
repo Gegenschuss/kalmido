@@ -9,6 +9,10 @@
    only lists the agent sees, a team agent false; fav_quiet: a list without a star pushes no comment, an @mention still
    comes, a starred list pushes as before, the News stay complete; POST /api/favorites/suggestion offers a busy list once,
    never a starred / quiet list, fav_suggest 0 = none, agents 403; Ctrl+K order is client-side (p2461_d_ui.js)
+ - #1422: the folder default hide_done goes through folder_apply: "all" drops the owner's own choice of the lists and
+   counts the lists that change, an own choice against the folder marks the list (folder_own, "This list differs"), "Back
+   to the folder" drops it, "Only new lists" and "Not set" keep what each list shows, dry_run changes nothing, a shared list
+   of someone else keeps its setting
 usage: p2461_d_api_test.py <datadir>"""
 import json
 import os
@@ -251,6 +255,73 @@ check(Bo.patch(B + "/api/settings", json={"fav_asked": ""}).status_code in (200,
 Bo.patch(B + "/api/settings", json={"fav_suggest": "0"})
 dbx("UPDATE user_settings SET value='' WHERE user_id=? AND key='fav_asked'", (BOB,), write=True)
 check(Bo.post(B + "/api/favorites/suggestion", json={}).json().get("list_id") is None, "fav_suggest 0: no suggestion")
+
+# ================================================================== #1422 folder default "Hide completed"
+def views(s):
+    return json.loads(s.get(B + "/api/state").json()["settings"].get("show_done_views") or "{}")
+
+
+def own_of(s, lid):
+    return json.loads(next(l for l in s.get(B + "/api/state").json()["lists"] if l["id"] == lid).get("folder_own") or "[]")
+
+
+def shown(s, lid):
+    """What the web app shows (showDone / lmDoneDefault): the own choice, else the folder default, else the person's default."""
+    st = s.get(B + "/api/state").json()
+    v = json.loads(st["settings"].get("show_done_views") or "{}").get(f"l:{lid}")
+    if v is not None:
+        return bool(v)
+    lst = next(l for l in st["lists"] if l["id"] == lid)
+    eff, parts = {}, (lst.get("folder") or "").split("/")
+    for i in range(1, len(parts) + 1):
+        eff.update((st.get("folder_props") or {}).get("/".join(parts[:i])) or {})
+    if "hide_done" in eff:
+        return not eff["hide_done"]
+    return st["settings"].get("show_done_default") != "0"
+
+
+P1 = A.post(B + "/api/lists", json={"name": "Shoot", "folder": "Jobs", "org_id": ORG}).json()["id"]
+P2 = A.post(B + "/api/lists", json={"name": "Edit", "folder": "Jobs", "org_id": ORG}).json()["id"]
+BL = Bo.post(B + "/api/lists", json={"name": "Bob's job"}).json()["id"]
+Bo.put(B + f"/api/lists/{BL}/members", json={"user_id": ALICE, "role": "edit"})
+A.patch(B + f"/api/lists/{BL}", json={"folder": "Jobs"})  # bob's list sits in alice's folder (her own place for it)
+check(A.patch(B + "/api/settings", json={"show_done_views": json.dumps({f"l:{P2}": 1, f"l:{BL}": 1})}).ok, "setup: own choices")
+check(own_of(A, P2) == [], "an own choice without a folder default: nothing differs")
+r = A.put(B + "/api/folders/props", json={"folder": "Jobs", "props": {"hide_done": True}, "apply": "all", "dry_run": True})
+check(r.ok and r.json().get("changed") == 2 and views(A).get(f"l:{P2}") == 1 and shown(A, P1),
+      "dry_run: counts the 2 lists that would change, changes nothing " + r.text[:200])
+r = A.put(B + "/api/folders/props", json={"folder": "Jobs", "props": {"hide_done": True}, "apply": "all"})
+check(r.ok and r.json().get("changed") == 2, "all: the counter names the 2 lists that changed " + r.text[:200])
+check(not shown(A, P1) and not shown(A, P2) and f"l:{P2}" not in views(A), "all: both own lists hide completed, the own choice is gone")
+check(views(A).get(f"l:{BL}") == 1 and shown(A, BL), "a shared list of someone else keeps its setting")
+# an own choice against the folder: visible as "differs", until "Back to the folder"
+check(A.patch(B + "/api/settings", json={"show_done_views": json.dumps({**views(A), f"l:{P2}": 1})}).ok, "alice shows completed in Edit")
+check(own_of(A, P2) == ["hide_done"], "the own choice marks the list as differing " + str(own_of(A, P2)))
+fi = A.get(B + "/api/folders/props", params={"folder": "Jobs"}).json()
+check(any(x["id"] == P2 and x["own"] == ["hide_done"] for x in fi["lists"]), "the folder dialog knows the differing list")
+r = A.put(B + "/api/folders/props", json={"folder": "Jobs", "props": {"hide_done": True}, "apply": "all"})
+check(r.ok and any(x["id"] == P2 and x["own"] == ["hide_done"] for x in r.json()["lists"]) and shown(A, P2),
+      "all without force: the differing list keeps its choice and is named " + r.text[:200])
+check(A.patch(B + "/api/settings", json={"show_done_views": json.dumps({**views(A), f"l:{P2}": 0})}).ok and own_of(A, P2) == [],
+      "a choice equal to the folder: no longer differs")
+A.patch(B + "/api/settings", json={"show_done_views": json.dumps({**views(A), f"l:{P2}": 1})})
+r = A.post(B + f"/api/lists/{P2}/folder-reset", json={})
+check(r.ok and own_of(A, P2) == [] and f"l:{P2}" not in views(A) and not shown(A, P2), "Back to the folder: the folder hides completed again")
+# "Only new lists": the existing lists keep what they show, a new list follows the folder
+r = A.put(B + "/api/folders/props", json={"folder": "Jobs", "props": {"hide_done": False}, "apply": "new"})
+check(r.ok and not shown(A, P1) and not shown(A, P2), "Only new lists: the existing lists still hide completed")
+check(own_of(A, P1) == ["hide_done"], "Only new lists: an existing list now differs from the folder " + str(own_of(A, P1)))
+P3 = A.post(B + "/api/lists", json={"name": "Grade", "folder": "Jobs", "org_id": ORG}).json()["id"]
+check(shown(A, P3) and own_of(A, P3) == [], "a new list follows the folder (shows completed)")
+r = A.put(B + "/api/folders/props", json={"folder": "Jobs", "props": {"hide_done": False}, "apply": "all", "force": True})
+check(r.ok and r.json().get("changed") == 2 and shown(A, P1) and shown(A, P2) and own_of(A, P1) == [],
+      "all + force: the differing lists follow too " + r.text[:200])
+# "Not set" again: every list keeps what it shows
+A.patch(B + "/api/settings", json={"show_done_default": "0"})
+r = A.put(B + "/api/folders/props", json={"folder": "Jobs", "props": {"hide_done": None}, "apply": "all"})
+check(r.ok and shown(A, P1) and shown(A, P3), "Not set again: the lists keep showing completed (the person's default hides)")
+A.patch(B + "/api/settings", json={"show_done_default": "1"})
+check(json.loads(Bo.get(B + "/api/state").json()["settings"].get("show_done_views") or "{}") == {}, "bob's own settings are untouched")
 
 print(f"p2461_d_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 time.sleep(0.1)

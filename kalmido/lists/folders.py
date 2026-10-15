@@ -10,14 +10,14 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..core.access import Denied, need_collab
 from ..personal.timetrack import BadInput
 
 # 2.40.0 (#1373): agent_peers is no folder default any more (agents never address each other); a stored one is ignored
 FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_tidy", "agent_listen")  # 2.30.0 (#1034): agent_listen
-FOLDER_PROPS += ("hide_done",)  # 2.39.1 (#1214): "Hide completed" for the lists of the folder (the client applies it, see showDone)
+FOLDER_PROPS += ("hide_done",)  # 2.39.1 (#1214): "Hide completed" for the lists of the folder; 2.46.1 (#1422): a real default, see lc_done_*
 FOLDER_PROPS += ("agent_followup",)  # 2.41.0 (#1423): "Agent follows up" as a folder default (2.40 ignores the key)
 FOLDER_PROPS += ("time_tracking",)  # 2.41.0 (#1471): time tracking on / off for the lists of the folder (lists.time_tracking)
 FOLDER_APPLY = ("all", "new")
@@ -168,6 +168,16 @@ def folder_apply(c, lid, keys=None, force=False, dry=False):
                 if not dry:
                     listen_set_all(c, lid, bool(v))
                 changed += 1
+            elif k == "hide_done":  # 2.46.1 (#1422): the list follows the folder: the owner's own choice for it goes
+                views = lc_done_views(c, me())
+                prev = (getattr(g, "lc_done_prev", None) or {}).get(lid)
+                if prev is None:
+                    prev = lc_done_shown(c, me(), lid, lr["folder"], views)
+                if f"l:{lid}" in views and not dry:
+                    del views[f"l:{lid}"]
+                    lc_done_put(c, me(), views)
+                if prev == bool(v):  # it showed completed tasks and the folder hides them, or the other way round
+                    changed += 1
             elif k == "agent_tidy":
                 cur = c.execute("SELECT agent_tidy FROM lists WHERE id=?", (lid,)).fetchone()[0] or "off"
                 if cur == v:
@@ -288,6 +298,8 @@ def folder_props_put():
     props = {k: v for k, v in {**cur, **new}.items() if v is not None}
     dry = b.get("dry_run") is True
     out, changed = [], 0
+    if "hide_done" in new:  # 2.46.1 (#1422): what each list shows before the change (counted / kept below)
+        g.lc_done_prev = {r["id"]: lc_done_shown(c, me(), r["id"], r["folder"]) for r in folder_lists(c, me(), f)}
     if not dry:
         if props:
             c.execute("INSERT INTO folder_props(owner_id,folder,props,updated_at) VALUES(?,?,?,?) ON CONFLICT(owner_id,folder) "
@@ -297,6 +309,8 @@ def folder_props_put():
         if "agent_id" in new:  # 2.41.0 (#1420): the one agent of an older client = the folder's first agent (none: no agents)
             from ..lists.foldershare import sh_folder_agents_from_props
             sh_folder_agents_from_props(c, me(), f, new["agent_id"] or 0)
+    if "hide_done" in new and not dry and (apply == "new" or new["hide_done"] is None):
+        lc_done_keep(c, f)  # 2.46.1 (#1422): "Only new lists" / "Not set" again: the lists keep what they show
     if apply == "all":
         keys = [k for k in new if new[k] is not None]
         if dry:  # what would happen: the new values against every list; rolled back below, nothing stays
@@ -456,6 +470,8 @@ def lm_folder_keep(c, lid, keep=()):
         return
     diff = {x["key"] for x in lm_folder_changes(c, lid, r["folder"] or "")} | {k for k in keep if k not in LM_MOVE_KEYS}  # 2.40.0 (#1422)
     eff = folder_effective(c, r["owner_id"], r["folder"] or "")[0]
+    if lc_done_differs(c, me(), lid, eff):  # 2.46.1 (#1422): an own "Show / Hide completed" of the list
+        diff.add("hide_done")
     c.execute("UPDATE lists SET folder_own=? WHERE id=?", (json.dumps(sorted(k for k in diff if k in eff)), lid))
 
 
@@ -477,3 +493,71 @@ def lm_folder_preview(lid):
     need_list(c, lid, write=False)
     f = clean_folder(request.args.get("folder") or "", strict=False)
     return jsonify(changes=lm_folder_changes(c, lid, f))
+
+
+# ---- 2.46.1 (#1422): "Hide completed" (hide_done) as a real folder default for the owner's own lists. What a list shows is
+# the owner's own choice for it (user setting show_done_views, key "l:<id>"), else the folder default, else the person's
+# default (the client: showDone / lmDoneDefault). The folder applies through folder_apply like its other defaults: a list
+# that follows drops the owner's own choice; an own choice that differs from the folder marks the list (folder_own
+# "hide_done": "This list differs", "Back to the folder"); "Only new lists" and "Not set" again keep what each list shows.
+# Shared lists of others keep their own settings (only the owner's lists, as for every folder default).
+def lc_done_views(c, uid):
+    try:
+        d = json.loads(usettings(c, uid).get("show_done_views") or "{}")
+    except ValueError:
+        d = {}
+    return d if isinstance(d, dict) else {}
+
+
+def lc_done_put(c, uid, views):
+    uset(c, uid, "show_done_views", json.dumps(views, ensure_ascii=False, separators=(",", ":")))
+
+
+def lc_done_shown(c, uid, lid, folder, views=None):
+    """True when list lid of uid shows its completed tasks now."""
+    v = (lc_done_views(c, uid) if views is None else views).get(f"l:{lid}")
+    if v is not None:
+        return bool(int(v))
+    eff = folder_effective(c, uid, folder or "")[0]
+    if "hide_done" in eff:
+        return not eff["hide_done"]
+    return usettings(c, uid).get("show_done_default") != "0"
+
+
+def lc_done_differs(c, uid, lid, eff, views=None):
+    """The owner chose "Show / Hide completed" for list lid against the folder's default."""
+    v = (lc_done_views(c, uid) if views is None else views).get(f"l:{lid}")
+    return "hide_done" in eff and v is not None and bool(int(v)) == bool(eff["hide_done"])
+
+
+def lc_done_keep(c, folder):
+    """After the folder default changed without the lists following: every list of mine in it keeps what it showed before
+    (g.lc_done_prev) as its own choice; where that differs from the folder, the list is marked as differing."""
+    prev = getattr(g, "lc_done_prev", None) or {}
+    views = lc_done_views(c, me())
+    for r in folder_lists(c, me(), folder):
+        was = prev.get(r["id"])
+        if was is not None and f"l:{r['id']}" not in views and lc_done_shown(c, me(), r["id"], r["folder"], views) != was:
+            views[f"l:{r['id']}"] = int(was)
+    lc_done_put(c, me(), views)
+    for r in folder_lists(c, me(), folder):
+        eff = folder_effective(c, me(), r["folder"] or "")[0]
+        list_own_mark(c, r["id"], "hide_done", lc_done_differs(c, me(), r["id"], eff, views))
+
+
+def lc_done_sync(c, uid, old_raw, new_raw):
+    """The person changed their per-view choices (PATCH /api/settings show_done_views): a changed entry of an own list in a
+    folder with "Hide completed" marks the list as differing from the folder (or no longer)."""
+    try:
+        old, new = json.loads(old_raw or "{}"), json.loads(new_raw or "{}")
+    except ValueError:
+        return
+    if not isinstance(old, dict) or not isinstance(new, dict):
+        return
+    for k in {k for k in set(old) | set(new) if old.get(k) != new.get(k) and k.startswith("l:") and k[2:].isdigit()}:
+        r = c.execute("SELECT id, owner_id, folder FROM lists WHERE id=?", (int(k[2:]),)).fetchone()
+        if not r or r["owner_id"] != uid or not r["folder"]:
+            continue
+        eff = folder_effective(c, uid, r["folder"])[0]
+        if "hide_done" in eff:
+            list_own_mark(c, r["id"], "hide_done", lc_done_differs(c, uid, r["id"], eff, new))

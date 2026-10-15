@@ -3,6 +3,8 @@
 //   starred list above an unstarred one with the same match
 // - Settings > Appearance: the switches "Quieter pushes from lists without a star" (off) and "Suggest favourites" (on) save
 // - the suggestion: a busy list without a star is offered once in a message; its button sets the star, nothing is set alone
+// - #1422: showing completed in my list of a folder with "Hide completed" marks it at once ("This list differs", Back to
+//   the folder); the server marks it the same way
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -46,6 +48,20 @@ const sql = (q, args = []) => execFileSync('python3', [path.join(__dirname, 'dbx
   if (q) { q.checked = true; q.dispatchEvent(new w.Event('change', {bubbles: true})); }
   const st = await until(async () => { const s = (await call('GET', '/api/state')).settings; return s.fav_quiet === '1' && s; });
   check(st && st.fav_quiet === '1', '#1361: the switch saves fav_quiet');
+  w.close();
+
+  // #1422: an own choice against the folder's "Hide completed" is visible
+  await call('PUT', '/api/folders/props', {folder: 'Jobs', props: {hide_done: true}});
+  const J = (await call('POST', '/api/lists', {name: 'Shoot', folder: 'Jobs'})).id;
+  w = await boot({user: 'alice', hash: 'l/' + J}); d = w.document;
+  check(w.eval(`showDone('l:${J}')`) === false, '#1422: the folder hides completed in my list');
+  await w.eval(`setShowDone(true, 'l:${J}')`); await sleep(300);
+  check(w.eval(`JSON.parse(listById(${J}).folder_own || '[]').includes('hide_done')`), '#1422: the own choice marks the list at once');
+  check(/This list differs: Hide completed/.test(w.eval(`folderHintHtml(listById(${J}), ${J})`)), '#1422: the list dialog says it differs');
+  const fo = await until(async () => { const l = (await call('GET', '/api/state')).lists.find(x => x.id === J); return (l.folder_own || '').includes('hide_done') && l; });
+  check(!!fo, '#1422: the server marks it the same way');
+  await w.eval(`setShowDone(false, 'l:${J}')`); await sleep(300);
+  check(!w.eval(`JSON.parse(listById(${J}).folder_own || '[]').includes('hide_done')`), '#1422: the same value as the folder: no longer differs');
   w.close();
 
   // the suggestion: alice's own changes in "Busy project" on 6 days of the last two weeks

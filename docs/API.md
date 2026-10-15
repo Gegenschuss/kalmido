@@ -947,6 +947,12 @@ the list keeps them and they count as its own (*differs from the folder*). The a
 `GET /api/lists/{id}/folder-preview?folder=` names what would change (`changes: [{key, from, to}]`). The folder setting
 `hide_done` (*Hide completed*) is a default for the lists of the folder and its subfolders; the person's setting
 `show_done_default` (`"1"` show / `"0"` hide) holds for every view without its own choice.
+2.46.1 (#1422): `hide_done` works like the other folder defaults, for the owner's own lists (shared lists of others keep
+their setting). What a list shows is the owner's own choice for it (`show_done_views`, key `"l:<id>"`), else the folder
+default, else `show_done_default`. `apply: all` drops the own choice of every list that follows (`changed` counts the lists
+whose view changes; `dry_run` too); an own choice that differs from the folder marks the list (`folder_own` contains
+`hide_done`, *This list differs*) until `POST /api/lists/{id}/folder-reset`; `apply: new` and `hide_done: null` keep what each
+existing list shows (as its own choice).
 
 ## Playbook (2.39.0)
 

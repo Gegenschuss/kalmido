@@ -6235,7 +6235,7 @@
   "Unknown country code: {0} (two letters, ISO 3166-1, e.g. DE, AT, CH)": "Codice paese sconosciuto: {0} (due lettere, ISO 3166-1, ad es. DE, AT, CH)",
   "valid country of the company (ISO code, now {0})": "paese valido dell'azienda (codice ISO, ora {0})",
   "valid country of the client (ISO code, now {0})": "paese valido del cliente (codice ISO, ora {0})",
-  "Hide completed: for your own lists in this folder, at once for all of them (also with “Only new lists”). A list where you chose to show or hide completed yourself keeps that choice until “Completed: like the default” in its menu.": "Nascondi completate: per le tue liste in questa cartella, subito per tutte (anche con «Solo le nuove liste»). Una lista in cui hai scelto tu di mostrare o nascondere le completate mantiene la scelta fino a «Completate: come predefinito» nel suo menu.",
+  "Hide completed: the default for your own lists in this folder, applied like the settings above (with “Only new lists” the existing lists keep what they show). Shared lists of others keep their setting. A list where you show or hide completed yourself differs from the folder until “Back to the folder” in its dialog.": "Nascondi completate: l'impostazione predefinita per le tue liste in questa cartella, applicata come le impostazioni sopra (con «Solo nuove liste» le liste esistenti continuano a mostrare ciò che mostrano). Le liste condivise da altri mantengono la loro impostazione. Una lista in cui mostri o nascondi tu le completate si discosta dalla cartella fino a «Torna alla cartella» nella sua finestra.",
   "Settled": "Saldato",
   "Only the fee of a finalised reminder can be waived or marked as paid": "Solo la commissione di un sollecito finalizzato può essere condonata o segnata come pagata",
   "fee open: {0}": "commissione aperta: {0}",
@@ -6758,5 +6758,6 @@
   "Suggest favourites": "Suggerisci preferiti",
   "While you have favourites, lists without a star send pushes only for @mentions, assignments, reminders and approvals. The News stay complete; a list bell set to All wins.": "Finché hai dei preferiti, le liste senza stella inviano notifiche push solo per @menzioni, assegnazioni, promemoria e approvazioni. Le novità restano complete; una campanella della lista su «Tutto» ha la precedenza.",
   "After two weeks of much work in a list without a star, Kalmido asks once whether to add it to your favourites. It never sets a star by itself.": "Dopo due settimane di molto lavoro in una lista senza stella, Kalmido chiede una volta se aggiungerla ai preferiti. Non mette mai una stella da solo.",
-  "You worked a lot in “{0}” these two weeks. Add it to your favourites?": "Hai lavorato molto in «{0}» nelle ultime due settimane. Aggiungerla ai preferiti?"
+  "You worked a lot in “{0}” these two weeks. Add it to your favourites?": "Hai lavorato molto in «{0}» nelle ultime due settimane. Aggiungerla ai preferiti?",
+  "{0} list changed": ["{0} lista modificata", "{0} liste modificate"]
 }

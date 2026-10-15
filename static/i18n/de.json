@@ -6235,7 +6235,7 @@
   "Unknown country code: {0} (two letters, ISO 3166-1, e.g. DE, AT, CH)": "Unbekannter Ländercode: {0} (zwei Buchstaben, ISO 3166-1, z. B. DE, AT, CH)",
   "valid country of the company (ISO code, now {0})": "gültiges Land der Firma (ISO-Code, jetzt {0})",
   "valid country of the client (ISO code, now {0})": "gültiges Land des Kunden (ISO-Code, jetzt {0})",
-  "Hide completed: for your own lists in this folder, at once for all of them (also with “Only new lists”). A list where you chose to show or hide completed yourself keeps that choice until “Completed: like the default” in its menu.": "Erledigte ausblenden: gilt für deine eigenen Listen in diesem Ordner, sofort für alle (auch bei „Nur neue Listen“). Eine Liste, in der du Erledigte selbst ein- oder ausgeblendet hast, behält das, bis du in ihrem Menü „Erledigte: wie Standard“ wählst.",
+  "Hide completed: the default for your own lists in this folder, applied like the settings above (with “Only new lists” the existing lists keep what they show). Shared lists of others keep their setting. A list where you show or hide completed yourself differs from the folder until “Back to the folder” in its dialog.": "Erledigte ausblenden: die Vorgabe für deine eigenen Listen in diesem Ordner, angewendet wie die Einstellungen oben (bei „Nur neue Listen“ zeigen die vorhandenen Listen weiter, was sie zeigen). Geteilte Listen anderer behalten ihre Einstellung. Eine Liste, in der du Erledigte selbst ein- oder ausblendest, weicht vom Ordner ab, bis du in ihrem Dialog „Zurück auf Ordner“ wählst.",
   "Settled": "Erledigt",
   "Only the fee of a finalised reminder can be waived or marked as paid": "Nur die Gebühr einer festgeschriebenen Mahnung kann erlassen oder als bezahlt markiert werden",
   "fee open: {0}": "Gebühr offen: {0}",
@@ -6758,5 +6758,6 @@
   "Suggest favourites": "Favoriten vorschlagen",
   "While you have favourites, lists without a star send pushes only for @mentions, assignments, reminders and approvals. The News stay complete; a list bell set to All wins.": "Solange du Favoriten hast, schicken Listen ohne Stern Pushs nur noch bei @-Erwähnungen, Zuweisungen, Erinnerungen und Freigaben. Die Neuigkeiten bleiben vollständig; eine Listen-Glocke auf „Alle“ hat Vorrang.",
   "After two weeks of much work in a list without a star, Kalmido asks once whether to add it to your favourites. It never sets a star by itself.": "Nach zwei Wochen mit viel Arbeit in einer Liste ohne Stern fragt Kalmido einmal, ob sie zu deinen Favoriten soll. Einen Stern setzt Kalmido nie selbst.",
-  "You worked a lot in “{0}” these two weeks. Add it to your favourites?": "Du hast in den letzten zwei Wochen viel in „{0}“ gearbeitet. Zu deinen Favoriten hinzufügen?"
+  "You worked a lot in “{0}” these two weeks. Add it to your favourites?": "Du hast in den letzten zwei Wochen viel in „{0}“ gearbeitet. Zu deinen Favoriten hinzufügen?",
+  "{0} list changed": ["{0} Liste geändert", "{0} Listen geändert"]
 }
