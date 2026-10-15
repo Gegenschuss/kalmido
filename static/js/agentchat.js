@@ -6,7 +6,7 @@
 // 2.13.0 (#453, Fold screenshots): the side panel only where sidebar + list + panel fit (>= 1000 px); below (phones, an
 // unfolded Fold, tablets in portrait) the chat is a full page with Back. Decided again on every resize / rotation
 // (chatRelayout), keeping the draft, the focus and the newest message in view.
-const chatFull = () => isMobile() || innerWidth < 1000;
+const chatFull = () => isMobile() || innerWidth < 1000 || (typeof dw_chatMini === 'function' && dw_chatMini());  // 2.46.2 (#1719): the chat's own window (chatwin.js)
 let chatRelT = 0;
 function chatRelayout() {
   if (!S.booted || imeOn || !S.chat.aid) return;
@@ -644,7 +644,8 @@ function stepsChanged() {
 // 2.29.0 (#363): window <-> side panel, fold (window only)
 function chatWinBtns() {
   const fl = !!$('#achat.float');
-  return (fl ? `<button class="iconbtn" data-act="chat-min" title="${esc(tr('Fold'))}" aria-label="${esc(tr('Fold'))}" aria-expanded="true">${ic('chev', 's')}</button>` : '')
+  return (typeof dw_winBtn === 'function' ? dw_winBtn('agents', S.chat.aid) : '')  // 2.46.2 (#1719)
+    + (fl ? `<button class="iconbtn" data-act="chat-min" title="${esc(tr('Fold'))}" aria-label="${esc(tr('Fold'))}" aria-expanded="true">${ic('chev', 's')}</button>` : '')
     + `<button class="iconbtn" data-act="chat-dock" data-fl="${fl ? 0 : 1}" title="${esc(fl ? tr('Dock as side panel') : tr('Open as a window'))}" aria-label="${esc(fl ? tr('Dock as side panel') : tr('Open as a window'))}">${ic(fl ? 'panel' : 'expand', 's')}</button>`;
 }
 function chatInner(aid) {

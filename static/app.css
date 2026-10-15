@@ -6665,3 +6665,10 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
   .modal:not(.authscreen):not(.shopmode):not(.palette)>.card>:is(h3,.lhdr,.shdr),.modal:not(.authscreen):not(.shopmode):not(.palette)>.card>form>:is(h3,.lhdr){cursor:move}
   .modal>.card.dwdrag{transition:none;user-select:none}
 }
+
+/* 2.46.2 B (#1719) a chat in its own window (chatwin.js, /?mini=1#agents/<id> or #team/<id>): only the conversation */
+html.mini-chat #top,html.mini-chat .chback,html.mini-chat .tcback,html.mini-chat .tclist{display:none!important}
+html.mini-chat .tcview{grid-template-columns:minmax(0,1fr);border:0;border-radius:0;margin:0}
+html.mini-chat body.in-team #view{display:flex;flex-direction:column;overflow:hidden}
+html.mini-chat body.in-team .tcwrap{flex:1;min-height:0;display:flex;flex-direction:column}
+html.mini-chat body.in-team .tcview{flex:1;height:auto}
