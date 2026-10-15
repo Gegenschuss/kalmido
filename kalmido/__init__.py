@@ -148,6 +148,8 @@ ORDER = (
     "office.contacts_cl",  # 2.40.0 (#1380): contact persons of a client (no routes; used by team.clients, office.docs, legacyimport)
     "office.legacyimport",  # 2.39.1 (#1182): legacy import (clients / services / equipment from .xlsx, archive of old PDFs)
     "office.parts",  # 2.47.0 (#1215): parts of a quotation (Teilangebote): routes, title page calculation, invoice modes
+    "office.travel",  # 2.47.3 (#1022, part B): travel expenses (trips, receipts, evaluation, billing on)
+    "office.cashflow",  # 2.47.3 (#1652, part B): cash flow per month + fixed costs
     "team.approvals",
     "team.forms",
     "team.v1",

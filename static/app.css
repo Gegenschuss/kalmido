@@ -6847,3 +6847,37 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .jobtag{display:inline-flex;align-items:center;gap:.375rem;align-self:flex-start;padding:.0625rem .5rem;border-radius:62.5rem;background:color-mix(in srgb,var(--jcol) 16%,var(--bg3));color:var(--text);font-size:var(--fs-xs);line-height:1.5}
 .jobtag i{flex:0 0 auto;width:.5rem;height:.5rem;border-radius:50%;background:var(--jcol)}
 .jpart .jobtag i{background:color-mix(in srgb,var(--jcol) 65%,#fff)}
+/* 2.47.3 B (#1022, #1652): travel expenses and cash flow in the office */
+.rkbar select{min-height:2.25rem}
+.rkbadge{display:inline-block;min-width:1.25rem;padding:0 .3rem;border-radius:999px;background:var(--accent);color:var(--on-accent,#fff);font-size:.75rem;line-height:1.25rem;text-align:center}
+.rksum{font-variant-numeric:tabular-nums;white-space:nowrap}
+.rkmiss{color:var(--accent)}
+.rkhead{margin:.25rem 0 .75rem}.rkhead h3{margin:0 0 .25rem}.rkhead p{margin:.125rem 0}
+.rknote{white-space:pre-wrap}
+.rkits .rkit{display:flex;align-items:center;gap:.5rem}
+.rkits .rkit .ofcrow{flex:1;min-width:0}
+.rksel,.rkdatev{display:flex;align-items:center;min-height:2.75rem;white-space:nowrap}
+.rksel input,.rkdatev input{width:1.25rem;height:1.25rem}
+.rkppl{display:flex;flex-wrap:wrap;gap:.25rem .75rem}
+.rklab{min-width:8rem}
+.rktab,.rkcftab{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.rktab th,.rktab td,.rkcftab th,.rkcftab td{padding:.5rem .5rem;border-bottom:1px solid var(--line2);text-align:left}
+.rktab .num,.rkcftab .num{text-align:right;white-space:nowrap}
+.rktab tfoot th,.rkcftab tfoot th{border-bottom:0}
+@media (max-width:600px){.rkits .rkit{flex-wrap:wrap}.rkits .rkit .ofcrow{flex-basis:calc(100% - 2.5rem)}.rkdatev{margin-left:2rem}}
+.rkcfrange{white-space:nowrap}
+.rkcfms{display:grid;grid-template-columns:repeat(auto-fill,minmax(18rem,1fr));gap:.75rem;margin:.5rem 0}
+.rkcfm{border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);padding:.5rem .75rem}
+.rkcfm.cur{border-color:var(--accent)}
+.rkcfm header{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .5rem;min-height:2rem}
+.rkcfbal{font-variant-numeric:tabular-nums;white-space:nowrap}.rkcfbal.neg{color:var(--danger,#c0392b)}
+.rkcfbars{display:flex;flex-direction:column;gap:2px;margin:.25rem 0}
+.rkcfbars span{display:block;height:4px;border-radius:2px;transform-origin:left center;transition:transform .2s ease}
+.rkcfbin{background:var(--accent)}.rkcfbout{background:var(--accent);opacity:.35}
+.rkcftab td,.rkcftab th{padding:0 .25rem;vertical-align:middle}
+.rkcftab td .rkcfv{display:inline-flex;align-items:center;justify-content:flex-end;margin:0;min-height:2.75rem;min-width:4rem;padding:0 .25rem;background:none;border:0;color:var(--text);font:inherit;font-variant-numeric:tabular-nums;cursor:pointer;border-radius:var(--radius)}
+.rkcftab .rkcfv:hover,.rkcftab .rkcfv:focus-visible,.rkcftab .rkcfv[aria-expanded="true"]{color:var(--accent);text-decoration:underline}
+.rkcftab .rkcfv.plan{font-style:italic}
+.rkcftab td .rkcfz{min-width:0;cursor:default}
+.rkcftab th{font-weight:500}
+.rkcfents{margin-top:.25rem}.rkcfents .ofcrow{text-decoration:none}

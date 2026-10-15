@@ -51,12 +51,13 @@ function viewOffice() {
   const tab = ofcTab();
   if (OFC.tab !== tab) { OFC.tab = tab; OFC.q = ''; }  // the search belongs to one tab
   if (!OFC.info && !OFC.infoErr && !OFC.infoLoading) setTimeout(ofcInfo, 0);
-  const tabs = `<div class="seg ofctabs wrap" role="tablist" aria-label="${esc(tr('Office & finance'))}">${OFC_TABS.map(([k, i, n]) => `<button type="button" role="tab" data-go="office/${k}" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>`;
+  const tabs = `<div class="seg ofctabs wrap" role="tablist" aria-label="${esc(tr('Office & finance'))}">${OFC_TABS.filter(t => !t[3] || ofcAdmin()).map(([k, i, n]) => `<button type="button" role="tab" data-go="office/${k}" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>`;
   let body;
   if (OFC.infoErr) body = `<div class="empty nempty eact">${ic('building')}<span>${esc(OFC.infoErr)}</span><a class="btn" href="#settings">${tr('Settings')}</a></div>`;
   else if (!OFC.info) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
   else if (tab === 'offers') body = typeof ofdOffersTab === 'function' ? '' : `<div class="empty">${ic('receipt')}<span>${tr('Quotations arrive with the next step of this module.')}</span></div>`;
   else if (tab === 'settings') body = S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : ofcSettingsHtml();  // 2.39.1 (#1182): office/import
+  else if (typeof OFC_TABS.find(t => t[0] === tab)?.[4] === 'function') body = OFC_TABS.find(t => t[0] === tab)[4]();  // 2.47.3 (B, #1022 #1652): tabs of their own module, [3] = admins only
   else body = ofcListHtml(tab);
   const html = `<div class="dash office" data-ofctab="${tab}"><div class="ofchead">${OFC.info ? `<span class="muted ofcorg">${esc(OFC.info.settings?.company?.name || orgLabelOf(OFC.info.org_id))}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ''}</span>` : ''}</div>${tabs}<div class="ofcbody"${tab === 'offers' && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
   if (tab === 'offers' && OFC.info && typeof ofdOffersTab === 'function') setTimeout(() => { const el = $('.office .ofcbody'); if (el && ofcTab() === 'offers') ofdOffersTab(el); }, 0);
