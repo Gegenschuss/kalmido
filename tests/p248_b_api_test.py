@@ -334,6 +334,27 @@ check(Ca.put(B + "/api/docs/settings", json={"ws": f"org:{ORG}", "levels": {"sen
 check(Da.get(B + "/api/docs/settings", params={"ws": f"org:{ORG}"}).status_code == 404, "org settings: not for other organisations")
 check(Bo.put(B + "/api/docs/settings", json={"ws": f"org:{ORG}", "levels": {"sender": "rules"}}).ok, "org settings: the admin")
 check(upload(Da, [("x.pdf", text_pdf(["x"]), "application/pdf")], f"org:{ORG}").status_code == 404, "no upload into a foreign organisation")
+# 2.48.0 review (S1): a member files into the organisation's marked documents folder (never a second "Dokumente (2)"),
+# the document stays theirs; folders only as far as they see them
+RA = Bo.get(B + "/api/docs/settings", params={"ws": f"org:{ORG}"}).json()["root_id"]
+check(Bo.patch(B + f"/api/files/nodes/{RA}", json={"name": "Unterlagen"}).ok, "the admin renames the documents folder")
+r = upload(Ca, [("carol.pdf", text_pdf(["Carol Beleg Kreidefabrik", "Datum 07.10.2026"]), "application/pdf")], f"org:{ORG}")
+check(r.status_code == 201, f"carol (member) uploads into Alpha ({r.text[:120]})")
+DC = r.json()["ids"][0] if r.ok else 0
+dc = done(Ca, DC)
+check(dc and dc["parent_id"] == RA, f"carol's document lies in Alpha's documents folder ({dc and dc['parent_id']} vs {RA})")
+check(not dbx("SELECT 1 FROM fs_nodes WHERE org_id=? AND parent_id IS NULL AND id<>?", (ORG, RA)), "no second documents folder")
+check(dbx("SELECT owner_id FROM fs_nodes WHERE id=?", (DC,))[0][0] == CAROL, "the document stays carol's")
+check(DC in (ids_of(Bo) or []) and DC in (ids_of(Ca) or []) and DA not in (ids_of(Ca) or []), "bob (admin) sees it; carol still not bob's")
+fr = Bo.post(B + "/api/files/folders", json={"name": "Belege", "parent_id": RA}).json().get("id")
+check(Bo.patch(B + f"/api/docs/{DC}", json={"folder": fr}).ok and doc(Ca, DC).ok and (doc(Ca, DC).json()["folder"] or {}).get("id") == fr,
+      "the admin sorts carol's document into a folder of the documents folder; it stays hers")
+check([f["id"] for f in Ca.get(B + "/api/docs/settings", params={"ws": f"org:{ORG}"}).json()["folders"]] == [] and
+      fr in [f["id"] for f in Bo.get(B + "/api/docs/settings", params={"ws": f"org:{ORG}"}).json()["folders"]],
+      "settings: carol sees no folder she cannot open (L4), bob sees it")
+check(Ca.patch(B + f"/api/docs/{DC}", json={"folder": "Privatkram"}).status_code == 400 and
+      not dbx("SELECT 1 FROM fs_nodes WHERE name='Privatkram'"), "carol makes no folder in bob's documents folder")
+check(Ca.post(B + "/api/files/folders", json={"name": "X", "parent_id": RA}).status_code in (403, 404), "members add files there, not folders")
 ws_rows = {x[0] for x in dbx("SELECT DISTINCT ws FROM doc_meta")}
 check(ws_rows == {"u1", f"o{ORG}"}, f"documents keep their workspace ({ws_rows})")
 check(dbx("SELECT org_id FROM fs_nodes WHERE id=?", (DA,))[0][0] == ORG and dbx("SELECT org_id FROM fs_nodes WHERE id=?", (D1,))[0][0] is None,
