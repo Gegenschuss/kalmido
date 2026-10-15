@@ -37,7 +37,7 @@ async function clLoad() {
   try { const j = await api('GET', id ? `/api/clients/${id}${q}` : `/api/clients${q}`); if (seq === CLV.seq) { CLV.data = j; CLV.id = id; } }
   catch { if (seq === CLV.seq) { CLV.data = {error: true}; CLV.id = id; } }
   CLV.loading = false;
-  if (S.route.mod === 'clients' && seq === CLV.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, viewClients())); }
+  if (S.route.mod === 'clients' && seq === CLV.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); }
 }
 const clReload = () => { CLV.data = null; if (S.route.mod === 'clients') clLoad(); };
 function budgetBar(c) {

@@ -4064,7 +4064,6 @@
   "Gift ideas": "Idee regalo",
   "Add a gift idea": "Aggiungi un'idea regalo",
   "Used for": "Usata per",
-  "At home": "A casa",
   "Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children": "Compleanni, faccende di casa a turno, liste della spesa per reparto, menù settimanale, scadenze, liste per la valigia e account per bambini",
   "What do you use Kalmido for?": "Per cosa usi Kalmido?",
   "Child account": "Account bambino",
@@ -6689,5 +6688,18 @@
   "{0} task changes": ["cambia {0} attività", "cambiano {0} attività"],
   "Filter by this column…": "Filtra per questa colonna…",
   "Only {0}: {1}": "Solo {0}: {1}",
-  "Key figure on the project page…": "Indicatore nella pagina del progetto…"
+  "Key figure on the project page…": "Indicatore nella pagina del progetto…",
+  "Office|area": "Ufficio",
+  "Time|area": "Tempo",
+  "Review|area": "Riepilogo",
+  "Home|area": "Casa",
+  "Parts: {0}": "Parti: {0}",
+  "Office & finance (quotations, services, documents; needs an organisation), your contacts and the clients": "Ufficio e finanze (preventivi, servizi, documenti; richiede un'organizzazione), i tuoi contatti e i clienti",
+  "Time tracking on tasks with reports, and the focus timer; finished focus sessions can count as time entries": "Registrazione del tempo sulle attività con report e il timer di concentrazione; le sessioni concluse possono contare come voci di tempo",
+  "Your day and week in review with a private journal, and the statistics": "Il tuo giorno e la tua settimana in sintesi con un diario privato, e le statistiche",
+  "Home & life (contracts, devices, staying in touch, health, trips, read later) and family": "Casa e vita (contratti, dispositivi, restare in contatto, salute, viaggi, leggi dopo) e famiglia",
+  "Time tracking on tasks with reports, and the focus timer": "Registrazione del tempo sulle attività con report e il timer di concentrazione",
+  "Your contacts; clients and the office come with “Office & finance”": "I tuoi contatti; clienti e ufficio arrivano con «Ufficio e finanze»",
+  "Statistics, and your day and week in review with a private journal": "Statistiche, e il tuo giorno e la tua settimana in sintesi con un diario privato",
+  "Family (chores, shopping, meal plan, accounts for children) and Home & life (contracts, devices, health, trips)": "Famiglia (faccende, spesa, menu, account per bambini) e casa e vita (contratti, dispositivi, salute, viaggi)"
 }

@@ -60,7 +60,8 @@ async function quotaDialog(j) {
 // "New task" is there (tablets, an unfolded Fold in portrait)
 function fabSync() { const f = $('#fab'); if (f) f.classList.toggle('gone', fabOff() || S.multi.size > 0 || (!!$('#view .qdock') && (tabletDock() || !isMobile()))); }
 window.addEventListener('resize', () => { if (S.booted) requestAnimationFrame(fabSync); });
-const MODS = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus timer')], ['family', 'family', N_('Family')]];
+// 2.44.0 (#1187): the focus timer and family are tabs of their areas (Time, Home) now: areas.js, tab ids "a:<area>"
+const MODS = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Matrix')], ['habits', 'habit', N_('Habits')]];
 // tab bar / rail order is a server setting (same on every device), editable in the settings
 function navOrder() {
   const keys = MODS.map(m => m[0]);
@@ -77,9 +78,10 @@ const leadEmoji = n => (String(n ?? '').match(/^((?:\p{Extended_Pictographic}|\p
 // 2.24.0 (UX-36): the default bar is what one hand needs every day: Inbox, Today, Search and the lists (the drawer); modules
 // come in only when someone pins them (Settings > Appearance > Tab bar, or "Customize tab bar" under "More")
 const tabDefault = () => ['s:inbox', 's:today', 'search', 'lists'];
-const tabIds = () => LS.get('tabbar', null) || tabDefault();
+const tabIds = () => mg_tabIds(LS.get('tabbar', null)) || tabDefault();  // 2.44.0 (#1187): old module tabs -> their area
 function tabItem(id) {
   const [kind, ...rest] = id.split(':'), v = rest.join(':');
+  if (kind === 'a') return mg_tabItem(id);  // 2.44.0 (#1187)
   if (kind === 'm') {
     const md = MODS.find(x => x[0] === v);
     if (!md || (v !== 'tasks' && !feat(v))) return null;
@@ -113,7 +115,7 @@ const tabItems = () => tabIds().map(tabItem).filter(Boolean);
 function tabOn(items) {
   const r = S.route, exact = items.find(t => t.key && r.mod === 'tasks' && t.key === r.key);
   if (exact) return exact.id;
-  const m = items.find(t => t.mod && t.mod === r.mod && !(r.mod === 'tasks' && r.key === 'search'));
+  const m = items.find(t => t.mod && (t.mod === r.mod || (t.area && mg_areaOf(r.mod)?.[0] === t.area)) && !(r.mod === 'tasks' && r.key === 'search'));
   return m ? m.id : null;
 }
 // 1.5.3: the "g …" shortcuts in the tooltips of what they open
@@ -130,7 +132,7 @@ function tabOverflow() {
   const items = tabItems(), shown = items.length > TAB_MAX ? items.slice(0, TAB_MAX - 1) : items;
   const rest = items.slice(shown.length);
   const mods2 = mods().filter(([m]) => !items.some(t => t.mod === m)).map(([m]) => tabItem('m:' + m));
-  const misc = ['home', 'team', 'news', 'agents', 'overview', 'stats', 'time', 'office', 'search', 'settings'].filter(k => !items.some(t => t.id === k)).map(tabItem).filter(Boolean);
+  const misc = ['home', 'team', 'news', 'agents', 'overview', ...MG_IDS.map(x => 'a:' + x), 'search', 'settings'].filter(k => !items.some(t => t.id === k)).map(tabItem).filter(Boolean);
   // search + settings are also in the side menu: they alone do not justify a "Mehr" tab
   return {shown, more: rest.length || mods2.length ? [...rest, ...mods2, ...misc] : []};
 }
@@ -158,7 +160,7 @@ function tabsMore(anchor) {
   // the tab bar, set apart
   const grp = t => ['team', 'news', 'agents'].includes(t.id) ? 1 : ['search', 'settings'].includes(t.id) ? 2 : 0;
   const ord = [0, 1, 2].flatMap(g => [...(g === 1 ? [{head: tr('Conversations|nav')}] : g === 2 ? ['-'] : [{head: tr('Views')}]), ...more.filter(t => grp(t) === g)]);
-  menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head ? t : ({label: t.id === 'news' && S.news?.unread ? `${t.label} (${S.news.unread})` : t.label, icon: t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
+  menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head ? t : ({label: t.id === 'news' && S.news?.unread ? `${t.label} (${S.news.unread})` : t.label, icon: t.ico ? t.ico : t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
     fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.go)})), '-', {label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}]);
 }
 function counts() {
@@ -195,16 +197,17 @@ const SIDE_FOLDED = ['views', 'areas'];  // 2.39.1 (#1185): "Areas" folds like "
 // hidden: "g:<group>" or "e:<entry>"; the same on every device). "Lists" can be moved but not hidden.
 // 2.27.0 (#984): "Views" by default above the lists again (right below Plan, still folded); an own arrangement stays
 // 2.39.1 (#1185): "Views" (calendar-like ways to look at tasks) and "Areas" (the modules) instead of one grown list
-const SIDE_GROUPS = ['focus', 'views', 'areas', 'clients', 'lists', 'filters', 'tags', 'team'];
+// 2.44.0 (#1187): the clients are a tab of the area Office (no own group any more)
+const SIDE_GROUPS = ['focus', 'views', 'areas', 'lists', 'filters', 'tags', 'team'];
 const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Lists'), filters: N_('Filters'), tags: N_('Tags'), views: N_('Views'), areas: N_('Areas|nav'), team: N_('Conversations|nav')};
 const SIDE_VIEW_KEYS = ['cal', 'timeline', 'matrix', 'overview', 'workload'];
-const SIDE_AREA_KEYS = ['office', 'time', 'contacts', 'habits', 'pomo', 'review', 'stats', 'life', 'family', 'agents'];
+const SIDE_AREA_KEYS = ['office', 'time', 'habits', 'review', 'life', 'agents'];  // 2.44.0 (#1187): office, time, review, life = areas (areas.js)
 const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['stale', N_('Lying idle')], ['assigned', N_('My tasks')], ['byme', N_('Assigned by me')]];
 const sideModEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
   ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
   ['workload', N_('Workload'), workloadOn()], ['office', N_('Office & finance'), officeOn()], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()]].filter(x => x[2]);
 const sideViewEntries = () => SIDE_VIEW_KEYS.map(k => sideModEntries().find(x => x[0] === k)).filter(Boolean);
-const sideAreaEntries = () => SIDE_AREA_KEYS.map(k => sideModEntries().find(x => x[0] === k)).filter(Boolean);
+const sideAreaEntries = () => SIDE_AREA_KEYS.map(k => MG_IDS.includes(k) ? mg_sideEntry(k) : sideModEntries().find(x => x[0] === k)).filter(Boolean);
 function sidePref() {
   let o = {}; try { o = JSON.parse(S.settings?.sidebar || '{}') || {}; } catch { o = {}; }
   const order = Array.isArray(o.order) ? o.order : [], hidden = Array.isArray(o.hidden) ? o.hidden : [];
@@ -363,7 +366,7 @@ function renderSide() {
     agentsTab() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : ''].filter(h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return !m || !hid('e:' + (m[1] || m[2])) || S.route.mod === m[1]; });
   // 2.39.1 (#1185): split into "Views" and "Areas", each in its fixed order
   const modKey = h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return m ? m[1] || m[2] : ''; };
-  const modIn = keys => keys.map(x => modRows.find(h => modKey(h) === x) || '').join('');
+  const modIn = keys => keys.map(x => MG_IDS.includes(x) ? mg_sideRow(x, hid) : modRows.find(h => modKey(h) === x) || '').join('');  // 2.44.0 (#1187): one row per area
   const views = modIn(SIDE_VIEW_KEYS), areas = modIn(SIDE_AREA_KEYS);
   // Team: the people I share lists with (their tasks) and the agents (status dot; a click opens the chat)
   const ags = shownAgents(), ppl = teamPeople().slice(0, 12);
@@ -381,7 +384,6 @@ function renderSide() {
   // an unfolded Fold)
   const SB = {
     focus: `${grp('focus', tr('Plan|nav'), focus)}`,
-    clients: `${clientsSideHtml(onTasks)}`,
     lists: `<div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${S.listReorder ? `<div class="sreobar" role="group" aria-label="${esc(tr('Sort lists'))}"><span class="sreot"><b>${tr('Sort lists')}</b><small>${esc(tr('Drag by the handle on the left, or use “…”'))}</small></span><button type="button" class="btn sm pri" data-act="lists-reorder">${tr('Done')}</button></div>` : ''}${sideOpen('lists') || S.listReorder ? (lh && favListsHtml(lh, lists)) || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>`,
     filters: `${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine lists, dates, priorities, tags'))}`,
     tags: `${tags.length ? `<div class="sgroup"><button class="shead stoggle ${tagsOpen ? '' : 'closed'}" data-act="side-tags" aria-expanded="${tagsOpen}">${ic('chev', 's fcar')}<span class="spacer">${tr('Tags')}</span><span class="c">${tagsOpen ? '' : tags.length}</span></button>${tagsOpen ? tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join('') : ''}</div>` : ''}`,
@@ -435,6 +437,7 @@ function renderTop0() {
   const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload')};
   let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
+  if (mg_title(m) && !S.me?.kid) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below
   let acts = '';
   if (m === 'tasks' && (k.startsWith('l:') || k === 'inbox')) {
     const l = k === 'inbox' ? inbox() : listById(+k.slice(2));
@@ -749,22 +752,22 @@ function renderView0() {
   if (m === 'cal') { setHtml(el, viewCal()); requestAnimationFrame(calFit); }
   else if (m === 'matrix') setHtml(el, viewMatrix());
   else if (m === 'habits') setHtml(el, viewHabits());
-  else if (m === 'pomo') { setHtml(el, viewPomo()); loadPomoStats(); }
+  else if (m === 'pomo') { setHtml(el, mg_wrap(m, viewPomo())); loadPomoStats(); }
   else if (m === 'news') setHtml(el, viewNews());
-  else if (m === 'stats') setHtml(el, viewStats());
-  else if (m === 'time') setHtml(el, viewTime());
+  else if (m === 'stats') setHtml(el, mg_wrap(m, viewStats()));
+  else if (m === 'time') setHtml(el, mg_wrap(m, viewTime()));  // 2.44.0 (#1187): mg_wrap = the area's tabs on top
   else if (m === 'overview') setHtml(el, viewOverview());
   else if (m === 'agents') setHtml(el, viewAgents());
   else if (m === 'team') { setHtml(el, viewTeam()); if (S.tc.fitUntil > Date.now()) teamFit(true); }  // 2.17.0 (#419); 2.17.2: a room opened by its address ends at the newest message
   else if (m === 'notes') setHtml(el, viewNotes());  // 2.17.0 (#442)
   else if (m === 'home') setHtml(el, viewHome());  // 2.17.0 (#475)
-  else if (m === 'family') setHtml(el, viewFamily());  // 2.19.0 (#653)
-  else if (m === 'contacts') setHtml(el, viewContacts());  // 2.21.0 (#658)
-  else if (m === 'life') setHtml(el, viewLife());  // 2.22.0 (#663)
-  else if (m === 'review') setHtml(el, viewReview());
-  else if (m === 'clients') setHtml(el, viewClients());  // 2.23.0 (#463)
+  else if (m === 'family') setHtml(el, mg_wrap(m, viewFamily()));  // 2.19.0 (#653)
+  else if (m === 'contacts') setHtml(el, mg_wrap(m, viewContacts()));  // 2.21.0 (#658)
+  else if (m === 'life') setHtml(el, mg_wrap(m, viewLife()));  // 2.22.0 (#663)
+  else if (m === 'review') setHtml(el, mg_wrap(m, viewReview()));
+  else if (m === 'clients') setHtml(el, mg_wrap(m, viewClients()));  // 2.23.0 (#463)
   else if (m === 'workload') setHtml(el, viewWorkload());
-  else if (m === 'office') setHtml(el, viewOffice());  // 2.36.1 (#1021)
+  else if (m === 'office') setHtml(el, mg_wrap(m, viewOffice()));  // 2.36.1 (#1021)
   else if (S.route.key === 'search') setHtml(el, viewSearch());
   else if (S.route.key === 'done' || S.route.key === 'trash') setHtml(el, viewHistory());
   else if (S.route.key === 'archived') setHtml(el, viewArchived());

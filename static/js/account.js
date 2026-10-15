@@ -1227,20 +1227,25 @@ const PURPOSE_ALL = ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 's
 // the single modules to fine-tune. Collaboration + time tracking are the instance switches; the other modules
 // become the default of new users (the admin gets them too). "Skip" leaves everything on. All changeable later.
 const SETUP_MAIN = [['collab', N_('Collaboration'), N_('Share lists, assign tasks, @mentions, activity and News')],
-  ['time', N_('Time tracking'), N_('Timers and manual time entries on tasks, reports and CSV export')]];
+  ['a:time', N_('Time|area'), N_('Time tracking on tasks with reports, and the focus timer')]];  // 2.44.0 (#1187): the area Time
+// 2.44.0 (#1187): the areas offered here and the modules each one switches (Office: contacts here; clients and the office come
+// with the purpose "Office & finance", server PURPOSE_EXTRA); with a matching purpose only the modules the purpose holds
+const MG_SU_AREA = {'a:time': ['time', 'pomo'], 'a:review': ['review', 'stats'], 'a:life': ['family', 'contracts', 'home', 'care', 'health', 'travel', 'reading'], 'a:office': ['contacts']};
+const mg_suIn = (k, x) => MG_SU_AREA[x] ? MG_SU_AREA[x].some(p => PURPOSE_MODS[k].includes(p)) : PURPOSE_MODS[k].includes(x);
+const mg_suHas = (on, x) => MG_SU_AREA[x] ? MG_SU_AREA[x].some(p => on.has(p)) : on.has(x);
 const SETUP_MODS = [['cal', N_('Calendar'), N_('Month, week and day view of your tasks')], ['timeline', N_('Timeline'), N_('Tasks with start and end as bars over time')],
   ['events', N_('Events'), N_('Appointments in your own calendars next to the tasks, shared calendars, invitations, synced with the phone’s calendar')],
-  ['contacts', N_('Contacts'), N_('Your address books: contacts linked to tasks and events, birthdays, synced with the phone’s contacts')],
+  ['a:office', N_('Office|area'), N_('Your contacts; clients and the office come with “Office & finance”')],
   ['matrix', N_('Eisenhower matrix'), N_('Urgent and important in four quadrants')], ['kanban', N_('Kanban'), N_('Lists as boards with columns')],
-  ['habits', N_('Habits'), N_('Daily and weekly habits with streaks')], ['pomo', N_('Focus timer'), N_('Pomodoro timer and stopwatch')],
-  ['stats', N_('Statistics'), N_('Completions, on-time rate, focus time and streaks')], ['progress', N_('Project progress'), N_('Progress per list and the project status (“Where is it stuck?”)')],
+  ['habits', N_('Habits'), N_('Daily and weekly habits with streaks')],
+  ['a:review', N_('Review|area'), N_('Statistics, and your day and week in review with a private journal')], ['progress', N_('Project progress'), N_('Progress per list and the project status (“Where is it stuck?”)')],
   ['deps', N_('Dependencies'), N_('Tasks blocked by other tasks, with arrows in the timeline (Gantt)')], ['fields', N_('Custom fields'), N_('Own fields per list, such as budget, client or phase')],
   ['comments', N_('Comments'), N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News')],
-  ['family', N_('Family'), N_('Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children')]];
+  ['a:life', N_('Home|area'), N_('Family (chores, shopping, meal plan, accounts for children) and Home & life (contracts, devices, health, trips)')]];
 // 2.7.0 (K21, #405): a simple start for a new instance; one question "Start with" below. 2.19.0 (#653): the presets are the
 // answers to "What do you use Kalmido for?" (For me = the simple start, Family, Team, Software projects)
 const SETUP_PRESETS = Object.fromEntries(PURPOSES.map(([k, i, n, d]) => [k, {name: n, icon: i, desc: d,
-  off: [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(x => !PURPOSE_MODS[k].includes(x))}]));
+  off: [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(x => !mg_suIn(k, x))}]));
 // 2.25.0 (UX-19): the same count as Settings > Modules: what is picked here against every module (the ones not offered
 // here, such as Home & life or Clients, start off and are switched on later in Settings > Modules)
 function setupCount(picked) {
@@ -1263,8 +1268,8 @@ async function setupChoices(el, logo) {
   // 2.13.2 (#478 F12): step 2 shown again after a reload (setup still pending) starts from what is on now, not from
   // "Simple list" ("Start" would switch modules off again); a new account (all modules on = the default) keeps "Simple list"
   const fs0 = st.settings?.features;
-  if (typeof fs0 === 'string' && !all.filter(x => x !== 'family').every(x => fs0.split(',').includes(x))) {  // everything on = the untouched default (2.19.0: Family is off by default)
-    const on = new Set(fs0.split(',')); picked = new Set(all.filter(x => on.has(x) && (x !== 'collab' || st.collab_all !== false) && (x !== 'time' || st.time_all !== false)));
+  if (typeof fs0 === 'string' && !all.filter(x => x !== 'a:life' && x !== 'a:review').every(x => mg_suHas(new Set(fs0.split(',')), x))) {  // everything on = the untouched default (2.19.0: Family is off by default; 2.44.0: Home, and Review without the journal)
+    const on = new Set(fs0.split(',')); picked = new Set(all.filter(x => mg_suHas(on, x) && (x !== 'collab' || st.collab_all !== false) && (x !== 'a:time' || st.time_all !== false)));
     preset = Object.keys(SETUP_PRESETS).find(k => all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x))) || '';
   }
   // 2.7.0 (K21): one question "Start with": empty, the sample project, or a project of a built-in type (agency, software, personal)
@@ -1304,12 +1309,12 @@ async function setupChoices(el, logo) {
     if (b.dataset.suStart !== undefined) {
       start = b.dataset.suStart;
       // a project type needs its modules (agency: time tracking + custom fields, software: kanban + dependencies)
-      for (const m of {agency: ['time', 'fields'], software: ['kanban', 'deps']}[start] || []) picked.add(m);
+      for (const m of {agency: ['a:time', 'fields'], software: ['kanban', 'deps']}[start] || []) picked.add(m);
       draw(); return;
     }
     const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || tr('Error {0}', r.status)); };
     try {
-      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k)), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) ? {purpose: preset} : {}), ...(askOrg && ['team', 'software', 'office'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
+      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('a:time'), modules: [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(k => picked.has(k) && k !== 'collab').flatMap(k => MG_SU_AREA[k] ? MG_SU_AREA[k].filter(p => !matches(preset) || PURPOSE_MODS[preset].includes(p)) : [k]), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) ? {purpose: preset} : {}), ...(askOrg && ['team', 'software', 'office'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
       else return;
       location.replace('/');
     } catch (err) { $('#su-err', el).textContent = err.message || tr('Server not reachable.'); }

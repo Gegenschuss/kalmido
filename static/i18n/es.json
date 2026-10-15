@@ -4064,7 +4064,6 @@
   "Gift ideas": "Ideas de regalo",
   "Add a gift idea": "Añadir idea de regalo",
   "Used for": "Uso",
-  "At home": "En casa",
   "Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children": "Cumpleaños, tareas de casa por turnos, listas de la compra por secciones, menú semanal, plazos, listas de equipaje y cuentas para niños",
   "What do you use Kalmido for?": "¿Para qué usas Kalmido?",
   "Child account": "Cuenta infantil",
@@ -6689,5 +6688,18 @@
   "{0} task changes": ["cambia {0} tarea", "cambian {0} tareas"],
   "Filter by this column…": "Filtrar por esta columna…",
   "Only {0}: {1}": "Solo {0}: {1}",
-  "Key figure on the project page…": "Indicador en la página del proyecto…"
+  "Key figure on the project page…": "Indicador en la página del proyecto…",
+  "Office|area": "Oficina",
+  "Time|area": "Tiempo",
+  "Review|area": "Revisión",
+  "Home|area": "Hogar",
+  "Parts: {0}": "Partes: {0}",
+  "Office & finance (quotations, services, documents; needs an organisation), your contacts and the clients": "Oficina y finanzas (presupuestos, servicios, documentos; requiere una organización), tus contactos y los clientes",
+  "Time tracking on tasks with reports, and the focus timer; finished focus sessions can count as time entries": "Registro de tiempo en tareas con informes y el temporizador de enfoque; las sesiones de enfoque terminadas pueden contar como registros de tiempo",
+  "Your day and week in review with a private journal, and the statistics": "Tu día y tu semana en revisión con un diario privado, y las estadísticas",
+  "Home & life (contracts, devices, staying in touch, health, trips, read later) and family": "Hogar y vida (contratos, aparatos, mantener el contacto, salud, viajes, leer más tarde) y familia",
+  "Time tracking on tasks with reports, and the focus timer": "Registro de tiempo en tareas con informes y el temporizador de enfoque",
+  "Your contacts; clients and the office come with “Office & finance”": "Tus contactos; los clientes y la oficina llegan con «Oficina y finanzas»",
+  "Statistics, and your day and week in review with a private journal": "Estadísticas, y tu día y tu semana en revisión con un diario privado",
+  "Family (chores, shopping, meal plan, accounts for children) and Home & life (contracts, devices, health, trips)": "Familia (tareas del hogar, compras, menú, cuentas para niños) y hogar y vida (contratos, aparatos, salud, viajes)"
 }

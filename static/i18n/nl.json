@@ -4064,7 +4064,6 @@
   "Gift ideas": "Cadeau-ideeën",
   "Add a gift idea": "Cadeau-idee toevoegen",
   "Used for": "Gebruikt voor",
-  "At home": "Thuis",
   "Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children": "Verjaardagen, huishoudtaken om de beurt, boodschappenlijsten per afdeling, weekmenu, deadlines, paklijsten en accounts voor kinderen",
   "What do you use Kalmido for?": "Waarvoor gebruik je Kalmido?",
   "Child account": "Kinderaccount",
@@ -6689,5 +6688,18 @@
   "{0} task changes": ["{0} taak wijzigt", "{0} taken wijzigen"],
   "Filter by this column…": "Op deze kolom filteren…",
   "Only {0}: {1}": "Alleen {0}: {1}",
-  "Key figure on the project page…": "Kengetal op de projectpagina…"
+  "Key figure on the project page…": "Kengetal op de projectpagina…",
+  "Office|area": "Kantoor",
+  "Time|area": "Tijd",
+  "Review|area": "Terugblik",
+  "Home|area": "Thuis",
+  "Parts: {0}": "Onderdelen: {0}",
+  "Office & finance (quotations, services, documents; needs an organisation), your contacts and the clients": "Kantoor en financiën (offertes, diensten, documenten; vraagt een organisatie), je contacten en de klanten",
+  "Time tracking on tasks with reports, and the focus timer; finished focus sessions can count as time entries": "Tijdregistratie op taken met rapporten, en de focustimer; afgeronde focussessies kunnen als tijdregistratie tellen",
+  "Your day and week in review with a private journal, and the statistics": "Je dag en week in terugblik met een privédagboek, en de statistieken",
+  "Home & life (contracts, devices, staying in touch, health, trips, read later) and family": "Thuis en leven (contracten, apparaten, contact houden, gezondheid, reizen, later lezen) en gezin",
+  "Time tracking on tasks with reports, and the focus timer": "Tijdregistratie op taken met rapporten, en de focustimer",
+  "Your contacts; clients and the office come with “Office & finance”": "Je contacten; klanten en het kantoor komen met ‘Kantoor en financiën’",
+  "Statistics, and your day and week in review with a private journal": "Statistieken, en je dag en week in terugblik met een privédagboek",
+  "Family (chores, shopping, meal plan, accounts for children) and Home & life (contracts, devices, health, trips)": "Gezin (huishouden, boodschappen, menu, accounts voor kinderen) en thuis en leven (contracten, apparaten, gezondheid, reizen)"
 }
