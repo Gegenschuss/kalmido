@@ -21,7 +21,7 @@ from ..core.i18n import LANGS, tr
 
 
 # 2.48.0 (#1207): modules of 2.48 that are on for everyone once (features_rev 11)
-FEATS_2480 = ("files",)
+FEATS_2480 = ("files", "docs")  # 2.48.0 (#1207, #1111): the file store and the documents, on for everyone once
 
 
 def now_utc():

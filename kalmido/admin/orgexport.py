@@ -129,6 +129,11 @@ def _jdef(v):
 def _ox_dec_row(c, oid, table, row):
     """The row with every field the server encrypted with the organisation key in plain text (core/orgcrypt.py)."""
     from ..core.orgcrypt import oc_dec, oc_dec_row
+    if table.startswith("doc_") and row.get("ws"):  # 2.48.0 (#1111): documents seal with the workspace in the context (docs/store.py)
+        from ..docs.store import doc_open
+        for k, v in list(row.items()):
+            if isinstance(v, str) and v.startswith("kenc1:"):
+                row[k] = doc_open(c, row["ws"], f"{table}.{k}", v, default=None)
     row = oc_dec_row(c, oid, table, row)  # the protected columns (core/orgcrypt.py FIELDS; office_doc_items: cost from cost_enc)
     for k, v in list(row.items()):  # a second floor: any other value with the field prefix
         if isinstance(v, str) and v.startswith("kenc1:"):
@@ -228,6 +233,15 @@ OX_AREAS = (
     ("office/archive.json", "office_archive", "org_id=?"),
     ("office/import_runs.json", "office_import_runs", "org_id=?"),
     ("office/log.json", "office_doc_log", "org_id=?"),
+    # 2.48.0 (#1111): documents (recognised text, amounts, sender names and rules decrypted); not the learnt models, not the
+    # keyed word index (both are rebuilt from the documents), not the forwarding addresses (their token is a secret)
+    ("documents/meta.json", "doc_meta", "org_id=?"),
+    ("documents/senders.json", "doc_senders", "org_id=?"),
+    ("documents/types.json", "doc_types", "org_id=?"),
+    ("documents/tags.json", "doc_tags", "org_id=?"),
+    ("documents/document_tags.json", "doc_node_tags", "node_id IN (SELECT node_id FROM doc_meta WHERE org_id=?)"),
+    ("documents/rules.json", "doc_rules", "org_id=?"),
+    ("documents/settings.json", "doc_cfg", "org_id=?"),
 )
 OX_NOT_INCLUDED = (
     "private lists and private sharing of the members (lists without the organisation), other organisations",

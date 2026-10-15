@@ -54,8 +54,10 @@ function bootDone() {
     // 2.13.1 (#465): "Send to agent": with an agent to chat with, the share sheet asks where it goes (a new task stays the
     // default); the files + text then wait in that agent's chat box, ready to send
     const ags = agentsOn() ? (S.agents || []).filter(a => a.enabled) : [];
-    const dest = ags.length && (files.length || meta.text || meta.url || meta.title) ? await shareDest(ags) : 'task';
-    if (dest !== 'task') {
+    const docs = files.length && typeof dc_shareOk === 'function' && dc_shareOk();  // 2.48.0 (#1111): "File as document"
+    const dest = (ags.length || docs) && (files.length || meta.text || meta.url || meta.title) ? await shareDest(ags, docs) : 'task';
+    if (dest === 'doc') await dc_shareFiles(files);
+    else if (dest !== 'task') {
       const txt = [meta.title, meta.text, meta.url && !(meta.text || '').includes(meta.url) ? meta.url : ''].map(x => (x || '').trim()).filter(Boolean).join('\n');
       if (txt) S.drafts['chat:' + dest] = txt;
       S.chatFiles[dest] = files.slice(0, 10);

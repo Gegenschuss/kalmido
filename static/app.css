@@ -6860,7 +6860,92 @@ button.lnph:hover{border-color:var(--accent)}
   body.e2eprinting .e2eprint{display:block;color:#000;background:#fff;padding:2rem;font:12pt/1.5 sans-serif}
   .e2eprint h1{font-size:18pt;margin:0 0 .5rem}
   .e2eprint code{display:block;font:600 20pt/1.4 monospace;letter-spacing:.06em;margin:1.5rem 0;padding:1rem;border:1px solid #000;word-break:break-all}
+/* 2.48.0 B (#1111): documents -- the list as cards with a preview, filters, the drop zone, the document sheet, settings */
+.dc-view{position:relative;max-width:1100px;margin:0 auto;padding:0 .75rem 5rem}
+.dc-up{min-height:2.75rem}
+.dc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.75rem 0 .25rem}
+.dc-acts2{display:inline-flex;align-items:center;gap:.25rem;margin-left:auto}
+.dc-bar #dc-q{flex:1 1 14rem;min-height:2.75rem}
+.dc-seg button{min-height:2.5rem}
+.dc-count{display:inline-block;min-width:1.25rem;padding:0 .35rem;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:var(--fs-xs);text-align:center}
+.dc-filters{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.25rem 0 .5rem}
+.dc-filters select,.dc-filters input{min-height:2.5rem}
+.dc-range{display:inline-flex;align-items:center;gap:.35rem;color:var(--muted)}
+.dc-wait{display:flex;align-items:center;gap:.35rem}
+.dc-grid{list-style:none;margin:.5rem 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:.75rem}
+.dc-card>button{display:flex;flex-direction:column;width:100%;height:100%;padding:0;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);color:inherit;text-align:left;cursor:pointer;overflow:hidden}
+.dc-card>button:hover,.dc-card>button:focus-visible{border-color:var(--accent)}
+.dc-th{display:block;height:12rem;background:var(--bg3);overflow:hidden}
+.dc-th img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+.dc-ph{display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-height:6rem;color:var(--faint)}
+.dc-ph .i{width:2.5rem;height:2.5rem}
+.dc-ct{display:flex;flex-direction:column;gap:.2rem;padding:.5rem .6rem .6rem;min-width:0}
+.dc-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-mt{color:var(--muted);font-size:var(--fs-s)}
+.dc-tags{display:flex;flex-wrap:wrap;gap:.25rem}
+.dc-tag{padding:0 .4rem;border-radius:999px;background:var(--bg3);font-size:var(--fs-xs)}
+.dc-st{font-size:var(--fs-xs);color:var(--muted)}
+.dc-st.failed{color:var(--danger)}
+.dc-revdot{align-self:flex-start;padding:0 .4rem;border-radius:999px;background:var(--accent-soft);color:var(--text);font-size:var(--fs-xs)}
+.dc-drop{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:6rem;border:2px dashed var(--accent);border-radius:var(--r-l);background:color-mix(in srgb,var(--bg) 85%,transparent);opacity:0;pointer-events:none}
+.dc-view.dragging .dc-drop{opacity:1}
+.dc-drop span{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1rem;border-radius:var(--radius);background:var(--accent);color:var(--accent-ink)}
+@media (prefers-reduced-motion:no-preference){.dc-drop{transition:opacity .15s}.dc-card>button{transition:border-color .15s}}
+.dc-md .card{max-width:44rem;width:100%}
+.dc-top{display:flex;gap:.75rem;align-items:flex-start;margin:.25rem 0 .5rem}
+.dc-prev{flex:0 0 7rem;padding:0;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg3);overflow:hidden;cursor:zoom-in}
+.dc-prev img{display:block;width:100%}
+.dc-acts{display:flex;flex-wrap:wrap;gap:.4rem}
+.dc-acts .btn{min-height:2.5rem}
+.dc-state{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.25rem 0;color:var(--muted);font-size:var(--fs-s)}
+.dc-state.failed{color:var(--danger)}
+.dc-rev{display:flex;flex-direction:column;gap:.4rem;margin:.5rem 0;padding:.6rem .75rem;border:1px solid var(--accent);border-radius:var(--radius);background:var(--accent-soft)}
+.dc-sug{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
+.dc-revact{display:flex;justify-content:flex-end;gap:.5rem;flex-wrap:wrap}
+.dc-rev .btn,.dc-due .btn{min-height:2.5rem}
+.dc-due{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
+.dc-f{position:relative}
+.dc-f input,.dc-f select{min-height:2.5rem}
+.dc-auto{margin-left:.35rem;padding:.1rem .45rem;border:1px solid var(--line);border-radius:999px;background:var(--bg3);color:var(--muted);font-size:var(--fs-xs);cursor:pointer;white-space:nowrap}
+.dc-auto:hover,.dc-auto:focus-visible{border-color:var(--accent);color:var(--text)}
+.dc-amt{display:flex;gap:.35rem;flex:1}
+.dc-amt #dc-amount{flex:1;min-width:0}
+.dc-amt #dc-currency{flex:0 0 5rem;width:5rem}
+.dc-text pre{max-height:18rem;overflow:auto;white-space:pre-wrap;font-size:var(--fs-s);background:var(--bg3);padding:.5rem;border-radius:var(--r-s)}
+.dc-rules{list-style:none;margin:0;padding:0}
+.dc-rule{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--line)}
+.dc-mail code{word-break:break-all}
+@media (max-width:899px){
+  .dc-view{padding:0 .5rem 6rem}
+  .dc-grid{grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));gap:.5rem}
+  .dc-up span{display:none}
+  .dc-filters{display:grid;grid-template-columns:1fr 1fr}
+  .dc-filters select{width:100%}
+  .dc-range{justify-content:space-between}
+  .dc-range input{flex:1;min-width:0}
+  .dc-th{height:9.5rem}
+  .dc-top{flex-direction:column}
+  .dc-prev{flex-basis:auto;width:9rem}
 }
+
+/* 2.48.0 D (#1152) Paperless-ngx in the documents settings: connection, progress, the mapping of the preview */
+.pl-slot h4 { margin-top: 1.2rem; }
+.pl-conn { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .6rem; }
+.pl-url { font-family: var(--mono, monospace); font-size: .9em; overflow-wrap: anywhere; }
+.pl-err { color: var(--danger, #c0392b); margin: .3rem 0; }
+.pl-err:empty { display: none; }
+.pl-run { display: flex; align-items: center; gap: .6rem; margin: .5rem 0; }
+.pl-run > span { font-size: .9em; white-space: nowrap; }
+.pl-bar { flex: 1; height: 6px; border-radius: 3px; background: var(--line, rgba(127,127,127,.25)); overflow: hidden; }
+.pl-bar > i { display: block; height: 100%; background: var(--accent); transform-origin: left; transition: transform .2s ease; }
+.pl-sec { margin: .6rem 0; }
+.pl-sec > summary { cursor: pointer; min-height: 2.5rem; display: flex; align-items: center; gap: .4rem; }
+.pl-maps { list-style: none; margin: 0; padding: 0; }
+.pl-map { display: grid; grid-template-columns: 1fr auto 1fr; gap: .4rem; align-items: center; padding: .3rem 0; border-top: 1px solid var(--line, rgba(127,127,127,.2)); }
+.pl-map input:disabled { opacity: .5; }
+.pl-from { overflow-wrap: anywhere; }
+@media (max-width: 600px) { .pl-map { grid-template-columns: 1fr 1fr; } .pl-from { grid-column: 1 / -1; } }
+@media (prefers-reduced-motion: reduce) { .pl-bar > i { transition: none; } }
 /* 2.48.0 A (#1207) the file store "Ablage" (ablage.js): spaces on the left (a row of buttons on phones), the path, the list */
 .abview{display:grid;grid-template-columns:13rem minmax(0,1fr);gap:1rem;align-items:start;min-height:12rem;border-radius:var(--r,10px);transition:box-shadow .15s}
 .abview.abdrop{box-shadow:inset 0 0 0 2px var(--accent)}
@@ -6915,6 +7000,15 @@ button.lnph:hover{border-color:var(--accent)}
   .abrow .iconbtn{width:2.75rem;height:2.75rem}
 }
 @media (prefers-reduced-motion:reduce){.abview{transition:none}}
+
+/* 2.48.0 D (#1356) receipts in the document sheet: project, category, an agent's suggestion with Accept / Reject */
+.rc-slot { margin: .6rem 0; }
+.rc-slot:empty { display: none; }
+.rc-h { margin: .4rem 0; }
+.rc-sug { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .6rem;
+  border-radius: 8px; background: var(--accent-soft); margin-bottom: .5rem; }
+.rc-acts { display: flex; gap: .4rem; }
+.rc-acts .btn { min-height: 2.5rem; }
 /* 2.48.0 A (#1207) "Show in the file store" on file tiles: next to the remove button (shown like it: hover, always on touch) */
 .att .attlink{right:1.875rem}
 .att .attlink:only-of-type{right:.25rem}

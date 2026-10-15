@@ -1,0 +1,455 @@
+"""2.48.0 (#1152): the Paperless-ngx connection of a workspace and the import of its documents into the Kalmido documents.
+
+Self-hosted servers only (a hosted server answers 404 and the app shows nothing). One connection per workspace: an
+organisation's admins set it up for the organisation, a person for their own space (a freelancer without an organisation
+is their own admin, #1348). The documents go into the documents area of exactly that workspace (docs_ingest), never into
+another one. Only Paperless-ngx -> Kalmido: Kalmido only reads (GET), it never writes or deletes anything in Paperless-ngx.
+
+- The API token is sealed with the workspace's key (docs/store.py doc_seal) and never sent back to the app (only "set").
+  It only goes to the host it was entered for: the SSRF guard of the calendar subscriptions (public addresses; an internal
+  host only when an admin allowed it), no redirects, timeouts, MAX_FILE_MB per file.
+- Preview: number of documents, the tags / correspondents / document types with their counts and how they map (a tag ->
+  a tag | a folder of the documents | skipped; correspondent -> sender, document type -> type; names can be changed).
+- Import: in the background (one thread per server process, the state in pl_sources.run_*), stoppable, with progress.
+  What comes along: the original file, Paperless' text (no new recognition), the date, tags, correspondent, type, custom
+  fields + notes + archive serial number as text below the document's text. Nothing twice: pl_imported (Paperless id per
+  connection address) and the checksum of the file within the workspace.
+- Following (optional): every every_min minutes the newest documents come in (newest first, until a page holds nothing new).
+"""
+import hashlib
+import json
+import re
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import timedelta
+
+from ..core.config import app, MAX_FILE_MB
+from ..core.db import connect, iso, now_utc, parse_iso
+from ..core.i18n import N_, tr
+from ..core.pg import system_ctx
+from ..docs import store as S
+
+PL_TIMEOUT = 20               # s per request
+PL_API_VERSION = 5            # Accept: application/json; version=5 (custom fields, notes as a list)
+PL_PAGE = 50                  # documents per page of the import
+PL_LABEL_PAGES = 20           # pages of 100 tags / correspondents / types at most
+PL_JSON_MAX = 8 * 1024 * 1024
+PL_TOKEN_MAX = 400
+PL_EVERY = (15, 30, 60, 240, 1440)  # minutes between two looks for new documents
+PL_IDLE = 5                   # s the worker sleeps when there is nothing to do
+PL_STALE = 10                 # min without a heartbeat: a run that was cut off (restart) is taken up again
+PL_TEXT_MAX = 200_000
+_W = {"thread": None}
+_WAKE = threading.Event()
+_LOCK = threading.Lock()
+
+PL_ERR = {"key": N_("The API token is not set (or the server key changed): enter it again"),
+          "auth": N_("Paperless-ngx refused the API token"),
+          "network": N_("Paperless-ngx could not be reached"),
+          "redirect": N_("Paperless-ngx answered with a redirect: check the address"),
+          "answer": N_("Paperless-ngx sent an answer Kalmido does not understand: check the address"),
+          "too_large": N_("The file is larger than {0} MB"),
+          "owner": N_("The person who set up the connection can no longer import here"),
+          "quota": N_("The storage space is full: the import stopped"),
+          "failed": N_("The import stopped because of an error")}
+
+
+class PlError(Exception):
+    def __init__(self, code, detail=""):
+        super().__init__(code)
+        self.code, self.detail = code, str(detail)[:20]
+
+    def stored(self):
+        return self.code + (":" + self.detail if self.detail else "")
+
+
+def pl_err_text(stored):
+    """The readable text of a stored error code ('' stays '')."""
+    if not stored:
+        return ""
+    code = str(stored).partition(":")[0]
+    if code in PL_ERR:
+        return tr(PL_ERR[code], MAX_FILE_MB) if code == "too_large" else tr(PL_ERR[code])
+    from ..calendars.subscriptions import cal_err_text
+    return cal_err_text(stored)
+
+
+def _now():
+    return iso(now_utc())
+
+
+def pl_src(url):
+    """A short key of a Paperless-ngx address: the same document id of another instance is another document."""
+    return hashlib.sha256(str(url).lower().encode()).hexdigest()[:12]
+
+
+def pl_norm_url(u):
+    """https?://host[:port][/path] without /api at the end, or None."""
+    from ..calendars.subscriptions import cal_norm_url
+    u = cal_norm_url(u)
+    if not u or not u.lower().startswith(("http://", "https://")):
+        return None
+    p = urllib.parse.urlsplit(u)
+    if p.query or p.fragment or p.username or p.password or not p.hostname:
+        return None
+    u = u.rstrip("/")
+    if u.lower().endswith("/api"):
+        u = u[:-4]
+    return u
+
+
+def pl_row(c, ws):
+    return c.execute("SELECT * FROM pl_sources WHERE ws=?", (ws,)).fetchone()
+
+
+def pl_token(c, r):
+    return S.doc_open(c, r["ws"], "pl_sources.token", r["token"]) if r["token"] else ""
+
+
+def pl_mapping(c, r):
+    m = S._jopen(c, r["ws"], "pl_sources.mapping", r["mapping"], {}) if r and r["mapping"] else {}
+    return {k: (m.get(k) if isinstance(m.get(k), dict) else {}) for k in ("tags", "senders", "types")}
+
+
+# ---- HTTP ---------------------------------------------------------------------------------------------------------------
+def pl_get(c, url, token, path, raw=False, limit=PL_JSON_MAX):
+    """GET url + path from Paperless-ngx with the token. JSON (raw: (bytes, content type, file name)). Raises PlError."""
+    from ..calendars.subscriptions import _cal_opener, cal_allow, CalError
+    if not token:
+        raise PlError("key")
+    hdr = {"Authorization": f"Token {token}", "Accept": f"application/json; version={PL_API_VERSION}"}
+    if raw:
+        hdr["Accept"] = "*/*"
+    req = urllib.request.Request(url + path, headers=hdr, method="GET")
+    try:
+        with _cal_opener(cal_allow(c)).open(req, timeout=PL_TIMEOUT) as resp:
+            if not raw and resp.headers.get("Content-Length", "").isdigit() and int(resp.headers["Content-Length"]) > limit:
+                raise PlError("answer")
+            data = resp.read(limit + 1)
+            if len(data) > limit:
+                raise PlError("too_large" if raw else "answer")
+            if raw:
+                cd = resp.headers.get("Content-Disposition") or ""
+                m = re.search(r"filename\*=UTF-8''([^;]+)", cd) or re.search(r'filename="?([^";]+)"?', cd)
+                name = urllib.parse.unquote(m.group(1)) if m else ""
+                return data, (resp.headers.get("Content-Type") or "").split(";")[0].strip(), name
+            try:
+                return json.loads(data or b"null")
+            except ValueError:
+                raise PlError("answer") from None
+    except urllib.error.HTTPError as e:
+        e.close()
+        raise PlError("auth" if e.code in (401, 403) else "redirect" if 300 <= e.code < 400 else "http", e.code) from None
+    except urllib.error.URLError as e:
+        raise PlError(e.reason.code if isinstance(e.reason, CalError) else "network") from None
+    except CalError as e:
+        raise PlError(e.code) from None
+    except PlError:
+        raise
+    except (OSError, ValueError):
+        raise PlError("network") from None
+
+
+def pl_check(c, url, token):
+    """A quick look whether address + token work (raises PlError)."""
+    j = pl_get(c, url, token, "/api/documents/?page_size=1")
+    if not isinstance(j, dict) or "count" not in j:
+        raise PlError("answer")
+    return int(j.get("count") or 0)
+
+
+def pl_labels(c, url, token, kind):
+    """All tags / correspondents / document_types / custom_fields: [{id, name, count}]."""
+    out, page = [], 1
+    while page <= PL_LABEL_PAGES:
+        j = pl_get(c, url, token, f"/api/{kind}/?page_size=100&page={page}")
+        if not isinstance(j, dict) or not isinstance(j.get("results"), list):
+            raise PlError("answer")
+        for x in j["results"]:
+            if isinstance(x, dict) and isinstance(x.get("id"), int):
+                out.append({"id": x["id"], "name": str(x.get("name") or "")[:S.NAME_MAX],
+                            "count": int(x.get("document_count") or 0) if str(x.get("document_count") or "0").isdigit() else 0})
+        if not j.get("next"):
+            break
+        page += 1
+    return out
+
+
+def _map_default(kind, lid, name):
+    return {"to": "tag", "name": name} if kind == "tags" else name
+
+
+def pl_preview(c, r):
+    """What an import would bring: count, already imported, the labels with their mapping."""
+    url, tok = r["url"], pl_token(c, r)
+    count = pl_check(c, url, tok)
+    mp = pl_mapping(c, r)
+    out = {"count": count, "already": c.execute("SELECT COUNT(*) FROM pl_imported WHERE ws=? AND src=?", (r["ws"], pl_src(url))).fetchone()[0]}
+    for kind, key in (("tags", "tags"), ("correspondents", "senders"), ("document_types", "types")):
+        rows = []
+        for x in pl_labels(c, url, tok, kind):
+            m = mp[key].get(str(x["id"]))
+            if key == "tags":
+                m = m if isinstance(m, dict) and m.get("to") in ("tag", "folder", "skip") else {"to": "tag", "name": x["name"]}
+                rows.append({**x, "to": m["to"], "target": str(m.get("name") or x["name"])[:S.NAME_MAX]})
+            else:
+                rows.append({**x, "to": "skip" if m == "" else "keep", "target": (m if isinstance(m, str) and m else x["name"])[:S.NAME_MAX]})
+        out[key] = rows
+    return out
+
+
+def pl_clean_mapping(d):
+    """{tags: {id: {to, name}}, senders: {id: name|''}, types: {id: name|''}} from the app (unknown parts dropped)."""
+    out = {"tags": {}, "senders": {}, "types": {}}
+    if not isinstance(d, dict):
+        return out
+    for k, v in (d.get("tags") or {}).items() if isinstance(d.get("tags"), dict) else ():
+        if str(k).isdigit() and isinstance(v, dict) and v.get("to") in ("tag", "folder", "skip"):
+            out["tags"][str(k)] = {"to": v["to"], "name": str(v.get("name") or "").strip()[:S.NAME_MAX]}
+    for key in ("senders", "types"):
+        for k, v in (d.get(key) or {}).items() if isinstance(d.get(key), dict) else ():
+            if str(k).isdigit() and isinstance(v, str):
+                out[key][str(k)] = v.strip()[:S.NAME_MAX]
+    return out
+
+
+# ---- one document -------------------------------------------------------------------------------------------------------
+def _doc_text(doc, notes, fields):
+    """Paperless' text + custom fields + notes + archive serial number (labelled, below the text)."""
+    parts = [str(doc.get("content") or "").strip()]
+    extra = []
+    if doc.get("archive_serial_number") not in (None, ""):
+        extra.append(f"{tr('Archive serial number')}: {doc['archive_serial_number']}")
+    for f in doc.get("custom_fields") or []:
+        if isinstance(f, dict) and f.get("value") not in (None, "", []):
+            extra.append(f"{fields.get(f.get('field'), tr('Field'))}: {f['value']}")
+    if extra:
+        parts.append("\n".join(extra))
+    if notes:
+        parts.append(tr("Notes") + ":\n" + "\n".join(f"- {n}" for n in notes))
+    return "\n\n".join(p for p in parts if p)[:PL_TEXT_MAX]
+
+
+def _notes(c, r, tok, doc):
+    n = doc.get("notes")
+    if isinstance(n, list):
+        return [str(x.get("note") or "").strip() for x in n if isinstance(x, dict) and str(x.get("note") or "").strip()][:200]
+    if isinstance(n, int) and n > 0:
+        j = pl_get(c, r["url"], tok, f"/api/documents/{int(doc['id'])}/notes/")
+        j = j.get("results") if isinstance(j, dict) else j
+        return [str(x.get("note") or "").strip() for x in (j or []) if isinstance(x, dict) and str(x.get("note") or "").strip()][:200]
+    return []
+
+
+def _day(v):
+    v = str(v or "")[:10]
+    return v if re.fullmatch(r"\d{4}-\d{2}-\d{2}", v) else None
+
+
+def pl_import_doc(c, r, uid, tok, doc, labels, fields):
+    """One Paperless document into the documents of r's workspace. Returns 'new' | 'skip' | 'dup'. Raises PlError."""
+    from ..docs.ingest import docs_ingest
+    ws, src, pid = r["ws"], pl_src(r["url"]), int(doc["id"])
+    if c.execute("SELECT 1 FROM pl_imported WHERE ws=? AND src=? AND pl_id=?", (ws, src, pid)).fetchone():
+        return "skip"
+    data, mime, fname = pl_get(c, r["url"], tok, f"/api/documents/{pid}/download/?original=true", raw=True,
+                               limit=MAX_FILE_MB * 1024 * 1024)
+    sha = hashlib.sha256(data).hexdigest()
+    asn = doc.get("archive_serial_number") if isinstance(doc.get("archive_serial_number"), int) else None
+    same = c.execute("SELECT node_id FROM pl_imported WHERE ws=? AND sha256=? AND node_id IS NOT NULL LIMIT 1", (ws, sha)).fetchone() or \
+        c.execute("""SELECT n.id FROM fs_versions v JOIN fs_nodes n ON n.id=v.node_id AND n.cur_version=v.no AND n.deleted_at IS NULL
+                     JOIN doc_meta d ON d.node_id=n.id AND d.ws=? WHERE v.sha256=? LIMIT 1""", (ws, sha)).fetchone()
+    if same:
+        c.execute("INSERT INTO pl_imported(ws,src,pl_id,org_id,node_id,sha256,asn,dup,created_at) VALUES(?,?,?,?,?,?,?,1,?) "
+                  "ON CONFLICT DO NOTHING", (ws, src, pid, r["org_id"], same[0], sha, asn, _now()))
+        return "dup"
+    mp = pl_mapping(c, r)
+    tags, folder = [], None
+    for t in doc.get("tags") or []:
+        m = mp["tags"].get(str(t)) or {"to": "tag", "name": labels["tags"].get(t, "")}
+        name = (m.get("name") or labels["tags"].get(t, "")).strip()
+        if not name or m.get("to") == "skip":
+            continue
+        if m.get("to") == "folder":
+            folder = folder or name
+        elif name not in tags:
+            tags.append(name)
+    meta = {"ext_id": f"pl:{src}:{pid}", "date": _day(doc.get("created_date") or doc.get("created")), "tags": tags,
+            "text": _doc_text(doc, _notes(c, r, tok, doc), fields)}
+    for key, kind, field in (("senders", "correspondents", "correspondent"), ("types", "document_types", "document_type")):
+        lid = doc.get(field)
+        if isinstance(lid, int):
+            m = mp[key].get(str(lid))
+            name = labels[kind].get(lid, "") if m is None else m
+            if name:
+                meta["sender" if key == "senders" else "type"] = name
+    title = str(doc.get("title") or "").strip()
+    orig = str(doc.get("original_file_name") or fname or "").strip()
+    ext = ("." + orig.rsplit(".", 1)[1][:8]) if "." in orig else (".pdf" if mime == "application/pdf" else "")
+    name = (title + ext if title and not title.lower().endswith(ext.lower()) else title) or orig or f"paperless-{pid}{ext}"
+    nid = docs_ingest(c, uid, r["org_id"], name[:200], data, mime or None, "paperless", meta)
+    if folder:
+        node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+        fid = S.folder_by_name(c, node, uid, folder)
+        if fid:
+            S.move_to_folder(c, node, fid)
+    c.execute("INSERT INTO pl_imported(ws,src,pl_id,org_id,node_id,sha256,asn,dup,created_at) VALUES(?,?,?,?,?,?,?,0,?) "
+              "ON CONFLICT DO NOTHING", (ws, src, pid, r["org_id"], nid, sha, asn, _now()))
+    return "new"
+
+
+# ---- the run ------------------------------------------------------------------------------------------------------------
+def pl_may_import(c, uid, org_id):
+    """May uid (still) import into this workspace: an organisation's admin / the person themself."""
+    u = c.execute("SELECT disabled FROM users WHERE id=?", (uid,)).fetchone() if uid else None
+    if not u or u["disabled"]:
+        return False
+    from ..agents.core import is_agent
+    if is_agent(c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()):
+        return False
+    if org_id:
+        from ..accounts.orgs import is_org_admin
+        return bool(is_org_admin(c, uid, org_id))
+    return True
+
+
+def _set(c, sid, **kw):
+    kw["run_beat"] = _now()
+    c.execute("UPDATE pl_sources SET " + ", ".join(f"{k}=?" for k in kw) + " WHERE id=?", (*kw.values(), sid))
+
+
+def _stopped(c, sid):
+    r = c.execute("SELECT run_state FROM pl_sources WHERE id=?", (sid,)).fetchone()
+    return not r or r[0] == "stop"
+
+
+def pl_run(c, sid):
+    """One import run of connection sid (claimed: run_state 'busy'). kind 'all' = every document (oldest first), 'new' =
+    newest first until a page holds nothing new. Commits after every document."""
+    from ..admin.hosting import QuotaExceeded
+    from ..core.access import Denied
+    from ..docs.ingest import docs_kick as kick
+    r = c.execute("SELECT * FROM pl_sources WHERE id=?", (sid,)).fetchone()
+    uid = r["run_by"]
+    if not pl_may_import(c, uid, r["org_id"]):
+        _set(c, sid, run_state="", run_error="owner", follow=0, error="owner")
+        c.commit()
+        return
+    tok = pl_token(c, r)
+    counts = {"new": 0, "skip": 0, "dup": 0, "fail": 0, "done": 0}
+    try:
+        labels = {k: {x["id"]: x["name"] for x in pl_labels(c, r["url"], tok, k)} for k in ("tags", "correspondents", "document_types")}
+        fields = {x["id"]: x["name"] for x in pl_labels(c, r["url"], tok, "custom_fields")}
+        order = "id" if r["run_kind"] == "all" else "-id"
+        page, stop = 1, False
+        while not stop:
+            j = pl_get(c, r["url"], tok, f"/api/documents/?ordering={order}&page_size={PL_PAGE}&page={page}")
+            if not isinstance(j, dict) or not isinstance(j.get("results"), list):
+                raise PlError("answer")
+            if page == 1 and r["run_kind"] == "all":
+                _set(c, sid, run_total=int(j.get("count") or 0))
+                c.commit()
+            fresh = 0
+            for doc in j["results"]:
+                if not isinstance(doc, dict) or not isinstance(doc.get("id"), int):
+                    continue
+                if _stopped(c, sid):
+                    stop = True
+                    break
+                try:
+                    with c.savepoint():
+                        res = pl_import_doc(c, r, uid, tok, doc, labels, fields)
+                except PlError as e:
+                    if e.code in ("auth", "network", "key", "blocked"):
+                        raise
+                    res = "fail"
+                except (Denied, ValueError, QuotaExceeded) as e:
+                    print("paperless: document refused", doc.get("id"), type(e).__name__, flush=True)
+                    res = "fail"
+                    if isinstance(e, QuotaExceeded):
+                        counts["fail"] += 1
+                        raise PlError("quota") from None
+                counts[res if res in counts else "fail"] += 1
+                counts["done"] += 1
+                fresh += res == "new"
+                _set(c, sid, run_done=counts["done"], run_new=counts["new"], run_skip=counts["skip"] + counts["dup"], run_fail=counts["fail"])
+                c.commit()
+                if res == "new":
+                    kick()
+            if not j.get("next") or (r["run_kind"] != "all" and not fresh):
+                break
+            page += 1
+        _set(c, sid, run_state="", synced_at=_now(), error="", run_error="")
+    except PlError as e:
+        c.rollback()
+        _set(c, sid, run_state="", run_error=e.stored(), error=e.stored(), synced_at=_now())
+    c.commit()
+
+
+def pl_claim(c):
+    """The id of a connection whose run this process takes now (queued, a run cut off, a follow that is due), or None."""
+    stale = iso(now_utc() - timedelta(minutes=PL_STALE))
+    c.execute("UPDATE pl_sources SET run_state='queued' WHERE run_state='busy' AND (run_beat IS NULL OR run_beat < ?)", (stale,))
+    c.execute("UPDATE pl_sources SET run_state='' WHERE run_state='stop' AND (run_beat IS NULL OR run_beat < ?)", (stale,))
+    for r in c.execute("SELECT id, every_min, synced_at, created_by FROM pl_sources WHERE follow=1 AND run_state='' AND token<>''").fetchall():
+        last = parse_iso(r["synced_at"]) if r["synced_at"] else None
+        if not last or now_utc() - last >= timedelta(minutes=int(r["every_min"] or 15)):
+            c.execute("UPDATE pl_sources SET run_state='queued', run_kind='new', run_by=?, run_total=0, run_done=0, run_new=0, run_skip=0, "
+                      "run_fail=0, run_error='', run_beat=? WHERE id=? AND run_state=''", (r["created_by"], _now(), r["id"]))
+    x = c.execute("""UPDATE pl_sources SET run_state='busy', run_beat=? WHERE id=(SELECT id FROM pl_sources WHERE run_state='queued'
+                     ORDER BY run_beat, id LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING id""", (_now(),)).fetchone()
+    c.commit()
+    return x[0] if x else None
+
+
+def pl_run_once():
+    c = connect()
+    try:
+        with system_ctx(c):  # paperless worker: the import of every workspace's connection; the right of run_by is checked in pl_run
+            sid = pl_claim(c)
+            if not sid:
+                return 0
+            try:
+                pl_run(c, sid)
+            except Exception as e:  # noqa: BLE001 -- the worker never dies on one run
+                c.rollback()
+                print("paperless: run", sid, type(e).__name__, e, flush=True)
+                _set(c, sid, run_state="", run_error="failed", error="failed")
+                c.commit()
+        return 1
+    finally:
+        c.close()
+
+
+def _loop():
+    from ..accounts.session import GATE
+    time.sleep(1)
+    while True:
+        n = 0
+        try:
+            with GATE.bg():
+                n = pl_run_once()
+        except Exception as e:  # noqa: BLE001 -- the worker never dies
+            print("paperless: worker", type(e).__name__, e, flush=True)
+        if not n:
+            _WAKE.wait(PL_IDLE)
+            _WAKE.clear()
+
+
+def pl_kick():
+    """Wake the worker (start it when it does not run yet)."""
+    with _LOCK:
+        if _W["thread"] is None or not _W["thread"].is_alive():
+            _W["thread"] = threading.Thread(target=_loop, daemon=True, name="paperless")
+            _W["thread"].start()
+    _WAKE.set()
+
+
+@app.before_request
+def _pl_start():
+    from ..admin.hosting import hosted
+    if _W["thread"] is None and not hosted():
+        pl_kick()

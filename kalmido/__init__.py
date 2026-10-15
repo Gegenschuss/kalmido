@@ -161,6 +161,17 @@ ORDER = (
     "personal.timegaps",  # 2.34.0 (#269)
     "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
     "admin.orgcrypt_cli",  # 2.42.0 (#828): the organisation keys' start-up pass + command line (no routes)
+    "docs.extract",  # 2.48.0 (#1111): date / due date / amount from a text (no routes, standard library only)
+    "docs.rules",  # 2.48.0 (#1111): sorting rules (no routes)
+    "docs.classify",  # 2.48.0 (#1111): the locally learning classifier (no routes)
+    "docs.ocr",  # 2.48.0 (#1111): text recognition + preview images (no routes)
+    "docs.store",  # 2.48.0 (#1111): documents: tables, sealing, word index, recognition run (no routes)
+    "docs.ingest",  # 2.48.0 (#1111): docs_ingest + the background queue, mail / inbox folder
+    "docs.web",  # 2.48.0 (#1111): the routes of the documents area
+    "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
+    "paperless.ngx",  # 2.48.0 (#1152): Paperless-ngx connection + import into the documents (self-hosted only)
+    "paperless.web",  # 2.48.0 (#1152): the routes of the Paperless-ngx connection (self-hosted only)
+    "receipts.suggest",  # 2.48.0 (#1356): receipts: project / category, agents suggest, people confirm
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

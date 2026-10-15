@@ -171,6 +171,10 @@ def mail_target(c, msg):
 def mail_import(c, raw):
     """One message (bytes) -> one task. Returns the task id, None when it is for nobody or already imported."""
     msg = email.message_from_bytes(raw, policy=email.policy.default)
+    from ..docs.ingest import docs_mail_import  # 2.48.0 (#1111): a document address -> its attachments become documents
+    d = docs_mail_import(c, msg, raw)
+    if d is not None:
+        return d or None
     mid = str(msg.get("Message-ID", "")).strip()[:300] or ("sha:" + hashlib.sha256(raw).hexdigest())
     if c.execute("SELECT 1 FROM tasks WHERE tt_id=?", ("mail:" + mid,)).fetchone():
         return None

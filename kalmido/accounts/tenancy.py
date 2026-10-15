@@ -57,6 +57,10 @@ CHECKS = {
                     "WHERE n.org_id IS NOT NULL AND " + _PERSON.format(o="n", m="s")),
     "file_agent": ("SELECT s.node_id, s.agent_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id JOIN agents a ON a.user_id=s.agent_id "
                    "WHERE COALESCE(a.org_id,0)!=COALESCE(n.org_id,0)"),
+    # 2.48.0 (#1111): an organisation's forwarding address for documents held by a person who left it (the mail input
+    # refuses it anyway: docs/ingest.py docs_mail_import)
+    "doc_mail_person": ("SELECT m.org_id, m.user_id FROM doc_mail m JOIN users u ON u.id=m.user_id WHERE m.org_id IS NOT NULL AND "
+                        + _PERSON.format(o="m", m="m")),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
@@ -82,7 +86,8 @@ def boundary_check(c):
 # and agents whose owner left stay counted as before.
 REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", "list_id"),
           "cal_person": ("ev_cal_members", "cal_id"), "book_person": ("book_members", "book_id"),
-          "file_person": ("fs_shares", "node_id")}  # 2.48.0 (#1207)
+          "file_person": ("fs_shares", "node_id"),  # 2.48.0 (#1207)
+          "doc_mail_person": ("doc_mail", "org_id")}  # 2.48.0 (#1111)
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Administration > Organisations")
 
 
