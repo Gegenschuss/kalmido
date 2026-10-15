@@ -207,6 +207,7 @@ OX_AREAS = (
     ("office/company.json", "office_company", "org_id=?"),
     ("office/settings.json", "office_settings", "org_id=?"),
     ("office/services.json", "office_services", "org_id=?"),
+    ("office/roles.json", "office_roles", "org_id=?"),  # 2.47.0 (#1649): Freelancer-Rollen + Drehpersonal (costs decrypted like the others)
     ("office/equipment.json", "office_equipment", "org_id=?"),
     ("office/packages.json", "office_sets", "org_id=?"),
     ("office/texts.json", "office_texts", "org_id=?"),
@@ -215,6 +216,7 @@ OX_AREAS = (
     ("office/numbers.json", "office_numbers", "org_id=?"),
     ("office/documents.json", "office_docs", "org_id=?"),
     ("office/document_items.json", "office_doc_items", f"doc_id IN ({DSQ})"),
+    ("office/document_parts.json", "office_doc_parts", "org_id=?"),  # 2.47.0 (#1215): the parts of quotations
     ("office/payments.json", "office_payments", "org_id=?"),
     ("office/archive.json", "office_archive", "org_id=?"),
     ("office/import_runs.json", "office_import_runs", "org_id=?"),

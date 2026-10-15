@@ -304,18 +304,26 @@ def _lines_eur(c, oid, r):
     return office_calc(d, doc_items(c, r["id"], oid), pack)["lines"]
 
 
-def inv_items_from_offer(c, oid, r):
+def inv_items_from_offer(c, oid, r, parts_mode=None, parts_title=None):
     """The positions of an invoice from quotation r: every quotation line becomes a plain position with its amount (the
     producing / raw data / discount automation of the quotation is condensed into positions; an uncounted raw data option
     is left out). Rates stay in EUR; the invoice converts them with its own rate."""
     from .docs import doc_items
+    from .parts import tp_inv_items  # 2.47.0 (#1215): a quotation with parts -> title page / summary / full (office/parts.py)
+    out = tp_inv_items(c, oid, r, parts_mode, parts_title)
+    if out is not None:
+        return out
     items = doc_items(c, r["id"], oid)
+    lines = _lines_eur(c, oid, r)
+    pct = {ln.get("id"): ln for ln in lines if ln.get("kind") == "item" and ln.get("pct") is not None}
     out = []
     for it in items:
         row = {k: it.get(k) for k in ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "intext", "cost")}
         row.update(raw_fee=0, producing=0, discountable=1)
+        if it.get("unit") == "percent" and it.get("id") in pct:  # 2.47.0 (#1649): a percent position becomes its amount
+            row.update(qty=1, unit="flat", rate=pct[it["id"]]["total"])
         out.append(row)
-    for ln in _lines_eur(c, oid, r):
+    for ln in lines:
         if ln["kind"] == "producing":
             out.append({"kind": "service", "service_id": None, "title": ln["title"], "detail": ln.get("detail") or "", "qty": ln["qty"], "unit": "day",
                         "rate": ln["rate"], "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1})
@@ -407,12 +415,12 @@ def inv_apply_client(c, oid, row, b):
         row["einvoice_format"] = "xrechnung"
 
 
-def inv_from_offer(c, oid, uid, offer):
+def inv_from_offer(c, oid, uid, offer, parts_mode=None, parts_title=None):
     s = office_settings(c, oid)
     row = inv_new_row(c, oid, s, "invoice", offer["lang"], offer)
     row["source_doc_id"] = offer["id"]
     did = _insert_doc(c, oid, uid, row)
-    _put_rows(c, oid, did, inv_items_from_offer(c, oid, offer))
+    _put_rows(c, oid, did, inv_items_from_offer(c, oid, offer, parts_mode, parts_title))
     return did
 
 
@@ -825,7 +833,9 @@ def inv_from_offer_post(did):
     r = doc_row(c, oid, did)
     if r["kind"] != "offer":
         raise Denied(409, tr("Only a quotation can be turned into an invoice"))
-    nid = inv_from_offer(c, oid, uid, r)
+    b = body()  # 2.47.0 (#1215): {parts_mode?: full|title|summary, parts_title?} for a quotation with parts
+    b = b if isinstance(b, dict) else {}
+    nid = inv_from_offer(c, oid, uid, r, b.get("parts_mode") or None, b.get("parts_title") if isinstance(b.get("parts_title"), str) else None)
     recalc(c, oid, nid)
     ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "invoice", "from_id": did, "from_number": r["number"]})
     bump(c)

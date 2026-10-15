@@ -176,11 +176,22 @@ def office_calc(doc, items, pack=None):
     quot = dec(doc.get("prod_quotient"), "3")
     prod_rate = dec(doc.get("producing_rate"), "600")
     disc_pct = dec(doc.get("discount_pct"), "0")
+    # 2.47.0 (#1645): producing switched on per document; None (rows of 2.46 and older, callers without it) = as before:
+    # the flagged positions alone decide
+    prod_on = doc.get("producing_on")
+    prod_on = True if prod_on is None else _flag(prod_on)
     rates = {k: (Decimal(0) if novat else pack_tax(pack, k)) for k in TAX_KEYS}
 
     def conv(rate):  # the rate in the document's currency
         r = dec(rate)
         return money(r * fx) if currency == "USD" else money(r)
+
+    # 2.47.0 (#1649): a position of unit "percent" (e.g. the artists' social insurance) is its rate in percent of the
+    # positions marked extern of the same sheet; its quantity does not count
+    ext_base = Decimal(0)
+    for it in items or []:
+        if (it.get("kind") or "service") == "service" and it.get("unit") != "percent" and it.get("intext") == "extern":
+            ext_base += money(dec(it.get("qty"), "1") * conv(it.get("rate")))
 
     lines, pos = [], 0
     items_net = Decimal(0)
@@ -197,30 +208,37 @@ def office_calc(doc, items, pack=None):
         if kind == "text":
             lines.append({"kind": "text", "text": it.get("detail") or it.get("text") or it.get("title") or ""})
             continue
-        qty = dec(it.get("qty"), "1")
-        rate = conv(it.get("rate"))
-        total = money(qty * rate)
+        unit = it.get("unit") or "day"
+        pct = None
+        if unit == "percent":  # 2.47.0 (#1649): shown as "5 %" x the extern sum
+            pct = dec(it.get("rate"))
+            qty, rate = Decimal(1), ext_base
+            total = money(ext_base * pct / 100)
+        else:
+            qty = dec(it.get("qty"), "1")
+            rate = conv(it.get("rate"))
+            total = money(qty * rate)
         tax = it.get("tax") if it.get("tax") in TAX_KEYS else "standard"
         pos += 1
         items_net += total
         base[tax] += total
         if _flag(it.get("raw_fee")):
             raw_base += total
-        if _flag(it.get("producing")):
+        if _flag(it.get("producing")) and pct is None:
             prod_qty += qty
         if _flag(it.get("discountable", 1)):
             disc_base[tax] += total
         costs += money(dec(it.get("cost")) * qty * (fx if currency == "USD" else 1))
-        unit = it.get("unit") or "day"
         lines.append({"kind": "item", "pos": pos, "id": it.get("id"), "service_id": it.get("service_id"), "title": it.get("title") or "",
-                      "detail": it.get("detail") or "", "qty": _num(qty), "qty_text": fmt_qty(qty, lang), "unit": unit,
-                      "unit_text": unit_text(pack, lang, unit, qty),
+                      "detail": it.get("detail") or "", "qty": _num(qty), "qty_text": fmt_qty(qty, lang) if pct is None else fmt_qty(pct, lang) + " %",
+                      "unit": unit, "unit_text": unit_text(pack, lang, unit, qty) if pct is None else "",
+                      **({"pct": _num(pct), "base": _num(ext_base)} if pct is not None else {}),
                       "rate": _num(rate), "tax": tax, "tax_pct": _num(rates[tax]), "total": _num(total),
                       "raw_fee": 1 if _flag(it.get("raw_fee")) else 0, "producing": 1 if _flag(it.get("producing")) else 0,
                       "intext": it.get("intext") or "intern", "discountable": 1 if _flag(it.get("discountable", 1)) else 0})
 
     # Producing
-    days = half_days(prod_qty / quot) if quot > 0 and prod_qty > 0 else Decimal(0)
+    days = half_days(prod_qty / quot) if prod_on and quot > 0 and prod_qty > 0 else Decimal(0)
     prod_rate_doc = conv(prod_rate)
     prod_total = money(days * prod_rate_doc) if days > 0 else Decimal(0)
     if days > 0:
@@ -266,7 +284,7 @@ def office_calc(doc, items, pack=None):
     out = {
         "lang": lang, "currency": currency, "fx_rate": _num(fx) if currency == "USD" else None,
         "fx_note": label(pack, lang, "fx_note", rate=fmt_qty(fx, lang)) if currency == "USD" else "",
-        "vat_mode": "novat" if novat else "vat", "raw_mode": raw_mode,
+        "vat_mode": "novat" if novat else "vat", "raw_mode": raw_mode, "producing_on": 1 if prod_on else 0,
         "items_net": _num(items_net), "producing_qty": _num(prod_qty), "producing_days": _num(days), "producing_rate": _num(prod_rate_doc),
         "producing_total": _num(prod_total), "raw_base": _num(raw_base), "raw_factor": _num(raw_factor), "raw_amount": _num(raw_amount),
         "discount_pct": _num(disc_pct), "discount": _num(discount),
@@ -329,6 +347,10 @@ def inv_calc(doc, items, pack=None):
     net = Decimal(0)
     costs = Decimal(0)
     base = {k: Decimal(0) for k in TAX_KEYS}
+    ext_base = Decimal(0)  # 2.47.0 (#1649): the base of positions of unit "percent", like office_calc
+    for it in items or []:
+        if (it.get("kind") or "service") == "service" and it.get("unit") != "percent" and it.get("intext") == "extern":
+            ext_base += money(dec(it.get("qty"), "1") * conv(it.get("rate")))
     for it in items or []:
         kind = it.get("kind") or "service"
         if kind == "heading":
@@ -337,9 +359,10 @@ def inv_calc(doc, items, pack=None):
         if kind == "text":
             lines.append({"kind": "text", "text": it.get("detail") or it.get("text") or it.get("title") or ""})
             continue
-        qty = dec(it.get("qty"), "1")
-        rate = conv(it.get("rate"))
-        total = money(qty * rate)
+        pct = dec(it.get("rate")) if kind == "service" and it.get("unit") == "percent" else None
+        qty = dec(it.get("qty"), "1") if pct is None else Decimal(1)
+        total = money(qty * conv(it.get("rate"))) if pct is None else money(ext_base * pct / 100)
+        rate = conv(it.get("rate")) if pct is None else total  # an invoice line stays qty x rate (EN 16931)
         if kind == "discount":
             total = -abs(total)
         tax = it.get("tax") if it.get("tax") in TAX_KEYS else "standard"
@@ -351,7 +374,9 @@ def inv_calc(doc, items, pack=None):
         unit = it.get("unit") or "day"
         lines.append({"kind": "discount" if kind == "discount" else "item", "pos": pos, "id": it.get("id"), "service_id": it.get("service_id"),
                       "title": it.get("title") or (label(pack, lang, "discount") if kind == "discount" else ""), "detail": it.get("detail") or "",
-                      "qty": _num(qty), "qty_text": fmt_qty(qty, lang), "unit": unit, "unit_text": unit_text(pack, lang, unit, qty),
+                      "qty": _num(qty), "qty_text": fmt_qty(qty, lang) if pct is None else fmt_qty(pct, lang) + " %", "unit": unit,
+                      "unit_text": unit_text(pack, lang, unit, qty) if pct is None else "",
+                      **({"pct": _num(pct), "base": _num(ext_base)} if pct is not None else {}),
                       "rate": _num(rate), "rate_text": fmt_money(rate, lang, currency), "tax": tax, "tax_pct": _num(rates[tax]),
                       "total": _num(total), "total_text": fmt_money(total, lang, currency), "net": dstr(total), "intext": it.get("intext") or "intern"})
     tax_lines, tax_sum = [], Decimal(0)

@@ -173,7 +173,7 @@ function ofdEditorHtml() {
   const logSec = adm ? ofdSec('log', tr('History'), ofdLogHtml(d)) : '';
   const ln = OFD.langNotes && OFD.langNotes.id === d.id && !lk ? OFD.langNotes.notes : [];  // 2.40.0 (#1381): what the language switch left as it was
   const langNote = ln.length ? `<div class="ofdlnote" role="status">${ic('info', 's')}<span>${tr('Language changed. Standard texts were translated; these stayed as they were:')}<br>${ln.map(esc).join('<br>')}</span><button type="button" class="ib" data-ofd="ln-x" aria-label="${esc(tr('Close'))}">${ic('x', 's')}</button></div>` : '';
-  return `${head}${banner}${langNote}<div class="ofdeditor" data-fg="ofd:${d.id}" data-fg-live><fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${headSec}<section class="ofdsec open"><h3>${kind === 'reminder' ? tr('Reminded invoices') : tr('Positions')}</h3>${items}${auto}${totals}</section>${kind === 'reminder' ? '' : rightsSec}${textsSec}${kind === 'reminder' ? '' : fieldsSec}</fieldset>${ofdFeeHtml(d, adm)}${paySec}${logSec}</div>`;
+  return `${head}${banner}${langNote}<div class="ofdeditor" data-fg="ofd:${d.id}" data-fg-live><fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${headSec}${kind === 'offer' && typeof tpOpenId === 'function' && tpPart(d, tpOpenId(d)) ? `<section class="ofdsec open tpsec"><h3>${esc(tr('Part'))}</h3>${tpPartEditorHtml(d, adm)}</section>` /* 2.47.0 (#1215): an open part */ : `<section class="ofdsec open"><h3>${kind === 'reminder' ? tr('Reminded invoices') : tr('Positions')}</h3>${items}${auto}${totals}</section>${typeof tpPartsHtml === 'function' ? tpPartsHtml(d, adm) : ''}`}${kind === 'reminder' ? '' : rightsSec}${textsSec}${kind === 'reminder' ? '' : fieldsSec}</fieldset>${ofdFeeHtml(d, adm)}${paySec}${logSec}</div>`;
 }
 // 2.38.0 (#1021, F1): the invoices a reminder lists (read-only rows), the payments of an invoice
 function ofdRefsHtml(d, t) {
@@ -205,6 +205,7 @@ function ofdItemsHtml(d, adm) {
     if (it.kind === 'heading') return `<li class="ofdit ofdhd"><span class="ofdpos muted">${ic('list', 's')}</span><input data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(tr('Heading (category)'))}" aria-label="${esc(tr('Heading'))}">${mv}</li>`;
     if (it.kind === 'text') return `<li class="ofdit ofdtx"><span class="ofdpos muted">${ic('note', 's')}</span><textarea data-i="${i}" data-k="detail" rows="2" maxlength="4000" placeholder="${esc(tr('Text block'))}" aria-label="${esc(tr('Text block'))}">${esc(it.detail)}</textarea>${mv}</li>`;
     const line = (d.totals?.lines || []).find(l => (l.kind === 'item' || l.kind === 'discount') && l.id === it.id);
+    if (it.kind === 'part' && typeof tpItemRow === 'function') return tpItemRow(it, i, d, line, mv);  // 2.47.0 (#1215): a part on the title page
     if (it.kind === 'discount') return `<li class="ofdit ofddisc"><span class="ofdpos">${line?.pos || ''}</span>
       <div class="ofditb"><input class="ofdtt" data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(tr('Discount'))}" aria-label="${esc(tr('Discount'))}">
       <span class="ofdnums"><span class="muted">−</span><input data-i="${i}" data-k="rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(it.rate))}" aria-label="${esc(tr('Amount'))}"><span class="muted">€</span>
@@ -213,28 +214,30 @@ function ofdItemsHtml(d, adm) {
     return `<li class="ofdit"><span class="ofdpos">${line?.pos || ''}</span>
       <div class="ofditb"><input class="ofdtt" data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(tr('Service'))}" aria-label="${esc(tr('Service'))}">
       <input class="ofddt" data-i="${i}" data-k="detail" value="${esc(it.detail)}" maxlength="4000" placeholder="${esc(tr('Detail (optional)'))}" aria-label="${esc(tr('Detail'))}">
-      <span class="ofdnums"><input data-i="${i}" data-k="qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.qty))}" aria-label="${esc(tr('Quantity'))}">
-      <select data-i="${i}" data-k="unit" aria-label="${esc(tr('Unit'))}">${OFC_UNITS.map(([v, n]) => `<option value="${v}" ${it.unit === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>
-      <span class="muted">×</span><input data-i="${i}" data-k="rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(it.rate))}" aria-label="${esc(tr('Rate (EUR)'))}"><span class="muted">€</span>
+      <span class="ofdnums">${it.unit === 'percent' ? ekPctHtml(it, i, line, d) : `<input data-i="${i}" data-k="qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.qty))}" aria-label="${esc(tr('Quantity'))}">
+      <select data-i="${i}" data-k="unit" aria-label="${esc(tr('Unit'))}">${ekUnits().map(([v, n]) => `<option value="${v}" ${it.unit === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>
+      <span class="muted">×</span><input data-i="${i}" data-k="rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(it.rate))}" aria-label="${esc(tr('Rate (EUR)'))}"><span class="muted">€</span>`}
       <select data-i="${i}" data-k="tax" aria-label="${esc(tr('VAT'))}">${taxes.map(([v, n]) => `<option value="${v}" ${it.tax === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
       <b class="ofdlt">${line ? esc(line.total_text || ofdMoney(line.total, d)) : ''}</b></span>
-      <span class="ofdflags">${inv ? '' : `${ofcRawOn() || it.raw_fee ? `<label class="chkl"><input type="checkbox" data-i="${i}" data-k="raw_fee" ${it.raw_fee ? 'checked' : ''}> ${tr('raw data')}</label>` : ''}${ofcProdOn() || it.producing ? `<label class="chkl"><input type="checkbox" data-i="${i}" data-k="producing" ${it.producing ? 'checked' : ''}> ${tr('producing')}</label>` : ''}<label class="chkl"><input type="checkbox" data-i="${i}" data-k="discountable" ${it.discountable ? 'checked' : ''}> ${tr('discount')}</label>`}
-      ${adm ? `<label class="chkl ofdcost">${tr('Cost')} <input data-i="${i}" data-k="cost" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.cost))}" aria-label="${esc(tr('External cost per unit (internal)'))}"></label>` : ''}</span></div>${mv}</li>`;
+      <span class="ofdflags">${inv ? '' : `<label class="chkl"><input type="checkbox" data-i="${i}" data-k="raw_fee" ${it.raw_fee ? 'checked' : ''}> ${tr('raw data')}</label><label class="chkl"><input type="checkbox" data-i="${i}" data-k="producing" ${it.producing ? 'checked' : ''}> ${tr('producing')}</label><label class="chkl"><input type="checkbox" data-i="${i}" data-k="discountable" ${it.discountable ? 'checked' : ''}> ${tr('discount')}</label>`}
+      ${adm ? `<label class="chkl ofdcost">${tr('Purchase')} <input data-i="${i}" data-k="cost" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.cost))}" aria-label="${esc(tr('External cost per unit (internal)'))}"></label>${it.margin != null ? `<span class="ofdmargin${it.margin < 0 ? ' neg' : ''}">${esc(tr('Surplus {0}', ofdMoney(it.margin, d)))}</span>` : ''}` : ''}</span></div>${mv}</li>`;
   }).join('');
   return `<ul class="ofdits" role="list">${rows}</ul><div class="ofdadd"><button type="button" class="btn sm pri" data-ofd="it-svc">${ic('plus', 's')}<span>${tr('Add service')}</span></button><button type="button" class="btn sm" data-ofd="it-head">${ic('list', 's')}<span>${tr('Heading')}</span></button><button type="button" class="btn sm" data-ofd="it-text">${ic('note', 's')}<span>${tr('Text block')}</span></button>${inv ? `<button type="button" class="btn sm" data-ofd="it-disc">${ic('calc', 's')}<span>${tr('Discount')}</span></button>` : ''}</div>`;
 }
 function ofdAutoHtml(d, t) {
+  const pOn = d.producing_on !== 0;  // 2.47.0 (#1645): the switches of the document, always shown (null = a document of 2.46: as before)
   const lines = (t.lines || []).filter(l => ['producing', 'raw', 'discount'].includes(l.kind));
   const prod = lines.find(l => l.kind === 'producing'), raw = lines.find(l => l.kind === 'raw'), disc = lines.find(l => l.kind === 'discount');
   const rowL = (title, detail, total) => `<li class="ofdauto"><span class="ofdpos muted">${ic('calc', 's')}</span><span class="ofcn"><b>${esc(title)}</b>${detail ? `<small class="muted">${esc(detail)}</small>` : ''}</span><b class="ofdlt">${esc(total)}</b></li>`;
   return `<ul class="ofdits ofdautos" role="list">
-    ${prod ? rowL(prod.title, prod.detail, prod.total_text || ofdMoney(prod.total, d)) : ofcProdOn() ? rowL(t.labels?.producing || 'Producing', tr('no position counts towards producing'), '') : ''}
+    ${prod ? rowL(prod.title, prod.detail, prod.total_text || ofdMoney(prod.total, d)) : pOn ? rowL(t.labels?.producing || 'Producing', tr('no position counts towards producing'), '') : ''}
     ${raw ? rowL(raw.title, raw.detail, raw.total_text || ofdMoney(raw.total, d)) : ''}
     ${disc ? rowL(disc.title, disc.detail, disc.total_text || ofdMoney(disc.total, d)) : ''}</ul>
     <div class="ofdgrid ofdrules">
-    ${ofcRawOn() || d.raw_mode !== 'none' ? `${ofdF('raw_mode', tr('Raw data'), ofdSel('raw_mode', d.raw_mode, OFD_RAW.map(([v, n]) => [v, tr(n)])))}
-    ${ofdF('raw_factor', tr('Raw data factor'), ofdIn('raw_factor', ofdNumIn(d.raw_factor), {num: true, max: 10}), tr('share of the positions with raw data'))}` : ''}
-    ${ofcProdOn() || prod ? `${ofdF('prod_quotient', tr('Producing quotient'), ofdIn('prod_quotient', ofdNumIn(d.prod_quotient), {num: true, max: 10}), tr('production days per producing day'))}
+    ${ofdF('raw_mode', tr('Raw data'), ofdSel('raw_mode', d.raw_mode, OFD_RAW.map(([v, n]) => [v, tr(n)])))}
+    ${d.raw_mode !== 'none' ? ofdF('raw_factor', tr('Raw data factor'), ofdIn('raw_factor', ofdNumIn(d.raw_factor), {num: true, max: 10}), tr('share of the positions with raw data')) : ''}
+    <div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-producing_on" data-f="producing_on" ${pOn ? 'checked' : ''}> ${tr('Calculate producing')}</label></div>
+    ${pOn ? `${ofdF('prod_quotient', tr('Producing quotient'), ofdIn('prod_quotient', ofdNumIn(d.prod_quotient), {num: true, max: 10}), tr('production days per producing day'))}
     ${ofdF('producing_rate', tr('Producing rate'), ofdIn('producing_rate', ofdNumIn(d.producing_rate), {num: true, max: 12}), '€')}` : ''}
     ${ofdF('discount_pct', tr('Discount'), ofdIn('discount_pct', ofdNumIn(d.discount_pct), {num: true, max: 8}), '%')}
     </div>`;
@@ -256,8 +259,13 @@ function ofdTotalsHtml(d, t, adm) {
   if (d.vat_mode !== 'novat') rows.push([L.gross || tr('Gross total'), ofdMoney(t.gross || 0, d), 'gross']);
   return `<div class="ofdtotals" id="ofd-totals"><dl>${rows.map(([k, v, c]) => `<div class="ofdtr tr-${c}"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
     <p class="muted ofdnote">${esc(t.vat_note || '')}${t.fx_note ? ` · ${esc(t.fx_note)}` : ''}</p>
-    ${adm && t.costs != null ? `<p class="muted ofdint">${ic('eye', 's')} ${tr('Internal: external costs {0}, surplus {1}', ofdMoney(t.costs, d), ofdMoney(t.margin, d))}</p>` : ''}</div>`;
+    ${adm && t.costs != null ? `<p class="muted ofdint">${ic('eye', 's')} ${tr('Internal: external costs {0}, surplus {1}', ofdMoney(t.costs, d), ofdMoney(t.margin, d))}</p>` : ''}
+    ${adm && d.items_margin != null ? `<p class="muted ofdint ofdmsum">${tr('Surplus of the positions: {0}', ofdMoney(d.items_margin, d))}</p>` : ''}</div>`;
 }
+// 2.47.0 (#1649): a position of unit "percent" (e.g. artists' social insurance): its rate in % of the positions marked extern
+const ekUnits = () => OFC_UNITS.some(u => u[0] === 'percent') ? OFC_UNITS : [...OFC_UNITS, ['percent', '%']];
+const ekPctHtml = (it, i, line, d) => `<input data-i="${i}" data-k="rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(it.rate))}" aria-label="${esc(tr('Rate in percent'))}"><span class="muted">%</span>`
+  + `<span class="muted ofdpctof">${esc(tr('of {0} external', ofdMoney(line?.base ?? 0, d)))}</span>`;
 
 // ---- the history (organisation admins; office log of this document)
 const OFD_ACTIONS = {create: N_('created'), update: N_('changed'), items: N_('positions changed'), number: N_('number set'), status: N_('status changed'),
@@ -290,12 +298,13 @@ async function ofdSave(method, url, body) {
   finally { OFD.saving--; OFD.log = null; ofdDraw(); OFD.list = null; }
 }
 function ofdSaveHint() { const s = $('.ofdsave'); if (s) s.textContent = OFD.saving ? tr('Saving…') : ''; }
-const ofdPatch = body => ofdSave('PATCH', `/api/office/docs/${OFD.doc.id}`, body);
+const ofdPatch = body => typeof tpView === 'function' && tpView() ? tpPatch(body) : ofdSave('PATCH', `/api/office/docs/${OFD.doc.id}`, body);
 function ofdItemsBody() {
   return (OFD.doc.items || []).map(it => ({id: it.id, kind: it.kind, service_id: it.service_id, title: it.title, detail: it.detail, qty: it.qty, unit: it.unit, rate: it.rate, tax: it.tax,
-    raw_fee: it.raw_fee, producing: it.producing, intext: it.intext, cost: it.cost, discountable: it.discountable}));
+    raw_fee: it.raw_fee, producing: it.producing, intext: it.intext, cost: it.cost, discountable: it.discountable, ref_part_id: it.ref_part_id}));  // 2.47.0 (#1215): + ref_part_id
 }
-const ofdPutItems = () => ofdSave('PUT', `/api/office/docs/${OFD.doc.id}/items`, {items: ofdItemsBody()});
+// 2.47.0 (#1215): with a part open, positions and calculation values go to the part (office_parts.js)
+const ofdPutItems = () => typeof tpView === 'function' && tpView() ? tpPutItems() : ofdSave('PUT', `/api/office/docs/${OFD.doc.id}/items`, {items: ofdItemsBody()});
 function ofdRightsBody() {
   const r = OFD.doc.rights || {}, g = id => $('#ofd-' + id);
   const dim = k => ({id: g('r-' + k)?.value ? +g('r-' + k).value : null, text: g('r-' + k + '-t')?.value ?? r[k]?.text ?? ''});
@@ -313,7 +322,8 @@ async function ofdChange(e) {
   if (t.id === 'ofd-status' && !OFD.doc) { OFD.status = t.value; OFD.list = null; ofdLoadList(true); return; }
   if (t.id === 'ofd-status' && OFD.doc && S.route.id !== OFD.doc.id) { OFD.status = t.value; OFD.list = null; ofdLoadList(true); return; }
   if (!OFD.doc) return;
-  const d = OFD.doc;
+  if (t.dataset.tp && typeof tpChange === 'function') { await tpChange(t); return; }  // 2.47.0 (#1215): title / print of a part
+  const d = typeof tpCur === 'function' ? tpCur() : OFD.doc;  // 2.47.0 (#1215): an open part's positions
   if (t.dataset.i != null && t.dataset.k) {  // a position
     const it = d.items[+t.dataset.i]; if (!it) return;
     const k = t.dataset.k;
@@ -342,12 +352,13 @@ async function ofdChange(e) {
   if (f === 'recipient_name' || f === 'recipient_lines') { await ofdPatch({recipient: {name: $('#ofd-recipient_name')?.value ?? d.recipient?.name, lines: ($('#ofd-recipient_lines')?.value ?? (d.recipient?.lines || []).join('\n')).split('\n')}}); return; }
   if (f === 'client_id') { await ofdPatch({client_id: t.value ? +t.value : null, recipient_from_client: !!t.value}); return; }
   if (f === 'contract_id') { await ofdPatch({contract_id: t.value ? +t.value : null}); return; }
+  if (f === 'producing_on') { await ofdPatch({producing_on: t.checked ? 1 : 0}); return; }  // 2.47.0 (#1645)
   if (['fx_rate', 'raw_factor', 'prod_quotient', 'producing_rate', 'discount_pct', 'payment_days', 'reminder_level', 'reminder_fee', 'reminder_deadline_days'].includes(f)) { const v = ofcNum(t.value); await ofdPatch({[f]: v}); return; }
   await ofdPatch({[f]: t.value});
 }
 async function ofdClick(e) {
   const b = e.target.closest('[data-ofd]'); if (!b) return;
-  const a = b.dataset.ofd, d = OFD.doc;
+  const a = b.dataset.ofd, d = typeof tpCur === 'function' ? tpCur() : OFD.doc;  // 2.47.0 (#1215): an open part's positions
   if (a === 'pdf') return;  // the link itself
   e.preventDefault();
   if (a === 'new') {
@@ -364,6 +375,8 @@ async function ofdClick(e) {
   }
   if (a === 'remind') { ofdReminderDialog(); return; }
   if (!d) return;
+  if (a.startsWith('tp-') && typeof tpClick === 'function') { await tpClick(a, b); return; }  // 2.47.0 (#1215): the parts
+  if (a === 'to-invoice' && d.parts?.length && typeof tpInvoiceDialog === 'function') { tpInvoiceDialog(d); return; }  // 2.47.0 (#1215): choose the form
   if (a === 'to-invoice') { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/invoice`); OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; toast(tr('Invoice draft created')); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } return; }
   if (a === 'credit') {
     if (!await askConfirm(tr('Credit note for {0}?', d.number || ''), tr('A draft with all positions is made. Shorten it for a partial credit; finalised over the full amount it cancels the invoice.'), {ok: tr('Create credit note')})) return;
@@ -483,16 +496,18 @@ async function ofdReminderDialog() {
 }
 // the service picker: search the catalogue, tap = a new position with the service's name (document language), rate and flags
 function ofdServicePicker() {
-  const d = OFD.doc, lg = ofdLang(d);
+  const d = typeof tpCur === 'function' ? tpCur() : OFD.doc, lg = ofdLang(d);  // 2.47.0 (#1215): into an open part
   const md = modal(`<h3>${tr('Add service')}</h3><div class="ctsearch">${ic('search', 's')}<input id="ofd-sq" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search services'))}" autocomplete="off"></div><div id="ofd-slist" class="ofdslist"></div>
     <div class="foot"><button type="button" class="btn" data-m="free">${tr('Free position')}</button><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('ofdpick');
   const draw = () => {
     const q = ($('#ofd-sq', md)?.value || '').trim().toLowerCase();
-    const rows = ofcRows('services').filter(s => !s.archived && (!q || [s.name_de, s.name_en, s.category].some(v => (v || '').toLowerCase().includes(q))));
+    // 2.47.0 (#1216): services of the kind shooting belong only to the shoot calculation, never among the positions
+    const rows = ofcRows('services').filter(s => !s.archived && s.intext !== 'shooting' && (!q || [s.name_de, s.name_en, s.category].some(v => (v || '').toLowerCase().includes(q))));
     const groups = new Map(); for (const s of rows) { const k = s.category || tr('No category'); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(s); }
-    $('#ofd-slist', md).innerHTML = rows.length ? [...groups].map(([k, ss]) => `<h4 class="ofcgrp">${esc(k)}</h4><ul class="ofclist" role="list">${ss.map(s => { const ct = d.contract?.rates?.[s.id]; const rate = ct ?? (s.unit === 'hour' && s.hourly_rate != null ? s.hourly_rate : s.daily_rate); return `<li><button type="button" class="ofcrow" data-sid="${s.id}"><span class="ofcn"><b>${esc(ofdSvcName(s, d))}</b><small class="muted">${esc([rate != null ? `${fmtNum(rate, 2)} € / ${tr(OFC_UNITS.find(u => u[0] === s.unit)?.[1] || s.unit)}` : '', ct != null ? tr('contract rate') : '', ofcTax(s.tax)].filter(Boolean).join(' · '))}</small></span>${ic('plus', 's')}</button></li>`; }).join('')}</ul>`).join('')
-      : `<p class="muted lempty">${ofcRows('services').length ? tr('Nothing matches.') : esc(tr('No services yet (tab {0}).', '\u0001')).replace('\u0001', `<a href="#office/services" data-m="tab">${esc(tr('Services'))}</a>`)}</p>`;  // 2.39.1 (#1220): the tab as a link
+    $('#ofd-slist', md).innerHTML = rows.length ? [...groups].map(([k, ss]) => `<h4 class="ofcgrp">${esc(k)}</h4><ul class="ofclist" role="list">${ss.map(s => { const ct = d.contract?.rates?.[s.id]; const rate = ct ?? (s.unit === 'hour' && s.hourly_rate != null ? s.hourly_rate : s.daily_rate); return `<li><button type="button" class="ofcrow" data-sid="${s.id}"><span class="ofcn"><b>${esc(ofdSvcName(s, d))}</b><small class="muted">${esc([rate != null ? `${s.unit === 'percent' ? `${fmtNum(rate, 2)} %` : `${fmtNum(rate, 2)} € / ${tr(OFC_UNITS.find(u => u[0] === s.unit)?.[1] || s.unit)}`}` : '', ct != null ? tr('contract rate') : '', ofcTax(s.tax)].filter(Boolean).join(' · '))}</small></span>${ic('plus', 's')}</button></li>`; }).join('')}</ul>`).join('')
+      + (typeof tpPickerHtml === 'function' && !q ? tpPickerHtml(d) : '')  // 2.47.0 (#1215): after the services, the parts
+      : (typeof tpPickerHtml === 'function' && tpPickerHtml(d)) || `<p class="muted lempty">${ofcRows('services').length ? tr('Nothing matches.') : esc(tr('No services yet (tab {0}).', '\u0001')).replace('\u0001', `<a href="#office/services" data-m="tab">${esc(tr('Services'))}</a>`)}</p>`;  // 2.39.1 (#1220): the tab as a link
   };
   draw();
   if (!Array.isArray(OFC.data.services)) {  // the catalogue may still be loading: show it once it is there
@@ -503,11 +518,12 @@ function ofdServicePicker() {
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-sid],[data-m]'); if (!b) return;
     if (b.dataset.m === 'close' || b.dataset.m === 'tab') { md.remove(); return; }  // (tab: the link goes on to #office/services)
+    if (b.dataset.m === 'part' && typeof tpPick === 'function') { md.remove(); await tpPick(+b.dataset.pid); return; }  // 2.47.0 (#1215)
     const blank = {kind: 'service', service_id: null, title: '', detail: '', qty: 1, unit: 'day', rate: 0, tax: 'standard', raw_fee: 0, producing: 0, intext: 'intern', cost: 0, discountable: 1};
     if (b.dataset.m === 'free') { d.items.push(blank); md.remove(); await ofdPutItems(); $(`.ofdits [data-i="${d.items.length - 1}"][data-k="title"]`)?.focus(); return; }
     const s = ofcRow('services', +b.dataset.sid); if (!s) return;
     const ct = d.contract?.rates?.[s.id];
-    d.items.push({...blank, service_id: s.id, title: ofdSvcName(s, d), unit: s.unit || 'day', rate: ct ?? (s.unit === 'hour' && s.hourly_rate != null ? s.hourly_rate : s.daily_rate) ?? 0, tax: s.tax || 'standard', raw_fee: s.raw_fee ? 1 : 0, producing: s.producing ? 1 : 0, intext: s.intext || 'intern'});
+    d.items.push({...blank, cost: null /* 2.47.0 (#1649): the server takes the purchase of the service's role */, service_id: s.id, title: ofdSvcName(s, d), unit: s.unit || 'day', rate: ct ?? (s.unit === 'hour' && s.hourly_rate != null ? s.hourly_rate : s.daily_rate) ?? 0, tax: s.tax || 'standard', raw_fee: s.raw_fee ? 1 : 0, producing: s.producing ? 1 : 0, intext: s.intext || 'intern'});
     md.remove(); await ofdPutItems();
     $(`.ofdits [data-i="${d.items.length - 1}"][data-k="qty"]`)?.focus();
   });

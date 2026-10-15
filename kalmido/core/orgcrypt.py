@@ -52,15 +52,22 @@ FIELDS = {
     "office_contracts": ("rates",),
     "office_docs": ("sender",),
     "office_doc_log": ("detail",),
+    "office_roles": ("costs",),  # 2.47.0 (#1649): the purchase of a role
+    "office_purchases": ("amount",),  # 2.47.0 (#1649): the purchase of an accepted quotation
+    "office_doc_parts": ("sheet",),  # 2.47.0 (#1216): the shoot calculation sheet (markups, rates of external crew = purchase)
 }
-JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"): ("costs", "margin")}
+JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"): ("costs", "margin"),
+             ("office_doc_parts", "totals"): ("costs", "margin")}  # 2.47.0 (#1215)
 # 2.46.1 (#1641): what Settings > Administration shows as encrypted / not encrypted. Every FIELDS table and JSON_KEYS entry
 # has its category here (a test checks it); plus the organisations' files and the tokens sealed with the server key itself
 # (git.py git_seal, oidc.py oidc_seal). Everything else is stored as it is (the list "plain" names the main parts).
 PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("office_settings", "data"): N_("Bank and tax data of the company"),
                  ("office_docs", "totals"): N_("Purchase prices and margins"), "office_contracts": N_("Framework contract rates"),
                  "office_docs": N_("Senders of finished documents"), "office_doc_log": N_("The log of the documents"),
-                 "files": N_("Files of organisations"), "tokens": N_("Stored access tokens (Git, client secret of the single sign-on)")}
+                 "files": N_("Files of organisations"), "tokens": N_("Stored access tokens (Git, client secret of the single sign-on)"),
+                 # 2.47.0 (#1649, #1215, #1216): roles' purchase prices, purchases of accepted quotations, parts and shoot sheets
+                 "office_roles": N_("Purchase prices and margins"), "office_purchases": N_("Purchase prices and margins"),
+                 "office_doc_parts": N_("Purchase prices and margins"), ("office_doc_parts", "totals"): N_("Purchase prices and margins")}
 PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))
 
 
@@ -333,7 +340,8 @@ def oc_json_store(c, org_id, table, col, j):
 
 # keys whose presence in an office log entry (office_doc_log.detail, JSON text) makes the whole entry encrypted: company
 # fields, purchase prices, contract rates. Other entries stay plain (the daily count of own-text mails reads them)
-LOG_MARKERS = ('"iban"', '"bic"', '"bank_name"', '"tax_number"', '"vat_id"', '"cost"', '"costs"', '"margin"', '"rates"', '"company"', '"bank_lines"')
+LOG_MARKERS = ('"iban"', '"bic"', '"bank_name"', '"tax_number"', '"vat_id"', '"cost"', '"costs"', '"margin"', '"rates"', '"company"', '"bank_lines"',
+               '"cost_day"', '"cost_hour"', '"markup_pct"')  # 2.47.0 (#1649): the roles' purchase prices / markup
 
 
 def oc_log_detail(c, org_id, text):

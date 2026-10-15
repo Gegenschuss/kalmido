@@ -15,7 +15,7 @@ from .packs import office_pack, office_pack_codes, office_pack_validate
 from .model import (
     MD_KINDS, office_create, office_delete, office_export, office_gate, office_import, office_org, office_role, office_row,
     office_rows, office_seed_texts, office_settings, office_settings_clean, office_settings_save, office_update, office_number_format,
-    office_number_next, office_scheme_clean, office_scheme_period,
+    office_number_next, office_scheme_clean, office_scheme_period, sr_public,
 )
 from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
 
@@ -40,7 +40,14 @@ def office_settings_get():
     pack = office_pack(s["pack"]) or office_pack("DE")
     return jsonify(settings=s, company_fields=ofx_company(c, oid), org_id=oid, role=office_role(c, uid, oid), pack={"code": pack["code"], "name": pack["name"], "tax": pack["tax"],
                                                                                "formats": pack["formats"], "currency": pack["currency"]},
-                   number_preview=office_number_next(c, oid, "offer", s["offer_scheme"], peek=True)[0])
+                   number_preview=office_number_next(c, oid, "offer", s["offer_scheme"], peek=True)[0],
+                   industry=_industry(s))
+
+
+def _industry(s):
+    """2.47.0 (#1216): the industry packs switched on (labels, defaults, suggested crew functions) for the client."""
+    from .sheet import dk_pack, dk_pack_public, dk_packs_on
+    return [dk_pack_public(dk_pack(x)) for x in dk_packs_on(s)]
 
 
 @app.put("/api/office/settings")
@@ -114,7 +121,7 @@ def office_pack_check():
     return jsonify(problems=office_pack_validate(b.get("pack") if isinstance(b, dict) else None))
 
 
-# ---- master data: one set of routes per kind (services, equipment, sets, texts, contracts)
+# ---- master data: one set of routes per kind (services, equipment, sets, texts, contracts; 2.47.0: roles, crew)
 def _kind(kind):
     if kind not in MD_KINDS:
         raise Denied(404)
@@ -127,7 +134,8 @@ def office_rows_get(kind):
     _kind(kind)
     c, uid, oid = _ctx()
     a = request.args
-    return jsonify(items=office_rows(c, oid, kind, archived=a.get("archived") == "1", q=a.get("q") or ""))
+    adm = office_role(c, uid, oid) == "admin"  # 2.47.0 (#1649): members never get purchase prices / markups
+    return jsonify(items=[sr_public(kind, r, adm) for r in office_rows(c, oid, kind, archived=a.get("archived") == "1", q=a.get("q") or "")])
 
 
 @app.post("/api/office/<kind>")
@@ -147,7 +155,7 @@ def office_row_post(kind):
 def office_row_get(kind, rid):
     _kind(kind)
     c, uid, oid = _ctx()
-    return jsonify(office_row(c, oid, kind, rid))
+    return jsonify(sr_public(kind, office_row(c, oid, kind, rid), office_role(c, uid, oid) == "admin"))  # 2.47.0 (#1649)
 
 
 @app.patch("/api/office/<kind>/<int:rid>")
@@ -184,7 +192,7 @@ def office_row_delete(kind, rid):
 @app.get("/api/office/export")
 def office_export_get():
     c, uid, oid = _ctx()
-    d = office_export(c, oid)
+    d = office_export(c, oid, office_role(c, uid, oid) == "admin")  # 2.47.0 (#1649)
     ofx_log(c, oid, "export", target="master_data")
     c.commit()
     data = json.dumps(d, ensure_ascii=False, indent=1)

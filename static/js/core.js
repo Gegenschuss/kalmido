@@ -203,10 +203,10 @@ const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => 
 // 1.9.0 profile pictures: S.avatars = {user id: URL} (me + everybody sharing a list with me, from /api/state; the News
 // answer adds its people). av() = the round picture, or the initials as before. cls/attrs: the caller's classes + title.
 const avUrl = id => (id && ((S.avatars || {})[id] || (S.me && +id === S.me.id ? S.me.avatar : ''))) || '';
-function av(id, name, cls = 'avatar', attrs = '', inner = '') {
+function av(id, name, cls = 'avatar', attrs = '', inner = '', eager = false) {  // 2.47.0 (#1654): eager = always visible (sidebar), no lazy load
   const u = avUrl(id), ag = id ? agentDot(id) : '';  // 2.0.0: agents get a status dot
   if (ag || (id && isAgentUser(id))) { cls += ' agent'; inner += ag + botBadge(); }  // 2.28.0 (#985): + the robot badge
-  return `<span class="${cls}${u ? ' pic' : ''}" ${attrs}>${u ? `<img src="${esc(u)}" alt="" loading="lazy" decoding="async" draggable="false">` : esc(initials(name))}${inner}</span>`;
+  return `<span class="${cls}${u ? ' pic' : ''}" ${attrs}>${u ? `<img src="${esc(u)}" alt="" ${eager ? 'decoding="sync"' : 'loading="lazy" decoding="async"'} draggable="false">` : esc(initials(name))}${inner}</span>`;
 }
 // 2.7.2 (#418): a person's picture as a button: a tap / click opens the person card (agents: status, chat, current task;
 // people: their tasks, mention). The capture handler below takes the click before the row / dialog under it.

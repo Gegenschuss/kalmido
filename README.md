@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.47.0** (2026-10-15): Office & finance: **quotation parts** (sub pages with a title page, invoice from them in
+  three forms), a **shoot calculation** for film and video (industry pack), **crew and freelancer roles** with purchase
+  prices and the **surplus per position** for admins, producing and raw data **switched per quotation**, and the legacy
+  Excel import **fills empty fields** instead of skipping.
 - **2.46.1** (2026-10-15): **folder rows** like list rows, lists and sections **drag to the very end**, **several
   contacts at once** (delete, move), the legacy import **per area**, a **list channel** for listening agents,
   **favourites** for agents and Ctrl+K, a switch **all modules** and samples only on request, a simpler **family**
