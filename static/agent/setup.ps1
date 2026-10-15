@@ -66,7 +66,7 @@ if ($Cmd -eq 'claude' -and $Agent -and -not (Test-Path -LiteralPath "$env:USERPR
 # kalmido-setup-step: instance
 if (-not $Dir) { Die '-Dir FOLDER is missing (the project folder the agent works in)' }
 if ($Dir -eq '~' -or $Dir.StartsWith('~\') -or $Dir.StartsWith('~/')) { $Dir = $HOME + $Dir.Substring(1) }
-$Dir = [IO.Path]::GetFullPath($Dir).TrimEnd('\', '/')
+$Dir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Dir).TrimEnd('\', '/')  # relative to the PowerShell location (5.1: GetFullPath would use the process directory)
 $leaf = ([IO.Path]::GetFileName($Dir) -replace '[^A-Za-z0-9_.-]', '-'); if ($leaf.Length -gt 40) { $leaf = $leaf.Substring(0, 40) }
 $sha = [Security.Cryptography.SHA1]::Create()
 $hash = (($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Dir.ToLowerInvariant())) | Select-Object -First 4 | ForEach-Object { $_.ToString('x2') }) -join '')
@@ -127,8 +127,9 @@ if ($DryRun) { Say "  (dry run) trade the code for the agent's token at $Url/api
 else {
   New-Item -ItemType Directory -Force -Path $Inst | Out-Null
   # only this Windows account may read the instance folder (inheritance off, one rule for the current user)
-  $acl = New-Object System.Security.AccessControl.DirectorySecurity
+  $acl = Get-Acl -LiteralPath $Inst
   $acl.SetAccessRuleProtection($true, $false)
+  foreach ($rule in @($acl.Access)) { [void]$acl.RemoveAccessRule($rule) }
   $me = [Security.Principal.WindowsIdentity]::GetCurrent().User
   $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($me, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')))
   Set-Acl -LiteralPath $Inst -AclObject $acl
