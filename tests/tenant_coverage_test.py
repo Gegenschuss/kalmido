@@ -79,6 +79,10 @@ KINDS = {
     "family": ("n/a", "the household of the Family module: private by definition (kid_parents), never an organisation's object"),
     "token": ("n/a", "an inbound hook addressed by the unguessable secret of one list (sealed, looked up by its hash): nothing to "
                      "guess by id"),
+    # 2.49.0 (#1106): finding people by e-mail (accounts/discover.py)
+    "people": ("n/a", "finding people by e-mail and connection requests: person to person, outside every workspace; the "
+                      "person's own requests / connections / blocks only, a hit only through an exact confirmed address "
+                      "(p249_e_api_test.py: no account disclosure, no probing by id, organisations unchanged)"),
 }
 
 ROUTES = {
@@ -474,6 +478,11 @@ ROUTES = {
     "GET /api/admin/agents/{}/machines": "admin", "DELETE /api/admin/agents/{}/machines/{}": "admin",
     "POST /api/agent-setup/redeem": "auth", "POST /api/agent-setup/remove": "auth",
     "GET /agent-setup.sh": "public", "GET /agent-setup.ps1": "public",
+    # 2.49.0 (#1106): find people by e-mail, connection requests, blocks
+    "GET /api/disc": "people", "PUT /api/disc": "people", "POST /api/disc/confirm": "people", "POST /api/disc/find": "people",
+    "POST /api/disc/check": "people", "POST /api/disc/requests": "people", "POST /api/disc/requests/{}/{}": "people",
+    "DELETE /api/disc/requests/{}": "people", "DELETE /api/disc/connections/{}": "people",
+    "POST /api/disc/connections/{}/restore": "people", "POST /api/disc/blocks/{}": "people", "DELETE /api/disc/blocks/{}": "people",
 }
 
 # ---- 1. every route is classified, nothing stale
