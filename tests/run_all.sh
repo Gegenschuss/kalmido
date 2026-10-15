@@ -719,6 +719,9 @@ fresh; run p246d_b_api "$PY" p246d_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p246d_b_ui node p246d_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.4 part C: #1737 workspace line + greyed-out people in the Share dialogs, #1755 one-line Undo message above the keyboard
 fresh; run p246d_c_ui node p246d_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.46.6 part A: #1722 #1714 #1715 #1717 #1445 the reference launcher: cut buttons, one suggestion, the fixed rules block,
+# WORKFLOW-KALMIDO.md, a wake run after a job and a lost job resumed once (pure Python, no server)
+run p2466_a_launcher "$PY" p2466_a_launcher_test.py
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -104,7 +104,8 @@
   older, still visible message already offers as a button (offer the next-best different step instead). Only the newest
   message's buttons stay live: a newer message expires older open ones; take back buttons that are no longer current
   with `withdraw_chat_choices`. A host that posts your answer for you (the launcher's event mode, 2.40.0) turns a final
-  block ` ```suggest ` (one line per suggestion) into the button.
+  block ` ```suggest ` (one line per suggestion) into the button. A button holds at most **80 characters**: keep the
+  suggestion shorter (a longer one is cut at a word with "…" and the person sends the cut text).
 - A long chat answer worth keeping (a plan, a release draft, a summary to review later): send it with `offer_save: true`
   (`send_chat`, 2.37.0). The person gets the button *Save as task* under it and decides; never save a message yourself.
 - A new session that took over a summary, or a compacted conversation, may be shown with a notice (`send_chat` with

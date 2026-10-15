@@ -272,7 +272,7 @@ class Api:
         if suggest and not approval:  # 2.40.0 (#1100 suggest_buttons): the suggestions as answer buttons (2.28+)
             if self.choices_ok is not False:
                 try:
-                    return self._post_chat(uid, {**b, "choices": [{"id": f"s{i + 1}", "label": s[:80]} for i, s in enumerate(suggest[:3])]})
+                    return self._post_chat(uid, {**b, "choices": [{"id": f"s{i + 1}", "label": label_cut(s)} for i, s in enumerate(suggest[:3])]})
                 except ApiError as e:
                     if e.status != 400:
                         raise
@@ -315,7 +315,7 @@ class Api:
         if approval:
             x = {"approval": {k: v for k, v in approval.items() if k in ("title", "what")}, "expires_in": APPROVAL_TTL_S}
         elif suggest:
-            x = {"choices": [{"id": f"s{i + 1}", "label": s[:80]} for i, s in enumerate(suggest[:3])]}
+            x = {"choices": [{"id": f"s{i + 1}", "label": label_cut(s)} for i, s in enumerate(suggest[:3])]}
         else:
             x = {}
         try:
@@ -529,13 +529,13 @@ def build_prompt(evs, chat_uid, extra=None):
                    "proposal, variants, \"shall I ...?\"), end your answer with "
                    "a block ```approval (first line: what you want to do, optional further lines: what happens on yes) "
                    "and wait: only a yes is a yes, silence never is. Up to three short next steps for the person may "
-                   "follow in a final block ```suggest (one per line): they become answer buttons. Commands, code "
+                   "follow in a final block ```suggest (one per line, at most 80 characters each): they become answer buttons. Commands, code "
                    "and configuration the person should run or paste go into their own fenced code block with a language (one block per place, one "
                    "command per line, no prompt sign, steps chained with &&), never as code inside a sentence.")
     else:
         out.append("This is a task event: answer on the task itself (comment) with the Kalmido tools; your final text "
                    "is not posted anywhere. To ask for a decision there, use request_comment_approval (a card with Yes / No); "
-                   "offer up to three next steps as add_comment choices (answer buttons). Alternatively end your final "
+                   "offer up to three next steps as add_comment choices (answer buttons, at most 80 characters each). Alternatively end your final "
                    "text with a block ```approval or ```suggest: then that text is posted as your comment on the task "
                    "with the card / buttons (do not post it again yourself).")
     if extra:  # 2.44.0 (#1441 / #1444 / #1446): open approvals, notes of the launcher, the previous conversation's summary
@@ -708,7 +708,7 @@ def split_tail_blocks(text):
         if kind == "approval" and appr is None:  # the last one wins when there are several
             _, appr = split_approval("```approval\n" + "\n".join(inner) + "\n```")
         elif kind == "suggest" and not sugg:
-            sugg = [re.sub(r"^(?:[-*]|\d+[.)])\s*", "", x)[:80] for x in inner][:3]
+            sugg = [label_cut(re.sub(r"^(?:[-*]|\d+[.)])\s*", "", x)) for x in inner][:3]
         elif kind == "done":
             done = [re.sub(r"^[-*]\s*", "", x)[:200] for x in inner] + done
     return "\n".join(lines).rstrip(), appr, [s for s in sugg if s], done
@@ -716,6 +716,18 @@ def split_tail_blocks(text):
 
 # kalmido-capability: notice (2.41.0, #1206): the line a chat shows when the agent's conversation was compacted mid-run
 NOTICE_COMPACTED = os.environ.get("KALMIDO_NOTICE_COMPACTED", "Conversation compacted ({0})")
+
+
+LABEL_MAX = 80  # the server keeps 80 characters of a button label
+
+
+def label_cut(s, n=LABEL_MAX):
+    """2.46.6 (#1722): a suggestion button label: whitespace folded; a longer one ends at a word with "…" (never mid-word)."""
+    s = " ".join(str(s or "").split())
+    if len(s) <= n:
+        return s
+    cut = s[:n - 1].rsplit(" ", 1)[0] if " " in s[:n - 1] else s[:n - 1]
+    return cut.rstrip(" ,;:.-") + "…"
 
 
 def suggest_line(sugg):
