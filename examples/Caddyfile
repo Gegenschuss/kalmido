@@ -1,0 +1,16 @@
+# Kalmido behind Caddy 2 (built-in login). Caddy gets the certificate itself and sends
+# X-Forwarded-For / -Proto / -Host on its own. WebSockets are not needed (Caddy would pass them anyway).
+# Caddy on the same host as docker-compose.yml (Kalmido published on 127.0.0.1:3040).
+kalmido.example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3040 {
+		# long polling: agents and open apps wait up to 60 s for news
+		transport http {
+			read_timeout 120s
+		}
+	}
+	# uploads: 4 x TASKS_MAX_FILE_MB (default 200 MB)
+	request_body {
+		max_size 200MB
+	}
+}
