@@ -202,6 +202,10 @@ def _ctx_build(c, uid):
     from .pg import system_ctx as pg_system
     with pg_system(c):  # 2.37.0 (#1150): the memberships themselves are read past row-level security
         orgs, aorg, agent = _orgs_of(c, uid)
+        if not agent:  # 2.47.3 (#1360): the person's personal office (a hidden orgs row only its owner reaches)
+            r = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()
+            if r:
+                orgs = (*orgs, r[0])
     return AccessCtx(uid, orgs, "agent" if agent else "user", aorg, None)
 
 

@@ -15,7 +15,7 @@ from .packs import office_pack, office_pack_codes, office_pack_validate
 from .model import (
     MD_KINDS, office_create, office_delete, office_export, office_gate, office_import, office_org, office_role, office_row,
     office_rows, office_seed_texts, office_settings, office_settings_clean, office_settings_save, office_update, office_number_format,
-    office_number_next, office_scheme_clean, office_scheme_period, sr_public,
+    office_number_next, office_scheme_clean, office_scheme_period, sr_public, pb_info,
 )
 from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
 
@@ -41,7 +41,7 @@ def office_settings_get():
     return jsonify(settings=s, company_fields=ofx_company(c, oid), org_id=oid, role=office_role(c, uid, oid), pack={"code": pack["code"], "name": pack["name"], "tax": pack["tax"],
                                                                                "formats": pack["formats"], "currency": pack["currency"]},
                    number_preview=office_number_next(c, oid, "offer", s["offer_scheme"], peek=True)[0],
-                   industry=_industry(s))
+                   industry=_industry(s), **pb_info(c, uid, oid))
 
 
 def _industry(s):
@@ -223,3 +223,48 @@ def office_import_post():
     ofx_log(c, oid, "import", target="master_data", detail={"overwrite": bool(overwrite), "counts": counts})
     c.commit()
     return jsonify(ok=True, counts=counts)
+
+
+# ---- 2.47.3 (#1360): the personal office moves into a new organisation (one way)
+@app.post("/api/office/move")
+def pb_move_post():
+    """Body {name, confirm: true}: the owner of the personal office shown turns it into a new organisation named name, with
+    themselves as its admin -- the same area id, so numbers, keys, files and the log stay as they are (no duplicate
+    numbers); the owner's private clients move with it. One way, no undo. Only where organisations can be created: the
+    mode workspaces and an instance admin (the rule of POST /api/admin/orgs). Into an existing organisation: not yet."""
+    from flask import g
+    from ..accounts.orgs import ORG_NAME_MAX, instance_mode, org_member_add
+    from ..core.access import acx_drop
+    from ..core.db import uset
+    from ..core.pg import system_ctx
+    from .model import pb_owner
+    c, uid, oid = _ctx(admin=True)
+    b = body()
+    if pb_owner(c, oid) != uid:
+        return err(tr("Only a personal office can move into an organisation"), 409)
+    if not isinstance(b, dict) or b.get("confirm") is not True:
+        return err(tr("Please confirm the move"))
+    if instance_mode(c) != "workspaces" or not g.user["is_admin"]:
+        raise Denied(403, tr("Only an admin of this server can create an organisation"))
+    name = " ".join(str(b.get("name") or "").split())[:ORG_NAME_MAX]
+    if not name:
+        return err(tr("Name missing"))
+    with system_ctx(c):  # creating an organisation (instance structure) out of the caller's own area
+        if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL", (name,)).fetchone():
+            return err(tr("An organisation with this name exists"), 409)
+        if c.execute("UPDATE orgs SET name=?, personal_of=NULL WHERE id=? AND personal_of=?", (name, oid, uid)).rowcount != 1:
+            return err(tr("Only a personal office can move into an organisation"), 409)
+        org_member_add(c, oid, uid, "admin")
+        moved = [r[0] for r in c.execute("SELECT id FROM clients WHERE org_id IS NULL AND created_by=?", (uid,))]
+        if moved:
+            q = ",".join("?" * len(moved))
+            c.execute(f"UPDATE clients SET org_id=? WHERE id IN ({q})", (oid, *moved))
+            c.execute(f"UPDATE office_client_contacts SET org_id=? WHERE client_id IN ({q})", (oid, *moved))
+    g.pop("pb_owner", None)
+    acx_drop()
+    uset(c, uid, "workspace", f"org:{oid}")
+    ofx_log(c, oid, "move", target="settings", detail={"name": name, "clients": len(moved)})
+    bump(c)
+    c.commit()
+    print("organisation", name, "(id", oid, ") made from a personal office by", g.user["username"], flush=True)
+    return jsonify(ok=True, org_id=oid, name=name, clients=len(moved))

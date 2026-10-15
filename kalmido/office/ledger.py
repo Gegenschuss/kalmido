@@ -35,7 +35,7 @@ from ..core.pg import write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_json_store, oc_log_detail
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
-from .model import office_gate, office_org, office_role, office_settings
+from .model import office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .packs import office_pack
 
 # P2: does a document of this kind get its number only when it is finalised? (quotations: at creation, unless the
@@ -321,7 +321,7 @@ def ofx_finalize(c, oid, uid, did):
     rec = _j(r["recipient"], {})
     rsnap = {"name": rec.get("name") or "", "lines": rec.get("lines") or []}
     if r["client_id"]:
-        cl = c.execute("SELECT * FROM clients WHERE id=? AND org_id=?", (r["client_id"], oid)).fetchone()
+        cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone()
         if cl:
             for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days"):
                 rsnap[k] = cl[k] if k in cl.keys() else None

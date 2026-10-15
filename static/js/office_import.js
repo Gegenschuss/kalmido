@@ -12,7 +12,7 @@ if (typeof fgWatch === 'function') fgWatch(() => !!OIM.pv || OIM.arch.some(x => 
 async function oimLoad() {
   try { const j = await api('GET', '/api/office/legacy/runs'); OIM.runs = j.runs || []; } catch (x) { OIM.runs = []; }
   try { OIM.counter = await api('GET', '/api/office/legacy/counter'); } catch { OIM.counter = null; }
-  try { const j = await api('GET', '/api/clients'); OIM.clients = (j.clients || []).filter(c => !c.archived && c.org_id === OFC.info?.org_id); } catch { OIM.clients = []; }
+  try { const j = await api('GET', '/api/clients'); OIM.clients = (j.clients || []).filter(c => !c.archived && (c.org_id || null) === pb_clOrg()); } catch { OIM.clients = []; }
   ofcDraw();
 }
 const oimClientOpts = cur => [['', tr('no client')], ...(OIM.clients || []).map(c => [c.id, c.name])].map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('');

@@ -47,7 +47,7 @@ async function ofdLoadDoc(id, force) {
 }
 function ofdDraw() {
   if (S.route.mod !== 'office' || ofcTab() !== 'offers') return;
-  const el = $('.office .ofcbody'); if (el) ofdOffersTab(el);
+  const el = $('.office .ofcbody .pboffers') || $('.office .ofcbody'); if (el) ofdOffersTab(el);  // 2.47.3 (#1360): below the hint of an empty personal office
 }
 // the entry from office.js: fills the tab's body (list or editor)
 function ofdOffersTab(el) {
@@ -106,7 +106,7 @@ function ofdEditorHtml() {
   const texts = kind => ofcRows('texts').filter(x => x.kind === kind && !x.archived);
   const txtOpt = kind => texts(kind).map(x => [x.id, (x.key ? x.key + ': ' : '') + (lg === 'en' && !x.text_en && x.text_de ? tr('(no English text)') + ' ' : '') + ((lg === 'en' ? x.text_en || x.text_de : x.text_de || x.text_en) || '').slice(0, 70)]);  // 2.40.0 (#1381): no silent German
   const contracts = ofcRows('contracts').filter(x => !x.archived || x.id === d.contract_id).map(x => [x.id, x.name]);
-  const clients = typeof clientsOn === 'function' && clientsOn() ? (S.clients || []).filter(c => (!c.archived && c.org_id === OFC.info?.org_id) || c.id === d.client_id).map(c => [c.id, c.name]) : [];
+  const clients = typeof clientsOn === 'function' && clientsOn() ? (S.clients || []).filter(c => (!c.archived && (c.org_id || null) === pb_clOrg()) || c.id === d.client_id).map(c => [c.id, c.name]) : [];
   const lk = !!d.locked, inv = ofdIsInv(d), kind = d.kind, ro = !d.can_edit;
   const numTxt = d.number || (d.number_at_finalize ? tr('Draft') : tr('(no number)'));
   const stOpts = kind === 'offer' ? OFD_STATUS : OFD_INV_STATUS[kind].map(v => [v, OFD_STATE[v]]);
@@ -314,7 +314,7 @@ function ofdRightsBody() {
 // ---- events (delegated on the tab's body)
 function ofdInput(e) {
   const t = e.target;
-  if (t.id === 'ofd-q') { OFD.q = t.value; const el = t.closest('.ofcbody'); if (el) keepFocus(el, () => fl_set(el, ofdListHtml())); }
+  if (t.id === 'ofd-q') { OFD.q = t.value; const el = t.closest('.pboffers, .ofcbody'); if (el) keepFocus(el, () => fl_set(el, ofdListHtml())); }
 }
 function ofdKey(e) { if (e.key === 'Enter' && e.target.id === 'ofd-q') e.preventDefault(); }
 async function ofdChange(e) {
@@ -429,7 +429,7 @@ async function ofdClick(e) {
 async function ofdCreate(body) {
   try { const j = await rawFetch('POST', '/api/office/docs', body); OFD.doc = j; OFD.list = null; OFD.kind = j.kind; go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); }
 }
-const ofdClientOpts = () => typeof clientsOn === 'function' && clientsOn() ? (S.clients || []).filter(c => !c.archived && c.org_id === OFC.info?.org_id).map(c => [c.id, c.name]) : [];
+const ofdClientOpts = () => typeof clientsOn === 'function' && clientsOn() ? (S.clients || []).filter(c => !c.archived && (c.org_id || null) === pb_clOrg()).map(c => [c.id, c.name]) : [];
 function ofdDlg(title, body, okLabel, onOk) {
   const md = modal(`<h3>${esc(title)}</h3><div class="ofddlg">${body}</div><div class="foot"><span class="aerr" role="alert"></span><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button type="button" class="btn pri" data-m="ok">${esc(okLabel)}</button></div>`);
   md.addEventListener('click', async e => {

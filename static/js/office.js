@@ -11,6 +11,7 @@ const OFC_TEXT_KINDS = [['rights_time', N_('Rights: duration')], ['rights_territ
   ['intro', N_('Introduction')], ['closing', N_('Closing')], ['note', N_('Note|office')], ['block', N_('Text block between positions')], ['raw_note', N_('Raw data note')]];
 const officeOn = () => feat('office') && !S.me?.kid;
 const ofcAdmin = () => OFC.info?.role === 'admin';
+const pb_clOrg = () => OFC.info?.personal ? null : (OFC.info?.org_id || null);  // 2.47.3 (#1360): a personal office's clients are the private ones
 const ofcTab = () => OFC_TABS.some(t => t[0] === S.route.tab) ? S.route.tab : S.route.tab === 'import' ? 'settings' : 'offers';  // 2.39.1 (#1182): the import page sits under Settings
 // money / numbers of the master data: in the person's locale, the organisation's currency
 const ofcCur = () => OFC.info?.settings?.currency || 'EUR';
@@ -20,7 +21,7 @@ const ofcTax = k => { const t = OFC.info?.pack?.tax; const pct = t ? t[k] : null
 
 // ---- loading
 async function ofcInfo(force) {
-  if (OFC.infoLoading) return;
+  if (OFC.infoLoading || OFC.pbWait) return;  // 2.47.3 (#1360): not while the new workspace is being saved
   if (OFC.info && !force) return;
   OFC.infoLoading = true;
   try { OFC.info = await api('GET', '/api/office/settings'); OFC.infoErr = null; }
@@ -50,17 +51,47 @@ function viewOffice() {
   if (!officeOn()) return `<div class="empty">${tr('Office & finance is off (Settings > Modules)')}</div>`;
   const tab = ofcTab();
   if (OFC.tab !== tab) { OFC.tab = tab; OFC.q = ''; }  // the search belongs to one tab
+  pb_wsFollow();
   if (!OFC.info && !OFC.infoErr && !OFC.infoLoading) setTimeout(ofcInfo, 0);
   const tabs = `<div class="seg ofctabs wrap" role="tablist" aria-label="${esc(tr('Office & finance'))}">${OFC_TABS.map(([k, i, n]) => `<button type="button" role="tab" data-go="office/${k}" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>`;
   let body;
   if (OFC.infoErr) body = `<div class="empty nempty eact">${ic('building')}<span>${esc(OFC.infoErr)}</span><a class="btn" href="#settings">${tr('Settings')}</a></div>`;
   else if (!OFC.info) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
+  else if (pb_hintHtml()) body = pb_hintHtml() + (tab === 'offers' ? '<div class="pboffers"></div>' : tab === 'settings' ? (S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : ofcSettingsHtml()) : ofcListHtml(tab));  // 2.47.3 (#1360)
   else if (tab === 'offers') body = typeof ofdOffersTab === 'function' ? '' : `<div class="empty">${ic('receipt')}<span>${tr('Quotations arrive with the next step of this module.')}</span></div>`;
   else if (tab === 'settings') body = S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : ofcSettingsHtml();  // 2.39.1 (#1182): office/import
   else body = ofcListHtml(tab);
-  const html = `<div class="dash office" data-ofctab="${tab}"><div class="ofchead">${OFC.info ? `<span class="muted ofcorg">${esc(OFC.info.settings?.company?.name || orgLabelOf(OFC.info.org_id))}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ''}</span>` : ''}</div>${tabs}<div class="ofcbody"${tab === 'offers' && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
-  if (tab === 'offers' && OFC.info && typeof ofdOffersTab === 'function') setTimeout(() => { const el = $('.office .ofcbody'); if (el && ofcTab() === 'offers') ofdOffersTab(el); }, 0);
+  const html = `<div class="dash office" data-ofctab="${tab}"><div class="ofchead">${OFC.info ? `<span class="muted ofcorg">${esc(OFC.info.settings?.company?.name || (OFC.info.personal ? tr('Private|workspace') : orgLabelOf(OFC.info.org_id)))}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ''}</span>` : ''}</div>${tabs}<div class="ofcbody"${tab === 'offers' && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
+  if (tab === 'offers' && OFC.info && typeof ofdOffersTab === 'function') setTimeout(() => { const el = $('.office .ofcbody .pboffers') || $('.office .ofcbody'); if (el && ofcTab() === 'offers') ofdOffersTab(el); }, 0);  // 2.47.3 (#1360): below the hint
   return html;
+}
+// ---- 2.47.3 (#1360): the office follows the workspace switch ("Private" = the person's own office, an organisation's =
+// its office). wsSet (workspace.js) calls pb_wsChanged(true) before saving the setting and pb_wsChanged(false) after it,
+// so the office is read for the new workspace only once the server knows it; a switch on another device is caught here.
+function pb_reset(nav) {
+  OFC.info = null; OFC.infoErr = null; OFC.data = {};
+  if (typeof OFD !== 'undefined') { OFD.list = null; OFD.doc = null; OFD.docId = null; OFD.log = null; }
+  if (typeof OIM !== 'undefined') OIM.list = null;
+  if (nav && S.route.mod === 'office' && S.route.id) setTimeout(() => go('office/' + (S.route.tab || 'offers')), 0);  // a document of the other area
+}
+function pb_wsFollow() {
+  if (!S.me || !S.settings) return;
+  const ws = typeof wsCur === 'function' ? wsCur() : '';
+  if (OFC.ws !== undefined && OFC.ws !== ws) pb_reset();
+  OFC.ws = ws;
+}
+function pb_wsChanged(saving) {
+  OFC.pbWait = !!saving;
+  if (saving) { pb_reset(true); OFC.ws = typeof wsCur === 'function' ? wsCur() : ''; }
+  else ofcDraw();
+}
+// the empty personal office of a person with organisations points to the offices of these organisations
+function pb_hintHtml() {
+  const h = OFC.info?.personal ? OFC.info.org_offices || [] : [];
+  if (!h.length) return '';
+  return `<div class="pbhint shint keep">${ic('building', 's')}<div>${h.map(o => `<p>${esc(tr('The office of your organisation {0} is in the workspace {0}.', o.name))}</p>
+    <button type="button" class="btn sm" data-ofc="pb-ws" data-ws="org:${o.id}">${esc(tr('Switch to {0}', o.name))}</button>`).join('')}
+    <p class="muted">${esc(tr('This is your personal office in the workspace Private: its clients, documents and settings are yours alone.'))}</p></div></div>`;
 }
 const orgLabelOf = oid => (S.me?.workspaces || []).find(o => o.id === oid)?.name || '';
 
@@ -251,6 +282,7 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-numat', tr('Quotation number'), ofcSel('os-numat', s.offer_number_at || 'create', [['create', tr('when the quotation is created')], ['finalize', tr('when it is finalised')]]))}${ofcII('numat')}
     ${ofcRowF('os-valid', tr('Quotation valid for'), `<span class="lacts"><input id="os-valid" value="${esc(String(s.offer_valid_days ?? 30))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}
     <h3>${tr('Invoices')}</h3>
+    ${ofcChk('os-small', tr('Small business: no VAT (section 19 UStG)'), s.small_business)}${typeof ux_info === 'function' ? ux_info('small_business') : ''}
     ${ofcSchemeHtml('os-inv-scheme', 'invoice', tr('Invoice numbers'), s.invoice_scheme, dis)}
     ${ofcSchemeHtml('os-cr-scheme', 'credit', tr('Credit note numbers'), s.credit_scheme, dis)}
     ${ofcSchemeHtml('os-rm-scheme', 'reminder', tr('Reminder numbers'), s.reminder_scheme, dis)}
@@ -295,7 +327,20 @@ function ofcSettingsHtml() {
       ${adm ? `<input type="file" id="os-import" accept="application/json,.json" hidden><button type="button" class="btn sm" data-ofc="import">${ic('upload', 's')} ${tr('Import')}</button><label class="chkl" data-fg-skip><input type="checkbox" id="os-overwrite"> ${tr('overwrite existing')}</label>` : ''}</div>
     ${adm ? `<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('Clients, services and equipment from a spreadsheet; old invoices and quotations as an archive.')}</p><div class="lacts"><a class="btn sm" href="#office/import">${ic('upload', 's')} ${tr('Import legacy data')}</a></div>` : ''}
     ${adm ? `<h3>${tr('Access log')}</h3><p class="muted">${tr('Who opened, printed, changed or exported documents and master data of this organisation.')}</p>${ofcLogHtml()}` : ''}
+    ${adm && OFC.info.personal && OFC.info.can_move ? `<h3>${tr('Move into an organisation')}</h3><p class="muted">${tr('Turns this personal office into a new organisation with you as its admin: documents, numbers, settings, master data and your private clients go with it. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-move">${ic('building', 's')} ${tr('Create organisation…')}</button></div>` : ''}
   </form>`;
+}
+// 2.47.3 (#1360): the personal office becomes a new organisation (one way: name, then a confirmation)
+async function pb_move() {
+  const name = ((await askPrompt(tr('Name of the new organisation'), OFC.info?.settings?.company?.name || OFC.info?.company_fields?.name || '', {ok: tr('Next'), input: {max: 60}})) || '').trim();
+  if (!name) return;
+  if (!await askConfirm(tr('Move your personal office into “{0}”?', name), tr('Turns this personal office into a new organisation with you as its admin: documents, numbers, settings, master data and your private clients go with it. This cannot be undone.'), {ok: tr('Move'), danger: true})) return;
+  try {
+    const j = await api('POST', '/api/office/move', {name, confirm: true});
+    await refreshMe(); S.workspaces = true; S.settings.workspace = 'org:' + j.org_id; LS.set('ws', S.settings.workspace);
+    pb_reset(true); OFC.ws = typeof wsCur === 'function' ? wsCur() : ''; render();
+    toast(tr('The organisation “{0}” now holds your office', j.name));
+  } catch (x) { toast(x.message || tr('unknown')); }
 }
 // 2.36.2 (#1021 P4): the company as single fields (print lines are made from them; the free lines stay the fallback)
 const OFC_CO_FIELDS = [['street', N_('Street'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country'), 2],
@@ -380,7 +425,7 @@ async function ofcSaveSettings(form) {
     intro_text_id: {de: +v('#os-intro-de') || null, en: +v('#os-intro-en') || null}, closing_text_id: {de: +v('#os-closing-de') || null, en: +v('#os-closing-en') || null},
     rights_default: {time_id: +v('#os-rt') || null, territory_id: +v('#os-rr') || null, media_id: +v('#os-rm') || null}, pack: v('#os-pack'),
     invoice_scheme: v('#os-inv-scheme'), credit_scheme: v('#os-cr-scheme'), reminder_scheme: v('#os-rm-scheme'), payment_days: ofcNum(v('#os-paydays')), reminder_fee: ofcNum(v('#os-rmfee')),
-    reminder_deadline_days: ofcNum(v('#os-rmdays')), einvoice_format: v('#os-einv'), datev_email: v('#os-datev').trim(), datev_auto: $('#os-datev-auto', form)?.checked ? 1 : 0,
+    reminder_deadline_days: ofcNum(v('#os-rmdays')), einvoice_format: v('#os-einv'), datev_email: v('#os-datev').trim(), datev_auto: $('#os-datev-auto', form)?.checked ? 1 : 0, small_business: $('#os-small', form)?.checked ? 1 : 0,
     invoice_closing_de: v('#os-inv-close-de'), invoice_closing_en: v('#os-inv-close-en'), reminder_text_de: v('#os-rm-text-de'), reminder_text_en: v('#os-rm-text-en')};
   if (typeof tpSettingsBody === 'function') Object.assign(body, tpSettingsBody(form));  // 2.47.0 (#1215)
   try { const j = await api('PUT', '/api/office/settings', body); OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null; fgDone(form.dataset.fg); toast(tr('Saved')); ofcDraw(); }
@@ -408,6 +453,8 @@ async function ofcImport(file, overwrite) {
 document.addEventListener('click', async e => {
   const b = e.target.closest?.('[data-ofc]'); if (!b) return;
   const a = b.dataset.ofc;
+  if (a === 'pb-move') { pb_move(); return; }  // 2.47.3 (#1360)
+  if (a === 'pb-ws') { if (typeof wsSet === 'function') wsSet(b.dataset.ws); return; }  // 2.47.3 (#1360)
   if (a === 'new') { e.preventDefault(); ofcModal(b.dataset.kind, null); }
   else if (a === 'open') { e.preventDefault(); const r = ofcRow(b.dataset.kind, +b.dataset.id); if (r) ofcModal(b.dataset.kind, r); }
   else if (a === 'import') { e.preventDefault(); const inp = $('#os-import'); if (inp) { inp.onchange = () => { ofcImport(inp.files[0], $('#os-overwrite')?.checked); inp.value = ''; }; inp.click(); } }

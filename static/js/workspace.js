@@ -23,8 +23,10 @@ async function wsSet(ws) {
   if (!wsOptions().includes(ws)) ws = 'all';
   S.settings.workspace = ws; LS.set('ws', ws);
   closeSide?.();
+  if (typeof pb_wsChanged === 'function') pb_wsChanged(true);  // 2.47.3 (#1360): the office follows once the server knows it
   render();
   try { await api('PATCH', '/api/settings', {workspace: ws}); } catch { /* api() said it */ }
+  if (typeof pb_wsChanged === 'function') pb_wsChanged(false);
 }
 // the switch in the sidebar (under the brand): one button naming the shown workspace (a long organisation name fits), the
 // menu offers Private | <organisations> | All workspaces

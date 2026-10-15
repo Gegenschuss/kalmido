@@ -94,7 +94,7 @@ def apply(c):
     # a database owner without superuser could not start
     c.execute("CREATE OR REPLACE FUNCTION kalmido_org_count() RETURNS bigint LANGUAGE plpgsql STABLE AS $f$"
               "DECLARE prev text := current_setting('app.role', true); n bigint; "
-              "BEGIN PERFORM set_config('app.role', 'system', true); SELECT COUNT(*) INTO n FROM orgs; "
+              "BEGIN PERFORM set_config('app.role', 'system', true); SELECT COUNT(*) INTO n FROM orgs WHERE personal_of IS NULL; "
               "PERFORM set_config('app.role', COALESCE(prev, ''), true); RETURN n; END$f$")
     STATE["enforced"] = _app_role(c)
     if not STATE["enforced"]:

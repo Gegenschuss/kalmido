@@ -123,7 +123,7 @@ def clean_client(c, uid, b, new=False):
             u = _user(c, uid)
             from ..accounts.orgs import user_orgs
             mine = set(user_orgs(c, uid))
-            if v is not None and not c.execute("SELECT 1 FROM orgs WHERE id=?", (v,)).fetchone():
+            if v is not None and not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (v,)).fetchone():  # 2.47.3 (#1360)
                 raise BadInput(tr("Invalid value: {0}", k))
             if v is not None and v not in mine and not (u["is_admin"] and not _org_boundary(c)):
                 raise BadInput(tr("You can only add clients to your own organisations"))
