@@ -1,4 +1,4 @@
-// 2.46.X (#1737): the Share dialogs of lists, folders, calendars and address books say which workspace the object belongs to
+// 2.46.4 (#1737): the Share dialogs of lists, folders, calendars and address books say which workspace the object belongs to
 // ("Belongs to: <organisation> (organisation)" / "Private") and grey out the people the server would refuse (not in the
 // organisation) with the reason, before anything is sent. The server check (ws_fit_problem) stays the truth.
 const shWsOn = () => typeof wsOn === 'function' && wsOn();

@@ -33,7 +33,7 @@ function folderShareModal(f, opt = {}) {
   const agFits = u => !wsOn() || (u.org_id || null) === fws();  // the agents of the folder's workspace, as in a list (agFits)
   const drawPeople = () => {
     const box = $('#fsh-members', md); if (!box) return;
-    shWsFill($('#fsh-ws', md), fws(), own ? () => $('[data-m="fsh-props"]', md)?.click() : null);  // 2.46.X (#1737)
+    shWsFill($('#fsh-ws', md), fws(), own ? () => $('[data-m="fsh-props"]', md)?.click() : null);  // 2.46.4 (#1737)
     const nm = p => p.name || users?.find(u => u.id === p.user_id)?.display_name || '?';
     const cand = (users || []).filter(u => !u.agent && u.id !== S.me?.id && !have.some(p => p.user_id === u.id));
     box.innerHTML = `<div class="mrow fshowner">${av(S.me?.id, S.me?.display_name || '')}<span class="n">${esc(S.me?.display_name || '')} ${tr('(me)')}</span><span class="muted">${tr('Owner')}</span></div>`

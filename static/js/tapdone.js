@@ -1,8 +1,8 @@
-/* Kalmido web client: "Tap does not open details" of a list (2.46.X, #1751).
+/* Kalmido web client: "Tap does not open details" of a list (2.46.4, #1751).
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-// ---- 2.46.X (#1751): a list switch (lists.tap_done, the same for every member; owner / list admins change it). On, a tap
+// ---- 2.46.4 (#1751): a list switch (lists.tap_done, the same for every member; owner / list admins change it). On, a tap
 // on a task row of the list (its title, the gaps of the row) ticks the task off or back on like its circle (with the undo
 // message); the details stay one step away: the row's menu ("Open details": right-click on a desktop, long press > More on
 // a phone), Enter on the focused row, the columns of a table list. A double click on a desktop still renames the task

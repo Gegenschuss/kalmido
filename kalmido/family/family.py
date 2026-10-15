@@ -473,7 +473,7 @@ def pm_family_list(c, uid, folder=""):
 def fam_list_create(c, uid, kind, name=None, folder=""):
     """A new list of family kind `kind`; 2.46.1 (#1608): without a colour (lists made before keep theirs)."""
     lg = lang(c, uid)
-    tick = 1 if kind in ("shopping", "packing") else 0  # 2.46.X (#1751): + "Tap does not open details" on
+    tick = 1 if kind in ("shopping", "packing") else 0  # 2.46.4 (#1751): + "Tap does not open details" on
     lid = insert_id(c, """INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,family,tap_done)
                        VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                     (name or tr(FAM_LIST_NAMES[kind], lg=lg), "", folder, my_max_sort(c, uid) + 1, "list",

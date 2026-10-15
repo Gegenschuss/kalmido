@@ -1,4 +1,4 @@
-// 2.46.X part C UI tests (#1737 #1755), own container (start.sh). jsdom, invented data only:
+// 2.46.4 part C UI tests (#1737 #1755), own container (start.sh). jsdom, invented data only:
 // - #1737 the Share dialogs of a list, an address book, a calendar and a folder say "Belongs to: <organisation> (organisation)" /
 //   "Private" with the sentence below, people outside the organisation are greyed out with the reason, a mirrored address book is
 //   private even when it carries an organisation, the "Change workspace" link only where there is a way (not for a mirrored book)

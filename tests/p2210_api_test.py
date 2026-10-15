@@ -546,7 +546,7 @@ r = iph.req("PROPFIND", "/dav/addressbooks/alice/", '<?xml version="1.0"?><d:pro
 abh = ms(r.text)[0]
 check(r.status_code == 207 and AB in abh and abh[AB]["{DAV:}resourcetype"].find("{urn:ietf:params:xml:ns:carddav}addressbook") is not None
       and len(abh[AB]["{urn:ietf:params:xml:ns:carddav}supported-address-data"]) == 2, "the address book home: the book, vCard 3 + 4")
-# 2.46.X (#1736): the own home reports full rights (macOS Contacts takes the home as the account and stays read only otherwise)
+# 2.46.4 (#1736): the own home reports full rights (macOS Contacts takes the home as the account and stays read only otherwise)
 hp = abh["/dav/addressbooks/alice/"]["{DAV:}current-user-privilege-set"]
 hpv = {x.tag.split("}")[1] for pr in hp for x in pr}
 check({"read", "write", "write-content", "bind", "unbind"} <= hpv, f"the own address book home: write, bind, unbind {hpv}")
@@ -607,7 +607,7 @@ check(f"/dav/addressbooks/bob/b{BK}/" in ms(r.text)[0], "Bob's address book home
 check(bob.req("PUT", f"/dav/addressbooks/bob/b{BK}/b.vcf", V4.replace("v4-1", "b-1"), **{"Content-Type": "text/vcard"}).status_code == 403, "view only: PUT 403")
 check(eve.req("GET", AB.replace("alice", "eve") + "IOS-CARD-1.vcf").status_code == 404, "Eve: the book does not exist for her")
 check(iph.req("PUT", AB + "bad.vcf", "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:x\r\nEND:VCARD\r\n", **{"Content-Type": "text/vcard"}).status_code == 400, "a card without a UID: 400")
-# 2.46.X (#1736): the ETag ignores the PRODID line (it carries the app version) - an update keeps every ETag and sync token
+# 2.46.4 (#1736): the ETag ignores the PRODID line (it carries the app version) - an update keeps every ETag and sync token
 import hashlib
 import re as _re
 r = dx.req("GET", AB + "v4-1.vcf")

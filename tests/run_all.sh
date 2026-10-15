@@ -710,12 +710,12 @@ fresh; run p2462_d_api "$PY" p2462_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2462_d_ui node p2462_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.2 part A: #1718 no flicker (the view is morphed on a redraw of the same route)
 fresh; run p2462_a_ui node p2462_a_ui.js "$KALMIDO_TEST_DATA"
-# 2.46.X part A: #1732 the contacts of a deleted address book leave the list at once (dialog, filter, live update)
+# 2.46.4 part A: #1732 the contacts of a deleted address book leave the list at once (dialog, filter, live update)
 fresh; run p246d_a_ui node p246d_a_ui.js "$KALMIDO_TEST_DATA"
-# 2.46.X part B: #1751 the list switch "Tap does not open details" (a tap ticks off; on for shopping / packing lists)
+# 2.46.4 part B: #1751 the list switch "Tap does not open details" (a tap ticks off; on for shopping / packing lists)
 fresh; run p246d_b_api "$PY" p246d_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p246d_b_ui node p246d_b_ui.js "$KALMIDO_TEST_DATA"
-# 2.46.X part C: #1737 workspace line + greyed-out people in the Share dialogs, #1755 one-line Undo message above the keyboard
+# 2.46.4 part C: #1737 workspace line + greyed-out people in the Share dialogs, #1755 one-line Undo message above the keyboard
 fresh; run p246d_c_ui node p246d_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi

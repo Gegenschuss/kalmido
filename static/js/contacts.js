@@ -24,7 +24,7 @@ function ctDate(v) {  // '1980-05-12' / '--05-12' -> "12 May 1980" / "12 May"
   if (v.startsWith('--')) { const d = new Date(2000, +v.slice(2, 4) - 1, +v.slice(5, 7)); try { return d.toLocaleDateString(LOCALE(), {day: 'numeric', month: 'long'}); } catch { return v.slice(2); } }  // no year: no weekday either
   return fmtDay('year', pd(v));
 }
-// 2.46.X (#1732): an address book that is gone (deleted, left, or so on another device): its contacts, a filter on it, an open card
+// 2.46.4 (#1732): an address book that is gone (deleted, left, or so on another device): its contacts, a filter on it, an open card
 // and selected ids of it leave the view at once - before, ctLoad failed on the filter and kept the old items until a reload
 let ct_seenBooks = null;
 function ct_prune() {
@@ -55,7 +55,7 @@ async function ctLoad() {
     if (seq !== CT.seq) return;
     CT.items = j.items; CT.total = j.total; CT.groups = j.groups || [];
   } catch (e) {
-    if (seq === CT.seq && e?.status === 404 && CT.book) { CT.book = ''; CT.loading = false; return ctLoad(); }  // 2.46.X (#1732): the filtered book is gone
+    if (seq === CT.seq && e?.status === 404 && CT.book) { CT.book = ''; CT.loading = false; return ctLoad(); }  // 2.46.4 (#1732): the filtered book is gone
     if (seq === CT.seq) CT.items = CT.items || [];
   }
   CT.loading = false;
@@ -73,7 +73,7 @@ async function ctOpen(id) {
 function ctDraw() { if (S.route.mod === 'contacts') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('contacts', viewContacts()))); } }
 function viewContacts() {
   if (CT.items === null && !CT.loading) setTimeout(ctLoad, 0);
-  ct_prune();  // 2.46.X (#1732): also after a live update
+  ct_prune();  // 2.46.4 (#1732): also after a live update
   const books = (S.books || []).filter(b => wsObjIn(b));  // 2.30.0 (#1036): the address books of the shown workspace
   const items = CT.items === null ? null : CT.items.filter(c => !ctBook(c.book_id) || wsObjIn(ctBook(c.book_id)));
   const mob = isMobile(), showCard = CT.card && (!mob || CT.sel);
@@ -443,14 +443,14 @@ async function ctBooksModal() {
   });
 }
 function ctShareModal(b, users, names, done) {
-  const bOrg = () => b.imported || b.src_id ? null : b.org_id || null;  // 2.46.X (#1737): a book mirrored from a connected account is always private
+  const bOrg = () => b.imported || b.src_id ? null : b.org_id || null;  // 2.46.4 (#1737): a book mirrored from a connected account is always private
   const md = modal(`<h3>${tr('Share {0}', esc(b.name))}</h3><div class="shws"></div><div id="cbs-list"></div>
     <div class="row"><label for="cbs-user">${tr('Person')}</label><select id="cbs-user" data-sheet-av>${shWsOptions(users, bOrg(), b.members)}</select>
       <select id="cbs-role" aria-label="${esc(tr('Role'))}"><option value="view">${tr('can view')}</option><option value="edit">${tr('can edit')}</option></select><button class="btn sm pri" data-cbs="add">${tr('Share')}</button></div>
     <div class="shint">${tr('Contacts are personal data: share an address book only with people who may see all of it.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-cbs="close">${tr('Done')}</button></div>`);
   const draw = () => { $('#cbs-list', md).innerHTML = (b.members || []).length ? `<ul class="evclist">${b.members.map(m => `<li class="evcrow">${av(m.user_id, names.get(m.user_id) || '')}<span class="evcn">${esc(names.get(m.user_id) || '?')} <span class="muted">· ${esc(m.role === 'edit' ? tr('can edit') : tr('can view'))}</span></span><button class="iconbtn" data-cbsrm="${m.user_id}" aria-label="${esc(tr('Stop sharing with {0}', names.get(m.user_id) || ''))}">${ic('x', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('Not shared yet.')}</p>`; };
-  const wsDraw = () => {  // 2.46.X (#1737)
+  const wsDraw = () => {  // 2.46.4 (#1737)
     shWsFill($('.shws', md), bOrg(), b.imported || b.src_id ? null : a => wsMoveMenu(a, b.org_id, async org => {
       try { await api('PATCH', `/api/books/${b.id}`, {org_id: org}); } catch { return; }
       b.org_id = org; wsDraw(); $('#cbs-user', md).innerHTML = shWsOptions(users, bOrg(), b.members); shWsPick($('#cbs-user', md)); done();

@@ -1,4 +1,4 @@
-// 2.46.X UI tests, part A (#1732), own container (start.sh). jsdom, invented data only:
+// 2.46.4 UI tests, part A (#1732), own container (start.sh). jsdom, invented data only:
 // - #1732 an address book deleted in the "Address books" dialog: its contacts leave the list at once - without a filter, with the
 //   filter on that book (the filter falls back to all books), an open card of it closes, selected ids of it are dropped
 // - the same when the book is deleted elsewhere (another device) and the state is loaded again (live update)

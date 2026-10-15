@@ -1,4 +1,4 @@
-// 2.46.X UI tests of part B (#1751, own container, start.sh). jsdom: the list switch "Tap does not open details".
+// 2.46.4 UI tests of part B (#1751, own container, start.sh). jsdom: the list switch "Tap does not open details".
 // - a shopping list (on by default): a tap on a task row ticks it off (undo message), a second tap puts it back; no panel
 // - a mouse click waits for a double click: a double click renames the task (inline field), nothing is ticked off
 // - "Open details" on top of the row's menu (taskMenu, right-click) and of the phone's selection menu opens the task

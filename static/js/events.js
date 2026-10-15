@@ -7,7 +7,7 @@ let toastTimer;
 // 2.6.0 (K18): the toast sits above whatever is docked at the bottom (the composer "Add task…", the tab bar, the + button),
 // never on top of it; measured each time it shows
 function toastPlace(el) {
-  // 2.46.X (#1755): with a real keyboard the visible area ends where the keyboard starts (visual viewport, in layout
+  // 2.46.4 (#1755): with a real keyboard the visible area ends where the keyboard starts (visual viewport, in layout
   // coordinates); the message sits above the lowest input field there (the comment field), else right above the keyboard
   const vv = window.visualViewport, kb = typeof kbReal === 'function' && kbReal();
   const vis = kb ? Math.round(vv.offsetTop + vv.height) : innerHeight;
@@ -22,7 +22,7 @@ function toastPlace(el) {
   }
   // 2.13.0 (#453 A12): an open bottom sheet (snooze, date, menus) is never covered: the toast sits above its top edge
   // 2.25.0 (UX-31): the phone's quick-add sheet too: the message sits above it, never over the field
-  // 2.46.X (#1755): a sheet taller than 70 % no longer sends the message to the top (over the header / the content): it stays at the bottom
+  // 2.46.4 (#1755): a sheet taller than 70 % no longer sends the message to the top (over the header / the content): it stays at the bottom
   const sh = $('#pop.sheet:not(.hidden)') || $('.qadd.sheet'), sr = sh && sh.offsetHeight ? an_rect(sh) : null;  // 2.46.1 (#1558): an_rect = where the sheet will be, not where its entry animation is now
   el.classList.remove('totop');
   if (sr && sr.top >= innerHeight * .3) top = Math.min(top, sr.top);
@@ -94,7 +94,7 @@ function toast(msg, undo, ms, label) {  // label: the button's text instead of "
   announce(msg + (undo ? ' · ' + (label || tr('Undo')) + (isTouch() ? '' : ' (' + kbText('Mod+Z') + ')') : ''));
   if (!undo || label) HIST.toastE = null;  // any other message ends the toast's shortcut (the history keeps the step)
   el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button>${esc(label || tr('Undo'))}</button>${isMobile() || isTouch() || label ? '' : kb('Mod+Z')}` : ''}`;
-  el.classList.toggle('one', !!undo); el.title = undo ? msg : '';  // 2.46.X (#1755): one line, the name is cut with an ellipsis, the button stays whole
+  el.classList.toggle('one', !!undo); el.title = undo ? msg : '';  // 2.46.4 (#1755): one line, the name is cut with an ellipsis, the button stays whole
   el.classList.remove('hidden');
   toastPlace(el);
   if (undo) el.querySelector('button').onclick = () => { el.classList.add('hidden'); undo(); };

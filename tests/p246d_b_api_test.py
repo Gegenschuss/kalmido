@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.46.X part B API tests (#1751), own container (start.sh): the list switch "Tap does not open details" (lists.tap_done).
+"""2.46.4 part B API tests (#1751), own container (start.sh): the list switch "Tap does not open details" (lists.tap_done).
 - new shopping and packing lists start with it on, a meal plan and a plain list with it off; a packing list from a template too
 - PATCH tap_done: owner and list admins (0 / 1 / true / false), a member with edit rights gets 403, wrong values 400
 - once on for the shopping / packing lists that exist when the column is created (the column dropped by hand, a restart);

@@ -519,7 +519,7 @@ function shareModal(id, opt = {}) {
     const box = $('#l-members', md);
     if (box) {
       const ppl = people.filter(p => !isAg(p));
-      // 2.28.0 (#935): an organisation's list is shared only with its members; 2.46.X (#1737): the others are greyed out with the reason
+      // 2.28.0 (#935): an organisation's list is shared only with its members; 2.46.4 (#1737): the others are greyed out with the reason
       const cand = users && users.filter(u => !u.agent && u.id !== S.me?.id && !people.some(p => p.user_id === u.id));
       shWsFill($('#sh-ws', md), cur.org_id || null, own && !cur.is_inbox ? () => $('[data-m="list-edit"]', md)?.click() : null);
       box.innerHTML = ppl.map(p => row(cur, p, mng)).join('') +
@@ -804,7 +804,7 @@ function listModal(id, folder = '', o = {}) {
   $('#l-bell', md)?.addEventListener('bell-sync', e => bellHint(e.target.value));
   $('#l-stale', md)?.addEventListener('change', e => { e.stopPropagation(); staleDaysSet(id, e.target); });  // 2.34.0 (#266)
   if (id) ovWire(md, id);  // 2.46.0 (#1603): "Everyone in the organisation"
-  if (id) tp_wire(md, id);  // 2.46.X (#1751): "Tap does not open details"
+  if (id) tp_wire(md, id);  // 2.46.4 (#1751): "Tap does not open details"
   $('#l-dsx', md)?.addEventListener('change', e => { e.stopPropagation(); dsxSet(id, e.target.checked).then(() => { const x = listById(id), c = $('#l-dsx', md); if (x && c) c.checked = dsxOn(x); }); });  // 2.36.2 (#1136)
   $('[data-m="bell-custom"]', md)?.addEventListener('click', e => { e.stopPropagation(); bellCustomModal(id); });
   // ---- autosave (existing lists)
@@ -849,7 +849,7 @@ function listModal(id, folder = '', o = {}) {
     if ($('#l-dab', md)) $('#l-dab', md).checked = !!x.checklist;
     if ($('#l-fam', md)) $('#l-fam', md).value = x.family || '';
     if ($('#l-dsx', md)) { $('#l-dsx', md).checked = dsxOn(x); $('#l-dsx', md).disabled = dsxFixedOff(x); }  // 2.36.2 (#1136)
-    tp_sync(md, x);  // 2.46.X (#1751)
+    tp_sync(md, x);  // 2.46.4 (#1751)
   };
   let saving = Promise.resolve();
   const autosave = () => {

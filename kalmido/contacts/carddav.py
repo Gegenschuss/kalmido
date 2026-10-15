@@ -50,7 +50,7 @@ _PRODID_RE = re.compile(r"^PRODID[:;][^\r\n]*(?:\r?\n[ \t][^\r\n]*)*\r?\n", re.I
 
 
 def _etag(text):
-    # 2.46.X (#1736): without the PRODID line (it carries the app version) - else every update changes all ETags and sync tokens,
+    # 2.46.4 (#1736): without the PRODID line (it carries the app version) - else every update changes all ETags and sync tokens,
     # and a change made on a device before the update fails with 412
     body = _PRODID_RE.sub("", text)
     return '"' + hashlib.sha1(body.encode("utf-8"), usedforsecurity=False).hexdigest()[:24] + '"'
@@ -112,7 +112,7 @@ def _privs_of(role):
 
 
 def props_home(u):
-    # 2.46.X (#1736): the own home belongs to the signed-in account - full rights, else macOS Contacts treats the account as
+    # 2.46.4 (#1736): the own home belongs to the signed-in account - full rights, else macOS Contacts treats the account as
     # read only and never sends a change (MKCOL stays 403: address books are made in the app)
     return {**dav_common(u), D_ + "resourcetype": "<D:collection/>", D_ + "displayname": _xe(APP_NAME),
             D_ + "owner": f"<D:href>{_xe(dav_principal_href(u))}</D:href>", D_ + "current-user-privilege-set": _privs_of("owner"),

@@ -1264,7 +1264,7 @@ MIGRATIONS = [
     # organisation (read-only until they join; org_edit = 1: they may edit without joining)
     ("lists", "org_visibility", "ALTER TABLE lists ADD COLUMN org_visibility TEXT NOT NULL DEFAULT ''"),
     ("lists", "org_edit", "ALTER TABLE lists ADD COLUMN org_edit BIGINT NOT NULL DEFAULT 0"),
-    # 2.46.X (#1751): "Tap does not open details": a tap on a task row ticks it off (owner / list admins; 0 / 1). The second
+    # 2.46.4 (#1751): "Tap does not open details": a tap on a task row ticks it off (owner / list admins; 0 / 1). The second
     # entry runs once with the column's creation (the columns present are read before this loop): the shopping and packing
     # lists that exist get it on; later the person may switch it off and it stays off
     ("lists", "tap_done", "ALTER TABLE lists ADD COLUMN tap_done BIGINT NOT NULL DEFAULT 0"),
