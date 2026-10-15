@@ -1050,7 +1050,7 @@ def v1_agent_chat_post(uid):
     jpar = None
     if b.get("job_parent") not in (None, ""):
         jpar = as_int(b["job_parent"], "job_parent", 1)
-        if not jid or jpar == jid or not c.execute("SELECT 1 FROM agent_jobs WHERE id=? AND agent_id=?", (jpar, aid)).fetchone():
+        if not jid or jpar == jid or not c.execute("SELECT 1 FROM agent_jobs WHERE id=? AND agent_id=? AND user_id=?", (jpar, aid, uid)).fetchone():  # review K3: + the person
             raise BadInput(tr("Invalid value: {0}", "job_parent"))
     b = {k: v for k, v in b.items() if k not in ("job_id", "job_parent")}
     if fb is not None and isinstance(b.get("multi"), str):

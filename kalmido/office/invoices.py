@@ -399,7 +399,9 @@ def inv_new_row(c, oid, s, kind, lang, src=None):
                     row["payment_days"] = int(cl["payment_terms_days"])
                 if cl["buyer_reference"] and kind in ("invoice", "credit"):  # 2.40.0 (#1368): credit notes too
                     row["einvoice_format"] = "xrechnung"
-    if s.get("small_business") and kind != "reminder":  # 2.47.3 (#1360): section 19 UStG -- no VAT, the exemption note (E)
+    # 2.47.3 (#1360): section 19 UStG -- no VAT, the exemption note (E); a credit note keeps the tax of the invoice it
+    # corrects (review S3: a credit for a 19 % invoice from before the switch must balance it)
+    if s.get("small_business") and kind != "reminder" and not (kind == "credit" and src is not None):
         row["vat_mode"], row["vat_note"] = "novat", "small"
     return row
 

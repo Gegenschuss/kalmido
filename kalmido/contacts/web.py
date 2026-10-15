@@ -191,7 +191,7 @@ def op_import(c, uid, bid, raw, bg=False):
     cards = split_vcards(text)
     if bg and len(cards) > IMPORT_SYNC_MAX:
         return lv_import_start(c, uid, bid, cards)
-    res = import_vcards(c, uid, bid, text, batch=IMPORT_BATCH, cards=cards, photos=40)  # 2.41.0 (#1437): commits per batch
+    res = import_vcards(c, uid, bid, text, batch=IMPORT_BATCH, cards=cards, photos=15)  # 2.41.0 (#1437): commits per batch; 2.47.3: 15 s photo budget
     c.commit()
     return res
 

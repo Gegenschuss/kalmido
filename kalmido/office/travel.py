@@ -544,6 +544,11 @@ def rk_bill_post():
                      f"WHERE i.org_id=? AND i.id IN ({','.join('?' * len(ids))}) ORDER BY i.date, i.sort, i.id", [oid] + ids).fetchall()
     if len(rows) != len(set(ids)):
         raise Denied(404)
+    # 2.47.3 (review S1): two parallel billings of the same receipts -> the second sees them billed (409), never twice
+    from ..core.pg import write_lock
+    write_lock(c, f"office_trips_bill_{int(oid)}")
+    rows = c.execute(f"SELECT i.*, t.dest, t.date_from FROM office_trip_items i JOIN office_trips t ON t.id=i.trip_id AND t.org_id=i.org_id "
+                     f"WHERE i.org_id=? AND i.id IN ({','.join('?' * len(ids))}) ORDER BY i.date, i.sort, i.id", [oid] + ids).fetchall()
     for x in rows:
         if _billed_ok(c, oid, dict(x)):
             raise Denied(409, tr("A receipt has already been billed"))
@@ -600,7 +605,9 @@ def rk_unbill_post():
         for x in c.execute(f"SELECT billed_doc_id FROM office_trip_items WHERE org_id=? AND id IN ({','.join('?' * len(ids))})", [oid] + ids):
             if x[0]:
                 docs.add(x[0])
-        c.execute(f"UPDATE office_trip_items SET billed_doc_id=NULL, billed_at=NULL, updated_at=? WHERE org_id=? AND id IN ({','.join('?' * len(ids))})",
+        # 2.47.3 (review S2): receipts on a finalised document stay billed (it can no longer lose its positions)
+        c.execute(f"UPDATE office_trip_items SET billed_doc_id=NULL, billed_at=NULL, updated_at=? WHERE org_id=? AND id IN ({','.join('?' * len(ids))}) "
+                  "AND NOT EXISTS (SELECT 1 FROM office_docs d WHERE d.id=office_trip_items.billed_doc_id AND d.locked_at IS NOT NULL AND d.locked_at != '')",
                   [iso(now_utc()), oid] + ids)
     removed = 0
     for did in docs:
