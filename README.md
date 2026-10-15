@@ -2060,7 +2060,7 @@ Python (Flask, waitress, python-dateutil, cryptography for Web Push, the stored 
 
 ## Limits
 
-Kalmido is built for one person, a household or a small team, not as a hosted service for many accounts.
+One Kalmido instance is built for one person, a household or a small team. Many separate groups run best as one instance each, not as thousands of accounts on a single instance.
 
 - **Tasks:** every device loads all open tasks plus the last 14 days of completed ones (and a year of habit
   history) in one request and re-renders from it. A few thousand open tasks per user feel instant; around
