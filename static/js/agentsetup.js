@@ -10,7 +10,7 @@ function ains_command(os, url, code, folder) {
   if (os === 'windows') return `& ([scriptblock]::Create((irm ${ains_pq(url + '/agent-setup.ps1')}))) -Url ${ains_pq(url)} -Code ${code} -Dir ${ains_pq(folder)}`;
   return `curl -fsSL ${ains_q(url + '/agent-setup.sh')} | bash -s -- --url ${ains_q(url)} --code ${code} --dir ${ains_q(folder)}`;
 }
-const ains_folderHint = os => os === 'windows' ? '$HOME\\projects\\website' : '~/projects/website';
+const ains_folderHint = os => os === 'windows' ? '~\\projects\\website' : '~/projects/website';
 const ains_osName = os => tr((AINS_OS.find(x => x[0] === os) || ['', ''])[1]) || '';
 function ains_machinesHtml(ms) {
   if (!ms.length) return `<div class="muted mhint">${tr('No computer yet.')}</div>`;

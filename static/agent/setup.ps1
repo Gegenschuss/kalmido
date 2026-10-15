@@ -65,6 +65,7 @@ if ($Cmd -eq 'claude' -and $Agent -and -not (Test-Path -LiteralPath "$env:USERPR
 
 # kalmido-setup-step: instance
 if (-not $Dir) { Die '-Dir FOLDER is missing (the project folder the agent works in)' }
+$Dir = $Dir -replace '^(\$HOME|\$env:USERPROFILE|%USERPROFILE%)(?=$|[\\/])', '~'  # 2.44.0 (review): a typed $HOME is no literal folder name
 if ($Dir -eq '~' -or $Dir.StartsWith('~\') -or $Dir.StartsWith('~/')) { $Dir = $HOME + $Dir.Substring(1) }
 $Dir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Dir).TrimEnd('\', '/')  # relative to the PowerShell location (5.1: GetFullPath would use the process directory)
 $leaf = ([IO.Path]::GetFileName($Dir) -replace '[^A-Za-z0-9_.-]', '-'); if ($leaf.Length -gt 40) { $leaf = $leaf.Substring(0, 40) }
@@ -162,9 +163,8 @@ else {
   $list = Join-Path $Inst 'starter_files.txt'
   if (-not (Fetch 'starter_files.txt' $list)) {
     if ($From) { Die "no starter_files.txt in $From" }
-    $StarterBase = $StarterBase -replace '/v[0-9][^/]*/mcp/$', '/main/mcp/'
-    Say "  this version's files are not published yet; trying $StarterBase"
-    if (-not (Fetch 'starter_files.txt' $list)) { Die "cannot fetch the starter file list (${StarterBase}starter_files.txt)" }
+    # 2.44.0 (review): no fallback to another branch -- the starter must match this instance's version
+    Die "cannot fetch the starter file list (${StarterBase}starter_files.txt); this version may not be published yet - try again later or use -From DIR"
   }
   foreach ($raw in Get-Content -LiteralPath $list) {
     $f = ($raw -replace '#.*$', '').Trim()

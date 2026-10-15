@@ -207,9 +207,8 @@ else
   [ -n "$FROM" ] || [ -n "$STARTER_BASE" ] || die "Kalmido sent no address for the starter files; use --from DIR"
   if ! fetch starter_files.txt "$INST/starter_files.txt"; then
     [ -z "$FROM" ] || die "no starter_files.txt in $FROM"
-    case "$STARTER_BASE" in */v[0-9]*/mcp/) STARTER_BASE=$(printf '%s' "$STARTER_BASE" | sed 's#/v[0-9][^/]*/mcp/$#/main/mcp/#') ;; esac
-    say "  this version's files are not published yet; trying $STARTER_BASE"
-    fetch starter_files.txt "$INST/starter_files.txt" || die "cannot fetch the starter file list (${STARTER_BASE}starter_files.txt)"
+    # 2.44.0 (review): no fallback to another branch -- the starter must match this instance's version
+    die "cannot fetch the starter file list (${STARTER_BASE}starter_files.txt); this version may not be published yet - try again later or use --from DIR"
   fi
   while IFS= read -r f || [ -n "$f" ]; do
     f=${f%%#*}; f=$(printf '%s' "$f" | tr -d ' \r')
