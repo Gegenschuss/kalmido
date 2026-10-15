@@ -177,7 +177,9 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   d.querySelector('#pop [role="menuitem"]')?.click(); await sleep(300);  // 2.28.0 (#970): "Add agent…" asks team or personal first
   d.querySelector('#ag-user').value = 'robo'; d.querySelector('#ag-name').value = 'Robo';
   d.querySelector('.modal:last-of-type [data-m="ok"]').click(); await sleep(1200);
-  check(/API token of Robo/.test(d.body.textContent) && [...d.querySelectorAll('input, code')].some(x => /abk_/.test(x.value || x.textContent)), 'new agent: token shown once');
+  // 2.46.6 (#1709): a polling team agent: "Set it up on a computer now?" first, the token on request
+  d.querySelector('.modal:last-of-type [data-m="av-tok"]')?.click(); await sleep(200);
+  check(/Set it up on a computer now/.test(d.body.textContent) && [...d.querySelectorAll('input, code')].some(x => /abk_/.test(x.value || x.textContent)), 'new agent: setup offered, token shown once on request');
   const us = (await call('alice', 'GET', '/api/users')).users;
   check(us.find(u => u.username === 'robo')?.kind === 'agent', 'robo created as agent');
   // pause (kill switch)

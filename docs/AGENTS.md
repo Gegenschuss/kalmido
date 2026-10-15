@@ -13,7 +13,7 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
 - [Concept](#concept)
 - [Permissions](#permissions-2150) (2.15.0)
 - [Personal agents](#personal-agents-272) (2.7.2)
-- [Set up an agent](#set-up-an-agent) (2.7.2: Linux, macOS, Windows; team and personal agents)
+- [Set up an agent](#set-up-an-agent) (2.7.2: Linux, macOS, Windows; team and personal agents); [Which agent when?](#which-agent-when-2466) (2.46.6)
 - [Receiving events](#receiving-events)
 - [Events](#events)
 - [Planned jobs](#planned-jobs-2340) (2.34.0)
@@ -179,6 +179,25 @@ Behind a login proxy, let `/agent-setup.sh`, `/agent-setup.ps1` and `/api/agent-
 | Where it runs | a server, as its own sandbox user, as a service | the person's own computer |
 | Who shares lists with it | everyone who shares a list with it | only its owner |
 | Who instructs it | the people named in its `CLAUDE.md` | its owner |
+
+#### Which agent when? (2.46.6)
+
+- **Personal agent**: when it runs on your computer, with your Claude access and quota, in your working folder, and only
+  you give it orders. It can still work in the workspace of an organisation.
+- **Team agent**: when colleagues should give it orders themselves; it runs on a shared computer that is always on, with
+  an account of the organisation. Its rules (`CLAUDE.md`) name who may give orders.
+- Fewer people giving orders means less risk. A personal agent is gone while its owner's computer is off. The list switch
+  *Members may see and use the agent* does not open a personal agent to the members: only its owner addresses it (the
+  switch says so when a personal agent is in the list or the folder).
+- Switching later needs no new setup: an admin changes *Belongs to* to team or person. Lists and history stay; adjust the
+  rules in its `CLAUDE.md`.
+
+The app shows the same as *Which agent when?* where an agent is created. After creating an agent (a personal one, or a
+team agent without a webhook) it offers *Set it up on a computer now?*: **Set up** opens the one-command setup, the API
+token of the new agent is shown only on request (*Show the token for an own setup*). Until a computer connected, the
+agent's row says **Set up**. The Agents view lists on every agent's card the lists it is in that you see (folder, who may
+address it there, *listens in* / *only via @*; a tap opens the list's settings); the row of a personal agent shows its
+workspace and changes it (`PATCH /api/my/agents/<id>` with `org_id`).
 
 Paths used below:
 

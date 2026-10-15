@@ -1216,7 +1216,7 @@ function agModal(a, done, o = {}) {
   const ownerSel = (people) => `<div class="row"><label for="ag-owner">${tr('Belongs to')}</label><select id="ag-owner"><option value="" ${!personal ? 'selected' : ''}>${tr('Team agent')}</option>${people.map(u => `<option value="${u.id}" ${(a ? a.owner?.id : S.me?.id) === u.id ? 'selected' : ''}>${esc(tr('Personal agent of {0}', u.display_name))}</option>`).join('')}</select></div>
     <div class="shint" id="ag-ownhint">${personal ? tr('Only this person sees and uses it: in the chat, at @, when assigning and sharing. Admins see it by name with the kill switch only.') : tr('A team agent for lists with several people; the owner of a list decides who may address it.')}</div>`;
   const md = modal(`<h3>${a ? tr('Edit agent') : personal ? tr('New personal agent') : tr('New team agent')}</h3>
-    <div id="ag-ownrow">${ownerSel(S.me ? [S.me] : [])}</div>
+    <div id="ag-ownrow">${ownerSel(S.me ? [S.me] : [])}</div>${a ? '' : av_whichHtml()}
     ${wsOn() ? `<div class="row"><label for="ag-ws">${tr('Workspace')}</label>${wsSelectHtml('ag-ws', a ? a.org_id : (wsCur().startsWith('org:') ? +wsCur().slice(4) : (personal ? null : S.me?.workspaces?.[0]?.id)))}</div><div class="shint">${tr('An agent works in one workspace and joins only its lists; a private agent never sees an organisation’s lists.')}</div>` : ''}
     <div class="row"><label for="ag-name">${tr('Display name')}</label><input id="ag-name" value="${esc(a?.name || '')}" maxlength="60" placeholder="Claude"></div>
     <div class="row"><label for="ag-user">${tr('Username')}</label><input id="ag-user" class="unin" value="${esc(a?.username || '')}" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="32" placeholder="claude"><span class="muted">${tr('for the login and @mentions')}</span></div>
@@ -1295,7 +1295,8 @@ function agModal(a, done, o = {}) {
       b.disabled = true; show('');
       const r = await calReq(a ? 'PATCH' : 'POST', a ? `/api/admin/agents/${a.id}` : '/api/admin/agents', body);
       md.remove(); done && done(); load().then(render).catch(() => {});
-      if (!a) secretModal(tr('API token of {0}', r.name), r.token, tr('Copy it now into the agent’s configuration: it is shown only this once.') + (r.webhook_secret ? ' ' + tr('Webhook signing secret: {0}', `<code class="topic">${esc(r.webhook_secret)}</code>`) : '') + ' ' + tr('Then share lists with the agent (list dialog > Sharing).'));
+      if (!a && !r.webhook_secret) av_setupOffer(r, `/api/admin/agents/${r.id}`, r.token);  // 2.46.6 (#1709): a polling team agent: set it up now
+      else if (!a) secretModal(tr('API token of {0}', r.name), r.token, tr('Copy it now into the agent’s configuration: it is shown only this once.') + (r.webhook_secret ? ' ' + tr('Webhook signing secret: {0}', `<code class="topic">${esc(r.webhook_secret)}</code>`) : '') + ' ' + tr('Then share lists with the agent (list dialog > Sharing).'));
       else if (r.webhook_secret) secretModal(tr('Signing secret'), r.webhook_secret, tr('Copy it now into the receiver: it is shown only this once. It signs every delivery (header X-Kalmido-Signature).'));
       else toast(tr('Saved'));
     } catch (x) { show(x.message); } finally { b.disabled = false; }
