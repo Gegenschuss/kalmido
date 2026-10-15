@@ -936,13 +936,20 @@ def perm_hook(argv):
         os.replace(tmp, os.path.join(pdir, pid + ".req.json"))
         ans = os.path.join(pdir, pid + ".ans")
         end = time.time() + int(os.environ.get("KALMIDO_PERM_TIMEOUT") or PERM_TIMEOUT_S)
-        decision = ""
+        decision, asked = "", ""
         while time.time() < end:
             if os.path.exists(ans):
                 with open(ans, encoding="utf-8") as f:
                     decision = f.read().strip()
+                try:  # 2.44.0 (review): an allow counts only for a question the runner really posted in the chat
+                    with open(os.path.join(pdir, pid + ".posted"), encoding="utf-8") as f:
+                        asked = f.read().strip()
+                except OSError:
+                    asked = ""
                 break
             time.sleep(0.5)
+        if decision == "allow" and not asked:
+            decision = "deny"
         for x in (pid + ".req.json", pid + ".ans", pid + ".posted"):
             try:
                 os.remove(os.path.join(pdir, x))
@@ -1678,7 +1685,7 @@ class Runner:
 
     def fetch_loop(self):
         """The event thread: long polling; answers to permission questions go to the hook at once, everything else into
-        the queue on disk (the cursor moves on once it is there: a restart answers it from the queue, never twice)."""
+        the queue on disk (the cursor moves on once it is there: a restart answers it from the queue; a crash in the middle of a run can answer it once more)."""
         backoff = 0
         while True:
             try:
