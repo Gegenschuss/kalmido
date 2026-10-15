@@ -89,7 +89,7 @@ function overdueAct(a) {
 }
 // 2.32.0 (#1055): the lists the selection can move to (the bar's Move, the key m without the multi panel)
 function multiMoveMenu(a) {
-  tch_listPicker(a, {filter: l => canEditList(l.id), pick: l => batch('patch', {list_id: l.id, section_id: null}, true)});  // 2.38.0 (#1177)
+  tch_listPicker(a, {filter: l => canEditList(l.id), pick: l => { const ids = [...S.multi]; S.multi.clear(); S.multiMode = false; dgToList(ids, l.id); }});  // 2.38.0 (#1177); 2.43.0 (#1003): subtasks leave their parent (one batch, one undo)
 }
 // 2.32.0 (#1055): the phone bar's More: what does not fit into the four buttons
 function multiMoreMenu(a) {
@@ -97,6 +97,7 @@ function multiMoreMenu(a) {
   menu(a, [
     ...(ids.length >= 2 ? [{label: tr('Edit'), icon: 'edit', fn: () => { ME.sheet = true; meSync(); }}] : []),
     ...(one && one.id > 0 && canEdit(one) ? [{label: tr('More actions'), icon: 'dots', fn: () => taskMenu($(`#view .trow[data-id="${one.id}"] .ttl`) || a, one.id)}] : []),
+    ...(ids.length && ids.some(i => canEdit(taskById(i))) ? dgMenuItems(ids) : []),  // 2.43.0 (#1003): Subtasks of… / Out of the parent task
     {label: tr('Select all'), icon: 'all', fn: () => { $$('#view .trow').forEach(r => S.multi.add(+r.dataset.id)); render(); }},
     ...(clnSel() ? [{label: tr('Tidy up…'), icon: 'bot', cls: 'mclean', fn: () => clnRequest(clnSel().id, ids)}] : []),  // 2.39.0 (#1151)
     '-',

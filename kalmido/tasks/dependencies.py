@@ -113,8 +113,9 @@ def dep_add():
     for x in (t, bl):
         need_project(c, c.execute("SELECT list_id FROM tasks WHERE id=?", (x,)).fetchone()[0], "deps")
     if not c.execute("SELECT 1 FROM task_deps WHERE task_id=? AND blocker_id=?", (t, bl)).fetchone():
-        if dep_reaches(c, bl, t):
-            return err(tr("That would create a circular dependency"))
+        if dep_reaches(c, bl, t):  # 2.43.0 (#1330): names both tasks (both are visible here)
+            return err(tr("That would create a circular dependency: “{0}” already waits on “{1}” (directly or through other tasks).",
+                          rows[bl]["title"][:80], rows[t]["title"][:80]))
         if c.execute("SELECT COUNT(*) FROM task_deps WHERE task_id=?", (t,)).fetchone()[0] >= DEP_MAX:
             return err(tr("At most {0} dependencies per task", DEP_MAX))
         c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)",
