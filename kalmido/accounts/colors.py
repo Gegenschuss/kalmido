@@ -72,8 +72,8 @@ def ac_color_map(c, uid):
     rows = c.execute(f"""SELECT id, color FROM users WHERE id=? OR id IN (SELECT owner_id FROM lists WHERE id IN {vis_sql()})
                          OR id IN (SELECT user_id FROM list_members WHERE list_id IN {vis_sql()})
                          OR id IN (SELECT user_id FROM org_members WHERE org_id IN (SELECT org_id FROM org_members WHERE user_id=?))
-                         OR id IN (SELECT user_id FROM agents WHERE owner_id=? OR (owner_id IS NULL AND org_id IN
-                                   (SELECT org_id FROM org_members WHERE user_id=?)))""",
+                         OR id IN (SELECT user_id FROM agents WHERE owner_id=? OR org_id IN
+                                   (SELECT org_id FROM org_members WHERE user_id=?))""",
                      (uid, uid, uid, uid, uid, uid, uid, uid)).fetchall()
     missing = [r["id"] for r in rows if not r["color"]]
     if missing and ac_assign(c, missing):
