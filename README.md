@@ -20,6 +20,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.48.0** (2026-10-16): **Files** with folders, versions and shares to people, groups and agents (each agent sees
+  only what is shared with it and gets its own result folder); **Documents** that read scans locally, find date, due
+  date and amount, sort themselves in by rules or by learning from your corrections and are searchable in full text;
+  a **PDF preview** inside Kalmido; **lock a note** with your own password (end-to-end); for self-hosters an import
+  from **Paperless-ngx**.
 - **2.47.1** (2026-10-15): **several chats at once**: agent chats, team channels and direct messages open one above the
   other in the chat panel (Ctrl/Cmd+click or *Open in split window*), each with its own draft and unread dot, a movable
   divider and the open windows kept per device; phones switch between them in a row at the top. **Fixed colours**:
@@ -1063,6 +1068,24 @@ its draft and unread dot, a header folds, moves or closes it, the divider betwee
 heights). On phones a row of the open chats at the top switches between them. Every agent and person has a **fixed
 colour** (#1721) in avatars everywhere; change yours under *Settings > Account*, an agent's in its settings, and switch
 people's colours off under *Settings > Appearance*.
+
+## Files and documents (2.48.0)
+
+**Files** (#1207) keeps folders and files for you and for each organisation, with versions (upload the same name again),
+a trash with undo and links to task and project files that keep the original's rights. Share a folder or file with
+people, groups or agents to view or edit, optionally until a date; shares are inherited by everything below and never
+leave the workspace. Agents see only what is shared with them, write their results into their own folder, and every
+agent access shows up in the file's history.
+
+**Documents** (#1111) is the place for letters, invoices and contracts: drop PDFs, scans or photos, share them from the
+phone, forward them by mail or put them into *Documents/Inbox*. Kalmido reads scans locally (German and English),
+finds date, due date and amount, and sorts in sender, type, tags and folder by your rules or by learning from your
+corrections; what it is unsure about waits in *To review*. Search finds words from the content. Text and amounts are
+stored encrypted. Self-hosters can import an existing Paperless-ngx instance (#1152).
+
+**PDF preview** (#1367): PDFs open inside Kalmido (pages, zoom, swipe), also in the Android app. **Lock a note**
+(#1642): the lock in a task's note encrypts it with your own password in your own, unshared lists; without the
+password and the recovery code it cannot be recovered, not even by the operator.
 
 ## Notes
 

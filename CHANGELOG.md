@@ -7,6 +7,54 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.48.0] - 2026-10-16
+
+**In short:** **Files** for you and your organisation with shares to people, groups and agents, **Documents** that read
+scans locally and sort themselves in, a **PDF preview** inside Kalmido and **notes locked with your own password**.
+
+### Added
+- **Files** (#1207): a new area with folders and files for yourself and per organisation (*My files*, the organisation,
+  *Shared with me*, *Trash*). Upload with the button or by dragging; the same name again makes a new version, older
+  versions can be restored. Rename, move and delete into the trash, each with undo. Share a folder or file with people,
+  groups and agents (view or edit, optional end date, inherited by everything below), only within its workspace; an
+  organisation folder can be opened to the whole organisation. *Show in Files* on task and project files adds a link
+  that keeps the original's rights. Contents are encrypted at rest like attachments and count towards the storage quota.
+- **Documents** (#1111): PDFs, scans and photos in one place with a preview image, date, sender, type and tags, filters
+  and full-text search in the content. Scans are read locally in the container (German and English text recognition,
+  no external service); date, due date and amount are found without any agent. Sorting in works per feature (sender,
+  type, tags, folder) with rules (word, all words, exact phrase, pattern, fuzzy), learning from your own corrections, by
+  an agent, or off; sure hits are set and marked *automatic*, unsure ones wait in *To review*, every correction trains
+  along. A document never moves to another workspace. In: drag and drop, *Save as document* in the share sheet, a mail
+  address for documents (with an IMAP mailbox configured), the folder *Documents/Inbox*. A due date becomes a task with
+  one click. Archive serial numbers (ASN) with your own prefix, read from a QR code or the text. Recognised text,
+  amounts and senders are stored encrypted; the search uses keyed word hashes instead of a plain-text index.
+- **PDF preview** (#1367): attachments, comment and chat files, project files, quotations, invoices, credit notes,
+  reminders and archive PDFs open in a preview window: pages, zoom (buttons, Ctrl+wheel, pinch), swipe on phones, page
+  numbers, download and *Open in new tab*; Ctrl/Cmd+click still opens a tab. pdf.js is shipped with Kalmido (no CDN,
+  scripts in PDFs stay off); offline or damaged files show a clear note.
+- **Lock a note** (#1642): the lock in a task's note encrypts the note text in your browser with your own password
+  (the end-to-end key with its printable recovery code). The server and the operator see only ciphertext; title, date
+  and list stay readable. Only in your own lists that are not shared. Search, agents, exports, mail, calendars and
+  webhooks leave a locked note out and mark it as locked. Without the password and the recovery code the note is lost.
+- **Paperless-ngx import** (#1152, self-hosted instances only): connect a Paperless-ngx instance per organisation (and
+  for your private space) and take over its documents with the original file, text, date, correspondent, document type,
+  tags (mapped in a preview first), custom fields and notes; no duplicates on a second run. Optionally new documents
+  follow every 15 minutes up to once a day. Kalmido only reads there.
+- **Agents** (#1207, #1111, #1356): the scopes `files:read` / `files:write`, the MCP tools `list_files`, `read_file`,
+  `write_file`, `create_file_folder`, `list_documents`, `get_document`, `update_document`, `suggest_receipt`,
+  `list_receipt_suggestions` and the events `file_shared` and `document_added`. Every agent gets its own result folder;
+  every access of an agent is listed in the file's history. For receipts an agent only suggests project and category,
+  a person accepts or rejects (with undo).
+
+### Fixed
+- The backup now contains project files again (missing since 2.7.1) and the new files.
+
+### Notes
+- Additive database change (new tables `fs_*`, `doc_*`, `pl_sources`, `pl_imported`, `rc_*`, `task_note_locks`); the
+  previous version runs on with it.
+- The image is about 125 MB larger (Tesseract with German and English, Poppler, zbar).
+- Existing agents do not get `files:read` / `files:write` by themselves: tick them in the agent's settings.
+
 ## [2.47.1] - 2026-10-15
 
 **In short:** **several chats at once** in the chat panel, one above the other, and a **fixed colour for every agent
