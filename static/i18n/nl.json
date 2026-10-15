@@ -6730,5 +6730,13 @@
   "Time tracking on tasks with reports, and the focus timer": "Tijdregistratie op taken met rapporten, en de focustimer",
   "Your contacts; clients and the office come with “Office & finance”": "Je contacten; klanten en het kantoor komen met ‘Kantoor en financiën’",
   "Statistics, and your day and week in review with a private journal": "Statistieken, en je dag en week in terugblik met een privédagboek",
-  "Family (chores, shopping, meal plan, accounts for children) and Home & life (contracts, devices, health, trips)": "Gezin (huishouden, boodschappen, menu, accounts voor kinderen) en thuis en leven (contracten, apparaten, gezondheid, reizen)"
+  "Family (chores, shopping, meal plan, accounts for children) and Home & life (contracts, devices, health, trips)": "Gezin (huishouden, boodschappen, menu, accounts voor kinderen) en thuis en leven (contracten, apparaten, gezondheid, reizen)",
+  "Setup code": "Installatiecode",
+  "The server prints it into its log at start: {0}": "De server schrijft hem bij het starten in zijn log: {0}",
+  "Wrong setup code. It is in the server log (docker compose logs kalmido).": "Verkeerde installatiecode. Hij staat in het serverlog (docker compose logs kalmido).",
+  "The server key is missing": "De serversleutel ontbreekt",
+  "KALMIDO_SECRET_KEY (or the key file) is not valid: it must be 32 random bytes, base64.": "KALMIDO_SECRET_KEY (of het sleutelbestand) is ongeldig: het moeten 32 willekeurige bytes zijn, base64.",
+  "KALMIDO_SECRET_FILE lies inside the data or backup folder and was ignored. Put it on its own volume.": "KALMIDO_SECRET_FILE ligt in de data- of back-upmap en is genegeerd. Zet het op een eigen volume.",
+  "The key file KALMIDO_SECRET_FILE cannot be read or written, see the server log.": "Het sleutelbestand KALMIDO_SECRET_FILE kan niet worden gelezen of geschreven, zie het serverlog.",
+  "Without KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE no access token can be stored and organisation data stays unencrypted. See SELF-HOSTING.md.": "Zonder KALMIDO_SECRET_KEY of KALMIDO_SECRET_FILE kunnen geen toegangstokens worden opgeslagen en blijven organisatiegegevens onversleuteld. Zie SELF-HOSTING.md."
 }

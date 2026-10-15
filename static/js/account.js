@@ -689,6 +689,7 @@ async function authScreen(j) {
     el.innerHTML = `<div class="card">${logo}
       ${setup ? `<p>${tr('Welcome! Create the first account, it becomes the admin.')}</p>${info.login ? `<p class="muted">${esc(tr('Signed in at the login proxy as “{0}”: the account is linked to it, a password is optional.', info.login))}</p>` : ''}` : ''}
       <form id="auth-form" autocomplete="on">
+        ${setup && info.setup_code ? `<label class="aulab" for="au-code">${tr('Setup code')}</label><input id="au-code" autocapitalize="off" autocomplete="one-time-code" spellcheck="false" required aria-describedby="au-code-h"><div class="shint shcode" id="au-code-h">${tr('The server prints it into its log at start: {0}', '<code>docker compose logs kalmido</code>')}</div>` : ''}${''/* 2.45.0 (#1515) */}
         <label class="aulab" for="au-user">${tr('Username')}</label><input id="au-user" name="username" autocapitalize="off" autocomplete="username" required value="${setup && info.login ? esc(String(info.login).toLowerCase()) : ''}">
         ${setup ? `<label class="aulab" for="au-name">${tr('Display name')}</label><input id="au-name" maxlength="60" autocomplete="name" placeholder="${tr('optional')}">` : ''}
         <label class="aulab" for="au-pw">${tr('Password')}</label><span class="pwwrap"><input id="au-pw" name="password" type="password" autocomplete="${setup ? 'new-password' : 'current-password'}" ${setup && info.login ? '' : 'required'} ${setup ? `placeholder="${tr('at least {0} characters', 8)}"` : ''}><button type="button" class="iconbtn pweye" data-au="pwshow" aria-pressed="false" aria-label="${esc(tr('Show password'))}" title="${esc(tr('Show password'))}">${ic('eye', 's')}</button></span>
@@ -714,7 +715,7 @@ async function authScreen(j) {
     el.querySelector('#auth-form').addEventListener('submit', async e => {
       e.preventDefault();
       const errEl = $('#au-err', el);
-      const body = setup ? {username: $('#au-user', el).value.trim(), display_name: $('#au-name', el).value.trim(), password: $('#au-pw', el).value, wizard: true, lang: I18N.code || 'en'}  // 2.24.0 (UX-22): the language seen here sticks
+      const body = setup ? {username: $('#au-user', el).value.trim(), display_name: $('#au-name', el).value.trim(), password: $('#au-pw', el).value, wizard: true, lang: I18N.code || 'en', ...($('#au-code', el) ? {setup_code: $('#au-code', el).value.trim()} : {})}  // 2.24.0 (UX-22): the language seen here sticks
         : {username: $('#au-user', el).value.trim(), password: $('#au-pw', el).value, remember: $('#au-rem', el).checked};
       try {
         const r = await fetch(setup ? '/api/auth/setup' : '/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)});
@@ -729,7 +730,7 @@ async function authScreen(j) {
   }
   document.body.appendChild(el);
   $('#app')?.setAttribute('inert', '');  // 2.13.0 (#453 P7): nothing behind the login (the hidden "New task" button) gets the focus
-  setTimeout(() => $('#au-user', el)?.focus(), 50);
+  setTimeout(() => ($('#au-code', el) || $('#au-user', el))?.focus(), 50);
 }
 // ------------------------------------------------------------------ passkeys (WebAuthn), two-factor, backups
 // base64url <-> ArrayBuffer for the WebAuthn JSON the server sends / expects (py_webauthn format)

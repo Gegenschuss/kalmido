@@ -62,6 +62,8 @@ def about_info(c, u):
                  twofa_required=gsetting(c, "twofa_required") == "1", passkey_login=gsetting(c, "passkey_login") != "0",
                  oidc=oidc_public(c), backups_env=BK_ON_ENV,
                  public_links=gsetting(c, "public_links") != "0", public_links_env=PUB_ENV)
+        from ..core.config import SECRET_KEY, SECRET_KEY_PROBLEM, SECRET_KEY_SRC
+        d.update(secret_key=bool(SECRET_KEY), secret_key_problem=SECRET_KEY_PROBLEM, secret_key_src=SECRET_KEY_SRC)  # 2.45.0 (#1515)
         from ..accounts.signup import signup_admin
         d.update(signup_admin(c))  # 2.23.0 (#711)
         from ..admin.hosting import hosting_admin

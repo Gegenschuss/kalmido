@@ -6730,5 +6730,13 @@
   "Time tracking on tasks with reports, and the focus timer": "Registro de tiempo en tareas con informes y el temporizador de enfoque",
   "Your contacts; clients and the office come with “Office & finance”": "Tus contactos; los clientes y la oficina llegan con «Oficina y finanzas»",
   "Statistics, and your day and week in review with a private journal": "Estadísticas, y tu día y tu semana en revisión con un diario privado",
-  "Family (chores, shopping, meal plan, accounts for children) and Home & life (contracts, devices, health, trips)": "Familia (tareas del hogar, compras, menú, cuentas para niños) y hogar y vida (contratos, aparatos, salud, viajes)"
+  "Family (chores, shopping, meal plan, accounts for children) and Home & life (contracts, devices, health, trips)": "Familia (tareas del hogar, compras, menú, cuentas para niños) y hogar y vida (contratos, aparatos, salud, viajes)",
+  "Setup code": "Código de configuración",
+  "The server prints it into its log at start: {0}": "El servidor lo escribe en su registro al arrancar: {0}",
+  "Wrong setup code. It is in the server log (docker compose logs kalmido).": "Código de configuración incorrecto. Está en el registro del servidor (docker compose logs kalmido).",
+  "The server key is missing": "Falta la clave del servidor",
+  "KALMIDO_SECRET_KEY (or the key file) is not valid: it must be 32 random bytes, base64.": "KALMIDO_SECRET_KEY (o el archivo de clave) no es válido: deben ser 32 bytes aleatorios en base64.",
+  "KALMIDO_SECRET_FILE lies inside the data or backup folder and was ignored. Put it on its own volume.": "KALMIDO_SECRET_FILE está dentro de la carpeta de datos o de copias y se ignoró. Ponlo en un volumen propio.",
+  "The key file KALMIDO_SECRET_FILE cannot be read or written, see the server log.": "El archivo de clave KALMIDO_SECRET_FILE no se puede leer ni escribir; consulta el registro del servidor.",
+  "Without KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE no access token can be stored and organisation data stays unencrypted. See SELF-HOSTING.md.": "Sin KALMIDO_SECRET_KEY ni KALMIDO_SECRET_FILE no se pueden guardar tokens de acceso y los datos de la organización quedan sin cifrar. Consulta SELF-HOSTING.md."
 }

@@ -25,7 +25,7 @@ from werkzeug.security import check_password_hash
 from ..core.config import app, APP_NAME, COOKIE, MIN_PASSWORD, NTFY_TOPIC, PUBLIC_URL, USERNAME_RE
 from ..core.pg import insert_id
 from ..core.i18n import lang, languages, N_, tr
-from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, write_lock
+from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, local_now, now_utc, uset, write_lock
 from ..accounts.session import (
     _accept_lang, _DUMMY_HASH, _peer_trusted, _rate_blocked, _rate_fail, _rate_keys, _rate_reset, _token_hash,
     client_ip, FAIL_WINDOW, proxy_login_value, set_cookie, start_session, user_public,
@@ -46,7 +46,14 @@ def auth_info():
                    oidc={"label": oidc_cfg(c)["label"]} if oidc_cfg(c)["on"] else None, passkey_login=gsetting(c, "passkey_login") != "0",
                    login_errors={k: tr(v) for k, v in OIDC_ERRORS.items()} if oidc_cfg(c)["on"] else {},
                    org=_org_label(c),  # 2.22.0 (#752): the instance's organisation (only when there is exactly one)
-                   signup=_signup_info(c))  # 2.23.0 (#711): registration on the login page (None = off)
+                   signup=_signup_info(c),  # 2.23.0 (#711): registration on the login page (None = off)
+                   setup_code=setup and _setup_code_required(c))  # 2.45.0 (#1515): the setup page asks for the code from the log
+
+
+def _setup_code_required(c):
+    from ..accounts.setupcode import sh_code_ensure, sh_code_required
+    sh_code_ensure(c)
+    return sh_code_required()
 
 
 def _signup_info(c):
@@ -127,6 +134,11 @@ def auth_setup():
     if c.execute("SELECT 1 FROM users").fetchone():
         c.rollback()
         return err(tr("Setup is already done"), 409)
+    from ..accounts.setupcode import sh_code_check, sh_code_used
+    bad = sh_code_check(c, b.get("setup_code"))  # 2.45.0 (#1515): the one-time code from the server log
+    if bad:
+        c.rollback()
+        return err(*bad)
     username = (b.get("username") or "").strip().lower()
     pw = b.get("password") or ""
     proxy = proxy_login_value() or None
@@ -148,9 +160,14 @@ def auth_setup():
         gset(c, "default_lang", b["lang"])
     if b.get("wizard") is True:  # 2.13.0 (#453 A16): the setup page's step 2 comes back after a reload until it is finished
         gset(c, "setup_step2", "pending")
+    if not gsetting(c, "bk_enabled_at") and not gsetting(c, "bk_last_ok"):  # 2.45.0 (#1515): a new server backs up daily
+        gset(c, "bk_on", "1")
+        gset(c, "bk_enabled_at", iso(now_utc()))
+        gset(c, "bk_last_day", local_now().date().isoformat())  # the first one tomorrow at bk_time (not of the empty server now)
     bump(c)
     tok, age = start_session(c, uid, True) if pw else (None, None)
     c.commit()
+    sh_code_used()
     resp = jsonify(ok=True)
     return set_cookie(resp, tok, age) if tok else resp
 
