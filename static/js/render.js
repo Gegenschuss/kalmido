@@ -145,6 +145,7 @@ function renderTabs() {
   document.body.classList.toggle('tab-search', shown.some(t => t.id === 'search'));
   $('#tabs').innerHTML = shown.map(t => tabBtn(t, t.id === on)).join('') +
     (more.length ? `<button class="${moreOn ? 'on' : ''}" data-act="tabs-more"><span class="tico">${ic('dots', 'l')}</span><span>${tr('More')}</span></button>` : '');
+  an_tabs();  // 2.46.1 (#1560): the underline of the tab that became active slides in
 }
 const sideOpenDrawer = () => { S.sideToLists = true; $('#top [data-act="side"]')?.click(); };  // 2.24.0 (UX-36): "Lists" in "More"
 // 2.31.0 (#1057, audit N5): the drawer opened by the tab "Lists" starts at the group Lists (Plan and Views stay above it)
@@ -255,18 +256,20 @@ function licDim(hex) {  // the list colour 40 % towards the light theme's text c
   const h = hex.slice(1), x = h.length < 6 ? [...h.slice(0, 3)].map(c => c + c) : [h.slice(0, 2), h.slice(2, 4), h.slice(4, 6)];
   return '#' + x.map((v, i) => Math.round(parseInt(v, 16) * .6 + [19, 20, 24][i] * .4).toString(16).padStart(2, '0')).join('');
 }
+// 2.46.1 (#1636): a shopping list without its own icon (or an emoji in its name) shows the cart -- only shown, nothing stored
+const sb_kindIcon = l => l.family === 'shopping' ? 'cart' : '';
 function listIconHtml(l, opts = {}) {
   const {cls = '', full = true, emoji = false, pic = true} = opts;
   if (!l || l.is_inbox) return '';
   const sm = sbiMode(), col = cssColor(l.color), st = col ? ` style="--lc:${col};--lcl:${licDim(col)}"` : '', cc = col ? ' lcol' : '';
   if (l.icon) return pic && sm !== 'dot' ? `<span class="lic lict${cc} ${cls}" aria-hidden="true"${st}>${licon(l, 'licon')}</span>` : '';
-  const em = leadEmoji(l.name);
+  const em = leadEmoji(l.name), kic = !em && sb_kindIcon(l);
   if (sm === 'emoji') return em ? (emoji ? `<span class="lic lict lemo${cc} ${cls}" aria-hidden="true"${st}>${esc(em)}</span>` : '')
-    : full ? `<span class="lic${cc} ${cls}" aria-hidden="true"${st}>${ic('list')}</span>` : '';
-  if (!em && !full) return '';
+    : full || kic ? `<span class="lic${cc} ${cls}" aria-hidden="true"${st}>${ic(kic || 'list')}</span>` : '';
+  if (!em && !full && !kic) return '';
   const lk = em && sm === 'line' ? sbiIconFor(em) : '';
   if (sm === 'dot') return `<span class="lic ${cls}" aria-hidden="true"><span class="licd" style="${col ? 'background:' + col : ''}"></span></span>`;
-  return `<span class="lic${cc} ${cls}" aria-hidden="true"${st}>${ic(lk || 'list')}</span>`;
+  return `<span class="lic${cc} ${cls}" aria-hidden="true"${st}>${ic(lk || kic || 'list')}</span>`;
 }
 // 2.36.2 (#1139): an agent gets a small robot in a calm blue (--bot) wherever it writes or sends; people get no symbol
 const licBot = () => ic('bot', 's lbot');
@@ -301,7 +304,7 @@ function renderSide() {
     const pg = progressFor(l) && l.progress?.total && sbiProg() && !progHidden(l.id) ? `<span class="sprog" role="img" style="--p:${pct(l.progress)}%" aria-label="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}" title="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}"></span>` : '';
     const shr = (l.status && statusFor(l) ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
       (l.shared && collab() && l.bell === 'mute' ? `<span class="shr bellm" title="${esc(tr('Notifications: {0}', bellLabel('mute')))}">${ic('belloff', 's')}</span>` : '') +
-      (l.shared && collab() ? licShareHtml(l) : '');  // 2.36.2 (#1139): person / robot, always shown
+      (l.shared && collab() ? licShareHtml(l) : '') + ovSideMark(l);  // 2.36.2 (#1139): person / robot, always shown; 2.46.0 (#1603): not joined
     // 2.22.0 (#692): sort mode: a grip on the left, the name shortens with …, the buttons in a fixed column on the right
     // 2.25.0 (UX-02): the full name (it wraps), a grip to drag by (touch: at once, no long press) and ONE "…" button with
     // up / down / folder for keyboards and anyone who does not drag (WCAG 2.5.7)
@@ -315,9 +318,9 @@ function renderSide() {
     const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
     const active = fl.some(l => onTasks && k === 'l:' + l.id);
     const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the rest of the row folds
-    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() ? '' : 'draggable="true"'}>${S.listReorder ? `<span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>` : ''}<span class="sic" aria-hidden="true">${ic('folder', 's')}</span><span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span>${folderShrHtml(f) /* 2.41.0 (#1428) */}<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
+    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() ? '' : 'draggable="true"'}>${S.listReorder ? `<span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>` : ic('chev', 's fcar') /* 2.46.1 (#1607): the arrow before the folder icon */}<span class="sic" aria-hidden="true">${ic('folder', 's')}</span><span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span>${S.listReorder ? '' : `<span class="c" ${n ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${n || ''}</span>` /* 2.46.1 (#1607): the number right after the name, the share icon at the right like a list's */}${folderShrHtml(f) /* 2.41.0 (#1428) */}<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
       ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
-      : `<span class="c" ${n ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${n || ''}</span>${ic('chev', 's fcar')}<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
+      : `<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
   };
   const fempty = () => `<div class="fempty">${isMobile() ? tr('empty: assign lists in sort mode') : tr('empty: drag a list here')}</div>`;
   const wsAll = wsCur() === 'all';
@@ -736,7 +739,8 @@ function keepFocus(root, fn) {
   if (n && n.offsetParent !== null && !n.disabled) n.focus({preventScroll: true});
   return r;
 }
-function renderView() { return td_rcRun(() => { const r = keepFocus($('#view'), renderView0); rowRove(); rowMoreWatch(); td_lcSweep(); return r; }); }
+function renderView() { return td_rcRun(() => { const r = an_view(() => keepFocus($('#view'), renderView0));  // 2.46.1 (#1560): a view change / a new empty hint fades in
+    rowRove(); rowMoreWatch(); td_lcSweep(); return r; }); }
 function renderView0() {
   const m = S.route.mod, el = $('#view');
   // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
@@ -915,8 +919,8 @@ const grpName = gid => grpById(gid)?.name || tr('Group');
 const listGroups = lid => (listById(lid)?.groups || []);
 function grpChip(t) {
   const n = grpName(t.assignee_group_id), mine = myGroup(t.assignee_group_id), tip = esc(tr('Assigned to the group {0}: whoever has time takes it', n));
-  return canAssign(t) || mine ? `<button type="button" class="gchip ${mine ? 'me' : ''}" data-act="assign" title="${tip}" aria-label="${tip}" aria-haspopup="menu">${ic('users', 's')}<span>${esc(n)}</span></button>`
-    : `<span class="gchip" title="${tip}">${ic('users', 's')}<span>${esc(n)}</span></span>`;
+  return canAssign(t) || mine ? `<button type="button" class="gchip ${mine ? 'me' : ''}" data-act="assign" title="${tip}" aria-label="${tip}" aria-haspopup="menu">${fg_gico(t.assignee_group_id)}<span>${esc(n)}</span></button>`
+    : `<span class="gchip" title="${tip}">${fg_gico(t.assignee_group_id)}<span>${esc(n)}</span></span>`;  // 2.46.0 (#1605): + its picture
 }
 async function takeTask(id) {
   const t = taskById(id); if (!t) return;
@@ -1358,7 +1362,7 @@ function viewListBody() {
   const rl = v.list && listById(v.list), ro = rl && !canEditList(rl.id), ck = !!(rl && rl.checklist);
   const lc = rl ? listCols(rl) : null;  // 2.14.0 (#425)
   const cols = rl && !lc && fieldCols(rl.id) ? fieldsOf(rl.id).slice(0, 6) : null;
-  let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
+  let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (rl?.org_reader ? ovJoinBar(rl) : ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
   // 2.25.0 (UX-54): "Now doable" explains itself once
   if (S.route.key === 'stale' && !hintSeen('stale')) h += `<div class="onehint" data-hint="stale">${ic('clock', 's')}<span>${esc(tr('Lying idle: open tasks without a change, comment or time entry for {0} days or more, and tasks waiting on someone without a follow-up day. Each list can set its own number of days (list settings).', S.staleDays || 7))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="stale" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;  // 2.34.0 (#266)
   if (S.route.key === 'doable' && !hintSeen('doable')) h += `<div class="onehint" data-hint="doable">${ic('zap', 's')}<span>${esc(tr('Now doable: your open tasks you can start right away. Nothing blocks them, their start has come, and they are due today, overdue or without a date.'))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="doable" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;

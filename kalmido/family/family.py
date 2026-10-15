@@ -47,7 +47,7 @@ from ..agents.core import agent_ids, is_agent
 # Rights: the usual list roles; rewards / stars of a kid only its parents (and admins); a kid requests rewards.
 from dateutil.relativedelta import relativedelta  # noqa: E402
 
-FAM_LIST_KINDS = ("", "shopping", "meals", "birthdays", "household", "packing")
+FAM_LIST_KINDS = ("", "shopping", "meals", "birthdays", "household", "packing", "family")  # 2.46.1 (#1615): "family"
 FAM_OCC = ("birthday", "anniversary")
 FAM_NAME_MAX, FAM_NOTE_MAX = 100, 200
 FAM_LEAD_MAX = 365
@@ -213,6 +213,8 @@ def clean_fam(v):
             out["src"] = v["src"][:200]
         if isinstance(v.get("card"), str) and v["card"]:
             out["card"] = v["card"][:200]  # the vCard UID of an imported contact (kept for a later contacts module)
+    elif k == "meal":  # 2.46.1 (#1615): a meal of the meal plan, in any list (before: only lists of family "meals")
+        allowed = {"kind"}
     elif k == "deadline":
         allowed = {"kind", "type", "who", "expires", "notice", "lead"}
         if v.get("type", "other") not in FAM_DL:
@@ -421,15 +423,59 @@ def fam_list(c, uid, kind, create=True):
 
 
 FAM_LIST_NAMES = {"shopping": N_("Shopping list"), "meals": N_("Meal plan"), "birthdays": N_("Birthdays"),
-                  "household": N_("Household"), "packing": N_("Packing list")}
-FAM_LIST_COLORS = {"shopping": "#22c55e", "meals": "#f59e0b", "birthdays": "#ec4899", "household": "#0ea5e9", "packing": "#8b5cf6"}
+                  "household": N_("Household"), "packing": N_("Packing list"), "family": N_("Family")}
+# 2.46.1 (#1615): the family's one list "Family" holds these sections; birthdays, deadlines and meals without a chosen list
+# land in theirs (a list of the old kind "birthdays" / "household" / "meals" the user has stays the target)
+FAM_SECTIONS = (("household", N_("Household")), ("birthdays", N_("Birthdays")), ("meals", N_("Meal plan")), ("deadlines", N_("Deadlines")))
+PM_OLD_KIND = {"birthdays": "birthdays", "deadlines": "household", "meals": "meals"}
+
+
+def pm_fam_section(c, lid, key, lg):
+    """The section of FAM_SECTIONS `key` in list lid (by its name in any language), created when missing (user's language)."""
+    name = tr(dict(FAM_SECTIONS)[key], lg=lg)
+    names = {tr(dict(FAM_SECTIONS)[key], lg=x).casefold() for x in [*LANGS, "en"]}
+    for sid, n in c.execute("SELECT id, name FROM sections WHERE list_id=? ORDER BY id", (lid,)):
+        if (n or "").strip().casefold() in names:
+            return sid
+    n = c.execute("SELECT COALESCE(MAX(sort),0) FROM sections WHERE list_id=?", (lid,)).fetchone()[0]
+    return insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, name, n + 1))
+
+
+def pm_fam_target(c, uid, key, create=True):
+    """Where a birthday / deadline / meal goes without a chosen list -> (list id, section id or None): a list of the old
+    kind (birthdays / household / meals) first, else the list "Family" with its section (created when missing, create)."""
+    old = fam_list(c, uid, PM_OLD_KIND[key], create=False)
+    if old:
+        return old, None
+    lid = fam_list(c, uid, "family", create=False)
+    if not lid:
+        if not create:
+            return None, None
+        lid = pm_family_list(c, uid)
+    return lid, pm_fam_section(c, lid, key, lang(c, uid))
+
+
+def pm_fam_sec_of(c, lid, key, uid):
+    """A chosen list that is a list "Family" (family kind "family"): the section of `key` there; else None."""
+    r = c.execute("SELECT family FROM lists WHERE id=?", (lid,)).fetchone()
+    return pm_fam_section(c, lid, key, lang(c, uid)) if r and r[0] == "family" else None
+
+
+def pm_family_list(c, uid, folder=""):
+    """The list "Family" with its four sections (Household, Birthdays, Meal plan, Deadlines)."""
+    lid = fam_list_create(c, uid, "family", folder=folder)
+    lg = lang(c, uid)
+    for i, (_, n) in enumerate(FAM_SECTIONS):
+        c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, tr(n, lg=lg), i + 1))
+    return lid
 
 
 def fam_list_create(c, uid, kind, name=None, folder=""):
+    """A new list of family kind `kind`; 2.46.1 (#1608): without a colour (lists made before keep theirs)."""
     lg = lang(c, uid)
     lid = insert_id(c, """INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,family)
                        VALUES(?,?,?,?,?,?,?,?,?,?)""",
-                    (name or tr(FAM_LIST_NAMES[kind], lg=lg), FAM_LIST_COLORS.get(kind, ""), folder, my_max_sort(c, uid) + 1, "list",
+                    (name or tr(FAM_LIST_NAMES[kind], lg=lg), "", folder, my_max_sort(c, uid) + 1, "list",
                      iso(now_utc()), uid, 1 if kind in ("shopping", "packing") else 0, "list", kind))
     list_created(c, uid, lid)  # 2.22.0 (#747): no shop areas by itself (the list bar's "Add shop areas" adds them); 2.25.0 (#931)
     return lid
@@ -479,8 +525,9 @@ def occ_create(c, uid, b, check=True):
         lid = as_int(lid, "list_id", 1)
         if check:
             need_list(c, lid)
+        sid = pm_fam_sec_of(c, lid, "birthdays", uid)
     else:
-        lid = fam_list(c, uid, "birthdays")
+        lid, sid = pm_fam_target(c, uid, "birthdays")  # 2.46.1 (#1615)
     name = re.sub(r"\s+", " ", name).strip()[:FAM_NAME_MAX]
     lg = lang(c, uid)
     fam = {"kind": kind, "name": name, "lead": lead, **({"year": year} if year else {})}
@@ -490,9 +537,9 @@ def occ_create(c, uid, b, check=True):
     ts = iso(now_utc())
     rem = ",".join(dict.fromkeys(str(x) for x in ([lead * 1440] if lead else []) + [0]))
     title = tr("Birthday: {0}", name, lg=lg) if kind == "birthday" else tr("Anniversary: {0}", name, lg=lg)
-    tid = insert_id(c, """INSERT INTO tasks(list_id,title,due,reminders,repeat,sort,created_at,updated_at,created_by,fam)
-                       VALUES(?,?,?,?,?,?,?,?,?,?)""",
-                    (lid, title[:TITLE_MAX], due.isoformat(), rem, occ_rule(mo, dy),
+    tid = insert_id(c, """INSERT INTO tasks(list_id,section_id,title,due,reminders,repeat,sort,created_at,updated_at,created_by,fam)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                    (lid, sid, title[:TITLE_MAX], due.isoformat(), rem, occ_rule(mo, dy),
                      c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0],
                      ts, ts, uid, json.dumps(fam, ensure_ascii=False, separators=(",", ":"))))
     log_act(c, tid, "created", uid=uid)
@@ -500,8 +547,8 @@ def occ_create(c, uid, b, check=True):
     if not isinstance(gifts, list) or len(gifts) > 50 or not all(isinstance(x, str) for x in gifts):
         raise BadInput(tr("Invalid value: {0}", "gifts"))
     for i, gft in enumerate(x.strip()[:TITLE_MAX] for x in gifts if x.strip()):
-        c.execute("INSERT INTO tasks(list_id,parent_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?)",
-                  (lid, tid, gft, i + 1, ts, ts, uid))
+        c.execute("INSERT INTO tasks(list_id,section_id,parent_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?,?)",
+                  (lid, sid, tid, gft, i + 1, ts, ts, uid))
     return tid
 
 
@@ -524,8 +571,9 @@ def deadline_create(c, uid, b):
     if lid not in (None, ""):
         lid = as_int(lid, "list_id", 1)
         need_list(c, lid)
+        sid = pm_fam_sec_of(c, lid, "deadlines", uid)
     else:
-        lid = fam_list(c, uid, "household")
+        lid, sid = pm_fam_target(c, uid, "deadlines")  # 2.46.1 (#1615)
     lg = lang(c, uid)
     title = b.get("title")
     if not isinstance(title, str) or not title.strip():
@@ -544,9 +592,9 @@ def deadline_create(c, uid, b):
     ts = iso(now_utc())
     fam = {"kind": "deadline", "type": k, "who": who, "expires": exp, "notice": notice, "lead": lead}
     rem = ",".join(dict.fromkeys(str(x) for x in ([lead * 1440] if lead else []) + [0]))
-    tid = insert_id(c, """INSERT INTO tasks(list_id,title,due,reminders,repeat,deadline,priority,sort,created_at,updated_at,created_by,fam)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (lid, title.strip()[:TITLE_MAX], due.isoformat(), rem, rep, 2, 3,
+    tid = insert_id(c, """INSERT INTO tasks(list_id,section_id,title,due,reminders,repeat,deadline,priority,sort,created_at,updated_at,created_by,fam)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (lid, sid, title.strip()[:TITLE_MAX], due.isoformat(), rem, rep, 2, 3,
                      c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0],
                      ts, ts, uid, json.dumps(fam, ensure_ascii=False, separators=(",", ":"))))
     log_act(c, tid, "created", uid=uid)
@@ -721,21 +769,37 @@ def packing_create(c, uid, key, name=None):
 
 
 # ---- "What do you use Kalmido for?" (setup, welcome tour, Settings > Modules)
-def purpose_apply(c, uid, purpose, examples=True):
-    """Switches the user's modules to the purpose and (examples) creates its starter lists once. -> {features, created}"""
+def pm_purpose_on(purpose, all_mods=None):
+    """2.46.1 (#1591): the modules a purpose switches on. all_mods None = the purpose's own package (before 2.46.1),
+    True = every module ("Switch on all modules"), False = none (lists and tasks only, whatever the purpose)."""
+    if all_mods is None:
+        return set(PURPOSE_ON[purpose]) | set(PURPOSE_EXTRA.get(purpose, ()))
+    return set(PURPOSE_MODS) | set(PURPOSE_EXTRA.get(purpose, ())) if all_mods else set()
+
+
+PM_EXTRA_ALL = tuple(dict.fromkeys(x for v in PURPOSE_EXTRA.values() for x in v))
+
+
+def purpose_apply(c, uid, purpose, examples=False, all_mods=None):
+    """Switches the user's modules to the purpose and (examples) creates its sample project once. -> {features, created}
+    2.46.1 (#1591): all_mods True / False = the switch "Switch on all modules" (stored as mods_all); False switches off the
+    business modules too (lists and tasks only). #1602: the sample project only on request (examples, off by default)."""
     if purpose not in PURPOSES:
         raise BadInput(tr("Invalid value: {0}", "purpose"))
     fs = [x for x in (usettings(c, uid).get("features") or "").split(",") if x]
-    on = set(PURPOSE_ON[purpose])
-    fs = [x for x in fs if x not in PURPOSE_MODS or x in on] + [x for x in PURPOSE_MODS if x in on and x not in fs]
-    fs += [x for x in PURPOSE_EXTRA.get(purpose, ()) if x not in fs]
+    on = pm_purpose_on(purpose, all_mods)
+    sw = PURPOSE_MODS + (PM_EXTRA_ALL if all_mods is False else ())
+    fs = [x for x in fs if x not in sw or x in on] + [x for x in PURPOSE_MODS if x in on and x not in fs]
+    fs += [x for x in PURPOSE_EXTRA.get(purpose, ()) if x in on and x not in fs]
+    if all_mods is not None:
+        uset(c, uid, "mods_all", "1" if all_mods else "0")
     uset(c, uid, "features", ",".join(fs))
     uset(c, uid, "purpose", purpose)
     created = []
-    if examples:
-        if purpose == "family":
-            created = family_examples(c, uid)
-        elif purpose == "software" and not c.execute("SELECT 1 FROM lists WHERE owner_id=? AND ptype='software' AND archived=0", (uid,)).fetchone():
+    if purpose == "family":  # 2.46.1 (#1615): the two starter lists always, their examples with the switch (#1602)
+        created = family_examples(c, uid, tasks=examples)
+    elif examples:
+        if purpose == "software" and not c.execute("SELECT 1 FROM lists WHERE owner_id=? AND ptype='software' AND archived=0", (uid,)).fetchone():
             lid, _ = ptype_create(c, uid, "software", tr(PTYPE_NAMES["software"], lg=lang(c, uid)))
             created.append(lid)
         elif purpose in ("team", "office") and not sample_state(c, uid):
@@ -748,35 +812,40 @@ FAM_CHORES = ((N_("Take out the rubbish"), "FREQ=WEEKLY;BYDAY=MO"), (N_("Clean t
 FAM_SHOP_EXAMPLES = (N_("Apples"), N_("Bread"), N_("Milk"))
 
 
-def family_examples(c, uid):
-    """The starter lists of the family setup, in the folder "Family": shopping list (with areas), household chores,
-    birthdays, meal plan. A kind the user already has a list of is skipped. Returns the new list ids."""
+def family_examples(c, uid, tasks=True):
+    """2.46.1 (#1615): the starter lists of the purpose Family, in the folder "Family": the shopping list (done at the
+    bottom, with the shop areas) and ONE list "Family" with the sections Household, Birthdays, Meal plan, Deadlines.
+    Each only when the user has none of its kind yet (old lists Household / Birthdays / Meal plan count for "Family").
+    tasks (#1602, "Create a sample project"): the example items too. Returns the new list ids."""
     lg = lang(c, uid)
     folder = clean_folder(tr("Family", lg=lg))
     made, ts, day = [], iso(now_utc()), local_now().date()
-    for kind in ("shopping", "household", "birthdays", "meals"):
-        if fam_list(c, uid, kind, create=False):
-            continue
-        lid = fam_list_create(c, uid, kind, folder=folder)
+    if not fam_list(c, uid, "shopping", create=False):
+        lid = fam_list_create(c, uid, "shopping", folder=folder)
         made.append(lid)
-        if kind == "shopping":
+        shop_areas_add(c, lid, lg)
+        if tasks:
             secs = {r["name"]: r["id"] for r in c.execute("SELECT id, name FROM sections WHERE list_id=?", (lid,))}
             for i, (it, area) in enumerate(zip(FAM_SHOP_EXAMPLES, (SHOP_AREAS[0], SHOP_AREAS[1], SHOP_AREAS[2]))):
                 sid = secs.get(tr(area, lg=lg))
                 c.execute("INSERT INTO tasks(list_id,section_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?)",
                           (lid, sid, tr(it, lg=lg), i + 1, ts, ts, uid))
                 shop_remember(c, lid, tr(it, lg=lg), sid)
-        elif kind == "household":
+    if not any(fam_list(c, uid, k, create=False) for k in ("family", "household", "birthdays", "meals")):
+        lid = pm_family_list(c, uid, folder)
+        made.append(lid)
+        if tasks:
+            hs = pm_fam_section(c, lid, "household", lg)
             for i, (t, rep) in enumerate(FAM_CHORES):
                 rule = rr_rule(rep, day.isoformat())
                 nxt = rule.after(datetime(day.year, day.month, day.day), inc=True).date() if rule else day
-                c.execute("INSERT INTO tasks(list_id,title,due,repeat,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?,?)",
-                          (lid, tr(t, lg=lg), nxt.isoformat(), rep, i + 1, ts, ts, uid))
-        elif kind == "meals":
-            c.execute("INSERT INTO tasks(list_id,title,content,due,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?,?)",
-                      (lid, tr("Spaghetti with tomato sauce", lg=lg),
+                c.execute("""INSERT INTO tasks(list_id,section_id,title,due,repeat,sort,created_at,updated_at,created_by)
+                             VALUES(?,?,?,?,?,?,?,?,?)""", (lid, hs, tr(t, lg=lg), nxt.isoformat(), rep, i + 1, ts, ts, uid))
+            c.execute("""INSERT INTO tasks(list_id,section_id,title,content,due,sort,created_at,updated_at,created_by,fam)
+                         VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                      (lid, pm_fam_section(c, lid, "meals", lg), tr("Spaghetti with tomato sauce", lg=lg),
                        "\n".join("- " + tr(x, lg=lg) for x in (N_("Spaghetti"), N_("Tomatoes"), N_("Onion"), N_("Parmesan"))),
-                       day.isoformat(), 1, ts, ts, uid))
+                       day.isoformat(), len(FAM_CHORES) + 1, ts, ts, uid, '{"kind":"meal"}'))
     if made:
         fl = json.loads(usettings(c, uid).get("folders") or "[]")
         if folder and folder not in fl:
@@ -814,7 +883,7 @@ def family_overview(c, uid, start=None):
             rots.append({"task_id": t["id"], "list_id": t["list_id"], "title": t["title"], "mode": r.get("mode", "done"),
                          "who": [{"user_id": x, "name": names.get(x, "?")} for x in r["who"]],
                          "current": t["assignee_id"], "next": r["who"][(i + 1) % n], "due": t["due"]})
-        if lists.get(t["list_id"], {}).get("family") == "meals" and t["due"] and not t["parent_id"] and \
+        if (lists.get(t["list_id"], {}).get("family") == "meals" or f.get("kind") == "meal") and t["due"] and not t["parent_id"] and \
                 mon.isoformat() <= t["due"] <= (mon + timedelta(days=6)).isoformat():
             meals.append({"task_id": t["id"], "list_id": t["list_id"], "title": t["title"], "day": t["due"], "time": t["due_time"],
                           "ingredients": ingredient_lines(t["content"])})

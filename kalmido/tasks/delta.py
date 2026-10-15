@@ -36,6 +36,7 @@ DL_TABLES = {
     "task_enc_notes": ("task_id",),  # 2.42.0 (#828): the encrypted note marker of a task
     "lists": "full", "list_members": "full", "sections": "full", "list_fields": "full", "list_tags": "full",
     "group_shares": "full", "group_members": "full", "folder_people": "full",
+    "org_members": "full",  # 2.46.0 (#1603): lists seen by the whole organisation follow its members
 }
 # one function for all of them; TG_ARGV = the id columns (to_jsonb reads a column by name from any row type)
 DL_FN = """CREATE OR REPLACE FUNCTION kalmido_dl_touch() RETURNS trigger LANGUAGE plpgsql AS $fn$

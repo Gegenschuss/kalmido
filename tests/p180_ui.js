@@ -123,7 +123,9 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
   const toLast = async () => { for (let i = 0; i < 8 && /Next|Weiter/.test(d.querySelector('[data-tour="next"]')?.textContent || ''); i++) { click(w, d.querySelector('[data-tour="next"]')); await sleep(80); } };
   check(!tb(), 'tour: no question on the first card');
   await toLast();
-  check(tb() && tb().checked && /Create a sample project/.test(tb().closest('label').textContent), 'tour: the last card offers the sample, preticked with the project modules');
+  // 2.46.1 (#1602): the sample project is off by default, also with the project modules; ticked by hand it comes
+  check(tb() && !tb().checked && /Create a sample project/.test(tb().closest('label').textContent), 'tour: the last card offers the sample, unticked (2.46.1)');
+  click(w, tb());
   click(w, d.querySelector('[data-tour="next"]'));
   check(await until(() => w.eval('S.sample')), 'tour: Done created it');
   check(w.eval('S.lists').some(l => l.name === 'Getting started') && w.eval('S.sample.lists').length === 2, 'Getting started list + the sample');

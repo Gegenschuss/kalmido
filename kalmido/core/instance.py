@@ -223,12 +223,10 @@ def admin_setup():
     if lang:
         gset(c, "default_lang", lang)
         uset(c, me(), "lang", lang)
-    if b.get("org_name"):  # 2.23.0 (#799): the first-run setup asks once for the organisation's name (unless configured)
-        from ..accounts.orgs import instance_mode, main_org, ORG_NAME_ENV
-        import re as _re
-        nm = _re.sub(r"\s+", " ", str(b["org_name"])).strip()[:60]
-        if nm and instance_mode(c) == "organisation" and not ORG_NAME_ENV and main_org(c):
-            c.execute("UPDATE orgs SET name=? WHERE id=?", (nm, main_org(c)))
+    # 2.23.0 (#799): the first-run setup asks once for the organisation's name (unless configured). 2.46.0 (#1592): a name
+    # (or KALMIDO_ORG_NAME) creates the first organisation with the setting-up admin as its admin (empty: private only)
+    from ..accounts.orgs import om_setup_org
+    om_setup_org(c, me(), b.get("org_name"))
     pt = b.get("project_type")  # 2.4.0 (#243): "Start with a project" of a built-in type
     if pt not in (None, "") and pt not in PTYPES:
         return err(tr("Invalid value: {0}", "project_type"))
@@ -241,10 +239,14 @@ def admin_setup():
         from ..family.family import _LIFE, PURPOSE_ON, PURPOSE_EXTRA  # 2.22.0 (#741): the Home & life modules of the purpose (the admin's own)
         on = [m for m in PURPOSE_ON[b["purpose"]] if m in _LIFE and m not in fs.split(",")]  # 2.44.0: not twice
         on += [m for m in PURPOSE_EXTRA.get(b["purpose"], ()) if m not in on and m not in fs.split(",")]  # 2.36.1 (#1021): office
+        am = b.get("all_modules")  # 2.46.1 (#1591): "Switch on all modules": on = Home & life too, off = lists and tasks only
+        if isinstance(am, bool):
+            on = [m for m in (_LIFE + PURPOSE_EXTRA.get(b["purpose"], ())) if m not in fs.split(",")] if am else []
+            uset(c, me(), "mods_all", "1" if am else "0")
         if on:
             uset(c, me(), "features", ",".join([x for x in fs.split(",") if x] + on))
-        if b["purpose"] == "family":
-            family_examples(c, me())
+        if b["purpose"] == "family":  # 2.46.1 (#1615): the two starter lists; their examples only with "Sample project" (#1602)
+            family_examples(c, me(), tasks=b.get("examples") is True)
     if b.get("sample") is True and not sample_state(c, me()):  # 1.8.0: "Create a sample project"
         sample_create(c, me())
     elif "sample" in b:

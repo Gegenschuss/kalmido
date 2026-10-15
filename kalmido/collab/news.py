@@ -228,6 +228,10 @@ def notif_ok(c, uid, s, row, ch, lid=None):
         return False
     if bell == "all":
         return True
+    if ch == "push" and lid and bell == "default" and s.get("fav_quiet") == "1":  # 2.46.1 (#1361): quieter lists without a star
+        from ..lists.favorites import lc_fav_quiet
+        if lc_fav_quiet(c, uid, lid, row):
+            return False
     key = BELL_CUSTOM_KEY.get(row, row)
     if bell == "custom" and key in BELL_CUSTOM_ROWS:
         x = cust.get(key, {})
@@ -242,6 +246,9 @@ def bell_all_users(c, lid, row=None):
     for r in c.execute("SELECT user_id, mode, custom FROM list_bell WHERE list_id=? AND mode IN ('all','custom')", (lid,)):
         if r["mode"] == "all" or (key and any(bell_custom_of(r["custom"]).get(key, {}).values())):
             out.add(r["user_id"])
+    if out:  # 2.46.0 (#1603): only the owner and members (a reader through "Everyone in the organisation" gets no events)
+        from ..core.access import list_people
+        out &= list_people(c, lid)
     return out
 
 

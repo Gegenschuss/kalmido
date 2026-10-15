@@ -65,6 +65,7 @@ set +a
 # kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server, proposals, message_edited, playbook, approval_check, notice, comment_answer, comment_blocks
 # kalmido-capability: outbox, jobs, event_bundling (2.44.0: mcp/agent_extras.py and mcp/agent_job.py, loaded by agent_run.py)
 # kalmido-capability: approval_closed, perm_relay, approval_lifecycle, session_resume, robust_runs
+# kalmido-capability: team_listen (2.46.1: team chat messages of lists the agent listens in on, in mcp/agent_run.py)
 # (2.44.0: agent_run.py; perm_relay and session_resume only when COMMAND is Claude Code)
 # (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)
 if [[ $EVENTS == 1 ]]; then

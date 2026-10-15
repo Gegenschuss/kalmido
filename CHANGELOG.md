@@ -7,6 +7,92 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.46.1] - 2026-10-15
+
+**In short:** **Lists, sidebar, phone animations**: folder rows read like list rows, lists and sections can be dragged to
+the very end, several contacts at once, the legacy import per area, a list channel for listening agents, favourites
+grow up, and on the phone sheets, rows and views move softly instead of jumping.
+
+### Added
+- **Several contacts at once** (#1554): *Select* in the contacts (a long press on the phone), a bar with the count,
+  *All* follows search, group and address book; delete (one question with the number, gone from the phones via CardDAV
+  too) or move to another address book you may change. One request for up to 5,000 contacts (`POST /contacts/bulk`,
+  MCP `bulk_contacts`); every contact is checked first, nothing changes on a foreign or read-only one. Agents: 10 or more
+  contacts wait for a person's approval. Birthday tasks follow (deleted contacts: to the trash).
+- **Legacy Excel import per area** (#1557): a switch per area (customers, services, equipment) in the preview, the count
+  on the button follows; the import history can undo one area (*Only equipment back*), the whole undo still works after it.
+- **List channel for listening agents** (#1639): an agent that listens in a list gets every channel message of a person
+  as `team_message` (fields `mentioned`, `listening`), not only @mentions; its own messages trigger nothing. Docs, MCP
+  template and the reference launcher (`team_listen`) are updated.
+- **Favourites, the rest** (#1361): agents see the person's stars (`favorite` in `GET /lists`), Ctrl+K starts with
+  favourites, an optional *Quieter pushes from lists without a star* (off by default; @mentions, replies to you,
+  assignments, reminders and approvals still come), and a one-time suggestion for a busy list (never set on its own,
+  can be switched off).
+- **Switch on all modules** (#1591): a switch under *What do you use Kalmido for?* (setup, purpose dialog, Settings >
+  Modules); off = only lists and tasks, whatever the purpose. API: `all_modules` in `/me/purpose`.
+- **What is encrypted** (#1641): Settings > Administration > Organisation shows two short lists *Encrypted* / *Not
+  encrypted* taken from the server's list of encrypted fields; the same table in SELF-HOSTING.md.
+
+### Changed
+- **Folder rows** (#1607, #1643): the arrow stands before the folder icon, the number right after the name, the share
+  icon in the lists' share column; a folder row is as high as a list row, no extra room between folders.
+- **Sample project only on request** (#1602): switching the purpose asks with a switch *Create a sample project* (off
+  by default); *Getting started* stays. API: `/me/purpose` creates samples only with `examples: true`.
+- **Family setup** (#1615, #1608): a shopping list (with shop areas) and one list *Family* with the sections Household,
+  Birthdays, Meal plan, Deadlines; dishes carry a mark and count from every list; birthdays, deadlines, dishes and the
+  CardDAV import without a chosen list go there. New family lists get no automatic colour. Existing lists stay as they are.
+- **Shopping lists show the cart** (#1636) in the sidebar, the list header and the search, unless they have an own icon.
+- **Office tab "Quotes & invoices"** (#1637, was *Documents*); empty states with one big button under the text, calmer
+  three-level tabs, search and filter of the same height.
+- **Folder default "Hide completed"** (#1422) works like the other folder defaults (*Only new lists*, the number of
+  changed lists, *This list differs* / *Back to folder*), for your own lists.
+- **Phone animations** (#1558, #1559, #1560): sheets and dialogs fold up from the bottom and away again; rows fade out
+  when completed or deleted and slide off on a swipe; opened and new rows, the dimmed background, the + button, the
+  selection bar and hint texts fade; views, the calendar (from its side), the tab underline and the search glide in.
+  *Reduce motion* turns all of it off; the desktop is unchanged.
+
+### Fixed
+- **Subtasks typed fast** (#1634): a second Enter waits its turn and what is typed meanwhile stays in the field.
+- **Module counter** (#1601): quick changes of the purpose no longer leave the counter and the switches disagreeing.
+- **Drag to the very end** (#1612, #1635): a list dropped below the last list (or on its own folder header) goes to the
+  end; sections and Kanban columns can go last too, and on the phone a long press on a section header drags it.
+- **Inline title edit** (#1622): the field stays on the line of the circle and ends before the columns.
+
+## [2.46.0] - 2026-10-15
+
+**In short:** **Organisations and rights**: one kind of server for everybody - organisations plus a private space -, an
+admin picks the organisation when adding a person, organisation lists can be open to the whole organisation, and folder
+sharing asks before it replaces roles set per list.
+
+### Security
+- Security fix (organisation boundary, sign-up) (#1562).
+
+### Changed
+- **One kind of server** (#1592): organisations and a private space everywhere (formerly the mode *workspaces*); there is
+  no automatic single-organisation mode any more and no membership is added at start. Existing memberships, roles and
+  lists stay as they are. Organisation admins can remove members (their lists go to the admin). The user management
+  still lists every account for instance admins. `KALMIDO_INSTANCE_MODE=organisation` is ignored; `shared` stays.
+  People outside your organisations are reached by sharing a private list by e-mail address; a server without any
+  organisation lets everyone see everyone. The login page names no organisation; open registration stays off on a server
+  with organisations. Clients follow the organisation boundary for instance admins too. Upgrading: one check at the first
+  start of 2.46.0 writes once what the old start-up sync wrote every time (everybody in the one organisation), nothing else.
+- **Folder sharing asks first** (#1606): changing a person's or group's role in a shared folder asks *Set everywhere* /
+  *Only new lists* when some lists have a role of their own.
+- **Organisation settings tidied up** (#1563): one heading and one info link for the encryption block; the boundary check
+  unfolds to the affected lists, calendars and address books with a *Clean up* button.
+
+### Added
+- **Organisation and role when adding a person** (#1561): *Administration > People > Add* offers the organisation (none or
+  one of them) and the role (member / admin); the API takes `orgs: [{id, role}]`.
+- **Everyone in the organisation** (#1603): an organisation list can be visible to all members of its organisation
+  (read-only until they join, or editable for all); agents only when invited; no notifications for readers.
+- **Group pictures** (#1605): a preset or an own photo per group, shown in the share dialogs, the group management and on
+  tasks assigned to a group; backups now include profile pictures, list icons and group pictures (a 2.45 server cannot
+  restore such a backup).
+
+### Fixed
+- Back button between the share dialog and the settings of a folder or a list, without stacking dialogs (#1604).
+
 ## [2.45.1] - 2026-10-15
 
 **In short:** fixes for contacts and office master data (no new features apart from the English device name).

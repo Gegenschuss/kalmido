@@ -89,38 +89,43 @@ today = date.today()
 
 # ================================================================== the setup: "What do you use Kalmido for?" = Family (German)
 r = A.post(B + "/api/admin/setup", json={"lang": "de", "collab_all": True, "time_all": True,
-                                          "modules": ["cal", "habits", "comments", "family"], "purpose": "family"})
+                                          "modules": ["cal", "habits", "comments", "family"], "purpose": "family", "examples": True})  # 2.46.1 (#1602)
 check(r.ok, "setup with purpose family " + r.text[:200])
 A.patch(B + "/api/settings", json={"tour": "done"})
 st = A.get(B + "/api/state").json()
 fs = st["settings"]["features"].split(",")
 check("family" in fs and "collab" in fs and "timeline" not in fs and st["settings"]["purpose"] == "family", f"modules of the family setup: {fs}")
 fl = {l["family"]: l for l in st["lists"] if l["family"]}
-check(set(fl) == {"shopping", "household", "birthdays", "meals"}, f"four starter lists {sorted(fl)}")
-check(fl["shopping"]["name"] == "Einkaufsliste" and fl["meals"]["name"] == "Essensplan" and all(l["folder"] == "Familie" for l in fl.values()),
-      "… named in German, in the folder Familie " + str([(l["name"], l["folder"]) for l in fl.values()]))
-SHOP, HOUSE, BDAYS, MEALS = (fl[k]["id"] for k in ("shopping", "household", "birthdays", "meals"))
+# 2.46.1 (#1615): the family starts with the shopping list and ONE list "Family" with sections (was four lists)
+check(set(fl) == {"shopping", "family"}, f"two starter lists {sorted(fl)}")
+check(fl["shopping"]["name"] == "Einkaufsliste" and fl["family"]["name"] == "Familie" and all(l["folder"] == "Familie" for l in fl.values())
+      and all(l["color"] == "" for l in fl.values()), "… named in German, in the folder Familie, without a colour (#1608) " + str([(l["name"], l["folder"], l["color"]) for l in fl.values()]))
+SHOP, FAM = fl["shopping"]["id"], fl["family"]["id"]
+HOUSE = MEALS = BDAYS = FAM  # 2.46.1 (#1615): household, meals and birthdays share the list "Family" (in their sections)
+fsec = {s["name"]: s["id"] for s in st["sections"] if s["list_id"] == FAM}
+check(list(fsec) == ["Haushalt", "Geburtstage", "Essensplan", "Fristen"], f"the sections of the list Familie {list(fsec)}")
 secs = [s["name"] for s in st["sections"] if s["list_id"] == SHOP]
-check(secs == [] and fl["shopping"]["checklist"] == 1, f"the shopping list: (2.22.0 #747) no shop areas by itself, done items at the bottom {secs}")
+check(secs[:3] == ["Obst & Gemüse", "Brot & Backwaren", "Milchprodukte & Eier"] and len(secs) == 8 and fl["shopping"]["checklist"] == 1,
+      f"the shopping list: (2.46.1 #1615) with the 8 shop areas, done items at the bottom {secs}")
 r = A.post(B + f"/api/lists/{SHOP}/shop-areas")
-check(r.ok and r.json()["added"] == 8 and r.json()["sorted"] == 3, "switched on by hand: 8 areas, the three example items sorted in " + r.text)
-st = A.get(B + "/api/state").json()
-secs = [s["name"] for s in st["sections"] if s["list_id"] == SHOP]
-check(secs[:3] == ["Obst & Gemüse", "Brot & Backwaren", "Milchprodukte & Eier"] and len(secs) == 8, f"the 8 shop areas {secs}")
+check(r.ok and r.json()["added"] == 0, "shop areas again: none added " + r.text)
 ex = [t for t in st["tasks"] if t["list_id"] == SHOP]
 check({t["title"] for t in ex} == {"Äpfel", "Brot", "Milch"} and all(t["section_id"] for t in ex), "three example items, each in its area")
-chores = [t for t in st["tasks"] if t["list_id"] == HOUSE]
+chores = [t for t in st["tasks"] if t["list_id"] == HOUSE and t["section_id"] == fsec["Haushalt"]]
 check(len(chores) == 4 and all(t["repeat"] and t["due"] >= today.isoformat() for t in chores), "household: four repeating chores " + str([(t["title"], t["repeat"], t["due"]) for t in chores]))
-meal = [t for t in st["tasks"] if t["list_id"] == MEALS]
-check(len(meal) == 1 and meal[0]["due"] == today.isoformat() and "- Tomaten" in meal[0]["content"], "a meal for today with its ingredients")
+meal = [t for t in st["tasks"] if t["list_id"] == MEALS and (t.get("fam") or {}).get("kind") == "meal"]
+check(len(meal) == 1 and meal[0]["due"] == today.isoformat() and "- Tomaten" in meal[0]["content"] and meal[0]["section_id"] == fsec["Essensplan"],
+      "a meal for today with its ingredients, marked as a meal, in the section Essensplan")
 check("Familie" in json.loads(st["settings"]["folders"]), "the folder is in the folder order")
 r = A.post(B + "/api/me/purpose", json={"purpose": "family"})
-check(r.ok and r.json()["created"] == [] and len([l for l in A.get(B + "/api/state").json()["lists"] if l["family"]]) == 4,
+check(r.ok and r.json()["created"] == [] and len([l for l in A.get(B + "/api/state").json()["lists"] if l["family"]]) == 2,
       "purpose family again: no second set of lists")
 r = A.post(B + "/api/me/purpose", json={"purpose": "software"})
+check(r.ok and r.json()["created"] == [], "2.46.1 (#1602): no sample project without examples")
+r = A.post(B + "/api/me/purpose", json={"purpose": "software", "examples": True})
 fs = r.json()["features"].split(",")
 check(r.ok and len(r.json()["created"]) == 1 and "family" not in fs and {"kanban", "deps", "time", "timeline"} <= set(fs), f"purpose software: a project, the modules {fs}")
-check(A.post(B + "/api/me/purpose", json={"purpose": "software"}).json()["created"] == [], "… once")
+check(A.post(B + "/api/me/purpose", json={"purpose": "software", "examples": True}).json()["created"] == [], "… once")
 r = A.post(B + "/api/me/purpose", json={"purpose": "me"})
 check(set(r.json()["features"].split(",")) <= {"cal", "paperless", "agents", "events", "contacts"} and "cal" in r.json()["features"].split(","),
       "purpose me: the simple start (2.21: with events + contacts) " + r.json()["features"])
@@ -147,7 +152,7 @@ check(A.patch(B + f"/api/users/{LINA}", json={"is_admin": True}).status_code == 
 check(A.patch(B + f"/api/users/{LINA}", json={"parents": [MAX]}).status_code == 400, "a kid is no parent")
 check(A.patch(B + f"/api/users/{LINA}", json={"parents": [1, BOB]}).ok, "Bob is a parent of Lina too")
 check(A.patch(B + f"/api/users/{BOB}", json={"kid": True, "is_admin": True}).status_code == 400, "kid + admin at once: 400")
-for lid in (SHOP, HOUSE, MEALS):
+for lid in (SHOP, FAM):
     check(A.put(B + f"/api/lists/{lid}/members", json={"user_id": BOB, "role": "edit"}).ok, "share with Bob")
     A.put(B + f"/api/lists/{lid}/members", json={"user_id": LINA, "role": "edit"})
 roles = dict(dbx("SELECT list_id, role FROM list_members WHERE user_id=?", (LINA,)))
@@ -160,7 +165,8 @@ check(r.status_code == 201, "a birthday " + r.text[:200])
 O = r.json()
 check(O["title"] == "Birthday: Grandma Erika" and O["due"] == nd.isoformat() and O["repeat"] == "FREQ=YEARLY" and O["reminders"] == "10080,0",
       f"title, the next date, yearly, reminded 7 days before + on the day {O['title']} {O['due']} {O['reminders']}")
-check(O["fam"] == {"kind": "birthday", "name": "Grandma Erika", "year": 1946, "lead": 7} and O["list_id"] == BDAYS, f"fam + the Birthdays list {O['fam']}")
+check(O["fam"] == {"kind": "birthday", "name": "Grandma Erika", "year": 1946, "lead": 7} and O["list_id"] == BDAYS
+      and O["section_id"] == fsec["Geburtstage"], f"fam + the list Family, section Geburtstage (2.46.1 #1615, the language changed meanwhile) {O['fam']}")
 gifts = [t for t in A.get(B + "/api/state").json()["tasks"] if t["parent_id"] == O["id"]]
 check([g["title"] for g in sorted(gifts, key=lambda t: t["sort"])] == ["Book", "Scarf"], "gift ideas are subtasks")
 past = today - timedelta(days=3)
@@ -197,7 +203,7 @@ exp = today + timedelta(days=60)
 r = A.post(B + "/api/family/deadlines", json={"type": "passport", "who": "Lina", "expires": exp.isoformat()})
 P = r.json()
 check(r.status_code == 201 and P["title"] == "Renew the passport: Lina" and P["due"] == exp.isoformat() and P["deadline"] == 2 and P["reminders"] == "129600,0"
-      and P["list_id"] == HOUSE and P["fam"]["type"] == "passport", "passport: due on expiry, reminded 90 days before " + str((P.get("title"), P.get("reminders"))))
+      and P["list_id"] == HOUSE and P["section_id"] == fsec["Fristen"] and P["fam"]["type"] == "passport", "passport: due on expiry, reminded 90 days before " + str((P.get("title"), P.get("reminders"))))
 end = today + timedelta(days=200)
 r = A.post(B + "/api/family/deadlines", json={"type": "insurance", "who": "Car insurance", "expires": end.isoformat()})
 I = r.json()
@@ -255,7 +261,8 @@ check(json.loads(dbx("SELECT rotation FROM tasks WHERE id=?", (chore2,))[0][0])[
 check(until(lambda: True, 1) and dbx("SELECT COUNT(*) FROM activity WHERE task_id=? AND kind='rotation'", (chore2,))[0][0] == 1, "an activity line")
 check(Bo.patch(B + f"/api/tasks/{chore2}", json={"rotation": None}).json().get("rotation") is None, "rotation off (a member)")
 # moving a rotating task into another list: only its people stay
-r = A.patch(B + f"/api/tasks/{chore}", json={"list_id": BDAYS})
+SOLO = A.post(B + "/api/lists", json={"name": "Solo"}).json()["id"]  # 2.46.1 (#1615): birthdays share the list Family now
+r = A.patch(B + f"/api/tasks/{chore}", json={"list_id": SOLO})
 check(r.ok and r.json().get("rotation") is None, "moved to a list nobody else shares: the rotation ends " + str(r.json().get("rotation")))
 A.patch(B + f"/api/tasks/{chore}", json={"list_id": HOUSE})
 

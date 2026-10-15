@@ -219,6 +219,16 @@ def contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "patch": op("Change a contact (only the fields given)", K, ok(ref("Contact")) | errs("400", "403", "404", "409"), [cid_p],
                     body={"type": "object", "properties": {**props, "expect": {"type": "string"}}}, scope=S),
         "delete": op("Delete a contact", K, {"204": {"description": "Deleted"}} | errs("403", "404"), [cid_p], scope=S)}
+    paths["/contacts/bulk"] = {"post": op(  # 2.46.1 (#1554)
+        "Delete or move several contacts at once (up to 5000 ids). Every contact is checked first: one unknown or foreign id -> 404, "
+        "one in a read-only address book -> 403, and nothing changes. move: book_id = the target (write access); a contact the target "
+        "has already (same UID) is left where it is and listed in conflicts. Birthday tasks follow (deleted contacts: to the trash).", K,
+        ok({"type": "object", "properties": {"action": {"type": "string"}, "deleted": {"type": "integer"}, "moved": {"type": "integer"},
+                                             "unchanged": {"type": "integer"}, "conflicts": {"type": "array", "items": {"type": "integer"}}}})
+        | errs("400", "403", "404", "409"),
+        body={"type": "object", "required": ["ids", "action"], "properties": {
+            "ids": {"type": "array", "items": {"type": "integer"}}, "action": {"type": "string", "enum": ["delete", "move"]},
+            "book_id": {"type": "integer", "description": "move: the target address book"}}}, scope=S)}
     paths["/tasks/{id}/contacts"] = {"post": op(
         "Link a contact to a task: waiting (the task waits on them), responsible (they do it, outside Kalmido) or about (needs tasks:write too)", K,
         ok({"type": "object", "properties": {"items": {"type": "array", "items": {"type": "object"}}}}) | errs("400", "403", "404"), [pid()],

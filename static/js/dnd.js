@@ -268,40 +268,37 @@ function secHeadMenu(anchor, sid) {
     '-', {label: tr('Section menu…'), icon: 'dots', fn: () => sectionMenu(anchor, sid)}]);
 }
 let secDrag = null;
-const secTarget = el => el?.closest?.('#view .ghead[data-section], #view .kcol[data-kcol]');
 const secOf = el => el.classList.contains('kcol') ? el.dataset.kcol : el.dataset.section;
 document.addEventListener('dragstart', e => {
   const h = e.target.closest?.('[data-sdrag]'); if (!h) return;
   e.stopPropagation();
   secDrag = +h.dataset.sdrag; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'section:' + secDrag);
-  requestAnimationFrame(() => h.closest('.ghead, .kcol')?.classList.add('dragging'));
+  requestAnimationFrame(() => sb_secFold(h, true));  // 2.46.1 (#1635): the section folds while it is dragged
 }, true);
 document.addEventListener('dragover', e => {
   if (secDrag === null) return;
-  $$('#view .dropbefore').forEach(x => x.classList.remove('dropbefore'));
-  const t = secTarget(e.target); if (!t || +secOf(t) === secDrag) return;
-  e.preventDefault(); t.classList.add('dropbefore');
+  // 2.46.1 (#1635): anywhere on the sections; past the middle of the last one = the end
+  const sp = sb_secSpot(e.clientX, e.clientY, e.target), ok = !!sb_secOrder(secDrag, sp);
+  sb_secMark(ok ? sp : null);
+  if (ok) e.preventDefault();
 });
 document.addEventListener('drop', e => {
   if (secDrag === null) return;
   e.preventDefault(); e.stopImmediatePropagation();
   const sid = secDrag; secDrag = null;
-  $$('#view .dropbefore, #view .dragging').forEach(x => x.classList.remove('dropbefore', 'dragging'));
-  const t = secTarget(e.target); if (!t) return;
-  const s = S.sections.find(x => x.id === sid); if (!s) return;
-  const tid = secOf(t) ? +secOf(t) : null, ids = secIds(s.list_id).filter(x => x !== sid);
-  ids.splice(tid ? ids.indexOf(tid) : 0, 0, sid);  // before the target ("Unassigned" = first)
-  if (ids.join() !== secIds(s.list_id).join()) saveSectionOrder(s.list_id, ids);
+  const o = sb_secOrder(sid, sb_secSpot(e.clientX, e.clientY, e.target));  // 2.46.1 (#1635): before the target ("Unassigned" = first) or at the end (measured while folded)
+  $$('#view .dropbefore, #view .dropafter, #view .dragging').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'dragging', 'sb-secfold'));
+  if (o) saveSectionOrder(o.lid, o.ids);
 }, true);
-document.addEventListener('dragend', () => { if (secDrag !== null) { secDrag = null; $$('#view .dropbefore, #view .dragging').forEach(x => x.classList.remove('dropbefore', 'dragging')); } });
-// touch: long-press a section header (list view, kanban) = move up / down
+document.addEventListener('dragend', () => { if (secDrag !== null) { secDrag = null; $$('#view .dropbefore, #view .dropafter, #view .dragging').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'dragging', 'sb-secfold')); } });
+// touch: long-press a section header (list view, kanban) = drag it (2.46.1 #1635, secdrag.js); held without moving = move up / down
 let secHold = null, secHeld = false;
 document.addEventListener('touchstart', e => {
   const h = e.target.closest?.('#view .ghead[data-section], #view .khead[data-ksec]');
   const sid = h && +(h.dataset.section || h.dataset.ksec);
   if (!sid || e.target.closest('.iconbtn, .gact')) { secHold = null; return; }
   const p = e.touches[0];
-  secHold = {h, sid, x: p.clientX, y: p.clientY, timer: setTimeout(() => { if (!secHold) return; secHold.fired = true; if (navigator.vibrate) navigator.vibrate(12); secHeadMenu(secHold.h, secHold.sid); }, 450)};
+  secHold = {h, sid, x: p.clientX, y: p.clientY, timer: setTimeout(() => { if (!secHold) return; secHold.fired = true; if (!canEditList(S.sections.find(x => x.id === secHold.sid)?.list_id)) { secHeadMenu(secHold.h, secHold.sid); return; } sb_secHoldStart(secHold.h, secHold.sid, secHold.x, secHold.y); }, 450)};
 }, {passive: true});
 document.addEventListener('touchmove', e => { if (secHold && !secHold.fired && Math.hypot(e.touches[0].clientX - secHold.x, e.touches[0].clientY - secHold.y) > 8) { clearTimeout(secHold.timer); secHold = null; } }, {passive: true});
 function secHoldEnd(e) {
@@ -332,12 +329,18 @@ document.addEventListener('touchmove', e => {
 function swipeEnd(e) {
   if (!swipe) return;
   const {r, dx, lock} = swipe; swipe = null;
-  r.style.transition = 'transform .18s'; r.style.transform = ''; r.style.background = '';
+  // 2.46.1 (#1559): a swipe that completes the task carries the row on out to the right (like a dismissed news item) instead of snapping back
+  const going = lock === 'x' && dx > 90 && e?.type !== 'touchcancel' && an_on();
+  r.style.transition = going ? 'transform .18s ease-in, opacity .18s ease-in' : 'transform .18s'; r.style.transform = going ? 'translateX(110%)' : ''; r.style.background = going ? r.style.background : '';
+  if (going) r.style.opacity = '0';
   setTimeout(() => { r.style.transition = ''; }, 200);
   if (lock !== 'x' || e?.type === 'touchcancel') return;  // 2.13.4: a cancelled swipe snaps back and does nothing
   swiped = true; setTimeout(() => { swiped = false; }, 350);
   const id = +r.dataset.id;
-  if (dx > 90) toggleTask(id);
+  if (dx > 90) {
+    const back = () => { if (going && r.isConnected) { r.style.transition = 'transform .18s, opacity .18s'; r.style.transform = ''; r.style.opacity = ''; r.style.background = ''; setTimeout(() => { r.style.transition = ''; }, 200); } };
+    Promise.resolve(toggleTask(id)).then(back, back);  // the list redraws without the row; if it stayed (cancelled, error) it slides back
+  }
   // 2.24.0 (UX-09 / UX-14 / UX-37): the short menu names its task, keeps the order of the task menu (date, list, …) and ends
   // with "All…"; "Move to list…" sorts the inbox
   else if (dx < -90) {  // 2.25.0 (UX-37): emptying the inbox = putting tasks into lists: there "Move to list…" leads the menu

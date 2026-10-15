@@ -242,7 +242,7 @@ const bySort = (a, b) => a.sort - b.sort || a.id - b.id;
 const archivedTask = t => !!t && !!listById(t.list_id)?.archived;
 const archHidden = t => archivedTask(t) && !(S.route.mod === 'tasks' && S.route.key === 'l:' + t.list_id);
 // ctx: include the read-only context parents of a participant's subtasks (only the list view shows them, above their subtask)
-function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.status === 0 && !archHidden(t) && !wsHidden(t) && (ctx || !t.context)); }  // 2.28.0 (#935): + the workspace
+function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.status === 0 && !archHidden(t) && !wsHidden(t) && !ovHidden(t) && (ctx || !t.context)); }  // 2.28.0 (#935): + the workspace
 
 // ------------------------------------------------------------------ api + offline outbox
 // While offline, task/habit writes are applied locally and queued (localStorage outbox); on reconnect
@@ -565,7 +565,7 @@ function applyState(j) {
   S.dayplan = j.dayplan || {work_start: '09:00', work_end: '17:00', review_time: '', default_duration: 30};  // 2.10.0 (#440)
   S.kids = j.kids || []; S.kidIds = new Set(j.kid_ids || []);  // 2.19.0 (#653)
   S.peopleVis = j.people_visibility || 'all';  // 2.22.0 (#752)
-  S.instanceMode = j.instance_mode || 'organisation';
+  S.instanceMode = j.instance_mode || 'workspaces';  // 2.46.0 (#1592)
   S.workspaces = !!j.workspaces; S.wsMismatches = j.ws_mismatches || {};  // 2.28.0 (#935)
   S.notifAsk = j.notif_ask || [];  // 2.33.0 (#927): the one-time question about notification templates
   S.storage = j.storage || null; S.announce = j.announce || null;  // 2.24.0 (#910 / #907)  // 2.23.0 (#799): organisation | shared | multi

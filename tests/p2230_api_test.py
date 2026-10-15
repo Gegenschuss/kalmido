@@ -97,21 +97,22 @@ CAROL = A.post(B + "/api/users", json={"username": "carol", "display_name": "Car
 Bo, Ca = sess("bob"), sess("carol")
 for s in (Bo, Ca):
     s.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": FEAT})
-# ================================================================== #799: the kind of instance (no variable, one organisation = organisation)
+# ================================================================== #799: the kind of instance
+# 2.46.0 (#1592): no mode = workspaces; no organisation is made at start, nobody joins one by default. The former
+# organisation instance (one organisation with everyone, the admin its admin) is built through the admin API.
 oj = A.get(B + "/api/admin/orgs").json()
-check(oj["mode"] == "organisation" and len(oj["orgs"]) == 1 and not oj["editable"] and set(oj["orgs"][0]["members"]) >= {1, BOB, CAROL},
-      "#799: organisation mode by default: one organisation with everyone " + json.dumps(oj)[:200])
-ORG1 = oj["orgs"][0]["id"]
-check(A.post(B + "/api/admin/orgs", json={"name": "New"}).status_code == 403 and A.delete(B + f"/api/admin/orgs/{ORG1}").status_code == 403
-      and A.patch(B + f"/api/admin/orgs/{ORG1}", json={"name": "X"}).status_code == 403
-      and A.put(B + "/api/admin/orgs/visibility", json={"mode": "all"}).status_code == 403, "#799: no creating, deleting, renaming, visibility switch (403)")
-check(A.get(B + "/api/state").json()["instance_mode"] == "organisation" and A.get(B + "/api/state").json()["people_visibility"] == "org", "#799: state")
-# an instance that kept two organisations from 2.22 ("multi"): set up in the database (the app cannot create one any more)
+check(oj["mode"] == "workspaces" and oj["orgs"] == [] and oj["editable"] and oj["creatable"], "#1592: workspaces by default, no organisation " + json.dumps(oj)[:200])
+r = A.post(B + "/api/admin/orgs", json={"name": "Example"})
+check(r.status_code == 201 and r.json()["admins"] == [1], "#1592: the instance admin creates an organisation (and administers it) " + r.text[:200])
+ORG1 = r.json()["id"]
+check(A.patch(B + f"/api/admin/orgs/{ORG1}", json={"members": [1, BOB, CAROL], "admins": [1]}).ok, "#1592: members set")
+check(A.put(B + "/api/admin/orgs/visibility", json={"mode": "all"}).status_code == 403, "#799: no visibility switch (403)")
+check(A.get(B + "/api/state").json()["instance_mode"] == "workspaces" and A.get(B + "/api/state").json()["people_visibility"] == "org", "#799: state")
+# two organisations (2.46.0 (#1592): as before in the database)
 ORG2 = dbx("INSERT INTO orgs(name,icon,created_at) VALUES('Other','','2026-10-01T00:00:00Z') RETURNING id")[0][0]
 dbx("DELETE FROM org_members WHERE user_id=?", (CAROL,))
 dbx("INSERT INTO org_members(org_id,user_id) VALUES(?,?)", (ORG2, CAROL))
-check(A.get(B + "/api/admin/orgs").json()["mode"] == "multi" and A.get(B + "/api/admin/orgs").json()["editable"], "#799: two organisations kept: multi (editable)")
-A.put(B + "/api/admin/orgs/visibility", json={"mode": "org"})
+check(A.get(B + "/api/admin/orgs").json()["mode"] == "workspaces" and A.get(B + "/api/admin/orgs").json()["editable"], "#799: two organisations: editable")
 
 # ================================================================== #795: task_added for agents
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments", "structure"], "username": "claude", "display_name": "Claude"})
@@ -371,9 +372,9 @@ check(K.post(B + "/api/auth/invite/check", json={"token": ktok}).status_code == 
 r = K.post(B + "/api/auth/link", json={"token": ktok})
 check(r.ok and r.json()["ok"] and K.get(B + "/api/me").json()["username"] == "tim", "it signs the kid in")
 check(requests.post(B + "/api/auth/link", headers=H, json={"token": ktok}).status_code == 404, "once")
-check(Bo.post(B + f"/api/users/{kid}/signin-link").status_code == 403, "Bob (not a parent): no")
+check(Bo.post(B + f"/api/users/{kid}/signin-link").status_code in (403, 404), "Bob (not a parent): no")  # 2.46.0 (#1592): 404 when he does not see the kid
 A.post(B + "/api/users", json={"username": "bobkid", "display_name": "Bobkid", "kid": True, "parents": [BOB]})
-bk = next(u["id"] for u in A.get(B + "/api/users").json()["users"] if u["username"] == "bobkid")
+bk = next(u["id"] for u in A.get(B + "/api/users?all=1").json()["users"] if u["username"] == "bobkid")  # 2.46.0 (#1592): the user management
 r = Bo.post(B + f"/api/users/{bk}/signin-link")
 check(r.ok and "#signin/" in r.json()["link"], "a parent creates the link for their kid")
 check(A.post(B + "/api/users/1/signin-link").status_code == 409, "never for an admin")
@@ -420,7 +421,7 @@ check(r.ok and r.json()["ok"] and R.get(B + "/api/me").json()["username"] == "ma
 st = R.get(B + "/api/state").json()
 check([l for l in st["lists"] if not l["is_inbox"]] == [] and not st["me"]["is_admin"], "no list access, no admin")
 dom = dbx("SELECT org_id FROM org_members WHERE user_id=?", (u[0][0],))
-check(dom == [(ORG1,)], "the instance's first organisation (no domain match) " + str(dom))
+check(dom == [], "#1562: no organisation without a domain match " + str(dom))  # 2.46.0 (#1562): before: the instance's first one
 # approval mode (with mail): confirm -> waits; the admin approves
 A.patch(B + "/api/admin/settings", json={"signup_mode": "approval"})
 m1 = len(mails())
@@ -437,15 +438,16 @@ r = requests.post(B + "/api/auth/login", headers=H, json={"username": "nina", "p
 check(r.status_code == 403 and "approve" in r.json()["error"], "login: 'waits for approval' (only with the right password)")
 check(requests.post(B + "/api/auth/login", headers=H, json={"username": "nina", "password": "wrong-pass-1"}).status_code == 401, "a wrong password: the usual 401")
 check(any(it["kind"] == "signup" and it["data"]["user_id"] == nid for it in A.get(B + "/api/news").json()["items"]), "the admins get a News item")
-check(next(x for x in A.get(B + "/api/users").json()["users"] if x["id"] == nid)["disabled"], "listed as disabled until approved")
+check(next(x for x in A.get(B + "/api/users?all=1").json()["users"] if x["id"] == nid)["disabled"], "listed as disabled until approved")  # 2.46.0 (#1592): the user management
 check(Bo.post(B + f"/api/users/{nid}/approve").status_code == 403, "only admins approve")
 check(A.post(B + f"/api/users/{nid}/approve").ok and sess("nina", "nina-secret-1").get(B + "/api/me").ok, "approved: Nina logs in")
-check(A.post(B + f"/api/users/{nid}/approve").status_code == 409, "approve twice: 409")
+check(A.post(B + f"/api/users/{nid}/approve").status_code in (404, 409), "approve twice: 409")  # 2.46.0 (#1592): 404 once she belongs to an organisation the admin is not in
 check(not any(it["kind"] == "signup" for it in A.get(B + "/api/news").json()["items"]), "the News item disappears once decided")
 # open mode, the rate limit, expired registrations are removed
-A.patch(B + "/api/admin/settings", json={"signup_mode": "open"})
+# 2.46.0 (#1592): a server with organisations refuses open registration; the rest runs in the approval mode
+check(A.patch(B + "/api/admin/settings", json={"signup_mode": "open"}).status_code == 409, "#1592: no open registration with organisations")
 r = R.post(B + "/api/auth/signup", json={"name": "Otto", "email": "otto@anywhere.example"})
-check(r.json() == {"ok": True, "mail": True, "pending": False} and dbx("SELECT signup FROM users WHERE username='otto'") == [("confirm",)], "open mode")
+check(r.json() == {"ok": True, "mail": True, "pending": True} and dbx("SELECT signup FROM users WHERE username='otto'") == [("confirm",)], "approval mode")
 check(R.post(B + "/api/auth/signup", json={"name": "", "email": "y@anywhere.example"}).status_code == 400
       and R.post(B + "/api/auth/signup", json={"name": "Y", "email": "nope"}).status_code == 400, "validation: name, e-mail")
 dbx("UPDATE user_invites SET expires_at='2020-01-01T00:00:00Z' WHERE user_id=(SELECT id FROM users WHERE username='otto')")
@@ -476,15 +478,16 @@ def restart(extra):
     assert subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=e, capture_output=True, text=True).returncode == 0
 
 
+# 2.46.0 (#1592): the former mode "organisation" is ignored: no renaming, nobody moved, the login page names no organisation
 restart("-e KALMIDO_INSTANCE_MODE=organisation -e KALMIDO_ORG_NAME=Acme")
 A = sess("alice")
 oj = A.get(B + "/api/admin/orgs").json()
-check(oj["mode"] == "organisation" and [o["name"] for o in oj["orgs"]] == ["Acme"] and CAROL in oj["orgs"][0]["members"] and oj["name_env"],
-      "#799: organisation by configuration: the first organisation, renamed, everyone in it " + json.dumps(oj)[:200])
-check(requests.get(B + "/api/auth/info").json()["org"] == "Acme", "#799: the login page shows the name")
-check({p["id"] for p in A.get(B + "/api/workload").json()["people"]} >= {1, BOB, CAROL}, "#799: workload: the whole organisation")
+check(oj["mode"] == "workspaces" and sorted(o["name"] for o in oj["orgs"]) == ["Example", "Other"] and CAROL not in [o for o in oj["orgs"] if o["id"] == ORG1][0]["members"] and oj["name_env"],
+      "#1592: the mode organisation is ignored: no renaming, nobody moved " + json.dumps(oj)[:200])
+check(requests.get(B + "/api/auth/info").json()["org"] == "", "#1592: the login page names no organisation")
+check({p["id"] for p in A.get(B + "/api/workload").json()["people"]} >= {1, BOB}, "#799: workload: the whole organisation")
 check(A.patch(B + "/api/admin/settings", json={"signup_mode": "open"}).status_code == 409 and A.patch(B + "/api/admin/settings", json={"signup_mode": "approval"}).ok,
-      "#799: an organisation registers only by domain or with approval")
+      "#799 / #1592: a server with organisations registers only by domain or with approval")
 restart("-e KALMIDO_INSTANCE_MODE=shared")
 A = sess("alice")
 Bo = sess("bob")

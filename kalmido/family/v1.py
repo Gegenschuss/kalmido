@@ -196,7 +196,7 @@ def v1_family_reward_decide(rid):
 def v1_me_purpose():
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("purpose", "examples"))
+    reject_unknown(b, ("purpose", "examples", "all_modules"))  # 2.46.1 (#1591): all_modules
     return jsonify(v1_call(me_purpose, body=b))
 
 
@@ -294,4 +294,5 @@ def family_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     paths["/me/purpose"] = {"post": op("What the token's user uses Kalmido for: switches the modules and creates the starter lists once", F,
                                        ok({"type": "object", "properties": {"features": {"type": "string"}, "created": {"type": "array", "items": {"type": "integer"}}}}) | errs("400"),
                                        body={"type": "object", "required": ["purpose"], "properties": {"purpose": {"type": "string", "enum": list(PURPOSES)},
-                                                                                                       "examples": {"type": "boolean"}}}, scope="account")}
+                                                                                                       "examples": {"type": "boolean"},
+                                                                                                       "all_modules": {"type": "boolean"}}}, scope="account")}

@@ -28,6 +28,7 @@ ORDER = (
     "core.state",
     "lists.lists",
     "lists.groups",
+    "lists.grouppics",  # 2.46.0 (#1605)
     "lists.ownership",
     "lists.sections",
     "lists.folders",
@@ -98,6 +99,7 @@ ORDER = (
     "integrations.errorreports",
     "api.projects",
     "lists.kpis",  # 2.43.0 (#1328): sum row + key figures (web + token API)
+    "lists.orgvis",  # 2.46.0 (#1603): organisation lists visible to the whole organisation
     "api.scopes",
     "collab.notes",
     "collab.teamchat",
@@ -120,6 +122,7 @@ ORDER = (
     "contacts.carddav",
     "contacts.web",
     "contacts.v1",
+    "contacts.bulk",  # 2.46.1 (#1554): delete / move several contacts at once
     "life.model",
     "life.karakeep",
     "life.web",

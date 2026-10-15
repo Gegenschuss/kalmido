@@ -31,10 +31,11 @@ const V = B + 'api/v1';
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'comments']});
+  // 2.46.0 (#1592): no organisation from the start any more: the setup creates the one these tests use (id 1), new people join it
+  await call('POST', '/api/admin/setup', {org_name: 'Kalmido', lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const ME = (await call('GET', '/api/state')).me, ORG = ME.workspaces[0].id;
-  const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob Baker', password: 'password123'})).id;
+  const BOB = (await call('POST', '/api/users', {orgs: [1], username: 'bob', display_name: 'Bob Baker', password: 'password123'})).id;
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'claude', display_name: 'Claude'});
   const AG = ag.id, AGH = {Authorization: 'Bearer ' + ag.token, 'Content-Type': 'application/json'};
   const SW = (await call('POST', '/api/lists', {name: 'App dev', ptype: 'software', org_id: ORG})).id;

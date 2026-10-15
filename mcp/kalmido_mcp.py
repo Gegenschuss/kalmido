@@ -368,7 +368,8 @@ TOOLS = [
                    "listen_agent_ids (2.13.1): agents that get a comment event for EVERY comment a person writes in the list "
                    "(\"Agent reads every comment\", set by the list owner / admins), not only on tasks they follow. "
                    "columns (2.14.0): the list's row columns in order (null = default layout), see set_list_columns. "
-                   "project_type (2.18.0): agency | software | private, null = none.",
+                   "project_type (2.18.0): agency | software | private, null = none. "
+                   "favorite (2.46.1): a favourite list of your person (personal agents; put them first in overviews).",
      _obj({}), lambda api, a: api.call("GET", "/lists")),
     ("set_list_columns", "2.14.0: set which columns the rows of a list show and in which order, the same for every member "
                          "(only as the list's owner or admin). Keys: id (task number in front of the title), due, prio, who "
@@ -824,6 +825,11 @@ TOOLS += [
      lambda api, a: api.call("PATCH", f"/contacts/{int(a['contact_id'])}", body=_pick(a, CT_KEYS))),
     ("delete_contact", "2.21.0: delete a contact.", _obj({"contact_id": S_ID}, ["contact_id"]),
      lambda api, a: api.call("DELETE", f"/contacts/{int(a['contact_id'])}")),
+    ("bulk_contacts", "2.46.1: delete or move several contacts at once (ids from search_contacts, up to 5000). All are checked first: "
+                      "one you may not change -> nothing happens. move: book_id = the target address book; contacts it has already stay "
+                      "(conflicts). Ask the person before deleting many.",
+     _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "move"]}, "book_id": S_ID}, ["ids", "action"]),
+     lambda api, a: api.call("POST", "/contacts/bulk", body=_pick(a, ("ids", "action", "book_id")))),
     ("link_contact", "2.21.0: link a contact to a task: waiting (the task waits on them), responsible (they do it outside Kalmido) or about "
                      "(needs tasks:write too).",
      _obj({"task_id": S_ID, "contact_id": S_ID, "kind": {"type": "string", "enum": ["waiting", "responsible", "about"]}}, ["task_id", "contact_id"]),
@@ -917,9 +923,12 @@ TOOLS += [
      lambda api, a: api.call("POST", "/lists", body=a)),
     ("update_list", "Change a list: name, color, folder (moving your own list into another folder waits for approval), view, kind, "
                     "archived (true = archive), done_at_bottom, nag, day_hours, time_tracking (2.41.0, owner), project_type (2.18.0, owner / list admins: "
-                    "agency | software | private, null = none; switches on what the type needs, never deletes anything).",
+                    "agency | software | private, null = none; switches on what the type needs, never deletes anything); "
+                    "org_visibility (2.46.0, owner / list admins of an organisation list: \"\" = only invited people, \"org\" = everyone "
+                    "in the organisation, read-only for them unless org_edit true; opening it waits for approval).",
      _obj({"list_id": S_ID, **LIST_PROPS, "archived": {"type": "boolean"},
-           "project_type": {"type": ["string", "null"], "enum": ["agency", "software", "private", "", None]}}, ["list_id"]),
+           "project_type": {"type": ["string", "null"], "enum": ["agency", "software", "private", "", None]},
+           "org_visibility": {"type": "string", "enum": ["", "org"]}, "org_edit": {"type": "boolean"}}, ["list_id"]),
      lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}", body=_without(a, "list_id"))),
     ("delete_list", "Delete an ARCHIVED list for good (owner; archive it first with update_list archived=true); its tasks go to the "
                     "trash." + APPROVAL_NOTE, _obj({"list_id": S_ID}, ["list_id"]),
@@ -1183,7 +1192,8 @@ TOOLS += [
     ("delete_note", "2.17.0: delete a note.", _obj({"note_id": S_ID}, ["note_id"]), lambda api, a: api.call("DELETE", f"/notes/{int(a['note_id'])}")),
     ("list_team_chats", "2.17.0: the team chat conversations you take part in: one channel per shared list you are a member of "
                         "(people + agents), with unread counts. Agents cannot open direct messages; people talk to you in your own "
-                        "chat (send_chat). You get the event team_message when someone @mentions you in a channel.",
+                        "chat (send_chat). You get the event team_message when someone @mentions you in a channel (2.46.1: in a list where "
+                        "you listen in, every message a person writes there).",
      _obj({}), lambda api, a: api.call("GET", "/team/rooms")),
     ("read_team_chat", "2.17.0: messages of a team chat conversation, oldest first; before = a message id for older ones. Mentions "
                        "are <@user id>.",
@@ -1378,7 +1388,7 @@ TOOL_SCOPES = {
                  "restore_event", "reply_to_event", "add_preparation_task", "get_task_events"),
     "contacts": ("list_address_books", "create_address_book", "update_address_book", "delete_address_book", "share_address_book",
                  "unshare_address_book", "import_vcards", "export_vcards", "search_contacts", "get_contact", "create_contact", "update_contact",
-                 "delete_contact", "link_contact", "unlink_contact", "set_contact_care"),
+                 "delete_contact", "bulk_contacts", "link_contact", "unlink_contact", "set_contact_care"),
     "private": ("add_health_entry", "write_journal"),
 }
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read

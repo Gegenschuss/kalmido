@@ -14,6 +14,7 @@ function renderMultiBar() {
   if (!b) { b = document.createElement('div'); b.id = 'mbar'; document.body.appendChild(b); }
   const n = S.multi.size;
   b.classList.toggle('hidden', !(S.multiMode || n));
+  an_watch(b);  // 2.46.1 (#1559): the bar slides in and out (watched after its first state is set)
   document.body.classList.toggle('msel', !!(S.multiMode || n));  // 2.26.0: the docked quick add steps back while selecting
   $('#fab').classList.toggle('gone', fabOff() || S.multiMode || n > 0 || (!!$('#view .qdock') && (tabletDock() || !isMobile())));
   // 2.26.0 (#936): the selection is edited in the task panel (from two tasks: their common fields, see multiedit.js); the
@@ -468,7 +469,27 @@ document.addEventListener('dragstart', e => {
   if (r) { listDrag = +r.dataset.list; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'list:' + listDrag); }
   else if (fh) { folderDrag = fh.dataset.folder; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'folder:' + folderDrag); }
 });
-const sideDropTarget = (el, folder = folderDrag !== null) => !el?.closest ? null : folder ? el.closest('#side .fhead, #side .shead.lroot') : el.closest('#side .srow[data-list], #side .fhead, #side .fempty, #side .shead.lroot');
+const sideDropTarget = (el, folder = folderDrag !== null, y = null) => !el?.closest ? null : folder ? el.closest('#side .fhead, #side .shead.lroot') : el.closest('#side .srow[data-list], #side .fhead, #side .fempty, #side .shead.lroot') || sb_sideEnd(el, y);
+// 2.46.1 (#1612 #1635): the targets in their order (list rows, sections, board columns) and the pointer (clientY, or clientX
+// for columns): the target under it or, in a gap or up to `slack` px past the last one, the nearest; after = the pointer is
+// past its middle (so the last one can be passed: dropped at the very end). null = outside.
+function sb_dropNear(els, pos, axis = 'y', slack = 24) {
+  const vis = els.filter(x => x.getBoundingClientRect().height > 0); if (!vis.length || pos == null) return null;
+  const lo = axis === 'y' ? 'top' : 'left', hi = axis === 'y' ? 'bottom' : 'right', R = vis.map(x => x.getBoundingClientRect());
+  if (pos < R[0][lo] || pos > R[R.length - 1][hi] + slack) return null;
+  let i = R.findIndex(r => pos < r[hi]); if (i < 0) i = R.length - 1;
+  return {el: vis[i], after: pos > (R[i][lo] + R[i][hi]) / 2};
+}
+// 2.46.1 (#1612): a list dragged off any row (below the last list of a folder or of the loose lists, in a gap) = the nearest list row
+const sb_sideEnd = (el, y) => el.closest('#side') && sb_dropNear($$('#side .sg-lists .srow[data-list]'), y)?.el || null;
+// 2.46.1 (#1612): a list dropped on its own folder's header (or on "Lists" while it has no folder) goes to the end there
+function sb_listToEnd(id, f) {
+  const l = listById(id), order = sideOrder(), was = order.map(x => x.id).join();
+  order.splice(order.indexOf(l), 1);
+  const last = order.map(x => x.folder || '').lastIndexOf(f);
+  order.splice(last + 1, 0, l);
+  if (order.map(x => x.id).join() !== was) saveListOrder(order, undefined, tr('Moved list {0}', qn(lname(l))));
+}
 // 2.4.0 (#361): what dropping folder `from` on target t does: 'before' (reorder among siblings), 'into' (a subfolder, or a
 // folder without subfolders, goes into the top folder t; onto a subfolder elsewhere: into its parent, before it), 'top'
 // (a subfolder onto the "Lists" header), null = nothing
@@ -496,14 +517,14 @@ const sideMark = (t, drag, y) => {  // the same highlights for mouse and touch; 
 };
 document.addEventListener('dragover', e => {
   if (!listDrag && folderDrag === null) return;
-  if (sideMark(sideDropTarget(e.target), {list: listDrag, folder: folderDrag}, e.clientY)) e.preventDefault();
+  if (sideMark(sideDropTarget(e.target, folderDrag !== null, e.clientY), {list: listDrag, folder: folderDrag}, e.clientY)) e.preventDefault();
 });
 document.addEventListener('drop', e => {
   if (!listDrag && folderDrag === null) return;
   e.preventDefault(); e.stopImmediatePropagation();
   const drag = {list: listDrag, folder: folderDrag}; listDrag = null; folderDrag = null;
   $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
-  const t = sideDropTarget(e.target, drag.folder !== null);
+  const t = sideDropTarget(e.target, drag.folder !== null, e.clientY);
   sideDrop(drag, t, sideAfter(t, e.clientY));
 }, true);
 // one drop in the sidebar (mouse or touch): a folder before a folder, a list into a folder (its header or empty body),
@@ -530,8 +551,8 @@ async function sideDrop(drag, t, after = false) {
   if (l.mirrored) { toast(mirroredMsg(l)); return; }  // 2.27.0 (#988)
   const f0 = l.folder || '';
   const undoFolder = (f, e) => { if (f !== f0 && e && !e._said) offerUndo(folderNowShared(id, f) || (f ? tr('Moved to folder {0}', fDisp(f)) : tr('Removed from folder')), e); };  // 2.41.0 (#1428)
-  if (t.classList.contains('fhead') || t.classList.contains('fempty')) { const f = (t.closest('[data-folder]') || t).dataset.folder; undoFolder(f, await setListFolder(id, f)); return; }
-  if (t.classList.contains('lroot')) { undoFolder('', await setListFolder(id, '')); return; }
+  if (t.classList.contains('fhead') || t.classList.contains('fempty')) { const f = (t.closest('[data-folder]') || t).dataset.folder; if (f === f0) { sb_listToEnd(id, f); return; } undoFolder(f, await setListFolder(id, f)); return; }
+  if (t.classList.contains('lroot')) { if (!f0) { sb_listToEnd(id, ''); return; } undoFolder('', await setListFolder(id, '')); return; }
   const order = sideOrder(), moving = order.find(x => x.id === id), target = listById(+t.dataset.list);
   if (!moving || !target || moving === target) return;
   order.splice(order.indexOf(moving), 1);
@@ -587,7 +608,7 @@ document.addEventListener('touchmove', e => {
   e.preventDefault();
   sd.moved = true; sd.lx = p.clientX; sd.ly = p.clientY;
   sd.ghost.style.top = (p.clientY - sd.dy) + 'px';
-  const t = sideDropTarget(document.elementFromPoint(p.clientX, p.clientY), sd.folder != null);
+  const t = sideDropTarget(document.elementFromPoint(p.clientX, p.clientY), sd.folder != null, p.clientY);
   sideMark(t, sd, p.clientY);
   const side = $('#side'), r = side.getBoundingClientRect();
   if (r.height && side.scrollBy) { if (p.clientY < r.top + 48) side.scrollBy(0, -12); else if (p.clientY > r.bottom - 48) side.scrollBy(0, 12); }
@@ -603,7 +624,7 @@ function sdEnd(e) {
   if (e && e.cancelable) e.preventDefault();
   sdHeld = true; setTimeout(() => { sdHeld = false; }, 500);
   st.ghost.remove(); st.el.classList.remove('dragging');
-  const t = st.moved ? sideDropTarget(document.elementFromPoint(st.lx, st.ly), st.folder != null) : null;
+  const t = st.moved ? sideDropTarget(document.elementFromPoint(st.lx, st.ly), st.folder != null, st.ly) : null;
   $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (!st.moved && st.reorder) return;  // a tap on the grip
   if (!st.moved) { const el = st.list ? $(`#side .srow[data-list="${st.list}"]`) : $(`#side .fhead[data-folder="${rmEsc(st.folder)}"]`); if (el) st.list ? listMenu(el, st.list) : folderMenu(el, st.folder); return; }
@@ -686,7 +707,7 @@ async function folderPropsModal(f, opt = {}) {
       ${fsw('fs-al', 'agent_listen', tr('Agent listens in'), tr('Off: the agent reacts only to an @mention, an assignment or a wake. Per agent in the Share dialog.'))}` : ''}
     <h4>${tr('Completed')}</h4>
     ${fsw('fs-hd', 'hide_done', tr('Hide completed'), '')}
-    <div class="shint lhint fshdhint">${tr('Hide completed: for your own lists in this folder, at once for all of them (also with “Only new lists”). A list where you chose to show or hide completed yourself keeps that choice until “Completed: like the default” in its menu.')}</div>
+    <div class="shint lhint fshdhint">${tr('Hide completed: the default for your own lists in this folder, applied like the settings above (with “Only new lists” the existing lists keep what they show). Shared lists of others keep their setting. A list where you show or hide completed yourself differs from the folder until “Back to the folder” in its dialog.')}</div>
     ${typeof timeOn === 'function' && timeOn() ? `<h4>${tr('Time tracking')}</h4>${fsw('fs-tt', 'time_tracking', tr('Time tracking'), '')}` : ''}
     ${collab() ? `<div class="row"><label>${tr('People')}</label><button type="button" class="btn sm" data-m="people">${ic('users', 's')} ${tr('Share…')}</button></div>` : ''}
     <div class="row"><label>${tr('Repository')}</label><button type="button" class="btn sm" data-m="repos">${ic('git', 's')} ${tr('Repository…')}</button></div>
@@ -721,6 +742,7 @@ async function folderPropsModal(f, opt = {}) {
     er.hidden = !bad.length;
     saved(undo ? () => put(k, prev, false) : null);
     if (v === null && nL) toast(tr('Not set: the lists keep the value they have.'));
+    else if (r.changed) toast(trn('{0} list changed', '{0} lists changed', r.changed));  // 2.46.1 (#1422): the counter
     await load(); render();
   };
   md.addEventListener('change', e => {

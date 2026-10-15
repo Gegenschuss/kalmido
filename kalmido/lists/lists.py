@@ -267,7 +267,7 @@ def list_update(lid):
     role = need_list(c, lid, write=False)
     given = set(b)  # 2.29.0 (#1030): what this request sets on its own (kept when the list moves into a folder)
     tb_col_on = None  # 2.39.1 (#1293): modules the field columns switched on (None = no field columns sent)
-    tidy0 = c.execute("SELECT agent_tidy, agent_members, agent_peers, agent_followup, folder FROM lists WHERE id=?", (lid,)).fetchone()
+    tidy0 = c.execute("SELECT agent_tidy, agent_members, agent_peers, agent_followup, folder, org_id FROM lists WHERE id=?", (lid,)).fetchone()
     if "agent_tidy" in b or "tidy_agent_id" in b:  # 2.0.0: "Agent may tidy up entries" (own permission rule, see
         # list_tidy_update); 2.4.1 (#379): "Tidy up by" (the one agent)
         e = list_tidy_update(c, lid, b.get("agent_tidy"), b.get("tidy_agent_id"), "tidy_agent_id" in b)
@@ -340,6 +340,12 @@ def list_update(lid):
         if e:
             return e
         b = {k: v for k, v in b.items() if k not in ("col_sums", "kpis")}
+    if "org_visibility" in b or "org_edit" in b:  # 2.46.0 (#1603): "Everyone in the organisation" (owner / list admins)
+        from ..lists.orgvis import ov_list_patch
+        e = ov_list_patch(c, lid, role, b)
+        if e:
+            return e
+        b = {k: v for k, v in b.items() if k not in ("org_visibility", "org_edit")}
     conflicts = []
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
     if prev:  # D4 undo / redo: a setting changed elsewhere meanwhile stays (reported in conflicts)
@@ -436,6 +442,9 @@ def list_update(lid):
                 list_own_mark(c, lid, k)
         if "listen_agent_ids" in given and vals.get("folder", tidy0["folder"]) == tidy0["folder"]:  # 2.30.0 (#1034)
             list_own_mark(c, lid, "agent_listen")
+    if "org_id" in given or vals.get("family") or vals.get("life"):  # 2.46.0 (#1603): private again -> only its members
+        from ..lists.orgvis import ov_private_reset
+        ov_private_reset(c, lid, tidy0["org_id"] if tidy0 else None)
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts, **pt_out)
@@ -710,6 +719,46 @@ def folder_people_get():
     return jsonify(people=[{"user_id": r[0], "role": r[1], "name": r[2] or r[3] or ""} for r in  # 2.41.0 (#1420): + name
                            c.execute("""SELECT p.user_id, p.role, u.display_name, u.username FROM folder_people p JOIN users u ON u.id=p.user_id
                                         WHERE p.owner_id=? AND p.folder=? ORDER BY p.created_at""", (me(), f))])
+
+
+# ---- 2.46.0 (#1606): before a changed folder role reaches the lists of the folder, the client asks when lists have a role
+# set by hand for that person (their own role differs from the old folder role and from the new one).
+def fg_people_diff(c, owner, f, uid, role):
+    """[{list_id, name, role}] of owner's lists in folder f where the folder role `role` would replace a role of uid set by hand."""
+    from ..family.family import is_kid
+    prev = c.execute("SELECT role FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (owner, f, uid)).fetchone()
+    if not prev or prev[0] == role:  # a first share or the same role touches no list role
+        return []
+    r2 = "participant" if is_kid(c, uid) else role
+    out = []
+    for r in c.execute("""SELECT l.id, l.name, l.folder, m.own_role FROM lists l JOIN list_members m ON m.list_id=l.id AND m.user_id=?
+                          WHERE l.owner_id=? AND l.archived=0 AND l.is_inbox=0 AND m.own_role IS NOT NULL ORDER BY lower(l.name), l.id""",
+                       (uid, owner)).fetchall():
+        if _in_folder(r["folder"], f) and r["own_role"] not in (prev[0], r2):
+            out.append({"list_id": r["id"], "name": r["name"], "role": r["own_role"]})
+    return out
+
+
+@app.get("/api/folders/people/diff")
+def folder_people_diff():
+    """?folder=&user_id=&role=: the lists of my folder where that role would replace a role set per list (#1606)."""
+    from flask import request
+    from ..agents.admin import personal_agent_foreign
+    from ..accounts.orgs import may_see
+    need_collab()
+    c = db()
+    f = clean_folder(request.args.get("folder") or "", strict=False)
+    role = request.args.get("role") or ""
+    if not f or role not in ROLES:
+        return err(tr("Invalid value: {0}", "folder" if not f else "role"))
+    try:
+        uid = int(request.args.get("user_id") or 0)
+    except (TypeError, ValueError):
+        uid = 0
+    if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() \
+            or personal_agent_foreign(c, uid, me()) or not may_see(c, me(), uid):
+        return err(tr("unknown user"), 404)
+    return jsonify(lists=fg_people_diff(c, me(), f, uid, role))
 
 
 @app.put("/api/folders/people")

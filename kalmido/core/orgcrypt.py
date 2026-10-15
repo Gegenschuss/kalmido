@@ -54,6 +54,19 @@ FIELDS = {
     "office_doc_log": ("detail",),
 }
 JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"): ("costs", "margin")}
+# 2.46.1 (#1641): what Settings > Administration shows as encrypted / not encrypted. Every FIELDS table and JSON_KEYS entry
+# has its category here (a test checks it); plus the organisations' files and the tokens sealed with the server key itself
+# (git.py git_seal, oidc.py oidc_seal). Everything else is stored as it is (the list "plain" names the main parts).
+PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("office_settings", "data"): N_("Bank and tax data of the company"),
+                 ("office_docs", "totals"): N_("Purchase prices and margins"), "office_contracts": N_("Framework contract rates"),
+                 "office_docs": N_("Senders of finished documents"), "office_doc_log": N_("The log of the documents"),
+                 "files": N_("Files of organisations"), "tokens": N_("Stored access tokens (Git, client secret of the single sign-on)")}
+PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))
+
+
+def pm_crypt_scope():
+    """{encrypted: [..], plain: [..]} in the user's language (no key material, the same for every organisation)."""
+    return {"encrypted": list(dict.fromkeys(tr(v) for v in PM_CRYPT_CATS.values())), "plain": [tr(x) for x in PM_CRYPT_PLAIN]}
 
 
 class OrgCryptError(Exception):
@@ -612,7 +625,8 @@ def oc_route_status(oid):
     c = db()
     _org_admin(c, oid)
     u = c.execute("SELECT password_hash FROM users WHERE id=?", (g.user["id"],)).fetchone()
-    return jsonify(**oc_status(c, oid), password=bool(u and u["password_hash"]))  # password: showing the key asks for it
+    return jsonify(**oc_status(c, oid), password=bool(u and u["password_hash"]),  # password: showing the key asks for it
+                   scope=pm_crypt_scope())  # 2.46.1 (#1641)
 
 
 @app.post("/api/orgs/<int:oid>/encryption/recovery")
@@ -650,7 +664,7 @@ def oc_route_admin_get():
     from ..accounts.users import need_admin
     need_admin()
     c = db()
-    return jsonify(enabled=oc_enabled(), org_encrypt=_setting(c) != "0")
+    return jsonify(enabled=oc_enabled(), org_encrypt=_setting(c) != "0", scope=pm_crypt_scope())  # 2.46.1 (#1641): scope
 
 
 @app.put("/api/admin/orgcrypt")

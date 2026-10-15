@@ -243,7 +243,8 @@ def openapi_spec():
             "client_id": nul("integer", description="2.23.0: the client the list belongs to (GET /clients); null = none")}},
         "ListDetail": {"allOf": [ref("List"), {"type": "object", "properties": {"sections": {"type": "array", "items": ref("Section")},
             "fields": {"type": "array", "description": "2.14.0: the list's custom fields (ids for the columns f:<id>)",
-                       "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "type": {"type": "string"}}}}}}]},
+                       "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "type": {"type": "string"}}}},
+            "favorite": {"type": "boolean", "description": "2.46.1 (#1361): a favourite of the person (an agent: of the person it belongs to; a team agent: always false)"}}}]},
         "ListInput": {"type": "object", "additionalProperties": False, "required": ["name"], "properties": {
             "name": {"type": "string"}, "color": {"type": "string", "description": "#rgb / #rrggbb or empty"},
             "folder": {"type": "string", "description": "Folder path, at most 2 levels (\"Clients/Company X\"); deeper: 400"},
@@ -639,6 +640,8 @@ def openapi_spec():
     pb_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.39.0 (#1168)
     from ..lists.kpis import fx_spec
     fx_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.43.0 (#1328)
+    from ..lists.orgvis import ov_spec
+    ov_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.46.0 (#1603)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
     hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.24.0 (#907 #910)
     from ..notify.caps import notif_tpl_spec

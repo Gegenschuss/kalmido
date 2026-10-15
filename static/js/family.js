@@ -12,11 +12,13 @@ const famOn = () => feat('family');
 const kidMe = () => !!S.me?.kid;
 S.kids = []; S.famWeek = null; S.shop = null;
 const FAM_KINDS = [['', N_('An ordinary list')], ['shopping', N_('Shopping list')], ['meals', N_('Meal plan')], ['birthdays', N_('Birthdays')],
-  ['household', N_('Household')], ['packing', N_('Packing list')]];
+  ['household', N_('Household')], ['packing', N_('Packing list')], ['family', N_('Family')]];  // 2.46.1 (#1615): "family"
 const FAM_KIND_ICON = {shopping: 'cart', meals: 'meal', birthdays: 'cake', household: 'home', packing: 'bag'};
 const famKindOf = lid => listById(lid)?.family || '';
 const isOcc = t => !!t?.fam && (t.fam.kind === 'birthday' || t.fam.kind === 'anniversary');
 const isDl = t => t?.fam?.kind === 'deadline';
+// 2.46.1 (#1615): a meal = a task marked as one (fam.kind meal, any list) or a task of an old Meal plan list
+const pm_isMeal = t => t?.fam?.kind === 'meal' || famKindOf(t?.list_id) === 'meals';
 const occAge = t => isOcc(t) && t.fam.year && t.due ? +t.due.slice(0, 4) - t.fam.year : null;
 // "turns 80" / "25 years" (the anniversary), '' without a year
 function occWhat(t) {
@@ -39,7 +41,7 @@ function famData() {
   const rots = open.filter(t => t.rotation?.who?.length > 1);
   const mon = S.famWeek || today(), sun = addDays(mon, 6);  // 2.19.0: the next seven days from today (a Sunday showed only the past week)
   const mealLists = S.lists.filter(l => l.family === 'meals' && !l.archived);
-  const meals = [...S.tasks.values()].filter(t => !t.deleted_at && !t.parent_id && t.due && t.due >= mon && t.due <= sun && mealLists.some(l => l.id === t.list_id));
+  const meals = [...S.tasks.values()].filter(t => !t.deleted_at && !t.parent_id && t.due && t.due >= mon && t.due <= sun && pm_isMeal(t) && !listById(t.list_id)?.archived);
   const shops = S.lists.filter(l => l.family === 'shopping' && !l.archived);
   return {occ, dls, rots, mon, meals, mealLists, shops, kids: S.kids || []};
 }
@@ -117,7 +119,7 @@ function viewKid() {
 // ---- dialogs
 function occModal(o = {}) {
   const lists = S.lists.filter(l => !l.archived && canEditList(l.id) && !l.is_inbox);
-  const bl = lists.find(l => l.family === 'birthdays');
+  const bl = lists.find(l => l.family === 'birthdays') || lists.find(l => l.family === 'family');  // 2.46.1 (#1615): or the list "Family"
   const months = [...Array(12)].map((_, i) => MON[i]);
   const md = modal(`<h3>${ic('cake', 's')} ${tr('Birthday or anniversary')}</h3>
     <div class="seg" id="oc-kind" role="radiogroup" aria-label="${esc(tr('Kind'))}"><button type="button" role="radio" aria-checked="true" class="on" data-k="birthday">${tr('Birthday')}</button><button type="button" role="radio" aria-checked="false" data-k="anniversary">${tr('Anniversary')}</button></div>
@@ -125,7 +127,7 @@ function occModal(o = {}) {
     <div class="row"><label for="oc-day">${tr('Date')}</label><span class="ocdate"><input id="oc-day" type="number" inputmode="numeric" min="1" max="31" placeholder="${esc(tr('Day'))}" aria-label="${esc(tr('Day'))}"><select id="oc-month" aria-label="${esc(tr('Month'))}">${months.map((m, i) => `<option value="${i + 1}" ${i === new Date().getMonth() ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select><input id="oc-year" type="number" inputmode="numeric" min="1900" max="${new Date().getFullYear()}" placeholder="${esc(tr('Year'))}" aria-label="${esc(tr('Year (optional)'))}"></span></div>
     <div class="row"><label for="oc-lead">${tr('Remind me')}</label><select id="oc-lead">${[0, 1, 3, 7, 14, 30].map(n => `<option value="${n}" ${n === 7 ? 'selected' : ''}>${n ? trn('{0} day before', '{0} days before', n) : tr('on the day')}</option>`).join('')}</select></div>
     <div class="row"><label for="oc-gifts">${tr('Gift ideas')}</label><input id="oc-gifts" placeholder="${esc(tr('optional, separated by commas'))}"></div>
-    ${lists.length > 1 || !bl ? `<div class="row"><label for="oc-list">${tr('List')}</label><select id="oc-list">${bl ? '' : `<option value="">${tr('New list: Birthdays')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === bl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
+    ${lists.length > 1 || !bl ? `<div class="row"><label for="oc-list">${tr('List')}</label><select id="oc-list">${bl ? '' : `<option value="">${tr('New list: Family')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === bl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
     <div class="aerr" role="alert" id="oc-err"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Add')}</button></div>`);
   md.classList.add('famdlg');
@@ -149,14 +151,14 @@ function occModal(o = {}) {
 }
 function dlModal() {
   const lists = S.lists.filter(l => !l.archived && canEditList(l.id) && !l.is_inbox);
-  const hl = lists.find(l => l.family === 'household');
+  const hl = lists.find(l => l.family === 'household') || lists.find(l => l.family === 'family');  // 2.46.1 (#1615)
   const md = modal(`<h3>${ic('hourglass', 's')} ${tr('Household deadline')}</h3>
     <div class="ptcards dltypes" role="radiogroup" aria-label="${esc(tr('Kind'))}">${DL_TYPES.map(([k, n, i], j) => `<button type="button" class="ptcard ${j ? '' : 'on'}" role="radio" aria-checked="${!j}" data-dl="${k}">${ic(i, 's')}<b>${tr(n)}</b></button>`).join('')}</div>
     <div class="row"><label for="dl-who" id="dl-wholab">${tr('For whom / what')}</label><input id="dl-who" maxlength="100" autocomplete="off" placeholder="${esc(tr('e.g. Lina, the family car, household insurance'))}"></div>
     <div class="row"><label id="dl-explab">${tr('Expires on')}</label>${dateIn('dl-exp', '', {label: tr('Expires on'), empty: tr('choose')})}</div>
     <div class="row dlnotice" hidden><label for="dl-notice">${tr('Notice period')}</label><select id="dl-notice">${[0, 1, 2, 3, 6, 12].map(n => `<option value="${n}">${n ? trn('{0} month', '{0} months', n) : tr('none')}</option>`).join('')}</select></div>
     <div class="shint lhint" id="dl-hint"></div>
-    ${lists.length > 1 || !hl ? `<div class="row"><label for="dl-list">${tr('List')}</label><select id="dl-list">${hl ? '' : `<option value="">${tr('New list: Household')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === hl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
+    ${lists.length > 1 || !hl ? `<div class="row"><label for="dl-list">${tr('List')}</label><select id="dl-list">${hl ? '' : `<option value="">${tr('New list: Family')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === hl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
     <div class="aerr" role="alert" id="dl-err"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Add')}</button></div>`);
   md.classList.add('famdlg');
@@ -191,13 +193,23 @@ async function famPack(k) {
 async function famNewList(kind) {
   try { const l = await api('POST', '/api/lists', {name: tr(FAM_KINDS.find(x => x[0] === kind)[1]), family: kind}); await load(); return l.id; } catch { return null; }
 }
+// 2.46.1 (#1615): the list "Family" (created when missing) and its section `key` (server: FAM_SECTIONS) -> {list_id, section_id}
+const PM_FAM_SECS = {household: N_('Household'), birthdays: N_('Birthdays'), meals: N_('Meal plan'), deadlines: N_('Deadlines')};
+async function pm_famTarget(key) {
+  let l = S.lists.find(x => x.family === 'family' && !x.archived && canAddTo(x.id));
+  const lid = l ? l.id : await famNewList('family'); if (!lid) return null;
+  const nm = [tr(PM_FAM_SECS[key]), PM_FAM_SECS[key]].map(x => x.toLowerCase());
+  let s = S.sections.find(x => x.list_id === lid && nm.includes(x.name.trim().toLowerCase()));
+  if (!s) { try { s = await api('POST', '/api/sections', {list_id: lid, name: tr(PM_FAM_SECS[key])}); await load(); } catch { s = null; } }
+  return {list_id: lid, section_id: s?.id || null};
+}
 async function famMeal(day) {
   const name = await askPrompt(tr('What is on {0}?', fmtDateLoc(day)), '', {ok: tr('Add'), input: {placeholder: tr('e.g. Lasagne'), max: 300}});
   if (!name || !name.trim()) return;
-  let lid = famData().mealLists.find(l => canAddTo(l.id))?.id;
-  if (!lid) lid = await famNewList('meals');
-  if (!lid) return;
-  const t = await createTask({title: name.trim(), list_id: lid, due: day}).catch(() => null);
+  // 2.46.1 (#1615): an old Meal plan list first, else the list "Family" (section Meal plan), marked as a meal
+  let lid = famData().mealLists.find(l => canAddTo(l.id))?.id, sec = {};
+  if (!lid) { const x = await pm_famTarget('meals'); if (!x) return; lid = x.list_id; sec = {section_id: x.section_id, fam: {kind: 'meal'}}; }
+  const t = await createTask({title: name.trim(), list_id: lid, due: day, ...sec}).catch(() => null);
   if (t) toast(tr('Added: {0}', t.title), () => openDetail(t.id), 6000, tr('Ingredients…'));
 }
 async function famIngredients(id) {
@@ -251,7 +263,7 @@ function rewardsModal(kid) {
 // address books (CardDAV): birthdays + anniversaries of the contacts become yearly tasks
 async function contactsModal() {
   const lists = S.lists.filter(l => !l.archived && canEditList(l.id) && !l.is_inbox);
-  const bl = lists.find(l => l.family === 'birthdays');
+  const bl = lists.find(l => l.family === 'birthdays') || lists.find(l => l.family === 'family');  // 2.46.1 (#1615): or the list "Family"
   const md = modal(`<h3>${ic('users', 's')} ${tr('Birthdays from your contacts')}</h3>
     <p class="muted">${tr('Kalmido reads the birthdays and anniversaries of an address book (CardDAV: Nextcloud, iCloud, Radicale, mailbox.org …) once a day and adds them as yearly tasks. Nothing is written back. The password is stored encrypted.')}</p>
     <div id="ct-list"><div class="muted">${tr('Loading…')}</div></div>
@@ -259,7 +271,7 @@ async function contactsModal() {
     <div class="row"><label for="ct-url">${tr('Server address')}</label><input id="ct-url" type="url" inputmode="url" autocapitalize="off" placeholder="https://…"></div>
     <div class="row"><label for="ct-user">${tr('Username')}</label><input id="ct-user" autocapitalize="off" autocomplete="off"></div>
     <div class="row"><label for="ct-pw">${tr('Password')}</label><input id="ct-pw" type="password" autocomplete="new-password" placeholder="${esc(tr('an app password, if the server offers one'))}"></div>
-    <div class="row"><label for="ct-list-sel">${tr('List')}</label><select id="ct-list-sel">${bl ? '' : `<option value="">${tr('New list: Birthdays')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === bl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>
+    <div class="row"><label for="ct-list-sel">${tr('List')}</label><select id="ct-list-sel">${bl ? '' : `<option value="">${tr('New list: Family')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === bl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>
     <div class="aerr" role="alert" id="ct-err"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button><button class="btn pri" data-m="add">${ic('plus', 's')} ${tr('Connect')}</button></div>`);
   md.classList.add('famdlg');
@@ -318,7 +330,7 @@ function famDetailHtml(t, l, ro) {
   if ((kidIn && !t.fam && !proj) || t.stars != null) {
     out.push(`<div class="row"><label for="d-stars">${tr('Stars for a child')}</label><input id="d-stars" class="numin" type="number" inputmode="numeric" min="0" max="50" value="${esc(t.stars ?? '')}" placeholder="1" ${ro || !canEditList(t.list_id) ? 'readonly' : ''}><span class="muted">★</span></div>`);
   }
-  if (famKindOf(t.list_id) === 'meals' && !t.parent_id) {
+  if (pm_isMeal(t) && !t.parent_id) {  // 2.46.1 (#1615): also a meal in the list "Family"
     out.push(`<div class="row"><label>${tr('Ingredients')}</label><button type="button" class="btn sm" data-act="fam-ingr" data-id="${t.id}">${ic('cart', 's')}<span>${tr('To the shopping list')}</span></button><span class="muted">${tr('one per line in the description')}</span></div>`);
   }
   return out.length ? `<div class="dsec famsec"><h5>${tr('Family')}</h5><div class="famf">${out.join('')}</div></div>` : '';
@@ -458,6 +470,8 @@ function famBar(l) {
   if (l.family === 'meals') return `<div class="fambar"><a class="btn" href="#family">${ic('meal', 's')}<span>${tr('Week plan')}</span></a><span class="muted">${tr('A meal per day, the ingredients in its description.')}</span></div>`;
   if (l.family === 'birthdays') return `<div class="fambar"><button type="button" class="btn" data-act="fam-occ">${ic('cake', 's')}<span>${tr('Birthday')}</span></button><button type="button" class="btn" data-act="fam-contacts">${ic('users', 's')}<span>${tr('From contacts…')}</span></button></div>`;
   if (l.family === 'household') return `<div class="fambar"><button type="button" class="btn" data-act="fam-dl">${ic('hourglass', 's')}<span>${tr('Household deadline')}</span></button><a class="btn" href="#family">${ic('family', 's')}<span>${tr('Family')}</span></a></div>`;
+  // 2.46.1 (#1615): the list "Family" holds birthdays, deadlines and the meal plan in its sections
+  if (l.family === 'family') return `<div class="fambar"><button type="button" class="btn" data-act="fam-occ">${ic('cake', 's')}<span>${tr('Birthday')}</span></button><button type="button" class="btn" data-act="fam-dl">${ic('hourglass', 's')}<span>${tr('Household deadline')}</span></button><a class="btn" href="#family">${ic('meal', 's')}<span>${tr('Week plan')}</span></a></div>`;
   return '';
 }
 
@@ -466,15 +480,25 @@ const purposeCards = (cur, attr = 'data-purpose') => `<div class="ptcards purpos
 async function purposeSet(p) {
   const n = PURPOSES.find(x => x[0] === p);
   // 2.25.0 (UX-25): the dialog lists what changes (modules on / off, tabs that leave the tab bar)
-  const want = new Set(PURPOSE_MODS[p] || []), mname = k => tr(FEATS.find(x => x[0] === k)?.[1] || k);
-  const ton = [...PURPOSE_ALL, ...(PURPOSE_EXTRA[p] || [])].filter(k => want.has(k) && !feat(k)), toff = PURPOSE_ALL.filter(k => !want.has(k) && feat(k));
+  // 2.46.1 (#1591): with the switch "Switch on all modules" (on = every module, off = lists and tasks only)
+  const all = pm_allOn(), want = pm_purposeOn(p, all), mname = k => tr(FEATS.find(x => x[0] === k)?.[1] || k);
+  const ton = [...PURPOSE_ALL, ...(PURPOSE_EXTRA[p] || [])].filter(k => want.has(k) && !feat(k)), toff = pm_touched(all).filter(k => !want.has(k) && feat(k));
   const tabs = tabIds().filter(id => id.startsWith('m:') && toff.includes(id.slice(2))).map(id => mname(id.slice(2)));
   const chg = `<ul class="cdlg-l">${ton.length ? `<li>${esc(tr('On: {0}', ton.map(mname).join(', ')))}</li>` : ''}${toff.length ? `<li>${esc(tr('Off: {0}', toff.map(mname).join(', ')))}</li>` : ''}${tabs.length ? `<li>${esc(tr('Leaves the tab bar: {0}', tabs.join(', ')))}</li>` : ''}${!ton.length && !toff.length ? `<li>${esc(tr('No module changes.'))}</li>` : ''}</ul>`;
-  const once = p === 'family' && !S.lists.some(l => l.family) ? tr('A shopping list, household chores, birthdays and a meal plan are created once (in the folder Family).') : p === 'software' ? tr('A software project is created once.') : p === 'team' || p === 'office' ? tr('The sample project is created once.') : '';
-  if (!await askConfirm(tr('Switch to “{0}”?', tr(n[2])), '', {ok: tr('Set up'), html: `<p>${esc(tr('Your modules are switched to fit; nothing is deleted and everything can be changed again below.'))}</p>${chg}${once ? `<p>${esc(once)}</p>` : ''}`})) return false;
-  let j; try { j = await api('POST', '/api/me/purpose', {purpose: p}); } catch { return false; }
-  S.settings.features = j.features; S.settings.purpose = p;
-  await load(); render();
+  // 2.46.1 (#1615): Family brings the shopping list + the list "Family" (always, once); the switch adds example entries
+  const famNew = p === 'family' && !S.lists.some(l => ['shopping', 'family', 'household', 'birthdays', 'meals'].includes(l.family));
+  const once = p === 'family' ? (famNew ? tr('Example entries in the shopping list and the list Family.') : '') : p === 'software' ? tr('A software project is created once.') : p === 'team' || p === 'office' ? tr('The sample project is created once.') : '';
+  // 2.46.1 (#1602): the sample project is a switch, off by default (instead of the fixed sentence)
+  let ex = false; const exCh = e => { if (e.target.id === 'pm-ex') ex = e.target.checked; };
+  document.addEventListener('change', exCh);
+  let ok; try { ok = await askConfirm(tr('Switch to “{0}”?', tr(n[2])), '', {ok: tr('Set up'), html: `<p>${esc(tr('Your modules are switched to fit; nothing is deleted and everything can be changed again below.'))}</p>${chg}${famNew ? `<p>${esc(tr('A shopping list and a list Family (sections Household, Birthdays, Meal plan, Deadlines) are created once, in the folder Family.'))}</p>` : ''}${once ? pm_switchHtml('pm-ex', false, tr('Create a sample project'), once) : ''}`}); } finally { document.removeEventListener('change', exCh); }
+  if (!ok) return false;
+  let j; try { j = await api('POST', '/api/me/purpose', {purpose: p, all_modules: all, examples: !!once && ex}); } catch { return false; }
+  S.settings.features = j.features; S.settings.purpose = p; S.settings.mods_all = all ? '1' : '0';
+  await load();
+  // 2.46.1 (#1601): a state fetched across the switch may carry the modules from before; the answer of the switch counts
+  if (S.settings.purpose === p) S.settings.features = j.features;
+  render();
   toast(j.created?.length ? trn('Done: {0} list created', 'Done: {0} lists created', j.created.length) : tr('Done'));
   return true;
 }
@@ -487,11 +511,17 @@ function rxMore(anchor) {
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('[data-act="rx-more"]'); if (!b) return; e.preventDefault(); e.stopPropagation(); rxMore(b); });
 // Settings > Modules: "What do you use Kalmido for?"
+let pm_purposeBusy = false;
 document.addEventListener('click', async e => {
   const b = e.target.closest?.('.smodal [data-purpose]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();
-  if (!await purposeSet(b.dataset.purpose)) return;
-  const md = $('.smodal'); if (md) { md._noflush = true; md.remove(); settingsModal('modules'); setTimeout(() => $(`.smodal [data-purpose="${b.dataset.purpose}"]`)?.focus(), 80); }
+  // 2.46.1 (#1601): one purpose switch at a time; quick clicks between the purposes overlapped (switch, reload, rebuild)
+  // and left a dialog whose counts and switches showed different states
+  if (pm_purposeBusy) return;
+  pm_purposeBusy = true;
+  let ok; try { ok = await purposeSet(b.dataset.purpose); } finally { pm_purposeBusy = false; }
+  if (!ok) return;
+  const mds = $$('.smodal'); if (mds.length) { mds.forEach(md => { md._noflush = true; md.remove(); }); settingsModal('modules'); settingsSync(); setTimeout(() => $(`.smodal [data-purpose="${b.dataset.purpose}"]`)?.focus(), 80); }
 });
 // 2.19.0 (owner, #655): the magnifier stays visible on a phone while the sidebar drawer is open: a round search button on
 // the dimmed area next to the drawer, where the header's search sits (the header itself is under the scrim then)

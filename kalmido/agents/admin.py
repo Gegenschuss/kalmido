@@ -458,6 +458,10 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
         v = oids[0] if oids else (None if a["owner_id"] else main_org(c))
     if v in (None, "", 0, "0", "private"):
         c.execute("UPDATE agents SET org_id=NULL WHERE user_id=?", (aid,))
+        if a["org_id"]:  # 2.46.0 (#1592, review fix): a private agent is no member of its former organisation
+            c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (a["org_id"], aid))
+            from ..core.access import acx_drop
+            acx_drop()
         return
     if isinstance(v, bool) or not isinstance(v, int) or not c.execute("SELECT 1 FROM orgs WHERE id=?", (v,)).fetchone():
         raise BadInput(tr("Invalid value: {0}", "org_id"))
@@ -475,6 +479,12 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
         if n:
             raise BadInput(tr("The agent is still in {0} calendars or address books of another workspace: take it out of them first", n))
     c.execute("UPDATE agents SET org_id=? WHERE user_id=?", (v, aid))
+    # 2.46.0 (#1592): an agent of an organisation is one of its members (seen and shared with there, as every agent of the
+    # former mode organisation); it leaves the membership of its former workspace
+    if a["org_id"] and a["org_id"] != v:
+        c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (a["org_id"], aid))
+    from ..accounts.orgs import org_member_add
+    org_member_add(c, v, aid)
 
 
 def personal_agent_foreign(c, aid, uid):

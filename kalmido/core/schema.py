@@ -1258,6 +1258,12 @@ MIGRATIONS = [
     ("lists", "fx_kpis", "ALTER TABLE lists ADD COLUMN fx_kpis TEXT"),
     # 2.45.1 (#1556): the English name of a device (like office_services.name_en; '' = the German name is used)
     ("office_equipment", "name_en", "ALTER TABLE office_equipment ADD COLUMN name_en TEXT NOT NULL DEFAULT ''"),
+    # 2.46.0 (#1605): a group's picture ('' = the group symbol, p:<preset>, u:<token> = own photo; lists/grouppics.py)
+    ("groups", "avatar", "ALTER TABLE groups ADD COLUMN avatar TEXT NOT NULL DEFAULT ''"),
+    # 2.46.0 (#1603): who sees an organisation list: '' = only the people it is shared with, 'org' = every member of its
+    # organisation (read-only until they join; org_edit = 1: they may edit without joining)
+    ("lists", "org_visibility", "ALTER TABLE lists ADD COLUMN org_visibility TEXT NOT NULL DEFAULT ''"),
+    ("lists", "org_edit", "ALTER TABLE lists ADD COLUMN org_edit BIGINT NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -1322,6 +1328,7 @@ USER_DEFAULTS = {
     # 1.5.1: "Show completed" per view (route key like "today", "l:12", "f:3", "tag:x"; "cal" = the calendar) -> 0/1,
     # json object. 1.8.1: the global switch show_completed is gone, a view without an entry shows its completed tasks
     "show_done_views": "{}",
+    "mods_all": "1",            # 2.46.1 (#1591): "Switch on all modules" under "What do you use Kalmido for?" (0 = lists and tasks only)
     "show_done_default": "1",   # 2.39.1 (#1214): views without an own entry (and without a folder default) show completed tasks
     "group_order": "{}",        # 2.39.1 (#1221): json route key -> [group ids], the own order of a view's groups (all devices)
     # modules that can be switched off in the settings (hidden from nav, data stays)
@@ -1364,6 +1371,9 @@ USER_DEFAULTS = {
     # 2.40.0 (#1361): favourites (personal): comma list of starred list ids; fav_only = the sidebar shows only them (the other
     # lists fold under "More lists"); fav_views = comma list of view keys (today, assigned, ...) filtered to favourites
     "fav_lists": "", "fav_only": "0", "fav_views": "",
+    # 2.46.1 (#1361): fav_quiet = lists without a star push only @mentions / assignments; fav_suggest = offer a busy list as a
+    # favourite once (fav_asked = the lists already offered)
+    "fav_quiet": "0", "fav_suggest": "1", "fav_asked": "",
     # 2.40.0 (#1344): "My tasks": own = the person's own order (user_task_order, default), lists = grouped by list as before
     "mine_view": "own",
     # 2.6.1 (#401): 1 = date, time, repeat and reminder changes wait for OK (default: they apply at once, with Undo)

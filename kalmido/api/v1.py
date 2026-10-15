@@ -474,6 +474,9 @@ def v1_list(d):
             "archived": bool(d["archived"]), "done_at_bottom": bool(d.get("checklist")), "checklist": bool(d.get("checklist")),
             "kind": d.get("kind") or "list", "view": d["view"], "role": d["role"],
             "org_id": d.get("org_id"),  # 2.28.0 (#935): the workspace (null = private)
+            # 2.46.0 (#1603): "" = only the people it is shared with, "org" = everyone in the organisation (org_edit: they may
+            # edit without joining); org_reader: you see it only that way (POST /lists/{id}/join makes you a member)
+            "org_visibility": d.get("org_visibility") or "", "org_edit": bool(d.get("org_edit")), "org_reader": bool(d.get("org_reader")),
             "owner_id": d["owner_id"], "owner_name": d["owner_name"], "shared": d["shared"],
             "status": d.get("status") or None, "progress": d["progress"], "created_at": d["created_at"],
             "tags": d.get("tags") or [], "agent_tidy": d.get("agent_tidy") or "off", "tidy_agent_id": d.get("tidy_agent_id"),
@@ -705,8 +708,10 @@ def v1_lists():
     for r in visible_sections(c, me()):  # 2.0.8 (#333): every list with its sections [{id, name}]
         secs.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"]})
     fl = v1_list_fields(c)
-    return jsonify(data=[{**v1_list(d), "sections": secs.get(d["id"], []), "fields": fl.get(d["id"], [])} for d in visible_lists(c, me())],
-                   next_cursor=None)
+    from ..lists.favorites import lc_fav_of
+    fav = lc_fav_of(c, me())  # 2.46.1 (#1361): favourite of the person (an agent: of its owner)
+    return jsonify(data=[{**v1_list(d), "sections": secs.get(d["id"], []), "fields": fl.get(d["id"], []), "favorite": d["id"] in fav}
+                         for d in visible_lists(c, me())], next_cursor=None)
 
 
 def v1_list_fields(c, lid=None):
@@ -771,7 +776,8 @@ def v1_list_patch(lid):
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist",
                                                "listen_agent_ids", "columns", "archived", "project_type", "family", "life", "trip",
                                                "client_id", "agent_members", "agent_peers", "org_id",
-                                               "stale_days", "agent_followup", "folder_adopt", "time_tracking"))  # 2.28.0 (#935); 2.34.0 (#266); 2.39.1 (#1188); 2.41.0 (#1471)
+                                               "stale_days", "agent_followup", "folder_adopt", "time_tracking",
+                                               "org_visibility", "org_edit"))  # 2.28.0 (#935); 2.34.0 (#266); 2.39.1 (#1188); 2.41.0 (#1471); 2.46.0 (#1603)
     if unknown:
         raise UnknownFields(unknown)
     if "family" in b and b["family"] is None:  # 2.19.0 (#653): null = an ordinary list
@@ -782,7 +788,7 @@ def v1_list_patch(lid):
         if b["project_type"] not in (None, "") and b["project_type"] not in PTYPES:
             raise BadInput(tr("Invalid value: {0}", "project_type"))
         b = {**{k: v for k, v in b.items() if k != "project_type"}, "ptype": b["project_type"] or ""}
-    for k in ("checklist", "done_at_bottom", "archived", "agent_members", "agent_peers", "time_tracking"):  # 2.41.0 (#1471): time_tracking
+    for k in ("checklist", "done_at_bottom", "archived", "agent_members", "agent_peers", "time_tracking", "org_edit"):  # 2.41.0 (#1471): time_tracking
         if k in b and not isinstance(b[k], bool):
             raise BadInput(tr("Invalid value: {0}", k))
     if "folder_adopt" in b and not isinstance(b["folder_adopt"], bool):  # 2.39.1 (#1188): take the new folder's settings
@@ -795,6 +801,10 @@ def v1_list_patch(lid):
         cur = c.execute("SELECT name, folder FROM lists WHERE id=?", (lid,)).fetchone()
         if clean_folder(b["folder"] or "") != (cur["folder"] or ""):
             need_approval(c, N_("Move the list “{0}” into the folder “{1}”"), (cur["name"], str(b["folder"] or "")[:100]), list_id=lid)
+    if b.get("org_visibility") == "org" or b.get("org_edit") is True:  # 2.46.0 (#1603): an agent opens a list to its organisation
+        cur = c.execute("SELECT name, org_visibility, org_edit FROM lists WHERE id=?", (lid,)).fetchone()
+        if (b.get("org_visibility") == "org" and cur["org_visibility"] != "org") or (b.get("org_edit") is True and not cur["org_edit"]):
+            need_approval(c, N_("Make the list “{0}” visible to everyone in the organisation"), (cur["name"],), list_id=lid)
     j = v1_call(list_update, lid, body=b)
     d = next((x for x in visible_lists(c, me()) if x["id"] == lid), None)
     if not d:
@@ -812,11 +822,13 @@ def v1_list_get(lid):
     d = next((x for x in visible_lists(c, me()) if x["id"] == lid), None)
     if not d:
         raise Denied(404)
+    from ..lists.favorites import lc_fav_of
     from ..lists.playbook import pb_effective
     pb = pb_effective(c, lid)  # 2.39.0 (#1168): the effective Playbook (null = none; never of a health list)
     return jsonify({**v1_list(d), "sections": [{"id": r["id"], "name": r["name"], "sort": r["sort"]}
                                                for r in visible_sections(c, me()) if r["list_id"] == lid],
                     "fields": v1_list_fields(c, lid).get(lid, []),
+                    "favorite": lid in lc_fav_of(c, me()),  # 2.46.1 (#1361)
                     "playbook": pb["text"] if pb and pb["text"] and pb["life"] != "health" else None})
 
 

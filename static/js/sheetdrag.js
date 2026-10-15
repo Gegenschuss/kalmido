@@ -69,7 +69,7 @@ function sd_end(cancel) {
   if (!cancel && (SD.ty > Math.min(120, h * 0.3) || flick)) {
     el.style.transform = `${SD.base}translateY(${Math.round(h + 40)}px)`;
     setTimeout(() => {
-      sd_closer(el)();
+      an_skipNext(); sd_closer(el)();
       if (el.isConnected) sd_reset(el, !el.classList.contains('hidden'));  // a draft guard kept it open: back in place
     }, 180);
   } else {

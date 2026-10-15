@@ -261,6 +261,7 @@ ROUTES = {
     "GET /api/folders/repos": "folder", "POST /api/folders/repos": "folder", "PUT /api/lists/{}/folder-repo": "list",  # 2.33.0 (#934)
     "GET /api/folders/notify-template": "folder", "PUT /api/folders/notify-template": "folder",  # 2.33.0 (#927)
     "GET /api/lists/{}/notify-template": "list", "PUT /api/lists/{}/notify-template": "list",
+    "GET /api/folders/people/diff": "folder", "GET /api/folders/groups/{}/diff": "folder",  # 2.46.0 (#1606): roles set per list
     "GET /api/v1/lists/{}/notify-template": "list", "POST /api/notify-templates/asked": "own",
     "GET /api/search/messages": "aggregate",  # 2.33.0 (#1080): only what the person may read (vis_sql, rooms, own agent chats)
     "GET /api/admin/client-ip": "admin",  # 2.33.0 (#834)
@@ -271,6 +272,8 @@ ROUTES = {
     # ---- group (6)
     "GET /api/v1/groups": "group", "GET /api/v1/groups/{}": "group", "GET /api/groups": "group",
     "POST /api/admin/groups": "group", "PATCH /api/admin/groups/{}": "group", "DELETE /api/admin/groups/{}": "group",
+    "PUT /api/admin/groups/{}/avatar": "group", "POST /api/admin/groups/{}/avatar": "group",  # 2.46.0 (#1605): group pictures
+    "DELETE /api/admin/groups/{}/avatar": "group", "GET /api/group-avatar/{}/{}.jpg": "group",  # (p2460_c_api_test.py: outside 404)
     # ---- ical (3)
     "GET /ical/{}.ics": "ical", "GET /api/ical": "ical", "POST /api/ical": "ical",
     # ---- list (100)
@@ -309,6 +312,7 @@ ROUTES = {
     "GET /api/lists/{}/status": "list", "GET /api/lists/{}/overview": "list", "PATCH /api/lists/{}/overview": "list", "GET /api/lists/{}/layout": "list", "PUT /api/lists/{}/layout": "list",
     "POST /api/lists/{}/links": "list", "PATCH /api/lists/{}/links/{}": "list", "DELETE /api/lists/{}/links/{}": "list",
     "PUT /api/lists/{}/links/order": "list", "POST /api/lists/{}/milestones": "list",
+    "POST /api/lists/{}/join": "list", "POST /api/v1/lists/{}/join": "list",  # 2.46.0 (#1603): p2460_b_api checks the boundary
     # 2.43.0: key figures (#1328), notepads + block colours (#1346), all times of a project (#1434): need_list / need_note
     # on the list, foreign ids 404 (p2430_a_api_test.py, p2430_c_api_test.py, p2430_d_api_test.py)
     "GET /api/lists/{}/kpis": "list", "GET /api/v1/lists/{}/kpis": "list", "PUT /api/lists/{}/page-style": "list",
@@ -324,7 +328,8 @@ ROUTES = {
     "GET /api/v1/news": "news", "POST /api/v1/news/read": "news", "GET /api/news": "news",
     "POST /api/news/dismiss": "news", "POST /api/news/read": "news",
     # ---- org (13)
-    "GET /api/admin/orgs": "org", "POST /api/admin/orgs": "org", "PATCH /api/admin/orgs/{}": "org",
+    "GET /api/admin/orgs": "org", "POST /api/admin/orgs/boundary/repair": "org",  # 2.46.0 (#1563)
+     "POST /api/admin/orgs": "org", "PATCH /api/admin/orgs/{}": "org",
     "DELETE /api/admin/orgs/{}": "org", "PUT /api/admin/orgs/visibility": "org", "GET /api/orgs": "org",
     "PATCH /api/orgs/{}": "org", "PUT /api/orgs/{}/members": "org", "DELETE /api/orgs/{}/members/{}": "org",
     # 2.35.0 (#1101): an organisation admin's lists of the organisation (p2350_c_api_test.py: other organisation, private list, member 403)
@@ -337,6 +342,7 @@ ROUTES = {
     # 2.42.0 (#833): the organisation export (its admins only; p2420_c_api_test.py: member 403, other organisation 404, agent refused)
     "GET /api/orgs/{}/export": "org", "POST /api/orgs/{}/export": "org", "DELETE /api/orgs/{}/export": "org", "GET /api/orgs/{}/export/file": "org",
     # ---- own (119)
+    "POST /api/favorites/suggestion": "own",  # 2.46.1 (#1361): a favourite suggestion from the person's own activity
     "PUT /api/tasks/mine-order": "own", "GET /api/me/wait-suggestions": "own", "DELETE /api/me/wait-suggestions": "own",  # 2.41.0 (#1205)
     "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",
     "POST /api/ntfy/test": "own", "GET /api/push/vapid": "own", "GET /api/push/subs": "own", "POST /api/push/subs": "own",

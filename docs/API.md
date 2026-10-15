@@ -171,8 +171,9 @@ had been made in the app. Webhooks fire too.
 | `GET /lists/{id}` | read | One list with its sections and (2.14.0) its custom `fields` `[{id, name, type}]` (also on `GET /lists`); 2.39.0: `playbook` = the list's effective Playbook (null = none) |
 | `GET /lists/{id}/playbook` | read | 2.39.0 (#1168): the list's Playbook, the owner's working rules for agents: `{list_id, text` (effective: the folders' parts, then the list's own)`, list_text, folders [{folder, text}], version` (a short marker)`, list_version, updated_at}`; health lists `404`. See [AGENTS.md](AGENTS.md#playbook-2390) |
 | `POST /lists/{id}/playbook/proposals` | agent | 2.39.0: **agent tokens only**, members of the list: propose a new text of the list's own Playbook `{text, note?}` -> `201 {id, state, base_version}`; at most 3 open per agent and list (`409`); people apply or discard it in the app (event `playbook_proposal`) |
-| `PATCH /lists/{id}` | structure | 2.41.0: `time_tracking` (the owner, boolean): time tracking on for this list. 2.40.0: `name` and `color` also by list admins (a rename puts a News entry at the owner; the rest stays the owner's, `403`). 2.28.0: `org_id` (the owner): the list's workspace, an organisation you belong to or `null` = private (`409` while people / agents in it do not fit, for family / Home & life lists and the inbox); lists carry `org_id`. 2.18.0: `project_type` (owner / list admins): `agency`, `software`, `private` or `null` / `""` (none); switching turns on what the type needs, nothing is deleted; lists carry `project_type`. 2.15.0: `archived` (true / false; the owner). 2.14.0: `columns` (owner / list admins; others `403`): the row columns of the list in order, the same for every member: `id` (task number in front of the title), `due`, `prio`, `who`, `tags`, `time`, `progress`, `deps`, `created`, `f:<field id>`; a key that is not listed is not shown; `null` = the default layout; unknown keys or fields of another list `400`. A new custom field joins configured columns at the end. 2.39.1 (#1293): `f:<id>` columns switch the module *Custom fields* on for the list's owner; the answer then carries `modules_on` (`["fields"]`, also with `project_type`: the modules it switched on). 2.13.1: `listen_agent_ids` (owner / list admins): the agents that read every comment of a person in the list ([AGENTS.md](AGENTS.md#agent-reads-every-comment-2131)). 2.7.0: change a list. The owner: `name`, `color`, `kind`, `done_at_bottom` (2.7.2), `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
+| `PATCH /lists/{id}` | structure | 2.46.0: `org_visibility` (`""` = only the people the list is shared with, default; `"org"` = everyone in the list's organisation: members who are not shared with it see it read-only, `org_reader: true`, role `view`) and `org_edit` (boolean: they may edit without joining, role `edit`), owner / list admins, only for lists of an organisation and never for health / Home & life / family lists (409); a list that becomes private is reset; an agent opening a list waits for approval (202). 2.41.0: `time_tracking` (the owner, boolean): time tracking on for this list. 2.40.0: `name` and `color` also by list admins (a rename puts a News entry at the owner; the rest stays the owner's, `403`). 2.28.0: `org_id` (the owner): the list's workspace, an organisation you belong to or `null` = private (`409` while people / agents in it do not fit, for family / Home & life lists and the inbox); lists carry `org_id`. 2.18.0: `project_type` (owner / list admins): `agency`, `software`, `private` or `null` / `""` (none); switching turns on what the type needs, nothing is deleted; lists carry `project_type`. 2.15.0: `archived` (true / false; the owner). 2.14.0: `columns` (owner / list admins; others `403`): the row columns of the list in order, the same for every member: `id` (task number in front of the title), `due`, `prio`, `who`, `tags`, `time`, `progress`, `deps`, `created`, `f:<field id>`; a key that is not listed is not shown; `null` = the default layout; unknown keys or fields of another list `400`. A new custom field joins configured columns at the end. 2.39.1 (#1293): `f:<id>` columns switch the module *Custom fields* on for the list's owner; the answer then carries `modules_on` (`["fields"]`, also with `project_type`: the modules it switched on). 2.13.1: `listen_agent_ids` (owner / list admins): the agents that read every comment of a person in the list ([AGENTS.md](AGENTS.md#agent-reads-every-comment-2131)). 2.7.0: change a list. The owner: `name`, `color`, `kind`, `done_at_bottom` (2.7.2), `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
 | `GET /lists/{id}/repos` | read | 2.2.0: repositories connected to a (project) list: `provider` (`github` / `gitea` / `gitlab` / `bitbucket`, 2.18.0), `base_url`, `web_url`, `owner`, `repo`, `full_name`, `default_branch`, `status` (`new` / `ok` / `error`), `error`, `polled_at`. Never a token; connecting is only in the app (list owner / list admins). Lists also carry `repos`. 2.33.0: a list without repositories of its own lists the ones of its folder that it uses (`folder` = the folder's path for the folder's owner, `""` for everyone else and for agents, `null` = the list's own repository; connected by the folder's owner in the folder settings, switchable off per list); `#id` / `fixes #id` then work for the tasks of every project list in that folder |
+| `POST /lists/{id}/join` | structure | 2.46.0: join a list you see through `org_visibility: "org"` (`org_reader`): you become a member with the role `edit` and get its notifications; 409 when you are a member already, 404 for anybody else (agents never see lists this way). Leave again with `DELETE /lists/{id}/members/{your id}`. Readers find the list's tasks in search and in `GET /lists`, but not in the calendar feed, CalDAV, the briefing or the list's channel, and get no notifications until they join |
 | `POST /lists/{id}/owner` | structure | 2.1.2: transfer the ownership `{user_id}` to another active person (never an agent); the old owner stays as a list admin. Admins may take over a list whose owner is an agent or a disabled user. Agent tokens always `403`, inboxes `409` |
 | `GET /tasks` | read | Tasks (not in the trash), oldest first; filters below |
 | `POST /tasks` | tasks:write | Create a task (default list: the user's inbox) |
@@ -365,7 +366,7 @@ deadlines are ordinary tasks with a `family` object; rotations, people and stars
 | `POST /family/kids/{id}/rewards` · `PATCH /family/rewards/{id}` · `DELETE` | tasks:write · tasks:write · delete | `{title, cost, emoji?, once?}` (parents) |
 | `POST /family/rewards/{id}/request` | tasks:write | the kid asks (with enough stars); its parents get a push |
 | `POST /family/rewards/{id}/decide` | tasks:write | `{approve}`: redeem (the stars are taken; `once` rewards are done) or decline (parents) |
-| `POST /me/purpose` | account | `{purpose: me\|family\|team\|software, examples?}`: switches your modules and creates the starter lists once |
+| `POST /me/purpose` | account | `{purpose: me\|home\|family\|team\|software\|office, examples?, all_modules?}`: switches your modules; the sample project of the purpose only with `examples: true` (since 2.46.1 off by default; Family always gets its shopping list and the list Family once); `all_modules` true = every module, false = lists and tasks only, missing = the purpose's own set |
 
 Task fields: `family` (`{kind: birthday|anniversary, name, year?, lead?, src?, card?}` (`card`: the vCard UID of a date
 imported from an address book) or `{kind: deadline, type, who, expires, notice,
@@ -413,6 +414,7 @@ a task needs `tasks:write` too. A contact is only visible to people who see its 
 | `POST /address-books/{id}/import` · `GET …/export` | `{vcf}`: vCard 3 / 4 text (the same UID is updated; at most 20 MB, never more than the server's request limit `4 × TASKS_MAX_FILE_MB`; larger: `400` / `413` with `error` naming the limit) -> `{created, updated, unchanged, errors}`; 2.41.0: stored in batches of 200, each committed (a failure keeps the batches before it); the book as `{vcf}`. The app's own `POST /api/books/{id}/import?background=1` (multipart `file`) answers a file of more than 100 cards with 202 `{import_id, state: running, total, done, …}` at once and `GET /api/books/imports/{import_id}` (only for the person who started it) tells `state` running / done / failed, `done` of `total`, the counts and `error` |
 | `GET /contacts?q=&book_id=&group=&limit=&cursor=` | search name, company, e-mail, phone (also without spaces), address, group; `{data, next_cursor, total, groups}` |
 | `POST /contacts` · `GET /contacts/{id}` · `PATCH` · `DELETE` | `{book_id?, kind?, fn?, given?, family?, middle?, prefix?, suffix?, nickname?, org?, dept?, title?, emails?, phones?, addresses?, urls?, bday?, anniversary?, note?, groups?, photo?}`; `GET` adds the linked `tasks` and `events` |
+| `POST /contacts/bulk` | 2.46.1: `{ids, action: delete\|move, book_id?}` several contacts at once (up to 5000). Every contact is checked first: one unknown or foreign id `404`, one in a read-only address book `403`, and nothing changes. `move`: `book_id` = the target (write access, `409` beyond the contacts per book); a contact the target has already (same UID) stays where it is. `{action, deleted}` / `{action, moved, unchanged, conflicts: [ids]}`. Birthday tasks follow (deleted contacts: to the trash; another birthday list: new tasks there). Agents: 10 or more contacts wait for a person's approval (`202`), like task batches |
 | `POST /tasks/{id}/contacts` · `DELETE /tasks/{id}/contacts/{contact_id}` | `{contact_id, kind: waiting\|responsible\|about}` |
 
 `emails` / `phones` / `urls`: `[{value, type: [home|work|cell|other], pref?, label?}]`; `addresses`: `[{street, code,
@@ -947,6 +949,12 @@ the list keeps them and they count as its own (*differs from the folder*). The a
 `GET /api/lists/{id}/folder-preview?folder=` names what would change (`changes: [{key, from, to}]`). The folder setting
 `hide_done` (*Hide completed*) is a default for the lists of the folder and its subfolders; the person's setting
 `show_done_default` (`"1"` show / `"0"` hide) holds for every view without its own choice.
+2.46.1 (#1422): `hide_done` works like the other folder defaults, for the owner's own lists (shared lists of others keep
+their setting). What a list shows is the owner's own choice for it (`show_done_views`, key `"l:<id>"`), else the folder
+default, else `show_done_default`. `apply: all` drops the own choice of every list that follows (`changed` counts the lists
+whose view changes; `dry_run` too); an own choice that differs from the folder marks the list (`folder_own` contains
+`hide_done`, *This list differs*) until `POST /api/lists/{id}/folder-reset`; `apply: new` and `hide_done: null` keep what each
+existing list shows (as its own choice).
 
 ## Playbook (2.39.0)
 
@@ -997,7 +1005,9 @@ settings ("connects lists with different people").
 ## Favourites (2.40.0)
 
 Every person can star the lists and projects they really work on. The stars are **personal**: other members of a list
-and agents never see them, and agents cannot set any (`403`).
+never see them, and agents cannot set any (`403`). 2.46.1 (#1361): the person's own agents (personal agents, `owner`)
+see the flag `favorite` on the lists they see anyway (`GET /api/v1/lists`, `GET /api/v1/lists/{id}`); a team agent
+without an owner sees `false` everywhere.
 
 | Call | What it does |
 |---|---|
@@ -1008,6 +1018,18 @@ The stars travel with the person's settings in `GET /api/state` (`settings.fav_l
 order they were starred). Two more settings belong to them (`PATCH /api/settings`): `fav_only` (`"1"` = the sidebar shows
 the favourites and folds every other list under *More lists*) and `fav_views` (comma list of the views that show only tasks
 of favourites: `today`, `tomorrow`, `week`, `doable`, `assigned`). With and without an organisation alike.
+
+2.46.1 (#1361), two more settings and one call:
+
+- `fav_quiet` (`"1"`, default `"0"`): while the person has at least one favourite, lists without a star send **pushes**
+  only for @mentions, assignments and what must not be missed (reminders, approvals, shares, follow-ups); comments,
+  replies, new / completed tasks, status changes, unblocked tasks and team chat messages of those lists stay in the News
+  without a push. A list bell set to *All* or *Custom* wins. No new kind of push.
+- `fav_suggest` (`"1"` = default, `"0"` = off): the app offers a busy list as a favourite once.
+- `POST /api/favorites/suggestion` (web API, the signed-in person; agents `403`): answers `{list_id, name}` for ONE list
+  without a star, not archived, not the Basket, that the person changed on at least 5 different days with at least 20
+  changes during the last 14 days -- or `{list_id: null}`. Each list is offered only once (`fav_asked`, kept by the
+  server); a star is never set by itself.
 
 ## My tasks in an own order (2.40.0)
 
