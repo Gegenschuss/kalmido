@@ -35,6 +35,10 @@ function modalA11y(m) {
   const h = card && card.querySelector('h1,h2,h3,h4');
   if (h && !m.hasAttribute('aria-labelledby')) { if (!h.id) h.id = 'mh-' + Math.random().toString(36).slice(2, 8); m.setAttribute('aria-labelledby', h.id); }
   const prev = document.activeElement;
+  // 2.46.2 (#1659 #1718): a redraw while the dialog is open (an optimistic save draws the header again) can replace the opener;
+  // the focus then goes to its new copy (same signature and position as in keepFocus)
+  let psig = null, pi = 0;
+  if (prev && prev !== document.body) try { psig = focusSig(prev); pi = [...document.querySelectorAll(psig)].indexOf(prev); } catch { psig = null; }
   m.addEventListener('keydown', e => {
     if (e.key !== 'Tab' || e.defaultPrevented) return;
     const f = focusables(m).filter(x => x.tabIndex >= 0 || x === document.activeElement); e.preventDefault(); if (!f.length) return;
@@ -50,7 +54,9 @@ function modalA11y(m) {
   onRemove(m, () => {
     if (!document) return;  // the window is gone
     const a = document.activeElement;
-    if (prev && prev.isConnected && prev !== document.body && (!a || a === document.body || !a.isConnected)) { try { prev.focus({preventScroll: true}); } catch { /* gone */ } }
+    let t = prev;
+    if (t && !t.isConnected && psig) try { const all = document.querySelectorAll(psig); t = all[Math.max(0, Math.min(pi, all.length - 1))] || null; } catch { t = null; }
+    if (t && t.isConnected && t !== document.body && (!a || a === document.body || !a.isConnected)) { try { t.focus({preventScroll: true}); } catch { /* gone */ } }
   });
 }
 // ---- UX1 (U12): the app's own dialogs instead of window.confirm / window.prompt. askConfirm resolves true / false,

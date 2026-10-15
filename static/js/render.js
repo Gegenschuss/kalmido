@@ -695,10 +695,11 @@ window.addEventListener('resize', () => { if (S.route?.mod === 'cal') calFit(); 
 // 2.13.2 (#478 N2): a re-render (live updates of agents, comments, jobs) never takes the keyboard focus away: a focused
 // button / link / cell of the rebuilt area gets its focus back on its new copy (same tag + data-* / id, same position
 // among equal ones), so Tab goes on from there instead of falling back to the start (the "tab ping-pong")
+const cssEsc = v => typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(v) : String(v).replace(/["\\]/g, '\\$&');  // 2.46.2: not in every test DOM
 function focusSig(el) {
-  if (el.id) return '#' + CSS.escape(el.id);
-  const a = [...el.attributes].filter(x => /^data-/.test(x.name) && x.name !== 'data-k').map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join('');
-  return el.tagName.toLowerCase() + a + (a ? '' : el.getAttribute('aria-label') ? `[aria-label="${CSS.escape(el.getAttribute('aria-label'))}"]` : '');
+  if (el.id) return `[id="${cssEsc(el.id)}"]`;
+  const a = [...el.attributes].filter(x => /^data-/.test(x.name) && x.name !== 'data-k').map(x => `[${x.name}="${cssEsc(x.value)}"]`).join('');
+  return el.tagName.toLowerCase() + a + (a ? '' : el.getAttribute('aria-label') ? `[aria-label="${cssEsc(el.getAttribute('aria-label'))}"]` : '');
 }
 // While such an element has the focus the area is not rebuilt but morphed (setHtml -> morphKids: same nodes where tag and
 // key match, only attributes / text change), so the focused node itself stays in place: browsers keep their Tab position
@@ -808,7 +809,8 @@ function morphKids(a, b) {
 const fl_sig = () => { const l = S.route.mod === 'tasks' ? routeList() : null; return [S.route.mod, S.route.key, S.route.tab, S.route.agent, l ? listView(l) + (isRoadmap() ? 'r' : '') + (isOverview() ? 'o' : '') : ''].join('|'); };
 function keepFocus(root, fn) {
   const a = document.activeElement, isView = !!root && root.id === 'view', vs = isView ? fl_sig() : null;
-  const same = isView && FL.vsig === vs && !!root.firstChild;
+  // 2.46.2 (#1718): the header is morphed on every redraw too, so a dialog's opener there (Menu, …) stays the same node
+  const same = (isView ? FL.vsig === vs : root?.id === 'top') && !!root.firstChild;
   if (!root || ((!a || a === document.body || !root.contains(a) || editFocused()) && !same)) { try { return fn(); } finally { if (isView) FL.vsig = vs; } }
   let sig = null, i = 0;
   if (a && a !== document.body && root.contains(a) && !editFocused()) try { sig = focusSig(a); i = [...root.querySelectorAll(sig)].indexOf(a); } catch { sig = null; }

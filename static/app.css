@@ -6358,6 +6358,10 @@ html.mini-task #app,html.mini-task #app.detail-open{grid-template-columns:minmax
 @media (pointer:coarse){ .lymore{opacity:.8;min-width:2.75rem;min-height:2.75rem;justify-content:center} }
 .lyb.lym .povh,.lyb.lym > .dcard > h3,.lyb.lym > .dcard > h2{padding-right:2rem}
 .lyb.lym .agjh{padding-right:2.25rem}  /* the … button must not cover the Open / All switch of the agents view (axe target-size) */
+/* 2.46.2 (#1452): the evening review card (only after the end of the working hours) keeps its "Hide for today" x clear of the … button */
+.lyb.lym > .rvcard > .rvhd{padding-right:1.5rem}
+.lyb.lym > .rvcard.fold{padding-right:2rem}
+@media (pointer:coarse){ .lyb.lym > .rvcard > .rvhd{padding-right:2.5rem} .lyb.lym > .rvcard.fold{padding-right:3.25rem} }
 .pov .lysix{margin-top:.75rem;row-gap:.75rem}
 .pov .lysix > .lyb > .povs{margin-top:0;height:100%}
 .lygrip{position:absolute;right:1px;bottom:1px;width:.875rem;height:.875rem;cursor:nwse-resize;opacity:0;transition:opacity .15s;
