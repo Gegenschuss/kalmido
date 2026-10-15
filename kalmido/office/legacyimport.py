@@ -672,6 +672,8 @@ def fi_import(c, oid, uid, b):
     lists = {k: b.get(k) or [] for k in ("clients", "services", "equipment")}
     if not all(isinstance(v, list) for v in lists.values()) or sum(len(v) for v in lists.values()) > 3 * FI_ROWS_MAX:
         raise BadInput(tr("Invalid data"))
+    areas = bk_areas(b.get("areas"))  # 2.46.1 (#1557): only the areas switched on (absent: all); the others are not even checked
+    lists = {k: v if k in areas else [] for k, v in lists.items()}
     rid = _run_new(c, oid, uid, "data")
     counts = {"clients": 0, "merged": 0, "contacts": 0, "services": 0, "equipment": 0, "skipped": 0}
     merged = {}
@@ -693,8 +695,38 @@ def fi_import(c, oid, uid, b):
             row = office_create(c, oid, kind, {k: x[k] for k in cols if k in x and x[k] is not None})
             c.execute(f"UPDATE {'office_services' if kind == 'services' else 'office_equipment'} SET import_run_id=? WHERE id=? AND org_id=?", (rid, row["id"], oid))
             counts[kind] += 1
-    c.execute("UPDATE office_import_runs SET counts=?, detail=? WHERE id=? AND org_id=?", (json.dumps(counts), json.dumps({"merged": merged}), rid, oid))
+    c.execute("UPDATE office_import_runs SET counts=?, detail=? WHERE id=? AND org_id=?",
+              (json.dumps(counts), json.dumps({"merged": merged, "areas": list(areas)}), rid, oid))
     return rid, counts
+
+
+# 2.46.1 (#1557): the areas of a data import, each imported and undone on its own. The run keeps per area when it was
+# undone in its detail JSON ({"undone": {"equipment": "<iso>"}}, no new column); undone_at = the whole run (every area
+# with entries undone, or the whole undo).
+FI_AREAS = ("clients", "services", "equipment")
+
+
+def bk_areas(v, empty_ok=True):
+    if v is None:
+        return FI_AREAS
+    if not isinstance(v, list) or any(x not in FI_AREAS for x in v) or (not v and not empty_ok):
+        raise BadInput(tr("Invalid value: {0}", "areas"))
+    return tuple(a for a in FI_AREAS if a in v)
+
+
+def bk_area_counts(counts):
+    """{area: number of entries the run made / changed in it} (only areas with entries)."""
+    n = {"clients": sum(int(counts.get(k) or 0) for k in ("clients", "merged", "contacts")),
+         "services": int(counts.get("services") or 0), "equipment": int(counts.get("equipment") or 0)}
+    return {k: v for k, v in n.items() if v}
+
+
+def bk_detail(r):
+    try:
+        d = json.loads(r["detail"] or "{}")
+    except ValueError:
+        d = {}
+    return d if isinstance(d, dict) else {}
 
 
 # ---------------------------------------------------------------- undo
@@ -705,16 +737,27 @@ def _client_used(c, oid, cid, rid):
                 or c.execute("SELECT 1 FROM office_archive WHERE client_id=? AND org_id=? AND (run_id IS NULL OR run_id!=?) LIMIT 1", (cid, oid, rid)).fetchone())
 
 
-def fi_undo(c, oid, uid, rid):
-    """Undoes run rid: removes its records nothing builds on; -> {removed: {...}, kept: {...}}. 409 when already undone."""
+def fi_undo(c, oid, uid, rid, kinds=None):
+    """Undoes run rid: removes its records nothing builds on; -> {removed: {...}, kept: {...}}. 409 when already undone.
+    2.46.1 (#1557): kinds = only these areas of a data import (clients | services | equipment); the whole undo later
+    takes the areas that are left."""
     write_lock(c, f"office_import_{int(oid)}")
     r = _run_row(c, oid, rid)
     if r["undone_at"]:
         raise Denied(409, tr("This import has already been undone"))
+    detail = bk_detail(r)
+    undone = detail.get("undone") if isinstance(detail.get("undone"), dict) else {}
+    if kinds is not None:
+        kinds = bk_areas(kinds, empty_ok=False)
+        if r["kind"] != "data":
+            raise BadInput(tr("Invalid value: {0}", "kinds"))
+        if any(k in undone for k in kinds):
+            raise Denied(409, tr("This part of the import has already been undone"))
+    todo = [k for k in (kinds or FI_AREAS) if k not in undone]
     removed = {"clients": 0, "services": 0, "equipment": 0, "archive": 0, "merged": 0, "contacts": 0}
     kept = {"clients": 0, "services": 0, "equipment": 0}
     kept_ids = set()
-    for row in c.execute("SELECT id FROM clients WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall():
+    for row in (c.execute("SELECT id FROM clients WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall() if "clients" in todo else []):
         if _client_used(c, oid, row["id"], rid):
             kept["clients"] += 1
             kept_ids.add(row["id"])
@@ -723,16 +766,15 @@ def fi_undo(c, oid, uid, rid):
         removed["clients"] += 1
     s = office_settings(c, oid)
     for kind, table in (("services", "office_services"), ("equipment", "office_equipment")):
+        if kind not in todo:
+            continue
         for row in c.execute(f"SELECT id FROM {table} WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall():
             if office_in_use(c, kind, row["id"], oid) or (kind == "services" and s.get("producing_service_id") == row["id"]):
                 kept[kind] += 1
                 continue
             c.execute(f"DELETE FROM {table} WHERE id=? AND org_id=?", (row["id"], oid))
             removed[kind] += 1
-    try:
-        merged = (json.loads(r["detail"] or "{}") or {}).get("merged") or {}
-    except ValueError:
-        merged = {}
+    merged = (detail.get("merged") or {}) if "clients" in todo else {}
     for cid, fill in merged.items():  # merged clients: empty the filled fields again while they still hold the imported value
         cur = c.execute("SELECT * FROM clients WHERE id=? AND org_id=?", (int(cid), oid)).fetchone()
         if not cur:
@@ -745,7 +787,8 @@ def fi_undo(c, oid, uid, rid):
     # 2.40.0 (#1380): the contact persons the run added to other clients (a kept client of the run keeps its own)
     from .contacts_cl import fk_sync
     touched = set()
-    for row in c.execute("SELECT id, client_id FROM office_client_contacts WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall():
+    for row in (c.execute("SELECT id, client_id FROM office_client_contacts WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall()
+                if "clients" in todo else []):
         if row["client_id"] in kept_ids:
             continue
         c.execute("DELETE FROM office_client_contacts WHERE id=? AND org_id=?", (row["id"], oid))
@@ -754,11 +797,21 @@ def fi_undo(c, oid, uid, rid):
     for cid in touched:
         fk_sync(c, cid)
     files = []
-    for row in c.execute("SELECT id, file FROM office_archive WHERE org_id=? AND run_id=?", (oid, rid)).fetchall():
+    for row in (c.execute("SELECT id, file FROM office_archive WHERE org_id=? AND run_id=?", (oid, rid)).fetchall() if kinds is None else []):
         files.append(row["file"])
         c.execute("DELETE FROM office_archive WHERE id=? AND org_id=?", (row["id"], oid))
         removed["archive"] += 1
-    c.execute("UPDATE office_import_runs SET undone_at=?, undone_by=? WHERE id=? AND org_id=?", (iso(now_utc()), uid, rid, oid))
+    ts = iso(now_utc())
+    if r["kind"] == "data":
+        undone.update({k: ts for k in todo})
+        detail["undone"] = undone
+        c.execute("UPDATE office_import_runs SET detail=? WHERE id=? AND org_id=?", (json.dumps(detail), rid, oid))
+    try:
+        counts = json.loads(r["counts"] or "{}")
+    except ValueError:
+        counts = {}
+    if kinds is None or all(k in undone for k in bk_area_counts(counts if isinstance(counts, dict) else {})):
+        c.execute("UPDATE office_import_runs SET undone_at=?, undone_by=? WHERE id=? AND org_id=?", (ts, uid, rid, oid))
     return removed, kept, files
 
 
@@ -1216,15 +1269,21 @@ def fi_runs_get():
             users[r["created_by"]] = (u["display_name"] or u["username"]) if u else ""
         out.append({"id": r["id"], "kind": r["kind"], "counts": counts, "total": sum(v for k, v in counts.items() if k != "skipped" and isinstance(v, int)),
                     "created_at": r["created_at"], "user_name": users.get(r["created_by"], ""), "undone_at": r["undone_at"]})
+        if r["kind"] == "data":  # 2.46.1 (#1557): per area: its entries and when it was undone
+            und = bk_detail(r).get("undone") or {}
+            out[-1]["areas"] = {k: {"count": n, "undone_at": und.get(k) if isinstance(und, dict) else None}
+                                for k, n in bk_area_counts(counts if isinstance(counts, dict) else {}).items()}
     return jsonify(runs=out)
 
 
 @app.post("/api/office/legacy/runs/<int:rid>/undo")
 def fi_undo_post(rid):
+    """Org admin. 2.46.1 (#1557): body {kinds: [clients | services | equipment]} = only these areas (none: the whole run)."""
     c, uid, oid = _ctx()
-    removed, kept, files = fi_undo(c, oid, uid, rid)
+    kinds = (body() or {}).get("kinds")
+    removed, kept, files = fi_undo(c, oid, uid, rid, kinds=kinds)
     from .ledger import ofx_log
-    ofx_log(c, oid, "undo", target="legacy", detail={"run_id": rid, "removed": removed, "kept": kept})
+    ofx_log(c, oid, "undo", target="legacy", detail={"run_id": rid, "removed": removed, "kept": kept, **({"kinds": kinds} if kinds else {})})
     bump(c)
     c.commit()
     _unlink_files(oid, files)  # after the commit: a failed undo keeps its files

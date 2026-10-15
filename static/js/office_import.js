@@ -38,18 +38,39 @@ function oimHtml() {
 function oimPreviewHtml() {
   const p = OIM.pv, cl = p.clients || [];
   const unsure = cl.filter(c => c.flags?.length).length, dups = cl.filter(c => c.dup).length;
-  const n = cl.filter(c => c.action !== 'skip').length + (p.services || []).filter(s => s.action !== 'skip').length + (p.equipment || []).filter(s => s.action !== 'skip').length;
+  const n = bk_areasOn(p).reduce((a, k) => a + (p[k] || []).filter(s => s.action !== 'skip').length, 0);  // 2.46.1 (#1557): only the areas switched on
   const f = OIM.filter;
   const chips = `<div class="seg wrap oimf" role="tablist">${[['', tr('All ({0})', cl.length)], ['unsure', tr('Unsure ({0})', unsure)], ['dup', tr('Duplicates ({0})', dups)]].map(([k, t]) => `<button type="button" role="tab" data-oim="filter" data-f="${k}" aria-selected="${f === k}" class="${f === k ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>`;
   const rows = cl.map((c, i) => [c, i]).filter(([c]) => !f || (f === 'unsure' ? c.flags?.length : c.dup));
   const other = Object.entries(p.other || {}).filter(([, v]) => v);
   const otherNames = {staff: N_('Staff'), freelancer: N_('Freelancers')};
   return `<div class="oimpv">
-    ${cl.length ? `<h4>${tr('Clients')}</h4>${chips}<ul class="oimcards" role="list">${rows.map(([c, i]) => oimClientCard(c, i)).join('')}</ul>` : `<p class="muted">${tr('No sheet Contacts found.')}</p>`}
-    ${(p.services || []).length ? `<h4>${tr('Services')}</h4><ul class="oimcards" role="list">${p.services.map((s, i) => oimSimpleCard('services', s, i, s.name_de, [s.category, s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : '', s.hourly_rate != null ? `${ofcMoney(s.hourly_rate)}/${tr('h|unit')}` : ''])).join('')}</ul>` : ''}
-    ${(p.equipment || []).length ? `<h4>${tr('Equipment')}</h4><ul class="oimcards" role="list">${p.equipment.map((s, i) => oimSimpleCard('equipment', s, i, s.name, [s.name_en, s.category, s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : ''])).join('')}</ul>` : ''}
+    ${cl.length ? `${bk_areaHead(p, 'clients', tr('Clients'))}${bk_off(p, 'clients') ? '' : `${chips}<ul class="oimcards" role="list">${rows.map(([c, i]) => oimClientCard(c, i)).join('')}</ul>`}` : `<p class="muted">${tr('No sheet Contacts found.')}</p>`}
+    ${(p.services || []).length ? `${bk_areaHead(p, 'services', tr('Services'))}${bk_off(p, 'services') ? '' : `<ul class="oimcards" role="list">${p.services.map((s, i) => oimSimpleCard('services', s, i, s.name_de, [s.category, s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : '', s.hourly_rate != null ? `${ofcMoney(s.hourly_rate)}/${tr('h|unit')}` : ''])).join('')}</ul>`}` : ''}
+    ${(p.equipment || []).length ? `${bk_areaHead(p, 'equipment', tr('Equipment'))}${bk_off(p, 'equipment') ? '' : `<ul class="oimcards" role="list">${p.equipment.map((s, i) => oimSimpleCard('equipment', s, i, s.name, [s.name_en, s.category, s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : ''])).join('')}</ul>`}` : ''}
     ${other.length ? `<p class="muted">${esc(tr('Not imported (Kalmido has no master data for them yet): {0}', other.map(([k, v]) => `${tr(otherNames[k] || k)} (${v})`).join(', ')))}</p>` : ''}
     <div class="foot stfoot oimfoot"><span class="aerr" role="alert"></span><span class="spacer"></span><button type="button" class="btn" data-oim="cancel">${tr('Cancel')}</button><button type="button" class="btn pri" data-oim="import" ${n && !OIM.busy ? '' : 'disabled'}>${esc(trn('Import {0} entry', 'Import {0} entries', n))}</button></div></div>`;
+}
+
+// 2.46.1 (#1557): every area (clients, services, equipment) has a switch "Take over" and "Skip all"; an area switched off
+// folds away, is not sent and not checked (a later import of the same file with only the equipment needs no address work)
+const BK_AREAS = ['clients', 'services', 'equipment'];
+const bk_off = (p, k) => !!p.off?.[k];
+const bk_areasOn = p => BK_AREAS.filter(k => (p[k] || []).length && !bk_off(p, k));
+function bk_areaHead(p, k, title) {
+  const list = p[k] || [], on = !bk_off(p, k), take = list.filter(s => s.action !== 'skip').length, allSkip = !take;
+  return `<div class="oimarea ${on ? '' : 'off'}"><h4>${esc(title)} <span class="muted">${on ? esc(tr('{0} of {1}', take, list.length)) : esc(tr('not taken over'))}</span></h4><span class="spacer"></span>
+    ${on && (!allSkip || list.some(x => bk_back(x) !== 'skip')) ? `<button type="button" class="btn sm ghost" data-oim="area-skip" data-area="${k}">${esc(allSkip ? tr('Take over all') : tr('Skip all'))}</button>` : ''}
+    <label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" data-oim-area="${k}" ${on ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${esc(tr('Take over'))}</span></label></div>`;
+}
+const bk_back = x => x.was && x.was !== 'skip' ? x.was : x.dup ? 'skip' : 'new';  // a duplicate stays skipped unless it was chosen before
+function bk_skipAll(k) {  // "Skip all" of an area (and back: every row gets the action it had before, a duplicate its proposal)
+  const list = OIM.pv?.[k] || [], any = list.some(s => s.action !== 'skip');
+  for (const x of list) {
+    if (any) { if (x.action !== 'skip') { x.was = x.action; x.action = 'skip'; } }
+    else x.action = bk_back(x);
+  }
+  ofcDraw();
 }
 
 function oimClientCard(c, i) {
@@ -129,13 +150,23 @@ function oimCounterHtml() {
   }).join('');
 }
 
+// 2.46.1 (#1557): a data import with more than one area: undo one area alone ("Only undo the equipment"); an area undone shows so
+const BK_UNDO = {clients: N_('Only undo the clients'), services: N_('Only undo the services'), equipment: N_('Only undo the equipment')};
+const BK_UNDONE = {clients: N_('Clients undone'), services: N_('Services undone'), equipment: N_('Equipment undone')};
+function bk_runAreas(x) {
+  const a = Object.entries(x.areas || {});
+  if (x.undone_at || a.length < 2) return '';
+  return `<div class="oimrunareas">${a.map(([k, v]) => v.undone_at ? `<span class="rotag">${esc(tr(BK_UNDONE[k] || k))}</span>`
+    : `<button type="button" class="btn sm ghost" data-oim="undo" data-id="${x.id}" data-kind="${k}">${ic('undo', 's')} ${esc(tr(BK_UNDO[k] || k))} <span class="muted">(${v.count})</span></button>`).join('')}</div>`;
+}
+
 function oimRunsHtml() {
   const r = OIM.runs;
   if (r === null) return `<p class="muted">${tr('Loading…')}</p>`;
   if (!r.length) return `<p class="muted">${tr('No imports yet.')}</p>`;
   const kn = {data: N_('Master data'), archive: N_('Archive|documents')};
   return `<ul class="ofclist" role="list">${r.map(x => `<li class="oimrun"><span class="ofcn"><b>${esc(tr(kn[x.kind] || x.kind))} · ${esc(trn('{0} entry', '{0} entries', x.total || 0))}</b><small class="muted">${esc([typeof ofdWhen === 'function' ? ofdWhen(x.created_at) : x.created_at, x.user_name].filter(Boolean).join(' · '))}</small></span>
-    ${x.undone_at ? `<span class="rotag">${tr('undone')}</span>` : `<button type="button" class="btn sm" data-oim="undo" data-id="${x.id}">${ic('undo', 's')} ${tr('Undo')}</button>`}</li>`).join('')}</ul>`;
+    ${x.undone_at ? `<span class="rotag">${tr('undone')}</span>` : `<button type="button" class="btn sm" data-oim="undo" data-id="${x.id}">${ic('undo', 's')} ${tr('Undo')}</button>`}${bk_runAreas(x)}</li>`).join('')}</ul>`;
 }
 
 // ---- the archive in the documents tab (office_docs.js asks for it when the kind "Archive" is chosen)
@@ -178,7 +209,8 @@ async function oimImport() {
     contact_row: c.action === 'contact' && c.dup?.kind === 'file' ? c.dup.row : undefined}));
   OIM.busy = true; ofcDraw();
   try {
-    const j = await api('POST', '/api/office/legacy/import', {clients: cl, services: p.services || [], equipment: p.equipment || []});
+    const areas = bk_areasOn(p), pick = k => areas.includes(k) ? (k === 'clients' ? cl : p[k] || []) : [];
+    const j = await api('POST', '/api/office/legacy/import', {clients: pick('clients'), services: pick('services'), equipment: pick('equipment'), areas});
     const c = j.counts || {};
     toast(tr('Imported: {0} clients, {1} services, {2} devices', c.clients || 0, c.services || 0, c.equipment || 0) + (c.contacts ? ' · ' + trn('{0} contact person added', '{0} contact persons added', c.contacts) : ''));
     OIM.pv = null; ofcReload('services'); ofcReload('equipment');
@@ -236,10 +268,12 @@ document.addEventListener('click', async e => {
   else if (a === 'arch-go') oimArchiveGo();
   else if (a === 'counter') {
     try { await api('POST', '/api/office/legacy/counter', {kind: b.dataset.kind, last: +b.dataset.last}); toast(tr('Saved')); await oimLoad(); await ofcInfo(true); } catch (x) { toast(x.message || ''); }
-  } else if (a === 'undo') {
-    if (!await askConfirm(tr('Undo this import?'), tr('Everything it added is removed, except what is in use by now (a client with a quotation, a list or an archived document; a service in a document). Clients that were merged lose the fields the import filled in.'), {ok: tr('Undo'), danger: true})) return;
+  } else if (a === 'area-skip') bk_skipAll(b.dataset.area);
+  else if (a === 'undo') {
+    const kind = b.dataset.kind;  // 2.46.1 (#1557): one area only
+    if (!await askConfirm(kind ? tr(BK_UNDO[kind]) + '?' : tr('Undo this import?'), kind ? tr('Only the entries of this area are removed, except what is in use by now. The rest of the import stays.') : tr('Everything it added is removed, except what is in use by now (a client with a quotation, a list or an archived document; a service in a document). Clients that were merged lose the fields the import filled in.'), {ok: tr('Undo'), danger: true})) return;
     try {
-      const j = await api('POST', `/api/office/legacy/runs/${b.dataset.id}/undo`);
+      const j = await api('POST', `/api/office/legacy/runs/${b.dataset.id}/undo`, kind ? {kinds: [kind]} : undefined);
       const k = j.kept || {}, kept = (k.clients || 0) + (k.services || 0) + (k.equipment || 0);
       toast(tr('Import undone') + (kept ? ' · ' + trn('{0} entry stays because it is in use', '{0} entries stay because they are in use', kept) : ''));
       OIM.list = null; ofcReload('services'); ofcReload('equipment'); await oimLoad();
@@ -248,6 +282,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.dataset?.oimArea && OIM.pv) { OIM.pv.off = {...OIM.pv.off, [t.dataset.oimArea]: !t.checked}; ofcDraw(); return; }  // 2.46.1 (#1557)
   if (t.dataset?.oimOn && OIM.pv) {
     const list = t.dataset.oimOn === 'c' ? OIM.pv.clients : OIM.pv[t.dataset.oimOn], x = list?.[+t.dataset.i];
     if (x) { if (!t.checked) { x.was = x.action; x.action = 'skip'; } else x.action = x.was && x.was !== 'skip' ? x.was : (x.dup && (x.contact || '').trim() ? 'contact' : 'new'); ofcDraw(); }

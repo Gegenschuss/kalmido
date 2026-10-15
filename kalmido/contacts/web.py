@@ -155,6 +155,10 @@ def op_contact_edit(c, uid, cid, b):
         need_book(c, nb, write=True)
         if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?)", (nb, r["uid"], r["href"])).fetchone():
             raise Denied(409, tr("The address book has this contact already"))
+        nbk = c.execute("SELECT occ_list_id FROM books WHERE id=?", (nb,)).fetchone()
+        if c.execute("SELECT occ_list_id FROM books WHERE id=?", (r["book_id"],)).fetchone()[0] != nbk[0]:
+            from ..contacts.bulk import bk_occ_drop  # 2.46.1 (#1554): another birthday list: the old tasks go, contact_store makes new ones
+            bk_occ_drop(c, uid, [cid])
         c.execute("UPDATE contacts SET book_id=? WHERE id=?", (nb, cid))
         book_touch(c, r["book_id"])
         r = c.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
@@ -166,6 +170,8 @@ def op_contact_edit(c, uid, cid, b):
 
 def op_contact_delete(c, uid, cid):
     r, role = need_contact(c, cid, write=True)
+    from ..contacts.bulk import bk_occ_drop  # 2.46.1 (#1554): its birthday / anniversary tasks go to the trash with it
+    bk_occ_drop(c, uid, [cid])
     c.execute("DELETE FROM contacts WHERE id=?", (cid,))
     book_touch(c, r["book_id"])
     bump(c)

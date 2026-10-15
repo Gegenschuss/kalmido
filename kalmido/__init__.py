@@ -120,6 +120,7 @@ ORDER = (
     "contacts.carddav",
     "contacts.web",
     "contacts.v1",
+    "contacts.bulk",  # 2.46.1 (#1554): delete / move several contacts at once
     "life.model",
     "life.karakeep",
     "life.web",

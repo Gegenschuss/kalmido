@@ -824,6 +824,11 @@ TOOLS += [
      lambda api, a: api.call("PATCH", f"/contacts/{int(a['contact_id'])}", body=_pick(a, CT_KEYS))),
     ("delete_contact", "2.21.0: delete a contact.", _obj({"contact_id": S_ID}, ["contact_id"]),
      lambda api, a: api.call("DELETE", f"/contacts/{int(a['contact_id'])}")),
+    ("bulk_contacts", "2.46.1: delete or move several contacts at once (ids from search_contacts, up to 5000). All are checked first: "
+                      "one you may not change -> nothing happens. move: book_id = the target address book; contacts it has already stay "
+                      "(conflicts). Ask the person before deleting many.",
+     _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "move"]}, "book_id": S_ID}, ["ids", "action"]),
+     lambda api, a: api.call("POST", "/contacts/bulk", body=_pick(a, ("ids", "action", "book_id")))),
     ("link_contact", "2.21.0: link a contact to a task: waiting (the task waits on them), responsible (they do it outside Kalmido) or about "
                      "(needs tasks:write too).",
      _obj({"task_id": S_ID, "contact_id": S_ID, "kind": {"type": "string", "enum": ["waiting", "responsible", "about"]}}, ["task_id", "contact_id"]),
@@ -1378,7 +1383,7 @@ TOOL_SCOPES = {
                  "restore_event", "reply_to_event", "add_preparation_task", "get_task_events"),
     "contacts": ("list_address_books", "create_address_book", "update_address_book", "delete_address_book", "share_address_book",
                  "unshare_address_book", "import_vcards", "export_vcards", "search_contacts", "get_contact", "create_contact", "update_contact",
-                 "delete_contact", "link_contact", "unlink_contact", "set_contact_care"),
+                 "delete_contact", "bulk_contacts", "link_contact", "unlink_contact", "set_contact_care"),
     "private": ("add_health_entry", "write_journal"),
 }
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read

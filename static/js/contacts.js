@@ -6,7 +6,7 @@
 // 2.21.0 (#658): the contacts live in Kalmido's own address books (S.books from /api/state) and sync with the phone over
 // CardDAV. The view loads its page of contacts (GET /api/contacts, never part of /api/state: contacts are personal data
 // and can be many); a contact opens as a card (desktop: next to the list, phone: the whole view), "Edit" opens the editor.
-const CT = {q: '', group: '', book: '', items: null, total: 0, groups: [], sel: null, card: null, loading: false, seq: 0};
+const CT = {q: '', group: '', book: '', items: null, total: 0, groups: [], sel: null, card: null, loading: false, seq: 0, pick: null};  // 2.46.1 (#1554): pick = the selected ids (Set) in the selection mode
 const ctOn = () => feat('contacts');
 const CT_LINK = [['waiting', N_('Waiting on')], ['responsible', N_('Responsible')], ['about', N_('About')]];
 const CT_TYPES = {emails: [['home', N_('Home')], ['work', N_('Work')], ['other', N_('Other')]],
@@ -56,13 +56,13 @@ function viewContacts() {
   const bar = `<div class="ctbar"><div class="ctsearch">${ic('search', 's')}<input id="ct-q" type="search" value="${esc(CT.q)}" placeholder="${esc(tr('Search contacts'))}" aria-label="${esc(tr('Search contacts'))}" autocomplete="off" enterkeyhint="search"></div>
     ${CT.groups.length ? `<select id="ct-group" aria-label="${esc(tr('Group'))}"><option value="">${tr('All groups')}</option>${CT.groups.map(g => `<option value="${esc(g)}" ${g === CT.group ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select>` : ''}
     ${books.length > 1 ? `<select id="ct-book" aria-label="${esc(tr('Address book'))}"><option value="">${tr('All address books')}</option>${books.map(b => `<option value="${b.id}" ${String(b.id) === String(CT.book) ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>` : ''}
-    <span class="spacer"></span><button class="btn sm pri" data-ct="new">${ic('plus', 's')}<span class="cdl">${tr('New contact')}</span></button>
+    <span class="spacer"></span>${books.some(ctWrite) ? `<button class="iconbtn ${CT.pick ? 'on' : ''}" data-ct="pick" aria-pressed="${!!CT.pick}" aria-label="${esc(tr(CT.pick ? 'End selection' : 'Select'))}" title="${esc(tr(CT.pick ? 'End selection' : 'Select'))}">${ic('select')}</button>` : ''}<button class="btn sm pri" data-ct="new">${ic('plus', 's')}<span class="cdl">${tr('New contact')}</span></button>
     <button class="iconbtn" data-ct="menu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   const list = items === null ? `<div class="muted ctempty">${tr('Loading…')}</div>` : !items.length
     ? `<div class="empty">${ic('users')}${CT.q || CT.group ? tr('No contact matches.') : tr('No contacts yet. Add one, import a vCard file, or connect the phone.')}</div>`
-    : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${items.map(c => `<li><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''}" data-ctopen="${c.id}" aria-current="${c.id === CT.sel}">${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`).join('')}</ul>
+    : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${items.map(c => `<li><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''} ${bk_rowCls(c)}" data-ctopen="${c.id}" ${CT.pick ? `aria-pressed="${CT.pick.has(c.id)}"` : `aria-current="${c.id === CT.sel}"`}>${CT.pick ? bk_chk(c) : ''}${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`).join('')}</ul>
       ${CT.total > CT.items.length ? `<div class="muted ctmore">${tr('{0} of {1} shown: search to narrow it down', items.length, CT.total)}</div>` : ''}`;
-  return `<div class="ctview ${showCard ? 'withcard' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${mob && showCard ? '' : bar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw">${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
+  return `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw">${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
 }
 function ctCardHtml(c) {
   const b = ctBook(c.book_id), w = ctWrite(b);
@@ -100,7 +100,11 @@ document.addEventListener('change', e => {
   if (e.target.id === 'ct-book') { CT.book = e.target.value; ctLoad(); }
 });
 document.addEventListener('click', async e => {
+  const bb = e.target.closest('#ct-sbar [data-ctb]');
+  if (bb) { bk_barAct(bb.dataset.ctb, bb); return; }
   const o = e.target.closest('[data-ctopen]');
+  if (o && CT.pick) { e.preventDefault(); if (Date.now() - bk_lpDone > 600) bk_toggle(+o.dataset.ctopen); return; }  // 2.46.1 (#1554): the selection mode
+  if (o && Date.now() - bk_lpDone < 600) { e.preventDefault(); return; }  // the click that ends a long press
   if (o) { e.preventDefault(); if (isMobile()) go('contacts/' + o.dataset.ctopen); else ctOpen(+o.dataset.ctopen); return; }
   const tk = e.target.closest('[data-cttask]');
   if (tk) { e.preventDefault(); const id = +tk.dataset.cttask; if (taskById(id)) openDetail(id); else go('t/' + id); return; }
@@ -108,6 +112,7 @@ document.addEventListener('click', async e => {
   if (gp) { CT.group = gp.dataset.ctgroup; CT.sel = null; CT.card = null; if (isMobile()) go('contacts'); ctLoad(); return; }
   const b = e.target.closest('#view [data-ct]'); if (!b) return;
   const k = b.dataset.ct;
+  if (k === 'pick') { CT.pick = CT.pick ? null : new Set(); ctDraw(); return; }
   if (k === 'new') ctEditor(null);
   else if (k === 'edit' && CT.card) ctEditor(CT.card);
   else if (k === 'back') { CT.sel = null; CT.card = null; go('contacts'); }
@@ -125,6 +130,90 @@ document.addEventListener('click', async e => {
       feat('events') && {label: tr('Invite to a new event'), icon: 'cal', fn: () => evEditor({attendees: [{contact_id: c.id, name: c.fn, email: c.emails?.[0]?.value || '', partstat: 'needs-action'}]})}]);
   }
 });
+
+// ---- 2.46.1 (#1554): several contacts at once. The selection mode (the select button in the bar; on the phone a long
+// press on a row) shows a tick per row; a tap adds / removes a contact. The floating bar (like the tasks' selection bar)
+// shows the count, "All" (every contact matching the search, group and address book, also beyond the shown 500), Move
+// (an address book one may change) and Delete (one question with the count). One request each (POST /api/contacts/bulk);
+// contacts in read-only address books cannot be ticked. Contacts have no undo (the single delete has none either).
+let bk_lpDone = 0, bk_lp = null;
+const bk_can = c => ctWrite(ctBook(c.book_id));
+const bk_rowCls = c => !CT.pick ? '' : CT.pick.has(c.id) ? 'picked' : bk_can(c) ? '' : 'ctro';
+const bk_chk = c => `<span class="ctchk ${CT.pick.has(c.id) ? 'on' : ''}" aria-hidden="true">${CT.pick.has(c.id) ? ic('check', 's') : ''}</span>`;
+function bk_toggle(id) {
+  const c = (CT.items || []).find(x => x.id === id); if (!c || !CT.pick) return;
+  if (!bk_can(c)) { toast(tr('You can only read this address book')); return; }
+  if (CT.pick.has(id)) CT.pick.delete(id); else CT.pick.add(id);
+  ctDraw();
+}
+function bk_start(id) { CT.pick = new Set(); bk_toggle(id); if (!CT.pick.size) ctDraw(); }
+function bk_end() { CT.pick = null; ctDraw(); }
+function bk_barHtml() {
+  const n = CT.pick.size, btn = (k, i, lab, cls = '') => `<button type="button" class="mbb ${cls}" data-ctb="${k}" title="${esc(lab)}" aria-label="${esc(lab)}" ${n || k === 'all' ? '' : 'disabled'}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
+  return `<div id="ct-sbar" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="mcount" role="status">${n ? tr('{0} selected', n) : tr('Tap contacts')}</span>
+    ${btn('all', 'all', bk_allOn() ? tr('Select none') : tr('All'))}${btn('move', 'folder', tr('Move'))}${btn('del', 'trash', tr('Delete'), 'danger')}
+    <button type="button" class="iconbtn mbx" data-ctb="close" title="${esc(tr('Clear selection') + ' (Esc)')}" aria-label="${esc(tr('Clear selection'))}">${ic('x')}</button></div>`;
+}
+// every contact of the current search / group / address book (the list shows 500, an import has more): fetched as pages
+async function bk_matching() {
+  if (CT.items && CT.total <= CT.items.length) return CT.items;
+  const out = [];
+  for (let off = 0; off < CT.total && off < 20000; off += 2000) {
+    const qs = new URLSearchParams({q: CT.q, limit: '2000', offset: String(off)});
+    if (CT.group) qs.set('group', CT.group);
+    if (CT.book) qs.set('book_id', CT.book);
+    const j = await api('GET', '/api/contacts?' + qs); out.push(...j.items);
+    if (j.items.length < 2000) break;
+  }
+  return out;
+}
+const bk_shown = items => items.filter(c => bk_can(c) && (!ctBook(c.book_id) || wsObjIn(ctBook(c.book_id))));
+const bk_allOn = () => !!CT.pick?.size && CT.items !== null && CT.total <= CT.items.length && bk_shown(CT.items).every(c => CT.pick.has(c.id)) && CT.pick.size >= bk_shown(CT.items).length;
+async function bk_barAct(k, el) {
+  if (!CT.pick) return;
+  if (k === 'close') { bk_end(); return; }
+  if (k === 'all') {
+    if (bk_allOn()) { CT.pick.clear(); ctDraw(); return; }
+    let all; try { all = bk_shown(await bk_matching()); } catch { return; }
+    for (const c of all) CT.pick.add(c.id);
+    ctDraw(); return;
+  }
+  const ids = [...CT.pick]; if (!ids.length) return;
+  if (k === 'del') {
+    if (!await askConfirm(trn('Delete {0} contact?', 'Delete {0} contacts?', ids.length), tr('They are also removed from the phones that sync these address books.'), {ok: tr('Delete'), danger: true})) return;
+    try { await bk_send({action: 'delete'}, ids); } catch { return; }
+    toast(trn('{0} contact deleted', '{0} contacts deleted', ids.length));
+    if (CT.pick && CT.sel && ids.includes(CT.sel)) { CT.sel = null; CT.card = null; }
+    bk_end(); await load().catch(() => {}); ctLoad();
+  } else if (k === 'move') {
+    const books = (S.books || []).filter(b => ctWrite(b) && wsObjIn(b) && !b.imported);
+    if (!books.length) { toast(tr('No address book you may change')); return; }
+    menu(el, books.map(b => ({label: b.name, icon: 'folder', fn: () => bk_move(ids, b)})), null, null, tr('Move'));
+  }
+}
+async function bk_send(body, ids) {  // one request per 5000 (the server's limit; an address book holds up to 20000)
+  const out = {moved: 0, conflicts: []};
+  for (let i = 0; i < ids.length; i += 5000) { const j = await api('POST', '/api/contacts/bulk', {...body, ids: ids.slice(i, i + 5000)}); out.moved += j.moved || 0; out.conflicts.push(...(j.conflicts || [])); }
+  return out;
+}
+async function bk_move(ids, b) {
+  let j; try { j = await bk_send({action: 'move', book_id: b.id}, ids); } catch { return; }
+  const conf = (j.conflicts || []).length;
+  toast([trn('{0} contact moved to {1}', '{0} contacts moved to {1}', j.moved, b.name), conf ? trn('{0} was there already and stayed', '{0} were there already and stayed', conf) : ''].filter(Boolean).join(' · '));
+  bk_end(); await load().catch(() => {}); ctLoad(); if (CT.sel) ctOpen(CT.sel);
+}
+document.addEventListener('keydown', e => {  // capture: before the global Esc (an open menu / dialog closes first)
+  if (e.key === 'Escape' && CT.pick && S.route.mod === 'contacts' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); bk_end(); }
+}, true);
+// the phone: a long press on a row starts the selection with it (the click after it does nothing)
+document.addEventListener('pointerdown', e => {
+  const r = e.pointerType === 'touch' && !CT.pick && e.target.closest?.('#view .ctrow[data-ctopen]'); if (!r) return;
+  clearTimeout(bk_lp?.t);
+  bk_lp = {x: e.clientX, y: e.clientY, t: setTimeout(() => { bk_lp = null; bk_lpDone = Date.now(); navigator.vibrate?.(10); bk_start(+r.dataset.ctopen); }, 500)};
+});
+document.addEventListener('pointermove', e => { if (bk_lp && Math.hypot(e.clientX - bk_lp.x, e.clientY - bk_lp.y) > 10) { clearTimeout(bk_lp.t); bk_lp = null; } });
+for (const ev of ['pointerup', 'pointercancel']) document.addEventListener(ev, () => { if (bk_lp) { clearTimeout(bk_lp.t); bk_lp = null; } });
+document.addEventListener('contextmenu', e => { if (e.target.closest?.('#view .ctrow[data-ctopen]') && (bk_lp || Date.now() - bk_lpDone < 600)) e.preventDefault(); });
 
 // ---- the editor
 async function ctEditor(c) {
