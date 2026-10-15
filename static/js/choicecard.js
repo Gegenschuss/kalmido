@@ -98,7 +98,7 @@ document.addEventListener('click', e => {
 }, true);
 document.addEventListener('contextmenu', e => {
   const b = e.target.closest?.(CC_APV_ED); if (!b || b.disabled) return;
-  e.preventDefault(); if (Date.now() - ccLongDone > 600) ccToBox(+b.dataset.cid, 'yes');
+  e.preventDefault(); if (ccLong) { clearTimeout(ccLong.t); ccLong = null; ccLongDone = Date.now(); ccToBox(+b.dataset.cid, 'yes'); return; } if (Date.now() - ccLongDone > 600) ccToBox(+b.dataset.cid, 'yes');  // 2.46.7: Android fires contextmenu before the long-press timer: one insert, not two
 });
 document.addEventListener('pointerdown', e => {
   const b = e.pointerType === 'touch' && e.target.closest?.(CC_APV_ED); if (!b || b.disabled) return;

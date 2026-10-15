@@ -54,6 +54,14 @@ switched per quotation, and a legacy Excel import that fills gaps instead of ski
   with the new database, but quotations with parts made in 2.47 show their parts flat (and a too high sum) under 2.46: roll
   back only with a database restore, or do not edit such quotations there.
 
+## [2.46.7] - 2026-10-15
+
+**In short:** fixes for 2.46.6 from the device test.
+
+### Fixed
+- **Long press on "Yes" or a suggestion button on Android** (#1711): "Yes, but: ..." is inserted once, not twice.
+- **Touch targets** (#1708): the agent's "Lists" summary and the workspace button are 44 px high on touch screens.
+
 ## [2.46.6] - 2026-10-15
 
 **In short:** **agent launcher and settings**: the reference launcher brings its own safety rules to every run, one
