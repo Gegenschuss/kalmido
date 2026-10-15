@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.48.0 part B (#1111): the recognition building blocks of the documents, pure Python, no server.
  - extract.py: document date, due date and amount from German / English text; traps: phone numbers, IBAN, postal
-   codes, birthdays before 1990, dates far in the future, net / VAT lines are no total
+   codes, birthdays before 1990, dates far in the future, net / VAT lines are no total; the archive serial number
  - rules.py: every kind of match (any / all / exact / regex / fuzzy), the first rule wins a single-value feature, tags
    add up; an evil regex is refused when saved and cannot hang the server when run
  - classify.py: learns from examples, needs enough examples and confidence, takes a corrected document out again, and two
@@ -78,6 +78,10 @@ check(X.parse_number("0,00") is None, "zero is no amount")
 # without a total word: the largest amount with a currency, never a bare number
 r = X.extract("Bestellung 12345\nArtikel A 9,99 €\nArtikel B 19,99 €", TODAY)
 check(r["amount"] == "19.99", f"largest with currency {r}")
+
+# archive serial numbers: QR text / recognised text, the prefix, no match inside other words, never 0
+check(X.find_asn("ASN", ["ASN00042"]) == 42 and X.find_asn("ASN", ["", "Archiv asn 7 hier"]) == 7, "archive number from a code / the text")
+check(X.find_asn("ASN", ["BASN12 and ASN0"]) is None and X.find_asn("K-", ["K-0099"]) == 99, "archive number: word boundary, own prefix")
 
 # ---- rules -----------------------------------------------------------------------------------------------------------
 check(R.check_pattern("(a+)+$") == "nested", "nested quantifier refused")

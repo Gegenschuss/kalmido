@@ -284,6 +284,34 @@ r = A.post(B + "/api/docs/labels/sender", json={"ws": "private", "name": r.json(
 check(r.status_code == 201 and A.get(B + f"/api/docs/{D1}").json()["sender"]["name"] == "Versicherung Beispiel AG (neu)", "undo: back on the documents")
 check(Bo.delete(B + f"/api/docs/labels/sender/{r.json()['id']}").status_code == 404, "another person cannot delete the label")
 
+# ---- archive serial numbers: a QR code on a scan, unique per workspace, the next free one, search
+def qr_pdf(text):
+    """A scan with a QR code (drawn in the test container: segno + Pillow are in the image)."""
+    import base64
+    code = ("import base64, io, segno\nfrom PIL import Image\nq = segno.make(%r, micro=False)\nb = io.BytesIO()\n"
+            "q.save(b, kind='png', scale=8, border=4)\nqr = Image.open(b).convert('L')\npage = Image.new('L', (1654, 2339), 255)\n"
+            "page.paste(qr, (1200, 100))\no = io.BytesIO()\npage.save(o, 'PDF', resolution=200)\nprint(base64.b64encode(o.getvalue()).decode())") % text
+    out = subprocess.run(["docker", "exec", CT, "python", "-c", code], capture_output=True, text=True, check=True)
+    return base64.b64decode(out.stdout)
+
+
+if OCR:
+    q1 = upload(A, [("qr1.pdf", qr_pdf("ASN00042"), "application/pdf")]).json()["ids"][0]
+    d = done(A, q1, 120)
+    check(d and d["asn"] == 42 and d["auto"].get("asn") == "code", f"archive number read from the QR code ({d and (d['asn'], d['auto'])})")
+    q2 = upload(A, [("qr2.pdf", qr_pdf("ASN00042"), "application/pdf")]).json()["ids"][0]
+    d = done(A, q2, 120)
+    check(d and d["asn"] is None, "the same number twice: not given again")
+    check(ids_of(A, q="ASN00042") == [q1] and q1 in ids_of(A, q="42"), "search by the archive number")
+r = A.patch(B + f"/api/docs/{D1}", json={"asn": "next"})
+nxt = r.json().get("asn") if r.ok else None
+check(r.ok and isinstance(nxt, int) and nxt >= 1, f"the next free number ({r.text[:100]})")
+check(A.patch(B + f"/api/docs/{D2}", json={"asn": nxt}).status_code == 409, "a number in use: 409")
+check(A.put(B + "/api/docs/settings", json={"ws": "private", "asn_prefix": "1x"}).status_code == 400, "prefix: a letter first")
+check(A.put(B + "/api/docs/settings", json={"ws": "private", "asn_prefix": "ARC"}).json()["asn_prefix"] == "ARC", "own prefix")
+check(D1 in ids_of(A, q=f"ARC{nxt:05d}"), "search with the own prefix")
+A.put(B + "/api/docs/settings", json={"ws": "private", "asn_prefix": "ASN"})
+
 # ---- task for the due date
 r = A.post(B + f"/api/docs/{D1}/task")
 check(r.status_code == 201, f"a task for the due date ({r.text[:120]})")
