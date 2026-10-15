@@ -160,12 +160,12 @@ EL = Em.post(B + "/api/lists", json={"name": "Emil's org list"}).json()
 check(EL["org_id"] == ORG, "a member's list in the organisation")
 r = A.post(B + "/api/admin/agents", json={"username": "emilbot", "display_name": "Emil bot", "owner_id": EMIL})
 EB = r.json()["id"]
-check(r.status_code == 201 and "emilbot" in members(ORG) and Do.put(B + f"/api/lists/{OL['id']}/members", json={"user_id": EB, "role": "edit"}).ok,
+check(r.status_code == 201 and "emilbot" in members(ORG) and Em.put(B + f"/api/lists/{EL['id']}/members", json={"user_id": EB, "role": "edit"}).ok,
       "a member's personal agent in the organisation and in an organisation list")
 r = Do.delete(B + f"/api/orgs/{ORG}/members/{EMIL}")
 check(r.ok and r.json()["transferred"] == 1 and "emil" not in members(ORG), "#1592: an organisation admin removes a member " + r.text[:120])
 check(db("SELECT owner_id FROM lists WHERE id=?", (EL["id"],)) == [(db("SELECT id FROM users WHERE username='dora'")[0][0],)], "#1592: the list goes to the admin who removed")
-check("emilbot" not in members(ORG) and not db("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (OL["id"], EB))
+check("emilbot" not in members(ORG) and not db("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (EL["id"], EB))
       and db("SELECT org_id FROM agents WHERE user_id=?", (EB,)) == [(None,)], "#1592 review: the removed member's agent leaves the organisation and its lists")
 
 # ================================================================== restarts: nobody is put back, the old mode is ignored
