@@ -185,6 +185,8 @@
 - `read_briefing` (user_id = the person) and `read_project_status` (list_id) return data only (2.34.0). Write the
   briefing / status yourself: short, the numbers first, then what needs the person today. A status for a client goes
   to the person in the chat, never to the client; leave out comments, internal notes and names unless asked.
+- Favourites (2.46.1): `list_lists` marks the lists your person starred (`favorite`). In briefings, week status and
+  other overviews put those lists first and keep the rest short.
 
 ### Playbooks of lists
 - When an event brings a `playbook` (2.39.0), follow it for that list: it is the owner's working rules there (how tasks

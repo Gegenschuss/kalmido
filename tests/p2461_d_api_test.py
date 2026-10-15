@@ -5,7 +5,12 @@
    team_message (mentioned false, listening true), an agent that does not listen in gets nothing without an @mention, an
    agent's own message triggers nothing (no loop), a health list never; the agent may write in the channel of a list shared
    with it and not in the channel of a list it does not see
+ - #1361 (favourites 4-7): GET /api/v1/lists(/{id}) carries "favorite" = a star of the agent's person (personal agent),
+   only lists the agent sees, a team agent false; fav_quiet: a list without a star pushes no comment, an @mention still
+   comes, a starred list pushes as before, the News stay complete; POST /api/favorites/suggestion offers a busy list once,
+   never a starred / quiet list, fav_suggest 0 = none, agents 403; Ctrl+K order is client-side (p2461_d_ui.js)
 usage: p2461_d_api_test.py <datadir>"""
+import json
 import os
 import subprocess
 import sys
@@ -79,6 +84,13 @@ def latest(h):
 def events(h, since, kind=None):
     d = requests.get(V + f"/agent/events?since={since}&limit=200", headers=h).json()["data"]
     return [e for e in d if kind is None or e["event"] == kind]
+
+
+def pushes():
+    try:
+        return [json.loads(x) for x in open(os.path.join(DATA, "ntfy.log"), encoding="utf-8") if x.strip()]
+    except FileNotFoundError:
+        return []
 
 
 def room_of(s, lid):
@@ -158,6 +170,87 @@ if room and proom:
     c6 = latest(CLH)
     A.post(B + f"/api/team/rooms/{room['id']}/messages", json={"body": "Anything else?"})
     check(events(CLH, c6) == [], "listening off: no team_message without an @mention")
+
+# ================================================================== #1361 favourites, points 4-7
+# 7: the agent API marks the favourites of the agent's person
+r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "pia", "display_name": "Pia",
+                                          "owner_id": ALICE})
+check(r.ok, "setup: alice's personal agent " + r.text[:120])
+PIA, PIAH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
+F1 = A.post(B + "/api/lists", json={"name": "Starred", "org_id": ORG}).json()["id"]
+F2 = A.post(B + "/api/lists", json={"name": "Plain two", "org_id": ORG}).json()["id"]
+F3 = A.post(B + "/api/lists", json={"name": "Starred, not for pia", "org_id": ORG}).json()["id"]
+for lid in (F1, F2):
+    A.put(B + f"/api/lists/{lid}/members", json={"user_id": PIA, "role": "edit"})
+for lid in (F1, F3):
+    check(A.put(B + f"/api/lists/{lid}/favorite", json={}).ok, f"setup: star {lid}")
+lv = {l["id"]: l for l in requests.get(V + "/lists", headers=PIAH).json()["data"]}
+check(lv.get(F1, {}).get("favorite") is True and lv.get(F2, {}).get("favorite") is False and F3 not in lv,
+      "pia: favorite true for the starred list, false for the other, the starred list it does not see is not there")
+check(requests.get(V + f"/lists/{F1}", headers=PIAH).json().get("favorite") is True, "pia: GET /lists/{id} favorite")
+check(requests.get(V + f"/lists/{F3}", headers=PIAH).status_code == 404, "pia: the starred list not shared with it: 404")
+check(A.put(B + f"/api/lists/{SW}/favorite", json={}).ok, "setup: star the software list")
+lc = {l["id"]: l for l in requests.get(V + "/lists", headers=CLH).json()["data"]}
+check(lc.get(SW, {}).get("favorite") is False, "a team agent (no owner): favorite false")
+check(requests.put(B + f"/api/lists/{F2}/favorite", headers={**PIAH, **H}, json={}).status_code in (401, 403, 404), "an agent sets no star")
+
+# 4: quieter pushes from lists without a star (bob has a push topic; he follows his own tasks)
+A.patch(B + f"/api/users/{BOB}", json={"ntfy_topic": "t-bob"})
+Q1 = A.post(B + "/api/lists", json={"name": "Quiet", "org_id": ORG}).json()["id"]
+Q2 = A.post(B + "/api/lists", json={"name": "Loud", "org_id": ORG}).json()["id"]
+for lid in (Q1, Q2):
+    A.put(B + f"/api/lists/{lid}/members", json={"user_id": BOB, "role": "edit"})
+TQ1 = Bo.post(B + "/api/tasks", json={"title": "Quiet task", "list_id": Q1}).json()["id"]
+TQ2 = Bo.post(B + "/api/tasks", json={"title": "Loud task", "list_id": Q2}).json()["id"]
+check(Bo.put(B + f"/api/lists/{Q2}/favorite", json={}).ok, "setup: bob stars Loud")
+check(Bo.patch(B + "/api/settings", json={"fav_quiet": "1"}).ok, "bob: fav_quiet on")
+check(Bo.patch(B + "/api/settings", json={"fav_quiet": "2"}).status_code == 400, "fav_quiet is a switch")
+
+
+def bob_push(fn):
+    time.sleep(3.5)  # the push gap of the test container
+    n = len(pushes())
+    fn()
+    time.sleep(1.5)
+    return [p for p in pushes()[n:] if p.get("topic") == "t-bob"]
+
+
+got = bob_push(lambda: A.post(B + f"/api/tasks/{TQ1}/comments", json={"body": "Looks good"}))
+check(got == [], "fav_quiet: a comment in a list without a star: no push " + str(got)[:200])
+news_q = Bo.get(B + "/api/news").json()["items"]
+check(any((x.get("data") or {}).get("task_id") == TQ1 or x.get("task_id") == TQ1 for x in news_q), "fav_quiet: the News keep the comment")
+got = bob_push(lambda: A.post(B + f"/api/tasks/{TQ2}/comments", json={"body": "Looks good too"}))
+check(len(got) == 1, "fav_quiet: a comment in a starred list still pushes " + str(got)[:200])
+got = bob_push(lambda: A.post(B + f"/api/tasks/{TQ1}/comments", json={"body": f"<@{BOB}> please check"}))
+check(len(got) == 1, "fav_quiet: an @mention in a list without a star still pushes " + str(got)[:200])
+Bo.patch(B + "/api/settings", json={"fav_quiet": "0"})
+got = bob_push(lambda: A.post(B + f"/api/tasks/{TQ1}/comments", json={"body": "One more"}))
+check(len(got) == 1, "fav_quiet off: the comment pushes again " + str(got)[:200])
+
+# 6: a suggestion once, never automatic
+st0 = Bo.get(B + "/api/state").json()["settings"]
+check(st0.get("fav_suggest") == "1" and st0.get("fav_quiet") == "0", "defaults: fav_suggest 1, fav_quiet 0")
+r = Bo.post(B + "/api/favorites/suggestion", json={})
+check(r.ok and r.json().get("list_id") is None, "no busy list yet: no suggestion " + r.text[:120])
+Q3 = A.post(B + "/api/lists", json={"name": "Busy", "org_id": ORG}).json()["id"]
+A.put(B + f"/api/lists/{Q3}/members", json={"user_id": BOB, "role": "edit"})
+TQ3 = Bo.post(B + "/api/tasks", json={"title": "Busy task", "list_id": Q3}).json()["id"]
+now = time.time()
+for i in range(24):  # bob's own changes on 6 different days of the last two weeks; the starred list gets the same
+    at = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(now - (i % 6 + 1) * 86400))
+    for t in (TQ3, TQ2):
+        dbx("INSERT INTO activity(task_id, user_id, kind, data, created_at) VALUES(?,?,?,?,?)", (t, BOB, "edit", "{}", at), write=True)
+r = Bo.post(B + "/api/favorites/suggestion", json={})
+check(r.ok and r.json().get("list_id") == Q3 and r.json().get("name") == "Busy", "a busy list without a star is offered " + r.text[:120])
+check(Q3 not in [int(x) for x in (Bo.get(B + "/api/state").json()["settings"].get("fav_lists") or "").split(",") if x], "the star is not set by itself")
+r = Bo.post(B + "/api/favorites/suggestion", json={})
+check(r.ok and r.json().get("list_id") is None, "each list is offered only once " + r.text[:120])
+check(requests.post(B + "/api/favorites/suggestion", headers={**PIAH, **H}, json={}).status_code in (401, 403, 404), "agents: no suggestion")
+check(Bo.patch(B + "/api/settings", json={"fav_asked": ""}).status_code in (200, 400) and
+      Bo.post(B + "/api/favorites/suggestion", json={}).json().get("list_id") is None, "fav_asked cannot be reset from the app")
+Bo.patch(B + "/api/settings", json={"fav_suggest": "0"})
+dbx("UPDATE user_settings SET value='' WHERE user_id=? AND key='fav_asked'", (BOB,), write=True)
+check(Bo.post(B + "/api/favorites/suggestion", json={}).json().get("list_id") is None, "fav_suggest 0: no suggestion")
 
 print(f"p2461_d_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 time.sleep(0.1)

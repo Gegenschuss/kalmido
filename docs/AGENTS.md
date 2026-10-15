@@ -891,6 +891,10 @@ client". Kalmido writes no prose itself: you get the data and formulate the text
   assignee in their own lists: `kinds` `assigned` / `comment` / `status` / `due`, `by`, `at`) and `stale` (their tasks
   lying idle, see `GET /stale`). `since` is the moment the person last marked the briefing read in the app (on an
   earlier day), else 18:00 yesterday, never more than 7 days back; `?since=` overrides it. Reading marks nothing read.
+- **Favourites of your person (2.46.1, #1361)**: `GET /lists` (MCP `list_lists`) and `GET /lists/{id}` carry `favorite`:
+  `true` for the lists your person (a personal agent's owner) starred, only among the lists you see anyway; a team agent
+  without an owner gets `false`. In a briefing, a week status or any overview put the favourite lists first (the rows
+  carry `list_id`) and keep the rest short.
 - **Status report of a list** `GET /lists/{id}/status-report?days=7` (or `from` / `to`, `lang`; MCP
   `read_project_status`, scope read). Only lists shared with you. `done` (completed in the period), `in_progress`
   (open main tasks with a change, comment or time entry in the period), `blocked`, `overdue`, `upcoming` (due from today

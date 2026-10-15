@@ -316,21 +316,23 @@ function palItems() {
     const t = curTask(); if (!t) return [];
     return (canEditList(t.list_id) ? S.lists : []).filter(l => !l.archived && canEditList(l.id) && l.id !== t.list_id).map(l => ({id: 'mv:' + l.id, kind: 'list', label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, sw: cssColor(l.color),
       fn: () => patchUndoable(t.id, {list_id: l.id, section_id: null}, tr('Moved to {0}', lname(l)))}))
-      .map(x => ({...x, score: fuzzy(q, x.label)})).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+      .map(x => ({...x, score: fuzzy(q, x.label)})).filter(x => x.score > 0).map(x => ({...x, score: x.score + lc_favBoost(x)})).sort((a, b) => b.score - a.score);
   }
   const all = palAll();
   if (!q) {  // recently viewed tasks / lists, recent commands, then the actions for the current task, the rest of the actions + views
     const viewed = palViewed();
     const recent = LS.get('palRecent', []).map(id => all.find(x => x.id === id)).filter(x => x && x.kind !== 'task').slice(0, 5).map(x => ({...x, group: 'recent'}));
-    const seen = new Set(recent.map(x => x.id)), order = {task: 0, action: 1, view: 2};
-    return [...viewed, ...recent, ...all.filter(x => !seen.has(x.id) && !x.qonly && x.kind in order).sort((a, b) => order[a.kind] - order[b.kind]).map(x => ({...x, group: x.kind}))];
+    // 2.46.1 (#1361): the favourite lists on top
+    const favs = lc_palFavs(all), fl = new Set(favs.map(x => 'rv:' + x.id));
+    const seen = new Set([...recent, ...favs].map(x => x.id)), order = {task: 0, action: 1, view: 2};
+    return [...favs, ...viewed.filter(x => !fl.has(x.id)), ...recent.filter(x => !favs.some(f => f.id === x.id)), ...all.filter(x => !seen.has(x.id) && !x.qonly && x.kind in order).sort((a, b) => order[a.kind] - order[b.kind]).map(x => ({...x, group: x.kind}))];
   }
   const boost = {action: 30, task: 40, view: 25, list: 20, note: 18, filter: 15, tag: 10, setting: 5, tasks: 0};
   // 2.13.0: "#447" or "447" jumps straight to that task (only one this person can see)
   const nm = q.match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
   const jump = hit ? [{id: 'tid:' + hit.id, kind: 'tasks', label: `#${hit.id} ${hit.title}`, sub: lname(listById(hit.list_id)) || '', icon: 'hash', fn: () => openDetail(hit.id)}] : [];
   const hits = jump.concat(all.map(x => ({...x, score: Math.max(fuzzy(q, x.label), x.sub ? fuzzy(q, x.sub) * 0.3 : 0)}))
-    .filter(x => x.score > 0).map(x => ({...x, score: x.score + boost[x.kind]})).sort((a, b) => b.score - a.score).slice(0, 60));
+    .filter(x => x.score > 0).map(x => ({...x, score: x.score + boost[x.kind] + lc_favBoost(x)})).sort((a, b) => b.score - a.score).slice(0, 60));
   // 2.16.0 (#644): what the field can do with the text itself: ask an agent (the text goes to its chat) and create a task
   // (quick add syntax, the list like the quick add). Real matches first; without one, "Create" is on top (Enter = create)
   const r = parseQuick(q, new Set()), d = quickDefaults(), tl = listById(r.list_id || d.list_id) || inbox();
@@ -348,7 +350,10 @@ async function palAsk(aid, text) {
   try { await api('POST', `/api/agents/${aid}/chat`, {body: text}); } catch { return; }
   chatOpen(aid);
 }
-const PAL_GROUP = {viewed: N_('Recently viewed'), recent: N_('Recent'), task: N_('Selected task'), action: N_('Actions'), view: N_('Go to'), msgs: N_('Messages')};
+// 2.46.1 (#1361): favourite lists first -- on top of the empty palette (at most 8) and a lead among the hits
+const lc_favBoost = x => x.kind === 'list' && favIs(String(x.id).replace(/^(l|mv):/, '')) ? 15 : 0;
+const lc_palFavs = all => favIds().map(id => all.find(x => x.id === 'l:' + id)).filter(Boolean).slice(0, 8).map(x => ({...x, group: 'fav'}));
+const PAL_GROUP = {fav: N_('Favourites'), viewed: N_('Recently viewed'), recent: N_('Recent'), task: N_('Selected task'), action: N_('Actions'), view: N_('Go to'), msgs: N_('Messages')};
 function palDraw() {
   const el = $('.palette'); if (!el) return;
   PAL.items = palItems();

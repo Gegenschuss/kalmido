@@ -368,7 +368,8 @@ TOOLS = [
                    "listen_agent_ids (2.13.1): agents that get a comment event for EVERY comment a person writes in the list "
                    "(\"Agent reads every comment\", set by the list owner / admins), not only on tasks they follow. "
                    "columns (2.14.0): the list's row columns in order (null = default layout), see set_list_columns. "
-                   "project_type (2.18.0): agency | software | private, null = none.",
+                   "project_type (2.18.0): agency | software | private, null = none. "
+                   "favorite (2.46.1): a favourite list of your person (personal agents; put them first in overviews).",
      _obj({}), lambda api, a: api.call("GET", "/lists")),
     ("set_list_columns", "2.14.0: set which columns the rows of a list show and in which order, the same for every member "
                          "(only as the list's owner or admin). Keys: id (task number in front of the title), due, prio, who "

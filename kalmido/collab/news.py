@@ -228,6 +228,10 @@ def notif_ok(c, uid, s, row, ch, lid=None):
         return False
     if bell == "all":
         return True
+    if ch == "push" and lid and bell == "default" and s.get("fav_quiet") == "1":  # 2.46.1 (#1361): quieter lists without a star
+        from ..lists.favorites import lc_fav_quiet
+        if lc_fav_quiet(c, uid, lid, row):
+            return False
     key = BELL_CUSTOM_KEY.get(row, row)
     if bell == "custom" and key in BELL_CUSTOM_ROWS:
         x = cust.get(key, {})

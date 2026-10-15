@@ -997,7 +997,9 @@ settings ("connects lists with different people").
 ## Favourites (2.40.0)
 
 Every person can star the lists and projects they really work on. The stars are **personal**: other members of a list
-and agents never see them, and agents cannot set any (`403`).
+never see them, and agents cannot set any (`403`). 2.46.1 (#1361): the person's own agents (personal agents, `owner`)
+see the flag `favorite` on the lists they see anyway (`GET /api/v1/lists`, `GET /api/v1/lists/{id}`); a team agent
+without an owner sees `false` everywhere.
 
 | Call | What it does |
 |---|---|
@@ -1008,6 +1010,18 @@ The stars travel with the person's settings in `GET /api/state` (`settings.fav_l
 order they were starred). Two more settings belong to them (`PATCH /api/settings`): `fav_only` (`"1"` = the sidebar shows
 the favourites and folds every other list under *More lists*) and `fav_views` (comma list of the views that show only tasks
 of favourites: `today`, `tomorrow`, `week`, `doable`, `assigned`). With and without an organisation alike.
+
+2.46.1 (#1361), two more settings and one call:
+
+- `fav_quiet` (`"1"`, default `"0"`): while the person has at least one favourite, lists without a star send **pushes**
+  only for @mentions, assignments and what must not be missed (reminders, approvals, shares, follow-ups); comments,
+  replies, new / completed tasks, status changes, unblocked tasks and team chat messages of those lists stay in the News
+  without a push. A list bell set to *All* or *Custom* wins. No new kind of push.
+- `fav_suggest` (`"1"` = default, `"0"` = off): the app offers a busy list as a favourite once.
+- `POST /api/favorites/suggestion` (web API, the signed-in person; agents `403`): answers `{list_id, name}` for ONE list
+  without a star, not archived, not the Basket, that the person changed on at least 5 different days with at least 20
+  changes during the last 14 days -- or `{list_id: null}`. Each list is offered only once (`fav_asked`, kept by the
+  server); a star is never set by itself.
 
 ## My tasks in an own order (2.40.0)
 

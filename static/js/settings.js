@@ -192,6 +192,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-prbg': ['prio_bg', N_('Priority as background'), 'sel'],  // 2.40.0 (#1416)
   's-sideic': ['side_icons', N_('List icons'), 'sel'], 's-sideprog': ['side_progress', N_('Progress in the sidebar'), 'chk'],  // 2.36.0 (#1117)
   's-sdd': ['show_done_default', N_('Completed tasks'), 'sel'],  // 2.39.1 (#1214)
+  's-favq': ['fav_quiet', N_('Quieter pushes from lists without a star'), 'chk'], 's-favs': ['fav_suggest', N_('Suggest favourites'), 'chk'],  // 2.46.1 (#1361)
 };
 const SET_RENDER = ['sidebar', 'prio_bg', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
@@ -636,7 +637,7 @@ function settingsModal(focus) {
       <div class="row" style="margin-top:.5rem"><span class="spacer"></span><button class="btn sm" data-m="side-reset">${tr('Default')}</button></div>
       <div class="row"><label for="s-sideic">${tr('List icons')}</label><select id="s-sideic">${[['line', N_('Lines')], ['emoji', N_('Emoji')], ['dot', N_('Dot')]].map(([v, n]) => `<option value="${v}" ${(s.side_icons || 'line') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       <div class="row">${chk('s-sideprog', s.side_progress !== '0', tr('Progress in the sidebar'))}</div>
-      ${hint(tr('Lines: a calm grey icon for the emoji at the start of a list name (the emoji stays in the name), its dot in the list colour. Dot: only the list colour. A project can also hide its progress in its own settings. For all your devices.'))}`,
+      ${hint(tr('Lines: a calm grey icon for the emoji at the start of a list name (the emoji stays in the name), its dot in the list colour. Dot: only the list colour. A project can also hide its progress in its own settings. For all your devices.'))}${lc_favSetHtml(chk, hint)}`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
       ${hint(tr('Applies to all devices and to the notifications. Quick add understands English, German and the language chosen here.'))}
