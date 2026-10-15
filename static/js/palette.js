@@ -468,7 +468,7 @@ function tourStart() {
   if (!inList || !$('#view .trow')) go('today');  // the tour points at a task (a fresh account's Inbox is empty)
   TOUR.on = true; TOUR.steps = tourSteps(); TOUR.i = 0;
   // 1.8.0: first start of an account: "Create a sample project" on the first card (preticked for project setups)
-  TOUR.sample = S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0'; TOUR.sampleOn = TOUR.sample && sampleDefault(); TOUR.sampleSent = false; TOUR.sampleShown = false;
+  TOUR.sample = S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0'; TOUR.sampleOn = false;  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
   let el = $('.tour');
   if (!el) { el = document.createElement('div'); el.className = 'tour'; el.innerHTML = '<div class="tring"></div><div class="tcard" role="dialog" aria-live="polite"></div>'; document.body.appendChild(el); }
   el.addEventListener('click', e => {

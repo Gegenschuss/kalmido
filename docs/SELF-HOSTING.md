@@ -383,6 +383,18 @@ Since 2.42 the server encrypts the sensitive data of every organisation **at res
 Nothing changes for the people: whoever may see a value or a file (also an agent through the API) sees it as before;
 only the database and the data folder hold ciphertext.
 
+At a glance (the same two lists as in Settings > Administration > Organisation, since 2.46.1):
+
+| Encrypted (with `KALMIDO_SECRET_KEY`) | Not encrypted |
+|---|---|
+| Bank and tax data of the company | Tasks |
+| Purchase prices and margins | Notes |
+| Framework contract rates | Descriptions |
+| Senders of finished documents | Comments |
+| The log of the documents | Contacts |
+| Files of organisations | Chats |
+| Stored access tokens (Git, client secret of the single sign-on) | |
+
 - **What is encrypted:** the office's bank and tax data (IBAN, BIC, bank, tax number, VAT ID), the free company lines,
   the frozen sender of finalised documents, purchase prices of positions (and the costs / margin of a document), the
   special rates of framework contracts, office log entries that carry such values, and the stored files: attachments

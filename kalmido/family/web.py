@@ -124,11 +124,16 @@ def family_packing_new():
 
 @app.post("/api/me/purpose")
 def me_purpose():
-    """{purpose: me | family | team | software, examples?: true} -- "What do you use Kalmido for?": switches my modules and
-    creates the starter lists of that purpose once."""
+    """{purpose: me | home | family | team | software | office, examples?: false, all_modules?: bool} -- "What do you use
+    Kalmido for?": switches my modules and creates the sample project of that purpose once, only with examples true
+    (2.46.1, #1602: off by default). all_modules (#1591): true = every module, false = lists and tasks only; missing =
+    the purpose's package."""
     c, uid = db(), me()
     b = body()
-    out = purpose_apply(c, uid, b.get("purpose"), b.get("examples", True) is not False)
+    am = b.get("all_modules")
+    if am is not None and not isinstance(am, bool):
+        return err(tr("Invalid value: {0}", "all_modules"))
+    out = purpose_apply(c, uid, b.get("purpose"), b.get("examples") is True, am)
     bump(c)
     c.commit()
     return jsonify(out)

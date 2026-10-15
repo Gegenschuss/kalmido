@@ -241,10 +241,14 @@ def admin_setup():
         from ..family.family import _LIFE, PURPOSE_ON, PURPOSE_EXTRA  # 2.22.0 (#741): the Home & life modules of the purpose (the admin's own)
         on = [m for m in PURPOSE_ON[b["purpose"]] if m in _LIFE and m not in fs.split(",")]  # 2.44.0: not twice
         on += [m for m in PURPOSE_EXTRA.get(b["purpose"], ()) if m not in on and m not in fs.split(",")]  # 2.36.1 (#1021): office
+        am = b.get("all_modules")  # 2.46.1 (#1591): "Switch on all modules": on = Home & life too, off = lists and tasks only
+        if isinstance(am, bool):
+            on = [m for m in (_LIFE + PURPOSE_EXTRA.get(b["purpose"], ())) if m not in fs.split(",")] if am else []
+            uset(c, me(), "mods_all", "1" if am else "0")
         if on:
             uset(c, me(), "features", ",".join([x for x in fs.split(",") if x] + on))
-        if b["purpose"] == "family":
-            family_examples(c, me())
+        if b["purpose"] == "family":  # 2.46.1 (#1615): the two starter lists; their examples only with "Sample project" (#1602)
+            family_examples(c, me(), tasks=b.get("examples") is True)
     if b.get("sample") is True and not sample_state(c, me()):  # 1.8.0: "Create a sample project"
         sample_create(c, me())
     elif "sample" in b:

@@ -1264,7 +1264,11 @@ async function setupChoices(el, logo) {
   // 2.24.0 (UX-23): the purpose first; the name of the organisation only for a team / company, empty allowed (the
   // instance's default name is not offered as a value), changeable later under Administration > Organisation
   let orgName = (st.me?.orgs?.[0] || '').toLowerCase() === APP_NAME.toLowerCase() ? '' : st.me?.orgs?.[0] || '';
-  const apply = k => { preset = k; picked = new Set(all.filter(x => !SETUP_PRESETS[k].off.includes(x))); };
+  // 2.46.1 (#1591): "Switch on all modules" (null = untouched: the presets decide as before); it sets the modules below,
+  // never the two server switches on top (collaboration, time for everyone)
+  let modsAll = null;
+  const pm_su = () => { if (modsAll !== null) for (const [k] of SETUP_MODS) modsAll ? picked.add(k) : picked.delete(k); };
+  const apply = k => { preset = k; picked = new Set(all.filter(x => !SETUP_PRESETS[k].off.includes(x))); pm_su(); };
   apply('me');
   // 2.13.2 (#478 F12): step 2 shown again after a reload (setup still pending) starts from what is on now, not from
   // "Simple list" ("Start" would switch modules off again); a new account (all modules on = the default) keeps "Simple list"
@@ -1284,6 +1288,7 @@ async function setupChoices(el, logo) {
       <h3>${tr('What do you use Kalmido for?')}</h3>
       <p class="muted">${tr('Pick a start, untick what you do not need. Everything can be changed later in Settings.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${matches(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${matches(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b><small class="muted">${tr(p.desc)}</small></button>`).join('')}</div>
+      ${pm_allHtml('su-modsall', modsAll ?? SETUP_MODS.every(([k]) => picked.has(k)))}
       ${askOrg && ['team', 'software', 'office'].includes(preset) ? `<h3><label for="su-org">${tr('Name of your team or company')} <span class="muted">${tr('(optional)')}</span></label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company'))}"><p class="muted">${tr('Shown next to the app name and in invitations. You can change it later in Settings > Administration > Organisation.')}</p>` : ''}
       <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${esc(setupCount(picked))}</span></summary>
       <div class="suse-main">${SETUP_MAIN.map(row).join('')}</div>
@@ -1298,6 +1303,7 @@ async function setupChoices(el, logo) {
   draw();
   el.addEventListener('input', e => { if (e.target.id === 'su-org') orgName = e.target.value; });
   el.addEventListener('change', e => {
+    if (e.target.id === 'su-modsall') { modsAll = e.target.checked; pm_su(); draw(); return; }
     const c = e.target.closest('[data-use]'); if (!c) return;
     c.checked ? picked.add(c.dataset.use) : picked.delete(c.dataset.use);
     $$('[data-su-preset]', el).forEach(b => { b.classList.toggle('on', matches(b.dataset.suPreset)); b.setAttribute('aria-pressed', matches(b.dataset.suPreset)); });
@@ -1315,7 +1321,7 @@ async function setupChoices(el, logo) {
     }
     const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || tr('Error {0}', r.status)); };
     try {
-      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('a:time'), modules: [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(k => picked.has(k) && k !== 'collab').flatMap(k => MG_SU_AREA[k] ? MG_SU_AREA[k].filter(p => !matches(preset) || PURPOSE_MODS[preset].includes(p)) : [k]), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) ? {purpose: preset} : {}), ...(askOrg && ['team', 'software', 'office'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
+      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('a:time'), modules: [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(k => picked.has(k) && k !== 'collab').flatMap(k => MG_SU_AREA[k] ? MG_SU_AREA[k].filter(p => !matches(preset) || PURPOSE_MODS[preset].includes(p)) : [k]), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) || (modsAll !== null && preset) ? {purpose: preset} : {}), ...(modsAll !== null ? {all_modules: modsAll} : {}), examples: start === 'sample', ...(askOrg && ['team', 'software', 'office'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
       else return;
       location.replace('/');
     } catch (err) { $('#su-err', el).textContent = err.message || tr('Server not reachable.'); }
