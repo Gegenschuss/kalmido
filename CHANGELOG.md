@@ -7,6 +7,15 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.43.1] - 2026-10-15
+
+**In short:** fixes for the checks of 2.43.0 (no new features).
+
+### Fixed
+- The custom period of *Tracked time* uses the app's date picker; *Tracked* in a project header is a full-size touch target.
+- The … button of a block no longer covers the *Open / All* switch in the agents view.
+- New styles of 2.43.0 follow the text size (rem instead of px).
+
 ## [2.43.0] - 2026-10-15
 
 **In short:** **Project pro**: lists with columns work like a **spreadsheet**, **formula fields**, a totals row and **key

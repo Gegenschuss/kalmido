@@ -306,6 +306,13 @@ ROUTES = {
     "GET /api/lists/{}/status": "list", "GET /api/lists/{}/overview": "list", "PATCH /api/lists/{}/overview": "list", "GET /api/lists/{}/layout": "list", "PUT /api/lists/{}/layout": "list",
     "POST /api/lists/{}/links": "list", "PATCH /api/lists/{}/links/{}": "list", "DELETE /api/lists/{}/links/{}": "list",
     "PUT /api/lists/{}/links/order": "list", "POST /api/lists/{}/milestones": "list",
+    # 2.43.0: key figures (#1328), notepads + block colours (#1346), all times of a project (#1434): need_list / need_note
+    # on the list, foreign ids 404 (p2430_a_api_test.py, p2430_c_api_test.py, p2430_d_api_test.py)
+    "GET /api/lists/{}/kpis": "list", "GET /api/v1/lists/{}/kpis": "list", "PUT /api/lists/{}/page-style": "list",
+    "POST /api/lists/{}/notepads": "list", "PATCH /api/notepads/{}": "list", "DELETE /api/notepads/{}": "list",
+    "GET /api/lists/{}/time/delete-all": "list", "POST /api/lists/{}/time/delete-all": "list", "POST /api/lists/{}/time/restore": "list",
+    # 2.43.0 (#1452): the default arrangement of the views: a layout without data of a person, set by the operator
+    "GET /api/layouts/std": "public", "PUT /api/layouts/std/{}": "admin",
     "PATCH /api/lists/{}/milestones/{}": "list", "DELETE /api/lists/{}/milestones/{}": "list",
     "POST /api/lists/{}/checklist": "list", "POST /api/sections": "list", "PATCH /api/sections/{}": "list",
     "POST /api/lists/{}/sections/order": "list", "DELETE /api/sections/{}": "list", "POST /api/lists/{}/shift": "list",

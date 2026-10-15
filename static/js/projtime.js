@@ -38,7 +38,7 @@ async function tz_open(ids, name) {
   const one = ids.length === 1 ? ids[0] : 0;
   const md = modal(`<h3>${tr('Tracked time')} · ${esc(name)}</h3>
     <div class="tzper"><select id="tz-per" aria-label="${esc(tr('Period'))}">${tz_PER.map(([k, n]) => `<option value="${k}">${esc(tr(n))}</option>`).join('')}</select>
-      <span id="tz-cust" hidden><input type="date" id="tz-from"> <input type="date" id="tz-to"></span></div>
+      <span id="tz-cust" hidden>${dateIn('tz-from', '', {label: tr('From')})} ${dateIn('tz-to', '', {label: tr('To')})}</span></div>
     <div id="tz-body"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><a class="btn" id="tz-csv" download>${ic('download', 's')} CSV</a><button class="btn" data-m="tz-open">${tr('Open in time tracking')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>
     ${one && !isViewer(one) ? `<div class="tzdanger"><button class="btn danger" data-m="tz-wipe">${ic('trash', 's')} ${tr('Delete all times of this project')}</button></div>` : ''}`);

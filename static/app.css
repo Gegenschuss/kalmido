@@ -6305,6 +6305,7 @@ html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5re
 /* 2.43.0 D (#1434) tracked time of a project in a window */
 .tsum[data-tsum]{cursor:pointer;border-radius:var(--r-s,.375rem)}
 .tsum[data-tsum]:hover b,.tsum[data-tsum]:focus-visible b{color:var(--accent)}
+@media (pointer:coarse){ .tsum[data-tsum]{display:inline-flex;align-items:center;min-height:2.75rem} }  /* touch target (CI ux1_ui 390px) */
 .tzmodal .tzper{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
 .tzmodal .tzsum{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;font-size:var(--fs-l,1.125rem)}
 .tzmodal .tzsum b{font-variant-numeric:tabular-nums}
@@ -6329,9 +6330,9 @@ html.mini-task #app,html.mini-task #app.detail-open{grid-template-columns:minmax
 #view .trow.dgdep,#view .trow.dgonto,#view .trow.dgno{position:relative;box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-soft)}
 #view .trow.dgno{box-shadow:inset 0 0 0 2px var(--line2);background:none}
 #view .trow.dgdep::after,#view .trow.dgonto::after,#view .trow.dgno::after{content:attr(data-dg);position:absolute;right:.5rem;top:50%;transform:translateY(-50%);z-index:2;pointer-events:none;
-  padding:.125rem .5rem;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:.75rem;font-weight:600;white-space:nowrap;max-width:70%;overflow:hidden;text-overflow:ellipsis}
+  padding:.125rem .5rem;border-radius:999rem;background:var(--accent);color:var(--accent-ink);font-size:.75rem;font-weight:600;white-space:nowrap;max-width:70%;overflow:hidden;text-overflow:ellipsis}
 #view .trow.dgno::after{background:var(--bg4);color:var(--text2)}
-.dgghost{position:fixed;top:-200px;left:-200px;padding:.3rem .75rem;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:.8125rem;font-weight:600;white-space:nowrap}
+.dgghost{position:fixed;top:-200px;left:-200px;padding:.3rem .75rem;border-radius:999rem;background:var(--accent);color:var(--accent-ink);font-size:.8125rem;font-weight:600;white-space:nowrap}
 .dgzones{display:flex;gap:.5rem;margin:.375rem 0 .5rem}
 .dgzone{flex:1;display:flex;flex-direction:column;gap:.125rem;padding:.625rem .75rem;border:2px dashed var(--line2);border-radius:var(--r-l);color:var(--text2);font-size:.8125rem;min-height:3.25rem}
 .dgzone b{color:var(--text);font-weight:600}
@@ -6360,9 +6361,10 @@ html.mini-task #app,html.mini-task #app.detail-open{grid-template-columns:minmax
 .lymore:hover,.lymore:focus-visible,.lyb:hover > .lymore{opacity:1}
 @media (pointer:coarse){ .lymore{opacity:.8;min-width:2.75rem;min-height:2.75rem;justify-content:center} }
 .lyb.lym .povh,.lyb.lym > .dcard > h3,.lyb.lym > .dcard > h2{padding-right:2rem}
+.lyb.lym .agjh{padding-right:2.25rem}  /* the … button must not cover the Open / All switch of the agents view (axe target-size) */
 .pov .lysix{margin-top:.75rem;row-gap:.75rem}
 .pov .lysix > .lyb > .povs{margin-top:0;height:100%}
-.lygrip{position:absolute;right:1px;bottom:1px;width:14px;height:14px;cursor:nwse-resize;opacity:0;transition:opacity .15s;
+.lygrip{position:absolute;right:1px;bottom:1px;width:.875rem;height:.875rem;cursor:nwse-resize;opacity:0;transition:opacity .15s;
   background:linear-gradient(135deg,transparent 45%,var(--faint) 45%,var(--faint) 55%,transparent 55%,transparent 70%,var(--faint) 70%,var(--faint) 80%,transparent 80%)}
 .lyb:hover > .lygrip,body.wgresizing .lygrip{opacity:.8}
 body.wgresizing,body.wgresizing *{cursor:nwse-resize!important;user-select:none}
@@ -6414,7 +6416,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 #view .sgact{position:relative;box-shadow:inset 0 0 0 2px var(--accent);border-radius:var(--r-s)}
 #view .lcols .lc.sgsel{position:relative;background:color-mix(in srgb,var(--accent) 14%,transparent);border-radius:0}
 #view .lcols .lc.sgact.sgsel{border-radius:var(--r-s)}
-.sgfill{position:absolute;right:0;bottom:0;width:7px;height:7px;background:var(--accent);border:1px solid var(--bg);cursor:ns-resize;border-radius:1px}
+.sgfill{position:absolute;right:0;bottom:0;width:.4375rem;height:.4375rem;background:var(--accent);border:1px solid var(--bg);cursor:ns-resize;border-radius:1px}
 .sgnew{display:flex;align-items:center;padding:.25rem .5rem .25rem 2.25rem;border-bottom:1px solid var(--line)}
 .sgnew .sgin{flex:1;min-width:0;border:0;border-radius:var(--r-s);box-shadow:inset 0 0 0 2px var(--accent);padding:.25rem .5rem;background:var(--bg);color:var(--text);font:inherit}
 .sgpmd{max-width:min(56rem,96vw)}

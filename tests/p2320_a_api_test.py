@@ -104,8 +104,10 @@ A.put(B + f"/api/lists/{P}/members", json={"user_id": BOB, "role": "admin"})
 A.put(B + f"/api/lists/{P}/members", json={"user_id": CAROL, "role": "edit"})
 A.put(B + f"/api/lists/{P}/members", json={"user_id": CL, "role": "edit"})
 ov = A.get(B + f"/api/lists/{P}/overview").json()
-check(ov.get("layout") == {"std": "", "mine": "", "can_std": True}, "#983: the overview carries the layout (owner may set the standard) " + str(ov.get("layout")))
-check(Ca.get(B + f"/api/lists/{P}/layout").json() == {"std": "", "mine": "", "can_std": False}, "#983: a member may not set the standard")
+# 2.43.0 (#1346): the layout also carries the block colours and notepads (style, pads, can_style)
+_sub = lambda d: {k: (d or {}).get(k) for k in ("std", "mine", "can_std")}
+check(_sub(ov.get("layout")) == {"std": "", "mine": "", "can_std": True}, "#983: the overview carries the layout (owner may set the standard) " + str(ov.get("layout")))
+check(_sub(Ca.get(B + f"/api/lists/{P}/layout").json()) == {"std": "", "mine": "", "can_std": False}, "#983: a member may not set the standard")
 check(Bo.get(B + f"/api/lists/{P}/layout").json()["can_std"] is True, "#983: a list admin may")
 STD = {"order": ["files", "desc", "ms"], "hidden": ["links"], "half": ["files"]}
 r = A.put(B + f"/api/lists/{P}/layout", json={"layout": json.dumps(STD), "scope": "standard"})
