@@ -728,9 +728,14 @@ function verStale() { return !!(APP_VER && S.serverVer && APP_VER !== S.serverVe
 // text typed but not sent / saved (a comment, a chat message, the quick add) also holds the automatic reload back
 const verDraft = () => ['#c-input', '#tc-in', '#chat-in', '#qinput', '#qsheet', '#d-sub'].some(s => ($(s)?.value || '').trim());
 const verQuiet = () => !editing() && !editFocused() && !$('.modal') && !$('#pop:not(.hidden)') && !$('.qadd.sheet') && !OUT.q.length && !S.multiMode && !verDraft();
+let verBusy = false;
 async function verReload() {
+  if (verBusy) return;
+  verBusy = true;
   try { if (OUT.q.length) await flush(); } catch { /* offline: the outbox stays in this browser and is sent after the reload */ }
   try { if (typeof flushSaves === 'function') await flushSaves(); } catch { /* nothing waiting */ }
+  // 2.45.0 (#1529): only reload once the page and the stylesheet are really served (the container may still be restarting)
+  if (typeof rl_waitServer === 'function' && !await rl_waitServer()) { verBusy = false; const b = $('#newver [data-nv]'); if (b) b.disabled = false; return; }
   try { sessionStorage.setItem('kalmido-reloaded', S.serverVer); } catch { /* private mode */ }
   try { const reg = await navigator.serviceWorker?.getRegistration(); await reg?.update(); } catch { /* no service worker */ }
   location.reload();

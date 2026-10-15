@@ -10,14 +10,41 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/fonts/AtkinsonHyperlegible-Regular.woff2', '/static/fonts/AtkinsonHyperlegible-Bold.woff2',
   // 2.20.0 (#646): the web client in modules, the same list and order as the script tags in index.html
   // (tools/check_layout.py compares them)
-  '/static/js/icons.js', '/static/js/core.js', '/static/js/workspace.js', '/static/js/quickadd.js', '/static/js/views.js', '/static/js/render.js', '/static/js/calendar.js',
+  '/static/js/reloadguard.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/workspace.js', '/static/js/quickadd.js', '/static/js/views.js', '/static/js/render.js', '/static/js/calendar.js',
   '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/habits.js', '/static/js/detail.js', '/static/js/collab.js', '/static/js/attachments.js', '/static/js/mdtitle.js',
   '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js', '/static/js/settings.js', '/static/js/integrations.js', '/static/js/account.js',
   '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/projtime.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/sharedlg.js', '/static/js/dnd.js', '/static/js/dragmulti.js',
   '/static/js/palette.js', '/static/js/agents.js', '/static/js/cleanup.js', '/static/js/dayplan.js', '/static/js/choicecard.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/listedit.js', '/static/js/playbook.js', '/static/js/git.js',
   '/static/js/chat.js', '/static/js/richcopy.js', '/static/js/dashboard.js', '/static/js/widgets.js', '/static/js/pinboard.js', '/static/js/family.js', '/static/js/calevents.js', '/static/js/contacts.js', '/static/js/life.js', '/static/js/formguard.js', '/static/js/liveparts.js', '/static/js/countries.js', '/static/js/clients.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_import.js', '/static/js/areas.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/favorites.js', '/static/js/mineorder.js', '/static/js/tablecells.js', '/static/js/sheetgrid.js', '/static/js/formula.js', '/static/js/listadmin.js', '/static/js/orgexport.js', '/static/js/orgcrypt.js', '/static/js/sheetdrag.js', '/static/js/miniwin.js', '/static/js/e2e.js', '/static/js/main.js'];
+// 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
+// old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
-self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
+self.addEventListener('activate', e => { e.waitUntil(swCleanup().then(() => self.clients.claim())); });
+async function swCleanup() {
+  const c = await caches.open(CACHE);
+  for (const u of ['/', '/static/app.css']) if (!await c.match(u, {ignoreSearch: true})) return;  // incomplete: keep the old caches as a fallback
+  for (const k of await caches.keys()) if (k !== CACHE && k !== 'tasks-share') await caches.delete(k);
+}
+// any cached copy of a request, the newest cache first
+async function swAnyCache(req, opt) {
+  const hit = await caches.match(req, opt);
+  if (hit) return hit;
+  for (const k of (await caches.keys()).reverse()) { const r = await (await caches.open(k)).match(req, opt); if (r) return r; }
+  return undefined;
+}
+async function swShell(req, url) {
+  const opt = {ignoreSearch: url.pathname === '/'};
+  let r = null;
+  try { r = await fetch(req); } catch { r = null; }
+  if (r && r.ok && !r.redirected && r.type === 'basic') { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return r; }
+  // network error or 5xx (server restarting): any cached copy beats a broken answer; 2.4.0 (#187): the quick capture page is the app shell too
+  if (!r || r.status >= 500) {
+    const hit = (await swAnyCache(req, opt)) || (url.pathname === '/capture' ? await swAnyCache('/', {ignoreSearch: true}) : undefined);
+    if (hit) return hit;
+    if (!r) throw new TypeError('network error');
+  }
+  return r;
+}
 // Android share sheet (share_target POST): keep the shared files in a cache and open the app,
 // which then creates the task + uploads with the normal (login) session.
 async function handleShare(req) {
@@ -48,9 +75,7 @@ self.addEventListener('fetch', e => {
   // A response that is no JSON (a sign-in page) is never cached for a language file.
   if (url.pathname.startsWith('/static/i18n/') && url.search) { e.respondWith(swI18n(e.request)); return; }
   // network first, fall back to cache (a new deploy shows up immediately when online)
-  e.respondWith(fetch(e.request).then(r => { if (r.ok && !r.redirected && r.type === 'basic') { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); } return r; }).catch(() => caches.match(e.request, {ignoreSearch: url.pathname === '/'})
-    // 2.4.0 (#187): the quick capture page is the app shell too (offline: the capture goes to the outbox)
-    .then(r => r || (url.pathname === '/capture' ? caches.match('/', {ignoreSearch: true}) : r))));
+  e.respondWith(swShell(e.request, url));
 });
 
 async function swI18n(req) {
