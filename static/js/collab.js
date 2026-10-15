@@ -524,9 +524,9 @@ function personCard(anchor, id) {
   const mine = l ? openTasks().filter(x => x.list_id === l.id && x.assignee_id === id && x.id !== t?.id).sort(bySort) : [];
   const acts = [];
   if (a && a.enabled && typeof chatOpen === 'function') acts.push(['chat', 'comment', tr('Open chat')]);
-  if ((a ? a.enabled && typeof chatOpen === 'function' : id !== meId && teamOn()) && typeof cw_split === 'function') acts.push(['cwsplit', 'panel', tr('Open in split window')]);  // 2.47.1 (#1720)
   if (a && feat('agents')) acts.push(['jobs', 'bot', tr('Jobs')]);
   if (!a && id !== meId) acts.push(['dm', 'comment', tr('Message')]);  // 2.24.0 (#906): a direct message, first and big
+  if ((a ? a.enabled && typeof chatOpen === 'function' : id !== meId && teamOn()) && typeof cw_split === 'function') acts.push(['cwsplit', 'panel', tr('Open in split window')]);  // 2.47.1 (#1720): after Message (#906 stays first and big)
   if (!a) acts.push(['who', 'list', id === meId ? tr('My tasks') : tr('Tasks of {0}', name)]);  // 2.7.2 (#418)
   if (t && !t.context && id !== t.assignee_id && canAssign(t) && p) acts.push(['assign', 'user', tr('Assign this task')]);
   if (t && $('#c-input') && cmSocial(t) && id !== meId && p) acts.push(['mention', 'at', tr('Mention')]);
