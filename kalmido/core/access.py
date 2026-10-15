@@ -327,15 +327,50 @@ _ORG_SCOPE_SQL = ("(l.org_id IS NULL OR EXISTS (SELECT 1 FROM agents a WHERE a.u
                   "AND EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=l.org_id AND om.user_id=p.u)))")
 
 
-def acx_lists_sql(write=False, req=True):
+# 2.46.0 (#1603): "Everyone in the organisation" -- an organisation list with org_visibility 'org' is in the scope of every
+# current member of its organisation (people only, never agents; never health / Home & life / family lists). Relative to p.u.
+def _ov_sql(write=False):
+    if not collab_all():
+        return ""
+    return (" OR (l.org_visibility='org' AND l.org_id IS NOT NULL AND COALESCE(l.life, '')='' AND COALESCE(l.family, '')=''"
+            + (" AND l.org_edit=1" if write else "")
+            + " AND NOT EXISTS (SELECT 1 FROM agents a WHERE a.user_id=p.u)"
+            " AND EXISTS (SELECT 1 FROM users ou WHERE ou.id=p.u AND COALESCE(ou.kind, '')!='agent')"
+            " AND EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=l.org_id AND om.user_id=p.u))")
+
+
+def ov_open(row):
+    """Does the list row (org_id, life, family, org_visibility) open itself to its organisation?"""
+    return bool(row["org_id"]) and (row["org_visibility"] or "") == "org" and not (row["life"] or "") and not (row["family"] or "")
+
+
+def ov_role(c, lid, uid, row=None):
+    """2.46.0 (#1603): the role uid has in list lid only through "Everyone in the organisation" (not shared with them):
+    'view', 'edit' with org_edit, else None. Agents never; the owner and members have their own role (list_role)."""
+    if not uid or not collab_all():
+        return None
+    if row is None:
+        row = c.execute("SELECT org_id, life, family, org_visibility, org_edit FROM lists WHERE id=?", (lid,)).fetchone()
+    if not row or not ov_open(row):
+        return None
+    if c.execute("SELECT 1 FROM users WHERE id=? AND COALESCE(kind, '')='agent'", (uid,)).fetchone() or \
+            c.execute("SELECT 1 FROM agents WHERE user_id=?", (uid,)).fetchone():
+        return None
+    if not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (row["org_id"], uid)).fetchone():
+        return None
+    return "edit" if row["org_edit"] else "view"
+
+
+def acx_lists_sql(write=False, req=True, ov=True):
     """THE list scope (2.36.2, #1142): subquery of the list ids an account may see (write: change as a whole). Two ? = the
     account id. One place for owner / members / roles, the collaboration switch, the organisation boundary and (req=True:
     the request's own account) the health-list and token-allowlist filters. vis_sql, wr_sql, visible_lists and dav_lists use
-    it. Participants are in the read scope; what they see is decided per task (tvis)."""
+    it. Participants are in the read scope; what they see is decided per task (tvis). ov=False: without the lists seen only
+    through "Everyone in the organisation" (2.46.0, #1603: calendars, briefing, channels follow the joined lists)."""
     roles = " AND role IN ('edit', 'admin')" if write else ""
     org = f" AND (NOT ({_boundary_sql()}) OR {_ORG_SCOPE_SQL})" if _boundary_on() else ""
     return (f"(SELECT l.id FROM lists l, (SELECT CAST(? AS INTEGER) AS u, CAST(? AS INTEGER) AS v) p "
-            f"WHERE (l.owner_id=p.u OR l.id IN (SELECT list_id FROM list_members WHERE user_id=p.v{roles}{_members_on()})){org}"
+            f"WHERE (l.owner_id=p.u OR l.id IN (SELECT list_id FROM list_members WHERE user_id=p.v{roles}{_members_on()}){_ov_sql(write) if ov else ''}){org}"
             f"{_req_filters_sql() if req else ''})")
 
 
@@ -349,9 +384,9 @@ def _req_filters_sql():
     return out
 
 
-def vis_sql():
-    """Subquery of the list ids the current user may see (two ? = user id)."""
-    return acx_lists_sql()
+def vis_sql(ov=True):
+    """Subquery of the list ids the current user may see (two ? = user id; ov=False: only owned / joined, see acx_lists_sql)."""
+    return acx_lists_sql(ov=ov)
 
 
 def wr_sql():
@@ -452,7 +487,7 @@ def acx_task_ok(c, tid, uid):
 
 def list_role(c, lid, uid=None):
     uid = uid or me()
-    r = c.execute("SELECT owner_id, life, org_id FROM lists WHERE id=?", (lid,)).fetchone()
+    r = c.execute("SELECT owner_id, life, org_id, family, org_visibility, org_edit FROM lists WHERE id=?", (lid,)).fetchone()
     if not r:
         return None
     if r[1] == "health" and health_hidden(c, uid):  # 2.22.0 (#663)
@@ -468,6 +503,8 @@ def list_role(c, lid, uid=None):
     else:
         m = c.execute("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
         role = m[0] if m and collab_all() else None
+        if not m:
+            role = ov_role(c, lid, uid, r)  # 2.46.0 (#1603): a reader of an organisation-wide list (not shared with them)
     if role and has_request_context() and g.get("audit_aid") == uid:
         access_note(lid)  # 2.30.0 (#919): the agents' list access log
     return role

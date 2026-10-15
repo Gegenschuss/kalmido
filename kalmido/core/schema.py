@@ -1256,6 +1256,10 @@ MIGRATIONS = [
     # project page (json list of tiles), both the same for everyone
     ("lists", "tb_sums", "ALTER TABLE lists ADD COLUMN tb_sums TEXT"),
     ("lists", "fx_kpis", "ALTER TABLE lists ADD COLUMN fx_kpis TEXT"),
+    # 2.46.0 (#1603): who sees an organisation list: '' = only the people it is shared with, 'org' = every member of its
+    # organisation (read-only until they join; org_edit = 1: they may edit without joining)
+    ("lists", "org_visibility", "ALTER TABLE lists ADD COLUMN org_visibility TEXT NOT NULL DEFAULT ''"),
+    ("lists", "org_edit", "ALTER TABLE lists ADD COLUMN org_edit BIGINT NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

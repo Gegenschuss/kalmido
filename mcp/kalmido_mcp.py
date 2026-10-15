@@ -917,9 +917,12 @@ TOOLS += [
      lambda api, a: api.call("POST", "/lists", body=a)),
     ("update_list", "Change a list: name, color, folder (moving your own list into another folder waits for approval), view, kind, "
                     "archived (true = archive), done_at_bottom, nag, day_hours, time_tracking (2.41.0, owner), project_type (2.18.0, owner / list admins: "
-                    "agency | software | private, null = none; switches on what the type needs, never deletes anything).",
+                    "agency | software | private, null = none; switches on what the type needs, never deletes anything); "
+                    "org_visibility (2.46.0, owner / list admins of an organisation list: \"\" = only invited people, \"org\" = everyone "
+                    "in the organisation, read-only for them unless org_edit true; opening it waits for approval).",
      _obj({"list_id": S_ID, **LIST_PROPS, "archived": {"type": "boolean"},
-           "project_type": {"type": ["string", "null"], "enum": ["agency", "software", "private", "", None]}}, ["list_id"]),
+           "project_type": {"type": ["string", "null"], "enum": ["agency", "software", "private", "", None]},
+           "org_visibility": {"type": "string", "enum": ["", "org"]}, "org_edit": {"type": "boolean"}}, ["list_id"]),
      lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}", body=_without(a, "list_id"))),
     ("delete_list", "Delete an ARCHIVED list for good (owner; archive it first with update_list archived=true); its tasks go to the "
                     "trash." + APPROVAL_NOTE, _obj({"list_id": S_ID}, ["list_id"]),

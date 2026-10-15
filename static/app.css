@@ -6500,3 +6500,8 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .authscreen .shint.shcode{margin:.25rem 0 .75rem}
 .shint.warn.shkey{color:var(--text);background:var(--bg3);border-left:.1875rem solid var(--danger);border-radius:var(--radius);padding:.625rem .75rem;margin:0 0 .75rem}
 .shint.warn.shkey b{color:var(--danger);display:block;margin-bottom:.125rem}
+/* 2.46.0 B (#1603) "Everyone in the organisation": the join bar above a list seen through the organisation, the sidebar mark */
+.rohint.ovbar{flex-wrap:wrap}
+.rohint.ovbar span{flex:1 1 12rem}
+.rohint.ovbar .btn{min-height:2.25rem}
+.shr.ovmark{opacity:.6}

@@ -98,6 +98,7 @@ ORDER = (
     "integrations.errorreports",
     "api.projects",
     "lists.kpis",  # 2.43.0 (#1328): sum row + key figures (web + token API)
+    "lists.orgvis",  # 2.46.0 (#1603): organisation lists visible to the whole organisation
     "api.scopes",
     "collab.notes",
     "collab.teamchat",

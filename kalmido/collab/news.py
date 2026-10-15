@@ -242,6 +242,9 @@ def bell_all_users(c, lid, row=None):
     for r in c.execute("SELECT user_id, mode, custom FROM list_bell WHERE list_id=? AND mode IN ('all','custom')", (lid,)):
         if r["mode"] == "all" or (key and any(bell_custom_of(r["custom"]).get(key, {}).values())):
             out.add(r["user_id"])
+    if out:  # 2.46.0 (#1603): only the owner and members (a reader through "Everyone in the organisation" gets no events)
+        from ..core.access import list_people
+        out &= list_people(c, lid)
     return out
 
 

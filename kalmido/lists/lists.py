@@ -340,6 +340,12 @@ def list_update(lid):
         if e:
             return e
         b = {k: v for k, v in b.items() if k not in ("col_sums", "kpis")}
+    if "org_visibility" in b or "org_edit" in b:  # 2.46.0 (#1603): "Everyone in the organisation" (owner / list admins)
+        from ..lists.orgvis import ov_list_patch
+        e = ov_list_patch(c, lid, role, b)
+        if e:
+            return e
+        b = {k: v for k, v in b.items() if k not in ("org_visibility", "org_edit")}
     conflicts = []
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
     if prev:  # D4 undo / redo: a setting changed elsewhere meanwhile stays (reported in conflicts)
@@ -436,6 +442,9 @@ def list_update(lid):
                 list_own_mark(c, lid, k)
         if "listen_agent_ids" in given and vals.get("folder", tidy0["folder"]) == tidy0["folder"]:  # 2.30.0 (#1034)
             list_own_mark(c, lid, "agent_listen")
+    if "org_id" in given or vals.get("family") or vals.get("life"):  # 2.46.0 (#1603): private again -> only its members
+        from ..lists.orgvis import ov_private_reset
+        ov_private_reset(c, lid)
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts, **pt_out)

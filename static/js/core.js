@@ -242,7 +242,7 @@ const bySort = (a, b) => a.sort - b.sort || a.id - b.id;
 const archivedTask = t => !!t && !!listById(t.list_id)?.archived;
 const archHidden = t => archivedTask(t) && !(S.route.mod === 'tasks' && S.route.key === 'l:' + t.list_id);
 // ctx: include the read-only context parents of a participant's subtasks (only the list view shows them, above their subtask)
-function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.status === 0 && !archHidden(t) && !wsHidden(t) && (ctx || !t.context)); }  // 2.28.0 (#935): + the workspace
+function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.status === 0 && !archHidden(t) && !wsHidden(t) && !ovHidden(t) && (ctx || !t.context)); }  // 2.28.0 (#935): + the workspace
 
 // ------------------------------------------------------------------ api + offline outbox
 // While offline, task/habit writes are applied locally and queued (localStorage outbox); on reconnect

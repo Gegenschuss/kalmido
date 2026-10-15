@@ -716,6 +716,7 @@ function listModal(id, folder = '', o = {}) {
     ${wsOn() && !l.is_inbox && (own || id) ? `<div class="row lwsrow"><label for="l-ws">${tr('Workspace')}</label>${own ? wsSelectHtml('l-ws', id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) : `<span class="muted">${esc(wsLabel(l.org_id))}</span>`}</div>
     <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
     ${id && (S.wsMismatches || {})[String(id)] ? `<div class="shint keep lhint">${ic('alert', 's')} ${esc(tr('An agent of another workspace is in this list (from before the workspaces): take it out in the Share dialog, or keep it on purpose.'))}</div>` : ''}` : ''}
+    ${id ? ovRowHtml(l) : ''}
     <div class="lfolderhint" id="l-fhint" role="note" ${folderHintHtml(l, id, folder) ? '' : 'hidden'}>${folderHintHtml(l, id, folder)}</div>
     ${listDlgTeamHtml(l, id)}
     <div class="row"><label for="l-view">${tr('View')}</label><select id="l-view"><option value="list">${tr('List')}</option>${feat('kanban') ? `<option value="kanban" ${l.view === 'kanban' ? 'selected' : ''}>${tr('Kanban')}</option>` : ''}${feat('timeline') ? `<option value="timeline" ${l.view === 'timeline' ? 'selected' : ''}>${tr('Timeline')}</option>` : ''}</select></div>
@@ -769,6 +770,7 @@ function listModal(id, folder = '', o = {}) {
   $('#l-bell', md)?.addEventListener('change', async e => { e.stopPropagation(); if (e.target.value === 'custom') { bellHint('custom'); bellCustomModal(id); return; } await bellSet(id, e.target.value); bellHint(e.target.value); });
   $('#l-bell', md)?.addEventListener('bell-sync', e => bellHint(e.target.value));
   $('#l-stale', md)?.addEventListener('change', e => { e.stopPropagation(); staleDaysSet(id, e.target); });  // 2.34.0 (#266)
+  if (id) ovWire(md, id);  // 2.46.0 (#1603): "Everyone in the organisation"
   $('#l-dsx', md)?.addEventListener('change', e => { e.stopPropagation(); dsxSet(id, e.target.checked).then(() => { const x = listById(id), c = $('#l-dsx', md); if (x && c) c.checked = dsxOn(x); }); });  // 2.36.2 (#1136)
   $('[data-m="bell-custom"]', md)?.addEventListener('click', e => { e.stopPropagation(); bellCustomModal(id); });
   // ---- autosave (existing lists)

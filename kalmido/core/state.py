@@ -125,6 +125,8 @@ def visible_lists(c, uid):
         d["status_by_name"] = snames.get(r["status_by"], "")
         if r["owner_id"] != uid:
             d.update(folder=r["m_folder"], sort=r["m_sort"], view=r["m_view"] or r["view"], role=r["m_role"])
+            if r["m_role"] is None:  # 2.46.0 (#1603): in the scope only through "Everyone in the organisation" (not joined)
+                d.update(role="edit" if r["org_edit"] else "view", org_reader=True, folder="", sort=r["sort"])
             if r["folder"]:  # 2.27.0 (#988): a list in its owner's folder sits for everyone where the owner put it (mirrored)
                 d.update(folder=r["folder"], sort=r["sort"], mirrored=True)
         else:
