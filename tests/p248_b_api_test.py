@@ -223,6 +223,13 @@ row = dbx("SELECT text, amount FROM doc_meta WHERE node_id=?", (D1,))[0]
 check(row[0].startswith("kenc1:") and row[1].startswith("kenc1:"), "text and amount sealed in the database")
 check(not any("haftpflicht" in (x[0] or "").lower() for x in dbx("SELECT h FROM doc_words WHERE node_id=?", (D1,))), "word index holds hashes only")
 check(A.get(B + f"/api/docs/{D1}/file").content[:4] == b"%PDF", "the file itself")
+# 2.48.0 review (L3): the preview of a private document is sealed on disk like its text, the route opens it
+th = dbx("SELECT thumb FROM doc_meta WHERE node_id=?", (D1,))[0][0]
+if th:
+    raw = open(os.path.join(DATA, "attachments", th), "rb").read()
+    check(raw.startswith(b"KENC1\n") and A.get(B + f"/api/docs/{D1}/thumb").content[:2] == b"\xff\xd8", "private preview: sealed on disk, a JPEG from the route")
+else:
+    print("NOTE: no preview image for the text PDF in this image -- the sealing check of the preview is skipped", flush=True)
 
 # ---- search
 check(ids_of(A, q="haftpflicht") == [D1], "search: a whole word")
