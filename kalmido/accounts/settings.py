@@ -24,7 +24,8 @@ from .layouts import LAYOUT_KEYS
 
 SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share",
                         "purpose", "evcals_hidden", "care_sent",
-                        "brief_sent", "brief_read")  # 2.34.0 (#264)
+                        "brief_sent", "brief_read",  # 2.34.0 (#264)
+                        "fav_asked")  # 2.46.1 (#1361): lists already offered as a favourite
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "areas", "team")  # 2.25.0 (UX-03); 2.39.1 (#1185): areas
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family")  # 2.17.0 (#475), 2.19.0
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "celebrate", "cal_today",
@@ -36,6 +37,7 @@ SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "tim
                   "agent_steps_live", "agent_steps_always",  # 2.32.0 (#1081)
                   "show_done_default",  # 2.39.1 (#1214): "Hide completed" as the default of every view (0 = hide)
                   "fav_only",  # 2.40.0 (#1361): the sidebar shows only the favourites
+                  "fav_quiet", "fav_suggest",  # 2.46.1 (#1361): quieter pushes from lists without a star; favourite suggestions
                   "mods_all")  # 2.46.1 (#1591): "Switch on all modules" with the purpose
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
@@ -351,6 +353,9 @@ def settings_update():
             v = clean_setting(k, v)  # BadInput: 400, nothing stored
             if v is not None:
                 vals[k] = v
+    if "show_done_views" in vals:  # 2.46.1 (#1422): an own choice against a folder's "Hide completed" is marked
+        from ..lists.folders import lc_done_sync
+        lc_done_sync(c, me(), usettings(c, me()).get("show_done_views"), vals["show_done_views"])
     for k, v in vals.items():
         uset(c, me(), k, v)
     bump(c)
