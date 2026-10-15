@@ -6823,5 +6823,6 @@
   "Admin of the organisation": "Beheerder van de organisatie",
   "This server has organisations: open registration is not possible (only their e-mail domains or with approval).": "Deze server heeft organisaties: open registratie is niet mogelijk (alleen hun e-maildomeinen of met goedkeuring).",
   "A kid account cannot be an admin of an organisation": "Een kinderaccount kan geen beheerder van een organisatie zijn",
-  "Unknown organisation": "Onbekende organisatie"
+  "Unknown organisation": "Onbekende organisatie",
+  "Hide this note": "Deze melding verbergen"
 }

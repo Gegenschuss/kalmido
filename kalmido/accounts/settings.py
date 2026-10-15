@@ -193,6 +193,14 @@ def clean_setting(k, v):
         return json.dumps(list(dict.fromkeys(f for f in (clean_folder(x, False) for x in arr) if f)), ensure_ascii=False)
     if k == "show_done_views":
         return clean_done_views(v)
+    if k == "wgstd_hide":  # 2.46.2 (#1726): {view key: short signature}
+        try:
+            o = json.loads(sv or "{}")
+        except ValueError:
+            raise bad from None
+        if not isinstance(o, dict) or len(o) > 200 or not all(isinstance(a, str) and 0 < len(a) <= 80 and isinstance(b, str) and len(b) <= 40 for a, b in o.items()):
+            raise bad
+        return json.dumps(o, ensure_ascii=False)
     if k == "group_order":  # 2.39.1 (#1221)
         return kb_clean_group_order(v)
     if k in CAL_LIST_KEYS:  # 2.36.1 (#1127, #956): json lists (list ids / calendar keys "e:<id>" | "s:<id>")

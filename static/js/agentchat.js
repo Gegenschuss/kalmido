@@ -684,6 +684,7 @@ function chatPatch(o = {}) {
   const box = $('#chat-msgs'); if (!box) return;
   const a = agentById(S.chat.aid), near = chatNear(box), top = box.scrollTop, h = box.scrollHeight, last = +(box.dataset.last || 0);
   patchKids(box, chatMsgs());
+  cf_after(box, 'a:' + S.chat.aid, o.keep);  // 2.46.2 (#1660): new messages fade in (older pages and the first fill stay quiet)
   apvPinSync();  // 2.35.0 (#1103)
   chatHeadSync(a);  // 2.32.0 (#1079): the host may report another model / mode while the chat is open
   const sl = $('#chat-steps'), slh = chatStepsLiveHtml(); if (sl && sl._h !== slh && sl.outerHTML !== slh) { sl.outerHTML = slh; const n = $('#chat-steps'); if (n) n._h = slh; }

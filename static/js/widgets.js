@@ -98,6 +98,7 @@ document.addEventListener('click', e => {
   const k = a.dataset.act;
   if (k === 'wg-more') wgMenu(a);
   else if (k === 'wg-promote') lyQueue(() => wgPromote(a.dataset.lyv));  // after the saves still on their way
+  else if (k === 'wg-hide') wgHide(a.dataset.lyv);
   else if (k === 'wg-reset') lyQueue(() => wgReset(a.dataset.lyv));
 }, true);
 
@@ -109,13 +110,30 @@ function wgOwn(v) {  // {own, std} raw values (the project page: mine / the proj
   const sd = wgJ(S.lyStd?.[d.key]);
   return {own: wgHasLayout(o) ? o : null, std: wgHasLayout(sd) || !d.def ? sd : d.def()};  // 2.45.0 (#1504): no standard set = the view's default
 }
+// 2.46.2 (#1726): the note can be dismissed; it stays away until the own arrangement or the standard changes (setting wgstd_hide, all devices)
+const wgHideKey = v => LY[v]?.src ? (routeList()?.id ? v + ':' + routeList().id : '') : v;
+const wgHideMap = () => wgJ(S.settings?.wgstd_hide);
+function wgHideSig(v, own, std) {
+  const t = wgSig(v, own) + '|' + wgSig(v, std); let h = 5381;
+  for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0;
+  return h.toString(36) + t.length.toString(36);
+}
+function wgHide(v) {
+  const hk = wgHideKey(v), {own, std} = wgOwn(v); if (!hk || !own) return;
+  const m = wgHideMap(); m[hk] = wgHideSig(v, own, std);
+  const keys = Object.keys(m); if (keys.length > 150) for (const k of keys.slice(0, keys.length - 150)) delete m[k];
+  S.settings.wgstd_hide = JSON.stringify(m); renderView();
+  api('PATCH', '/api/settings', {wgstd_hide: S.settings.wgstd_hide}).catch(() => { /* api() said it; the local value stays */ });
+}
 function wgStdBar(v, o) {
   const d = LY[v]; if (S.ly.view === v) return '';
   if (!d.src) setTimeout(() => wgStdLoad(), 0);
   const {own, std} = wgOwn(v);
   if (!own || wgSig(v, own) === wgSig(v, std)) return '';
+  const hk = wgHideKey(v), hs = wgHideSig(v, own, std);
+  if (hk && wgHideMap()[hk] === hs) return '';  // 2.46.2 (#1726): dismissed for exactly this arrangement and standard
   const can = d.src ? !!o.canStd : S.lyStdCan;
-  return `<div class="wgstd"><span class="muted">${tr('Your own arrangement differs from the standard.')}</span><span class="spacer"></span>${can ? `<button type="button" class="btn sm" data-act="wg-promote" data-lyv="${v}">${ic('users', 's')}<span>${tr('Make this the standard for everyone')}</span></button>` : ''}<button type="button" class="btn sm" data-act="wg-reset" data-lyv="${v}">${ic('undo', 's')}<span>${tr('Reset to the standard')}</span></button></div>`;
+  return `<div class="wgstd"><span class="muted">${tr('Your own arrangement differs from the standard.')}</span><span class="spacer"></span>${can ? `<button type="button" class="btn sm" data-act="wg-promote" data-lyv="${v}">${ic('users', 's')}<span>${tr('Make this the standard for everyone')}</span></button>` : ''}<button type="button" class="btn sm" data-act="wg-reset" data-lyv="${v}">${ic('undo', 's')}<span>${tr('Reset to the standard')}</span></button><button type="button" class="iconbtn wgstdx" data-act="wg-hide" data-lyv="${v}" title="${esc(tr('Hide this note'))}" aria-label="${esc(tr('Hide this note'))}">${ic('x', 's')}</button></div>`;
 }
 const wgStr = o => o && Object.keys(o).length ? JSON.stringify(o) : '';
 async function wgPromote(v) {
