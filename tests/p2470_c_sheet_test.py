@@ -114,6 +114,9 @@ eq(c["margin"], "4701.00", "surplus = net - costs")
 eq(c["blocks"], ["staff", "share", "km", "meals", "hotel", "set", "free"], "print order from the pack")
 eq([ln["block"] for ln in c["lines"]][:3], ["staff", "staff", "staff"], "staff first")
 
+cp = S.dk_sheet_calc(sheet(), {"code": "DE", "tax": {"standard": 19}}, "de", "EUR", Decimal(1))
+eq((cp["net"], cp["labels"].get("title")), ("7779.00", "Drehkostenkalkulation"), "a country pack passed in: the sheet's industry pack is used")
+
 # meals with one night: the shoot day at the small rate too (the spreadsheet's rule)
 c1 = S.dk_sheet_calc(sheet(head=head(nights=1)))
 eq(line(c1, "meals")["rate"], "28.00", "one night: 14 + 14")
