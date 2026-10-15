@@ -65,7 +65,7 @@ BELEG_RE = re.compile(r"[^A-Za-z0-9$&%*+\-/]")  # the characters DATEV allows in
 
 def _q(s):
     """A text field: in double quotes, inner quotes doubled, no line breaks or semicolon trouble."""
-    return '"' + re.sub(r"[\r\n\t]+", " ", str(s or "")).replace('"', '""') + '"'
+    return '"' + re.sub(r"[\x00-\x1f\x7f]+", " ", str(s or "")).replace('"', '""') + '"'  # 2.47.3 (review K1): every control character
 
 
 def _amt(d):
@@ -198,7 +198,7 @@ def _case(r, s):
     note = (r["vat_note"] if "vat_note" in r.keys() else "") or ""
     if note in ("reverse", "abroad", "small"):
         return note
-    return "small" if s.get("small_business") else "exempt"  # 2.47.3 A (#1360) adds the small business switch
+    return "exempt"  # 2.47.3 (review S2): the document's own note decides, never today's switch (documents already exported keep their account)
 
 
 def dx_rows(c, oid, d_from, d_to, s=None):
@@ -226,8 +226,14 @@ def dx_rows(c, oid, d_from, d_to, s=None):
                 parts.append((tl.get("rate_key") or "standard", dec(tl.get("base") or 0) + dec(tl.get("amount") or 0)))
             if not parts:  # a document without positions or tax lines: the gross on the standard account
                 parts.append(("standard", dec(t.get("gross") or 0)))
-        for k, amount in parts:
-            amount = money(amount / fx)
+        # 2.47.3 (review S1): in USD every line is rounded on its own -> the rounding difference to the document's gross in
+        # EUR goes onto the last line, so the debtor balances with the payment
+        conv = [(k, money(a / fx)) for k, a in parts]
+        if fx != 1 and conv:
+            diff = money(dec(t.get("gross") or 0) / fx) - sum((a for _, a in conv), Decimal(0))
+            if diff and abs(diff) <= Decimal("0.05"):
+                conv[-1] = (conv[-1][0], conv[-1][1] + diff)
+        for k, amount in conv:
             if amount == 0:
                 continue
             sign = "S" if (amount > 0) == (r["kind"] == "invoice") else "H"
