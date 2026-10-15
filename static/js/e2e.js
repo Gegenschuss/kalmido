@@ -338,8 +338,8 @@ function e2eNoteHtml(t) {
   const lock = ic('lock', 's'), mine = !!t.encrypted_note_mine, n = E2E.notes[t.id];
   const head = `<h5>${lock} ${tr('Encrypted note')}</h5>`;
   if (!e2eUnlocked()) {
-    return mine ? `<div class="dsec e2enote" id="d-enc">${head}<button type="button" class="btn sm" data-e2e="note-unlock">${lock} ${tr('Unlock')}</button></div>`
-      : `<div class="dsec e2enote e2eadd" id="d-enc"><button type="button" class="linkbtn" data-e2e="note-new">${lock}<span>${tr('Encrypted note')}</span></button></div>`;
+    if (!mine) return ''; // 2.46.2 (#1663): encryption locked and no note of mine: hide the field
+    return `<div class="dsec e2enote" id="d-enc">${head}<button type="button" class="btn sm" data-e2e="note-unlock">${lock} ${tr('Unlock')}</button></div>`;
   }
   if (n?.loading) return `<div class="dsec e2enote" id="d-enc">${head}<div class="muted mhint">${tr('Decrypting…')}</div></div>`;
   if (mine && (!n || n.tid !== t.id)) { e2eNoteLoad(t.id); return `<div class="dsec e2enote" id="d-enc">${head}<div class="muted mhint">${tr('Decrypting…')}</div></div>`; }

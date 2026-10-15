@@ -2107,7 +2107,6 @@
   "{0} day later": ["{0} Tag später", "{0} Tage später"],
   "{0} day earlier": ["{0} Tag früher", "{0} Tage früher"],
   "no change": "keine Änderung",
-  "Drop tasks here": "Aufgaben hier ablegen",
   "Move to folder…": "In Ordner verschieben…",
   "Moved to folder {0}": "In Ordner „{0}“ verschoben",
   "Removed from folder": "Aus dem Ordner genommen",
