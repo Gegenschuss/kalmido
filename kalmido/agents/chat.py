@@ -169,6 +169,7 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
             # 2.35.0 (#1103): choices.approval = {title, what, std?} -- an approval request (buttons yes / no, a card)
             "choices": ch, "choice": ans, "choice_state": choice_state(r, ch, ans, newest),
             "job_id": r["job_id"] if "job_id" in r.keys() else None,  # 2.32.0 (#1081): the job whose result this is
+            "job_parent": r["job_parent"] if "job_parent" in r.keys() else None,  # 2.47.3 (#1764): the leading job of that part job
             # 2.37.0 (#1159): the agent offers "Save as task" under this message (the person saves, never the agent)
             "offer_save": bool(r["offer_save"]) if "offer_save" in r.keys() and r["sender"] == "agent" else False,
             **chat_reply(r),  # 2.33.0 (#1076): reply_to + reply (the quote of the answered message)

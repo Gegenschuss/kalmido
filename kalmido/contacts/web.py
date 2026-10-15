@@ -191,7 +191,7 @@ def op_import(c, uid, bid, raw, bg=False):
     cards = split_vcards(text)
     if bg and len(cards) > IMPORT_SYNC_MAX:
         return lv_import_start(c, uid, bid, cards)
-    res = import_vcards(c, uid, bid, text, batch=IMPORT_BATCH, cards=cards)  # 2.41.0 (#1437): commits per batch
+    res = import_vcards(c, uid, bid, text, batch=IMPORT_BATCH, cards=cards, photos=40)  # 2.41.0 (#1437): commits per batch
     c.commit()
     return res
 
@@ -233,7 +233,7 @@ def lv_import_run(st, ctx, uid, bid, cards):
     try:
         c = connect()
         c.set_ctx(*ctx)
-        res = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, progress=prog, cards=cards)
+        res = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, progress=prog, cards=cards, photos=900)
         c.commit()
         with _IMP_LOCK:
             st.update(state="done", done=st["total"], **res)

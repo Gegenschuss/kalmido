@@ -95,13 +95,14 @@ function modalSub(parent, open) {
   };
   Promise.resolve(open()).then(ch => { if (ch && ch.isConnected) onRemove(ch, show); else show(); }, show);
 }
-function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel}) {
+function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel, after}) {  // after(md): 2.47.3 (#1729) extra wiring of an html body
   return new Promise(res => {
     let done = false;
     const md = modal(`<form class="cdlg-f" novalidate><h3 id="cdlg-t">${esc(title)}</h3>${body || html ? `<div class="cdlg-b" id="cdlg-b">${html || esc(body)}</div>` : ''}
       ${input ? `<input id="cdlg-in" value="${esc(input.value || '')}" placeholder="${esc(input.placeholder || '')}" aria-labelledby="cdlg-t" autocomplete="off" ${input.type ? `type="${input.type}"` : ''} ${input.max ? `maxlength="${input.max}"` : ''}>` : ''}
       <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-cd="no">${esc(cancel || tr('Cancel'))}</button><button type="submit" class="btn ${danger ? 'danger solid' : 'pri'}" data-cd="yes">${esc(ok || tr('OK'))}</button></div></form>`);
     md.classList.add('cdlg');
+    if (after) after(md);
     md.setAttribute('role', input ? 'dialog' : 'alertdialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'cdlg-t');
     if (body || html) md.setAttribute('aria-describedby', 'cdlg-b');
     const prev = document.activeElement;

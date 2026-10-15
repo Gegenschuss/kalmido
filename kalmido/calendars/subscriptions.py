@@ -270,13 +270,15 @@ def cal_url_hint(u):
 CAL_UA = f"{APP_NAME}/{APP_VERSION} (calendar subscription)"
 
 
-def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozenset(), cross_redirects=False):
+def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozenset(), cross_redirects=False,
+             max_bytes=None, timeout=None, deadline=None):
     """One request, redirects followed by hand (at most 5; never https -> http). Returns (status, headers, body,
     final url). auth = (user, password): Basic auth, only ever sent to the host of `url`; a redirect to another
     host is only followed without credentials (cross_redirects, https only). Every hop runs through the SSRF guard."""
     first = (urllib.parse.urlsplit(url).hostname or "").lower()
     op = _cal_opener(allow)
-    deadline = time.monotonic() + CAL_DEADLINE
+    deadline = time.monotonic() + (deadline or CAL_DEADLINE)  # 2.47.3 (#1738): max_bytes / timeout / deadline for small fetches (contact photos)
+    max_bytes = max_bytes or CAL_MAX_BYTES
     for _hop in range(6):
         p = urllib.parse.urlsplit(url)
         if p.scheme not in ("http", "https") or not p.hostname or p.username or p.password:
@@ -286,7 +288,7 @@ def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozen
             hd["Authorization"] = "Basic " + base64.b64encode(f"{auth[0]}:{auth[1]}".encode()).decode()
         req = urllib.request.Request(url, data=body, method=method, headers=hd)
         try:
-            r = op.open(req, timeout=CAL_TIMEOUT)
+            r = op.open(req, timeout=timeout or CAL_TIMEOUT)
         except urllib.error.HTTPError as e:
             loc, code = (e.headers.get("Location") if e.headers else None), e.code
             hdrs = e.headers
@@ -329,7 +331,7 @@ def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozen
         try:
             with r:
                 cl = r.headers.get("Content-Length") or ""
-                if cl.isdigit() and int(cl) > CAL_MAX_BYTES:
+                if cl.isdigit() and int(cl) > max_bytes:
                     raise CalError("too_large")
                 chunks, n = [], 0
                 while True:
@@ -339,7 +341,7 @@ def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozen
                     if not b:
                         break
                     n += len(b)
-                    if n > CAL_MAX_BYTES:
+                    if n > max_bytes:
                         raise CalError("too_large")
                     chunks.append(b)
                 return r.status, r.headers, b"".join(chunks), url

@@ -94,6 +94,18 @@ async function chatLoad() {
   catch (e) { S.chat.err = e instanceof Offline ? tr('Only available online.') : e.message; }
   chatDraw(); renderTop(); if (S.route.mod === 'agents' && !S.route.agent) fl_viewSoon(true, 'agents');  // 2.46.2 (#1718): gathered
 }
+// 2.47.3 (#1764): messages of a background job ("Job #163: …", "✅ Job #163 … fertig:", ⏰ / ⏹ / ⚠️) are marked in the job's colour:
+// a stripe at the left of the bubble and a tag "Job #163". The colour comes from the number (the palette of #1721); a part job
+// (the message carries job_parent = its leader, POST chats {job_id, job_parent}) takes the colour of its leader, a little lighter.
+const UX_JOB_RE = /^\s*(?:[\u2705\u23F0\u23F9\u26A0]\uFE0F?\s*)?Job #(\d+)\b/;
+function ux_jobOf(m) {
+  if (m.from !== 'agent' || m.kind === 'notice') return null;
+  const x = UX_JOB_RE.exec(m.body || ''); if (!x) return null;
+  const no = +x[1], par = +m.job_parent || 0;
+  return {no, parent: par && par !== no ? par : 0};
+}
+const ux_jobColor = n => AC_COLORS[(+n || 0) % AC_COLORS.length];
+const ux_jobTag = jb => `<span class="jobtag" aria-hidden="true"><i></i>${esc(tr('Job #{0}', jb.no))}</span>`;
 function chatMsgs() {
   const a = agentById(S.chat.aid);
   // 2.12.2 (#451): every row has a key (data-k), so chatPatch() only swaps or appends the rows that changed
@@ -106,7 +118,8 @@ function chatMsgs() {
     // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
     const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
     const ap = !mine && apvKind(m), apo = ap && chatChoiceSt(m) === 'open', ed = mine && S.chat.edit === m.id;  // 2.39.0 (#1179): my message in edit mode
-    return `<div class="cmsg ${mine ? 'me' : 'ag'}${rxShow('c' + m.id)}${chatPerm(m) ? ' perm' : ''}${ap ? ' apv' + (apo ? ' apvopen' : '') : ''}" data-k="m${m.id}${m.choice ? 'a' : ''}${ap ? chatChoiceSt(m)[0] : ''}${m.edited_at ? 'e' + m.edited_at : ''}${ed ? 'E' : ''}" data-mid="a:${m.id}" ${ap ? `id="apv-${m.id}"` : ''}>${!mine && stepsAlwaysOn() ? chatStepsKept(m) : ''}${replyQuoteHtml(m, 'a')}${ap ? apvHead(m, apo) : ''}${ed ? chatEditHtml(m) : m.body && !(ap === 'a' && m.body.trim() === m.choices.approval.title) ? `<div class="cbub">${commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${tlkChSug(m) ? '' : chatChoicesHtml(m)}${!mine && m.job_id && m.job_steps ? jobStepsHtml(m.job_id, m.job_steps) : ''}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${!mine && m.offer_save && !m.saved_task_id ? `<div class="csoffer"><button type="button" class="btn sm" data-act="chat-save" data-mid="${m.id}">${ic('bookmark', 's')} ${tr('Save as task')}</button></div>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${mine && m.edited_at ? chatEditedHtml(m) : ''}${chatRxHtml(m, a)}${a?.enabled ? replyBtn('chrbtn mreply') : ''}${chatSavedMark(m)}<button type="button" class="rx rxtog" data-act="chat-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>${tlkChSug(m) ? chatChoicesHtml(m) : ''}</div>`; }).join('')
+    const jb = !mine && ux_jobOf(m), jcol = jb ? ux_jobColor(jb.parent || jb.no) : '';  // 2.47.3 (#1764)
+    return `<div class="cmsg ${mine ? 'me' : 'ag'}${jb ? ' jobm' + (jb.parent ? ' jpart' : '') : ''}${rxShow('c' + m.id)}${chatPerm(m) ? ' perm' : ''}${ap ? ' apv' + (apo ? ' apvopen' : '') : ''}" data-k="m${m.id}${m.choice ? 'a' : ''}${ap ? chatChoiceSt(m)[0] : ''}${m.edited_at ? 'e' + m.edited_at : ''}${ed ? 'E' : ''}" data-mid="a:${m.id}" ${ap ? `id="apv-${m.id}"` : ''}${jb ? ` style="--jcol:${jcol}"` : ''}>${!mine && stepsAlwaysOn() ? chatStepsKept(m) : ''}${replyQuoteHtml(m, 'a')}${ap ? apvHead(m, apo) : ''}${jb ? ux_jobTag(jb) : ''}${ed ? chatEditHtml(m) : m.body && !(ap === 'a' && m.body.trim() === m.choices.approval.title) ? `<div class="cbub">${commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${tlkChSug(m) ? '' : chatChoicesHtml(m)}${!mine && m.job_id && m.job_steps ? jobStepsHtml(m.job_id, m.job_steps) : ''}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${!mine && m.offer_save && !m.saved_task_id ? `<div class="csoffer"><button type="button" class="btn sm" data-act="chat-save" data-mid="${m.id}">${ic('bookmark', 's')} ${tr('Save as task')}</button></div>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${mine && m.edited_at ? chatEditedHtml(m) : ''}${chatRxHtml(m, a)}${a?.enabled ? replyBtn('chrbtn mreply') : ''}${chatSavedMark(m)}<button type="button" class="rx rxtog" data-act="chat-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>${tlkChSug(m) ? chatChoicesHtml(m) : ''}</div>`; }).join('')
     + (off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
 }
 // 2.41.0 (#1206): a notice of the agent ("New session, summary taken over (22:10)"): one grey line in the middle, no bubble,
@@ -1285,7 +1298,7 @@ function agModal(a, done, o = {}) {
         return;
       }
       if (m === 'del') {
-        if (!await askConfirm(tr('Delete the agent “{0}”?', a.name), a.owner ? tr('Its tokens, events, jobs and chats are deleted; lists it owns go to {0}. Its comments stay.', a.owner.name) : tr('Its tokens, events, jobs and chats are deleted; lists it owns come to you. Its comments stay.'), {ok: tr('Delete'), danger: true})) return;
+        if (!await ains_askRemove(`/api/admin/agents/${a.id}`, tr('Delete the agent “{0}”?', a.name), a.owner ? tr('Its tokens, events, jobs and chats are deleted; lists it owns go to {0}. Its comments stay.', a.owner.name) : tr('Its tokens, events, jobs and chats are deleted; lists it owns come to you. Its comments stay.'), {ok: tr('Delete'), danger: true})) return;  // 2.47.3 (#1729): shows the uninstall commands of its computers
         await calReq('DELETE', `/api/admin/agents/${a.id}`);  // 2.7.2 (#420)
         md.remove(); done && done(); load().then(render).catch(() => {}); return;
       }

@@ -1169,6 +1169,8 @@ MIGRATIONS = [
     # (#1081): the job a chat message is the result of (its history "Verlauf" shows under it). New columns only.
     ("agents", "host_info", "ALTER TABLE agents ADD COLUMN host_info TEXT NOT NULL DEFAULT ''"),
     ("agent_chat", "job_id", "ALTER TABLE agent_chat ADD COLUMN job_id BIGINT REFERENCES agent_jobs(id) ON DELETE SET NULL"),
+    # 2.47.3 (#1764): the leading job of a part job whose message this is (colour in the chat); plain number, no foreign key; 2.47.2 never reads it
+    ("agent_chat", "job_parent", "ALTER TABLE agent_chat ADD COLUMN job_parent BIGINT"),
     # 2.33.0 (#1076): a reply to one message of the same place (task comments, team chat, agent chat); nullable, no foreign
     # key (a deleted / trimmed original shows as "Message deleted"); 2.32 never reads it. Way back: the column stays unused.
     ("comments", "reply_to", "ALTER TABLE comments ADD COLUMN reply_to BIGINT"),

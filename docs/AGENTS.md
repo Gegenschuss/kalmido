@@ -169,7 +169,11 @@ green dot while connected, the computer's name (the launcher reports it with `PU
 contact and the agent's last error (e.g. a missing `claude`). **Remove computer** revokes that computer's token at once
 (it cannot be undone; set the computer up again to use it). On the computer, the same command with `--uninstall --dir ...`
 (`-Uninstall -Dir ...`) stops and removes the autostart, revokes its token and deletes the instance folder (the project
-folder stays). `--dry-run` / `-DryRun` only shows what would happen; `--no-autostart` / `-NoAutostart` installs without
+folder stays). 2.47.3 (#1729): *Remove computer* and *Delete agent* show that uninstall command ready to copy for every
+computer set up this way (Mac/Linux or Windows after the stored operating system): run it on the computer first, then
+delete; deleting works without it, but the program then stays on the computer. The command also runs through when the
+key is already revoked (agent deleted): Kalmido answers 401, the script only says so and still stops the autostart and
+deletes the files. `--dry-run` / `-DryRun` only shows what would happen; `--no-autostart` / `-NoAutostart` installs without
 the autostart. A *New API token* in the agent's settings still replaces every token of the agent, also the computers'.
 Behind a login proxy, let `/agent-setup.sh`, `/agent-setup.ps1` and `/api/agent-setup/` through like `/api/v1/`.
 
@@ -1098,10 +1102,17 @@ A job object: `{id, agent_id, task_id, user_id, title, state, log, action, actio
 
 ```
 GET  /api/v1/agent/chats?since=<message id>   -> {data: [{id, user: {id, name}, from: "user" | "agent", body, task_id, created_at}], cursor}
-POST /api/v1/agent/chats/{user_id}           {"body": "…", "task_id": 51, "job_id": 42 (2.32.0: the job whose result this is)}
+POST /api/v1/agent/chats/{user_id}           {"body": "…", "task_id": 51, "job_id": 42 (2.32.0: the job whose result this is), "job_parent": 40 (2.47.3, optional)}
 ```
 
 In a chat, the agent can create tasks and comments, but only in lists where it has the rights to do so.
+
+2.47.3 (#1764): messages of background jobs are marked in the chat. A message of an agent that begins with `Job #N` (also
+after a leading ✅ ⏰ ⏹ ⚠️, e.g. `Job #163: …`, `✅ Job #163 „Title“ fertig:`) gets a stripe in a fixed colour taken from the
+number and a tag `Job #163`. A part job is meant to look like its leader: send `job_parent` (an id of another job of the
+same agent, only together with `job_id`, else `400`) and the message takes the leader's colour, a little lighter. The
+field comes back in the message as `job_parent` (`null` without); older servers answer `400` for the unknown field, so send
+it only together with `job_id` and retry without both.
 
 **What the person sees in the chat header (2.4.1).** Under the agent's name: typing dots while it writes to this person,
 then its state in words: *working on #51* (the status task, a link), *working*, *waiting for you*, *ready* (idle),
