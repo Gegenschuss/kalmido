@@ -59,6 +59,8 @@ set +a
 : "${KALMIDO_URL:?KALMIDO_URL missing in $ENV_FILE}" "${KALMIDO_TOKEN:?KALMIDO_TOKEN missing in $ENV_FILE}"
 [[ "${KALMIDO_EVENTS:-0}" == 1 ]] && EVENTS=1
 # kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server, proposals, message_edited, playbook, approval_check, notice, comment_answer, comment_blocks
+# kalmido-capability: approval_closed, perm_relay, approval_lifecycle, session_resume, robust_runs
+# (2.44.0: agent_run.py; perm_relay and session_resume only when COMMAND is Claude Code)
 # (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)
 if [[ $EVENTS == 1 ]]; then
   RUNNER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent_run.py"

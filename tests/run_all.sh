@@ -643,6 +643,9 @@ fresh; run p2430_c_ui node p2430_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.43.0 part A: #1328 formula fields, sum row, key figures; #1331 a list like a spreadsheet
 fresh; run p2430_a_api "$PY" p2430_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2430_a_ui node p2430_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.44.0 part A: the launcher's event runner core (approval-done, permission questions, approval lifecycle, resumed
+# conversations, robust runs) against a stub API and a fake command (pure Python: no container needed)
+run p2440_a_launcher "$PY" p2440_a_launcher_test.py
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
