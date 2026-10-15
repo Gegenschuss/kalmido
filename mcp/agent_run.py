@@ -27,11 +27,22 @@ that arrive together: one run), the same way a hosted chat service does it:
                       block: then it becomes the agent's comment on that task with the approval card / answer buttons
                       (2.41+; older servers: the plain comment with the question / the steps as a line) (2.42.0, #1383)
   - older servers:    a feature the server does not know (404 / 400 unknown field) is switched off once, the rest works
+  - approval-done:    the open cards of a chat stand in its prompt; a final ```approval-done block closes exactly the
+                      cards the person decided in words (withdraw), never as a yes (2.44.0, #1441)
+  - approval state:   open cards survive a restart (state.json), one reminder after 2 h, expired after 7 days (#1444)
+  - permissions:      Claude Code: a PermissionRequest hook (`agent_run.py --perm-hook`, per run via --settings) asks the
+                      person in the chat before a tool outside the allow list; 9 min without an answer = no (#1442)
+  - conversations:    Claude Code: each person's chat goes on in one conversation (--resume); a new one after size, runs,
+                      a pause, a new day, a model change, Reset now -- with a summary as context (#1446)
+  - robust runs:      429 tried again, time limit per run (process group), 2 tries, event queue on disk, a lock (#1448)
 
-usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [ARGS...]
+usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [ARGS...]   |   agent_run.py --perm-hook
   KALMIDO_URL, KALMIDO_TOKEN    from the environment (the launcher loads the env file)
   KALMIDO_PROMPT_FILE           optional text put in front of every event (default: read CLAUDE.md, handle the event)
-  KALMIDO_STATE_DIR             where the event cursor is kept (default ~/.cache/kalmido-agent)
+  KALMIDO_STATE_DIR             event cursor, state.json, queue, lock, permission files (default ~/.cache/kalmido-agent)
+  KALMIDO_PERM_RELAY / _TIMEOUT / _USER   permission questions in the chat (default on / 540 s / the agent's owner)
+  KALMIDO_SESSION_RESUME        0 = a fresh run per event (default 1); KALMIDO_SESSION_MAX_TOKENS / _MAX_RUNS / _IDLE_MIN
+  KALMIDO_RUN_TIMEOUT           seconds per run (default 3600, 0 = none); KALMIDO_APPROVAL_REMIND / KALMIDO_APPROVAL_TTL
   KALMIDO_PERMISSION_MODE       the permission mode to report when COMMAND has no --permission-mode
   KALMIDO_APPROVAL_CHECK        0 = no approval check of chat answers (default 1)
   --once-event FILE             handle the events of FILE (one JSON object per line) and exit (for tests)
@@ -61,6 +72,16 @@ TYPING_EVERY_S = 8
 QUOTA_EVERY_S = 300       # plan usage at most every 5 minutes (and after every run)
 CHAT_CHUNK = 7500         # the server takes 8000 characters per message
 APPROVAL_TTL_S = int(os.environ.get("KALMIDO_APPROVAL_TTL") or 7 * 86400)  # an approval card expires (default 7 days)
+APPROVAL_REMIND_S = int(os.environ.get("KALMIDO_APPROVAL_REMIND") or 2 * 3600)  # 2.44.0 (#1444): one reminder after 2 h
+PERM_TIMEOUT_S = int(os.environ.get("KALMIDO_PERM_TIMEOUT") or 540)  # 2.44.0 (#1442): no answer in 9 min = denied
+PERM_RELAY = os.environ.get("KALMIDO_PERM_RELAY", "1").strip() != "0"
+RUN_TIMEOUT_S = int(os.environ.get("KALMIDO_RUN_TIMEOUT") or 3600)  # 2.44.0 (#1448): 0 = no time limit per run
+RETRY_429_S = (5, 15, 30, 60)  # 2.44.0 (#1448): HTTP 429 of the API -> try again after 5 / 15 / 30 / 60 s
+QUEUE_SETTLE_S = 2.0  # 2.44.0 (#1448): events that come within 2 s of each other are handled together
+SESSION_RESUME = os.environ.get("KALMIDO_SESSION_RESUME", "1").strip() != "0"  # 2.44.0 (#1446)
+SESSION_MAX_TOKENS = int(os.environ.get("KALMIDO_SESSION_MAX_TOKENS") or 150000)
+SESSION_MAX_RUNS = int(os.environ.get("KALMIDO_SESSION_MAX_RUNS") or 60)
+SESSION_IDLE_S = int(os.environ.get("KALMIDO_SESSION_IDLE_MIN") or 120) * 60
 CHAT_RUN_EVENTS = ("chat", "chat_choice", "scheduled_job")
 SKIP_EVENTS = ("runtime_changed", "reset", "ping", "typing")  # the launcher restarts on runtime changes itself
 REDACTED = "[redacted]"
@@ -114,7 +135,19 @@ class Api:
         self.token = token
         self.progress_ok = self.host_ok = self.quota_ok = self.approval_ok = self.choices_ok = self.notice_ok = None
 
-    def req(self, method, path, body=None, query=None, timeout=30):
+    def req(self, method, path, body=None, query=None, timeout=30, retry=True):
+        """One API call; HTTP 429 is tried again after 5 / 15 / 30 / 60 s (kalmido-capability: robust_runs, 2.44.0 #1448)."""
+        for wait in (RETRY_429_S if retry else ()):
+            try:
+                return self._req(method, path, body, query, timeout)
+            except ApiError as e:
+                if e.status != 429:
+                    raise
+                log(f"{path.split('?')[0]}: HTTP 429, trying again in {wait} s")
+                time.sleep(wait)
+        return self._req(method, path, body, query, timeout)
+
+    def _req(self, method, path, body=None, query=None, timeout=30):
         url = self.base + path + ("?" + urllib.parse.urlencode(query) if query else "")
         data = json.dumps(body).encode() if body is not None else None
         rq = urllib.request.Request(url, data=data, method=method, headers={
@@ -130,7 +163,7 @@ class Api:
     def soft(self, method, path, body=None, timeout=20):
         """A cosmetic call: never raises; returns the HTTP status (0 = not reachable)."""
         try:
-            self.req(method, path, body, timeout=timeout)
+            self.req(method, path, body, timeout=timeout, retry=False)  # cosmetic: never held up by 429 waits
             return 200
         except ApiError as e:
             return e.status
@@ -188,7 +221,8 @@ class Api:
         if self.notice_ok is False or not uid:
             return False
         try:
-            self.req("POST", f"/agent/chats/{uid}", {"body": " ".join(str(text).split())[:200], "kind": "notice"}, timeout=10)
+            self.req("POST", f"/agent/chats/{uid}", {"body": " ".join(str(text).split())[:200], "kind": "notice"}, timeout=10,
+                     retry=False)  # 2.44.0: a 429 loses only this line, never waits
         except ApiError as e:
             if not self.notice_ok and (e.status == 404 or (e.status == 400 and "Unknown field" in e.body)):
                 self.notice_ok = False
@@ -246,6 +280,32 @@ class Api:
             b["body"] = (body + "\n\n" if body else "") + suggest_line(suggest)  # no buttons: a numbered line
         return self._post_chat(uid, b)
 
+
+    # kalmido-capability: approval_closed, approval_lifecycle (2.44.0, #1441 / #1444)
+    def withdraw(self, uid, mid, outcome=""):
+        """Close the card / buttons of one of our chat messages (POST .../withdraw, 2.30+): outcome "" (withdrawn, e.g.
+        decided in words), denied (a no in words) or expired; never allowed (only the person approves). True = closed or
+        nothing left to close (404 / 409)."""
+        try:
+            self.req("POST", f"/agent/chats/{int(uid)}/messages/{int(mid)}/withdraw", {"outcome": outcome} if outcome else {}, timeout=15)
+            return True
+        except ApiError as e:
+            log(f"withdraw {mid}: HTTP {e.status}")
+            return e.status in (404, 409)
+        except Exception as e:
+            log(f"withdraw {mid}: {type(e).__name__}")
+            return False
+
+    # kalmido-capability: perm_relay (2.44.0, #1442)
+    def perm_question(self, uid, body, timeout_s):
+        """A permission question in the chat (2.30+: permission true = buttons Allow / Deny, stays open for timeout_s; a
+        thumbs up / down on it answers too). Older servers: plain text, answered with yes / no."""
+        try:
+            return self._post_chat(uid, {"body": body, "permission": True, "expires_in": int(timeout_s)})
+        except ApiError as e:
+            if e.status != 400:
+                raise
+        return self._post_chat(uid, {"body": body + "\n\n(answer yes or no)"})
 
     # kalmido-capability: comment_blocks (2.42.0, #1383)
     def comment(self, tid, body, approval=None, suggest=None):
@@ -353,6 +413,8 @@ class Stream:
         self.result, self.model, self.last_text = None, "", ""
         self.on_event = None  # 2.44.0 B (#1443): called with every parsed event (images the command looks at)
         self.session_id = ""  # for the one approval_check follow-up in the same session
+        self.tools, self.context_tokens = 0, 0  # 2.44.0 (#1448 / #1446): tool calls seen, size of the conversation
+        self.timed_out, self.err_tail = False, []
         self._lock = threading.Lock()  # tick() runs from the reader and from the ticker thread
 
     def feed(self, line):
@@ -372,13 +434,19 @@ class Stream:
             self.model = str(ev.get("model") or "")
             self.on_model(self.model)
         elif t == "assistant":
+            u = (ev.get("message") or {}).get("usage")
+            if isinstance(u, dict):  # 2.44.0 (#1446): what the conversation weighs now (session_resume)
+                self.context_tokens = sum(int(u.get(k) or 0) for k in ("input_tokens", "cache_read_input_tokens",
+                                                                        "cache_creation_input_tokens", "output_tokens"))
             for blk in ((ev.get("message") or {}).get("content") or []):
                 if not isinstance(blk, dict):
                     continue
                 if blk.get("type") == "text" and str(blk.get("text") or "").strip():
                     self.text = self.last_text = str(blk["text"]).strip()
-                elif blk.get("type") == "tool_use" and self.text:
-                    self.pending, self.text = self.text, ""
+                elif blk.get("type") == "tool_use":
+                    self.tools += 1
+                    if self.text:
+                        self.pending, self.text = self.text, ""
         elif t == "rate_limit_event":
             self.on_usage(ev.get("rate_limit_info") or {})
         elif t == "system" and ev.get("subtype") == "compact_boundary" and self.on_compact:
@@ -443,7 +511,7 @@ def reply_hint(rp):
 DEFAULT_PROMPT = "Read CLAUDE.md. Then handle this Kalmido event following it."
 
 
-def build_prompt(evs, chat_uid):
+def build_prompt(evs, chat_uid, extra=None):
     head = DEFAULT_PROMPT
     pf = os.environ.get("KALMIDO_PROMPT_FILE")
     if pf:
@@ -470,6 +538,8 @@ def build_prompt(evs, chat_uid):
                    "offer up to three next steps as add_comment choices (answer buttons). Alternatively end your final "
                    "text with a block ```approval or ```suggest: then that text is posted as your comment on the task "
                    "with the card / buttons (do not post it again yourself).")
+    if extra:  # 2.44.0 (#1441 / #1444 / #1446): open approvals, notes of the launcher, the previous conversation's summary
+        out += [""] + list(extra)
     pb_seen = set()
     for ev in evs:
         x = ev.get("data") or {}
@@ -711,6 +781,199 @@ def chunks(text, n=CHAT_CHUNK):
     return [f"{p}\n\n_({i + 1}/{len(out)})_" for i, p in enumerate(out)] if len(out) > 1 else out
 
 
+# kalmido-capability: approval_closed (2.44.0, #1441)
+def match_approval(line, approvals):
+    """A line of an ```approval-done block -> (message id of the ONE open approval it names, or None; decided no). The
+    title as listed in the prompt, case and spaces aside; a longer line may also contain it (or the other way round).
+    No hit or several hits: None -- the cards stay open, never a guess."""
+    no = bool(re.match(r"(?i)(?:no|nein)\s*[:\-\u2013]\s*", line))
+    key = " ".join(re.sub(r"(?i)^(?:yes|ja|no|nein)\s*[:\-\u2013]\s*", "", line).split()).casefold()
+    if len(key) < 3:
+        return None, no
+    norm = {mid: " ".join(str(a.get("title") or "").split()).casefold() for mid, a in approvals.items()}
+    hits = [mid for mid, w in norm.items() if w == key]
+    if not hits and len(key) >= 20:
+        hits = [mid for mid, w in norm.items() if len(w) >= 20 and (key in w or w in key)]
+    return (hits[0] if len(hits) == 1 else None), no
+
+
+# kalmido-capability: approval_lifecycle, perm_relay, session_resume, robust_runs (2.44.0, #1444 / #1442 / #1446 / #1448)
+class RunnerState:
+    """Everything the runner must not forget across a restart, in ONE file of the state folder (state.json, written
+    atomically: a .new file, then os.replace): open approval cards, closed / expired ones, notes for the next prompt,
+    open permission questions, the conversation (session) per chat, the event queue."""
+
+    def __init__(self, state_dir):
+        self.dir = state_dir
+        self.path = os.path.join(state_dir, "state.json")
+        self.lock = threading.RLock()
+        try:
+            with open(self.path, encoding="utf-8") as f:
+                self.data = json.load(f)
+            if not isinstance(self.data, dict):
+                raise ValueError
+        except (OSError, ValueError):
+            self.data = {}
+        for k in ("approvals", "notes", "perms", "perm_expired", "sessions", "summaries"):
+            self.data.setdefault(k, {})
+        for k in ("closed", "expired", "perm_done", "queue"):
+            self.data.setdefault(k, [])
+
+    def save(self):
+        with self.lock:
+            os.makedirs(self.dir, exist_ok=True)
+            tmp = self.path + ".new"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(self.data, f, ensure_ascii=False)
+            os.replace(tmp, self.path)
+
+    def remember(self, key, mid, keep=200):
+        """mid into the list key (closed, expired, perm_done): an event for it later counts once / gets an answer."""
+        lst = self.data[key]
+        if str(mid) not in lst:
+            lst.append(str(mid))
+            del lst[:-keep]
+
+    def note(self, uid, text):
+        """A line for the next prompt of the chat with uid (e.g. an approval that expired)."""
+        self.data["notes"].setdefault(str(uid), []).append(text[:300])
+        del self.data["notes"][str(uid)][:-10]
+
+
+class RunLock:
+    """2.44.0 (#1448): one runner per state folder. An OS lock on <state>/runner.lock (flock on Linux / macOS,
+    msvcrt.locking on Windows) with the PID inside: the OS frees it when the process ends, so a stale lock file of a
+    crashed runner never blocks a new start."""
+
+    def __init__(self, path):
+        self.path, self.fh = path, None
+
+    def acquire(self):
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        fh = open(self.path, "a+")
+        try:
+            if os.name == "nt":
+                import msvcrt
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (OSError, ImportError):
+            fh.close()
+            return False
+        fh.seek(0)
+        fh.truncate()
+        fh.write(str(os.getpid()))
+        fh.flush()
+        self.fh = fh
+        return True
+
+    def release(self):
+        if self.fh:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+                    self.fh.seek(0)
+                    msvcrt.locking(self.fh.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(self.fh.fileno(), fcntl.LOCK_UN)
+            except (OSError, ImportError):
+                pass
+            self.fh.close()
+            self.fh = None
+
+    @staticmethod
+    def held(path):
+        """Is a runner holding this lock right now? (the permission hook asks: nobody there = deny at once)"""
+        if not os.path.exists(path):
+            return False
+        probe = RunLock(path)
+        if probe.acquire():
+            probe.release()
+            return False
+        return True
+
+
+YES_WORDS = ("yes", "y", "ok", "okay", "allow", "ja", "jo", "jep", "klar", "erlauben", "\U0001f44d")
+NO_WORDS = ("no", "n", "nope", "deny", "nein", "ne", "nee", "ablehnen", "\U0001f44e")
+# kalmido-capability: perm_relay -- the texts of a permission question (KALMIDO_PERM_TEXT / _LATE override them)
+PERM_TEXT = os.environ.get("KALMIDO_PERM_TEXT", "**May I run this?** ({0})")
+PERM_LATE = os.environ.get("KALMIDO_PERM_LATE", "This answer came too late: the command was denied already. Please give the order again.")
+APPROVAL_EXPIRED_PRESS = os.environ.get("KALMIDO_APPROVAL_EXPIRED", "This approval has expired. Please ask again if it is still needed.")
+APPROVAL_REMINDER = os.environ.get("KALMIDO_APPROVAL_REMINDER", "Reminder: an approval is still open - {0}. Nothing happens without your yes (the card above).")
+# kalmido-capability: session_resume, notice -- the line a chat shows when the runner starts a new conversation
+NOTICE_SESSION = os.environ.get("KALMIDO_NOTICE_SESSION", "New conversation ({0})")
+SUMMARY_PROMPT = ("(Launcher: this conversation ends now ({why}) and a new one starts with your next order. Write a short "
+                  "summary for it: open work, decisions, what the person expects next, in at most 15 short lines. Facts only, "
+                  "no greeting, no tools.)")
+RUN_FAILED = os.environ.get("KALMIDO_RUN_FAILED", "Sorry, this run failed twice ({0}). Please try again later.")
+
+
+def perm_hook(argv):
+    """2.44.0 (#1442) `agent_run.py --perm-hook`: the PermissionRequest hook of a Claude Code run (the runner hands it in
+    with --settings). It writes the request into KALMIDO_PERM_DIR, waits until the runner wrote the person's answer
+    (KALMIDO_PERM_TIMEOUT, default 9 min; no answer = deny) and tells Claude Code allow or deny. No runner holds the lock
+    -> deny at once. Never fails the run: any error = deny."""
+    def out(allow, why=""):
+        d = {"behavior": "allow"} if allow else {"behavior": "deny", "message": f"Kalmido launcher: {why}. Do not retry it; "
+                                                 "say in your answer what was denied."}
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": d}}))
+        return 0
+    try:
+        d = json.loads(sys.stdin.read() or "{}")
+        pdir = os.environ.get("KALMIDO_PERM_DIR") or ""
+        if not pdir or not RunLock.held(os.path.join(os.path.dirname(pdir), "runner.lock")):
+            return out(False, "the launcher is not running, nobody can answer the question")
+        os.makedirs(pdir, exist_ok=True)
+        pid = f"{time.time_ns()}-{os.getpid()}"
+        req = {"tool_name": d.get("tool_name"), "tool_input": d.get("tool_input"), "uid": os.environ.get("KALMIDO_PERM_UID") or "",
+               "label": os.environ.get("KALMIDO_RUN_LABEL") or "", "at": time.time()}
+        tmp = os.path.join(pdir, pid + ".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(req, f, ensure_ascii=False)
+        os.replace(tmp, os.path.join(pdir, pid + ".req.json"))
+        ans = os.path.join(pdir, pid + ".ans")
+        end = time.time() + int(os.environ.get("KALMIDO_PERM_TIMEOUT") or PERM_TIMEOUT_S)
+        decision = ""
+        while time.time() < end:
+            if os.path.exists(ans):
+                with open(ans, encoding="utf-8") as f:
+                    decision = f.read().strip()
+                break
+            time.sleep(0.5)
+        for x in (pid + ".req.json", pid + ".ans", pid + ".posted"):
+            try:
+                os.remove(os.path.join(pdir, x))
+            except OSError:
+                pass
+        if decision == "allow":
+            return out(True)
+        return out(False, "denied by the person in the chat" if decision else "no answer in the chat in time (counts as no)")
+    except Exception as e:
+        return out(False, f"the question could not be asked ({type(e).__name__})")
+
+
+def kill_tree(p):
+    """2.44.0 (#1448): end the command AND what it started (its process group; Windows: taskkill /T)."""
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+        else:
+            import signal
+            os.killpg(p.pid, signal.SIGTERM)
+            try:
+                p.wait(5)
+            except subprocess.TimeoutExpired:
+                os.killpg(p.pid, signal.SIGKILL)
+    except Exception:
+        try:
+            p.kill()
+        except Exception:
+            pass
+
+
 class Runner:
     def __init__(self, cmd, state_dir, dry=False):
         self.cmd, self.dry = cmd, dry
@@ -719,9 +982,66 @@ class Runner:
         self.state_dir = os.path.expanduser(state_dir)
         self.pmode, self.host_pmode = permission_modes(cmd)
         self.model = ""
-        self.approvals = {}  # message id -> {uid, title, what, at}: the approval requests this runner posted
+        self.state = RunnerState(self.state_dir)  # 2.44.0 (#1444): approvals, sessions, queue survive a restart
         self.extras = agent_extras.Extras(self.api, self.state_dir, cmd) if agent_extras else None  # 2.44.0 B (#1443 #1445 #1447)
         self.suggestions = {}  # chat user id -> the suggestions of the last answer (2.40.0: a typed number picks one)
+        self.agent = {}  # GET /api/v1/agent (owner_id, runtime) -- read at the start of the loop
+        self.wake = threading.Event()
+        self.refresh_due = False
+        self.perm_thread = None
+        self.cur = 0
+
+    # the approval requests this runner posted: message id -> {uid, title, what, at, reminded} (2.44.0: on disk)
+    @property
+    def approvals(self):
+        return self.state.data["approvals"]
+
+    @approvals.setter
+    def approvals(self, v):
+        self.state.data["approvals"] = v
+
+    def is_claude(self):
+        """The command is Claude Code (hooks, --settings, --resume, stream-json): only then perm_relay / session_resume."""
+        return os.path.basename(self.cmd[0]).lower().split(".")[0] == "claude"
+
+    def perm_dir(self):
+        return os.path.join(self.state_dir, "perm")
+
+    def hook_settings(self):
+        """2.44.0 (#1442): the settings file handed to every run with --settings (never the person's own settings): the
+        PermissionRequest hook that asks in the chat. Further hooks of other parts go in here too."""
+        cmd = f'"{sys.executable}" "{os.path.abspath(__file__)}" --perm-hook'
+        s = {"hooks": {}}
+        if PERM_RELAY:
+            s["hooks"]["PermissionRequest"] = [{"matcher": "*", "hooks": [{"type": "command", "command": cmd,
+                                                                            "timeout": PERM_TIMEOUT_S + 60}]}]
+        return s
+
+    def child_env(self, uid, tid):
+        """2.44.0 (#1442): the environment of one run (the hook finds the runner through it)."""
+        ex = getattr(self, "extras", None)  # part B (agent_extras): KALMIDO_OUTBOX, KALMIDO_CHAT_USER, ... as the base
+        env = dict(ex.env() if ex and hasattr(ex, "env") else os.environ)
+        env.update(KALMIDO_PERM_DIR=self.perm_dir(), KALMIDO_PERM_TIMEOUT=str(PERM_TIMEOUT_S),
+                   KALMIDO_PERM_UID=str(uid or self.perm_uid(tid) or ""),
+                   KALMIDO_RUN_LABEL=("chat" if uid else f"task {tid}" if tid else "event"))
+        return env
+
+    def perm_uid(self, tid=None):
+        """Who answers a permission question of a task run: KALMIDO_PERM_USER, else the agent's owner."""
+        v = os.environ.get("KALMIDO_PERM_USER") or (self.agent or {}).get("owner_id")
+        return int(v) if str(v or "").isdigit() else None
+
+    def run_args(self, args):
+        """--settings with the hook file when the command is Claude Code and has no --settings of its own."""
+        if not self.is_claude() or not PERM_RELAY or any(a == "--settings" or a.startswith("--settings=") for a in args):
+            return args
+        os.makedirs(self.state_dir, exist_ok=True)
+        f = os.path.join(self.state_dir, "run-settings.json")
+        tmp = f + ".new"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(self.hook_settings(), fh)
+        os.replace(tmp, f)
+        return args + ["--settings", f]
 
     def host(self):
         return {"model": model_label(self.model), "permission_mode": self.pmode, "host_permission_mode": self.host_pmode}
@@ -759,7 +1079,24 @@ class Runner:
         if ev.get("event") != "chat_choice":
             return
         mid = str(x.get("message_id") or "")
-        mine = self.approvals.pop(mid, None)
+        st = self.state.data
+        if mid and mid in st["expired"]:  # 2.44.0 (#1444): a press on a card that expired gets an answer, never a run
+            ev["_drop"] = True
+            uid = self.chat_uid(ev)
+            if uid and (x.get("approval") in ("approved", "rejected") or x.get("choice_ids")):
+                try:
+                    self.api.chat(uid, APPROVAL_EXPIRED_PRESS)
+                except Exception as e:
+                    log(f"expired approval {mid}: answer not posted ({type(e).__name__})")
+            return
+        if mid and mid in st["closed"] and mid not in self.approvals:  # the same answer twice (button + reaction): once
+            ev["_drop"] = True
+            return
+        with self.state.lock:
+            mine = self.approvals.pop(mid, None)
+            if mine or x.get("approval") in ("approved", "rejected"):
+                self.state.remember("closed", mid)
+                self.state.save()
         if not mine and x.get("approval") not in ("approved", "rejected"):
             return
         if x.get("approval") not in ("approved", "rejected"):
@@ -779,6 +1116,10 @@ class Runner:
             evs = self.extras.intake(evs) + (self.extras.take_bundle() if self.extras.due() else [])
         for ev in evs:
             self.mark_approval(ev)
+            if ev.get("_drop"):
+                continue
+            if ev.get("event") in ("reset", "runtime_changed"):
+                self.refresh_due = True  # 2.44.0 (#1446): the next run reads the runtime again (reset / model)
             if ev.get("event") in SKIP_EVENTS:
                 log(f"event {ev.get('event')}: left to the launcher")
                 continue
@@ -801,17 +1142,23 @@ class Runner:
             if sugg and ev.get("event") == "chat" and body.isdigit() and 1 <= int(body) <= len(sugg):
                 x["picked_suggestion"] = sugg[int(body) - 1]
 
+    def make_prompt(self, evs, uid, extra):
+        """build_prompt, with part B's additions (bundle, notes, outbox / job hints) when agent_extras is there."""
+        if self.extras:  # 2.44.0 B (#1443 #1445 #1447)
+            return self.extras.build(build_prompt, evs, uid, extra)
+        return build_prompt(evs, uid, extra)
+
     def run(self, uid, evs):
         self.pick_suggestion(uid, evs)
-        prompt = self.extras.build(build_prompt, evs, uid) if self.extras else build_prompt(evs, uid)  # 2.44.0 B (#1443 #1445 #1447)
         args = list(self.cmd)
         if "-p" not in args and "--print" not in args:
             args.append("-p")
         if "--output-format" not in args:
             args += ["--output-format", "stream-json", "--verbose"]
         task = next(((ev.get("data") or {}).get("task") or {} for ev in evs if (ev.get("data") or {}).get("task")), {})
-        log(f"run: {'+'.join(str(e.get('event')) for e in evs)} ({'chat ' + str(uid) if uid else 'task event'}), prompt {len(prompt)} chars")
         if self.dry:
+            prompt = self.make_prompt(evs, uid, self.prompt_extra(uid, None, consume=False))
+            log(f"run: {'+'.join(str(e.get('event')) for e in evs)} ({'chat ' + str(uid) if uid else 'task event'}), prompt {len(prompt)} chars")
             print(json.dumps({"args": args, "chat_user_id": uid, "prompt": prompt}, ensure_ascii=False))
             return
         what = "Answering in the chat" if uid else "Working on an event"
@@ -819,18 +1166,24 @@ class Runner:
             self.extras.begin_run(uid, not uid)
         tid = None if uid else task.get("id")
         self.api.status("working", what, task_id=tid, host=self.host())
-        st, rc = self._exec(args, prompt, uid, what, tid)
+        key = self.session_start(uid, args, what)  # 2.44.0 (#1446): the conversation of this chat goes on
+        prompt = self.make_prompt(evs, uid, self.prompt_extra(uid, key))
+        log(f"run: {'+'.join(str(e.get('event')) for e in evs)} ({'chat ' + str(uid) if uid else 'task event'}), prompt {len(prompt)} chars"
+            + (", resumed" if key and key in self.state.data["sessions"] else ""))
+        st, rc, why = self.attempt_runs(args, prompt, uid, what, tid, key)
         if st is None:
             self.api.status("error", "The agent command cannot be started")
+            self.run_failed(uid, why)
             return
         text = result_text(st)
+        self.session_done(key, st)
         self.usage.report(force=True)
         if uid:
             if text:
                 body, appr, sugg, done = split_tail_blocks(redact(text))
                 body, appr, sugg = self.check_approval(args, uid, body, appr, sugg, st.session_id, what)
-                if done:  # closing open cards from words is not done by this runner yet
-                    log(f"{len(done)} approval-done line(s) left as they are")
+                if done:  # 2.44.0 (#1441): approvals the person decided in words -> exactly those cards are closed
+                    self.close_decided(uid, done)
                 if appr:
                     sugg = []
                 ids = [int((e.get("data") or {}).get("message", {}).get("id") or 0) for e in evs if e.get("event") == "chat"]
@@ -845,10 +1198,14 @@ class Runner:
                         r = self.api.chat(uid, part or (appr["title"] if appr else ""), approval=appr if last else None,
                                           reply_to=reply_to if i == 0 else None, suggest=sugg if last else None)
                         if last and appr and isinstance(r, dict) and r.get("id"):
-                            self.approvals[str(r["id"])] = {"uid": uid, **appr, "at": time.time()}
+                            with self.state.lock:
+                                self.approvals[str(r["id"])] = {"uid": uid, **appr, "at": time.time()}
+                                self.state.save()
                     log(f"answer posted: {len(body)} chars{', approval' if appr else ''}")
                 except Exception as e:
                     log(f"answer not posted: {type(e).__name__} {getattr(e, 'status', '')}")
+            elif why:
+                self.run_failed(uid, why)
             else:
                 try:
                     self.api.chat(uid, "Sorry, this run ended without an answer. Please try again.")
@@ -861,6 +1218,178 @@ class Runner:
             self.api.status("error", "The last run failed")
         else:
             self.api.status("idle", host=self.host())
+
+    # kalmido-capability: robust_runs (2.44.0, #1448)
+    def attempt_runs(self, args, prompt, uid, what, tid, key):
+        """At most 2 tries of one run -> (Stream or None, exit code, why it failed or ""). A second try only when the first
+        failed without doing anything (no tool call): never twice what already changed something; never after the time
+        limit. A conversation that cannot be resumed (gone, broken) is dropped: the second try starts fresh."""
+        st, rc, why = None, -1, ""
+        for n in (1, 2):
+            sess = self.state.data["sessions"].get(key) if key else None
+            st, rc = self._exec(self.run_args(args + (["--resume", sess["id"]] if sess else [])), prompt, uid, what, tid)
+            if st is not None and (result_text(st) or rc == 0):
+                return st, rc, ""
+            why = ("cannot be started" if st is None else
+                   f"time limit of {max(1, RUN_TIMEOUT_S // 60)} min reached" if st.timed_out else
+                   f"exit code {rc}" + (": " + " ".join(redact(st.err_tail[-1]).split())[:160] if st.err_tail else ""))
+            log(f"try {n} failed: {'cannot start' if st is None else 'time limit' if st.timed_out else f'exit {rc}'}")
+            if st is not None and (st.timed_out or st.tools):
+                break
+            if sess:
+                with self.state.lock:
+                    self.state.data["sessions"].pop(key, None)
+                    self.state.save()
+                log("the conversation cannot be resumed: the next try starts a fresh one")
+        return st, rc, why
+
+    def run_failed(self, uid, why):
+        """A chat run that failed twice: a short, redacted note into that chat (task runs: only the status)."""
+        if not uid:
+            return
+        try:
+            self.api.chat(uid, RUN_FAILED.replace("{0}", redact(why or "unknown")))
+        except Exception as e:
+            log(f"failure note not posted: {type(e).__name__}")
+
+    # kalmido-capability: session_resume (2.44.0, #1446)
+    def session_start(self, uid, args, what):
+        """The conversation key of a chat run (chat:<person>) when its conversation may go on (Claude Code, no own
+        --resume / --continue / --session-id, KALMIDO_SESSION_RESUME not 0), else None (a fresh run as before). Task
+        events always run fresh; each person has a conversation of their own (nothing of one chat reaches another). A
+        conversation that is due to end (size, runs, pause, a new day, model change, Reset now) first writes a short
+        summary (own short run, not after a reset) that the next prompt carries fenced as context only."""
+        if not uid or not SESSION_RESUME or not self.is_claude() or \
+                any(a in ("--resume", "-r", "--continue", "-c", "--session-id") or a.startswith("--resume=") for a in self.cmd):
+            return None
+        if self.refresh_due:
+            self.refresh_agent()
+        key = f"chat:{uid}"
+        s = self.state.data["sessions"].get(key)
+        why = self.rotate_reason(s) if s else ""
+        if why:
+            log(f"conversation of chat {uid} ends: {why}")
+            if why != "reset":
+                st, _ = self._exec(self.run_args(args + ["--resume", s["id"]]), SUMMARY_PROMPT.format(why=why), uid, what, None, steps=False)
+                t = result_text(st) if st else ""
+                if t:
+                    self.state.data["summaries"][key] = {"text": redact(t)[:6000], "at": time.time()}
+            with self.state.lock:
+                self.state.data["sessions"].pop(key, None)
+                self.state.save()
+            self.api.notice(uid, NOTICE_SESSION.replace("{0}", why))
+        return key
+
+    def rotate_reason(self, s):
+        rt = (self.agent or {}).get("runtime") or {}
+        if rt.get("reset_seq") is not None and s.get("reset_seq") is not None and int(rt["reset_seq"]) != int(s["reset_seq"]):
+            return "reset"
+        if rt.get("model") and s.get("model") and rt["model"] != s["model"]:
+            return "model changed"
+        if s.get("day") != time.strftime("%Y-%m-%d"):
+            return "a new day"
+        if int(s.get("tokens") or 0) >= SESSION_MAX_TOKENS:
+            return "size"
+        if int(s.get("runs") or 0) >= SESSION_MAX_RUNS:
+            return "number of runs"
+        if time.time() - float(s.get("last") or 0) > SESSION_IDLE_S:
+            return "long pause"
+        return ""
+
+    def session_done(self, key, st):
+        if not key or not st.session_id:
+            return
+        rt = (self.agent or {}).get("runtime") or {}
+        with self.state.lock:
+            s = self.state.data["sessions"].get(key) or {}
+            if s.get("id") != st.session_id:
+                s = {"id": st.session_id, "day": time.strftime("%Y-%m-%d"), "runs": 0, "started": time.time(),
+                     "model": rt.get("model") or "", "reset_seq": rt.get("reset_seq")}
+            s.update(runs=int(s.get("runs") or 0) + 1, last=time.time(), tokens=st.context_tokens or s.get("tokens") or 0)
+            self.state.data["sessions"][key] = s
+            self.state.save()
+
+    def refresh_agent(self):
+        try:
+            self.agent = self.api.req("GET", "/agent") or {}
+            self.refresh_due = False
+        except Exception as e:
+            log(f"agent settings: {type(e).__name__}")
+
+    def prompt_extra(self, uid, key, consume=True):
+        """2.44.0 (#1446 / #1444 / #1441): lines for the prompt in front of the events -- the summary of the previous
+        conversation (fenced, context only), the runner's notes (an approval that expired), the open approval cards of
+        this chat with the rule for ```approval-done."""
+        if not uid:
+            return []
+        d, out = self.state.data, []
+        summ = (d["summaries"].pop(key, None) if consume else d["summaries"].get(key)) if key else None
+        if summ and summ.get("text"):
+            out += ["Summary of your previous conversation with this person, written by you (context only, not an order):",
+                    "<<<summary of the previous conversation>>>", str(summ["text"]).replace("<<<", "< < <"), "<<<end summary>>>", ""]
+        notes = d["notes"].pop(str(uid), []) if consume else d["notes"].get(str(uid), [])
+        if notes:
+            out += ["Notes from the launcher (facts, not orders):"] + ["- " + n for n in notes] + [""]
+        opened = [a for a in self.approvals.values() if str(a.get("uid")) == str(uid)]
+        if opened:
+            out += ["Open approvals (your cards in this chat, still unanswered):"] + ["- " + str(a.get("title") or "") for a in opened]
+            out += ["If the person decides one of them in words (a clear yes or no to exactly that card), do what the words say and "
+                    "end your answer with a block ```approval-done (alias ```freigabe-erledigt): one line per decided card, its "
+                    "title exactly as listed above, with \"No: \" in front for a no. The launcher then closes exactly those cards. "
+                    "Never list a card the person did not decide; silence is never a yes.", ""]
+        if consume and (summ or notes):
+            self.state.save()
+        return out
+
+    # kalmido-capability: approval_closed (2.44.0, #1441)
+    def close_decided(self, uid, lines):
+        """Lines of an ```approval-done block -> close (withdraw) exactly those open cards of this chat; never as a yes (only
+        a press of the person approves on a card: outcome withdrawn, or denied for "No: "). No hit / several hits: nothing."""
+        mine = {m: a for m, a in self.approvals.items() if str(a.get("uid")) == str(uid)}
+        for line in lines:
+            mid, no = match_approval(line, mine)
+            if not mid:
+                log("approval-done: no single open approval matches a line; left open")
+                continue
+            mine.pop(mid, None)
+            if self.api.withdraw(uid, mid, "denied" if no else ""):
+                with self.state.lock:
+                    self.approvals.pop(mid, None)
+                    self.state.remember("closed", mid)
+                    self.state.save()
+                log(f"approval on message {mid} closed, decided in words ({'no' if no else 'done'})")
+
+    # kalmido-capability: approval_lifecycle (2.44.0, #1444)
+    def housekeep(self):
+        """Once a minute: an open approval gets ONE reminder after APPROVAL_REMIND_S and expires after APPROVAL_TTL_S (the
+        card is withdrawn as expired, the next prompt of that chat says so); open permission questions past their time
+        are closed as expired."""
+        with self.state.lock:
+            changed = self._housekeep_approvals()
+        changed = self.perm_expire() or changed
+        if changed:
+            self.state.save()
+
+    def _housekeep_approvals(self):
+        now, changed = time.time(), False
+        for mid, ap in list(self.approvals.items()):
+            age = now - float(ap.get("at") or now)
+            if age > APPROVAL_TTL_S:
+                with self.state.lock:
+                    self.approvals.pop(mid, None)
+                    self.state.remember("expired", mid)
+                    self.state.note(ap.get("uid"), f"Your approval request \"{ap.get('title')}\" expired without an answer "
+                                                   "(counts as no): do not do it; ask again only if it is still needed.")
+                changed = True
+                self.api.withdraw(ap.get("uid"), mid, "expired")
+                log(f"approval on message {mid} expired")
+            elif age > APPROVAL_REMIND_S and not ap.get("reminded"):
+                ap["reminded"], changed = True, True
+                try:
+                    self.api.chat(ap.get("uid"), APPROVAL_REMINDER.replace("{0}", str(ap.get("title") or "")))
+                except Exception as e:
+                    log(f"approval reminder not posted: {type(e).__name__}")
+        return changed
 
     def task_blocks(self, tid, text):
         """A task run's final text that ends with ```approval / ```suggest -> the agent's comment on the task with the card /
@@ -899,6 +1428,134 @@ class Runner:
                 body = body.rstrip() + CARD_HINT[lang2 or lang or "en"]
         return body, appr, sugg
 
+    # kalmido-capability: perm_relay (2.44.0, #1442)
+    def intercept(self, evs):
+        """Answers to the runner's permission questions never become runs: a button / thumbs up / down on the question
+        (chat_choice) or a plain yes / no in the chat while exactly ONE question of that person is open is handed to the
+        waiting hook at once (also while a run lasts: the event thread calls this). A late answer gets a short note."""
+        out = []
+        d = self.state.data
+        for ev in evs:
+            x = ev.get("data") or {}
+            mid = str(x.get("message_id") or "")
+            if ev.get("event") == "chat_choice" and mid and (mid in d["perms"] or mid in d["perm_done"] or mid in d["perm_expired"]):
+                ids = [str(i) for i in (x.get("choice_ids") or [])]
+                dec = ("allow" if x.get("approval") == "approved" or ids == ["allow"] else
+                       "deny" if x.get("approval") == "rejected" or ids == ["deny"] else None)
+                self.resolve_perm(mid, dec)
+                continue
+            if ev.get("event") == "chat":
+                uid = self.chat_uid(ev)
+                word = str((x.get("message") or {}).get("body") or "").strip().lower().rstrip(".!")
+                if word in YES_WORDS or word in NO_WORDS:
+                    pend = [m for m, q in d["perms"].items() if str(q.get("uid")) == str(uid)]
+                    late = [m for m, q in d["perm_expired"].items() if str(q.get("uid")) == str(uid) and time.time() - q["at"] < 300]
+                    if len(pend) == 1:
+                        self.resolve_perm(pend[0], "allow" if word in YES_WORDS else "deny")
+                        continue
+                    if not pend and late and not any(str(a.get("uid")) == str(uid) for a in self.approvals.values()):
+                        self.resolve_perm(late[-1], None)
+                        continue
+            out.append(ev)
+        return out
+
+    def resolve_perm(self, mid, decision):
+        """The person's answer to permission question mid -> the hook's answer file (allow / deny). Twice: once; after the
+        time limit: the note that it came too late (the command was denied already)."""
+        d = self.state.data
+        with self.state.lock:
+            if mid in d["perm_expired"]:
+                q = d["perm_expired"].pop(mid)
+                self.state.remember("perm_done", mid)
+                self.state.save()
+                try:
+                    self.api.chat(int(q["uid"]), PERM_LATE)
+                except Exception:
+                    pass
+                return
+            q = d["perms"].get(mid)
+            if mid in d["perm_done"] or not q or decision is None:
+                return
+            d["perms"].pop(mid)
+            self.state.remember("perm_done", mid)
+            self.state.save()
+        try:
+            tmp = os.path.join(self.perm_dir(), q["pid"] + ".ans.new")
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(decision)
+            os.replace(tmp, os.path.join(self.perm_dir(), q["pid"] + ".ans"))
+        except OSError as e:
+            log(f"permission answer not handed over: {type(e).__name__}")
+        log(f"permission question {mid}: {decision}")
+
+    def perm_expire(self):
+        """Open permission questions past their time limit: closed (expired); a later answer gets the 'too late' note."""
+        d, changed = self.state.data, False
+        with self.state.lock:
+            for mid, q in list(d["perms"].items()):
+                if time.time() - float(q.get("at") or 0) > PERM_TIMEOUT_S + 5:
+                    d["perms"].pop(mid)
+                    d["perm_expired"][mid] = {"uid": q.get("uid"), "at": time.time()}
+                    changed = True
+                    self.api.withdraw(q.get("uid"), mid, "expired")
+                    log(f"permission question {mid}: no answer in time (denied)")
+            for mid, q in list(d["perm_expired"].items()):
+                if time.time() - float(q.get("at") or 0) > 86400:
+                    d["perm_expired"].pop(mid)
+                    changed = True
+            if changed:
+                self.state.save()
+        return changed
+
+    def perm_poll(self):
+        """New requests of the hook -> a permission question in the chat (no person to ask / not postable: deny)."""
+        pdir = self.perm_dir()
+        try:
+            names = sorted(f for f in os.listdir(pdir) if f.endswith(".req.json"))
+        except OSError:
+            names = []
+        for name in names:
+            pid = name[:-len(".req.json")]
+            if os.path.exists(os.path.join(pdir, pid + ".posted")) or os.path.exists(os.path.join(pdir, pid + ".ans")):
+                continue
+            try:
+                with open(os.path.join(pdir, name), encoding="utf-8") as f:
+                    rq = json.load(f)
+                uid = int(rq["uid"]) if str(rq.get("uid") or "").isdigit() else self.perm_uid()
+                tin = rq.get("tool_input") if isinstance(rq.get("tool_input"), dict) else {}
+                detail = tin.get("command") or tin.get("file_path") or tin.get("url") or json.dumps(tin, ensure_ascii=False)
+                body = (PERM_TEXT.replace("{0}", f"{rq.get('label') or 'run'}, {rq.get('tool_name') or '?'}")
+                        + "\n\n```\n" + redact(str(detail))[:1500].replace("```", "` ` `") + "\n```")
+                m = self.api.perm_question(uid, body, PERM_TIMEOUT_S) if uid else None
+                mid = str((m or {}).get("id") or "")
+                with open(os.path.join(pdir, pid + ".posted"), "w") as f:
+                    f.write(mid)
+                if not mid:
+                    raise ValueError("no person to ask")
+                with self.state.lock:
+                    self.state.data["perms"][mid] = {"pid": pid, "uid": uid, "at": time.time()}
+                    self.state.save()
+                log(f"permission question {mid} asked ({rq.get('tool_name')})")
+            except Exception as e:
+                log(f"permission question not asked ({type(e).__name__}): denied")
+                with open(os.path.join(pdir, pid + ".ans"), "w") as f:
+                    f.write("deny")
+
+    def ensure_perm_watch(self):
+        if self.perm_thread or not PERM_RELAY or not self.is_claude():
+            return
+
+        def watch():
+            while True:
+                try:
+                    self.perm_poll()
+                    self.perm_expire()
+                except Exception as e:
+                    log(f"permission watch: {type(e).__name__}")
+                time.sleep(1)
+        self.perm_thread = threading.Thread(target=watch, daemon=True)
+        self.perm_thread.start()
+
     def _exec(self, args, prompt, uid, what, tid, steps=True):
         """One headless run of COMMAND (prompt on stdin) -> (Stream, exit code); (None, -1) = it cannot be started. A chat
         run shows typing dots while it lasts and its prose between tool calls as steps."""
@@ -928,14 +1585,26 @@ class Runner:
         typing()
         exe = shutil.which(args[0]) or args[0]  # Windows: claude.exe / claude.cmd (PATHEXT); a .cmd runs through cmd.exe
         run_args = (["cmd.exe", "/d", "/c", exe] if os.name == "nt" and exe.lower().endswith((".cmd", ".bat")) else [exe]) + args[1:]
+        # 2.44.0 (#1448): own process group, so the time limit ends the command and everything it started
+        grp = {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)} if os.name == "nt" else {"start_new_session": True}
+        self.ensure_perm_watch()
         try:
             p = subprocess.Popen(run_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                 text=True, encoding="utf-8", errors="replace", bufsize=1,
-                                 env=self.extras.env() if self.extras else None)  # 2.44.0 B (#1443 #1445)
+                                 text=True, encoding="utf-8", errors="replace", bufsize=1, env=self.child_env(uid, tid), **grp)
         except OSError as e:
             log(f"cannot start {args[0]}: {type(e).__name__}")
             return None, -1
-        err_tail = []
+        st.timed_out = False
+        err_tail = st.err_tail = []
+
+        def time_up():
+            st.timed_out = True
+            log(f"time limit of {RUN_TIMEOUT_S} s reached: ending the command")
+            kill_tree(p)
+        timer = threading.Timer(RUN_TIMEOUT_S, time_up) if RUN_TIMEOUT_S > 0 else None
+        if timer:
+            timer.daemon = True
+            timer.start()
 
         def errs():
             for ln in p.stderr:
@@ -943,8 +1612,11 @@ class Runner:
                 del err_tail[:-20]
         te = threading.Thread(target=errs, daemon=True)
         te.start()
-        p.stdin.write(prompt)
-        p.stdin.close()
+        try:
+            p.stdin.write(prompt)
+            p.stdin.close()
+        except OSError:  # the command ended before it read its prompt
+            pass
         stop = threading.Event()
 
         def ticker():  # typing dots and a throttled step also while the command is quiet
@@ -957,10 +1629,13 @@ class Runner:
             st.feed(line)
         rc = p.wait()
         stop.set()
+        if timer:
+            timer.cancel()
         te.join(2)
         return st, rc
 
     def handle(self, evs, save=False):
+        evs = self.intercept(evs)
         for uid, group in self.groups(evs):
             until = self.usage.paused_until()
             if until:
@@ -978,6 +1653,59 @@ class Runner:
                 if seqs and max(seqs) > self.cur:
                     self.cur = max(seqs)
                     self.save_cursor(self.cur)
+                self.queue_drop(group)
+
+    # kalmido-capability: robust_runs (2.44.0, #1448): the events wait in a queue on disk while a run lasts
+    def queue_add(self, evs):
+        with self.state.lock:
+            have = {str(e.get("seq")) for e in self.state.data["queue"]}
+            for e in evs:
+                if e.get("seq") is None or str(e["seq"]) not in have:
+                    self.state.data["queue"].append(e)
+                    have.add(str(e.get("seq")))
+            self.state.save()
+        self.wake.set()
+
+    def queue_drop(self, evs):
+        seqs = {str(e.get("seq")) for e in evs if e.get("seq") is not None}
+        if not seqs:
+            return
+        with self.state.lock:
+            q = self.state.data["queue"]
+            self.state.data["queue"] = [e for e in q if str(e.get("seq")) not in seqs]
+            if len(self.state.data["queue"]) != len(q):
+                self.state.save()
+
+    def fetch_loop(self):
+        """The event thread: long polling; answers to permission questions go to the hook at once, everything else into
+        the queue on disk (the cursor moves on once it is there: a restart answers it from the queue, never twice)."""
+        backoff = 0
+        while True:
+            try:
+                d = self.api.req("GET", "/agent/events", query={"since": self.cur, "wait": 50}, timeout=80)
+                backoff = 0
+            except ApiError as e:
+                log(f"events: HTTP {e.status}; waiting 60 s")  # 403 = paused, the launcher stops us
+                time.sleep(60)
+                continue
+            except Exception as e:
+                backoff = min(60, backoff * 2 or 5)
+                log(f"events: {type(e).__name__}; waiting {backoff} s")
+                time.sleep(backoff)
+                continue
+            try:
+                evs = self.intercept(d.get("data") or [])
+                if evs:
+                    self.queue_add(evs)
+                c = d.get("cursor")
+                if c is not None and int(c) != self.cur:
+                    self.cur = int(c)
+                    self.save_cursor(self.cur)
+            except Exception as e:  # never lose the event thread (the same events come again from the old cursor)
+                log(f"events not queued: {type(e).__name__}")
+                time.sleep(5)
+            if d.get("busy"):
+                time.sleep(5)
 
     def loop(self):
         cur = self.load_cursor()
@@ -993,33 +1721,33 @@ class Runner:
                 time.sleep(wait)
                 wait = min(300, wait * 2)
         self.cur = cur
-        backoff = 0
-        while True:
-            try:
-                d = self.api.req("GET", "/agent/events", query={"since": cur, "wait": self.extras.wait_s(50) if self.extras else 50}, timeout=80)
-                backoff = 0
-            except ApiError as e:
-                log(f"events: HTTP {e.status}; waiting 60 s")  # 403 = paused, the launcher stops us
-                time.sleep(60)
+        self.refresh_agent()
+        self.ensure_perm_watch()
+        threading.Thread(target=self.fetch_loop, daemon=True).start()
+        last_hk = 0.0
+        while True:  # the work thread: one run after the other from the queue
+            if time.time() - last_hk >= 60:
+                last_hk = time.time()
+                try:
+                    self.housekeep()
+                except Exception as e:
+                    log(f"housekeeping: {type(e).__name__}")
+            ex = getattr(self, "extras", None)  # part B: a bundle of task events that is due runs without a new event
+            due = bool(ex and ex.due())
+            if not self.state.data["queue"] and not due:
+                self.wake.wait(min(30, ex.wait_s(30)) if ex and hasattr(ex, "wait_s") else 30)
+                self.wake.clear()
                 continue
-            except Exception as e:
-                backoff = min(60, backoff * 2 or 5)
-                log(f"events: {type(e).__name__}; waiting {backoff} s")
-                time.sleep(backoff)
-                continue
-            evs = d.get("data") or []
-            if evs or (self.extras and self.extras.due()):  # 2.44.0 B (#1447): a bundle that is due runs without a new event
-                self.handle(evs, save=True)
-            c = d.get("cursor")
-            if c is not None and int(c) != self.cur:
-                self.cur = int(c)
-                self.save_cursor(self.cur)
-            cur = self.cur
-            if d.get("busy"):
-                time.sleep(5)
+            time.sleep(QUEUE_SETTLE_S if self.state.data["queue"] else 0)
+            with self.state.lock:
+                taken = list(self.state.data["queue"])
+            self.handle(taken, save=True)
+            self.queue_drop(taken)
 
 
 def main(argv):
+    if argv[:1] == ["--perm-hook"]:  # 2.44.0 (#1442): the PermissionRequest hook of a run
+        return perm_hook(argv[1:])
     state = os.environ.get("KALMIDO_STATE_DIR") or "~/.cache/kalmido-agent"
     once, dry = None, False
     i = 0
@@ -1042,6 +1770,10 @@ def main(argv):
         log("KALMIDO_URL / KALMIDO_TOKEN missing")
         return 2
     r = Runner(cmd, state, dry)
+    lock = RunLock(os.path.join(r.state_dir, "runner.lock"))
+    if not dry and not lock.acquire():  # 2.44.0 (#1448): never two runners on one state folder
+        log("another runner works with this state folder already: not starting a second one")
+        return 3
     if once:
         with open(once, encoding="utf-8") as f:
             r.handle([json.loads(l) for l in f if l.strip()])

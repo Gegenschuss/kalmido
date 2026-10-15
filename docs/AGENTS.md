@@ -1442,10 +1442,20 @@ starts the next run. 2.40.0 (approval check): a chat answer that asks to decide 
 goes back to the agent once in the same session (`--resume`: the complete answer with the block, no tools); still none ->
 it is posted with a visible note that nothing happens without an explicit yes (`KALMIDO_APPROVAL_CHECK=0`: off). 2.42.0
 (#1383): the final text of a **task** run is posted nowhere unless it ends with a block ` ```approval ` or ` ```suggest `;
-then it becomes the agent's comment on that task with the approval card / the answer buttons. A server without steps, host info, plan usage or approval cards (before 2.32 / 2.33 / 2.35) is
+then it becomes the agent's comment on that task with the approval card / the answer buttons. 2.44.0: the open cards of a
+chat stand in its prompt and a final block ` ```approval-done ` closes exactly the cards the person decided in words
+(`POST /api/v1/agent/chats/{user_id}/messages/{id}/withdraw`, never as a yes); open cards live in the state folder, get one
+reminder after 2 h and expire after 7 days; with Claude Code a `PermissionRequest` hook (handed in per run with
+`--settings`) asks the person in the chat before a tool outside the allow list (`permission: true`, 9 minutes, no answer =
+no, `KALMIDO_PERM_RELAY=0`: off), and each person's chat goes on in one conversation (`--resume`; a new one after size,
+runs, a pause, a new day, a model change or *Reset now*, with a summary as context; `KALMIDO_SESSION_RESUME=0`: off); 429
+is tried again after 5 / 15 / 30 / 60 s, a run has a time limit (`KALMIDO_RUN_TIMEOUT`, default 3600 s) and two tries,
+events wait in a queue on disk and a lock stops a second runner on the same state folder. A server without steps, host info, plan usage or approval cards (before 2.32 / 2.33 / 2.35) is
 detected by its answer (404 / 400) and the feature is switched off once. Keys in the env file: `KALMIDO_EVENTS=1` (same
 as `--events`), `KALMIDO_PROMPT_FILE`, `KALMIDO_STATE_DIR` (event cursor, default `~/.cache/kalmido-agent`),
-`KALMIDO_PERMISSION_MODE`, `KALMIDO_USAGE_LIMIT`, `KALMIDO_USAGE_FILE`, `KALMIDO_USAGE_MAX_AGE_H` (default 6: older
+`KALMIDO_PERMISSION_MODE`, `KALMIDO_PERM_RELAY`, `KALMIDO_PERM_TIMEOUT`, `KALMIDO_PERM_USER`, `KALMIDO_APPROVAL_REMIND`,
+`KALMIDO_APPROVAL_TTL`, `KALMIDO_SESSION_RESUME`, `KALMIDO_SESSION_MAX_TOKENS`, `KALMIDO_SESSION_MAX_RUNS`,
+`KALMIDO_SESSION_IDLE_MIN`, `KALMIDO_RUN_TIMEOUT` (2.44.0), `KALMIDO_USAGE_LIMIT`, `KALMIDO_USAGE_FILE`, `KALMIDO_USAGE_MAX_AGE_H` (default 6: older
 values count as unknown), `KALMIDO_PYTHON`. The list of these capabilities is
 [`mcp/launcher_capabilities.json`](../mcp/launcher_capabilities.json); `tests/launcher_parity_test.py` fails when one of the
 two launchers lacks one.

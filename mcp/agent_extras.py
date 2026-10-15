@@ -252,10 +252,11 @@ class Extras:
         out.append(f"<<<end task {int(tid)}>>>")
         return out
 
-    def build(self, build_prompt, evs, uid):
-        """The prompt of a run: the normal one (a bundle is no event of its own there) plus notes, bundle, hints."""
+    def build(self, build_prompt, evs, uid, extra=None):
+        """The prompt of a run: the normal one (a bundle is no event of its own there) plus notes, bundle, hints;
+        extra = the runner's own lines (open approvals, summary of the last conversation)."""
         bundles = [e for e in evs if e.get("event") == "task_bundle"]
-        prompt = self.decorate(build_prompt([e for e in evs if e.get("event") != "task_bundle"], uid), uid, evs)
+        prompt = self.decorate(build_prompt([e for e in evs if e.get("event") != "task_bundle"], uid, extra), uid, evs)
         for b in bundles:
             prompt += "\n\n" + "\n".join(self.bundle_lines(b))
         return prompt
