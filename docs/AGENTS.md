@@ -1294,6 +1294,8 @@ Agents read files like this:
 | Send files in the chat | `POST /api/v1/agent/chats/{user_id}` as `multipart/form-data`: `body` (optional with files), `task_id`, `file` (repeatable) | `send_chat` with `files: [{name, base64, mime?}]` |
 | Write a text file onto a task (2.30.0) | `POST /api/v1/tasks/{id}/attachments/text` with `{name, content}` (needs `attachments:write`) | `create_text_file` |
 
+The reference starter (`mcp/agent_run.py`, [AGENT-SETUP.md](AGENT-SETUP.md#9-autostart-with-the-runtime-launcher)) uses this for you (2.44.0): files in the run's folder `$KALMIDO_OUTBOX` and images the agent looked at go as one multipart chat message before the answer; a job (`mcp/agent_job.py`) posts its result with `job_id` and its files; task events of lists the agent listens in are bundled into one run.
+
 Permissions are the app's: an agent reads files only of tasks it sees with their comments (a list shared with it; as a
 participant only its own tasks) and only of its own conversations; anything else is `404`. `get_attachment` returns
 `name`, `mime`, `size` and `base64`, at most `max_bytes` (default 5 MB, at most 20 MB); images also come as an MCP image

@@ -443,6 +443,32 @@ chat messages of one person that arrive together: one run). It does what a hoste
 - **Task answers** (2.42.0): the final text of a task run is posted nowhere (the agent comments with its tools) -- unless it
   ends with a block ` ```approval ` or ` ```suggest `: then that text becomes the agent's comment on the task with the
   approval card / the answer buttons (servers before 2.41: the plain comment with the question / the numbered steps).
+- **Files at the answer** (2.44.0, [`mcp/agent_extras.py`](../mcp/agent_extras.py)): every chat run gets a fresh folder, `$KALMIDO_OUTBOX`.
+  What the agent puts there is attached to its chat answer (up to 10 files, `KALMIDO_MAX_FILE_MB` per file, default 50 like the
+  server; the MIME type comes from the file ending), sent as a message of its own just before the answer so the answer's
+  buttons stay the newest message. Images the agent only **looks at** with its Read tool are copied there and attached too (chat runs
+  only; task runs have no folder; folders named in `KALMIDO_NO_AUTO_IMAGE_DIRS`, and any path with a part `uploads` or
+  `chat-attachments`, are never attached, so the person's own uploads do not come back). The prompt tells the agent about the folder. Needs
+  a server with chat files (2.13.1+); older servers get nothing.
+- **Long work as a job** (2.44.0, [`mcp/agent_job.py`](../mcp/agent_job.py)): work that takes more than about ten minutes (a release
+  build, an audit, a full test run) the agent starts with `python3 agent_job.py start --title "..." [--worktree] -` (the brief on
+  stdin). The job is an own background run of the same command (it survives a restart of the runner), shows as a job in the Agents
+  tab with its steps and progress lines (`agent_job.py progress ID "..."`), and posts its complete result, with the files in its own
+  outbox, into the chat. The next chat run gets a note that the job is done. *Stop* on the job stops the process. When the plan
+  limit ends a run, the job waits for the reset (+ 2 minutes) and continues the **same session** (`--resume`, at most 3 times).
+  `--worktree` gives it its own `git worktree` and branch `job/<id>` (at most `KALMIDO_JOB_WORKTREES` open, default 2); `list`,
+  `status ID` and `stop ID` do what they say; `KALMIDO_JOB_TIMEOUT_H` (default 6) ends a job that runs too long. After the
+  command compacted its conversation (`compact_boundary`) the brief is played in again -- this needs an agent command that
+  takes a stream of user messages (Claude Code: `--input-format stream-json`, used automatically for a command named `claude`);
+  other commands cannot be reminded. Stop, resume and the brief survive because everything lives in the state folder
+  (`jobs/<id>/`). Without Claude Code's session id there is no resume: a limit ends the job with its error.
+- **Task events bundled** (2.44.0): new or moved tasks (`task_added`, `tasks_added`, `tidy`; the server sends them only to agents that
+  listen in) are collected for 2 minutes (`KALMIDO_BUNDLE_S`) and handled in **one** run that only answers, checks or asks on the
+  tasks -- never builds. The run carries each task with its description and the latest comments. Pure information (`missed`,
+  `playbook_proposal`, a Stop of a job the runner does not know) does not start a run; it waits as a note for the next one. With
+  `KALMIDO_OWNER_IDS=1,5` (user ids) the events of anyone else count as information too. Task events with a task (a comment, a mention)
+  also carry the task text. Chat messages are never held back. The collected events live in the state folder (`bundle.json`),
+  a restart loses nothing.
 - **Older servers** (before 2.32 / 2.33 / 2.35): what the server does not know yet is switched off once; the rest runs as
   before.
 
