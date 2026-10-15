@@ -77,7 +77,8 @@ def mail_info():
             lists.append({"list_id": lid, "name": l["name"], "address": mail_addr(t)})
     u = c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone()
     return jsonify(enabled=MAIL_IN_ON, address=mail_addr(toks.get(None)) if MAIL_IN_ON else "", plain=MAIL_ADDRESS if MAIL_IN_ON else "",
-                   lists=lists if MAIL_IN_ON else [], from_me=s.get("mail_from_me") == "1", email=(u["email"] if u else "") or "",
+                   lists=lists if MAIL_IN_ON else [], from_me=s.get("mail_from_me") == "1",
+                   trim_fwd=s.get("mail_trim_fwd") == "1", trim_eml=s.get("mail_trim_eml") != "0",  # 2.49.0 (#971) email=(u["email"] if u else "") or "",
                    digest={"enabled": MAIL_OUT_ON, "on": s.get("digest_mail") == "1", "time": s.get("digest_time") or ""})
 
 
@@ -179,6 +180,15 @@ def mail_import(c, raw):
         return None
     subj = MAIL_PREFIX_RE.sub("", str(msg.get("Subject", "")).replace("\n", " ")).strip()
     text, files = mail_text(msg)
+    us = usettings(c, uid)
+    eml = None
+    if us.get("mail_trim_fwd") == "1":  # 2.49.0 (#971): a forwarded mail shrinks to one header line + the message; the original stays as .eml
+        from .mailtrim import md_trim_forward
+        short = md_trim_forward(text)
+        if short != text:
+            text = short
+            if us.get("mail_trim_eml") != "0":
+                eml = raw
     lg = lang(c, uid)
     sender = str(msg.get("From", "")).strip()
     title = subj or (text.split("\n", 1)[0][:120] if text else tr("E-mail", lg=lg))
@@ -194,6 +204,8 @@ def mail_import(c, raw):
         agent_added_events(c, tid, source="mail")  # 2.23.0 (#795)
     else:
         tid = new_inbox_task(c, uid, title, content, "mail:" + mid, url)
+    if eml is not None:
+        files = [((subj[:60].replace("/", "-").strip() or "mail") + ".eml", "message/rfc822", eml)] + files
     for name, mime, data in files[:20]:
         if 0 < len(data) <= MAX_FILE_MB * 1024 * 1024:
             try:

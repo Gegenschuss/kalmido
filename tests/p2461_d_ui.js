@@ -24,7 +24,7 @@ const sql = (q, args = []) => execFileSync('python3', [path.join(__dirname, 'dbx
   check(r.ok, 'setup');
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['comments']});
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', show_done_default: '1', show_done_new: '0'});  // 2.49.0 (#1535): the old defaults (completed stay visible)
   const L = {};
   for (const n of ['Report North', 'Report South', 'Garden', 'Kitchen', 'Busy project']) L[n] = (await call('POST', '/api/lists', {name: n})).id;
   await call('PUT', `/api/lists/${L.Kitchen}/favorite`, {});

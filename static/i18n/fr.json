@@ -6984,5 +6984,10 @@
   "Sky blue": "Bleu ciel",
   "Brown": "Marron",
   "Show colours for people": "Afficher les couleurs des personnes",
-  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Chaque personne et chaque agent a une couleur fixe : le cercle derrière les initiales, un fin anneau autour d’une photo. Désactivé : seuls les agents sont colorés."
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Chaque personne et chaque agent a une couleur fixe : le cercle derrière les initiales, un fin anneau autour d’une photo. Désactivé : seuls les agents sont colorés.",
+  "Hide completed tasks in new lists": "Masquer les tâches terminées dans les nouvelles listes",
+  "A new list hides its completed tasks; the list’s “…” menu shows them again. A folder default goes first, existing lists stay as they are. For all your devices.": "Une nouvelle liste masque ses tâches terminées ; le menu « … » de la liste les affiche à nouveau. Un réglage de dossier est prioritaire ; les listes existantes ne changent pas. Pour tous vos appareils.",
+  "Shorten forwarded mails": "Raccourcir les e-mails transférés",
+  "Keep the original mail as an attachment": "Garder l’e-mail d’origine en pièce jointe",
+  "A forwarded mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.": "Un e-mail transféré devient le titre (sans « Fwd: ») avec une ligne « De … , date » au-dessus du message ; signatures, mentions légales et anciennes réponses citées sont supprimées. Vos propres mots au-dessus du transfert restent."
 }

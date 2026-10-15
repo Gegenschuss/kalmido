@@ -6984,5 +6984,10 @@
   "Sky blue": "Himmelblau",
   "Brown": "Braun",
   "Show colours for people": "Farben für Personen anzeigen",
-  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Jede Person und jeder Agent hat eine feste Farbe: der Kreis hinter den Initialen, ein dünner Ring um ein Foto. Aus: nur Agenten sind farbig."
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Jede Person und jeder Agent hat eine feste Farbe: der Kreis hinter den Initialen, ein dünner Ring um ein Foto. Aus: nur Agenten sind farbig.",
+  "Hide completed tasks in new lists": "Erledigte Aufgaben in neuen Listen ausblenden",
+  "A new list hides its completed tasks; the list’s “…” menu shows them again. A folder default goes first, existing lists stay as they are. For all your devices.": "Eine neue Liste blendet ihre erledigten Aufgaben aus; im „…“-Menü der Liste lassen sie sich wieder zeigen. Eine Ordner-Vorgabe geht vor, bestehende Listen bleiben unverändert. Für alle deine Geräte.",
+  "Shorten forwarded mails": "Weitergeleitete Mails kürzen",
+  "Keep the original mail as an attachment": "Die Original-Mail als Anhang behalten",
+  "A forwarded mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.": "Eine weitergeleitete Mail wird zum Titel (ohne „Fwd:“) mit einer Zeile „Von … , Datum“ über der Nachricht; Signaturen, Rechtshinweise und ältere zitierte Antworten werden entfernt. Deine eigenen Worte oberhalb der Weiterleitung bleiben."
 }

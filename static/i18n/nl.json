@@ -6984,5 +6984,10 @@
   "Sky blue": "Hemelsblauw",
   "Brown": "Bruin",
   "Show colours for people": "Kleuren voor personen tonen",
-  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Elke persoon en elke agent heeft een vaste kleur: de cirkel achter de initialen, een dunne ring om een foto. Uit: alleen agenten zijn gekleurd."
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Elke persoon en elke agent heeft een vaste kleur: de cirkel achter de initialen, een dunne ring om een foto. Uit: alleen agenten zijn gekleurd.",
+  "Hide completed tasks in new lists": "Voltooide taken in nieuwe lijsten verbergen",
+  "A new list hides its completed tasks; the list’s “…” menu shows them again. A folder default goes first, existing lists stay as they are. For all your devices.": "Een nieuwe lijst verbergt haar voltooide taken; het menu „…” van de lijst toont ze weer. Een mapstandaard gaat voor; bestaande lijsten blijven zoals ze zijn. Voor al je apparaten.",
+  "Shorten forwarded mails": "Doorgestuurde e-mails inkorten",
+  "Keep the original mail as an attachment": "De originele e-mail als bijlage bewaren",
+  "A forwarded mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.": "Een doorgestuurde e-mail wordt de titel (zonder „Fwd:”) met één regel „Van … , datum” boven het bericht; handtekeningen, juridische teksten en oudere geciteerde antwoorden verdwijnen. Je eigen woorden boven de doorverwijzing blijven staan."
 }

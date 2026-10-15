@@ -6814,3 +6814,17 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 /* 2.46.7 (#1708): touch targets of the Lists summary and the workspace button (device test) */
 .aglists>summary{min-height:2.75rem}
 @media (pointer:coarse){.agnm .avws{min-height:2.75rem}}
+
+/* 2.49.0 D (#1769) the x in a toast: closes it without the action; 32 px target on the phone */
+#toast button.tx{flex:none;display:grid;place-items:center;width:2rem;height:2rem;margin:-.25rem -.25rem -.25rem -.25rem;border-radius:50%;color:var(--muted);font-weight:400}
+#toast button.tx:hover{color:var(--text);background:rgba(127,127,127,.18)}
+@media (pointer:coarse){ #toast button.tx{min-width:2rem;min-height:2rem;padding:0} }
+
+/* 2.49.0 D (#1766) ticking off: the line runs over the title (ui-strike), then the row folds away (ui-gone, only when completed
+   tasks are hidden). Height is animated on purpose here; reduced motion draws the line at once (ui-now) and drops the row. */
+@keyframes ui_strike{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.trow.ui-strike .ttl{position:relative;color:var(--muted);transition:color .35s}
+.trow.ui-strike .ttl::after{content:'';position:absolute;left:0;right:0;top:55%;height:1.5px;background:var(--faint);transform-origin:left center;animation:ui_strike .35s ease-out forwards;pointer-events:none}
+.trow.ui-strike.ui-now .ttl{transition:none}
+.trow.ui-strike.ui-now .ttl::after{animation:none}
+.trow.ui-gone{height:0!important;min-height:0;opacity:0;overflow:hidden;padding-top:0;padding-bottom:0;margin-top:0;margin-bottom:0;border-width:0;pointer-events:none;transition:height .25s ease-in,opacity .25s ease-in,padding .25s ease-in,margin .25s ease-in}

@@ -6984,5 +6984,10 @@
   "Sky blue": "Azul cielo",
   "Brown": "Marrón",
   "Show colours for people": "Mostrar colores para personas",
-  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Cada persona y cada agente tiene un color fijo: el círculo detrás de las iniciales, un anillo fino alrededor de una foto. Desactivado: solo los agentes tienen color."
+  "Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.": "Cada persona y cada agente tiene un color fijo: el círculo detrás de las iniciales, un anillo fino alrededor de una foto. Desactivado: solo los agentes tienen color.",
+  "Hide completed tasks in new lists": "Ocultar las tareas completadas en las listas nuevas",
+  "A new list hides its completed tasks; the list’s “…” menu shows them again. A folder default goes first, existing lists stay as they are. For all your devices.": "Una lista nueva oculta sus tareas completadas; el menú «…» de la lista las vuelve a mostrar. Un valor de carpeta tiene prioridad; las listas existentes no cambian. Para todos tus dispositivos.",
+  "Shorten forwarded mails": "Acortar los correos reenviados",
+  "Keep the original mail as an attachment": "Conservar el correo original como adjunto",
+  "A forwarded mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.": "Un correo reenviado pasa a ser el título (sin «Fwd:») con una línea «De … , fecha» sobre el mensaje; se quitan firmas, avisos legales y respuestas citadas antiguas. Tus propias palabras sobre el reenvío se conservan."
 }

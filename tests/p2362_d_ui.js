@@ -33,7 +33,7 @@ const groupOf = row => row?.closest('.group');
   const ids = {};
   for (const u of ['bob', 'carol', 'dave']) ids[u] = (await call('POST', '/api/users', {username: u, display_name: u[0].toUpperCase() + u.slice(1), password: 'password123', email: `${u}@example.com`})).id;
   for (const u of ['bob', 'carol', 'dave']) CK[u] = await login(u);
-  for (const u of ['alice', 'bob', 'carol', 'dave']) await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'}, u);
+  for (const u of ['alice', 'bob', 'carol', 'dave']) await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', show_done_default: '1', show_done_new: '0'}, u);  // 2.49.0 (#1535): the old defaults (completed stay visible)
   const share = async (lid, uid, who = 'alice') => { let r = await call('PUT', `/api/lists/${lid}/members`, {user_id: uid, role: 'edit'}, who); if (r.status === 409) r = await call('PUT', `/api/lists/${lid}/members`, {user_id: uid, role: 'edit', bridge_ok: true}, who); check(r.status === 200, 'setup: share ' + JSON.stringify(r).slice(0, 80)); };
   // lists: a project with two sections, a plain list, a plain list with a section, a shopping list, a list with done at the bottom
   const P = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;

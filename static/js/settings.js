@@ -189,6 +189,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-review': ['review_time', N_('Daily review at'), 'time'],
   's-brief': ['brief_time', N_('Morning briefing at'), 'time'],  // 2.34.0 (#264)
   's-lemo': ['list_emoji', N_('Suggest icons for new lists'), 'chk'],  // 2.32.0 (#1077)
+  's-sdn': ['show_done_new', N_('Hide completed tasks in new lists'), 'chk'],  // 2.49.0 (#1535)
   's-prbg': ['prio_bg', N_('Priority as background'), 'sel'],  // 2.40.0 (#1416)
   's-pcol': ['person_colors', N_('Show colours for people'), 'chk'],  // 2.47.1 (#1721)
   's-sideic': ['side_icons', N_('List icons'), 'sel'], 's-sideprog': ['side_progress', N_('Progress in the sidebar'), 'chk'],  // 2.36.0 (#1117)
@@ -256,7 +257,7 @@ function settingsSync() {
   const s = S.settings;
   for (const [id, [k, , kind]] of Object.entries(SETS)) {
     const el = $('#' + id, md); if (!el || el === document.activeElement) continue;
-    if (kind === 'chk') el.checked = k === 'celebrate' || k === 'list_emoji' || k === 'side_progress' || k === 'person_colors' || k === 'ical_alarms' || k === 'cal_today' || k === 'time_focus' ? s[k] !== '0' : s[k] === '1';
+    if (kind === 'chk') el.checked = k === 'celebrate' || k === 'list_emoji' || k === 'show_done_new' || k === 'side_progress' || k === 'person_colors' || k === 'ical_alarms' || k === 'cal_today' || k === 'time_focus' ? s[k] !== '0' : s[k] === '1';
     else { el.value = s[k] ?? ''; if (el.dataset.dp) dpSync(el); }
   }
   for (const el of $$('[data-feat]', md)) el.checked = feat(el.dataset.feat);
@@ -644,6 +645,8 @@ function settingsModal(focus) {
     org: S.me && lmOrgPaneOn() ? wsPaneHtml(t => `<div class="shint">${t}</div>`) : '',  // 2.39.1 (#1188): Settings > Organisation
     look: `<div id="s-lookin">${lookHtml()}</div>
       <h4 id="s-lemo-h">${tr('New lists')}</h4><div class="row">${chk('s-lemo', s.list_emoji !== '0', tr('Suggest icons for new lists'))}</div>
+      <div class="row">${chk('s-sdn', s.show_done_new !== '0', tr('Hide completed tasks in new lists'))}</div>
+      ${hint(tr('A new list hides its completed tasks; the list’s “…” menu shows them again. A folder default goes first, existing lists stay as they are. For all your devices.'))}
       ${hint(tr('A new list gets an icon that matches its name; you can always choose another one. Existing lists keep their icons. For all your devices.'))}
       <h4 id="s-sdd-h">${tr('Completed tasks')}</h4><div class="row"><label for="s-sdd">${tr('In lists and views')}</label><select id="s-sdd"><option value="1">${tr('Show completed')}</option><option value="0" ${s.show_done_default === '0' ? 'selected' : ''}>${tr('Hide completed')}</option></select></div>
       ${hint(tr('The default for every list and view. A folder (Folder settings) or a single list (its “…” menu) can choose otherwise. For all your devices.'))}

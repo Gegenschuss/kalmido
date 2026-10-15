@@ -66,6 +66,38 @@ function an_rowOut(ids) {
 }
 const an_rowsBack = ids => ids.forEach(id => document.querySelectorAll(`#view .trow[data-id="${id}"].an-rowout`).forEach(r => r.classList.remove('an-rowout')));
 
+// ---- 2.49.0 (#1766): ticking a task off. The line always runs over the title first (~0.35 s); with "Hide completed" on, the
+// row then folds away (height + opacity, ~0.25 s), otherwise it stays struck through. Ticked again meanwhile: the exit is
+// cancelled. The redraw (load + render) waits until no row is still animating, so several quick ticks never make the list jump.
+const UI = {busy: 0, idle: [], pend: new Map()};
+const UI_STRIKE_MS = 380, UI_GONE_MS = 250;
+const ui_motion = () => { try { return !matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return true; } };
+const ui_idle = () => UI.busy ? new Promise(r => UI.idle.push(r)) : Promise.resolve();
+function ui_doneStart(id, hide) {
+  const rows = [...document.querySelectorAll(`#view .trow[data-id="${id}"]`)], mo = ui_motion(), tm = [];
+  const a = {cancelled: false, api: null};
+  let fin; a.done = new Promise(r => { fin = r; });
+  UI.busy++;
+  const end = () => { if (a.ended) return; a.ended = true; fin(); if (!--UI.busy) UI.idle.splice(0).forEach(r => r()); };
+  rows.forEach(r => r.classList.add('ui-strike', ...(mo ? [] : ['ui-now'])));
+  const gone = () => {
+    if (a.cancelled) return;
+    if (!mo) { rows.forEach(r => { r.style.display = 'none'; }); end(); return; }
+    rows.forEach(r => { r.style.height = r.offsetHeight + 'px'; r.offsetHeight; r.classList.add('ui-gone'); });
+    tm.push(setTimeout(end, UI_GONE_MS));
+  };
+  if (!rows.length) end();
+  else if (!hide) tm.push(setTimeout(end, mo ? UI_STRIKE_MS : 0));
+  else if (!mo) gone();
+  else tm.push(setTimeout(gone, UI_STRIKE_MS));
+  a.cancel = () => {
+    a.cancelled = true; tm.forEach(clearTimeout);
+    rows.forEach(r => { r.classList.remove('ui-strike', 'ui-now', 'ui-gone'); r.style.height = ''; r.style.display = ''; });
+    end();
+  };
+  return a;
+}
+
 // ---- #1559: a redraw that opens a group / subtasks / the done section: the rows that were not there before fade in
 function an_rowsIn(fn) {
   if (!an_on()) return fn();

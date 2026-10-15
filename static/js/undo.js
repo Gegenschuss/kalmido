@@ -300,6 +300,15 @@ async function patchUndoable(id, body, msg) {
 async function toggleTask(id) {
   const t = taskById(id); if (!t) return;
   if (!canEdit(t)) { roToast(); return; }
+  const pend = UI.pend.get(id);
+  if (pend) {  // 2.49.0 (#1766): ticked again while the exit runs: cancel it and reopen
+    pend.cancel(); UI.pend.delete(id);
+    $$(`.trow[data-id="${id}"] .chk`).forEach(c => { c.classList.remove('on'); c.innerHTML = ''; });
+    await pend.api;
+    const r = await api('POST', `/api/tasks/${id}/reopen`); const {undo, ...rt} = r; putTask(rt);
+    await load(); render();
+    return;
+  }
   const snaps = withKids(id), n = qn(t.title.slice(0, 40));
   if (t.status !== 0) {
     const fade = an_rowOut([id]);  // 2.46.1 (#1559): the row fades while the request runs; the redraw waits for it
@@ -312,12 +321,17 @@ async function toggleTask(id) {
     return;
   }
   if (t.blocked && dFor(t) && !await askConfirm(tr('“{0}” is still blocked by {1}. Complete it anyway?', t.title, blockedNames(t)), '', {ok: tr('Complete anyway')})) return;
-  // optimistic: fade the row, then sync
+  // optimistic: strike the row through, then sync
   $$(`.trow[data-id="${id}"] .chk`).forEach(c => { c.classList.add('on'); c.innerHTML = ic('check'); });
   const cs = celeSnap([id]);
-  const fade = an_rowOut([id]);  // 2.46.1 (#1559): the row fades while the request runs; the redraw waits for it
-  let j; try { j = await api('POST', `/api/tasks/${id}/complete`, t.repeat && t.due ? {expect_due: t.due} : undefined); } catch (x) { an_rowsBack([id]); throw x; }
-  await fade;
+  const anim = ui_doneStart(id, doneToggleView() && !showDone());  // 2.49.0 (#1766): line first, then the exit when completed tasks are hidden
+  UI.pend.set(id, anim);
+  const call = api('POST', `/api/tasks/${id}/complete`, t.repeat && t.due ? {expect_due: t.due} : undefined);
+  anim.api = call.catch(() => {});
+  let j; try { j = await call; } catch (x) { anim.cancel(); UI.pend.delete(id); an_rowsBack([id]); throw x; }
+  await anim.done; await ui_idle();
+  if (anim.cancelled) return;  // ticked off again meanwhile: that call reopens
+  UI.pend.delete(id);
   wpCloseLocal([id]);
   await load();
   render();

@@ -180,6 +180,7 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
         v = gsetting(c, gk)
         if v:
             vals[k] = v
+    vals["show_done_default"] = "0"  # 2.49.0 (#1535): a NEW account starts with completed tasks hidden (existing accounts keep their choice)
     if seed_global:  # the single-user settings become this user's settings
         for r in c.execute("SELECT key, value FROM settings"):
             if r["key"] in USER_DEFAULTS:
