@@ -39,7 +39,7 @@ async function clLoad() {
   CLV.loading = false;
   if (S.route.mod === 'clients' && seq === CLV.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); }
 }
-const clReload = () => { CLV.data = null; if (S.route.mod === 'clients') clLoad(); };
+const clReload = () => { CLV.data = null; ms_clDirty(); if (S.route.mod === 'clients') ms_clDraw(); };  // 2.47.3 (#1734): the page loads what it shows
 function budgetBar(c) {
   const b = c.budget || {}, st = c.stats || {};
   if (!b || b.level === 'none') return '';
@@ -49,12 +49,7 @@ function budgetBar(c) {
 }
 function viewClients() {
   if (!clientsOn()) return `<div class="empty">${tr('Clients are off (Settings > Modules)')}</div>`;
-  const id = S.route.client || null;
-  if ((!CLV.data || CLV.id !== id) && !CLV.loading) setTimeout(clLoad, 0);
-  const d = CLV.data && CLV.id === id ? CLV.data : null;
-  if (!d) return `<div class="dash clients"><p class="muted lempty">${tr('Loading…')}</p></div>`;
-  if (d.error) return `<div class="dash clients"><div class="empty">${ic('brief')}${tr('This client does not exist or you cannot see it.')}<a class="btn" href="#clients">${tr('All clients')}</a></div></div>`;
-  return id ? clientDetailHtml(d) : clientsGridHtml(d.clients);
+  return ms_clView();  // 2.47.3 (#1734): list + card like the contacts (clientpage.js) instead of the grid / the detail page
 }
 function clientsGridHtml(cs) {
   if (!cs.length) return `<div class="dash clients"><div class="empty nempty eact">${ic('brief')}<span>${tr('Clients sit above your lists: hours, budget and the timesheet per client. Only people of your organisation see them.')}</span><button class="btn pri" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button></div></div>`;
@@ -63,16 +58,16 @@ function clientsGridHtml(cs) {
     <div class="clnums"><span><b>${esc(fmtHours(c.stats.month_seconds))}</b><small>${esc(monthLabel(c.stats.month))}</small></span><span><b>${esc(fmtHours(c.stats.seconds))}</b><small>${tr('in total')}</small></span>${c.stats.amount ? `<span><b>${esc(fmtMoney(c.stats.amount))}</b><small>${tr('amount')}</small></span>` : ''}</div>
     ${budgetBar(c)}</section>`).join('')}</div></div>`;
 }
-function clientDetailHtml(c) {
+function clientDetailHtml(c, inCard) {  // 2.47.3 (#1734): inCard = the lower part of the client's card (clientpage.js)
   const st = c.stats, est = st.estimate_min;
   const lists = (c.per_list || []).map(p => { const l = listById(p.id); return `<tr><td><a href="#l/${p.id}">${esc(l ? lname(l) : p.name)}</a></td><td class="n">${p.estimate_min ? esc(fmtH(p.estimate_min)) : '–'}</td><td class="n">${esc(hmm(p.seconds))}</td><td class="n">${p.estimate_min ? `<span class="${p.seconds / 60 > p.estimate_min ? 'over' : ''}">${Math.round(100 * p.seconds / 60 / p.estimate_min)} %</span>` : ''}</td><td class="n">${p.amount ? esc(fmtMoney(p.amount)) : ''}</td></tr>`; }).join('');
   const addr = [c.contact, c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '', c.phone ? `<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : ''].filter(Boolean);
   const mon = c.stats.month;
-  return `<div class="dash clients cldetail">
-    <div class="clhead">${clientIco(c)}<h2>${esc(c.name)}</h2>${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}<span class="spacer"></span>
-      <button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button></div>
-    ${addr.length || c.address ? `<p class="clsub">${addr.join(' · ')}${c.address ? `<br><span class="muted cladr">${esc(c.address)}</span>` : ''}</p>` : ''}
-    ${(c.contacts || []).length > 1 ? `<ul class="clklist" role="list" aria-label="${esc(tr('Contact persons'))}">${c.contacts.map(k => `<li><b>${esc(k.name)}</b>${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone)}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul>` : ''}
+  return `<div class="${inCard ? 'msclstats' : 'dash clients'} cldetail">
+    ${inCard ? '' : `<div class="clhead">${clientIco(c)}<h2>${esc(c.name)}</h2>${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}<span class="spacer"></span>
+      <button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button></div>`}
+    ${!inCard && (addr.length || c.address) ? `<p class="clsub">${addr.join(' · ')}${c.address ? `<br><span class="muted cladr">${esc(c.address)}</span>` : ''}</p>` : ''}
+    ${!inCard && (c.contacts || []).length > 1 ? `<ul class="clklist" role="list" aria-label="${esc(tr('Contact persons'))}">${c.contacts.map(k => `<li><b>${esc(k.name)}</b>${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone)}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul>` : ''}
     <div class="clmon"><button class="iconbtn" data-act="client-month" data-d="-1" aria-label="${esc(tr('Previous month'))}" title="${esc(tr('Previous month'))}">${ic('left', 's')}</button><b>${esc(monthLabel(mon))}</b><button class="iconbtn" data-act="client-month" data-d="1" aria-label="${esc(tr('Next month'))}" title="${esc(tr('Next month'))}">${ic('right', 's')}</button></div>
     <div class="sttiles"><div><b>${esc(hmm(st.month_seconds))}</b><span>${esc(monthLabel(mon))}</span><small>${st.month_amount ? esc(fmtMoney(st.month_amount)) : ''}</small></div>
       <div><b>${esc(hmm(st.seconds))}</b><span>${tr('in total')}</span><small>${st.amount ? esc(fmtMoney(st.amount)) : ''}</small></div>

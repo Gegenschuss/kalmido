@@ -6959,3 +6959,80 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 .trow.ui-strike.ui-now .ttl{transition:none}
 .trow.ui-strike.ui-now .ttl::after{animation:none}
 .trow.ui-gone{height:0!important;min-height:0;opacity:0;overflow:hidden;padding-top:0;padding-bottom:0;margin-top:0;margin-bottom:0;border-width:0;pointer-events:none;transition:height .25s ease-in,opacity .25s ease-in,padding .25s ease-in,margin .25s ease-in}
+/* 2.47.3 C (#1731, #1733, #1734): the edit sheet of a selection (contacts, clients) */
+.msdlg .msrow{align-items:flex-start}
+.modal .msdlg .row label.msuse,.msdlg .row label.msuse{min-width:8.75rem;color:var(--text);font-size:var(--fs-m);gap:.375rem;padding-top:.375rem}
+.msdlg .msin{display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:12rem}
+.msdlg .msin textarea{width:100%}
+/* 2.47.3 C (#1734): Office > Clients in the layout of the contacts (list + card); a client = briefcase + tag "Client",
+   a contact = person + tag "Contact"; the client card carries a faint tint of the accent (never the only sign) */
+.msclh{display:flex;align-items:center;gap:.375rem;margin:0;font-size:var(--fs-m);font-weight:600}
+.mscav{border-radius:var(--radius);background:color-mix(in srgb,var(--cc,var(--accent)) 16%,var(--bg3));color:var(--cc,var(--accent));font-size:1rem}
+.mscav.big{border-radius:var(--r-l);font-size:1.5rem}
+.mstags{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;margin-top:.125rem;font-size:var(--fs-s)}
+.mstag{display:inline-flex;align-items:center;gap:.25rem;padding:0 .5rem;border-radius:62.5rem;border:1px solid var(--line2);color:var(--text2);font-size:.75rem;line-height:1.5rem}
+.mstag-cl{border-color:color-mix(in srgb,var(--accent) 40%,var(--line2));color:var(--accent)}
+.msclcard:not(.ctnone){background:color-mix(in srgb,var(--accent) 3%,transparent);border-radius:var(--r-l);padding:.5rem .75rem 2rem}
+.msclcard .cldetail{display:flex;flex-direction:column}
+.msclcard .sttiles{grid-template-columns:repeat(auto-fit,minmax(8rem,1fr))}
+.msclients .ctrow.msarch .ctn b{color:var(--muted)}
+.msclients .msbud{width:.5rem;height:.5rem;border-radius:50%;flex:none;background:var(--ok)}
+.msclients .msbud.lv-warn{background:var(--p3)}.msclients .msbud.lv-over{background:var(--danger)}
+.msclempty{max-width:28rem;margin:1rem auto}
+
+/* 2.47.3 D (#1729): uninstall commands of an agent's computers in the delete / remove dialogs */
+.ainsun{margin:.5rem 0;padding:.5rem .625rem;background:var(--bg3);border-radius:var(--radius)}
+.ainsunh{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.ainsunc{display:flex;gap:.5rem;margin-top:.375rem}
+.ainsuncmd{flex:1;min-width:0;font-family:var(--mono);font-size:var(--fs-s)}
+
+/* 2.47.3 D (#1764): messages of background jobs in the agent chat: stripe in the job's colour + tag "Job #N" (no coloured area) */
+.cmsg.jobm .cbub{box-shadow:inset .25rem 0 0 var(--jcol)}
+.cmsg.jobm.jpart .cbub{box-shadow:inset .25rem 0 0 color-mix(in srgb,var(--jcol) 65%,#fff)}
+.jobtag{display:inline-flex;align-items:center;gap:.375rem;align-self:flex-start;padding:.0625rem .5rem;border-radius:62.5rem;background:color-mix(in srgb,var(--jcol) 16%,var(--bg3));color:var(--text);font-size:var(--fs-xs);line-height:1.5}
+.jobtag i{flex:0 0 auto;width:.5rem;height:.5rem;border-radius:50%;background:var(--jcol)}
+.jpart .jobtag i{background:color-mix(in srgb,var(--jcol) 65%,#fff)}
+/* 2.47.3 B (#1022, #1652): travel expenses and cash flow in the office */
+.rkbar select{min-height:2.25rem}
+.rkbadge{display:inline-block;min-width:1.25rem;padding:0 .3rem;border-radius:999rem;background:var(--accent);color:var(--on-accent,#fff);font-size:.75rem;line-height:1.25rem;text-align:center}
+.rksum{font-variant-numeric:tabular-nums;white-space:nowrap}
+.rkmiss{color:var(--accent)}
+.rkhead{margin:.25rem 0 .75rem}.rkhead h3{margin:0 0 .25rem}.rkhead p{margin:.125rem 0}
+.rknote{white-space:pre-wrap}
+.rkits .rkit{display:flex;align-items:center;gap:.5rem}
+.rkits .rkit .ofcrow{flex:1;min-width:0}
+.rksel,.rkdatev{display:flex;align-items:center;min-height:2.75rem;white-space:nowrap}
+.rksel input,.rkdatev input{width:1.25rem;height:1.25rem}
+.rkppl{display:flex;flex-wrap:wrap;gap:.25rem .75rem}
+.rklab{min-width:8rem}
+.rktab,.rkcftab{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.rktab th,.rktab td,.rkcftab th,.rkcftab td{padding:.5rem .5rem;border-bottom:1px solid var(--line2);text-align:left}
+.rktab .num,.rkcftab .num{text-align:right;white-space:nowrap}
+.rktab tfoot th,.rkcftab tfoot th{border-bottom:0}
+@media (max-width:600px){.rkits .rkit{flex-wrap:wrap}.rkits .rkit .ofcrow{flex-basis:calc(100% - 2.5rem)}.rkdatev{margin-left:2rem}}
+.rkcfrange{white-space:nowrap}
+.rkcfms{display:grid;grid-template-columns:repeat(auto-fill,minmax(18rem,1fr));gap:.75rem;margin:.5rem 0}
+.rkcfm{border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);padding:.5rem .75rem}
+.rkcfm.cur{border-color:var(--accent)}
+.rkcfm header{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .5rem;min-height:2rem}
+.rkcfbal{font-variant-numeric:tabular-nums;white-space:nowrap}.rkcfbal.neg{color:var(--danger,#c0392b)}
+.rkcfbars{display:flex;flex-direction:column;gap:2px;margin:.25rem 0}
+.rkcfbars span{display:block;height:.25rem;border-radius:2px;transform-origin:left center;transition:transform .2s ease}
+.rkcfbin{background:var(--accent)}.rkcfbout{background:var(--accent);opacity:.35}
+.rkcftab td,.rkcftab th{padding:0 .25rem;vertical-align:middle}
+.rkcftab td .rkcfv{display:inline-flex;align-items:center;justify-content:flex-end;margin:0;min-height:2.75rem;min-width:4rem;padding:0 .25rem;background:none;border:0;color:var(--text);font:inherit;font-variant-numeric:tabular-nums;cursor:pointer;border-radius:var(--radius)}
+.rkcftab .rkcfv:hover,.rkcftab .rkcfv:focus-visible,.rkcftab .rkcfv[aria-expanded="true"]{color:var(--accent);text-decoration:underline}
+.rkcftab .rkcfv.plan{font-style:italic}
+.rkcftab td .rkcfz{min-width:0;cursor:default}
+.rkcftab th{font-weight:500}
+.rkcfents{margin-top:.25rem}.rkcfents .ofcrow{text-decoration:none}
+/* 2.47.3 E (#1727): marked lists in the sidebar (Shift / Cmd-click, long-press "Select") and the bar of their view */
+#side .srow[data-mark]{background:var(--accent-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent);color:var(--text)}
+.dxbar{display:inline-flex;gap:.4rem;align-items:center}
+@media (pointer:coarse){.dxbar .btn{min-height:2.75rem}}
+/* 2.47.3 E (#1460): the DATEV export settings block */
+.dxset .lacts .numin{max-width:7rem}
+
+/* 2.47.3 G (#1382): the (i) buttons of the quotation editor fields are 24 px targets (every control there >= 24 px) */
+.ofdeditor .ib:not(.ibl),.ofdhead .ib:not(.ibl){width:1.5rem;height:1.5rem}
+.ofdeditor .ib.ibl,.ofdhead .ib.ibl{min-height:1.5rem}

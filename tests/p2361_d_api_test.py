@@ -196,7 +196,8 @@ check("Zusatzleistung" in tot_page or "Producing" in tot_page, "the totals never
 check(Ca.get(B + f"{D}/{DOC}/pdf").status_code == 404, "the second organisation: 404 for the PDF")
 check(Ca.get(B + f"{D}/{LONG}/pdf").status_code == 404 and Ca.get(B + f"{D}/999999/pdf").status_code == 404, "foreign and unknown ids: 404, never 403 with content")
 check(A.get(B + f"{D}/999999/pdf").status_code == 404, "unknown document: 404")
-check(Da.get(B + f"{D}/{DOC}/pdf").status_code == 400 and Da.get(B + "/api/office/logo").status_code == 400, "a private person without an organisation: 400")
+# 2.47.3 (#1360): a person without an organisation has the own personal office: nothing of the organisation's
+check(Da.get(B + f"{D}/{DOC}/pdf").status_code == 404 and Da.get(B + "/api/office/logo").status_code == 404, "a private person without an organisation: 404 (own personal office)")
 ags = [requests.get(B + f"{D}/{DOC}/pdf", headers=AGH).status_code, requests.get(B + "/api/office/logo", headers=AGH).status_code,
        requests.post(B + "/api/office/logo", headers=AGH, files={"file": ("l.png", picture(), "image/png")}).status_code]
 check(all(x in (401, 403) for x in ags), f"an agent token: refused on pdf and logo {ags}")

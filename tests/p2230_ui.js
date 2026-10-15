@@ -72,7 +72,7 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   click(w, md.querySelector('[data-m="save"]'));
   await until(() => w.eval('S.route.mod') === 'clients' && d.querySelector('#view .cldetail'));
   const CL = w.eval('S.route.client');
-  check(CL && d.querySelector('#view .cldetail h2')?.textContent === 'Café Aurora' && d.querySelectorAll('#view .sttiles > div').length === 4, 'saved: the client page with four tiles');
+  check(CL && d.querySelector('#view #mscl-h')?.textContent === 'Café Aurora' && d.querySelectorAll('#view .sttiles > div').length === 4, 'saved: the client page with four tiles');
   check(d.querySelector('#side [data-mgside="office"].on') && w.eval("mg_areaOf(S.route.mod)?.[0]") === 'office', 'the area Office is highlighted (2.44.0, #1187: no own client rows)');
   // the list's client in the list dialog
   w.eval(`listModal(${P})`); await sleep(400);
@@ -97,8 +97,9 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   d.querySelector('.tsheet')?.remove(); d.body.classList.remove('tsprint');
   click(w, d.querySelector('#view [data-act="client-tvx"]')); await sleep(200);
   check(!d.querySelector('#view .tvclient') && w.eval('S.tv.client') === null, 'the client filter off again');
-  w.eval(`go('clients')`); await until(() => d.querySelector('#view .clcard'));
-  check(d.querySelector('#view .clcard h2 a')?.getAttribute('href') === `#client/${CL}`, 'all clients: a card per client');
+  // 2.47.3 (#1734): the clients page has the layout of the contacts: a row per client in the list, the card next to it
+  w.eval(`go('clients')`); await until(() => d.querySelector('#view .msclients .ctrow'));
+  check(!!d.querySelector(`#view .msclients .ctrow[data-clopen="${CL}"]`), 'all clients: a row per client');
   w.close();
 
   // ================= workload (Bob)
@@ -246,7 +247,7 @@ const BASE = 'cal,comments,collab,time,progress,agents';
     // (a tree), no extra room before a folder
     check(g.topIc.length === 1 && g.fIc > g.topIc[0] && g.kidIc.length === 1 && g.kidIc[0] > g.fIc && Math.abs(g.before - g.gList) <= 1, `${tag}: #794 #1607: one icon column for the top lists, one inside the folder (further in than the folder icon), no extra room before the folder ` + JSON.stringify(g));
     await shot(`p2230-${vw}-${th}-side.png`);
-    await ev(`(() => { document.querySelector('#side').classList.remove('open'); location.hash = '#clients'; return 1; })()`); await ready(ev, '#view .clcard');
+    await ev(`(() => { document.querySelector('#side').classList.remove('open'); location.hash = '#clients'; return 1; })()`); await ready(ev, '#view .msclients .ctrow');  // 2.47.3 (#1734): list + card
     check(await sideways(ev) <= 0, `${tag}: clients: nothing sideways`);
     if (vw !== 690) await axe(ev, `${tag} clients`);
     await ev(`(() => { location.hash = '#client/' + S.clients[0].id; return 1; })()`); await ready(ev, '#view .cldetail .cltable');

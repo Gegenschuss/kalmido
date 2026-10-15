@@ -28,6 +28,7 @@ TABLES = (
     "office_import_runs", "office_archive",  # 2.39.1 (#1182)
     "office_client_contacts",  # 2.40.0 (#1380): contact persons of a client (org_id like the client)
     "office_roles", "office_doc_parts", "office_purchases",  # 2.47.0 (#1649, #1215, #1216)
+    "office_trips", "office_trip_items", "office_fixed_costs",  # 2.47.3 (#1022, #1652, part B)
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
 )
@@ -95,7 +96,7 @@ def apply(c):
     # a database owner without superuser could not start
     c.execute("CREATE OR REPLACE FUNCTION kalmido_org_count() RETURNS bigint LANGUAGE plpgsql STABLE AS $f$"
               "DECLARE prev text := current_setting('app.role', true); n bigint; "
-              "BEGIN PERFORM set_config('app.role', 'system', true); SELECT COUNT(*) INTO n FROM orgs; "
+              "BEGIN PERFORM set_config('app.role', 'system', true); SELECT COUNT(*) INTO n FROM orgs WHERE personal_of IS NULL; "
               "PERFORM set_config('app.role', COALESCE(prev, ''), true); RETURN n; END$f$")
     STATE["enforced"] = _app_role(c)
     if not STATE["enforced"]:

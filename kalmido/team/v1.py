@@ -5,6 +5,7 @@ from ..core.config import app
 from ..personal.timetrack import reject_unknown
 from ..api.v1 import v1_args, v1_call, v1_json, v1_view
 from ..team.clients import CLIENT_FIELDS, client_create, client_delete, client_get, client_update, clients_list
+from ..team.clients_bulk import clients_bulk
 from ..team.workload import workload_get
 from ..team.approvals import APPROVAL_ACTIONS, APPROVAL_STATES, task_approval
 from ..team.forms import FORM_ACCESS, form_create, form_delete, form_update, forms_list
@@ -47,6 +48,13 @@ def v1_client_update(cid):
 def v1_client_delete(cid):
     v1_args(())
     return jsonify(v1_call(client_delete, cid))
+
+
+@app.post("/api/v1/clients/bulk")
+@v1_view
+def v1_clients_bulk():  # 2.47.3 (#1733)
+    v1_args(())
+    return jsonify(v1_call(clients_bulk, body=v1_json()))
 
 
 @app.get("/api/v1/workload")
@@ -138,6 +146,18 @@ def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "patch": op("Change a client", C, ok(ref("Client")) | errs("400", "403", "404"), [pid("id", "Client id")], body=cin, scope="structure"),
         "delete": op("Delete a client (its creator or an admin); its lists stay", C, ok({"type": "object"}) | errs("403", "404"),
                      [pid("id", "Client id")], scope="structure")}
+    paths["/clients/bulk"] = {"post": op(  # 2.47.3 (#1733)
+        "Several clients at once (up to 1000 ids; one you do not see -> 404, nothing changes). delete: a client used in quotations, "
+        "invoices or framework contracts is archived instead; only its creator or an admin deletes (others: skipped). archive / unarchive; "
+        "set: rate, budget_h, budget_amount, color (null clears), note_append; restore: items = the undo of an answer", C,
+        ok({"type": "object", "properties": {"action": {"type": "string"}, "deleted": {"type": "integer"}, "archived": {"type": "integer"},
+                                             "changed": {"type": "integer"}, "unchanged": {"type": "integer"}, "skipped": {"type": "integer"},
+                                             "undo": {"type": "array", "items": {"type": "object"}}}}) | errs("400", "403", "404"),
+        body={"type": "object", "additionalProperties": False, "required": ["action"], "properties": {
+            "ids": {"type": "array", "items": {"type": "integer"}},
+            "action": {"type": "string", "enum": ["delete", "archive", "unarchive", "set", "restore"]},
+            "rate": num, "budget_h": num, "budget_amount": num, "color": {"type": "string", "description": "#rrggbb, empty = none"},
+            "note_append": {"type": "string"}, "items": {"type": "array", "items": {"type": "object"}}}}, scope="structure")}
     cell = {"type": "object", "properties": {"minutes": {"type": "integer"}, "tasks": {"type": "integer"},
                                              "unestimated": {"type": "integer"}, "ids": {"type": "array", "items": {"type": "integer"}},
                                              "pct": nul("integer"), "level": {"type": "string", "enum": ["none", "ok", "warn", "over"]}}}

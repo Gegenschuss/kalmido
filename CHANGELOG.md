@@ -7,6 +7,62 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.47.4] - 2026-10-16
+
+**In short:** the checks of 2.47.3 green again; no new functions.
+
+### Fixed
+- The DATEV export dialog uses the app's date picker (#1460); the (i) buttons in the quotation editor are big enough to
+  tap (#1382); sizes of the new travel and cash flow elements follow the text size (#1022, #1652).
+- Tests: the office now has eight tabs, and three date-dependent tests no longer fail shortly after midnight.
+
+## [2.47.3] - 2026-10-16
+
+**In short:** **Office & finance without an organisation** (a personal office for freelancers), **travel expenses**, a
+**cash flow** overview, the **DATEV booking batch** export, **several entries at once** for contacts, clients and lists,
+and a clients page in the layout of the contacts.
+
+### Added
+- **Personal office** (#1360): everybody has an office of their own - master data, number ranges, company details, logo,
+  quotations and invoices - and is its admin; no organisation needed (also in the server mode `shared`). The workspace
+  switch decides: *Private* = the personal office, an organisation = its office (no silent fallback to the only
+  organisation any more). **Small business rule** (section 19 UStG) in the company settings: new documents without VAT,
+  with the legal note, e-invoice tax category E. *Office > Settings > Move into an organisation* turns a personal office
+  into a new organisation (one way, with confirmation; server admins).
+- **Travel expenses** (#1022): trips with period, destination, overnight stay, participants and purpose (job with client /
+  project, or acquisition), receipts with fixed categories, currency and rate, the tick *Receipt in DATEV* (no receipt
+  images in Kalmido), a filter for missing ticks, evaluations per month, year, person, project, client and category
+  (CSV), and billing receipts on to a quotation or invoice draft (never twice). Office admins only.
+- **Cash flow** (#1652): per month money in (payments, open invoices by due date, accepted quotations not yet invoiced)
+  and out (purchases of accepted quotations, travel receipts, fixed costs with repetition), actual and planned apart,
+  3 or 6 months ahead, tap a value for the entries behind it. Office admins only.
+- **DATEV booking batch** (#1460): *Office > Invoices > DATEV export* downloads finalised invoices, credit notes and
+  payments of a period as EXTF CSV (format 700, category 21); consultant / client number, fiscal year, account length,
+  SKR03/SKR04 accounts and tax keys in the settings. Let your tax adviser import a test file once.
+- **Contacts: edit several at once** (#1731): groups add / remove, company, department, kind, append a note; undo.
+- **Clients: several at once** (#1733): select (Shift/Cmd+click, long press), delete (clients in use are archived),
+  archive / restore, set rate, budget, colour, append a note; undo. Also `POST /api/v1/clients/bulk` and the MCP tool
+  `bulk_clients`.
+- **Several lists at once** (#1727): Shift/Cmd+click lists in the sidebar (phone: list menu > *Select several lists*)
+  shows their tasks grouped like a folder; archive them together with one undo.
+- **Uninstall command** (#1729): deleting an agent or removing a computer shows the command that removes the agent from
+  that computer (macOS/Linux or Windows).
+- **Job colours in the chat** (#1764): messages of a job get a coloured stripe and a "Job #N" mark; part jobs take the
+  colour of their leading job (optional `job_parent` on agent chat messages).
+
+### Changed
+- **Clients page** (#1734): list on the left, the client's card on the right (phone: list, then card) with rate, budget,
+  contact persons, billing details and open invoices; a "Client" tag and briefcase vs. "Contact" and person keep the two
+  apart. It follows the workspace switch.
+- **Office settings** (#1382): (i) explanations for the remaining fields, the quotation / invoice editor and the client card.
+- **vCard import** (#1738): photo links of Google contacts are fetched and stored (Google's image server only, size and
+  time limits); Google's letter placeholders are skipped; importing the file again adds missing photos.
+
+### Notes
+- Additive database changes (`orgs.personal_of`, travel / fixed cost tables, `agent_chat.job_parent`); the previous
+  version runs on with them. Going back: personal offices show up there as organisations `private-<id>` without members -
+  leave them alone (see docs/OFFICE.md).
+
 ## [2.47.2] - 2026-10-15
 
 **In short:** CI fixes for 2.47.0 and 2.47.1; this version brings both packages live together.

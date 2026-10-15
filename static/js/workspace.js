@@ -24,10 +24,12 @@ async function wsSet(ws) {
   if (!wsOptions().includes(ws)) ws = 'all';
   S.settings.workspace = ws; LS.set('ws', ws);
   closeSide?.();
+  if (typeof pb_wsChanged === 'function') pb_wsChanged(true);  // 2.47.3 (#1360): the office follows once the server knows it
   // 2.49.0 (#1770): the open list does not stay when it is not part of the new workspace -> that workspace's inbox
   const ol = S.route?.mod === 'tasks' && String(S.route.key || '').startsWith('l:') ? listById(+S.route.key.slice(2)) : null;
   if (ol && !inWs(ol, wsCur())) go(keyToHash(START_KEY)); else render();
   try { await api('PATCH', '/api/settings', {workspace: ws}); } catch { /* api() said it */ }
+  if (typeof pb_wsChanged === 'function') pb_wsChanged(false);
 }
 // 2.49.0 (#1770): a list of another workspace opened directly (link, search, notification): the filter follows it
 function wsFollow(key) {

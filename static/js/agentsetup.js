@@ -20,6 +20,33 @@ function ains_machinesHtml(ms) {
       <small class="muted">${esc([m.connected ? tr('connected') : m.last_used_at ? tr('last contact {0}', relTime(m.last_used_at)) : tr('never connected'), ains_osName(m.os), m.folder].filter(Boolean).join(' · '))}</small></span>
       <button class="btn sm danger" data-m="ains-del" aria-label="${esc(tr('Remove computer {0}', m.host || m.prefix))}">${ic('trash', 's')} ${tr('Remove computer')}</button></div>`).join('');
 }
+// 2.47.3 (#1729): the command that takes an agent off one computer again (stops the autostart, revokes the key when it still
+// works, deletes the files; the project folder stays). Mac/Linux or Windows after the OS stored with the computer.
+function ains_uninstallCmd(m, url) {
+  if (!m.folder) return '';
+  if (m.os === 'windows') return `& ([scriptblock]::Create((irm ${ains_pq(url + '/agent-setup.ps1')}))) -Uninstall -Dir ${ains_pq(m.folder)} -Lang ${ains_lang()}`;
+  return `curl -fsSL ${ains_q(url + '/agent-setup.sh')} | bash -s -- --uninstall --dir ${ains_q(m.folder)} --lang ${ains_lang()}`;
+}
+function ains_uninstallHtml(ms) {
+  return ms.map(m => `<div class="ainsun"><div class="ainsunh">${hdot(m.connected ? 'ready' : 'offline')}<b>${esc(m.host || tr('Unknown computer'))}</b>
+    <small class="muted">${esc([m.connected ? tr('connected') : tr('not connected'), ains_osName(m.os), m.folder].filter(Boolean).join(' · '))}</small></div>
+    <div class="ainsunc"><input readonly class="ainsuncmd" value="${esc(ains_uninstallCmd(m, location.origin))}" aria-label="${esc(tr('Uninstall command for {0}', m.host || m.prefix))}" spellcheck="false" autocomplete="off">
+    <button type="button" class="btn sm" data-ainsun="copy">${ic('copy', 's')} ${tr('Copy')}</button></div></div>`).join('');
+}
+// asks before removing an agent (only = nobody) or one computer: when computers were set up with the one-command setup, the
+// dialog shows their uninstall commands first ("run it on the computer, then delete"); deleting stays possible without it
+async function ains_askRemove(base, title, body, o, only) {
+  let ms = [];
+  try { ms = ((await api('GET', base + '/machines')).machines || []).filter(m => m.folder && (!only || m.id === only)); } catch { /* no list: the plain question */ }
+  if (!ms.length) return askConfirm(title, body, o);
+  const hint = only ? tr('Run this command on the computer to stop the agent there and delete its files. Without it the program stays there and can no longer reach Kalmido.')
+    : tr('Run the command on each computer first, then delete the agent. Deleting works without it, but the program then stays on the computer.');
+  return askConfirm(title, '', {...o, html: `<p>${esc(body)}</p><p class="muted">${esc(hint)}</p>${ains_uninstallHtml(ms)}`, after: md => md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-ainsun="copy"]'); if (!b) return;
+    const inp = $('.ainsuncmd', b.closest('.ainsunc'));
+    if (await clipCopy(inp.value)) toast(tr('Copied')); else { inp.select(); toast(tr('Copy failed, select the text by hand')); }
+  })});
+}
 function ains_setupModal(a, base) {
   let os = LS.get('ainsOs') || ains_osGuess(), exp = 0, timer = 0;
   const md = modal(`<h3>${esc(tr('Set up {0} on a computer', a.name))}</h3>
@@ -34,6 +61,7 @@ function ains_setupModal(a, base) {
     </div>
     <div class="calerr" role="alert" id="ains-err" hidden></div>
     <h4>${tr('Computers')}</h4>
+    <div class="shint">${tr('To take the agent off a computer again, use Remove computer: it shows the uninstall command, which stops the autostart and deletes the files there (the project folder stays).')}</div>
     <div id="ains-ms"><div class="muted mhint">${tr('Loading…')}</div></div>
     ${a.status === 'error' && a.status_text ? `<div class="shint keep warn">${esc(tr('Last error of the agent: {0}', a.status_text))}</div>` : ''}
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Done')}</button></div>`);
@@ -77,7 +105,7 @@ function ains_setupModal(a, base) {
     }
     if (m === 'ains-del') {
       const mc = (md._ms || []).find(x => x.id === +b.closest('[data-ainsm]').dataset.ainsm); if (!mc) return;
-      if (!await askConfirm(tr('Remove computer {0}?', mc.host || mc.prefix), tr('Its token stops working at once and the agent there can no longer reach Kalmido. This cannot be undone: to use the computer again, set it up anew.'), {ok: tr('Remove computer'), danger: true})) return;
+      if (!await ains_askRemove(base, tr('Remove computer {0}?', mc.host || mc.prefix), tr('Its token stops working at once and the agent there can no longer reach Kalmido. This cannot be undone: to use the computer again, set it up anew.'), {ok: tr('Remove computer'), danger: true}, mc.id)) return;  // 2.47.3 (#1729): + the uninstall command
       try { const j = await api('DELETE', `${base}/machines/${mc.id}`); $('#ains-ms', md).innerHTML = ains_machinesHtml(j.machines || []); md._ms = j.machines || []; toast(tr('Computer removed')); } catch (x) { show(x.message); }
     }
   });

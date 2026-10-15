@@ -41,6 +41,7 @@ $MsgEn = @{
   folder = '  project folder: {0}'
   instance = '  instance: {0}'
   rev_ok = '  this computer is removed in Kalmido (its token no longer works)'
+  rev_gone = '  the key of this computer was already revoked in Kalmido (agent deleted or computer removed): cleaning up here only'
   rev_fail = '  Kalmido did not answer: remove the computer in Settings > Agents if it is still listed'
   dry_stop = '  (dry run) stop and remove the task ''{0}'' and {1}'
   s_uninstall = 'Removing the agent of {0} from this computer'
@@ -85,6 +86,7 @@ $MsgDe = @{
   folder = '  Projektordner: {0}'
   instance = '  Instanz: {0}'
   rev_ok = '  dieser Computer ist in Kalmido entfernt (sein Token funktioniert nicht mehr)'
+  rev_gone = '  der Schlüssel dieses Computers war in Kalmido schon widerrufen (Agent gelöscht oder Computer entfernt): es wird nur hier aufgeräumt'
   rev_fail = '  Kalmido hat nicht geantwortet: entferne den Computer unter Einstellungen > Agenten, falls er noch aufgelistet ist'
   dry_stop = '  (Probelauf) die Aufgabe ''{0}'' und {1} stoppen und entfernen'
   s_uninstall = 'Entferne den Agenten von {0} von diesem Computer'
@@ -182,7 +184,10 @@ function Revoke {
     Invoke-RestMethod -Method Post -Uri ($e['KALMIDO_URL'].TrimEnd('/') + '/api/agent-setup/remove') -Body '{}' -ContentType 'application/json' `
       -Headers @{ Authorization = "Bearer $($e['KALMIDO_TOKEN'])"; 'X-Requested-With' = 'kalmido' } -TimeoutSec 20 | Out-Null
     Say (M 'rev_ok')
-  } catch { Say (M 'rev_fail') }
+  } catch {
+    $code = 0; try { $code = [int]$_.Exception.Response.StatusCode } catch { $code = 0 }
+    if ($code -eq 401) { Say (M 'rev_gone') } else { Say (M 'rev_fail') }  # 2.47.3 (#1729): already revoked = only a hint, the cleanup goes on
+  }
 }
 
 # kalmido-setup-step: autostart_stop

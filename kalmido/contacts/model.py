@@ -5,6 +5,8 @@ import json
 import quopri
 import re
 import secrets
+import time
+import urllib.parse
 from datetime import date
 
 from flask import has_request_context
@@ -443,6 +445,8 @@ def parse_vcard(text):
             if ph and not v["photo"]:
                 v["photo"] = ph
             else:
+                if not ph and re.match(r"https://", vc_unesc(val).strip(), re.I):
+                    v["photo_url"] = vc_unesc(val).strip()  # 2.47.3 (#1738): a link; the file import may fetch it (photo_fetch)
                 keep.append(line)
         elif name in ("KIND", "X-ADDRESSBOOKSERVER-KIND"):
             k = val.strip().lower()
@@ -481,6 +485,44 @@ def _photo_in(params, val):
             return ""
         return f"data:image/{t};base64," + re.sub(r"\s", "", val)
     return ""
+
+
+# 2.47.3 (#1738): Google Contacts exports PHOTO as a link. The file import fetches it: only https on *.googleusercontent.com, at
+# most PHOTO_FETCH_BYTES, a few seconds each and a budget per import, through the calendar module's SSRF guard (every resolved
+# address must be public, no redirect to another host). Google's grey default pictures (the anonymous user, letters) are skipped.
+PHOTO_FETCH_BYTES, PHOTO_FETCH_S = 2 * 1024 * 1024, 5
+PHOTO_HOST = re.compile(r"[a-z0-9-]+(\.[a-z0-9-]+)*\.googleusercontent\.com")
+PHOTO_DEFAULT = re.compile(r"default-user|/AAAAAAAAAAA/")
+PHOTO_MIN_BYTES = 1200  # a flat single-colour picture is smaller than this
+
+
+def photo_url_ok(url):
+    try:
+        p = urllib.parse.urlsplit(url)
+        host, port = (p.hostname or "").lower(), p.port
+    except ValueError:
+        return False
+    return p.scheme == "https" and not p.username and not p.password and port in (None, 443) and bool(PHOTO_HOST.fullmatch(host)) \
+        and not PHOTO_DEFAULT.search(p.path)
+
+
+def photo_fetch(url, timeout=PHOTO_FETCH_S):
+    """The picture behind a Google photo link as a data URI, '' when it is not allowed / not fetchable / a placeholder."""
+    if not photo_url_ok(url):
+        return ""
+    from ..calendars.subscriptions import cal_http
+    if not urllib.parse.urlsplit(url).query:
+        url = re.sub(r"=[^/?#]*$", "", url) + "=s256"  # Google's image server resizes by this suffix
+    try:
+        st, hd, data, final = cal_http(url, max_bytes=PHOTO_FETCH_BYTES, timeout=timeout, deadline=timeout * 2)
+    except Exception:  # noqa: BLE001 -- any failure just leaves the contact without the picture
+        return ""
+    if st != 200 or len(data) < PHOTO_MIN_BYTES or not photo_url_ok(final):
+        return ""
+    t = "jpeg" if data[:3] == b"\xff\xd8\xff" else "png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "gif" if data[:4] == b"GIF8" else \
+        "webp" if data[:4] == b"RIFF" and data[8:12] == b"WEBP" else ""
+    uri = f"data:image/{t};base64," + base64.b64encode(data).decode("ascii") if t else ""
+    return uri if uri and len(uri) <= PHOTO_MAX else ""
 
 
 def _params_out(t, pref, version):
@@ -880,17 +922,20 @@ def split_vcards(text):
 IMPORT_BATCH = 200
 
 
-def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=None, cards=None):
+def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=None, cards=None, photos=0):
     """Every vCard of text into the book: the same UID is updated (importing twice changes nothing). -> counts.
     2.41.0 (#1437): the book is counted once, birthdays are synced only where the book keeps them, the book is touched and
     the version bumped once per batch; batch=N commits every N cards (a large import keeps what it did and never holds the
-    instance-wide version row for long); progress(done, total, res) after each batch."""
+    instance-wide version row for long); progress(done, total, res) after each batch.
+    2.47.3 (#1738): photos=N (seconds of budget; only the file import) fetches PHOTO links of Google's image server; an existing
+    contact that already has a picture keeps it, so importing the same file again only adds the missing ones."""
     res = {"created": 0, "updated": 0, "unchanged": 0, "errors": 0}
     cards = split_vcards(text) if cards is None else cards
     bk = c.execute("SELECT occ_list_id, src_id FROM books WHERE id=?", (book_id,)).fetchone()
     bulk = {"occ": bool(bk and bk["occ_list_id"] and not bk["src_id"])}
     have = c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=?", (book_id,)).fetchone()[0]
     dirty = False
+    t_photos = time.monotonic() + photos
 
     def flush(i):
         nonlocal dirty
@@ -919,7 +964,11 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
             continue
         if not v["uid"]:
             v["uid"] = "import-" + hashlib.sha1((v["fn"] + "|" + json.dumps(v["emails"])).encode("utf-8"), usedforsecurity=False).hexdigest()[:20]
-        old = c.execute("SELECT id, src_digest FROM contacts WHERE book_id=? AND uid=?", (book_id, v["uid"])).fetchone()
+        old = c.execute("SELECT id, src_digest, photo FROM contacts WHERE book_id=? AND uid=?", (book_id, v["uid"])).fetchone()
+        if photos and not v["photo"] and v.get("photo_url"):
+            v["photo"] = (old["photo"] if old else "") or (photo_fetch(v["photo_url"]) if time.monotonic() < t_photos else "")
+            if v["photo"]:  # the link is replaced by the picture (it would be sent twice otherwise)
+                v["extra"] = "\n".join(x for x in v["extra"].split("\n") if not (x.upper().startswith("PHOTO") and v["photo_url"] in x))
         if old and src_digest and old["src_digest"] == dig:
             res["unchanged"] += 1
             continue

@@ -235,7 +235,10 @@ A.put(B + O + "/settings", json={"offer_number_at": "create"})
 
 # ---------------------------------------------------------------- office log
 check(Bo.get(B + f"{D}/{DOC}/log").status_code == 403 and Bo.get(B + O + "/log").status_code == 403, "log: members 403")
-check(Ca.get(B + f"{D}/{DOC}/log").status_code in (400, 403, 404) and Da.get(B + O + "/log").status_code in (400, 403), "tenant-matrix: office -- log: others cannot")
+# 2.47.3 (#1360): a person without an organisation reads the log of the own personal office (nothing of the organisation)
+r = Da.get(B + O + "/log")
+check(Ca.get(B + f"{D}/{DOC}/log").status_code in (400, 403, 404) and r.ok and all(x.get("doc_id") != DOC for x in r.json()["log"]),
+      "tenant-matrix: office -- log: others cannot")
 lg = A.get(B + f"{D}/{DOC}/log").json()["log"]
 acts = [x["action"] for x in lg]
 for a in ("create", "items", "update", "finalize", "status", "render", "pdf"):

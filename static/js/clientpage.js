@@ -1,0 +1,180 @@
+/* Kalmido web client: Office > Clients in the layout of the contacts (2.47.3, #1734): the list on the left (search, archived,
+   the selection mode of #1733), the client's card on the right (phone: the list, then the card). Clients and contacts
+   stay apart: the heading "Office > Clients", a "Client" tag and the briefcase on every card (a contact: "Contact" and
+   the person), the card shows rate, budget, contact persons, billing details and open invoices.
+   Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
+'use strict';
+
+const MSC = {items: null, loading: false, seq: 0, q: '', arch: false, pick: null, last: null, inv: null, invLoading: false};
+async function ms_clLoad() {
+  const seq = ++MSC.seq;
+  MSC.loading = true;
+  try { const j = await api('GET', '/api/clients?archived=1'); if (seq === MSC.seq) MSC.items = (j.clients || []).filter(ms_inWs); }
+  catch { if (seq === MSC.seq) MSC.items = MSC.items || []; }
+  MSC.loading = false;
+  if (seq === MSC.seq) ms_clDraw();
+}
+// open invoices per client (office on): the organisation's invoices, loaded once per visit of the page
+async function ms_clInvLoad() {
+  MSC.invLoading = true;
+  try { MSC.inv = (await rawFetch('GET', '/api/office/docs?kind=invoice')).docs || []; } catch { MSC.inv = []; }  // quiet: without an office (400) no section
+  MSC.invLoading = false;
+  ms_clDraw();
+}
+function ms_clDraw() { if (S.route.mod === 'clients') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); } }
+const ms_clDirty = () => { MSC.items = null; MSC.inv = null; };
+const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived) && (!MSC.q.trim() || [c.name, c.contact, c.email, c.phone, c.note, c.billing?.customer_no]
+  .some(v => (v || '').toLowerCase().includes(MSC.q.trim().toLowerCase()))));
+const ms_clAv = (c, big) => `<span class="avatar ctav mscav ${big ? 'big' : ''}" style="${cssColor(c.color) ? '--cc:' + cssColor(c.color) : ''}" aria-hidden="true">${c.icon ? esc(c.icon) : ic('brief', big ? '' : 's')}</span>`;
+const ms_tag = (kind) => kind === 'client' ? `<span class="mstag mstag-cl">${ic('brief', 's')}${tr('Client')}</span>` : `<span class="mstag">${ic('user', 's')}${tr('Contact')}</span>`;
+
+// 2.47.3 (#1360): the page follows the workspace of the sidebar like the office (Private = the private clients, an
+// organisation = its clients, All = every client one sees)
+const ms_inWs = c => { const ws = typeof wsCur === 'function' ? wsCur() : 'all'; return ws === 'all' || (ws === 'private' ? c.org_id == null : 'org:' + c.org_id === ws); };
+function ms_clView() {
+  if (MSC.ws !== undefined && MSC.ws !== (typeof wsCur === 'function' ? wsCur() : 'all')) ms_clDirty();
+  MSC.ws = typeof wsCur === 'function' ? wsCur() : 'all';
+  if (MSC.items === null && !MSC.loading) setTimeout(ms_clLoad, 0);
+  const id = S.route.client || null, mob = isMobile();
+  if (id && (!CLV.data || CLV.id !== id) && !CLV.loading) setTimeout(clLoad, 0);
+  if (id && MSC.inv === null && !MSC.invLoading && typeof officeOn === 'function' && officeOn()) setTimeout(ms_clInvLoad, 0);
+  const d = id && CLV.data && CLV.id === id ? CLV.data : null;
+  const card = !id ? (mob ? '' : `<div class="ctcard ctnone muted">${ic('brief')}${tr('Choose a client')}</div>`)
+    : !d ? `<div class="ctcard ctnone muted">${tr('Loading…')}</div>`
+    : d.error ? `<div class="ctcard ctnone muted">${ic('brief')}${tr('This client does not exist or you cannot see it.')}${mob ? `<a class="btn" href="#clients">${tr('All clients')}</a>` : ''}</div>` : ms_clCard(d);
+  const head = `<h2 class="msclh">${ic('receipt', 's')}<span class="muted">${tr('Office|area')}</span><span class="muted" aria-hidden="true">›</span><span>${tr('Clients')}</span></h2>`;
+  const bar = `<div class="ctbar"><div class="ctsearch">${ic('search', 's')}<input id="mscl-q" type="search" value="${esc(MSC.q)}" placeholder="${esc(tr('Search clients'))}" aria-label="${esc(tr('Search clients'))}" autocomplete="off" enterkeyhint="search"></div>
+    <label class="chkl"><input type="checkbox" id="mscl-arch" ${MSC.arch ? 'checked' : ''}> ${tr('Archived')}</label><span class="spacer"></span>
+    ${(MSC.items || []).length ? `<button class="iconbtn ${MSC.pick ? 'on' : ''}" data-mscl="pick" aria-pressed="${!!MSC.pick}" aria-label="${esc(tr(MSC.pick ? 'End selection' : 'Select'))}" title="${esc(tr(MSC.pick ? 'End selection' : 'Select'))}">${ic('select')}</button>` : ''}
+    <button class="btn sm pri" data-act="client-new">${ic('plus', 's')}<span class="cdl">${tr('New client')}</span></button></div>`;
+  const items = MSC.items === null ? null : ms_clShown();
+  const list = items === null ? `<div class="muted ctempty">${tr('Loading…')}</div>`
+    : !MSC.items.length ? `<div class="empty nempty eact msclempty">${ic('brief')}<span>${tr('Clients are companies for quotations and invoices, with hours and budget. Private people belong in Contacts.')}</span><button class="btn pri" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>${feat('contacts') ? `<a class="btn" href="#contacts">${ic('users', 's')} ${tr('Contacts')}</a>` : ''}</div>`
+    : !items.length ? `<div class="empty">${ic('brief')}${tr('No client matches.')}</div>`
+    : `<ul class="ctlist" role="list" aria-label="${esc(tr('Clients'))}">${items.map(c => `<li><button type="button" class="ctrow ${c.id === id ? 'on' : ''} ${MSC.pick?.has(c.id) ? 'picked' : ''} ${c.archived ? 'msarch' : ''}" data-clopen="${c.id}" ${MSC.pick ? `aria-pressed="${MSC.pick.has(c.id)}"` : `aria-current="${c.id === id}"`}>${MSC.pick ? `<span class="ctchk ${MSC.pick.has(c.id) ? 'on' : ''}" aria-hidden="true">${MSC.pick.has(c.id) ? ic('check', 's') : ''}</span>` : ''}${ms_clAv(c)}<span class="ctn"><b>${esc(c.name)}</b><small class="muted">${esc([c.archived ? tr('archived') : '', c.contact, c.email].filter(Boolean).join(' · '))}</small></span>${c.budget && c.budget.level !== 'none' ? `<i class="msbud lv-${c.budget.level}" title="${esc(tr(BUDGET_TXT[c.budget.level]))}"></i>` : ''}</button></li>`).join('')}</ul>`;
+  return `<div class="ctview msclients ${id ? 'withcard' : ''} ${MSC.pick ? 'ctpicking' : ''}">${mob && id ? '' : head}${MSC.pick && !(mob && id) ? ms_clBar() : ''}${mob && id ? '' : bar}<div class="ctcols">${mob && id ? '' : `<div class="ctlistw">${list}</div>`}${card}</div></div>`;
+}
+function ms_clCard(c) {
+  const b = c.billing || {}, cur = S.settings.time_currency || '€';
+  const ii = k => typeof ux_info === 'function' ? ux_info(k) : '';  // 2.47.3 (D, #1382): the (i) explanations of the office
+  const f = (icon, label, val, k) => val ? `<div class="ctf">${ic(icon, 's')}<span class="ctfl muted">${esc(label)}</span><span>${val}</span></div>${k ? ii(k) : ''}` : '';
+  const adr = [b.street, [b.zip, b.city].filter(Boolean).join(' '), b.country].filter(Boolean).join(', ') || c.address || '';
+  const bud = [c.budget_h ? `${fmtNum(c.budget_h, 1)} h` : '', c.budget_amount ? `${fmtNum(c.budget_amount, 2)} ${cur}` : ''].filter(Boolean).join(' · ');
+  const inv = (MSC.inv || []).filter(x => x.client_id === c.id && x.open > 0 && !['draft', 'cancelled'].includes(x.status));
+  const ks = (c.contacts || []).filter(k => k.name);
+  return `<article class="ctcard msclcard" aria-labelledby="mscl-h">
+    <div class="cthead">${isMobile() ? `<button class="iconbtn" data-mscl="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ms_clAv(c, true)}<div class="cthn"><h3 id="mscl-h">${esc(c.name)}</h3><div class="mstags">${ms_tag('client')}${c.archived ? `<span class="rotag">${tr('Archived')}</span>` : ''}${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}</div></div>
+      <span class="ctacts"><button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button><button class="iconbtn" data-mscl="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
+    <div class="ctfields">
+      ${f('money', tr('Hourly rate'), c.rate != null ? esc(`${fmtNum(c.rate, 2)} ${cur}`) : '')}
+      ${f('chart', tr('Budget'), esc(bud))}
+      ${f('at', tr('E-mail'), c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
+      ${f('phone', tr('Phone'), c.phone ? `<a href="tel:${esc(c.phone.replace(/[^\d+]/g, ''))}">${esc(c.phone)}</a>` : '')}
+      ${f('mappin', tr('Address'), esc(adr))}
+      ${f('hash', tr('Customer number'), esc(b.customer_no || ''), 'cl_customer_no')}
+      ${f('receipt', tr('VAT ID'), esc(b.vat_id || ''), 'cl_vat_id')}
+      ${f('tag', tr('Buyer reference (e.g. routing ID)'), esc(b.buyer_reference || ''), 'cl_buyer_reference')}
+      ${f('at', tr('E-mail for invoices'), b.email_invoice ? `<a href="mailto:${esc(b.email_invoice)}">${esc(b.email_invoice)}</a>` : '', 'cl_email_invoice')}
+      ${f('clock', tr('Payment terms (days)'), b.payment_terms_days != null ? esc(String(b.payment_terms_days)) : '', 'cl_payment_terms_days')}
+    </div>
+    ${ks.length ? `<div class="ctsec"><h4>${tr('Contact persons')}</h4><ul class="ctlinks msclks">${ks.map(k => `<li>${ic('user', 's')} <b>${esc(k.name)}</b>${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default && ks.length > 1 ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone.replace(/[^\d+]/g, ''))}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul></div>` : ''}
+    ${typeof officeOn === 'function' && officeOn() && MSC.inv !== null ? `<div class="ctsec"><h4>${tr('Open invoices')}</h4>${inv.length ? `<ul class="ctlinks">${inv.map(x => `<li><a class="linkbtn" href="#office/offers/${x.id}">${ic('receipt', 's')} ${esc(x.number || tr('Draft'))}</a><span class="muted"> · ${esc(x.date ? fmtDateLoc(x.date) : '')} · ${esc(x.open_text || '')} · ${esc(x.status_text || '')}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No open invoices.')}</p>`}</div>` : ''}
+    ${clientDetailHtml(c, true)}
+  </article>`;
+}
+
+// ---- #1733: several clients at once (the selection bar of the contacts, multisel.js): Edit (rate, budget, colour,
+// a note appended), Archive / Restore, Delete (a client in use is archived instead); one undo step each except Delete
+function ms_clBar() {
+  const n = MSC.pick.size, sel = (MSC.items || []).filter(c => MSC.pick.has(c.id)), allArch = sel.length && sel.every(c => c.archived);
+  const shown = ms_clShown(), allOn = n && shown.every(c => MSC.pick.has(c.id));
+  return ms_barHtml('ct-sbar', 'clb', n, tr('Tap clients'), [['all', 'all', allOn ? tr('Select none') : tr('All')], ['edit', 'edit', tr('Edit')],
+    ['arch', allArch ? 'undo' : 'archive', allArch ? tr('Restore') : tr('Archive')], ['del', 'trash', tr('Delete'), 'danger']]);
+}
+function ms_clClick(id, shift) {
+  if (!MSC.pick) { MSC.pick = new Set(); MSC.last = null; }
+  if (shift && MSC.last != null) for (const x of ms_range(ms_clShown().map(c => c.id), MSC.last, id)) MSC.pick.add(x);
+  else if (MSC.pick.has(id)) MSC.pick.delete(id); else MSC.pick.add(id);
+  MSC.last = id; ms_clDraw();
+}
+const ms_clEnd = () => { MSC.pick = null; MSC.last = null; ms_clDraw(); };
+const ms_clSend = body => rawFetch('POST', '/api/clients/bulk', body);
+async function ms_clAfter() { ms_clDirty(); CLV.data = null; await load().catch(() => {}); ms_clDraw(); }
+async function ms_clAct(k) {
+  if (!MSC.pick) return;
+  if (k === 'close') { ms_clEnd(); return; }
+  const shown = ms_clShown();
+  if (k === 'all') { if (MSC.pick.size && shown.every(c => MSC.pick.has(c.id))) MSC.pick.clear(); else for (const c of shown) MSC.pick.add(c.id); ms_clDraw(); return; }
+  const ids = [...MSC.pick]; if (!ids.length) return;
+  if (k === 'arch') {
+    const sel = (MSC.items || []).filter(c => MSC.pick.has(c.id)), action = sel.every(c => c.archived) ? 'unarchive' : 'archive';
+    let j; try { j = await ms_clSend({action, ids}); } catch (x) { toast(x.message || ''); return; }
+    ms_clEnd(); await ms_clAfter();
+    const msg = action === 'archive' ? trn('{0} client archived', '{0} clients archived', j.changed) : trn('{0} client restored', '{0} clients restored', j.changed);
+    if (j.changed) ms_hist(msg, msg, async () => { await ms_clSend({action: 'restore', items: j.undo}); await ms_clAfter(); }, async () => { j = await ms_clSend({action, ids}); await ms_clAfter(); });
+    else toast(msg);
+  } else if (k === 'del') {
+    if (!await askConfirm(trn('Delete {0} client?', 'Delete {0} clients?', ids.length), tr('Clients used in quotations, invoices or contracts are archived instead. Their lists stay; they only lose the client.'), {ok: tr('Delete'), danger: true})) return;
+    let j; try { j = await ms_clSend({action: 'delete', ids}); } catch (x) { toast(x.message || ''); return; }
+    if (S.route.client && ids.includes(S.route.client) && !j.undo.some(x => x.id === S.route.client)) go('clients');
+    ms_clEnd(); await ms_clAfter();
+    toast([trn('{0} deleted', '{0} deleted', j.deleted), j.archived ? trn('{0} archived (in use)', '{0} archived (in use)', j.archived) : '', j.skipped ? trn('{0} skipped (only the creator or an admin may delete it)', '{0} skipped (only the creator or an admin may delete them)', j.skipped) : ''].filter(Boolean).join(' · '));
+  } else if (k === 'edit') ms_clEdit(ids);
+}
+function ms_clEdit(ids) {
+  const cur = esc(S.settings.time_currency || '€'), num = (k, unit, lab) => `<span class="lacts"><input id="ms-f-${k}" data-msf="${k}" inputmode="decimal" class="numin" placeholder="–" aria-label="${esc(lab)}"><span class="muted">${unit}</span></span>`;
+  ms_sheet(trn('Edit {0} client', 'Edit {0} clients', ids.length), tr('Only what you fill in or tick changes; everything else stays as it is.'), [
+    {k: 'rate', label: tr('Hourly rate'), input: num('rate', cur, tr('Hourly rate')), hint: tr('empty = remove')},
+    {k: 'budget_h', label: tr('Budget in hours'), input: num('budget_h', 'h', tr('Budget in hours')), hint: tr('empty = remove')},
+    {k: 'budget_amount', label: tr('Budget as an amount'), input: num('budget_amount', cur, tr('Budget as an amount')), hint: tr('empty = remove')},
+    {k: 'color', label: tr('Colour'), input: `<input type="color" id="ms-f-color" data-msf="color" value="#4f7cff" aria-label="${esc(tr('Colour'))}">`},
+    {k: 'note_append', label: tr('Append to the note'), input: `<textarea id="ms-f-note_append" data-msf="note_append" rows="3" maxlength="4000"></textarea>`, fill: true}],
+  async v => {
+    const body = {action: 'set', ids};
+    for (const k of ['rate', 'budget_h', 'budget_amount']) if (k in v) body[k] = v[k].trim() === '' ? null : v[k].trim().replace(',', '.');
+    if ('color' in v) body.color = v.color;
+    if (v.note_append) body.note_append = v.note_append;
+    let j = await ms_clSend(body);
+    ms_clEnd(); await ms_clAfter();
+    const msg = trn('{0} client changed', '{0} clients changed', j.changed);
+    if (j.changed) ms_hist(msg, tr('Clients changed'), async () => { await ms_clSend({action: 'restore', items: j.undo}); await ms_clAfter(); }, async () => { j = await ms_clSend(body); await ms_clAfter(); });
+    else toast(msg);
+    return true;
+  });
+}
+
+// ---- events
+document.addEventListener('input', e => {
+  if (e.target.id !== 'mscl-q') return;
+  MSC.q = e.target.value; clearTimeout(MSC.t); MSC.t = setTimeout(ms_clDraw, 120);
+});
+document.addEventListener('change', e => { if (e.target.id === 'mscl-arch') { MSC.arch = e.target.checked; ms_clDraw(); } });
+const ms_clLp = ms_longPress('#view .msclients .ctrow[data-clopen]', () => !!MSC.pick, r => ms_clClick(+r.dataset.clopen, false));
+document.addEventListener('click', e => {
+  if (S.route.mod !== 'clients') return;
+  const bb = e.target.closest('#ct-sbar [data-clb]');
+  if (bb) { ms_clAct(bb.dataset.clb); return; }
+  const o = e.target.closest('#view [data-clopen]');
+  if (o) {
+    e.preventDefault();
+    if (ms_lpRecent(ms_clLp)) return;  // the click that ends a long press
+    if (MSC.pick || (ms_modClick(e) && !isMobile())) { ms_clClick(+o.dataset.clopen, e.shiftKey); return; }
+    go('client/' + o.dataset.clopen); return;
+  }
+  const b = e.target.closest('#view [data-mscl]'); if (!b) return;
+  const k = b.dataset.mscl;
+  if (k === 'pick') { MSC.pick = MSC.pick ? null : new Set(); MSC.last = null; ms_clDraw(); }
+  else if (k === 'back') go('clients');
+  else if (k === 'cmenu' && CLV.data?.id) {
+    const c = CLV.data;
+    menu(b, [{label: c.archived ? tr('Restore') : tr('Archive'), icon: c.archived ? 'undo' : 'archive', fn: async () => {
+      let j; try { j = await ms_clSend({action: c.archived ? 'unarchive' : 'archive', ids: [c.id]}); } catch (x) { toast(x.message || ''); return; }
+      await ms_clAfter();
+      const msg = c.archived ? trn('{0} client restored', '{0} clients restored', 1) : trn('{0} client archived', '{0} clients archived', 1);
+      if (j.changed) ms_hist(msg, msg, async () => { await ms_clSend({action: 'restore', items: j.undo}); await ms_clAfter(); }, async () => { await ms_clSend({action: c.archived ? 'unarchive' : 'archive', ids: [c.id]}); await ms_clAfter(); });
+    }}]);
+  }
+});
+document.addEventListener('keydown', e => {  // capture: before the global Esc (an open menu / dialog closes first)
+  if (e.key === 'Escape' && MSC.pick && S.route.mod === 'clients' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); ms_clEnd(); }
+}, true);

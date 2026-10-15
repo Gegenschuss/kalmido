@@ -279,10 +279,10 @@ def t_send_chat(api, a):
             except ValueError:
                 raise ApiError(400, f"files: {f['name']} is not valid base64") from None
             files.append((f["name"], f.get("mime") or "application/octet-stream", data))
-        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to", "offer_save", "kind")), files))  # approval: see request_chat_approval
+        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to", "offer_save", "kind")), files))  # approval: see request_chat_approval
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
-    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to", "offer_save", "kind")))
+    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to", "offer_save", "kind")))
 
 
 def t_request_chat_approval(api, a):
@@ -627,6 +627,8 @@ TOOLS = [
            "reply_to": {**S_ID, "description": "2.33.0: the id of a message of this conversation you answer (a message's reply / reply_to "
                                                "show what the person answered)"},
            "job_id": {**S_ID, "description": "2.32.0: this message is the result of your job for this person (its history shows under it)"},
+           "job_parent": {**S_ID, "description": "2.47.3: with job_id: the leading job of this part job (another job of yours); the app colours a message "
+                                                 "'Job #N: ...' by its job and gives a part job the colour of its leader"},
            "permission": {"type": "boolean"}, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800},
            "choices": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {
                "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
@@ -827,9 +829,15 @@ TOOLS += [
      lambda api, a: api.call("DELETE", f"/contacts/{int(a['contact_id'])}")),
     ("bulk_contacts", "2.46.1: delete or move several contacts at once (ids from search_contacts, up to 5000). All are checked first: "
                       "one you may not change -> nothing happens. move: book_id = the target address book; contacts it has already stay "
-                      "(conflicts). Ask the person before deleting many.",
-     _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "move"]}, "book_id": S_ID}, ["ids", "action"]),
-     lambda api, a: api.call("POST", "/contacts/bulk", body=_pick(a, ("ids", "action", "book_id")))),
+                      "(conflicts). 2.47.3: set changes properties of all of them (groups_add / groups_remove, org, dept, kind, note_append "
+                      "is appended; read-only or imported address books are skipped); its answer's undo, sent back with action restore as "
+                      "items, puts the old values back. Ask the person before deleting many.",
+     _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "move", "set", "restore"]}, "book_id": S_ID,
+           "groups_add": {"type": "array", "items": {"type": "string"}}, "groups_remove": {"type": "array", "items": {"type": "string"}},
+           "org": {"type": "string"}, "dept": {"type": "string"}, "kind": {"type": "string", "enum": ["individual", "org"]},
+           "note_append": {"type": "string"}, "items": {"type": "array", "items": {"type": "object"}}}, ["action"]),
+     lambda api, a: api.call("POST", "/contacts/bulk", body=_pick(a, ("ids", "action", "book_id", "groups_add", "groups_remove", "org", "dept",
+                                                                       "kind", "note_append", "items")))),
     ("link_contact", "2.21.0: link a contact to a task: waiting (the task waits on them), responsible (they do it outside Kalmido) or about "
                      "(needs tasks:write too).",
      _obj({"task_id": S_ID, "contact_id": S_ID, "kind": {"type": "string", "enum": ["waiting", "responsible", "about"]}}, ["task_id", "contact_id"]),
@@ -1338,6 +1346,14 @@ TOOLS += [
      lambda api, a: api.call("PATCH", f"/clients/{int(a['client_id'])}", body=_pick(a, tuple(_CLIENT)))),
     ("delete_client", "2.23.0: delete a client (its creator or an admin); its lists stay.", _obj({"client_id": S_ID}, ["client_id"]),
      lambda api, a: api.call("DELETE", f"/clients/{int(a['client_id'])}")),
+    ("bulk_clients", "2.47.3: several clients at once (ids from list_clients, up to 1000). delete: a client used in quotations, invoices or "
+                     "framework contracts is archived instead (only its creator or an admin deletes; others are skipped); archive / "
+                     "unarchive; set: rate, budget_h, budget_amount, color (null clears), note_append (appended); restore: items = the "
+                     "undo of an answer. Ask the person before deleting many.",
+     _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "archive", "unarchive", "set", "restore"]},
+           "rate": {"type": ["number", "null"]}, "budget_h": {"type": ["number", "null"]}, "budget_amount": {"type": ["number", "null"]},
+           "color": {"type": "string"}, "note_append": {"type": "string"}, "items": {"type": "array", "items": {"type": "object"}}}, ["action"]),
+     lambda api, a: api.call("POST", "/clients/bulk", body=_pick(a, ("ids", "action", "rate", "budget_h", "budget_amount", "color", "note_append", "items")))),
     ("get_workload", "2.23.0 (module workload): planned hours per person and week against their capacity (open assigned tasks, "
                      "their duration as the estimate).", _obj({"start": D, "weeks": {"type": "integer", "minimum": 1, "maximum": 12},
                                                                "org": {"type": "integer"}}),
@@ -1376,7 +1392,7 @@ TOOL_SCOPES = {
                   "create_field", "update_field", "create_list_tag", "update_list_tag", "delete_list_tag", "create_template",
                   "update_template", "apply_template", "create_filter", "update_filter", "set_project_overview", "add_project_link",
                   "update_project_link", "delete_project_link", "reorder_project_links", "set_project_status", "add_milestone", "update_milestone",
-                  "delete_milestone", "create_client", "update_client", "delete_client", "create_form", "update_form", "delete_form"),
+                  "delete_milestone", "create_client", "update_client", "delete_client", "bulk_clients", "create_form", "update_form", "delete_form"),
     "delete": ("delete_reward", "delete_note", "delete_list", "delete_section", "delete_task", "restore_task", "empty_trash", "delete_field", "delete_template",
                "delete_filter", "delete_habit"),
     "attachments:read": ("get_attachment", "read_attachment"),

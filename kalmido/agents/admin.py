@@ -466,7 +466,7 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
             from ..core.access import acx_drop
             acx_drop()
         return
-    if isinstance(v, bool) or not isinstance(v, int) or not c.execute("SELECT 1 FROM orgs WHERE id=?", (v,)).fetchone():
+    if isinstance(v, bool) or not isinstance(v, int) or not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (v,)).fetchone():  # 2.47.3 (#1360)
         raise BadInput(tr("Invalid value: {0}", "org_id"))
     if a["owner_id"] and v not in user_orgs(c, a["owner_id"]):
         raise BadInput(tr("The owner of this agent is not a member of that organisation"))

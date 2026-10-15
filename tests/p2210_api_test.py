@@ -242,7 +242,8 @@ check(Bo.get(B + f"/api/events/{E1['id']}").status_code == 404 and not [x for x 
 check(A.put(B + f"/api/evcals/{W['id']}/members", json={"user_id": BOB, "role": "view"}).ok, "Work shared with Bob (view)")
 cb = Bo.get(B + "/api/evcals").json()["items"]
 check(len(cb) == 1 and cb[0]["role"] == "view" and cb[0]["owner_name"] == "Alice" and "members" not in cb[0], f"Bob: the calendar, view, no member list {cb}")
-check({x["eid"] for x in occs(Bo, D, D)} == {NY["id"]}, "Bob sees the Work events only")
+# 2.47.3: the weekly Work standup can fall on D (test day three days before its first Monday); it is a Work event too
+check({x["eid"] for x in occs(Bo, D, D)} - {WK["id"]} == {NY["id"]}, "Bob sees the Work events only")
 check(Bo.patch(B + f"/api/events/{NY['id']}", json={"title": "x"}).status_code == 403 and Bo.post(B + "/api/events", json={"title": "x", "cal_id": W["id"], "start": f"{D}T10:00"}).status_code == 403,
       "view: no changes, no new events")
 check(Bo.get(B + f"/api/events/{E1['id']}").status_code == 404, "Bob: an event of the Private calendar stays hidden")

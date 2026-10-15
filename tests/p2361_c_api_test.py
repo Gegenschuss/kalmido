@@ -274,9 +274,10 @@ for m, p in (("GET", f"{D}/{DOC}"), ("PATCH", f"{D}/{DOC}"), ("PUT", f"{D}/{DOC}
              ("POST", f"{D}/{DOC}/duplicate"), ("DELETE", f"{D}/{DOC}"), ("GET", f"{D}/{DOC}/render")):
     r = Ca.request(m, B + p, json={"status": "draft", "items": []})
     check(r.status_code == 404, f"other organisation: {m} {p} -> 404 (got {r.status_code})")
+# 2.47.3 (#1360): a person without an organisation works in the own personal office: empty, nothing of the organisation
 r = Da.get(B + D)
-check(r.status_code == 400 and "organisation" in r.text, f"a private person without an organisation: 400 with a hint ({r.status_code} {r.text[:80]})")
-check(Da.post(B + D, json={}).status_code == 400 and Da.get(B + f"{D}/{DOC}").status_code == 400, "private person: nothing")
+check(r.status_code == 200 and r.json()["docs"] == [] and r.json()["org_id"] != ORG, f"a private person without an organisation: the own personal office ({r.status_code} {r.text[:80]})")
+check(Da.get(B + f"{D}/{DOC}").status_code == 404, "private person: nothing of the organisation")
 r = requests.get(B + D, headers=AGH)
 check(r.status_code in (401, 403), f"an agent token is refused: 401/403 ({r.status_code})")
 check(requests.get(B + f"{D}/{DOC}", headers=AGH).status_code in (401, 403) and requests.post(B + D, headers=AGH, json={}).status_code in (401, 403), "agent: refused on every docs route")

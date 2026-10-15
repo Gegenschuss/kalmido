@@ -65,7 +65,7 @@ const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and li
   workload: N_('How much each person of your organisation has on their plate per week, against their hours per week'),
   forms: N_('A link with a small form (requests, bug reports) that creates a task in a list; agents can sort it in'),
   agents: N_('A tab with the agents (AI assistants, bots) you share lists with: their status, jobs to approve and the chat'),
-  office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents of your organisation'),
+  office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents - your own or your organisation\'s'),
   wiki: N_('Pages in Markdown for processes, checklists and know-how of your organisation (or only for you), with links between them and to tasks'),  // 2.49.0 (#1199)
   progress: N_('Progress bar in the list header and the project status (“Where is it stuck?”); with collaboration also a status per list')};
 const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f);
@@ -295,7 +295,7 @@ async function rawFetch0(method, url, body) {
   if (OUT.down) { OUT.down = false; if (S.booted && !OUT.online) renderTop(); }
   setOnline(true);
   if (r.type === 'opaqueredirect' || (r.headers.get('content-type') || '').includes('text/html')) {
-    location.reload();  // login session expired -> login page
+    location.reload();  // Authelia session expired -> login page
     throw new Error('auth');
   }
   const j = await r.json().catch(() => ({}));
@@ -870,6 +870,7 @@ function parseHash() {
   if (a === 'grp' && +b) return {mod: 'tasks', key: 'grp:' + +b};  // 2.10.0 (#441): the tasks of a group
   if (a === 'today' && b === 'review') return {mod: 'tasks', key: 'today', review: true};  // 2.10.0 (#440): push "Daily review"
   if (a === 'folder' && b) return {mod: 'tasks', key: 'folder:' + h.slice(7)};  // 2.4.0: a path has a slash
+  if (a === 'lists' && b) return {mod: 'tasks', key: 'lists:' + b};  // 2.47.3 (#1727): several marked lists (sidebar.js)
   if (a === 'agents') return {mod: 'agents', key: 'agents', agent: +b || null};
   if (a === 'job' && +b) return {mod: 'agents', key: 'agents', job: +b};  // 2.36.2 (#1141): one job, unfolded with its history
   if (a === 'ev' && +b) return {mod: 'cal', key: 'cal', ev: +b};  // 2.21.0 (#659): a push / News about an event
@@ -941,7 +942,7 @@ function replyFocus(id, n = 0) {
   try { ci.focus({preventScroll: true}); } catch { ci.focus(); }
   ci.scrollIntoView?.({block: 'nearest'});
 }
-const keyToHash = k => k.startsWith('who:') ? 'who/' + k.slice(4) : k.startsWith('grp:') ? 'grp/' + k.slice(4) : k.startsWith('l:') ? 'l/' + k.slice(2) : k.startsWith('f:') ? 'f/' + k.slice(2) : k.startsWith('tag:') ? 'tag/' + encodeURIComponent(k.slice(4)) : k.startsWith('folder:') ? 'folder/' + encodeURIComponent(k.slice(7)) : k;
+const keyToHash = k => k.startsWith('lists:') ? 'lists/' + k.slice(6) : k.startsWith('who:') ? 'who/' + k.slice(4) : k.startsWith('grp:') ? 'grp/' + k.slice(4) : k.startsWith('l:') ? 'l/' + k.slice(2) : k.startsWith('f:') ? 'f/' + k.slice(2) : k.startsWith('tag:') ? 'tag/' + encodeURIComponent(k.slice(4)) : k.startsWith('folder:') ? 'folder/' + encodeURIComponent(k.slice(7)) : k;
 // 1.5.2: folder view (key "folder:<name>"): the open tasks of every active list in that sidebar folder, grouped by list
 const folderLists = f => sideOrder().filter(l => fUnder(l.folder, f) && !l.archived && !l.is_inbox);  // 2.4.0: subfolders too
 window.addEventListener('hashchange', route);
