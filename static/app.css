@@ -6720,3 +6720,8 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .avwhich{margin:.375rem 0}
 .avwhich>summary{cursor:pointer;display:flex;align-items:center;gap:.375rem;min-height:2.25rem;font-size:.875rem;color:var(--text2)}
 .avwhich ul{margin:.25rem 0 0;padding-left:1.25rem;display:flex;flex-direction:column;gap:.25rem}
+/* 2.46.6 C (#1710) an admin switch next to the own setting: small mark "Admin · applies to everyone" + jump to Administration */
+.modrow .ad-mark{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:.25rem .5rem;flex-basis:100%;font-size:var(--fs-xs)}
+.ad-tag{padding:.0625rem .4375rem;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:999px;color:var(--accent);white-space:nowrap}
+.ad-mark .ad-open{font-size:var(--fs-xs)}
+@media (pointer:coarse){ .ad-mark .ad-open{min-height:2.75rem;padding:0 .5rem} }

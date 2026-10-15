@@ -150,12 +150,12 @@ const V = B + 'api/v1';
   w.eval(`settingsModal('agents')`); await until(() => d.querySelector('.modal [data-aisub="setup"]'));
   md = d.querySelector('.modal');
   const subs = [...md.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim());
-  check(subs.filter(x => /Set up/.test(x)).length === 1 && subs.includes('Administration'), '#1024: ONE "Set up" and "Administration" ' + subs.join('|'));
+  check(subs.filter(x => /Set up/.test(x)).length === 1 && !subs.includes('Administration'), '#1024: ONE "Set up"; 2.46.6 (#1710): no "Administration" sub-tab any more ' + subs.join('|'));
   click(w, md.querySelector('[data-aisub="setup"]')); await sleep(400);
   const setup = md.querySelector('#aisp-setup');
   check(/Who is the agent for/.test(setup.textContent) && [...setup.querySelectorAll('[data-agseg="guide"] [data-agsv]')].map(b => b.textContent.trim()).join('|') === 'For me|For the team' && setup.querySelector('#s-agwhy').textContent.length > 40,
     '#1024: the first question For me / For the team with one sentence ' + [...setup.querySelectorAll('[data-agseg="guide"] [data-agsv]')].map(b => b.textContent.trim()).join('|'));
-  check(!setup.querySelector('#s-uag') && md.querySelector('#aisp-admin #s-uag') && md.querySelector('#aisp-admin #s-sclim'), '#1024: the server-wide switches are under Administration, not under Set up');
+  check(!setup.querySelector('#s-uag') && md.querySelector('#admp-agents #s-uag') && md.querySelector('#admp-agents #s-sclim'), '#1024: the server-wide switches are under Administration (2.46.6 (#1710): Settings > Administration > Agents), not under Set up');
   click(w, md.querySelector('[data-aisub="agents"]'));
   await until(() => md.querySelector('#s-ags .agown'));
   check(/Team/.test(md.querySelector(`#s-ags [data-agid="${AG}"] .agown`)?.textContent || ''), '#1024: the agent card says Team');

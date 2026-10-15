@@ -102,7 +102,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(rows.length >= 12 && rows.every(r => r.querySelector('small')?.textContent.trim().length > 10), `every module with one sentence (${rows.length})`);
   check(mp.querySelectorAll('details.modgrp').length >= 3 && [...mp.querySelectorAll('details.modgrp')].every(g => /\d+ of \d+ on/.test(g.querySelector('summary').textContent)), 'modules grouped, folded, with "x of y on" (2.25.0)');
   check(mp.querySelector('#s-collaball') && mp.querySelector('#s-timeall'), 'admin: "for everyone" next to collaboration and time tracking');
-  check(!md.querySelector('[data-pane="users"] #s-collaball'), 'no second copy under Administration');
+  check(!md.querySelector('[data-pane="users"] #s-collaball') && md.querySelector('[data-pane="users"] #s-collaball-a') && mp.querySelectorAll('[data-modrow] .ad-mark').length === 2, 'no second copy with the same id under Administration (2.46.6 (#1710): the same switch there as #s-collaball-a, the mark in Modules)');
   check(mp.querySelector('[data-modrow="pomo"] details #s-pf') && mp.querySelector('[data-modrow="time"] details #s-trnd'), 'focus and time options folded under their module');
   check(!md.querySelector('#s-nav') && !md.querySelector('[data-pane="layout"]') && !md.querySelector('[data-pane="collab"]'), 'the duplicate module list and the Collaboration tab are gone');
   check(md.querySelector('[data-pane="look"] #s-tabbar'), 'tab bar under Appearance');
