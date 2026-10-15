@@ -5,6 +5,7 @@
 //   Settings stays alone at the bottom
 // - #1509: "Messages" with the unread count on top of "Conversations", the last conversations (at most 5, unread first and
 //   bold), a bubble at every person opens the direct message, g n opens the messenger (in the shortcut help)
+// - #1532: a new folder belongs to the shown workspace (Private / an organisation), so it shows there at once
 // - #1516: "Notes" in Views with the number of notes; #notes = the notes of all lists: pinned first, the list's name, a filter
 //   by list, a search in title and text, "New note" in a picked list; rights as before (participants / view-only)
 const path = require('path');
@@ -161,6 +162,24 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   w = await boot({user: 'carol', hash: 'notes'}); d = w.document;
   await until(() => d.querySelector('#view .sbnall'));
   check(cards().length === 2 && !d.querySelector('[data-sb="note-new"]'), '#1516: Carol (view): reads, no "New note"');
+  w.close();
+
+  // ================= #1532 a new folder belongs to the shown workspace (shows at once while empty)
+  const ORG = (await call('GET', '/api/state')).me.workspaces[0].id;
+  const fShown = n => [...d.querySelectorAll('#side .fhead')].some(f => f.dataset.folder === n);
+  await call('PATCH', '/api/settings', {workspace: 'private'});
+  w = await boot({user: 'alice', hash: 'inbox'}); d = w.document; await sleep(300);
+  w.prompt = () => 'Ideas'; await w.eval('newFolder()');
+  check(await until(() => fShown('Ideas')), '#1532: Private: the new folder shows at once');
+  check(await until(async () => (await call('GET', '/api/folders/props?folder=Ideas')).props?.org_id === 0), '#1532: stored as private');
+  await call('PATCH', '/api/settings', {workspace: 'org:' + ORG}); await w.eval('load().then(render)'); await sleep(300);
+  w.prompt = () => 'Team ideas'; await w.eval('newFolder()');
+  check(await until(() => fShown('Team ideas')) && !fShown('Ideas'), '#1532: in the organisation: its new folder shows, the private one not');
+  w.prompt = () => 'Drafts'; await w.eval(`newFolder(null, 'Team ideas')`);
+  check(await until(() => fShown('Team ideas') && !w.eval(`foldClosed('Team ideas')`) ? [...d.querySelectorAll('#side .fhead')].some(f => f.dataset.folder === 'Team ideas/Drafts') : w.eval(`folderNames().includes('Team ideas/Drafts') && sb_folderInWs('Team ideas/Drafts')`)), '#1532: a subfolder inherits the workspace');
+  check(!('Team ideas/Drafts' in w.eval('S.folderProps')), '#1532: … without an own setting');
+  await call('PATCH', '/api/settings', {workspace: 'all'}); await w.eval('load().then(render)'); await sleep(300);
+  check(fShown('Ideas') && fShown('Team ideas'), '#1532: All shows both');
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);
