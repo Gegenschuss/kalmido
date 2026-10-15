@@ -7,6 +7,15 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.47.2] - 2026-10-15
+
+**In short:** CI fixes for 2.47.0 and 2.47.1; this version brings both packages live together.
+
+### Fixed
+- The person card keeps *Message* first and big (#906); *Open in split window* follows it (#1720).
+- New sizes of 2.47.0 / 2.47.1 in rem, so they follow the font size (calculation box, colour picker, split windows).
+- `p2466_c_ui` waits for both time tracking switches after switching on under Administration.
+
 ## [2.47.1] - 2026-10-15
 
 **In short:** **several chats at once** in the chat panel, one above the other, and a **fixed colour for every agent
