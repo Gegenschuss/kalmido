@@ -112,6 +112,7 @@ ORDER = (
     "accounts.invite",
     "family.family",
     "family.web",
+    "family.pin",  # 2.49.0 B (#1551)
     "family.carddav",
     "family.v1",
     "events.model",

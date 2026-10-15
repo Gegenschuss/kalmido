@@ -6814,3 +6814,20 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 /* 2.46.7 (#1708): touch targets of the Lists summary and the workspace button (device test) */
 .aglists>summary{min-height:2.75rem}
 @media (pointer:coarse){.agnm .avws{min-height:2.75rem}}
+/* 2.49.0 B (#1537) child accounts: "My day" sections per shared list; Settings > Account without the parts a child
+   cannot use (app passwords, end-to-end keys, developer tokens, the agent chat button) */
+.kidv .kd_list .kidsec{display:flex;align-items:center;gap:.5rem}
+.kidv .kd_empty{margin:.25rem 0 0}
+body.kidmode #chatfab,body.kidmode .smodal .sdev,body.kidmode .smodal #s-apw-h,body.kidmode .smodal #s-apw-h+.shint,body.kidmode .smodal #s-apws,
+body.kidmode .smodal .row:has(>[data-apw]),body.kidmode .smodal #s-e2e-h,body.kidmode .smodal #s-e2e,body.kidmode .smodal .ssearch,
+body.kidmode .smodal .snav [data-sec="org"],body.kidmode .smodal .snav [data-sec="modules"],body.kidmode .smodal .snav [data-sec="integr"],
+body.kidmode .smodal .snav [data-sec="ai"],body.kidmode .smodal .snav [data-sec="data"],body.kidmode .smodal .snav [data-sec="users"],
+body.kidmode .smodal .snav [data-sec="help"]{display:none!important}
+/* 2.49.0 B (#1551) the parents' PIN: a big number field (phone keypad), a calm message line */
+.kd_pinin{font-size:1.75rem;letter-spacing:.5em;text-align:center;min-height:3.25rem;width:100%;max-width:14rem}
+.kdpin .card>.kd_pinin{display:block;margin:.75rem auto}
+.kd_pinmsg{min-height:1.5em;text-align:center;color:var(--muted)}
+/* 2.49.0 B (#1533) a child's welcome tour: bigger cards and buttons */
+body.kidmode .tour .tcard h3{font-size:var(--fs-l)}
+body.kidmode .tour .tcard p{font-size:1.125rem;line-height:1.5}
+body.kidmode .tour .tfoot .btn{min-height:2.75rem;padding-inline:1rem}

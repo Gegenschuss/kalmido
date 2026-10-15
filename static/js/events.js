@@ -809,6 +809,7 @@ document.addEventListener('keydown', async e => {
     return;
   }
   // 2.4.0 (#187): Ctrl+Space = quick capture from anywhere (also while typing somewhere else)
+  if (S.me?.kid) return;  // 2.49.0 (#1537): a child has no shortcuts (quick add, views ... only fail for it)
   if (e.ctrlKey && !e.altKey && !e.metaKey && (e.code === 'Space' || e.key === ' ') && t.id !== 'qsheet' && !$('.authscreen')) { e.preventDefault(); quickCapture(); return; }
   if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'n') { e.preventDefault(); const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }

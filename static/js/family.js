@@ -94,7 +94,7 @@ const PACK_UI = [['holiday', N_('Holiday'), '🏖️'], ['pool', N_('Swimming po
 function kidCardHtml(k) {
   const req = (k.rewards || []).filter(r => r.state === 'requested');
   return `<div class="kidc" data-kid="${k.id}"><div class="kidh">${av(k.id, k.display_name)}<b>${esc(k.display_name)}</b><span class="kstars" aria-label="${esc(trn('{0} star', '{0} stars', k.stars))}"><span aria-hidden="true">★</span> ${k.stars}</span><span class="spacer"></span>
-    <button type="button" class="btn sm" data-act="fam-give" data-kid="${k.id}">${ic('plus', 's')}<span>${tr('Stars')}</span></button><button type="button" class="btn sm" data-act="fam-rewards" data-kid="${k.id}">${ic('gift', 's')}<span>${tr('Rewards')}</span></button></div>
+    <button type="button" class="btn sm" data-act="fam-give" data-kid="${k.id}">${ic('plus', 's')}<span>${tr('Stars')}</span></button><button type="button" class="btn sm" data-act="fam-rewards" data-kid="${k.id}">${ic('gift', 's')}<span>${tr('Rewards')}</span></button><button type="button" class="btn sm" data-act="fam-pin" data-kid="${k.id}" aria-label="${esc(tr('Parent PIN for {0}', k.display_name))}">${ic('lock', 's')}<span>${k.pin ? tr('PIN on') : tr('PIN')}</span></button></div>
     ${req.map(r => `<div class="kreq"><span class="kreqt">${esc(tr('{0} would like: {1}', k.display_name, (r.emoji ? r.emoji + ' ' : '') + r.title))} · ${r.cost} ★</span><span class="kreqb"><button type="button" class="btn sm" data-act="fam-decide" data-rid="${r.id}" data-ok="0">${tr('Not now')}</button><button type="button" class="btn sm pri" data-act="fam-decide" data-rid="${r.id}" data-ok="1">${ic('check', 's')}<span>${tr('Approve')}</span></button></span></div>`).join('')}</div>`;
 }
 // the kid's view: big buttons, only its own tasks (the server sends no others), its stars and the rewards
@@ -104,17 +104,24 @@ function viewKid() {
     .sort((a, b) => a.status - b.status || (a.due || '9999').localeCompare(b.due || '9999') || a.id - b.id);
   const todo = mine.filter(t => t.status === 0);
   const hi = new Date().getHours();
+  // 2.49.0 (#1537, owner decision 15.10.): the kid's own tasks first, then one section per list shared with it (its name
+  // as the heading; an empty one says so)
+  const shared = kd_sharedLists(), sid = new Set(shared.map(l => l.id)), own = mine.filter(t => !sid.has(t.list_id));
+  const ul = ts => `<ul class="kidtasks">${ts.map(t => `<li class="${t.status ? 'done' : ''}"><button type="button" class="kidchk" data-act="kid-tick" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(tr('Done: {0}', t.title))}">${t.status ? ic('check') : ''}</button>
+      <span class="kidt"><b>${esc(t.title)}</b>${t.due ? `<span class="muted">${esc(dayLabel(t.due))}${t.due_time ? ' ' + t.due_time : ''}</span>` : ''}</span><span class="kidst" aria-label="${esc(trn('{0} star', '{0} stars', t.stars ?? 1))}">${'★'.repeat(Math.min(5, t.stars ?? 1))}</span></li>`).join('')}</ul>`;
   return `<div class="kidv"><div class="kidtop"><h2>${esc(hi < 11 ? tr('Good morning, {0}', S.me.display_name) : hi < 18 ? tr('Hello, {0}', S.me.display_name) : tr('Good evening, {0}', S.me.display_name))}</h2>
     <div class="kidbal" role="status" aria-label="${esc(trn('You have {0} star', 'You have {0} stars', k.stars))}"><span aria-hidden="true">★</span><b>${k.stars}</b></div></div>
     <h3 class="kidsec">${tr('My tasks')}</h3>
-    ${mine.length ? `<ul class="kidtasks">${mine.map(t => `<li class="${t.status ? 'done' : ''}"><button type="button" class="kidchk" data-act="kid-tick" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(tr('Done: {0}', t.title))}">${t.status ? ic('check') : ''}</button>
-      <span class="kidt"><b>${esc(t.title)}</b>${t.due ? `<span class="muted">${esc(dayLabel(t.due))}${t.due_time ? ' ' + t.due_time : ''}</span>` : ''}</span><span class="kidst" aria-label="${esc(trn('{0} star', '{0} stars', t.stars ?? 1))}">${'★'.repeat(Math.min(5, t.stars ?? 1))}</span></li>`).join('')}</ul>`
-      : heronEmpty('done', tr('Nothing to do right now.'), '')}
+    ${own.length ? ul(own) : mine.length || shared.length ? `<p class="muted kd_empty">${tr('Nothing to do right now.')}</p>` : heronEmpty('done', tr('Nothing to do right now.'), '')}
+    ${shared.map(l => { const ts = mine.filter(t => t.list_id === l.id);
+      return `<section class="kd_list" data-kd-list="${l.id}"><h3 class="kidsec">${esc(lname(l))}</h3>${ts.length ? ul(ts) : `<p class="muted kd_empty">${tr('Nothing here for you right now.')}</p>`}</section>`; }).join('')}
     ${todo.length || !mine.length ? '' : `<p class="kidyay">${tr('All done. Great job!')}</p>`}
     <h3 class="kidsec">${tr('Rewards')}</h3>
     ${(k.rewards || []).length ? `<ul class="kidrw">${k.rewards.map(r => `<li><span class="kre" aria-hidden="true">${esc(r.emoji || '🎁')}</span><span class="kidt"><b>${esc(r.title)}</b><span class="muted">${r.cost} ★</span></span>${r.state === 'requested' ? `<span class="kwait">${tr('Asked – waiting')}</span>` : r.state === 'redeemed' ? `<span class="muted">${tr('Redeemed')}</span>` : k.stars < r.cost ? `<span class="kneed">${esc(trn('{0} more star', '{0} more stars', r.cost - k.stars))}</span>` : `<button type="button" class="btn pri kidbtn" data-act="kid-want" data-rid="${r.id}">${tr('I want this')}</button>`}</li>`).join('')}</ul>`
       : `<p class="muted">${tr('No rewards yet: ask your parents.')}</p>`}</div>`;
 }
+// 2.49.0 (#1537): the lists others shared with the kid (not its own Basket / lists), by name
+const kd_sharedLists = () => S.lists.filter(l => !l.archived && !l.is_inbox && !l.context && l.owner_id !== S.me?.id).sort((a, b) => lname(a).localeCompare(lname(b)));
 
 // ---- dialogs
 function occModal(o = {}) {
@@ -443,6 +450,7 @@ document.addEventListener('click', async e => {
   else if (k === 'fam-areas') { try { const j = await api('POST', `/api/lists/${a.dataset.lid}/shop-areas`, {}); await load(); render(); toast(trn('{0} shop area added', '{0} shop areas added', j.added)); } catch { /* api() said it */ } }
   else if (k === 'fam-give') famGive(+a.dataset.kid);
   else if (k === 'fam-rewards') rewardsModal(+a.dataset.kid);
+  else if (k === 'fam-pin') kd_pinSet(+a.dataset.kid);  // 2.49.0 (#1551)
   else if (k === 'fam-decide') { try { famKidSet(await api('POST', `/api/family/rewards/${a.dataset.rid}/decide`, {approve: a.dataset.ok === '1'})); toast(a.dataset.ok === '1' ? tr('Redeemed') : tr('Declined')); } catch { /* api() said it */ } }
   else if (k === 'kid-tick') {
     const t = taskById(id); if (!t) return;
@@ -535,4 +543,74 @@ function sideSearchSync() {
   }
   const lab = tr('Search and commands');
   if (b.getAttribute('aria-label') !== lab) { b.setAttribute('aria-label', lab); b.title = lab; b.innerHTML = ic('search'); }
+}
+// 2.49.0 (#1537): what a child account sees in Settings: its account (name, picture, colour, password, sign-in), General
+// (language), Appearance and Notifications (push). The areas whose writes the server refuses to a child (organisation,
+// modules, integrations, agents, data, administration), the help for grown-ups and in the account pane app passwords,
+// end-to-end keys and the developer part are hidden by app.css (block 2.49.0 B; the panes stay in the page, their set-up
+// code expects them)
+// ---- 2.49.0 (#1551): the parents' PIN of a child account. With a PIN the child needs it for Settings, its account and
+// Log out (the server checks too, family/pin.py); a correct PIN opens them for 5 minutes in this session. Ticking off and
+// asking for rewards never need it.
+const kd_me = () => (S.me?.kid && (S.kids || [])[0]) || null;
+function kd_pinNeed() { const k = kd_me(); return !!(k && k.pin && !(k.pin_open && Date.parse(k.pin_open) > Date.now())); }
+function kd_pinClosed() { const k = kd_me(); if (k) { k.pin_open = null; if (!$('.kdpin')) kd_pinAsk(); } }
+function kd_pinAsk(then) {
+  const k = kd_me(); if (!k) return;
+  $('.kdpin')?.remove();
+  const md = modal(`<h3>${ic('lock', 's')} ${tr('Parent PIN')}</h3>
+    <p class="muted">${tr('Settings, your account and logging out need the PIN of your parents.')}</p>
+    <input id="kd-pin" class="kd_pinin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6" aria-label="${esc(tr('PIN'))}">
+    <div class="kd_pinmsg" id="kd-pinmsg" role="status" aria-live="polite"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Open')}</button></div>`);
+  md.classList.add('kdpin');
+  const inp = $('#kd-pin', md), msg = $('#kd-pinmsg', md);
+  const wait = s => { msg.textContent = trn('Too many wrong PINs. Try again in {0} minute.', 'Too many wrong PINs. Try again in {0} minutes.', Math.max(1, Math.ceil(s / 60))); inp.disabled = true; };
+  if (k.pin_wait > 0) wait(k.pin_wait);
+  const go = async () => {
+    const pin = inp.value.trim(); if (!/^\d{4,6}$/.test(pin)) { msg.textContent = tr('The PIN has 4 to 6 digits'); inp.focus(); return; }
+    try {
+      const j = await rawFetch('POST', '/api/me/pin/unlock', {pin});
+      k.pin_open = j.until; k.pin_wait = 0; md.remove(); if (then) then();
+    } catch (e) {
+      if (e.status === 429) wait(e.data?.wait || 900);
+      else if (e.status === 403) { msg.textContent = e.data?.left ? trn('Wrong PIN. {0} try left.', 'Wrong PIN. {0} tries left.', e.data.left) : tr('Wrong PIN'); inp.value = ''; inp.focus(); }
+      else msg.textContent = e.message || '';
+    }
+  };
+  md.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.m === 'close') md.remove(); else if (b.dataset.m === 'ok') go(); });
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+  setTimeout(() => inp.focus(), 30);
+}
+// a parent: set, change or remove the PIN of a child
+function kd_pinSet(kid) {
+  const k = (S.kids || []).find(x => x.id === kid); if (!k) return;
+  const md = modal(`<h3>${ic('lock', 's')} ${tr('Parent PIN for {0}', esc(k.display_name))}</h3>
+    <p class="muted">${tr('With a PIN {0} needs it for Settings, the account and logging out. Ticking off tasks and asking for rewards stay free.', esc(k.display_name))}</p>
+    <div class="row"><label for="kd-new">${k.pin ? tr('New PIN') : tr('PIN')}</label><input id="kd-new" class="kd_pinin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password" maxlength="6" placeholder="${esc(tr('4 to 6 digits'))}"></div>
+    <div class="aerr" role="alert" id="kd-err"></div>
+    <div class="foot">${k.pin ? `<button class="btn danger" data-m="del">${tr('Remove PIN')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  md.classList.add('famdlg');
+  const errEl = $('#kd-err', md), inp = $('#kd-new', md);
+  const save = async () => {
+    const pin = inp.value.trim(); if (!/^\d{4,6}$/.test(pin)) { errEl.textContent = tr('The PIN has 4 to 6 digits'); inp.focus(); return; }
+    try { famKidSet(await rawFetch('PUT', `/api/family/kids/${kid}/pin`, {pin})); md.remove(); toast(tr('PIN saved for {0}', k.display_name)); } catch (e) { errEl.textContent = e.message || ''; }
+  };
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.m === 'close') md.remove();
+    else if (b.dataset.m === 'save') save();
+    else if (b.dataset.m === 'del') { try { famKidSet(await rawFetch('DELETE', `/api/family/kids/${kid}/pin`)); md.remove(); toast(tr('PIN removed for {0}', k.display_name)); } catch (er) { errEl.textContent = er.message || ''; } }
+  });
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+  setTimeout(() => inp.focus(), 30);
+}
+// ---- 2.49.0 (#1533): the welcome tour of a child account: at most four big cards in plain words, no sample project,
+// no modules, no shortcuts, no settings. A child cannot add tasks itself (family.py KID_WRITE), so there is no card for it.
+function kd_tourSteps() {
+  const at = sel => () => { const e = $(sel); return e ? e.getBoundingClientRect() : null; };
+  const s = [{id: 'kd-tasks', sel: '.kidv .kidsec', t: N_('Your tasks'), d: N_('Here are your things for today.'), r: at('.kidv .kidsec')},
+    {id: 'kd-tick', sel: '.kidv .kidchk', t: N_('Tick off'), d: N_('Tap the circle when you have done something. Then it is done and you get stars.'), r: at('.kidv .kidchk')},
+    {id: 'kd-parents', sel: '.kidv .kd_list', t: N_('From your parents'), d: collab() ? N_('Tasks your parents give you are here, under the name of their list. Messages come in behind the bell at the top.') : N_('Tasks your parents give you are here, under the name of their list.'), r: at('.kidv .kd_list .kidsec')}];
+  return s;
 }

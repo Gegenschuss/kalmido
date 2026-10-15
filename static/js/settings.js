@@ -632,6 +632,7 @@ function hostWire(md) {
   });
 }
 function settingsModal(focus) {
+  if (kd_pinNeed()) return kd_pinAsk(() => settingsModal(focus));  // 2.49.0 (#1551): a child with the parents' PIN
   const s = S.settings;
   const topicUrl = `${S.ntfyUrl}/${s.ntfy_topic}`;
   const dev = `<span class="devtag">${tr('This device')}</span>`, hint = t => `<div class="shint">${t}</div>`;
