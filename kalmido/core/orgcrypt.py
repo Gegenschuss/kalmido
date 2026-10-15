@@ -55,6 +55,9 @@ FIELDS = {
     "office_roles": ("costs",),  # 2.47.0 (#1649): the purchase of a role
     "office_purchases": ("amount",),  # 2.47.0 (#1649): the purchase of an accepted quotation
     "office_doc_parts": ("sheet",),  # 2.47.0 (#1216): the shoot calculation sheet (markups, rates of external crew = purchase)
+    "office_trips": ("people", "note"),  # 2.47.3 (#1022): participants and note of a trip
+    "office_trip_items": ("amount", "amount_home"),  # 2.47.3 (#1022): the amounts of a travel receipt
+    "office_fixed_costs": ("amount",),  # 2.47.3 (#1652): fixed costs of the cash flow
 }
 JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"): ("costs", "margin"),
              ("office_doc_parts", "totals"): ("costs", "margin")}  # 2.47.0 (#1215)
@@ -67,7 +70,9 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "files": N_("Files of organisations"), "tokens": N_("Stored access tokens (Git, client secret of the single sign-on)"),
                  # 2.47.0 (#1649, #1215, #1216): roles' purchase prices, purchases of accepted quotations, parts and shoot sheets
                  "office_roles": N_("Purchase prices and margins"), "office_purchases": N_("Purchase prices and margins"),
-                 "office_doc_parts": N_("Purchase prices and margins"), ("office_doc_parts", "totals"): N_("Purchase prices and margins")}
+                 "office_doc_parts": N_("Purchase prices and margins"), ("office_doc_parts", "totals"): N_("Purchase prices and margins"),
+                 # 2.47.3 (#1022, #1652): travel expenses (participants, amounts) and fixed costs
+                 "office_trips": N_("Travel expenses"), "office_trip_items": N_("Travel expenses"), "office_fixed_costs": N_("Fixed costs")}
 PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))
 
 

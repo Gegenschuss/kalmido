@@ -6814,3 +6814,36 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 /* 2.46.7 (#1708): touch targets of the Lists summary and the workspace button (device test) */
 .aglists>summary{min-height:2.75rem}
 @media (pointer:coarse){.agnm .avws{min-height:2.75rem}}
+/* 2.47.3 B (#1022, #1652): travel expenses and cash flow in the office */
+.rkbar select{min-height:2.25rem}
+.rkbadge{display:inline-block;min-width:1.25rem;padding:0 .3rem;border-radius:999px;background:var(--accent);color:var(--on-accent,#fff);font-size:.75rem;line-height:1.25rem;text-align:center}
+.rksum{font-variant-numeric:tabular-nums;white-space:nowrap}
+.rkmiss{color:var(--accent)}
+.rkhead{margin:.25rem 0 .75rem}.rkhead h3{margin:0 0 .25rem}.rkhead p{margin:.125rem 0}
+.rknote{white-space:pre-wrap}
+.rkits .rkit{display:flex;align-items:center;gap:.5rem}
+.rkits .rkit .ofcrow{flex:1;min-width:0}
+.rksel,.rkdatev{display:flex;align-items:center;min-height:2.75rem;white-space:nowrap}
+.rksel input,.rkdatev input{width:1.25rem;height:1.25rem}
+.rkppl{display:flex;flex-wrap:wrap;gap:.25rem .75rem}
+.rklab{min-width:8rem}
+.rktab,.cftab{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.rktab th,.rktab td,.cftab th,.cftab td{padding:.5rem .5rem;border-bottom:1px solid var(--line2);text-align:left}
+.rktab .num,.cftab .num{text-align:right;white-space:nowrap}
+.rktab tfoot th,.cftab tfoot th{border-bottom:0}
+@media (max-width:600px){.rkits .rkit{flex-wrap:wrap}.rkits .rkit .ofcrow{flex-basis:calc(100% - 2.5rem)}.rkdatev{margin-left:2rem}}
+.cfrange{white-space:nowrap}
+.cfms{display:grid;grid-template-columns:repeat(auto-fill,minmax(18rem,1fr));gap:.75rem;margin:.5rem 0}
+.cfm{border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);padding:.5rem .75rem}
+.cfm.cur{border-color:var(--accent)}
+.cfm header{display:flex;align-items:center;gap:.5rem;min-height:2rem}
+.cfbal{font-variant-numeric:tabular-nums;white-space:nowrap}.cfbal.neg{color:var(--danger,#c0392b)}
+.cfbars{display:flex;flex-direction:column;gap:2px;margin:.25rem 0}
+.cfbars span{display:block;height:4px;border-radius:2px;transform-origin:left center;transition:transform .2s ease}
+.cfbin{background:var(--accent)}.cfbout{background:var(--accent);opacity:.35}
+.cfv{min-height:2.75rem;min-width:4rem;padding:0 .25rem;background:none;border:0;color:var(--text);font:inherit;font-variant-numeric:tabular-nums;text-align:right;cursor:pointer;border-radius:var(--radius)}
+.cfv:hover,.cfv:focus-visible,.cfv[aria-expanded="true"]{color:var(--accent);text-decoration:underline}
+.cfv.plan{font-style:italic}
+.cfz{display:inline-block;cursor:default}
+.cftab th{font-weight:500}
+.cfents{margin-top:.25rem}.cfents .ofcrow{text-decoration:none}
