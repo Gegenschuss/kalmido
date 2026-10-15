@@ -282,8 +282,9 @@ fp = [q for q in REQS if q["ct"].startswith("multipart/") and "/agent/chats/7" i
 check(fp and b'filename="report.txt"' in fp[0]["body"] and b"All done: first" in fp[0]["body"] and b'name="job_id"' in fp[0]["body"],
       "the result with the job's file is posted into the chat, linked to the job")
 check(any(q["m"] == "PATCH" and q["p"].endswith("/jobs/41") and b'"done"' in q["body"] for q in REQS), "the Kalmido job is set to done")
-nt = os.path.join(TMP, "jst", "notes.jsonl")
-check(os.path.exists(nt) and "Job #41" in open(nt).read(), "a note for the next run says the job is done")
+# 2.46.6 (#1445): a job with a chat person wakes the chat agent (one wake file) instead of a note for the next run
+wk = os.path.join(TMP, "jst", "wakes", "41.json")
+check(os.path.exists(wk) and json.load(open(wk))["job"]["state"] == "done", "a wake file says the job is done")
 sj = [x for x in seen() if x.get("job") == "41"]
 check(sj and sj[0]["outbox"].endswith("outbox"), "the job has its own outbox")
 r = job("list")

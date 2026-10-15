@@ -183,14 +183,17 @@ function notifPatch(s, row, ch, on) {
   const sorted = Object.keys(o).sort().reduce((a, k) => { a[k] = Object.keys(o[k]).sort().reduce((b, j) => { b[j] = o[k][j]; return b; }, {}); return a; }, {});
   return {notify: JSON.stringify(sorted), news_kinds: NEWS_KINDS.map(x => x[0]).filter(k => nk.includes(k)).join(',')};
 }
-function notifMatrixHtml(s, hint) {
+// 2.46.6 (#1710): adm = only the admins' rows (Settings > Administration > Agents); the own matrix leaves them out
+function notifMatrixHtml(s, hint, adm = false) {
   const m = notifMatrix(s), social = collab();
-  const rows = NOTIF_ROWS.filter(([r, , , f]) => (social || !NM_SOCIAL.includes(r)) && (!f || (f === 'deps' ? depsOn() : f === 'admin' ? !!S.me?.is_admin : f === 'propose' ? propOn() : feat('agents'))));
+  const rows = NOTIF_ROWS.filter(([r, , , f]) => adm ? f === 'admin' && !!S.me?.is_admin : (social || !NM_SOCIAL.includes(r)) && (!f || (f === 'deps' ? depsOn() : f === 'admin' ? false : f === 'propose' ? propOn() : feat('agents'))));
+  if (!rows.length) return '';
+  const hid = adm ? 's-newsadm-h' : 's-news-h';
   const box = (r, ch, lab) => m[r][ch] === null ? `<span class="nmna" aria-label="${esc(tr('not available'))}">–</span>`
     : `<label class="nmhit"><input type="checkbox" data-nm="${r}" data-ch="${ch}" ${m[r][ch] ? 'checked' : ''} aria-label="${esc(tr(lab) + ': ' + (ch === 'news' ? tr('News') : tr('Push')))}"></label>`;  // 2.13.0: a 44 px hit area
-  return `<h4 id="s-news-h">${tr('What notifies you')}</h4>
-    ${hint(tr('News = under the bell in the app, Push = a notification on your devices. Your own actions never notify you. Each list can override this with its bell (list menu > Notifications).'))}
-    <div class="nmx" role="table" aria-labelledby="s-news-h"><div class="nmh" role="row"><span role="columnheader">${tr('Event')}</span><span role="columnheader">${tr('News')}</span><span role="columnheader">${tr('Push')}</span></div>
+  return `<h4 id="${hid}">${adm ? tr('What notifies you as an admin') : tr('What notifies you')}</h4>
+    ${adm ? '' : hint(tr('News = under the bell in the app, Push = a notification on your devices. Your own actions never notify you. Each list can override this with its bell (list menu > Notifications).'))}
+    <div class="nmx" role="table" aria-labelledby="${hid}"><div class="nmh" role="row"><span role="columnheader">${tr('Event')}</span><span role="columnheader">${tr('News')}</span><span role="columnheader">${tr('Push')}</span></div>
     ${rows.map(([r, n, d]) => `<div class="nmr" role="row"><span class="nml" role="cell">${tr(n)}${d ? `<small>${tr(d)}</small>` : ''}</span><span role="cell">${social ? box(r, 'news', n) : '<span class="nmna">–</span>'}</span><span role="cell">${box(r, 'push', n)}</span></div>`).join('')}</div>`;
 }
 // 2.24.0 (#910): what my files take (the storage quota of the server)

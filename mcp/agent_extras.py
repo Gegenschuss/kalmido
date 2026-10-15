@@ -12,7 +12,7 @@ bundling of task events (#1447). agent_run.py imports it tolerantly: without thi
                    chat-attachments / uploads).
   jobs (#1445)     the prompt tells a chat run how to start a job; the environment carries the command (KALMIDO_JOB_CMD),
                    the person (KALMIDO_CHAT_USER) and the state folder. A Stop of a job (event `job`, action stop) is passed
-                   to agent_job.py; a finished job leaves a line in notes.jsonl for the next run.
+                   to agent_job.py; a finished job wakes the chat agent (2.46.6, agent_run.py job_watch).
   bundling (#1447) task_added / tasks_added / tidy are collected for KALMIDO_BUNDLE_S seconds (default 120) and handled in
                    ONE run that only comments, never builds. Pure information (missed, a Stop of an unknown job, events of
                    persons not in KALMIDO_OWNER_IDS when that list is set) is kept as a note for the next run instead of a

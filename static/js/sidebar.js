@@ -712,7 +712,7 @@ async function folderPropsModal(f, opt = {}) {
     ${collab() && agentsOn() ? `<h4 id="fs-ag-h">${tr('Agents')}</h4>
       <div class="row fsagrow"><label>${tr('Agent')}</label><span class="fsags" id="fs-ags">${esc(agNames().join(', ') || tr('No agent'))}</span><button type="button" class="linkbtn" data-m="share-ag">${ic('users', 's')} ${tr('In the Share dialog…')}</button></div>
       <div class="shint lhint">${tr('Which agents work in this folder you choose in its Share dialog; the switches here are the defaults for its lists.')}</div>
-      ${fsw('fs-am', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and list admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.'))}
+      ${fsw('fs-am', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and list admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.') + (av_folderPersonal(f).length ? `<span class="avpers"> ${esc(av_personalHint(av_folderPersonal(f)))}</span>` : ''))}
       ${fsw('fs-af', 'agent_followup', tr('Agent follows up'), tr('Once a day the agent gets the tasks of this list that lie idle and asks about them in a comment or drafts a reminder. Nothing is sent to anyone outside. Off by default.'))}
       ${sel('fs-td', 'agent_tidy', TIDY.map(([k, n]) => [k, tr(n)]), hasAg() || 'agent_tidy' in p ? '' : 'disabled')}
       <div class="shint lhint" id="fs-tdhint">${hasAg() ? tr('Tidy up by: the agent of each list.') : tr('Add an agent in the Share dialog first.')}</div>
@@ -760,7 +760,7 @@ async function folderPropsModal(f, opt = {}) {
   md.addEventListener('change', e => {
     const t = e.target, k = t.dataset?.fk; if (!k) return;
     e.stopPropagation();
-    if (t.type === 'checkbox') { put(k, t.checked); return; }
+    if (t.type === 'checkbox') { put(k, t.checked).then(() => { if (k === 'agent_members' && t.checked && av_folderPersonal(f).length) toast(tr('Saved') + ' · ' + av_personalHint(av_folderPersonal(f)), undefined, 9000); }); return; }  // 2.46.6 (#1680)
     put(k, t.value === '' ? null : k === 'agent_tidy' ? t.value : +t.value);
   });
   md.addEventListener('click', async e => {

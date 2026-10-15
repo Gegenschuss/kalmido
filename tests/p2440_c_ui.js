@@ -58,7 +58,8 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   click(w, md.querySelector('[data-m="ains-make"]'));
   await until(() => !md.querySelector('#ains-out').hidden);
   const wcmd = md.querySelector('#ains-cmd').value;
-  check(wcmd.startsWith('& ([scriptblock]::Create((irm ') && wcmd.includes("/agent-setup.ps1'))) -Url '") && /-Code ks_[\w-]+ -Dir 'C:\\work\\site'$/.test(wcmd), 'Windows: the PowerShell command ' + wcmd);
+  // 2.46.6 (#1713): the command ends with the account language (-Lang de|en)
+  check(wcmd.startsWith('& ([scriptblock]::Create((irm ') && wcmd.includes("/agent-setup.ps1'))) -Url '") && /-Code ks_[\w-]+ -Dir 'C:\\work\\site' -Lang (de|en)$/.test(wcmd), 'Windows: the PowerShell command ' + wcmd);
   check(/PowerShell/.test(md.querySelector('#ains-how').textContent), 'Windows: paste into PowerShell');
   const wcode = wcmd.match(/-Code (ks_[\w-]+)/)[1];
   check(wcode !== code, 'every press makes a new code');

@@ -116,8 +116,8 @@ function backdate(agentId, ids) {
   await until(() => d.querySelectorAll('#s-ags [data-agid]').length === 2);
   let md = d.querySelector('.modal.smodal'), pane = md.querySelector('[data-pane="ai"]');
   const subs = [...pane.querySelectorAll('.aisub [data-aisub]')];
-  check(subs.map(b => b.dataset.aisub).join() === 'agents,lists,usage,log,setup,safe,admin' && subs.map(b => b.textContent.trim()).join() === 'Status,Lists,Usage,Log,Set up,Use safely,Administration', 'sub-tabs Status / Lists / Usage / Log / Set up / Use safely (2.6.0: Agents -> Overview, 2.7.0: Status, 2.7.2: Set up, 2.30.0: Use safely)');
-  check(subs[0].getAttribute('aria-selected') === 'true' && !pane.querySelector('#aisp-agents').hidden && ['lists', 'usage', 'log'].every(k => pane.querySelector('#aisp-' + k).hidden), 'Agents first, the others hidden');
+  check(subs.map(b => b.dataset.aisub).join() === 'agents,lists,usage,setup,safe' && subs.map(b => b.textContent.trim()).join() === 'Status,Lists,Usage,Set up,Use safely', 'sub-tabs Status / Lists / Usage / Log / Set up / Use safely (2.6.0: Agents -> Overview, 2.7.0: Status, 2.7.2: Set up, 2.30.0: Use safely)');  // 2.46.6 (#1710): Log and Administration moved to Settings > Administration > Agents
+  check(subs[0].getAttribute('aria-selected') === 'true' && !pane.querySelector('#aisp-agents').hidden && ['lists', 'usage'].every(k => pane.querySelector('#aisp-' + k).hidden), 'Agents first, the others hidden');
   check(pane.querySelector('details.aiexp') && !pane.querySelector('details.aiexp').open && /team member for an AI assistant/.test(pane.querySelector('details.aiexp').textContent), 'explanation closed once an agent exists');
   check(!pane.querySelector('[data-feat="agents"]'), 'no module switch while the module is on');
   const cards = [...pane.querySelectorAll('#s-ags .agsrow')];
@@ -169,36 +169,37 @@ function backdate(agentId, ids) {
   check(pane.querySelector('#aiu-det')?.open && /\$/.test(pane.querySelector('.aiusum').textContent), 'cost view: Details stays open');
   click(w, pane.querySelector('[data-aiu-m="tokens"]')); await sleep(300);
 
-  // Log
-  click(w, pane.querySelector('[data-aisub="log"]'));
-  await until(() => pane.querySelector('#s-aud .audr:not(.audh)'));
-  let lr = [...pane.querySelectorAll('#s-aud .audr:not(.audh)')];
+  // Log (2.46.6 (#1710): moved to Settings > Administration > Agents)
+  const apane = md.querySelector('[data-pane="users"]');
+  click(w, md.querySelector('.snav [data-sec="users"]')); click(w, apane.querySelector('[data-admsub="agents"]'));
+  await until(() => apane.querySelector('#s-aud .audr:not(.audh)'));
+  let lr = [...apane.querySelectorAll('#s-aud .audr:not(.audh)')];
   check(lr.length === 20 && !lr.some(r => /agent\/events/.test(r.textContent)), 'Log: 20 rows, no event polling: ' + lr.length);
-  check(pane.querySelector('#aud-poll')?.checked, 'switch "Hide event polling" on');
-  const sum = pane.querySelector('#aud-sum');
+  check(apane.querySelector('#aud-poll')?.checked, 'switch "Hide event polling" on');
+  const sum = apane.querySelector('#aud-sum');
   const today0 = w.eval('JSON.stringify(S.aud.today)');
   check(/\d+ requests today/.test(sum.textContent) && /\d+ denied/.test(sum.textContent) && /120 event polls hidden/.test(sum.textContent) && JSON.parse(today0).polls === 120, 'summary: ' + sum.textContent + ' ' + today0);
   const tr1 = lr.find(r => r.querySelector('.audi') && r.querySelector('.audi').textContent.includes('#' + T));
   check(tr1 && /Write the release notes/.test(tr1.querySelector('.audi').textContent), 'task title instead of a bare id: ' + tr1?.querySelector('.audi').textContent);
-  click(w, pane.querySelector('[data-aud="more"]'));
-  await until(() => pane.querySelectorAll('#s-aud .audr:not(.audh)').length > 20);
-  check(pane.querySelectorAll('#s-aud .audr:not(.audh)').length === 70, 'Load more: +50');
+  click(w, apane.querySelector('[data-aud="more"]'));
+  await until(() => apane.querySelectorAll('#s-aud .audr:not(.audh)').length > 20);
+  check(apane.querySelectorAll('#s-aud .audr:not(.audh)').length === 70, 'Load more: +50');
   click(w, sum.querySelector('[data-aud="denied"]'));
-  await until(() => pane.querySelector('#aud-csv').getAttribute('href').includes('status=denied') && pane.querySelectorAll('#s-aud .audr:not(.audh)').length && [...pane.querySelectorAll('#s-aud .audr:not(.audh)')].every(r => r.classList.contains('den')));
-  const dr = [...pane.querySelectorAll('#s-aud .audr:not(.audh)')];
-  check(dr.length && dr.every(r => r.classList.contains('den')) && pane.querySelector('#aud-st').value === 'denied', 'the denied count filters: ' + dr.length);
-  change(w, pane.querySelector('#aud-st'), ''); w.eval(`S.aud.day = ''; audSetDay(document.querySelector('.modal.smodal'))`);
-  const sw = pane.querySelector('#aud-poll'); sw.checked = false; change(w, sw);
-  await until(() => !/event polls hidden/.test(pane.querySelector('#aud-sum').textContent));
-  check(!/event polls hidden/.test(pane.querySelector('#aud-sum').textContent) && w.eval('audQuery()').indexOf('hide_poll') < 0 && w.localStorage.getItem('tasks.audPoll') === '"0"', 'switch off: the polling counts again (remembered)');
-  check(!/hide_poll/.test(pane.querySelector('#aud-csv').getAttribute('href')), 'CSV follows the switch');
-  const fb = pane.querySelector('[data-aud="filters"]');
+  await until(() => apane.querySelector('#aud-csv').getAttribute('href').includes('status=denied') && apane.querySelectorAll('#s-aud .audr:not(.audh)').length && [...apane.querySelectorAll('#s-aud .audr:not(.audh)')].every(r => r.classList.contains('den')));
+  const dr = [...apane.querySelectorAll('#s-aud .audr:not(.audh)')];
+  check(dr.length && dr.every(r => r.classList.contains('den')) && apane.querySelector('#aud-st').value === 'denied', 'the denied count filters: ' + dr.length);
+  change(w, apane.querySelector('#aud-st'), ''); w.eval(`S.aud.day = ''; audSetDay(document.querySelector('.modal.smodal'))`);
+  const sw = apane.querySelector('#aud-poll'); sw.checked = false; change(w, sw);
+  await until(() => !/event polls hidden/.test(apane.querySelector('#aud-sum').textContent));
+  check(!/event polls hidden/.test(apane.querySelector('#aud-sum').textContent) && w.eval('audQuery()').indexOf('hide_poll') < 0 && w.localStorage.getItem('tasks.audPoll') === '"0"', 'switch off: the polling counts again (remembered)');
+  check(!/hide_poll/.test(apane.querySelector('#aud-csv').getAttribute('href')), 'CSV follows the switch');
+  const fb = apane.querySelector('[data-aud="filters"]');
   click(w, fb);
-  check(pane.querySelector('#aud-ctl').classList.contains('open') && fb.getAttribute('aria-expanded') === 'true', 'the Filter button opens the filters (phones)');
+  check(apane.querySelector('#aud-ctl').classList.contains('open') && fb.getAttribute('aria-expanded') === 'true', 'the Filter button opens the filters (phones)');
   // remembered sub-tab + direct entries
   md.remove();
-  w.eval(`settingsModal('ai')`); await sleep(400);
-  check(d.querySelector('.smodal [data-aisub="log"]').getAttribute('aria-selected') === 'true', 'reopened: the last sub-tab (Log)');
+  w.eval(`settingsModal()`); await sleep(400);  // 2.46.6 (#1710): the log is Administration > Agents
+  check(d.querySelector('.smodal [data-admsub="agents"]').getAttribute('aria-selected') === 'true' && !d.querySelector('.smodal [data-aisub="log"]'), 'reopened: the last area and sub-tab (Administration > Agents)');
   d.querySelector('.smodal').remove();
   w.eval(`settingsModal('usage')`); await sleep(400);
   check(!d.querySelector('.smodal #aisp-usage').hidden, "settingsModal('usage') opens Usage");
@@ -252,8 +253,10 @@ function backdate(agentId, ids) {
   w.eval(`settingsModal('activity')`);
   await until(() => d.querySelector('#s-aud .audr:not(.audh)'));
   pane = d.querySelector('.smodal [data-pane="ai"]');
-  check([...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join() === 'Status,Listen,Verbrauch,Protokoll,Einrichten,Sicher nutzen,Verwaltung', 'German sub-tabs: ' + [...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join());
-  check(/Ereignis-Abfragen ausblenden/.test(pane.textContent) && /Anfragen/.test(pane.querySelector('#aud-sum').textContent) && /Welche Listen sie sehen/.test(pane.textContent) && /Agenten sind KI-Teammitglieder/.test(pane.textContent), 'German texts');
+  const apd = d.querySelector('.smodal [data-pane="users"]');  // 2.46.6 (#1710): Log and Verwaltung moved to Admin > Agenten
+  check([...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join() === 'Status,Listen,Verbrauch,Einrichten,Sicher nutzen', 'German sub-tabs: ' + [...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join());
+  check(/Ereignis-Abfragen ausblenden/.test(apd.textContent) && /Anfragen/.test(apd.querySelector('#aud-sum').textContent) && /Welche Listen sie sehen/.test(pane.textContent) && /Agenten sind KI-Teammitglieder/.test(pane.textContent), 'German texts');
+  check(d.querySelector('.smodal .snav [data-sec="users"] span')?.textContent === 'Admin' && apd.querySelector('[data-admsub="agents"]')?.getAttribute('aria-selected') === 'true', '2.46.6 (#1710): the area is called Admin, settingsModal(activity) opens its sub-tab Agenten');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
@@ -268,11 +271,13 @@ function backdate(agentId, ids) {
       await nav(B + '#today'); await sleep(2500);
       await ev(`localStorage.setItem('tasks.audPoll', '1'); S.aud.poll = true; settingsModal('ai')`); await sleep(400);
       for (const k of ['agents', 'lists', 'usage', 'log']) {
-        await ev(`document.querySelector('.smodal [data-aisub="${k}"]').click()`); await sleep(1800);
+        // 2.46.6 (#1710): the log is Settings > Administration > Agents
+        await ev(k === 'log' ? `document.querySelector('.smodal .snav [data-sec="users"]').click(); document.querySelector('.smodal [data-admsub="agents"]').click()` : `document.querySelector('.smodal [data-aisub="${k}"]').click()`); await sleep(1800);
+        const [SP, PN] = k === 'log' ? ['#sp-users', '#admp-agents'] : ['#sp-ai', '#aisp-' + k];
         if (k === 'lists') { await ev(`document.querySelector('#s-ai-tbl [data-aiall="1"]')?.click()`); await sleep(300); }
         if (k === 'usage') { await ev(`(() => { const x = document.querySelector('#aiu-det'); x.open = true; })()`); await sleep(300); }
         const m = await ev(`(() => {
-          const sp = document.querySelector('#sp-ai'), pane = document.querySelector('#aisp-${k}'), r = pane.getBoundingClientRect();
+          const sp = document.querySelector('${SP}'), pane = document.querySelector('${PN}'), r = pane.getBoundingClientRect();
           const over = [...pane.querySelectorAll('*')].filter(e => { const b = e.getBoundingClientRect(); return b.width && b.right > r.right + 1 && !e.closest('select') && getComputedStyle(e).position !== 'fixed'; }).map(e => e.getAttribute('class') || e.tagName).slice(0, 4);
           const cut = [...pane.querySelectorAll('.agsrow .agnm, .aitd select')].filter(e => e.getBoundingClientRect().right > r.right + 1).length
             + [...pane.querySelectorAll('.agsrow .agfacts, .agsrow .agnm')].filter(e => e.scrollWidth > e.clientWidth + 1).length;  // nothing cut off ("ready · 9 l…")

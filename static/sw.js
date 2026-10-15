@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v141';
+const CACHE = 'tasks-shell-v142';
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -14,7 +14,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/habits.js', '/static/js/detail.js', '/static/js/collab.js', '/static/js/attachments.js', '/static/js/mdtitle.js',
   '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js', '/static/js/dlgmove.js', '/static/js/settings.js', '/static/js/integrations.js', '/static/js/account.js',
   '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/projtime.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/sharedlg.js', '/static/js/dnd.js', '/static/js/secdrag.js', '/static/js/dragmulti.js',
-  '/static/js/palette.js', '/static/js/agents.js', '/static/js/cleanup.js', '/static/js/dayplan.js', '/static/js/choicecard.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/listedit.js', '/static/js/playbook.js', '/static/js/git.js',
+  '/static/js/palette.js', '/static/js/agents.js', '/static/js/cleanup.js', '/static/js/dayplan.js', '/static/js/choicecard.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/agentview.js', '/static/js/listedit.js', '/static/js/playbook.js', '/static/js/git.js',
   '/static/js/chat.js', '/static/js/cfnew.js', '/static/js/richcopy.js', '/static/js/dashboard.js', '/static/js/widgets.js', '/static/js/pinboard.js', '/static/js/family.js', '/static/js/tapdone.js', '/static/js/purposemods.js', '/static/js/calevents.js', '/static/js/contacts.js', '/static/js/life.js', '/static/js/formguard.js', '/static/js/liveparts.js', '/static/js/countries.js', '/static/js/clients.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_import.js', '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/areas.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/sbnav.js', '/static/js/notesall.js', '/static/js/favorites.js', '/static/js/mineorder.js', '/static/js/tablecells.js', '/static/js/sheetgrid.js', '/static/js/formula.js', '/static/js/listadmin.js', '/static/js/orgexport.js', '/static/js/orgcrypt.js', '/static/js/cryptscope.js', '/static/js/sheetdrag.js', '/static/js/sheetmotion.js', '/static/js/miniwin.js', '/static/js/chatwin.js', '/static/js/e2e.js', '/static/js/orgvis.js', '/static/js/main.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell

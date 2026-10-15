@@ -719,6 +719,16 @@ fresh; run p246d_b_api "$PY" p246d_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p246d_b_ui node p246d_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.4 part C: #1737 workspace line + greyed-out people in the Share dialogs, #1755 one-line Undo message above the keyboard
 fresh; run p246d_c_ui node p246d_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.46.6 part D: #1711 pen on approval cards, #1713 setup command in the account language
+fresh; run p2466_d_ui node p2466_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.46.6 part A: #1722 #1714 #1715 #1717 #1445 the reference launcher: cut buttons, one suggestion, the fixed rules block,
+# WORKFLOW-KALMIDO.md, a wake run after a job and a lost job resumed once (pure Python, no server)
+run p2466_a_launcher "$PY" p2466_a_launcher_test.py
+# 2.46.6 part B: #1680 #1708 #1709 #1716 personal agent hint at the members switch, an agent's lists, setup offer, which agent when
+fresh; run p2466_b_api "$PY" p2466_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2466_b_ui node p2466_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.46.6 part C: #1710 Settings: the admin parts gathered under Administration ("Admin"), mark "Admin · applies to everyone"
+fresh; run p2466_c_ui node p2466_c_ui.js "$KALMIDO_TEST_DATA"
 shard 5  # 2.47.0: the 2.47 suites run in shard 5 (shard 8 with the 2.46 suites took 24 min, shard 5 17 min)
 # 2.47.0 part C: #1216 shoot calculation sheet (core without server; API + UI need the part routes of #1215)
        run p2470_c_sheet "$PY" p2470_c_sheet_test.py

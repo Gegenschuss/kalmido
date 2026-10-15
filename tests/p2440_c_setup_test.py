@@ -222,6 +222,14 @@ for b in BASHES:
     o = r.stdout
     check(r.returncode == 0, f"{b}: dry run exit 0: {r.stderr[-400:]}")
     check(all(x in o for x in ("Checking what is needed", "Connecting to Kalmido", "Fetching the starter files", "Starting it at every login", "Done")), f"{b}: dry run shows every step")
+    # 2.46.6 (#1713): --lang de gives the German messages, anything else English; commands and paths stay as they are
+    rd = subprocess.run([b, SETUP_SH, "--dry-run", "--lang", "de-DE", "--url", URL, "--code", "ks_good_code", "--dir", "~/my project", "--cmd", "fakeagent"],
+                        env=env, capture_output=True, text=True, timeout=60)
+    check(rd.returncode == 0 and all(x in rd.stdout for x in ("Prüfe, was gebraucht wird", "Verbinde mit Kalmido", "Lade die Starter-Dateien", "Fertig", "(Probelauf)")), f"{b}: --lang de: German messages: {rd.stdout[:300]!r} {rd.stderr[-200:]!r}")
+    check("Checking what is needed" not in rd.stdout and (OSN != "linux" or "Restart=always" in rd.stdout), f"{b}: --lang de: no English step lines, the unit text is unchanged")
+    rf = subprocess.run([b, SETUP_SH, "--dry-run", "--lang", "fr", "--url", URL, "--code", "ks_good_code", "--dir", "~/my project", "--cmd", "fakeagent"],
+                        env=env, capture_output=True, text=True, timeout=60)
+    check(rf.returncode == 0 and "Checking what is needed" in rf.stdout, f"{b}: --lang fr falls back to English")
     if OSN == "mac":
         check("<key>KeepAlive</key><true/>" in o and "<key>RunAtLoad</key><true/>" in o and "/bin/bash" in o and "--events" in o, f"{b}: LaunchAgent with KeepAlive / RunAtLoad")
     else:

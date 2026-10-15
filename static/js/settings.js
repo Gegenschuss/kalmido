@@ -352,8 +352,18 @@ function modCountsSync(md) {
 function modRowHtml(k, opt = () => '') {
   const adm = !!S.me?.is_admin;
   const n = FEATS.find(x => x[0] === k)?.[1] || k, srv = k === 'collab' ? S.collabAll !== false : k === 'time' ? S.timeAll !== false : true;
-  const all = adm && (k === 'collab' || k === 'time') ? `<label class="mall" title="${esc(k === 'collab' ? tr('Off: nobody can share lists, assign tasks, comment, or get News and collaboration notifications; shared lists are then only visible to their owner.') : tr('Off: nobody sees timers, time entries or reports; running timers are stopped at that moment, focus sessions no longer become time entries.'))}"><span class="swc"><input type="checkbox" id="${k === 'collab' ? 's-collaball' : 's-timeall'}" ${srv ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('for everyone')}</span></label>` : '';
+  const all = adm && (k === 'collab' || k === 'time') ? `<label class="mall" title="${esc(k === 'collab' ? tr('Off: nobody can share lists, assign tasks, comment, or get News and collaboration notifications; shared lists are then only visible to their owner.') : tr('Off: nobody sees timers, time entries or reports; running timers are stopped at that moment, focus sessions no longer become time entries.'))}"><span class="swc"><input type="checkbox" id="${k === 'collab' ? 's-collaball' : 's-timeall'}" ${srv ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('for everyone')}</span></label>${ad_markHtml(k === 'collab' ? 's-collaball-a' : 's-timeall-a')}` : '';
   return `<div class="modrow ${feat(k) ? '' : 'off'}" data-modrow="${k}"><label class="mmain"><span class="swc"><input type="checkbox" data-feat="${k}" ${feat(k) ? 'checked' : ''} ${srv ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(n)}</b><small class="muted">${tr(MOD_DESC[k] || FEAT_DESC[k] || '')}</small>${srv ? '' : `<small class="muted cnote" id="${k === 'collab' ? 's-collabnote' : 's-timenote'}">${tr('Turned off on this server, for everyone. Your own setting applies again once an admin turns it back on.')}</small>`}</span></label>${all}${opt(k)}</div>`;
+}
+// 2.46.6 (#1710): an admin switch that stays next to the own setting says so: "Admin · applies to everyone" + a jump to
+// the same switch under Administration (adSel = the id there)
+const ad_markHtml = adSel => `<span class="ad-mark"><span class="ad-tag">${tr('Admin · applies to everyone')}</span><button type="button" class="linkbtn ad-open" data-adopen="${adSel}">${tr('Open in Administration')}</button></span>`;
+// 2.46.6 (#1710): Administration > Server > Whole server: collaboration and time tracking for everyone (the same switches
+// as in Modules, there with the mark above)
+function ad_allSwHtml() {
+  const sw = (id, on, n, d) => `<label class="wide"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span>${tr(n)}<small class="muted">${tr(d)}</small></span></label>`;
+  return sw('s-collaball-a', S.collabAll !== false, N_('Collaboration for everyone'), N_('Off: nobody can share lists, assign tasks, comment, or get News and collaboration notifications; shared lists are then only visible to their owner.'))
+    + sw('s-timeall-a', S.timeAll !== false, N_('Time tracking for everyone'), N_('Off: nobody sees timers, time entries or reports; running timers are stopped at that moment, focus sessions no longer become time entries.'));
 }
 // 2.0.5 (#313): Settings > Agents bundles the agents: what they are, the switch, how they get lists, their status;
 // admins also manage them here (was Settings > Administration > Agents; settingsModal('agents') still lands here).
@@ -363,8 +373,9 @@ function modRowHtml(k, opt = () => '') {
 // 2.7.0 (#405 S2): the Agents page only with the module on, or for an admin while agents exist (they manage them there)
 const aiPaneOn = () => !!S.me && (feat('agents') || (!!S.me.is_admin && (S.agents || []).length > 0));
 // 2.29.0 (#1024): ONE "Set up" (first question: for me / for the team); the server-wide switches are "Administration" (admins)
-const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['log', 'clock', N_('Log')], ['setup', 'help', N_('Set up|agents')], ['safe', 'lock', N_('Use safely')], ['admin', 'gear', N_('Administration|agents')]];  // 2.30.0 (#920): Use safely  // 2.7.2 (#420): Set up
-const aiSubs = () => AI_SUBS.filter(([k]) => k === 'log' || k === 'admin' ? !!S.me?.is_admin : k === 'usage' ? !!S.me?.is_admin || (S.agents || []).length > 0 : true);
+// 2.46.6 (#1710): Log and the server-wide rules moved to Settings > Administration > Agents (ADM_SUBS); old jumps land there
+const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['setup', 'help', N_('Set up|agents')], ['safe', 'lock', N_('Use safely')]];  // 2.30.0 (#920): Use safely  // 2.7.2 (#420): Set up
+const aiSubs = () => AI_SUBS.filter(([k]) => k === 'usage' ? !!S.me?.is_admin || (S.agents || []).length > 0 : true);
 function aiSubCur(want) { const ks = aiSubs().map(x => x[0]), k = want || LS.get('aiSub', 'agents'); return ks.includes(k) ? k : 'agents'; }
 function aiHtml(hint, want) {
   const adm = !!S.me?.is_admin, ags = S.agents || [], cur = aiSubCur(want);
@@ -386,10 +397,8 @@ function aiHtml(hint, want) {
     <div class="aitbl" id="s-ai-tbl" role="table" aria-labelledby="s-ai-lists-h"><div class="muted mhint">${tr('Loading…')}</div></div>` : `<div class="muted mhint">${tr('You do not manage any list yet.')}</div>`}`)}
     ${subs.some(x => x[0] === 'usage') ? pane('usage', `${hint(adm ? tr('What the agents report about their model usage: tokens and, if they send it, the cost. You see every agent; limits are set per agent (Edit).') : tr('What the agents in your lists report about their model usage, counted in the lists you see.'))}
     <div class="aiu" id="s-aiu"></div>`) : ''}
-    ${adm ? pane('log', audHtml()) : ''}
     ${pane('setup', agSetupPaneHtml(hint))}
-    ${pane('safe', agSafeHtml())}
-    ${adm ? pane('admin', agAdminPaneHtml(hint)) : ''}`;
+    ${pane('safe', agSafeHtml())}`;
 }
 // ---- 2.7.2 (#420) Settings > Agents > Set up: my personal agents (when an admin allows them), the admins' switch for
 // that, and the two guides (a team agent on a server / a personal agent on your own computer), each for Linux, macOS and
@@ -414,7 +423,7 @@ function agWhyHtml(g, adm) {
 }
 // 2.29.0 (#1024): the server-wide switches (admins), no longer mixed into "Set up"
 function agAdminPaneHtml(hint) {
-  return `${hint(tr('Server-wide rules for every agent. Agents themselves are created under Status (team) or Set up (personal).'))}
+  return `${hint(tr('Server-wide rules for every agent. Agents themselves are created under Settings > Agents: Status (team) or Set up (personal).'))}
     <h4 id="s-uag-h">${tr('Personal agents for everyone')}</h4>
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('Users may create their own agents')}</span></label></div>
     <div class="row"><label for="s-uagmax">${tr('Per person at most')}</label><input id="s-uagmax" type="number" inputmode="numeric" min="1" max="20" value="2" class="numin"></div>
@@ -424,26 +433,29 @@ function agAdminPaneHtml(hint) {
     <div id="s-sclim" aria-labelledby="s-sclim-h"></div>`;
 }
 async function agSetupDraw(md) {
+  if (S.me?.is_admin) ad_agPolicyDraw(md);  // 2.46.6 (#1710): the rules sit in Administration > Agents (no #s-myown needed)
   const box = $('#s-myown', md); if (!box) return;
   let j;
   try { j = await api('GET', '/api/my/agents'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j;
-  const row = a => `<div class="mrow agsrow ${a.enabled ? '' : 'off'}" data-myag="${a.id}">${avBtn(a.id, a.name)}<span class="n"><span class="agnm"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span></span>
+  const row = a => `<div class="mrow agsrow ${a.enabled ? '' : 'off'}" data-myag="${a.id}">${avBtn(a.id, a.name)}<span class="n"><span class="agnm"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span>${av_wsBtn(a)}</span>
       <small class="muted agfacts">${hdot(agentHst(a))}${((t) => `<span class="agft" title="${esc(t)}">${esc(t)}</span>`)([a.enabled ? agentSt(a) : a.admin_paused ? tr('paused by an admin') : tr('paused'), trn('{0} list', '{0} lists', (a.lists || []).length), scopeSummary(a.effective_scopes || a.scopes)].join(' · '))}</small></span>
-    <span class="agacts"><button class="iconbtn" data-myag-act="setup" title="${esc(tr('Set up on a computer'))}" aria-label="${esc(tr('Set up {0} on a computer', a.name))}">${ic('download', 's')}</button><button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
+    <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
       <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
   const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the login and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
-    <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself (your own provider and key): what it reads in your lists goes to that provider, and you are responsible for it. Everyone in a list you share with it is told where it runs.'))}</div>` : '';
+    <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself (your own provider and key): what it reads in your lists goes to that provider, and you are responsible for it. Everyone in a list you share with it is told where it runs.'))}</div>${av_whichHtml()}` : '';  // 2.46.6 (#1716)
   box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${tr('Your organisation does not let members connect agents (an admin can allow it: Administration > Organisation).')}</div>`)) + add;
   userNameFollow(box, 'myag-name', 'myag-user');  // 2.28.0 (#926)
-  if (S.me?.is_admin) {
-    try {
-      const p = await api('GET', '/api/admin/agent-policy'); const sw = $('#s-uag', md), mx = $('#s-uagmax', md); if (sw) sw.checked = p.user_agents; if (mx) { mx.value = p.max_per_user; mx.disabled = !p.user_agents; }
-      const lb = $('#s-sclim', md);  // 2.15.0 (#479): the admin's limit, one grid for agents and one for personal tokens
-      if (lb && p.scope_limit) lb.innerHTML = [['agents', N_('Agents')], ['tokens', N_('Personal API tokens')]].map(([k, n]) => `<fieldset class="sclim"><legend>${tr(n)}</legend><div class="scgrid">${p.scopes.filter(x => k !== 'agents' || (x !== 'account' && x !== 'private')).map(x => `<label class="chkl sc"><input type="checkbox" data-sclim="${k}" data-scope="${x}" ${p.scope_limit[k].includes(x) ? 'checked' : ''} ${x === 'read' ? 'disabled' : ''}><span>${esc(tr(SCOPE_SHORT[x] || x))}</span></label>`).join('')}</div></fieldset>`).join('');
-    } catch { /* offline */ }
-  }
+}
+// 2.46.6 (#1710): the admins' agent rules (Administration > Agents), filled wherever the pane is
+async function ad_agPolicyDraw(md) {
+  if (!$('#s-uag', md)) return;
+  try {
+    const p = await api('GET', '/api/admin/agent-policy'); const sw = $('#s-uag', md), mx = $('#s-uagmax', md); if (sw) sw.checked = p.user_agents; if (mx) { mx.value = p.max_per_user; mx.disabled = !p.user_agents; }
+    const lb = $('#s-sclim', md);  // 2.15.0 (#479): the admin's limit, one grid for agents and one for personal tokens
+    if (lb && p.scope_limit) lb.innerHTML = [['agents', N_('Agents')], ['tokens', N_('Personal API tokens')]].map(([k, n]) => `<fieldset class="sclim"><legend>${tr(n)}</legend><div class="scgrid">${p.scopes.filter(x => k !== 'agents' || (x !== 'account' && x !== 'private')).map(x => `<label class="chkl sc"><input type="checkbox" data-sclim="${k}" data-scope="${x}" ${p.scope_limit[k].includes(x) ? 'checked' : ''} ${x === 'read' ? 'disabled' : ''}><span>${esc(tr(SCOPE_SHORT[x] || x))}</span></label>`).join('')}</div></fieldset>`).join('');
+  } catch { /* offline */ }
 }
 function agSetupWire(md) {
   md.addEventListener('click', async e => {
@@ -464,12 +476,13 @@ function agSetupWire(md) {
         if (userNameBad(un)) { toast(userNameBad(un)); need($('#myag-user', md)); return; }  // 2.28.0 (#926)
         b.disabled = true;
         const r = await api('POST', '/api/my/agents', {username: un, display_name: $('#myag-name', md).value.trim(), provider: $('#myag-prov', md)?.value.trim() || ''});
-        secretModal(tr('API token of {0}', r.name), r.token, tr('Copy it now into the agent’s configuration: it is shown only this once.') + ' ' + tr('Then share lists with the agent (list dialog > Sharing).'));
+        av_setupOffer(r, `/api/my/agents/${r.id}`, r.token);  // 2.46.6 (#1709): set it up now; the token only on request
         await load(); render();
       }
       if (!a) { agSetupDraw(md); return; }
       if (k === 'token') { agTokenModal(a, `/api/my/agents/${a.id}/token`); return; }
       if (k === 'setup') { ains_setupModal(a, `/api/my/agents/${a.id}`); return; }  // 2.44.0 (#1517)
+      if (k === 'ws') { av_wsMenu(b, a, () => agSetupDraw(md)); return; }  // 2.46.6 (#1708): its workspace
       if (k === 'perm') {  // 2.15.0 (#479): what my agent may do (within the admin's limit) and from where
         permModal(tr('Permissions of {0}', a.name), box._j.scopes || [], a.scopes, a.allowed_ips, async (scopes, ips, pm) => {
           await calReq('PATCH', `/api/my/agents/${a.id}`, {scopes, allowed_ips: ips, list_ids: listCapVal(pm, 'pm-lcap')}); toast(tr('Saved')); agSetupDraw(md);  // 2.30.0 (#919)
@@ -526,18 +539,27 @@ function aiSubShow(md, want, save) {
 }
 // ---- 2.24.0 (#826): Settings > Administration in five sub-tabs (the pattern of Agents): People, Sign-in, Organisation,
 // Server, Log & errors. The last one is remembered per device; the settings search opens the sub-tab of its hit.
-const ADM_SUBS = [['users', 'users', N_('People|admin')], ['signin', 'key', N_('Sign-in')], ['org', 'home', N_('Organisation')], ['server', 'grid', N_('Server')], ['log', 'alert', N_('Log & errors')]];
-function admSubCur(want) { const k = want || LS.get('admSub', 'users'); return ADM_SUBS.some(x => x[0] === k) ? k : 'users'; }
+// 2.46.6 (#1710): + Agents (the server-wide agent rules, the API log and the admins' usage alert, before in Settings > Agents)
+const ADM_SUBS = [['users', 'users', N_('People|admin')], ['signin', 'key', N_('Sign-in')], ['org', 'home', N_('Organisation')], ['agents', 'bot', N_('Agents')], ['server', 'grid', N_('Server')], ['log', 'alert', N_('Log & errors')]];
+const ad_admSubs = () => ADM_SUBS.filter(([k]) => k !== 'agents' || !!S.api?.enabled);  // agents need the API
+const ad_admFocus = f => ({users: 'users', groups: 'users', activity: 'agents', agentpolicy: 'agents', server: 'server'})[f];  // settingsModal(focus) -> sub-tab
+function admSubCur(want) { const k = want || LS.get('admSub', 'users'); return ad_admSubs().some(x => x[0] === k) ? k : 'users'; }
 function admSubsHtml(parts, want) {
   const cur = admSubCur(want);
-  return `<div class="seg aisub admsub" role="tablist" aria-label="${esc(tr('Administration'))}">${ADM_SUBS.map(([k, i, n]) => `<button type="button" role="tab" id="adms-${k}" data-admsub="${k}" aria-controls="admp-${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>
-    ${ADM_SUBS.map(([k]) => `<div class="aisp admp" data-admp="${k}" id="admp-${k}" role="tabpanel" aria-labelledby="adms-${k}" ${k === cur ? '' : 'hidden'}>${parts[k] || ''}</div>`).join('')}`;
+  return `<div class="seg aisub admsub" role="tablist" aria-label="${esc(tr('Administration'))}">${ad_admSubs().map(([k, i, n]) => `<button type="button" role="tab" id="adms-${k}" data-admsub="${k}" aria-controls="admp-${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>
+    ${ad_admSubs().map(([k]) => `<div class="aisp admp" data-admp="${k}" id="admp-${k}" role="tabpanel" aria-labelledby="adms-${k}" ${k === cur ? '' : 'hidden'}>${parts[k] || ''}</div>`).join('')}`;
 }
 function admSubShow(md, want, save) {
   const k = admSubCur(want); if (save) LS.set('admSub', k);
   $$('[data-admsub]', md).forEach(b => { const on = b.dataset.admsub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
   segReveal($(`[data-admsub="${k}"]`, md));
   $$('[data-admp]', md).forEach(p => { p.hidden = p.dataset.admp !== k; });
+  if (k === 'agents') return Promise.all([ad_agPolicyDraw(md), audDraw(md)]);  // 2.46.6 (#1710): loaded when shown
+}
+// 2.46.6 (#1710): Administration > Agents: the rules for every agent, the admins' alert on usage limits, the API log
+function ad_agentsHtml(hint) {
+  if (!S.api?.enabled) return '';
+  return `${agAdminPaneHtml(hint)}${notifMatrixHtml(S.settings, hint, true)}<h4 id="s-adlog-h">${tr('Log')}</h4>${audHtml()}`;
 }
 // Organisation: whether members may connect their own agents (#896, the policy user_agents of #420, off by default)
 function orgAgentsHtml(hint) {
@@ -712,13 +734,14 @@ function settingsModal(focus) {
       ${hint(tr('Private to you. Save a task (with subtasks) from its menu (…) or a list from the list dialog; use them from the template button in the add bar or under Lists > +. Dates are kept as “days after use”.'))}
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${sampleHtml(hint)}`,
-    ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', activity: 'log'}[focus]) : '',  // 2.7.0 (#405 S2)
+    ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage'}[focus]) : '',  // 2.7.0 (#405 S2)
     users: S.me?.is_admin ? admSubsHtml({  // 2.24.0 (#826): Administration in sub-tabs like Agents
       users: usersHtml() + grpHtml() + orphHtml(),
       signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
       org: orgsHtml() + orgAgentsHtml(hint) + ocAdminHtml(hint),  // 2.42.0 (#828): + encryption of organisation data
-      server: instanceHtml(chk, hint) + hostHtml(hint) + bkHtml() + stoHtml(),
-      log: aaHtml()}, {users: 'users', groups: 'users'}[focus]) : '',  // 1.9.0: users first
+      agents: ad_agentsHtml(hint),  // 2.46.6 (#1710)
+      server: instanceHtml(chk, hint) + ad_updHtml(hint) + hostHtml(hint) + bkHtml() + stoHtml(),  // 2.46.6 (#1710): + the update check result (was Help)
+      log: aaHtml()}, ad_admFocus(focus)) : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
       ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, lists, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
@@ -742,7 +765,7 @@ function settingsModal(focus) {
   };
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: 'ai', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'users' : 'ai', agentpolicy: 'users', server: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" name="kalmido-settings-search" data-1p-ignore data-lpignore="true" data-bwignore readonly placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
@@ -846,7 +869,7 @@ function settingsModal(focus) {
     }
   });
   md.addEventListener('keydown', e => { if (e.key === 'Enter' && (SETS[e.target.id] || e.target.id === 'a-name') && isText(e.target)) { e.preventDefault(); e.target.id === 'a-name' ? saveName() : saveEl(e.target); } });
-  md.addEventListener('change', e => { if (['s-collaball', 's-timeall', 's-updcheck', 's-2fareq', 's-pklogin', 's-oidcauto', 's-publinks'].includes(e.target.id)) adminSwitch(md, e.target); });
+  md.addEventListener('change', e => { if (['s-collaball', 's-timeall', 's-collaball-a', 's-timeall-a', 's-updcheck', 's-2fareq', 's-pklogin', 's-oidcauto', 's-publinks'].includes(e.target.id)) adminSwitch(md, e.target); });
   md.addEventListener('change', async e => {  // 2.7.0 (#407): hours per day / shift for the whole server, one history step
     if (e.target.id !== 's-dayh') return;
     const from = S.timeDayH || 8, to = +String(e.target.value).replace(',', '.');
@@ -910,11 +933,17 @@ function settingsModal(focus) {
   agSetupWire(md);  // 2.7.2 (#420)
   if (cur === 'notify') wpDraw(md);
   ntfyShow(md);
-  if (cur === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); ocAdminDraw(md); }  // 2.42.0 (#828): + ocAdminDraw
+  if (cur === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); ocAdminDraw(md); Promise.resolve(admSubShow(md, ad_admFocus(focus))).then(() => { if (focus === 'activity') $('#s-adlog-h', md)?.scrollIntoView({block: 'start'}); }); }  // 2.42.0 (#828): + ocAdminDraw  // 2.46.6 (#1710): + the shown sub-tab's data; 'activity' = its log, once the rules above it are drawn
   aiTblWire(md);
-  if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', activity: 'log', agentsafe: 'safe'}[focus]);  // 2.5.1 (#393)
+  if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', agentsafe: 'safe'}[focus]);  // 2.5.1 (#393)
   md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); const g = e.target.closest('[data-aigo]'); if (g) aiSubShow(md, g.dataset.aigo, true); });
   md.addEventListener('click', e => { const b = e.target.closest('[data-admsub]'); if (b) admSubShow(md, b.dataset.admsub, true); });  // 2.24.0 (#826)
+  md.addEventListener('click', e => {  // 2.46.6 (#1710): "Open in Administration" next to an admin switch
+    const b = e.target.closest('[data-adopen]'), el = b && $('#' + b.dataset.adopen, md); if (!el) return;
+    show('users'); idx(false); const ap = el.closest('[data-admp]'); if (ap) admSubShow(md, ap.dataset.admp, true);
+    const r = el.closest('label') || el;
+    setTimeout(() => { r.scrollIntoView?.({block: 'center'}); r.classList.add('flash'); setTimeout(() => r.classList.remove('flash'), 1600); }, 30);
+  });
   if (S.me?.is_admin) hostWire(md);
   aiuWire(md, only => { const box = $('#s-aiu', md); if (only && box && S.aiu.data) box.innerHTML = aiuHtml(S.aiu.data, Math.max(240, Math.min(720, (box.clientWidth || 560) - 8))); else aiuDraw(md); });  // 2.1.1 (#326)
   if (cur === 'account' && S.me) { tfaDraw(md); tokDraw(md); apwDraw(md); e2eDraw(md); }
@@ -1154,10 +1183,10 @@ const shKeyWarn = a => a.secret_key === false ? `<div class="shint warn shkey" r
 function instanceHtml(chk, hint) {
   const a = S.about || {};
   return `${shKeyWarn(a)}<h4 id="s-instance-h">${tr('Whole server')}</h4>
-    ${hint(tr('Apply to every user at once. Nothing is deleted: switched back on, everything is there again.') + ' ' + tr('Collaboration and time tracking for everyone: Settings > Modules.'))}
-    <div class="featgrid">
+    ${hint(tr('Apply to every user at once. Nothing is deleted: switched back on, everything is there again.'))}
+    <div class="featgrid">${ad_allSwHtml()}
       <label class="wide"><input type="checkbox" id="s-publinks" ${a.public_links !== false && a.public_links_env !== false ? 'checked' : ''} ${a.public_links_env === false ? 'disabled' : ''}><span>${tr('Public links to lists')}<small class="muted">${a.public_links_env === false ? `<span title="KALMIDO_PUBLIC_LINKS=0">${tr('Switched off by the server operator.')}</span>` : tr('List owners can share a list with people without an account through a secret link (view only or tick off). Off: every public link stops working at once; nothing is deleted.')}</small></span></label>
-      <label class="wide"><input type="checkbox" id="s-updcheck" ${a.update_check !== false && a.update_env !== false ? 'checked' : ''} ${a.update_env === false ? 'disabled' : ''}><span>${tr('Check daily for a new version')}<small class="muted">${a.update_env === false ? `<span title="KALMIDO_UPDATE_CHECK=0">${tr('Switched off by the server operator.')}</span>` : tr('The server asks GitHub once a day for the latest release; nothing is installed automatically and the browser never contacts GitHub. Result under Help.')}</small></span></label>
+      <label class="wide"><input type="checkbox" id="s-updcheck" ${a.update_check !== false && a.update_env !== false ? 'checked' : ''} ${a.update_env === false ? 'disabled' : ''}><span>${tr('Check daily for a new version')}<small class="muted">${a.update_env === false ? `<span title="KALMIDO_UPDATE_CHECK=0">${tr('Switched off by the server operator.')}</span>` : tr('The server asks GitHub once a day for the latest release; nothing is installed automatically and the browser never contacts GitHub. The result shows below.')}</small></span></label>
     </div>
     ${S.timeAll !== false ? `<h4 id="s-dayh-h">${tr('Time sums')}</h4>
     <div class="row"><label for="s-dayh">${tr('Hours per day')}</label><input id="s-dayh" inputmode="decimal" class="numin" value="${esc(fmtNum(a.time_day_h || S.timeDayH || 8, 2))}"><span class="muted">${tr('h per working day / shift')}</span></div>
@@ -1245,13 +1274,18 @@ function aboutVerRows(a) {
   const off = srv && app !== srv;
   return `<div class="row aboutapp${off ? ' off' : ''}"><label>${tr('App in this window')}</label><span>v${esc(app)}${off ? ` · <b>${esc(tr('Server: v{0}', srv))}</b> <button type="button" class="btn sm pri" data-nv="go">${esc(tr('Reload'))}</button>` : ` · <span class="muted">${esc(tr('up to date'))}</span>`}</span></div>`;
 }
-// Settings > Help: version, and for admins the result of the daily update check (server side, never automatic)
+// Settings > Help: the version (2.46.6 (#1710): the admins' update check result moved to Administration > Server, ad_updHtml)
 function aboutHtml(chk, hint) {
   const a = S.about || {};
   let h = `<h4 id="s-about-h">${tr('About')}</h4><div class="row"><label>${tr('Version')}</label><span class="aboutver">Kalmido v${esc(a.version || '?')}</span></div>${aboutVerRows(a)}
     <div class="row aboutcopy"><label>©</label><span class="muted">2026 Gegenschuss Doberenz Enders Grund eGbR · AGPL-3.0</span></div>
     <div class="row aboutlinks"><label></label>${ABOUT_LINKS.map(([u, n, i]) => `<a class="btn sm" href="${u}" target="_blank" rel="noopener noreferrer">${ic(i, 's')} ${tr(n)}</a>`).join('')}</div>`;
-  if (!S.me?.is_admin) return h;
+  return h;
+}
+// 2.46.6 (#1710): Administration > Server: the result of the daily update check (server side, never automatic)
+function ad_updHtml(hint) {
+  const a = S.about || {};
+  let h = '';
   if (a.available) {
     h += `<div class="shint updline"><b>${tr('v{0} installed — v{1} available', esc(a.version), esc(a.latest))}</b>${a.url ? ` · <a href="${esc(a.url)}" target="_blank" rel="noopener">${tr('Release notes')}</a>` : ''}</div>
       <div class="shelp">${tr('To update, run <code>~/kalmido/update.sh</code> (installed with the installer; it backs up the database first), or in the folder with docker-compose.yml: <code>docker compose pull && docker compose up -d</code> (prebuilt image) or <code>git pull && docker compose up -d --build</code> (built from source).')}</div>`;
@@ -1259,19 +1293,19 @@ function aboutHtml(chk, hint) {
     const when = new Date(a.checked_at).toLocaleString(I18N.code || 'en');
     h += hint(a.error ? tr('The last update check failed ({0}); it tries again later.', esc(a.error)) : a.latest ? tr('Up to date (checked {0}).', esc(when)) : tr('Checked {0}.', esc(when)));
   }
-  if (!a.update_env || !a.update_check) h += hintK(tr('The update check is off (Settings > Administration).'));
-  return h;
+  return h ? `<h4 id="s-upd-h">${tr('Updates')}</h4>${h}` : '';
 }
 const ADMIN_SW = {'s-collaball': ['collab_all', N_('Collaboration for everyone')], 's-timeall': ['time_all', N_('Time tracking for everyone')], 's-updcheck': ['update_check', N_('Check daily for a new version')],
-  's-2fareq': ['twofa_required', N_('Require two-factor authentication')], 's-pklogin': ['passkey_login', N_('Passkey login')], 's-oidcauto': ['oidc_autocreate', N_('Create accounts on first OIDC login')], 's-publinks': ['public_links', N_('Public links to lists')]};
+  's-2fareq': ['twofa_required', N_('Require two-factor authentication')], 's-pklogin': ['passkey_login', N_('Passkey login')], 's-oidcauto': ['oidc_autocreate', N_('Create accounts on first OIDC login')], 's-publinks': ['public_links', N_('Public links to lists')],
+  's-collaball-a': ['collab_all', N_('Collaboration for everyone')], 's-timeall-a': ['time_all', N_('Time tracking for everyone')]};  // 2.46.6 (#1710): the same switches under Administration > Server
 async function adminSwitch(md, el, fromHist) {
   const on = el.checked;
   const ask = async (t, b, ok) => fromHist || await askConfirm(t, b, {ok, danger: true});
-  if (el.id === 's-collaball' && !on && !await ask(tr('Turn collaboration off for everyone?'), tr('Shared lists are then only visible to their owner; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
-  if (el.id === 's-timeall' && !on && !await ask(tr('Turn time tracking off for everyone?'), tr('Running timers are stopped now; entries are kept.'), tr('Turn off'))) { el.checked = true; return; }
+  const key = ADMIN_SW[el.id][0];
+  if (key === 'collab_all' && !on && !await ask(tr('Turn collaboration off for everyone?'), tr('Shared lists are then only visible to their owner; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
+  if (key === 'time_all' && !on && !await ask(tr('Turn time tracking off for everyone?'), tr('Running timers are stopped now; entries are kept.'), tr('Turn off'))) { el.checked = true; return; }
   if (el.id === 's-2fareq' && on && !await ask(tr('Require two-factor authentication?'), tr('Everyone who logs in with a password must set it up at the next login (sessions that are open now stay open).'), tr('Require'))) { el.checked = false; return; }
   if (el.id === 's-publinks' && !on && !await ask(tr('Turn public links off for everyone?'), tr('Every public link stops working at once; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
-  const key = ADMIN_SW[el.id][0];
   try {
     const j = await api('PATCH', '/api/admin/settings', {[key]: on});
     if (j && j.version) S.about = j;
@@ -1286,8 +1320,8 @@ async function adminSwitch(md, el, fromHist) {
   else return;
   await load(); render();
   if ((key === 'collab_all' || key === 'time_all') && md.isConnected) {
-    const sec = LS.get('settingsSec', 'modules'), sc = $('.spanes', md)?.scrollTop || 0; md._noflush = true; md.remove();
-    const n = settingsModal(sec), p = $('.spanes', n); if (p) p.scrollTop = sc;
+    const sec = $('.snav [data-sec].on', md)?.dataset.sec || LS.get('settingsSec', 'modules'), sc = $('.spanes', md)?.scrollTop || 0; md._noflush = true; md.remove();  // 2.46.6 (#1710): sec = the area shown
+    const n = settingsModal(sec === 'users' ? 'server' : sec), p = $('.spanes', n); if (p) p.scrollTop = sc;  // 2.46.6 (#1710): back on Administration > Server
     if (!fromHist) setSaved(HIST.undo[HIST.undo.length - 1]);
   }
 }

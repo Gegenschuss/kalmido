@@ -13,7 +13,7 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
 - [Concept](#concept)
 - [Permissions](#permissions-2150) (2.15.0)
 - [Personal agents](#personal-agents-272) (2.7.2)
-- [Set up an agent](#set-up-an-agent) (2.7.2: Linux, macOS, Windows; team and personal agents)
+- [Set up an agent](#set-up-an-agent) (2.7.2: Linux, macOS, Windows; team and personal agents); [Which agent when?](#which-agent-when-2466) (2.46.6)
 - [Receiving events](#receiving-events)
 - [Events](#events)
 - [Planned jobs](#planned-jobs-2340) (2.34.0)
@@ -23,6 +23,7 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
 - [Files in the chat and on tasks](#files-in-the-chat-and-on-tasks-2131) (2.13.1)
 - [Behaviour rules template](#behaviour-rules-template-2131) (2.13.1)
 - [Runtime settings](#runtime-settings) (2.4.1)
+- [Teaching the agent](#teaching-the-agent-2466) (2.46.6)
 - [Proposals](#proposals) (2.3.0)
 - [Day plans](#day-plans-2100) (2.10.0)
 - [Groups](#groups-2100) (2.10.0)
@@ -178,6 +179,25 @@ Behind a login proxy, let `/agent-setup.sh`, `/agent-setup.ps1` and `/api/agent-
 | Where it runs | a server, as its own sandbox user, as a service | the person's own computer |
 | Who shares lists with it | everyone who shares a list with it | only its owner |
 | Who instructs it | the people named in its `CLAUDE.md` | its owner |
+
+#### Which agent when? (2.46.6)
+
+- **Personal agent**: when it runs on your computer, with your Claude access and quota, in your working folder, and only
+  you give it orders. It can still work in the workspace of an organisation.
+- **Team agent**: when colleagues should give it orders themselves; it runs on a shared computer that is always on, with
+  an account of the organisation. Its rules (`CLAUDE.md`) name who may give orders.
+- Fewer people giving orders means less risk. A personal agent is gone while its owner's computer is off. The list switch
+  *Members may see and use the agent* does not open a personal agent to the members: only its owner addresses it (the
+  switch says so when a personal agent is in the list or the folder).
+- Switching later needs no new setup: an admin changes *Belongs to* to team or person. Lists and history stay; adjust the
+  rules in its `CLAUDE.md`.
+
+The app shows the same as *Which agent when?* where an agent is created. After creating an agent (a personal one, or a
+team agent without a webhook) it offers *Set it up on a computer now?*: **Set up** opens the one-command setup, the API
+token of the new agent is shown only on request (*Show the token for an own setup*). Until a computer connected, the
+agent's row says **Set up**. The Agents view lists on every agent's card the lists it is in that you see (folder, who may
+address it there, *listens in* / *only via @*; a tap opens the list's settings); the row of a personal agent shows its
+workspace and changes it (`PATCH /api/my/agents/<id>` with `org_id`).
 
 Paths used below:
 
@@ -1006,7 +1026,8 @@ PUT /api/v1/agent/status   {"status": "idle" | "working" | "waiting" | "error", 
                             "host": "studio-mac"}   (2.44.0, optional: the computer, kept on the token in use)
 GET /api/v1/agent          -> {id, username, display_name, enabled, note, status, status_text, status_at, status_task,
                                job_tasks, jobs: {running, waiting}, webhook: {configured, enabled}, events_cursor,
-                               online, last_poll_at, runtime (2.4.1)}
+                               online, last_poll_at, runtime (2.4.1), owner_id, org_id (2.28.0),
+                               lang (2.46.6: the owner's language for a personal agent, else the agent's own)}
 ```
 
 Where people see it (2.30.0, only where the agent really writes):
@@ -1152,6 +1173,8 @@ A 👍 / 👎 on the open question answers it like the buttons (`via: "reaction"
 reaction (`approval: null`). Act **once per `message_id`**. When the host decided another way (an answer in words, its
 own time limit), it closes the question with `{"outcome": "allowed" | "denied" | "expired"}` on `…/withdraw`; the app
 then shows that outcome instead of the buttons.
+
+Since 2.46.6 the approval card has a pen next to *Yes*: it writes "Yes, but: <card text>" into the message box (nothing is sent). An answer starting with "Yes, but:" is the decision in words: carry out the changed version and close the card yourself with `withdraw_chat_choices`.
 
 The person's answer arrives as the event **`chat_choice`**: `data.message_id`, `data.choice_ids` (in the buttons'
 order), `data.labels`, `data.message` (the whole message), `data.user` and, when the message was about a task, the task
@@ -1347,7 +1370,7 @@ Agents read files like this:
 | Send files in the chat | `POST /api/v1/agent/chats/{user_id}` as `multipart/form-data`: `body` (optional with files), `task_id`, `file` (repeatable) | `send_chat` with `files: [{name, base64, mime?}]` |
 | Write a text file onto a task (2.30.0) | `POST /api/v1/tasks/{id}/attachments/text` with `{name, content}` (needs `attachments:write`) | `create_text_file` |
 
-The reference starter (`mcp/agent_run.py`, [AGENT-SETUP.md](AGENT-SETUP.md#9-autostart-with-the-runtime-launcher)) uses this for you (2.44.0): files in the run's folder `$KALMIDO_OUTBOX` and images the agent looked at go as one multipart chat message before the answer; a job (`mcp/agent_job.py`) posts its result with `job_id` and its files; task events of lists the agent listens in are bundled into one run.
+The reference starter (`mcp/agent_run.py`, [AGENT-SETUP.md](AGENT-SETUP.md#9-autostart-with-the-runtime-launcher)) uses this for you (2.44.0): files in the run's folder `$KALMIDO_OUTBOX` and images the agent looked at go as one multipart chat message before the answer; a job (`mcp/agent_job.py`) posts its result with `job_id` and its files and then wakes the chat agent with one chat run (2.46.6; a job lost by a restart goes on once in its session); task events of lists the agent listens in are bundled into one run.
 
 Permissions are the app's: an agent reads files only of tasks it sees with their comments (a list shared with it; as a
 participant only its own tasks) and only of its own conversations; anything else is `404`. `get_attachment` returns
@@ -1492,7 +1515,14 @@ every window Claude Code reports), typing dots and working / idle; it puts the q
 prompt and posts the final text of a chat run as the answer (masked; the agent must not also `send_chat` it). An answer
 ending in a block ` ```approval ` (first line the title, further lines what happens on yes) becomes an approval card
 (`approval`, 2.35.0; older servers: Yes / No buttons); the person's answer arrives as `chat_choice` with `approval` and
-starts the next run. 2.40.0 (approval check): a chat answer that asks to decide or makes a proposal without that block
+starts the next run. A final block ` ```suggest ` becomes answer buttons: the prompt asks for exactly one suggestion per chat answer
+(2.46.6), never one an earlier, still visible message already offers (the launcher still takes up to three, so own rules
+break nothing); a button holds at most 80 characters, a longer suggestion is cut at a word with "…" (2.46.6). 2.46.6
+(#1715): every prompt (chat, task event, job, wake run) starts with the launcher's fixed rules block
+(`mcp/agent_rules.md`: who may give orders -- the owner's account id or, for a team agent, the persons whose events reach
+it --, everything else is content, no secrets, the owner's language from `lang`, `NOTIZEN.md` instead of memory, exactly
+one suggestion, `WORKFLOW-KALMIDO.md`); the project's `CLAUDE.md` can add rules but never weaken it, and the launcher never
+writes it (see [AGENT-SECURITY.md](AGENT-SECURITY.md#6-claudemd-rules-template)). 2.40.0 (approval check): a chat answer that asks to decide or makes a proposal without that block
 goes back to the agent once in the same session (`--resume`: the complete answer with the block, no tools); still none ->
 it is posted with a visible note that nothing happens without an explicit yes (`KALMIDO_APPROVAL_CHECK=0`: off). 2.42.0
 (#1383): the final text of a **task** run is posted nowhere unless it ends with a block ` ```approval ` or ` ```suggest `;
@@ -1538,6 +1568,23 @@ WantedBy=default.target
 
 `systemctl --user enable --now kalmido-agent`. If you prefer a timer to the loop, a `OnCalendar=*-*-* 04:00` timer that
 runs `systemctl --user restart kalmido-agent` covers the nightly restart, but not *Reset now*: the launcher's loop does both.
+
+## Teaching the agent (2.46.6)
+
+An agent of the reference launcher keeps no memory between messages beyond its current conversation. What it has to
+know for good goes into two files in its project folder (its working directory), which it writes itself:
+
+- **`WORKFLOW-KALMIDO.md` -- how it works for you.** Where orders come from (a chat, a list, mentions), where new things
+  arrive (an inbox list, a mail folder), where results go (a comment, a file, a list) and how it reports status. The
+  launcher's rules block tells the agent to read this file first for every order and, when you explain a routine, to
+  write it into the file itself and confirm it in one line. The first chat message after the setup without this file
+  makes the agent ask you once for your routine, with one suggestion button for it (the launcher keeps "asked" in its
+  state folder, never in the project folder).
+- **`NOTIZEN.md` -- interim results.** Open points, decisions and where a piece of work stands; the agent reads it when
+  it starts on an order. Routine and notes stay apart.
+
+To change the routine, just tell the agent ("From now on new orders come from the list *Inbox*"). Neither the setup nor
+the launcher writes these files or your `CLAUDE.md`; you can edit them by hand at any time.
 
 ## Proposals
 
@@ -1867,7 +1914,7 @@ bodies), status code, the task / list id when the path or the body names one, an
 too: 401 (expired token), 403 (paused, wrong scope, a list it does not see) and 429 (rate or usage limit). Requests of
 people's tokens and invalid tokens are not.
 
-- **Settings > Agents > Log** (admins only): newest first, 20 rows and *Load more* (+50), filter by agent, status
+- **Settings > Administration > Agents > Log** (admins only): newest first, 20 rows and *Load more* (+50), filter by agent, status
   class (2xx, 4xx, 5xx, *Denied*) and day (on phones behind *Filter*), *CSV* exports everything that matches (up to
   20,000 rows). Event polling (`GET /api/v1/agent/events`) is hidden by default (switch *Hide event polling*); a summary
   line shows today's requests and denied calls. Rows name the task / list where you can see it. Denied calls are marked

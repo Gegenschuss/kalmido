@@ -356,7 +356,8 @@ function tidyRowHtml(l) {
   // 2.26.0 (#928): who may address the list's agents (owner / list admins switch; default off)
   const sw = (id, k, label, hint) => `<label class="chkl swl agacc"><span class="swc"><input type="checkbox" role="switch" id="${id}" data-agacc="${k}" ${l[k] ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${label}</span></label>
     <div class="shint aghint">${hint}</div>`;  // 2.32.0 (#1058): the explanation behind the (i) at the switch
-  const acc = sw('l-agm', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and list admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.'))
+  const acc = sw('l-agm', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and list admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.')
+      + (av_personal(l).length ? `<span class="avpers"> ${esc(av_personalHint(av_personal(l)))}</span>` : ''))  // 2.46.6 (#1680)
     // 2.40.0 (#1373): "Agents may address each other" is gone -- agents never do (fixed off)
     // 2.34.0 (#266): "Agent follows up": once a day the list's agents get its tasks lying idle and suggest a follow-up as a comment
     + sw('l-agf', 'agent_followup', tr('Agent follows up'), tr('Once a day the agent gets the tasks of this list that lie idle and asks about them in a comment or drafts a reminder. Nothing is sent to anyone outside. Off by default.'));
@@ -387,7 +388,9 @@ function tidyWire(md, lid) {
   md.addEventListener('change', async e => {
     const acc = e.target.dataset?.agacc;  // 2.26.0 (#928)
     if (acc) {
-      try { await api('PATCH', `/api/lists/${lid}`, {[acc]: e.target.checked}); toast(tr('Saved')); await load(); render(); }
+      // 2.46.6 (#1680): switched on with a personal agent in the list: the message says who can address it (the hint stays at the switch)
+      const ps = acc === 'agent_members' && e.target.checked ? av_personal(listById(lid)) : [];
+      try { await api('PATCH', `/api/lists/${lid}`, {[acc]: e.target.checked}); toast(ps.length ? tr('Saved') + ' · ' + av_personalHint(ps) : tr('Saved'), undefined, ps.length ? 9000 : undefined); await load(); render(); }
       catch { e.target.checked = !!listById(lid)?.[acc]; }
       return;
     }
@@ -499,7 +502,7 @@ function viewAgents() {
   const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}" data-k="ag${a.id}">${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
       <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · '))}</span></div>
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button>${a.approvals_open ? `<button class="btn sm apvcard" data-act="chat-open" data-aid="${a.id}">${ic('lock', 's')} ${esc(apvCount(a.approvals_open))}</button>` : ''}
-      <button class="btn sm" data-act="sched-open" data-aid="${a.id}" title="${esc(tr('Planned jobs'))}">${ic('clock', 's')} ${tr('Plans')}</button></div></div>`;
+      <button class="btn sm" data-act="sched-open" data-aid="${a.id}" title="${esc(tr('Planned jobs'))}">${ic('clock', 's')} ${tr('Plans')}</button></div>${av_listsHtml(a)}</div>`;  // 2.46.6 (#1708): its lists
   const items = S.jobs.items || [];
   if (ags.length) {  // 2.32.0 (#1063): the overview is built from blocks (Customize)
     const P = {agents: `<div class="agcards">${ags.map(card).join('')}</div>`, usage: aiuCardHtml(),

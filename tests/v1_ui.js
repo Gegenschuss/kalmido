@@ -17,15 +17,18 @@ const sql = q => execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, 
   w.eval(`settingsModal('help')`); await sleep(300);
   let md = d.querySelector('.smodal');
   const help = md.querySelector('[data-pane="help"]').textContent;
-  check(/installed — v99\.0\.0 available/.test(help) && md.querySelector('[data-pane="help"] a[href$="/v99.0.0"]'), 'help: update line + release notes link');
-  check(/update\.sh/.test(help) && /docker compose pull/.test(help), 'help: update commands');
+  // 2.46.6 (#1710): the update check result moved from Help to Settings > Administration > Server (Help = what everyone sees)
+  const srv = md.querySelector('#admp-server').textContent;
+  check(/installed — v99\.0\.0 available/.test(srv) && md.querySelector('#admp-server a[href$="/v99.0.0"]') && !/v99/.test(help), 'administration > server: update line + release notes link (not in Help)');
+  check(/update\.sh/.test(srv) && /docker compose pull/.test(srv), 'administration > server: update commands');
   // 1.7.1: the Markdown syntax lives in Help (not in the description placeholder); comments line only with collaboration
   const fmtH = [...md.querySelectorAll('[data-pane="help"] h4')].find(h => h.textContent === 'Formatting (Markdown)');
   const fmtT = fmtH?.nextElementSibling?.textContent || '';
   check(fmtH && ['**bold**', '*italic*', '~~strikethrough~~', '`code`', '[text](https://…)', '###', '1. item', '- [ ]', '- [x]', 'Turn the open checklist items into subtasks'].every(x => fmtT.includes(x)) && /Comments:.*no headings, lists or checklists/.test(fmtT), 'help: Formatting (Markdown) entry for descriptions + comments');
   check(md.querySelector('[data-pane="users"] #s-updcheck')?.checked === true, 'users > whole server: update check switch');
   check(md.querySelector('[data-pane="modules"] #s-timeall')?.checked === true && md.querySelector('[data-pane="modules"] #s-collaball'), 'modules: collaboration + time switches for everyone (admin)');
-  check(!md.querySelector('[data-pane="users"] #s-collaball') && /Settings > Modules/.test(md.querySelector('[data-pane="users"]').textContent), 'administration: pointer to Modules');
+  // 2.46.6 (#1710): Administration > Server lists the same two switches (own ids); Modules marks them "Admin · applies to everyone"
+  check(!md.querySelector('[data-pane="users"] #s-collaball') && md.querySelector('#admp-server #s-collaball-a')?.checked === true && md.querySelector('#admp-server #s-timeall-a')?.checked === true, 'administration: the switches for everyone');
   // instance switch off -> applies at once (1.5: own dialog, answered by the test bridge), personal switch disabled + note
   click(w, md.querySelector('.snav [data-sec="modules"]')); await sleep(50);
   const all = md.querySelector('#s-collaball');

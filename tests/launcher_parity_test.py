@@ -67,8 +67,9 @@ for sid in ("prereq", "redeem", "starter_files", "mcp_config", "autostart", "uni
 listed = [ln.split("#")[0].strip() for ln in read("starter_files.txt").split("\n")]
 listed = [x for x in listed if x]
 check(len(listed) == len(set(listed)) and all("/" not in x and "\\" not in x for x in listed), f"starter_files.txt: plain unique names {listed}")
+# 2.46.6 (#1715): the rules block (agent_rules.md) is a starter file too
 for fn in sorted(os.listdir(MCP)):
-    if re.match(r"(agent_[a-z_]+\.py|agent_launcher\.(sh|ps1)|kalmido_mcp\.py|launcher_capabilities\.json)$", fn):
+    if re.match(r"(agent_[a-z_]+\.py|agent_rules\.md|agent_launcher\.(sh|ps1)|kalmido_mcp\.py|launcher_capabilities\.json)$", fn):
         check(fn in listed, f"starter_files.txt lists {fn}")
 for fn in ("agent_launcher.sh", "agent_launcher.ps1", "agent_run.py", "kalmido_mcp.py"):
     check(os.path.isfile(os.path.join(MCP, fn)) and fn in listed, f"required starter file {fn}")
