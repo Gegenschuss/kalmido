@@ -6659,3 +6659,9 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .rohint.ovbar span{flex:1 1 12rem}
 .rohint.ovbar .btn{min-height:2.25rem}
 .shr.ovmark{opacity:.6}
+
+/* 2.46.2 B (#1665) desktop: a dialog of modal() moves by its header (dlgmove.js); phones / touch unchanged */
+@media (hover:hover) and (pointer:fine) and (min-width:900px){
+  .modal:not(.authscreen):not(.shopmode):not(.palette)>.card>:is(h3,.lhdr,.shdr),.modal:not(.authscreen):not(.shopmode):not(.palette)>.card>form>:is(h3,.lhdr){cursor:move}
+  .modal>.card.dwdrag{transition:none;user-select:none}
+}
