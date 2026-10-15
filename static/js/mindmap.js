@@ -118,7 +118,7 @@ function viewMindmap(l) {
     ${MM.outline ? '' : `<button type="button" class="iconbtn" data-mm="fit" title="${esc(tr('Fit to screen'))}" aria-label="${esc(tr('Fit to screen'))}">${ic('expand', 's')}</button>`}
     <button type="button" class="iconbtn" data-mm="more" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   if (MM.outline) return `<div class="mmwrap mmout" data-lid="${l.id}">${bar}${mm_outlineHtml(tree, ro)}</div>`;
-  if (!MM.pan) MM.pan = mm_fitPan(L);
+  if (!MM.pan) { MM.pan = mm_fitPan(L); MM.fitNow = true; }  // fitted again to the real stage once it is on the page (mm_bind)
   setTimeout(mm_bind, 0);
   return `<div class="mmwrap" data-lid="${l.id}">${bar}<div class="mmstage" tabindex="0" role="tree" aria-label="${esc(tr('Mind map of {0}', lname(l)))}" aria-activedescendant="mm-n-${MM.sel}">
     <div class="mmcanvas" style="transform:translate(${MM.pan.x}px,${MM.pan.y}px) scale(${MM.pan.k})">${mm_svg(L, {live: true})}</div>
@@ -432,7 +432,11 @@ function mm_wheel(e) {
   } else { MM.pan.x -= e.deltaX; MM.pan.y -= e.deltaY; }
   mm_applyPan();
 }
-function mm_bind() { const st = $('.mmstage'); if (st && !st.dataset.wb) { st.dataset.wb = '1'; st.addEventListener('wheel', mm_wheel, {passive: false}); } }
+function mm_bind() {
+  const st = $('.mmstage'); if (!st) return;
+  if (!st.dataset.wb) { st.dataset.wb = '1'; st.addEventListener('wheel', mm_wheel, {passive: false}); }
+  if (MM.fitNow && st.clientWidth && MM.last) { MM.fitNow = false; MM.pan = mm_fitPan(MM.last.L, st); mm_applyPan(); }
+}
 // ---- a ```mindmap block in a knowledge page (display only)
 function mm_blockHtml(text) {
   const t = mm_mdTree(text);
