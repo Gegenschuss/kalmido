@@ -6,10 +6,13 @@
 // - the list view "Mind map": Tab = sub-branch, Enter = branch next to it, Shift+Tab = up a level, Space = fold, Del = delete
 //   (+ Undo), each branch a task on the server; view-only lists show no editing buttons
 // - phone width: the map has its stage and a wrapping tool bar, an open page hides the tree
+// Firefox (real layout, skipped without firefox): 390 px touch - the page and the map stay inside the screen; 1280 px - tree
+// and page side by side
 const {execFileSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const firefox = require('./ff')({tag: 'p249_c_ui', check: (c, w) => check(c, w), shots: 'P249C_SHOTS'});
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -155,6 +158,32 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   await until(() => d.querySelector('#view .wkpage h2'));
   check(d.querySelector('#view .wkpage') && !d.querySelector('#view .wkside') && d.querySelector('#view [data-wk="close"]'), 'phone: an open page hides the tree, Back is there');
   w.close();
+
+  // ================= Firefox: the real layout
+  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+    await nav(B + 'static/icon.svg');
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.wkSpace', JSON.stringify('${SP}')); return 1; })()`);
+    check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
+    const OVER = `(() => { const vw = document.documentElement.clientWidth, bad = [...document.querySelectorAll('#view *')].filter(e => { const r = e.getBoundingClientRect(); return r.width && r.right > vw + 1 && !e.closest('.mmcanvas, .vsegm, .mdtbl, .mmblock'); }).map(e => e.tagName + '.' + e.className).slice(0, 5); return {sw: document.scrollingElement.scrollWidth, vw, bad}; })()`;
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
+    await nav(B + '#wiki/' + OTHER);
+    for (let i = 0; i < 30 && !(await ev('!!document.querySelector("#view .wkpage h2")').catch(() => false)); i++) await sleep(300);
+    let o = await ev(OVER);
+    check(o.sw <= o.vw + 1 && !o.bad.length, '390 px: an open page stays inside the screen ' + JSON.stringify(o));
+    await shot('p249c-wiki-390.png');
+    await nav(B + '#l/' + L);
+    for (let i = 0; i < 30 && !(await ev('!!document.querySelector("#view .mmstage [data-mmn]")').catch(() => false)); i++) await sleep(300);
+    o = await ev(OVER);
+    const st = await ev(`(() => { const r = document.querySelector('#view .mmstage').getBoundingClientRect(), b = document.querySelector('#view .mmbar').getBoundingClientRect(); return {l: r.left, r: r.right, h: r.height, br: b.right, vw: document.documentElement.clientWidth, n: document.querySelectorAll('#view .mmstage [data-mmn]').length}; })()`);
+    check(o.sw <= o.vw + 1 && !o.bad.length && st.r <= st.vw + 1 && st.br <= st.vw + 1 && st.h >= 250 && st.n >= 4, '390 px: the map and its bar inside the screen, the stage tall enough ' + JSON.stringify({o, st}));
+    await shot('p249c-mindmap-390.png');
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 800}});
+    await nav(B + '#wiki/' + OTHER);
+    for (let i = 0; i < 30 && !(await ev('!!document.querySelector("#view .wkpage h2") && !!document.querySelector("#view .wkside")').catch(() => false)); i++) await sleep(300);
+    const two = await ev(`(() => { const a = document.querySelector('#view .wkside').getBoundingClientRect(), b = document.querySelector('#view .wkpage').getBoundingClientRect(); return {ar: a.right, bl: b.left, at: Math.round(a.top), bt: Math.round(b.top)}; })()`);
+    check(two.ar <= two.bl && Math.abs(two.at - two.bt) < 40, '1280 px: tree and page side by side ' + JSON.stringify(two));
+    await shot('p249c-wiki-1280.png');
+  }, true);
 
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
