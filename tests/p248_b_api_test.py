@@ -281,7 +281,7 @@ if r.ok:
     t = A.get(B + f"/api/tasks/{r.json()['task_id']}").json()
     check(str(t.get("due") or "").startswith("2026-09-30") and f"#docs/{D1}" in (t.get("notes") or t.get("content") or ""), f"task: due + link ({t.get('due')})")
 
-# ---- workspace boundary
+# ---- workspace boundary (tenant-matrix: document)
 r = upload(Bo, [("alpha.pdf", text_pdf(["Alpha Lieferant Rechnung", "Projekt Sonnenblume", "Summe 10,00 EUR"]), "application/pdf")], f"org:{ORG}")
 check(r.status_code == 201, f"bob uploads into Alpha ({r.text[:120]})")
 DA = r.json()["ids"][0]
