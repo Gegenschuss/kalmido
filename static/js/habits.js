@@ -253,7 +253,7 @@ function pomoStatsHtml(j) {
     ${j.per_task.length ? `<div class="ptasks"><div class="muted" style="border:0;font-size:var(--fs-s)">${tr('Focus by task (30 days)')}</div>${j.per_task.map(([n, m]) => `<div><span>${esc(n)}</span><span class="muted">${fmtH(m)}</span></div>`).join('')}</div>` : ''}`;
 }
 const fmtH = m => m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
-async function loadPomoStats() { try { pomoStatsCache = await api('GET', '/api/pomo/stats'); const el = $('#pstats'); if (el) el.innerHTML = pomoStatsHtml(pomoStatsCache); } catch { /* ignore */ } }
+async function loadPomoStats() { try { pomoStatsCache = await api('GET', '/api/pomo/stats'); const el = $('#pstats'); if (el) fl_set(el, pomoStatsHtml(pomoStatsCache)); } catch { /* ignore */ } }
 let finishing = false;
 setInterval(async () => {
   if (!S.pomo) return;

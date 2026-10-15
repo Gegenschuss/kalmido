@@ -58,7 +58,7 @@ function ofdOffersTab(el) {
     if (!OFC.data.texts && !OFC.loading.texts) setTimeout(() => ofcLoad('texts'), 0);
     if (!OFC.data.contracts && !OFC.loading.contracts) setTimeout(() => ofcLoad('contracts'), 0);
   } else if (!OFD.list && !OFD.loading) setTimeout(ofdLoadList, 0);
-  keepFocus(el, () => setHtml(el, id ? ofdEditorHtml() : ofdListHtml()));
+  keepFocus(el, () => fl_set(el, id ? ofdEditorHtml() : ofdListHtml()));  // 2.46.2 (#1718): morphed
   if (!el._ofd) { el._ofd = true; el.addEventListener('click', ofdClick); el.addEventListener('change', ofdChange); el.addEventListener('input', ofdInput); el.addEventListener('keydown', ofdKey); }
 }
 
@@ -305,7 +305,7 @@ function ofdRightsBody() {
 // ---- events (delegated on the tab's body)
 function ofdInput(e) {
   const t = e.target;
-  if (t.id === 'ofd-q') { OFD.q = t.value; const el = t.closest('.ofcbody'); if (el) keepFocus(el, () => setHtml(el, ofdListHtml())); }
+  if (t.id === 'ofd-q') { OFD.q = t.value; const el = t.closest('.ofcbody'); if (el) keepFocus(el, () => fl_set(el, ofdListHtml())); }
 }
 function ofdKey(e) { if (e.key === 'Enter' && e.target.id === 'ofd-q') e.preventDefault(); }
 async function ofdChange(e) {

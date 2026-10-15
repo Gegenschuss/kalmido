@@ -119,7 +119,7 @@ function bandJobsLoad() {
   S.bandJobs.busy = true; const v0 = S.v;  // 2.37.0 (#1161): the version the request was asked for (a newer one fetches again)
   api('GET', '/api/agents/jobs?state=open').then(j => { S.bandJobs.items = j.jobs || []; }).catch(() => {}).finally(() => {
     S.bandJobs.busy = false; const sig = JSON.stringify(S.bandJobs.items.map(x => x.id + x.state)); S.bandJobs.v = v0;
-    if (sig !== S.bandJobs.sig) { S.bandJobs.sig = sig; if ($('#view .agband')) renderView(); else if ((S.route.key === 'today' && S.route.mod === 'tasks') || S.route.mod === 'home') viewSafeRender(); }  // 2.13.0: + the Today card; 2.43.0 (#1504): + the start page
+    if (sig !== S.bandJobs.sig) { S.bandJobs.sig = sig; if ($('#view .agband')) fl_viewSoon(true); else if ((S.route.key === 'today' && S.route.mod === 'tasks') || S.route.mod === 'home') fl_viewSoon(false); }  // 2.13.0: + the Today card; 2.43.0 (#1504): + the start page
   });
 }
 // 2.13.0 (#453 A6): the jobs that wait for ME (approve / reject, or a proposal of mine that is ready), for the agent pill's
@@ -436,7 +436,7 @@ async function loadJobs() {
     if (one) S.jobs.items = [one, ...S.jobs.items]; else { S.jobFocus = null; toast(tr('Job not found')); }
   }
   if (S.jobFocus) S.jobOpen[S.jobFocus] = true;
-  if (S.route.mod === 'agents') viewSafeRender();  // 2.37.0 (#1161): a field in the view keeps its text; drawn once it is left
+  if (S.route.mod === 'agents') { if (S.jobFocus) viewSafeRender(); else fl_viewSoon(false, 'agents'); }  // 2.37.0 (#1161): a field in the view keeps its text; drawn once it is left; 2.46.2 (#1718): gathered (a focused job is drawn at once)
   if (S.jobFocus) setTimeout(jobFocusShow, 0);
 }
 // 2.37.0 (#1161): back in front (another app, another tab, the back/forward cache): the jobs list again, also while a field
@@ -496,7 +496,7 @@ function viewAgents() {
   if (S.jobs.items === null) { S.jobs.items = []; S.jobs.older = []; S.jobs.next = S.jobs.more = null; loadJobs(); aiuLoad().then(() => { if (S.route.mod === 'agents') renderView(); }); }  // 2.1.1: the usage card
   if (S.route.agent && chatFull()) return chatViewHtml(S.route.agent);
   const ags = (S.agents || []).filter(a => wsAgentIn(a));  // 2.28.0 (#935)
-  const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}">${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
+  const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}" data-k="ag${a.id}">${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
       <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · '))}</span></div>
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button>${a.approvals_open ? `<button class="btn sm apvcard" data-act="chat-open" data-aid="${a.id}">${ic('lock', 's')} ${esc(apvCount(a.approvals_open))}</button>` : ''}
       <button class="btn sm" data-act="sched-open" data-aid="${a.id}" title="${esc(tr('Planned jobs'))}">${ic('clock', 's')} ${tr('Plans')}</button></div></div>`;
