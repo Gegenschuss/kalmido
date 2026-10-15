@@ -101,6 +101,7 @@ ROUTES = {
     # ---- agent (44)
     "GET /api/agents/{}/bridges": "agent", "POST /api/v1/agent/chats/{}/messages/{}/withdraw": "agent",  # 2.30.0 (#919 / #1037)
     "GET /api/my/agents": "agent", "POST /api/my/agents": "agent", "PATCH /api/my/agents/{}": "agent",
+    "PATCH /api/agents/{}/color": "agent",  # 2.47c (#1721): also p247c_b_api_test.py
     "POST /api/my/agents/{}/token": "agent", "DELETE /api/my/agents/{}": "agent", "GET /api/v1/agent": "agent",
     "PUT /api/v1/agent/status": "agent", "GET /api/v1/agent/events": "agent", "GET /api/v1/agent/jobs": "agent",
     "POST /api/v1/agent/jobs": "agent", "PATCH /api/v1/agent/jobs/{}": "agent", "GET /api/agents": "agent",

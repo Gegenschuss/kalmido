@@ -215,7 +215,8 @@ APP_ONLY = [
         "* /api/me/tokens", "* /api/me/webhooks", "POST /api/me/drop-token", "* /api/me/avatar", "GET /api/me/share/")),
     ("administration: never through a token (agents are never admins); admins read users / status with admin-read", (
         "* /api/admin/", "* /api/users", "GET /api/version", "GET /api/about", "GET /api/health")),
-    ("agents are managed by people (admins / owners), not by tokens", ("* /api/my/agents",)),
+    ("agents are managed by people (admins / owners), not by tokens", ("* /api/my/agents",
+                                                                       "PATCH /api/agents/{}/color")),  # 2.47c (#1721)
     ("approvals and proposals come only from people (the agent's side: /agent/jobs, POST /agent/jobs/{id}/proposal)", (
         "* /api/agents/jobs", "* /api/proposals", "POST /api/comments/{}/apply", "POST /api/comments/{}/decide")),
     ("people's side of the agent chat (2.39.0: also editing one's own message), waking and sharing with agents (the agent uses /agent/*)", (
