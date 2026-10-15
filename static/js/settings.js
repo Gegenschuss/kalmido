@@ -291,7 +291,7 @@ async function setLang(code) {
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 // 2.44.0 (#1187): Office, Time, Review and Home are ONE switch each ("a:<area>", areas.js), their parts below it
 const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events']], [N_('For you'), ['habits', 'comments']],
-  [N_('Projects and team'), ['collab', 'progress', 'deps', 'fields', 'agents', 'workload', 'forms']], [N_('Areas|nav'), ['a:office', 'a:time', 'a:review', 'a:life']]];
+  [N_('Projects and team'), ['collab', 'progress', 'deps', 'fields', 'agents', 'workload', 'forms', 'wiki']], [N_('Areas|nav'), ['a:office', 'a:time', 'a:review', 'a:life']]];
 const MOD_DESC = {office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents; needs an organisation (business area)'),  // 2.36.1 (#1021)
   cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Pomodoro timer and stopwatch'),
@@ -975,7 +975,7 @@ function settingsModal(focus) {
       grp(N_('Filters'), S.filters.map(f => opt('f:' + f.id, f.name)).join('')) +
       grp(N_('Folders'), folderNames().map(f => opt('folder:' + f, fDisp(f))).join('')) +
       grp(N_('Tags'), Object.keys(counts().tags).sort((a, b) => a.localeCompare(b, 'de')).map(t => opt('tag:' + t, '#' + t)).join('')) +
-      grp(N_('Other'), opt('home', tr('Start|home')) + (teamOn() ? opt('team', tr('Team chat')) : '') + (collab() ? opt('news', tr('News')) : '') + (feat('agents') && agentsOn() ? opt('agents', tr('Agents')) : '') + (overviewOn() ? opt('overview', tr('Project status')) : '') + mg_tabOpts(opt) /* 2.44.0 (#1187) */ + opt('search', tr('Search')) + opt('lists', tr('Lists')) + opt('settings', tr('Settings')));
+      grp(N_('Other'), opt('home', tr('Start|home')) + (teamOn() ? opt('team', tr('Team chat')) : '') + (collab() ? opt('news', tr('News')) : '') + (feat('agents') && agentsOn() ? opt('agents', tr('Agents')) : '') + (overviewOn() ? opt('overview', tr('Project status')) : '') + mg_tabOpts(opt) /* 2.44.0 (#1187) */ + (feat('wiki') ? opt('wiki', tr('Knowledge pages')) : '') /* 2.49.0 (#1199) */ + opt('search', tr('Search')) + opt('lists', tr('Lists')) + opt('settings', tr('Settings')));
   };
   md._tabDraw = tabDraw;
   // 2.25.0 (UX-03): the sidebar: groups up / down, an eye per group, check boxes for the entries of Plan and Views

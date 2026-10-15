@@ -166,6 +166,8 @@ The most used helpers:
 | `api/projects.py` | The project page in the token API. |
 | `api/scopes.py` | Token scopes, approvals and the complete agent API (the routes the web client has). |
 | `collab/notes.py` | Notes of a list / project. |
+| `wiki/pages.py` | 2.49.0 (#1199): knowledge pages per organisation or private (path = name, `[[links]]` + backlinks in `wiki_links`, rename relinks, trash / restore, ZIP export / import). See docs/WIKI.md. |
+| `wiki/outline.py` | 2.49.0 (#1201): parses an outline (Markdown list, OPML, FreeMind `.mm`; no DOCTYPE / entities) for the mind map import; stores nothing. |
 | `collab/teamchat.py` | Team chat (rooms and direct messages). |
 | `collab/msgsearch.py` | 2.33.0: search in comments, team chat and agent chats; since 2.37.0 a trigram index (`pg_trgm`) on `kalmido_fold(body)` (unaccent + umlaut folding) per message table, visibility, snippets. |
 | `collab/e2e.py` | 2.42.0 (#828, #909): end-to-end encryption in the browser: the person's public key + wrapped key bundle (`e2e_keys`), the encrypted note of a task (`task_enc_notes`), encrypted task files (`attachments.enc`), the switch of an encrypted DM (`tchat_rooms.e2e`, `tchat_msgs.enc`). Stores ciphertext only; see *End-to-end encryption* below. |
@@ -305,6 +307,8 @@ registering the ones of its area.
 | `life.js` | Home & life: the view, its dialogs (contract, device, upkeep, health, trip, Karakeep), the review + journal, staying in touch on a contact's card. |
 | `areas.js` | 2.44.0 (#1187): the areas Office, Time, Review and Home: one sidebar row / tab each, the tabs of their parts on top of the page (each part keeps its route), one switch per area in Settings > Modules. |
 | `sbnav.js` | 2.45.0 (#1509): the messenger in the sidebar: "Messages" with the unread count, the last five conversations, a speech bubble at every person for a direct message. |
+| `wiki.js` | 2.49.0 (#1199): `#wiki` / `#wiki/<id>` = the knowledge pages of a space (an organisation or private): tree from the paths, editor with `[[` suggestions and autosave, backlinks, templates, ZIP export / import. |
+| `mindmap.js` | 2.49.0 (#1201): the list view "Mind map" (SVG, keys like Mindjet, drag to rehang, pan / pinch, outline, export Markdown / SVG / PNG, outline import) and the ```mindmap block of knowledge pages. |
 | `notesall.js` | 2.45.0 (#1516): `#notes` = the notes of all lists and projects (pinned first, a filter by list, a search in title and text, a new note in a picked list). |
 | `main.js` | Start-up: loading the state, polling, the service worker. Loaded last. |
 

@@ -503,7 +503,7 @@ document.addEventListener('click', async e => {
     case 'list-menu': listMenu(a, id); break;
     case 'top-more': menu(a, topMoreItems()); break;
     case 'fview': if (a.classList.contains('on')) break; if (a.dataset.k === 'matrix') { mxSet({scope: 'folder:' + a.dataset.f}); go('matrix'); } else go('folder/' + encodeURIComponent(a.dataset.f)); break;  // 2.4.2 (#390)
-    case 'view-list': case 'view-kanban': case 'view-timeline': case 'view-overview': {
+    case 'view-list': case 'view-kanban': case 'view-timeline': case 'view-overview': case 'view-mindmap': {  // 2.49.0 (#1201)
       const l = routeList();
       // phones: only the current view is shown (room for ← / →), a tap on it offers the others
       if (isTouch() && a.classList.contains('on') && a.closest('.vseg')) {

@@ -30,7 +30,7 @@ LIST_SORTS = ("", "prio", "custom", "date", "title", "creator", "flow", "created
 # 2.31.0 (#354): the sorts of a click on a column title (the other direction, the columns without a menu entry)
 LIST_SORTS += ("date_desc", "prio_asc")
 LIST_SORT_RE = r"cf:\d{1,9}(_desc)?|col:(who|tags|time|progress|deps)(_desc)?"
-LIST_VIEWS = ("list", "kanban", "timeline")
+LIST_VIEWS = ("list", "kanban", "timeline", "mindmap")  # 2.49.0 (#1201): + mind map
 LIST_COLOR_RE = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
 LIST_NAME_MAX, FOLDER_MAX = 200, 100
 
