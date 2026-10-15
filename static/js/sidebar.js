@@ -493,23 +493,26 @@ function sb_listToEnd(id, f) {
 // 2.4.0 (#361): what dropping folder `from` on target t does: 'before' (reorder among siblings), 'into' (a subfolder, or a
 // folder without subfolders, goes into the top folder t; onto a subfolder elsewhere: into its parent, before it), 'top'
 // (a subfolder onto the "Lists" header), null = nothing
-function folderDropKind(from, t) {
+function folderDropKind(from, t, after = false) {
   if (!t || from == null) return null;
   if (t.classList.contains('lroot')) return fParent(from) ? 'top' : null;
   const to = t.dataset.folder;
   if (!to || to === from || fUnder(to, from)) return null;
+  if (fParent(from) && !fParent(to) && !after) return 'uptop';  // 2.46.2 (#1664): a subfolder on the upper half of a top folder: top-level folder right before it
   if (fParent(to) === fParent(from)) return 'before';
   if (folderSubs(from).length) return null;  // a folder with subfolders stays top-level (two levels at most)
   return to === fParent(from) ? null : 'into';
 }
 // 2.27.0 (#991): the lower half of a list row = after it (so a list can go to the very end of a folder)
 const sideAfter = (t, y) => !!t && t.classList.contains('srow') && y != null && (() => { const r = t.getBoundingClientRect(); return r.height > 0 && y > r.top + r.height / 2; })();
+// 2.46.2 (#1664): the lower half of a folder header (a dragged subfolder goes into it there, above it: before it)
+const sb_headAfter = (t, y) => !!t && t.classList.contains('fhead') && y != null && (() => { const r = t.getBoundingClientRect(); return r.height > 0 && y > r.top + r.height / 2; })();
 const sideMark = (t, drag, y) => {  // the same highlights for mouse and touch; false = not a valid target
   $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (!t || (drag.list && t.dataset.list && +t.dataset.list === drag.list)) return false;
   if (drag.folder != null) {
-    const kd = folderDropKind(drag.folder, t); if (!kd) return false;
-    t.classList.add(kd === 'before' || (kd === 'into' && fParent(t.dataset.folder)) ? 'dropbefore' : 'drop');
+    const kd = folderDropKind(drag.folder, t, sb_headAfter(t, y)); if (!kd) return false;
+    t.classList.add(kd === 'before' || kd === 'uptop' || (kd === 'into' && fParent(t.dataset.folder)) ? 'dropbefore' : 'drop');
     return true;
   }
   t.classList.add(t.classList.contains('srow') ? (sideAfter(t, y) ? 'dropafter' : 'dropbefore') : 'drop');
@@ -525,7 +528,7 @@ document.addEventListener('drop', e => {
   const drag = {list: listDrag, folder: folderDrag}; listDrag = null; folderDrag = null;
   $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   const t = sideDropTarget(e.target, drag.folder !== null, e.clientY);
-  sideDrop(drag, t, sideAfter(t, e.clientY));
+  sideDrop(drag, t, sideAfter(t, e.clientY) || (drag.folder !== null && sb_headAfter(t, e.clientY)));
 }, true);
 // one drop in the sidebar (mouse or touch): a folder before a folder, a list into a folder (its header or empty body),
 // out of a folder (the "Lists" header), or before another list (taking over that list's folder). One request; moving
@@ -533,11 +536,17 @@ document.addEventListener('drop', e => {
 async function sideDrop(drag, t, after = false) {
   if (!t) return;
   if (drag.folder != null) {
-    const kd = folderDropKind(drag.folder, t), from = drag.folder;
+    const kd = folderDropKind(drag.folder, t, after), from = drag.folder;
     if (kd === 'before') {
       const arr = folderNames().filter(x => x !== from);
       arr.splice(arr.indexOf(t.dataset.folder), 0, from);
       saveFolders(fParent(from) ? arr : arr.filter(x => !fParent(x)).flatMap(x => [x, ...folderSubs(x)])); return;
+    }
+    if (kd === 'uptop') {  // 2.46.2 (#1664): one toast; the folder is renamed to a top-level one, then placed right before the target
+      const to = t.dataset.folder, np = fName(from);
+      await folderMove(from, np, tr('{0} is a top-level folder now', qn(np)));
+      if (!folderNames().includes(from) && folderNames().includes(np)) { const arr = folderNames().filter(x => x !== np); arr.splice(arr.indexOf(to), 0, np); saveFolders(arr); }
+      return;
     }
     if (kd === 'top') { folderMove(from, fName(from), tr('{0} is a top-level folder now', qn(fName(from)))); return; }
     if (kd === 'into') {
@@ -628,7 +637,7 @@ function sdEnd(e) {
   $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (!st.moved && st.reorder) return;  // a tap on the grip
   if (!st.moved) { const el = st.list ? $(`#side .srow[data-list="${st.list}"]`) : $(`#side .fhead[data-folder="${rmEsc(st.folder)}"]`); if (el) st.list ? listMenu(el, st.list) : folderMenu(el, st.folder); return; }
-  if (t && e?.type === 'touchend') sideDrop({list: st.list, folder: st.folder}, t, sideAfter(t, st.ly));
+  if (t && e?.type === 'touchend') sideDrop({list: st.list, folder: st.folder}, t, sideAfter(t, st.ly) || (st.folder != null && sb_headAfter(t, st.ly)));
 }
 document.addEventListener('touchend', sdEnd);
 document.addEventListener('touchcancel', sdEnd);
