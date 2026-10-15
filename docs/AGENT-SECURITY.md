@@ -301,6 +301,11 @@ commands (they have no such hook); `KALMIDO_PERM_RELAY=0` switches it off. What 
   file with secrets masked.
 - Only the person of that chat answers (task runs: the agent's owner, or `KALMIDO_PERM_USER`). `dontAsk` above never
   asks anyone: keep it for agents that must never wait for a click.
+- It guards against mistakes, not against a hostile command: the hook and the runner talk through files in the state
+  folder, and the command runs as the same OS user. Once a tool that can write files or run programs is allowed, the
+  command could answer its own later questions or change the runner. Against injected instructions the allow list and
+  `dontAsk` stay the real limit; for a stronger wall run the command as an own OS user without write access to the
+  state folder and the starter files.
 
 ### 5. Event loop with back-off
 
