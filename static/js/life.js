@@ -31,7 +31,7 @@ async function lifeLoad() {
   LF.loading = true;
   try { const j = await api('GET', '/api/life'); if (seq === LF.seq) LF.data = j; } catch { if (seq === LF.seq) LF.data = LF.data || {modules: []}; }
   LF.loading = false;
-  if (S.route.mod === 'life' && seq === LF.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, viewLife())); }
+  if (S.route.mod === 'life' && seq === LF.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('life', viewLife()))); }
 }
 const lifeReload = () => { LF.data = null; return lifeLoad(); };
 
@@ -363,7 +363,7 @@ async function rvLoad() {
   RV.loading = true;
   try { const j = await api('GET', `/api/life/review?period=${RV.period}&date=${RV.date || today()}`); if (seq === RV.seq) RV.data = j; } catch { if (seq === RV.seq) RV.data = RV.data || null; }
   RV.loading = false;
-  if (S.route.mod === 'review' && seq === RV.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, viewReview())); }
+  if (S.route.mod === 'review' && seq === RV.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('review', viewReview()))); }
 }
 function viewReview() {
   RV.date = RV.date || today();

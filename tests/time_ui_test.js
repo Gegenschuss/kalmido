@@ -120,7 +120,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   // ================= reports view
   await call('PATCH', `/api/lists/${WORK}`, {rate: 60});
   w.location.hash = 'time'; await sleep(1200);
-  check(d.querySelector('#top h1').textContent === 'Time tracking', 'time view title');
+  check(d.querySelector('#top h1').textContent === 'Time' && d.querySelector('#view .mgtabs [data-go="time"][aria-selected="true"]'), 'time view title');  // 2.44.0 (#1187): the area Time, its tab Time tracking
   check(d.querySelectorAll('.timev .sttiles > div').length === 3, 'tiles: range (time + decimal hours), today, amount');
   check(d.querySelector('.ttable .tvl') && [...d.querySelectorAll('.ttable .tvt')].some(r => /Review/.test(r.textContent)), 'table: list and task rows');
   check(!d.querySelector('[data-act="tv-scope"]') === false, 'scope toggle shown (shared list)');
@@ -171,7 +171,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
 
   // ================= German (bob)
   const wb = await boot({user: 'bob', hash: 'time'}); const db2 = wb.document; await sleep(900);
-  check(db2.querySelector('#top h1').textContent === 'Zeiterfassung', 'German title');
+  check(db2.querySelector('#top h1').textContent === 'Zeit' && /Zeiterfassung/.test(db2.querySelector('#view .mgtabs')?.textContent || ''), 'German title');  // 2.44.0 (#1187)
   check(/Stundennachweis/.test(db2.querySelector('[data-act="tv-sheet"]').textContent) && /Diese Woche/.test(db2.querySelector('.tvseg').textContent), 'German buttons');
   db2.querySelector('[data-act="tv-sheet"]').click(); await sleep(100);
   check(db2.querySelector('.tsheet h1').textContent === 'Stundennachweis' && /Summe/.test(db2.querySelector('.tsheet').textContent), 'German timesheet');
@@ -189,7 +189,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   check(!d.querySelector('.snav [data-sec="time"]'), 'module off: no settings pane');
   d.querySelector('.smodal')?.remove();
   w.location.hash = 'time'; await sleep(400);
-  check(w.eval('S.route.mod') === 'tasks' && /Time tracking is off/.test(d.querySelector('#toast').textContent), 'module off: #time redirects with a hint');
+  check(w.eval('S.route.mod') === 'pomo' && /Time tracking is off/.test(d.querySelector('#toast').textContent), 'module off: #time redirects with a hint');  // 2.44.0 (#1187): to the other tab of Time (the focus timer)
   check((await call('GET', '/api/time/report')).entries.length > 0, 'module off: data kept');
   await call('POST', '/api/time/stop', {});
   await call('PATCH', '/api/settings', {features: 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time'});

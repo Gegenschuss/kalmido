@@ -47,7 +47,7 @@ async function ctOpen(id) {
   try { CT.card = await api('GET', `/api/contacts/${id}`); } catch { CT.card = null; CT.sel = null; toast(tr('This contact does not exist or you cannot see it.')); }
   if (S.route.mod === 'contacts') ctDraw();
 }
-function ctDraw() { if (S.route.mod === 'contacts') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, viewContacts())); } }
+function ctDraw() { if (S.route.mod === 'contacts') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('contacts', viewContacts()))); } }
 function viewContacts() {
   if (CT.items === null && !CT.loading) setTimeout(ctLoad, 0);
   const books = (S.books || []).filter(b => wsObjIn(b));  // 2.30.0 (#1036): the address books of the shown workspace

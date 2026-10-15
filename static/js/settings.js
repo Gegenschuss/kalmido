@@ -260,6 +260,7 @@ function settingsSync() {
   for (const el of $$('[data-feat]', md)) el.checked = feat(el.dataset.feat);
   for (const el of $$('[data-agvis]', md)) el.checked = !agentHidden().has(+el.dataset.agvis);
   $$('[data-modrow]', md).forEach(r => r.classList.toggle('off', !feat(r.dataset.modrow)));
+  mg_setSync(md);  // 2.44.0 (#1187)
   modCountsSync(md);  // 2.25.0 (UX-19)
   const nm = $('#a-name', md); if (nm && nm !== document.activeElement && S.me) nm.value = S.me.display_name;
   $$('#s-lang [data-lang-set]', md).forEach(b => b.classList.toggle('on', b.dataset.langSet === (s.lang || 'en')));
@@ -285,9 +286,9 @@ async function setLang(code) {
   setSaved(e);
 }
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
-const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events', 'contacts']], [N_('For you'), ['habits', 'pomo', 'stats', 'comments']],
-  [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents', 'clients', 'workload', 'forms']], [N_('At home'), ['family', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading']],
-  [N_('Office & finance'), ['office']]];  // 2.36.1 (#1021)
+// 2.44.0 (#1187): Office, Time, Review and Home are ONE switch each ("a:<area>", areas.js), their parts below it
+const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events']], [N_('For you'), ['habits', 'comments']],
+  [N_('Projects and team'), ['collab', 'progress', 'deps', 'fields', 'agents', 'workload', 'forms']], [N_('Areas|nav'), ['a:office', 'a:time', 'a:review', 'a:life']]];
 const MOD_DESC = {office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents; needs an organisation (business area)'),  // 2.36.1 (#1021)
   cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Pomodoro timer and stopwatch'),
@@ -329,7 +330,7 @@ function modulesHtml(hint) {
       <div class="row"><label for="s-trem">${tr('Reminder after')}</label><input type="number" id="s-trem" value="${esc(s.time_remind_h ?? '4')}" min="0" max="48" step="0.5" class="numin"><span class="muted">${tr('hours, push “still running?”, 0 = off')}</span></div>
       <div class="row"><label for="s-tstop">${tr('Stop automatically after')}</label><input type="number" id="s-tstop" value="${esc(s.time_autostop_h ?? '12')}" min="0" max="72" step="0.5" class="numin"><span class="muted">${tr('hours, end = start + value, 0 = off')}</span></div>
       <div class="row"><label>${tr('Focus sessions')}</label><label class="chkl"><input type="checkbox" id="s-tfocus" ${s.time_focus !== '0' ? 'checked' : ''}> ${tr('count as time entries (not while a timer runs)')}</label></div></details>` : '';
-  const row = k => modRowHtml(k, opt);
+  const row = k => k.startsWith('a:') ? mg_modAreaHtml(k.slice(2), x => modRowHtml(x, opt)) : modRowHtml(k, opt);  // 2.44.0 (#1187)
   return `<h4 id="s-purpose-h">${tr('What do you use Kalmido for?')}</h4>${purposeCards(S.settings.purpose || '')}
     ${hint(tr('Switch on only what you need; everything else disappears from the menus. Nothing is deleted: switched back on, everything is there again.'))}
     <div class="modtot muted" id="s-modtot">${esc(modCount())}</div>
@@ -338,9 +339,9 @@ function modulesHtml(hint) {
 // 2.25.0 (UX-19): the module groups start folded and say how many are on ("3 of 4 on"); the total on top counts the same
 // switches (every module shown here), and the setup counts against it too
 const modGroupKeys = ks => ks;
-const modGroupCount = r => tr('{0} of {1} on', r.filter(k => feat(k)).length, r.length);
+const modGroupCount = r => tr('{0} of {1} on', r.filter(k => mg_featOn(k)).length, r.length);
 const modAll = () => MOD_GROUPS.flatMap(([, ks]) => modGroupKeys(ks));
-const modCount = () => { const a = modAll(); return tr('{0} of {1} modules on', a.filter(k => feat(k)).length, a.length); };
+const modCount = () => { const a = modAll(); return tr('{0} of {1} modules on', a.filter(k => mg_featOn(k)).length, a.length); };
 function modCountsSync(md) {
   const t = $('#s-modtot', md); if (t) t.textContent = modCount();
   for (const d of $$('[data-modgrp]', md)) { const r = modGroupKeys(MOD_GROUPS[+d.dataset.modgrp][1]), c = $('.mgc', d); if (c) c.textContent = modGroupCount(r); }
@@ -770,7 +771,7 @@ function settingsModal(focus) {
   if (focus === 'caldav' || focus === 'apppw') setTimeout(() => $(focus === 'caldav' ? '#s-dav-h' : '#s-apw-h', md)?.scrollIntoView({block: 'start'}), 0);
   // 2.7.0 (#405 S8): the module keys land on their row (and open its options), not just on top of Modules
   const modFocus = {layout: 'cal', collab: 'collab', focus: 'pomo', time: 'time'}[focus];
-  if (modFocus) setTimeout(() => { const r = $(`[data-pane="modules"] [data-modrow="${modFocus}"]`, md); if (!r) return; const gd = r.closest('details.modgrp'); if (gd) gd.open = true; const o = $('details.mopt', r); if (o) o.open = true; r.scrollIntoView?.({block: 'start'}); r.classList.add('flash'); }, 0);
+  if (modFocus) setTimeout(() => { const r = $(`[data-pane="modules"] [data-modrow="${modFocus}"]`, md); if (!r) return; const gd = r.closest('details.modgrp'); if (gd) gd.open = true; const gp = r.closest('details.mgparts'); if (gp) gp.open = true; const o = $('details.mopt', r); if (o) o.open = true; r.scrollIntoView?.({block: 'start'}); r.classList.add('flash'); }, 0);
   const show = k => {
     cur = k; LS.set('settingsSec', k); head();
     $$('.snav button', md).forEach(b => { b.classList.toggle('on', b.dataset.sec === k); b.setAttribute('aria-selected', b.dataset.sec === k); });
@@ -830,12 +831,14 @@ function settingsModal(focus) {
         .then(() => { S.notify = notifMatrix(S.settings); });
       return;
     }
+    if (el.dataset.mgarea) { mg_areaSwitch(md, el); return; }  // 2.44.0 (#1187)
     if (el.dataset.feat) {
       const on = el.checked, k = el.dataset.feat, n = tr(FEATS.find(x => x[0] === k)?.[1] || k);
       const fs = new Set((S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').filter(Boolean));
       on ? fs.add(k) : fs.delete(k);
       $$(`[data-feat="${k}"]`, md).forEach(x => { x.checked = on; x.closest('[data-modrow]')?.classList.toggle('off', !on); });  // 2.0.5: agents twice
       setApply({features: FEATS.map(x => x[0]).filter(x => fs.has(x)).join(',')}, on ? tr('{0} on', n) : tr('{0} off', n)).then(() => {
+        mg_setSync(md);  // 2.44.0 (#1187): the area's switch follows its parts
         const r = el.closest('[data-modrow]'); if (r && k === 'time' && on && !$('#s-trnd', md)) { const cur = LS.get('settingsSec'); md._noflush = true; md.remove(); settingsModal(cur); }
       });
     }
@@ -930,14 +933,14 @@ function settingsModal(focus) {
       grp(N_('Filters'), S.filters.map(f => opt('f:' + f.id, f.name)).join('')) +
       grp(N_('Folders'), folderNames().map(f => opt('folder:' + f, fDisp(f))).join('')) +
       grp(N_('Tags'), Object.keys(counts().tags).sort((a, b) => a.localeCompare(b, 'de')).map(t => opt('tag:' + t, '#' + t)).join('')) +
-      grp(N_('Other'), opt('home', tr('Start|home')) + (teamOn() ? opt('team', tr('Team chat')) : '') + (collab() ? opt('news', tr('News')) : '') + (feat('agents') && agentsOn() ? opt('agents', tr('Agents')) : '') + (overviewOn() ? opt('overview', tr('Project status')) : '') + (feat('stats') ? opt('stats', tr('Statistics')) : '') + (timeOn() ? opt('time', tr('Time tracking')) : '') + opt('search', tr('Search')) + opt('lists', tr('Lists')) + opt('settings', tr('Settings')));
+      grp(N_('Other'), opt('home', tr('Start|home')) + (teamOn() ? opt('team', tr('Team chat')) : '') + (collab() ? opt('news', tr('News')) : '') + (feat('agents') && agentsOn() ? opt('agents', tr('Agents')) : '') + (overviewOn() ? opt('overview', tr('Project status')) : '') + mg_tabOpts(opt) /* 2.44.0 (#1187) */ + opt('search', tr('Search')) + opt('lists', tr('Lists')) + opt('settings', tr('Settings')));
   };
   md._tabDraw = tabDraw;
   // 2.25.0 (UX-03): the sidebar: groups up / down, an eye per group, check boxes for the entries of Plan and Views
   const sideDraw = () => {
     const box = $('#s-sidebar', md); if (!box) return;
     const p = sidePref(), ord = sideGroupOrder();
-    const ent = g => (g === 'focus' ? SIDE_PLAN : g === 'views' ? sideViewEntries() : g === 'areas' ? sideAreaEntries() : []).map(([x, n]) => `<label class="chkl sidee"><input type="checkbox" data-side-e="${x}" ${p.hidden.includes('e:' + x) ? '' : 'checked'}> ${esc(tr(n))}</label>`).join('');
+    const ent = g => (g === 'focus' ? SIDE_PLAN : g === 'views' ? sideViewEntries() : g === 'areas' ? sideAreaEntries() : []).map(([x, n]) => `<label class="chkl sidee"><input type="checkbox" data-side-e="${x}" ${x.split(',').every(y => p.hidden.includes('e:' + y)) ? '' : 'checked'}> ${esc(tr(n))}</label>`).join('');
     box.innerHTML = ord.map((g, i) => { const n = tr(SIDE_NAMES[g]), shown = !p.hidden.includes('g:' + g), e = shown ? ent(g) : '';
       return `<div class="navrow sidegrp ${shown ? '' : 'off'}" data-sideg="${g}">${g === 'lists' ? `<span class="iconbtn sideye" aria-hidden="true">${ic('list', 's')}</span>` : `<button class="iconbtn sideye" data-side-eye aria-pressed="${shown}" title="${esc(shown ? tr('Hide {0}', n) : tr('Show {0}', n))}" aria-label="${esc(tr('Show {0}', n))}">${ic(shown ? 'eye' : 'eyeoff', 's')}</button>`}<span>${esc(n)}</span><button class="iconbtn" data-smove="-1" ${i ? '' : 'disabled'} title="${tr('move up')}" aria-label="${esc(tr('Move {0} up', n))}">${ic('chev', 's up')}</button><button class="iconbtn" data-smove="1" ${i < ord.length - 1 ? '' : 'disabled'} title="${tr('move down')}" aria-label="${esc(tr('Move {0} down', n))}">${ic('chev', 's')}</button></div>${e ? `<div class="sideents">${e}</div>` : ''}`; }).join('');
   };
@@ -946,7 +949,8 @@ function settingsModal(focus) {
   sideDraw();
   md.addEventListener('change', e => {
     const x = e.target.dataset?.sideE; if (!x) return;
-    const p = sidePref(), h = new Set(p.hidden); e.target.checked ? h.delete('e:' + x) : h.add('e:' + x);
+    const p = sidePref(), h = new Set(p.hidden);
+    for (const y of x.split(',')) e.target.checked ? h.delete('e:' + y) : h.add('e:' + y);  // 2.44.0 (#1187): an area = all its parts
     sideSave({order: p.order, hidden: [...h]});
   });
   const tabApply = ids => { if (ids) LS.set('tabbar', ids); else LS.set('tabbar', null); tabDraw(); renderTabs(); };

@@ -214,6 +214,9 @@ def admin_setup():
         return e
     fs = ",".join(f for f in USER_DEFAULTS["features"].split(",") + ["family"] if f in ("collab", "time") or f in mods)
     gset(c, "default_features", fs)
+    # 2.44.0 (#1187): the areas Review and Home bring the journal and Home & life: on for the admin only (as with a purpose)
+    from ..family.family import _LIFE
+    fs = ",".join([x for x in fs.split(",") if x] + [m for m in _LIFE if m in mods and m not in fs.split(",")])
     uset(c, me(), "features", fs)
     if lang:
         gset(c, "default_lang", lang)
@@ -234,7 +237,7 @@ def admin_setup():
             return err(tr("Invalid value: {0}", "purpose"))
         uset(c, me(), "purpose", b["purpose"])
         from ..family.family import _LIFE, PURPOSE_ON, PURPOSE_EXTRA  # 2.22.0 (#741): the Home & life modules of the purpose (the admin's own)
-        on = [m for m in PURPOSE_ON[b["purpose"]] if m in _LIFE]
+        on = [m for m in PURPOSE_ON[b["purpose"]] if m in _LIFE and m not in fs.split(",")]  # 2.44.0: not twice
         on += [m for m in PURPOSE_EXTRA.get(b["purpose"], ()) if m not in on and m not in fs.split(",")]  # 2.36.1 (#1021): office
         if on:
             uset(c, me(), "features", ",".join([x for x in fs.split(",") if x] + on))
