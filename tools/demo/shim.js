@@ -415,7 +415,7 @@
   on('DELETE', '/api/me/wait-suggestions', (q, b) => { DB.waitHidden = [...new Set([...(DB.waitHidden || []), String(b.note || '').trim().toLowerCase()])]; return {ok: true, items: waitSugg()}; });
   on('PATCH', '/api/lists/(\\d+)', (q, b, id) => {
     const l = listById(id) || gone();
-    for (const k of ['name', 'color', 'folder', 'sort', 'view', 'archived', 'checklist', 'dep_shift', 'kind', 'tickets', 'nag', 'description', 'agent_tidy', 'rate', 'day_hours', 'family', 'time_tracking']) if (k in b) l[k] = typeof b[k] === 'boolean' ? (b[k] ? 1 : 0) : b[k];
+    for (const k of ['name', 'color', 'folder', 'sort', 'view', 'archived', 'checklist', 'dep_shift', 'kind', 'tickets', 'nag', 'description', 'agent_tidy', 'rate', 'day_hours', 'family', 'time_tracking', 'tap_done']) if (k in b) l[k] = typeof b[k] === 'boolean' ? (b[k] ? 1 : 0) : b[k];
     if ('done_at_bottom' in b) l.checklist = b.done_at_bottom ? 1 : 0;
     if ('archived' in b) l.archived_at = b.archived ? iso() : null;
     if ('columns' in b) l.columns = Array.isArray(b.columns) ? [...new Set(b.columns)] : null;  // 2.14.0 (#425)

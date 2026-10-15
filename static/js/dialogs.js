@@ -780,6 +780,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="shint lhint">${ic('cart', 's')} ${tr('What you tick off stays visible at the bottom and comes back with one tap: handy for shopping and packing lists.')}</div>` : ''}
     ${id && own && !l.is_inbox ? `<div class="row ldsxrow"><span></span><label class="chkl"><input type="checkbox" id="l-dsx" ${dsxOn(l) ? 'checked' : ''} ${dsxFixedOff(l) ? 'disabled' : ''}> ${tr('Keep completed in their section')}</label></div>
     <div class="shint lhint" id="l-dsxhint">${tr('Completed tasks stay at their place in their section, crossed out, with their subtasks. For everyone in the list. Not with “Show completed at the bottom” or for shopping lists.')}</div>` : ''}
+    ${id ? tp_rowHtml(l) : ''}
     <div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint">${tr('Default for the tasks of this list with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>
     ${id && ['owner', 'admin'].includes(l.role || 'owner') && !l.family && !l.life ? staleRowHtml(l) : ''}
@@ -802,6 +803,7 @@ function listModal(id, folder = '', o = {}) {
   $('#l-bell', md)?.addEventListener('bell-sync', e => bellHint(e.target.value));
   $('#l-stale', md)?.addEventListener('change', e => { e.stopPropagation(); staleDaysSet(id, e.target); });  // 2.34.0 (#266)
   if (id) ovWire(md, id);  // 2.46.0 (#1603): "Everyone in the organisation"
+  if (id) tp_wire(md, id);  // 2.46.X (#1751): "Tap does not open details"
   $('#l-dsx', md)?.addEventListener('change', e => { e.stopPropagation(); dsxSet(id, e.target.checked).then(() => { const x = listById(id), c = $('#l-dsx', md); if (x && c) c.checked = dsxOn(x); }); });  // 2.36.2 (#1136)
   $('[data-m="bell-custom"]', md)?.addEventListener('click', e => { e.stopPropagation(); bellCustomModal(id); });
   // ---- autosave (existing lists)
@@ -846,6 +848,7 @@ function listModal(id, folder = '', o = {}) {
     if ($('#l-dab', md)) $('#l-dab', md).checked = !!x.checklist;
     if ($('#l-fam', md)) $('#l-fam', md).value = x.family || '';
     if ($('#l-dsx', md)) { $('#l-dsx', md).checked = dsxOn(x); $('#l-dsx', md).disabled = dsxFixedOff(x); }  // 2.36.2 (#1136)
+    tp_sync(md, x);  // 2.46.X (#1751)
   };
   let saving = Promise.resolve();
   const autosave = () => {

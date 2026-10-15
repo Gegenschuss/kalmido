@@ -6824,5 +6824,11 @@
   "A kid account cannot be an admin of an organisation": "Een kinderaccount kan geen beheerder van een organisatie zijn",
   "Unknown organisation": "Onbekende organisatie",
   "Hide this note": "Deze melding verbergen",
-  "First line taken as the contact person: please check": "Eerste regel als contactpersoon overgenomen: controleer dit"
+  "First line taken as the contact person: please check": "Eerste regel als contactpersoon overgenomen: controleer dit",
+  "Open details": "Details openen",
+  "Tap": "Tikken",
+  "Tap does not open details": "Tikken opent geen details",
+  "A tap on a task ticks it off. Details with a long press or the menu.": "Een tik op een taak vinkt hem af. Details via lang drukken of het menu.",
+  "A tap ticks the task off": "Een tik vinkt de taak af",
+  "A tap opens the details": "Een tik opent de details"
 }
