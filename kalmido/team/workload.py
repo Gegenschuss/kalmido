@@ -101,7 +101,7 @@ def workload(c, uid, start=None, weeks=4, org=None):
             w["pct"] = round(w["minutes"] / 60 / p["capacity_h"] * 100) if p["capacity_h"] else None
             w["level"] = "none" if w["pct"] is None else "over" if w["pct"] > 100 else "warn" if w["pct"] >= 80 else "ok"
     from ..accounts.orgs import user_orgs
-    orgs = [{"id": r[0], "name": r[1]} for r in c.execute("SELECT id, name FROM orgs ORDER BY lower(name), id")
+    orgs = [{"id": r[0], "name": r[1]} for r in c.execute("SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id")
             if g.user["is_admin"] or r[0] in user_orgs(c, uid)]
     return {"weeks": [{"start": a.isoformat(), "end": b.isoformat()} for a, b in bounds], "people": [out[i] for i in ids],
             "org_id": oid, "orgs": orgs, "today": today.isoformat()}

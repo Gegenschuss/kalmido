@@ -60,6 +60,7 @@ _CHAT = "a team chat room (room_id -> tchat_rooms: a list's room or a direct cha
 _AGENT = "the agent's own rows (agent_id -> agents.org_id; its lists through list_members)"
 _FAM = "the household of a family (Family module): private by definition, never an organisation's"
 TENANT_EXEMPT = {
+    "orgs": "2.47.3 (#1360): personal_of = the owner of a personal office (a hidden orgs row; its own policy: only the owner's app.org_ids reach it)",
     "agent_setup_codes": "2.44.0 (#1517): a one-time setup code of one agent, issued by its owner / an instance admin and redeemed without an account (the agent row carries the workspace)",
     "task_tags": _TASK, "attachments": _TASK, "comments": _TASK, "activity": _TASK, "task_seen": _TASK, "task_push": _TASK,
     "task_deps": _TASK, "pomos": _TASK, "tidy_pending": _TASK, "task_people": _TASK, "comment_reactions": "per comment -> its task",

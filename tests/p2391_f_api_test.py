@@ -277,7 +277,9 @@ check(Bo.post(B + L + "/preview", files={"file": ("DATA.xlsx", XLSX)}).status_co
 check(Bo.post(B + L + "/import", json={"clients": []}).status_code == 403, "rights: member import 403")
 check(requests.post(B + L + "/preview", headers=AGH, files={"file": ("DATA.xlsx", XLSX)}).status_code == 403, "rights: an agent token 403")
 check(requests.get(B + L + "/runs", headers=AGH).status_code == 403, "rights: agent cannot list runs")
-check(Da.post(B + L + "/preview", files={"file": ("DATA.xlsx", XLSX)}).status_code == 400, "rights: a person without an organisation 400")
+# 2.47.3 (#1360): a person without an organisation imports into the own personal office (the preview stores nothing)
+r = Da.post(B + L + "/preview", files={"file": ("DATA.xlsx", XLSX)})
+check(r.ok and not any((x.get("dup") or {}).get("kind") == "existing" for x in r.json()["clients"]), "rights: a person without an organisation: own office, no duplicates from the organisation")
 
 # ---------------------------------------------------------------- import with corrections
 rows = [dict(x) for x in cl]

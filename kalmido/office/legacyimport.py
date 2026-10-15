@@ -39,7 +39,7 @@ from ..core.pg import insert_id, write_lock
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
-from .model import (MD, office_create, office_gate, office_in_use, office_number_format, office_org, office_role, office_rows, office_scheme_period,
+from .model import (MD, pb_cl_org, pb_cl_sql, office_create, office_gate, office_in_use, office_number_format, office_org, office_role, office_rows, office_scheme_period,
                     office_settings, office_update)
 
 FI_XLSX_MAX = 10 * 1024 * 1024  # the uploaded spreadsheet
@@ -411,7 +411,7 @@ def _same(a_norm, a_zip, b_norm, b_zip):
 
 
 def _org_clients(c, oid):
-    return [dict(r) for r in c.execute("SELECT id, name, zip, city, street, contact, country, address FROM clients WHERE org_id=? ORDER BY id", (oid,))]
+    return [dict(r) for r in c.execute(f"SELECT id, name, zip, city, street, contact, country, address FROM clients WHERE {pb_cl_sql(c, oid)} ORDER BY id")]
 
 
 def _cname(s):
@@ -764,13 +764,13 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
             tid = made.get(x.get("contact_row"))
             if not tid:
                 raise BadInput(tr("The client of row {0} is not imported", x.get("contact_row") if isinstance(x.get("contact_row"), int) else "?"))
-        if not c.execute("SELECT 1 FROM clients WHERE id=? AND org_id=?", (tid, oid)).fetchone():
+        if not c.execute(f"SELECT 1 FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (tid,)).fetchone():
             raise BadInput(tr("Invalid value: {0}", "merge_id"))
         name = str(x.get("contact") or "").strip()
         if not name:
             raise BadInput(tr("Name missing"))
         if not fk_has_name(c, tid, name):
-            fk_add(c, tid, oid, {"name": name[:120]}, run_id=rid)
+            fk_add(c, tid, pb_cl_org(c, oid), {"name": name[:120]}, run_id=rid)
             fk_sync(c, tid)
             counts["contacts"] = counts.get("contacts", 0) + 1
         else:
@@ -784,17 +784,17 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
             mid = int(x.get("merge_id"))
         except (TypeError, ValueError):
             raise BadInput(tr("Invalid value: {0}", "merge_id")) from None
-        cur = c.execute("SELECT * FROM clients WHERE id=? AND org_id=?", (mid, oid)).fetchone()
+        cur = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (mid,)).fetchone()
         if not cur:
             raise BadInput(tr("Invalid value: {0}", "merge_id"))
         f.pop("name", None)
         f = clean_client(c, uid, f)
         fill = {k: v for k, v in f.items() if k in MERGE_FIELDS and v and not (cur[k] or "").strip()}
         if fill:
-            c.execute(f"UPDATE clients SET {', '.join(k + '=?' for k in fill)}, updated_at=? WHERE id=? AND org_id=?", [*fill.values(), ts, mid, oid])
+            c.execute(f"UPDATE clients SET {', '.join(k + '=?' for k in fill)}, updated_at=? WHERE id=? AND {pb_cl_sql(c, oid)}", [*fill.values(), ts, mid])
             merged[str(mid)] = {**merged.get(str(mid), {}), **fill}
             if fill.get("contact") and not fk_has_name(c, mid, fill["contact"]):  # 2.40.0 (#1380): the filled contact = a contact person
-                fk_add(c, mid, oid, {"name": fill["contact"]}, run_id=rid, default=True)
+                fk_add(c, mid, pb_cl_org(c, oid), {"name": fill["contact"]}, run_id=rid, default=True)
                 fk_sync(c, mid)
         if isinstance(x.get("row"), int):
             made[x["row"]] = mid
@@ -802,12 +802,12 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
         return
     if act != "new":
         raise BadInput(tr("Invalid value: {0}", "action"))
-    f["org_id"] = oid
+    f["org_id"] = pb_cl_org(c, oid)  # 2.47.3 (#1360): a personal office's clients are private clients
     f = clean_client(c, uid, f, new=True)
-    f.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts, import_run_id=rid)
+    f.update(org_id=pb_cl_org(c, oid), created_by=uid, created_at=ts, updated_at=ts, import_run_id=rid)
     cid = insert_id(c, f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
     if f.get("contact"):  # 2.40.0 (#1380): the default contact person (removed with the client by the undo)
-        fk_add(c, cid, oid, {"name": f["contact"]}, run_id=rid, default=True)
+        fk_add(c, cid, pb_cl_org(c, oid), {"name": f["contact"]}, run_id=rid, default=True)
     if isinstance(x.get("row"), int):
         made[x["row"]] = cid
     counts["clients"] += 1
@@ -978,12 +978,12 @@ def fi_undo(c, oid, uid, rid, kinds=None):
     removed = {"clients": 0, "services": 0, "equipment": 0, "archive": 0, "merged": 0, "contacts": 0, "filled": 0, "roles": 0, "crew": 0}
     kept = {"clients": 0, "services": 0, "equipment": 0, "roles": 0, "crew": 0}
     kept_ids = set()
-    for row in (c.execute("SELECT id FROM clients WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall() if "clients" in todo else []):
+    for row in (c.execute(f"SELECT id FROM clients WHERE {pb_cl_sql(c, oid)} AND import_run_id=?", (rid,)).fetchall() if "clients" in todo else []):
         if _client_used(c, oid, row["id"], rid):
             kept["clients"] += 1
             kept_ids.add(row["id"])
             continue
-        c.execute("DELETE FROM clients WHERE id=? AND org_id=?", (row["id"], oid))
+        c.execute(f"DELETE FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (row["id"],))
         removed["clients"] += 1
     s = office_settings(c, oid)
     sr_unfill(c, oid, detail, todo, removed)  # 2.47.0 (#1648): first, so a service lets go of the run's role
@@ -1000,22 +1000,23 @@ def fi_undo(c, oid, uid, rid, kinds=None):
             removed[kind] += 1
     merged = (detail.get("merged") or {}) if "clients" in todo else {}
     for cid, fill in merged.items():  # merged clients: empty the filled fields again while they still hold the imported value
-        cur = c.execute("SELECT * FROM clients WHERE id=? AND org_id=?", (int(cid), oid)).fetchone()
+        cur = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (int(cid),)).fetchone()
         if not cur:
             continue
         back = [k for k, v in fill.items() if k in MERGE_FIELDS and (cur[k] or "") == v]
         if back:
-            c.execute(f"UPDATE clients SET {', '.join(k + '=?' for k in back)}, updated_at=? WHERE id=? AND org_id=?",
-                      [""] * len(back) + [iso(now_utc()), int(cid), oid])
+            c.execute(f"UPDATE clients SET {', '.join(k + '=?' for k in back)}, updated_at=? WHERE id=? AND {pb_cl_sql(c, oid)}",
+                      [""] * len(back) + [iso(now_utc()), int(cid)])
             removed["merged"] += 1
     # 2.40.0 (#1380): the contact persons the run added to other clients (a kept client of the run keeps its own)
     from .contacts_cl import fk_sync
     touched = set()
-    for row in (c.execute("SELECT id, client_id FROM office_client_contacts WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall()
+    kw = f"client_id IN (SELECT id FROM clients WHERE {pb_cl_sql(c, oid)})"  # 2.47.3 (#1360): also a personal office's (org_id NULL)
+    for row in (c.execute(f"SELECT id, client_id FROM office_client_contacts WHERE {kw} AND import_run_id=?", (rid,)).fetchall()
                 if "clients" in todo else []):
         if row["client_id"] in kept_ids:
             continue
-        c.execute("DELETE FROM office_client_contacts WHERE id=? AND org_id=?", (row["id"], oid))
+        c.execute(f"DELETE FROM office_client_contacts WHERE id=? AND {kw}", (row["id"],))
         touched.add(row["client_id"])
         removed["contacts"] += 1
     for cid in touched:
@@ -1218,7 +1219,7 @@ def _archive_fields(c, oid, b, partial=False):
                 cid = int(cid)
             except (TypeError, ValueError):
                 raise BadInput(tr("Invalid value: {0}", "client_id")) from None
-            if not c.execute("SELECT 1 FROM clients WHERE id=? AND org_id=?", (cid, oid)).fetchone():
+            if not c.execute(f"SELECT 1 FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (cid,)).fetchone():
                 raise BadInput(tr("Invalid value: {0}", "client_id"))
             f["client_id"] = cid
     return f
@@ -1300,7 +1301,7 @@ def _archive_public(r, names=None):
 
 
 def fi_archive_rows(c, oid, kind=""):
-    names = {r["id"]: r["name"] for r in c.execute("SELECT id, name FROM clients WHERE org_id=?", (oid,))}
+    names = {r["id"]: r["name"] for r in c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)}")}
     sql, args = "SELECT * FROM office_archive WHERE org_id=?", [oid]
     if kind in ("invoice", "offer"):
         sql += " AND kind=?"
@@ -1442,13 +1443,13 @@ def fk_archive_people(c, oid, uid, b, rid):
         if same:
             cid = same["id"]
         else:
-            f["org_id"] = oid
+            f["org_id"] = pb_cl_org(c, oid)  # 2.47.3 (#1360)
             f = clean_client(c, uid, f, new=True)
             ts = iso(now_utc())
-            f.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts, import_run_id=rid)
+            f.update(org_id=pb_cl_org(c, oid), created_by=uid, created_at=ts, updated_at=ts, import_run_id=rid)
             cid = insert_id(c, f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
             if f.get("contact"):
-                fk_add(c, cid, oid, {"name": f["contact"]}, run_id=rid, default=True)
+                fk_add(c, cid, pb_cl_org(c, oid), {"name": f["contact"]}, run_id=rid, default=True)
     name = str(b.get("add_contact") or "").strip()
     if name:
         tid = cid
@@ -1457,10 +1458,10 @@ def fk_archive_people(c, oid, uid, b, rid):
                 tid = int(b.get("client_id"))
             except (TypeError, ValueError):
                 raise BadInput(tr("Invalid value: {0}", "client_id")) from None
-        if not c.execute("SELECT 1 FROM clients WHERE id=? AND org_id=?", (tid, oid)).fetchone():
+        if not c.execute(f"SELECT 1 FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (tid,)).fetchone():
             raise BadInput(tr("Invalid value: {0}", "client_id"))
         if not fk_has_name(c, tid, name):
-            fk_add(c, tid, oid, {"name": name[:120]}, run_id=rid)
+            fk_add(c, tid, pb_cl_org(c, oid), {"name": name[:120]}, run_id=rid)
             fk_sync(c, tid)
     return cid
 
@@ -1579,7 +1580,7 @@ def fi_parse_post():
     names = (body() or {}).get("names")
     if not isinstance(names, list) or len(names) > 500 or not all(isinstance(n, str) for n in names):
         raise BadInput(tr("Invalid data"))
-    cl = [(r["id"], r["name"]) for r in c.execute("SELECT id, name FROM clients WHERE org_id=? AND archived=0 ORDER BY id", (oid,))]
+    cl = [(r["id"], r["name"]) for r in c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 ORDER BY id")]
     items = []
     for n in names:
         p = fi_parse_filename(n[:300], cl)

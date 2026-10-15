@@ -7124,5 +7124,22 @@
   "Planned": "Previsto",
   "Quotation, not yet invoiced": "Preventivo, non ancora fatturato",
   "Refund on a credit note": "Rimborso di una nota di credito",
-  "the rest after part invoices": "il resto dopo fatture parziali"
+  "the rest after part invoices": "il resto dopo fatture parziali",
+  "Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents; your own office (Private) or your organisation's": "Preventivi con calcolo, servizi e tariffe, attrezzatura, blocchi di testo, contratti quadro e documenti PDF; il tuo ufficio (Privato) o quello della tua organizzazione",
+  "Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents - your own or your organisation's": "Preventivi con calcolo, servizi e tariffe, attrezzatura, blocchi di testo, contratti quadro e documenti PDF - tuoi o della tua organizzazione",
+  "Office & finance (quotations, services, documents; your own or your organisation's), your contacts and the clients": "Ufficio e finanze (preventivi, servizi, documenti; il tuo o quello della tua organizzazione), i tuoi contatti e i clienti",
+  "Choose a workspace at the top (Private or an organisation) to open its office": "Scegli in alto un'area di lavoro (Privato o un'organizzazione) per aprirne l'ufficio",
+  "Only a personal office can move into an organisation": "Solo un ufficio personale può essere trasferito in un'organizzazione",
+  "Please confirm the move": "Conferma il trasferimento",
+  "Only an admin of this server can create an organisation": "Solo un amministratore di questo server può creare un'organizzazione",
+  "The office of your organisation {0} is in the workspace {0}.": "L'ufficio della tua organizzazione {0} si trova nell'area di lavoro {0}.",
+  "Switch to {0}": "Passa a {0}",
+  "This is your personal office in the workspace Private: its clients, documents and settings are yours alone.": "Questo è il tuo ufficio personale nell'area Privato: clienti, documenti e impostazioni sono solo tuoi.",
+  "Small business: no VAT (section 19 UStG)": "Piccola impresa: senza IVA (§ 19 UStG)",
+  "Move into an organisation": "Trasferisci in un'organizzazione",
+  "Turns this personal office into a new organisation with you as its admin: documents, numbers, settings, master data and your private clients go with it. This cannot be undone.": "Trasforma questo ufficio personale in una nuova organizzazione con te come amministratore: documenti, numeri, impostazioni, dati di base e i tuoi clienti privati la seguono. Non si può annullare.",
+  "Create organisation…": "Crea organizzazione…",
+  "Name of the new organisation": "Nome della nuova organizzazione",
+  "Move your personal office into “{0}”?": "Trasferire il tuo ufficio personale in «{0}»?",
+  "The organisation “{0}” now holds your office": "Il tuo ufficio è ora nell'organizzazione «{0}»"
 }

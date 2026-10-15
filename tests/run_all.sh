@@ -761,6 +761,9 @@ fresh; run p2473_d_ui node p2473_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.3 part B: travel expenses (#1022) + cash flow (#1652) in the office
 fresh; run p2473_b_api "$PY" p2473_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2473_b_ui node p2473_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.47.3 part A: Office & finance without an organisation (#1360)
+fresh; run p2473_a_api "$PY" p2473_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2473_a_ui node p2473_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

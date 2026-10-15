@@ -1341,6 +1341,10 @@ MIGRATIONS = [
     ("lists", "tap_done", "UPDATE lists SET tap_done=1 WHERE family IN ('shopping', 'packing')"),
     # 2.47.1 (#1721): the fixed colour of an account (agents and people; accounts/colors.py, '' = not given yet)
     ("users", "color", "ALTER TABLE users ADD COLUMN color TEXT NOT NULL DEFAULT ''"),
+    # 2.47.3 (#1360): the personal office of a person = a hidden orgs row (personal_of = its owner, NULL = a real
+    # organisation); it never shows as an organisation (no members, filtered wherever orgs are listed or counted)
+    ("orgs", "personal_of", "ALTER TABLE orgs ADD COLUMN personal_of BIGINT REFERENCES users(id) ON DELETE CASCADE"),
+    ("orgs", "personal_of", "CREATE UNIQUE INDEX IF NOT EXISTS orgs_personal ON orgs(personal_of) WHERE personal_of IS NOT NULL"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

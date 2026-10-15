@@ -152,7 +152,7 @@ def om_orgs_arg(c, b):
         out[oid] = role
     with system_ctx(c):  # the instance admin: which organisations exist (structure)
         for oid in out:
-            if not c.execute("SELECT 1 FROM orgs WHERE id=?", (oid,)).fetchone():
+            if not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (oid,)).fetchone():  # 2.47.3 (#1360)
                 return tr("Unknown organisation")
     return sorted(out.items())
 
@@ -259,7 +259,7 @@ def user_update(uid):
                 org_leave(c, o, uid, heir if heir != uid else me())
             for o in b["orgs"]:
                 if o not in have:
-                    if c.execute("SELECT 1 FROM orgs WHERE id=?", (o,)).fetchone():
+                    if c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (o,)).fetchone():
                         org_member_add(c, o, uid)
     if uid == me() and (("is_admin" in b and not b["is_admin"]) or b.get("disabled") or b.get("kind") == "agent"):
         return err(tr("You cannot remove your own admin rights or disable yourself"))

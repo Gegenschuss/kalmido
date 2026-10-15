@@ -7124,5 +7124,22 @@
   "Planned": "Gepland",
   "Quotation, not yet invoiced": "Offerte, nog niet gefactureerd",
   "Refund on a credit note": "Terugbetaling van een creditnota",
-  "the rest after part invoices": "de rest na deelfacturen"
+  "the rest after part invoices": "de rest na deelfacturen",
+  "Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents; your own office (Private) or your organisation's": "Offertes met calculatie, diensten en tarieven, apparatuur, tekstblokken, raamcontracten en pdf-documenten; je eigen kantoor (Privé) of dat van je organisatie",
+  "Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents - your own or your organisation's": "Offertes met calculatie, diensten en tarieven, apparatuur, tekstblokken, raamcontracten en pdf-documenten - van jezelf of van je organisatie",
+  "Office & finance (quotations, services, documents; your own or your organisation's), your contacts and the clients": "Kantoor en financiën (offertes, diensten, documenten; je eigen of dat van je organisatie), je contacten en de klanten",
+  "Choose a workspace at the top (Private or an organisation) to open its office": "Kies bovenaan een werkruimte (Privé of een organisatie) om het kantoor ervan te openen",
+  "Only a personal office can move into an organisation": "Alleen een persoonlijk kantoor kan naar een organisatie verhuizen",
+  "Please confirm the move": "Bevestig de verhuizing",
+  "Only an admin of this server can create an organisation": "Alleen een beheerder van deze server kan een organisatie aanmaken",
+  "The office of your organisation {0} is in the workspace {0}.": "Het kantoor van je organisatie {0} vind je in de werkruimte {0}.",
+  "Switch to {0}": "Naar {0} wisselen",
+  "This is your personal office in the workspace Private: its clients, documents and settings are yours alone.": "Dit is je persoonlijke kantoor in de werkruimte Privé: de klanten, documenten en instellingen zijn alleen van jou.",
+  "Small business: no VAT (section 19 UStG)": "Kleine ondernemer: geen btw (§ 19 UStG)",
+  "Move into an organisation": "Naar een organisatie verhuizen",
+  "Turns this personal office into a new organisation with you as its admin: documents, numbers, settings, master data and your private clients go with it. This cannot be undone.": "Maakt van dit persoonlijke kantoor een nieuwe organisatie met jou als beheerder: documenten, nummers, instellingen, stamgegevens en je privéklanten verhuizen mee. Dit kan niet ongedaan worden gemaakt.",
+  "Create organisation…": "Organisatie aanmaken…",
+  "Name of the new organisation": "Naam van de nieuwe organisatie",
+  "Move your personal office into “{0}”?": "Je persoonlijke kantoor naar ‘{0}’ verhuizen?",
+  "The organisation “{0}” now holds your office": "Je kantoor zit nu in de organisatie ‘{0}’"
 }

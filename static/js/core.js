@@ -63,7 +63,7 @@ const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and li
   workload: N_('How much each person of your organisation has on their plate per week, against their hours per week'),
   forms: N_('A link with a small form (requests, bug reports) that creates a task in a list; agents can sort it in'),
   agents: N_('A tab with the agents (AI assistants, bots) you share lists with: their status, jobs to approve and the chat'),
-  office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents of your organisation'),
+  office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents - your own or your organisation\'s'),
   progress: N_('Progress bar in the list header and the project status (“Where is it stuck?”); with collaboration also a status per list')};
 const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f);
 // collaboration off (own switch, or the admin's switch for the whole server): no comments / activity / mentions /

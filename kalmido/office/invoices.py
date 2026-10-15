@@ -24,7 +24,7 @@ from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
 from .packs import office_pack
-from .model import office_gate, office_org, office_role, office_settings
+from .model import office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
 
 INV_KINDS = ("invoice", "credit", "reminder")
@@ -177,7 +177,7 @@ def inv_missing(c, oid, r, s, pack, items):
     """The required fields of an invoice that are still missing (names in the signed-in person's language)."""
     miss = []
     rec = _j(r["recipient"], {})
-    cl = c.execute("SELECT * FROM clients WHERE id=? AND org_id=?", (r["client_id"], oid)).fetchone() if r["client_id"] else None
+    cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone() if r["client_id"] else None
     if not (rec.get("name") or "").strip():
         miss.append(tr("recipient name"))
     addr_ok = cl is not None and all((cl[k] if k in cl.keys() else "") for k in ("street", "zip", "city"))
@@ -393,12 +393,14 @@ def inv_new_row(c, oid, s, kind, lang, src=None):
         if src["lang"] != lang:
             row["intro"], row["closing"] = inv_default_texts(c, oid, s, kind, src["lang"])
         if src["client_id"]:
-            cl = c.execute("SELECT buyer_reference, payment_terms_days FROM clients WHERE id=? AND org_id=?", (src["client_id"], oid)).fetchone()
+            cl = c.execute(f"SELECT buyer_reference, payment_terms_days FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (src["client_id"],)).fetchone()
             if cl is not None:
                 if cl["payment_terms_days"] and kind == "invoice":
                     row["payment_days"] = int(cl["payment_terms_days"])
                 if cl["buyer_reference"] and kind in ("invoice", "credit"):  # 2.40.0 (#1368): credit notes too
                     row["einvoice_format"] = "xrechnung"
+    if s.get("small_business") and kind != "reminder":  # 2.47.3 (#1360): section 19 UStG -- no VAT, the exemption note (E)
+        row["vat_mode"], row["vat_note"] = "novat", "small"
     return row
 
 
@@ -406,7 +408,7 @@ def inv_apply_client(c, oid, row, b):
     """A new draft with a client: its payment terms and (buyer reference = XRechnung) its e-invoice format, unless given."""
     if not row.get("client_id") or row.get("kind") not in ("invoice", "credit"):  # 2.40.0 (#1368): credit: the format only
         return
-    cl = c.execute("SELECT buyer_reference, payment_terms_days FROM clients WHERE id=? AND org_id=?", (row["client_id"], oid)).fetchone()
+    cl = c.execute(f"SELECT buyer_reference, payment_terms_days FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (row["client_id"],)).fetchone()
     if cl is None:
         return
     if cl["payment_terms_days"] and "payment_days" not in b and row.get("kind") == "invoice":
@@ -452,7 +454,7 @@ def inv_from_time(c, oid, uid, b):
         cid = int(cid)
     except (TypeError, ValueError):
         raise BadInput(tr("Invalid value: {0}", "client_id"))
-    cl = c.execute("SELECT * FROM clients WHERE id=? AND org_id=?", (cid, oid)).fetchone()
+    cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (cid,)).fetchone()
     if cl is None:
         raise Denied(404)
     d_from, d_to = _date(b.get("from"), "from"), _date(b.get("to"), "to")
@@ -601,7 +603,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
                                                                    "iban", "bic", "bank_name", "register_court", "register_no", "managing_directors")}
     rec = _j(r["recipient_snapshot"], {}) if ofx_locked(r) and r["recipient_snapshot"] else {}
     if not rec and r["client_id"]:
-        cl = c.execute("SELECT * FROM clients WHERE id=? AND org_id=?", (r["client_id"], oid)).fetchone()
+        cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone()
         if cl is not None:
             rec = {k: (cl[k] if k in cl.keys() else "") for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice")}
     for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice"):
