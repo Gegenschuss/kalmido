@@ -643,6 +643,7 @@ fresh; run p2430_c_ui node p2430_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.43.0 part A: #1328 formula fields, sum row, key figures; #1331 a list like a spreadsheet
 fresh; run p2430_a_api "$PY" p2430_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2430_a_ui node p2430_a_ui.js "$KALMIDO_TEST_DATA"
+shard 6  # 2.46.3: the 2.44 / 2.45 suites run in shard 6 (shard 10 reached the 30 min CI job limit, shard 6 took 14 min)
 # 2.44.0 part B: #1443 outbox + looked-at images, #1445 jobs (agent_job.py), #1447 task events bundled (starter modules, no server)
 fresh; run p2440_b_launcher "$PY" p2440_b_launcher_test.py
 # 2.44.0 part A: the launcher's event runner core (approval-done, permission questions, approval lifecycle, resumed
@@ -670,23 +671,7 @@ fresh; run p2450_b_ui node p2450_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2451_a_api "$PY" p2451_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.45.1 part B: #1556 devices with a German and an English name (master data, legacy import Device DE / Device EN, undo)
 fresh; run p2451_b_api "$PY" p2451_b_api_test.py "$KALMIDO_TEST_DATA"
-# 2.47.0 part C: #1216 shoot calculation sheet (core without server; API + UI need the part routes of #1215)
-       run p2470_c_sheet "$PY" p2470_c_sheet_test.py
-fresh; run p2470_c_sheet_api "$PY" p2470_c_sheet_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p2470_c_sheet_ui node p2470_c_sheet_ui.js "$KALMIDO_TEST_DATA"
-# 2.47.0 part E: #1654 account node survives renderSide, sidebar avatar not lazy
-fresh; run p2470_e_avatar_ui node p2470_e_avatar_ui.js "$KALMIDO_TEST_DATA"
-# 2.47.0 part D: #1645 producing / raw data per quotation (default, migration), #1649 purchase from the role, surplus per position (admins only), percent position, purchases of accepted quotations
-fresh; run p2470_d_cost_api "$PY" p2470_d_cost_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p2470_d_cost_ui node p2470_d_cost_ui.js "$KALMIDO_TEST_DATA"
-# 2.47.0 part A: #1648 fill instead of skip, #1649 masters Freelancer-Rollen / Drehpersonal + their import, #1645 import columns
-fresh; run p2470_a_import_api "$PY" p2470_a_import_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p2470_a_roles_ui node p2470_a_roles_ui.js "$KALMIDO_TEST_DATA"
-# 2.47.0 part B: #1215 parts of a quotation (title page calculation, rights, PDF pages, invoice forms; the editor)
-fresh; run p2470_b_parts_api "$PY" p2470_b_parts_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p2470_b_parts_ui node p2470_b_parts_ui.js "$KALMIDO_TEST_DATA"
-# 2.47.0 part F: review follow-ups (#1216 no purchase in the cached shoot totals, #1649 percent positions in invoices from parts)
-fresh; run p2470_f_review_api "$PY" p2470_f_review_api_test.py "$KALMIDO_TEST_DATA"
+shard 8  # 2.46.3: the 2.46 suites (and new ones after them) run in shard 8 (shard 10 full, shard 8 took 15 min)
 # 2.46.1 lead: #1634 subtasks typed fast (queue, the rebuilt field keeps the text)
 fresh; run p2461_l_ui node p2461_l_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.1 part C: #1554 several contacts at once (delete / move in one request, rights, birthdays, CardDAV, token API; the selection)
@@ -734,6 +719,24 @@ fresh; run p246d_b_api "$PY" p246d_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p246d_b_ui node p246d_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.4 part C: #1737 workspace line + greyed-out people in the Share dialogs, #1755 one-line Undo message above the keyboard
 fresh; run p246d_c_ui node p246d_c_ui.js "$KALMIDO_TEST_DATA"
+shard 5  # 2.47.0: the 2.47 suites run in shard 5 (shard 8 with the 2.46 suites took 24 min, shard 5 17 min)
+# 2.47.0 part C: #1216 shoot calculation sheet (core without server; API + UI need the part routes of #1215)
+       run p2470_c_sheet "$PY" p2470_c_sheet_test.py
+fresh; run p2470_c_sheet_api "$PY" p2470_c_sheet_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2470_c_sheet_ui node p2470_c_sheet_ui.js "$KALMIDO_TEST_DATA"
+# 2.47.0 part E: #1654 account node survives renderSide, sidebar avatar not lazy
+fresh; run p2470_e_avatar_ui node p2470_e_avatar_ui.js "$KALMIDO_TEST_DATA"
+# 2.47.0 part D: #1645 producing / raw data per quotation (default, migration), #1649 purchase from the role, surplus per position (admins only), percent position, purchases of accepted quotations
+fresh; run p2470_d_cost_api "$PY" p2470_d_cost_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2470_d_cost_ui node p2470_d_cost_ui.js "$KALMIDO_TEST_DATA"
+# 2.47.0 part A: #1648 fill instead of skip, #1649 masters Freelancer-Rollen / Drehpersonal + their import, #1645 import columns
+fresh; run p2470_a_import_api "$PY" p2470_a_import_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2470_a_roles_ui node p2470_a_roles_ui.js "$KALMIDO_TEST_DATA"
+# 2.47.0 part B: #1215 parts of a quotation (title page calculation, rights, PDF pages, invoice forms; the editor)
+fresh; run p2470_b_parts_api "$PY" p2470_b_parts_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2470_b_parts_ui node p2470_b_parts_ui.js "$KALMIDO_TEST_DATA"
+# 2.47.0 part F: review follow-ups (#1216 no purchase in the cached shoot totals, #1649 percent positions in invoices from parts)
+fresh; run p2470_f_review_api "$PY" p2470_f_review_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

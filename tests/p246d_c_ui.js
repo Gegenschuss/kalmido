@@ -123,6 +123,12 @@ const FEAT = 'cal,events,comments,collab,contacts';
   const bottom = () => parseInt(t.style.bottom || '-1', 10);
   w.eval(`__vv.height = 300; toast('Done', () => {})`);
   check(bottom() === 520 - 240 + 12 && !t.classList.contains('totop'), '#1755: keyboard open: above the comment field, not at the top: bottom ' + t.style.bottom);
+  // 2.46.5 (#1755): a second field above the comment field (the description) must not win
+  w.eval(`(() => { const d = document.createElement('textarea'); d.id = 'zz-desc'; document.body.appendChild(d);
+    Object.defineProperty(d, 'offsetWidth', {value: 300}); d.getBoundingClientRect = () => ({top: 160, bottom: 220, left: 0, right: 300, width: 300, height: 60});
+    toast('Done', () => {}); })()`);
+  check(bottom() === 520 - 240 + 12, '#1755: keyboard open, description above: still above the comment field: bottom ' + t.style.bottom);
+  w.eval(`document.getElementById('zz-desc').remove()`);
   w.eval(`__ci.getBoundingClientRect = () => ({top: 100, bottom: 140, left: 0, right: 300, width: 300, height: 40}); toast('Done', () => {})`);
   check(bottom() === 520 - 300 + 12, '#1755: keyboard open, only a field in the upper part: right above the keyboard: bottom ' + t.style.bottom);
   w.eval(`__vv.height = 520; toast('Done', () => {})`);

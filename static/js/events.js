@@ -16,9 +16,16 @@ function toastPlace(el) {
     const e = $(s); if (!e || !e.offsetWidth) continue;
     const r = e.getBoundingClientRect(); if (r.top > vis * .5 && r.top < top && r.bottom > vis - 160) top = r.top;
   }
-  if (kb) for (const f of $$('input:not([type=hidden]):not([type=checkbox]):not([type=radio]),textarea')) {
-    if (!f.offsetWidth) continue;
-    const r = f.getBoundingClientRect(); if (r.top > vis * .4 && r.bottom <= vis + 1 && r.top < top) top = r.top;
+  // 2.46.5 (#1755): the focused field, else the LOWEST one (before: the highest of them - the description above the comment field)
+  if (kb) {
+    let best = null;
+    for (const f of $$('input:not([type=hidden]):not([type=checkbox]):not([type=radio]),textarea')) {
+      if (!f.offsetWidth) continue;
+      const r = f.getBoundingClientRect(); if (!(r.top > vis * .4 && r.bottom <= vis + 1 && r.top < top)) continue;
+      if (f === document.activeElement) { best = r.top; break; }
+      if (best === null || r.top > best) best = r.top;
+    }
+    if (best !== null) top = best;
   }
   // 2.13.0 (#453 A12): an open bottom sheet (snooze, date, menus) is never covered: the toast sits above its top edge
   // 2.25.0 (UX-31): the phone's quick-add sheet too: the message sits above it, never over the field

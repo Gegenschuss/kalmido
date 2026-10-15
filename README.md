@@ -24,6 +24,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   three forms), a **shoot calculation** for film and video (industry pack), **crew and freelancer roles** with purchase
   prices and the **surplus per position** for admins, producing and raw data **switched per quotation**, and the legacy
   Excel import **fills empty fields** instead of skipping.
+- **2.46.5** (2026-10-15): the undo message with the keyboard open sits above the field you type in.
 - **2.46.4** (2026-10-15): **contacts sync, share labels, shopping lists**: the **Mac Contacts app** can change and delete
   contacts over CardDAV again (and contacts no longer all reload after an update), **Share dialogs** say whether an item
   belongs to an organisation or is private, a **tap ticks off** in shopping lists (switch per list), and the undo

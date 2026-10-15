@@ -54,6 +54,14 @@ switched per quotation, and a legacy Excel import that fills gaps instead of ski
   with the new database, but quotations with parts made in 2.47 show their parts flat (and a too high sum) under 2.46: roll
   back only with a database restore, or do not edit such quotations there.
 
+## [2.46.5] - 2026-10-15
+
+**In short:** the undo message with the keyboard open now sits above the field you type in.
+
+### Fixed
+- **Undo message with the keyboard open** (#1755): it sits above the focused field (or the lowest one, e.g. the
+  comment field), no longer above the description higher up in the task details.
+
 ## [2.46.4] - 2026-10-15
 
 **In short:** **Contacts sync, share labels, shopping lists**: the Mac Contacts app can change and delete contacts over
