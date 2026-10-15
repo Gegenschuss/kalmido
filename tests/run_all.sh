@@ -558,6 +558,7 @@ fresh; run p2390_b_api "$PY" p2390_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2390_b_ui node p2390_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.39.0 (#1168): the Playbook of lists / folders (versions, agent API, proposals, events, scheduled list checks, templates, backup)
 fresh; run p2390_a_api "$PY" p2390_a_api_test.py "$KALMIDO_TEST_DATA"
+shard 6  # 2.43.1: the 2.39.1 suites run in shard 6 (shard 9 reached the 30 min CI job limit, shard 6 took 11 min)
 fresh; run p2391_m_ui node p2391_m_ui.js "$KALMIDO_TEST_DATA"
 # 2.39.1 (#1219 basket + Sort, My tasks; #1221 group headers with their path + own order; #1185 sidebar Views / Areas, fold all)
 fresh; run p2391_k_api "$PY" p2391_k_api_test.py "$KALMIDO_TEST_DATA"
