@@ -7,6 +7,14 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.46.7] - 2026-10-15
+
+**In short:** fixes for 2.46.6 from the device test.
+
+### Fixed
+- **Long press on "Yes" or a suggestion button on Android** (#1711): "Yes, but: ..." is inserted once, not twice.
+- **Touch targets** (#1708): the agent's "Lists" summary and the workspace button are 44 px high on touch screens.
+
 ## [2.46.6] - 2026-10-15
 
 **In short:** **agent launcher and settings**: the reference launcher brings its own safety rules to every run, one

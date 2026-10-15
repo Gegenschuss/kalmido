@@ -6725,3 +6725,5 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .ad-tag{padding:.0625rem .4375rem;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:999px;color:var(--accent);white-space:nowrap}
 .ad-mark .ad-open{font-size:var(--fs-xs)}
 @media (pointer:coarse){ .ad-mark .ad-open{min-height:2.75rem;padding:0 .5rem} }
+/* 2.46.7 (#1708): touch targets of the Lists summary and the workspace button (device test) */
+@media (pointer:coarse){.aglists>summary{min-height:2.75rem;display:flex;align-items:center;gap:.375rem}.agnm .avws{min-height:2.75rem}}

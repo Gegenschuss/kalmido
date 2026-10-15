@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.46.7** (2026-10-15): fixes for 2.46.6: a long press on Android inserts "Yes, but: ..." once; larger touch targets in the agent view.
 - **2.46.6** (2026-10-15): **agent launcher and settings**: the reference launcher gives every run its **fixed
   safety rules** itself, offers **exactly one suggestion** (cut at a word, 80 characters), learns the working routine in
   `WORKFLOW-KALMIDO.md`, wakes the chat agent after a **job** and resumes a job once after a restart; the **agent view**
