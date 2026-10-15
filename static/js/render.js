@@ -767,7 +767,7 @@ function renderView0() {
   else if (m === 'time') setHtml(el, mg_wrap(m, viewTime()));  // 2.44.0 (#1187): mg_wrap = the area's tabs on top
   else if (m === 'overview') setHtml(el, viewOverview());
   else if (m === 'agents') setHtml(el, viewAgents());
-  else if (m === 'team') { setHtml(el, viewTeam()); if (S.tc.fitUntil > Date.now()) teamFit(true); }  // 2.17.0 (#419); 2.17.2: a room opened by its address ends at the newest message
+  else if (m === 'team') { setHtml(el, viewTeam()); cf_view(); if (S.tc.fitUntil > Date.now()) teamFit(true); }  // 2.17.0 (#419); 2.17.2: a room opened by its address ends at the newest message
   else if (m === 'notes') setHtml(el, viewNotes());  // 2.17.0 (#442)
   else if (m === 'home') setHtml(el, viewHome());  // 2.17.0 (#475)
   else if (m === 'family') setHtml(el, mg_wrap(m, viewFamily()));  // 2.19.0 (#653)

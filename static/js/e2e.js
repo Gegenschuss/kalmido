@@ -153,7 +153,7 @@ async function e2eEnsure() {
 function e2eUnlockDlg() {
   return new Promise(done => {
     const md = modal(`<h3>${ic('lock', 's')} ${tr('Unlock encryption')}</h3><form class="e2eform" novalidate>
-      <input type="password" id="e2e-pw" placeholder="${esc(tr('Passphrase'))}" aria-label="${esc(tr('Passphrase'))}" autocomplete="off" required>
+      <input type="password" id="e2e-pw" placeholder="${esc(tr('Passphrase'))}" aria-label="${esc(tr('Passphrase'))}" autocomplete="new-password" required>
       <label class="chkl"><input type="checkbox" id="e2e-rem"> ${tr('Remember on this device')}</label>
       <div class="aerr" role="alert" id="e2e-err"></div>
       <button type="button" class="linkbtn" data-m="code">${tr('Forgot the passphrase? Use the recovery code')}</button>
@@ -269,7 +269,7 @@ async function e2eRewrap(bundle, pass) {
 function e2ePassDlg() {
   return new Promise(done => {
     const md = modal(`<h3>${tr('Change the passphrase')}</h3><form class="e2eform" novalidate>
-      <input type="password" id="e2e-old" placeholder="${esc(tr('Current passphrase'))}" aria-label="${esc(tr('Current passphrase'))}" autocomplete="off" required>
+      <input type="password" id="e2e-old" placeholder="${esc(tr('Current passphrase'))}" aria-label="${esc(tr('Current passphrase'))}" autocomplete="new-password" required>
       ${e2ePassHtml()}<div class="aerr" role="alert" id="e2e-err"></div>
       <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" type="submit">${tr('Save')}</button></div></form>`);
     md.classList.add('e2edlg');

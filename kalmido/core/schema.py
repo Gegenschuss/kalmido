@@ -1328,6 +1328,7 @@ USER_DEFAULTS = {
     # 1.5.1: "Show completed" per view (route key like "today", "l:12", "f:3", "tag:x"; "cal" = the calendar) -> 0/1,
     # json object. 1.8.1: the global switch show_completed is gone, a view without an entry shows its completed tasks
     "show_done_views": "{}",
+    "wgstd_hide": "{}",         # 2.46.2 (#1726): per view the signature of the arrangement whose "differs from the standard" note was dismissed
     "mods_all": "1",            # 2.46.1 (#1591): "Switch on all modules" under "What do you use Kalmido for?" (0 = lists and tasks only)
     "show_done_default": "1",   # 2.39.1 (#1214): views without an own entry (and without a folder default) show completed tasks
     "group_order": "{}",        # 2.39.1 (#1221): json route key -> [group ids], the own order of a view's groups (all devices)

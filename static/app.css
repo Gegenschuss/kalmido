@@ -6659,3 +6659,15 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .rohint.ovbar span{flex:1 1 12rem}
 .rohint.ovbar .btn{min-height:2.25rem}
 .shr.ovmark{opacity:.6}
+/* 2.46.2 C (#1712) never red text on the accent fill: pri + danger reads like danger solid */
+.btn.pri.danger{background:var(--danger);border-color:var(--danger);color:var(--danger-ink)}
+/* 2.46.2 C (#1651) hidden username field before the account password so managers pair the right login */
+.cfhid{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden;border:0;padding:0}
+/* 2.46.2 C (#1726) the dismiss x of the "differs from the standard" note */
+.wgstd .wgstdx{margin-left:.125rem}
+/* 2.46.2 C (#1660) new chat messages / comments fade in; the "New comment" pill sticks to the bottom of the task panel */
+@keyframes cfin{from{opacity:0;transform:translateY(.375rem)}to{opacity:1;transform:none}}
+.cfin{animation:cfin .18s ease-out}
+@media (prefers-reduced-motion:reduce){ .cfin{animation:none} }
+.chnew.cmnew{position:sticky;bottom:.75rem;margin:0 auto;width:max-content}
+.chnew.cmnew.hidden{display:none}

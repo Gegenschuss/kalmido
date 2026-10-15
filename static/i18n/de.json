@@ -3756,7 +3756,7 @@
   "Mark {0} tasks as won’t do": "{0} Aufgaben als „Nicht erledigen“ markieren",
   "Move {0} tasks to the trash": "{0} Aufgaben in den Papierkorb legen",
   "Move the list “{0}” into the folder “{1}”": "Die Liste „{0}“ in den Ordner „{1}“ verschieben",
-  "New API token for {0}": "Neuer API-Token für {0}",
+  "New API token for {0}": "Neues API-Token für {0}",
   "Not allowed on this server": "Auf diesem Server nicht erlaubt",
   "Not allowed (scope, role or a switched-off module)": "Nicht erlaubt (Berechtigung, Rolle oder ausgeschaltetes Modul)",
   "Only from": "Nur von",
@@ -6823,5 +6823,6 @@
   "Admin of the organisation": "Admin der Organisation",
   "This server has organisations: open registration is not possible (only their e-mail domains or with approval).": "Dieser Server hat Organisationen: offene Registrierung ist nicht möglich (nur deren E-Mail-Domains oder mit Freigabe).",
   "A kid account cannot be an admin of an organisation": "Ein Kinderkonto kann nicht Admin einer Organisation sein",
-  "Unknown organisation": "Unbekannte Organisation"
+  "Unknown organisation": "Unbekannte Organisation",
+  "Hide this note": "Hinweis ausblenden"
 }

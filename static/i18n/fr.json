@@ -6823,5 +6823,6 @@
   "Admin of the organisation": "Administrateur de l'organisation",
   "This server has organisations: open registration is not possible (only their e-mail domains or with approval).": "Ce serveur a des organisations : l'inscription ouverte n'est pas possible (uniquement leurs domaines e-mail ou avec approbation).",
   "A kid account cannot be an admin of an organisation": "Un compte enfant ne peut pas être administrateur d'une organisation",
-  "Unknown organisation": "Organisation inconnue"
+  "Unknown organisation": "Organisation inconnue",
+  "Hide this note": "Masquer cette note"
 }

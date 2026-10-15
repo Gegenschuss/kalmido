@@ -77,6 +77,7 @@ function tcRoomHtml() {
     <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the list'))}" aria-label="${esc(tr('Open the list'))}">${ic('list')}</button>` : ''}
     ${e2eRoomBtns(room)}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button></div>`;
   return `${head}${e2eRoomNotice(room)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
+    <button type="button" class="chnew hidden" id="tc-new">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${replyBarHtml('t:' + rid)}<div class="chcomp tccomp"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > 18 ? name.slice(0, 17).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="send" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
     <button type="button" class="btn pri" data-act="tc-send">${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
 }
@@ -107,7 +108,9 @@ function tcPatch(bottom) {
   const box = $('#tc-msgs'); if (!box) return;
   const near = bottom || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   setHtml(box, tcMsgsHtml());
-  if (near) box.scrollTop = box.scrollHeight;
+  const added = cf_after(box, 't:' + S.tc.rid);  // 2.46.2 (#1660): new messages fade in; scrolled up -> "New message ↓"
+  if (near) { box.scrollTop = box.scrollHeight; cf_pill('tc-new', false); }
+  else if (added.length) cf_pill('tc-new', true);
 }
 // a tap, the wheel or a key in the log ends the "stay at the newest message" phase (the person reads / reacts)
 for (const ev of ['pointerdown', 'wheel', 'touchstart', 'keydown']) document.addEventListener(ev, e => { if (S.tc?.fitUntil && e.target.closest?.('#tc-msgs')) S.tc.fitUntil = 0; }, {capture: true, passive: true});
@@ -682,6 +685,14 @@ function chatSaveModal(kind, m, done) {
   setTimeout(() => $('#cs-title', md)?.focus(), 30);
   return md;
 }
+// 2.46.2 (#1666): every comment (also another person's, also in a read-only list) can be copied like a chat message
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act="cm-copy"]'); if (!a) return;
+  e.preventDefault(); e.stopPropagation();
+  const m = (S.tl?.comments || []).find(x => x.id === +a.dataset.cid); if (!m) return;
+  menu(a, [{label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.tl.comments, m, 'comment')},
+    {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(S.tl.comments, m, 'comment', true)}]);
+});
 // 2.42.0 (#1383): "Save as task" under an agent's comment in a task (collab.js commentHtml) and its "Saved" mark
 document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-act="cm-save"],[data-act="cm-saved"]'); if (!a) return;
@@ -695,7 +706,7 @@ document.addEventListener('click', e => {
 // 2.41.0 (#1374): also "_(2/3)_" (the reference launcher's mark); an agent's closing blocks / host notes stay out (rcpClean)
 const CPART = /\s*_\((?:\S+ )?(\d+)\/(\d+)\)_\s*$/;
 function chatCopyText(msgs, m, kind) {
-  const plain = x => { const t = String(x.body || '').replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, S.tc?.users || {})); return kind === 'agent' && x.from === 'agent' ? rcpClean(t) : t; };
+  const plain = x => { const t = String(x.body || '').replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, (kind === 'comment' ? S.tl?.users : S.tc?.users) || {})); return kind === 'agent' && x.from === 'agent' ? rcpClean(t) : t; };
   const p = plain(m).match(CPART), i = msgs.indexOf(m);
   if (!p || i < 0) return {text: plain(m), n: 1};
   const k = +p[1], n = +p[2], run = msgs.slice(i - k + 1, i - k + 1 + n);

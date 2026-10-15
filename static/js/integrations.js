@@ -83,7 +83,7 @@ async function agTokenModal(a, url) {
     <div class="shint keep warn">${tr('Every older token of this agent stops working at once.')}</div>
     <div class="row"><label for="agt-exp">${tr('Expires')}</label><select id="agt-exp"><option value="">${tr('never')}</option><option value="30">${tr('in 30 days')}</option><option value="90">${tr('in 90 days')}</option><option value="365">${tr('in a year')}</option></select></div>
     <div class="calerr" role="alert" id="agt-err" hidden></div>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri danger" data-m="ok">${tr('New API token')}</button></div>`);
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger solid" data-m="ok">${tr('New API token')}</button></div>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
