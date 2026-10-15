@@ -6814,3 +6814,11 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 /* 2.46.7 (#1708): touch targets of the Lists summary and the workspace button (device test) */
 .aglists>summary{min-height:2.75rem}
 @media (pointer:coarse){.agnm .avws{min-height:2.75rem}}
+/* 2.49.0 Leiter (#1770) the fixed sign Private / organisation in a list's header */
+.wsbadge{display:inline-flex;align-items:center;gap:.3125rem;margin-left:.5rem;padding:.0625rem .5rem;border-radius:1rem;font-size:.75rem;font-weight:500;color:var(--text2);background:color-mix(in srgb,var(--accent) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);cursor:pointer;flex:none;white-space:nowrap;max-width:11rem;vertical-align:middle;line-height:1.5}
+.wsbadge span{overflow:hidden;text-overflow:ellipsis}
+.wsbadge:hover{border-color:color-mix(in srgb,var(--accent) 50%,transparent)}
+.wsbadge .wsemo{font-size:.75rem}
+#top h1 .wsbadge{flex:none}
+#top.tl4 .wsbadge span{display:none}
+@media (max-width:599px){ .wsbadge{max-width:7.5rem;padding:.0625rem .4375rem;margin-left:.375rem} }

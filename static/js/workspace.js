@@ -11,7 +11,8 @@ const wsCur = () => { const v = S.settings?.workspace || 'all'; return wsOn() &&
 const wsOf = l => !l || !l.org_id ? 'private' : 'org:' + l.org_id;
 const inWs = (l, ws = wsCur()) => ws === 'all' || !l || !!l.is_inbox || wsOf(l) === ws;
 // a task of a list outside the shown workspace is hidden everywhere except in that list itself (like an archived list's)
-const wsHidden = t => wsCur() !== 'all' && !!t && !inWs(listById(t.list_id)) && !(S.route.mod === 'tasks' && S.route.key === 'l:' + t.list_id);
+// 2.49.0 (#1770): no exception for the open list any more -- a list is only shown inside its own workspace (wsFollow)
+const wsHidden = t => wsCur() !== 'all' && !!t && !inWs(listById(t.list_id));
 const wsOrg = id => (S.me?.workspaces || []).find(w => w.id === +id);
 const wsName = ws => ws === 'all' ? tr('All workspaces') : ws === 'private' ? tr('Private|workspace') : (wsOrg(ws.slice(4))?.name || tr('Organisation'));
 const wsIcon = ws => ws === 'private' ? ic('home', 's') : ws === 'all' ? ic('grid', 's') : (wsOrg(ws.slice(4))?.icon ? `<span class="wsemo" aria-hidden="true">${esc(wsOrg(ws.slice(4)).icon)}</span>` : ic('brief', 's'));
@@ -23,8 +24,26 @@ async function wsSet(ws) {
   if (!wsOptions().includes(ws)) ws = 'all';
   S.settings.workspace = ws; LS.set('ws', ws);
   closeSide?.();
-  render();
+  // 2.49.0 (#1770): the open list does not stay when it is not part of the new workspace -> that workspace's inbox
+  const ol = S.route?.mod === 'tasks' && String(S.route.key || '').startsWith('l:') ? listById(+S.route.key.slice(2)) : null;
+  if (ol && !inWs(ol, wsCur())) go(keyToHash(START_KEY)); else render();
   try { await api('PATCH', '/api/settings', {workspace: ws}); } catch { /* api() said it */ }
+}
+// 2.49.0 (#1770): a list of another workspace opened directly (link, search, notification): the filter follows it
+function wsFollow(key) {
+  const l = String(key || '').startsWith('l:') ? listById(+key.slice(2)) : null;
+  if (!l || inWs(l)) return;
+  const ws = wsOf(l);
+  if (!wsOptions().includes(ws)) return;  // an organisation the person is not in (a list shared from outside): leave the filter
+  S.settings.workspace = ws; LS.set('ws', ws);
+  api('PATCH', '/api/settings', {workspace: ws}).catch(() => {});
+}
+// 2.49.0 (#1770): the fixed sign in a list's header: Private or the organisation, from the list's OWN org_id (not the
+// filter), under "All" too; a click opens the workspace switch like the chip
+function wsBadge(l) {
+  if (!wsOn() || !l || l.is_inbox) return '';
+  const ws = wsOf(l), nm = wsLabel(l.org_id);
+  return `<button type="button" class="wsbadge" data-act="ws-menu" aria-haspopup="menu" title="${esc(tr('Workspace: {0}', nm))}" aria-label="${esc(tr('Workspace: {0}', nm))}">${wsIcon(ws)}<span>${esc(nm)}</span></button>`;
 }
 // the switch in the sidebar (under the brand): one button naming the shown workspace (a long organisation name fits), the
 // menu offers Private | <organisations> | All workspaces
