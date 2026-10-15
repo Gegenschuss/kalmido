@@ -148,7 +148,10 @@ function cw_winHtml(w) {
   cw_ren = w.k;
   let h;
   try { h = t ? cw_with(w.k, tcRoomHtml) : cw_with(w.k, () => chatInner(id)); } finally { cw_ren = ''; }
-  return `<section class="cwin${t ? ' tcroom' : ''}${w.c ? ' cwc' : ''}${S.cw.act === w.k ? ' cwact' : ''}" data-cw="${w.k}" style="flex-grow:${w.h || 1}" aria-label="${esc(cw_name(w.k))}">${live ? h : cw_noIds(h)}</section>`;
+  // the person's colour (#1721, core.js ac_color) as a thin line on top of the header; team chats without a person: none
+  const room = t && (S.tc.rooms || []).find(r => r.id === id), uid = t ? room?.kind === 'dm' && room.user_id : id;
+  const col = uid && typeof ac_color === 'function' ? ac_color(uid) : '';
+  return `<section class="cwin${t ? ' tcroom' : ''}${w.c ? ' cwc' : ''}${S.cw.act === w.k ? ' cwact' : ''}${col ? ' cwcol' : ''}" data-cw="${w.k}" style="flex-grow:${w.h || 1}${col ? ';--cwcol:' + esc(col) : ''}" aria-label="${esc(cw_name(w.k))}">${live ? h : cw_noIds(h)}</section>`;
 }
 const cw_sepHtml = i => `<div class="cwsep" role="separator" aria-orientation="horizontal" tabindex="0" data-cwsep="${i}" aria-label="${esc(tr('Resize the chats'))}" title="${esc(tr('Drag to resize, double-click to share the height evenly'))}"></div>`;
 function cw_draw() {

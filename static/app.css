@@ -6734,6 +6734,7 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 #achat.cwsplit .cwin>.chath{padding:.5rem .75rem}
 #achat.cwsplit .cwin>.chath,#achat.cwsplit .cwin>.tcrhead{cursor:grab;user-select:none;border-bottom:1px solid var(--line)}
 #achat.cwsplit .cwin.cwact>.chath,#achat.cwsplit .cwin.cwact>.tcrhead{box-shadow:inset 3px 0 0 var(--accent)}
+#achat.cwsplit .cwin.cwcol>.chath,#achat.cwsplit .cwin.cwcol>.tcrhead{border-top:3px solid var(--cwcol)}
 #achat.cwsplit .cwin.cwdrag{z-index:3;opacity:.92;box-shadow:var(--shadow)}
 #achat.cwsplit .cwin .tcback{display:none}
 #achat.cwmany .cwin [data-dwchat],#achat.cwmany .cwin [data-act="chat-dock"]{display:none}  /* in the window menu */
