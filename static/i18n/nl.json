@@ -6837,5 +6837,8 @@
   "Only members of the organisation can be invited. An agent of the organisation sees it only if it is shared with that agent.": "Alleen leden van de organisatie kunnen worden uitgenodigd. Een agent van de organisatie ziet het alleen als het met hem is gedeeld.",
   "Only people you explicitly invite see it.": "Alleen uitdrukkelijk uitgenodigde personen zien het.",
   "Not in the organisation": "Niet in de organisatie",
-  "Yes, but:": "Ja, maar:"
+  "Yes, but:": "Ja, maar:",
+  "The Kalmido starter (Set up on a computer) gives the agent its safety rules itself in every run; your CLAUDE.md cannot weaken them. These rules are for reading and for other setups.": "De Kalmido-starter (Op een computer instellen) geeft de agent bij elke run zelf zijn veiligheidsregels mee; je CLAUDE.md kan ze niet afzwakken. Deze regels zijn om na te lezen en voor andere opstellingen.",
+  "Teaching the agent": "De agent inwerken",
+  "Tell the agent how you work: where orders come from, where new things arrive, where results go and how it reports status. It writes this into WORKFLOW-KALMIDO.md in its project folder and reads it first for every order; interim results go into NOTIZEN.md. The starter asks for it once after the setup.": "Leg de agent uit hoe je werkt: waar opdrachten vandaan komen, waar nieuwe dingen binnenkomen, waar resultaten heen gaan en hoe hij de status meldt. Hij schrijft dat in WORKFLOW-KALMIDO.md in zijn projectmap en leest het bij elke opdracht eerst; tussenstanden gaan naar NOTIZEN.md. De starter vraagt er na het instellen één keer naar."
 }

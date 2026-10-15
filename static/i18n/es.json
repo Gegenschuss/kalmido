@@ -6837,5 +6837,8 @@
   "Only members of the organisation can be invited. An agent of the organisation sees it only if it is shared with that agent.": "Solo se puede invitar a miembros de la organización. Un agente de la organización solo lo ve si se ha compartido con él.",
   "Only people you explicitly invite see it.": "Solo lo ven las personas que inviten expresamente.",
   "Not in the organisation": "No está en la organización",
-  "Yes, but:": "Sí, pero:"
+  "Yes, but:": "Sí, pero:",
+  "The Kalmido starter (Set up on a computer) gives the agent its safety rules itself in every run; your CLAUDE.md cannot weaken them. These rules are for reading and for other setups.": "El iniciador de Kalmido (Configurar en un ordenador) da al agente sus reglas de seguridad en cada ejecución; tu CLAUDE.md no puede debilitarlas. Estas reglas son para leer y para otras configuraciones.",
+  "Teaching the agent": "Enseñar al agente",
+  "Tell the agent how you work: where orders come from, where new things arrive, where results go and how it reports status. It writes this into WORKFLOW-KALMIDO.md in its project folder and reads it first for every order; interim results go into NOTIZEN.md. The starter asks for it once after the setup.": "Explica al agente cómo trabajas: de dónde vienen los encargos, dónde llega lo nuevo, adónde van los resultados y cómo informa del estado. Lo escribe en WORKFLOW-KALMIDO.md en su carpeta de proyecto y lo lee primero en cada encargo; los resultados intermedios van a NOTIZEN.md. El iniciador lo pregunta una vez tras la configuración."
 }

@@ -10,3 +10,4 @@ CLAUDE.template.md
 claude_usage_hook.py
 agent_extras.py
 agent_job.py
+agent_rules.md

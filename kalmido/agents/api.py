@@ -7,7 +7,7 @@ from flask import g, jsonify
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.pg import insert_id
 from ..core.i18n import tr
-from ..core.db import bump, connect, db, iso, now_utc, parse_iso
+from ..core.db import bump, connect, db, iso, now_utc, parse_iso, usettings
 from ..accounts.session import GATE
 from ..core.access import Denied, task_visible
 from ..tasks.validation import as_int
@@ -37,7 +37,9 @@ def agent_self(c, aid):
                         "enabled": bool(a["webhook_id"] and c.execute("SELECT enabled FROM webhooks WHERE id=?", (a["webhook_id"],)).fetchone()[0])},
             "events": list(AGENT_EVENTS), "long_poll_max": AGENT_WAIT_MAX,
             "usage_limit": usage_state(c, a),  # 2.1.1 (#326): where it stands against its limits (None = no limits)
-            "runtime": {**agent_runtime(a), "timezone": str(TZ)}}  # 2.4.1 (#377): what the host's launcher applies
+            "runtime": {**agent_runtime(a), "timezone": str(TZ)},  # 2.4.1 (#377): what the host's launcher applies
+            # 2.46.6 (#1715): the language the launcher's rules block asks for (the owner's for a personal agent, else its own)
+            "lang": lang_of(usettings(c, p["owner_id"] or aid))}
 
 
 @app.get("/api/v1/agent")
