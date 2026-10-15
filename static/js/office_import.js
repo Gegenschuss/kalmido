@@ -47,7 +47,7 @@ function oimPreviewHtml() {
   return `<div class="oimpv">
     ${cl.length ? `<h4>${tr('Clients')}</h4>${chips}<ul class="oimcards" role="list">${rows.map(([c, i]) => oimClientCard(c, i)).join('')}</ul>` : `<p class="muted">${tr('No sheet Contacts found.')}</p>`}
     ${(p.services || []).length ? `<h4>${tr('Services')}</h4><ul class="oimcards" role="list">${p.services.map((s, i) => oimSimpleCard('services', s, i, s.name_de, [s.category, s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : '', s.hourly_rate != null ? `${ofcMoney(s.hourly_rate)}/${tr('h|unit')}` : ''])).join('')}</ul>` : ''}
-    ${(p.equipment || []).length ? `<h4>${tr('Equipment')}</h4><ul class="oimcards" role="list">${p.equipment.map((s, i) => oimSimpleCard('equipment', s, i, s.name, [s.category, s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : ''])).join('')}</ul>` : ''}
+    ${(p.equipment || []).length ? `<h4>${tr('Equipment')}</h4><ul class="oimcards" role="list">${p.equipment.map((s, i) => oimSimpleCard('equipment', s, i, s.name, [s.name_en, s.category, s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : ''])).join('')}</ul>` : ''}
     ${other.length ? `<p class="muted">${esc(tr('Not imported (Kalmido has no master data for them yet): {0}', other.map(([k, v]) => `${tr(otherNames[k] || k)} (${v})`).join(', ')))}</p>` : ''}
     <div class="foot stfoot oimfoot"><span class="aerr" role="alert"></span><span class="spacer"></span><button type="button" class="btn" data-oim="cancel">${tr('Cancel')}</button><button type="button" class="btn pri" data-oim="import" ${n && !OIM.busy ? '' : 'disabled'}>${esc(trn('Import {0} entry', 'Import {0} entries', n))}</button></div></div>`;
 }

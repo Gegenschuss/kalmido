@@ -82,7 +82,7 @@ function ofcListHtml(kind) {
   let list;
   if (kind === 'services') list = ofcGrouped(rows, r => r.category || tr('No category'), r => ofcRowBtn('services', r, r.name_de, [r.name_en, r.unit === 'hour' && r.hourly_rate != null ? `${ofcMoney(r.hourly_rate)}/${tr('h|unit')}` : r.daily_rate != null ? `${ofcMoney(r.daily_rate)}/${tr('Day|unit')}` : '', ofcTax(r.tax), r.raw_fee ? tr('raw data') : '', r.producing ? tr('producing') : '', r.intext === 'intern' ? tr('internal') : ''].filter(Boolean).join(' · ')));
   else if (kind === 'equipment') {
-    list = ofcGrouped(rows, r => r.category || tr('No category'), r => ofcRowBtn('equipment', r, r.name, r.daily_rate != null ? `${ofcMoney(r.daily_rate)}/${tr('Day|unit')}` : ''));
+    list = ofcGrouped(rows, r => r.category || tr('No category'), r => ofcRowBtn('equipment', r, r.name, [r.name_en, r.daily_rate != null ? `${ofcMoney(r.daily_rate)}/${tr('Day|unit')}` : ''].filter(Boolean).join(' · ')));  // 2.45.1 (#1556): + English name
     const sets = ofcRows('sets').filter(r => hit(r) && (OFC.arch || !r.archived));
     list += `<h3 class="ofcgrp">${tr('Sets')}</h3>` + (sets.length ? `<ul class="ofclist" role="list">${sets.map(r => ofcRowBtn('sets', r, r.name, [trn('{0} device', '{0} devices', (r.items || []).length), r.discount_pct ? tr('{0} % discount', fmtNum(r.discount_pct, 1)) : ''].filter(Boolean).join(' · '))).join('')}</ul>` : `<p class="muted lempty">${tr('No sets yet. A set bundles devices with one discount.')}</p>`);
   } else if (kind === 'texts') list = ofcGrouped(rows, r => tr(OFC_TEXT_KINDS.find(k => k[0] === r.kind)?.[1] || r.kind), r => ofcRowBtn('texts', r, r.key || (r.text_de || r.text_en).slice(0, 60), (r.text_de && !r.text_en ? tr('no English text stored') + ' · ' : '') + (r.key ? [r.text_de, r.text_en].filter(Boolean).join(' / ').slice(0, 120) : (r.text_en || '').slice(0, 80))), OFC_TEXT_KINDS.map(k => tr(k[1])));
@@ -126,7 +126,8 @@ function ofcModal(kind, r) {
       + ofcRowF('of-role', tr('Role'), ofcIn('of-role', r?.role, {max: 80, ph: tr('optional')})) + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
   } else if (kind === 'equipment') {
     const cats = [...new Set(ofcRows('equipment').map(x => x.category).filter(Boolean))];
-    f = ofcRowF('of-name', tr('Name'), ofcIn('of-name', r?.name)) + ofcRowF('of-category', tr('Category'), ofcIn('of-category', r?.category, {max: 80, list: 'of-cats'})) + `<datalist id="of-cats">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`
+    // 2.45.1 (#1556): German + English name, like a service
+    f = ofcRowF('of-name', tr('Name (German)'), ofcIn('of-name', r?.name)) + ofcRowF('of-name_en', tr('Name (English)'), ofcIn('of-name_en', r?.name_en)) + ofcRowF('of-category', tr('Category'), ofcIn('of-category', r?.category, {max: 80, list: 'of-cats'})) + `<datalist id="of-cats">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`
       + ofcRowF('of-daily_rate', tr('Daily rate'), ofcIn('of-daily_rate', rate(r?.daily_rate), {num: true}), ofcCur());
   } else if (kind === 'sets') {
     const eq = ofcRows('equipment').filter(x => !x.archived).map(x => [x.id, x.name]);
@@ -177,7 +178,7 @@ function ofcModal(kind, r) {
       const v = id => $(id, md)?.value ?? '';
       const body = {};
       if (kind === 'services') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), category: v('#of-category'), unit: v('#of-unit'), daily_rate: ofcNum(v('#of-daily_rate')), hourly_rate: ofcNum(v('#of-hourly_rate')), tax: v('#of-tax'), raw_fee: $('#of-raw_fee', md).checked ? 1 : 0, producing: $('#of-producing', md).checked ? 1 : 0, intext: v('#of-intext'), role: v('#of-role'), sort: ofcNum(v('#of-sort')) ?? 0});
-      else if (kind === 'equipment') Object.assign(body, {name: v('#of-name'), category: v('#of-category'), daily_rate: ofcNum(v('#of-daily_rate'))});
+      else if (kind === 'equipment') Object.assign(body, {name: v('#of-name'), name_en: v('#of-name_en'), category: v('#of-category'), daily_rate: ofcNum(v('#of-daily_rate'))});
       else if (kind === 'sets') Object.assign(body, {name: v('#of-name'), discount_pct: ofcNum(v('#of-discount_pct')), items: $$('.ofcitem', md).map(it => ({equipment_id: +$('select', it).value, qty: ofcNum($('input', it).value) ?? 1})).filter(it => it.equipment_id)});
       else if (kind === 'texts') Object.assign(body, {kind: v('#of-kind'), key: v('#of-key'), text_de: v('#of-text_de'), text_en: v('#of-text_en'), sort: ofcNum(v('#of-sort')) ?? 0});
       else if (kind === 'contracts') {

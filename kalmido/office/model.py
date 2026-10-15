@@ -365,8 +365,8 @@ MD = {
                           "raw_fee": ("int01", False, None), "producing": ("int01", False, None), "intext": ("choice", False, INTEXT),
                           "role": ("str", False, 80), "tax": ("choice", False, TAXES), "archived": ("int01", False, None)}},
     "equipment": {"table": "office_equipment", "order": "lower(category), lower(name), id", "label": "name",
-                  "cols": {"name": ("str", True, NAME_MAX), "category": ("str", False, 80), "daily_rate": ("num0", False, None),
-                           "archived": ("int01", False, None)}},
+                  "cols": {"name": ("str", True, NAME_MAX), "name_en": ("str", False, NAME_MAX), "category": ("str", False, 80),  # 2.45.1 (#1556): name_en
+                           "daily_rate": ("num0", False, None), "archived": ("int01", False, None)}},
     "sets": {"table": "office_sets", "order": "lower(name), id", "label": "name",
              "cols": {"name": ("str", True, NAME_MAX), "discount_pct": ("num", False, None), "items": ("items", False, None),
                       "archived": ("int01", False, None)}},
@@ -413,6 +413,9 @@ def office_rows(c, oid, kind, archived=True, q=""):
         if kind == "services":
             sql += " AND (name_de ILIKE ? ESCAPE '\\' OR name_en ILIKE ? ESCAPE '\\' OR category ILIKE ? ESCAPE '\\')"
             args += [like, like, like]
+        elif kind == "equipment":  # 2.45.1 (#1556): also the English name
+            sql += " AND (name ILIKE ? ESCAPE '\\' OR name_en ILIKE ? ESCAPE '\\')"
+            args += [like, like]
         elif kind == "texts":
             sql += " AND (key ILIKE ? ESCAPE '\\' OR text_de ILIKE ? ESCAPE '\\' OR text_en ILIKE ? ESCAPE '\\')"
             args += [like, like, like]
