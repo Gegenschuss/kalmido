@@ -40,10 +40,12 @@ def ov_list_patch(c, lid, role, b):
     return None
 
 
-def ov_private_reset(c, lid):
-    """A list that became private (no organisation, Home & life, family) is shared again only with its members."""
+def ov_private_reset(c, lid, org0=None):
+    """A list that became private (no organisation, Home & life, family) or moved to another organisation (org0 = the one
+    before) is shared again only with its members."""
     c.execute("UPDATE lists SET org_visibility='', org_edit=0 WHERE id=? AND (org_id IS NULL OR COALESCE(life, '')!='' "
-              "OR COALESCE(family, '')!='') AND (org_visibility!='' OR org_edit!=0)", (lid,))
+              "OR COALESCE(family, '')!='' OR (CAST(? AS BIGINT) IS NOT NULL AND org_id!=CAST(? AS BIGINT))) AND (org_visibility!='' OR org_edit!=0)",
+              (lid, org0, org0))
 
 
 def ov_join(c, lid, uid):

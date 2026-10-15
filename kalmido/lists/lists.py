@@ -267,7 +267,7 @@ def list_update(lid):
     role = need_list(c, lid, write=False)
     given = set(b)  # 2.29.0 (#1030): what this request sets on its own (kept when the list moves into a folder)
     tb_col_on = None  # 2.39.1 (#1293): modules the field columns switched on (None = no field columns sent)
-    tidy0 = c.execute("SELECT agent_tidy, agent_members, agent_peers, agent_followup, folder FROM lists WHERE id=?", (lid,)).fetchone()
+    tidy0 = c.execute("SELECT agent_tidy, agent_members, agent_peers, agent_followup, folder, org_id FROM lists WHERE id=?", (lid,)).fetchone()
     if "agent_tidy" in b or "tidy_agent_id" in b:  # 2.0.0: "Agent may tidy up entries" (own permission rule, see
         # list_tidy_update); 2.4.1 (#379): "Tidy up by" (the one agent)
         e = list_tidy_update(c, lid, b.get("agent_tidy"), b.get("tidy_agent_id"), "tidy_agent_id" in b)
@@ -444,7 +444,7 @@ def list_update(lid):
             list_own_mark(c, lid, "agent_listen")
     if "org_id" in given or vals.get("family") or vals.get("life"):  # 2.46.0 (#1603): private again -> only its members
         from ..lists.orgvis import ov_private_reset
-        ov_private_reset(c, lid)
+        ov_private_reset(c, lid, tidy0["org_id"] if tidy0 else None)
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts, **pt_out)

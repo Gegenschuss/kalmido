@@ -244,6 +244,15 @@ L3 = Bo.post(B + "/api/lists", json={"name": "Third", "org_id": ORG}).json()["id
 Bo.patch(B + f"/api/lists/{L3}", json={"org_visibility": "org"})
 r = Bo.patch(B + f"/api/lists/{L3}", json={"org_id": None})
 check(r.ok and dbx("SELECT org_visibility FROM lists WHERE id=?", (L3,))[0][0] == "", f"moved to the private space: reset ({r.status_code} {r.text[:120]})")
+# 2.46.0 (#1603, review): a list that moves to another organisation is shared again only with its members
+r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": BOB})
+check(r.status_code == 201, f"setup: a second organisation ({r.text[:120]})")
+ORG2 = r.json()["id"]
+L4 = Bo.post(B + "/api/lists", json={"name": "Fourth", "org_id": ORG}).json()["id"]
+Bo.patch(B + f"/api/lists/{L4}", json={"org_visibility": "org", "org_edit": 1})
+r = Bo.patch(B + f"/api/lists/{L4}", json={"org_id": ORG2})
+check(r.ok and list(dbx("SELECT org_id, org_visibility, org_edit FROM lists WHERE id=?", (L4,))[0]) == [ORG2, "", 0],
+      f"moved to another organisation: reset ({r.status_code} {r.text[:120]})")
 dbx("UPDATE lists SET org_visibility='org' WHERE id=?", (L2,), write=True)  # a stale value never opens a private list
 check(lst(Er, L2) is None and Er.get(B + f"/api/lists/{L2}/members").status_code in (403, 404, 405), "a stale value on a Home & life list opens nothing")
 
