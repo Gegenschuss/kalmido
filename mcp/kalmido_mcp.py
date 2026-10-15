@@ -131,7 +131,7 @@ S_ID = {"type": "integer", "minimum": 1}
 PRIO = {"type": "string", "enum": ["none", "low", "medium", "high"]}
 STRS = {"type": "array", "items": {"type": "string"}}
 TASK_FIELDS = {
-    "title": {"type": "string"}, "list_id": S_ID, "notes": {"type": "string", "description": "Markdown"},
+    "title": {"type": "string"}, "list_id": S_ID, "notes": {"type": "string", "description": "Markdown (a task with note_locked: true refuses it: 409)"},
     "section_id": {"type": ["integer", "null"]}, "priority": PRIO,
     "due": {"type": ["string", "null"], "description": "YYYY-MM-DD"},
     "due_time": {"type": ["string", "null"], "description": "HH:MM (local), null = all day"},

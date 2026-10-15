@@ -1383,6 +1383,10 @@ placeholders only: a task says `encrypted_note: true` (never the text), an encry
 `encrypted: true` and a neutral name, and downloading it or reading its text answers `404`. Encrypted direct messages
 never reach agents (agents take no part in DMs). Do not ask anyone to paste encrypted content into a comment.
 
+**Locked notes (2.48.0).** A person can lock the notes of a task in their own, unshared list with their own password. The
+task then has empty `notes` and `note_locked: true`; locked notes are not readable for agents, and writing `notes` on such a
+task answers `409` (other fields can still change). Work with the title, dates and comments; do not ask for the note's text.
+
 **Reading a file as text (2.34.0).** `GET /api/v1/attachments/{id}/text` (MCP `read_attachment`, scope
 `attachments:read`, same rights as the file itself, else `404`) answers `{id, task_id, comment_id, name, mime, size, url,
 kind, text, chars, truncated, message}`:

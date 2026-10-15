@@ -516,6 +516,8 @@ def export_json():
         "attachments": (f"SELECT * FROM attachments WHERE task_id IN {task_ids}", (uid,)),
         "comments": (f"SELECT * FROM comments WHERE task_id IN {task_ids} AND deleted_at IS NULL", (uid,)),
         "activity": (f"SELECT * FROM activity WHERE task_id IN {task_ids}", (uid,)),
+        # 2.48.0 (#1642): notes locked with a password, as stored (ciphertext; their tasks have an empty note)
+        "task_note_locks": (f"SELECT * FROM task_note_locks WHERE task_id IN {task_ids}", (uid,)),
         "settings": ("SELECT key, value FROM user_settings WHERE user_id=?", (uid,)),
         "templates": ("SELECT id, kind, name, data, created_at, updated_at FROM templates WHERE user_id=?", (uid,)),
         "time_entries": ("SELECT * FROM time_entries WHERE user_id=? ORDER BY start", (uid,)),

@@ -932,6 +932,11 @@ CREATE TABLE IF NOT EXISTS office_purchases (
   ref BIGINT, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS office_purchases_org ON office_purchases(org_id, date);
 CREATE INDEX IF NOT EXISTS office_purchases_doc ON office_purchases(doc_id);
+-- 2.48.0 C (#1642): the note of a task locked with its owner's own password (body = {v, iv, ct}, encrypted in the browser
+-- with the person's end-to-end key, AAD "kalmido-locknote:v1:<task_id>:<user_id>"; tasks.content is empty meanwhile)
+CREATE TABLE IF NOT EXISTS task_note_locks (
+  task_id BIGINT PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body TEXT NOT NULL, updated_at TEXT NOT NULL);
 """
 # Bumped when the database layout changes (stored in kalmido_meta.schema_version; SQLite: PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).

@@ -6836,3 +6836,28 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
   .pvbar .pvnav,.pvbar .pvzoom{flex:1 1 auto;justify-content:center}
   .pvbody{padding:.5rem .5rem calc(.5rem + var(--safe-b))}
 }
+/* 2.48.0 C (#1642) locked notes (notelock.js): the lock under a note, the locked placeholder, the unlocked editor; the printable recovery code */
+.lnbar{display:flex;margin:.125rem 0 .25rem}
+.lnlock{display:inline-flex;align-items:center;gap:.375rem;color:var(--muted);font-size:var(--fs-s);padding:.375rem .125rem;min-height:2.25rem}
+.lnlock:hover{color:var(--accent)}
+.lnote{margin:.25rem 0 .5rem}
+.lnph{display:flex;align-items:center;gap:.75rem;width:100%;text-align:left;padding:.875rem 1rem;border:1px dashed var(--line);border-radius:var(--r-l);background:var(--bg2);color:var(--text)}
+.lnph>svg{width:1.375rem;height:1.375rem;color:var(--accent);flex:none}
+.lnph div{display:flex;flex-direction:column;gap:.125rem;min-width:0}
+.lnph b{font-weight:600}
+.lnph .muted{font-size:var(--fs-s)}
+button.lnph{cursor:pointer;min-height:3.25rem}
+button.lnph:hover{border-color:var(--accent)}
+.lnhead{display:flex;align-items:center;gap:.375rem;font-size:var(--fs-s);font-weight:600;color:var(--text2);margin-bottom:.25rem}
+.lnhead>svg{color:var(--accent)}
+.lnote textarea{width:100%}
+.lnmeta{font-size:var(--fs-s);margin-top:.25rem}
+.lnacts{margin-top:.5rem}
+.lnhint{display:flex;align-items:center;gap:.375rem}
+.e2eprint{display:none}
+@media print{
+  body.e2eprinting>*:not(.e2eprint){display:none!important}
+  body.e2eprinting .e2eprint{display:block;color:#000;background:#fff;padding:2rem;font:12pt/1.5 sans-serif}
+  .e2eprint h1{font-size:18pt;margin:0 0 .5rem}
+  .e2eprint code{display:block;font:600 20pt/1.4 monospace;letter-spacing:.06em;margin:1.5rem 0;padding:1rem;border:1px solid #000;word-break:break-all}
+}

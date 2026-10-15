@@ -277,6 +277,7 @@ Only when your host runs `mcp/agent_run.py` (the prompt then says so):
 
 End-to-end encrypted content (2.42.0) shows only as a placeholder: a task's `encrypted_note: true`, a file with
 `encrypted: true` (not readable for you). Leave it alone; do not ask for its content.
+Locked notes (2.48.0) are not readable: a task with `note_locked: true` has empty notes, and writing its notes answers 409.
 
 <!-- kalmido-tool-index:start -->
 ## Events and tools (index)

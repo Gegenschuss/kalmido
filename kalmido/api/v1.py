@@ -369,6 +369,8 @@ def v1_task(d):
                             for a in d.get("attachments") or []])
     if d.get("encrypted_note"):  # 2.42.0 (#828): only that there is one (the content is end-to-end encrypted)
         out["encrypted_note"] = True
+    if d.get("note_locked"):  # 2.48.0 (#1642): the note is locked with its owner's password: notes stays empty
+        out["note_locked"] = True
     return out
 
 
@@ -384,6 +386,8 @@ def task_for(c, row, uid):
     out = {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"])}
     if c.execute("SELECT 1 FROM task_enc_notes WHERE task_id=? LIMIT 1", (row["id"],)).fetchone():
         out["encrypted_note"] = True  # 2.42.0 (#828): agents learn only that there is an encrypted note
+    if c.execute("SELECT 1 FROM task_note_locks WHERE task_id=?", (row["id"],)).fetchone():
+        out["note_locked"] = True  # 2.48.0 (#1642): the note is locked with its owner's password (never readable here)
     return out
 
 

@@ -190,6 +190,7 @@ OX_AREAS = (
     ("tasks/people.json", "task_people", f"task_id IN ({TSQ})"),
     ("tasks/history.json", "activity", f"task_id IN ({TSQ})"),
     ("tasks/encrypted_notes.json", "task_enc_notes", f"task_id IN ({TSQ})"),  # 2.42.0 (#828, agent A): browser-encrypted, as stored
+    ("tasks/locked_notes.json", "task_note_locks", f"task_id IN ({TSQ})"),  # 2.48.0 (#1642): locked notes, browser-encrypted, as stored
     ("time_entries.json", "time_entries", f"list_id IN ({LSQ})"),
     ("comments.json", "comments", f"task_id IN ({TSQ})"),
     ("comments/reactions.json", "comment_reactions", f"comment_id IN (SELECT id FROM comments WHERE task_id IN ({TSQ}))"),
@@ -328,6 +329,8 @@ def ox_build(c, oid, out, by=None):
                 (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id IN ({LSQ}))""", (oid,)).fetchone()[0]
         if "tasks/encrypted_notes.json" in man.counts:
             man.client_enc["task_notes"] = man.counts["tasks/encrypted_notes.json"]
+        if "tasks/locked_notes.json" in man.counts:
+            man.client_enc["locked_notes"] = man.counts["tasks/locked_notes.json"]
         manifest = {
             "format": "kalmido-org-export", "format_version": OX_FORMAT, "kalmido_version": APP_VERSION,
             "org": {"id": int(oid), "name": org["name"]}, "created_at": iso(now_utc()), "created_by": by,

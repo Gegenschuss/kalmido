@@ -289,6 +289,7 @@ function histLabel(b, a) {
 function offerUndo(msg, e) { histToast(msg, e); }
 async function patchUndoable(id, body, msg) {
   const before = snapTask(taskById(id));
+  if (body?.list_id && typeof ln_moveHint === 'function') ln_moveHint(id, body.list_id);  // 2.48.0 (#1642): a locked note stays locked
   const t = await patchTask(id, body, true);
   if (t?.shifted?.length) { shiftUndo(before, t, msg); return t; }
   const after = snapTask(S.tasks.get(id) || t);

@@ -481,11 +481,13 @@ function renderDetail0() {
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
       ${ck ? '' : approvalBar(t, ro)}
       ${ck || ro ? '' : dupHintHtml(t)}
+      ${t.note_locked && typeof ln_html === 'function' ? ln_html(t, ro) : `${''/* 2.48.0 (#1642): a locked note replaces the description (notelock.js) */}
       ${mdMode && !ro && (isTouch() || td_mdPenOnly()) ? `<div class="mdbox"><button type="button" class="iconbtn mdpen" data-act="md-edit" title="${esc(tr('Edit description'))}" aria-label="${esc(tr('Edit description'))}">${ic('edit', 's')}</button>` : ''}
       <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tlkL ? esc(tr('Locked')) : td_mdPenOnly() ? '' : tr('Click to edit')}">${mdMode ? mdMentions(mdTaskRefs(renderMd(t.content, false, {lid: t.list_id}), true), t) : ''}</div>${mdMode && !ro && (isTouch() || td_mdPenOnly()) ? '</div>' : ''}
       ${mdLong ? `<button class="linkbtn mdmore" data-act="md-more" aria-expanded="${!mdClamp}">${mdClamp ? tr('Show more') : tr('Show less')}</button>` : ''}
       ${mdOpen && mdMode ? `<button class="btn sm mdsub" data-act="md-subtasks">${ic('sub', 's')} ${tr('Turn the open checklist items into subtasks')}</button>` : ''}
       <textarea id="d-content" class="dcontent ${mdMode ? 'hidden' : ''}" placeholder="${ck ? tr('Note') : tr('Description')}" aria-label="${ck ? tr('Note') : tr('Description')}" ${tlkR ? 'readonly' : ''}>${esc(t.content)}</textarea>
+      ${typeof ln_btnHtml === 'function' ? ln_btnHtml(t, ro || ck || tlkR) : ''}`}
       ${ck ? '' : e2eNoteHtml(t)}${''/* 2.42.0 (#828): my encrypted note (e2e.js) */}
       ${msT && t.id > 0 ? `<div class="dsec mssec" id="d-ms">${msReportHtml(t)}</div>` : ''}
       ${(() => {  // 2.24.0 (UX-41)

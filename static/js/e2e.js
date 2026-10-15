@@ -220,7 +220,7 @@ function e2eCodeDlg(code) {
   return new Promise(done => {
     const md = modal(`<h3>${tr('Your recovery code')}</h3><p class="muted">${tr('With this code you can set a new passphrase if you forget it. Write it down or keep it in a password manager. It is shown only now.')}</p>
       <code class="e2ecode" id="e2e-code">${esc(code)}</code>
-      <div class="row"><button type="button" class="btn sm" data-m="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
+      <div class="row"><button type="button" class="btn sm" data-m="copy">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm" data-m="print">${ic('printer', 's')} ${tr('Print')}</button></div>
       <label class="chkl"><input type="checkbox" id="e2e-noted"> ${tr('I have written down the recovery code')}</label>
       <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-m="done" disabled>${tr('Done')}</button></div>`);
     md.classList.add('e2edlg');
@@ -228,9 +228,21 @@ function e2eCodeDlg(code) {
     md.addEventListener('change', e => { if (e.target.id === 'e2e-noted') $('[data-m="done"]', md).disabled = !e.target.checked; });
     md.addEventListener('click', e => {
       if (e.target.closest('[data-m="copy"]')) clipCopy(code);
+      if (e.target.closest('[data-m="print"]')) e2eCodePrint(code);  // 2.48.0 (#1642)
       if (e.target.closest('[data-m="done"]') && $('#e2e-noted', md).checked) { md.remove(); done(); }
     });
   });
+}
+// 2.48.0 (#1642): the recovery code on a sheet of paper: only this sheet is printed (app.css @media print, body.e2eprinting)
+function e2eCodePrint(code) {
+  const p = document.createElement('div');
+  p.className = 'e2eprint';
+  p.innerHTML = `<h1>${esc(tr('Kalmido recovery code'))}</h1><p>${esc(S.me?.display_name || '')} · ${esc(location.host)} · ${esc(new Date().toLocaleDateString())}</p>
+    <code>${esc(code)}</code><p>${esc(tr('With this code you can set a new passphrase if you forget it. Keep it in a safe place. Without passphrase and recovery code your locked notes, encrypted files and messages are lost; nobody can restore them, not even the operator.'))}</p>`;
+  document.body.appendChild(p); document.body.classList.add('e2eprinting');
+  const done = () => { p.remove(); document.body.classList.remove('e2eprinting'); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  window.print(); setTimeout(done, 60000);  // the sheet is invisible on screen; afterprint usually removes it first
 }
 // a new passphrase with the recovery code (the code stays the same)
 function e2eResetDlg() {

@@ -311,6 +311,13 @@ the notice that switched it) with an empty `body`; such a conversation refuses p
 the browser; the app's own endpoints for them (`/api/e2e/keys`, `/api/e2e/pub/{user_id}`, `/api/tasks/{id}/enc-note`,
 `/api/tasks/{id}/enc-attachments`, `/api/team/rooms/{id}/e2e`) are for the signed-in person only (agents `403`).
 
+**Locked notes** (2.48.0): a person can lock the notes of a task in their own, unshared list with their own password
+(end-to-end, in the browser). Then `notes` is empty and the task carries `"note_locked": true` (absent otherwise) in every
+output (REST, webhooks, MCP). Nothing can read or overwrite a locked note: `PATCH /tasks/{id}` with non-empty `notes`
+answers `409` (other fields still change); CalDAV clients keep the lock (their description is ignored). Search, exports
+and calendar feeds leave the note out. Only the person who locked it unlocks it, in the app (`/api/tasks/{id}/note-lock`,
+signed-in person only, agents `403`).
+
 **Locked tasks** (2.36.0): `locked: true` makes a task read-only **in the app**: title, notes, date and time,
 priority, list, tags, repeat and assignee stay as they are until someone who may change the task unlocks it there
 (comments, checkboxes in the notes, completing / reopening and subtasks stay free; the app's own writes are checked by
