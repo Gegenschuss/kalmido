@@ -470,7 +470,7 @@ chat messages of one person that arrive together: one run). It does what a hoste
   `KALMIDO_RUN_TIMEOUT` seconds (default 3600, 0 = no limit) together with everything it started (its process group;
   Windows `taskkill /T`). A failed run is tried once more only when it had not called a tool yet; then the chat gets a
   short note with the reason (secrets masked). Events that arrive during a run wait in a queue in the state folder (a
-  restart answers them, never twice), and a lock there (`runner.lock`) keeps a second runner from starting on the same
+  restart answers them; a crash in the middle of a run can answer one once more), and a lock there (`runner.lock`) keeps a second runner from starting on the same
   folder (it exits with code 3; a stale lock never blocks).
 - **Suggestions** (2.40.0): a final block ` ```suggest ` (up to three short next steps, one per line) becomes answer
   buttons under the answer (servers without buttons: a numbered line). A pressed button comes back as `chat_choice`
