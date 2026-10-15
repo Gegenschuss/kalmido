@@ -3,6 +3,7 @@
 
  - #1591: the switch "Switch on all modules": off = lists and tasks only whatever the purpose, on = every module (Office
    adds its business modules), stored as mods_all; without the field the purpose's own set as before
+ - #1602: POST /api/me/purpose creates the sample project only with examples true (off by default)
  - #1641: Administration > Encryption lists what is encrypted and what not; every encrypted field of orgcrypt (FIELDS,
    JSON_KEYS) has its category, the list comes with the same rights as the encryption state
 """
@@ -89,6 +90,14 @@ check("cal" in fs and "kanban" not in fs, f"#1591: without the field the purpose
 check(Bo.post(B + "/api/me/purpose", json={"purpose": "me", "all_modules": "yes"}).status_code == 400, "#1591: all_modules must be a boolean")
 check(Bo.patch(B + "/api/settings", json={"mods_all": "0", "features": "cal"}).ok and Bo.get(B + "/api/state").json()["settings"]["mods_all"] == "0",
       "#1591: the settings switch (PATCH, one step with the modules)")
+
+# ================================================================== #1602: the sample project only on request
+r = A.post(B + "/api/me/purpose", json={"purpose": "team"})
+check(r.ok and r.json()["created"] == [] and A.get(B + "/api/state").json().get("sample") is None, "#1602: team without examples: no sample project")
+r = A.post(B + "/api/me/purpose", json={"purpose": "software", "examples": False})
+check(r.json()["created"] == [], "#1602: software, examples false: no project")
+r = A.post(B + "/api/me/purpose", json={"purpose": "software", "examples": True})
+check(len(r.json()["created"]) == 1, "#1602: examples true: the software project")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
