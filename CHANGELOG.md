@@ -7,7 +7,6 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-<<<<<<< HEAD
 ## [2.47.0] - 2026-10-15
 
 **In short:** **Office & finance: calculation and master data import**: quotations with sub pages (parts), a shoot
@@ -51,10 +50,10 @@ switched per quotation, and a legacy Excel import that fills gaps instead of ski
 
 ### Notes
 - Database: new tables `office_roles`, `office_doc_parts`, `office_purchases`; new columns `office_services.role_id`,
-  `office_doc_items.part_id` / `ref_part_id`, `office_docs.producing_on` (filled once at start-up). 2.46.2 keeps running
+  `office_doc_items.part_id` / `ref_part_id`, `office_docs.producing_on` (filled once at start-up). 2.46.3 keeps running
   with the new database, but quotations with parts made in 2.47 show their parts flat (and a too high sum) under 2.46: roll
   back only with a database restore, or do not edit such quotations there.
-=======
+
 ## [2.46.4] - 2026-10-15
 
 **In short:** **Contacts sync, share labels, shopping lists**: the Mac Contacts app can change and delete contacts over
@@ -90,7 +89,6 @@ belongs to, a tap in shopping lists ticks off instead of opening the details, an
   sits above the task's foot on phones.
 - **Evening review on Home** (#1452): its *Hide for today* x no longer sits under the block's *...* button.
 - **Settings** (#1651): the helper user name field for password managers is fully hidden.
->>>>>>> main
 
 ## [2.46.2] - 2026-10-15
 
