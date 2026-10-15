@@ -20,7 +20,7 @@ from ..accounts.session import _DUMMY_HASH, _token_hash, me
 from ..collab.comments import send_pushes, user_names
 from ..family.family import is_kid, kid_dict, kid_parents, kid_push, need_kid
 
-PIN_RE = re.compile(r"^\d{4,6}$")
+PIN_RE = re.compile(r"^[0-9]{4,6}$")  # 2.49.0 review L6: ASCII digits only (\d takes other scripts too)
 PIN_TRIES = 5      # wrong PINs in a row, then the lock
 PIN_LOCK = 900     # s: the lock after PIN_TRIES wrong PINs
 PIN_OPEN = 300     # s: how long a correct PIN opens account / settings / log out in this session

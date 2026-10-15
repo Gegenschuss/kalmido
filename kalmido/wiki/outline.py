@@ -52,9 +52,14 @@ def mm_xml(text):
         raise BadInput(tr("The file could not be read"))
 
 
+MM_XML_DEPTH = 40  # 2.49.0 review L5: deeper branches of an imported file are cut (no recursion error on hostile files)
+
+
 def mm_parse_opml(text):
-    def walk(el):
-        return [mm_node(o.get("text") or o.get("title") or "", walk(o)) for o in el.findall("outline")]
+    def walk(el, d=0):
+        if d >= MM_XML_DEPTH:
+            return []
+        return [mm_node(o.get("text") or o.get("title") or "", walk(o, d + 1)) for o in el.findall("outline")]
     x = mm_xml(text)
     b = x.find("body")
     t = x.find("head/title")
@@ -62,8 +67,10 @@ def mm_parse_opml(text):
 
 
 def mm_parse_freemind(text):
-    def walk(el):
-        return [mm_node(n.get("TEXT") or (n.findtext("richcontent") or ""), walk(n)) for n in el.findall("node")]
+    def walk(el, d=0):
+        if d >= MM_XML_DEPTH:
+            return []
+        return [mm_node(n.get("TEXT") or (n.findtext("richcontent") or ""), walk(n, d + 1)) for n in el.findall("node")]
     x = mm_xml(text)
     top = x.find("node")
     if top is None:

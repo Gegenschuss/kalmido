@@ -568,7 +568,7 @@ function kd_pinAsk(then) {
   const wait = s => { msg.textContent = trn('Too many wrong PINs. Try again in {0} minute.', 'Too many wrong PINs. Try again in {0} minutes.', Math.max(1, Math.ceil(s / 60))); inp.disabled = true; };
   if (k.pin_wait > 0) wait(k.pin_wait);
   const go = async () => {
-    const pin = inp.value.trim(); if (!/^\d{4,6}$/.test(pin)) { msg.textContent = tr('The PIN has 4 to 6 digits'); inp.focus(); return; }
+    const pin = inp.value.trim(); if (!/^[0-9]{4,6}$/.test(pin)) { msg.textContent = tr('The PIN has 4 to 6 digits'); inp.focus(); return; }
     try {
       const j = await rawFetch('POST', '/api/me/pin/unlock', {pin});
       k.pin_open = j.until; k.pin_wait = 0; md.remove(); if (then) then();
@@ -593,7 +593,7 @@ function kd_pinSet(kid) {
   md.classList.add('famdlg');
   const errEl = $('#kd-err', md), inp = $('#kd-new', md);
   const save = async () => {
-    const pin = inp.value.trim(); if (!/^\d{4,6}$/.test(pin)) { errEl.textContent = tr('The PIN has 4 to 6 digits'); inp.focus(); return; }
+    const pin = inp.value.trim(); if (!/^[0-9]{4,6}$/.test(pin)) { errEl.textContent = tr('The PIN has 4 to 6 digits'); inp.focus(); return; }
     try { famKidSet(await rawFetch('PUT', `/api/family/kids/${kid}/pin`, {pin})); md.remove(); toast(tr('PIN saved for {0}', k.display_name)); } catch (e) { errEl.textContent = e.message || ''; }
   };
   md.addEventListener('click', async e => {

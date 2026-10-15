@@ -57,7 +57,7 @@ def _pw_send(who):
     from ..accounts.invite import invite_mail, invite_new
     c = db()
     write_lock(c, "accounts")
-    rows = c.execute("SELECT * FROM users WHERE lower(email)=? OR username=? ORDER BY id LIMIT 3", (who, who)).fetchall()
+    rows = c.execute("SELECT * FROM users WHERE lower(email)=? OR lower(username)=? ORDER BY id LIMIT 3", (who, who)).fetchall()
     out = []
     for u in rows:
         if not _pw_eligible(u):
