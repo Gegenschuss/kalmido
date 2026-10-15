@@ -302,6 +302,7 @@ registering the ones of its area.
 | `life.js` | Home & life: the view, its dialogs (contract, device, upkeep, health, trip, Karakeep), the review + journal, staying in touch on a contact's card. |
 | `areas.js` | 2.44.0 (#1187): the areas Office, Time, Review and Home: one sidebar row / tab each, the tabs of their parts on top of the page (each part keeps its route), one switch per area in Settings > Modules. |
 | `sbnav.js` | 2.45.0 (#1509): the messenger in the sidebar: "Messages" with the unread count, the last five conversations, a speech bubble at every person for a direct message. |
+| `notesall.js` | 2.45.0 (#1516): `#notes` = the notes of all lists and projects (pinned first, a filter by list, a search in title and text, a new note in a picked list). |
 | `main.js` | Start-up: loading the state, polling, the service worker. Loaded last. |
 
 ### Adding a client file
