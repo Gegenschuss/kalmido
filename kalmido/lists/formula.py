@@ -53,6 +53,8 @@ def fx_tokens(s):
             continue
         m = _NUM.match(s, i)
         if m:
+            if not math.isfinite(float(m.group())):  # review S1: "999...9" is inf
+                raise _err(tr("Invalid value: {0}", m.group()[:20]), i)
             out.append(("num", float(m.group()), i))
             i = m.end()
             continue
@@ -175,7 +177,7 @@ def fx_tree(expr):
         return int(v[1:])
     try:
         t = _Parser(fx_tokens(expr), res, len(expr)).parse()
-    except BadInput:
+    except (BadInput, RecursionError):  # 2.43.0 (#1328): review S1, deep nesting
         t = None
     if len(_CACHE) > 2000:
         _CACHE.clear()
@@ -205,8 +207,11 @@ def fx_compile(text, fields, self_id=None):
         if f["type"] not in FX_REF_TYPES:
             raise BadInput(tr("Formula: “{0}” is not a number field", f["name"]))
         return f["id"]
-    tree = _Parser(fx_tokens(text), res, len(text)).parse()
-    return fx_render(tree), fx_refs(tree)
+    try:
+        tree = _Parser(fx_tokens(text), res, len(text)).parse()
+        return fx_render(tree), fx_refs(tree)
+    except RecursionError:  # review S1: "-(-(-(..." nested deeper than Python's stack -> 400, not 500
+        raise BadInput(tr("Invalid value: {0}", "formula")) from None
 
 
 _PREC = {"+": 1, "-": 1, "*": 2, "/": 2}

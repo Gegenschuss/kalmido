@@ -2,6 +2,8 @@
 Owner and list admins delete every entry of the list, other members only their own. Entries an invoice already bills stay
 (an invoice made from the time of a client's project covers the entry's day and carries the project's name). Running timers stay.
 Agent accounts: 403. Restore is the Undo step: the client sends back what the delete returned; the same rights apply."""
+from datetime import datetime
+
 from flask import g, jsonify
 
 from ..core.config import app
@@ -24,8 +26,9 @@ def tz_billed_sql(a="e."):
     """SQL fragment: the entry is covered by an invoice (not cancelled) of the list's client that carries the list's name."""
     return (f"EXISTS (SELECT 1 FROM office_docs d JOIN lists bl ON bl.id={a}list_id "
             f"WHERE d.kind='invoice' AND d.status<>'cancelled' AND bl.client_id IS NOT NULL AND d.client_id=bl.client_id "
-            f"AND d.org_id=bl.org_id AND d.service_from IS NOT NULL AND substr({a}start,1,10)>=d.service_from "
-            f"AND substr({a}start,1,10)<=d.service_to AND EXISTS (SELECT 1 FROM office_doc_items i WHERE i.doc_id=d.id AND i.title=bl.name))")
+            f"AND d.org_id=bl.org_id AND COALESCE(d.service_from, d.service_to) IS NOT NULL "
+            f"AND substr({a}start,1,10)>=COALESCE(d.service_from, d.service_to) AND substr({a}start,1,10)<=COALESCE(d.service_to, d.service_from) "
+            f"AND EXISTS (SELECT 1 FROM office_doc_items i WHERE i.doc_id=d.id AND lower(trim(i.title))=lower(trim(bl.name))))")  # review V2
 
 
 def tz_scope(c, lid):
@@ -96,8 +99,16 @@ def tz_restore(lid):
         owner = e.get("user_id")
         if not isinstance(owner, int) or (owner != uid and not admin):
             continue
-        if not c.execute("SELECT 1 FROM users WHERE id=?", (owner,)).fetchone():
+        if not c.execute("SELECT 1 FROM users WHERE id=?", (owner,)).fetchone() or not list_role(c, lid, owner):
+            continue  # review V1: only people of this list get entries back
+        try:  # review V1: real times, end after start, seconds at most the span
+            t0, t1 = datetime.fromisoformat(str(e["start"])[:40]), datetime.fromisoformat(str(e["end"])[:40])
+            span, secs = int((t1 - t0).total_seconds()), int(e.get("seconds") or 0)
+        except (ValueError, TypeError):
             continue
+        if span < 0:
+            continue
+        e["seconds"] = min(max(0, secs), span)
         tid = e.get("task_id")
         if tid and not c.execute("SELECT 1 FROM tasks WHERE id=? AND list_id=?", (tid, lid)).fetchone():
             tid = None

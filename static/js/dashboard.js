@@ -189,7 +189,7 @@ function lyEditor(v, o = {}) {
   const d = LY[v], pr = lyPref(v, {std: S.ly.std}), {order, hidden, size, fixed} = pr, bs = lyBlocks(v), A = lyAct(v), n = order.length;
   const desk = !isMobile();
   const rows = order.map((k, i) => { const [_, nm, icon, def] = bs.find(b => b[0] === k), sz = size(k);
-    return `<li data-k="${k}" ${desk ? 'draggable="true"' : ''} tabindex="-1">${desk ? `<span class="lyg" aria-hidden="true">${ic('grip', 's')}</span>` : ''}${ic(icon, 's')}<span class="dcl">${tr(nm)}</span>
+    return `<li data-k="${k}" ${desk ? 'draggable="true"' : ''} tabindex="-1">${desk ? `<span class="lyg" aria-hidden="true">${ic('grip', 's')}</span>` : ''}${ic(icon, 's')}<span class="dcl">${esc(tr(nm))}</span>
       ${d.nosize || !desk ? '' : `<button type="button" class="btn sm lysz" data-act="ly-size" data-lyv="${v}" data-k="${k}" aria-pressed="${sz === 'full'}" title="${esc(tr('Width'))}" aria-label="${esc(tr('Width') + ': ' + tr(nm) + ', ' + (sz === 'full' ? tr('full width') : tr('half width')))}">${sz === 'full' ? tr('Full') : tr('Half')}</button>`}
       <button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="-1" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + tr(nm))}">${ic('up', 's')}</button>
       <button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="1" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + tr(nm))}">${ic('down', 's')}</button>
