@@ -457,6 +457,12 @@ ROUTES = {
     "GET /api/lists/{}/checks": "agent", "POST /api/lists/{}/checks": "agent", "PATCH /api/list-checks/{}": "agent",
     "DELETE /api/list-checks/{}": "agent", "POST /api/list-checks/{}/run": "agent",
     "PATCH /api/agents/{}/chat/{}": "agent",
+    # 2.44.0 (#1517): one-command setup of an agent on a computer (one-time code, the computers = the agent's tokens)
+    "POST /api/my/agents/{}/setup-code": "agent", "GET /api/my/agents/{}/machines": "agent",
+    "DELETE /api/my/agents/{}/machines/{}": "agent", "POST /api/admin/agents/{}/setup-code": "admin",
+    "GET /api/admin/agents/{}/machines": "admin", "DELETE /api/admin/agents/{}/machines/{}": "admin",
+    "POST /api/agent-setup/redeem": "auth", "POST /api/agent-setup/remove": "auth",
+    "GET /agent-setup.sh": "public", "GET /agent-setup.ps1": "public",
 }
 
 # ---- 1. every route is classified, nothing stale
