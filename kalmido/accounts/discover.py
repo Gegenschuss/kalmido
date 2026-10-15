@@ -110,7 +110,7 @@ def _state(c, uid, other):
     """none | sent | incoming | connected -- what the person sees about other (always the same queries)."""
     a, b = _pair(uid, other or 0)
     lk = c.execute("SELECT 1 FROM conn_links WHERE a_id=? AND b_id=? AND deleted_at IS NULL", (a, b)).fetchone()
-    out = c.execute("SELECT 1 FROM conn_requests WHERE from_id=? AND to_id=?", (uid, other or 0)).fetchone()
+    out = c.execute("SELECT 1 FROM conn_requests WHERE from_id=? AND to_id=? AND status NOT LIKE 'wd_%'", (uid, other or 0)).fetchone()
     inc = c.execute("SELECT 1 FROM conn_requests WHERE from_id=? AND to_id=? AND status='open'", (other or 0, uid)).fetchone()
     from ..accounts.orgs import may_see
     seen = may_see(c, uid, other or 0)
@@ -176,7 +176,7 @@ def disc_get():
         inc = ppl("""SELECT r.id, r.created_at, u.id AS uid, u.display_name, u.username, u.avatar FROM conn_requests r
                      JOIN users u ON u.id=r.from_id WHERE r.to_id=? AND r.status='open' AND u.disabled=0 ORDER BY r.id DESC""", uid)
         out = ppl("""SELECT r.id, r.created_at, u.id AS uid, u.display_name, u.username, u.avatar FROM conn_requests r
-                     JOIN users u ON u.id=r.to_id WHERE r.from_id=? AND u.disabled=0
+                     JOIN users u ON u.id=r.to_id WHERE r.from_id=? AND u.disabled=0 AND r.status NOT LIKE 'wd_%'
                      AND NOT EXISTS (SELECT 1 FROM conn_links l WHERE l.deleted_at IS NULL AND
                                      ((l.a_id=r.from_id AND l.b_id=r.to_id) OR (l.b_id=r.from_id AND l.a_id=r.to_id)))
                      ORDER BY r.id DESC""", uid)
@@ -391,7 +391,12 @@ def conn_request():
     blocked = c.execute("SELECT 1 FROM conn_blocks WHERE user_id=? AND blocked_id=?", (other, uid)).fetchone()
     old = c.execute("SELECT id, status FROM conn_requests WHERE from_id=? AND to_id=?", (uid, other)).fetchone()
     if old:  # asking again changes nothing for the other person (a declined request stays declined: no nagging)
-        c.rollback()
+        if old["status"].startswith("wd_"):  # 2.49.0 review S1: asking again after a withdrawal brings the old state back, no new push
+            st0 = old["status"][3:]
+            c.execute("UPDATE conn_requests SET status=? WHERE id=?", ("hidden" if blocked and st0 == "open" else st0, old["id"]))
+            c.commit()
+        else:
+            c.rollback()
         return jsonify(state="sent", id=old["id"])
     rid = insert_id(c, "INSERT INTO conn_requests(from_id, to_id, status, created_at) VALUES(?,?,?,?)",
                     (uid, other, "hidden" if blocked else "open", iso(now_utc())))
@@ -459,10 +464,13 @@ def conn_answer(rid, action):
 
 @app.delete("/api/disc/requests/<int:rid>")
 def conn_withdraw(rid):
-    """The sender takes a request back (any state but accepted). Undo = asking again with the ref."""
+    """The sender takes a request back (any state but accepted). Undo = asking again with the ref. 2.49.0 review S1: the row
+    stays, marked wd_<state>: asking again restores that state without a new push (no withdraw / ask loop of pushes, a
+    declined request stays declined)."""
     u = _need_person()
     c = db()
-    n = c.execute("DELETE FROM conn_requests WHERE id=? AND from_id=? AND status!='accepted'", (rid, u["id"])).rowcount
+    n = c.execute("UPDATE conn_requests SET status='wd_' || status WHERE id=? AND from_id=? AND status IN ('open','declined','hidden')",
+                  (rid, u["id"])).rowcount
     c.commit()
     if not n:
         raise Denied(404)

@@ -259,6 +259,17 @@ check(Ev.get(B + "/api/disc").json()["incoming"][0]["person"]["id"] == CID, "eve
 check(Ci.delete(B + f"/api/disc/requests/{CRID}").ok, "cid withdraws")
 check(not Ev.get(B + "/api/disc").json()["incoming"] and "connreq" not in news(Ev), "withdrawn: gone for eve (also the News item)")
 check(Ev.delete(B + f"/api/disc/requests/{CRID}").status_code == 404, "only the sender withdraws")
+# 2.49.0 review S1: withdraw + ask again is no loop: the same row comes back (no new request), a declined one stays declined
+check(not [x for x in Ci.get(B + "/api/disc").json()["outgoing"] if x["id"] == CRID], "a withdrawn request leaves the sent list")
+CREF = find(Ci, "eve@example.com").json()["person"]["ref"]
+r = Ci.post(B + "/api/disc/requests", json={"ref": CREF})
+check(r.ok and r.json().get("id") == CRID and Ev.get(B + "/api/disc").json()["incoming"][0]["id"] == CRID, "asking again restores the same request")
+check(Ev.post(B + f"/api/disc/requests/{CRID}/decline").ok, "eve declines cid")
+check(Ci.delete(B + f"/api/disc/requests/{CRID}").ok, "cid withdraws the declined request")
+r = Ci.post(B + "/api/disc/requests", json={"ref": CREF})
+check(r.ok and r.json().get("state") == "sent" and r.json().get("id") == CRID, "asking again after a withdrawal: 'sent' again")
+check(not Ev.get(B + "/api/disc").json()["incoming"] and "connreq" not in news(Ev), "a declined request stays declined after withdraw + ask")
+check(Ci.delete(B + f"/api/disc/requests/{CRID}").ok, "cid withdraws it again (the checks below expect no request to eve)")
 
 # ---- block
 r = Ci.post(B + "/api/disc/requests", json={"ref": find(Ci, "ann.example@example.com").json()["person"]["ref"]})

@@ -962,6 +962,7 @@ CREATE INDEX IF NOT EXISTS wiki_links_task ON wiki_links(to_task) WHERE to_task 
 -- "findable by e-mail"; email = the confirmed address, normalised (NFC, trimmed, lower case), confirmed_at NULL until the
 -- link of the confirmation mail (disc_tokens, hash only) was used. disc_quota: searches and checked addresses per day.
 -- conn_requests: status open | declined | hidden (from a blocked person) -- the sender always sees "sent".
+-- wd_<status> = withdrawn by the sender (asking again restores <status> without a push).
 -- conn_links: accepted connections (a_id < b_id), visible to both like a shared list; deleted_at = disconnected (undo).
 CREATE TABLE IF NOT EXISTS disc_profiles (
   user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, email TEXT NOT NULL DEFAULT '',
