@@ -1225,7 +1225,7 @@ function agModal(a, done, o = {}) {
     ${a ? `<div class="row"><label>${tr('Lists')}</label>${listCapHtml(a.list_ids, a.lists, 'ag-lcap')}</div>${bridgesHtml(a)}` : ''}
     <div class="row"><label for="ag-url">${tr('Webhook URL')}</label><input id="ag-url" type="url" value="${esc(a?.webhook?.url || '')}" placeholder="${tr('optional: https://… (empty = the agent polls)')}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
     <div class="shint">${tr('With a webhook every event is POSTed there at once, signed like the webhooks. Without one the agent fetches its events: GET /api/v1/agent/events (with ?wait=60 it gets them within seconds).')}</div>
-    ${a ? `<div class="row"><label></label><button class="btn sm" data-m="token">${ic('key', 's')} ${tr('New API token')}</button>${a.webhook ? `<button class="btn sm" data-m="secret">${ic('key', 's')} ${tr('New signing secret')}</button>` : ''}</div>
+    ${a ? `<div class="row"><label></label><button class="btn sm" data-m="ains-setup">${ic('download', 's')} ${tr('Set up on a computer')}</button><button class="btn sm" data-m="token">${ic('key', 's')} ${tr('New API token')}</button>${a.webhook ? `<button class="btn sm" data-m="secret">${ic('key', 's')} ${tr('New signing secret')}</button>` : ''}</div>
     <div class="shint keep">${esc(trn('{0} list shared with it', '{0} lists shared with it', a.lists.length))}${a.lists.length ? ': ' + esc(a.lists.map(l => l.name).join(', ')) : ''}</div>` : ''}
     ${aiuLimFields(a)}
     ${agRtFields(a)}
@@ -1256,6 +1256,7 @@ function agModal(a, done, o = {}) {
     if (m === 'close') { md.remove(); return; }
     try {
       if (m === 'token') { agTokenModal(a, `/api/admin/agents/${a.id}/token`); return; }
+      if (m === 'ains-setup') { ains_setupModal(a, `/api/admin/agents/${a.id}`); return; }  // 2.44.0 (#1517)
       if (m === 'secret') {
         if (!await askConfirm(tr('Create a new signing secret?'), tr('The receiver must use the new one from now on.'), {ok: tr('New secret'), danger: true})) return;
         const r = await calReq('POST', `/api/admin/agents/${a.id}/secret`);
