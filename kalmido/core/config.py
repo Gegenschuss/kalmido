@@ -146,7 +146,7 @@ def _sh_inside(path, folder):
     return a == b or a.startswith(b.rstrip(os.sep) + os.sep)
 
 
-def sh_secret_file():
+def sh_secret_file(again=False):
     global SECRET_KEY_SRC
     if not SECRET_FILE:
         return None, "unset"
@@ -157,7 +157,7 @@ def sh_secret_file():
               "the key next to the data it protects). Put it on its own volume, e.g. /secret/kalmido.key.", file=sys.stderr, flush=True)
         return None, "file_in_data"
     try:
-        with open(SECRET_FILE, encoding="ascii") as f:
+        with open(SECRET_FILE, encoding="utf-8-sig") as f:  # a BOM from an editor is tolerated
             k = _secret_key_parse(f.read().strip())
         if not k:
             print(f"KALMIDO_SECRET_FILE {SECRET_FILE} holds no valid key (32 bytes, base64): no server key.", file=sys.stderr, flush=True)
@@ -165,7 +165,12 @@ def sh_secret_file():
         SECRET_KEY_SRC = "file"
         return k, ""
     except FileNotFoundError:
-        pass
+        if again:  # e.g. a dangling symlink: exists for O_EXCL, missing for open
+            print(f"KALMIDO_SECRET_FILE {SECRET_FILE} cannot be read: no server key.", file=sys.stderr, flush=True)
+            return None, "file_error"
+    except ValueError:  # not text (UnicodeDecodeError)
+        print(f"KALMIDO_SECRET_FILE {SECRET_FILE} holds no valid key (32 bytes, base64): no server key.", file=sys.stderr, flush=True)
+        return None, "invalid"
     except OSError as e:
         print(f"KALMIDO_SECRET_FILE {SECRET_FILE} cannot be read ({e.strerror}): no server key.", file=sys.stderr, flush=True)
         return None, "file_error"
@@ -178,7 +183,7 @@ def sh_secret_file():
             f.flush()
             os.fsync(f.fileno())
     except FileExistsError:
-        return sh_secret_file()
+        return sh_secret_file(True)
     except OSError as e:
         print(f"KALMIDO_SECRET_FILE {SECRET_FILE} cannot be written ({e.strerror}): no server key.", file=sys.stderr, flush=True)
         return None, "file_error"

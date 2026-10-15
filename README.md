@@ -2009,6 +2009,13 @@ and on the [releases page](https://github.com/Gegenschuss/kalmido/releases). *Se
 and, since 2.27.0, the version of the app in that window. A window that was open across an update shows *New version
 available – Reload* and reloads by itself once nothing is being typed.
 
+**Updating to 2.45 or later from an older version:** the new `docker-compose.yml` keeps the server key in its own folder
+`./secret` next to `./data`. Create it before the first start so the container (user 1000) can write the key file:
+`mkdir secret && sudo chown 1000 secret`. If `KALMIDO_SECRET_KEY` is already set in `.env`, it stays in charge and the folder
+stays empty. Otherwise the server creates a key once and from then on encrypts organisation data with it: keep a copy of
+`secret/kalmido.key` apart from the backups of `./data` - a backup without its key cannot be read
+(*Administration > Whole server* reminds you).
+
 **Update check:** every 6 hours the server asks the GitHub API for the latest release and compares it with its own
 version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Help*, "vX.Y.Z installed — vX.Y.Z+1
 available" with a link to the release notes. Nothing is downloaded or installed automatically, the container gets
