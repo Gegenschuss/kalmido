@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.43.0** (2026-10-15): **project pro**: lists with columns work like a **spreadsheet** (keyboard, paste ranges,
+  fill down), **formula fields**, a totals row and **key figures** on the project page, **dependencies and subtasks by
+  dragging** (several tasks at once), **blocks adjusted in place** with a **pinboard** project page (colours, notepads),
+  the tracked time of a project in one window and a task in its own window.
 - **2.42.0** (2026-10-14): **end-to-end encryption** in the browser for a private task note, files and direct messages
   (passphrase + recovery code, safety numbers), **encryption at rest per organisation** for bank and tax data, purchase
   and contract rates and stored files (recovery key, way back with `decrypt-all`), an encrypted **organisation export**,

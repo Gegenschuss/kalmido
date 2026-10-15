@@ -7,6 +7,46 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.43.0] - 2026-10-15
+
+**In short:** **Project pro**: lists with columns work like a **spreadsheet**, **formula fields**, a totals row and **key
+figures** on the project page, **dependencies and subtasks by dragging** (also several tasks at once), **blocks adjusted in
+place** with a project page that works like a **pinboard** (colours, notepads), tracked time of a project in one window,
+and a task in its own window.
+
+### Added
+- **Lists like a spreadsheet** (#1331): an active cell moved with the arrow keys, Tab and Enter; typing replaces the value,
+  Esc cancels. Paste ranges from a spreadsheet with a preview (columns mapped to fields, extra rows become tasks), copy a
+  selection as a table, fill down (Ctrl/Cmd+D or the handle), select several cells and change them at once, a filter per
+  column, due date and assignee right in the cell, Enter in the last row adds a task. One Undo per action; on the phone a
+  tap still edits the cell.
+- **Calculating with custom fields** (#1328): a totals row under number columns (sum, average, count, min, max; owners and
+  list admins save the choice for everyone), a new field type *Formula* (`+ - * /`, brackets, `round()`, computed on the
+  server, read-only; renaming a field keeps the formula) and *key figures* on the project page (sum, count, average or a
+  rate under a condition). API: `GET /api/v1/lists/{id}/kpis`, MCP `get_key_figures`;
+  writing a formula value answers 400.
+- **Dependencies by dragging** (#1330): drag a task with Alt/Option onto another one in the list or on the board = "waits
+  on it"; while dragging, the task panel offers *Waits on* / *Blocks* drop fields. Circles are refused with both task names;
+  on the phone the task menu has *Waiting on a task…*.
+- **Several tasks at once** (#1003): drag a selection onto a task to make them its subtasks, onto a section, column or
+  list to take them out of their parent; the selection panel has *Subtasks of…* and *Out of the parent task*. One Undo,
+  order, assignees and dates stay.
+- **Blocks adjusted in place** (#1452): every block of the start page, Today, time tracking, agents, projects, the project
+  page and the review has a … menu (width 1/3 to full, height, move, hide), a resize handle and a move grip on a computer,
+  *+ Block* at the end, and *Set as default for everyone* / *Reset to default* once your arrangement differs (project:
+  owner and list admins; other views: instance admins).
+- **Project page as a pinboard** (#1346): a colour per block for everyone in the project and notepads (Markdown, own title
+  and colour, several per project) that members with write access edit right on the page.
+- **Tracked time of a project** (#1434): a click on *Tracked* opens the time by person and task with a period, the latest
+  entries and CSV; *Delete all times of this project* (owner and list admins all, members their own, typed confirmation,
+  billed time stays, Undo).
+- **A task in its own window** (#1500): middle click on a task, *Open in its own window* in the task menu or the button in
+  the task panel (computer only).
+
+### Fixed
+- The agents card of the start page showed one row per agent, so a second running job of the same agent was missing.
+- Moving selected subtasks to another list kept them attached to their parent in the old list.
+
 ## [2.42.0] - 2026-10-14
 
 **In short:** **End-to-end encryption** in the browser for a private note and files on a task and for direct messages,
