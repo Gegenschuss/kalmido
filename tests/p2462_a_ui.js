@@ -6,6 +6,8 @@
 // - a list: same data = 0, a new task on top = the other rows keep their nodes
 // - start page, calendar (month), timeline: same data = 0
 // - a hand-opened <details> stays open through a redraw, an input keeps its typed value
+// #1659 at once: the list name shows in the sidebar / header while it is typed (saved after the pause, one undo step);
+//   folder and archive at once (an error puts it back), a deleted list leaves at once, key figures and a calendar's name too
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');
@@ -17,7 +19,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK;
 const call = async (method, url, body, ck = CK, hd = {}) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...(ck ? {Cookie: ck} : {}), ...hd}, body: body ? JSON.stringify(body) : undefined}); return r.json().catch(() => ({})); };
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
-const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,team,notes';
+const FEAT = 'cal,events,comments,collab,time,progress,agents,kanban,timeline,team,notes';
 // in the page: how many element nodes a redraw inserts into #view (each inserted subtree counts once)
 const CNT = `window.__cnt = async fn => { let n = 0; const add = ms => { for (const m of ms) for (const x of m.addedNodes) if (x.nodeType === 1) n++; };
   const mo = new MutationObserver(add); mo.observe(document.getElementById('view'), {childList: true, subtree: true});
@@ -29,7 +31,7 @@ const cnt = (w, code) => w.eval(`__cnt(async () => { ${code} })`);
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'comments', 'timeline', 'kanban', 'agents']});
+  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'events', 'comments', 'timeline', 'kanban', 'agents']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const L = (await call('POST', '/api/lists', {name: 'Shoot'})).id;
   const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -115,6 +117,64 @@ const cnt = (w, code) => w.eval(`__cnt(async () => { ${code} })`);
   n = await cnt(w, 'renderView();');
   check(n === 0, '#1718 timeline: the same data drawn again inserts no node (' + n + ')');
   check(bar.isConnected, '#1718 timeline: a bar is the same node');
+  w.close();
+
+  // ================= #1659 at once: list name, folder, archive, delete, key figures, calendar
+  await call('PATCH', `/api/lists/${L}`, {view: 'list'});
+  const L2 = (await call('POST', '/api/lists', {name: 'Archive me'})).id, L3 = (await call('POST', '/api/lists', {name: 'Delete me'})).id;
+  const EC = await call('POST', '/api/evcals', {name: 'Mine', color: '#60a5fa'});
+  check(EC.id, 'setup: a calendar ' + JSON.stringify(EC));
+  w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
+  await until(() => d.querySelector(`#side .srow[data-list="${L}"]`));
+  const sideName = id => d.querySelector(`#side .srow[data-list="${id}"]`)?.textContent || '';
+  w.eval(`listModal(${L})`); await sleep(300);
+  const ln = d.querySelector('.modal #l-name');
+  check(!!ln, '#1659: the list dialog is open');
+  const h0 = w.eval('HIST.undo.length');
+  for (const v of ['Shoot d', 'Shoot da', 'Shoot day']) { ln.value = v; ln.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(60); }
+  await sleep(100);
+  check(sideName(L).includes('Shoot day'), '#1659: the sidebar shows the typed name at once ' + JSON.stringify(sideName(L)));
+  check((d.querySelector('#top h1')?.textContent || '').includes('Shoot day'), '#1659: the header too');
+  let srv = (await call('GET', '/api/state')).lists.find(x => x.id === L);
+  check(srv.name === 'Shoot', '#1659: ... while it is not saved yet (' + srv.name + ')');
+  await sleep(1400);
+  srv = (await call('GET', '/api/state')).lists.find(x => x.id === L);
+  check(srv.name === 'Shoot day', '#1659: saved after the pause (' + srv.name + ')');
+  check(w.eval('HIST.undo.length') === h0 + 1, '#1659: one undo step for the whole name');
+  d.querySelector('.modal [data-m="close"], .modal .mclose')?.click(); d.querySelectorAll('.modal').forEach(m => m.remove()); await sleep(200);
+  check(sideName(L).includes('Shoot day') && w.eval(`listById(${L})._live`) === undefined, '#1659: dialog closed: the saved name, no live name left');
+  // folder: the list is in the folder at once (before the request is answered), the reload follows
+  w.eval(`window.__lp = listPatch(${L2}, {folder: 'Work'}, 'Folder'); 1`);
+  check(w.eval(`listById(${L2}).folder`) === 'Work', '#1659: the folder is set at once');
+  await w.eval('__lp');
+  srv = (await call('GET', '/api/state')).lists.find(x => x.id === L2);
+  check(srv.folder === 'Work', '#1659: ... and saved');
+  // archive offline: shown at once, back after the error
+  w.__offline = true;
+  w.eval(`window.__lp = listPatch(${L2}, {archived: 1}, 'Archive'); 1`);
+  check(+w.eval(`listById(${L2}).archived`) === 1, '#1659: archived at once');
+  const r2 = await w.eval('__lp');
+  w.__offline = false;
+  check(r2 === false && !+w.eval(`listById(${L2}).archived`), '#1659: an error puts the list back (not archived)');
+  // delete: gone at once (confirm answers yes), deleted on the server behind it
+  w.eval(`window.__ld = listDeleteForGood(${L3}); 1`);
+  await until(() => !w.eval(`!!listById(${L3})`), 20);
+  check(!w.eval(`!!listById(${L3})`) && !d.querySelector(`#side .srow[data-list="${L3}"]`), '#1659: a deleted list leaves at once');
+  await w.eval('__ld'); await sleep(800);
+  srv = (await call('GET', '/api/state')).lists.find(x => x.id === L3);
+  check(!srv, '#1659: ... and is deleted on the server');
+  check(!w.eval(`!!listById(${L3})`), '#1659: ... and stays gone after the reload');
+  // key figures: on the list at once
+  w.eval(`window.__kp = fxKpiSave(${L}, [{title: 'Open', agg: 'count', field: null, state: 'open'}]); 1`);
+  check((w.eval(`JSON.stringify(listById(${L}).kpis || [])`)).includes('Open'), '#1659: key figures set at once');
+  check(await w.eval('__kp') === true, '#1659: ... and saved');
+  // calendar rename: at once
+  await w.eval('load()');
+  w.eval(`window.__er = evCalRename(${EC.id}, 'Shoots', () => {}); 1`);
+  check(w.eval(`evCal(${EC.id})?.name`) === 'Shoots', '#1659: a renamed calendar has its name at once');
+  await w.eval('__er');
+  const ecs = await call('GET', '/api/evcals');
+  check(JSON.stringify(ecs).includes('Shoots'), '#1659: ... and saved');
   w.close();
 
   console.log(`p2462_a_ui: ${ok} passed, ${F.length} failed`);
