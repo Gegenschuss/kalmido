@@ -314,6 +314,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `playbook_proposal`: people applied or discarded your proposed change of a list's Playbook
 - `message_edited`: a person changed a chat message, comment or team message you already had (a correction)
 - `file_shared`: a folder or file of the file store was shared with you (`node`, `role` view | edit)
+- `document_added`: a new document was recognised in a folder / file shared with you (`document`); a receipt? see *assign a receipt* below
 
 Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get_document` (text, sender, amount) ->
 `list_lists` (the projects you can see) -> `suggest_receipt` with project and / or category and a short note why. A person

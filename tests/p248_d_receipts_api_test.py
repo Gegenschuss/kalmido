@@ -206,6 +206,29 @@ check(A.post(B + f"/api/receipt-suggestions/{S2}/reopen").ok and dbx("SELECT sta
 r = A.put(B + f"/api/docs/{D1}/receipt", json={"project_id": None, "category": ""})
 check(r.ok and r.json()["receipt"]["project"] is None, "a person clears it directly")
 
+# ---- event document_added: a new document in a folder shared with the agent (after its first recognition)
+ROOT = A.get(B + "/api/docs/settings?ws=private").json().get("root_id")
+check(ROOT and A.post(B + f"/api/files/nodes/{ROOT}/shares", json={"agent_id": PAG, "role": "view"}).ok, "setup: the documents folder shared")
+
+
+def ev_added(nid):
+    evs = PAGS.get(V + "/agent/events").json().get("data") or []
+    return [e for e in evs if e.get("event") == "document_added" and (e.get("data") or {}).get("document", {}).get("id") == nid]
+
+
+D3 = upload(A, "invoice-train.pdf", "Train ticket 49.00 EUR")
+for _ in range(120):
+    if ev_added(D3):
+        break
+    time.sleep(0.5)
+ev = ev_added(D3)
+check(len(ev) == 1 and ev[0]["data"]["document"]["url"] == f"/api/v1/documents/{D3}", f"document_added once for the new document ({ev})")
+check(not EAGS.get(V + "/agent/events").json().get("data") or not any(e.get("event") == "document_added" for e in EAGS.get(V + "/agent/events").json().get("data")),
+      "an agent without a share hears nothing")
+r = A.post(B + f"/api/docs/{D3}/redo")
+time.sleep(4)
+check(len(ev_added(D3)) == 1, "Recognise again sends no second event")
+
 # ---- organisation: its agent, its project; never a private one
 OD = upload(Bo, "org-invoice.pdf", "Organisation invoice", ws=f"org:{ORG}")
 OP = project(Bo, "Alpha campaign", ORG)
