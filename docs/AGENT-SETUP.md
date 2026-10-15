@@ -472,9 +472,11 @@ chat messages of one person that arrive together: one run). It does what a hoste
   short note with the reason (secrets masked). Events that arrive during a run wait in a queue in the state folder (a
   restart answers them; a crash in the middle of a run can answer one once more), and a lock there (`runner.lock`) keeps a second runner from starting on the same
   folder (it exits with code 3; a stale lock never blocks).
-- **Suggestions** (2.40.0): a final block ` ```suggest ` (up to three short next steps, one per line) becomes answer
-  buttons under the answer (servers without buttons: a numbered line). A pressed button comes back as `chat_choice`
-  with its label; a next message that is only the number (`2`) picks that suggestion too.
+- **Suggestions** (2.40.0): a final block ` ```suggest ` becomes answer buttons under the answer (servers without
+  buttons: a numbered line). 2.46.6: the prompt asks for exactly one suggestion per answer, at most 80 characters, never
+  one an earlier, still visible message already offers; the launcher still takes up to three lines, and a longer label is
+  cut at a word with "…". A pressed button comes back as `chat_choice` with its label; a next message that is only the
+  number (`1`) picks that suggestion too.
 - **The answer**: the final text of a chat run is posted into the person's chat (secrets masked); a long one in numbered
   parts, cut at paragraphs, with a code block closed at the cut and opened again in the next part (2.40.0). The agent must not post
   it again with `send_chat` (the prompt says so).

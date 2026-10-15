@@ -528,14 +528,16 @@ def build_prompt(evs, chat_uid, extra=None):
                    "person's language about what you do next. If you need the person's approval or ask them to decide (a "
                    "proposal, variants, \"shall I ...?\"), end your answer with "
                    "a block ```approval (first line: what you want to do, optional further lines: what happens on yes) "
-                   "and wait: only a yes is a yes, silence never is. Up to three short next steps for the person may "
-                   "follow in a final block ```suggest (one per line, at most 80 characters each): they become answer buttons. Commands, code "
+                   "and wait: only a yes is a yes, silence never is. Otherwise end your answer with exactly ONE short suggestion "
+                   "for the person's next message in a final block ```suggest (one line, at most 80 characters): it becomes an "
+                   "answer button. Never offer a step that an earlier, still visible message already offers; then offer the "
+                   "next-best different one. Commands, code "
                    "and configuration the person should run or paste go into their own fenced code block with a language (one block per place, one "
                    "command per line, no prompt sign, steps chained with &&), never as code inside a sentence.")
     else:
         out.append("This is a task event: answer on the task itself (comment) with the Kalmido tools; your final text "
                    "is not posted anywhere. To ask for a decision there, use request_comment_approval (a card with Yes / No); "
-                   "offer up to three next steps as add_comment choices (answer buttons, at most 80 characters each). Alternatively end your final "
+                   "offer at most ONE next step as an add_comment choice (an answer button, at most 80 characters). Alternatively end your final "
                    "text with a block ```approval or ```suggest: then that text is posted as your comment on the task "
                    "with the card / buttons (do not post it again yourself).")
     if extra:  # 2.44.0 (#1441 / #1444 / #1446): open approvals, notes of the launcher, the previous conversation's summary

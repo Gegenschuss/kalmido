@@ -1492,8 +1492,9 @@ every window Claude Code reports), typing dots and working / idle; it puts the q
 prompt and posts the final text of a chat run as the answer (masked; the agent must not also `send_chat` it). An answer
 ending in a block ` ```approval ` (first line the title, further lines what happens on yes) becomes an approval card
 (`approval`, 2.35.0; older servers: Yes / No buttons); the person's answer arrives as `chat_choice` with `approval` and
-starts the next run. A final block ` ```suggest ` (one line per suggestion) becomes answer buttons; a button holds at most 80
-characters, a longer suggestion is cut at a word with "…" (2.46.6), so the agent is told to keep them shorter. 2.40.0 (approval check): a chat answer that asks to decide or makes a proposal without that block
+starts the next run. A final block ` ```suggest ` becomes answer buttons: the prompt asks for exactly one suggestion per chat answer
+(2.46.6), never one an earlier, still visible message already offers (the launcher still takes up to three, so own rules
+break nothing); a button holds at most 80 characters, a longer suggestion is cut at a word with "…" (2.46.6). 2.40.0 (approval check): a chat answer that asks to decide or makes a proposal without that block
 goes back to the agent once in the same session (`--resume`: the complete answer with the block, no tools); still none ->
 it is posted with a visible note that nothing happens without an explicit yes (`KALMIDO_APPROVAL_CHECK=0`: off). 2.42.0
 (#1383): the final text of a **task** run is posted nowhere unless it ends with a block ` ```approval ` or ` ```suggest `;

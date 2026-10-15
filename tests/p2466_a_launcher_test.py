@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """2.46.6 part A: the reference launcher (mcp/agent_run.py, mcp/agent_job.py) without a server -- suggestion buttons cut
-at a word (#1722). A stub API, pure Python, no container."""
+at a word (#1722), exactly one suggestion (#1714). A stub API, pure Python, no container."""
 import importlib.util
 import os
 import sys
@@ -65,6 +65,17 @@ p = ar.build_prompt([{"event": "chat", "data": {"user": {"id": 7, "name": "Ann"}
 check("at most 80 characters" in p, "the chat prompt names the 80-character limit")
 p = ar.build_prompt([{"event": "comment", "data": {"task": {"id": 5}}}], None)
 check("at most 80 characters" in p, "the task prompt names the 80-character limit")
+
+# ---- #1714: exactly one suggestion per answer (chat and task runs); the parser still takes up to three
+p = ar.build_prompt([{"event": "chat", "data": {"user": {"id": 7, "name": "Ann"}, "message": {"id": 1, "body": "hi"}}}], 7)
+check("exactly ONE short suggestion" in p and "Up to three" not in p, "the chat prompt asks for exactly one suggestion")
+check("already offers" in p and "next-best different one" in p, "never a suggestion an earlier message already offers")
+p = ar.build_prompt([{"event": "comment", "data": {"task": {"id": 5}}}], None)
+check("at most ONE next step" in p and "up to three" not in p, "the task prompt offers at most one next step")
+tb = ar.split_tail_blocks("Done.\n\n```suggest\nA\nB\nC\nD\n```")
+check(tb[2] == ["A", "B", "C"], f"own rules that give three still work (at most three taken): {tb[2]}")
+tpl = open(os.path.join(MCP, "CLAUDE.template.md"), encoding="utf-8").read()
+check("exactly **one** suggestion" in tpl and "80 characters" in tpl, "the template says one suggestion, 80 characters")
 
 print(f"p2466_a_launcher: {ok} ok, {len(F)} failed")
 sys.exit(1 if F else 0)
