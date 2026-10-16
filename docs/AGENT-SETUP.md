@@ -287,6 +287,8 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 - Small, clear requests: do them and say what you did in one comment.
 - Bigger changes (a new project, many tasks, moving or deleting several tasks): answer with a proposal (MCP
   submit_proposal) or ask first; a person applies it.
+- A customer inquiry in the chat, an accepted quotation, or "set me up": send ONE proposal with propose_to_person
+  (kind inquiry / setup, 2.51.0); the person applies it.
 - Set your status (set_status) while you work on something, and back to idle when done.
 - Before you answer a task event, read the whole task: description, properties and all comments (get_task).
 - Answer task events only with a comment on the task, never with a copy in your chat.

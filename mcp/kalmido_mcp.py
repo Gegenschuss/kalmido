@@ -520,6 +520,17 @@ TOOLS = [
                                                                                      "notes": {"type": "string", "maxLength": 5000},
                                                                                      "due": {"type": "string", "format": "date"}}, ["title"])}},
           ["list_id", "title", "reason", "tasks"]), lambda api, a: api.call("POST", "/agent/proposals", body=_pick(a, ("list_id", "title", "reason", "tasks")))),
+    # 2.51.0 (#1351 #1358): your own proposal for a person you work with (no job_request needed)
+    ("propose_to_person", "2.51.0: Your own proposal for a person you work with, without a job_request: kind inquiry (a customer "
+                          "inquiry from the chat, text or a mail attachment, becomes ONE proposal: project list, first tasks, shoot "
+                          "days as event drafts, optionally a quotation draft; with offer_id an ACCEPTED quotation (event "
+                          "offer_accepted) becomes the project, without a new quotation) or kind setup (the setup assistant: modules "
+                          "on / off, lists, a first project of a type; ask first what the person uses Kalmido for). proposal has the "
+                          "shape of submit_proposal for that kind (see there). The person gets 'Proposal ready', applies or "
+                          "discards it (job event). Nothing exists before that; you never send, finalise or book anything.",
+     _obj({"kind": {"type": "string", "enum": ["inquiry", "setup"]}, "user_id": S_ID, "title": {"type": "string", "maxLength": 300},
+           "offer_id": S_ID, "proposal": {"type": "object"}}, ["kind", "user_id", "proposal"]),
+     lambda api, a: api.call("POST", "/agent/proposals", body=_pick(a, ("kind", "user_id", "title", "offer_id", "proposal")))),
     ("react", "Add (or with remove=true take back) a reaction on a comment: up (👍), down (👎), heart (❤️) or any single emoji.",
      _obj({"comment_id": S_ID, "emoji": {"type": "string", "minLength": 1, "maxLength": 16,
                                          "description": "up, down, heart or one emoji character"}, "remove": {"type": "boolean"}},
@@ -580,7 +591,7 @@ TOOLS = [
            "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"}}, ["title"]),
      lambda api, a: api.call("POST", "/agent/jobs", body=a)),
     ("get_job", "One of the agent's jobs. A proposal job (event job_request) also carries kind (project | subtasks | triage | "
-                "extract | dayplan | cleanup), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
+                "extract | dayplan | cleanup | inquiry | setup), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
      _obj({"job_id": S_ID}, ["job_id"]), lambda api, a: api.call("GET", f"/agent/jobs/{int(a['job_id'])}")),
     ("submit_proposal", "Answer a job_request with ONE structured proposal; the person reviews, edits and applies it. Never create "
                         "the lists / tasks yourself. proposal by kind -- project: {name, folder?, sections: [names], tasks: [{title, "
@@ -597,6 +608,12 @@ TOOLS = [
                         "task_id, section_id (null = no section)?, position? (1 = top inside the section), reason?} | {op: close, task_id, "
                         "reason}]} -- only task ids from input.items, each at most once over all entries, section ids from input.list."
                         "sections; merging keeps the first task (the notes of the others are appended), the others are closed as won't do. "
+                        "inquiry (2.51.0, an inquiry becomes a project): {name, folder?, project_type? (input.project_types), client? "
+                        "{id (from input.clients) | name}, sections, tasks (as project), shoot_days: [{title, date, end_date?, start_time? "
+                        "(HH:MM), end_time?, location?, notes?}] (event drafts), offer?: {title?, intro?, items: [{service_id?, text, qty, "
+                        "unit?, price?, discount? (%)}]} (a quotation draft; only when input.office.ok, never with input.offer)}. "
+                        "setup (2.51.0): {modules: [{key, on}] (input.modules), lists: [{name, color?, folder?, sections?}], project?: "
+                        "{type, name}}. "
                         "Every kind may add summary (a short explanation). Dates YYYY-MM-DD, priority none | low | medium | high. "
                         "At most 200 entries; resubmitting replaces the proposal until the person applied or discarded it.",
      _obj({"job_id": S_ID, "proposal": {"type": "object"}}, ["job_id", "proposal"]), t_submit_proposal),
@@ -1467,7 +1484,7 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 
 TOOL_SCOPES = {
     "agent": ("get_agent", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
-              "submit_proposal", "propose_to_other_topic", "update_job", "list_chats", "chat_typing", "send_chat", "request_chat_approval", "withdraw_chat_choices", "report_usage", "get_usage",
+              "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "chat_typing", "send_chat", "request_chat_approval", "withdraw_chat_choices", "report_usage", "get_usage",
               "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",

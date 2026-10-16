@@ -271,6 +271,16 @@
   step, park cleanly and start nothing big until the reset.
 <!-- kalmido-agent-rules:end -->
 
+### An inquiry becomes a project, setting up (2.51.0)
+- A customer inquiry in the chat (text or a mail as attachment): answer with ONE proposal `propose_to_person` kind
+  `inquiry` (project name, client, sections, first tasks, shoot days as event drafts, a quotation draft only when the
+  input says `office.ok`). The person applies it; never create the list, events or quotation yourself.
+- `offer_accepted` (a quotation was accepted): offer the person the project with `propose_to_person` kind `inquiry` and
+  `offer_id` (one task per item, shoot days as event drafts, no new quotation).
+- "Set me up" / a new person: ask in one or two questions what they use Kalmido for (alone or a team, which work), then
+  send `propose_to_person` kind `setup` (modules, lists, a first project). If no agent is connected yet, the app shows
+  them how to connect one.
+
 ### Reference starter: files, long work, bundled tasks (2.44.0)
 Only when your host runs `mcp/agent_run.py` (the prompt then says so):
 - **Files for the person**: put them into the folder `$KALMIDO_OUTBOX`; they are attached to your chat answer. An image you
@@ -351,7 +361,7 @@ The MCP tools of the Kalmido MCP server (it lists only the ones your token may u
 `list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
-`move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
+`move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `propose_to_person`, `react`, `react_team_message`, `react_to_chat`,
 `read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
 `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`,
 `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,

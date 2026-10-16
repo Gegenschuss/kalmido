@@ -1005,6 +1005,45 @@ When an agent needs a change in a list it cannot see (another team's topic, a sh
 working in that list; tasks exist only when the owner applies it. Allowed targets: lists owned by a person the agent
 already works with; anything else answers `404`. At most 10 open ones per agent.
 
+### An inquiry becomes a project, the setup assistant (2.51.0)
+
+Two more kinds of proposals. The agent sends them on its own for a person it works with (no `job_request` needed):
+`POST /api/v1/agent/proposals {"kind": "inquiry" | "setup", "user_id", "title?", "offer_id?", "proposal"}` (MCP
+`propose_to_person`), or a person asks for one (`POST /api/proposals {agent_id, kind: "inquiry", text, file_name?,
+offer_id?}` / `{agent_id, kind: "setup", text?}`, event `job_request`, answer with `submit_proposal`). Either way the
+person gets *Proposal ready*, reviews every part (checkboxes, titles, dates, sections), and ONE *Apply* creates it all
+as that person; one undo step takes it back. The agent never creates, sends, finalises or books anything itself. Who
+may receive one: the same rule as for asking (*Proposals for* of the agent; a person it does not work with answers
+`404`); at most 10 undecided ones per agent and person (`429`).
+
+- **`inquiry`** (#1351): a customer inquiry (chat text, a mail as attachment) becomes a project. `proposal`: `name`,
+  `folder?`, `project_type?` (one of `input.project_types`: agency, software, private), `client?` (`{id}` from
+  `input.clients`, or `{name}`: a suggestion, used when a client of that exact name exists, else shown as *New client:
+  create it in the office*), `sections`, `tasks` (as kind `project`, at least one), `shoot_days: [{title, date,
+  end_date?, start_time?, end_time?, location?, notes?}]` and `offer?: {title?, intro?, items: [{service_id?, text, qty,
+  unit?, price?, discount?}]}`. Applying creates the project list (in the agent's organisation when the person is a
+  member there, otherwise private), its sections and tasks, every shoot day as an **event draft** (`status: tentative`,
+  all-day without times) in the person's own calendar (the module *Events* is switched on when it was off), and the
+  quotation as a **draft** through the office (prices and free items are marked as with every agent draft, see
+  [OFFICE.md](OFFICE.md)). The quotation part needs the agent's switch *May draft office documents* and the office's
+  privacy switch *Agents may read office data* (`input.office.ok`; `input.clients` only then); otherwise the dialog shows
+  it as *not possible* and it is left out. Undo removes the list while nobody added anything (else the proposal's tasks
+  go to the trash), the event drafts while they are still drafts, the quotation while it is a draft; redo brings it back.
+- **An accepted quotation becomes a project** (from #1021): after the event `offer_accepted`, send kind `inquiry` with
+  `offer_id`. The input then holds `offer` (number, title, client, items with title / quantity / unit), the project gets
+  the offer's client, a deal of the sales pipeline with this offer gets the project; make one task per item and the
+  shoot-day items event drafts. No new quotation (`offer` in the proposal answers 400). Needs the same office switches
+  (`403` otherwise).
+- **`setup`** (#1358): the setup assistant for a new person (also a freelancer without an organisation). Ask what they
+  use Kalmido for, then propose `modules: [{key, on}]` (keys of `input.modules`; only real changes count), `lists:
+  [{name, color?, folder?, sections?}]` and `project?: {type, name}` (a first project of that type with its standard
+  sections). It changes only the person's own settings and lists, nothing of an organisation. Undo switches the modules
+  back and removes the new lists while they are empty (a used list stays and is named). The app offers *Set up with
+  your agent* in Settings > Modules and on the last card of the welcome tour: it opens the chat with a prepared text
+  (without an agent: Settings > Agents).
+- The agent's `job` event after applying: `{action: "approve", proposal: {state: "applied", created, events, offer_id,
+  lists, modules, parts_skipped, list_id}}`.
+
 ### Requests that wait for a person (2.15.0)
 
 Some changes by an agent never happen at once, whatever its permissions:
@@ -1677,7 +1716,7 @@ by <agent>*), and it is one undo step.
    <agent>…* (task menu, palette), *Sort the basket with <agent>…* (the inbox's menu - in the app the inbox is called “Basket” since 2.39.1 -, palette,
    or the bot button when inbox items are selected), *Tasks from notes…* (a list's menu, palette), *Tidy up the list…* (2.39.0: a list's menu, or
    *Tidy up…* for selected tasks; always the list's tidy agent). With several agents they pick one.
-2. Kalmido creates a job (kind `project`, `subtasks`, `triage`, `extract`, `dayplan` or `cleanup`; state `running`, `proposal_state`
+2. Kalmido creates a job (kind `project`, `subtasks`, `triage`, `extract`, `dayplan`, `cleanup`, `inquiry` or `setup`; state `running`, `proposal_state`
    `requested`) and sends the agent the event `job_request` with the input.
 3. The agent reads the input, sets its status to `working`, and submits ONE proposal:
    `POST /api/v1/agent/jobs/{id}/proposal` (MCP `submit_proposal`). Kalmido validates it (400 with the reason,
@@ -2229,7 +2268,7 @@ with the scope it needs). The tools:
   answer 404 for it)
 - waiting on someone: `set_waiting`, `clear_waiting`, `list_waiting`, `list_stale_tasks` (2.34.0: tasks lying idle)
 - agent channel (agent tokens only): `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`,
-  `create_job`, `get_job`, `update_job`, `submit_proposal`, `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
+  `create_job`, `get_job`, `update_job`, `submit_proposal`, `propose_to_person` (2.51.0), `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
   `chat_typing`, `react_to_chat`, `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`
 
 Setup is in [mcp/README.md](../mcp/README.md).
@@ -2264,7 +2303,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
-`move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
+`move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `propose_to_person`, `react`, `react_team_message`, `react_to_chat`,
 `read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
 `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`,
 `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
