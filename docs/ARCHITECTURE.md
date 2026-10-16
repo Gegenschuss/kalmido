@@ -355,6 +355,38 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 - Tests: `tests/boot.js` (jsdom) and `tests/ff.js` (Firefox) load every on-demand module right after the start, so suites
   may call their functions directly; `lazy: true` leaves them to the app (`tests/p253_a_ui.js`).
 
+2.65.0 (#1823, #1824): more modules, and modules carry their styles.
+
+| Module | Files | Opens with |
+|---|---|---|
+| `agentchat` | `agentchat.js`, `agentsetup.js` | the agent chat, Settings (needs `integrations`) |
+| `calendar` | `calview.js` (month / week / day, Settings > Calendars), `caldrag.js` | the calendar view, Settings |
+| `stats` | `stats.js` (the statistics view; the charts stay in `templates.js`) | the statistics view |
+| `wiki`, `mindmap` | `wiki.js`, `mindmap.js` | knowledge pages (need `mindmap`), a list as mind map, a task's "Mentioned in" |
+| `pdf` | `pdfview.js` | a click on a preview link (`data-pview`, the listener is in `lazyload.js`) |
+| `docs` | `docs.js`, `paperless.js`, `receipts.js` | the documents view, the share sheet's "File as document" |
+| `life` | `life.js` | Home & life, the daily review, a life list's bar / a life task's details |
+| `integrations` | `integrations.js` | Settings, the agent chat (tokens, webhooks, CalDAV) |
+| `playbook` | `playbook.js` | the playbook area of a list / folder dialog, Settings |
+| `timeline` | `timeline.js`, `roadmap.js` | a list's timeline, the roadmap, the calendar's timeline |
+
+`contacts` now also loads `newsletter.js`. What the start needs of them stays at start: `chatbase.js` (the phone /
+desktop switch of the chat, the pop-up button, reaction rows, `patchKids`, the task panel's usage line), `calendar.js`
+(the events' data, the kanban board, the agenda's bar, `calReq`), `templates.js` (the charts) and small parts in
+`lazyload.js` (`pv_attr`, the documents switch, `lifeOn` / `fmtMoney`, `pbOn` / `pbMenuItem`, `isRoadmap` / `tlReaches`,
+`API_DOCS`).
+
+- `LD_NEED`: modules a module needs before its own files (Settings: agent chat, calendar, integrations, playbook).
+- `LD_NOP`: stand-ins that do nothing before the module is loaded (they only update what the module drew, e.g. `chatPatch`).
+- Styles: `LD_CSS` names each module's stylesheets in `static/css/<name>.css`; `loadModule` loads them next to the
+  scripts and resolves only once both apply (no unstyled flash); `loadCss(name)` loads one alone. `LAZY_CSS` in
+  `static/sw.js` precaches them (offline); `tools/check_layout.py` checks `LAZY_CSS` = `LD_CSS` = `static/css/*.css`. A
+  module stylesheet comes after `app.css` in the cascade: only rules whose every selector names a class / id that only the
+  module's scripts use move there, and none that a later rule of `app.css` for the same class would override. Suites that
+  read rules use `allCss()` / `allCssSync()` of `tests/boot.js` (app.css + the module stylesheets).
+- Idle preload: 5 s after the start, one per idle moment, Settings (with what it needs), then the areas this person has
+  switched on (calendar, timeline, knowledge pages, documents, home & life); not office, contacts, statistics, PDF.
+
 ## Database: PostgreSQL (2.37)
 
 Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone.

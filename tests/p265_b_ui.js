@@ -126,7 +126,7 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview'], mindmap: 
   w.close();
 
   // ================= Firefox: real browser + service worker
-  await firefox(async ({ev, nav}) => {
+  await firefox(async ({ev, nav, cmd, ctx, shot}) => {
     await nav(B + 'static/icon.svg');
     await ev('(() => { localStorage.clear(); return 1; })()');
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.ok)`), 'Firefox: login');
@@ -143,6 +143,19 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview'], mindmap: 
         if (c) { const m = []; for (const u of want) if (!await c.match(u, {ignoreSearch: true})) m.push(u); miss = m; } if (miss.length) await new Promise(r => setTimeout(r, 250)); }
       return {sw: !!reg.active, miss}; })()`);
     check(cached.sw && !cached.miss.length, 'Firefox: the service worker cache holds every LAZY + LAZY_CSS file (offline) ' + JSON.stringify(cached));
+    // screenshots of the areas whose styles moved (kalmido-mactest.sh shot p265_b_ui), desktop and phone width
+    if (process.env.P265B_SHOTS) for (const [vw, vh, tag] of [[1280, 800, 'desk'], [390, 844, 'phone']]) {
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}}).catch(() => 0);
+      for (const h of ['docs', 'cal', 'stats', 'wiki', 'life', 'agents']) {
+        await nav(B + '#' + h);
+        for (let i = 0; i < 30 && await ev(`/^\\s*Loading…\\s*$/.test(document.querySelector('#view')?.textContent || 'Loading…')`).catch(() => true); i++) await sleep(200);
+        await sleep(600); await shot(`${tag}-${h}`);
+      }
+      await ev(`(document.querySelector('[data-act="settings"]')?.click(), 1)`).catch(() => 0);
+      for (let i = 0; i < 30 && !(await ev('!!document.querySelector(".smodal")').catch(() => false)); i++) await sleep(200);
+      await sleep(600); await shot(`${tag}-settings`);
+      await ev(`(document.querySelectorAll('.smodal, .modal').forEach(m => m.remove()), 1)`).catch(() => 0);
+    }
   }, false);
 
   console.log(`${ok} ok, ${F.length} failed`);
