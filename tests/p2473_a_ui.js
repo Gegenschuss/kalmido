@@ -60,8 +60,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
 
   // ================= 2.56.3 (#1842): in the organisation's office a document's client field offers the organisation's
   // clients (/api/state names their org_id), never the private ones
-  await call('PATCH', '/api/settings', {workspace: 'private'});
-  const pcl = await call('POST', '/api/clients', {name: 'Alice privat'});
+  const pcl = await call('POST', '/api/clients', {name: 'Alice privat', org_id: null});
   await call('PATCH', '/api/settings', {workspace: 'org:' + org.id});
   const ocl = await call('POST', '/api/clients', {name: 'Org-Kunde GmbH', org_id: org.id});
   check([pcl.http, ocl.http].every(h => h === 200 || h === 201) && pcl.org_id == null && ocl.org_id === org.id, `a private and an organisation client ${pcl.http} ${ocl.http}`);
