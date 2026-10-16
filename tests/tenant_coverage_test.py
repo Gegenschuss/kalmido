@@ -564,7 +564,7 @@ ROUTES = {
     # 2.48.0 (#1207 / #1152 / #1356)
     "DELETE /api/files/nodes/{}": "file", "DELETE /api/files/shares/{}": "file", "DELETE /api/paperless": "paperless",
     "GET /api/docs/{}/receipt": "receipt", "GET /api/files": "file", "GET /api/files/folders": "file",
-    "GET /api/files/search": "file",  # 2.61.0 (#1820): names + recognised text, the boundary tested in p261_c_api_test.py
+    "GET /api/files/search": "file", "GET /api/v1/files/search": "file",  # 2.61.0 (#1820): names + recognised text, the boundary tested in p261_c_api_test.py
     "GET /api/files/nodes/{}": "file", "GET /api/files/nodes/{}/content": "file",
     "GET /api/files/nodes/{}/share-targets": "file", "GET /api/paperless": "paperless",
     "GET /api/paperless/preview": "paperless", "GET /api/v1/files": "file", "GET /api/v1/files/{}": "file",
