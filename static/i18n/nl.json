@@ -7915,5 +7915,6 @@
   "Option for {0}": "Optie voor {0}",
   "Applying adds the selected time entries as you (times and note can be changed above). One step, undo takes it back.": "Toepassen voegt de gekozen tijden voor jou toe (tijden en notitie kun je hierboven wijzigen). Eén stap, ongedaan maken draait hem terug.",
   "Applying creates per selected day a task in the project with a draft in your calendar, and pencils in the selected crew and equipment as options, never firm. Warnings never block. One step, undo takes it back.": "Toepassen maakt per gekozen dag een taak in het project met een concept in je agenda en zet de gekozen crew en techniek als optie, nooit vast. Waarschuwingen blokkeren nooit. Eén stap, ongedaan maken draait hem terug.",
-  "Draft confirmed": "Concept bevestigd"
+  "Draft confirmed": "Concept bevestigd",
+  "You have {0} open proposals: wait until people decided on them": "Je hebt {0} open voorstellen: wacht tot erover beslist is"
 }
