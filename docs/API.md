@@ -324,6 +324,18 @@ answers `409` (other fields still change); CalDAV clients keep the lock (their d
 and calendar feeds leave the note out. Only the person who locked it unlocks it, in the app (`/api/tasks/{id}/note-lock`,
 signed-in person only, agents `403`).
 
+**Lists encrypted in the browser** (2.64.1): the members of a list can encrypt its texts in their browsers (titles, notes,
+links, code snippets, comments, list notes, section names, free-text field values). The server only holds ciphertexts, so
+such a list is not readable through the API: every `/api/v1/` answer has empty texts there and the object carries
+`"encrypted": true` (a task, a comment); a write that touches such a list (a task, comment, note or section in it, a move
+into it, a new task with its `list_id`) answers `403` with `"code": "list_e2e"`. Agents never see such a list and cannot be
+added to it (`409`); "share all lists", automatic sharing, folders and groups skip it. Webhooks of such a list carry ids,
+dates and status with `"encrypted": true`, never a text; CalDAV and the calendar feed show the neutral word "🔒 Task" with
+the due date and the reminders (a calendar app cannot change the texts or create tasks there, `403`); pushes, the daily mail,
+the status report and News name the list instead of a task; the server search and the message search leave it out (the app
+searches it on the device). Exports keep the ciphertexts as they are (values starting with `e2e1:`); they can only be read in
+Kalmido with a member's own passphrase. Templates (private copies of a person) made before the switch are kept.
+
 **Locked tasks** (2.36.0): `locked: true` makes a task read-only **in the app**: title, notes, date and time,
 priority, list, tags, repeat and assignee stay as they are until someone who may change the task unlocks it there
 (comments, checkboxes in the notes, completing / reopening and subtasks stay free; the app's own writes are checked by
