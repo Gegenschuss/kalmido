@@ -96,16 +96,17 @@ def _list_agent(c, lid):
     return r[0] if r else None
 
 
-def folder_apply(c, lid, keys=None, force=False, dry=False):
+def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
     """Applies the folder defaults to list lid (of the current person, its owner). keys: only these (None = all set ones);
     force: also the ones the list keeps on its own. Returns [{key, reason}] of what could not be applied (dry: what WOULD not,
-    nothing is changed) and the number of changed settings."""
+    nothing is changed) and the number of changed settings. 2.58.0 (#1422): uid = the person (the callers pass it)."""
+    uid = uid or me()
     from ..api.v1 import V1Error, v1_call
     from ..accounts.orgs import clean_org_id, list_org, ws_member_problem
     from ..collab.reactions import list_tidy_update
     from ..lists.lists import list_agent_set
     lr = c.execute("SELECT id, owner_id, folder, is_inbox, family, life, archived FROM lists WHERE id=?", (lid,)).fetchone()
-    if not lr or lr["is_inbox"] or lr["owner_id"] != me():
+    if not lr or lr["is_inbox"] or lr["owner_id"] != uid:
         return [], 0
     eff, _ = folder_effective(c, lr["owner_id"], lr["folder"] or "")
     own = set() if force else set(list_own(c, lid))
@@ -123,7 +124,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False):
                     skipped.append({"key": k, "reason": tr("Home & life and family lists stay private")})
                     continue
                 if want:
-                    clean_org_id(c, want, me())
+                    clean_org_id(c, want, uid)
                 bad = [r[0] for r in c.execute("SELECT user_id FROM list_members WHERE list_id=?", (lid,)) if ws_member_problem(c, lid, r[0], org_id=want or 0)]
                 if bad:
                     names = ", ".join(r[0] or r[1] for r in c.execute(f"SELECT display_name, username FROM users WHERE id IN ({','.join('?' * len(bad))})", bad))
@@ -169,13 +170,13 @@ def folder_apply(c, lid, keys=None, force=False, dry=False):
                     listen_set_all(c, lid, bool(v))
                 changed += 1
             elif k == "hide_done":  # 2.46.1 (#1422): the list follows the folder: the owner's own choice for it goes
-                views = lc_done_views(c, me())
+                views = lc_done_views(c, uid)
                 prev = (getattr(g, "lc_done_prev", None) or {}).get(lid)
                 if prev is None:
-                    prev = lc_done_shown(c, me(), lid, lr["folder"], views)
+                    prev = lc_done_shown(c, uid, lid, lr["folder"], views)
                 if f"l:{lid}" in views and not dry:
                     del views[f"l:{lid}"]
-                    lc_done_put(c, me(), views)
+                    lc_done_put(c, uid, views)
                 if prev == bool(v):  # it showed completed tasks and the folder hides them, or the other way round
                     changed += 1
             elif k == "agent_tidy":
@@ -317,7 +318,7 @@ def folder_props_put():
             c.execute("INSERT INTO folder_props(owner_id,folder,props,updated_at) VALUES(?,?,?,?) ON CONFLICT(owner_id,folder) "
                       "DO UPDATE SET props=excluded.props", (me(), f, json.dumps(props), iso(now_utc())))
         for r in folder_lists(c, me(), f):
-            sk, n = folder_apply(c, r["id"], keys=keys, force=b.get("force") is True, dry=dry)
+            sk, n = folder_apply(c, r["id"], keys=keys, force=b.get("force") is True, dry=dry, uid=me())
             changed += n
             if sk or (list_own(c, r["id"]) and not b.get("force")):
                 out.append({"id": r["id"], "name": r["name"], "skipped": sk,
@@ -345,7 +346,7 @@ def list_folder_reset(lid):
         return err(tr("Invalid value: {0}", "keys"))
     own = [k for k in list_own(c, lid) if keys is not None and k not in keys]
     c.execute("UPDATE lists SET folder_own=? WHERE id=?", (json.dumps(own), lid))
-    sk, n = folder_apply(c, lid, keys=keys)
+    sk, n = folder_apply(c, lid, keys=keys, uid=me())
     bump(c)
     c.commit()
     return jsonify(ok=True, changed=n, skipped=sk)
@@ -368,7 +369,7 @@ def folder_list_arrived(c, lid, keep=()):
     for k in keep:
         if k in eff and (k in diff or k not in LM_MOVE_KEYS):
             list_own_mark(c, lid, k)
-    folder_apply(c, lid, keys=[k for k in FOLDER_PROPS if k not in keep])
+    folder_apply(c, lid, keys=[k for k in FOLDER_PROPS if k not in keep], uid=r["owner_id"])
 
 
 def folder_member_created(c, uid, lid):
@@ -462,15 +463,16 @@ def lm_folder_changes(c, lid, folder):
     return out
 
 
-def lm_folder_keep(c, lid, keep=()):
+def lm_folder_keep(c, lid, keep=(), uid=None):
     """My list lid moved into a folder without folder_adopt: nothing is applied; what differs from the folder (and the
-    keys set in the same request) counts as the list's own from now on."""
+    keys set in the same request) counts as the list's own from now on. 2.58.0 (#1422): uid = the person."""
+    uid = uid or me()
     r = c.execute("SELECT owner_id, folder FROM lists WHERE id=?", (lid,)).fetchone()
-    if not r or r["owner_id"] != me():
+    if not r or r["owner_id"] != uid:
         return
     diff = {x["key"] for x in lm_folder_changes(c, lid, r["folder"] or "")} | {k for k in keep if k not in LM_MOVE_KEYS}  # 2.40.0 (#1422)
     eff = folder_effective(c, r["owner_id"], r["folder"] or "")[0]
-    if lc_done_differs(c, me(), lid, eff):  # 2.46.1 (#1422): an own "Show / Hide completed" of the list
+    if lc_done_differs(c, uid, lid, eff):  # 2.46.1 (#1422): an own "Show / Hide completed" of the list
         diff.add("hide_done")
     c.execute("UPDATE lists SET folder_own=? WHERE id=?", (json.dumps(sorted(k for k in diff if k in eff)), lid))
 
@@ -480,7 +482,7 @@ def lm_folder_moved(c, lid, adopt, keep=()):
     if adopt:
         folder_list_arrived(c, lid, keep=keep)
     else:
-        lm_folder_keep(c, lid, keep=keep)
+        lm_folder_keep(c, lid, keep=keep, uid=me())
 
 
 @app.get("/api/lists/<int:lid>/folder-preview")

@@ -160,7 +160,7 @@ def _apply_lists(c, f, keys):
     from ..lists.folders import folder_apply
     shared, skipped = 0, []
     for r in _own_lists(c, f):
-        sk, n = folder_apply(c, r["id"], keys=keys)
+        sk, n = folder_apply(c, r["id"], keys=keys, uid=me())
         shared += n
         if sk:
             skipped.append({"id": r["id"], "name": r["name"], "reasons": [x["reason"] for x in sk]})
