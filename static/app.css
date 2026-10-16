@@ -7694,7 +7694,8 @@ button.jobtag b{font-weight:600}
 .scnmark.scnbad{background:var(--danger);color:#fff}
 .att .as .scnmark:first-child,.abbadges .scnmark:first-child{margin-left:0}
 .scnover{position:absolute;left:.25rem;bottom:.25rem;max-width:calc(100% - .5rem);display:flex}
-.scnover .scnmark{margin:0;overflow:hidden;text-overflow:ellipsis}
+.scnover .scnmark{margin:0;padding:.125rem .25rem}
+.scnover .scnmark span{display:none}  /* on a picture only the symbol; its label is the aria-label, a tap explains it */
 .scnlock{opacity:.85}
 .att.scnlock .attx svg,.povf.scnlock svg{color:var(--danger)}
 .povfx{display:flex;align-items:center;gap:.5rem;flex:1;min-width:0}

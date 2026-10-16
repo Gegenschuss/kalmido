@@ -97,8 +97,8 @@ const scnImgMark = a => a?.up ? `<span class="scnover">${upMarkHtml(a.up)}</span
 const scnWhy = e => {
   const m = e.target.closest?.('.scnmark[data-scnwhy]'); if (!m) return;
   if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
-  e.preventDefault(); e.stopPropagation();
-  toast(m.dataset.scnwhy);
+  e.preventDefault(); e.stopImmediatePropagation();  // nothing else opens (the text viewer listens on document too)
+  toast(m.dataset.scnwhy, null, 6000);  // long enough to read, with its close button
 };
 document.addEventListener('click', scnWhy, true);
 document.addEventListener('keydown', scnWhy, true);
