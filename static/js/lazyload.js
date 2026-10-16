@@ -215,6 +215,8 @@ function ld_idle(i) {
   const m = LD_IDLE[i]; if (!m) return;
   (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => {
     if (!S.me || document.hidden) return;
+    // data saver / a slow mobile connection: only the settings, the areas load on their first click
+    if (i && (navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || ''))) return;
     (m[1]() ? loadModule(m[0]) : Promise.resolve()).catch(() => {}).then(() => ld_idle(i + 1));
   });
 }
