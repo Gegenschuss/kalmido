@@ -51,6 +51,7 @@ function wsc_detail() {
 
 // ---- Settings > Workspaces: an organisation's colour (its admins choose, every member sees the same)
 function wsc_paneDraw(box) {
+  if (!box?.isConnected) return;  // the dialog closed while /api/orgs loaded
   const orgs = (box._j || {}).orgs || [];
   for (const det of box.querySelectorAll('details.wsorg[data-oid]')) {
     const o = orgs.find(x => x.id === +det.dataset.oid); if (!o || det.querySelector('.wscpick')) continue;
