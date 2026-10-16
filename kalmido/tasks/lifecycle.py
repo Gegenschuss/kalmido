@@ -247,6 +247,9 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         e = people_set(c, tid, lid, b["people"])
         if e:
             return e
+    if f and ("section_id" in f or "list_id" in f):  # 2.60.0 C (#1512): into the review section = review requested
+        from ..tasks.review import rvw_on_move
+        rvw_on_move(c, tid, cur)
     if f and "section_id" in f and not cur["parent_id"] and is_shop(c, lid):  # 2.19.0: the shop area of this item
         shop_remember(c, lid, f.get("title") or cur["title"], f["section_id"])
     return None
@@ -317,6 +320,11 @@ def do_complete(c, tid, status=2, undo=None):
     from ..collab.comments import assignment_events
     from ..family.family import _jparse, FAM_OCC, rot_next, stars_earn, stars_revoke
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+    if status == 2 and t["status"] != 2:  # 2.60.0 C (#1512): "done only after approval" -- every way of completing ends here
+        from ..tasks.review import rvw_gate
+        e = rvw_gate(c, tid)
+        if e:
+            raise Denied(409, e)
     ts = iso(now_utc())
     who = (me() or None) if status != 0 else None  # 0 = public link: nobody's completion (statistics)
     cnt = rr_count(t["repeat"])
@@ -365,6 +373,9 @@ def do_complete(c, tid, status=2, undo=None):
             c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL WHERE id=?", (d,))
         if undo is not None:
             undo.update(copy_id=cur_id, next=nxt)
+        if t["review"]:  # 2.60.0 C (#1512): the next occurrence needs its own approval
+            from ..tasks.review import rvw_after_repeat
+            rvw_after_repeat(c, tid)
     else:
         c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=?",
                   (status, ts, who, ts, tid))

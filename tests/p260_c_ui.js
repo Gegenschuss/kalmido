@@ -69,7 +69,7 @@ const FEAT = 'cal,comments,collab,agents';
   check(!bar()?.querySelector('[data-rvw="approve"]'), '#1512: the assignee has no Approve');
   w.eval(`toggleTask(${T1})`); await until(() => d.querySelector('.cdlg'));
   check(/Waiting for approval by Carol/.test(d.querySelector('.cdlg')?.textContent || ''), '#1512: the tick explains the gate');
-  check((await call('GET', `/api/tasks/${T1}`, null, CB)).status === 0, '#1512: the task stays open');
+  check((await call('GET', `/api/tasks/${T1}`, null, CB)).completed_at === null, '#1512: the task stays open');
   click(w, d.querySelector('.cdlg [data-cd="yes"]'));
   const t1 = await until(async () => { const t = await call('GET', `/api/tasks/${T1}`, null, CB); return t.review === 'pending' ? t : null; });
   check(t1 && t1.section_id === S2, '#1512: Send for review: pending, in the Review section');

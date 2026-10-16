@@ -7687,3 +7687,8 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+/* 2.60.0 C (#1512) review step: the bar in the task panel (shape of the approval bar), its states */
+.apbar.rvwbar.rvw-none{background:var(--bg2);border:.0625rem dashed var(--line2)}
+.apbar.rvwbar.rvw-approved{background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.apbar.rvwbar .apacts{display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
+.apbar.rvwbar .apacts .btn{min-height:2.25rem}

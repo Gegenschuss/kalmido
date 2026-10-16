@@ -1685,6 +1685,16 @@ MIGRATIONS = [
     ("tasks", "sprint_id", "ALTER TABLE tasks ADD COLUMN sprint_id BIGINT"),
     ("tasks", "sprint_at", "ALTER TABLE tasks ADD COLUMN sprint_at TEXT"),
     ("tasks", "points", "ALTER TABLE tasks ADD COLUMN points BIGINT"),
+    # 2.60.0 C (#1512): review step. tasks.reviewer_id = the person / agent who reviews (NULL = none), review '' | pending |
+    # approved | changes, review_at / review_by = the last decision (review_by NULL = a pull request counted), review_sec = the
+    # section the task came from when it went into review ("Back" returns it there). lists.review_cfg = json {on, reviewer,
+    # section, gate} ('' = off): gate = "done only after approval"
+    ("tasks", "reviewer_id", "ALTER TABLE tasks ADD COLUMN reviewer_id BIGINT"),
+    ("tasks", "review", "ALTER TABLE tasks ADD COLUMN review TEXT NOT NULL DEFAULT ''"),
+    ("tasks", "review_at", "ALTER TABLE tasks ADD COLUMN review_at TEXT"),
+    ("tasks", "review_by", "ALTER TABLE tasks ADD COLUMN review_by BIGINT"),
+    ("tasks", "review_sec", "ALTER TABLE tasks ADD COLUMN review_sec BIGINT"),
+    ("lists", "review_cfg", "ALTER TABLE lists ADD COLUMN review_cfg TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

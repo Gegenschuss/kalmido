@@ -170,6 +170,12 @@ def task_batch():
                 if str(tid) in expect and _norm(expect[str(tid)]) != _norm(row["due"]):
                     conflict(tid, "due", row["due"], expect[str(tid)])
                     continue
+                if st == 2:  # 2.60.0 C (#1512): waiting for a review approval -> this one is left open
+                    from ..tasks.review import rvw_gate
+                    e = rvw_gate(c, tid)
+                    if e:
+                        errors.append(e)
+                        continue
                 nxt = do_complete(c, tid, st, u)
                 undo[str(tid)] = signed(tid, u)
                 log_act(c, tid, "wont" if st == -1 else "reopen" if st == 0 else "complete", {"next": nxt} if nxt else None)

@@ -793,6 +793,7 @@ function listModal(id, folder = '', o = {}) {
     ${id && own && !l.is_inbox ? `<div class="row ldsxrow"><span></span><label class="chkl"><input type="checkbox" id="l-dsx" ${dsxOn(l) ? 'checked' : ''} ${dsxFixedOff(l) ? 'disabled' : ''}> ${tr('Keep completed in their section')}</label></div>
     <div class="shint lhint" id="l-dsxhint">${tr('Completed tasks stay at their place in their section, crossed out, with their subtasks. For everyone in the list. Not with “Show completed at the bottom” or for shopping lists.')}</div>` : ''}
     ${id ? tp_rowHtml(l) : ''}
+    ${id ? rvw_rowHtml(l) : ''}${''/* 2.60.0 C (#1512): review step (review.js) */}
     <div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint">${tr('Default for the tasks of this list with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>
     ${id && ['owner', 'admin'].includes(l.role || 'owner') && !l.family && !l.life ? staleRowHtml(l) : ''}
@@ -816,6 +817,7 @@ function listModal(id, folder = '', o = {}) {
   $('#l-stale', md)?.addEventListener('change', e => { e.stopPropagation(); staleDaysSet(id, e.target); });  // 2.34.0 (#266)
   if (id) ovWire(md, id);  // 2.46.0 (#1603): "Everyone in the organisation"
   if (id) tp_wire(md, id);  // 2.46.4 (#1751): "Tap does not open details"
+  if (id) rvw_wire(md, id);  // 2.60.0 C (#1512): review step
   $('#l-dsx', md)?.addEventListener('change', e => { e.stopPropagation(); dsxSet(id, e.target.checked).then(() => { const x = listById(id), c = $('#l-dsx', md); if (x && c) c.checked = dsxOn(x); }); });  // 2.36.2 (#1136)
   $('[data-m="bell-custom"]', md)?.addEventListener('click', e => { e.stopPropagation(); bellCustomModal(id); });
   // ---- autosave (existing lists)

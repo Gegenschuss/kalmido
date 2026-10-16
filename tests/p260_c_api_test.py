@@ -142,14 +142,14 @@ def agent(name):
 
 RV, rv = agent("reviewbot")      # member of P
 OUT, out = agent("outsider")     # no member of P
-LIM, lim = agent("limited")      # member of P, limited to OTHER
 P = A.post(B + "/api/lists", json={"name": "App", "kind": "project"}).json()["id"]
 OTHER = A.post(B + "/api/lists", json={"name": "Other"}).json()["id"]
-for u, role in ((BOB, "edit"), (CAROL, "edit"), (DAVE, "view"), (RV, "edit"), (LIM, "edit")):
-    assert A.put(B + f"/api/lists/{P}/members", json={"user_id": u, "role": role}).ok
-assert A.put(B + f"/api/lists/{OTHER}/members", json={"user_id": LIM, "role": "edit"}).ok
+for u, role in ((BOB, "edit"), (CAROL, "edit"), (DAVE, "view"), (RV, "edit")):
+    r = A.put(B + f"/api/lists/{P}/members", json={"user_id": u, "role": role})
+    assert r.ok, (u, role, r.status_code, r.text)
+r = A.put(B + f"/api/lists/{OTHER}/members", json={"user_id": RV, "role": "edit"})  # one agent per list: the same one in OTHER
+assert r.ok, r.text
 assert A.patch(B + f"/api/lists/{P}", json={"agent_members": True}).ok
-check(A.patch(B + f"/api/admin/agents/{LIM}", json={"list_ids": [OTHER]}).ok, "setup: the limited agent sees only OTHER")
 S1 = A.post(B + "/api/sections", json={"list_id": P, "name": "In progress"}).json()["id"]
 S2 = A.post(B + "/api/sections", json={"list_id": P, "name": "Review"}).json()["id"]
 
@@ -186,11 +186,15 @@ check(Ev.put(B + f"/api/lists/{P}/review", json={"on": False}).status_code == 40
 T1 = task("Login form")
 check(rvw(Bo, T1, action="reviewer", reviewer_id=EVE).status_code == 400, "a person without access cannot review")
 check(rvw(Bo, T1, action="reviewer", reviewer_id=OUT).status_code == 400, "an agent that is not in the list cannot review")
-r = rvw(Bo, T1, action="reviewer", reviewer_id=LIM)
+check(A.patch(B + f"/api/admin/agents/{RV}", json={"list_ids": [OTHER]}).ok, "setup: the agent limited to OTHER")
+r = rvw(Bo, T1, action="reviewer", reviewer_id=RV)
 check(r.status_code == 400 and "no access" in r.text, "an agent limited to other lists cannot review " + r.text[:200])
+r = A.patch(B + f"/api/admin/agents/{RV}", json={"list_ids": []})
+check(r.ok and not r.json().get("list_ids"), "the limit lifted again " + r.text[:200])
 r = rvw(Bo, T1, action="reviewer", reviewer_id=RV)
 check(r.ok and r.json().get("reviewer_id") == RV and not r.json().get("review"), "an agent of the list can review")
-check(rvw(Bo, T1, action="reviewer", reviewer_id=None).ok and "reviewer_id" not in one(T1), "the reviewer removed (field left out)")
+check(rvw(Bo, T1, action="reviewer", reviewer_id=None).status_code == 403, "with the gate on the assignee cannot remove the reviewer again")
+check(rvw(A, T1, action="reviewer", reviewer_id=None).ok and "reviewer_id" not in one(T1), "a list admin removes it (field left out)")
 
 # ---------------------------------------------------------------- into review: default reviewer, pending, News + push
 clear()

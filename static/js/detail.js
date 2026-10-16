@@ -482,6 +482,7 @@ function renderDetail0() {
       ${!ck && planOf(t) ? `<div class="dplan">${ic('clock', 's')}<span class="dplt">${esc(tr('Planned: {0}', planLabel(t)))}</span>${ro ? '' : `<button type="button" class="linkbtn" data-act="unplan" data-id="${t.id}">${tr('Unplan')}</button>`}</div>` : ''}
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
       ${ck ? '' : approvalBar(t, ro)}
+      ${ck ? '' : rvw_barHtml(t, ro)}${''/* 2.60.0 C (#1512): reviewer + review state (review.js) */}
       ${ck || ro ? '' : dupHintHtml(t)}
       ${t.note_locked && typeof ln_html === 'function' ? ln_html(t, ro) : `${''/* 2.48.0 (#1642): a locked note replaces the description (notelock.js) */}
       ${mdMode && !ro && (isTouch() || td_mdPenOnly()) ? `<div class="mdbox"><button type="button" class="iconbtn mdpen" data-act="md-edit" title="${esc(tr('Edit description'))}" aria-label="${esc(tr('Edit description'))}">${ic('edit', 's')}</button>` : ''}
