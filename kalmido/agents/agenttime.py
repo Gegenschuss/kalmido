@@ -51,6 +51,9 @@ def atm_person(c, a):
         o = agent_owner(c, uid)  # a personal agent works for its owner
         if o is None:
             raise BadInput(tr("Missing field: {0}", "user_id"))
+        u = c.execute("SELECT kind, disabled FROM users WHERE id=?", (o,)).fetchone()
+        if not u or u["kind"] == "agent" or u["disabled"]:
+            raise Denied(404)
         pid = o
     return pid, uid
 
@@ -88,6 +91,8 @@ def _entries(c, pid, viewer, frm, to):
                 cache[lid] = _both_lists(c, pid, viewer, lid)
             if not cache[lid]:
                 continue
+            if viewer != pid and r["task_id"] and not task_visible(c, r["task_id"], viewer):
+                continue  # a participant list: only the tasks the viewer may see
         s, e = parse_iso(r["start"]), parse_iso(r["end"])
         out.append({"id": r["id"], "task_id": r["task_id"], "list_id": lid, "title": r["task_title"] or "", "note": r["note"] or "",
                     "start": r["start"], "end": r["end"], "seconds": r["seconds"], "s": s, "e": e, "day": local_day(r["start"])})
