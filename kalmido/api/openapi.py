@@ -646,6 +646,8 @@ def openapi_spec():
     from ..docs.v1 import docs_spec
     docs_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1111)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
+    from ..lists.envs import env_spec
+    env_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.60.0 D (#1514)
     from ..office.agentdocs import ofa_spec
     ofa_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 A (#1348, #1350)
     from ..hub.absence import abs_spec

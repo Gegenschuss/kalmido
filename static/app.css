@@ -6631,8 +6631,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
    the document kinds as small segment switches; search field and filter share one height; no heading above the tabs */
 .mgtabs{background:none;border:0;padding:0;gap:.25rem}
 .mgtabs button{flex:none;border-radius:9rem;padding:.25rem .875rem}
-.seg.ofctabs{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;width:100%;background:none;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0;gap:.25rem;margin-bottom:.75rem}
-.seg.ofctabs::-webkit-scrollbar{display:none}
+.seg.ofctabs{display:flex;flex-wrap:wrap;width:100%;background:none;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0;gap:.25rem;margin-bottom:.75rem}
 .seg.ofctabs button{flex:none;white-space:nowrap;border-radius:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:.375rem .75rem}
 .seg.ofctabs button.on{background:none;border-bottom-color:var(--accent);color:var(--text)}
 .ofdkinds{font-size:var(--fs-s);margin-bottom:.5rem}
@@ -7687,3 +7686,16 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+
+/* 2.60.0 D (#1514) Environments (Staging, Live ...): a plain list under the project page's milestones and in a milestone's panel;
+   the roadmap marks where a milestone runs now with a small text next to its diamond (accent colour, no motion) */
+.envbox{margin-top:.75rem;display:flex;flex-direction:column;gap:.25rem}
+.envbox h4{margin:0 0 .25rem;font-size:var(--fs-s);color:var(--muted);font-weight:600}
+.envrow{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;min-height:2.25rem}
+.envn{min-width:5rem}
+.envnow{flex:1 1 8rem;min-width:0;overflow-wrap:anywhere}
+.envadd{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.25rem}
+.envnote{font-size:var(--fs-s);margin-top:.25rem}
+.envhb{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem}
+#env-urlin{width:100%;box-sizing:border-box;margin:.5rem 0 .25rem}
+.rm-env{position:absolute;top:50%;transform:translateY(-50%);font-size:var(--fs-xs);color:var(--accent);white-space:nowrap;pointer-events:none;z-index:2}

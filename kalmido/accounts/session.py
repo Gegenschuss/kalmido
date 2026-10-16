@@ -197,9 +197,9 @@ def authenticate():
         return api_authenticate()  # bearer token only (package B)
     if request.path.startswith(("/dav/", "/.well-known/")) or request.path == "/dav":
         return None  # 2.9.0 (#435): CalDAV: HTTP Basic with an app password (dav_login), never a cookie or the proxy header
-    if request.path.startswith(("/api/hooks/git/", "/api/hooks/issues/")) and request.method == "POST":
+    if request.path.startswith(("/api/hooks/git/", "/api/hooks/issues/", "/api/hooks/deploy/")) and request.method == "POST":
         return None  # 2.2.0: inbound Git webhook: no user, no proxy header, the HMAC signature is the credential
-        # (2.18.0: also the error-report webhook: the secret token in its URL is the credential)
+        # (2.18.0: also the error-report webhook: the secret token in its URL is the credential; 2.60.0: and the deploy hook)
     if request.path.startswith(PUB_PREFIX):
         return None  # public list link: no user; the token in the path is the credential (see "public links")
     c = db()

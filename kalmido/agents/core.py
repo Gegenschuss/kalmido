@@ -64,6 +64,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "missed",  # 2.29.0 (#1031): events older than AGENT_EVENTS_STALE_H, folded into one summary at the next poll
                 "stale_tasks",  # 2.34.0 (#266): once a day, the stale tasks of lists with "Agent follows up" on (bundled)
                 "scheduled_job",  # 2.34.0 (#272): a planned job of a person is due (agents/schedules.py); answer in their chat
+                "deployed",  # 2.60.0 (#1514): a version / milestone arrived in an environment (Staging, Live) of a list shared with the agent
                 "playbook_proposal",  # 2.39.0 (#1168): people applied / discarded the agent's proposed change of a list's Playbook
                 "message_edited",  # 2.39.0 (#1179): a person changed a chat message / comment / team message the agent already had
                 "file_shared",  # 2.48.0 (#1207): a folder / file of the file store was shared with the agent (node, role)

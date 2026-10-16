@@ -60,6 +60,7 @@ ORDER = (
     "lists.templates",
     "tasks.dependencies",
     "lists.projects",
+    "lists.envs",  # 2.60.0 D (#1514)
     "lists.formula",  # 2.43.0 (#1328): the formula parser (no routes; used by lists.fields)
     "lists.fields",
     "personal.stats",

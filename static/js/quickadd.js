@@ -21,7 +21,7 @@ const msGlyph = t => isMs(t) ? `<i class="msd" aria-hidden="true"></i><span clas
 function msChip(t) {  // the milestone a task belongs to, small (hidden on phones: rows stay calm)
   const m = t.milestone_id && S.tasks.get(t.milestone_id);
   if (m?.deleted_at) return '';  // 2.18.0: a milestone in the trash keeps its link (back on restore) but shows nowhere
-  return m ? `<span class="mschip" title="${esc(tr('Milestone') + ': ' + m.title)}"><i class="msd" aria-hidden="true"></i><span class="sr">${esc(tr('Milestone'))}: </span>${esc(m.title)}</span>` : '';
+  return m ? `<span class="mschip" title="${esc(tr('Milestone') + ': ' + m.title)}"><i class="msd" aria-hidden="true"></i><span class="sr">${esc(tr('Milestone'))}: </span>${esc(m.title)}${esc(typeof env_chipText === 'function' ? env_chipText(t) : '')}</span>` : '';  // 2.60.0 (#1514): ... · Live since 15.10.
 }
 // the one list of the multi-selection when "Set milestone" applies (all in one list with an open milestone, none a milestone)
 function msBulkList() {
@@ -53,7 +53,7 @@ function msReportHtml(t) {
   const off = !j ? `<div class="muted msempty">${S.msr.err ? tr('Burndown and release notes are available online.') : tr('Loading…')}</div>` : '';
   const bd = j && total ? `<h6>${tr('Burndown')}</h6>${msBurnSvg(j.burndown, total)}<details class="msbtab"><summary>${tr('Show as table')}</summary><table><thead><tr><th scope="col">${tr('Day')}</th><th scope="col">${tr('Open tasks')}</th></tr></thead><tbody>${j.burndown.days.map(d => `<tr><td>${esc(fmtDate(d.day))}</td><td>${d.open}</td></tr>`).join('')}</tbody></table></details>` : '';
   const rn = j ? `<div class="msrnh"><h6>${tr('Release notes')}</h6><button type="button" class="btn sm" data-act="ms-copy" aria-label="${esc(tr('Copy release notes'))}">${ic('copy', 's')}<span>${tr('Copy')}</span></button></div><div class="md msrn">${renderMd(j.release_notes, true)}</div>` : '';
-  return `<h5>${tr('Milestone')}</h5>${t.due ? '' : `<div class="muted msnodate"><i class="msd" aria-hidden="true"></i>${tr('No date yet: set one with the date button above.')}</div>`}${prog}${list}${off}${bd}${rn}`;
+  return `<h5>${tr('Milestone')}</h5>${t.due ? '' : `<div class="muted msnodate"><i class="msd" aria-hidden="true"></i>${tr('No date yet: set one with the date button above.')}</div>`}${prog}${typeof env_msHtml === 'function' ? env_msHtml(t, j) : ''}${list}${off}${bd}${rn}`;
 }
 function msBurnSvg(b, total) {
   const days = b.days || []; if (!days.length) return '';
