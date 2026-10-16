@@ -499,13 +499,17 @@ function viewAgents() {
   if (S.jobs.items === null) { S.jobs.items = []; S.jobs.older = []; S.jobs.next = S.jobs.more = null; loadJobs(); aiuLoad().then(() => { if (S.route.mod === 'agents') renderView(); }); }  // 2.1.1: the usage card
   if (S.route.agent && chatFull()) return chatViewHtml(S.route.agent);
   const ags = (S.agents || []).filter(a => wsAgentIn(a));  // 2.28.0 (#935)
+  // 2.55.0 (#1065): the agents block's settings (lyopts.js): only switched-on ones, the order (the other blocks see all)
+  const agOn = lyo_get('agents', 'agents', 'on'), agSort = lyo_get('agents', 'agents', 'sort'), agNeed = a => ['error', 'waiting', 'paused'].includes(agentHst(a)) || a.waiting || a.approvals_open ? 0 : 1;
+  const agShow = ags.filter(a => !agOn || a.enabled);
+  if (agSort === 'name') agShow.sort((a, b) => a.name.localeCompare(b.name, LOCALE())); else if (agSort === 'need') agShow.sort((a, b) => agNeed(a) - agNeed(b));
   const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}" data-k="ag${a.id}">${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
       <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · '))}</span></div>
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button>${a.approvals_open ? `<button class="btn sm apvcard" data-act="chat-open" data-aid="${a.id}">${ic('lock', 's')} ${esc(apvCount(a.approvals_open))}</button>` : ''}
       <button class="btn sm" data-act="sched-open" data-aid="${a.id}" title="${esc(tr('Planned jobs'))}">${ic('clock', 's')} ${tr('Plans')}</button></div>${av_listsHtml(a)}</div>`;  // 2.46.6 (#1708): its lists
   const items = S.jobs.items || [];
   if (ags.length) {  // 2.32.0 (#1063): the overview is built from blocks (Customize)
-    const P = {agents: `<div class="agcards">${ags.map(card).join('')}</div>`, usage: aiuCardHtml(),
+    const P = {agents: `<div class="agcards">${agShow.map(card).join('')}</div>`, usage: aiuCardHtml(),
       jobs: `<div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
         ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}<div class="jobs">${items.length ? items.map(jobHtml).join('') : `<div class="muted mhint">${S.jobs.f === 'open' ? tr('No running or waiting jobs.') : tr('No jobs yet.')}</div>`}</div>${jobsMoreHtml()}`,
       hint: `<div class="shint">${tr('Agents report their jobs here. Approve, Reject and Stop go to the agent at once and show up in the task’s history. On a comment of an agent, 👍 / 👎 by the list owner, a list admin or the assignee counts as approval or rejection.')}</div>`};

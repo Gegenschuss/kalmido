@@ -132,7 +132,12 @@ function viewOverview() {
   if (S.ly.view === 'projects') return h + lyHtml('projects', P) + '</div>';  // 2.35.0 (#1097): the totals as they are
   if (!shown.length) return h + lyHtml('projects', P) + `<div class="empty">${ic('done')}${tr('Nothing stuck. No overdue or blocked tasks.')}</div></div>`;
   P.projects = '';
-  for (const r of shown) {
+  // 2.55.0 (#1065): the block's settings (lyopts.js): only active projects, the order, how many
+  const pso = n => lyo_get('projects', 'projects', n), psrt = pso('sort'), pmax = pso('n');
+  let pshown = pso('active') ? shown.filter(r => !['complete', 'on_hold'].includes(r.l.status)) : shown.slice();
+  if (psrt === 'name') pshown.sort((a, b) => lname(a.l).localeCompare(lname(b.l), LOCALE())); else if (psrt === 'overdue') pshown.sort((a, b) => b.overdue.length - a.overdue.length || a.risk - b.risk);
+  if (pmax) pshown = pshown.slice(0, pmax);
+  for (const r of pshown) {
     const l = r.l, p = l.progress || {done: 0, total: 0};
     const who = t => t.assignee_id ? personName(l.id, t.assignee_id) || '?' : '';
     let body = '';
