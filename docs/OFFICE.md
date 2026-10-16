@@ -8,8 +8,8 @@ e-invoices and bookkeeping exports are planned for later stages.
 A person needs the module switched on (Settings > Modules > Office & finance, or the setup purpose "Office & finance").
 Since 2.47.3 no organisation is needed: everybody also has a **personal office** of their own (see below). Everything the
 module stores belongs to one office area - an organisation's office or one person's personal office; people of another
-organisation, and everybody else in the case of a personal office, never see it. Agents (AI assistants with a token) and child
-accounts have no access at all in this stage - there is no `/api/v1` route and no MCP tool for the module yet.
+organisation, and everybody else in the case of a personal office, never see it. Child accounts have no access. Agents (AI
+assistants with a token) reach the module only through `/api/v1/office` and only for drafts (2.51.0, see "Agents" below).
 
 ## Roles
 
@@ -18,7 +18,8 @@ accounts have no access at all in this stage - there is no `/api/v1` route and n
 | Organisation admin | module settings, master data, framework contracts, logo, import, delete documents |
 | Organisation member | read master data and settings, export the master data file, create / edit quotations, PDF |
 | Owner of a personal office | everything an organisation admin may, in the own personal office |
-| Agents, children | nothing (403) |
+| Agents | with three switches on: read master data and documents, drafts of quotations / invoices / reminders, payment suggestions (2.51.0) |
+| Children | nothing (403) |
 
 Which office you work in follows the workspace switch at the top of the sidebar: an organisation's workspace (`org:<id>`)
 shows its office, **Private** shows your personal office. Without any organisation (a freelancer, or a server in the
@@ -313,7 +314,7 @@ allowed) and `org_offices` (`[{id, name}]` while it is empty and the person has 
 `POST /api/office/docs/from-time`, `POST /api/office/docs/reminder`, `GET/POST /api/office/docs/<id>/payments`,
 `DELETE /api/office/docs/<id>/payments/<pid>`, `POST /api/office/docs/<id>/send`, `POST /api/office/docs/<id>/datev` and
 `GET /api/office/mail-status` (see "Invoices and credit notes" below); 2.40.0 adds `POST /api/office/docs/<id>/fee`
-(see "Payments and reminders"). Agents never reach `/api/office/*`.
+(see "Payments and reminders"). Agents never reach `/api/office/*` (their routes are `/api/v1/office`, see "Agents").
 
 ## Quotations and the calculator
 
@@ -582,8 +583,28 @@ Every change and every read of documents and master data is written to the offic
 what (create, change with the values before and after, positions, number, status, finalise, duplicate, delete, open,
 PDF, preview, export, import, logo) and on which document or master data. Repeated reads of the same person within ten
 minutes are written once. Organisation admins see the history of a document in its editor ("History") and the latest
-entries under Settings > Access log. The log is never part of alerts. Agents have no access to the module at all: an
-agent token on `/api/office/*` gets `403` without content.
+entries under Settings > Access log. The log is never part of alerts. An agent token on `/api/office/*` gets `403` without
+content; every request of an agent on `/api/v1/office` is one line in the log (2.51.0).
+
+## Agents (2.51.0)
+
+An agent prepares, a person decides. Three things must be on (all off by default): the token's scope `office`, the
+agent's switch **May draft office documents** (its settings dialog; an admin of its office area sets it, in a personal
+office the person) and the area's privacy switch **Agents may read office data** (Settings > Agents, admins; the hint
+says that client and price data go to the agent's AI model). Then the agent may read services (never purchase prices),
+text blocks, framework contracts, clients and the area's documents, and create:
+
+- **quotation drafts** (no number; positions from the services, free positions, other prices and discounts are marked in
+  the accent colour with a text until a person changes the position or presses *Confirm*; *Drafted by the agent ...*);
+- **invoice drafts** from accepted quotations (the same as *Create invoice*), **reminder drafts** over open invoices;
+- **payment suggestions** for open invoices (Kalmido has no bank access; the agent reads them from what a person gave
+  it): *Suggested payments* above the invoice list, an admin books or rejects each one.
+
+It never reserves a number, finalises, sends, changes a status, deletes or books. Its area is its workspace's office (a
+personal agent without a workspace: its owner's personal office), it acts for one person of that office (`requested_by`)
+and never sees another area. Each request is one line in the access log (filter *Agents*). Details: docs/AGENTS.md.
+People's routes: `GET/PATCH /api/office/agents/<id>` (the switch), `GET /api/office/pay-props`, `POST /api/office/pay-props/<id>`
+`{action: accept|reject}` (admins). The event `offer_accepted` tells the area's office agents about an accepted quotation.
 
 ## PDF layout
 

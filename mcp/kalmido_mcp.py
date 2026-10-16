@@ -1462,6 +1462,56 @@ TOOLS += [
      _obj({"state": {"type": "string", "enum": ["open", "accepted", "rejected", "all"]}}),
      lambda api, a: api.call("GET", "/receipt-suggestions", _pick(a, ("state",)))),
 ]
+
+# 2.51.0 (#1348, #1350): the office (Office & finance) -- drafts only, a person confirms. Needs the scope office, the agent's
+# switch "May draft office documents" and the area's privacy switch "Agents may read office data" (else 403)
+_RB = {"requested_by": {"type": "integer", "minimum": 1, "description": "The person this is for (default: your owner; a team agent must name one)"}}
+_OITEM = {"type": "object", "additionalProperties": False, "properties": {
+    "kind": {"type": "string", "enum": ["service", "text", "heading"]}, "service_id": {"type": "integer", "description": "A service of the catalogue (title, unit, price taken over)"},
+    "text": {"type": "string", "description": "Title (required without service_id)"}, "detail": {"type": "string"}, "qty": {"type": "number"},
+    "unit": {"type": "string", "enum": ["day", "hour", "piece", "minute", "flat", "percent"]}, "price": {"type": "number", "description": "Only when it must differ (marked)"},
+    "discount": {"type": "number", "minimum": 0, "maximum": 100, "description": "Percent off (marked)"}}}
+_ODRAFT = {"client_id": S_ID, "title": {"type": "string"}, "intro": {"type": "string"}, "items": {"type": "array", "items": _OITEM},
+           "list_id": {**S_ID, "description": "The project list"}, "notify": {"type": "boolean", "description": "A card in the person's chat: sum, PDF preview, Open in the office"}, **_RB}
+TOOLS += [
+    ("get_office", "2.51.0: the office area you work in (your workspace; a personal agent without one: your owner's personal office), the "
+                   "person you act for and the rules. Drafts only: a person reserves the number, finalises, sends and books.",
+     _obj(_RB), lambda api, a: api.call("GET", "/office", _pick(a, ("requested_by",)))),
+    ("list_office_data", "2.51.0: master data of the office: services (catalogue prices), texts (text blocks), contracts (framework contracts with "
+                         "their rates) or clients (q = name). Never purchase prices. Client and price data go to your model: read only what the order needs.",
+     _obj({"kind": {"type": "string", "enum": ["services", "texts", "contracts", "clients"]}, "q": {"type": "string"}, **_RB}, ["kind"]),
+     lambda api, a: api.call("GET", f"/office/{a['kind']}", _pick(a, ("q", "requested_by")))),
+    ("list_office_documents", "2.51.0: quotations (kind offer, default), invoices, credit notes or reminders of the office, newest first; client_id = "
+                              "earlier quotations of a client (their positions as a model); open = only open invoices (issued, sent, partial, overdue).",
+     _obj({"kind": {"type": "string", "enum": ["offer", "invoice", "credit", "reminder"]}, "client_id": S_ID, "status": {"type": "string"}, "open": {"type": "boolean"}, **_RB}),
+     lambda api, a: api.call("GET", "/office/docs", {**_pick(a, ("kind", "client_id", "status", "requested_by")), **({"open": "1"} if a.get("open") else {})})),
+    ("get_office_document", "2.51.0: one document of the office with its positions, sums and state.",
+     _obj({"doc_id": S_ID, **_RB}, ["doc_id"]), lambda api, a: api.call("GET", f"/office/docs/{int(a['doc_id'])}", _pick(a, ("requested_by",)))),
+    ("create_offer_draft", "2.51.0: a quotation DRAFT (no number, never sent): client, title, positions (service_id + qty takes title, unit and price "
+                           "from the catalogue or the client's framework contract; free positions, other prices and discounts are allowed but marked "
+                           "for the person). notify = a card in the person's chat with the sum, the PDF preview and \"Open in the office\".",
+     _obj(_ODRAFT, ["title"]), lambda api, a: api.call("POST", "/office/offers", body=_pick(a, tuple(_ODRAFT)))),
+    ("update_offer_draft", "2.51.0: change your own quotation draft while it is a draft (items replaces the whole list). Never status, number or sending.",
+     _obj({"doc_id": S_ID, **_ODRAFT}, ["doc_id"]),
+     lambda api, a: api.call("PATCH", f"/office/offers/{int(a['doc_id'])}", body=_pick(a, tuple(_ODRAFT)))),
+    ("draft_invoice_from_offer", "2.51.0: an invoice DRAFT from an accepted quotation (like a person's \"Create invoice\"; parts_mode for a quotation "
+                                 "with parts). A person finalises and sends it. The event offer_accepted tells you when a quotation was accepted.",
+     _obj({"offer_id": S_ID, "parts_mode": {"type": "string", "enum": ["full", "title", "summary"]}, "notify": {"type": "boolean"}, **_RB}, ["offer_id"]),
+     lambda api, a: api.call("POST", f"/office/offers/{int(a['offer_id'])}/invoice", body=_pick(a, ("parts_mode", "notify", "requested_by")))),
+    ("draft_reminder", "2.51.0: a reminder DRAFT over open, finalised invoices of one client (level 1 payment reminder, 2 reminder, 3 final reminder). "
+                       "Never sent by you: a person checks and sends it.",
+     _obj({"invoice_ids": {"type": "array", "items": S_ID, "minItems": 1}, "level": {"type": "integer", "enum": [1, 2, 3]}, "notify": {"type": "boolean"}, **_RB}, ["invoice_ids"]),
+     lambda api, a: api.call("POST", "/office/reminders", body=_pick(a, ("invoice_ids", "level", "notify", "requested_by")))),
+    ("suggest_payment", "2.51.0: suggest an incoming payment for an open invoice, read from what a person gave you (e.g. a pasted bank statement): "
+                        "amount, date, reference, confidence high / medium / low, note = why this invoice. An admin books or rejects it; you never "
+                        "book. Kalmido has no bank access.",
+     _obj({"invoice_id": S_ID, "amount": {"type": "string", "description": "Decimal text, e.g. 1190.00"}, "date": D, "reference": {"type": "string"},
+           "confidence": {"type": "string", "enum": ["high", "medium", "low"]}, "note": {"type": "string"}, **_RB}, ["invoice_id", "amount"]),
+     lambda api, a: api.call("POST", "/office/payment-suggestions", body=_pick(a, ("invoice_id", "amount", "date", "reference", "confidence", "note", "requested_by")))),
+    ("list_payment_suggestions", "2.51.0: your payment suggestions and what became of them (state open, accepted, rejected or all).",
+     _obj({"state": {"type": "string", "enum": ["open", "accepted", "rejected", "all"]}, **_RB}),
+     lambda api, a: api.call("GET", "/office/payment-suggestions", _pick(a, ("state", "requested_by")))),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -1496,10 +1546,12 @@ TOOL_SCOPES = {
     "private": ("add_health_entry", "write_journal"),
     "files:read": ("list_files", "read_file", "suggest_receipt", "list_receipt_suggestions"),  # 2.48.0 (#1207, #1356)
     "files:write": ("write_file", "create_file_folder"),
+    "office": ("get_office", "list_office_data", "list_office_documents", "get_office_document", "create_offer_draft", "update_offer_draft",
+               "draft_invoice_from_offer", "draft_reminder", "suggest_payment", "list_payment_suggestions"),  # 2.51.0 (#1348, #1350)
 }
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
-              "private", "files:read", "files:write")  # 2.48.0 (#1207): + files
+              "private", "files:read", "files:write", "office")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office
 _ME = {"at": 0.0, "v": None}
 ME_TTL = 300  # s: a changed scope shows in tools/list within 5 minutes (a call is refused by the server at once anyway)
 

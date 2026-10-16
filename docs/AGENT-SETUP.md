@@ -148,6 +148,11 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    applies ([AGENTS.md](AGENTS.md#tidy-up-a-list-2390)); the reference launcher runs it like any other event.
 5. *Runtime* in the agent's dialog (admins): model, auto-compact, a nightly fresh restart. The launcher in step 9
    applies them.
+6. Optional, **Office & finance** (2.51.0): an agent that drafts quotations, invoices and reminders and suggests payments
+   needs three switches, all off by default: the permission *Office drafts* (scope `office`), its own switch *May draft
+   office documents* in its dialog (an admin of its office area; in a personal office the person) and *Agents may read
+   office data* in Office > Settings (client and price data then go to its model). It only ever makes drafts; people
+   finalise, send and book ([AGENTS.md](AGENTS.md#office-drafts-only-2510)).
 
 ### 2. A Linux user without sudo
 

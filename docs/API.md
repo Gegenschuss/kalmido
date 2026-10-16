@@ -1090,6 +1090,31 @@ agents have none (`403`).
 assigned) stands above the placed ones, newest first; assigning a task to a person takes its old position away. The setting
 `mine_view` (`PATCH /api/settings`) is `own` (default) or `lists`.
 
+## Office: drafts of agents (2.51.0)
+
+Scope `office` (never in the legacy `write` or a new agent's default). Agents only, and only with their switch *May draft
+office documents* and the area's privacy switch *Agents may read office data* on (else `403`). `requested_by` (query or
+body) = the person the agent acts for (default: its owner; a team agent must name one). Drafts only: no route sets a
+number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENTS.md#office-drafts-only-2510).
+
+| Call | Scope | What it does |
+|---|---|---|
+| `GET /office` | office | The area (`{id, personal}`), `person_id`, `role`, currency, language, the rules |
+| `GET /office/{services\|texts\|contracts\|clients}` | office | Master data of the area (`q` = search); never purchase prices or markups |
+| `GET /office/docs` | office | `?kind=offer\|invoice\|credit\|reminder&client_id=&status=&open=1` -> `{data: [brief documents]}` |
+| `GET /office/docs/{id}` | office | One document with positions (`agent_flag` per position: `free`, `price`, `discount:<pct>`), sums, `agent_id` |
+| `GET /office/docs/{id}/pdf` | office | The PDF preview of a draft (marked as a draft); `409` for others |
+| `POST /office/offers` | office | `{client_id?, title, intro?, items: [{service_id?, text?, detail?, qty?, unit?, price?, discount?, kind?}], list_id?, notify?}` -> `201 {doc, chat_message_id?}` |
+| `PATCH /office/offers/{id}` | office | The agent's own draft while it is a draft (`items` replaces the list); `403` for a person's draft, `409` once sent |
+| `POST /office/offers/{id}/invoice` | office | An accepted quotation -> `201 {doc}` an invoice draft (`parts_mode?`, `notify?`) |
+| `POST /office/reminders` | office | `{invoice_ids, level?: 1-3, notify?}` -> `201 {doc}` a reminder draft over open invoices of one client |
+| `POST /office/payment-suggestions` | office | `{invoice_id, amount, date?, reference?, confidence?: high\|medium\|low, note?}` -> `201` an open suggestion (`exceeds_open` when above the open amount) |
+| `GET /office/payment-suggestions` | office | `?state=open` (default) `\| accepted \| rejected \| all`: the agent's own suggestions |
+
+The people's side (web app, signed in): `GET` / `PATCH /api/office/agents/{id}` (`{office_drafts: bool}`, an admin of the
+agent's office area), `GET /api/office/pay-props`, `POST /api/office/pay-props/{id}` `{action: accept|reject}` (admins;
+accept books the payment like *Record payment*), the settings key `agents_read` of `PUT /api/office/settings`.
+
 ## Documents (2.48.0)
 
 Documents are files of the file store (`/files`) with recognised text and fields. Scopes `files:read` / `files:write`;
