@@ -131,6 +131,10 @@ check(g.ok and g.headers.get("Content-Type", "").startswith("application/octet-s
       f"HTML as .png: never inline ({g.headers.get('Content-Type')} / {g.headers.get('Content-Disposition')})")
 r = A.post(B + "/api/files/upload", data={"space": "private"}, files={"file": ("pic.png", b"<svg xmlns='http://www.w3.org/2000/svg'><script>1</script></svg>", "image/png")})
 check(r.ok and dbx("SELECT mime FROM fs_nodes WHERE name='pic.png'")[0][0] == "application/octet-stream", "Ablage: SVG as .png stored as octet-stream")
+# 2.61.0 review: an HTML page with a "%PDF-" behind it is no PDF (it would go out inline without the sandbox)
+r = up_task(A, T, "poly.pdf", b"<html><script>alert(1)</script></html>\n%PDF-1.4\n%%EOF\n", "application/pdf")
+f = task_files(A, T).get("poly.pdf") or {}
+check(r.ok and f.get("mime") == "application/octet-stream", f"HTML/PDF polyglot: stored as octet-stream ({f.get('mime')})")
 png = b"\x89PNG\r\n\x1a\n" + b"\0" * 64
 up_task(A, T, "real.jpg", png, "image/jpeg")
 check(task_files(A, T).get("real.jpg", {}).get("mime") == "image/png", "a PNG named .jpg gets its real type")
