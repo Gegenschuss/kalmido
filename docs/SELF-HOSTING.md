@@ -716,8 +716,8 @@ itself never calls a language model or an outside service for this.
 Without the service (or with the switch off) everything works as before and the new parts are hidden. The vectors are
 stored in the table `task_vectors`: per organisation like its tasks (row-level security), sealed with the organisation's
 key when its data is encrypted, deleted with the task; they are not part of the organisation export (Kalmido computes them
-again). Thresholds for another model: `KALMIDO_RELATED_MIN`, `KALMIDO_RELATED_DUP`, `KALMIDO_RELATED_SEARCH` (see
-`.env.example`). A Raspberry Pi works too, only slower; leave the service out if the box is busy.
+again). Thresholds for another model: `KALMIDO_RELATED_MIN`, `KALMIDO_RELATED_DUP`, `KALMIDO_RELATED_SEARCH`,
+`KALMIDO_RELATED_MIX` (see `.env.example`). A Raspberry Pi works too, only slower; leave the service out if the box is busy.
 
 ## Moving to a new server
 
