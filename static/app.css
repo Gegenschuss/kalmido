@@ -7636,3 +7636,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .lyp-use{margin:6px 0}
 /* 2.55.0 D (#1067) statistics, the client card and family on the view builder: the blocks keep the spacing the cards had (the cards bring their own top margin) */
 .mscly .lybar,.stats > .lybar{display:flex;justify-content:flex-end}
+/* 2.56.0 B (#1795) organisation admins edit name, icon and colour of an organisation list: the mark in the overview row */
+.oadmrow .n b{display:flex;align-items:center;gap:.375rem}
+.oadmrow .ole-ic{width:1.125rem;height:1.125rem;border-radius:.25rem;flex:none}
+.oadmrow .ole-sw{width:.625rem;height:.625rem;border-radius:50%;flex:none}

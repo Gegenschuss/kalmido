@@ -209,7 +209,10 @@ function newsText(it, U) {
       lrestore: d.member ? tr('{0} restored the list {1} from the archive (list admin)', who, q(d.name || '')) : tr('{0} restored your list {1} from the archive (list admin)', who, q(d.name || '')),
       ldelete: tr('{0} deleted your list {1} for good (list admin). Its tasks are in the trash of your basket.', who, q(d.name || '')),
       lrename: tr('{0} renamed your list {1} to {2} (list admin)', who, q(d.old || ''), q(d.name || '')),  // 2.40.0 (#1431)
-      owner: tr('{0} handed the list {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);
+      owner: tr('{0} handed the list {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || '')),
+      // 2.56.0 (#1795): an organisation admin renamed it / changed its icon or colour
+      rename: tr('{0} renamed the list {1} to {2} (admin of {3})', who, q(d.old || ''), q(d.name || ''), q(d.org || '')),
+      restyle: tr('{0} changed the icon or colour of the list {1} (admin of {2})', who, q(d.name || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);
     case 'unblock': return d.hidden ? tr('{0} completed a task you cannot see: your task is unblocked', who) : tr('{0} completed {1}: your task is unblocked', who, q(d.title || ''));
     case 'newtask': return tr('{0} added a task', who);
     case 'connreq': return tr('{0} wants to connect with you', who);  // 2.49.0 (#1106)

@@ -8142,5 +8142,19 @@
   "Look at how my start page is arranged (tools get_view_layout and list_layout_blocks, view dashboard, user_id = my id) and which lists I use most. Only if a clearly better arrangement exists (for example my favourites and what I use every day on top), send me ONE proposal (tool propose_layout) with a short reason. Never repeat one I declined. Change nothing yourself.": "Regarde comment ma page d’accueil est disposée (outils get_view_layout et list_layout_blocks, vue dashboard, user_id = mon id) et quelles listes j’utilise le plus. Seulement s’il existe une disposition nettement meilleure (par exemple mes favoris et ce que j’utilise chaque jour en haut), envoie-moi UNE proposition (outil propose_layout) avec une courte raison. Ne répète jamais une proposition que j’ai refusée. Ne change rien toi-même.",
   "Customize statistics": "Personnaliser les statistiques",
   "Customize the client card": "Personnaliser la fiche client",
-  "Customize Family": "Personnaliser Famille"
+  "Customize Family": "Personnaliser Famille",
+  "An organisation admin only changes the name, the icon and the colour of a list": "Un administrateur de l’organisation ne modifie que le nom, l’icône et la couleur d’une liste",
+  "{0} changed {1}": "{0} a modifié {1}",
+  "{0} changed the icon of {1}": "{0} a modifié l’icône de {1}",
+  "Name: {0} → {1}": "Nom : {0} → {1}",
+  "new colour": "nouvelle couleur",
+  "colour removed": "couleur retirée",
+  "own picture": "image personnelle",
+  "preset picture": "image prédéfinie",
+  "picture removed": "image retirée",
+  "Edit “{0}”": "Modifier « {0} »",
+  "Only the name, the icon and the colour: the contents stay with the people of the list. {0} and the members are told.": "Seulement le nom, l’icône et la couleur : le contenu reste aux personnes de la liste. {0} et les membres sont informés.",
+  "List “{0}” changed": "Liste « {0} » modifiée",
+  "{0} renamed the list {1} to {2} (admin of {3})": "{0} a renommé la liste {1} en {2} (administrateur de {3})",
+  "{0} changed the icon or colour of the list {1} (admin of {2})": "{0} a modifié l’icône ou la couleur de la liste {1} (administrateur de {2})"
 }
