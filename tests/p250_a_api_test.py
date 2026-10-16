@@ -9,6 +9,7 @@
  - disposition: booking people / contacts / equipment / sets, option and firm, double bookings and absences = warnings
    (never blocked), "who is free", the booked person sees their own bookings, guests / other organisations: no access
  - rollback: only new tables / columns
+tenant-matrix: hub
 usage: p250_a_api_test.py <datadir>      (a fresh container; the suite restarts it in mode workspaces)"""
 import os
 import subprocess
@@ -185,6 +186,23 @@ check(Er.put(B + "/api/team/absences/holidays", json={"state": "BY"}).ok, "the f
 check(Bo.patch(B + f"/api/team/absences/{EOFF}", json={"note": "x"}).status_code == 404, "nobody else reads a freelancer's absence")
 check(Bo.get(B + "/api/team/absences/check", params={"user": ERIN, "date": "2026-11-20"}).json().get("absent") is False, "the check tells nothing about private areas")
 
+
+# ---- agents (REST API v1 / MCP get_absences): "away" only, own workspace only
+A = sess("alice")
+r = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "helper", "display_name": "Helper"})
+AGT, AGH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"], **H}
+check(A.patch(B + f"/api/admin/agents/{AGT}", json={"org_id": ORG}).ok, "setup: an agent of Alpha")
+r = requests.get(B + "/api/v1/absences", params={"start": "2026-11-01", "end": "2026-11-30"}, headers=AGH)
+j = r.json() if r.ok else {}
+check(r.ok and j.get("org_id") == ORG and any(x["user_id"] == CAROL for x in j["items"]), f"agent: Alpha's absences ({r.status_code} {r.text[:200]})")
+check(r.ok and all("kind" not in x and "note" not in x for x in j["items"]) and "sick" not in r.text and "flu" not in r.text, "agent: never the kind or the note")
+check(requests.get(B + "/api/v1/absences", params={"org": ORG2}, headers=AGH).status_code == 404, "agent: another organisation 404")
+check(A.patch(B + f"/api/admin/agents/{AGT}", json={"org_id": None}).ok, "setup: the agent becomes private")
+check(requests.get(B + "/api/v1/absences", headers=AGH).status_code == 404, "a private agent sees no team (404)")
+check(A.post(B + "/api/team/absences", json={"kind": "off", "start_date": D1}).status_code in (201, 404), "the instance admin outside Alpha enters into their own area")
+r = requests.get(B + "/api/team/absences", headers=AGH)
+check(r.status_code in (401, 403), f"agents cannot use the web routes ({r.status_code})")
+A.post(B + "/api/auth/logout")
 
 # ---- disposition (#1194): module off -> 409; resources of the area only
 check(Bo.get(B + "/api/team/dispo").status_code == 409, "disposition off by default: 409")

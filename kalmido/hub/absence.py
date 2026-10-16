@@ -24,6 +24,7 @@ from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..accounts.session import me, user_public
 from ..personal.timetrack import BadInput
+from ..api.v1 import v1_args, v1_view
 
 ABS_KINDS = ("vacation", "sick", "off", "other")
 ABS_HALF = ("", "am", "pm")
@@ -414,3 +415,57 @@ def abs_check_get():
         raise BadInput(tr("Invalid data")) from None
     day = _date(a.get("date") or "", "date")
     return jsonify(abs_check(c, who, day) or {"absent": False})
+
+
+# ---------------------------------------------------------------- REST API v1 (+ MCP get_absences): "away" only
+@app.get("/api/v1/absences")
+@v1_view
+def v1_absences():
+    """Who of the organisation is away when, never the kind or the note (sick leave = health data): an agent only for its
+    own workspace (agents.org_id; a private agent: 404), a person's token like the web app's area (?org=)."""
+    a = v1_args(("start", "end", "org"))
+    c, u = db(), g.user
+    try:
+        want = int(a["org"]) if a.get("org") else None
+    except ValueError:
+        raise BadInput(tr("Invalid data")) from None
+    if (u["kind"] or "user") == "agent":
+        r = c.execute("SELECT org_id FROM agents WHERE user_id=?", (u["id"],)).fetchone()
+        oid = r[0] if r and r[0] else None
+        if not oid or (want is not None and want != oid):
+            raise Denied(404)
+    else:
+        if u["kid"]:
+            raise Denied(403)
+        oid = abs_org(c, u["id"], want, create=False)
+    today = local_now().date()
+    first = _date(a["start"], "start") if a.get("start") else today
+    last = _date(a["end"], "end") if a.get("end") else first + timedelta(days=30)
+    if last < first or (last - first).days > ABS_RANGE_MAX:
+        raise BadInput(tr("Invalid value: {0}", "end"))
+    if not oid:
+        return jsonify(org_id=None, people=[], items=[], holidays=[])
+    people = abs_people(c, oid)
+    pids = {p["id"] for p in people}
+    rows = c.execute("SELECT * FROM hub_absences WHERE org_id=? AND deleted_at IS NULL AND start_date<=? AND end_date>=? ORDER BY start_date, id",
+                     (oid, last.isoformat(), first.isoformat())).fetchall()
+    return jsonify(org_id=oid, people=[{"id": p["id"], "display_name": p["display_name"] or p["username"]} for p in people],
+                   items=[{k: v for k, v in abs_public(r, False).items() if k != "id"} for r in rows if r["user_id"] in pids],
+                   holidays=[{"date": k, "name": v} for k, v in sorted(abs_holidays(abs_state(c, oid), first, last).items())])
+
+
+def abs_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
+    paths["/absences"] = {"get": op(
+        "2.50.0 (#1195): who of your organisation is away when (vacation, sick leave, days off) -- only \"away\" and the period, "
+        "never the kind or the note; an agent sees its own workspace only (a private agent: 404); plus the public holidays of the "
+        "organisation's state", "Workload",
+        ok({"type": "object", "properties": {
+            "org_id": nul("integer"),
+            "people": {"type": "array", "items": {"type": "object", "properties": {"id": {"type": "integer"}, "display_name": {"type": "string"}}}},
+            "items": {"type": "array", "items": {"type": "object", "properties": {
+                "user_id": {"type": "integer"}, "start_date": {"type": "string"}, "end_date": {"type": "string"},
+                "half_day": {"type": "string", "enum": ["", "am", "pm"]}}}},
+            "holidays": {"type": "array", "items": {"type": "object", "properties": {"date": {"type": "string"}, "name": {"type": "string"}}}}}})
+        | errs("400", "403", "404"),
+        [q("start", "First day (YYYY-MM-DD, default today)"), q("end", "Last day (default start + 30 days, at most a year)"),
+         q("org", "Organisation id (people only; default: the workspace / first organisation)", {"type": "integer"})])}
