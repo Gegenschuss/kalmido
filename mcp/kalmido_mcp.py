@@ -542,6 +542,11 @@ TOOLS = [
      _obj({"user_id": S_ID, "message_id": S_ID, "emoji": {"type": "string", "minLength": 1, "maxLength": 16,
                                                          "description": "up, down, heart or one emoji character"}, "remove": {"type": "boolean"}},
           ["user_id", "message_id", "emoji"]), t_react_chat),
+    ("pin_chat_message", "2.62.0 (#1848): pin (pinned=true) or unpin (pinned=false; omitted = toggle) a message of your chat with person user_id: it "
+                         "shows in the bar at the top of the conversation. At most 5 per conversation (else 409). The person's pins reach you as the "
+                         "event chat_pinned (information, nothing to do).",
+     _obj({"user_id": S_ID, "message_id": S_ID, "pinned": {"type": "boolean"}}, ["user_id", "message_id"]),
+     lambda api, a: api.call("POST", f"/agent/chats/{int(a['user_id'])}/messages/{int(a['message_id'])}/pin", body=_pick(a, ("pinned",)))),
     ("set_status", "Report the agent's status, shown on its avatar: idle | working | waiting (for approval) | error | paused, plus a short text "
                    "(paused needs the reason, e.g. 'a person works interactively here': people see it in the chip and the chat; "
                    "events keep queueing until you report another status). "
@@ -1235,6 +1240,10 @@ TOOLS += [
     ("react_team_message", "2.17.0: toggle a reaction (up, down, heart or one emoji) on a team chat message; on=true/false sets it.",
      _obj({"message_id": S_ID, "emoji": {"type": "string"}, "on": {"type": "boolean"}}, ["message_id", "emoji"]),
      lambda api, a: api.call("POST", f"/team/messages/{int(a['message_id'])}/reactions", body=_pick(a, ("emoji", "on")))),
+    ("pin_team_message", "2.62.0 (#1848): pin (pinned=true) or unpin (pinned=false; omitted = toggle) a team chat message of a conversation you "
+                         "belong to; at most 5 per conversation (else 409). read_team_chat returns pins.",
+     _obj({"message_id": S_ID, "pinned": {"type": "boolean"}}, ["message_id"]),
+     lambda api, a: api.call("POST", f"/team/messages/{int(a['message_id'])}/pin", body=_pick(a, ("pinned",)))),
     ("mark_team_chat_read", "2.17.0: mark a team chat conversation read (up to last_id, default the newest).",
      _obj({"room_id": S_ID, "last_id": S_ID}, ["room_id"]), lambda api, a: api.call("POST", f"/team/rooms/{int(a['room_id'])}/read", body=_pick(a, ("last_id",)))),
 ]
@@ -1608,13 +1617,13 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 
 TOOL_SCOPES = {
     "agent": ("get_agent", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
-              "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "chat_typing", "send_chat", "request_chat_approval", "withdraw_chat_choices", "report_usage", "get_usage",
+              "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "chat_typing", "send_chat", "request_chat_approval", "withdraw_chat_choices", "pin_chat_message", "report_usage", "get_usage",
               "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
                     "update_habit", "check_in_habit", "shift_list_dates", "request_approval"),
-    "comments": ("comment_typing", "request_comment_approval", "withdraw_comment_choices", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "request_integration_approval", "request_deploy_approval", "update_comment", "delete_comment", "mark_news_read",
+    "comments": ("comment_typing", "request_comment_approval", "withdraw_comment_choices", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "pin_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "request_integration_approval", "request_deploy_approval", "update_comment", "delete_comment", "mark_news_read",
                  "delete_chat_attachment"),
     "structure": ("create_trip", "add_shop_areas", "create_packing_list", "set_list_columns", "create_list", "update_list", "share_list", "unshare_list", "share_list_with_group",
                   "unshare_list_from_group", "create_section", "rename_section", "reorder_sections", "rename_folder", "delete_folder",

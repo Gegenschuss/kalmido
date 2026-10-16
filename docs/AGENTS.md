@@ -690,6 +690,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `file_shared` | 2.48.0 (#1207): the owner shared a folder or file of the [file store](#file-store-2480) with the agent (only for a new share, not for a changed role) | `node` `{id, name, kind}`, `role`: `view` \| `edit` |
 | `document_added` | 2.48.0 (#1356): a new document was recognised (once, after its first recognition) in a folder or file of the file store the agent sees (a share or its own result folder); read it with `get_document`, e.g. to [suggest project and category of a receipt](#receipts-suggest-project-and-category-2480) | `document` `{id, name, state, date, url}` |
 | `offer_accepted` | 2.51.0 (#1348): a quotation of the agent's office area was accepted (by a person or the customer's approval); only agents with the switch *May draft office documents* (a personal agent in an organisation only while its owner works in the office), while the area lets agents read office data (see [Office](#office-drafts-only-2510)) | `doc_id`, `number`, `title`, `client_id`, `list_id`, `net`, `gross`, `currency` |
+| `chat_pinned` | 2.62.0 (#1848): the person pinned or unpinned a message of the agent's chat (see [Pinned chat messages](#pinned-chat-messages-2620)); information only, nothing to answer (the reference launcher starts no run) | `message` (the chat message, with `pinned_at` / `pinned_by`), `pinned` (true / false), `user` `{id, name}` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1422,6 +1423,22 @@ the queued `chat` event. After that the agent gets the event `message_edited` (o
 Treat it as a correction: confirm it briefly in the chat, do not throw away running work and do not restart it, adjust
 only what the change affects. Edited task comments and team chat messages reach the agents that got them as an event
 the same way (`kind: comment` with `comment`, `task`, `list`; `kind: team` with `room`), never a new push to people.
+
+### Pinned chat messages (2.62.0)
+
+A message of the agent chat or of a team chat conversation can be pinned: it shows in a bar at the top of the
+conversation (newest pin first, a tap jumps to it). At most 5 per conversation (a 6th answers 409); a deleted message
+leaves the bar. Every message carries `pinned_at` (null = not pinned) and `pinned_by`; the conversation's page
+(`GET /api/v1/team/rooms/{id}/messages`, in the app also the agent chat) carries `pins`, also when they are older than
+the page.
+
+```
+POST /api/v1/agent/chats/{user_id}/messages/{message_id}/pin {"pinned": true}   (the agent, own conversations; MCP pin_chat_message)
+POST /api/v1/team/messages/{message_id}/pin                  {"pinned": false}  (members of the conversation; MCP pin_team_message)
+```
+
+Without `pinned` the pin toggles. When the **person** pins or unpins a message of the agent chat, the agent gets the event
+`chat_pinned` `{message, pinned, user}`; the agent's own pins and pins in team chats send no event.
 
 ## File store (2.48.0)
 
@@ -2424,7 +2441,7 @@ with the scope it needs). The tools:
 - waiting on someone: `set_waiting`, `clear_waiting`, `list_waiting`, `list_stale_tasks` (2.34.0: tasks lying idle)
 - agent channel (agent tokens only): `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`,
   `create_job`, `get_job`, `update_job`, `submit_proposal`, `propose_to_person` (2.51.0), `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
-  `chat_typing`, `react_to_chat`, `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`
+  `chat_typing`, `react_to_chat`, `pin_chat_message` (2.62.0), `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`
 
 Setup is in [mcp/README.md](../mcp/README.md).
 
@@ -2460,7 +2477,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `list_office_documents`, `list_packing_templates`, `list_payment_suggestions`, `list_project_files`,
 `list_receipt_suggestions`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,
 `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
-`list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `post_team_message`,
+`list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`,
 `propose_playbook`, `propose_to_other_topic`, `propose_to_person`, `react`, `react_team_message`, `react_to_chat`,
 `read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `remove_dependency`,
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
@@ -2541,6 +2558,7 @@ own chat.
 | `POST /team/rooms/{id}/messages` `{body, task_id?, reply_to?}` (mentions as `<@user id>`; 2.33.0 `reply_to`: a message of the same conversation) | `post_team_message` | comments |
 | `PATCH /team/messages/{id}` · `DELETE …` (own messages) | `edit_team_message` · `delete_team_message` | comments |
 | `POST /team/messages/{id}/reactions` `{emoji, on?}` | `react_team_message` | comments |
+| `POST /team/messages/{id}/pin` `{pinned?}` (2.62.0: at most 5 per conversation; the page of a conversation carries `pins`) | `pin_team_message` | comments |
 | `POST /team/rooms/{id}/read` `{last_id?}` | `mark_team_chat_read` | comments |
 
 **Searching conversations (2.33.0)**: `GET /search?scope=messages&q=…` (MCP `search_messages`, scope read) finds words in

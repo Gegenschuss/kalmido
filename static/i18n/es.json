@@ -8210,5 +8210,12 @@
   "Change position…": "Cambiar posición…",
   "Comments by agents": "Comentarios de agentes",
   "Only replies to me": "Solo respuestas a mí",
-  "Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.": "Solo respuestas a mí: un comentario de un agente te llega (Novedades y push) solo si responde a tu comentario, sigue justo después de tu comentario o te menciona. Los comentarios de personas no cambian."
+  "Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.": "Solo respuestas a mí: un comentario de un agente te llega (Novedades y push) solo si responde a tu comentario, sigue justo después de tu comentario o te menciona. Los comentarios de personas no cambian.",
+  "Sending…": "Enviando…",
+  "Pinned {0}/{1}": "Fijado {0}/{1}",
+  "Pinned messages": "Mensajes fijados",
+  "Next pinned message": "Siguiente mensaje fijado",
+  "Message pinned": "Mensaje fijado",
+  "Message unpinned": "Mensaje desfijado",
+  "At most {0} pinned messages. Unpin one first.": "Como máximo {0} mensajes fijados. Desfija uno primero."
 }

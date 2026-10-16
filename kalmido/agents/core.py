@@ -69,6 +69,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "file_shared",  # 2.48.0 (#1207): a folder / file of the file store was shared with the agent (node, role)
                 "document_added",  # 2.48.0 (#1356): a new document was recognised in a folder / file shared with the agent
                 "offer_accepted",  # 2.51.0 A (#1348): a quotation of its office area was accepted (agents with the office switch)
+                "chat_pinned",  # 2.62.0 (#1848): the person pinned / unpinned a message of its chat (message, pinned, user)
                 )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop", "message")  # 2.56.0 (#1791): message = text to a running job, no state change

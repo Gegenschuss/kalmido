@@ -25,6 +25,7 @@ async function loadRoom(rid, older = false) {
   catch (e) { S.tc.err = e instanceof Offline ? tr('The team chat is only available online.') : e.message; return; }
   if (S.tc.rid !== rid) return;
   S.tc.room = j.room; S.tc.users = {...S.tc.users, ...j.users}; S.tc.more = j.has_more; S.tc.err = null;
+  S.tc.pins = j.pins || [];  // 2.62.0 (#1848)
   S.tc.msgs = before ? [...j.messages, ...S.tc.msgs] : j.messages;
   e2eFromCache(S.tc.msgs); e2eRoomDecrypt(rid);  // 2.42.0 (#909): encrypted DMs (e2e.js)
   const last = S.tc.msgs[S.tc.msgs.length - 1];
@@ -78,15 +79,15 @@ function tcRoomHtml() {
     ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind === 'list' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
     <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the list'))}" aria-label="${esc(tr('Open the list'))}">${ic('list')}</button>` : ''}
     ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${e2eRoomBtns(room)}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
-  return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
+  return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${cpnBarHtml('t:' + rid)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
     <button type="button" class="chnew hidden" id="tc-new">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${replyBarHtml('t:' + rid)}<div class="chcomp tccomp"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > 18 ? name.slice(0, 17).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="send" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
-    <button type="button" class="btn pri" data-act="tc-send">${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
+    <button type="button" class="btn pri" data-act="tc-send"${csdBusy('t:' + rid) ? ' disabled' : ''}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
 }
 function tcMsgsHtml() {
   if (S.tc.err && !S.tc.msgs.length) return `<div class="muted mhint" data-k="err">${esc(S.tc.err)}</div>`;
   if (!S.tc.room) return `<div class="muted mhint" data-k="ld">${tr('Loading…')}</div>`;
-  if (!S.tc.msgs.length) return `<div class="muted cmempty" data-k="empty">${tr('No messages yet. Say hello.')}</div>`;
+  if (!S.tc.msgs.length && !csdBusy('t:' + S.tc.rid)) return `<div class="muted cmempty" data-k="empty">${tr('No messages yet. Say hello.')}</div>`;
   const U = S.tc.users, ags = new Set((S.tc.room.members || []).filter(m => m.agent).map(m => m.id));
   let prev = null, h = S.tc.more ? `<div class="chold" data-k="older"><button type="button" class="btn sm" data-act="tc-older">${tr('Load older messages')}</button></div>` : '';
   for (const m of S.tc.msgs) {
@@ -101,9 +102,9 @@ function tcMsgsHtml() {
     h += `<div class="cmsg ${mine ? 'me' : 'ag'}${!mine && ags.has(m.user_id) ? ' agc' : ''} ${first ? 'first' : ''}${rxShow('t' + m.id)}" data-k="m${m.id}" data-mid="t:${m.id}">
       ${first && !mine ? `<div class="tcwho">${av(m.user_id, uname(m.user_id, U), 'avatar sm')}<b>${esc(uname(m.user_id, U))}</b>${ags.has(m.user_id) ? agentBadge() : ''}</div>` : ''}
       ${body}${m.task ? `<button class="runtask" data-act="open-id" data-id="${m.task.id}">${ic('arrow', 's')}<span>${esc(m.task.title)}</span></button>` : ''}
-      <div class="cmeta"><time title="${esc(fmtWhen(m.created_at))}">${fmtWhen(m.created_at)}</time>${m.edited_at && !m.deleted ? `<span class="muted">${tr('edited')}</span>` : ''}${rxr}${m.deleted || S.tc.edit === m.id ? '' : replyBtn('chrbtn mreply')}${m.deleted ? '' : chatSavedMark(m)}${!m.deleted ? `<button type="button" class="rx rxtog" data-act="tc-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div></div>`;
+      <div class="cmeta"><time title="${esc(fmtWhen(m.created_at))}">${fmtWhen(m.created_at)}</time>${m.edited_at && !m.deleted ? `<span class="muted">${tr('edited')}</span>` : ''}${cpnMark(m)}${rxr}${m.deleted || S.tc.edit === m.id ? '' : replyBtn('chrbtn mreply')}${m.deleted ? '' : chatSavedMark(m)}${!m.deleted ? `<button type="button" class="rx rxtog" data-act="tc-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div></div>`;
   }
-  return h;
+  return h + csdHtml('t:' + S.tc.rid, S.tc.msgs, m => m.user_id === S.me?.id);  // 2.62.0 (#1530): "Sending…"
 }
 // patch the open conversation in place (keeps the box, its text and the keyboard)
 function tcPatch(bottom) {
@@ -113,6 +114,7 @@ function tcPatch(bottom) {
   const added = cf_after(box, 't:' + S.tc.rid);  // 2.46.2 (#1660): new messages fade in; scrolled up -> "New message ↓"
   if (near) { box.scrollTop = box.scrollHeight; cf_pill('tc-new', false); }
   else if (added.length) cf_pill('tc-new', true);
+  cpnSync();  // 2.62.0 (#1848): the bar of pinned messages
 }
 // a tap, the wheel or a key in the log ends the "stay at the newest message" phase (the person reads / reacts)
 for (const ev of ['pointerdown', 'wheel', 'touchstart', 'keydown']) document.addEventListener(ev, e => { if (S.tc?.fitUntil && e.target.closest?.('#tc-msgs')) S.tc.fitUntil = 0; }, {capture: true, passive: true});
@@ -132,20 +134,26 @@ function tcMentions(text) {
 async function tcSend() {
   const ta = $('#tc-in'), rid = S.tc.rid; if (!ta || !rid) return;
   const text = ta.value.trim(); if (!text) return;
-  const hadF = document.activeElement === ta;
+  const hadF = document.activeElement === ta, ck = 't:' + rid; if (csdBusy(ck)) return;  // 2.62.0 (#1530): one send at a time
+  const p = csdAdd(ck, text, S.tc.msgs), sb = () => $('[data-act="tc-send"]');  // shown as "Sending…", the box empties at once
+  ta.value = ''; delete S.drafts['team:' + rid]; autosize(ta); if (sb()) sb().disabled = true; tcPatch(true);
   if (!S.tc.room) { try { await loadRoom(rid); } catch { /* sent without the mention lookup */ } }  // 2.24.0: @names need the members
   let m;
   const rto = replyTo('t:' + rid);  // 2.33.0 (#1076)
   try {
     // 2.42.0 (#909): an encrypted DM sends only the ciphertext (encrypted in this browser)
-    const enc = S.tc.room?.e2e ? await e2eDmEncrypt(rid, text) : null; if (S.tc.room?.e2e && !enc) return;
-    if (!enc && !await e2eDownOk(rid)) return;  // 2.42.0 (#909): switched off by the server alone -> ask first
-    m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, {...(enc ? {enc} : {body: tcMentions(text)}), ...(rto ? {reply_to: rto} : {})});
+    const enc = S.tc.room?.e2e ? await e2eDmEncrypt(rid, text) : null; if (S.tc.room?.e2e && !enc) throw null;
+    if (!enc && !await e2eDownOk(rid)) throw null;  // 2.42.0 (#909): switched off by the server alone -> ask first
+    m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, {...(enc ? {enc} : {body: tcMentions(text)}), ...(rto ? {reply_to: rto} : {}), client_id: p.cid});
     if (enc) { m.body = text; m._dec = true; E2E.dec[m.id + ':'] = text; }
   }
-  catch (e) { toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); return; }
-  ta.value = ''; delete S.drafts['team:' + rid]; autosize(ta); replySent('t:' + rid);
-  S.tc.msgs.push(m);
+  catch (e) {  // 2.62.0 (#1530): the text goes back into the box
+    csdDone(ck, p); csdBack($('#tc-in'), text, 'team:' + rid); if (sb()) sb().disabled = false; tcPatch();
+    if (e) toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); return;
+  }
+  csdDone(ck, p); if (sb()) sb().disabled = false; replySent('t:' + rid);
+  if (S.tc.rid !== rid) return;
+  if (!S.tc.msgs.some(x => x.id === m.id)) S.tc.msgs.push(m);
   const r = (S.tc.rooms || []).find(x => x.id === rid); if (r) { r.last = {id: m.id, user_id: m.user_id, text, created_at: m.created_at}; r.last_at = m.created_at; }
   tcPatch(true);
   if (hadF || !isTouch()) ta.focus({preventScroll: true});
@@ -158,7 +166,7 @@ async function tcReact(mid, emoji) {
 function tcMsgMenu(anchor, mid) {
   const m = S.tc.msgs.find(x => x.id === mid); if (!m || m.deleted) return;
   const mine = m.user_id === S.me?.id;  // 2.37.0 (#1159): the menu on every message (Save as task); Edit / Delete only on my own
-  menu(anchor, [{label: tr('Reply'), icon: 'reply', fn: () => replyStart('t', mid)},
+  menu(anchor, [{label: tr('Reply'), icon: 'reply', fn: () => replyStart('t', mid)}, cpnItem('t', m),  // 2.62.0 (#1848): Pin / Unpin
     {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.tc.msgs, m, 'team')},  // 2.37.0 (#1165)
     {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(S.tc.msgs, m, 'team', true)},  // 2.41.0 (#1374)
     ...(m.enc ? [] : [{label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('team', m, () => tcPatch())}]),  // 2.42.0 (#909): not for encrypted ones
@@ -740,7 +748,7 @@ document.addEventListener('click', e => {
   const m = (S.chat?.msgs || []).find(x => x.id === +a.dataset.mid); if (!m) return;
   if (a.dataset.act === 'chat-save') { chatSaveModal('agent', m, () => chatPatch()); return; }
   const ag = agentById(S.chat.aid);
-  menu(a, [ag?.enabled ? {label: tr('Reply'), icon: 'reply', fn: () => replyStart('a', m.id)} : null,
+  menu(a, [ag?.enabled ? {label: tr('Reply'), icon: 'reply', fn: () => replyStart('a', m.id)} : null, m.kind === 'notice' ? null : cpnItem('a', m),  // 2.62.0 (#1848)
     {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.chat.msgs, m, 'agent')},  // 2.37.0 (#1165)
     {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(S.chat.msgs, m, 'agent', true)},  // 2.41.0 (#1374)
     {label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('agent', m, () => chatPatch())},

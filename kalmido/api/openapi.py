@@ -635,6 +635,8 @@ def openapi_spec():
     life_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.22.0 (#663)
     team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#419)
     msgsearch_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.33.0 (#1080)
+    from ..collab.chatpins import cpin_spec
+    cpin_spec(paths, op, ok, errs, pid)  # 2.62.0 (#1848)
     from ..agents.schedules import sched_spec
     sched_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.34.0 (#272)
     from ..lists.playbook import pb_spec
