@@ -164,6 +164,7 @@ APP_TO_API = {
     "GET /api/team/rooms/{}/messages": ["GET /team/rooms/{}/messages"], "POST /api/team/rooms/{}/messages": ["POST /team/rooms/{}/messages"],
     "POST /api/team/rooms/{}/read": ["POST /team/rooms/{}/read"], "PATCH /api/team/messages/{}": ["PATCH /team/messages/{}"],
     "DELETE /api/team/messages/{}": ["DELETE /team/messages/{}"], "POST /api/team/messages/{}/reactions": ["POST /team/messages/{}/reactions"],
+    "POST /api/team/messages/{}/pin": ["POST /team/messages/{}/pin"],  # 2.62.0 (#1848)
     # 2.19.0 (#653): the module Family
     "GET /api/family": ["GET /family"], "POST /api/family/occasions": ["POST /family/occasions"],
     "GET /api/family/deadline-types": ["GET /family/deadline-types"], "POST /api/family/deadlines": ["POST /family/deadlines"],
@@ -210,6 +211,8 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.62.0 (#1848): a person pins a message of their own agent chat in the app; the agent pins with POST /agent/chats/{}/messages/{}/pin "
+     "(MCP pin_chat_message)", ("=POST /api/agents/{}/chat/{}/pin",)),
     ("2.48.0 (#1207): managing the file store stays with people -- rename, move, trash, restore a version, shares, organisation-wide "
      "access, links to task / project files, the move targets; agents list, read and write files where they may edit",
      ("=PATCH /api/files/nodes/{}", "=DELETE /api/files/nodes/{}", "=POST /api/files/nodes/{}/restore", "=POST /api/files/nodes/{}/versions/{}/restore",
