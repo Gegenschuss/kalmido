@@ -24,7 +24,10 @@ def up_check(c, name, data, mime, uid=None, org_id=None, kind="att"):
     info = {"kind": kind}
     mime = scan.sc_sniff_mime(name, data, mime) or mime
     info["scan"] = scan.sc_scan(name, data)  # "clean" | "unchecked" | "off"; raises UploadRefused on a find
-    data, meta = photometa.pm_strip(c, data, mime, uid, org_id)
+    out, meta = photometa.pm_strip(c, data, mime, uid, org_id)
+    if out is not data and out != data and info["scan"] == "clean":  # the cut bytes are what is stored: scanned again
+        info["scan"] = scan.sc_scan(name, out)
+    data = out
     info.update(meta or {})
     return data, mime, info
 

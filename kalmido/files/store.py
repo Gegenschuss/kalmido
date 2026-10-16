@@ -324,8 +324,8 @@ def fs_put(c, uid, parent_id, name, data, mime=None, org_id=None, agent_id=None,
     nid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,agent_id,mime,size,created_by,created_at,updated_at)
                           VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                     (parent_id or None, "file", _free_name(c, parent_id, owner, org, name), owner, org, agent_id,
-                     _mime_of(name, mime), len(data), uid, ts, ts))
-    _store_version(c, nid, org, data, _mime_of(name, mime), uid)
+                     mime, len(data), uid, ts, ts))  # 2.61.0 (#1818): the type of the upload checks (octet-stream from the content stays)
+    _store_version(c, nid, org, data, mime, uid)
     up_after_store(c, "fs", nid, org, info)
     if up is not None:
         up.update(info)
@@ -375,6 +375,8 @@ def fs_read(c, nid, version=None):
     v = fs_version_row(c, nid, version)
     if not v:
         raise Denied(404)
+    from .scan import sc_guard
+    sc_guard(c, "fs", nid, v["no"])  # 2.61.0 (#1818): a version found infected later is locked
     return oc_read_file(c, os.path.join(ATT_DIR, v["path"]))
 
 

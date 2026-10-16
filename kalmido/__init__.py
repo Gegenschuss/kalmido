@@ -123,6 +123,7 @@ ORDER = (
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
     "files.v1",  # 2.48.0 (#1207): the file store in the REST API (files:read / files:write)
     "files.photometa",  # 2.61.0 B (#1819): photo metadata (GPS, camera) removed on upload (no routes; files/upsafe.py)
+    "files.upsafe",  # 2.61.0 (#1818 #1819 #1820): the shared upload path - scan, metadata, text recognition (no routes)
     "integrations.mail",
     "accounts.invite",
     "family.family",

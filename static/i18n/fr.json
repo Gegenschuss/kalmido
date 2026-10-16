@@ -8213,5 +8213,18 @@
   "Photos": "Photos",
   "Photo metadata of {0}": "Métadonnées des photos de {0}",
   "Taken on {0} at {1}": "Prise le {0} à {1}",
-  "from the capture date of the photo": "d’après la date de prise de vue de la photo"
+  "from the capture date of the photo": "d’après la date de prise de vue de la photo",
+  "{0}: malware found ({1}), not uploaded": "{0} : logiciel malveillant détecté ({1}), non envoyé",
+  "Locked: malware was found in this file ({0})": "Verrouillé : un logiciel malveillant a été détecté dans ce fichier ({0})",
+  "Locked: malware found": "Verrouillé : logiciel malveillant détecté",
+  "The virus scanner found {0} in this file. Download and preview are blocked; the file can be deleted.": "L’antivirus a détecté {0} dans ce fichier. Le téléchargement et l’aperçu sont bloqués ; le fichier peut être supprimé.",
+  "Unchecked": "Non vérifié",
+  "Too large for the virus scanner: this file was not checked.": "Trop volumineux pour l’antivirus : ce fichier n’a pas été vérifié.",
+  "The virus scanner was not reachable. The check follows automatically.": "L’antivirus n’était pas joignable. La vérification sera faite automatiquement plus tard.",
+  "The virus scanner found {0} in your file {1}. The file is locked.": "L’antivirus a détecté {0} dans ton fichier {1}. Le fichier est verrouillé.",
+  "Virus scanner: off (KALMIDO_CLAMD is not set). Uploads are not checked.": "Antivirus : désactivé (KALMIDO_CLAMD n’est pas défini). Les envois ne sont pas vérifiés.",
+  "Virus scanner: active.": "Antivirus : actif.",
+  "Virus scanner: not reachable. Uploads are taken and marked “Unchecked”; the check follows once it runs again.": "Antivirus : injoignable. Les envois sont acceptés et marqués « Non vérifié » ; la vérification suivra dès qu’il fonctionnera à nouveau.",
+  "{0} file waits for the check": ["{0} fichier attend la vérification", "{0} fichiers attendent la vérification"],
+  "{0} locked file (malware found)": ["{0} fichier verrouillé (logiciel malveillant détecté)", "{0} fichiers verrouillés (logiciel malveillant détecté)"]
 }

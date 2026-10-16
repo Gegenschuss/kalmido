@@ -8213,5 +8213,18 @@
   "Photos": "Foto’s",
   "Photo metadata of {0}": "Fotometadata van {0}",
   "Taken on {0} at {1}": "Genomen op {0} om {1}",
-  "from the capture date of the photo": "uit de opnamedatum van de foto"
+  "from the capture date of the photo": "uit de opnamedatum van de foto",
+  "{0}: malware found ({1}), not uploaded": "{0}: malware gevonden ({1}), niet geüpload",
+  "Locked: malware was found in this file ({0})": "Geblokkeerd: in dit bestand is malware gevonden ({0})",
+  "Locked: malware found": "Geblokkeerd: malware gevonden",
+  "The virus scanner found {0} in this file. Download and preview are blocked; the file can be deleted.": "De virusscanner heeft {0} in dit bestand gevonden. Downloaden en voorbeeld zijn geblokkeerd; het bestand kan worden verwijderd.",
+  "Unchecked": "Niet gecontroleerd",
+  "Too large for the virus scanner: this file was not checked.": "Te groot voor de virusscanner: dit bestand is niet gecontroleerd.",
+  "The virus scanner was not reachable. The check follows automatically.": "De virusscanner was niet bereikbaar. De controle volgt automatisch.",
+  "The virus scanner found {0} in your file {1}. The file is locked.": "De virusscanner heeft {0} in je bestand {1} gevonden. Het bestand is geblokkeerd.",
+  "Virus scanner: off (KALMIDO_CLAMD is not set). Uploads are not checked.": "Virusscanner: uit (KALMIDO_CLAMD is niet ingesteld). Uploads worden niet gecontroleerd.",
+  "Virus scanner: active.": "Virusscanner: actief.",
+  "Virus scanner: not reachable. Uploads are taken and marked “Unchecked”; the check follows once it runs again.": "Virusscanner: niet bereikbaar. Uploads worden aangenomen en gemarkeerd als „Niet gecontroleerd”; de controle volgt zodra hij weer draait.",
+  "{0} file waits for the check": ["{0} bestand wacht op de controle", "{0} bestanden wachten op de controle"],
+  "{0} locked file (malware found)": ["{0} geblokkeerd bestand (malware gevonden)", "{0} geblokkeerde bestanden (malware gevonden)"]
 }
