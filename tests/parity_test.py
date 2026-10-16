@@ -209,9 +209,16 @@ APP_TO_API = {
     "POST /api/files/folders": ["POST /files"], "POST /api/files/upload": ["POST /files"], "POST /api/files/nodes/{}/versions": ["POST /files/{}/versions"],
     # 2.48.0 (#1111): documents (agents read / set the fields of documents shared with them)
     "GET /api/docs": ["GET /documents"], "GET /api/docs/{}": ["GET /documents/{}"], "PATCH /api/docs/{}": ["PATCH /documents/{}"],
+    # 2.60.0 (#343): sprints -- agents read the sprints of a shared list and put tasks into one (or back to the backlog)
+    "GET /api/lists/{}/sprints": ["GET /lists/{}/sprints"], "GET /api/sprints/{}": ["GET /sprints/{}"],
+    "POST /api/lists/{}/sprints/assign": ["POST /lists/{}/sprints/assign"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.60.0 (#343): planning sprints stays with the people of a list -- switching sprints on, planning, editing, starting, closing "
+     "and removing a sprint; agents read sprints (list_sprints / get_sprint), put tasks into one (set_task_sprint) and hear "
+     "sprint_started / sprint_closed", ("=PUT /api/lists/{}/sprint-settings", "=POST /api/lists/{}/sprints", "=PATCH /api/sprints/{}",
+                                        "=DELETE /api/sprints/{}", "=POST /api/sprints/{}/start", "=POST /api/sprints/{}/close")),
     ("2.48.0 (#1207): managing the file store stays with people -- rename, move, trash, restore a version, shares, organisation-wide "
      "access, links to task / project files, the move targets; agents list, read and write files where they may edit",
      ("=PATCH /api/files/nodes/{}", "=DELETE /api/files/nodes/{}", "=POST /api/files/nodes/{}/restore", "=POST /api/files/nodes/{}/versions/{}/restore",

@@ -21,6 +21,7 @@ TASK_FIELDS = ("list_id", "section_id", "parent_id", "title", "content", "priori
                "assignee_group_id",  # 2.10.0 (#441): assigned to a group (whoever has time); excludes assignee_id
                "plan_start",  # 2.11.0: planned start "YYYY-MM-DDTHH:MM" (day plan), independent of the due date
                "ms", "milestone_id",  # 2.18.0 (#430): a milestone (1) / the milestone of the same list a task belongs to
+               "sprint_id",  # 2.60.0 (#343): the sprint of the same list the task is planned in (None = backlog)
                "fam", "rotation", "stars",  # 2.19.0 (#653): family data, household rotation, stars of a kid
                "snippets",  # 2.35.0 (#1095): code snippets (JSON list, tasks/snippets.py)
                "locked")  # 2.36.0 (#1118): the lock (1 = the app shows the task read-only, see lock_problem)
@@ -370,6 +371,8 @@ def clean_task(b):
                 v = 1 if v else 0
             if k == "milestone_id":
                 v = None if v in ("", None, 0) else as_int(v, tr("Milestone"), 1)
+            if k == "sprint_id":  # 2.60.0 (#343)
+                v = None if v in ("", None, 0) else as_int(v, "sprint_id", 1)
             if k == "fam":  # 2.19.0 (#653)
                 v = clean_fam(v)
             if k == "rotation":

@@ -1153,6 +1153,20 @@ TOOLS += [
      lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}/milestones/{_id(a, 'milestone_id')}", body=_without(a, "list_id", "milestone_id"))),
     ("delete_milestone", "Remove a milestone.", _obj({"list_id": S_ID, "milestone_id": S_ID}, ["list_id", "milestone_id"]),
      lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}/milestones/{_id(a, 'milestone_id')}")),
+    # 2.60.0 (#343): sprints of a project list (people switch them on, plan and close them; agents read and assign)
+    ("list_sprints", "2.60.0: the sprints of a project list (newest first): id, num, title, start, end, goal, state planned | active | "
+                     "closed, progress (done / total, points), the review of closed sprints (done / moved / added task ids, counts, "
+                     "points); plus the list's sprint settings and active_id. Empty when the list has no sprints.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/sprints")),
+    ("get_sprint", "2.60.0: one sprint with its tasks (open first) and a burndown (open work per day and an ideal line; unit count = "
+                   "tasks, points = story points).",
+     _obj({"sprint_id": S_ID, "unit": {"type": "string", "enum": ["count", "points"]}}, ["sprint_id"]),
+     lambda api, a: api.call("GET", f"/sprints/{_id(a, 'sprint_id')}", query={"unit": a["unit"]} if a.get("unit") else None)),
+    ("set_task_sprint", "2.60.0: put tasks of a list into one of its open sprints (sprint_id) or back to the backlog (sprint_id null). "
+                        "Needs edit rights on the list; milestones and tasks of other lists are skipped.",
+     _obj({"list_id": S_ID, "task_ids": {"type": "array", "items": {"type": "integer"}, "minItems": 1}, "sprint_id": {"type": ["integer", "null"]}},
+          ["list_id", "task_ids"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/sprints/assign", body={"ids": a["task_ids"], "sprint_id": a.get("sprint_id")})),
     ("set_project_status", "Post a status update of a project: status on_track | at_risk | off_track | on_hold | complete (empty = none) "
                            "and a short note; the members are told.",
      _obj({"list_id": S_ID, "status": {"type": "string", "enum": ["on_track", "at_risk", "off_track", "on_hold", "complete", ""]},

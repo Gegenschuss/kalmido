@@ -925,6 +925,7 @@ function taskRow(t, opts = {}) {
   if (t.points && !opts.trash && spt_on(t.list_id)) meta.push(spt_chip(t));  // 2.60.0 (#1511): story points
   if (isMs(t)) meta.push(`<span class="msm${t.due ? ' sr' : ''}">${t.due ? esc(tr('Milestone')) : `<i class="msd" aria-hidden="true"></i>${esc(tr('Milestone without a date'))}`}</span>`);  // 2.18.0 (#430)
   else if (t.milestone_id && !opts.trash && !opts.subRow) meta.push(msChip(t));
+  if (t.sprint_id) { const sc = spr_rowChip(t, opts); if (sc) meta.push(sc); }  // 2.60.0 (#343): only with "Show the sprint in the task row"
   if (isOcc(t) && famOn() && t.status === 0 && occWhat(t)) meta.push(`<span class="occm">${ic('cake', 's')}${esc(occWhat(t))}</span>`);  // 2.19.0 (#653)
   if (t.rotation?.who?.length > 1 && famOn() && t.status === 0 && !opts.trash) meta.push(`<span class="rotm" title="${esc(tr('Takes turns'))}">${ic('turns', 's')}<span class="sr">${esc(tr('Takes turns'))}</span></span>`);
   if (t.context) meta.push(`<span class="ctxm" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`);

@@ -374,6 +374,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `offer_accepted`: a quotation of your office area was accepted (`doc_id`, `client_id`, `list_id`, sums); only with your office switch on
 - `review_requested`: you are the reviewer of a task that went into review (`review` {state, list_id, url}); check it, then
   `review_task` approve, or changes with a short note what should change. Never approve a task assigned to you
+- `sprint_started` / `sprint_closed`: a sprint of a project list shared with you started / was closed (`sprint`, with `review` when closed: done / moved / added task ids and points). Sprints: `list_sprints`, `get_sprint` (tasks + burndown), `set_task_sprint` (into a sprint or back to the backlog; people plan and close sprints)
 
 Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get_document` (text, sender, amount) ->
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,

@@ -41,8 +41,9 @@ function listHead(l, o = {}) {
   // 2.31.0 (#1053): one slim line: bar left, overdue + next due right; "Set status" (no status yet) is not repeated here,
   // it lives on the project page and in the list's "…" menu (a status that is set still shows as its pill)
   const p = l.progress || {done: 0, total: 0, overdue: 0}, showP = progressFor(l) && p.total > 0 && !progHidden(l.id), pill = o.noPill ? '' : statusPill(l, true, false), ts = timeSumHtml([l]);
-  if (!showP && !pill && !ts) return vsegHtml(l) + famBar(l) + lifeBar(l) + agBandHtml();
-  return `${vsegHtml(l)}${famBar(l) + lifeBar(l)}<div class="lhead">${showP ? `<span class="lprow"><span class="lpg">${progBar(p)}</span>${progMeta(p)}</span>` : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
+  const sh = sprHead(l);  // 2.60.0 (#343): the sprint header (lists with sprints on)
+  if (!showP && !pill && !ts) return vsegHtml(l) + famBar(l) + lifeBar(l) + sh + agBandHtml();
+  return `${vsegHtml(l)}${famBar(l) + lifeBar(l)}<div class="lhead">${showP ? `<span class="lprow"><span class="lpg">${progBar(p)}</span>${progMeta(p)}</span>` : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${sh}${agBandHtml()}`;
 }
 // ---- 2.7.0 (#407): the tracked time of a project list (or of a folder's project lists) in its header, in hours and in
 // working days. Hours per day / shift: the list's own value (list dialog, owner; the same for every member), else the

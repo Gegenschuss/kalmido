@@ -106,6 +106,7 @@ ORDER = (
     "integrations.gitfolder",  # 2.33.0 (#934)
     "integrations.errorreports",
     "api.projects",
+    "lists.sprints",  # 2.60.0 (#343): sprints of project lists (after api.v1: it has token routes)
     "lists.kpis",  # 2.43.0 (#1328): sum row + key figures (web + token API)
     "lists.orgvis",  # 2.46.0 (#1603): organisation lists visible to the whole organisation
     "api.scopes",

@@ -12,7 +12,7 @@ document.addEventListener('dragstart', e => {
   requestAnimationFrame(() => r.classList.add('dragging'));
 });
 document.addEventListener('dragend', () => { dragId = null; DSE.v = 0; document.body.classList.remove('tdrag'); $$('.dragging,.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dragging', 'dropbefore', 'dropafter', 'drop')); });
-const DROP_SEL = '.trow, .kcol, .quad, .cal .cell, .srow[data-drop], .wcol, .wad, .wh, #view .ghead[data-section], #view .sdrop';
+const DROP_SEL = '.trow, .kcol, .quad, .cal .cell, .srow[data-drop], .wcol, .wad, .wh, #view .ghead[data-section], #view .sdrop, #view .sprh[data-sprdrop]';  // 2.60.0 (#343): + the sprint header
 // lower half of a row = drop after it (so the end of a block / list is reachable)
 const dropAfter = (row, y) => { const r = row.getBoundingClientRect(); return y != null && r.height > 0 && y > r.top + r.height / 2; };
 function markDrop(el, id, y) {
@@ -65,6 +65,8 @@ async function dropTask0(id, el, clientY) {
   if (el.closest('#detail')) return;
   if (sec && sec.dataset.newsec) { taskToNewSection(id); return; }  // (sec is false over a row)
   if (sec) { taskToSection(id, sec.dataset.section ? +sec.dataset.section : null); return; }
+  const sprh = el.closest('#view .sprh[data-sprdrop]');  // 2.60.0 (#343): dropped on the sprint header
+  if (sprh) { spr_dropTask(id, +sprh.dataset.sprdrop); return; }
   const item = {id};
   if (side) {
     const k = side.dataset.drop;

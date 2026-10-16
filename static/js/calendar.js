@@ -7,7 +7,7 @@ function viewKanban() {
   const k = S.route.key;
   const lid = k === 'inbox' ? inbox().id : +k.slice(2);
   const secs = S.sections.filter(s => s.list_id === lid), ro = !canEditList(lid);
-  const tasks = sortTasks(openTasks().filter(t => t.list_id === lid && !t.parent_id));
+  const tasks = sortTasks(openTasks().filter(t => t.list_id === lid && !t.parent_id && sprKeep(t, k)));  // 2.60.0 (#343): the sprint filter
   const cols = [];
   const loose = tasks.filter(t => !t.section_id || !secs.some(s => s.id === t.section_id));
   if (loose.length || !secs.length) cols.push({id: null, name: secs.length ? tr('Unassigned') : tr('Tasks'), tasks: loose});

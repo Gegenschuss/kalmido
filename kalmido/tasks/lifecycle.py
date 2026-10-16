@@ -159,6 +159,11 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
             return e
     elif lid != cur["list_id"] and cur["milestone_id"]:
         f["milestone_id"] = None  # moved to another list: the milestone stays behind
+    if "sprint_id" in f or (lid != cur["list_id"] and cur["sprint_id"]):  # 2.60.0 (#343): a sprint of the same list
+        from ..lists.sprints import spr_apply
+        e = spr_apply(c, f, cur, lid)
+        if e:
+            return e
     if "rotation" in f or (cur["rotation"] and lid != cur["list_id"]):  # 2.19.0 (#653): household rotation
         if "rotation" in f and has_request_context() and getattr(g, "user", None) and list_role(c, cur["list_id"]) == "participant":
             raise Denied(403, tr("Participants cannot change who a task is assigned to"))

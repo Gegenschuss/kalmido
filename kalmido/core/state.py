@@ -117,6 +117,8 @@ def visible_lists(c, uid):
     bells = {r[0]: (r[1], r[2]) for r in c.execute("SELECT list_id, mode, custom FROM list_bell WHERE user_id=?", (uid,))}
     repos = git_repos_of_lists(c, ids)  # 2.2.0 (#271)
     mss = milestones_of_lists(c, [r["id"] for r in rows if r["kind"] == "project"])  # 2.7.1 (#410): timeline markers
+    from ..lists.sprints import spr_of_lists
+    sprs = spr_of_lists(c, [r for r in rows if r["kind"] == "project"])  # 2.60.0 (#343)
     has_groups = collab_all() and bool(c.execute("SELECT 1 FROM group_shares LIMIT 1").fetchone())
     from ..lists.playbook import pb_flags
     pbs = pb_flags(c, rows)  # 2.39.0 (#1168): lists with an effective Playbook
@@ -155,6 +157,10 @@ def visible_lists(c, uid):
         d["notif_cap"] = cap_hint(c, r["id"], uid, d["owner_name"]) if r["owner_id"] != uid and collab_all() else None
         d["repos"] = repos.get(r["id"], [])
         d["milestones"] = mss.get(r["id"], [])
+        if r["id"] in sprs:  # 2.60.0 (#343): sprint settings + the active / planned / last closed sprints (lists with sprints on)
+            d["sprints"], d["sprint_cfg"] = sprs[r["id"]]["sprints"], sprs[r["id"]]["cfg"]
+        else:
+            d.pop("sprint_cfg", None)
         # 2.10.0 (#441): the groups the list is shared with (directly or through a folder of its owner)
         d["groups"] = [{"group_id": gid, "name": grp_name(c, gid), "role": role, "via": via}
                        for gid, role, via in grp_shares_of_list(c, r["id"])] if has_groups else []

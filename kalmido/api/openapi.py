@@ -682,6 +682,8 @@ def openapi_spec():
     rvw_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.60.0 C (#1512)
     from ..lists.points import spt_spec
     spt_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.60.0 B (#1511)
+    from ..lists.sprints import spr_spec
+    spr_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.60.0 (#343)
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",
