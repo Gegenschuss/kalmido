@@ -161,6 +161,8 @@ The most used helpers:
 | `agents/safety.py` | 2.30.0: agents stay inside one circle of people: bridges between lists with different people (409 + approval), moving tasks across circles waits for approval, the list restriction of agents / tokens, the agents' list access log. |
 | `agents/usage.py` | Model usage of agents, limits and the agents' audit log. |
 | `lists/public.py` | Public links of lists and checklist mode. |
+| `lists/custview.py` | 2.50.0 (#329): the customer view of a public link (`public_links.cv_show`: what the customer sees, filtered on the server). |
+| `office/signoff.py` | 2.50.0 (#1200): approval links with a simple electronic signature (`office_signoffs`): accept / decline a sent quotation, acceptance of a list, section or milestone; the customer page `/s/q/<token>`. |
 | `integrations/git.py` | Git integration of project lists (GitHub, GitLab, Gitea / Forgejo, Bitbucket) and tickets for agents. |
 | `integrations/errorreports.py` | Error reports (Sentry, GlitchTip ...) -> tickets. |
 | `api/projects.py` | The project page in the token API. |
@@ -280,6 +282,8 @@ registering the ones of its area.
 | `dialogs.js` | Modals: the app's own dialogs, the list dialog and the share dialog. |
 | `settings.js` | Settings: notifications, Web Push, autosave settings, personal agents, import. |
 | `integrations.js` | API tokens + scopes, webhooks, public links, calendar apps (CalDAV). |
+| `custview.js` | 2.50.0 (#329): Share dialog > Public link > *What does the customer see?* |
+| `signoff.js` | 2.50.0 (#1200): approval links on a sent quotation and in the Share dialog (acceptance), with their protocol. |
 | `account.js` | Account, users (admin), login, groups, passkeys, two-factor, sign-in policy, backups, the sample project. |
 | `templates.js` | Templates and statistics. |
 | `time.js` | Time tracking (module "time"). |

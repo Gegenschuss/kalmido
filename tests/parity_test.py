@@ -233,7 +233,8 @@ APP_ONLY = [
         "* /api/agents/{}/autoshare", "GET /api/agents/usage")),
     ("devices and pushes of a person", ("* /api/push/", "POST /api/ntfy/test")),
     ("2.17.0 (#443): a person's e-mail addresses for new tasks and the summary by mail (secrets of the account)", ("* /api/me/mail",)),
-    ("public links: sharing outside the instance, people only", ("* /api/lists/{}/public-link",)),
+    ("public links: sharing outside the instance, people only", ("* /api/lists/{}/public-link",
+                                                                  "* /api/lists/{}/signoffs")),  # 2.50.0 (#1200): acceptance links of a list
     ("2.33.0 (#927): notification templates are set by the owner in the app; agents only read a list's template",
      ("PUT /api/lists/{}/notify-template", "* /api/folders/notify-template", "POST /api/notify-templates/asked")),
     ("repositories: their secrets are entered by people; the API reads them (GET /lists/{id}/repos)", (

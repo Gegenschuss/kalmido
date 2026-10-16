@@ -135,7 +135,9 @@ check(Bo.get(B + f"/api/lists/{L}/public-link").status_code == 403 and Bo.get(B 
 check(Bo.put(B + f"/api/lists/{P}/public-link", json={}).status_code == 404, "IDOR: foreign private list 404")
 check(A.put(B + f"/api/lists/{inbox}/public-link", json={}).status_code == 400, "the inbox cannot be shared publicly")
 check(A.put(B + f"/api/lists/{L}/public-link", json={}, headers={"X-Requested-With": ""}).status_code == 403, "CSRF header needed")
-check(A.get(B + f"/api/lists/{L}/public-link").json() == {"enabled": True, "link": None}, "no link yet")
+j0 = A.get(B + f"/api/lists/{L}/public-link").json()
+# 2.50.0 (#329): + the options of the customer view (the list's tags and fields)
+check({k: v for k, v in j0.items() if k != "options"} == {"enabled": True, "link": None} and "options" in j0, "no link yet")
 for bad, what in (({"mode": "edit"}, "mode"), ({"notes": "yes"}, "notes"), ({"expires": "2020-01-01"}, "expiry in the past"),
                   ({"expires": "tomorrow"}, "expiry format"), ({"password": "abc"}, "password too short"), ({"password": 1234}, "password type")):
     check(A.put(B + f"/api/lists/{L}/public-link", json=bad).status_code == 400, "validation: " + what)

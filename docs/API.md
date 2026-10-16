@@ -951,6 +951,16 @@ that writes `props.agent_id` sets the folder's first agent (0 removes the folder
 in the folder: `GET /api/folders/public-links?folder=` · `PUT /api/folders/public-links` `{folder, on: bool, notes?}`
 (read only, no password; health lists never; existing links stay as they are) → `{enabled, lists: [{id, name, health,
 link}], created, removed}` (`enabled` = public links allowed on this server; `on: true` while they are off: `409`).
+2.50.0 (#329): the public link of one list, `GET/PUT /api/lists/<id>/public-link` (owner), also returns and takes `show`
+`{progress, sections, due, assignees, tags, files, brand: bool, fields: [field ids], tag: list tag id | null}` - what the
+customer sees (default: sections and due dates, as before); `GET` adds `options` `{tags, fields}` of the list. Task files
+of shown tasks are served through the token only (`/s/<token>/file/<id>`), never comment files; team comments never.
+2.50.0 (#1200): acceptance links of a list (owner): `GET /api/lists/<id>/signoffs` (links with their protocol, the list's
+`milestones` and `sections`), `POST /api/lists/<id>/signoffs` `{section_id? | task_id? (a milestone), expires?}`,
+`POST /api/lists/<id>/signoffs/<sid>/revoke`; quotations: see docs/OFFICE.md. With `show.feedback` on, the customer can
+leave a comment on a shown task (`POST /s/<token>/feedback`, name + text, plain, rate limited): it lands as a comment without
+an account (`user_id` null, `ext_name` = the typed name; in `/api/v1` and agent events `author.customer: true`). People only (no `/api/v1`, no MCP tool):
+like the public link, sharing outside the instance is a person's decision.
 `POST /api/folders/owner` `{folder, user_id}` hands every own list in the folder and its subfolders (not archived, never
 the Inbox) to that person (the rules of *Transfer ownership* per list; you stay list admin) → `{moved, skipped: [{id, name,
 reason}]}`. The folder routes act on the signed-in person's own folders; agent accounts get `403` when they change

@@ -34,6 +34,7 @@ TABLES = (
     "office_deals",  # 2.50.0 B (#1196): the sales pipeline
     "hub_absences",  # 2.50.0 A (#1195): absences (the area they were entered in; the app hides the kind)
     "hub_bookings",  # 2.50.0 A (#1194): bookings of the disposition
+    "office_signoffs",  # 2.50.0 C (#1200): approval links (NULL = a private list's acceptance, the app checks the list)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

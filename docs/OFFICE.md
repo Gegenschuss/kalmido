@@ -554,6 +554,28 @@ street, postcode, city, country, VAT ID, customer number, buyer reference (for e
 invoices and payment terms in days; the free address stays. These fields are for people only and are not part of agent
 answers.
 
+## Approval by the customer (2.50.0)
+
+A sent quotation gets an **approval link** (block *Approval by the customer* in the editor, members of the organisation):
+`POST /api/office/docs/<id>/signoff` `{expires?: YYYY-MM-DD}` (`409` unless the quotation is sent; a new link stops the
+older one), `GET /api/office/docs/<id>/signoffs` (newest first, with the protocol), `POST /api/office/signoffs/<sid>/revoke`.
+The customer opens `/s/q/<token>` without an account: the quotation as a summary (positions, totals) and as PDF, types a
+name (e-mail optional), ticks *I accept the quotation* and presses *Accept bindingly*, or declines with an optional
+reason. Stored in `office_signoffs` and in the office log (`signoff_accepted` / `signoff_declined` with the detail): name,
+e-mail, time (UTC), client address, user agent and the SHA-256 of the quotation's printed content when the link was
+made (`doc_hash`). The quotation is set to accepted / declined through the same code as the status change in the app
+(`odoc_set_status`: purchase, sales pipeline). Afterwards the link shows only the confirmation; a second decision is
+impossible. A quotation that changes after the link was made voids the link. The person who made the link gets a push
+(notification switch *Approval requests*). Token: 256 bits, looked up by its SHA-256 (a sealed copy lets the creator copy
+it again); unknown, expired, stopped and voided links get the same `404`; decisions are limited per client address and
+per link; the form carries a check value bound to the link. Name, e-mail, reason, address and user agent are encrypted at
+rest in organisations with encryption.
+
+This is a **simple electronic signature**: usually enough to accept a quotation or confirm an acceptance; not for contracts
+that the law requires in written form (they need a qualified signature). Kalmido gives no legal advice and builds no
+advanced or qualified signature. The same flow confirms the **acceptance** of a project, a section or a milestone from the
+list's Share dialog > Public link (*Request acceptance*); the customer's list page shows the open request.
+
 ## Access log
 
 Every change and every read of documents and master data is written to the office log (`office_doc_log`): who, when,

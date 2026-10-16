@@ -287,11 +287,13 @@ function pubDraw(md, lid, j) {
   box._j = j;
   const st = $('#sh-st-pub', md); if (st) st.textContent = k ? (k.expired ? tr('Expired') : tr('On')) : tr('Off');  // 2.32.0 (#1058): the folded line
   box.innerHTML = `${k ? `<div class="row icalrow"><input id="lp-url" readonly value="${esc(k.url)}" aria-label="${tr('Public link')}"><button class="btn sm pri" data-lp="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
-      <div class="shint">${k.expired ? `<span class="calerr" role="alert">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint keep">${tr('People without an account can open the list through a secret link: only this list, without comments, assignees or files.')}</div>`}
+      <div class="shint">${k.expired ? `<span class="calerr" role="alert">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint keep">${tr('People without an account can open the list through a secret link: only this list and only what you choose here.')}</div>`}
     <div class="row"><label for="lp-mode">${tr('Access')}</label><select id="lp-mode"><option value="view">${tr('View only')}</option><option value="tick" ${k?.mode === 'tick' ? 'selected' : ''}>${tr('View and tick off')}</option></select></div>
     <div class="row"><label for="lp-exp">${tr('Valid until')}</label>${dateIn('lp-exp', pubDate(k?.expires_at), {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
     <div class="row"><label for="lp-pw">${tr('Password')}</label><input type="password" id="lp-pw" autocomplete="new-password" placeholder="${k?.has_password ? tr('saved, empty = keep') : tr('optional')}">${k?.has_password ? `<label class="chkl"><input type="checkbox" id="lp-nopw"> ${tr('remove')}</label>` : ''}</div>
     <div class="row"><label></label><label class="chkl"><input type="checkbox" id="lp-notes" ${k?.notes ? 'checked' : ''}> ${tr('Show task notes')}</label></div>
+    ${cv_html(k, j.options)}
+    ${k ? sg_list_box(lid) : ''}
     <div class="row">${k ? `<button class="btn sm" data-lp="save">${tr('Save link settings')}</button><button class="btn sm" data-lp="regen">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-lp="off">${tr('Turn off')}</button>` : `<button class="btn sm pri" data-lp="save">${ic('link', 's')} ${tr('Create public link')}</button>`}</div>
     <div class="calerr" role="alert" id="lp-err" hidden></div>`;
 }
@@ -309,6 +311,7 @@ function pubWire(md, lid) {
       let j;
       if (a === 'save') {
         const body = {mode: $('#lp-mode', md).value, notes: $('#lp-notes', md).checked, expires: $('#lp-exp', md).value || null};
+        const cv = cv_read(md); if (cv) body.show = cv;  // 2.50.0 (#329)
         if ($('#lp-pw', md).value) body.password = $('#lp-pw', md).value; else if ($('#lp-nopw', md)?.checked) body.password = '';
         j = await calReq('PUT', `/api/lists/${lid}/public-link`, body);
         toast(tr('Public link saved'));

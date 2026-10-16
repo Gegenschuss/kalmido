@@ -7181,3 +7181,15 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .dp .clhead{flex-wrap:wrap;gap:.5rem}
 @media (max-width:599px){.dpgrid{display:none}.dpdays{display:block}}
 @media (max-width:599px){.dp .clhead>.seg{display:flex;width:100%}.dp .clhead>.seg button{flex:1;justify-content:center;min-height:2.25rem}.dp .clhead>.spacer{flex:1}}
+/* 2.50.0 C (#329) list dialog > Public link: "What does the customer see?" */
+.cvsec{margin:.5rem 0;padding:.75rem 0 .25rem;border-top:1px solid var(--line)}
+.cvsec .cvh{font-size:.8125rem;font-weight:600;color:var(--text2);margin-bottom:.5rem}
+.cvopts{display:grid;grid-template-columns:repeat(auto-fill,minmax(12rem,1fr));gap:.25rem .75rem}
+.cvopts .chkl{min-height:2.25rem}
+/* 2.50.0 C (#1200) approval links (quotation, list dialog): the protocol rows */
+.sgsec .sgh{font-size:.875rem;font-weight:600;margin:0 0 .5rem}
+.sglist{list-style:none;margin:0 0 .5rem;padding:0}
+.sgrow{padding:.5rem 0;border-bottom:1px solid var(--line)}
+.sgrow .sghead{font-size:.875rem;overflow-wrap:anywhere}
+.sgrow.st-accepted .sghead b{color:var(--accent)}
+.sgproto{margin-top:.25rem;font-size:.8125rem;color:var(--text2);overflow-wrap:anywhere}
