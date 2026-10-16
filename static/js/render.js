@@ -603,6 +603,7 @@ function topMoreItems() {
   // 2.24.0 (UX-35): Today's planners live here now (the header keeps its room for the tasks)
   if (m === 'tasks' && k === 'today') out.push({label: tr('Plan my day'), icon: 'cal', fn: () => dayplanModal('day')}, {label: tr('Fill free time'), icon: 'clock', fn: () => dayplanModal('fill')});
   if (m === 'tasks' && k === 'today') out.push({label: tr('Customize Today…'), icon: 'sliders', fn: () => lyOpen('today', true)});  // 2.32.0 (#1063)
+  if (m === 'tasks' && k === 'today' && typeof lyv_viewMenu === 'function') out.push(...lyv_viewMenu('today'));  // 2.55.0 (#1069): Today has no header switch
   if (m === 'time') out.push({label: tr('Customize…'), icon: 'sliders', fn: () => lyOpen('time', true)});
   if (m === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview())
     sec.push({label: S.multiMode ? tr('End selection') : tr('Select multiple'), icon: 'select', on: S.multiMode, fn: () => { S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); }},

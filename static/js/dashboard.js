@@ -172,7 +172,8 @@ function lyOptSet(v, b, n, x) {
 }
 const lyAct = v => v === 'home' ? 'dash' : 'ly';
 // 2.43.0 (#1452): the blocks are changed at their "…" menu; the arranging list stays for keyboards and screen readers
-const lyCustomBtn = v => `<button type="button" class="iconbtn lycust" data-act="${lyAct(v)}-custom" data-lyv="${v}" title="${esc(tr('Arrange blocks…'))}" aria-label="${esc(tr('Arrange blocks…'))}">${ic('sliders', 's')}</button>`;
+// 2.55.0 (#1069): + the switch of saved arrangements in front (lysets.js)
+const lyCustomBtn = v => `${typeof lyv_btn === 'function' ? lyv_btn(v) : ''}<button type="button" class="iconbtn lycust" data-act="${lyAct(v)}-custom" data-lyv="${v}" title="${esc(tr('Arrange blocks…'))}" aria-label="${esc(tr('Arrange blocks…'))}">${ic('sliders', 's')}</button>`;
 // the blocks of view v in the chosen order and widths; parts = {key: html | fn(closeButton) | ''} ('' = nothing to show now)
 function lyHtml(v, parts, o = {}) {
   const d = LY[v], {order, hidden, size} = lyPref(v);
@@ -211,7 +212,7 @@ function lyEditor(v, o = {}) {
   const list = `<details class="lylist" ${LS.get('lyList', true) ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('Order as a list')}</span></summary>
     <ol class="dcust" aria-label="${esc(v === 'home' ? tr('Cards') : tr('Blocks'))}" aria-describedby="lyhint-${v}">${rows}</ol><p class="muted lyhint" id="lyhint-${v}">${desk ? tr('Drag a row or use the arrows; Alt + arrow keys move the focused row.') : tr('Use the arrows to change the order.')}</p></details>`;
   return `<div class="lyed" data-lyed="${v}"><div class="dashhead"><h2>${esc(d.title())}</h2><span class="spacer"></span><button type="button" class="btn sm pri" data-act="${A}-done" data-lyv="${v}">${tr('Done')}</button></div>
-    <div class="lyopts">${scope}${ph}</div>
+    <div class="lyopts">${scope}${ph}</div>${typeof lyv_edBar === 'function' ? lyv_edBar(v) : ''}
     ${lydragCanvas(v, pr, o.parts || {})}
     ${list}
     ${reset}</div>`;
