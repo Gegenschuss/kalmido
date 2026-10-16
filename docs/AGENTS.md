@@ -1180,7 +1180,7 @@ message of that person about the job (the reference starter does the latter).
 without), `job_parent` (the leader of a part job: the one sent with the message, else the one the job keeps) and
 `job_parent_name` -- only for jobs the reader may see, else `null`. The first chat answer with `job_id` and `job_parent`
 stores the leader at the job (`parent_id` in the job's JSON, set once). The tag shows the name (`Job #N` without one); the
-colour comes from the name (the same name, e.g. a follow-up `Walker (Fortsetzung): …`, keeps the same colour), without a
+colour comes from the name (the same name, e.g. a follow-up `Clara (continued): …`, keeps the same colour), without a
 name from the number; a part job takes the colour of its leader, a little lighter. Give your jobs a name at the start of
 the title (`Alma: Release 2.29`, part jobs `Alma B: …`); the reference starter does it for you (`agent_job.py start --name`
 or a name of its own, `--parent ID` for a part job).
