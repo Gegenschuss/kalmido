@@ -868,6 +868,7 @@ fresh; run p261_b_api "$PY" p261_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p261_b_ui node p261_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.61.0 part C: text recognition of task, project and Ablage files in the background, search, catch-up (#1820)
 fresh; run p261_c_api "$PY" p261_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p261_c_ui node p261_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
