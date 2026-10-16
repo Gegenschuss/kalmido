@@ -69,8 +69,11 @@ def agent(name):
 CL, CLH = agent("claude")
 OT, OTH = agent("otto")
 W = A.post(B + "/api/lists", json={"name": "Work", "org_id": ORG}).json()["id"]
-for m in (CL, OT, BOB, CAROL):
+for m in (CL, BOB, CAROL):
     check(A.put(B + f"/api/lists/{W}/members", json={"user_id": m, "role": "edit"}).ok, f"setup: {m} in the list")
+W2 = A.post(B + "/api/lists", json={"name": "Otto", "org_id": ORG}).json()["id"]  # one agent per list (as p256_a)
+for m in (OT, BOB):
+    check(A.put(B + f"/api/lists/{W2}/members", json={"user_id": m, "role": "edit"}).ok, f"setup: {m} in otto's list")
 
 
 def job(hdr, title, who=BOB):
