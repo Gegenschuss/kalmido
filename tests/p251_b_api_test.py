@@ -366,5 +366,23 @@ check(not q("SELECT 1 FROM tasks WHERE list_id=? AND deleted_at IS NULL", (L10,)
 check(q("SELECT 1 FROM events WHERE id=? AND deleted_at IS NULL", (E10[0][0] if E10 else 0,)), "review 10: the changed draft stays")
 check("events" in feats(A), "review 10: the calendar module stays on while a draft stayed")
 
+if os.path.exists(os.path.join(N, "..", "kalmido", "office", "agentdocs.py")) or os.environ.get("PK2_OFFICE"):
+    A.put(O + "/settings", json={"agents_read": 1})
+    # #1351 review 2: office data only with the agent's scope office
+    check(A.patch(B + f"/api/my/agents/{PAG}", json={"scopes": ["write"]}).ok, "review 2: the agent loses the scope office")
+    r = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "proposal": OWN2})
+    check(r.status_code == 201 and r.json()["input"]["office"] == {"ok": False, "reason": "no_scope"} and r.json()["input"]["clients"] == [],
+          f"review 2: without the scope no clients, no quotation ({r.text[:200]})")
+    r = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "offer_id": QD, "proposal": FROM})
+    check(r.status_code == 403, f"review 2: without the scope the accepted quotation stays closed ({r.status_code})")
+    r = A.post(B + "/api/proposals", json={"kind": "inquiry", "agent_id": PAG, "text": MAIL})
+    jx = r.json().get("id") if r.ok else 0
+    ev2 = [e for e in events(pcl, "job_request") if e["data"]["job"]["id"] == jx]
+    check(ev2 and ev2[0]["data"]["input"]["office"].get("reason") == "no_scope" and ev2[0]["data"]["input"]["clients"] == [],
+          "review 2: the person's request carries no office data either")
+    A.patch(B + f"/api/my/agents/{PAG}", json={"scopes": ["write", "office"]})
+
+    A.put(O + "/settings", json={"agents_read": 0})
+
 print(f"p251_b_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
