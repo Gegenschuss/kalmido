@@ -1133,7 +1133,11 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     obj = {"type": "object"}
     ids = {"type": "array", "items": {"type": "integer"}}
     schemas["Section"] = {"type": "object", "properties": {"id": {"type": "integer"}, "list_id": {"type": "integer"},
-                                                         "name": {"type": "string"}, "sort": {"type": "number"}}}
+                                                         "name": {"type": "string"}, "sort": {"type": "number"},
+                                                         # 2.60.0 (#1510)
+                                                         "wip_limit": nul("integer", minimum=1, maximum=999, description="2.60.0: the "
+                                                                          "most open tasks the kanban column should hold (a hint, "
+                                                                          "moving stays allowed); null = no limit")}}
     schemas["SectionPage"] = page("Section")
     schemas["Field"] = {"type": "object", "properties": {"id": {"type": "integer"}, "list_id": {"type": "integer"}, "name": {"type": "string"},
                                                        "type": {"type": "string"}, "options": obj, "pinned": {"type": "integer"},
