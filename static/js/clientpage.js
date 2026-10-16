@@ -80,7 +80,7 @@ function ms_clCard(c) {
     </div>`,
       persons: ks.length ? `<div class="ctsec"><h4>${tr('Contact persons')}</h4><ul class="ctlinks msclks">${ks.map(k => `<li>${ic('user', 's')} ${k.contact_id && feat('contacts') ? `<a href="#contacts/${k.contact_id}" title="${esc(tr('Open contact'))}"><b>${esc(k.name)}</b></a>` : `<b>${esc(k.name)}</b>`}${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default && ks.length > 1 ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone.replace(/[^\d+]/g, ''))}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul></div>` : '',
       invoices: typeof officeOn === 'function' && officeOn() && MSC.inv !== null ? `<div class="ctsec"><h4>${tr('Open invoices')}</h4>${inv.length ? `<ul class="ctlinks">${inv.map(x => `<li><a class="linkbtn" href="#office/offers/${x.id}">${ic('receipt', 's')} ${esc(x.number || tr('Draft'))}</a><span class="muted"> · ${esc(x.date ? fmtDateLoc(x.date) : '')} · ${esc(x.open_text || '')} · ${esc(x.status_text || '')}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No open invoices.')}</p>`}</div>` : '',
-      ...clientDetailParts(c)})}</div>
+      ...clientDetailParts(c)})}${clm_histHtml(c)}</div>
   </article>`;
 }
 
@@ -90,7 +90,8 @@ function ms_clBar() {
   const n = MSC.pick.size, sel = (MSC.items || []).filter(c => MSC.pick.has(c.id)), allArch = sel.length && sel.every(c => c.archived);
   const shown = ms_clShown(), allOn = n && shown.every(c => MSC.pick.has(c.id));
   return ms_barHtml('ct-sbar', 'clb', n, tr('Tap clients'), [['all', 'all', allOn ? tr('Select none') : tr('All')], ['edit', 'edit', tr('Edit')],
-    ['arch', allArch ? 'undo' : 'archive', allArch ? tr('Restore') : tr('Archive')], ['del', 'trash', tr('Delete'), 'danger']]);
+    ['arch', allArch ? 'undo' : 'archive', allArch ? tr('Restore') : tr('Archive')], ['merge', 'deps', tr('Merge')], ['del', 'trash', tr('Delete'), 'danger']])
+    .replace('data-clb="merge"', n < 2 ? 'data-clb="merge" disabled' : 'data-clb="merge"');  // 2.66.0 B (#1835): from two clients on
 }
 function ms_clClick(id, shift) {
   if (!MSC.pick) { MSC.pick = new Set(); MSC.last = null; }
@@ -121,6 +122,33 @@ async function ms_clAct(k) {
     ms_clEnd(); await ms_clAfter();
     toast([trn('{0} deleted', '{0} deleted', j.deleted), j.archived ? trn('{0} archived (in use)', '{0} archived (in use)', j.archived) : '', j.skipped ? trn('{0} skipped (only the creator or an admin may delete it)', '{0} skipped (only the creator or an admin may delete them)', j.skipped) : ''].filter(Boolean).join(' · '));
   } else if (k === 'edit') ms_clEdit(ids);
+  else if (k === 'merge') clm_merge(ids);  // 2.66.0 B (#1835)
+}
+// 2.66.0 B (#1835): merging duplicate clients (multisel.js ms_merge; server team/clientmerge.py): per differing field the value
+// that stays, the contact persons are joined; the overview comes from the server (dry); one undo step (and Undo in the history)
+function clm_merge(ids) {
+  const sel = ids.map(i => (MSC.items || []).find(c => c.id === i)).filter(Boolean);
+  if (sel.length < 2) { toast(tr('Choose at least two entries to merge')); return; }
+  const cur = S.settings.time_currency || '€', num = (v, d, u) => v == null || v === '' ? '' : `${fmtNum(v, d)}${u ? ' ' + u : ''}`;
+  const val = (k, fn) => Object.fromEntries(sel.map(c => [c.id, String(fn(c) ?? '')]));
+  const fields = [['name', tr('Name'), c => c.name], ['contact', tr('Contact person'), c => c.contact], ['email', tr('E-mail'), c => c.email],
+    ['phone', tr('Phone'), c => c.phone], ['address', tr('Address'), c => c.address], ['color', tr('Colour'), c => c.color],
+    ['rate', tr('Hourly rate'), c => num(c.rate, 2, cur)], ['budget_h', tr('Budget in hours'), c => num(c.budget_h, 1, 'h')],
+    ['budget_amount', tr('Budget as an amount'), c => num(c.budget_amount, 2, cur)], ['note', tr('Note'), c => c.note],
+    ...OFX_CL_FIELDS.map(([k, n]) => [k, tr(n), c => (c.billing || {})[k]])].map(([k, label, fn]) => ({k, label, vals: val(k, fn)}));
+  const send = (target, pick, dry) => rawFetch('POST', '/api/clients/merge', {target, ids, pick, dry});
+  ms_merge({title: trn('Merge {0} client', 'Merge {0} clients', sel.length),
+    recs: sel.map(c => ({id: c.id, label: c.name, sub: [c.org_name, c.archived ? tr('Archived') : ''].filter(Boolean).join(' · ')})),
+    fields, lists: [{k: 'contacts', label: tr('Contact persons'), vals: Object.fromEntries(sel.map(c => [c.id, (c.contacts || []).map(k => k.name)]))}],
+    preview: (target, pick) => send(target, pick, true),
+    run: async (target, pick) => {
+      let j = await send(target, pick, false);
+      ms_clEnd(); await ms_clAfter(); go('client/' + target);
+      const msg = trn('{0} client merged', '{0} clients merged', sel.length);
+      ms_hist(msg, tr('Clients merged'), async () => { await rawFetch('POST', `/api/clients/merges/${j.run_id}/undo`, {}); await ms_clAfter(); },
+        async () => { j = await send(target, pick, false); await ms_clAfter(); });
+      return true;
+    }});
 }
 function ms_clEdit(ids) {
   const cur = esc(S.settings.time_currency || '€'), num = (k, unit, lab) => `<span class="lacts"><input id="ms-f-${k}" data-msf="${k}" inputmode="decimal" class="numin" placeholder="–" aria-label="${esc(lab)}"><span class="muted">${unit}</span></span>`;

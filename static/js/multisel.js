@@ -63,3 +63,62 @@ function ms_sheet(title, sub, rows, save) {
 }
 // a step of the history (undo / redo with the toast and Ctrl+Z): fn(dir) does the request
 const ms_hist = (msg, label, undo, redo) => histToast(msg, histAdd({label, undo: async () => { await undo(); return {}; }, redo: async () => { await redo(); return {}; }}));
+// 2.66.0 (#1835): merging several records into one (contacts.js, clientpage.js). Step 1: which record stays (target) and,
+// per field whose values differ, which value it keeps; lists (phones, e-mails, addresses, ...) are joined, not replaced.
+// Step 2: the overview the server computes (preview(target, pick) -> {lines: [text]}: what moves where), the note that the
+// others are gone afterwards (Undo in the history), then run(target, pick) -> true closes. o = {title, recs: [{id, label,
+// sub?}], fields: [{k, label, vals: {id: text}}], lists: [{k, label, vals: {id: [text]}}], preview, run}
+function ms_merge(o) {
+  const ids = o.recs.map(r => String(r.id));
+  const st = {target: ids[0], pick: {}, step: 1};
+  const md = modal('<div class="mgbody"></div>');
+  md.classList.add('msdlg', 'mgdlg');
+  const close = fgModal(md);
+  const body = $('.mgbody', md);
+  const diff = () => o.fields.filter(f => new Set(ids.map(i => (f.vals[i] ?? '').trim()).filter(Boolean)).size > 1);
+  const dflt = f => (f.vals[st.target] ?? '').trim() ? st.target : (ids.find(i => (f.vals[i] ?? '').trim()) || st.target);
+  const radio = (name, val, on, label, sub = '') => `<label class="mgopt"><input type="radio" name="${name}" value="${esc(val)}" ${on ? 'checked' : ''}><span>${esc(label)}${sub ? `<small class="muted">${esc(sub)}</small>` : ''}</span></label>`;
+  const joined = l => [...new Set(ids.flatMap(i => l.vals[i] || []).map(x => String(x).trim()).filter(Boolean))];
+  const draw1 = () => {
+    const df = diff();
+    for (const f of df) if (!ids.includes(st.pick[f.k])) st.pick[f.k] = dflt(f);
+    const same = o.fields.filter(f => !df.includes(f) && ids.some(i => (f.vals[i] ?? '').trim())).map(f => f.label);
+    const lists = (o.lists || []).map(l => [l, joined(l)]).filter(([, v]) => v.length);
+    body.innerHTML = `<h3>${esc(o.title)}</h3>
+      <fieldset class="mgset"><legend>${tr('Keep')}</legend>${o.recs.map(r => radio('mg-t', r.id, String(r.id) === st.target, r.label, r.sub)).join('')}</fieldset>
+      ${df.length ? `<p class="muted">${tr('Choose which value stays where the entries differ.')}</p>` : ''}
+      ${df.map(f => `<fieldset class="mgset"><legend>${esc(f.label)}</legend>${ids.filter(i => (f.vals[i] ?? '').trim()).map(i => radio('mg-f-' + f.k, i, st.pick[f.k] === i, f.vals[i])).join('')}</fieldset>`).join('')}
+      ${lists.length ? `<div class="mgjoin"><b>${tr('Joined')}</b>${lists.map(([l, v]) => `<div><span class="muted">${esc(l.label)}:</span> ${esc(v.slice(0, 6).join(', '))}${v.length > 6 ? ' …' : ''}</div>`).join('')}</div>` : ''}
+      ${same.length ? `<p class="muted mgsame">${esc(tr('Same in all: {0}', same.join(', ')))}</p>` : ''}
+      <div class="aerr" role="alert"></div>
+      <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="next">${tr('Next')}</button></div>`;
+  };
+  const draw2 = r => {
+    const t = o.recs.find(x => String(x.id) === st.target);
+    body.innerHTML = `<h3>${esc(o.title)}</h3><p>${esc(tr('Everything moves to "{0}":', t.label))}</p>
+      <ul class="mglines">${(r.lines || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+      <p class="mgwarn">${esc(tr('The other entries are gone afterwards ({0}). You can undo the merge in the history for 30 days.', o.recs.filter(x => String(x.id) !== st.target).map(x => x.label).join(', ')))}</p>
+      <div class="aerr" role="alert"></div>
+      <div class="foot"><button class="btn" data-m="back">${tr('Back')}</button><span class="spacer"></span><button class="btn pri" data-m="run">${tr('Merge')}</button></div>`;
+  };
+  md.addEventListener('change', e => {
+    const n = e.target.name || '';
+    if (n === 'mg-t') { st.target = e.target.value; st.pick = {}; draw1(); }
+    else if (n.startsWith('mg-f-')) st.pick[n.slice(5)] = e.target.value;
+  });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    const err = () => $('.aerr', md);
+    if (b.dataset.m === 'close') { close(); return; }
+    if (b.dataset.m === 'back') { st.step = 1; draw1(); return; }
+    b.disabled = true;
+    try {
+      const pick = Object.fromEntries(diff().map(f => [f.k, Number(st.pick[f.k])]));
+      if (b.dataset.m === 'next') { const r = await o.preview(Number(st.target), pick); st.step = 2; draw2(r); }
+      else if (b.dataset.m === 'run' && await o.run(Number(st.target), pick)) { md.remove(); return; }
+    } catch (x) { if (err()) err().textContent = x.message || ''; }
+    b.disabled = false;
+  });
+  draw1();
+  return md;
+}

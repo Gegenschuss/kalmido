@@ -27,6 +27,7 @@ ORDER = (
     "core.pages",
     "core.instance",
     "core.state",
+    "core.merges",  # 2.66.0 (#1835): merging contacts / clients (reversible)
     "lists.lists",
     "lists.groups",
     "lists.grouppics",  # 2.46.0 (#1605)
@@ -145,6 +146,7 @@ ORDER = (
     "life.v1",
     "team.clients",
     "team.clients_bulk",  # 2.47.3 (#1733): several clients at once
+    "team.clientmerge",  # 2.66.0 B (#1835): merging duplicate clients (reversible)
     "office.clientlink",  # 2.59.0 A (#1735): the address book search of the client dialog
     "team.workload",
     "hub.absence",  # 2.50.0 A (#1195): absences + German public holidays

@@ -88,6 +88,7 @@ function clientDetailHtml(c, inCard) {  // 2.47.3 (#1734): inCard = the lower pa
     ${pt.month}
     ${pt.lists}
     ${pt.note}
+    ${clm_histHtml(c)}
   </div>`;
 }
 function clientTimeQuery(c, mon) {
@@ -438,3 +439,20 @@ function ofxClientBillingHtml(b) {
   const filled = OFX_CL_FIELDS.some(([k]) => b[k] != null && b[k] !== '');
   return `<details class="clbill" ${filled ? 'open' : ''}><summary>${tr('Billing details')}</summary>${OFX_CL_FIELDS.map(([k, n, mx]) => (k === 'country' ? `<div class="row"><label for="clb-country-q">${esc(tr(n))}</label>${ctyField('clb-country', b.country, {attrs: 'data-clb="country"', label: tr(n)})}</div>` : `<div class="row"><label for="clb-${k}">${esc(tr(n))}</label><input id="clb-${k}" data-clb="${k}" maxlength="${mx}" value="${esc(b[k] ?? '')}" ${k === 'payment_terms_days' ? 'inputmode="numeric" class="numin"' : k === 'country' ? 'class="numin" autocapitalize="characters"' : k === 'email_invoice' ? 'type="email" autocomplete="off"' : ''}></div>`) + (typeof ofcII === 'function' ? ofcII('cl_' + k) : '')).join('')}</details>`;  // 2.40.0 (#1382): (i) of the terms
 }
+
+// 2.66.0 B (#1835): the merges into a client (its detail / card): "Merged with X, Y - date, person" and Undo (30 days)
+function clm_histHtml(c) {
+  const hs = c.merges || [];
+  if (!hs.length) return '';
+  const row = h => `<li>${ic('deps', 's')} <span>${esc(tr('Merged with {0}', h.merged.map(x => x.name).join(', ')))}<span class="muted"> – ${esc(fmtDateLoc((h.at || '').slice(0, 10)))}${h.by_name ? `, ${esc(h.by_name)}` : ''}${h.undone_at ? ` · ${tr('undone')}` : ''}</span></span>${h.undo === '' && h.can_undo ? `<button class="btn sm" data-clm-undo="${h.id}">${ic('undo', 's')} ${tr('Undo')}</button>` : ''}</li>`;
+  return `<section class="stcard clmhist"><div class="sthead"><h3>${tr('History')}</h3></div><ul class="ctlinks">${hs.map(row).join('')}</ul></section>`;
+}
+async function clm_undo(rid) {
+  let j; try { j = await rawFetch('POST', `/api/clients/merges/${rid}/undo`, {}); } catch (x) { toast(x.message || ''); return; }
+  if (typeof ms_clAfter === 'function') await ms_clAfter(); else clReload();
+  toast(j.target_gone ? tr('Merge undone. The client it went into was deleted since; the others are back.') : tr('Merge undone'));
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('#view [data-clm-undo]'); if (!b) return;
+  b.disabled = true; clm_undo(+b.dataset.clmUndo);
+});

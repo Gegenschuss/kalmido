@@ -264,6 +264,9 @@ def client_get(cid):
         st = client_stats(c, uid, cid, [lid], request.args.get("month"))
         per.append({"id": lid, "name": l["name"], "kind": l["kind"], "rate": l["rate"], "status": l["status"], **st})
     d["per_list"] = per
+    from .clientmerge import clm_history
+    if (g.user["kind"] or "user") != "agent":
+        d["merges"] = clm_history(c, uid, r)  # 2.66.0 B (#1835): the merges into this client (people only)
     return jsonify(d)
 
 
