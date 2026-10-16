@@ -69,6 +69,7 @@ ORDER = (
     "notify.alerts",
     "notify.sev",  # 2.36.2 (#1133)
     "calendars.subscriptions",
+    "calendars.davwrite",  # 2.52.0 B (#1128): writing into CalDAV subscriptions
     "admin.backup",
     "api.v1",
     "notify.caps",  # 2.33.0 (#927)

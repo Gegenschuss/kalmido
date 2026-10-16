@@ -8,7 +8,7 @@
 // sent later" instead of the error page.
 // Firefox: a phone (390 touch), the Fold unfolded upright (690 x 829) and across (829 x 690) with touch, a desktop (1440,
 // mouse): nothing sideways, 44 px targets on touch, axe (WCAG 2.2 A + AA) over the calendar, the editor, the calendars
-// dialog, the contacts view + card and the task panel, a drag over free time in the week creates an event, Tab stays in the
+// dialog, the contacts view + card and the task panel, a drag over free time in the week leaves a block "New event" (2.52.0: its Details opens the editor), Tab stays in the
 // editor. Screenshots with P2210_SHOTS=<dir>.
 const {execFileSync} = require('child_process');
 const fs = require('fs');
@@ -348,9 +348,13 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
     // drag over free time: 13:00-14:30 of the day after tomorrow
     const r = await ev(`(() => { const c = document.querySelector('#view .wcol[data-day="${t2}"]'), b = c.getBoundingClientRect(), H = weekH(); return {x: b.left + b.width / 2, y: b.top + 13 * H + 2, dy: 1.5 * H}; })()`);
     await drag(r.x, r.y, 0, r.dy);
+    await sleep(400);
+    // 2.52.0 (#1016): the drag leaves a block "New event" in the grid; its "Details" opens the editor with that time
+    check(await ev(`(() => { const b = document.querySelector('#view .wcol .cgnew'); return !!b && document.activeElement === b.querySelector('.cgin') && /13:00.14:30/.test(b.textContent); })()`), `${tag}: the drag leaves a block "New event" with the title field`);
+    await ev(`(() => { document.querySelector('#view .cgnew .cgdet').click(); return 1; })()`);
     await sleep(600);
     const got = await ev(`(() => { const m = document.querySelector('.modal.evmodal'); return m ? [m.querySelector('#ev-sd').value, m.querySelector('#ev-stm').value, m.querySelector('#ev-etm').value] : null; })()`);
-    check(got && got[0] === t2 && got[1] === '13:00' && got[2] === '14:30', `${tag}: a drag over free time opens the editor with that time ${JSON.stringify(got)}`);
+    check(got && got[0] === t2 && got[1] === '13:00' && got[2] === '14:30', `${tag}: its "Details" opens the editor with that time ${JSON.stringify(got)}`);
     // Tab stays in the editor
     await ev(`(() => { document.querySelector('#ev-title').focus(); return 1; })()`);
     let inside = true;

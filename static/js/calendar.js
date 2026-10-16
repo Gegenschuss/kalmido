@@ -120,7 +120,8 @@ function cevTime(e, d) {
   if (!cevTimed(e, d)) return tr('all day');
   return `${e.d0 === d ? fmtHM(e.s) : '…'}–${e.d1 === d ? fmtHM(e.e) : '…'}`;
 }
-const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}${ap_draftCls(e)}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}">${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtHM(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
+// 2.52.0 (#1016): cgok = may be dragged into other days (caldrag.js)
+const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}${ap_draftCls(e)}${cg_canDrag(e) ? ' cgok' : ''}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}">${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtHM(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
 const cevRow = (e, d) => `<div class="cevrow${ap_draftCls(e)}" data-cev="${e.id}" style="--cc:${cevColor(e)}" role="button" tabindex="0"><i class="cevdot"></i><span class="cevt">${cevTime(e, d)}</span><span class="cevn">${esc(cevTitle(e))}</span>${e.location ? `<span class="cevl">${esc(e.location)}</span>` : ''}<span class="cevc">${esc(cevCal(e))}</span></div>`;
 function cevTodayBlock() {  // "Events today" at the top of Today (setting cal_today)
   if (!feat('cal') || !calEvOn() || S.settings.cal_today === '0') return '';  // Calendar module off: gone here too
@@ -152,6 +153,7 @@ function cevWhen(e) {
 function cevPop(anchor, id) {
   const e = S.cal.items.find(x => x.id === id); if (!e) return;
   if (e.own) { evPop(anchor, e); return; }  // 2.21.0 (#659): an own event (calevents.js)
+  if (e.dvw_write) { dvw_pop(anchor, e); return; }  // 2.52.0 (#1128): a writable CalDAV subscription (davwrite.js)
   const desc = (e.description || '').slice(0, 2000);
   const p = openPop(anchor, `<div class="cevpop" style="--cc:${cevColor(e)}">
     <div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b></div>
@@ -219,7 +221,7 @@ function tlCalRows(start, end, DW) {  // calendar timeline: one row per calendar
 function calsHtml(chk, hint) {
   if (!S.calendars?.enabled) return `<h4 id="s-cals-h">${tr('Calendars')}</h4>${hintK(tr('Calendar subscriptions are turned off on this server'))}`;
   return `<h4 id="s-cals-h">${tr('Calendars')}</h4>
-    ${hint(tr('Show events from Google Calendar, iCloud, Outlook or any CalDAV server next to your tasks: in the calendar, the timeline and on Today. Read-only, and only you see them.'))}
+    ${hint(tr('Show events from Google Calendar, iCloud, Outlook or any CalDAV server next to your tasks: in the calendar, the timeline and on Today. Only you see them. Read-only, unless you allow writing for a CalDAV calendar (Edit).'))}
     <div class="members" id="s-cals"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="row"><button class="btn sm pri" data-m="cal-add">${ic('plus', 's')} ${tr('Add calendar')}</button></div>
     ${feat('cal') ? `<div class="row"><label>${tr('Today')}</label>${chk('s-caltoday', S.settings.cal_today !== '0', tr('show today’s events at the top'))}</div>` : ''}
@@ -243,7 +245,7 @@ async function calsDraw(md, j) {
   calInvalidate();
   box.innerHTML = j.subs.length ? j.subs.map(x => `<div class="calsub ${x.visible ? '' : 'off'}" data-cal="${x.id}" style="--cc:${cssColor(x.color) || '#94a3b8'}">
       <button class="cswatch" data-calact="color" title="${tr('Color')}" aria-label="${tr('Color')}"></button>
-      <div class="calsub-main"><b>${esc(x.name)}</b><small class="muted">${esc(x.kind === 'caldav' ? `CalDAV · ${x.username}` : x.url_hint)} · ${calStatus(x)}</small></div>
+      <div class="calsub-main"><b>${esc(x.name)}</b><small class="muted">${esc(x.kind === 'caldav' ? `CalDAV · ${x.username}` : x.url_hint)} · ${calStatus(x)}${x.write && x.can_write ? ' · ' + esc(tr('writable')) : ''}</small></div>
       <label class="calvis" title="${tr('Show')}"><input type="checkbox" data-calact="vis" ${x.visible ? 'checked' : ''} aria-label="${tr('Show')}"></label>
       <button class="iconbtn" data-calact="refresh" title="${tr('Refresh now')}" aria-label="${tr('Refresh now')}">${ic('repeat', 's')}</button>
       <button class="iconbtn" data-calact="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
@@ -355,8 +357,10 @@ function calEditModal(x, colors, done) {
     ${x.kind === 'ics' ? `<div class="row"><label for="ce-url">${tr('Link')}</label><input id="ce-url" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${tr('saved ({0}), empty = keep', x.url_hint)}"></div>`
     : `<div class="row"><label for="ce-user">${tr('Username')}</label><input id="ce-user" autocomplete="off" autocapitalize="off" value="${esc(x.username)}"></div>
       <div class="row"><label for="ce-pw">${tr('Password')}</label><input id="ce-pw" type="password" autocomplete="new-password" placeholder="${x.password_saved ? tr('saved, empty = keep') : ''}"></div>`}
+    ${dvw_editRow(x)}
     <div class="calerr" role="alert" id="ce-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  dvw_editWire(md, x, done);  // 2.52.0 (#1128): "Allow writing"
   md.addEventListener('click', async e => {
     const cb = e.target.closest('[data-c]');
     if (cb) { color = cb.dataset.c; $$('.cpal [data-c]', md).forEach(b => b.classList.toggle('on', b === cb)); return; }
@@ -437,7 +441,7 @@ function viewWeek() {
   const cols = days.map(d => {
     const blocks = layoutDay((map.get(d) || []).filter(t => t.due_time), evsOf(d).filter(e => cevTimed(e, d)).map(e => ({c: e, ...cevMin(e, d)}))).map(it => {
       const t = it.t, top = it.s / 60 * H, h = Math.max((it.e - it.s) / 60 * H, 20);
-      if (it.c) return `<div class="wcev${ap_draftCls(it.c)}" data-cev="${it.c.id}" style="--cc:${cevColor(it.c)};top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)"><b>${it.c.d0 === d ? fmtHM(it.c.s) : '…'}</b> ${esc(cevTitle(it.c))}</div>`;
+      if (it.c) return `<div class="wcev${ap_draftCls(it.c)}${cg_canDrag(it.c) ? ' cgok' : ''}" data-cev="${it.c.id}" style="--cc:${cevColor(it.c)};top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)"><b>${it.c.d0 === d ? fmtHM(it.c.s) : '…'}</b> ${esc(cevTitle(it.c))}</div>`;  // 2.52.0 (#1016): cgok = may be moved / resized (caldrag.js)
       return `<div class="wev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}" style="top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)">${msGlyph(t)}<b>${t.due_time}</b> ${mdTitleNL(t.title)}</div>`;
     }).join('');
     return `<div class="wcol ${d === t0 ? 'today' : ''}" data-day="${d}">${blocks}${d === t0 ? `<i class="nowline" style="top:${nowTop}px"></i>` : ''}</div>`;

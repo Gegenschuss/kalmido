@@ -38,7 +38,9 @@ the app has not yet been tested by people who use a screen reader every day (see
   tracking, the overviews and the project page: ↑ / ↓ buttons, Alt+↑ / Alt+↓ on a row and a switch per block (each move
   is announced); dragging the rows is only an extra on a computer. Dependencies (Alt + drop onto a task) also via
   *Waiting on a task…* in the task menu; several selected tasks also via *Subtasks of…* / *Out of the parent task* in the
-  multi panel and the phone's selection menu.
+  multi panel and the phone's selection menu. Calendar events (2.52.0): creating by dragging over free time, moving an
+  event and dragging its lower edge are extras (on a touch screen after holding 0.4 s); *+ Event*, the quick add's
+  *Event* and the event's *Edit* set every date and time with fields. Esc cancels a drag.
 - **Touch targets** of 44 × 44 px on touch screens (at least 24 px everywhere, WCAG 2.5.8), also in the compact density.
 - **Reduced motion.** With "reduce motion" set in the system, animations and smooth scrolling are off.
 - **Zoom and reflow.** The app works at 320 px width and at 200 % zoom without scrolling sideways (wide boards such as
