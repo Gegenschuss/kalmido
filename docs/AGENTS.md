@@ -1436,6 +1436,7 @@ Scopes: `files:read` (list, read) and `files:write` (add files and folders, new 
 | A folder's children (`?parent_id=`) / one node with its children or versions | `GET /api/v1/files?parent_id=<id>`, `GET /api/v1/files/{id}` | `list_files` with `folder_id` |
 | A file's bytes (`?version=` an older one) | `GET /api/v1/files/{id}/content` | `read_file` with `as: "base64"` |
 | A file as text (UTF-8, PDF text layer) | `GET /api/v1/files/{id}/text` | `read_file` |
+| Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text`) | `GET /api/v1/files/search?q=` | `search_files` |
 | A new file / folder (`{parent_id?, name, content \| content_base64, mime?, kind?}`; without `parent_id`: your own folder) | `POST /api/v1/files` | `write_file`, `create_file_folder` |
 | A new version of a file (`{content \| content_base64}`, role edit; the older versions stay) | `POST /api/v1/files/{id}/versions` | `write_file` with `file_id` |
 
@@ -2465,8 +2466,8 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
 `report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
 `request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
-`request_reward`, `restore_event`, `restore_task`, `search_contacts`, `search_messages`, `search_notes`, `search_tasks`,
-`send_chat`, `set_contact_care`, `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`,
+`request_reward`, `restore_event`, `restore_task`, `search_contacts`, `search_files`, `search_messages`,
+`search_notes`, `search_tasks`, `send_chat`, `set_contact_care`, `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`,
 `set_waiting`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
 `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unshare_address_book`, `unshare_event_calendar`,

@@ -205,6 +205,7 @@ APP_TO_API = {
     # 2.48.0 (#1207): the file store -- list, read, add files / folders, new versions
     "GET /api/files": ["GET /files"], "GET /api/files/nodes/{}": ["GET /files/{}"], "GET /api/files/nodes/{}/content": ["GET /files/{}/content"],
     "POST /api/files/folders": ["POST /files"], "POST /api/files/upload": ["POST /files"], "POST /api/files/nodes/{}/versions": ["POST /files/{}/versions"],
+    "GET /api/files/search": ["GET /files/search"],  # 2.61.0 (#1820): names + recognised text
     # 2.48.0 (#1111): documents (agents read / set the fields of documents shared with them)
     "GET /api/docs": ["GET /documents"], "GET /api/docs/{}": ["GET /documents/{}"], "PATCH /api/docs/{}": ["PATCH /documents/{}"],
 }

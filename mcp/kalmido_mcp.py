@@ -1419,6 +1419,11 @@ def t_read_file(api, a):
     return {"id": fid, "name": r["name"], "mime": r["mime"], "size": len(r["bytes"]), "base64": base64.b64encode(r["bytes"]).decode()}
 
 
+def t_search_files(api, a):
+    """2.61.0 (#1820): files whose name or recognised text matches q."""
+    return api.call("GET", "/files/search", {"q": a.get("q"), "space": a.get("space")})
+
+
 def t_write_file(api, a):
     """file_id: a new version of that file; else a new file in folder_id (default: your own result folder)."""
     body = _pick(a, ("content", "mime"))
@@ -1437,6 +1442,9 @@ TOOLS += [
                   "version = an older version, max_bytes).",
      _obj({"file_id": S_ID, "as": {"type": "string", "enum": ["text", "base64"]}, "version": {"type": "integer", "minimum": 1},
            "max_bytes": {"type": "integer", "minimum": 1}}, ["file_id"]), t_read_file),
+    ("search_files", "2.61.0: find files of the file store by name or by their text (PDF text layer, text the server recognised in "
+                     "scans and photos). Only files you may open; hit = name | text; at most 100, newest first. Then read_file.",
+     _obj({"q": {"type": "string", "minLength": 1, "maxLength": 200}, "space": {"type": "string"}}, ["q"]), t_search_files),
     ("write_file", "2.48.0: put a file into the file store: name + content (UTF-8 text) or base64, into folder_id (role edit) or, "
                    "without it, your own result folder (reports, drafts, patches people should read). file_id instead: a new version of "
                    "that file (the older ones stay).",
@@ -1636,7 +1644,7 @@ TOOL_SCOPES = {
                  "unshare_address_book", "import_vcards", "export_vcards", "search_contacts", "get_contact", "create_contact", "update_contact",
                  "delete_contact", "bulk_contacts", "link_contact", "unlink_contact", "set_contact_care"),
     "private": ("add_health_entry", "write_journal"),
-    "files:read": ("list_files", "read_file", "suggest_receipt", "list_receipt_suggestions"),  # 2.48.0 (#1207, #1356)
+    "files:read": ("list_files", "read_file", "search_files", "suggest_receipt", "list_receipt_suggestions"),  # 2.48.0 (#1207, #1356)
     "files:write": ("write_file", "create_file_folder"),
     "office": ("get_office", "list_office_data", "list_office_documents", "get_office_document", "create_offer_draft", "update_offer_draft",
                "draft_invoice_from_offer", "draft_reminder", "suggest_payment", "list_payment_suggestions"),  # 2.51.0 (#1348, #1350)

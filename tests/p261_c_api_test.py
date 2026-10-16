@@ -239,6 +239,17 @@ check(not fsearch(Zo, "zitronenbaum").json().get("items") and not fsearch(Er, "z
 check(fsearch(Zo, "zitronenbaum", f"org:{ORG}").status_code == 404, "#1820: a foreign organisation's space: 404")
 check(Bo.get(B + "/api/files/search").status_code == 400, "#1820: an empty query: 400")
 
+
+def v1(s, path, scopes=("read", "files:read")):
+    tok = s.post(B + "/api/me/tokens", json={"name": "s", "scopes": list(scopes)}).json()
+    return requests.get(B + "/api/v1" + path, headers={"Authorization": "Bearer " + (tok.get("token") or tok.get("value") or "")})
+
+
+j = v1(Bo, "/files/search?q=zitronenbaum").json()
+check(any(x["id"] == NF and x["hit"] == "text" and x.get("url") for x in j.get("data", [])), f"#1820 API: GET /files/search finds the file by its text {str(j)[:200]}")
+check(v1(Zo, "/files/search?q=zitronenbaum").json().get("data") == [], "#1820 API: another organisation finds nothing")
+check(v1(Bo, "/files/search").status_code == 400, "#1820 API: q is needed")
+
 P = Bo.post(B + "/api/lists", json={"name": "Site", "kind": "project", "org_id": ORG}).json()["id"]
 r = Bo.post(B + f"/api/lists/{P}/files", files={"file": ("plan.pdf", text_pdf(["Kirschgarten Bauabschnitt"]), "application/pdf")})
 check(r.ok, f"#1820 project file uploaded {r.status_code} {r.text[:120]}")
