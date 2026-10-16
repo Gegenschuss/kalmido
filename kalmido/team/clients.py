@@ -221,11 +221,12 @@ def client_public(c, uid, r, stats=False, month=None):
 
 
 def clients_brief(c, uid):
-    """/api/state: [{id, name, icon, color, archived, lists}] of the clients uid sees (module on)."""
+    """/api/state: [{id, name, icon, color, org_id, archived, lists}] of the clients uid sees (module on).
+    2.56.3 (#1842): org_id too - the office's client picker keeps only the clients of the office's org (null = private)."""
     if not clients_on(c, uid):
         return []
-    return [{"id": r["id"], "name": r["name"], "icon": r["icon"], "color": r["color"], "archived": bool(r["archived"]),
-             "lists": client_lists(c, uid, r["id"])} for r in client_rows(c, uid)]
+    return [{"id": r["id"], "name": r["name"], "icon": r["icon"], "color": r["color"], "org_id": r["org_id"],
+             "archived": bool(r["archived"]), "lists": client_lists(c, uid, r["id"])} for r in client_rows(c, uid)]
 
 
 def _gate(c):

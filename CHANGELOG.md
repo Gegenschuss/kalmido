@@ -25,6 +25,12 @@ devices), and **every workspace can get your own colour**: a light tint of the s
   organisation; only you see it. The sidebar takes a light tint of the shown workspace and the workspace switch shows a
   dot in front of each workspace. Without a choice an organisation keeps the colour its admins chose (#1807).
 
+## [2.56.3] - 2026-10-16
+
+### Fixed
+- In an organisation's office the client field of a quotation or invoice offers the organisation's clients again (it
+  stayed empty there, #1842).
+
 ## [2.56.1] - 2026-10-16
 
 CI fixes for 2.56.0 (both go live with this version).
