@@ -262,6 +262,7 @@ registering the ones of its area.
 | `quickadd.js` | The quick-add parser (six languages) and small task helpers: ticket types, milestones, links, repeat rules, reminders, deadlines. |
 | `views.js` | Which tasks a view shows (smart lists, filters, sorting, grouping). |
 | `render.js` | Rendering: the shell (sidebar, header, tabs) and task rows. |
+| `vlist.js` | Long lists (2.65.0): a view with more than 300 rows draws only the rows near the visible part (see below). |
 | `calendar.js` | Kanban, the calendar views and external calendar events. |
 | `timeline.js` | The timeline (Gantt). |
 | `roadmap.js` | The roadmap. |
@@ -336,6 +337,16 @@ registering the ones of its area.
 2. Add its `<script>` tag to `static/index.html` (before `main.js`, after the files whose functions it calls while it
    loads), add it to `SHELL` in `static/sw.js` in the same order and bump `CACHE` there.
 3. `python3 tools/check_layout.py` compares the three lists; `node --check` runs on every file in CI.
+
+### Long lists (2.65.0)
+
+A list view, Completed / Trash and the search results with more than `VL_MIN` (300) rows, and an address book of that
+size, are windowed by `vlist.js`: each group is drawn as a top spacer, the rows near the visible part (plus one and a half
+screens above and below) and a bottom spacer. Scrolling moves the window once per frame; measured row heights (an average
+for rows not drawn yet) keep the scroll height, and a spacer takes over the height of rows that leave or come above the
+visible part, so nothing visible moves. Code that needs the order of all rows of the view (Shift-click, Ctrl+A, j / k,
+the neighbours of a drop, swiping between tasks in the panel) calls `vl_ids()` instead of reading `.trow` from the DOM;
+`vl_reveal(id)` scrolls a row that is not drawn into the window. Shorter views are drawn as before.
 
 ### Modules loaded on demand (2.53.0)
 

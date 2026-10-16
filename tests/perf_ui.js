@@ -92,11 +92,12 @@ print(made)
     await m('today', `go('today')`, 2000);
     await m('all', `go('all')`, n > 10000 ? 8000 : 4000);
     await m('re-render (live update)', `render()`, n > 10000 ? 8000 : 4000);
-    const rm = await ev(`(() => ({rows: document.querySelectorAll('#view .trow').length, more: !!document.querySelector('#view [data-act="rows-more"]')}))()`);
-    check(rm.rows <= 900 && rm.more, `${tag}: "All" shows the first rows and "Show more" ` + JSON.stringify(rm));
-    await ev(`(() => { document.querySelector('#view [data-act="rows-more"]').click(); return 1; })()`); await sleep(400);
+    // 2.65.0 (#1825): a long view draws only the rows near the visible part (vlist.js) instead of the first ROW_CAP + "Show more"
+    const rm = await ev(`(() => ({rows: document.querySelectorAll('#view .trow').length, pads: document.querySelectorAll('#view .vlpad').length, all: vl_ids().length}))()`);
+    check(rm.rows <= 900 && rm.pads && rm.all > rm.rows, `${tag}: "All" draws a window of its rows ` + JSON.stringify(rm));
+    await ev(`(() => { const v = document.getElementById('view'); v.scrollTop = v.scrollHeight; vl_sync(); return 1; })()`); await sleep(400);
     const rm2 = await ev(`document.querySelectorAll('#view .trow').length`);
-    check(rm2 > rm.rows, `${tag}: "Show more" adds rows (${rm.rows} -> ${rm2})`);
+    check(rm2 > 0 && rm2 <= 900, `${tag}: at the end of "All" the window stays small (${rm.rows} -> ${rm2})`);
     await ev(`(() => { go('l/${L}'); return 1; })()`); await sleep(500);
     await m('render list', `render()`, 1500);
     await m('palette open + type', `openPalette(); const i = document.querySelector('.palette .pqin'); i.value = 'review'; i.dispatchEvent(new Event('input', {bubbles: true}))`, 1500);

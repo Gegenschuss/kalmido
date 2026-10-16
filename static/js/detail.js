@@ -589,7 +589,7 @@ async function saveLink(v) {
 // in areas that scroll sideways (tables, code, images). What was typed is saved first (flushSaves).
 const DSW_EDGE = 28, DSW_MIN = 70;
 let dsw = null;
-function dswIds() { return [...new Set($$('#view .trow[data-id]').map(r => +r.dataset.id))].filter(i => S.tasks.has(i)); }
+function dswIds() { return [...new Set(vl_ids())].filter(i => S.tasks.has(i)); }  // 2.65.0 (#1825): vl_ids = also the rows a long list does not draw
 function dswBlocked(el) {
   const f = el.closest('textarea, input, select, [contenteditable="true"]');
   if (f && (f === document.activeElement || f.matches('select, input[type="range"]'))) return true;  // typing / marking in a field (a field without the focus, e.g. the title, may be swiped over)

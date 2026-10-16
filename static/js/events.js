@@ -184,7 +184,7 @@ async function submitQuick(input, extra = {}) {
   // 2.13.0 (#453 P8): a task that does not show up in the open view (e.g. "… tomorrow 10:00" typed in Today lands in the
   // Inbox) says where it went, with "Open"
   if (created?.id && !d.files?.length && !d.open) setTimeout(() => {
-    if ($(`#view .trow[data-id="${created.id}"]`)) return;
+    if ($(`#view .trow[data-id="${created.id}"]`) || vl_ids().includes(created.id)) return;  // 2.65.0 (#1825): also a row a long list does not draw
     const t = taskById(created.id) || created, l = listById(t.list_id);
     const tt = t.title || '', tq = tr('“{0}”|quoted', tt.length > 40 ? tt.slice(0, 39) + '…' : tt);  // 2.25.0 (UX-31): which task, where it went
     toast([tt ? tq : '', l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + t.due_time : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));
@@ -336,7 +336,7 @@ document.addEventListener('click', async e => {
   const anchor0 = S.multi.size ? S.multiLast : S.sel || S.kf;
   if (mrow && !e.target.closest('.caret') && (S.multiMode || e.ctrlKey || e.metaKey || (e.shiftKey && anchor0))) {
     e.preventDefault(); e.stopPropagation();
-    const id = +mrow.dataset.id, ids = $$('#view .trow').map(r => +r.dataset.id);
+    const id = +mrow.dataset.id, ids = vl_ids();  // 2.65.0 (#1825): vl_ids = all rows of the view, also the ones a long list does not draw
     if (e.shiftKey && !e.ctrlKey && !e.metaKey && anchor0 && ids.includes(anchor0)) {
       const a = ids.indexOf(anchor0), b = ids.indexOf(id);
       if (a >= 0 && b >= 0) ids.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(x => S.multi.add(x));
@@ -693,7 +693,7 @@ document.addEventListener('click', async e => {
     case 'mb-menu': multiMoreMenu(a); break;
     case 'mb-sort': propRequest('triage', {ids: [...S.multi]}); break;  // 2.3.0 (#262)
     case 'mb-clean': { const l = clnSel(); if (l) clnRequest(l.id, [...S.multi]); break; }  // 2.39.0 (#1151)
-    case 'mb-all': $$('#view .trow').forEach(r => S.multi.add(+r.dataset.id)); render(); break;
+    case 'mb-all': vl_ids().forEach(i => S.multi.add(i)); render(); break;  // 2.65.0 (#1825): vl_ids = all rows of the view, also the ones a long list does not draw
     case 'mb-close': S.multi.clear(); S.multiMode = false; render(); break;
     case 'mb-more': menu(a, $$('#mbar .mbh').map(h => ({label: h.getAttribute('aria-label'), icon: h.dataset.ico, cls: h.classList.contains('danger') ? 'flag-5' : '', fn: () => h.click()}))); break;  // 2.13.0 (#453 A14)
     case 'pomo-pause': case 'pomo-resume': case 'pomo-stop': {

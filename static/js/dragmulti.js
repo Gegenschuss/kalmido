@@ -19,7 +19,7 @@
 const DG = {ids: null, zones: false};
 const DG_MAX_DEPTH = 3;  // kalmido/core/schema.py MAX_DEPTH (task > subtask > sub-subtask)
 const dgShort = s => { s = String(s || ''); return s.length > 40 ? s.slice(0, 39) + '…' : s; };
-const dgRowsOrder = () => new Map($$('#view .trow').map((r, i) => [+r.dataset.id, i]));
+const dgRowsOrder = () => new Map(vl_ids().map((id, i) => [id, i]));  // 2.65.0 (#1825): also the rows a long list does not draw
 // the ids in the order the user sees them (rows on screen first, then by sort)
 function dgOrder(ids) {
   const pos = dgRowsOrder(), big = 1e9;
@@ -168,7 +168,7 @@ async function dgBlock(ids, row, after) {
   list = list.filter(i => !deep.includes(i));
   if (target.list_id && list.some(i => S.tasks.get(i).list_id !== target.list_id) && !canEditList(target.list_id)) { roToast(); return; }
   const mode = sortMode();
-  let rows = $$('#view .trow').map(r => S.tasks.get(+r.dataset.id)).filter(x => x && x.parent_id === target.parent_id && !set.has(x.id) && (x.status === 0 || x.id === target.id));
+  let rows = vl_ids().map(i => S.tasks.get(i)).filter(x => x && x.parent_id === target.parent_id && !set.has(x.id) && (x.status === 0 || x.id === target.id));
   if (mode === 'prio' && !kcol) rows = rows.filter(x => x.priority === target.priority);
   const i = rows.findIndex(x => x.id === target.id), n = list.length;
   let lo, hi;
