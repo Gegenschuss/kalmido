@@ -114,7 +114,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   md.remove();
   await closeW(w);
   let wb = await boot({user: 'bob'}); let db = wb.document;
-  wb.eval(`settingsModal('modules')`); await sleep(300);
+  wb.eval(`settingsModal('modules')`);  // 2.53.0: wait for the dialog, not a fixed 300 ms (slow machines)
+  for (let i = 0; i < 50 && !/Ansichten/.test(db.querySelector('.smodal')?.textContent || ''); i++) await sleep(100);
   const bm = db.querySelector('.smodal');
   check(!bm.querySelector('#s-collaball') && ![...bm.querySelectorAll('.snav [data-sec]')].some(b => b.dataset.sec === 'users'), 'non-admin: no server switches, no Administration');
   check(/Module/.test(bm.querySelector('.snav .on').textContent) && /Ansichten/.test(bm.textContent), 'German: Module / Ansichten');
