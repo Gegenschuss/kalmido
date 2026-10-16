@@ -250,6 +250,9 @@ def nwl_busy(cid):
 
 def nwl_start(c, conn, kind="manual", by=None, wait=False):
     """Start a run of connection conn (a thread; wait: in this thread). None when one runs already."""
+    nwl_stale(c, conn["id"])
+    if c.execute("SELECT 1 FROM nl_runs WHERE conn_id=? AND state='busy'", (conn["id"],)).fetchone():
+        return None  # another server process runs it
     with _LOCK:
         if conn["id"] in _BUSY:
             return None
@@ -417,6 +420,19 @@ def _run_conn(c, conn_id, rid):
     for (oid,) in old:
         c.execute("DELETE FROM nl_runs WHERE id=?", (oid,))
     c.commit()
+
+
+NWL_STALE_MIN = 30
+
+
+def nwl_stale(c, conn_id):
+    """A run cut off by a restart (busy, not running in this process, older than NWL_STALE_MIN) counts as failed."""
+    if nwl_busy(conn_id):
+        return
+    old = iso(now_utc() - timedelta(minutes=NWL_STALE_MIN))
+    if c.execute("UPDATE nl_runs SET state='failed', ended_at=?, errors=? WHERE conn_id=? AND state='busy' AND started_at<?",
+                 (_now(), json.dumps([{"code": "failed", "segment": None}]), conn_id, old)).rowcount:
+        c.commit()
 
 
 def nwl_run_json(r):

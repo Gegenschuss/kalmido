@@ -46,6 +46,7 @@ def _public(c, ws, org):
     if not r:
         out["conn"] = None
         return out
+    N.nwl_stale(c, r["id"])
     rows = N.nwl_contacts(c, ws)
     secret_set = bool(r["secret"])
     out["conn"] = {"kind": r["kind"], "preview": r["kind"] in NWL_PREVIEW, "url": r["url"], "secret_set": secret_set,
