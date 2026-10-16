@@ -7719,3 +7719,17 @@ button.jobtag b{font-weight:600}
 .rt9simh{margin-top:.75rem}
 @keyframes rt9in{from{opacity:0;transform:translateY(-.25rem)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.rt9qh{animation:none}.rt9sec>summary::before{transition:none}}
+/* 2.66.0 (#1835): merging records (multisel.js ms_merge) */
+.mgdlg .mgset{border:0;padding:0;margin:0 0 .75rem;display:flex;flex-direction:column;gap:.25rem}
+.mgdlg .mgset legend{font-weight:600;font-size:var(--fs-s);color:var(--text2);margin-bottom:.25rem}
+.mgdlg .mgopt{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75rem;padding:.375rem .5rem;border:1px solid var(--line2);border-radius:.5rem;cursor:pointer;overflow-wrap:anywhere}
+.mgdlg .mgopt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.mgdlg .mgopt input{margin-top:.2rem;flex:none}
+.mgdlg .mgopt span{display:flex;flex-direction:column}
+.mgdlg .mgjoin{display:flex;flex-direction:column;gap:.25rem;margin:0 0 .75rem;font-size:var(--fs-s);overflow-wrap:anywhere}
+.mgdlg .mglines{margin:.25rem 0 .75rem;padding-left:1.25rem}
+.mgdlg .mgwarn{font-size:var(--fs-s);color:var(--text2)}
+/* 2.66.0 A (#1835) contacts: the merge history on a contact's card (one line per merge, Undo while possible) */
+.ctmsec .ctmrow{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
+.ctmsec .ctmrow>span{min-width:0;overflow-wrap:anywhere}
+.ctmsec .ctmrow .btn{min-height:2.5rem}

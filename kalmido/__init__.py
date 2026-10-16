@@ -27,6 +27,7 @@ ORDER = (
     "core.pages",
     "core.instance",
     "core.state",
+    "core.merges",  # 2.66.0 (#1835): merging contacts / clients (reversible)
     "lists.lists",
     "lists.groups",
     "lists.grouppics",  # 2.46.0 (#1605)
@@ -138,6 +139,7 @@ ORDER = (
     "contacts.web",
     "contacts.v1",
     "contacts.bulk",  # 2.46.1 (#1554): delete / move several contacts at once
+    "contacts.merge",  # 2.66.0 A (#1835): merging duplicate contacts (reversible)
     "contacts.orgbooks",  # 2.52.0 C (#1438): address books an organisation owns
     "life.model",
     "life.karakeep",

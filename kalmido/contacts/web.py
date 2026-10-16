@@ -136,7 +136,15 @@ def op_contacts(c, uid, a):
 
 def op_contact(c, uid, cid):
     r, role = need_contact(c, cid)
-    return {**contact_dict(c, r, uid), "role": role}
+    d = {**contact_dict(c, r, uid), "role": role}
+    if role in ("owner", "edit"):  # 2.66.0 A (#1835): the merges into this contact (history + undo), only for who may change it
+        from ..contacts.merge import ctm_history
+        m = ctm_history(c, cid)
+        if m:
+            from ..collab.comments import user_names
+            nm = user_names(c, [x["by"] for x in m])
+            d["merges"] = [{**x, "by_name": nm.get(x["by"], "")} for x in m]
+    return d
 
 
 def op_contact_new(c, uid, b):
