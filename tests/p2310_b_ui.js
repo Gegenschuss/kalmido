@@ -91,6 +91,7 @@ const CHIP = `(() => { const a = [...document.querySelectorAll('#detail .attsec 
   await sleep(900);
   let s = await sett();
   check(g.getAttribute('aria-valuenow') === '70' && s.detail_split === '70' && s.detail_cm_fold === '0', '#344: saved for the user on the server (70) ' + s.detail_split);
+  g = d.querySelector('#d-sgrip');  // 2.48.1: the panel may have been drawn again since (slow CI runner): the current line
   key(w, g, 'Enter'); await sleep(900);
   s = await sett();
   check(d.querySelector('#detail.dsfold') && s.detail_cm_fold === '1' && d.querySelector('#d-tl .dsfoldb')?.getAttribute('aria-expanded') === 'false' && /folded/.test(d.querySelector('#d-sgrip').getAttribute('aria-valuetext')), '#344: Enter folds the comments area (saved) ' + JSON.stringify([d.querySelector('#detail').className, s.detail_cm_fold, d.querySelector('#d-tl .dsfoldb')?.getAttribute('aria-expanded'), d.querySelector('#d-sgrip')?.getAttribute('aria-valuetext')]));
