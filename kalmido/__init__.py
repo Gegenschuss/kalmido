@@ -175,6 +175,7 @@ ORDER = (
     "office.agentdocs",  # 2.51.0 A (#1348, #1350): agents in the office: drafts, payment suggestions, the switches (API v1 + routes)
     "team.approvals",
     "team.forms",
+    "team.portal",  # 2.63.0 (#1513): customer reports (status link) and the customer portal
     "team.v1",
     "accounts.signup",
     "accounts.pwreset",  # 2.49.0 (#1531): "Forgot your password?"
