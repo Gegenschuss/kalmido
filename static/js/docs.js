@@ -14,8 +14,7 @@ const DC_STATE = {wait: N_('Waiting for recognition'), run: N_('Recognising…')
 const DC_BY = {rule: N_('set by a rule'), learn: N_('learnt from your documents'), agent: N_('set by an agent'), import: N_('imported'), code: N_('read from the code on the document')};
 
 // the module switch (Settings > Modules), off by default like the other areas
-FEATS.push(['docs', N_('Documents')]);
-FEAT_DESC.docs = N_('Scanned letters, invoices and contracts: text recognition, full-text search, sorting by rules and by what Kalmido learns from your corrections, due dates as tasks');
+// 2.65.0 (#1823): the module switch (FEATS, FEAT_DESC) and dc_shareOk are in lazyload.js (this file loads on demand)
 const dc_ws = () => (typeof wsCur === 'function' ? wsCur() : 'all');
 const dc_upWs = () => { const w = dc_ws(); return w.startsWith('org:') ? w : 'private'; };
 const dc_hashId = () => { try { const m = location.hash.match(/^#docs\/(\d+)/); return m ? +m[1] : null; } catch { return null; } };  // the sheet may close after its window is gone
@@ -113,7 +112,6 @@ async function dc_upload(files, ws, source) {
   if (S.route.mod === 'docs') dc_load();
   return j.ids || [];
 }
-const dc_shareOk = () => typeof feat === 'function' && feat('docs') && !S.me?.kid;
 async function dc_shareFiles(files) {  // the share sheet: "File as document"
   const ids = await dc_upload(files, dc_upWs(), 'share');
   if (ids.length) location.hash = '#docs';

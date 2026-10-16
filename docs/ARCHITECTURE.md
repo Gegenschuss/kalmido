@@ -263,7 +263,8 @@ registering the ones of its area.
 | `views.js` | Which tasks a view shows (smart lists, filters, sorting, grouping). |
 | `render.js` | Rendering: the shell (sidebar, header, tabs) and task rows. |
 | `vlist.js` | Long lists (2.65.0): a view with more than 300 rows draws only the rows near the visible part (see below). |
-| `calendar.js` | Kanban, the calendar views and external calendar events. |
+| `calendar.js` | Kanban, the calendar events' data and what other views show of the calendar. |
+| `calview.js` | 2.65.0 (#1823): the calendar views month / week / day and Settings > Calendars. Loaded on demand (module `calendar`). |
 | `timeline.js` | The timeline (Gantt). |
 | `roadmap.js` | The roadmap. |
 | `habits.js` | The Eisenhower matrix, habits and the pomodoro timer. |
@@ -290,7 +291,8 @@ registering the ones of its area.
 | `custview.js` | 2.50.0 (#329): Share dialog > Public link > *What does the customer see?* |
 | `signoff.js` | 2.50.0 (#1200): approval links on a sent quotation and in the Share dialog (acceptance), with their protocol. |
 | `account.js` | Account, users (admin), login, groups, passkeys, two-factor, sign-in policy, backups, the sample project. |
-| `templates.js` | Templates and statistics. |
+| `templates.js` | Templates and the charts (statistics, time tracking, agent usage). |
+| `stats.js` | 2.65.0 (#1823): the statistics view. Loaded on demand (module `stats`). |
 | `time.js` | Time tracking (module "time"). |
 | `projects.js` | Projects: status, progress, overview, dependencies, custom fields. |
 | `events.js` | Toasts, quick add wiring and the global event handlers. |
@@ -301,7 +303,8 @@ registering the ones of its area.
 | `agents.js` | Agents, reactions, shared list tags, tidy suggestions. |
 | `cleanup.js` | "Tidy up the list": the request to the list's tidy agent and the review of its cleanup proposal (2.39.0). |
 | `dayplan.js` | Day planning and the evening review. |
-| `agentchat.js` | The chat with an agent (side panel / view) and Settings > Agents: lists, setup guides, behaviour rules, activity log, usage, runtime. |
+| `agentchat.js` | The chat with an agent (side panel / view) and Settings > Agents: lists, setup guides, behaviour rules, activity log, usage, runtime. Loaded on demand (2.65.0, module `agentchat`). |
+| `chatbase.js` | 2.65.0 (#1823): what the start uses of the agent chat: the phone / desktop switch, the pop-up button, reaction rows, `patchKids`, the task panel's usage line. |
 | `listedit.js` | List editing, keyboard reordering, recent lists. |
 | `playbook.js` | The Playbook of a list or folder (2.39.0): the area in the list and folder dialogs, editor with preview, versions with a line diff and restore, agents' proposals, regular checks, the help examples. |
 | `git.js` | Git integration of project lists: repositories, pull requests + CI, agents' merge requests. |
@@ -366,6 +369,39 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
   start or give them a stand-in, then move the file from the script tags / `SHELL` to `LD_MODS` / `LAZY`.
 - Tests: `tests/boot.js` (jsdom) and `tests/ff.js` (Firefox) load every on-demand module right after the start, so suites
   may call their functions directly; `lazy: true` leaves them to the app (`tests/p253_a_ui.js`).
+
+2.65.0 (#1823, #1824): more modules, and modules carry their styles.
+
+| Module | Files | Opens with |
+|---|---|---|
+| `agentchat` | `agentchat.js`, `agentsetup.js` | the agent chat, Settings (needs `integrations`) |
+| `calendar` | `calview.js` (month / week / day, Settings > Calendars), `caldrag.js` | the calendar view, Settings |
+| `stats` | `stats.js` (the statistics view; the charts stay in `templates.js`) | the statistics view |
+| `wiki`, `mindmap` | `wiki.js`, `mindmap.js` | knowledge pages (need `mindmap`), a list as mind map, a task's "Mentioned in" |
+| `pdf` | `pdfview.js` | a click on a preview link (`data-pview`, the listener is in `lazyload.js`) |
+| `docs` | `docs.js`, `paperless.js`, `receipts.js` | the documents view, the share sheet's "File as document" |
+| `life` | `life.js` | Home & life, the daily review, a life list's bar / a life task's details |
+| `integrations` | `integrations.js` | Settings, the agent chat (tokens, webhooks, CalDAV) |
+| `playbook` | `playbook.js` | the playbook area of a list / folder dialog, Settings |
+| `timeline` | `timeline.js`, `roadmap.js` | a list's timeline, the roadmap, the calendar's timeline |
+
+`contacts` now also loads `newsletter.js`, `settings` first `acctset.js` (the settings sections of `account.js`; sign-in,
+invitations and logout stay in `account.js`). What the start needs of them stays at start: `chatbase.js` (the phone /
+desktop switch of the chat, the pop-up button, reaction rows, `patchKids`, the task panel's usage line), `calendar.js`
+(the events' data, the kanban board, the agenda's bar, `calReq`), `templates.js` (the charts) and small parts in
+`lazyload.js` (`pv_attr`, the documents switch, `lifeOn` / `fmtMoney`, `pbOn` / `pbMenuItem`, `isRoadmap` / `tlReaches`,
+`API_DOCS`).
+
+- `LD_NEED`: modules a module needs before its own files (Settings: agent chat, calendar, integrations, playbook).
+- `LD_NOP`: stand-ins that do nothing before the module is loaded (they only update what the module drew, e.g. `chatPatch`).
+- Styles: `LD_CSS` names each module's stylesheets in `static/css/<name>.css`; `loadModule` loads them next to the
+  scripts and resolves only once both apply (no unstyled flash); `loadCss(name)` loads one alone. `LAZY_CSS` in
+  `static/sw.js` precaches them (offline); `tools/check_layout.py` checks `LAZY_CSS` = `LD_CSS` = `static/css/*.css`. A
+  module stylesheet comes after `app.css` in the cascade: only rules whose every selector names a class / id that only the
+  module's scripts use move there, and none that a later rule of `app.css` for the same class would override. Suites that
+  read rules use `allCss()` / `allCssSync()` of `tests/boot.js` (app.css + the module stylesheets).
+- Idle preload: 5 s after the start, one per idle moment, Settings (with what it needs), then the areas this person has
+  switched on (calendar, timeline, knowledge pages, documents, home & life); not office, contacts, statistics, PDF.
 
 ## Database: PostgreSQL (2.37)
 

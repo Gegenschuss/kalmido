@@ -32,7 +32,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
   check(has(html[2], 'agc') && !has(html[2], 'new'), 'agent + read: agc only');
   check(!has(html[3], 'agc') && !has(html[3], 'new'), 'human + read: plain');
   check(/class="abadge"/.test(html[0]), 'the agent badge stays');
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   const blk = css.slice(css.indexOf('/* 2.53.0 E'));
   check(!/\.agc[^{]*\{[^}]*var\(--accent\)[^}]*\}/.test(blk.replace(/\.cm\.agc\.new,\.nitem\.agc\.unread\{[^}]*\}/, '')), 'agent tone never uses --accent (except the unread strip)');
   check(/--agent-bg/.test(blk) && /--agent-ink/.test(blk), 'own variables');

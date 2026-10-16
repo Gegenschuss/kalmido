@@ -90,7 +90,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   // ---- a board: the cards carry the edge (also in the list's own board): the card is the row in .kcards
   const card = d.createElement('div'); card.innerHTML = w.eval(`taskRow(taskById(${T1}), {compact: true})`);
   check(card.firstElementChild?.classList.contains('lpc'), '#1426: board cards carry the list colour edge (class)');
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   check(/#view \.kcards \.trow\.lpc\{box-shadow:inset/.test(css), '#1426: the edge on board cards also inside the list itself');
   w.close();
 

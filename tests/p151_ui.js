@@ -47,7 +47,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   const want = ['stats', 'time', ...(w.eval('overviewOn()') ? ['overview'] : []), 'settings'];
   // 2.13.3: the search is the command-bar field at the top (no "Search" row)
   check(want.every(k => navK.filter(x => x === k).length === 1) && d.querySelectorAll('#side .scmd[data-act="palette"]').length === 1 && !navK.includes('search'), 'sidebar: search (the field) / statistics / time / overview / settings, each once: ' + navK);
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   check(!/#side \.dupnav\{display:none\}/.test(css.split('2.8.0 "Leitstand"').pop()), 'CSS: nothing in the new sidebar is hidden on the desktop');
 
   // ================= (e) archived lists: hidden outside the list
@@ -285,7 +285,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   click(w, d.querySelector(`.tvrun.idle [data-act="timer-toggle"][data-id="${tt}"]`));
   check(await until(async () => (await call('GET', '/api/state')).timer?.task_id === tt), 'one tap starts it again');
   await w.eval('timerStop()');
-  const css2 = await (await fetch(B + 'static/app.css')).text();
+  const css2 = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   check(/@media \(max-width:899px\)\{\s*\.tvrun\{grid-template-columns:minmax\(0,1fr\)/.test(css2), 'phone: the card stacks');
 
   // ================= (j) archived lists: one plain row "Archived" like Trash (1.6.1), a main view lists them
@@ -498,7 +498,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   click(w, d.querySelector('[data-act="tl-nd"]')); await sleep(200);
   check(!d.querySelector('.tl-ndhead') && w.eval(`LS.get('tlnd')`)['l' + PJ] === false, 'header switch "No date" (remembered per device)');
   check(!w.eval(`tlNdOn(null)`), 'off by default outside project lists');
-  const css3 = await (await fetch(B + 'static/app.css')).text();
+  const css3 = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   check(/\.tl-row\{display:flex;height:2\.75rem/.test(css3) && /\.tl-bar\{position:absolute;top:\.3125rem;height:2\.125rem/.test(css3) && /\.tl-bar \.h\.l\{left:-\.375rem\}/.test(css3), '(r) taller rows / bars, handles past the ends');
   check(w.eval('TL_MINW') >= 18, '(r) minimum bar width');
 

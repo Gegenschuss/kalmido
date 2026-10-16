@@ -6,7 +6,6 @@
 // 2.13.0 (#453, Fold screenshots): the side panel only where sidebar + list + panel fit (>= 1000 px); below (phones, an
 // unfolded Fold, tablets in portrait) the chat is a full page with Back. Decided again on every resize / rotation
 // (chatRelayout), keeping the draft, the focus and the newest message in view.
-const chatFull = () => isMobile() || innerWidth < 1000 || (typeof dw_chatMini === 'function' && dw_chatMini());  // 2.46.2 (#1719): the chat's own window (chatwin.js)
 let chatRelT = 0;
 function chatRelayout() {
   if (!S.booted || imeOn || !S.chat.aid) return;
@@ -19,7 +18,6 @@ function chatRelayout() {
 }
 window.addEventListener('resize', () => { clearTimeout(chatRelT); chatRelT = setTimeout(() => { chatRelayout(); chatFabDraw(); }, 150); });
 try { screen.orientation?.addEventListener('change', () => { clearTimeout(chatRelT); chatRelT = setTimeout(chatRelayout, 150); }); } catch { /* old browsers */ }
-S.chat = {aid: null, msgs: [], err: null};
 function chatOpen(aid, o = {}) {
   tch_overlaysClose();  // 2.38.0 (#1155): no quick-add sheet or stale scrim stays over the chat
   if (typeof cw_note === 'function') cw_note('a:' + +aid, o);  // 2.47.1 (#1720): the list of open chats (chatwins.js)
@@ -37,23 +35,6 @@ function chatOpen(aid, o = {}) {
 }
 function chatClose() { if (S.chat.job && chatFull()) { jc_enter(S.chat.aid, null); return; }  // 2.56.0 (#1793): Back leaves a job's history first
   if (typeof cw_reset === 'function') cw_reset(); S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open', 'chat-float'); fitLayout(); chatFabDraw(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; go(b || 'agents'); } }
-// ---- 2.29.0 (#363) desktop: the chat as a pop-up window from anywhere -- the round button bottom right (the agent last
-// chatted with), the key A and "Chat as a window" in the command bar. The window stays open while you switch lists and views,
-// can be moved by its header, folded to the header and docked as the side panel again (remembered per device: chatFloat).
-const chatFloatOn = () => !chatFull() && LS.get('chatFloat', '') === '1';
-function chatFabAgent() {
-  const ags = (S.agents || []).filter(a => a.enabled && a.chat !== false), last = +LS.get('chatLast', 0);
-  return ags.find(a => a.id === last) || ags[0] || null;
-}
-function chatFabDraw() {
-  let b = $('#chatfab');
-  const a = S.booted && !chatFull() && feat('agents') && LS.get('chatFab', '1') !== '0' ? chatFabAgent() : null;
-  if (!a || !$('#achat')?.classList.contains('hidden') && $('#achat')) { b?.remove(); return; }
-  if (!b) { b = document.createElement('button'); b.id = 'chatfab'; b.type = 'button'; b.dataset.act = 'chat-pop'; document.body.appendChild(b); }
-  const t = tr('Chat with {0}', a.name);
-  b.title = t + ' (A)'; b.setAttribute('aria-label', t);
-  b.innerHTML = av(a.id, a.name, 'avatar') + (a.chat_unread || a.approvals_open ? `<span class="nbadge${a.approvals_open ? ' apvn' : ''}">${(a.chat_unread || 0) + (a.approvals_open || 0)}</span>` : '');
-}
 function chatPop(aid) {
   const p = $('#achat');
   if (p && !p.classList.contains('hidden') && (!aid || S.chat.aid === aid)) { if (p.classList.contains('float') && p.classList.contains('min')) { chatFloatMin(false); return; } chatClose(); return; }
@@ -192,7 +173,6 @@ const chatPerm = m => !!(m.from === 'agent' && m.choices?.permission);
 // come, are pinned at the top of the chat until answered (S.chat.apv: the open ones, also older than the loaded page) and
 // count at the agent (approvals_open). Afterwards: "Approved by … at …" / "Rejected by … at …".
 const jobSideSig = a => a ? [a.approvals_open || 0, a.chat_unread || 0, a.waiting || 0].join() : '';  // 2.36.2 (#1123): what the sidebar row shows
-const apvCount = n => trn('{0} approval open', '{0} approvals open', n);
 const apvIs = m => !!(m.from === 'agent' && m.choices?.approval);
 const apvKind = m => apvIs(m) ? 'a' : chatPerm(m) ? 'p' : '';
 const apvHeld = m => apvIs(m) || chatPerm(m);
@@ -384,17 +364,6 @@ document.addEventListener('drop', e => {
   if (cwk && typeof cw_act === 'function') cw_act(cwk);
   e.preventDefault(); e.stopImmediatePropagation(); z.classList.remove('filedrop'); chatAddFiles(e.dataTransfer.files); $('#chat-in')?.focus();
 }, true);
-// 2.7.2 (#421): reactions on a chat message. 2.13.0 (#453 A2): the quick 👍 / 👎 / ❤️ no longer sit as three empty circles
-// under every agent message: they appear on hover / keyboard focus (desktop) or a long press (touch) as a small bar over the
-// bubble's corner. Only an agent message that asks something (m.asks, server: chat_asks) counts a 👍 / 👎 as approval /
-// rejection: there the newest unanswered question shows the bar right away with the hint "👍 = approval", and a given 👍 / 👎
-// says "Counted as approval / rejection". Existing reactions always show as pills; on mine only what the agent reacted with.
-// the open quick bar is state (S.rxOpen = 'c<chat msg id>' | 'k<comment id>' | 't<team msg id>'), so a re-render (the chat
-// polls, a reaction arrives) keeps it open instead of closing it under the finger
-S.rxOpen = null;
-const rxTog = (key = null) => `<button type="button" class="rx rxtog" data-act="rx-tog" aria-expanded="${!!key && S.rxOpen === key}" title="${esc(tr('React'))}" aria-label="${esc(tr('React'))}">${ic('smile', 's')}</button>`;
-const rxShow = key => S.rxOpen === key ? ' rxshow' : '';
-const rxKey = host => host.classList.contains('cm') ? 'k' + host.dataset.cid : (host.closest('#tc-msgs') ? 't' : 'c') + String(host.dataset.mid).split(':').pop();
 function chatRxHtml(m, a) {
   const rs = m.reactions || [], ag = m.from === 'agent', on = !!a?.enabled, ask = ag && !!m.asks, perm = chatPerm(m);
   const meR = e => rs.some(r => r.emoji === e && r.users.some(u => S.me && u.id === S.me.id));
@@ -405,60 +374,6 @@ function chatRxHtml(m, a) {
   const open = ask && !perm && !voted && S.chat.msgs.length && S.chat.msgs[S.chat.msgs.length - 1].id === m.id;
   const extra = voted ? `<span class="rxok">${thumbIc(meR('up'))}${esc(voted)}</span>` : '';  // 2.32.0 (#1082)
   return rxRow(rs, {mid: m.id, act: 'chat-react', dis: !on, name: ask ? qn : null, extra, own: !ag, key: 'c' + m.id, keep: open ? ['up', 'down'] : []});
-}
-// 2.18.0 (#651, owner decision: reactions not hidden behind a smiley, too many taps): the quick reactions 👍 👎 ❤️ sit visibly in the
-// meta line of every chat message (agent chat and team chat, my own messages too); one tap toggles mine, the number says
-// how many reacted. Calm: an unused chip is only its muted emoji. Touch: 44 px targets through negative margins (the line
-// stays low). One Tab stop per message: a roving tabindex, ← → Home End move inside the row (rxRowKey).
-// dis = read-only (a paused agent, a deleted message): only the reactions that exist, as disabled chips.
-// name(k, meaning) = the label of a quick chip (the agent chat names 👍 / 👎 on a question as approval / rejection)
-const RXN = {up: N_('thumbs up'), down: N_('thumbs down'), heart: N_('heart')};
-// 2.23.0 (#823, owner decision): no reactions on one's own message (own: only the reactions of others, read-only); the quick
-// reactions of other people's messages sit behind a smiley button again (key: the open row, S.rxOpen), except keep (👍 / 👎
-// on an open question of an agent: the approval stays one tap away)
-function rxRow(rs, {mid, act, dis = false, name = null, extra = '', own = false, key = null, keep = []}) {
-  const meIn = r => !!r && (r.users || []).some(u => S.me && u.id === S.me.id), cnt = r => r ? r.count ?? (r.users || []).length : 0;
-  if (own) dis = true;
-  const items = RX.map(([k, em, n]) => { const o = name ? name(k, n) : n; return {k, em, n, o: o !== n ? o : '', r: rs.find(r => r.emoji === k)}; }).filter(x => !dis || cnt(x.r));
-  for (const r of rs) if (!RX.some(x => x[0] === r.emoji) && cnt(r)) items.push({k: r.emoji, em: rxEmoji(r.emoji), n: '', r});
-  if (!items.length && !extra) return '';
-  const fi = Math.max(0, items.findIndex(x => meIn(x.r)));
-  const chip = (x, i) => {
-    const me = meIn(x.r), c = cnt(x.r), who = c ? x.r.users.map(u => u.name).join(', ') : '';
-    const base = x.o ? tr(x.o) : RXN[x.k] ? tr('React with {0}', tr(RXN[x.k])) : x.em;
-    const lab = base + (who ? ': ' + who : ''), tip = (x.o ? tr(x.o) : x.n ? tr(x.n) : x.em) + (who ? ' · ' + who : '');
-    return `<button type="button" class="rx${c ? '' : ' add'}${me ? ' on' : ''}${!c && key && !keep.includes(x.k) ? ' rxq' : ''}" data-act="${act}" data-mid="${mid}" data-e="${esc(x.k)}" tabindex="${i === fi ? 0 : -1}" title="${esc(tip)}" aria-label="${esc(lab)}" aria-pressed="${me}" ${dis ? 'disabled' : ''}>${esc(x.em)}${c ? `<span class="rxn" aria-hidden="true">${c}</span>` : ''}</button>`;
-  };
-  // 2.19.0: "+" = more emojis (a small grid), one more stop in the row's arrow keys
-  const more = dis ? '' : (key ? rxTog(key) : '') + `<button type="button" class="rx rxplus${key ? ' rxq' : ''}" data-act="rx-more" data-rxact="${act}" data-mid="${mid}" tabindex="-1" aria-haspopup="dialog" title="${esc(tr('More reactions'))}" aria-label="${esc(tr('More reactions'))}">${ic('plus', 's')}</button>`;
-  return `<span class="rxbar chrx rxrow" role="group" aria-label="${esc(tr('Reactions'))}">${items.map(chip).join('')}${more}${extra}</span>`;
-}
-// the arrow keys inside a reaction row (one Tab stop per message)
-function rxRowKey(e) {
-  const b = e.target.closest?.('.rxrow .rx'); if (!b || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return false;
-  const all = $$('.rx:not(:disabled)', b.closest('.rxrow')), i = all.indexOf(b); if (i < 0) return false;
-  const j = e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + all.length) % all.length;
-  all.forEach((x, k) => x.tabIndex = k === j ? 0 : -1); all[j].focus(); e.preventDefault(); return true;
-}
-document.addEventListener('keydown', e => { if (rxRowKey(e)) e.stopPropagation(); }, true);
-// after a reaction the row is drawn anew: the focus goes back to the same chip (it was on it, now it is detached)
-function rxRefocus(sel, mid, emoji) {
-  const ae = document.activeElement; if (ae && ae !== document.body && ae.isConnected) return;
-  const b = $$(`${sel} .rxrow .rx[data-mid="${mid}"]`).find(x => x.dataset.e === emoji); if (!b) return;
-  $$('.rx', b.closest('.rxrow')).forEach(x => x.tabIndex = x === b ? 0 : -1); b.focus({preventScroll: true});
-}
-// touch: a long press on an agent message opens its reaction bar (another tap elsewhere closes it)
-{
-  let lp = null;
-  document.addEventListener('touchstart', e => {
-    // 2.18.0 (#651): chat messages show their reactions anyway; the long press stays for comments in the task panel
-    // 2.32.0 (#1062): an agent chat message too -- its smiley shows only on hover (desktop) or after a long press (touch)
-    const m = e.target.closest?.('#detail .cm:not(.cedit), #chat-msgs .cmsg.ag'); if (!m || e.touches.length !== 1 || e.target.closest('button, a, textarea, input')) { lp = null; return; }
-    const p = e.touches[0]; lp = {m, x: p.clientX, y: p.clientY, t: setTimeout(() => { $$('.rxshow').forEach(x => x !== m && x.classList.remove('rxshow')); m.classList.add('rxshow'); S.rxOpen = rxKey(m); if (navigator.vibrate) navigator.vibrate(10); lp = null; }, 450)};
-  }, {passive: true});
-  document.addEventListener('touchmove', e => { if (lp && Math.hypot(e.touches[0].clientX - lp.x, e.touches[0].clientY - lp.y) > 8) { clearTimeout(lp.t); lp = null; } }, {passive: true});
-  document.addEventListener('touchend', () => { if (lp) { clearTimeout(lp.t); lp = null; } }, {passive: true});
-  document.addEventListener('click', e => { if (!e.target.closest?.('.rxshow .chrxq, .rxshow .cmrxq')) $$('.rxshow').forEach(x => { if (!x.contains(e.target)) { x.classList.remove('rxshow'); if (S.rxOpen === rxKey(x)) S.rxOpen = null; } }); }, true);
 }
 async function chatReact(mid, emoji) {
   const aid = S.chat.aid, m = S.chat.msgs.find(x => x.id === mid); if (!aid || !m) return;
@@ -627,7 +542,6 @@ function stepsLive(on) {
 // a tap on the typing dots brings hidden steps back
 document.addEventListener('click', e => { if (e.target.closest?.('#chat-typing') && !stepsLiveOn() && (S.chat.live || []).length) stepsLive(true); });
 // a job's history ("History"): open / closed per job (default: the switch above), loaded when opened
-S.jobSteps = {}; S.jobOpen = {};
 const jobStepsBusy = new Set();
 const jobOpenIs = jid => S.jobOpen[jid] ?? stepsAlwaysOn();
 function jobStepsHtml(jid, n) {
@@ -725,7 +639,6 @@ function chatPatch(o = {}) {
   if (sb && sb.disabled === on && !S.chat.sending) sb.disabled = !on;
   jc_patch();  // 2.56.0 (#1793)
 }
-const chatNear = box => box.scrollHeight - box.scrollTop - box.clientHeight <= 3 * remPx();
 // 2.12.2 (#453 N4): the phone chat fills exactly what is visible (the visual viewport minus the header and, without a
 // keyboard, the tab bar); with the keyboard up (body.kb-open) the tab bar and the note go, and a chat that was at the
 // bottom stays at the bottom, so the newest message is right above the input
@@ -766,26 +679,6 @@ async function chatOlder() {
   finally { S.chat.busy = false; }
   chatPatch({keep: true});
 }
-// 2.12.2 (#451): replaces only the children of box that changed, by their key (data-k) or else by position; the box itself,
-// its scroll position and anything focused outside of it stay
-function patchKids(box, html) {
-  const t = document.createElement('template'); t.innerHTML = html;
-  const key = n => n.getAttribute('data-k') || (n.hasAttribute('data-cid') ? 'c' + n.getAttribute('data-cid') : null), old = new Map();
-  [...box.children].forEach(n => { const k = key(n); if (k) old.set(k, n); });
-  const keep = new Set(); let prev = null;
-  for (const n of [...t.content.children]) {
-    const k = key(n), at0 = prev ? prev.nextElementSibling : box.firstElementChild;
-    const o = k ? old.get(k) : at0 && !key(at0) && !keep.has(at0) ? at0 : null;
-    let use = n;
-    if (o && o.isEqualNode(n)) use = o;
-    else if (o) o.replaceWith(n);
-    const at = prev ? prev.nextElementSibling : box.firstElementChild;
-    if (at !== use) box.insertBefore(use, at);
-    keep.add(use); prev = use;
-  }
-  [...box.children].forEach(c => { if (!keep.has(c)) c.remove(); });
-  [...box.childNodes].forEach(c => { if (c.nodeType === 3) c.remove(); });
-}
 async function chatSend() {
   const ta = $('#chat-in'), aid = S.chat.aid, hadF = document.activeElement === ta; if (!ta || !aid) return;
   const body = jc_send(ta.value.trim()), files = S.chatFiles[aid] || []; if (!body && !files.length) return;  // 2.56.0 (#1793): "Clara: …" in a job's history
@@ -821,7 +714,6 @@ document.addEventListener('input', e => { if (e.target.id === 'chat-in') { S.dra
 // 2.5.1 (#393): first only the lists an agent sees (all of them while none is shared yet) + "Show all (n)", a search above
 // 10 lists (always over all lists), shared ones first; one tidy select with short labels, the tidy agent next to it only
 // while tidying is on and more than one agent could do it.
-const TIDY_SHORT = {off: N_('Off'), suggest: N_('Suggest'), auto: N_('Automatically')};
 async function aiTblDraw(md) {
   const box = $('#s-ai-tbl', md); if (!box) return;
   if (!box._ags) {
@@ -1341,8 +1233,6 @@ function agModal(a, done, o = {}) {
 // Agents view. Tokens = input + output + cache writes (cache reads apart), cost only when the agent reports it.
 // 2.6.0 (K24): the same short form in every language ("59.1k" / "59,1 Tsd.", "1.2M" / "1,2 Mio."); Intl's German compact
 // form spelled thousands out ("59.100")
-const fmtTok = v => { v = +v || 0; const f = x => x.toLocaleString(LOCALE(), {maximumFractionDigits: 1}); return v >= 1e6 ? tr('{0}M|million, short', f(v / 1e6)) : v >= 1e3 ? tr('{0}k|thousand, short', f(v / 1e3)) : f(v); };
-const fmtUsd = v => v === null || v === undefined ? '–' : +v > 0 && +v < .01 ? '<$0.01' : '$' + (+v).toFixed(2);
 const aiuVal = (x, m) => m === 'cost' ? fmtUsd(x.cost) : fmtTok(x.tokens);
 const aiuLimFmt = (v, metric) => metric === 'cost' ? fmtUsd(v) : tr('{0} tokens', fmtTok(v));
 function aiuNewsText(d) {
@@ -1420,8 +1310,6 @@ function aiuCardHtml() {
     <div class="aiug" role="table" aria-label="${esc(tr('Agent usage'))}"><div class="aiugh" role="row"><span role="columnheader"></span><span role="columnheader">${tr('Today')}</span><span role="columnheader">${tr('7 days')}</span><span role="columnheader">${tr('30 days')}</span></div>
     ${j.agents.filter(a => a.totals.d30.calls).map(a => `<div class="aiucr" role="row"><span class="n" role="rowheader">${av(a.id, a.name)}<span>${esc(a.name)}${a.limit_reached ? ` <small class="aiulr">${tr('limit reached')}</small>` : ''}</span></span><span class="aiuv" role="cell">${esc(aiuVal(a.totals.today, m))}</span><span class="aiuv" role="cell">${esc(aiuVal(a.totals.d7, m))}</span><span class="aiuv" role="cell">${esc(aiuVal(a.totals.d30, m))}</span></div>`).join('')}</div></div>`;
 }
-// the task panel: "Agent usage" of a task agents reported usage for (only on tasks the viewer sees: it comes with the task)
-const aiuTaskLine = t => t.ai_usage ? `<label>${tr('Agent usage')}</label><div class="aiuse" title="${esc(tr('Model usage agents reported for this task'))}">${ic('chart', 's')}<span>${esc(tr('{0} tokens', fmtTok(t.ai_usage.tokens)))}${t.ai_usage.cost !== null && t.ai_usage.cost !== undefined ? ' · ' + esc(fmtUsd(t.ai_usage.cost)) : ''} · ${esc(trn('{0} report', '{0} reports', t.ai_usage.calls))}</span></div>` : '';
 // the admin's limit fields in the agent dialog
 function aiuLimFields(a) {
   const l = a?.limits || {}, st = a?.usage;

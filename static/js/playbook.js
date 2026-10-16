@@ -37,14 +37,7 @@ const pbBody = (sc, b) => sc.lid ? b : {folder: sc.folder, ...b};
 const pbTitle = sc => sc.lid ? lname(listById(sc.lid) || {name: ''}) : fDisp(sc.folder);
 const pbWho = by => by ? esc(by.name || '') + (by.kind === 'agent' ? ' ' + agentBadge() : '') : '';
 const pbWhen = iso => typeof schedWhen === 'function' ? schedWhen(iso) : fmtWhen(iso);
-// the area: with agents (a folder too), and in a list with a playbook also for members who do not see its agent (they read
-// it); the menu entry: with a playbook, or for those who may write one
-const pbOn = l => agentsOn() || (collab() && !!l?.playbook);
-function pbMenuItem(l) {
-  if (!l || !pbOn(l) || l.is_inbox || l.archived) return null;
-  if (l.playbook) return {label: tr('Playbook'), icon: 'book', cls: 'mplaybook', fn: () => pbOpen(l.id)};
-  return canManage(l) && listAgents(l).length ? {label: tr('Playbook…'), icon: 'book', cls: 'mplaybook', rare: 1, fn: () => pbOpen(l.id)} : null;
-}
+// 2.65.0 (#1823): pbOn, pbMenuItem and pbAreaHtml are in lazyload.js (this file loads on demand, module playbook)
 
 // ---- a small line diff (longest common subsequence over the lines; very long texts: the changed middle as removed + added)
 function pbDiff(a, b) {
@@ -78,9 +71,6 @@ function pbDiffHtml(a, b) {
 }
 
 // ---- the area in the list dialog / folder dialog / its own dialog
-function pbAreaHtml(kind) {
-  return `<h4 id="pb-h-${kind}">${tr('Playbook')}</h4><div class="pbarea" id="pb-area" aria-labelledby="pb-h-${kind}"><div class="muted mhint">${tr('Loading…')}</div></div>`;
-}
 function pbPrevHtml(j, sc) {
   const parts = (j.folders || []).filter(f => (f.text || '').trim()).map(f => `<div class="pbpart pbinh"><div class="pbparth">${ic('folder', 's')} ${esc(tr('From the folder {0}', fDisp(f.folder)))} <span class="muted">· ${tr('read only here')}</span></div><div class="md">${renderMd(f.text, true)}</div></div>`);
   if ((j.text || '').trim()) parts.push(`<div class="pbpart pbown">${parts.length ? `<div class="pbparth">${ic(sc.lid ? 'list' : 'folder', 's')} ${esc(sc.lid ? tr('This list adds') : tr('This folder adds'))}</div>` : ''}<div class="md">${renderMd(j.text, true, sc.lid ? {lid: sc.lid} : {})}</div></div>`);

@@ -6,19 +6,50 @@
 
 // module -> its files in static/js/, in load order (the same files as LAZY in sw.js)
 const LD_MODS = {
-  settings: ['settings'],
-  contacts: ['contacts'],
+  settings: ['acctset', 'settings'],  // 2.65.0 (#1823): acctset.js = the settings sections of account.js
+  contacts: ['contacts', 'newsletter'],  // 2.65.0 (#1823): newsletter.js
   office: ['office', 'office_docs', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow',
     'office_pipeline', 'office_kpi', 'office_datev', 'officeagents'],
+  // 2.65.0 (#1823): more areas load on first use (the start loads about a third less)
+  agentchat: ['agentchat', 'agentsetup'],
+  pdf: ['pdfview'],
+  mindmap: ['mindmap'],
+  wiki: ['wiki'],
+  stats: ['stats'],
+  calendar: ['calview', 'caldrag'],
+  docs: ['docs', 'paperless', 'receipts'],
+  life: ['life'],
+  integrations: ['integrations'],
+  playbook: ['playbook'],
+  timeline: ['timeline', 'roadmap'],
 };
+// 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
+// draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
+// uses the token dialogs, a knowledge page embeds mind maps
+const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook'], agentchat: ['integrations'], wiki: ['mindmap']};
 // functions of a module that code loaded at start calls: a stand-in loads the module and then calls the real one (the
 // module's own function declaration replaces the stand-in on window)
-const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved'], contacts: ['ctRoute', 'ctEditor']};
+const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved'], contacts: ['ctRoute', 'ctEditor'],
+  // 2.65.0 (#1823)
+  agentchat: ['chatOpen', 'chatClose', 'chatPop', 'chatDock', 'chatFloatMin', 'apvJump', 'chatChoice', 'shareDest', 'chatFileRm', 'chatReact',
+    'chatModeMenu', 'stepsAlways', 'stepsLive', 'chatEditStart', 'chatOlder', 'chatSend', 'chatBottom', 'chatDraw', 'agModal', 'agDraw', 'aiuLoad', 'ains_setupModal'],
+  pdf: ['pdfView'], calendar: ['calColorPop', 'cg_commit'], docs: ['dc_shareFiles'],
+  life: ['contractModal', 'deviceModal', 'upkeepModal', 'healthModal', 'tripModal'], integrations: ['pubWire'],
+  playbook: ['pbMount', 'pbOpen', 'pbNewsOpen'], timeline: ['rmSet']};
+// 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
+const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender']};
 // drawing functions: the stand-in draws "Loading…" (views) or nothing (parts of another view), loads, and redraws the view
 // 2.65.0 (#1824): module -> its stylesheets in static/css/ (the same files as LAZY_CSS in sw.js, same order); loadModule loads
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
-const LD_CSS = {};
-const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office']};
+const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
+  wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs'], life: ['life'],
+  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline']};
+const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
+  // 2.65.0 (#1823)
+  chatViewHtml: ['agentchat', 1], jobStepsHtml: ['agentchat'], aiuCardHtml: ['agentchat'], aiuNewsText: ['agentchat'], chatInner: ['agentchat'],
+  chatMsgs: ['agentchat'], chatWinBtns: ['agentchat'], viewWiki: ['wiki', 1], viewMindmap: ['mindmap', 1],
+  mm_blockHtml: ['mindmap'], viewStats: ['stats', 1], viewCal: ['calendar', 1], viewDocs: ['docs', 1], viewLife: ['life', 1], viewReview: ['life', 1], pbNewsText: ['playbook'], viewTimeline: ['timeline', 1], viewRoadmap: ['timeline', 1],
+  tlNdBtn: ['timeline'], tlNdOn: ['timeline']};
 // stays at start (core.js modOn, areas, dashboard, the client page ask it before anything of the office is loaded)
 const officeOn = () => feat('office') && !S.me?.kid;
 
@@ -65,13 +96,14 @@ function loadModule(name, again) {
   const files = LD_MODS[name];
   if (!files) return Promise.reject(new Error('unknown module ' + name));
   ld_bar(1);
+  const need = Promise.all((LD_NEED[name] || []).map(m => loadModule(m)));  // 2.65.0 (#1823)
   // the files of one module run one after the other (later ones use the first one's globals); the browser fetches them side
   // by side meanwhile (preload)
   for (const f of files.slice(1)) {
     const l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = ld_url(f); l.dataset.ld = f; document.head.appendChild(l);
   }
   const css = Promise.all((LD_CSS[name] || []).map(loadCss));
-  const p = LD_P[name] = Promise.all([css, files.reduce((q, f) => q.then(() => ld_script(f)), Promise.resolve())]).then(() => { ld_bar(-1); }, e => {
+  const p = LD_P[name] = Promise.all([css, files.reduce((q, f) => q.then(() => ld_script(f)), need)]).then(() => { ld_bar(-1); }, e => {
     ld_bar(-1); delete LD_P[name];
     for (const f of files) if (!LD_RAN.has(f)) document.querySelectorAll(`[data-ld="${f}"]`).forEach(x => x.remove());
     toast(tr('Could not be loaded'), again || (() => loadModule(name)), 8000, tr('Try again'));
@@ -101,6 +133,7 @@ for (const [m, ns] of Object.entries(LD_CALL)) for (const n of ns) {
   };
   window[n] = stub;
 }
+for (const ns of Object.values(LD_NOP)) for (const n of ns) window[n] = () => '';  // 2.65.0 (#1823)
 // a part of another view (the client page's office hints, the start page's figures) loads the office only when it is on
 for (const [n, [m, view]] of Object.entries(LD_VIEW)) window[n] = () => { if (!view && m === 'office' && !officeOn()) return ''; ld_later(m); return view ? `<p class="muted lempty">${tr('Loading…')}</p>` : ''; };
 // the office switch of an agent (Settings > Agents, the agent chat's settings): its row is drawn at once, the office part
@@ -108,5 +141,81 @@ for (const [n, [m, view]] of Object.entries(LD_VIEW)) window[n] = () => { if (!v
 window.oa_switchRowHtml = aid => officeOn() ? `<div class="oa_sw" data-oa-aid="${+aid}" hidden></div>` : '';
 window.oa_switchLoad = md => !officeOn() ? Promise.resolve() : loadModule('office').then(() => { if (window.oa_switchLoad.ld) return; return oa_switchLoad(md); }).catch(() => {});
 window.oa_switchLoad.ld = 1;
+// 2.65.0 (#1823) knowledge pages: the command bar's pages and a task's "Mentioned in" load the module in the background (the
+// first time without them, as before while the pages were fetched); the task panel is drawn again once it is there
+window.wk_palAdd = () => { if (feat('wiki')) loadModule('wiki').catch(() => {}); };
+window.wk_mentionHtml = t => { if (feat('wiki') && t?.id > 0) loadModule('wiki').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
+// 2.65.0 (#1823) the PDF preview (pdfview.js, module pdf): its links are drawn at start, a click loads the module (moved here
+// from pdfview.js). A link that should open the preview: <a href="…" data-pview='{"url","name","size","dlUrl"}'>; a modifier
+// key keeps the browser's own behaviour (Ctrl/Cmd-click = new tab), like the text viewer's links
+document.addEventListener('click', e => {
+  const l = e.target.closest?.('a[data-pview],button[data-pview]');
+  if (!l || e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+  let o; try { o = JSON.parse(l.dataset.pview); } catch { return; }
+  e.preventDefault(); e.stopPropagation();
+  pdfView(o);
+}, true);
+// 2.65.0 (#1823) Documents (docs.js, module docs): the module switch and the share sheet's question stay at start (moved here)
+// its module switch (Settings > Modules), off by default like the other areas
+FEATS.push(['docs', N_('Documents')]);
+FEAT_DESC.docs = N_('Scanned letters, invoices and contracts: text recognition, full-text search, sorting by rules and by what Kalmido learns from your corrections, due dates as tasks');
+const dc_shareOk = () => typeof feat === 'function' && feat('docs') && !S.me?.kid;
+// 2.65.0 (#1823) Home & life (life.js, module life): the switch and the money format stay at start (moved here); a life list's
+// bar, a life task's details and a contact's care line load the module when one is drawn
+const LIFE_MODS = ['contracts', 'home', 'care', 'health', 'travel', 'reading'];
+const lifeOn = () => LIFE_MODS.some(m => feat(m));
+function fmtMoney(n) {
+  if (n == null) return '';
+  let s; try { s = new Intl.NumberFormat(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(n); } catch { s = n.toFixed(2); }
+  const cur = S.settings.time_currency ?? '€';
+  return cur ? s + ' ' + cur : s;
+}
+window.lifeBar = l => { if (l?.life && !l.archived && lifeOn()) ld_later('life'); return ''; };
+window.lifeDetailHtml = t => { if (t?.id > 0 && !t.context && ['contract', 'device', 'upkeep', 'health', 'bookmark'].includes(t.fam?.kind)) loadModule('life').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
+window.lifeCareHtml = c => { if (c && feat('care')) ld_later('life'); return ''; };
+// 2.65.0 (#1823) the API docs link (Settings > Agents, the agent chat): integrations.js loads on demand (moved here)
+const API_DOCS = 'https://github.com/Gegenschuss/kalmido/blob/main/docs/API.md';
+// 2.65.0 (#1823) playbooks (playbook.js, module playbook): the list / folder dialogs ask these at start (moved here); the
+// area loads the module when it mounts
+// the area: with agents (a folder too), and in a list with a playbook also for members who do not see its agent (they read
+// it); the menu entry: with a playbook, or for those who may write one
+const pbOn = l => agentsOn() || (collab() && !!l?.playbook);
+function pbMenuItem(l) {
+  if (!l || !pbOn(l) || l.is_inbox || l.archived) return null;
+  if (l.playbook) return {label: tr('Playbook'), icon: 'book', cls: 'mplaybook', fn: () => pbOpen(l.id)};
+  return canManage(l) && listAgents(l).length ? {label: tr('Playbook…'), icon: 'book', cls: 'mplaybook', rare: 1, fn: () => pbOpen(l.id)} : null;
+}
+function pbAreaHtml(kind) {
+  return `<h4 id="pb-h-${kind}">${tr('Playbook')}</h4><div class="pbarea" id="pb-area" aria-labelledby="pb-h-${kind}"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+}
+// 2.65.0 (#1823) the timeline and the roadmap (timeline.js, roadmap.js, module timeline): what the lists, the sidebar and the
+// drag ask at start (moved here)
+const rmEsc = v => String(v).replace(/["\\]/g, '\\$&');  // inside a quoted attribute selector
+function rmP() {
+  const src = S.rmLocal ?? S.settings.roadmap ?? '';
+  if (!S.rmPc || S.rmPc.src !== src) {
+    let v = {}; try { v = JSON.parse(src || '{}'); } catch { v = {}; }
+    S.rmPc = {src, v: v && typeof v === 'object' && !Array.isArray(v) ? v : {}};
+  }
+  return S.rmPc.v;
+}
+const isRoadmap = () => S.route.mod === 'tasks' && S.route.key === 'all' && feat('timeline') && rmP().v === 'timeline';
+function tlReaches(from, target) {  // does `from` (transitively) wait on `target`? (open blockers I can see)
+  const seen = new Set(), todo = [from];
+  while (todo.length) { const x = todo.pop(); if (x === target) return true; if (seen.has(x) || seen.size > 5000) continue; seen.add(x); todo.push(...(S.tasks.get(x)?.blockers || [])); }
+  return false;
+}
+const pv_attr = o => ` data-pview="${esc(JSON.stringify(o))}"`;
 // the settings dialog is opened most often: loaded in the background once the app has started and is idle
-setTimeout(() => (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => { if (S.me && !document.hidden) loadModule('settings').catch(() => {}); }), 5000);
+// 2.65.0 (#1823): then, one per idle moment, the areas this person has switched on (not all modules: no office, contacts,
+// statistics, PDF, playbooks), so their first click stays quick without slowing the start
+const LD_IDLE = [['settings', () => true], ['calendar', () => feat('cal')], ['timeline', () => feat('timeline')], ['wiki', () => feat('wiki')],
+  ['docs', () => feat('docs')], ['life', () => lifeOn()]];
+function ld_idle(i) {
+  const m = LD_IDLE[i]; if (!m) return;
+  (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => {
+    if (!S.me || document.hidden) return;
+    (m[1]() ? loadModule(m[0]) : Promise.resolve()).catch(() => {}).then(() => ld_idle(i + 1));
+  });
+}
+setTimeout(() => ld_idle(0), 5000);

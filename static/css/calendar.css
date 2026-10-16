@@ -1,0 +1,28 @@
+/* Kalmido web client: the styles of the module "calendar" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
+   Moved unchanged from app.css (same order); later than app.css in the cascade. */
+.wlbl{font-size:.625rem;color:var(--muted);padding:.375rem .25rem;text-align:right}
+.wgutter{position:relative;height:calc(24 * var(--h))}
+.wtime{position:absolute;right:.375rem;font-size:.625rem;color:var(--muted);transform:translateY(-.375rem)}
+.nowline{position:absolute;left:0;right:0;height:2px;background:var(--p5);z-index:2}
+.nowline::before{content:'';position:absolute;left:-.25rem;top:-.1875rem;width:.5rem;height:.5rem;border-radius:50%;background:var(--p5)}
+@media (max-width:899px) {
+  .wlbl{padding:.25rem 2px;font-size:.5625rem;line-height:1.1;overflow-wrap:anywhere}
+}
+.calsub{display:flex;align-items:center;gap:.5rem;padding:.375rem .25rem;border-bottom:1px solid var(--line)}
+.calsub.off .calsub-main{opacity:.55}
+.calsub-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.calsub-main b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.calsub-main small{font-size:var(--fs-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cswatch{flex:0 0 auto;width:1.125rem;height:1.125rem;border-radius:50%;background:var(--cc);border:2px solid color-mix(in srgb,var(--cc) 40%,var(--bg2))}
+.calvis{display:flex;align-items:center;padding:0 .25rem}
+.calvis input{width:1rem;height:1rem}
+.cpal{display:grid;grid-template-columns:repeat(5,1.75rem);gap:.375rem;padding:.25rem}
+.cpal.inline{grid-template-columns:repeat(9,1.5rem);padding:0}
+.cpal button{width:1.5rem;height:1.5rem;border-radius:50%;background:var(--cc);border:2px solid transparent}
+.cpal button.on{box-shadow:0 0 0 2px var(--bg2),0 0 0 .25rem var(--cc)}
+#ca-cals{margin:.25rem 0 .5rem}
+#ca-cals .shint{grid-column:1/-1}
+@media (max-width:899px) {
+  .cpal.inline{grid-template-columns:repeat(5,1.5rem)}
+}
+.evghost{position:absolute;left:2px;right:2px;background:var(--accent-soft);border:1px dashed var(--accent);border-radius:.3125rem;font:var(--fs-xs) var(--mono);padding:1px .25rem;z-index:2;pointer-events:none}

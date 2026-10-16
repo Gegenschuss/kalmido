@@ -131,7 +131,7 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   check(d.documentElement.style.getPropertyValue('--vvt') === '180px', 'visual viewport scrolled: dialog follows');
   w.__setSY(180); vv.height = 780; vv.offsetTop = 0; vv.fire('resize');  // keyboard gone, page left scrolled
   check(d.documentElement.style.getPropertyValue('--vvh') === '780px' && d.documentElement.style.getPropertyValue('--vvt') === '0px' && w.__scrolled >= 1 && w.scrollY === 0, 'keyboard hidden: re-centred, leftover page scroll undone');
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   check(/\.modal\{position:fixed;inset:0;[^}]*padding:calc\(var\(--vvt,0px\) \+ 1rem\) 1rem calc\(var\(--vvb,0px\) \+ 1rem\)/.test(css), 'CSS: .modal padded by --vvt / --vvb');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   // touch: "…" > Refresh on a shared list

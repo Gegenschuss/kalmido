@@ -27,6 +27,18 @@ PooledLoader.busy = 0; PooledLoader.wait = [];
 exports.PooledLoader = PooledLoader;
 const B = process.env.BASE || `http://127.0.0.1:${process.env.KALMIDO_TEST_PROXY_PORT || 3041}/`;
 exports.B = B; exports.errs = [];
+// 2.65.0 (#1824): the app's whole CSS = app.css + the module stylesheets (static/css/, LAZY_CSS of sw.js, in that order: they
+// come later in the cascade); the suites that read rules use this, a rule may have moved into a module's stylesheet
+const cssList = sw => [...((sw.match(/const LAZY_CSS = \[(.*?)\];/s) || [, ''])[1]).matchAll(/'\/static\/css\/([\w-]+\.css)'/g)].map(m => m[1]);
+exports.allCss = async () => {
+  const sw = await (await fetch(B + 'sw.js')).text(), parts = [await (await fetch(B + 'static/app.css')).text()];
+  for (const f of cssList(sw)) parts.push(await (await fetch(B + 'static/css/' + f)).text());
+  return parts.join('\n');
+};
+exports.allCssSync = () => {
+  const fs = require('fs'), st = require('path').join(__dirname, '..', 'static'), rd = f => fs.readFileSync(require('path').join(st, f), 'utf8');
+  return [rd('app.css'), ...cssList(rd('sw.js')).map(f => rd('css/' + f))].join('\n');
+};
 // 2.20.0 (#646): the web client is static/js/*.js (the order of the script tags in index.html); this is all of it as one text
 exports.clientSource = async () => {
   const html = await (await fetch(B)).text();

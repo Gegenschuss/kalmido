@@ -128,7 +128,7 @@ const CONTRAST = `(() => {
   const icn = JSON.parse(w.eval('JSON.stringify(Object.keys(P).map(k => [k, ic(k)]))'));
   check(icn.length >= 96 && icn.every(([, s]) => /viewBox="0 0 20 20"/.test(s) && /<(path|circle)/.test(s)), 'icon set: every key drawn on the 20 grid');
   check(icn.filter(([, s]) => /class="d"/.test(s)).length >= 50, 'most icons carry the dot');
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   check(/svg\.i\{[^}]*stroke-width:1\.6/.test(css) && /svg\.i \.d\{fill:var\(--dot,var\(--accent\)\)/.test(css), 'CSS: 1.6 strokes, dot in the accent');
   check(/--acc-l:#be185d/.test(css) && /--acc-d:#f472b6/.test(css), 'raspberry tokens (selectable since 2.11.0)');
   check(d.documentElement.dataset.accent === 'violet', 'violet = default accent (2.11.0, #449)');
