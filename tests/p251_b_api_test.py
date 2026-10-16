@@ -16,6 +16,7 @@
    person, undo puts the modules back and removes the lists while they are empty (a list with a task stays, named)
  - the quotation part (part A's office/agentdocs.py): skipped when the module is missing in this build
 usage: p251_b_api_test.py <datadir>"""
+import json
 import os
 import subprocess
 import sys
@@ -324,6 +325,16 @@ else:
     A.put(O + "/settings", json={"agents_read": 0})
     r = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "offer_id": QD, "proposal": FROM})
     check(r.status_code == 403, f"office: privacy switch off again -> 403 ({r.status_code})")
+
+# ================================================================== 2.51.0 review fixes (negative tests)
+# #1351 review 6: the mode "all" never reaches a person who shares no list with the agent
+check(A.patch(B + f"/api/admin/agents/{AG}", json={"proposals": "all"}).ok, "review 6: proposals mode all")
+r = cl.post("/agent/proposals", json={"kind": "setup", "user_id": BOB, "proposal": {"modules": [{"key": "habits", "on": True}]}})
+check(r.status_code == 404, f"review 6: mode all, setup for a person without a shared list: 404 ({r.status_code})")
+r = cl.post("/agent/proposals", json={"kind": "inquiry", "user_id": BOB, "proposal": OWN})
+check(r.status_code == 404, f"review 6: mode all, inquiry for a person without a shared list: 404 ({r.status_code})")
+A.patch(B + f"/api/admin/agents/{AG}", json={"proposals": "shared"})
+
 
 print(f"p251_b_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
