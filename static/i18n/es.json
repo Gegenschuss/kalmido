@@ -8229,5 +8229,6 @@
   "Status dots of lists": "Puntos de estado de las listas",
   "Share marks (person / robot)": "Marcas de compartir (persona / robot)",
   "Without counts, Today keeps its red number while something is overdue.": "Sin contadores, Hoy mantiene su número rojo mientras haya algo vencido.",
-  "App passwords (CalDAV) and API tokens stay valid. If someone else may have had access, check them under Settings > Account (API tokens: Advanced · for developers).": "Las contraseñas de aplicación (CalDAV) y los tokens de API siguen siendo válidos. Si otra persona pudo tener acceso, revísalos en Ajustes > Cuenta (tokens de API: Avanzado · para desarrolladores)."
+  "App passwords (CalDAV) and API tokens stay valid. If someone else may have had access, check them under Settings > Account (API tokens: Advanced · for developers).": "Las contraseñas de aplicación (CalDAV) y los tokens de API siguen siendo válidos. Si otra persona pudo tener acceso, revísalos en Ajustes > Cuenta (tokens de API: Avanzado · para desarrolladores).",
+  "Applying creates the project, its tasks and the shoot days as event drafts in your calendar, as you. Nothing is sent. One step, undo takes it back.": "Al aplicar se crean el proyecto, sus tareas y los días de rodaje como borradores de eventos en tu calendario, en tu nombre. No se envía nada. Un paso, deshacer lo revierte."
 }

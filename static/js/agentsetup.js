@@ -14,10 +14,13 @@ function ains_command(os, url, code, folder) {
 }
 const ains_folderHint = os => os === 'windows' ? '~\\projects\\website' : '~/projects/website';
 const ains_osName = os => tr((AINS_OS.find(x => x[0] === os) || ['', ''])[1]) || '';
+// 2.58.0 (#1527): a token without any computer data (made by hand or before 2.44) is shown as "API token" with its dates
+const f8c_plainTok = m => !m.host && !m.os && !m.folder;
 function ains_machinesHtml(ms) {
   if (!ms.length) return `<div class="muted mhint">${tr('No computer yet.')}</div>`;
-  return ms.map(m => `<div class="mrow ainsm" data-ainsm="${m.id}">${hdot(m.connected ? 'ready' : 'offline')}<span class="n"><b>${esc(m.host || tr('Unknown computer'))}</b>
-      <small class="muted">${esc([m.connected ? tr('connected') : m.last_used_at ? tr('last contact {0}', relTime(m.last_used_at)) : tr('never connected'), ains_osName(m.os), m.folder].filter(Boolean).join(' · '))}</small></span>
+  return ms.map(m => `<div class="mrow ainsm" data-ainsm="${m.id}">${hdot(m.connected ? 'ready' : 'offline')}<span class="n"><b>${esc(m.host || (f8c_plainTok(m) ? tr('API token') : tr('Unknown computer')))}</b>
+      <small class="muted">${esc((f8c_plainTok(m) ? [m.created_at && tr('created {0}', fmtWhen(m.created_at)), m.connected ? tr('connected') : m.last_used_at ? tr('last used {0}', relTime(m.last_used_at)) : tr('never used')]
+        : [m.connected ? tr('connected') : m.last_used_at ? tr('last contact {0}', relTime(m.last_used_at)) : tr('never connected'), ains_osName(m.os), m.folder]).filter(Boolean).join(' · '))}</small></span>
       <button class="btn sm danger" data-m="ains-del" aria-label="${esc(tr('Remove computer {0}', m.host || m.prefix))}">${ic('trash', 's')} ${tr('Remove computer')}</button></div>`).join('');
 }
 // 2.47.3 (#1729): the command that takes an agent off one computer again (stops the autostart, revokes the key when it still

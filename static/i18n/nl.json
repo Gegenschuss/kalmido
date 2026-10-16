@@ -8229,5 +8229,6 @@
   "Status dots of lists": "Statusstippen van lijsten",
   "Share marks (person / robot)": "Deelmarkeringen (persoon / robot)",
   "Without counts, Today keeps its red number while something is overdue.": "Zonder tellers houdt Vandaag zijn rode getal zolang er iets te laat is.",
-  "App passwords (CalDAV) and API tokens stay valid. If someone else may have had access, check them under Settings > Account (API tokens: Advanced · for developers).": "App-wachtwoorden (CalDAV) en API-tokens blijven geldig. Als iemand anders toegang kan hebben gehad, controleer ze onder Instellingen > Account (API-tokens: Geavanceerd · voor ontwikkelaars)."
+  "App passwords (CalDAV) and API tokens stay valid. If someone else may have had access, check them under Settings > Account (API tokens: Advanced · for developers).": "App-wachtwoorden (CalDAV) en API-tokens blijven geldig. Als iemand anders toegang kan hebben gehad, controleer ze onder Instellingen > Account (API-tokens: Geavanceerd · voor ontwikkelaars).",
+  "Applying creates the project, its tasks and the shoot days as event drafts in your calendar, as you. Nothing is sent. One step, undo takes it back.": "Toepassen maakt het project, de taken en de draaidagen als conceptafspraken in je agenda aan, als jij. Er wordt niets verstuurd. Eén stap, ongedaan maken draait hem terug."
 }
