@@ -288,7 +288,7 @@ def wiki_move():
     if dst.lower() == src.lower() or dst.lower().startswith(src.lower() + "/"):
         raise BadInput(tr("Invalid value: {0}", "to"))
     w, a = wiki_space_sql(oid, uid)
-    rows = c.execute(f"SELECT * FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND (lower(path)=? OR lower(path) LIKE ? ESCAPE '\\')",
+    rows = c.execute(f"SELECT * FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND (lower(path)=? OR lower(path) ILIKE ? ESCAPE '\\')",
                      [*a, src.lower(), src.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%"]).fetchall()
     if not rows:
         raise Denied(404)

@@ -110,7 +110,7 @@ def _state(c, uid, other):
     """none | sent | incoming | connected -- what the person sees about other (always the same queries)."""
     a, b = _pair(uid, other or 0)
     lk = c.execute("SELECT 1 FROM conn_links WHERE a_id=? AND b_id=? AND deleted_at IS NULL", (a, b)).fetchone()
-    out = c.execute("SELECT 1 FROM conn_requests WHERE from_id=? AND to_id=? AND status NOT LIKE 'wd_%'", (uid, other or 0)).fetchone()
+    out = c.execute("SELECT 1 FROM conn_requests WHERE from_id=? AND to_id=? AND status NOT IN ('wd_open','wd_declined','wd_hidden')", (uid, other or 0)).fetchone()
     inc = c.execute("SELECT 1 FROM conn_requests WHERE from_id=? AND to_id=? AND status='open'", (other or 0, uid)).fetchone()
     from ..accounts.orgs import may_see
     seen = may_see(c, uid, other or 0)
@@ -176,7 +176,7 @@ def disc_get():
         inc = ppl("""SELECT r.id, r.created_at, u.id AS uid, u.display_name, u.username, u.avatar FROM conn_requests r
                      JOIN users u ON u.id=r.from_id WHERE r.to_id=? AND r.status='open' AND u.disabled=0 ORDER BY r.id DESC""", uid)
         out = ppl("""SELECT r.id, r.created_at, u.id AS uid, u.display_name, u.username, u.avatar FROM conn_requests r
-                     JOIN users u ON u.id=r.to_id WHERE r.from_id=? AND u.disabled=0 AND r.status NOT LIKE 'wd_%'
+                     JOIN users u ON u.id=r.to_id WHERE r.from_id=? AND u.disabled=0 AND r.status NOT IN ('wd_open','wd_declined','wd_hidden')
                      AND NOT EXISTS (SELECT 1 FROM conn_links l WHERE l.deleted_at IS NULL AND
                                      ((l.a_id=r.from_id AND l.b_id=r.to_id) OR (l.b_id=r.from_id AND l.a_id=r.to_id)))
                      ORDER BY r.id DESC""", uid)

@@ -11,7 +11,6 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-P.mindmap = icPath('M7 10H9.5M9.5 10C11.5 10 11.5 5 14 5H17M9.5 10C11.5 10 11.5 15 14 15H17') + icDot(4.5, 10);
 const MM = {lid: null, sel: 'r', fold: new Set(), pan: null, edit: null, outline: false, drag: null, ptr: new Map(), pinch: null, last: null};
 const MM_H = 34, MM_GAP = 10, MM_COL = 56, MM_PADX = 12, MM_MAXW = 240, MM_FONT = '14px system-ui, -apple-system, "Segoe UI", sans-serif';
 let mm_ctx = null;
@@ -416,7 +415,14 @@ function mm_up(e) {
   if (d.lift && !d.moved) { mm_select(d.id); return; }
   if (d.moved) { if (d.over && e.type === 'pointerup') mm_rehang(d.id, d.over); else $$('.mmnode.drop').forEach(x => x.classList.remove('drop')); return; }
   if (e.type !== 'pointerup' || !d.id) return;
-  if (isTouch() && d.was === d.id) { const g = $(`.mmstage [data-mmn="${d.id}"]`), n = mm_node(d.id); if (g && n) mm_nodeMenu(g, n); return; }
+  if (isTouch() && d.was === d.id) {
+    const g = $(`.mmstage [data-mmn="${d.id}"]`), n = mm_node(d.id);
+    // 2.49.0 (#1201, device test): the click that follows this pointerup would land on the sheet's scrim and close it at once
+    const eat = ev => { ev.stopPropagation(); ev.preventDefault(); };
+    document.addEventListener('click', eat, {capture: true, once: true}); setTimeout(() => document.removeEventListener('click', eat, true), 400);
+    if (g && n) mm_nodeMenu(g, n);
+    return;
+  }
   mm_select(d.id);
 }
 document.addEventListener('pointerup', mm_up);

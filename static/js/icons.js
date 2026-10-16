@@ -12,6 +12,7 @@ const icFill = (x, y, r = 1.2) => `<circle class="f" cx="${x}" cy="${y}" r="${r}
 const icPath = d => `<path d="${d}"/>`;
 const P = {
   check: icPath('M4 10.5L8 14.5L16 5.5'),
+  mindmap: icPath('M7 10H9.5M9.5 10C11.5 10 11.5 5 14 5H17M9.5 10C11.5 10 11.5 15 14 15H17') + icDot(4.5, 10),  // 2.49.0 (#1201): the mind map view (not a list icon)
   zap: icPath('M11 3L5.5 11H10.5L9 17') + icDot(15.5, 6),
   plus: icPath('M10 4V16M4 10H16'),
   x: icPath('M5 5L15 15M15 5L5 15'),
