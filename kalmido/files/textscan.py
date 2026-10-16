@@ -109,6 +109,7 @@ def _enqueue(c, kind, ref_id, ref):
     ts = _now()
     r = c.execute(f"""INSERT INTO file_text(kind, ref_id, {COL[kind]}, org_id, ws, state, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?)
                       ON CONFLICT(kind, ref_id) DO UPDATE SET state='wait', tries=0, error='', method='', text='', pages=0,
+                      org_id=excluded.org_id, ws=excluded.ws,
                       truncated=0, sha256='', updated_at=excluded.updated_at RETURNING id""",
                   (kind, ref_id, ref_id, ref["org_id"], ref["ws"], "wait", ts, ts)).fetchone()
     c.execute("DELETE FROM file_words WHERE ft_id=?", (r[0],))  # the old version's words go at once
@@ -191,12 +192,44 @@ def _docs_busy(c):
                              AND n.deleted_at IS NULL LIMIT 1""").fetchone())
 
 
+_REHOME = {"at": 0.0}
+_WS_SQL = "CASE WHEN {0}.org_id IS NOT NULL THEN 'o' || {0}.org_id ELSE 'u' || {0}.owner_id END"
+_REHOME_SQL = {  # kind -> (FROM / WHERE joining the file's workspace owner as "w")
+    "att": "FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists w ON w.id=t.list_id WHERE f.kind='att' AND f.att_id=a.id",
+    "list": "FROM list_files lf JOIN lists w ON w.id=lf.list_id WHERE f.kind='list' AND f.list_file_id=lf.id",
+    "fs": "FROM fs_nodes w WHERE f.kind='fs' AND f.node_id=w.id",
+}
+
+
+def _rehome(c):
+    """2.61.0 review: a file whose workspace changed (its list / task / folder moved between organisations or into a
+    private space) is recognised again under the new workspace (key, index, row rights); every 5 minutes."""
+    if time.time() - _REHOME["at"] < 300:
+        return
+    _REHOME["at"] = time.time()
+    moved = []
+    for kind, src in _REHOME_SQL.items():
+        ws = _WS_SQL.format("w")
+        moved += [r[0] for r in c.execute(
+            f"""UPDATE file_text f SET state='wait', tries=0, error='', method='', text='', pages=0, truncated=0, sha256='',
+                org_id=w.org_id, ws={ws}, updated_at=? {src} AND f.ws <> {ws} RETURNING f.id""", (_now(),)).fetchall()]
+    for i in range(0, len(moved), 500):
+        part = moved[i:i + 500]
+        c.execute(f"DELETE FROM file_words WHERE ft_id IN ({','.join('?' * len(part))})", part)
+
+
 def ts_run_once():
     """One step: one waiting file (documents first); with nothing waiting, maybe one file of the catch-up. Returns 1 when
     a file was handled."""
     c = connect()
     try:
         with system_ctx(c):  # file text queue: server-side recognition of every workspace's files, nothing handed to a person
+            try:  # its own transaction: a failure here never stops the queue
+                _rehome(c)
+                c.commit()
+            except Exception as e:  # noqa: BLE001
+                c.rollback()
+                print("filetext: rehome", type(e).__name__, e, flush=True)
             if _docs_busy(c):
                 c.commit()
                 return 0
@@ -242,15 +275,9 @@ def _infected(c, kind, ref_id):
 
 
 def _sniff(data):
-    if data[:4] == b"%PDF" or b"%PDF" in data[:1024]:
-        return "application/pdf"
-    if data[:3] == b"\xff\xd8\xff":
-        return "image/jpeg"
-    if data[:8] == b"\x89PNG\r\n\x1a\n":
-        return "image/png"
-    if data[4:8] == b"ftyp" and data[8:12] in (b"heic", b"heix", b"heim", b"heis", b"hevc", b"hevx", b"mif1", b"msf1"):
-        return "image/heic"
-    return ""
+    from .scan import _sc_magic  # 2.61.0 review: the same reading of the first bytes as the upload check (no polyglot PDF)
+    m = _sc_magic(data) or ""
+    return m if m in ("application/pdf", "image/jpeg", "image/png", "image/heic") else ("image/heic" if m == "image/heif" else "")
 
 
 def _process(c, row):

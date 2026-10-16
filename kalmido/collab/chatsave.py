@@ -111,7 +111,8 @@ def dl_comment_message(c, cid):
 def _copy_files(c, tid, uid, files):
     """Copies the message's files to the task (the person's storage counts; what does not fit is skipped). -> skipped names."""
     from ..admin.hosting import quota_fits
-    from ..files.scan import sc_after_store, sc_locked, sc_marks
+    from ..files.scan import sc_locked, sc_marks
+    from ..files.upsafe import up_after_store
     from ..core.pg import insert_id
     skipped, ts = [], iso(now_utc())
     for name, mime, size, path, (kind, fid) in files:
@@ -128,8 +129,9 @@ def _copy_files(c, tid, uid, files):
         g.chat_save_new = getattr(g, "chat_save_new", []) + [rel]
         aid = insert_id(c, "INSERT INTO attachments(task_id,name,mime,size,path,created_at,user_id) VALUES(?,?,?,?,?,?,?)",
                         (tid, name, mime, size, rel, ts, uid))
-        if (sc_marks(c, kind, [fid]).get(fid) or {}).get("scan") == "unchecked":
-            sc_after_store(c, "att", aid, oc_task_org(c, tid) or None, {"scan": "unchecked"})
+        # the copy keeps an unchecked mark and gets its own text recognition (2.61.0 #1820)
+        up_after_store(c, "att", aid, oc_task_org(c, tid) or None,
+                       {"kind": "att", "scan": (sc_marks(c, kind, [fid]).get(fid) or {}).get("scan") or "clean"})
     return skipped
 
 
