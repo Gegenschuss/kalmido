@@ -30,6 +30,14 @@ the app has not yet been tested by people who use a screen reader every day (see
 - **Contrast.** Text has at least 4.5:1, large text and the edges of fields and controls at least 3:1, in light and
   dark and with every accent colour. Windows high contrast (forced colours) keeps checkboxes, selections and focus
   visible.
+- **List and workspace colours (2.53.0).** Lists choose from a fixed palette of 12 tones, each with its own value and
+  text colour for light and dark (4.5:1 as text and under text); an older free colour stays stored and is shown as the
+  nearest tone. An open list takes its colour as the accent of its view and tasks show it as a thin edge on boards, in
+  the calendar and in the collected views (the priority keeps its own marks); *Settings > Appearance > List colours only
+  as a dot* turns accent and edges off. An organisation has a colour of its own (8 tones, set by its admins in
+  *Settings > Workspaces*): its lists show a stripe in the header and the sidebar and a frame around the input fields,
+  and the header's sign names the organisation in words; Private stays without colour. Moving a task or list from
+  Private into an organisation says so in the message ("Will be visible to everyone in …", with Undo).
 - **Dragging is never the only way.** Tasks: *Move up / Move down* in the task menu or Alt+↑ / Alt+↓, *Move to
   section…*, *Move to list* (m), the date picker; the panels and columns that can be resized by dragging have a grip
   that works with ← → and Enter (standard width) or a double-click. The divider between the chats of the split chat
