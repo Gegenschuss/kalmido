@@ -24,6 +24,9 @@ TASK_FIELDS = ("list_id", "section_id", "parent_id", "title", "content", "priori
                "fam", "rotation", "stars",  # 2.19.0 (#653): family data, household rotation, stars of a kid
                "snippets",  # 2.35.0 (#1095): code snippets (JSON list, tasks/snippets.py)
                "locked")  # 2.36.0 (#1118): the lock (1 = the app shows the task read-only, see lock_problem)
+TASK_FIELDS += ("points",)  # 2.60.0 (#1511): story points (POINTS; NULL = none)
+# 2.60.0 (#1511): the allowed story points (Fibonacci); saving is always allowed, only the display follows lists.points_on
+POINTS = (1, 2, 3, 5, 8, 13)
 # 2.4.0 (#340): ticket types of a task (API v1 / MCP / events: "type"); '' = none
 TICKET_TYPES = ("bug", "feature", "task")
 
@@ -302,6 +305,17 @@ def ticket_template(c, lid, kind):
     return own if isinstance(own, str) and own.strip() else tr(TICKET_TPL[kind])
 
 
+def spt_clean(v):
+    """2.60.0 (#1511): story points from a client value: None / '' / 0 = none, else one of POINTS (BadInput otherwise)."""
+    from ..personal.timetrack import BadInput
+    if v in (None, "", 0, "0"):
+        return None
+    v = as_int(v, tr("Story points"))
+    if v not in POINTS:
+        raise BadInput(tr("Invalid value: {0}", tr("Story points")))
+    return v
+
+
 def clean_task(b):
     """Client values -> column values (validated; BadInput with a message otherwise)."""
     from ..personal.timetrack import BadInput
@@ -362,6 +376,8 @@ def clean_task(b):
                 v = clean_rotation(v)
             if k == "stars":
                 v = None if v in ("", None) else as_int(v, tr("Stars"), 0, STARS_MAX)
+            if k == "points":  # 2.60.0 (#1511)
+                v = spt_clean(v)
             if k == "locked":  # 2.36.0 (#1118): true / false / 0 / 1
                 if v not in (True, False, 0, 1, None):
                     raise BadInput(tr("Invalid value: {0}", "locked"))

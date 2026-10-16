@@ -408,7 +408,8 @@ def _v1_body(allowed):
 
 
 def v1_section(r):
-    return {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "sort": r["sort"]}
+    return {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "sort": r["sort"],
+            "wip_limit": r["wip_limit"]}  # 2.60.0 (#1510): null = no limit
 
 
 @app.get("/api/v1/lists/<int:lid>/sections")
@@ -425,10 +426,10 @@ def v1_sections(lid):
 def v1_section_create(lid):
     """{name, before_id?}: a new section at the end (or in front of section before_id)."""
     v1_args(())
-    b = _v1_body(("name", "before_id"))
+    b = _v1_body(("name", "before_id", "wip_limit"))
     c = db()
     need_list(c, lid)
-    fwd = {"list_id": lid, "name": b.get("name")}
+    fwd = {"list_id": lid, "name": b.get("name"), "wip_limit": b.get("wip_limit")}  # 2.60.0 (#1510)
     if b.get("before_id") is not None:
         bid = as_int(b["before_id"], "before_id", 1)
         cur = c.execute("SELECT id, sort FROM sections WHERE list_id=? ORDER BY sort, id", (lid,)).fetchall()
@@ -444,10 +445,10 @@ def v1_section_create(lid):
 @v1_view
 def v1_section_update(sid):
     v1_args(())
-    b = _v1_body(("name",))
-    if "name" not in b:
+    b = _v1_body(("name", "wip_limit"))  # 2.60.0 (#1510): + wip_limit (null = no limit)
+    if "name" not in b and "wip_limit" not in b:
         raise BadInput(tr("Nothing to change"))
-    v1_call(section_update, sid, body={"name": b["name"]})
+    v1_call(section_update, sid, body={k: b[k] for k in ("name", "wip_limit") if k in b})
     return jsonify(v1_section(db().execute("SELECT * FROM sections WHERE id=?", (sid,)).fetchone()))
 
 
@@ -1163,13 +1164,17 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
             "get": op("Sections of a list, in order", S, ok(ref("SectionPage")) | errs("404"), [lp]),
             "post": op("Create a section (at the end or before before_id)", S, ok(ref("Section"), "Created", "201") | errs("400", "403", "404"),
                        [lp], scope="structure", body={"type": "object", "required": ["name"], "properties": {
-                           "name": {"type": "string", "maxLength": 200}, "before_id": {"type": "integer"}}})},
+                           "name": {"type": "string", "maxLength": 200}, "before_id": {"type": "integer"},
+                           "wip_limit": nul("integer", minimum=0, maximum=999)}})},  # 2.60.0 (#1510)
         "/lists/{id}/sections/order": {"put": op("Reorder all sections of a list", S, ok(ref("SectionPage")) | errs("400", "403", "404"), [lp],
                                                  scope="structure", body={"type": "object", "required": ["ids"], "properties": {"ids": ids}},
                                                  desc="ids: every section of the list exactly once, in the new order.")},
         "/sections/{id}": {
-            "patch": op("Rename a section", S, ok(ref("Section")) | errs("400", "403", "404"), [pid("id", "Section id")], scope="structure",
-                        body={"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}}),
+            # 2.60.0 (#1510): + wip_limit
+            "patch": op("Rename a section / set its WIP limit", S, ok(ref("Section")) | errs("400", "403", "404"), [pid("id", "Section id")],
+                        scope="structure", body={"type": "object", "properties": {"name": {"type": "string"},
+                                                                                   "wip_limit": nul("integer", minimum=0, maximum=999)}},
+                        desc="wip_limit: the most open tasks the kanban column should hold (a hint only); null or 0 = no limit."),
             "delete": op("Delete a section (its tasks stay in the list)", S, ok(obj) | errs("403", "404"), [pid("id", "Section id")], scope="delete")},
         "/tasks/{id}/move": {"post": op("Move a task: list, section, parent and place", T, ok(ref("Task")) | errs("400", "403", "404"), [pid()],
                                         scope="tasks:write", body={"type": "object", "properties": {

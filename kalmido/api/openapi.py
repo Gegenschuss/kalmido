@@ -160,6 +160,9 @@ def openapi_spec():
                    "and assignee are read-only there until a person with write access unlocks it (comments, checkboxes in the "
                    "notes, completing and subtasks stay free). Tasks created with an agent token start locked (send "
                    "locked: false to create an open one); the API itself is not bound by the lock and can set or clear it"}}
+    # 2.60.0 (#1511): story points
+    task_props["points"] = nul("integer", enum=[1, 2, 3, 5, 8, 13, None], description="2.60.0: story points (Fibonacci); "
+                               "null = none. Always stored; the app shows them where the list has story points on (points_on)")
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
@@ -332,7 +335,11 @@ def openapi_spec():
         "Moved": {"type": "object", "properties": {
             "id": {"type": "integer"}, "title": {"type": "string"}, "start": nul("string", format="date"), "due": {"type": "string", "format": "date"},
             "prev_start": nul("string", format="date"), "prev_due": {"type": "string", "format": "date"}}},
-        "Section": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "sort": {"type": "number"}}},
+        "Section": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "sort": {"type": "number"},
+                                                     # 2.60.0 (#1510)
+                                                     "wip_limit": nul("integer", minimum=1, maximum=999, description="2.60.0: the most "
+                                                                      "open tasks the kanban column should hold (a hint, moving stays "
+                                                                      "allowed); null = no limit")}},
         "Tag": {"type": "object", "properties": {"name": {"type": "string"}, "tasks": {"type": "integer"}, "open": {"type": "integer"}}},
         "TagPage": page("Tag"),
         "Comment": {"type": "object", "properties": {
@@ -673,6 +680,8 @@ def openapi_spec():
     files_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1207)
     from ..receipts.suggest import rc_spec
     rc_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1356)
+    from ..lists.points import spt_spec
+    spt_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.60.0 B (#1511)
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",

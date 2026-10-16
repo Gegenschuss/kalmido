@@ -53,6 +53,7 @@ function meFields(ts) {
       open: a => menu(a, [{label: tr('Waiting on someone…'), icon: 'hourglass', fn: () => meWaitDialog()}, {label: tr('No longer waiting'), icon: 'x', fn: () => meWait(null)}])},
     {k: 'pinned', lab: N_('Pinned'), icon: 'pin', get: t => t.pinned ? 1 : 0, text: v => v ? tr('Pinned') : tr('Not pinned'), toggle: true,
       open: () => { const on = meTasks().every(t => t.pinned) ? 0 : 1; meApply('pinned', t => (t.pinned ? 1 : 0) !== on ? {pinned: on} : null, on ? tr('Pinned') : tr('Unpin')); }},
+    ...spt_meField(ts),  // 2.60.0 (#1511)
     ...(lid ? fieldsOf(lid).map(f => meCustom(f, lid)) : [])];
   return F.map(f => ({perm: canEdit, ...f}));
 }
