@@ -1587,7 +1587,6 @@
   "Secure connection failed (certificate)": "Beveiligde verbinding mislukt (certificaat)",
   "Server address, username and password are needed": "Serveradres, gebruikersnaam en wachtwoord zijn vereist",
   "Server": "Server",
-  "Show events from Google Calendar, iCloud, Outlook or any CalDAV server next to your tasks: in the calendar, the timeline and on Today. Read-only, and only you see them.": "Toon afspraken uit Google Agenda, iCloud, Outlook of een CalDAV-server naast je taken: in de agenda, de tijdlijn en bij Vandaag. Alleen lezen, en alleen jij ziet ze.",
   "show today’s events at the top": "afspraken van vandaag bovenaan tonen",
   "synced {0}": "gesynchroniseerd {0}",
   "Task created from the event": "Taak gemaakt van de afspraak",
@@ -7984,5 +7983,8 @@
   "Personal address book again": "Weer een persoonlijk adresboek",
   "Address book made personal": "Adresboek persoonlijk gemaakt",
   "Give the arrangement a name": "Geef de indeling een naam",
-  "At most {0} saved arrangements per view": "Hoogstens {0} opgeslagen indelingen per weergave"
+  "At most {0} saved arrangements per view": "Hoogstens {0} opgeslagen indelingen per weergave",
+  "Customize statistics": "Statistieken aanpassen",
+  "Customize the client card": "Klantkaart aanpassen",
+  "Customize Family": "Gezin aanpassen"
 }

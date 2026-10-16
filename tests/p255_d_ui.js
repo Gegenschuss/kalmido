@@ -15,9 +15,9 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...(ck ? {Cookie: ck} : {})}, body: body ? JSON.stringify(body) : undefined}); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
-const FEAT = 'cal,comments,collab,time,progress,agents,clients,family,habits,pomo,timeline';
+const FEAT = 'cal,comments,collab,time,progress,agents,clients,family,habits,pomo,timeline,stats';
 const keys = d => [...d.querySelectorAll('#view .lyb[data-lyk]')].map(x => x.dataset.lyk);
-const saved = async k => { const s = await call('GET', '/api/settings'); const v = s[k] || s.settings?.[k] || ''; return v ? JSON.parse(v) : {}; };
+const saved = async k => { const s = await call('GET', '/api/state'); const v = s.settings?.[k] || ''; return v ? JSON.parse(v) : {}; };
 
 (async () => {
   await sleep(600);
@@ -36,6 +36,7 @@ const saved = async k => { const s = await call('GET', '/api/settings'); const v
   let w = await boot({user: 'alice', hash: 'stats'}), d = w.document;
   await until(() => d.querySelector('#view .stats .lyb[data-lyk="tiles"]'));
   let ks = keys(d);
+  if (!ks.length) console.log('DIAG', w.eval('S.route.mod'), JSON.stringify(w.eval('S.st.err || null')), d.querySelector('#view').innerHTML.slice(0, 400));
   check(ks.slice(0, 3).join() === 'tiles,done,bylist' && ks.includes('overdue'), '#1067: statistics: the blocks in the old order ' + ks);
   check(d.querySelector('#view [data-act="ly-custom"][data-lyv="stats"]'), '#1067: statistics: a Customize button');
   click(w, d.querySelector('#view [data-act="ly-custom"][data-lyv="stats"]'));
@@ -57,15 +58,15 @@ const saved = async k => { const s = await call('GET', '/api/settings'); const v
   check(ks.join() === 'occ,rot,meals,shop,dl,pack', '#1067: family: the cards in the old order ' + ks);
   click(w, d.querySelector('#view [data-act="ly-custom"][data-lyv="family"]'));
   await until(() => d.querySelector('.lyed[data-lyed="family"]'));
-  click(w, d.querySelector('.lyed[data-lyed="family"] [data-act="ly-mv"][data-k="pack"][data-d="-1"]'));
-  v = await until(async () => { const x = await saved('view_family'); return (x.order || []).indexOf('pack') === (x.order || []).indexOf('dl') - 1 && x.order ? x : null; });
+  click(w, d.querySelector('.lyed[data-lyed="family"] [data-act="ly-mv"][data-k="occ"][data-d="1"]'));
+  v = await until(async () => { const x = await saved('view_family'); return (x.order || []).indexOf('occ') === 1 ? x : null; });
   check(v, '#1067: family: a moved card is stored ' + JSON.stringify(v));
   click(w, d.querySelector('.lyed[data-lyed="family"] [data-act="ly-done"]'));
   await sleep(300);
   w = await boot({user: 'alice', hash: 'family'}); d = w.document;
   await until(() => d.querySelector('#view .fam .lyb[data-lyk]'));
   ks = keys(d);
-  check(ks.indexOf('pack') < ks.indexOf('dl'), '#1067: family: the new order after a reload ' + ks);
+  check(ks.join() === 'rot,occ,meals,shop,dl,pack', '#1067: family: the new order after a reload ' + ks);
 
   // ================= the client card
   w = await boot({user: 'alice', hash: 'client/' + cl.id}); d = w.document;

@@ -77,16 +77,16 @@ function viewFamily() {
   const packH = `<div class="fpack">${PACK_UI.map(([k, n, e]) => `<button type="button" class="btn" data-act="fam-pack" data-k="${k}"><span aria-hidden="true">${e}</span> ${tr(n)}</button>`).join('')}</div>`;
   return `<div class="dash fam"><div class="dashhead fhead"><span class="spacer"></span>
     <button type="button" class="btn sm" data-act="fam-occ">${ic('cake', 's')}<span>${tr('Birthday')}</span></button>
-    <button type="button" class="btn sm" data-act="fam-dl">${ic('hourglass', 's')}<span>${tr('Household deadline')}</span></button></div>
-    <div class="dgrid">
-    ${card('occ', 'cake', tr('Birthdays & anniversaries'), occH + `<div class="fcfoot"><button type="button" class="btn sm" data-act="fam-contacts">${ic('users', 's')}<span>${tr('From contacts…')}</span></button></div>`, '', d.occ.filter(t => daysTo(t.due) <= 30).length || '')}
-    ${card('rot', 'turns', tr('Whose turn'), rotH, '', d.rots.length || '')}
-    ${card('meals', 'meal', tr('Meal plan'), mealH, weekNav)}
-    ${card('shop', 'cart', tr('Shopping'), shopH)}
-    ${card('dl', 'hourglass', tr('Deadlines'), dlH, '', d.dls.filter(t => daysTo(t.due) <= 30).length || '')}
-    ${kidsH ? card('kids', 'star', tr('Kids'), kidsH) : ''}
-    ${card('pack', 'bag', tr('Packing lists'), packH)}
-    </div></div>`;
+    <button type="button" class="btn sm" data-act="fam-dl">${ic('hourglass', 's')}<span>${tr('Household deadline')}</span></button>${lyCustomBtn('family')}</div>
+    ${lyHtml('family', {  // 2.55.0 (#1067): the cards are blocks of the view builder (same order and width as before)
+      occ: card('occ', 'cake', tr('Birthdays & anniversaries'), occH + `<div class="fcfoot"><button type="button" class="btn sm" data-act="fam-contacts">${ic('users', 's')}<span>${tr('From contacts…')}</span></button></div>`, '', d.occ.filter(t => daysTo(t.due) <= 30).length || ''),
+      rot: card('rot', 'turns', tr('Whose turn'), rotH, '', d.rots.length || ''),
+      meals: card('meals', 'meal', tr('Meal plan'), mealH, weekNav),
+      shop: card('shop', 'cart', tr('Shopping'), shopH),
+      dl: card('dl', 'hourglass', tr('Deadlines'), dlH, '', d.dls.filter(t => daysTo(t.due) <= 30).length || ''),
+      kids: kidsH ? card('kids', 'star', tr('Kids'), kidsH) : '',
+      pack: card('pack', 'bag', tr('Packing lists'), packH),
+    })}</div>`;
 }
 const PACK_UI = [['holiday', N_('Holiday'), '🏖️'], ['pool', N_('Swimming pool'), '🏊'], ['daycare', N_('Daycare'), '🎒'], ['camping', N_('Camping'), '⛺'], ['business', N_('Business trip'), '💼']];
 

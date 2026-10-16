@@ -7564,3 +7564,6 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .wsbar.on[data-wsc]:hover{border-color:var(--wsc)}
 .wsc-on .qadd:not(.dock) .box,.wsc-on .qadd.dock,.wsc-on .ccomp{border-color:color-mix(in srgb,var(--wsc) 65%,var(--line2))}
 .wscpick .colors button[disabled]{cursor:default}
+
+/* 2.55.0 D (#1067) statistics, the client card and family on the view builder: the blocks keep the spacing the cards had (the cards bring their own top margin) */
+.mscly .lybar,.stats > .lybar{display:flex;justify-content:flex-end}

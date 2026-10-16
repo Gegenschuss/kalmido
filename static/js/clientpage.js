@@ -65,7 +65,8 @@ function ms_clCard(c) {
   return `<article class="ctcard msclcard" aria-labelledby="mscl-h">
     <div class="cthead">${isMobile() ? `<button class="iconbtn" data-mscl="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ms_clAv(c, true)}<div class="cthn"><h3 id="mscl-h">${esc(c.name)}</h3><div class="mstags">${ms_tag('client')}${c.archived ? `<span class="rotag">${tr('Archived')}</span>` : ''}${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}</div></div>
       <span class="ctacts"><button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button><button class="iconbtn" data-mscl="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
-    <div class="ctfields">
+    <div class="mscly msclstats cldetail">${S.ly.view === 'clients' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('clients')}</div>`}${lyHtml('clients', {  // 2.55.0 (#1067): the card's sections are blocks of the view builder
+      details: `<div class="ctfields">
       ${f('money', tr('Hourly rate'), c.rate != null ? esc(`${fmtNum(c.rate, 2)} ${cur}`) : '')}
       ${f('chart', tr('Budget'), esc(bud))}
       ${f('at', tr('E-mail'), c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
@@ -76,10 +77,10 @@ function ms_clCard(c) {
       ${f('tag', tr('Buyer reference (e.g. routing ID)'), esc(b.buyer_reference || ''), 'cl_buyer_reference')}
       ${f('at', tr('E-mail for invoices'), b.email_invoice ? `<a href="mailto:${esc(b.email_invoice)}">${esc(b.email_invoice)}</a>` : '', 'cl_email_invoice')}
       ${f('clock', tr('Payment terms (days)'), b.payment_terms_days != null ? esc(String(b.payment_terms_days)) : '', 'cl_payment_terms_days')}
-    </div>
-    ${ks.length ? `<div class="ctsec"><h4>${tr('Contact persons')}</h4><ul class="ctlinks msclks">${ks.map(k => `<li>${ic('user', 's')} <b>${esc(k.name)}</b>${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default && ks.length > 1 ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone.replace(/[^\d+]/g, ''))}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul></div>` : ''}
-    ${typeof officeOn === 'function' && officeOn() && MSC.inv !== null ? `<div class="ctsec"><h4>${tr('Open invoices')}</h4>${inv.length ? `<ul class="ctlinks">${inv.map(x => `<li><a class="linkbtn" href="#office/offers/${x.id}">${ic('receipt', 's')} ${esc(x.number || tr('Draft'))}</a><span class="muted"> · ${esc(x.date ? fmtDateLoc(x.date) : '')} · ${esc(x.open_text || '')} · ${esc(x.status_text || '')}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No open invoices.')}</p>`}</div>` : ''}
-    ${clientDetailHtml(c, true)}
+    </div>`,
+      persons: ks.length ? `<div class="ctsec"><h4>${tr('Contact persons')}</h4><ul class="ctlinks msclks">${ks.map(k => `<li>${ic('user', 's')} <b>${esc(k.name)}</b>${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default && ks.length > 1 ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone.replace(/[^\d+]/g, ''))}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul></div>` : '',
+      invoices: typeof officeOn === 'function' && officeOn() && MSC.inv !== null ? `<div class="ctsec"><h4>${tr('Open invoices')}</h4>${inv.length ? `<ul class="ctlinks">${inv.map(x => `<li><a class="linkbtn" href="#office/offers/${x.id}">${ic('receipt', 's')} ${esc(x.number || tr('Draft'))}</a><span class="muted"> · ${esc(x.date ? fmtDateLoc(x.date) : '')} · ${esc(x.open_text || '')} · ${esc(x.status_text || '')}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No open invoices.')}</p>`}</div>` : '',
+      ...clientDetailParts(c)})}</div>
   </article>`;
 }
 

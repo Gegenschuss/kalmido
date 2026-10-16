@@ -1587,7 +1587,6 @@
   "Secure connection failed (certificate)": "Ha fallado la conexión segura (certificado)",
   "Server address, username and password are needed": "Se necesitan la dirección del servidor, el nombre de usuario y la contraseña",
   "Server": "Servidor",
-  "Show events from Google Calendar, iCloud, Outlook or any CalDAV server next to your tasks: in the calendar, the timeline and on Today. Read-only, and only you see them.": "Muestra eventos de Google Calendar, iCloud, Outlook o cualquier servidor CalDAV junto a tus tareas: en el calendario, el cronograma y en Hoy. Solo lectura, y solo tú los ves.",
   "show today’s events at the top": "mostrar los eventos de hoy arriba",
   "synced {0}": "sincronizado {0}",
   "Task created from the event": "Tarea creada a partir del evento",
@@ -7984,5 +7983,8 @@
   "Personal address book again": "Otra vez libreta personal",
   "Address book made personal": "Libreta de direcciones hecha personal",
   "Give the arrangement a name": "Ponle un nombre a la disposición",
-  "At most {0} saved arrangements per view": "Como máximo {0} disposiciones guardadas por vista"
+  "At most {0} saved arrangements per view": "Como máximo {0} disposiciones guardadas por vista",
+  "Customize statistics": "Personalizar las estadísticas",
+  "Customize the client card": "Personalizar la ficha del cliente",
+  "Customize Family": "Personalizar Familia"
 }

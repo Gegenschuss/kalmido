@@ -58,28 +58,36 @@ function clientsGridHtml(cs) {
     <div class="clnums"><span><b>${esc(fmtHours(c.stats.month_seconds))}</b><small>${esc(monthLabel(c.stats.month))}</small></span><span><b>${esc(fmtHours(c.stats.seconds))}</b><small>${tr('in total')}</small></span>${c.stats.amount ? `<span><b>${esc(fmtMoney(c.stats.amount))}</b><small>${tr('amount')}</small></span>` : ''}</div>
     ${budgetBar(c)}</section>`).join('')}</div></div>`;
 }
-function clientDetailHtml(c, inCard) {  // 2.47.3 (#1734): inCard = the lower part of the client's card (clientpage.js)
+// 2.55.0 (#1067): the parts of the client's card below its details (blocks of the view builder, clientpage.js)
+function clientDetailParts(c) {
   const st = c.stats, est = st.estimate_min;
   const lists = (c.per_list || []).map(p => { const l = listById(p.id); return `<tr><td><a href="#l/${p.id}">${esc(l ? lname(l) : p.name)}</a></td><td class="n">${p.estimate_min ? esc(fmtH(p.estimate_min)) : '–'}</td><td class="n">${esc(hmm(p.seconds))}</td><td class="n">${p.estimate_min ? `<span class="${p.seconds / 60 > p.estimate_min ? 'over' : ''}">${Math.round(100 * p.seconds / 60 / p.estimate_min)} %</span>` : ''}</td><td class="n">${p.amount ? esc(fmtMoney(p.amount)) : ''}</td></tr>`; }).join('');
-  const addr = [c.contact, c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '', c.phone ? `<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : ''].filter(Boolean);
   const mon = c.stats.month;
+  return {
+    month: `<div class="clmon"><button class="iconbtn" data-act="client-month" data-d="-1" aria-label="${esc(tr('Previous month'))}" title="${esc(tr('Previous month'))}">${ic('left', 's')}</button><b>${esc(monthLabel(mon))}</b><button class="iconbtn" data-act="client-month" data-d="1" aria-label="${esc(tr('Next month'))}" title="${esc(tr('Next month'))}">${ic('right', 's')}</button></div>
+      <div class="sttiles"><div><b>${esc(hmm(st.month_seconds))}</b><span>${esc(monthLabel(mon))}</span><small>${st.month_amount ? esc(fmtMoney(st.month_amount)) : ''}</small></div>
+        <div><b>${esc(hmm(st.seconds))}</b><span>${tr('in total')}</span><small>${st.amount ? esc(fmtMoney(st.amount)) : ''}</small></div>
+        <div><b>${est ? esc(fmtH(est)) : '–'}</b><span>${tr('estimated')}</span><small>${esc(trn('{0} task with an estimate', '{0} tasks with an estimate', st.estimated))}</small></div>
+        <div><b>${st.open}</b><span>${tr('open')}</span><small>${esc(tr('{0} done', st.done))}</small></div></div>
+      ${budgetBar(c)}
+      <div class="clacts"><button class="btn pri" data-act="client-sheet" data-id="${c.id}" ${timeOn() ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet {0}', monthLabel(mon))}</button>
+        <a class="btn" href="/api/time/export.csv?${esc(clientTimeQuery(c, mon))}" download ${timeOn() && c.lists.length ? '' : 'hidden'}>${ic('download', 's')} CSV</a></div>`,
+    lists: `<section class="stcard"><div class="sthead"><h3>${tr('Lists and projects')}</h3><span class="muted">${tr('estimate vs. actual')}</span></div>
+      ${lists ? `<table class="ttable cltable"><thead><tr><th>${tr('List')}</th><th class="n">${tr('Estimate')}</th><th class="n">${tr('Actual')}</th><th class="n">%</th><th class="n">${tr('Amount')}</th></tr></thead><tbody>${lists}</tbody></table>`
+        : `<p class="muted">${tr('No list yet: open a list’s settings and choose this client.')}</p>`}</section>`,
+    note: c.note ? `<section class="stcard"><div class="sthead"><h3>${tr('Note')}</h3></div><div class="md">${renderMd(c.note)}</div></section>` : ''};
+}
+function clientDetailHtml(c, inCard) {  // 2.47.3 (#1734): inCard = the lower part of the client's card (clientpage.js)
+  const pt = clientDetailParts(c);
+  const addr = [c.contact, c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '', c.phone ? `<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : ''].filter(Boolean);
   return `<div class="${inCard ? 'msclstats' : 'dash clients'} cldetail">
     ${inCard ? '' : `<div class="clhead">${clientIco(c)}<h2>${esc(c.name)}</h2>${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}<span class="spacer"></span>
       <button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button></div>`}
     ${!inCard && (addr.length || c.address) ? `<p class="clsub">${addr.join(' · ')}${c.address ? `<br><span class="muted cladr">${esc(c.address)}</span>` : ''}</p>` : ''}
     ${!inCard && (c.contacts || []).length > 1 ? `<ul class="clklist" role="list" aria-label="${esc(tr('Contact persons'))}">${c.contacts.map(k => `<li><b>${esc(k.name)}</b>${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone)}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul>` : ''}
-    <div class="clmon"><button class="iconbtn" data-act="client-month" data-d="-1" aria-label="${esc(tr('Previous month'))}" title="${esc(tr('Previous month'))}">${ic('left', 's')}</button><b>${esc(monthLabel(mon))}</b><button class="iconbtn" data-act="client-month" data-d="1" aria-label="${esc(tr('Next month'))}" title="${esc(tr('Next month'))}">${ic('right', 's')}</button></div>
-    <div class="sttiles"><div><b>${esc(hmm(st.month_seconds))}</b><span>${esc(monthLabel(mon))}</span><small>${st.month_amount ? esc(fmtMoney(st.month_amount)) : ''}</small></div>
-      <div><b>${esc(hmm(st.seconds))}</b><span>${tr('in total')}</span><small>${st.amount ? esc(fmtMoney(st.amount)) : ''}</small></div>
-      <div><b>${est ? esc(fmtH(est)) : '–'}</b><span>${tr('estimated')}</span><small>${esc(trn('{0} task with an estimate', '{0} tasks with an estimate', st.estimated))}</small></div>
-      <div><b>${st.open}</b><span>${tr('open')}</span><small>${esc(tr('{0} done', st.done))}</small></div></div>
-    ${budgetBar(c)}
-    <div class="clacts"><button class="btn pri" data-act="client-sheet" data-id="${c.id}" ${timeOn() ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet {0}', monthLabel(mon))}</button>
-      <a class="btn" href="/api/time/export.csv?${esc(clientTimeQuery(c, mon))}" download ${timeOn() && c.lists.length ? '' : 'hidden'}>${ic('download', 's')} CSV</a></div>
-    <section class="stcard"><div class="sthead"><h3>${tr('Lists and projects')}</h3><span class="muted">${tr('estimate vs. actual')}</span></div>
-      ${lists ? `<table class="ttable cltable"><thead><tr><th>${tr('List')}</th><th class="n">${tr('Estimate')}</th><th class="n">${tr('Actual')}</th><th class="n">%</th><th class="n">${tr('Amount')}</th></tr></thead><tbody>${lists}</tbody></table>`
-        : `<p class="muted">${tr('No list yet: open a list’s settings and choose this client.')}</p>`}</section>
-    ${c.note ? `<section class="stcard"><div class="sthead"><h3>${tr('Note')}</h3></div><div class="md">${renderMd(c.note)}</div></section>` : ''}
+    ${pt.month}
+    ${pt.lists}
+    ${pt.note}
   </div>`;
 }
 function clientTimeQuery(c, mon) {

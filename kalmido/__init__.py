@@ -196,6 +196,7 @@ ORDER = (
     "paperless.ngx",  # 2.48.0 (#1152): Paperless-ngx connection + import into the documents (self-hosted only)
     "paperless.web",  # 2.48.0 (#1152): the routes of the Paperless-ngx connection (self-hosted only)
     "receipts.suggest",  # 2.48.0 (#1356): receipts: project / category, agents suggest, people confirm
+    "accounts.layouts_more",  # 2.55.0 (#1067): the new views' blocks for the agents' proposals (after agents.lyprop)
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]
