@@ -7,6 +7,16 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.49.1] - 2026-10-16
+
+**In short:** the checks of 2.49.0 green again; 2.49.0 and 2.49.1 go live together.
+
+### Fixed
+- On phones the view switch of a list fits again with the new mind map view: the inactive views show only their icon.
+- The mind map's second tap on a branch opens its actions on phones.
+- Withdrawn connection requests and moving knowledge page folders work the same on PostgreSQL.
+- The new views of 2.49 follow the text size setting (rem instead of px); "Check your e-mail" wording on the login page.
+
 ## [2.49.0] - 2026-10-16
 
 **In short:** **Forgot your password?** on the login page and a calmer, friendlier login page; **kid accounts** start
