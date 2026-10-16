@@ -156,7 +156,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
     check(st === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + '#today');
-    for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#side .fv2-tile')`).catch(() => false)); i++) await sleep(300);
+    for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#side .fv2-tile') && document.querySelectorAll('#side .srow[data-list]').length > 25`).catch(() => false)); i++) await sleep(300);  // the 26 extra lists drawn
     await sleep(600);
     if (touch) { await ev(`(() => { sideOpenDrawer(); return 1; })()`); await sleep(600); }
     const m = await ev(`(() => { const s = document.querySelector('#side'), f = document.querySelector('#side .sbfix'), t = document.querySelector('#side .fv2-tile'); if (!f || !t) return null;
