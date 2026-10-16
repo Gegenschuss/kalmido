@@ -1359,12 +1359,14 @@ FKA_US_RE = re.compile(r"^[A-Za-z][A-Za-z .'-]{1,30}?,?\s+(?P<st>[A-Z]{2})\s+\d{
 FKA_UK_PC = r"[A-Z]{1,2}\d[A-Z\d]?\s\d[A-Z]{2}"
 FKA_UK_RE = re.compile(rf"^(?:{FKA_UK_PC}\s+[A-Z][A-Za-z .'-]{{1,30}}|[A-Z][A-Za-z .'-]{{1,30}}?,?\s+{FKA_UK_PC})$")
 FKA_AMOUNT_RE = re.compile(r"[€$£%]|\d,\d{2}(?!\d)|\d[.,]\d{3}[.,]\d{2}(?!\d)|\b(?:summe|zwischensumme|mwst|netto|brutto|subtotal|total)\b", re.I)
+# a quantity of a line item ("10000 Stück Flyer", "1200 x A4", "2026 konzept"): a unit or a lower-case word after the number
+FKA_QTY_RE = re.compile(r"^\d{4,5}\s+(?:[a-zäöüß]|(?i:stück|stk|std|stunden|tage|seiten|exemplare|minuten|min|kg|x)\b)")
 FKA_TAIL_COUNTRY_RE = re.compile(r"^(?P<head>.*?\S)\s*(?:[,/]|\s[-–])\s*(?P<country>[A-Za-zÄÖÜäöü. ]{2,30})$")
 
 
 def fka_zipline(ln, i):
     """2.56.1 (#1813): True for a postcode + city line (German / European postcode first, Dutch, US, UK)."""
-    if len(ln) > 60 or FKA_AMOUNT_RE.search(ln):
+    if len(ln) > 60 or FKA_AMOUNT_RE.search(ln) or FKA_QTY_RE.match(ln):
         return False
     if FK_ZIPLINE_RE.match(ln) or (NL_ZIP_RE.match(ln) and i):
         return True
@@ -1415,7 +1417,9 @@ def fk_pdf_block(text, own):
             return True
         if not part(k):
             return False
-        return len(n) >= max(6, len(oname) // 2) or part(k - 1) or part(k + 1) or len(norms[k - 1] + n) >= 4 and (norms[k - 1] + n) in oname
+        # alone a line counts only when it covers two thirds of the own name (a client "Name" of "Name Film GmbH" stays a client)
+        return len(n) >= 6 and 3 * len(n) >= 2 * len(oname) or part(k - 1) or part(k + 1) \
+            or k > 0 and len(norms[k - 1] + n) >= 4 and (norms[k - 1] + n) in oname
 
     def own_street(k):
         st = fka_street(lines[k])
@@ -1424,10 +1428,14 @@ def fk_pdf_block(text, own):
     for i, ln in enumerate(lines):
         if not zips[i] or FK_SENDER_RE.search(ln) or own_line(i):
             continue
+        zl, country = fka_split_country(ln)
+        m = ZIP_RE.match(zl)
+        same_zip = bool(m and ozip and m.group("zip") == ozip)
         top, own_seen = i, False
         while top > 0 and i - top < 5:
             up = lines[top - 1]
-            if own_line(top - 1) or own_street(top - 1):
+            # the own street counts only with the own postcode (or none known): a client in the same street of another town stays
+            if own_line(top - 1) or own_street(top - 1) and (same_zip or not ozip):
                 own_seen = True
                 break
             if zips[top - 1] or FK_SENDER_RE.search(up) or FK_STOP_RE.search(up) and not ATTN_RE.match(up) or len(up) > 70 \
@@ -1436,9 +1444,6 @@ def fk_pdf_block(text, own):
                     or len(up) <= 14 and " " in up and fk_value_line(up.replace(" ", "")):  # a BIC split by the PDF: "COL SDE33"
                 break
             top -= 1
-        zl, country = fka_split_country(ln)
-        m = ZIP_RE.match(zl)
-        same_zip = bool(m and ozip and m.group("zip") == ozip)
         if own_seen and (top == i or same_zip or not ozip):
             continue  # the organisation's own address block (letterhead / sender column); a client in the same town stays
         if same_zip and m.group("city").strip().lower() == ocity and top == i:

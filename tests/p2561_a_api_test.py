@@ -3,7 +3,8 @@
 the recipient behind 45+ lines of positions and totals; the walk up stops at the organisation's own block right above it
 (its name on two lines, " ," before the comma, eGbR); the own block with its city in another language ("/ Germany") and a
 split BIC above it is no recipient; US ("City ST 12345") and UK ("EC1A 1BB London") postcode lines; amounts are no
-postcode lines; a PDF with only the own block = no proposal.
+postcode lines; a PDF with only the own block = no proposal; review: a client in the own street of another town, a client
+named like one word of the own name, quantities ("10000 Stück") are no postcode lines.
 Invented companies, people, addresses and bank data only; the PDFs are generated here (a one-page text layer).
 usage: p2561_a_api_test.py <datadir>"""
 import os
@@ -135,6 +136,15 @@ check(st == "ok" and got(a)[:5] == ("Nachbar KG", "", "Andere Straße 3", "12345
 st, a, j = addr(text_pdf(HEAD + POS + SALUTE + OWNBLOCK + VALUES + ["MUSTERWERK", "Probe , Beispiel & Muster eGbR", "Beispielstraße 12",
                                                                      "12345 Sampletown, Germany"] + TAIL, "t6"))
 check(st == "none", f"#1813: a PDF without a foreign address = no proposal {j}")
+
+# review: a client in the own street of another town stays a recipient; a client named like one word of the own name too;
+# a quantity of a line item ("10000 Stück Flyer") is no postcode line
+st, a, j = addr(text_pdf(HEAD + SALUTE + OWNBLOCK + VALUES + ["Kunde Gamma AG", "Beispielstr. 12", "54333 Fernstadt"] + TAIL, "t8"))
+check(st == "ok" and got(a)[:5] == ("Kunde Gamma AG", "", "Beispielstr. 12", "54333", "Fernstadt"), f"#1813: a client in the own street elsewhere {j}")
+st, a, j = addr(text_pdf(HEAD + SALUTE + OWNBLOCK + VALUES + ["Beispiel", "Lindenweg 3", "54334 Weitweg"] + TAIL, "t9"))
+check(st == "ok" and got(a)[0] == "Beispiel" and got(a)[2:5] == ("Lindenweg 3", "54334", "Weitweg"), f"#1813: a client named like a word of the own name {j}")
+st, a, j = addr(text_pdf(HEAD + SALUTE + OWNBLOCK + VALUES + ["Pos Leistung", "10000 Stück Flyer"] + TAIL, "t10"))
+check(st == "none", f"#1813: a quantity is no postcode line {j}")
 
 # the own company only in the free lines of the settings (no structured fields): its block is still the sender
 r = A.put(B + "/api/office/settings", json={"company": {"name": OWN["name"], "lines": ["Beispielstraße 12, 12345 Musterstadt"]},
