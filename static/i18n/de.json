@@ -7398,5 +7398,6 @@
   "via {0}": "über {0}",
   "Who is free on …?": "Wer ist frei am …?",
   "You are not booked.": "Du bist nicht gebucht.",
-  "{0} booked you: {1} ({2})": "{0} hat dich gebucht: {1} ({2})"
+  "{0} booked you: {1} ({2})": "{0} hat dich gebucht: {1} ({2})",
+  "Option: {0}": "Option: {0}"
 }

@@ -263,6 +263,10 @@ check(r.ok and all(x["status"] == "firm" for x in r.json()["bookings"]) and len(
 news = Bo.get(B + "/api/news").json()
 items = news.get("items", news) if isinstance(news, dict) else news
 check(any(x.get("kind") == "dispo" for x in items), "a firm booking: News for bob")
+ev = Bo.get(B + "/api/calendars/events", params={"from": "2026-11-16", "to": "2026-11-22"}).json().get("events", [])
+mineev = [e for e in ev if e.get("booking")]
+check(len(mineev) == 1 and mineev[0]["title"].endswith("Shoot day 1") and mineev[0]["all_day"] and mineev[0]["end"] == "2026-11-18", f"bob's calendar shows his booking read-only ({mineev})")
+check(not [e for e in Da.get(B + "/api/calendars/events", params={"from": "2026-11-16", "to": "2026-11-22"}).json().get("events", []) if e.get("booking")], "nobody else's calendar shows it")
 r = Ca.delete(B + f"/api/team/dispo/bookings/{bk['user']['id']}", params={"all": 1})
 check(r.ok and len(r.json()["ids"]) == 2, "delete the whole job")
 check(not Bo.get(B + "/api/team/bookings/mine", params={"since": "2026-11-01"}).json()["bookings"], "deleted: gone from mine")

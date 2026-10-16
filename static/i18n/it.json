@@ -7398,5 +7398,6 @@
   "via {0}": "tramite {0}",
   "Who is free on …?": "Chi è libero il …?",
   "You are not booked.": "Non sei prenotato.",
-  "{0} booked you: {1} ({2})": "{0} ti ha prenotato: {1} ({2})"
+  "{0} booked you: {1} ({2})": "{0} ti ha prenotato: {1} ({2})",
+  "Option: {0}": "Opzione: {0}"
 }

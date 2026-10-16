@@ -384,3 +384,22 @@ def dsp_mine():
                      "WHERE b.resource_kind='user' AND b.resource_id=? AND b.deleted_at IS NULL AND b.\"end\">=? "
                      "ORDER BY b.start, b.id LIMIT 200", (uid, since)).fetchall()
     return jsonify(bookings=[{**dsp_public(r), "org": "" if r["personal_of"] else r["org_name"]} for r in rows])
+
+
+def dsp_cal(c, uid, lo, hi):
+    """My own bookings overlapping [lo, hi] (dates) as read-only calendar entries (GET /api/calendars/events): an option
+    says so in its title. Whole days: end = the day after (exclusive, like the other all-day events)."""
+    out = []
+    for r in c.execute("SELECT id, title, start, \"end\", status FROM hub_bookings WHERE resource_kind='user' AND resource_id=? "
+                       "AND deleted_at IS NULL AND start<=? AND \"end\">=? ORDER BY start, id LIMIT 500",
+                       (uid, hi.isoformat() + "T99", lo.isoformat())):
+        allday = "T" not in r["start"]
+        end = r["end"]
+        if allday:
+            end = (date.fromisoformat(end[:10]) + timedelta(days=1)).isoformat()
+        elif "T" not in end:
+            end = end[:10] + "T23:59"
+        out.append({"id": f"b{r['id']}", "booking": r["id"], "status": r["status"], "all_day": allday, "start": r["start"], "end": end,
+                    "title": tr("Option: {0}", r["title"]) if r["status"] == "option" else tr("Booked: {0}", r["title"]),
+                    "location": "", "description": ""})
+    return out

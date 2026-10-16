@@ -7398,5 +7398,6 @@
   "via {0}": "via {0}",
   "Who is free on …?": "Wie is vrij op …?",
   "You are not booked.": "Je bent niet geboekt.",
-  "{0} booked you: {1} ({2})": "{0} heeft je geboekt: {1} ({2})"
+  "{0} booked you: {1} ({2})": "{0} heeft je geboekt: {1} ({2})",
+  "Option: {0}": "Optie: {0}"
 }
