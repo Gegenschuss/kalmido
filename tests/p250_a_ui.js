@@ -91,9 +91,9 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
     await until(() => !d.querySelector('.dpmd'));
   };
   await book('Shoot day', D1, [['user', 1], ['equipment', CAM]]);
-  check(await until(() => [...d.querySelectorAll('#view .dpbar')].some(b => b.textContent.includes('Shoot day'))), 'the booking shows as a bar');
+  check(await until(() => [...d.querySelectorAll('#view .dpbk')].some(b => b.textContent.includes('Shoot day'))), 'the booking shows as a bar');
   await book('Interview', D1, [['equipment', CAM]]);
-  check(await until(() => d.querySelectorAll('#view .dpbar.warn').length >= 2), 'the same camera twice: both marked as a warning');
+  check(await until(() => d.querySelectorAll('#view .dpbk.warn').length >= 2), 'the same camera twice: both marked as a warning');
   const all = await call('GET', `/api/team/dispo?start=${D1}&days=1`);
   check(all.bookings?.length === 3, 'both bookings stay (warnings never block) ' + (all.bookings || []).length);
   d.querySelector('#dp-freeday').value = D1;
@@ -139,8 +139,8 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
     await nav(B + '#workload');
     for (let i = 0; i < 30 && !(await ev('!!document.querySelector("#view .ab2tabs")').catch(() => false)); i++) await sleep(300);
     await tab('dispo');
-    for (let i = 0; i < 30 && !(await ev('!!document.querySelector("#view .dptable .dpbar")').catch(() => false)); i++) await sleep(300);
-    const q = await ev(`(() => ({grid: getComputedStyle(document.querySelector('#view .dpgrid')).display, days: getComputedStyle(document.querySelector('#view .dpdays')).display, bars: document.querySelectorAll('#view .dpbar').length}))()`);
+    for (let i = 0; i < 30 && !(await ev('!!document.querySelector("#view .dptable .dpbk")').catch(() => false)); i++) await sleep(300);
+    const q = await ev(`(() => ({grid: getComputedStyle(document.querySelector('#view .dpgrid')).display, days: getComputedStyle(document.querySelector('#view .dpdays')).display, bars: document.querySelectorAll('#view .dpbk').length}))()`);
     check(q.grid !== 'none' && q.days === 'none' && q.bars >= 2, '1280 px: the grid with the bars ' + JSON.stringify(q));
     await shot('p250a-dispo-1280.png');
   }, true);

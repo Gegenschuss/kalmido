@@ -51,24 +51,24 @@ const today = new Date().toISOString().slice(0, 10);
     await signIn(ev, 'alice');
     // ================= #1196
     await nav(B + '#office/pipeline');
-    check(await ready(ev, `document.querySelectorAll('.ppcols .ppcol').length === 4`, 80), '#1196: the pipeline with four columns');
+    check(await ready(ev, `document.querySelectorAll('.pipcols .pipcol').length === 4`, 80), '#1196: the pipeline with four columns');
     check(await ev(`!!document.querySelector('.ofctabs [data-go="office/pipeline"]') && !!document.querySelector('.ofctabs [data-go="office/kpi"]')`), '#1196 #1197: both tabs for the admin');
     check(await ev(`/14,000\\.00/.test(document.querySelector('.pptiles').textContent) && /4,000\\.00/.test(document.querySelector('.pptiles').textContent)`),
       '#1196: open sum and weighted sum on top ' + await ev(`document.querySelector('.pptiles')?.textContent`));
     check(await ev(`document.querySelectorAll('.ppfcl li').length === 6 && document.querySelectorAll('.ppfcl li.next').length === 1`), '#1196: the months ahead with the next one marked');
-    check(await ev(`document.querySelectorAll('[data-ppcol="inquiry"] .ppcard').length === 1 && document.querySelectorAll('[data-ppcol="offer"] .ppcard').length === 1`), '#1196: the cards in their columns');
-    check(await ev(`document.querySelector('[data-ppcol="offer"] .ppcard').classList.contains('warn') && /declined/.test(document.querySelector('[data-ppcol="offer"] .ppcard').textContent)`), '#1196: a declined quotation shows on the card');
+    check(await ev(`document.querySelectorAll('[data-pipcol="inquiry"] .ppcard').length === 1 && document.querySelectorAll('[data-pipcol="offer"] .ppcard').length === 1`), '#1196: the cards in their columns');
+    check(await ev(`document.querySelector('[data-pipcol="offer"] .ppcard').classList.contains('warn') && /declined/.test(document.querySelector('[data-pipcol="offer"] .ppcard').textContent)`), '#1196: a declined quotation shows on the card');
     // new inquiry through the dialog
     await ev(`(() => { document.querySelector('[data-pp="new"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal #pp-title')`), '#1196: the deal dialog');
     await ev(`(() => { const m = document.querySelector('.modal'); m.querySelector('#pp-title').value = 'Messefilm'; m.querySelector('#pp-value').value = '2500'; m.querySelector('[data-m="save"]').click(); return 1; })()`);
-    check(await ready(ev, `!document.querySelector('.modal') && [...document.querySelectorAll('[data-ppcol="inquiry"] .ppcard')].some(c => /Messefilm/.test(c.textContent))`), '#1196: the new inquiry is in its column');
+    check(await ready(ev, `!document.querySelector('.modal') && [...document.querySelectorAll('[data-pipcol="inquiry"] .ppcard')].some(c => /Messefilm/.test(c.textContent))`), '#1196: the new inquiry is in its column');
     check(await ev(`${deals}.then(j => j.items.some(x => x.title === 'Messefilm' && x.stage === 'inquiry' && x.probability === 20))`), '#1196: saved as an inquiry with 20 %');
     // drag a card into "Order"
-    await ev(`(() => { const c = [...document.querySelectorAll('.ppcard')].find(x => /Imagefilm/.test(x.textContent)), col = document.querySelector('[data-ppcol="won"]'); const dt = new DataTransfer();
+    await ev(`(() => { const c = [...document.querySelectorAll('.ppcard')].find(x => /Imagefilm/.test(x.textContent)), col = document.querySelector('[data-pipcol="won"]'); const dt = new DataTransfer();
       c.dispatchEvent(new DragEvent('dragstart', {bubbles: true, dataTransfer: dt})); col.dispatchEvent(new DragEvent('dragover', {bubbles: true, cancelable: true, dataTransfer: dt})); col.dispatchEvent(new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: dt})); return 1; })()`);
     check(await ready(ev, `${deals}.then(j => j.items.some(x => x.title === 'Imagefilm' && x.stage === 'won' && x.probability === 100))`), '#1196: dragging into "Order" saves the stage');
-    check(await ready(ev, `[...document.querySelectorAll('[data-ppcol="won"] .ppcard')].some(c => /Imagefilm/.test(c.textContent))`), '#1196: the card moved');
+    check(await ready(ev, `[...document.querySelectorAll('[data-pipcol="won"] .ppcard')].some(c => /Imagefilm/.test(c.textContent))`), '#1196: the card moved');
     // the won deal offers "Create project"
     await ev(`(() => { [...document.querySelectorAll('.ppcard')].find(x => /Imagefilm/.test(x.textContent)).click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal [data-m="project"]') && !!document.querySelector('.modal [data-m="offer"]')`), '#1196: the won deal offers a quotation and a project');
@@ -77,11 +77,11 @@ const today = new Date().toISOString().slice(0, 10);
     // phone
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(400);
-    check(await ev(`getComputedStyle(document.querySelector('.ppseg')).display !== 'none' && [...document.querySelectorAll('.ppcol')].filter(c => getComputedStyle(c).display !== 'none').length === 1`), '#1196: on a phone one stage with the switcher');
+    check(await ev(`getComputedStyle(document.querySelector('.ppseg')).display !== 'none' && [...document.querySelectorAll('.pipcol')].filter(c => getComputedStyle(c).display !== 'none').length === 1`), '#1196: on a phone one stage with the switcher');
     await ev(`(() => { document.querySelector('[data-pp="stage"][data-v="won"]').click(); return 1; })()`);
-    check(await ready(ev, `[...document.querySelectorAll('.ppcol')].find(c => getComputedStyle(c).display !== 'none')?.dataset.ppcol === 'won'`), '#1196: the switcher shows another stage');
+    check(await ready(ev, `[...document.querySelectorAll('.pipcol')].find(c => getComputedStyle(c).display !== 'none')?.dataset.pipcol === 'won'`), '#1196: the switcher shows another stage');
     check(await ev(noSide), '#1196: on a phone nothing sticks out to the side');
-    check(await ev(`[...document.querySelectorAll('.ppcol.on .ppcard')].every(x => x.getBoundingClientRect().height >= 43)`), '#1196: large tap targets');
+    check(await ev(`[...document.querySelectorAll('.pipcol.on .ppcard')].every(x => x.getBoundingClientRect().height >= 43)`), '#1196: large tap targets');
     await shot('p250-b-pipeline-phone.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     // ================= #1197
