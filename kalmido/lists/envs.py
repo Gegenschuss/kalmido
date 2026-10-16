@@ -157,7 +157,10 @@ def env_close_tasks(c, mid, env_name, uid):
     ids = [r["id"] for r in c.execute("SELECT id FROM tasks WHERE milestone_id=? AND status=0 AND deleted_at IS NULL ORDER BY id", (mid,))]
     done = []
     prev = g.get("user")
+    from ..tasks.review import rvw_gate
     for tid in ids:
+        if rvw_gate(c, tid):  # 2.60.0 (#1514 + #1512): a task still waiting for its approval stays open
+            continue
         if not g.get("user"):
             g.user = {"id": None, "display_name": "", "username": "", "kind": "person"}  # a hook: nobody's completion
         try:
