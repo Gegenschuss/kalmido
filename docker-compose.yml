@@ -18,6 +18,9 @@ services:
       # 2.45.0: without KALMIDO_SECRET_KEY in .env the server key is created once in this file (own folder ./secret,
       # never inside ./data: a backup must not carry the key next to the data it protects). Keep a copy of it.
       KALMIDO_SECRET_FILE: ${KALMIDO_SECRET_FILE:-/secret/kalmido.key}
+      # 2.61.0: uploads are scanned by the virus scanner (service "clamav" below). Switch it off on small servers: set
+      # KALMIDO_CLAMD= (empty) in .env and remove the clamav service (docs/SELF-HOSTING.md "Virus scan of uploads")
+      KALMIDO_CLAMD: ${KALMIDO_CLAMD-clamav:3310}
     depends_on:
       db:
         condition: service_healthy
@@ -69,3 +72,25 @@ services:
     volumes:
       # the database files; no port is published, only Kalmido reaches the database
       - ./pgdata:/var/lib/postgresql/data
+
+  clamav:
+    # 2.61.0: ClamAV checks every upload before it is stored (about 1-1.5 GB RAM). freshclam inside the container updates the
+    # signatures by itself. Not reachable (e.g. still loading after a start): uploads are taken, marked "Unchecked" and
+    # checked once it runs. Without it: KALMIDO_CLAMD= in .env and delete this block.
+    image: clamav/clamav:1.4
+    container_name: kalmido-clamav
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 300s
+    volumes:
+      # the signatures (a named volume, kept across restarts: no full download on every start); no port is published
+      - clamav-db:/var/lib/clamav
+
+volumes:
+  clamav-db:

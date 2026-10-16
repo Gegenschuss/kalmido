@@ -210,6 +210,8 @@ def need_attachment(c, aid, write):
     if not write:  # 2.42.0 (#828): an encrypted file only for its uploader (never for agents)
         from ..collab.e2e import e2e_att_guard
         e2e_att_guard(a)
+        from ..files.scan import sc_guard
+        sc_guard(c, "att", aid)  # 2.61.0 (#1818): a file found infected later is locked (download, preview, text)
     if a["comment_id"] is None:
         need_task(c, a["task_id"], write, full=True)
         return a

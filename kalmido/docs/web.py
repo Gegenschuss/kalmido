@@ -480,6 +480,8 @@ def docs_file(nid):
     v = fs_version_row(c, nid)
     if not v:
         raise Denied(404)
+    from ..files.scan import sc_guard
+    sc_guard(c, "fs", nid, v["no"])  # 2.61.0 (#1818): a version found infected later is locked
     fs_log_add(c, nid, "download" if request.args.get("dl") == "1" else "read")
     c.commit()
     return send_stored({"id": nid, "path": v["path"], "name": n["name"], "mime": v["mime"] or n["mime"], "size": v["size"]})

@@ -1473,6 +1473,11 @@ participant only its own tasks) and only of its own conversations; anything else
 `name`, `mime`, `size` and `base64`, at most `max_bytes` (default 5 MB, at most 20 MB); images also come as an MCP image
 item so the model can look at them. A damaged file on the server answers `410`.
 
+Virus scan (2.61.0): files an agent uploads go through the same scan as people's ([SELF-HOSTING.md](SELF-HOSTING.md#virus-scan-of-uploads)).
+A find refuses the upload with `400` and a message naming the signature. A file the scanner could not check yet carries
+`up: {scan: "unchecked"}` in the file lists (`list_attachments`, project files, chat `attachments`); a file found infected later
+has `up: {scan: "infected", sig}` and every way to read it answers `403` - do not retry, tell the person.
+
 **End-to-end encrypted content (2.42.0).** People can keep an encrypted note on a task, attach encrypted files and
 encrypt a direct message conversation; this is encrypted in their browser and only they hold the keys. An agent sees
 placeholders only: a task says `encrypted_note: true` (never the text), an encrypted file is listed with

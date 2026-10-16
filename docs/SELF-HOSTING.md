@@ -22,6 +22,7 @@ addresses and paths to your setup.
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
 - [Mail](#mail)
+- [Virus scan of uploads](#virus-scan-of-uploads)
 - [Documents: text recognition](#documents-text-recognition)
   - [Import from Paperless-ngx (2.48)](#import-from-paperless-ngx-248)
 - [Moving to a new server](#moving-to-a-new-server)
@@ -615,6 +616,34 @@ Trigger every alert once on purpose after setting it up, the dead man's switch t
   account in five minutes, rate limited per address and sender. Kid accounts, agents, disabled accounts and accounts
   without a password (single sign-on only) get no link: their parents or an admin reset them. Two-factor sign-in stays
   required: after the new password the second step follows, and all other sessions of the account end.
+
+## Virus scan of uploads
+
+Since 2.61.0 every uploaded file (task and comment files, project files, the file store and documents, chat files, files from
+mail and the share sheet) goes to [ClamAV](https://www.clamav.net/) before it is stored. The `docker-compose.yml` brings the
+service `clamav` along; Kalmido talks to its daemon over the internal network (`KALMIDO_CLAMD=clamav:3310`, no port is
+published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the container keeps the signatures up to date
+(volume `clamav-db`). After a start it needs a few minutes to load them (`docker compose ps` shows *healthy* when it is ready).
+
+- **A find**: the upload is refused with the name of the signature ("file.pdf: malware found (...), not uploaded").
+- **Scanner not reachable** (still loading, stopped, crashed) or a file larger than `KALMIDO_CLAMD_MAX_MB`: the upload is
+  taken and marked *Unchecked* in the app. Once the scanner answers again, the server checks these files in the background
+  (up to 20 per minute). Clean: the mark goes. A find: the file is **locked** - it stays stored, but nobody can download or
+  preview it any more (403), and the person who uploaded it gets a News item. Deleting it is up to the people of the list.
+  *Settings > Users > Whole server* shows the scanner's state and how many files wait or are locked.
+- Files encrypted in the browser (end-to-end) cannot be read by the server and are not scanned.
+- Independent of the scanner, the server looks at the first bytes of every upload: a program or HTML page that claims to be a
+  picture or PDF is stored as a plain download (never shown inline).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KALMIDO_CLAMD` | `clamav:3310` in the compose file, else empty | `host:port` of clamd (TCP) or the path of its unix socket; empty = no scan |
+| `KALMIDO_CLAMD_MAX_MB` | `100` | larger files are not sent to the scanner (marked *Unchecked*); keep it at or below clamd's `StreamMaxLength` |
+| `KALMIDO_CLAMD_TIMEOUT` | `60` | seconds one scan may take |
+
+**Switch it off** on a small server (e.g. a Raspberry Pi with 1 GB): set `KALMIDO_CLAMD=` (empty) in `.env` and delete the
+`clamav:` block (and the `clamav-db` volume entry) from `docker-compose.yml`, then `docker compose up -d --remove-orphans`.
+Uploads are then taken without a scan and without a mark. An own ClamAV elsewhere: `KALMIDO_CLAMD=host:3310`.
 
 ## Documents: text recognition
 

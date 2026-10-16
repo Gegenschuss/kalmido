@@ -1206,3 +1206,16 @@ agents get no pushes and never mark people urgent.
 - Setting `tbl_accept` (`"1"` default, `"0"` = urgency set by others counts as *As the list*; it stays visible on the task).
 - The task history gets a line `bell` for urgency set for others (`{level, until, n}`, a count, no names) and when a person
   switches off an urgency someone else set (`{level, self: 1}`).
+
+## Virus scan of uploads (2.61.0)
+
+Every upload (`POST /api/v1/tasks/{id}/attachments`, `.../attachments/text`, project files, the file store, chat files) is
+checked by the server's virus scanner when the operator runs one ([SELF-HOSTING.md](SELF-HOSTING.md#virus-scan-of-uploads)).
+
+- A find: `400` with `error` = "<name>: malware found (<signature>), not uploaded"; nothing is stored.
+- File lists carry `up` only for files with a mark: `{"scan": "unchecked"}` (the scanner was not reachable or the file is too
+  large for it; `scan_why: "size"`), `{"scan": "infected", "sig": "<signature>"}` (found later: the file is locked).
+- Reading a locked file (`GET /api/v1/attachments/{id}`, `.../text`, `GET /api/v1/files/{id}/content`, project / chat files)
+  answers `403`; deleting it works as before.
+- A file whose content does not match its type (a program or HTML page named `.png`) is stored as
+  `application/octet-stream`.

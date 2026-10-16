@@ -239,6 +239,7 @@ def overview_build(c, lid, uid):
                               WHERE m.list_id=? ORDER BY m.added_at, u.id""", (lid,)):
             members.append({"user_id": m["user_id"], "name": m["display_name"] or m["username"], "role": m["role"],
                             **({"agent": True} if m["user_id"] in ag else {})})
+    from ..files.scan import sc_up
     status = []
     if collab_all():
         srows = c.execute("SELECT * FROM list_status WHERE list_id=? ORDER BY id DESC LIMIT 10", (lid,)).fetchall()
@@ -247,8 +248,8 @@ def overview_build(c, lid, uid):
                    "created_at": r["created_at"]} for r in srows]
     out = {"list_id": lid, "name": lst["name"], "role": role, "can_edit": role in WRITE_ROLES,
            "description": lst["description"] or "", "links": links, "milestones": ms,
-           "files": [ov_file_dict(r, names) for r in frows],
-           "task_files": tfiles, "members": members,
+           "files": sc_up(c, "list", [ov_file_dict(r, names) for r in frows]),  # 2.61.0 (#1818): + up (virus scan marks)
+           "task_files": sc_up(c, "att", tfiles), "members": members,
            "status": {"current": lst["status"] or None, "note": lst["status_note"] or "", "at": lst["status_at"], "history": status},
            "time": None}
     if time_all() and lst["time_tracking"]:  # 2.41.0 (#1471): "Tracked" only with the list's time tracking on
@@ -559,6 +560,9 @@ def need_list_file(c, fid, write):
     if not r:
         raise Denied(404)
     need_overview(c, r["list_id"], write=write)
+    if not write:
+        from ..files.scan import sc_guard
+        sc_guard(c, "list", fid)  # 2.61.0 (#1818): a file found infected later is locked
     return r
 
 

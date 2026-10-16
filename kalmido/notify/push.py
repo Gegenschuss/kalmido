@@ -555,6 +555,8 @@ def watchdog_tick(c):
     _wd_section(c, "boundary check", boundary_tick)  # 2.30.0 (#1036): once a night, before the alerts go out
     from ..notify.sev import sev_scan
     _wd_section(c, "security watch", sev_scan)  # 2.36.2 (#1133): new admins / org admins / agents / agent tokens
+    from ..files.scan import sc_tick
+    _wd_section(c, "virus scan", sc_tick)  # 2.61.0 (#1818): the uploads the scanner could not check yet
     _wd_section(c, "admin alerts", aa_tick)
 
 

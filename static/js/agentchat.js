@@ -323,7 +323,8 @@ function chatAttHtml(m) {
   const mine = m.from !== 'agent';
   return `<div class="atts chatts">${fs.map(a => {
     const del = mine ? `<button type="button" class="attdel" data-act="chat-file-rm" data-fid="${a.id}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove') + ': ' + a.name)}">${ic('x', 's')}</button>` : '';
-    if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="chat-att-view" data-mid="${m.id}" data-fid="${a.id}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${del}</div>`;
+    if (upLocked(a)) return scnLockedTile(a, del);  // 2.61.0 (#1818)
+    if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="chat-att-view" data-mid="${m.id}" data-fid="${a.id}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${scnImgMark(a)}${del}</div>`;
     return `<div class="att file">${attFileA(a)}${del}</div>`;  // 2.30.0 (#1035): text files open in the viewer
   }).join('')}</div>`;
 }

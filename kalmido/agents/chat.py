@@ -229,6 +229,9 @@ def chat_files_of(c, mids):
         return out
     for r in c.execute(f"SELECT id, message_id, name, mime, size FROM chat_files WHERE message_id IN ({','.join('?' * len(mids))}) ORDER BY id", mids):
         out.setdefault(r["message_id"], []).append({"id": r["id"], "name": r["name"], "mime": r["mime"], "size": r["size"]})
+    if out:  # 2.61.0 (#1818): + up (virus scan marks)
+        from ..files.scan import sc_up
+        sc_up(c, "chat", [d for v in out.values() for d in v])
     return out
 
 
@@ -637,6 +640,9 @@ def chat_file_access(c, fid, write=False):
         side = "user"
     if write and r["sender"] != side:
         raise Denied(403, tr("Only the sender can remove this file"))
+    if not write:
+        from ..files.scan import sc_guard
+        sc_guard(c, "chat", fid)  # 2.61.0 (#1818): a file found infected later is locked
     return r
 
 
