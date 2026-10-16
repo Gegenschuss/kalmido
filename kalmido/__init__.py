@@ -165,6 +165,7 @@ ORDER = (
     "office.pipeline",  # 2.50.0 B (#1196): the sales pipeline
     "office.kpi",  # 2.50.0 B (#1197): the business figures
     "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
+    "office.agentdocs",  # 2.51.0 A (#1348, #1350): agents in the office: drafts, payment suggestions, the switches (API v1 + routes)
     "team.approvals",
     "team.forms",
     "team.v1",

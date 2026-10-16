@@ -57,7 +57,10 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # page with its positions) or "summary" (one position per tax rate with this title)
                      "parts_invoice_mode": "full", "parts_summary_title_de": "Filmherstellung", "parts_summary_title_en": "Film production",
                      # 2.47.3 (#1460): the DATEV booking batch export (office.datev: advisor / client number, chart, accounts)
-                     "datev_extf": {}}
+                     "datev_extf": {},
+                     # 2.51.0 A (#1348): agents may read office data (clients, prices) -- they go to the agent's AI model; off by
+                     # default, needed together with the agent's own switch "may draft office documents" (office/agentdocs.py)
+                     "agents_read": 0}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -304,7 +307,7 @@ def office_settings_clean(c, oid, b, cur):
         elif k == "industry_packs":  # 2.47.0 (#1216)
             from .sheet import dk_packs_clean
             out[k] = dk_packs_clean(v)
-        elif k in ("datev_auto", "producing_on", "raw_on", "small_business"):  # 2.40.0 (#1379): the two calculation switches
+        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read"):  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "reminder_text_de", "reminder_text_en"):
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""

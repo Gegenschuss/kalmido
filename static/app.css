@@ -7403,3 +7403,22 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .sgrow .sghead{font-size:.875rem;overflow-wrap:anywhere}
 .sgrow.st-accepted .sghead b{color:var(--accent)}
 .sgproto{margin-top:.25rem;font-size:.8125rem;color:var(--text2);overflow-wrap:anywhere}
+/* 2.51.0 A (#1348, #1350): agents in the office -- marked positions, "drafted by", suggested payments, chat link buttons */
+.ofdit.oa_flag{box-shadow:inset 3px 0 0 var(--accent);background:var(--accent-soft)}
+.oa_flags{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.25rem;font-size:var(--fs-s)}
+.oa_flagt{color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:.25rem}
+.oa_flags .btn{min-height:2.25rem}
+.oa_by{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;margin:.25rem 0 .5rem}
+.oa_pp{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--radius);padding:.5rem .75rem;margin:.5rem 0}
+.oa_pp h3{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem;font-size:var(--fs-m)}
+.oa_pp ul{list-style:none;margin:0;padding:0}
+.oa_pp li{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem 0;border-top:1px solid var(--line)}
+.oa_pp li:first-child{border-top:0}
+.oa_ppm{display:flex;flex-direction:column;min-width:0;flex:1 1 12rem;overflow-wrap:anywhere}
+.oa_ppa{white-space:nowrap}
+.oa_ppb{display:flex;gap:.375rem}
+.oa_ppb .btn{min-height:2.5rem}
+.oa_logf{margin:.25rem 0 .5rem}
+.cchoices.oa_links a.cchb{text-decoration:none;display:inline-flex;align-items:center;gap:.375rem}
+.oa_sw .chkl{min-height:2.5rem}
+@media (max-width:600px){.oa_ppb{width:100%}.oa_ppb .btn{flex:1}}
