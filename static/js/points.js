@@ -81,10 +81,11 @@ function spt_velocityHtml(lid) {
     <line x1="0" x2="${w}" y1="${y(avg)}" y2="${y(avg)}" class="sptavg"/></svg>
     <p class="sptavgt">${esc(tr('Planning aid: avg. {0} points per sprint', avg))}</p></div>`;
 }
-// the block "Velocity" of the project page (lists with sprints and story points); undefined = not offered
-POV_BLOCKS.push(['velocity', N_('Velocity'), 'chart', 'half']);
+// the block "Velocity" of the project page and its editor: only in lists with sprints and story points on (undefined = not offered)
+const spt_povOn = l => !!l?.points_on && spt_sprintsOn(l);
+{ const blocks = LY.project.blocks; LY.project.blocks = () => [...blocks(), ...(spt_povOn(routeList()) ? [['velocity', N_('Velocity'), 'chart', 'half']] : [])]; }
 function spt_povPart(l) {
-  if (!l?.points_on || !spt_sprintsOn(l)) return undefined;
+  if (!spt_povOn(l)) return undefined;
   const h = spt_velocityHtml(l.id);
   return x => povSec('velocity', tr('Velocity'), h, x, h ? '' : tr('Shows the completed points once the first sprint is closed.'));
 }
