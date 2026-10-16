@@ -4,7 +4,10 @@
 # /api/documents/<id>/notes/, /api/tags/, /api/correspondents/, /api/document_types/, /api/custom_fields/. The data is
 # /data/pl.json (written by the test, re-read on every request; files as text); every request goes to /data/pl.log.
 # Any other method answers 405 and is logged (the test checks that Kalmido never writes).
+# 2.56.4 (#1859): pl.json "versions" = the API versions the server allows (Paperless-ngx 3.x: ["9", "10"]); an Accept header
+# with another version= answers 406 like DRF's AcceptHeaderVersioning. Without "versions" every version is taken.
 import json
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
@@ -54,6 +57,9 @@ class H(BaseHTTPRequestHandler):
         u = urlsplit(self.path)
         q = parse_qs(u.query)
         d = data()
+        ver = re.search(r'version=([0-9.]+)', self.headers.get('Accept', ''))
+        if ver and d.get('versions') and ver.group(1) not in d['versions']:
+            return self._send(406, {'detail': 'Invalid version in "Accept" header.'})
         p = u.path
         if p == '/redirect/api/documents/':
             return self._send(302, {}, extra={'Location': 'http://example.invalid/api/documents/'})

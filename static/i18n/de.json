@@ -7836,6 +7836,8 @@
   "Import started: it runs in the background": "Import gestartet: er läuft im Hintergrund",
   "Connected with Paperless-ngx": "Mit Paperless-ngx verbunden",
   "Paperless-ngx could not be reached": "Paperless-ngx war nicht erreichbar",
+  "Yes": "Ja",
+  "This Paperless-ngx version speaks no API version Kalmido understands (5, 9 or 10)": "Diese Paperless-ngx-Version spricht keine API-Version, die Kalmido versteht (5, 9 oder 10)",
   "Disconnect Paperless-ngx?": "Paperless-ngx trennen?",
   "The token is removed. Documents already imported stay in Kalmido.": "Das Token wird entfernt. Schon importierte Dokumente bleiben in Kalmido.",
   "No longer bring in new documents automatically": "Neue Dokumente nicht mehr automatisch übernehmen",

@@ -7,6 +7,15 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.56.4] - 2026-10-17
+
+### Fixed
+- Connecting Paperless-ngx 3.x works again: it only speaks API version 9 / 10 and answered Kalmido's version 5 with
+  "error (406)". Kalmido now asks for 10, then 9, then 5 (older servers keep working); a server without any of them gets a
+  readable reason (#1859).
+- Custom fields of newer Paperless-ngx versions come in readable: the label of a select option (instead of its id), amounts
+  as "42.00 EUR", yes / no and document links.
+
 ## [2.56.3] - 2026-10-16
 
 ### Fixed
