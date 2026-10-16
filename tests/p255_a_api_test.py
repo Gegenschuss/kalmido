@@ -205,7 +205,7 @@ if it:
 A.delete(B + f"/api/layouts/saved/{F}")
 check(any(x["name"] == "Alice: Morning" for x in saved(Bo)), "#1068: bob's copy stays his")
 # a project page template: only to people with access, re-checked when taking it over
-check(A.post(B + "/api/layouts/offers", json={"key": f"list:{P}", "name": "Page", "layout": PL, "to": [CAROL]}).status_code == 404,
+check(A.post(B + "/api/layouts/offers", json={"key": f"list:{P}", "name": "Page", "layout": PL, "to": [CAROL]}).status_code == 409,
       "#1068: a project page only to people with access (carol has none)")
 r = A.post(B + "/api/layouts/offers", json={"key": f"list:{P}", "name": "Page", "layout": PL, "to": [BOB]})
 check(r.ok, "#1068: a project page template to bob " + r.text[:200])
