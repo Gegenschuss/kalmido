@@ -2552,3 +2552,19 @@ something said earlier ("as we discussed about the invoice") instead of paging t
 curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" \
   "$KALMIDO_URL/api/v1/search?scope=messages&q=invoice%20dishwasher&art=c,t&limit=10"
 ```
+
+### Story points, WIP limits and velocity (2.60.0)
+Software teams can estimate tasks in story points and limit the work in progress per kanban column. Both are off until
+someone switches them on: story points per list (`points_on`, the owner), a WIP limit per section.
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| Story points of a task (`1, 2, 3, 5, 8, 13`, `null` = none) | `PATCH /api/v1/tasks/{id}` `{points}` | `update_task` / `create_task` (`points`) | tasks:write |
+| Story points on in a list (the owner) | `PATCH /api/v1/lists/{id}` `{points_on}` | `update_list` (`points_on`) | structure |
+| The WIP limit of a kanban column (`null` / `0` = none) | `PATCH /api/v1/sections/{id}` `{wip_limit}` | `set_wip_limit` | structure |
+| Completed points of the last closed sprints and their average | `GET /api/v1/lists/{id}/velocity` | `get_velocity` | read |
+
+- A WIP limit is a hint: moving a task into a full column stays allowed. Do not hold back work because of it; mention it
+  when you plan ("In progress already holds 3 of 3").
+- Estimate only when the list's rules or a person ask for it; a person's estimate is never overwritten.
+- Use the velocity as a planning aid for the next sprint ("about 21 points"), never as a measure of a person.

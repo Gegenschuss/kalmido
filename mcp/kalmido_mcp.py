@@ -152,6 +152,9 @@ TASK_FIELDS = {
     "people": {"type": "array", "items": {"type": "integer"}, "description": "2.19.0: who comes along (user ids sharing the list): they see the "
                "task and get its reminders"},
     "stars": {"type": ["integer", "null"], "minimum": 0, "maximum": 50, "description": "2.19.0: stars a kid account gets for completing it (null = 1)"},
+    # 2.60.0 (#1511): story points
+    "points": {"type": ["integer", "null"], "enum": [1, 2, 3, 5, 8, 13, None], "description": "2.60.0: story points (Fibonacci); null = none. "
+               "The app shows them where the list has story points on (points_on)"},
     "family": {"type": ["object", "null"], "description": "2.19.0: birthday / anniversary {kind, name, year?, lead?} or household deadline "
                "{kind: deadline, type, who, expires, notice, lead} data; easier: add_occasion / add_deadline"},
     # 2.35.0 (#1095): code snippets (plain code, no Markdown); the whole list is replaced
@@ -910,6 +913,7 @@ LIST_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "folder":
               "view": {"type": "string", "enum": ["list", "kanban", "timeline", "mindmap"]}, "kind": {"type": "string", "enum": ["list", "project"]},
               "done_at_bottom": {"type": "boolean"}, "nag": {"type": "string"}, "day_hours": {"type": ["number", "null"]},
               "time_tracking": {"type": "boolean", "description": "2.41.0: time tracking on for this list (any type, default off)"}}
+LIST_PROPS["points_on"] = {"type": "boolean", "description": "2.60.0: story points shown in the app (owner; default off)"}  # 2.60.0 (#1511)
 HABIT_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer", "minimum": 1},
                "days": {"type": "string", "description": "weekdays 1-7 (1 = Monday), e.g. 12345"}, "per_week": {"type": "integer", "minimum": 0},
                "remind_at": {"type": "string", "description": "HH:MM or empty"}}
@@ -980,8 +984,10 @@ TOOLS += [
     # ---- sections
     ("list_sections", "Sections of a list in order.", _obj({"list_id": S_ID}, ["list_id"]),
      lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/sections")),
-    ("create_section", "Create a section in a list (at the end, or before section before_id).",
-     _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1, "maxLength": 200}, "before_id": S_ID}, ["list_id", "name"]),
+    ("create_section", "Create a section in a list (at the end, or before section before_id). 2.60.0: wip_limit = the most open tasks "
+                       "the kanban column should hold (a hint only; null / 0 = none).",
+     _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1, "maxLength": 200}, "before_id": S_ID,
+           "wip_limit": {"type": ["integer", "null"], "minimum": 0, "maximum": 999}}, ["list_id", "name"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/sections", body=_without(a, "list_id"))),
     ("rename_section", "Rename a section.", _obj({"section_id": S_ID, "name": {"type": "string", "minLength": 1, "maxLength": 200}},
                                                  ["section_id", "name"]),
@@ -1602,6 +1608,14 @@ TOOLS += [
      _obj({"view": _VIEW, "name": {"type": "string", "maxLength": 40}, "layout": _LAYOUT, "summary": {"type": "string"},
            "title": {"type": "string"}, "user_id": S_ID}, ["view", "name", "layout"]),
      lambda api, a: api.call("POST", "/layouts/proposals", body=_pick(a, ("view", "name", "layout", "summary", "title", "user_id")))),
+# 2.60.0 (#1510, #1511): WIP limits of kanban columns, the velocity of a list's sprints
+    ("set_wip_limit", "2.60.0: set the WIP limit of a section (kanban column): the most open tasks it should hold. A hint only: the app "
+                      "marks the column above it, moving stays allowed. wip_limit null or 0 = no limit.",
+     _obj({"section_id": S_ID, "wip_limit": {"type": ["integer", "null"], "minimum": 0, "maximum": 999}}, ["section_id", "wip_limit"]),
+     lambda api, a: api.call("PATCH", f"/sections/{_id(a, 'section_id')}", body={"wip_limit": a.get("wip_limit")})),
+    ("get_velocity", "2.60.0: the velocity of a list: completed story points (and tasks) of its last up to 6 closed sprints and their "
+                     "average, a planning aid for the next sprint.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/velocity")),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
@@ -1644,6 +1658,7 @@ TOOL_SCOPES = {
 TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_entries")  # 2.51.0 (#1353)
 TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2.51.0 (#1355)
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
+TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
               "private", "files:read", "files:write", "office", "pinboard", "layouts")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts
