@@ -134,6 +134,11 @@ says(Bo, T, "bob")
 c = agent_says(T, "unrelated, but the bell says all")
 check(not news_for(ALICE, c), "#1854: 'only replies' holds against a list bell 'All'")
 A.put(B + f"/api/lists/{W['id']}/bell", json={"mode": "default"})
+# 2.62.0 (#1854, review): an agent's approval card waits for the person - it arrives with "only replies" too
+says(Bo, T, "bob again")
+r = requests.post(V + f"/tasks/{T}/comments", headers=CLH, json={"body": "May I merge?", "approval": {"title": "Merge the branch"}})
+check(r.status_code == 201, "agent: approval card " + r.text[:200])
+check(news_for(ALICE, r.json()["id"]), "#1854: an approval card of an agent reaches 'only replies' too")
 # bob kept "all": he hears the unrelated agent comments on a task he follows
 c = agent_says(T, "for the followers")
 check(news_for(BOB, c), "#1854: someone with 'all' still gets the agent's comment")

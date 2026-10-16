@@ -90,6 +90,7 @@ task as a push at the highest priority, even if the list is quiet.
 answers one of your comments (reply), comes right after your comment on that task, or @mentions you.
 
 - A task marked **Urgent** for you still brings every comment of that task; a list bell **All** does not override "only replies" for agents.
+- Approval cards, questions with buttons and suggestions of an agent always arrive: they wait for your answer.
 - A list bell **All** and a task marked **Urgent** for you still bring every comment of that list / task.
 - Pushes about other things agents do (new tasks, completions) keep their own switch.
 
