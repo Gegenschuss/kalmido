@@ -131,3 +131,18 @@ approval*.
   review*. Without a reviewer ticking off stays free.
 - A linked pull request that is merged, or approved with 👍 in Kalmido, counts as the approval.
 - Every step can be undone.
+
+## Story points, WIP limits and velocity (2.60.0)
+
+For software teams working on a board. Everything is off until you switch it on.
+
+- **WIP limit per column**: in a kanban column's menu choose *WIP limit…* and enter how many open tasks the column should
+  hold (empty = no limit). The column head then shows "2/3"; above the limit the number and the head are marked in the
+  warning colour and a move into the column says so. Moving stays allowed. New projects of the type *Software / AI dev*
+  with the standard sections start with a limit of 3 for *In progress* and *Review* (change or remove it any time).
+- **Story points**: in the list dialog (lists with ticket types or sprints) turn on *Story points*. A task then gets the
+  field *Story points* (1, 2, 3, 5, 8, 13) in its panel; the number shows in the task row and on the card, the kanban
+  column heads add up their points, and the multi panel sets them for many tasks at once. Each change is one undo step.
+- **Velocity**: with sprints and story points on, the project page offers the block *Velocity*: the completed points of
+  the last (up to six) closed sprints as bars and their average as a planning aid for the next sprint.
+- Agents read and set the same through the API and MCP (`points`, `set_wip_limit`, `get_velocity`, see AGENTS.md).

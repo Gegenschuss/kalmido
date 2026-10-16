@@ -14,7 +14,7 @@ from ..core.access import Denied, list_role, MANAGE_ROLES, my_inbox, my_max_sort
 from ..core.pages import valid_link
 from ..lists.lists import list_created, clean_color, clean_folder, LIST_KINDS
 from ..tasks.validation import (
-    clean_reminders, clean_ticket_tpl, log_act, rr_feasible, rr_norm, rr_problem, TICKET_TPL, TICKET_TYPES, valid_date,
+    clean_reminders, clean_ticket_tpl, log_act, POINTS, rr_feasible, rr_norm, rr_problem, TICKET_TPL, TICKET_TYPES, valid_date,
 )
 from ..tasks.tasks import ms_target, one_task, set_tags
 from ..personal.timetrack import BadInput
@@ -45,6 +45,8 @@ def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None):
          "due_time": t["due_time"] if t["due"] else None, "duration": t["duration"] if t["due_time"] else None,
          "reminders": t["reminders"] or "", "repeat": t["repeat"] or "", "repeat_from": t["repeat_from"] or "due",
          **({"ttype": t["ttype"]} if t["ttype"] else {}), **({"ms": 1} if t["ms"] and depth == 0 else {}), "children": []}
+    if t["points"]:  # 2.60.0 (#1511): the story points come along
+        n["points"] = t["points"]
     if t["snippets"]:  # 2.35.0 (#1095): the code snippets come along
         from ..tasks.snippets import snip_tpl
         n["snippets"] = snip_tpl(t["snippets"])
@@ -129,6 +131,7 @@ def tpl_clean_node(n, depth, count):
             "repeat_from": "done" if n.get("repeat_from") == "done" else "due",
             **({"ttype": n["ttype"]} if n.get("ttype") in TICKET_TYPES else {}),
             **({"snippets": _snips_tpl(n["snippets"])} if n.get("snippets") else {}),  # 2.35.0 (#1095)
+            **({"points": n["points"]} if n.get("points") in POINTS and not isinstance(n.get("points"), bool) else {}),  # 2.60.0 (#1511)
             # 2.18.0 (#430): a milestone (top level, without subtasks) / the node key of the milestone a task belongs to
             **({"ms": 1} if n.get("ms") and depth == 0 and not kids else {}),
             **({"mk": n["mk"]} if isinstance(n.get("mk"), str) and re.fullmatch(r"n\d{1,5}", n["mk"]) else {}),
@@ -352,6 +355,8 @@ def tpl_insert(c, n, lid, sec, parent, base, sort, uid, fmap=None, scale=1.0, ma
          "repeat": n.get("repeat") or "" if due else "", "repeat_from": n.get("repeat_from") or "due",
          "url": n.get("url"), "sort": sort, "created_by": uid, "ttype": n.get("ttype") if n.get("ttype") in TICKET_TYPES else "",
          "ms": 1 if n.get("ms") and parent is None else 0}
+    if n.get("points") in POINTS and not isinstance(n.get("points"), bool):  # 2.60.0 (#1511)
+        f["points"] = n["points"]
     if n.get("snippets"):  # 2.35.0 (#1095)
         from ..tasks.snippets import snip_clean
         try:
@@ -505,6 +510,10 @@ PTYPES = {
 }
 
 
+# 2.60.0 (#1510): WIP limits a new project of the type gets on its standard sections (section name -> limit)
+PTYPE_WIP = {"software": {"In progress": 3, "Review": 3}}
+
+
 PTYPE_NAMES = {"agency": N_("Agency"), "software": N_("Software / AI dev"), "private": N_("Personal|project type")}
 
 
@@ -523,6 +532,10 @@ def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=Fals
         raise BadInput(tr("Invalid value: {0}", tr("Project type")))
     lid = tpl_apply_list(c, uid, ptype_template(k, lang(c, uid), sections), name, folder, start or local_now().date(), color=color, org_id=org_id)
     c.execute("UPDATE lists SET ptype=? WHERE id=?", (k, lid))  # 2.18.0 (#408): the type is kept (list dialog, API)
+    if sections and PTYPE_WIP.get(k):  # 2.60.0 (#1510): the type's suggested WIP limits (changeable in the column menu)
+        lg = lang(c, uid)
+        for x, n in PTYPE_WIP[k].items():
+            c.execute("UPDATE sections SET wip_limit=? WHERE list_id=? AND name=?", (n, lid, tr(x, lg=lg)))
     fs = [x for x in (usettings(c, uid).get("features") or "").split(",") if x]
     on = [m for m in PTYPES[k]["modules"] if m not in fs]
     if on:

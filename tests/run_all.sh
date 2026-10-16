@@ -869,6 +869,9 @@ fresh; run p260_d_ui node p260_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.60.0 part C: the review step - reviewer, done only after approval, git pull requests count (#1512)
 fresh; run p260_c_api "$PY" p260_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p260_c_ui node p260_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.60.0 part B: WIP limits per kanban column (#1510), story points and velocity (#1511)
+fresh; run p260_b_api "$PY" p260_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p260_b_ui node p260_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

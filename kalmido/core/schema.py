@@ -1710,6 +1710,8 @@ MIGRATIONS = [
     ("tasks", "review_by", "ALTER TABLE tasks ADD COLUMN review_by BIGINT"),
     ("tasks", "review_sec", "ALTER TABLE tasks ADD COLUMN review_sec BIGINT"),
     ("lists", "review_cfg", "ALTER TABLE lists ADD COLUMN review_cfg TEXT NOT NULL DEFAULT ''"),
+    # 2.60.0 B (#1510): the most open tasks a kanban column should hold (NULL = no limit; a hint only, moving stays allowed)
+    ("sections", "wip_limit", "ALTER TABLE sections ADD COLUMN wip_limit BIGINT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
