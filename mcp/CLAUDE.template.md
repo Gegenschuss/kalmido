@@ -365,6 +365,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `file_shared`: a folder or file of the file store was shared with you (`node`, `role` view | edit)
 - `document_added`: a new document was recognised in a folder / file shared with you (`document`); a receipt? see *assign a receipt* below
 - `offer_accepted`: a quotation of your office area was accepted (`doc_id`, `client_id`, `list_id`, sums); only with your office switch on
+- `sprint_started` / `sprint_closed`: a sprint of a project list shared with you started / was closed (`sprint`, with `review` when closed: done / moved / added task ids and points). Sprints: `list_sprints`, `get_sprint` (tasks + burndown), `set_task_sprint` (into a sprint or back to the backlog; people plan and close sprints)
 
 Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get_document` (text, sender, amount) ->
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,

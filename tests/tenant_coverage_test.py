@@ -338,6 +338,11 @@ ROUTES = {
     "DELETE /api/v1/lists/{}/links/{}": "list", "PUT /api/v1/lists/{}/links/order": "list",
     "GET /api/v1/lists/{}/milestones": "list", "POST /api/v1/lists/{}/milestones": "list",
     "PATCH /api/v1/lists/{}/milestones/{}": "list", "DELETE /api/v1/lists/{}/milestones/{}": "list",
+    # 2.60.0 (#343): sprints belong to their list (need_list on the sprint's list: visibility to read, edit rights to change)
+    "GET /api/v1/lists/{}/sprints": "list", "GET /api/v1/sprints/{}": "list", "POST /api/v1/lists/{}/sprints/assign": "list",
+    "GET /api/lists/{}/sprints": "list", "POST /api/lists/{}/sprints": "list", "PUT /api/lists/{}/sprint-settings": "list",
+    "POST /api/lists/{}/sprints/assign": "list", "GET /api/sprints/{}": "list", "PATCH /api/sprints/{}": "list",
+    "DELETE /api/sprints/{}": "list", "POST /api/sprints/{}/start": "list", "POST /api/sprints/{}/close": "list",
     "GET /api/v1/lists/{}/sections": "list", "POST /api/v1/lists/{}/sections": "list", "PATCH /api/v1/sections/{}": "list",
     "PUT /api/v1/lists/{}/sections/order": "list", "DELETE /api/v1/sections/{}": "list",
     "GET /api/v1/lists/{}/fields": "list", "POST /api/v1/lists/{}/fields": "list", "PATCH /api/v1/fields/{}": "list",

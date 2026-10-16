@@ -690,6 +690,8 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `file_shared` | 2.48.0 (#1207): the owner shared a folder or file of the [file store](#file-store-2480) with the agent (only for a new share, not for a changed role) | `node` `{id, name, kind}`, `role`: `view` \| `edit` |
 | `document_added` | 2.48.0 (#1356): a new document was recognised (once, after its first recognition) in a folder or file of the file store the agent sees (a share or its own result folder); read it with `get_document`, e.g. to [suggest project and category of a receipt](#receipts-suggest-project-and-category-2480) | `document` `{id, name, state, date, url}` |
 | `offer_accepted` | 2.51.0 (#1348): a quotation of the agent's office area was accepted (by a person or the customer's approval); only agents with the switch *May draft office documents* (a personal agent in an organisation only while its owner works in the office), while the area lets agents read office data (see [Office](#office-drafts-only-2510)) | `doc_id`, `number`, `title`, `client_id`, `list_id`, `net`, `gross`, `currency` |
+| `sprint_started` | 2.60.0 (#343): a sprint of a project list shared with the agent started (switched on, started by hand, or the next one after closing) | `list_id`, `list`, `sprint` (id, num, title, start, end, goal, state, progress) |
+| `sprint_closed` | 2.60.0 (#343): a sprint was closed (by a person or after its last day); `sprint.review` holds the done / moved / added task ids, counts and points | `list_id`, `list`, `sprint` (with `review`), `next_sprint_id` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -2552,3 +2554,22 @@ something said earlier ("as we discussed about the invoice") instead of paging t
 curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" \
   "$KALMIDO_URL/api/v1/search?scope=messages&q=invoice%20dishwasher&art=c,t&limit=10"
 ```
+
+## Sprints (2.60.0)
+
+A project list can plan its work in sprints (list dialog > *Sprints*, off by default): time boxes of one or two weeks (or a
+free length) with a goal, a burndown and a review at the end. A task belongs to at most one open sprint of its own list
+(`sprint_id`; none = the backlog); moving it to another list clears it. People switch sprints on, plan, start and close them;
+agents with access to the list can:
+
+- read the sprints: `list_sprints` (`GET /api/v1/lists/{id}/sprints`: newest first, with progress, the review of closed
+  sprints and the list's settings) and `get_sprint` (`GET /api/v1/sprints/{id}?unit=count|points`: its tasks and a burndown
+  with an ideal line),
+- put tasks into a sprint or back to the backlog: `set_task_sprint` (`POST /api/v1/lists/{id}/sprints/assign`
+  `{ids, sprint_id | null}`, edit rights on the list; milestones and tasks of other lists are skipped),
+- hear `sprint_started` and `sprint_closed` (only for lists the agent may use; an agent limited to selected lists hears
+  nothing of the others).
+
+The review of a closed sprint (`sprint.review`): `done`, `moved` (open at closing), `added` (planned in after the start)
+as task ids, `count_done`, `count_total`, `points_done`, `points_total`, `points_added`, `target` (`next` | `backlog`),
+`next_id`. A good use: after `sprint_closed`, post a short summary in the list's team chat or comment on the moved tasks.
