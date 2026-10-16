@@ -55,6 +55,8 @@ function menuTidy(items) {
 let tchSheetT = '';
 const tch_sheetHead = (t, id = 'tch-sht', cls = '') => `<div class="tch-sh"><span class="tch-sht ${cls}" id="${id}">${esc(t || '')}</span><button type="button" class="iconbtn tch-shx" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x')}</button></div>`;
 document.addEventListener('click', e => { if (e.target.closest?.('#pop .tch-shx')) { e.preventDefault(); closePop(); } });
+// 2.62.0 (#1853): the four position moves (up / down / top / bottom) behind one "Change position…" entry (second level)
+const mpo_posItem = moves => ({label: tr('Change position…'), icon: 'sort', dis: moves.every(x => x.dis), more: moves});
 function menu(anchor, items, back, fsel, title) {
   items = menuTidy(items);  // 2.27.0: no doubled / edge separators
   const tt = title || tchSheetT, hd = isMobile() ? tch_sheetHead(tt) : '';

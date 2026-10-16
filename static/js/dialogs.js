@@ -363,7 +363,7 @@ function listMenuItems(id, anchor) {
   if (!l.is_inbox && !l.archived) items.push({label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(at(), id)});
   if (!l.is_inbox && !l.archived && typeof dx_start === 'function' && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.push({label: tr('Select several lists'), icon: 'check', fn: () => dx_start(id)});  // 2.47.3 (#1727)
   // 2.27.0 (#991): from the sidebar (right-click / long press): its place among the lists of its folder
-  if (!l.is_inbox && !l.archived && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.push('-', ...listMoveItems(id), '-');
+  if (!l.is_inbox && !l.archived && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.push('-', mpo_posItem(listMoveItems(id)), '-');  // 2.62.0 (#1853): one entry, the four moves in a second level
   if (propOn() && !l.archived) {  // 2.3.0 (#262 #263)
     if (l.is_inbox && own) items.push({label: propWith(N_('Sort the basket with {0}…'), N_('Sort the basket with an agent…')), icon: 'bot', rare: 1, fn: () => propRequest('triage', {})});
     else if (!l.is_inbox && canEditList(id)) items.push({label: tr('Tasks from notes…'), icon: 'bot', rare: 1, fn: () => propRequest('extract', {lid: id})});
