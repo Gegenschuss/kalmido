@@ -7687,3 +7687,7 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+
+/* 2.62.0 A (#1530) a message on its way: the bubble waits a little lighter until the server answered */
+.cmsg.csdpend .cbub{opacity:.6}
+.cmsg.csdpend .cmeta{opacity:.8}

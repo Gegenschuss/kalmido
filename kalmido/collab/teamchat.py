@@ -329,9 +329,16 @@ def tchat_post(rid):
         orig = reply_check(c, "t", b.get("reply_to"), room_id=rid)
     except BadInput as e:
         return err(str(e))
+    cid = csd_client_id(b)  # 2.62.0 (#1530): the same message sent again (several Enter presses) -> the stored one
+    if cid:
+        dup = csd_dup(c, "tchat_msgs", "room_id=? AND user_id=?", (rid, me()), cid, text)
+        if dup:
+            return jsonify(tchat_msg_dict(c, dup, tchat_rx(c, [dup["id"]]))), 200
     ts = iso_ms(now_utc())
     mid = insert_id(c, "INSERT INTO tchat_msgs(room_id,user_id,body,task_id,created_at,reply_to,enc) VALUES(?,?,?,?,?,?,?)",
                     (rid, me(), text, tid, ts, orig["id"] if orig else None, enc))
+    if cid:
+        c.execute("UPDATE tchat_msgs SET client_id=? WHERE id=?", (cid, mid))
     c.execute("UPDATE tchat_rooms SET last_at=? WHERE id=?", (ts, rid))
     c.execute("INSERT INTO tchat_reads(room_id,user_id,last_id) VALUES(?,?,?) ON CONFLICT(room_id,user_id) DO UPDATE SET last_id=excluded.last_id",
               (rid, me(), mid))
@@ -339,6 +346,30 @@ def tchat_post(rid):
     tchat_notify(c, r, m, mentions, replied=orig["user_id"] if orig and orig["user_id"] != me() else None)
     c.commit()
     return jsonify(tchat_msg_dict(c, m)), 201
+
+
+# ---- 2.62.0 (#1530): a message the app sends carries client_id (one per message, the same on a retry). The same text of
+# the same person in the same conversation with the same client_id within CSD_WINDOW seconds is answered with the stored
+# message instead of a new one (a second Enter while the first send still ran, e.g. right after waking a laptop). Without
+# client_id (agents, older apps) nothing changes. The check runs under a lock per conversation and person, so two
+# requests arriving at the same moment cannot both pass it.
+CSD_WINDOW = 10
+
+
+def csd_client_id(b):
+    v = b.get("client_id") if isinstance(b, dict) else None
+    return v.strip()[:64] if isinstance(v, str) and v.strip() else None
+
+
+def csd_dup(c, table, where, args, cid, text):
+    """The row of table (where + args = the conversation and the sender) sent with client_id cid and the same text within
+    CSD_WINDOW seconds, else None. Takes the lock that the caller's insert then holds until its commit."""
+    from datetime import timedelta
+    from ..core.pg import write_lock
+    write_lock(c, f"csd:{table}:{':'.join(str(a) for a in args)}")
+    r = c.execute(f"SELECT * FROM {table} WHERE {where} AND client_id=? AND created_at>=? ORDER BY id DESC LIMIT 1",
+                  (*args, cid, iso_ms(now_utc() - timedelta(seconds=CSD_WINDOW)))).fetchone()
+    return r if r and (r["body"] or "") == (text or "") else None
 
 
 def tchat_e2e_check(r, b):

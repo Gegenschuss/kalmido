@@ -111,7 +111,7 @@ function chatMsgs() {
   const a = agentById(S.chat.aid);
   // 2.12.2 (#451): every row has a key (data-k), so chatPatch() only swaps or appends the rows that changed
   if (S.chat.err && !S.chat.msgs.length) return `<div class="muted mhint" data-k="err">${esc(S.chat.err)}</div>`;  // a failed refresh keeps the messages
-  if (!S.chat.msgs.length) return `<div class="muted cmempty" data-k="empty">${tr('Ask {0} something, or ask it to plan, comment or create tasks in the lists you share.', esc(a?.name || ''))}</div>`;
+  if (!S.chat.msgs.length && !csdBusy('a:' + S.chat.aid)) return `<div class="muted cmempty" data-k="empty">${tr('Ask {0} something, or ask it to plan, comment or create tasks in the lists you share.', esc(a?.name || ''))}</div>`;
   const pend = chatPending(), off = a && pend && (!a.enabled || agentOffline(a));
   const older = S.chat.more ? `<div class="chold" data-k="older"><button type="button" class="btn sm" data-act="chat-older">${tr('Load older messages')}</button></div>` : '';
   return older + S.chat.msgs.map(m => { if (m.kind === 'notice') return chatNoticeHtml(m);  // 2.41.0 (#1206)
@@ -121,6 +121,7 @@ function chatMsgs() {
     const ap = !mine && apvKind(m), apo = ap && chatChoiceSt(m) === 'open', ed = mine && S.chat.edit === m.id;  // 2.39.0 (#1179): my message in edit mode
     const jb = !mine && ux_jobOf(m), jcol = jb ? ux_jobColor(jb.parent || jb.no) : '';  // 2.47.3 (#1764)
     return `<div class="cmsg ${mine ? 'me' : 'ag agc'}${jb ? ' jobm' + (jb.parent ? ' jpart' : '') : ''}${rxShow('c' + m.id)}${chatPerm(m) ? ' perm' : ''}${ap ? ' apv' + (apo ? ' apvopen' : '') : ''}" data-k="m${m.id}${m.choice ? 'a' : ''}${ap ? chatChoiceSt(m)[0] : ''}${m.edited_at ? 'e' + m.edited_at : ''}${ed ? 'E' : ''}" data-mid="a:${m.id}" ${ap ? `id="apv-${m.id}"` : ''}${jb ? ` style="--jcol:${jcol}"` : ''}>${!mine && stepsAlwaysOn() ? chatStepsKept(m) : ''}${replyQuoteHtml(m, 'a')}${ap ? apvHead(m, apo) : ''}${jb ? jc_tagHtml(jb, m) : ''}${ed ? chatEditHtml(m) : m.body && !(ap === 'a' && m.body.trim() === m.choices.approval.title) ? `<div class="cbub">${jb ? jc_bodyHtml(commentBody(m.body, {}), jb) : commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${tlkChSug(m) ? '' : chatChoicesHtml(m)}${!mine && m.job_id && m.job_steps ? jobStepsHtml(m.job_id, m.job_steps) : ''}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${!mine && m.offer_save && !m.saved_task_id ? `<div class="csoffer"><button type="button" class="btn sm" data-act="chat-save" data-mid="${m.id}">${ic('bookmark', 's')} ${tr('Save as task')}</button></div>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${mine && m.edited_at ? chatEditedHtml(m) : ''}${chatRxHtml(m, a)}${a?.enabled ? replyBtn('chrbtn mreply') : ''}${chatSavedMark(m)}<button type="button" class="rx rxtog" data-act="chat-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>${tlkChSug(m) ? chatChoicesHtml(m) : ''}</div>`; }).join('')
+    + csdHtml('a:' + S.chat.aid, S.chat.msgs, m => m.from !== 'agent')  // 2.62.0 (#1530): "Sending…"
     + (off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
 }
 // 2.41.0 (#1206): a notice of the agent ("New session, summary taken over (22:10)"): one grey line in the middle, no bubble,
@@ -793,12 +794,17 @@ async function chatSend() {
   const rto = replyTo('a:' + aid);  // 2.33.0 (#1076)
   let payload = {body, ...(rto ? {reply_to: rto} : {})};
   if (files.length) { payload = new FormData(); if (body) payload.append('body', body); if (rto) payload.append('reply_to', rto); files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
+  if (S.chat.sending) return;  // 2.62.0 (#1530): Enter while a message is on its way does nothing (Send is locked too)
   const btn = ta.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]'); if (btn) btn.disabled = true;  // 2.47.1 (#1720): this window's button
   const st = S.chat; let sent = false; st.sending = true;  // 2.47.1 (#1720): another window may become live during the POST
+  // 2.62.0 (#1530): a text without files shows at once as "Sending…" and the box empties; client_id makes a repeat harmless
+  const ck = 'a:' + aid, quick = !files.length, raw = ta.value, p = quick ? csdAdd(ck, body, st.msgs) : {cid: csdCid()};
+  if (files.length) payload.append('client_id', p.cid); else payload.client_id = p.cid;
+  if (quick) { ta.value = ''; delete S.drafts['chat:' + aid]; autosize(ta); chatDraw({bottom: true}); }
   if (files.length) toast(files.length === 1 ? tr('Uploading…') : tr('Uploading {0} files…', files.length));
-  try { const m = await rawFetch('POST', `/api/agents/${aid}/chat`, payload); st.msgs.push(m); ta.value = ''; delete S.drafts['chat:' + aid]; delete S.chatFiles[aid]; replySent('a:' + aid); const fb = $('#chat-files'); if (fb) fb.innerHTML = ''; sent = true; }
-  catch (e) { toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); }
-  finally { st.sending = false; if (btn) btn.disabled = false; }
+  try { const m = await rawFetch('POST', `/api/agents/${aid}/chat`, payload); if (!st.msgs.some(x => x.id === m.id)) st.msgs.push(m); if (!quick) { ta.value = ''; delete S.drafts['chat:' + aid]; } delete S.chatFiles[aid]; replySent('a:' + aid); const fb = $('#chat-files'); if (fb) fb.innerHTML = ''; sent = true; }
+  catch (e) { if (quick) csdBack($('#chat-in'), raw.trim(), 'chat:' + aid); toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); }
+  finally { csdDone(ck, p); st.sending = false; if (btn) btn.disabled = false; }
   chatDraw({bottom: sent});
   // 2.13.2 (#478 N9, replaces #320): sending never closes the keyboard (back and forth like a messenger); the box keeps
   // its focus where it had it (a tap on Send does not take it, see below), a desktop always types on

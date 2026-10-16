@@ -826,8 +826,17 @@ def agent_chat_post(aid):
     if not agent_active(a):
         return err(tr("This agent is paused"), 409)
     try:
-        fb, files = chat_input(("body", "task_id", "reply_to"))
-        r = chat_post(c, aid, me(), "user", fb if fb is not None else body(), files)
+        fb, files = chat_input(("body", "task_id", "reply_to", "client_id"))  # 2.62.0 (#1530): client_id
+        b = fb if fb is not None else body()
+        from ..collab.teamchat import csd_client_id, csd_dup
+        cid = csd_client_id(b)
+        dup = cid and csd_dup(c, "agent_chat", "agent_id=? AND user_id=? AND sender='user'", (aid, me()), cid,
+                              b.get("body").strip() if isinstance(b.get("body"), str) else "")
+        if dup:  # the same message again within seconds: the stored one, no second event for the agent
+            return jsonify(chat_one(c, dup, edits=True)), 200
+        r = chat_post(c, aid, me(), "user", b, files)
+        if cid:
+            c.execute("UPDATE agent_chat SET client_id=? WHERE id=?", (cid, r["id"]))
     except UnknownFields as e:
         return err(str(e))
     except BadInput as e:
