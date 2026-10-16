@@ -302,6 +302,9 @@ APP_ONLY = [
      "never answer; the state comes with GET /tasks/{id}/comments", ("POST /api/comments/{}/choice", "GET /api/comments/{}/choice")),
     ("2.41.0 (#1437): the app's progress of a vCard import in the background; the REST import answers when it is done",
      ("GET /api/books/imports/{}",)),
+    ("2.52.0 (#1438): handing an address book over to its organisation (and back), the members' role: organisation admins "
+     "only, and agents are never organisation admins; agents see an organisation's address book only through a share",
+     ("* /api/books/{}/org",)),
     ("2.29.0 (#1030 / #929): folder settings are per person (their own folders, like the sidebar order); people only, the "
      "lists' own values stay in /lists/{id}", ("* /api/folders/props", "POST /api/lists/{}/folder-reset")),
     ("2.39.1 (#1188): the app asks before a moved list takes its folder's workspace / agent; the API sends folder_adopt "
