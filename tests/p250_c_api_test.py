@@ -238,6 +238,11 @@ x = lst[0]
 check(x["state"] == "accepted" and x["signer_name"] == "Max <b>Muster</b>" and x["signer_email"] == "max@example.com" and x["ip"]
       and x["user_agent"] == "TestBrowser/1.0" and x["signed_at"] and x["doc_hash"] == S1["doc_hash"] and not x["live"] and not x["url"],
       f"the protocol {x}")
+# 2.50.0 (#1200 review): a member who is not an admin sees the protocol without the signer's e-mail, address and device
+y = Bo.get(B + f"/api/office/docs/{DOC}/signoffs").json()["signoffs"][0]
+check(y["signer_name"] == "Max <b>Muster</b>" and y["signer_email"] is None and y["ip"] is None and y["user_agent"] is None,
+      f"a member: no e-mail / address / device {y}")
+check(A.delete(B + f"/api/office/docs/{DOC}").status_code == 409, "a signed quotation cannot be deleted (the record is kept)")
 log = A.get(B + f"/api/office/docs/{DOC}/log").json().get("log") or []
 acts = [e["action"] for e in log]
 check("signoff_accepted" in acts and "signoff_link" in acts and "status" in acts, f"office log {acts}")
