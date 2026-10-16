@@ -308,9 +308,11 @@ check("Traceback" not in logs, "no traceback in the server log")
 
 # ================================================================== 2.59.0 (#1375): review - full visibility only
 # a participant sees the parent of an assigned subtask as context (title only): its related tasks = 404 like its notes
-check(Bo.put(B + f"/api/lists/{LP}/members", json={"user_id": DAVE, "role": "participant"}).ok, "setup: LP shared with dave (participant)")
-TQ = task(Bo, "Invoice parent with secret notes", LP, notes="secret parent notes")
-r = Bo.post(B + "/api/tasks", json={"title": "Invoice step for dave", "parent_id": TQ, "assignee_id": DAVE})
+LQ = A.post(B + "/api/lists", json={"name": "Desk"}).json()["id"]
+r = A.put(B + f"/api/lists/{LQ}/members", json={"user_id": DAVE, "role": "participant"})
+check(r.ok, "setup: alice's list shared with dave (participant) " + r.text[:120])
+TQ = task(A, "Invoice parent with secret notes", LQ, notes="secret parent notes")
+r = A.post(B + "/api/tasks", json={"title": "Invoice step for dave", "parent_id": TQ, "assignee_id": DAVE})
 check(r.ok, "setup: a subtask assigned to dave " + r.text[:120])
 TQa = r.json()["id"] if r.ok else 0
 check(Da.get(B + f"/api/tasks/{TQa}/related").status_code == 200, "participant: related of the own subtask")

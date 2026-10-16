@@ -188,7 +188,7 @@ _BADORG = {}  # org id -> monotonic time until which its tasks are left out (its
 # the tasks whose vector must be (re)computed: missing, other model, older than the task, other list / organisation, or plain
 # in an organisation whose data is encrypted (after "Encrypt organisation data" was switched on)
 _STALE_SQL = """SELECT t.id, t.title, t.content, t.list_id, t.updated_at, l.org_id, l.name AS lname, l.folder, p.title AS ptitle,
-       v.task_id AS vid, v.text_hash, v.model AS vmodel, v.vec
+       v.task_id AS vid, v.text_hash, v.model AS vmodel, v.vec, v.org_id AS vorg
   FROM tasks t JOIN lists l ON l.id=t.list_id LEFT JOIN tasks p ON p.id=t.parent_id LEFT JOIN task_vectors v ON v.task_id=t.id
  WHERE t.deleted_at IS NULL AND COALESCE(l.life, '')!='health'{skip}
    AND (v.task_id IS NULL OR v.model!=? OR v.updated_at < t.updated_at OR v.list_id IS DISTINCT FROM t.list_id
@@ -310,6 +310,8 @@ def _emb_batch(c):
         text = emb_text(r)
         h = emb_hash(c, text)
         same = r["vid"] is not None and r["text_hash"] == h and r["vmodel"] == model
+        if same and r["vorg"] != r["org_id"]:
+            same = False  # another workspace: sealed with another key (or plain) -- computed again, never carried over
         if same and enc and r["org_id"] and not str(r["vec"]).startswith(PREFIX):
             same = False  # plain in an encrypted organisation: computed again (sealed)
         if same:
