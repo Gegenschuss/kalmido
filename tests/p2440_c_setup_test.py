@@ -271,6 +271,8 @@ for b in BASHES:
     # 2.47.3 (#1729): --uninstall after the key was revoked (agent deleted): a hint, the cleanup still runs through (dry run + real)
     r = subprocess.run([b, SETUP_SH, "--url", URL, "--code", "ks_good_code", "--dir", "~/my project", "--cmd", "fakeagent", "--no-autostart"], env=env, capture_output=True, text=True, timeout=120)
     insts = os.listdir(os.path.join(home, ".kalmido", "agents")) if os.path.isdir(os.path.join(home, ".kalmido", "agents")) else []
+    # the folder of "~/other" from above is there too: take the one of "my project" (os.listdir has no fixed order)
+    insts = [x for x in insts if x.startswith("my-project-")]
     inst = os.path.join(home, ".kalmido", "agents", insts[0]) if insts else home
     ST["remove_code"] = 401
     ST["remove"].clear()
