@@ -389,6 +389,9 @@ document.addEventListener('click', async e => {
     case 'chat-att-view': { e.preventDefault(); const m = S.chat.msgs.find(x => x.id === +a.dataset.mid); attLightbox(+a.dataset.fid, (m?.attachments || []).filter(isImg)); break; }
     case 'chat-bottom': chatBottom(); break;
     case 'job-do': jobDo(+a.dataset.jid, a.dataset.a); break;
+    case 'jc-msg': jc_msg(+a.dataset.jid); break;  // 2.56.0 (#1791 / #1793): jobchat.js
+    case 'jc-open': jc_open(+a.dataset.aid, +a.dataset.jid); break;
+    case 'jc-back': jc_enter(S.chat.aid, null); break;
     case 'prop-open': propOpen(+a.dataset.jid); break;  // 2.3.0
     case 'aiu-more': settingsModal('usage'); break;
     case 'ag-setup': LS.set('aiSub', 'setup'); settingsModal('agents'); break;  // 2.22.0 (#739); 2.27.0 (#955): at "Set up"

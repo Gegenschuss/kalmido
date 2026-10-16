@@ -8156,5 +8156,9 @@
   "Only the name, the icon and the colour: the contents stay with the people of the list. {0} and the members are told.": "Nur Name, Symbol und Farbe: die Inhalte bleiben bei den Personen der Liste. {0} und die Mitglieder werden informiert.",
   "List “{0}” changed": "Liste „{0}“ geändert",
   "{0} renamed the list {1} to {2} (admin of {3})": "{0} hat die Liste {1} in {2} umbenannt (Admin von {3})",
-  "{0} changed the icon or colour of the list {1} (admin of {2})": "{0} hat Symbol oder Farbe der Liste {1} geändert (Admin von {2})"
+  "{0} changed the icon or colour of the list {1} (admin of {2})": "{0} hat Symbol oder Farbe der Liste {1} geändert (Admin von {2})",
+  "Open the chat of {0}": "Chat von {0} öffnen",
+  "Back to the whole chat": "Zurück zum ganzen Chat",
+  "Job has ended": "Job ist beendet",
+  "The job reads it after its next step.": "Der Job liest sie nach seinem nächsten Schritt."
 }

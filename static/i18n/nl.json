@@ -8156,5 +8156,9 @@
   "Only the name, the icon and the colour: the contents stay with the people of the list. {0} and the members are told.": "Alleen naam, pictogram en kleur: de inhoud blijft bij de mensen van de lijst. {0} en de leden krijgen bericht.",
   "List “{0}” changed": "Lijst ‘{0}’ gewijzigd",
   "{0} renamed the list {1} to {2} (admin of {3})": "{0} heeft de lijst {1} hernoemd naar {2} (beheerder van {3})",
-  "{0} changed the icon or colour of the list {1} (admin of {2})": "{0} heeft het pictogram of de kleur van de lijst {1} gewijzigd (beheerder van {2})"
+  "{0} changed the icon or colour of the list {1} (admin of {2})": "{0} heeft het pictogram of de kleur van de lijst {1} gewijzigd (beheerder van {2})",
+  "Open the chat of {0}": "Chat van {0} openen",
+  "Back to the whole chat": "Terug naar de hele chat",
+  "Job has ended": "Job is beëindigd",
+  "The job reads it after its next step.": "De job leest het na zijn volgende stap."
 }

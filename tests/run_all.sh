@@ -851,6 +851,9 @@ fresh; run p256_c_ui node p256_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.56.0 part B: organisation admins change name, icon and colour of the organisation's lists (#1795)
 fresh; run p256_b_api "$PY" p256_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p256_b_ui node p256_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.56.0 part A: a message to a job from its card, a job's own chat history (#1791 #1793)
+fresh; run p256_a_api "$PY" p256_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p256_a_ui node p256_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
