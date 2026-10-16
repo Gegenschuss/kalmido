@@ -75,8 +75,8 @@ const ticket = (tid, lid, name, mail) => execFileSync('docker', ['exec', CT, 'py
   const f = (pg.match(/name="f" value="([0-9a-f]{64})"/) || [])[1];
   await fetch(B + `p/${TK}/comment`, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({f, text: 'Thank you!'}).toString(), redirect: 'manual'});
   await w.eval(`loadTimeline(${T1})`);
-  await until(() => [...d.querySelectorAll('#d-tl-items .cm .ptltag')].some(x => !x.classList.contains('pub')));
-  check([...d.querySelectorAll('#d-tl-items .cm .ptltag')].some(x => !x.classList.contains('pub') && /Customer/.test(x.textContent)), '#1513: the customer\'s comment is marked "Customer"');
+  await until(() => [...d.querySelectorAll('#d-tl-items .cm .chead')].some(x => /Jane Example \(customer/.test(x.textContent)));
+  check([...d.querySelectorAll('#d-tl-items .cm .chead')].some(x => /Jane Example \(customer/.test(x.textContent) && !x.querySelector('.ptltag')), '#1513: the customer\'s comment is marked as the customer\'s (its name)');
   // the mail switch: one undo step
   const n0 = w.eval('HIST.undo.length');
   nt().checked = false; nt().dispatchEvent(new w.Event('change', {bubbles: true}));
