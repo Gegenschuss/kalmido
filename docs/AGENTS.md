@@ -689,7 +689,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `playbook_proposal` | 2.39.0 (#1168): a person applied or discarded the agent's proposed change of a list's [Playbook](#playbook-2390) | `list_id`, `proposal_id`, `state`: `applied` or `discarded`, `version` (applied: the new version of the list's part), `note` (yours), `by` `{id, name}`, `hint`; like every event of the list it carries the current `playbook` |
 | `file_shared` | 2.48.0 (#1207): the owner shared a folder or file of the [file store](#file-store-2480) with the agent (only for a new share, not for a changed role) | `node` `{id, name, kind}`, `role`: `view` \| `edit` |
 | `document_added` | 2.48.0 (#1356): a new document was recognised (once, after its first recognition) in a folder or file of the file store the agent sees (a share or its own result folder); read it with `get_document`, e.g. to [suggest project and category of a receipt](#receipts-suggest-project-and-category-2480) | `document` `{id, name, state, date, url}` |
-| `offer_accepted` | 2.51.0 (#1348): a quotation of the agent's office area was accepted (by a person or the customer's approval); only agents with the switch *May draft office documents*, while the area lets agents read office data (see [Office](#office-drafts-only-2510)) | `doc_id`, `number`, `title`, `client_id`, `list_id`, `net`, `gross`, `currency` |
+| `offer_accepted` | 2.51.0 (#1348): a quotation of the agent's office area was accepted (by a person or the customer's approval); only agents with the switch *May draft office documents* (a personal agent in an organisation only while its owner works in the office), while the area lets agents read office data (see [Office](#office-drafts-only-2510)) | `doc_id`, `number`, `title`, `client_id`, `list_id`, `net`, `gross`, `currency` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1014,8 +1014,9 @@ Two more kinds of proposals. The agent sends them on its own for a person it wor
 offer_id?}` / `{agent_id, kind: "setup", text?}`, event `job_request`, answer with `submit_proposal`). Either way the
 person gets *Proposal ready*, reviews every part (checkboxes, titles, dates, sections), and ONE *Apply* creates it all
 as that person; one undo step takes it back. The agent never creates, sends, finalises or books anything itself. Who
-may receive one: the same rule as for asking (*Proposals for* of the agent; a person it does not work with answers
-`404`); at most 10 undecided ones per agent and person (`429`).
+may receive one: the same rule as for asking (*Proposals for* of the agent), and in any case only a person who shares a
+list with the agent (also with *Proposals for: everyone*; a person it does not work with answers `404`); at most 10
+undecided ones per agent and person and 50 per agent (`429`).
 
 - **`inquiry`** (#1351): a customer inquiry (chat text, a mail as attachment) becomes a project. `proposal`: `name`,
   `folder?`, `project_type?` (one of `input.project_types`: agency, software, private), `client?` (`{id}` from
@@ -1026,10 +1027,14 @@ may receive one: the same rule as for asking (*Proposals for* of the agent; a pe
   member there, otherwise private), its sections and tasks, every shoot day as an **event draft** (`status: tentative`,
   all-day without times) in the person's own calendar (the module *Events* is switched on when it was off), and the
   quotation as a **draft** through the office (prices and free items are marked as with every agent draft, see
-  [OFFICE.md](OFFICE.md)). The quotation part needs the agent's switch *May draft office documents* and the office's
-  privacy switch *Agents may read office data* (`input.office.ok`; `input.clients` only then); otherwise the dialog shows
-  it as *not possible* and it is left out. Undo removes the list while nobody added anything (else the proposal's tasks
-  go to the trash), the event drafts while they are still drafts, the quotation while it is a draft; redo brings it back.
+  [OFFICE.md](OFFICE.md)). The quotation part needs the agent's switch *May draft office documents*, the office's
+  privacy switch *Agents may read office data* and the agent's scope `office` (`input.office.ok`, else
+  `input.office.reason`; `input.clients` only then); otherwise the dialog shows it as *not possible* and it is left out.
+  An end date without an end time runs to the end of that day. Undo removes the list while nobody added anything to it
+  (no other tasks, files, sign-off links, office documents or members; else the proposal's tasks go to the trash), the
+  event drafts while nobody changed them, the quotation while it is an unchanged draft without a number (the deletion is
+  in the office log; otherwise it stays and is named); modules it switched on go off again unless an event draft stayed.
+  Redo brings it back.
 - **An accepted quotation becomes a project** (from #1021): after the event `offer_accepted`, send kind `inquiry` with
   `offer_id`. The input then holds `offer` (number, title, client, items with title / quantity / unit), the project gets
   the offer's client, a deal of the sales pipeline with this offer gets the project; make one task per item and the

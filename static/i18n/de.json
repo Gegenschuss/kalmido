@@ -7915,5 +7915,6 @@
   "Option for {0}": "Option für {0}",
   "Applying adds the selected time entries as you (times and note can be changed above). One step, undo takes it back.": "Übernehmen trägt die ausgewählten Zeiten für dich ein (Zeiten und Notiz kannst du oben ändern). Ein Schritt, Rückgängig nimmt ihn zurück.",
   "Applying creates per selected day a task in the project with a draft in your calendar, and pencils in the selected crew and equipment as options, never firm. Warnings never block. One step, undo takes it back.": "Übernehmen legt je ausgewähltem Tag eine Aufgabe im Projekt mit einem Entwurf in deinem Kalender an und merkt die ausgewählte Crew und Technik als Option vor, nie fest. Warnungen blockieren nie. Ein Schritt, Rückgängig nimmt ihn zurück.",
-  "Draft confirmed": "Entwurf bestätigt"
+  "Draft confirmed": "Entwurf bestätigt",
+  "You have {0} open proposals: wait until people decided on them": "Du hast {0} offene Vorschläge: Warte, bis darüber entschieden ist"
 }

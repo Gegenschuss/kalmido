@@ -268,5 +268,36 @@ PH = {**H, "Authorization": "Bearer " + r.json()["token"]}
 r = requests.get(V, headers=PH)
 check(r.status_code == 403 and r.json()["error"].get("required_scope") == "office", "#1348: without the scope office: 403 " + r.text[:200])
 
+# ---------------------------------------------------------------- 2.51.0 review 15: offer_accepted and personal agents
+# a personal agent of bob in Alpha hears offer_accepted only while bob works in the office himself
+A.put(B + O + "/settings", json={"agents_read": 1})
+r = Bo.post(B + "/api/my/agents", json={"username": "bobbot", "display_name": "Bob Bot", "scopes": ["read", "office"], "org_id": ORG})
+check(r.status_code == 201, "review 15: bob's personal agent in Alpha " + r.text[:200])
+BAG, BH = r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
+check(A.patch(B + f"{O}/agents/{BAG}", json={"office_drafts": True}).ok, "review 15: the admin switches bob's agent on")
+
+
+def accepted_offer(title):
+    did = A.post(B + D, json={"client_id": CL, "project_title": title}).json()["id"]
+    A.put(B + f"{D}/{did}/items", json={"items": [{"kind": "service", "title": "Kamera", "qty": 1, "unit": "day", "rate": 800}]})
+    for st_ in ("sent", "accepted"):
+        A.post(B + f"{D}/{did}/status", json={"status": st_})
+    return did
+
+
+def heard(hd, did):
+    ev_ = requests.get(B + "/api/v1/agent/events", headers=hd, params={"since": 0, "limit": 500}).json()
+    return [e for e in ev_.get("events", ev_.get("data", [])) if e["event"] == "offer_accepted" and e["data"].get("doc_id") == did]
+
+
+Bo.patch(B + "/api/settings", json={"features": "cal,comments,collab,clients"})  # bob without the office module
+Q15 = accepted_offer("Review 15 ohne Buero")
+check(not heard(BH, Q15), "review 15: the owner has no office: his agent does not hear offer_accepted")
+check(heard(AH, Q15), "review 15: alice's agent (owner in the office) still hears it")
+Bo.patch(B + "/api/settings", json={"features": FEAT})
+Q16 = accepted_offer("Review 15 mit Buero")
+check(heard(BH, Q16), "review 15: owner back in the office: his agent hears it")
+A.put(B + O + "/settings", json={"agents_read": 0})
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

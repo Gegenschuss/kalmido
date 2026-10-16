@@ -7915,5 +7915,6 @@
   "Option for {0}": "Opzione per {0}",
   "Applying adds the selected time entries as you (times and note can be changed above). One step, undo takes it back.": "Applica aggiunge le voci di tempo selezionate a tuo nome (orari e nota si possono cambiare sopra). Un passo, annulla lo ripristina.",
   "Applying creates per selected day a task in the project with a draft in your calendar, and pencils in the selected crew and equipment as options, never firm. Warnings never block. One step, undo takes it back.": "Applica crea per ogni giorno selezionato un’attività nel progetto con una bozza nel tuo calendario e opziona la troupe e l’attrezzatura selezionate, mai in modo fisso. Gli avvisi non bloccano mai. Un passo, annulla lo ripristina.",
-  "Draft confirmed": "Bozza confermata"
+  "Draft confirmed": "Bozza confermata",
+  "You have {0} open proposals: wait until people decided on them": "Hai {0} proposte aperte: aspetta che vengano decise"
 }

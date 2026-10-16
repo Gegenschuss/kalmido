@@ -7915,5 +7915,6 @@
   "Option for {0}": "Option pour {0}",
   "Applying adds the selected time entries as you (times and note can be changed above). One step, undo takes it back.": "Appliquer ajoute les saisies de temps sélectionnées en votre nom (heures et note modifiables ci-dessus). Une étape, annuler la reprend.",
   "Applying creates per selected day a task in the project with a draft in your calendar, and pencils in the selected crew and equipment as options, never firm. Warnings never block. One step, undo takes it back.": "Appliquer crée pour chaque jour sélectionné une tâche dans le projet avec un brouillon dans votre calendrier et pose une option sur l’équipe et le matériel sélectionnés, jamais ferme. Les avertissements ne bloquent jamais. Une étape, annuler la reprend.",
-  "Draft confirmed": "Brouillon confirmé"
+  "Draft confirmed": "Brouillon confirmé",
+  "You have {0} open proposals: wait until people decided on them": "Tu as {0} propositions ouvertes : attends qu’une décision soit prise"
 }
