@@ -29,7 +29,8 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   const I18N = path.join(__dirname, '..', 'static', 'i18n');
   const OLD = {de: /Eingang(?!s?-?[a-z])|Eingangs/, fr: /boîte de réception/i, es: /bandeja de entrada/i, it: /In arrivo|posta in arrivo/, nl: /\binbox\b/i};
   const NEW = {de: 'Korb', fr: 'Panier', es: 'Cesta', it: 'Raccolta', nl: 'Mand'};
-  const allowed = k => /DATEV|document inbox|ntfy share inbox|topic inbox|Incoming invoices|^Coming up$/.test(k);  // it: "In arrivo" = coming up
+  // 2.48.0 (#1111): "Dokumente/Eingang" is the fixed name of a folder in the file store (data, the same in every language), not the basket
+  const allowed = k => /DATEV|document inbox|ntfy share inbox|topic inbox|Incoming invoices|^Coming up$|Dokumente\/Eingang/.test(k);  // it: "In arrivo" = coming up
   for (const lg of Object.keys(NEW)) {
     const dict = JSON.parse(fs.readFileSync(path.join(I18N, lg + '.json'), 'utf8'));
     check(dict.Basket === NEW[lg], `#1219 ${lg}: Basket = ${NEW[lg]} (${dict.Basket})`);

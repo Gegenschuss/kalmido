@@ -59,10 +59,10 @@ def _best(a, b):
 
 def fs_chain(c, nid):
     """The node nid and its ancestors up to the root (rows, nid first); [] when it does not exist."""
-    rows = c.execute(f"""WITH RECURSIVE up(id, lvl) AS (SELECT id, 0 FROM fs_nodes WHERE id=?
+    rows = c.execute("""WITH RECURSIVE up(id, lvl) AS (SELECT id, 0 FROM fs_nodes WHERE id=?
                            UNION ALL SELECT n.parent_id, up.lvl + 1 FROM fs_nodes n JOIN up ON n.id=up.id
-                           WHERE n.parent_id IS NOT NULL AND up.lvl < {CHAIN_MAX})
-                         SELECT n.*, up.lvl FROM up JOIN fs_nodes n ON n.id=up.id ORDER BY up.lvl""", (int(nid),)).fetchall()
+                           WHERE n.parent_id IS NOT NULL AND up.lvl < ?)
+                         SELECT n.*, up.lvl FROM up JOIN fs_nodes n ON n.id=up.id ORDER BY up.lvl""", (int(nid), CHAIN_MAX)).fetchall()
     return rows
 
 
@@ -436,17 +436,17 @@ def fs_log_add(c, nid, action, detail=""):
 
 def fs_height(c, nid):
     """How many levels lie below node nid (0: none)."""
-    r = c.execute(f"""WITH RECURSIVE dn(id, lvl) AS (SELECT id, 0 FROM fs_nodes WHERE id=?
-                       UNION ALL SELECT n.id, dn.lvl + 1 FROM fs_nodes n JOIN dn ON n.parent_id=dn.id WHERE dn.lvl < {CHAIN_MAX})
-                     SELECT COALESCE(MAX(lvl), 0) FROM dn""", (int(nid),)).fetchone()
+    r = c.execute("""WITH RECURSIVE dn(id, lvl) AS (SELECT id, 0 FROM fs_nodes WHERE id=?
+                       UNION ALL SELECT n.id, dn.lvl + 1 FROM fs_nodes n JOIN dn ON n.parent_id=dn.id WHERE dn.lvl < ?)
+                     SELECT COALESCE(MAX(lvl), 0) FROM dn""", (int(nid), CHAIN_MAX)).fetchone()
     return int(r[0] or 0)
 
 
 def fs_subtree(c, nid):
     """Ids of node nid and everything below it (deleted ones included)."""
-    return [r[0] for r in c.execute(f"""WITH RECURSIVE dn(id, lvl) AS (SELECT id, 0 FROM fs_nodes WHERE id=?
+    return [r[0] for r in c.execute("""WITH RECURSIVE dn(id, lvl) AS (SELECT id, 0 FROM fs_nodes WHERE id=?
                                          UNION ALL SELECT n.id, dn.lvl + 1 FROM fs_nodes n JOIN dn ON n.parent_id=dn.id
-                                         WHERE dn.lvl < {CHAIN_MAX}) SELECT id FROM dn""", (int(nid),))]
+                                         WHERE dn.lvl < ?) SELECT id FROM dn""", (int(nid), CHAIN_MAX))]
 
 
 def fs_purge(c, nid):

@@ -36,7 +36,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   await sleep(500);
   const keys = sel => [...d.querySelectorAll(`#side ${sel} .srow.smod`)].map(b => b.dataset.mgside || b.dataset.go || (b.dataset.act || '').replace('side-', ''));
   check(w.eval('SIDE_VIEW_KEYS.join()') === 'cal,timeline,matrix,overview,workload,notes' /* 2.45.0 (#1516): + Notes */ && /^cal,timeline,matrix/.test(keys('.sg-views').join()), 'Views: calendar, timeline, matrix, project status, workload ' + keys('.sg-views').join());
-  check(w.eval('SIDE_AREA_KEYS.join()') === 'office,wiki,time,habits,review,life,agents'  /* 2.49.0 (#1199): + knowledge pages */ && /^office,time,habits,review,life/.test(keys('.sg-areas').join()), 'Areas: office, time, habits, review, home, agents ' + keys('.sg-areas').join());
+  // 2.48.0 (#1207): + the file store after Office (off here: "files" is not in ALL)
+  check(w.eval('SIDE_AREA_KEYS.join()') === 'office,ablage,wiki,time,habits,review,life,agents' /* 2.49.0 (#1199): + knowledge pages */ && /^office,time,habits,review,life/.test(keys('.sg-areas').join()), 'Areas: office, time, habits, review, home, agents ' + keys('.sg-areas').join());
   const names = [...d.querySelectorAll('#side .sg-areas .srow .n')].map(x => x.textContent).join();
   check(/^Office,Time,Habits,Review,Home/.test(names), 'the area names ' + names);
   check(!d.querySelector('#side .sg-clients') && !d.querySelector('#side [data-go="pomo"]') && !d.querySelector('#side [data-go="family"]'), 'no clients group, no own rows for the parts');
