@@ -7577,3 +7577,9 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .cdlg .tbl-p,.cdlg .tbl-all{display:flex;align-items:center;gap:.5rem;min-height:2.75rem}
 .cdlg .tbl-all{border-bottom:1px solid var(--line)}
 .cdlg .tbl-until{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem}
+/* 2.53.0 A (#1410) modules loaded on demand: a thin bar at the top while a module loads (shown only after 300 ms) */
+.ldbar { position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 9999; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity .2s ease; }
+.ldbar.on { opacity: 1; }
+.ldbar::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: var(--accent); border-radius: 2px; transform: translateX(-100%); animation: ldbar 1.2s ease-in-out infinite; }
+@keyframes ldbar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { .ldbar::before { animation: none; transform: none; width: 100%; opacity: .5; } }

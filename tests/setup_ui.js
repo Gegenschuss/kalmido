@@ -84,7 +84,7 @@ const feats = st => st.settings.features.split(',');
   await api(jar, 'PATCH', '/api/settings', {features: feats(st).filter(f => f !== 'collab').join(',')});  // admin's own switch off too
   w = await open(jar); d = w.document; await sleep(300);
   const addUser = async name => {
-    w.eval(`settingsModal('users')`); await sleep(400);
+    await w.eval(`settingsModal('users')`); await sleep(400);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
     click(w, d.querySelector('[data-acc="user-new"]')); await sleep(200);
     const um = [...d.querySelectorAll('.modal')].pop();
     um.querySelector('#u-user').value = name; um.querySelector('#u-name').value = name; um.querySelector('#u-pw').value = 'password123';
@@ -112,7 +112,7 @@ const feats = st => st.settings.features.split(',');
   jar = {}; w = await open(jar); d = w.document;
   await step1(w); click(w, d.querySelector('[data-su="go"]')); await sleep(800);
   w.close(); w = await open(jar); d = w.document; await sleep(300);
-  w.eval(`settingsModal('users')`); await sleep(400);
+  await w.eval(`settingsModal('users')`); await sleep(400);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   click(w, d.querySelector('[data-acc="user-new"]')); await sleep(200);
   let um = [...d.querySelectorAll('.modal')].pop();
   um.querySelector('#u-user').value = 'dave'; um.querySelector('#u-pw').value = 'password123';

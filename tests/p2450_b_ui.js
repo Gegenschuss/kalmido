@@ -63,7 +63,7 @@ async function submit(w, code) {
 
   // ---- 2: the admin sees the warning about the missing server key (start.sh sets none)
   w = await boot({user: 'alice'}); d = w.document;
-  w.eval(`settingsModal('users')`); await sleep(800);
+  await w.eval(`settingsModal('users')`); await sleep(800);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   const warn = d.querySelector('.smodal [data-admp="server"] .shkey');
   check(warn && warn.getAttribute('role') === 'alert' && /server key is missing/.test(warn.textContent) && /KALMIDO_SECRET_KEY/.test(warn.textContent), 'Administration > Server: red warning without a server key');
   w.close();

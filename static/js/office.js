@@ -9,7 +9,7 @@ const OFC_UNITS = [['day', N_('Day|unit')], ['hour', N_('Hour|unit')], ['piece',
 const OFC_TAXES = [['standard', N_('standard rate')], ['reduced', N_('reduced rate')], ['exempt', N_('exempt')]];
 const OFC_TEXT_KINDS = [['rights_time', N_('Rights: duration')], ['rights_territory', N_('Rights: territory')], ['rights_media', N_('Rights: media')],
   ['intro', N_('Introduction')], ['closing', N_('Closing')], ['note', N_('Note|office')], ['block', N_('Text block between positions')], ['raw_note', N_('Raw data note')]];
-const officeOn = () => feat('office') && !S.me?.kid;
+// 2.53.0 (#1410): officeOn lives in lazyload.js (asked at start, before the office is loaded)
 const ofcAdmin = () => OFC.info?.role === 'admin';
 const pb_clOrg = () => OFC.info?.personal ? null : (OFC.info?.org_id || null);  // 2.47.3 (#1360): a personal office's clients are the private ones
 const ofcTab = () => OFC_TABS.some(t => t[0] === S.route.tab) ? S.route.tab : S.route.tab === 'import' ? 'settings' : 'offers';  // 2.39.1 (#1182): the import page sits under Settings

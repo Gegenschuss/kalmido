@@ -8006,5 +8006,6 @@
   "Workspace of {0}": "Espacio de trabajo de {0}",
   "Colour of the workspace": "Color del espacio de trabajo",
   "Lists of the organisation show it as a stripe in the header and the sidebar, for every member. Private stays without colour.": "Las listas de la organización la muestran como una franja en la cabecera y en la barra lateral, para todos los miembros. Lo privado queda sin color.",
-  "Only an admin of this organisation can change it.": "Solo un administrador de esta organización puede cambiarlo."
+  "Only an admin of this organisation can change it.": "Solo un administrador de esta organización puede cambiarlo.",
+  "Could not be loaded": "No se pudo cargar"
 }
