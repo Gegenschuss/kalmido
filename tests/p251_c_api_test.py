@@ -360,5 +360,13 @@ r = A.post(B + "/api/admin/agents", json={"username": "legacybot", "display_name
 check(r.status_code == 201 and "pinboard" not in r.json()["effective_scopes"] and "office" not in r.json()["effective_scopes"],
       f"review 8: write does not include pinboard ({r.json().get('effective_scopes')})")
 
+# review 11 (#1353 #1355): replacing a time / shoot proposal needs the scope of creating it
+old = dbx("SELECT scopes FROM api_tokens WHERE user_id=?", (AG,))[0][0]
+dbx("UPDATE api_tokens SET scopes=? WHERE user_id=?", (",".join(x for x in old.split(",") if x not in ("time", "calendar")), AG), write=True)
+check(AGS.post(V + f"/agent/jobs/{JT}/proposal", json={"items": [ITEM]}).status_code == 403
+      and AGS.post(V + f"/agent/jobs/{JS}/proposal", json=SHOOT).status_code == 403, "review 11: replacing without the scope: 403")
+dbx("UPDATE api_tokens SET scopes=? WHERE user_id=?", (old, AG), write=True)
+check(AGS.post(V + f"/agent/jobs/{JT}/proposal", json={"items": [ITEM]}).status_code == 409, "review 11: with the scope: the applied one 409")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
