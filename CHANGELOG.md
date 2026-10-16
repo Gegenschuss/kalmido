@@ -7,6 +7,14 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.50.2] - 2026-10-16
+
+**In short:** amounts from 1,000 keep their value when a form is opened and saved again.
+
+### Fixed
+- Office forms read the thousands separator of the app language: a pipeline deal of 1,500 no longer becomes 1.50 after
+  opening and saving it; the same for rates and cash flow amounts.
+
 ## [2.50.1] - 2026-10-16
 
 **In short:** the checks of 2.50.0 green again; 2.50.0 and 2.50.1 go live together.
