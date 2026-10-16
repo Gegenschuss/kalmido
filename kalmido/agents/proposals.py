@@ -50,8 +50,11 @@ from ..agents.chat import (
 # | all (every person of the instance) | off. The agent never gets general access: the job input is the only data it sees
 # (e.g. the selected inbox items, the lists the person ticked), stored with the job and deleted with it (PROP_KEEP_DAYS).
 PROP_KINDS = ("project", "subtasks", "triage", "extract", "dayplan", "cleanup")  # 2.10.0 (#440): dayplan; 2.39.0 (#1151): cleanup
+PROP_KINDS += ("time", "shoot")  # 2.51.0 C (#1353 #1355): time entries from events, shoot days (agents/agenttime.py, hub/agentdispo.py)
+PROP_KINDS_AGENT = ("time", "shoot")  # 2.51.0 C: the agent proposes these itself (POST /api/v1/agent/proposals/time|shoot), never on request
 PROP_STATES = ("requested", "ready", "applied", "discarded")
 PROP_MODES = ("off", "shared", "all")
+PROP_KINDS += ("inquiry", "setup")  # 2.51.0 B (#1351 #1358): an inquiry becomes a project, the setup assistant (agents/propkinds2.py)
 PROP_MAX_ITEMS = 200                    # entries one proposal may create / change (tasks + subtasks)
 PROP_MAX_BYTES = 256 * 1024             # JSON body of a proposal
 PROP_TITLE_MAX, PROP_NOTES_MAX, PROP_NAME_MAX, PROP_SUMMARY_MAX = 300, 5000, 120, 2000
@@ -329,16 +332,25 @@ def prop_validate(kind, b, inp):
         out["tasks"] = tasks
     elif kind == "dayplan":  # 2.10.0 (#440)
         out.update(dayplan_validate(b, inp))
+    elif kind in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358)
+        from ..agents.propkinds2 import pk2_validate
+        out.update(pk2_validate(kind, b, inp))
     elif kind == "cleanup":  # 2.39.0 (#1151): tidy up a list (agents/cleanup.py)
         from ..agents.cleanup import cln_validate
         _p_keys(b, "", (*common, "items"))
         out.update(cln_validate(b, inp))
+    elif kind in PROP_KINDS_AGENT:  # 2.51.0 C (#1353 #1355)
+        from ..agents.agenttime import atm_prop_validate
+        out.update(atm_prop_validate(kind, b, inp))
     return out
 
 
 # ---- the request (a person asks an agent)
 def prop_input(c, uid, kind, b):
     """The job input for a request body b -> (input, title, task_id, list_id). Only what the person chose to send."""
+    if kind in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358)
+        from ..agents.propkinds2 import pk2_input
+        return pk2_input(c, uid, kind, b)
     if kind == "project":
         _p_keys(b, "", ("agent_id", "kind", "text", "file_name", "folder"))
         inp = {"text": _p_str(b.get("text"), "text", PROP_TEXT_MAX, True, line=False),
@@ -432,6 +444,8 @@ def proposal_request():
     if kind == "cleanup":  # 2.39.0 (#1151): always the list's tidy agent, in packages (agents/cleanup.py)
         from ..agents.cleanup import cln_request
         return cln_request(c, uid, b)
+    if kind in PROP_KINDS_AGENT:  # 2.51.0 C: proposed by the agent itself, nothing to ask for
+        return err(tr("Invalid value: {0}", "kind"))
     try:
         aid = int(b.get("agent_id") or 0)
     except (TypeError, ValueError):
@@ -570,6 +584,10 @@ def prop_section(c, lid, name, made):
 def prop_run(c, j, sel, ed, extra):
     """Applies the selected (and edited) entries of the stored proposal as the current person. Returns the undo record."""
     kind, aid, uid = j["kind"], j["agent_id"], me()
+    if kind in PROP_KINDS_AGENT:  # 2.51.0 C (#1353 #1355): own edits (times, place), own records
+        from ..agents.agenttime import atm_prop_run
+        return atm_prop_run(c, j, sel, ed, {"at": iso(now_utc()), "sel": sel, "edits": ed, "extra": extra, "tasks": [], "sections": [],
+                                            "changes": {}, "list": None, "undone": False})
     prop, inp = json.loads(j["proposal"]), json.loads(j["input"] or "{}")
     edits = {k: prop_edit(kind, k, v, inp, prop) for k, v in ed.items()}
     ts = iso(now_utc())
@@ -578,6 +596,9 @@ def prop_run(c, j, sel, ed, extra):
     if kind == "cleanup":  # 2.39.0 (#1151)
         from ..agents.cleanup import cln_run
         return cln_run(c, j, sel, edits, rec)
+    if kind in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358): own keys, edits and parts
+        from ..agents.propkinds2 import pk2_run
+        return pk2_run(c, j, sel, ed, extra, rec)
     if kind == "project":
         name = _p_str(extra.get("name") or prop["name"], "name", PROP_NAME_MAX, True)
         folder = clean_folder(extra.get("folder") if extra.get("folder") is not None else prop.get("folder") or "", False)
@@ -754,9 +775,14 @@ def proposal_apply(jid):
     c.execute("UPDATE agent_jobs SET prop_state='applied', state='done', action='approve', action_by=?, action_at=?, updated_at=?, applied=? "
               "WHERE id=?", (me(), ts, ts, json.dumps(rec, ensure_ascii=False), jid))
     counts = {"created": len(rec["tasks"]), "changed": len(rec["changes"])}
+    if j["kind"] in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358): event drafts, the quotation draft, lists, modules, project_list_id
+        from ..agents.propkinds2 import pk2_result
+        counts.update(pk2_result(rec))
     if j["kind"] == "cleanup":  # 2.39.0 (#1151): counts per kind of entry + the skipped tasks (why)
         from ..agents.cleanup import cln_result
         counts.update(cln_result(rec))
+    if j["kind"] in PROP_KINDS_AGENT:  # 2.51.0 C: entries / drafts / options made (rec["made"])
+        counts.update(created=len(rec.get("made") or []), warnings=rec.get("warnings", 0))
     prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] in ("project", "cleanup") else None})
     c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data->>'job' = ?",
               (ts, me(), str(jid)))
@@ -796,9 +822,15 @@ def proposal_undo(jid):
     if j["prop_state"] != "applied" or not rec or rec.get("undone"):
         return err(tr("Nothing to undo"), 409)
     ts, skipped, n = iso(now_utc()), [], 0
-    if j["kind"] == "cleanup":  # 2.39.0 (#1151): field changes back, closed tasks open again (one step)
+    if j["kind"] in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358)
+        from ..agents.propkinds2 import pk2_undo
+        n, skipped = pk2_undo(c, j, rec)
+    elif j["kind"] == "cleanup":  # 2.39.0 (#1151): field changes back, closed tasks open again (one step)
         from ..agents.cleanup import cln_undo
         n, skipped = cln_undo(c, rec)
+    elif j["kind"] in PROP_KINDS_AGENT:  # 2.51.0 C: removes what it made (unchanged since)
+        from ..agents.agenttime import atm_prop_undo
+        n, skipped = atm_prop_undo(c, j, rec)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -852,7 +884,14 @@ def proposal_redo(jid):
     if j["prop_state"] != "applied" or not rec or not rec.get("undone"):
         return err(tr("Nothing to redo"), 409)
     skipped, n = [], 0
-    if j["kind"] == "project" and rec.get("list_deleted"):
+    if j["kind"] in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358)
+        from ..agents.propkinds2 import pk2_redo
+        try:
+            rec, n, skipped = pk2_redo(c, j, rec)
+        except (BadInput, Denied):
+            c.rollback()
+            raise
+    elif j["kind"] == "project" and rec.get("list_deleted"):
         try:
             rec = prop_run(c, j, rec["sel"], rec["edits"], rec.get("extra") or {})
         except (BadInput, Denied):
@@ -862,6 +901,10 @@ def proposal_redo(jid):
     elif j["kind"] == "cleanup":  # 2.39.0 (#1151)
         from ..agents.cleanup import cln_undo
         n, skipped = cln_undo(c, rec, back=False)
+        rec.update(undone=False)
+    elif j["kind"] in PROP_KINDS_AGENT:  # 2.51.0 C: makes it again
+        from ..agents.agenttime import atm_prop_undo
+        n, skipped = atm_prop_undo(c, j, rec, back=False)
         rec.update(undone=False)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
@@ -1271,6 +1314,9 @@ def v1_agent_cross_proposal():
     v1_args(())
     aid = need_agent()
     b = v1_json()
+    if isinstance(b, dict) and b.get("kind") in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358): a project from an inquiry, the setup
+        from ..agents.propkinds2 import pk2_agent_proposal
+        return pk2_agent_proposal(aid, b)
     _p_keys(b, "", ("list_id", "title", "reason", "tasks", "summary"))
     lid = _p_int(b.get("list_id"), "list_id")
     title = _p_str(b.get("title"), "title", PROP_TITLE_MAX, True)

@@ -906,12 +906,19 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "/agent/proposals": {"post": op(
             "Propose tasks for a list you cannot see (another topic). Lands as a proposal with the list's owner (no event for the "
             "agents there); only when a person applies it do tasks exist. Allowed: lists owned by a person you already work with; "
-            "others answer 404", AG, ok(ref("Job"), "Created", "201") | errs("400", "403", "404", "429"), scope=W,
-            body={"type": "object", "required": ["list_id", "title", "reason", "tasks"], "properties": {
+            "others answer 404. 2.51.0 (#1351 #1358): or {kind: inquiry | setup, user_id, title?, offer_id?, proposal} -- your own "
+            "proposal for a person you work with (an inquiry from the chat becomes a project; an accepted quotation, offer_id, "
+            "becomes a project; the setup assistant): a ready proposal for that person, who applies or discards it",
+            AG, ok(ref("Job"), "Created", "201") | errs("400", "403", "404", "413", "429"), scope=W,
+            body={"oneOf": [{"type": "object", "required": ["list_id", "title", "reason", "tasks"], "properties": {
                 "list_id": {"type": "integer"}, "title": {"type": "string", "maxLength": 300}, "reason": {"type": "string", "maxLength": 5000},
                 "summary": {"type": "string"},
                 "tasks": {"type": "array", "items": {"type": "object", "required": ["title"], "properties": {
-                    "title": {"type": "string"}, "notes": {"type": "string"}, "due": {"type": "string", "format": "date"}}}}}})},
+                    "title": {"type": "string"}, "notes": {"type": "string"}, "due": {"type": "string", "format": "date"}}}}}},
+                {"type": "object", "required": ["kind", "user_id", "proposal"], "additionalProperties": False, "properties": {  # 2.51.0 (#1351 #1358)
+                    "kind": {"type": "string", "enum": ["inquiry", "setup"]}, "user_id": {"type": "integer"},
+                    "title": {"type": "string", "maxLength": 300}, "offer_id": {"type": "integer"},
+                    "proposal": {"type": "object", "description": "the shape of kind inquiry / setup of POST /agent/jobs/{id}/proposal"}}}]})},
         "/agent/jobs/{id}/proposal": {"post": op(
             "Submit the structured proposal for a job_request (kind project | subtasks | triage | extract | dayplan | cleanup; see docs/AGENTS.md). "
             "Validated; replaces an earlier one until the person applied or discarded it", AG,
@@ -924,7 +931,13 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                  f"notes?, assignee_id?, due?, section?}}]}}; dayplan (2.10.0): {{items[{{task_id, start (HH:MM), duration?, note?}}], nofit[{{task_id, "
                                  f"note?}}]}} (2.11.0: applying sets plan_start + duration, never due dates; task ids from input.tasks); cleanup (2.39.0): {{items[{{op: merge, "
                                  f"task_ids[keep, ...], title?, reason?}} | {{op: rename, task_id, title, reason?}} | {{op: move, task_id, section_id|null, position?, reason?}} | "
-                                 f"{{op: close, task_id, reason}}]}} (task ids from input.items, each once). At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
+                                 f"{{op: close, task_id, reason}}]}} (task ids from input.items, each once); "
+                                 # 2.51.0 (#1351 #1358)
+                                 f"inquiry (2.51.0): {{name, folder?, project_type?, client?{{id (from input.clients) | name}}, sections[], tasks[] (as project), "
+                                 f"shoot_days[{{title, date, end_date?, start_time?, end_time?, location?, notes?}}] (event drafts), offer?{{title?, intro?, "
+                                 f"items[{{service_id?, text, qty, unit?, price?, discount?}}]}} (a quotation draft; only with input.office.ok; never with input.offer)}}; "
+                                 f"setup (2.51.0): {{modules[{{key, on}}], lists[{{name, color?, folder?, sections[]}}], project?{{type, name}}}}. "
+                                 f"At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
         "/agent/chats": {"get": op("Chat messages after a cursor", AG, ok(ref("ChatPage")) | errs("400", "403"),
                                    [q("since", "Message id", {"type": "integer"}), q("user_id", "One person", {"type": "integer"}), q("limit", "At most 500", {"type": "integer"})])},
         "/tasks/{id}/typing": {"post": op("2.22.0 (#693): \"<name> is writing …\" in the task's comments for 8 s (send it again while writing; "

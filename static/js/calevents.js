@@ -46,7 +46,7 @@ async function evPop(anchor, e) {
   const t = ev.task_id ? taskById(ev.task_id) : null;
   const desc = (e.description || '').slice(0, 2000);
   p.innerHTML = `<div class="cevpop evpop" style="--cc:${evCalColor(e)}">
-    <div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b>${e.status === 'cancelled' ? `<span class="evst">${tr('Cancelled')}</span>` : e.status === 'tentative' ? `<span class="evst">${tr('Tentative')}</span>` : ''}</div>
+    <div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b>${e.status === 'cancelled' ? `<span class="evst">${tr('Cancelled')}</span>` : e.status === 'tentative' ? `<span class="evst evdraftb">${tr('Draft')}</span>` : ''}</div>
     <div class="cevm">${ic('clock', 's')}<span>${esc(evWhen(e))}</span></div>
     ${e.recurring ? `<div class="cevm">${ic('repeat', 's')}<span>${esc(repeatLabel(ev.rrule) || tr('Repeats'))}${e.changed ? ' · ' + esc(tr('this date changed')) : ''}</span></div>` : ''}
     ${e.location ? `<div class="cevm">${ic('mappin', 's')}<span>${esc(e.location)}</span></div>` : ''}
@@ -56,7 +56,8 @@ async function evPop(anchor, e) {
     ${desc ? `<div class="cevdesc">${cevLinkify(desc)}</div>` : ''}
     ${t ? `<button class="linkbtn evtask" data-evp="task">${ic('done', 's')} ${esc(tr('Preparation: {0}', t.title))}</button>` : ''}
     ${me ? `<div class="evrsvp" role="group" aria-label="${esc(tr('Your answer'))}">${EV_PS.map(([k, n, i]) => `<button class="btn sm ${me.partstat === k ? 'on' : ''}" data-evps="${k}" aria-pressed="${me.partstat === k}">${ic(i, 's')} ${tr(n)}</button>`).join('')}</div>` : ''}
-    <div class="cevact">${w ? `<button class="btn sm pri" data-evp="edit">${ic('edit', 's')} ${tr('Edit')}</button>${!ev.task_id ? `<button class="btn sm" data-evp="prep">${ic('plus', 's')} ${tr('Preparation task')}</button>` : ''}<button class="btn sm danger" data-evp="del">${ic('trash', 's')} ${tr('Delete')}</button>` : `<button class="btn sm" data-evp="totask">${ic('plus', 's')} ${tr('Create task from event')}</button>`}</div></div>`;
+    ${w && ev.status === 'tentative' && !e.recurring ? `<div class="cevact apdraftact"><button class="btn sm pri" data-evp="apok">${ic('check', 's')} ${tr('Confirm')}</button><button class="btn sm" data-evp="del">${ic('x', 's')} ${tr('Discard')}</button></div>` : ''}
+    <div class="cevact">${w ? `<button class="btn sm${ev.status === 'tentative' && !e.recurring ? '' : ' pri'}" data-evp="edit">${ic('edit', 's')} ${tr('Edit')}</button>${!ev.task_id ? `<button class="btn sm" data-evp="prep">${ic('plus', 's')} ${tr('Preparation task')}</button>` : ''}<button class="btn sm danger" data-evp="del">${ic('trash', 's')} ${tr('Delete')}</button>` : `<button class="btn sm" data-evp="totask">${ic('plus', 's')} ${tr('Create task from event')}</button>`}</div></div>`;
   p.onclick = async ev2 => {
     const ps = ev2.target.closest('[data-evps]');
     if (ps) { try { await api('POST', `/api/events/${ev.id}/rsvp`, {partstat: ps.dataset.evps}); } catch { return; } closePop(); toast(tr('Answer sent: {0}', tr(EV_PS_WORD[ps.dataset.evps]))); calInvalidate(); renderView(); return; }
@@ -66,6 +67,7 @@ async function evPop(anchor, e) {
     if (k === 'edit') evEditor({ev, occ: e.recurring ? e.occ : null});
     else if (k === 'del') evDelete(ev, e.recurring ? e.occ : null);
     else if (k === 'task') openDetail(ev.task_id);
+    else if (k === 'apok') ap_evConfirm(ev);  // 2.51.0 C (#1355): a draft (tentative) becomes confirmed (agentplan.js)
     else if (k === 'prep') evPrepTask(ev);
     else if (k === 'totask') cevToTask(cevPrep({...e}));
   };

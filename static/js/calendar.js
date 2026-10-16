@@ -120,8 +120,8 @@ function cevTime(e, d) {
   if (!cevTimed(e, d)) return tr('all day');
   return `${e.d0 === d ? fmtHM(e.s) : '…'}–${e.d1 === d ? fmtHM(e.e) : '…'}`;
 }
-const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}">${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtHM(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
-const cevRow = (e, d) => `<div class="cevrow" data-cev="${e.id}" style="--cc:${cevColor(e)}" role="button" tabindex="0"><i class="cevdot"></i><span class="cevt">${cevTime(e, d)}</span><span class="cevn">${esc(cevTitle(e))}</span>${e.location ? `<span class="cevl">${esc(e.location)}</span>` : ''}<span class="cevc">${esc(cevCal(e))}</span></div>`;
+const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}${ap_draftCls(e)}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}">${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtHM(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
+const cevRow = (e, d) => `<div class="cevrow${ap_draftCls(e)}" data-cev="${e.id}" style="--cc:${cevColor(e)}" role="button" tabindex="0"><i class="cevdot"></i><span class="cevt">${cevTime(e, d)}</span><span class="cevn">${esc(cevTitle(e))}</span>${e.location ? `<span class="cevl">${esc(e.location)}</span>` : ''}<span class="cevc">${esc(cevCal(e))}</span></div>`;
 function cevTodayBlock() {  // "Events today" at the top of Today (setting cal_today)
   if (!feat('cal') || !calEvOn() || S.settings.cal_today === '0') return '';  // Calendar module off: gone here too
   const t0 = today();
@@ -208,7 +208,7 @@ function tlCalRows(start, end, DW) {  // calendar timeline: one row per calendar
         const x = diffDays(start, p.s) * DW, w = (diffDays(p.s, p.en) + 1) * DW;
         const nx = inLane[i + 1] ? diffDays(start, inLane[i + 1].s) * DW : days * DW;
         const free = Math.max(w, nx - x);
-        return `<div class="tl-cev" data-cev="${p.e.id}" style="left:${x + 2}px;width:${free - 4}px;--bw:${w - 4}px" title="${esc(cevTitle(p.e))}"><i class="cvxbar"></i><span>${esc(cevTitle(p.e))}</span></div>`;
+        return `<div class="tl-cev${ap_draftCls(p.e)}" data-cev="${p.e.id}" style="left:${x + 2}px;width:${free - 4}px;--bw:${w - 4}px" title="${esc(cevTitle(p.e))}"><i class="cvxbar"></i><span>${esc(cevTitle(p.e))}</span></div>`;
       }).join('')}</div></div>`;
     }
   }
@@ -437,7 +437,7 @@ function viewWeek() {
   const cols = days.map(d => {
     const blocks = layoutDay((map.get(d) || []).filter(t => t.due_time), evsOf(d).filter(e => cevTimed(e, d)).map(e => ({c: e, ...cevMin(e, d)}))).map(it => {
       const t = it.t, top = it.s / 60 * H, h = Math.max((it.e - it.s) / 60 * H, 20);
-      if (it.c) return `<div class="wcev" data-cev="${it.c.id}" style="--cc:${cevColor(it.c)};top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)"><b>${it.c.d0 === d ? fmtHM(it.c.s) : '…'}</b> ${esc(cevTitle(it.c))}</div>`;
+      if (it.c) return `<div class="wcev${ap_draftCls(it.c)}" data-cev="${it.c.id}" style="--cc:${cevColor(it.c)};top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)"><b>${it.c.d0 === d ? fmtHM(it.c.s) : '…'}</b> ${esc(cevTitle(it.c))}</div>`;
       return `<div class="wev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}" style="top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)">${msGlyph(t)}<b>${t.due_time}</b> ${mdTitleNL(t.title)}</div>`;
     }).join('');
     return `<div class="wcol ${d === t0 ? 'today' : ''}" data-day="${d}">${blocks}${d === t0 ? `<i class="nowline" style="top:${nowTop}px"></i>` : ''}</div>`;

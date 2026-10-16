@@ -68,6 +68,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "message_edited",  # 2.39.0 (#1179): a person changed a chat message / comment / team message the agent already had
                 "file_shared",  # 2.48.0 (#1207): a folder / file of the file store was shared with the agent (node, role)
                 "document_added",  # 2.48.0 (#1356): a new document was recognised in a folder / file shared with the agent
+                "offer_accepted",  # 2.51.0 A (#1348): a quotation of its office area was accepted (agents with the office switch)
                 )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop")
