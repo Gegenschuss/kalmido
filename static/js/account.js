@@ -396,6 +396,7 @@ async function wsPaneDraw(md) {
   oxDraw(box);  // 2.42.0 (#833): the export sections of the organisations I administer
   ocDraw(box);  // 2.42.0 (#828): their encryption sections
   wsc_paneDraw(box);  // 2.53.0 (#1474): each organisation's colour (its admins choose)
+  pmeta_paneDraw(box);  // 2.61.0 B (#1819): whether photos lose their metadata on upload (its admins choose)
 }
 function wsPaneWire(md) {
   md.addEventListener('change', async e => {

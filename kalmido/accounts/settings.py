@@ -44,6 +44,7 @@ SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "tim
                   "list_color_dot",  # 2.53.0 (#1426): list colours only as the dot
                   "mods_all",  # 2.46.1 (#1591): "Switch on all modules" with the purpose
                   "tbl_accept")  # 2.53.0 C (#1424): accept "Urgent" on a task set by someone else
+SETTINGS_FLAGS += ("photo_meta_strip",)  # 2.61.0 B (#1819): remove the metadata of my photos on upload
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)

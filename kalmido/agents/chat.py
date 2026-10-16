@@ -289,8 +289,14 @@ def chat_save_files(c, m, files, saved):
             return tr("{0}: the file is empty and was not uploaded", name)
         mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
-        c.execute("INSERT INTO chat_files(message_id,name,mime,size,path,created_at) VALUES(?,?,?,?,?,?)",
-                  (m["id"], name, mime, size, rel, ts))
+        from ..files.upsafe import up_check_path, up_after_store, UploadRefused
+        try:  # 2.61.0 (#1818 #1819): scan + metadata (chat files are personal: no organisation)
+            size, mime, info = up_check_path(c, full, name, mime, m["user_id"], None, "chat")
+        except UploadRefused as e:
+            return str(e)
+        cid = insert_id(c, "INSERT INTO chat_files(message_id,name,mime,size,path,created_at) VALUES(?,?,?,?,?,?)",
+                        (m["id"], name, mime, size, rel, ts))
+        up_after_store(c, "chat", cid, None, info)
     return None
 
 

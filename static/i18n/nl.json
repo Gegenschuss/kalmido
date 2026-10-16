@@ -8206,5 +8206,12 @@
   "Back to the whole chat": "Terug naar de hele chat",
   "Job has ended": "Job is beëindigd",
   "The job reads it after its next step.": "De job leest het na zijn volgende stap.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)",
+  "Remove location data from photos": "Locatiegegevens uit foto’s verwijderen",
+  "Also removes camera details and capture time from the stored file.": "Verwijdert ook cameragegevens en opnametijd uit het opgeslagen bestand.",
+  "Also removes camera details and capture time from the stored file. Applies to your private files; in an organisation its admins decide (Settings > Workspaces).": "Verwijdert ook cameragegevens en opnametijd uit het opgeslagen bestand. Geldt voor je privébestanden; in een organisatie beslissen de beheerders (Instellingen > Werkruimtes).",
+  "Photos": "Foto’s",
+  "Photo metadata of {0}": "Fotometadata van {0}",
+  "Taken on {0} at {1}": "Genomen op {0} om {1}",
+  "from the capture date of the photo": "uit de opnamedatum van de foto"
 }

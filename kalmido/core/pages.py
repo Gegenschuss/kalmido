@@ -159,9 +159,18 @@ def save_attachment_bytes(c, tid, name, mime, data):
     from ..tasks.attachments import safe_name
     from ..notify.alerts import aa_count, aa_oserr
     from ..admin.hosting import quota_fits
+    from ..core.orgcrypt import oc_task_org
+    from ..files.upsafe import up_check, up_after_store, UploadRefused
     name = safe_name(name)
     who = c.execute("SELECT created_by FROM tasks WHERE id=?", (tid,)).fetchone()
     who = who[0] if who else None
+    org = oc_task_org(c, tid) or None
+    mime = mime if mime and mime != "application/octet-stream" else (mimetypes.guess_type(name)[0] or "application/octet-stream")
+    try:  # 2.61.0 (#1818 #1819 #1820): a virus find -> the task comes without the file (never an error), like a full quota
+        data, mime, info = up_check(c, name, data, mime, who, org, "att")
+    except UploadRefused as e:
+        print("share / mail file skipped:", e, flush=True)
+        return
     if not quota_fits(c, who, len(data)):  # 2.24.0 (#910): storage full -> the task comes without the file (never an error)
         print("share / mail file skipped: storage quota of user", who, "reached", flush=True)
         return
@@ -170,14 +179,14 @@ def save_attachment_bytes(c, tid, name, mime, data):
         os.makedirs(os.path.join(ATT_DIR, str(tid)), exist_ok=True)
         with open(os.path.join(ATT_DIR, rel), "wb") as f:
             f.write(data)
-        from ..core.orgcrypt import oc_seal_path, oc_task_org
-        oc_seal_path(c, oc_task_org(c, tid), os.path.join(ATT_DIR, rel))  # 2.42.0 (#828): sealed in an organisation's list
+        from ..core.orgcrypt import oc_seal_path
+        oc_seal_path(c, org or 0, os.path.join(ATT_DIR, rel))  # 2.42.0 (#828): sealed in an organisation's list
     except OSError as e:
         aa_count("storage", "attachments", aa_oserr(e))
         raise
-    mime = mime if mime and mime != "application/octet-stream" else (mimetypes.guess_type(name)[0] or "application/octet-stream")
-    c.execute("INSERT INTO attachments(task_id,name,mime,size,path,created_at,user_id) VALUES(?,?,?,?,?,?,?)",
-              (tid, name, mime, len(data), rel, iso(now_utc()), who))
+    aid = insert_id(c, "INSERT INTO attachments(task_id,name,mime,size,path,created_at,user_id) VALUES(?,?,?,?,?,?,?)",
+                    (tid, name, mime, len(data), rel, iso(now_utc()), who))
+    up_after_store(c, "att", aid, org, info)
 
 
 def inbox_user(c):

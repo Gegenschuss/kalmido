@@ -687,7 +687,9 @@ def org_mine_dict(c, r, uid):
     from ..collab.comments import user_names
     mem = c.execute("SELECT m.user_id, m.role, u.kind, u.disabled FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY lower(u.display_name), u.id", (r["id"],)).fetchall()
     names = user_names(c, [m["user_id"] for m in mem])
-    return {"id": r["id"], "name": r["name"], "icon": r["icon"], "color": r["color"] or "", "domains": r["domains"], "role": org_role(c, uid, r["id"]) or "member",
+    return {"id": r["id"], "name": r["name"], "icon": r["icon"], "color": r["color"] or "", "domains": r["domains"],
+            "photo_meta_strip": bool(r["photo_meta_strip"]),  # 2.61.0 B (#1819)
+            "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "member",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
             "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (r["id"],)).fetchone()[0]}
@@ -714,13 +716,17 @@ def org_mine_update(oid):
     """2.28.0 (#935): {name?, icon?, domains?} -- an organisation admin renames it / sets its e-mail domains (modes multi /
     workspaces; in the mode organisation the name comes from the configuration or the instance admin).
     2.53.0 B (#1474): {color?} -- its colour for every member ('' = the default tone); only here (an admin of this
-    organisation), not in the instance admin's routes."""
+    organisation), not in the instance admin's routes. 2.61.0 B (#1819): {photo_meta_strip?: bool} likewise."""
     c, b = db(), body()
     _need_org_admin(c, oid)
     if instance_mode(c) != "workspaces":
         _no_change()
     if "color" in b:
         c.execute("UPDATE orgs SET color=? WHERE id=?", (wsc_clean_color(b["color"]), oid))
+    if "photo_meta_strip" in b:  # 2.61.0 B (#1819): remove the metadata of photos uploaded into the organisation (admins only)
+        if not isinstance(b["photo_meta_strip"], bool):
+            return err(tr("Invalid value: {0}", "photo_meta_strip"))
+        c.execute("UPDATE orgs SET photo_meta_strip=? WHERE id=?", (int(b["photo_meta_strip"]), oid))
     _org_patch(c, oid, b)
     bump(c)
     c.commit()

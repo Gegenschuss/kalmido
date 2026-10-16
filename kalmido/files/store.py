@@ -301,11 +301,12 @@ def _mime_of(name, mime):
     return mimetypes.guess_type(name)[0] or "application/octet-stream"
 
 
-def fs_put(c, uid, parent_id, name, data, mime=None, org_id=None, agent_id=None):
+def fs_put(c, uid, parent_id, name, data, mime=None, org_id=None, agent_id=None, up=None):
     """A new file `name` with the bytes `data` below folder parent_id (None: the root of the workspace org_id / uid's own
     space; the parent decides the workspace). uid needs 'edit' on the parent. A name that is taken gets " (2)"; an agent's
     executable ending gets ".txt" (#380). Checks size and quota. Returns the node id (the caller commits). Raises Denied
-    (rights), ValueError (empty / too large) or hosting.QuotaExceeded."""
+    (rights), ValueError (empty / too large; upsafe.UploadRefused: a virus find) or hosting.QuotaExceeded. up (a dict)
+    gets the info of the upload checks (2.61.0: scan state, capture date of a photo)."""
     from ..admin.hosting import quota_guard
     from ..tasks.attachments import unexec_name
     name = safe_fs_name(name)
@@ -316,6 +317,8 @@ def fs_put(c, uid, parent_id, name, data, mime=None, org_id=None, agent_id=None)
     data = bytes(data or b"")
     _check_data(name, data)
     owner, org = _place(c, uid, parent_id, org_id, add_file=True)
+    from .upsafe import up_check, up_after_store  # 2.61.0 (#1818 #1819 #1820): scan, metadata, text recognition
+    data, mime, info = up_check(c, name, data, _mime_of(name, mime), uid, org, "fs")
     quota_guard(c, uid, len(data))
     ts = _now()
     nid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,agent_id,mime,size,created_by,created_at,updated_at)
@@ -323,6 +326,9 @@ def fs_put(c, uid, parent_id, name, data, mime=None, org_id=None, agent_id=None)
                     (parent_id or None, "file", _free_name(c, parent_id, owner, org, name), owner, org, agent_id,
                      _mime_of(name, mime), len(data), uid, ts, ts))
     _store_version(c, nid, org, data, _mime_of(name, mime), uid)
+    up_after_store(c, "fs", nid, org, info)
+    if up is not None:
+        up.update(info)
     return nid
 
 
@@ -341,9 +347,13 @@ def fs_new_version(c, nid, data, mime=None):
         if unexec_name(n["name"]) != n["name"]:
             raise Denied(403, tr("Agents do not write new versions of executable files"))
         mime = "text/plain"
+    from .upsafe import up_check, up_after_store  # 2.61.0 (#1818 #1819 #1820)
+    data, mime, info = up_check(c, n["name"], data, _mime_of(n["name"], mime or n["mime"]), uid, n["org_id"], "fs")
     if uid:
         quota_guard(c, uid, len(data))
-    return _store_version(c, nid, n["org_id"], data, _mime_of(n["name"], mime or n["mime"]), uid)
+    no = _store_version(c, nid, n["org_id"], data, mime, uid)
+    up_after_store(c, "fs", nid, n["org_id"], info)
+    return no
 
 
 def fs_version_row(c, nid, version=None):

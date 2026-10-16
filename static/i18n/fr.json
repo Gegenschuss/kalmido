@@ -8206,5 +8206,12 @@
   "Back to the whole chat": "Retour au chat complet",
   "Job has ended": "La tâche est terminée",
   "The job reads it after its next step.": "La tâche le lit après sa prochaine étape.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)",
+  "Remove location data from photos": "Retirer les données de localisation des photos",
+  "Also removes camera details and capture time from the stored file.": "Retire aussi les informations de l’appareil et l’heure de prise de vue du fichier enregistré.",
+  "Also removes camera details and capture time from the stored file. Applies to your private files; in an organisation its admins decide (Settings > Workspaces).": "Retire aussi les informations de l’appareil et l’heure de prise de vue du fichier enregistré. S’applique à tes fichiers privés ; dans une organisation, ses administrateurs décident (Paramètres > Espaces de travail).",
+  "Photos": "Photos",
+  "Photo metadata of {0}": "Métadonnées des photos de {0}",
+  "Taken on {0} at {1}": "Prise le {0} à {1}",
+  "from the capture date of the photo": "d’après la date de prise de vue de la photo"
 }

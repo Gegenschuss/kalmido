@@ -121,6 +121,7 @@ ORDER = (
     "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
     "files.v1",  # 2.48.0 (#1207): the file store in the REST API (files:read / files:write)
+    "files.photometa",  # 2.61.0 B (#1819): photo metadata (GPS, camera) removed on upload (no routes; files/upsafe.py)
     "integrations.mail",
     "accounts.invite",
     "family.family",
