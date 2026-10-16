@@ -74,6 +74,8 @@ for m in (CL, BOB, CAROL):
 W2 = A.post(B + "/api/lists", json={"name": "Otto", "org_id": ORG}).json()["id"]  # one agent per list (as p256_a)
 for m in (OT, BOB):
     check(A.put(B + f"/api/lists/{W2}/members", json={"user_id": m, "role": "edit"}).ok, f"setup: {m} in otto's list")
+for lid in (W, W2):  # members (not only the owner) reach the list's agent
+    A.patch(B + f"/api/lists/{lid}", json={"agent_members": True})
 
 
 def job(hdr, title, who=BOB):
