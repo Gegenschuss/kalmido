@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.56.3** (2026-10-16): the client field of a document in an organisation's office offers its clients again.
 - **2.56.1** (2026-10-16): CI fixes for 2.56.0 (both go live with this version).
 - **2.56.0** (2026-10-16): a **Message** button on job cards, a **chat history per job** (tap its name), running jobs in
   the agent menu, **organisation admins rename and restyle** their organisation's lists (no access to contents) and
