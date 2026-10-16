@@ -307,5 +307,25 @@ check(r.ok and bl and bl[0]["blocked_by"] == [{"id": None, "title": None, "assig
       and "Hidden blocker" not in r.text and not [x for x in w["waits"] if x["who"] == CAROL],
       f"review 1: a blocker of an unshared list stays hidden ({bl} {w.get('waits')})")
 
+# review 4 (#1353): bookings in the time check only with the scope calendar; of a list the agent does not see only "Booked"
+TB, TBS = agent("timebot", ["read", "tasks:write", "time"], org=ORG)
+r = Bo.post(B + "/api/lists", json={"name": "Film Five", "kind": "project"})
+P5 = r.json()["id"]
+dbx("UPDATE lists SET org_id=? WHERE id=?", (ORG, P5), write=True)
+check(Bo.put(B + f"/api/lists/{P5}/members", json={"user_id": TB, "role": "edit"}).ok, "setup: P5 for the time agent")
+DX = today - timedelta(days=20)
+for title, lid in (("Secret shoot", PX), ("Visible shoot", P)):
+    r = Bo.post(B + "/api/team/dispo/bookings", json={"title": title, "start": str(DX), "end": str(DX), "status": "firm", "org": ORG,
+                                                      "resources": [{"kind": "user", "id": BOB}]})
+    check(r.status_code == 201, f"setup: booking {title} ({r.status_code} {r.text[:120]})")
+    dbx("UPDATE hub_bookings SET list_id=? WHERE title=?", (lid, title), write=True)
+r = TBS.get(V + "/time/check", params={"user_id": BOB, "from": str(DX), "to": str(DX)})
+check(r.ok and not [x for x in r.json()["issues"] if x["kind"] == "booking_no_time"] and "Secret shoot" not in r.text,
+      f"review 4: without the scope calendar no bookings ({r.status_code} {r.text[:200]})")
+r = AGS.get(V + "/time/check", params={"user_id": BOB, "from": str(DX), "to": str(DX)})
+bk = {x["title"]: x for x in r.json().get("issues", []) if x["kind"] == "booking_no_time"}
+check(r.ok and "Secret shoot" not in r.text and bk.get("Booked", {}).get("hidden") is True and bk["Booked"]["list_id"] is None
+      and bk.get("Visible shoot", {}).get("list_id") == P, f"review 4: a booking of an unseen list only as Booked ({bk})")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

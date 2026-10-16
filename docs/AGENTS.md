@@ -1601,7 +1601,9 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
   most 3 notepads per project (its status block included); they do not count against the 20 of people. A blocker in a list
   the agent does not see appears only as `hidden: true` (no title, id or assignee, not in `waits` / `people`).
 - **Time check.** `user_id` = a person who may chat with the agent (a personal agent: its owner by default). Only entries and
-  tasks of lists both see, events only of calendars shared with the agent, bookings only of the agent's workspace. Limits:
+  tasks of lists both see, events only of calendars shared with the agent, bookings only of the agent's workspace. Events
+  and bookings only with the scope `calendar`; a booking of a list the agent does not see appears as "Booked"
+  (`hidden: true`, no list). Limits:
   more than 12 h a day, an entry over 10 h, overlaps, weekend entries without an event or booking.
 - **Time proposals** (`items`: `date`, `start`, `end` as local HH:MM, `task_id` or `list_id`, `note`, `event_id`): a ready
   proposal for the person (News + push per their settings); they change times and note and apply it, one undo step. Entries

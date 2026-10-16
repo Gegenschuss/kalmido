@@ -123,18 +123,24 @@ def _events(c, pid, viewer, frm, to):
     return out
 
 
-def _bookings(c, pid, frm, to):
-    """The person's firm bookings (disposition) in the period -- only those the token's context reaches (its workspace)."""
+def _bookings(c, pid, viewer, frm, to):
+    """The person's firm bookings (disposition) in the period -- only those the token's context reaches (its workspace).
+    2.51.0 (#1353): title and list only for a list the viewer sees, otherwise just "busy"."""
     rows = c.execute("""SELECT id, title, start, "end", list_id FROM hub_bookings WHERE resource_kind='user' AND resource_id=?
                         AND status='firm' AND deleted_at IS NULL AND start<=? AND "end">=? ORDER BY start, id""",
                      (pid, to.isoformat() + "T99", frm.isoformat())).fetchall()
     today = local_now().date()
-    out = []
+    out, seen = [], {}
     for r in rows:
         d0, d1 = date.fromisoformat(r["start"][:10]), date.fromisoformat(r["end"][:10])
         d = max(d0, frm)
         while d <= min(d1, to, today - timedelta(days=1)):
-            out.append({"id": r["id"], "title": r["title"], "date": d, "list_id": r["list_id"]})
+        lid = r["list_id"]
+        if lid and lid not in seen:
+            seen[lid] = bool(list_role(c, lid, viewer)) and (viewer == pid or bool(list_role(c, lid, pid)))
+        show = bool(lid) and seen[lid]
+            out.append({"id": r["id"], "title": r["title"] if show else tr("Booked"), "date": d, "list_id": lid if show else None,
+                        "hidden": not show})
             d += timedelta(days=1)
     return out
 
@@ -171,7 +177,7 @@ def atm_check(c, pid, viewer, frm, to, events=True):
                 issues.append({"kind": "overlap", "date": d.isoformat(), "entry_ids": [a["id"], b["id"]],
                                "title": f"{a['title']} / {b['title']}"})
     evs = _events(c, pid, viewer, frm, to) if events else []
-    bks = _bookings(c, pid, frm, to)
+    bks = _bookings(c, pid, viewer, frm, to) if events else []  # 2.51.0 (#1353): bookings, like events, need the calendar scope
     busy_days = {e["s"].astimezone(TZ).date() for e in evs} | {b["date"] for b in bks}
     for d, xs in sorted(per_day.items()):
         if d.weekday() in ATM_WEEKEND and d not in busy_days:
@@ -184,7 +190,7 @@ def atm_check(c, pid, viewer, frm, to, events=True):
     for b in bks:
         if b["date"] not in per_day:
             issues.append({"kind": "booking_no_time", "date": b["date"].isoformat(), "booking_id": b["id"], "title": b["title"],
-                           "list_id": b["list_id"]})
+                           "list_id": b["list_id"], "hidden": b["hidden"]})
     issues.sort(key=lambda x: (x["date"], x["kind"]))
     return {"user_id": pid, "from": frm.isoformat(), "to": to.isoformat(), "events_checked": bool(events),
             "limits": {"day_max_hours": ATM_DAY_MAX_H, "entry_max_hours": ATM_ENTRY_MAX_H, "weekend_days": [6, 7]},
@@ -223,7 +229,7 @@ def v1_atm_check():
     c = db()
     pid, viewer = atm_person(c, a)
     frm, to = atm_period(a)
-    ev = g.get("auth_via") != "token" or "calendar" in (g.get("scopes") or set())  # events only with the calendar scope
+    ev = g.get("auth_via") != "token" or "calendar" in (g.get("scopes") or set())  # events + bookings only with the calendar scope
     return jsonify(atm_check(c, pid, viewer, frm, to, events=ev))
 
 
