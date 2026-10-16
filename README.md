@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.50.1** (2026-10-16): CI fixes for 2.50.0 and hidden form rows on phones (both go live with this version).
 - **2.50.0** (2026-10-16): business hub part 2 - **absences** with public holidays, a **disposition** for crew and
   equipment, a **sales pipeline** and **key figures** in the office, a **customer view** for public links and **customer
   approvals** with a simple electronic signature.

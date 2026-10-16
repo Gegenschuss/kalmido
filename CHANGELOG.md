@@ -7,6 +7,17 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.50.1] - 2026-10-16
+
+**In short:** the checks of 2.50.0 green again; 2.50.0 and 2.50.1 go live together.
+
+### Fixed
+- On phones some form rows (contact and event notes, agent forms) stayed hidden: the pipeline's columns shared a style
+  name with them. The day plan bar keeps its look next to the disposition's booking bars.
+- Absences and bookings pick dates and times with the app's own picker instead of the browser's field.
+- After saving an absence or a booking its row opens again on a tap without switching tabs.
+- German: the cash flow hint without the old word for the basket.
+
 ## [2.50.0] - 2026-10-16
 
 **In short:** the second part of the business hub: **absences** with public holidays, a **disposition** for crew and
