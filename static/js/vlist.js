@@ -35,11 +35,13 @@ const vl_h = (sg, t) => vl_hm().get(t.id) ?? (VL.est || 44) * (sg.ids ? sg.ids(t
 function vl_sum(sg, a, b) { let s = 0; for (let i = a; i < b; i++) s += vl_h(sg, sg.arr[i]); return s; }
 // every top-level node of an item carries data-vlg = its task id (the rows of a task and its subtasks, a list head)
 const vl_mark = (html, id) => html.replace(/<div class="(trow|mthl)(?=[\s"])/g, `<div data-vlg="${id}" class="$1`);
-const vl_padHtml = (sg, w, px) => `<div class="vlpad" data-k="vl${w}:${esc(sg.key)}" style="height:${Math.max(0, Math.round(px))}px" aria-hidden="true"></div>`;
-// a group of a windowed view: arr = its items (tasks), fn(t, i) = the HTML of item i, ids(t) = the row ids of an item
-function vl_seg(key, arr, fn, ids) {
+const vl_padHtml = (sg, w, px) => `<${sg.tag} class="vlpad" data-k="vl${w}:${esc(sg.key)}" style="height:${Math.max(0, Math.round(px))}px" aria-hidden="true"></${sg.tag}>`;
+// a group of a windowed view: arr = its items (tasks), fn(t, i) = the HTML of item i, ids(t) = the row ids of an item (false:
+// the items are no task rows, e.g. contacts);
+// tag = the spacers' element (li inside a list)
+function vl_seg(key, arr, fn, ids, tag = 'div') {
   key = String(key); while (VL.by.has(key)) key += '+';
-  const n = arr.length, w = vl_map(VL.wins, VL.key).get(key), sg = {key, arr, fn, ids, a: 0, b: 0, tp: 0};
+  const n = arr.length, w = vl_map(VL.wins, VL.key).get(key), sg = {key, arr, fn, ids, tag, a: 0, b: 0, tp: 0};
   VL.segs.push(sg); VL.by.set(key, sg);
   if (w) {
     const i = w.id != null ? arr.findIndex(t => t.id === w.id) : -1;
@@ -50,6 +52,8 @@ function vl_seg(key, arr, fn, ids) {
   for (let i = sg.a; i < sg.b; i++) h += vl_mark(fn(arr[i], i), arr[i].id);
   return h + vl_padHtml(sg, 'b', vl_sum(sg, sg.b, n));
 }
+// the box that scrolls a group: a list with its own scroll (data-vlsc, e.g. the contacts beside the card) or the view
+const vl_sc = (tp, v) => { const w = tp.closest('[data-vlsc]'); return w && w.scrollHeight > w.clientHeight + 1 ? w : v; };
 const vl_pad = (v, sg, w) => v.querySelector(`.vlpad[data-k="vl${w}:${sg.key.replace(/["\\]/g, '\\$&')}"]`);
 // the drawn nodes between a group's spacers, by item (task id as text -> nodes)
 function vl_nodes(tp, bp) {
@@ -92,14 +96,18 @@ function vl_sync() {
 // one pass: every group whose window does not cover the visible part (plus half a screen) or is far too big gets the window
 // of the visible part plus 1.5 screens above and below; returns true when something changed
 function vl_step(v) {
-  const vr = v.getBoundingClientRect(), st = v.scrollTop, vh = v.clientHeight || innerHeight;
-  const need = [st - vh * .5, st + vh * 1.5], want = [st - vh * 1.5, st + vh * 2.5], drag = vl_dragging();
-  // the first drawn row in view keeps its place on the screen
-  let anc = null;
-  for (const el of v.querySelectorAll('[data-vlg], .ghead')) { const r = el.getBoundingClientRect(); if (r.bottom > vr.top + 1 && r.height) { anc = [el, r.top]; break; } }
+  const drag = vl_dragging(), anc = new Map();
+  // the first drawn row in view keeps its place on the screen (per scrolling box: the view, or a list with its own scroll)
+  const ancOf = sc => {
+    if (anc.has(sc)) return; const vr = sc.getBoundingClientRect(); anc.set(sc, null);
+    for (const el of sc.querySelectorAll('[data-vlg], .ghead')) { const r = el.getBoundingClientRect(); if (r.bottom > vr.top + 1 && r.height) { anc.set(sc, [el, r.top]); break; } }
+  };
+  for (const sg of VL.segs) { const tp = vl_pad(v, sg, 't'); if (tp) ancOf(vl_sc(tp, v)); }
   let ch = false;
   for (const sg of VL.segs) {
     const tp = vl_pad(v, sg, 't'), bp = vl_pad(v, sg, 'b'); if (!tp || !bp) continue;
+    const sc = vl_sc(tp, v), vr = sc.getBoundingClientRect(), st = sc.scrollTop, vh = sc.clientHeight || innerHeight;
+    const need = [st - vh * .5, st + vh * 1.5], want = [st - vh * 1.5, st + vh * 2.5];
     const n = sg.arr.length, ya = tp.getBoundingClientRect().top - vr.top + st + sg.tp;  // the content y of item a
     const H = vl_hm(), hs = i => H.get(sg.arr[i].id) ?? vl_h(sg, sg.arr[i]);
     const yOf = i => { let y = ya; if (i < sg.a) for (let j = sg.a - 1; j >= i; j--) y -= hs(j); else for (let j = sg.a; j < i; j++) y += hs(j); return y; };
@@ -132,7 +140,7 @@ function vl_step(v) {
     ch = true;
   }
   if (!ch) return false;
-  if (anc && anc[0].isConnected) { const d = anc[0].getBoundingClientRect().top - anc[1]; if (Math.abs(d) >= 1) v.scrollTop += d; }
+  for (const [sc, a] of anc) if (a && a[0].isConnected) { const d = a[0].getBoundingClientRect().top - a[1]; if (Math.abs(d) >= 1) sc.scrollTop += d; }
   if (typeof rowRove === 'function') rowRove();
   return true;
 }
@@ -158,7 +166,7 @@ function vl_ids() {
   const out = [], one = t => [t.id];
   for (const el of els) {
     if (!el.classList.contains('vlpad')) { out.push(+el.dataset.id); continue; }
-    const k = el.dataset.k, sg = VL.by.get(k.slice(4)); if (!sg) continue;
+    const k = el.dataset.k, sg = VL.by.get(k.slice(4)); if (!sg || sg.ids === false) continue;  // false: not task rows (contacts)
     const [a, b] = k.startsWith('vlt:') ? [0, sg.a] : [sg.b, sg.arr.length], f = sg.ids || one;
     for (let i = a; i < b; i++) out.push(...f(sg.arr[i]));
   }
@@ -169,6 +177,7 @@ function vl_reveal(id) {
   const v = vl_view(); if (!VL.on || !v || !id || v.querySelector(`.trow[data-id="${+id}"]`)) return;
   const vr = v.getBoundingClientRect(), st = v.scrollTop, vh = v.clientHeight || innerHeight;
   for (const sg of VL.segs) {
+    if (sg.ids === false) continue;
     const f = sg.ids, i = sg.arr.findIndex(t => t.id === +id || (f && f(t).includes(+id))); if (i < 0) continue;
     const tp = vl_pad(v, sg, 't'); if (!tp) return;
     let y = tp.getBoundingClientRect().top - vr.top + st + sg.tp;
@@ -177,5 +186,5 @@ function vl_reveal(id) {
     vl_sync(); return;
   }
 }
-document.addEventListener('scroll', e => { if (VL.on && e.target?.id === 'view') { VL.st.set(VL.key, e.target.scrollTop); vl_sched(); } }, {capture: true, passive: true});
+document.addEventListener('scroll', e => { if (!VL.on) return; if (e.target?.id === 'view') { VL.st.set(VL.key, e.target.scrollTop); vl_sched(); } else if (e.target?.hasAttribute?.('data-vlsc')) vl_sched(); }, {capture: true, passive: true});
 addEventListener('resize', () => { if (!VL.on) return; if (innerWidth !== VL.w) { VL.w = innerWidth; VL.hs.clear(); VL.est = 0; } vl_sched(); });

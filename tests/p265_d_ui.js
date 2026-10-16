@@ -7,6 +7,7 @@
 // - j over the window's edge moves on and keeps the focused row visible; a jump far down draws the row
 // - a drop after the last drawn row takes its neighbour from the data (the order is right)
 // - a re-render (live update) and coming back to the list keep the scroll position
+// - 450 contacts: a window too (aria-setsize / aria-posinset), the end shows the last one
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {sleep, B, login} = require('./boot');
@@ -24,10 +25,11 @@ const perf = (k, v) => console.log(`PERF p265_d ${k} = ${typeof v === 'number' ?
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   const CK = await login('alice');
   const call = async (method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined}); return r.json().catch(() => ({})); };
-  await call('POST', '/api/admin/setup', {lang: 'en', modules: ['kanban', 'cal']});
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'});
+  await call('POST', '/api/admin/setup', {lang: 'en', modules: ['kanban', 'cal', 'contacts']});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'kanban,cal,contacts'});
+  const BK = (await call('POST', '/api/books', {name: 'Mine', org_id: null})).id;
   const BIG = (await call('POST', '/api/lists', {name: 'Big'})).id, SMALL = (await call('POST', '/api/lists', {name: 'Small'})).id;
-  check(BIG && SMALL, 'setup: two lists');
+  check(BIG && SMALL && BK, 'setup: two lists, an address book');
   execFileSync('docker', ['exec', '-w', '/app', process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test', 'python', '-c', `
 import datetime
 from kalmido.core.db import connect
@@ -40,6 +42,8 @@ for i in range(${N}):
                   (${BIG}, secs[i * 3 // ${N}], f"Row {i:05d}", i, now, now))
     if i % 25 == 7:
         c.execute("INSERT INTO tasks(list_id, parent_id, title, sort, created_at, updated_at, created_by) VALUES(?,?,?,?,?,?,1)", (${BIG}, t, f"Sub of {i:05d}", 0, now, now))
+for i in range(450):
+    c.execute("INSERT INTO contacts(book_id, uid, href, fn, search, created_at, updated_at) VALUES(?,?,?,?,?,?,?)", (${BK}, f"u{i}", f"u{i}.vcf", f"Person {i:03d}", f"person {i:03d}", now, now))
 for i in range(200):
     c.execute("INSERT INTO tasks(list_id, title, priority, sort, created_at, updated_at, created_by) VALUES(?,?,0,?,?,?,1)", (${SMALL}, f"Small {i:03d}", i, now, now))
 c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version'")
@@ -163,6 +167,20 @@ c.close()
     // a short list is drawn as before
     const sm = await ev(`(async () => { go('l/${SMALL}'); await new Promise(r => setTimeout(r, 600)); return {rows: document.querySelectorAll('#view .trow').length, pads: document.querySelectorAll('#view .vlpad').length}; })()`);
     check(sm.rows === 200 && !sm.pads, `${tag}: a list with 200 tasks draws all rows, no spacers ` + JSON.stringify(sm));
+    // contacts: 450 in one address book
+    const ct = await ev(`(async () => {
+      go('contacts'); for (let i = 0; i < 100 && !document.querySelector('#view .ctrow'); i++) await new Promise(r => setTimeout(r, 100));
+      ${frame};
+      const lw = document.querySelector('#view .ctlistw'), sc = lw && lw.scrollHeight > lw.clientHeight + 1 ? lw : document.getElementById('view');
+      const r = {rows: document.querySelectorAll('#view .ctrow').length, pads: document.querySelectorAll('#view .ctlist > .vlpad').length, n: (CT.items || []).length, set: document.querySelector('#view .ctlist > li[aria-setsize]')?.getAttribute('aria-setsize'), own: sc !== document.getElementById('view')};
+      for (let i = 0; i < 4; i++) { sc.scrollTop = sc.scrollHeight; vl_sync(); ${frame}; }
+      const last = (CT.items || [])[r.n - 1], el = last && document.querySelector('#view .ctrow[data-ctopen="' + last.id + '"]'), br = el?.getBoundingClientRect(), sr = sc.getBoundingClientRect();
+      r.end = !!br && br.bottom > sr.top && br.top < sr.bottom; r.pos = el?.parentNode.getAttribute('aria-posinset');
+      r.rows2 = document.querySelectorAll('#view .ctrow').length;
+      return r;
+    })()`);
+    check(ct.n === 450 && ct.rows < 300 && ct.pads === 2 && ct.set === '450', `${tag}: 450 contacts draw a window ` + JSON.stringify(ct));
+    check(ct.end && ct.pos === '450' && ct.rows2 < 300, `${tag}: the end of the contacts shows the last one ` + JSON.stringify(ct));
   }, touch);
 
   console.log(`${ok} ok, ${F.length} failed`);

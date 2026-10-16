@@ -66,7 +66,7 @@ async function ctOpen(id) {
   try { CT.card = await api('GET', `/api/contacts/${id}`); } catch { CT.card = null; CT.sel = null; toast(tr('This contact does not exist or you cannot see it.')); }
   if (S.route.mod === 'contacts') ctDraw();
 }
-function ctDraw() { if (S.route.mod === 'contacts') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('contacts', viewContacts()))); } }
+function ctDraw() { if (S.route.mod === 'contacts') { const el = $('#view'); if (el) { keepFocus(el, () => setHtml(el, mg_wrap('contacts', viewContacts()))); vl_after(); } } }  // 2.65.0 (#1825): vl_after
 function viewContacts() {
   if (CT.items === null && !CT.loading) setTimeout(ctLoad, 0);
   ct_prune();  // 2.46.4 (#1732): also after a live update
@@ -80,9 +80,14 @@ function viewContacts() {
     <button class="iconbtn" data-ct="menu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   const list = items === null ? `<div class="muted ctempty">${tr('Loading…')}</div>` : !items.length
     ? `<div class="empty">${ic('users')}${CT.q || CT.group ? tr('No contact matches.') : tr('No contacts yet. Add one, import a vCard file, or connect the phone.')}</div>`
-    : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${items.map(c => `<li><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''} ${bk_rowCls(c)}" data-ctopen="${c.id}" ${CT.pick ? `aria-pressed="${CT.pick.has(c.id)}"` : `aria-current="${c.id === CT.sel}"`}>${CT.pick ? bk_chk(c) : ''}${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`).join('')}</ul>
+    : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${ctRows(items, (c, vl) => `<li${vl}><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''} ${bk_rowCls(c)}" data-ctopen="${c.id}" ${CT.pick ? `aria-pressed="${CT.pick.has(c.id)}"` : `aria-current="${c.id === CT.sel}"`}>${CT.pick ? bk_chk(c) : ''}${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`)}</ul>
       ${CT.total > CT.items.length ? `<div class="muted ctmore">${tr('{0} of {1} shown: search to narrow it down', items.length, CT.total)}</div>` : ''}`;
-  return `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw">${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
+  return `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw" data-vlsc>${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
+}
+// 2.65.0 (#1825): a long address book draws only the rows near the visible part (vlist.js); row(c, attrs) = one <li>
+function ctRows(items, row) {
+  if (!vl_begin(items.length)) return items.map(c => row(c, '')).join('');
+  return vl_seg('ct', items, (c, i) => row(c, ` data-vlg="${c.id}" aria-setsize="${items.length}" aria-posinset="${i + 1}"`), false, 'li');
 }
 function ctCardHtml(c) {
   const b = ctBook(c.book_id), w = ctWrite(b);
