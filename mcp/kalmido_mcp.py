@@ -232,6 +232,8 @@ def t_add_comment(api, a):
     if a.get("reply_to"):  # 2.33.0 (#1076): answer one comment of the same task
         b["reply_to"] = int(a["reply_to"])
     b.update(_pick(a, ("choices", "multi")))  # 2.41.0 (#1383): answer buttons under the comment
+    if a.get("portal"):  # 2.63.0 (#1513): a public answer the customer of a customer report sees
+        b["portal"] = True
     return api.call("POST", f"/tasks/{int(a['task_id'])}/comments", body=b)
 
 
@@ -479,7 +481,11 @@ TOOLS = [
                        "question of a task stays live", "items": {"type": "object", "properties": {
                            "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
                            "style": {"type": "string", "enum": ["default", "primary", "danger"]}}, "required": ["id", "label"]}},
-           "multi": {"type": "boolean", "description": "2.41.0: the person may pick several buttons"}}, ["task_id", "body"]), t_add_comment),
+           "multi": {"type": "boolean", "description": "2.41.0: the person may pick several buttons"},
+           "portal": {"type": "boolean", "description": "2.63.0: a public answer to the customer of a customer report (the task has a "
+                      "ticket, you may change the task): the customer sees it on the status page and gets it by mail. Write it for the "
+                      "customer: factual, friendly, no internal details, no names of other people. Default false = internal"}},
+          ["task_id", "body"]), t_add_comment),
     ("request_comment_approval", "2.41.0: ask for an approval in a task comment (task_id): a card 'Approval needed' with Yes / No under "
                                  "your comment, shown on the task's row until answered. title = what is to be approved, what = what happens "
                                  "on yes. Only people who may edit the task (and may instruct you) answer; the answer arrives as the event "
