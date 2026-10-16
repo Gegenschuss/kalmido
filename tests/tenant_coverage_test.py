@@ -574,6 +574,8 @@ ROUTES = {
     "GET /api/v1/lists/{}/notepads": "list", "POST /api/v1/lists/{}/notepads": "list", "PATCH /api/v1/notepads/{}": "list",
     "DELETE /api/v1/notepads/{}": "list", "PUT /api/v1/lists/{}/status-pad": "list", "GET /api/v1/lists/{}/weekly-status": "list",
     "GET /api/v1/time/check": "aggregate", "GET /api/v1/time/from-events": "aggregate", "POST /api/v1/agent/proposals/time": "agent",
+    # 2.55.0 (#1066): an agent reads / proposes arrangements of its person's views (p255_b_api_test.py: other person / org 404)
+    "GET /api/v1/layouts/blocks": "agent", "GET /api/v1/layouts/{}": "agent", "POST /api/v1/layouts/proposals": "agent",
     "GET /api/v1/dispo": "hub", "GET /api/v1/dispo/free": "hub", "POST /api/v1/agent/proposals/shoot": "hub",
 }
 
