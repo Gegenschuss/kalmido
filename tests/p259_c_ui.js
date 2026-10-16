@@ -44,6 +44,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
     {id: 903, from: 'agent', kind: 'message', body: 'Walker (Fortsetzung): goes on', job_id: 260, job_name: 'Walker', created_at: '2026-10-16T20:02:00Z', reactions: []},
     {id: 904, from: 'agent', kind: 'message', body: 'Job #171: nameless', job_id: 171, created_at: '2026-10-16T20:03:00Z', reactions: []},
     {id: 905, from: 'agent', kind: 'message', body: 'part of a nameless leader', job_id: 172, job_name: 'Ida B', job_parent: 171, created_at: '2026-10-16T20:04:00Z', reactions: []},
+    {id: 906, from: 'agent', kind: 'message', body: 'part without its leader', job_id: 253, job_name: 'Walker G', created_at: '2026-10-16T20:05:00Z', reactions: []},
     {id: 906, from: 'agent', kind: 'message', body: 'Job #300: an old message that names another job', job_id: 301, job_name: 'Nils', created_at: '2026-10-16T20:05:00Z', reactions: []}])}; chatMsgs()`);
   const box = d.createElement('div'); box.innerHTML = html;
   const msg = id => box.querySelector(`[data-mid="a:${id}"]`);
@@ -52,6 +53,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(tag(901) === 'Walker' && col(901) === cName('Walker'), `the tag shows the name, the colour comes from it: ${tag(901)} ${col(901)}`);
   check(tag(902) === 'Walker E' && msg(902).classList.contains('jpart') && col(902) === col(901), `a part job: its own name, the leader's colour, lighter (jpart): ${tag(902)} ${col(902)}`);
   check(tag(903) === 'Walker' && col(903) === col(901), 'a follow-up job with the same name: the same colour');
+  // 2.59.0 (#1827): a part job without job_parent (older service) is told by its name "Walker G"
+  check(tag(906) === 'Walker G' && msg(906).classList.contains('jpart') && col(906) === col(901), `a part job without job_parent: the leader's tone from its name: ${col(906)}`);
   check(tag(904) === 'Job #171' && col(904) === w.eval('AC_COLORS[171 % 12]'), `without a name: "Job #171" and the colour of the number: ${tag(904)}`);
   check(tag(905) === 'Ida B' && col(905) === col(904), 'a part of a nameless leader: the leader\'s number colour');
   check(tag(906) === 'Job #300' && col(906) === w.eval('AC_COLORS[300 % 12]'), `the text names another job than job_id: that job's tag, not job_name: ${tag(906)}`);
