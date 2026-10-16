@@ -7486,3 +7486,20 @@ body.cgdrag .week,body.cgdrag .cal{cursor:grabbing}
 @media (pointer:coarse){.cgnew .cgin{font-size:16px}.cgnew .cgdet{min-height:2.75rem}}
 @media (prefers-reduced-motion:no-preference){.cgnew{animation:cgin .16s ease-out}}
 @keyframes cgin{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+/* 2.53.0 B (#1426) list colours (12 tones, listcolor.js): the open list's colour is the accent of the list view (header,
+   ticks, progress, buttons; #main + #fab, never global) and a thin edge on task cards (boards, calendar, the collected
+   views); the edge is the list, the background stays the priority's. The theme picks the tone: dark --lpd, light --lpl. */
+.lpv,.lp-acc{--lpc:var(--lpd)}
+:root[data-theme="light"] :is(.lpv,.lp-acc){--lpc:var(--lpl)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] :is(.lpv,.lp-acc){--lpc:var(--lpl)} }
+#main.lp-acc,#fab.lp-acc{--accent:var(--lpd);--accent-ink:var(--lpid);--accent-soft:color-mix(in srgb,var(--accent) 9%,var(--bg));--st-complete:var(--accent)}
+:root[data-theme="light"] :is(#main,#fab).lp-acc{--accent:var(--lpl);--accent-ink:var(--lpil)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] :is(#main,#fab).lp-acc{--accent:var(--lpl);--accent-ink:var(--lpil)} }
+#main:not(.lp-one) #view .trow.lpc,#view .kcards .trow.lpc{box-shadow:inset .1875rem 0 0 var(--lpc)}
+#main:not(.lp-one) #view .trow.lpc::before,#view .kcards .trow.lpc::before{left:.375rem}
+.cal .ev.lpc,.week .ev.lpc,.wev.lpc{border-left-color:var(--lpc)}
+.wev.lpc{background:color-mix(in srgb,var(--lpc) 16%,var(--bg2))}
+:is(.cal,.week) .ev.lpc.p5{background:color-mix(in srgb,var(--p5) 20%,var(--bg3))}
+:is(.cal,.week) .ev.lpc.p3{background:color-mix(in srgb,var(--p3) 20%,var(--bg3))}
+:is(.cal,.week) .ev.lpc.p1{background:color-mix(in srgb,var(--p1) 20%,var(--bg3))}
+.wev.lpc.p5{background:color-mix(in srgb,var(--p5) 22%,var(--bg2))}.wev.lpc.p3{background:color-mix(in srgb,var(--p3) 22%,var(--bg2))}.wev.lpc.p1{background:color-mix(in srgb,var(--p1) 22%,var(--bg2))}

@@ -1746,6 +1746,8 @@ USER_DEFAULTS = {
     "side_icons": "line",       # 2.36.0 (#1117): the sidebar's list icons: line (grey line icon for the name's emoji) | emoji | dot
     "prio_bg": "",              # 2.40.0 (#1416): tasks with a priority tinted in its colour: '' (off) | soft | strong
     "person_colors": "1",       # 2.47.1 (#1721): people in their account colour ('0' = only agents coloured)
+    "list_color_dot": "0",      # 2.53.0 (#1426): 1 = list colours only as the dot in the sidebar (no accent, no card edge)
+    "folder_colors": "{}",      # 2.53.0 (#1426): json {folder path: colour} of my folders; a new list in it takes the colour
     "side_progress": "1",       # 2.36.0 (#1117): progress bars of projects in the sidebar (0 = hidden)
     "cal_today": "1",           # "Events today" block on Today (external calendar subscriptions)
     "cal_tasks": "1",           # 2.36.1 (#1127): tasks with a date in the calendar views (0 = events only; Today, search, feeds unchanged)

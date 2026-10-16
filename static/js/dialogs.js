@@ -339,7 +339,7 @@ function listMenuItems(id, anchor) {
   const items = [...(l.is_inbox ? [] : [{label: tr('Edit list…'), icon: 'edit', fn: () => listModal(id)}]), ...(shareOk(l) && !l.archived ? [{label: tr(collab() ? N_('Share…') : N_('Ownership…')), icon: 'users', fn: () => shareModal(id)}] : [])];
   // 2.27.0 (#974): "Agent: <name>…" right under "Share…": opens the share dialog at its Agents part (one place for the setting)
   // 2.36.2 (#1135): from the sidebar (right-click / long press): the colour in one tap (the 9 fixed colours + none)
-  if (own && !l.is_inbox && !l.archived && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.unshift({rcls: 'mcols', rlab: tr('Color'), row: LCOLORS.map((c, i) => ({label: c ? tr('Color {0}', i) : tr('No color'), cls: 'mcol', swc: c, on: (l.color || '') === c, fn: () => licColor(id, c)}))}, '-');
+  if (own && !l.is_inbox && !l.archived && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.unshift(lp_menuRow(lp_col(l), c => licColor(id, c)), '-');  // 2.53.0 (#1426): the 12 tones (listcolor.js)
   if (agentsOn() && shareOk(l) && canManage(l) && !l.is_inbox && !l.archived) {
     const ag = listAgents(l)[0];
     items.push({label: ag ? tr('Agent: {0}…', ag.name) : tr('Agent…'), ...(ag ? {sub: listenLabel(l)} : {}), icon: 'bot', cls: 'magent', fn: () => shareModal(id, {focus: 'agents'})});  // 2.30.0 (#1034)
@@ -382,7 +382,7 @@ function listMenuItems(id, anchor) {
 // (notifications, progress, agent access, tasks from notes: rare: 1) in a second level "More list options…" (one alone stays
 // inline), and what cannot simply be taken back (archive, delete: danger: 1) last, set apart
 async function licColor(id, c) {  // 2.36.2 (#1135): the list colour from the sidebar menu, undoable
-  const l = listById(id); if (!l || (l.color || '') === c) return;
+  const l = listById(id); if (!l || lp_col(l) === c) return;  // 2.53.0 (#1426): the shown tone
   const e = await listPatch(id, {color: c}, tr('Colour of {0}', qn(lname(l))));
   if (e) offerUndo(tr('Colour of {0}', lname(l)), e);
 }
@@ -770,7 +770,7 @@ function listModal(id, folder = '', o = {}) {
     ${own && !l.is_inbox ? `<div class="row ltkrow" ${swArea(l) || l.tickets ? '' : 'hidden'}><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Templates…')}</button>` : ''}</div>
     <div class="shint lhint ltkhint" ${swArea(l) || l.tickets ? '' : 'hidden'}>${tr('Tasks get a type with an icon, a filter and quick add !bug / !feature; new bugs and features start with a note template.')}</div>` : ''}
     ${id && progressOn() ? `<div class="row"><label>${tr('Progress')}</label><label class="chkl"><input type="checkbox" id="l-showprog" ${progHidden(id) ? '' : 'checked'}> ${tr('Show the progress bar')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
-    <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, i) => `<button type="button" style="background:${c || 'var(--bg4)'}" class="${(l.color || '') === c ? 'on' : ''}" aria-pressed="${(l.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', i) : tr('No color'))}" data-c="${c}" ${adis}></button>`).join('')}</div></div>
+    <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${lp_dlgBtns(id || l.color ? lp_col(l) : lp_folderColor(folder), adis) /* 2.53.0 (#1426): the 12 tones; a new list: its folder's */}</div></div>
     ${id && !l.is_inbox && statusOn() && l.kind === 'project' ? `<div class="row"><label>${tr('Project status')}</label>${statusPill(l, true, true)}</div>` : ''}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
     <div class="shint lhint">${tr('When a task is postponed, the tasks of this list it blocks that would now start too early move by the same number of days (also in the timeline). One undo takes the whole chain back.')}</div>` : ''}
@@ -827,6 +827,7 @@ function listModal(id, folder = '', o = {}) {
       : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value,  // members: only their own placement / view
         ...(ladm ? {name: emo + nm, color: $('#l-col button.on', md)?.dataset.c || ''} : {})};  // 2.40.0 (#1431)
     if ((own || ladm) && !nm) delete body.name;  // an empty name is never saved (leaving the field puts the saved one back)
+    if ('color' in body) body.color = lp_keep(listById(id) || l, body.color);  // 2.53.0 (#1426): an old free colour stays stored
     return body;
   };
   const lsaved = e => {
@@ -844,7 +845,7 @@ function listModal(id, folder = '', o = {}) {
     if (document.activeElement !== $('#l-folder', md)) $('#l-folder', md).value = fDisp(x.folder || '');
     $('#l-view', md).value = listView(x); $('#l-kind', md).value = x.kind || 'list'; if ($('#l-kindp', md)) $('#l-kindp', md).checked = (x.kind || 'list') === 'project';
     $('#l-khint', md).innerHTML = kindHint(x.kind || 'list'); $('.kproj', md).hidden = (x.kind || 'list') !== 'project';
-    $$('#l-col button', md).forEach(b => { b.classList.toggle('on', (x.color || '') === b.dataset.c); b.setAttribute('aria-pressed', String((x.color || '') === b.dataset.c)); });
+    $$('#l-col button', md).forEach(b => { b.classList.toggle('on', lp_col(x) === b.dataset.c); b.setAttribute('aria-pressed', String(lp_col(x) === b.dataset.c)); });  // 2.53.0 (#1426)
     if ($('#l-depshift', md)) $('#l-depshift', md).checked = !!x.dep_shift;
     if ($('#l-tickets', md)) $('#l-tickets', md).checked = !!x.tickets;
     if ($('#l-ptype', md) && !ptPend) { $('#l-ptype', md).value = x.ptype || ''; $('#l-pthint', md).textContent = ptypeHint(x.ptype || ''); }

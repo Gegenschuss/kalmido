@@ -398,6 +398,7 @@ function folderMenu(anchor, f) {
   const into = folderNames().filter(t => !fParent(t) && t !== f && t !== fParent(f));
   const own = folderLists(f).some(l => isOwner(l)), noOwn = tr('Only your own lists can be shared');
   menu(anchor, [
+    ...lp_folderMenuRow(f),  // 2.53.0 (#1426): the folder's colour (new lists in it take it)
     {label: tr('New list in this folder'), icon: 'plus', fn: () => listModal(null, f)},
     // 2.37.0 (#1158): the folder settings always (they hold for new lists too); without lists of my own the share entries
     // stay visible but greyed out with the reason (lists of others cannot be shared)

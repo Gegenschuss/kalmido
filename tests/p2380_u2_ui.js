@@ -51,7 +51,8 @@ const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .0
   check(!!d.querySelector('#top h1 .lic.h.lcol svg'), 'header: the open list\'s icon in its colour');
   check(/--lcl:#[0-9a-f]{6}/.test(sic(CART).querySelector('.lic').getAttribute('style')), 'the darker light-theme colour travels along (--lcl)');
   // the light theme's colour: >= 3:1 on the light sidebar for every list colour of the picker
-  const pal = w.eval('LCOLORS').filter(Boolean), dim = pal.map(c => [c, w.eval(`licDim(${JSON.stringify(c)})`)]);
+  // 2.53.0 (#1426): the list colours of the picker = the 12 tones
+  const pal = w.eval('LP_TONES.map(t => t[2])'), dim = pal.map(c => [c, w.eval(`licDim(${JSON.stringify(c)})`)]);
   const low = dim.filter(([, c]) => cr(c, '#f8f8f9') < 3);
   check(dim.every(([, c]) => /^#[0-9a-f]{6}$/.test(c)) && !low.length, 'licDim: every picker colour >= 3:1 on the light sidebar ' + JSON.stringify(low));
   check(w.eval(`licDim('#abc')`) === w.eval(`licDim('#aabbcc')`), 'licDim: short hex works');

@@ -7944,5 +7944,7 @@
   "New event “{0}”": "Nuevo evento «{0}»",
   "Change a repeating event": "Cambiar un evento periódico",
   "Change every date of this repeating event?": "¿Cambiar todas las fechas de este evento periódico?",
-  "Single dates of a subscribed calendar cannot be changed here.": "Las fechas sueltas de un calendario suscrito no se pueden cambiar aquí."
+  "Single dates of a subscribed calendar cannot be changed here.": "Las fechas sueltas de un calendario suscrito no se pueden cambiar aquí.",
+  "List colours only as a dot": "Colores de lista solo como punto",
+  "An open list takes its colour for the header, ticks and buttons, and tasks show it as a thin edge on boards, in the calendar and in Today or Week. On: only the dot in the sidebar. For all your devices.": "Una lista abierta usa su color en la cabecera, las marcas y los botones, y las tareas lo muestran como un borde fino en los tableros, en el calendario y en Hoy o Semana. Activado: solo el punto en la barra lateral. Para todos tus dispositivos."
 }

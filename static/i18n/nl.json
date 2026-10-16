@@ -7944,5 +7944,7 @@
   "New event “{0}”": "Nieuwe afspraak ‘{0}’",
   "Change a repeating event": "Een terugkerende afspraak wijzigen",
   "Change every date of this repeating event?": "Alle datums van deze terugkerende afspraak wijzigen?",
-  "Single dates of a subscribed calendar cannot be changed here.": "Losse datums van een geabonneerde agenda kunnen hier niet worden gewijzigd."
+  "Single dates of a subscribed calendar cannot be changed here.": "Losse datums van een geabonneerde agenda kunnen hier niet worden gewijzigd.",
+  "List colours only as a dot": "Lijstkleuren alleen als stip",
+  "An open list takes its colour for the header, ticks and buttons, and tasks show it as a thin edge on boards, in the calendar and in Today or Week. On: only the dot in the sidebar. For all your devices.": "Een geopende lijst gebruikt haar kleur voor de kop, vinkjes en knoppen, en taken tonen haar als een dunne rand op borden, in de agenda en in Vandaag of Week. Aan: alleen de stip in de zijbalk. Voor al je apparaten."
 }
