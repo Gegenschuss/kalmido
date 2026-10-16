@@ -132,7 +132,10 @@ window.__fake = html => { const d = document.createElement('div'); d.innerHTML =
     await hover(`#d-tl a.tref[data-tref="${T1}"]`, 1270, 890);
     await sleep(200);
     check(!(await ev(`!!document.querySelector('.rfpv')`)), 'preview: not yet after 0.2 s');
-    check(await ready(ev, `!!document.querySelector('.rfpv.on')`, 8), 'preview: shown after 0.4 s');
+    // 2.53.1 CI: a live redraw of the detail (the new comment) can swap the link under the pointer - hover the new one again
+    let pvOn = await ready(ev, `!!document.querySelector('.rfpv.on')`, 8);
+    for (let i = 0; i < 2 && !pvOn; i++) { await hover(`#d-tl a.tref[data-tref="${T1}"]`, 1270, 890); pvOn = await ready(ev, `!!document.querySelector('.rfpv.on')`, 8); }
+    check(pvOn, 'preview: shown after 0.4 s');
     const pv = await ev(`(() => { const e = document.querySelector('.rfpv'), r = e.getBoundingClientRect(); return {t: e.textContent, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight}; })()`);
     check(pv.in, 'preview: inside the screen at the bottom right corner');
     check(/Write the brief/.test(pv.t) && /Agents/.test(pv.t) && /High/.test(pv.t) && /#studio/.test(pv.t) && /First line of the brief/.test(pv.t) && /1 comment/.test(pv.t),
