@@ -8187,5 +8187,8 @@
   "Look at how my start page is arranged (tools get_view_layout and list_layout_blocks, view dashboard, user_id = my id) and which lists I use most. Only if a clearly better arrangement exists (for example my favourites and what I use every day on top), send me ONE proposal (tool propose_layout) with a short reason. Never repeat one I declined. Change nothing yourself.": "Sieh dir an, wie meine Startseite angeordnet ist (Werkzeuge get_view_layout und list_layout_blocks, Ansicht dashboard, user_id = meine id) und welche Listen ich am meisten nutze. Nur wenn es eine deutlich bessere Anordnung gibt (zum Beispiel meine Favoriten und was ich täglich nutze nach oben), schick mir EINEN Vorschlag (Werkzeug propose_layout) mit kurzer Begründung. Wiederhole nie einen, den ich abgelehnt habe. Ändere selbst nichts.",
   "Customize statistics": "Statistik anpassen",
   "Customize the client card": "Kundenkarte anpassen",
-  "Customize Family": "Familie anpassen"
+  "Customize Family": "Familie anpassen",
+  "Your colour per workspace": "Deine Farbe je Arbeitsbereich",
+  "Only you see it: a light tint in the sidebar and a dot in the workspace switch. Without a choice an organisation shows the colour its admins chose; Private stays without colour.": "Nur du siehst sie: ein leichter Farbhauch in der Seitenleiste und ein Punkt im Arbeitsbereich-Umschalter. Ohne eigene Wahl zeigt eine Organisation die Farbe, die ihre Admins gewählt haben; Privat bleibt ohne Farbe.",
+  "Default (colour of the organisation)": "Standard (Farbe der Organisation)"
 }

@@ -46,24 +46,27 @@ function wsBadge(l) {
   if (!wsOn() || !l || l.is_inbox) return '';
   const ws = wsOf(l), nm = wsLabel(l.org_id);
   // 2.53.0 (#1474): an organisation's list: the sign in the organisation's colour (Private stays neutral)
-  return `<button type="button" class="wsbadge" data-act="ws-menu" aria-haspopup="menu" title="${esc(tr('Workspace: {0}', nm))}" aria-label="${esc(tr('Workspace: {0}', nm))}"${wsc_attr(l.org_id)}>${wsIcon(ws)}<span>${esc(nm)}</span></button>`;
+  return `<button type="button" class="wsbadge" data-act="ws-menu" aria-haspopup="menu" title="${esc(tr('Workspace: {0}', nm))}" aria-label="${esc(tr('Workspace: {0}', nm))}"${wsp_attr(ws) /* 2.57.0 B (#1807): my colour, Private too */}>${wsIcon(ws)}<span>${esc(nm)}</span></button>`;
 }
 // the switch in the sidebar (under the brand): one button naming the shown workspace (a long organisation name fits), the
 // menu offers Private | <organisations> | All workspaces
 function wsBarHtml() {
   if (!wsOn()) return '';
   const cur = wsCur();
-  return `<button type="button" class="wsbar ${cur === 'all' ? '' : 'on'}" data-act="ws-menu" aria-haspopup="menu" aria-label="${esc(tr('Workspace') + ': ' + wsName(cur))}" title="${esc(tr('Workspace') + ' · ' + tr('Only this workspace is shown'))}"${wsc_attr(wsc_ofWs(cur)) /* 2.53.0 (#1474) */}>${wsIcon(cur)}<span class="wsn">${esc(wsName(cur))}</span>${ic('chev', 's')}</button>`;
+  return `<button type="button" class="wsbar ${cur === 'all' ? '' : 'on'}" data-act="ws-menu" aria-haspopup="menu" aria-label="${esc(tr('Workspace') + ': ' + wsName(cur))}" title="${esc(tr('Workspace') + ' · ' + tr('Only this workspace is shown'))}"${wsp_attr(cur) /* 2.53.0 (#1474), 2.57.0 B (#1807) */}>${wsIcon(cur)}${cur === 'all' ? '' : wsp_dot(cur)}<span class="wsn">${esc(wsName(cur))}</span>${ic('chev', 's')}</button>`;
 }
 // the chip in the header while one workspace is shown (a click opens the switch as a menu)
 function wsChip() {
   if (!wsOn() || wsCur() === 'all') return '';
   const cur = wsCur();
-  return `<button type="button" class="wschip" data-act="ws-menu" aria-haspopup="menu" title="${esc(tr('Workspace: {0}', wsName(cur)) + ' · ' + tr('Only this workspace is shown'))}" aria-label="${esc(tr('Workspace: {0}', wsName(cur)))}"${wsc_attr(wsc_ofWs(cur)) /* 2.53.0 (#1474) */}>${wsIcon(cur)}<span>${esc(wsName(cur))}</span></button>`;
+  return `<button type="button" class="wschip" data-act="ws-menu" aria-haspopup="menu" title="${esc(tr('Workspace: {0}', wsName(cur)) + ' · ' + tr('Only this workspace is shown'))}" aria-label="${esc(tr('Workspace: {0}', wsName(cur)))}"${wsp_attr(cur) /* 2.53.0 (#1474), 2.57.0 B (#1807) */}>${wsIcon(cur)}<span>${esc(wsName(cur))}</span></button>`;
 }
 function wsMenu(anchor) {
   const cur = wsCur();
-  menu(anchor, wsOptions().map(ws => ({label: wsName(ws), icon: ws === 'private' ? 'home' : ws === 'all' ? 'grid' : 'brief', on: ws === cur, fn: () => wsSet(ws)})));
+  const opts = wsOptions();
+  const p = menu(anchor, opts.map(ws => ({label: wsName(ws), icon: ws === 'private' ? 'home' : ws === 'all' ? 'grid' : 'brief', on: ws === cur, fn: () => wsSet(ws)})));
+  // 2.57.0 B (#1807): a colour dot in front of each workspace's name (my colour or its default; neutral = a ring)
+  opts.forEach((ws, i) => { if (ws !== 'all') p?.querySelector(`[role="menuitem"][data-i="${i}"] .ml`)?.insertAdjacentHTML('beforebegin', wsp_dot(ws)); });
 }
 // the default workspace of a new list: the shown one; with "All" the one of the folder's lists, else the first organisation
 function wsDefaultOrg(folder = '') {

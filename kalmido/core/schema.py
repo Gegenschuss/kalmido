@@ -1835,6 +1835,9 @@ USER_DEFAULTS = {
     "agent_push": "0",
     # 2.53.0 C (#1424): 1 = "Urgent" set by someone else on a task counts for my pushes ('0' = as the list; still shown)
     "tbl_accept": "1",
+    # 2.57.0 B (#1807): my own colour per workspace, json {"private" | "org:<id>": tone key of LP_TONES | "none"};
+    # a missing key = the default (an organisation: its admins' colour, Private: neutral). Only I see it.
+    "ws_colors": "{}",
 }
 # global, server-internal (table settings); the legacy single-user rows stay there untouched
 GLOBAL_DEFAULTS = {

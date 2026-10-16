@@ -14,10 +14,51 @@ const WSC_TONES = [
 // the colour of a workspace. Private has none (neutral); an organisation has the one its admins chose
 // (orgs.color, nearest tone of WSC_TONES) or, before that, a default tone from its id -- coloured always means "others see it"
 const wsc_ix = (color, orgId) => { const i = color ? lp_nearIx(color, WSC_TONES, [0, 1]) : -1; return i >= 0 ? i : Math.abs(+orgId - 1) % WSC_TONES.length; };
-const wsc_tone = orgId => orgId ? WSC_TONES[wsc_ix(wsOrg(orgId)?.color, orgId)] : null;
+// 2.57.0 B (#1807): my own choice wins (setting ws_colors, a tone of LP_TONES -> its dark / light value, "none" = neutral)
+const wsc_tone = orgId => { if (!orgId) return null; const t = wsp_own('org:' + +orgId); return t === 'none' ? null : t ? [t[2], t[4]] : WSC_TONES[wsc_ix(wsOrg(orgId)?.color, orgId)]; };
 const wsc_vars = orgId => { const t = wsOn() && wsc_tone(orgId); return t ? `--wsd:${t[0]};--wsl:${t[1]}` : ''; };
 // the attributes for an element in a workspace's colour: data-wsc + style="--wsd/--wsl" (app.css picks the theme's tone)
 const wsc_attr = orgId => { const v = wsc_vars(orgId); return v ? ` data-wsc="1" style="${v}"` : ''; };
+// ---- 2.57.0 B (#1807): my own colour per workspace (setting ws_colors {"private" | "org:<id>": tone key | "none"}; only I
+// see it). Without a choice: an organisation keeps its admins' colour, Private stays neutral.
+const wsp_cols = () => { try { const o = JSON.parse(S.settings?.ws_colors || '{}'); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch { return {}; } };
+// my choice for a workspace: the LP_TONES row, 'none' or undefined (= the default)
+const wsp_own = ws => { const v = wsp_cols()[ws]; return v === 'none' ? 'none' : LP_TONES.find(t => t[0] === v); };
+// the tone [dark, light] of a workspace as shown to me ('all' and a neutral one: null)
+const wsp_tone = ws => { if (!wsOn() || !ws || ws === 'all') return null; if (ws !== 'private') return wsc_tone(wsc_ofWs(ws)); const t = wsp_own('private'); return t && t !== 'none' ? [t[2], t[4]] : null; };
+const wsp_vars = ws => { const t = wsp_tone(ws); return t ? `--wsd:${t[0]};--wsl:${t[1]}` : ''; };
+// like wsc_attr for a workspace key (the switch, the chip, a list's sign): Private takes my colour too
+const wsp_attr = ws => { const v = wsp_vars(ws); return v ? ` data-wsc="1" style="${v}"` : ''; };
+// the dot in front of a workspace's name (the switch and its menu); neutral = a hollow ring
+const wsp_dot = ws => `<span class="wsp-dot" aria-hidden="true"${wsp_attr(ws)}></span>`;
+// the tint of the sidebar (drawer and fold too): --sbbg on #side while one workspace is shown, neutral under "All"
+function wsp_side() { const cur = wsCur(); lp_put($('#side'), 'wsp-on', cur === 'all' ? '' : wsp_vars(cur), WSC_VARS); }
+async function wsp_set(ws, v) {
+  const before = S.settings.ws_colors || '{}', o = wsp_cols();
+  if ((o[ws] || '') === v) return;
+  if (v) o[ws] = v; else delete o[ws];
+  const after = JSON.stringify(o), lab = tr('Colour of {0}', qn(wsName(ws)));
+  const put = x => async () => { S.settings.ws_colors = x; render(); wsp_paneMark(); await api('PATCH', '/api/settings', {ws_colors: x}); return {}; };
+  try { await put(after)(); } catch { S.settings.ws_colors = before; render(); wsp_paneMark(); return; }
+  offerUndo(lab, histAdd({label: lab, undo: put(before), redo: put(after)}));
+}
+// Settings > Workspaces: my colour per workspace -- Default (organisations: the admins' colour), No color, the 12 list tones
+function wsp_paneHtml() {
+  const row = ws => {
+    const nm = wsName(ws), org = ws !== 'private', def = org ? WSC_TONES[wsc_ix(wsOrg(wsc_ofWs(ws))?.color, wsc_ofWs(ws))][0] : '';
+    const b = (v, bg, lab) => `<button type="button" style="background:${bg}" aria-label="${esc(lab)}" title="${esc(lab)}" data-wspc="${v}" class="${v ? '' : 'wsp-def'}"></button>`;
+    return `<div class="row wsp-row" data-wsp="${esc(ws)}"><span class="wsp-nm">${wsIcon(ws)}<span>${esc(nm)}</span></span><div class="colors" role="group" aria-label="${esc(tr('Colour of {0}', nm))}">${org ? b('', def, tr('Default (colour of the organisation)')) : ''}${b(org ? 'none' : '', 'var(--bg4)', tr('No color'))}${LP_TONES.map(t => b(t[0], t[2], tr(t[1]))).join('')}</div></div>`;
+  };
+  return `<div class="wsp-pane"><h5>${tr('Your colour per workspace')}</h5><div class="shint keep">${tr('Only you see it: a light tint in the sidebar and a dot in the workspace switch. Without a choice an organisation shows the colour its admins chose; Private stays without colour.')}</div>${wsOptions().filter(w => w !== 'all').map(row).join('')}</div>`;
+}
+// the pressed swatch of each row follows my setting (after a change, its Undo, another device)
+function wsp_paneMark() {
+  const cols = wsp_cols();
+  for (const r of $$('.wsp-row[data-wsp]')) {
+    const ws = r.dataset.wsp, v = LP_TONES.some(t => t[0] === cols[ws]) || (cols[ws] === 'none' && ws !== 'private') ? cols[ws] : '';
+    $$('[data-wspc]', r).forEach(b => { const on = b.dataset.wspc === v; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+  }
+}
 const wsc_ofWs = ws => String(ws || '').startsWith('org:') ? +ws.slice(4) : 0;
 // the sidebar row of an organisation's list: a stripe on its left edge
 const wsc_rowAttr = l => l && !l.is_inbox && l.org_id ? wsc_attr(l.org_id) : '';
@@ -43,6 +84,7 @@ function wsc_sync() {
   const k = S.route?.mod === 'tasks' ? String(S.route.key || '') : '';
   lp_put($('#main'), 'wsc-on', wsc_listVars(k.startsWith('l:') ? listById(+k.slice(2)) : null), WSC_VARS);
   wsc_detail();
+  wsp_side();  // 2.57.0 B (#1807): the sidebar's tint
 }
 function wsc_detail() {
   const t = S.sel ? taskById(S.sel) : null;
@@ -52,6 +94,12 @@ function wsc_detail() {
 // ---- Settings > Workspaces: an organisation's colour (its admins choose, every member sees the same)
 function wsc_paneDraw(box) {
   if (!box?.isConnected) return;  // the dialog closed while /api/orgs loaded
+  if (!box.querySelector('.wsp-pane')) {  // 2.57.0 B (#1807): my own colours, above the organisations
+    box.insertAdjacentHTML('afterbegin', wsp_paneHtml()); wsp_paneMark();
+    box.querySelector('.wsp-pane').addEventListener('click', e => {
+      const b = e.target.closest('[data-wspc]'); if (b && !b.classList.contains('on')) wsp_set(b.closest('[data-wsp]').dataset.wsp, b.dataset.wspc);
+    });
+  }
   const orgs = (box._j || {}).orgs || [];
   for (const det of box.querySelectorAll('details.wsorg[data-oid]')) {
     const o = orgs.find(x => x.id === +det.dataset.oid); if (!o || det.querySelector('.wscpick')) continue;

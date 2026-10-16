@@ -198,6 +198,8 @@ def clean_setting(k, v):
         return json.dumps(list(dict.fromkeys(f for f in (clean_folder(x, False) for x in arr) if f)), ensure_ascii=False)
     if k == "folder_colors":  # 2.53.0 (#1426): {folder path: "#rrggbb"} of my folders
         return lp_clean_folder_colors(v)
+    if k == "ws_colors":  # 2.57.0 B (#1807): my own colour per workspace
+        return wsp_clean_ws_colors(v)
     if k == "show_done_views":
         return clean_done_views(v)
     if k == "wgstd_hide":  # 2.46.2 (#1726): {view key: short signature}
@@ -360,6 +362,27 @@ def lp_clean_folder_colors(v):
         if f and col:
             out[f] = col
     return json.dumps(out, ensure_ascii=False)
+
+
+# 2.57.0 B (#1807): the tone keys a workspace colour may take (same keys as LP_TONES in listcolor.js) + "none"
+WSP_TONES = ("red", "orange", "yellow", "lime", "green", "teal", "sky", "blue", "violet", "purple", "pink", "grey")
+WSP_KEY_RE = re.compile(r"private|org:[1-9][0-9]{0,11}")
+
+
+def wsp_clean_ws_colors(v):
+    """2.57.0 B (#1807): my colours of my workspaces as stored json {"private" | "org:<id>": tone | "none"}. Strict: an
+    unknown key or tone is a 400. A key of an organisation I left stays harmless (the client only reads mine)."""
+    bad = BadInput(tr("Invalid value: {0}", "ws_colors"))
+    try:
+        o = json.loads(v or "{}") if isinstance(v, str) else None
+    except ValueError:
+        raise bad from None
+    if not isinstance(o, dict) or len(o) > 100:
+        raise bad
+    for key, tone in o.items():
+        if not isinstance(key, str) or not WSP_KEY_RE.fullmatch(key) or tone not in (*WSP_TONES, "none"):
+            raise bad
+    return json.dumps(o, ensure_ascii=False, separators=(",", ":"))
 
 
 @app.patch("/api/settings")
