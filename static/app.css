@@ -7687,3 +7687,6 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+
+/* 2.62.0 C (#1485): the head of the list and folder settings (name, "Saved · Undo", close) stays on top while the dialog scrolls */
+.lmodal .card>.lhdr,.fsmodal .card>.lhdr{position:sticky;top:0;z-index:3;background:var(--bg2);margin:-1.25rem -1.25rem .5rem;padding:1rem 1.25rem .5rem}
