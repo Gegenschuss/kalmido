@@ -42,6 +42,7 @@ TABLES = (
     "office_pay_props",  # 2.51.0 A (#1350): payment suggestions of agents
     "task_bell",  # 2.53.0 C (#1424): the bell of one task per person (NULL = a private list's task)
     "nl_conns", "nl_segments", "nl_members", "nl_runs",  # 2.55.0 E (#1455): the newsletter connection (NULL = a person's own)
+    "file_text",  # 2.61.0 C (#1820): recognised text of stored files (NULL = a private file, the app checks the file)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

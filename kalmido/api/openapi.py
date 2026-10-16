@@ -207,7 +207,8 @@ def openapi_spec():
             "text": nul("string", description="The text (PDF: the text layer, pages separated by a blank line); null for images, other files and errors"),
             "chars": {"type": "integer"}, "truncated": {"type": "boolean", "description": "true = cut at max_chars (at most 200000) or after 1000 pages"},
             "pages": {"type": "integer", "description": "PDF: number of pages"}, "pages_read": {"type": "integer"},
-            "no_text_layer": {"type": "boolean", "description": "PDF: a scanned PDF without a text layer (no OCR): text is empty"},
+            "no_text_layer": {"type": "boolean", "description": "PDF: a scanned PDF without a text layer: text is empty unless source is ocr"},
+            "source": {"type": "string", "enum": ["ocr"], "description": "2.61.0: the text was recognised in the background (scanned PDF, photo)"},
             "error": {"type": "string", "enum": ["encrypted", "unreadable", "too_complex"], "description": "PDF: why it could not be read"},
             "message": nul("string", description="A hint in the user's language (scanned PDF, image, error)")}},
         "Progress": {"type": "object", "properties": {"done": {"type": "integer"}, "total": {"type": "integer"}, "overdue": {"type": "integer"},
@@ -573,7 +574,8 @@ def openapi_spec():
                                              [pid("id", "Attachment id"), q("max_chars", "At most this many characters (1-200000, default 200000)", {"type": "integer"})],
                                              desc="Same rights as GET /attachments/{id}: agents only see files of lists shared with them (else 404). "
                                                   "PDFs are read on the server in a limited process (at most 20 MB, 1000 pages, 20 seconds); a scanned "
-                                                  "PDF without a text layer answers no_text_layer: true (no OCR). Images answer kind image and the url "
+                                                  "PDF without a text layer answers no_text_layer: true; since 2.61.0 a scan or photo whose text the server "
+                                                  "recognised in the background brings that text with source: ocr. Images answer kind image and the url "
                                                   "of the file; other files kind other. Results are cached per file content. 413 = larger than 20 MB, "
                                                   "503 = several PDFs are being read right now (Retry-After).")},
         "/chat-attachments/{id}": {

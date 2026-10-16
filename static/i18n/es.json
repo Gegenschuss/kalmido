@@ -8213,5 +8213,17 @@
   "Photos": "Fotos",
   "Photo metadata of {0}": "Metadatos de fotos de {0}",
   "Taken on {0} at {1}": "Tomada el {0} a las {1}",
-  "from the capture date of the photo": "de la fecha de captura de la foto"
+  "from the capture date of the photo": "de la fecha de captura de la foto",
+  "Text recognised": "Texto reconocido",
+  "The text of this file was recognised: the search finds it.": "El texto de este archivo se ha reconocido: la búsqueda lo encuentra.",
+  "No text found": "No se encontró texto",
+  "The text recognition found no text in this file.": "El reconocimiento de texto no encontró texto en este archivo.",
+  "Recognising text…": "Reconociendo texto…",
+  "The text of this file is being recognised in the background.": "El texto de este archivo se está reconociendo en segundo plano.",
+  "Found in the file {0}": "Encontrado en el archivo {0}",
+  "Search files: name or text": "Buscar archivos: nombre o texto",
+  "Found in the text": "Encontrado en el texto",
+  "in {0}": "en {0}",
+  "Project {0}": "Proyecto {0}",
+  "Search results": "Resultados de búsqueda"
 }

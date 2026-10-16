@@ -195,6 +195,7 @@ ORDER = (
     "docs.ocr",  # 2.48.0 (#1111): text recognition + preview images (no routes)
     "docs.store",  # 2.48.0 (#1111): documents: tables, sealing, word index, recognition run (no routes)
     "docs.ingest",  # 2.48.0 (#1111): docs_ingest + the background queue, mail / inbox folder
+    "files.textscan",  # 2.61.0 C (#1820): text recognition of normal stored files (queue, search, Ablage search route)
     "docs.web",  # 2.48.0 (#1111): the routes of the documents area
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
     "paperless.ngx",  # 2.48.0 (#1152): Paperless-ngx connection + import into the documents (self-hosted only)
