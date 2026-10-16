@@ -115,7 +115,7 @@ check(r.ok, f"public link created ({r.status_code} {r.text[:120]})")
 k = r.json()["link"]
 TOK = k["url"].split("/s/")[1]
 check(k["show"] == {"progress": False, "sections": True, "due": True, "assignees": False, "tags": False, "files": False, "brand": False,
-                    "fields": [], "tag": None}, f"a new link shows what 2.49 showed (sections + due dates) {k['show']}")
+                    "feedback": False, "fields": [], "tag": None}, f"a new link shows what 2.49 showed (sections + due dates) {k['show']}")
 check({f["id"] for f in k["options"]["fields"]} == {F1, F2} and [t["name"] for t in k["options"]["tags"]] == ["kunde"],
       f"the dialog offers the list's fields and tags {k['options']}")
 check(A.get(B + f"/api/lists/{L}/public-link").json().get("options", {}).get("fields"), "GET offers the options without a link too")
@@ -158,6 +158,27 @@ check("<h2>Dreh</h2>" not in p and "4 May" not in p and "2030" not in p, "sectio
 r = requests.post(B + f"/s/{TOK}/tick", data={"task": T2, "to": "done"}, allow_redirects=False)
 check(r.status_code == 404, f"ticking a task the link does not show: 404 ({r.status_code})")
 check(A.get(B + f"/api/tasks/{T2}").json().get("status") == 0, "the hidden task stays open")
+# the customer's comment (switch, off by default)
+check('id="fb"' not in anon("/s/" + TOK).text, "no comment form while the switch is off")
+r = requests.post(B + f"/s/{TOK}/feedback", data={"task": T1, "name": "Kim Kunde", "text": "x"}, allow_redirects=False)
+check(r.status_code == 403, f"posting a comment while it is off: 403 ({r.status_code})")
+A.put(B + f"/api/lists/{L}/public-link", json={"show": {"feedback": True}})
+p = anon("/s/" + TOK).text
+FB = form_key(p)
+check('id="fb"' in p and f'<option value="{T1}">' in p and f'<option value="{T2}">' not in p, "the comment form offers the shown tasks only")
+fb = lambda **d: requests.post(B + f"/s/{TOK}/feedback", data=d, allow_redirects=False)  # noqa: E731
+check(fb(f="0" * 64, task=T1, name="Kim Kunde", text="hi").status_code == 403, "comment with a wrong check value: 403")
+check(fb(f=FB, task=T2, name="Kim Kunde", text="hi").status_code == 404, "comment on a task the link does not show: 404")
+check(fb(f=FB, task=T1, name="K", text="hi").status_code == 400, "comment without a real name: 400")
+r = fb(f=FB, task=T1, name="Kim Kunde", text="Bitte <b>heller</b> <@1> machen")
+check(r.status_code == 303 and "sent=1" in r.headers.get("Location", ""), f"comment sent ({r.status_code})")
+check("has arrived" in anon(f"/s/{TOK}?sent=1").text, "the page thanks the customer")
+cm = [x for x in A.get(B + f"/api/tasks/{T1}/timeline").json().get("comments", []) if x.get("ext_name")]
+check(len(cm) == 1 and cm[0]["ext_name"] == "Kim Kunde" and cm[0]["user_id"] is None and "<@1>" not in cm[0]["body"], f"the comment on the task, marked as the customer's {cm}")
+check("heller" not in anon("/s/" + TOK).text, "comments never appear on the public page, also the customer's own")
+codes = [fb(f=FB, task=T1, name="Kim Kunde", text=f"more {i}").status_code for i in range(6)]
+check(429 in codes, f"customer comments are limited per address {codes}")
+A.put(B + f"/api/lists/{L}/public-link", json={"show": {"feedback": False}})
 # files off -> the download stops
 A.put(B + f"/api/lists/{L}/public-link", json={"show": {"files": False}})
 check(anon(f"/s/{TOK}/file/{ATT}").status_code == 404, "files switched off: the download is 404")

@@ -55,7 +55,19 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   const u = await until(() => d.querySelector('#sg-lbox [data-sgurl]'));
   check(u && /\/s\/q\/[A-Za-z0-9_-]{40,}$/.test(u.value), 'Request acceptance: the link to copy ' + (u && u.value));
   const PUB = k ? k.url.slice(k.url.indexOf('/s/') + 1) : '';
+  // a customer's comment shows their name in the task's comments
+  await call('PUT', `/api/lists/${L}/public-link`, {show: {feedback: true}});
+  const RC = (await call('GET', `/api/lists/${L}/public-link`)).link;
+  const page = await (await fetch(B + PUB)).text();
+  const fk = (page.match(/name="f" value="([0-9a-f]+)"/) || [])[1] || '';
+  const TID = +((page.match(/<option value="(\d+)">Rough cut</) || [])[1] || 0);
+  const pr = await fetch(B + PUB + '/feedback', {method: 'POST', body: new URLSearchParams({f: fk, task: String(TID), name: 'Kim Client', text: 'Looks good'}), redirect: 'manual'});
+  check(RC && pr.status === 303, 'customer comment sent ' + pr.status);
   const ACC = u ? u.value.slice(u.value.indexOf('/s/q/') + 1) : '';
+  w.close();
+  w = await boot({user: 'alice', hash: 't/' + TID}); d = w.document;
+  const who = await until(() => [...d.querySelectorAll('.cm .chead b')].find(b => /Kim Client/.test(b.textContent)));
+  check(who && who.textContent === 'Kim Client (customer, via the link)' && !who.closest('.cm').querySelector('button.cmav'), 'the comment shows the customer\'s name, no person card');
   w.close();
 
   // ================= a quotation: draft without, sent with the approval block

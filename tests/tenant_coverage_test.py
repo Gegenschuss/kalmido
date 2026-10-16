@@ -418,7 +418,7 @@ ROUTES = {
     "GET /api/lists/{}/public-link": "publiclink", "PUT /api/lists/{}/public-link": "publiclink",
     "POST /api/lists/{}/public-link/regenerate": "publiclink", "DELETE /api/lists/{}/public-link": "publiclink",
     # 2.50.0 (#329, #1200)
-    "GET /s/{}/file/{}": "signoff", "GET /s/{}/logo": "signoff", "GET /s/q/{}": "signoff", "GET /s/q/{}/pdf": "signoff", "POST /s/q/{}": "signoff",
+    "GET /s/{}/file/{}": "signoff", "GET /s/{}/logo": "signoff", "POST /s/{}/feedback": "signoff", "GET /s/q/{}": "signoff", "GET /s/q/{}/pdf": "signoff", "POST /s/q/{}": "signoff",
     "GET /api/lists/{}/signoffs": "signoff", "POST /api/lists/{}/signoffs": "signoff", "POST /api/lists/{}/signoffs/{}/revoke": "signoff",
     "GET /api/office/docs/{}/signoffs": "signoff", "POST /api/office/docs/{}/signoff": "signoff", "POST /api/office/signoffs/{}/revoke": "signoff",
     # ---- stats (2)
