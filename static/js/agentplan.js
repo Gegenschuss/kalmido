@@ -68,6 +68,7 @@ const ap_draftCls = e => e?.status === 'tentative' ? ' evdraft' : '';
 async function ap_evStatus(ev, st, label) {
   const put = async x => { await api('PATCH', `/api/events/${ev.id}`, {status: x}); calInvalidate(); renderView(); return {}; };
   try { await put(st); } catch { return; }
+  if (!$('#pop').classList.contains('hidden') && $('#pop .apdraftact')) closePop();  // 2.58.0 (#1811): a popup still showing the draft is closed, not left with Draft + Confirm
   histToast(label, histAdd({label, undo: () => put(ev.status), redo: () => put(st)}));
 }
 const ap_evConfirm = ev => ap_evStatus(ev, 'confirmed', tr('Draft confirmed'));

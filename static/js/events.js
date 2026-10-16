@@ -800,6 +800,10 @@ document.addEventListener('keydown', async e => {
   }
   if (e.key === 'Escape') {
     if (t.id === 'd-url') { e.preventDefault(); t.value = taskById(S.sel)?.url || ''; S.editLink = false; renderDetail(); return; }  // 2.41.0 (#1475): cancels
+    if (t.dataset?.cf !== undefined && t.closest('#detail') && t.nodeName === 'INPUT') {  // 2.58.0 (#1758): Esc in a detail field puts the saved value back, like the table cell
+      const f = fieldById(+t.dataset.cf), v = taskById(S.sel)?.fields?.[+t.dataset.cf];
+      if (f && (f.type === 'number' || f.type === 'text' || f.type === 'url')) { e.preventDefault(); e.stopPropagation(); t.value = v == null || v === '' ? '' : f.type === 'number' ? (+v).toLocaleString(LOCALE(), {useGrouping: false, maximumFractionDigits: 6}) : String(v); t.blur(); return; }
+    }
     const lb = $('.lightbox'); if (lb) { lb.remove(); return; }
     const ts = $('.tsheet'); if (ts && !$('.modal')) { $('[data-ts="close"]', ts).click(); return; }
     if (!$('#pop').classList.contains('hidden') || $('.qadd.sheet')) { closePop(); return; }
