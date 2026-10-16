@@ -32,7 +32,7 @@ import uuid
 HERE = os.path.dirname(os.path.abspath(__file__))
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
 BUNDLE_EVENTS = ("task_added", "tasks_added", "tidy")
-INFO_EVENTS = ("missed", "playbook_proposal")
+INFO_EVENTS = ("missed", "playbook_proposal", "deployed")  # 2.60.0 (#1514): deployed = information only
 FILES_MAX = 10             # the server takes 10 files per chat message
 NOTES_MAX = 40
 CONTEXT_TASKS = 8          # tasks whose text comes with a bundle

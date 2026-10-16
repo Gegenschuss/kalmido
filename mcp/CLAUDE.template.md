@@ -360,6 +360,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `missed`: a summary of events that were too old to deliver one by one
 - `stale_tasks`: once a day: tasks lying idle in lists with Agent follows up
 - `scheduled_job`: a planned job of a person is due (answer in their chat); `list_check: true` = a scheduled check of a list
+- `deployed`: a version / milestone arrived in an environment (Staging, Live) of a list shared with you; information only (`list_environments` shows all, `set_deployment` records one)
 - `playbook_proposal`: people applied or discarded your proposed change of a list's Playbook
 - `message_edited`: a person changed a chat message, comment or team message you already had (a correction)
 - `file_shared`: a folder or file of the file store was shared with you (`node`, `role` view | edit)
@@ -384,7 +385,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`, `get_dependencies`,
 `get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_key_figures`,
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`,
-`get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`,
+`get_playbook`, `get_project_overview`, `get_review`, `list_environments`, `set_deployment`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`,
 `get_time_gaps`, `get_timer`, `get_usage`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`,
 `import_vcards`, `ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`, `list_attachments`,
 `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,

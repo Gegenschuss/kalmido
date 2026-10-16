@@ -406,6 +406,17 @@ TOOLS = [
                       "(open tasks per day + the ideal line to the due date) and release notes (Markdown of its completed tasks by "
                       "ticket type). Milestones are tasks with milestone: true (list_tasks milestone=true).",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{int(a['task_id'])}/milestone")),
+    # 2.60.0 (#1514): environments of a project (Staging, Live): which milestone / version runs where since when
+    ("list_environments", "2.60.0: the environments of a project list (Staging, Live, ...) with the latest deployment of each "
+                          "{version, at, milestone_id, milestone, source}. People create and rename environments in the app.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/environments")),
+    ("set_deployment", "2.60.0: record that a version / milestone runs in an environment now (the time is now). environment = its id or "
+                       "name; give milestone_id, or a version (found by the milestone titles; a version without a milestone is kept as "
+                       "text). With \"complete tasks on arrival\" on for that environment the milestone's open tasks are completed. "
+                       "Needs write access to the list.",
+     _obj({"list_id": S_ID, "environment": {"type": ["integer", "string"], "description": "environment id or name"},
+           "version": {"type": "string", "maxLength": 100}, "milestone_id": S_ID}, ["list_id", "environment"]),
+     lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/deployments", body={k: a[k] for k in ("environment", "version", "milestone_id") if a.get(k) is not None})),
     # 2.10.0 (#441): groups (read) and the groups a list is shared with
     ("list_groups", "Groups of people (an admin creates them): id, name, members [{user_id, name}], synced (members follow a "
                     "sign-in group), mine. Lists and folders can be shared with a group; a task can be assigned to a group "

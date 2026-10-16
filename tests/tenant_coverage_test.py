@@ -508,6 +508,10 @@ ROUTES = {
     "DELETE /api/templates/{}": "template", "POST /api/templates/{}/apply": "template",
     # ---- token (2)
     "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/git/{}": "token",
+    # ---- 2.60.0 (#1514): environments of a project list (they belong to their list; the deploy hook is a secret token)
+    "POST /api/hooks/deploy/{}/{}": "token", "GET /api/lists/{}/envs": "list", "POST /api/lists/{}/envs": "list",
+    "PATCH /api/envs/{}": "list", "DELETE /api/envs/{}": "list", "POST /api/envs/{}/restore": "list", "POST /api/envs/{}/deploy": "list",
+    "DELETE /api/envs/{}/deploys/{}": "list", "GET /api/v1/lists/{}/environments": "list", "POST /api/v1/lists/{}/deployments": "list",
     # ---- webhook (7)
     "GET /api/me/webhooks": "webhook", "POST /api/me/webhooks": "webhook", "PATCH /api/me/webhooks/{}": "webhook",
     "DELETE /api/me/webhooks/{}": "webhook", "POST /api/me/webhooks/{}/secret": "webhook",
