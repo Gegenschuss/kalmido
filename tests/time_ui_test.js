@@ -127,7 +127,8 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   const csv = d.querySelector('.timev a[href^="/api/time/export.csv"]').getAttribute('href');
   check(/from=\d{4}-\d\d-\d\d&to=\d{4}-\d\d-\d\d&scope=mine/.test(csv), 'CSV link carries the filters ' + csv);
   d.querySelector('[data-act="tv-scope"][data-k="all"]').click(); await sleep(900);
-  check([...d.querySelectorAll('.ttable .tvl')].some(r => /Shared/.test(r.textContent) && /Bob/.test(r.textContent)), 'scope all: shared list with Bob');
+  // 2.63.0 (#1523): Alice is an editor of Shared: "all" shows only her own entries there, never Bob's
+  check(![...d.querySelectorAll('.ttable .tvl')].some(r => /Shared/.test(r.textContent) && /Bob/.test(r.textContent)), 'scope all: no Bob rows for an editor');
   d.querySelector('[data-act="tv-period"][data-k="custom"]').click(); await sleep(900);
   check(d.querySelector('#tv-from') && d.querySelector('#tv-to'), 'custom range inputs');
   d.querySelector('[data-act="tv-period"][data-k="week"]').click(); await sleep(900);
