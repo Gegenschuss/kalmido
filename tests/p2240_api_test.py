@@ -187,7 +187,13 @@ out = subprocess.run(["docker", "exec", CT, "python", "app.py", "announce", "Res
 check(out.returncode == 0 and '"maintenance"' in out.stdout, f"#907: python app.py announce {out.stdout[-200:]} {out.stderr[-200:]}")
 check(Bo.get(B + "/api/state").json()["announce"]["text"] == "Restart in a moment", "#907: the command's notice shows")
 out = subprocess.run(["docker", "exec", CT, "python", "app.py", "announce", "--clear"], capture_output=True, text=True)
-check(out.returncode == 0 and Bo.get(B + "/api/state").json()["announce"] is None, "#907: announce --clear")
+gone = False
+for _ in range(15):  # 2.53.1 CI: the command runs in its own process - give the app a moment to see the cleared notice
+    gone = Bo.get(B + "/api/state").json()["announce"] is None
+    if gone:
+        break
+    time.sleep(0.2)
+check(out.returncode == 0 and gone, f"#907: announce --clear {out.stdout[-200:]} {out.stderr[-200:]}")
 spec = requests.get(V + "/openapi.json").json()
 check({"/me/storage", "/announcement", "/admin/announcement"} <= set(spec["paths"]), "OpenAPI: the new routes are documented")
 
