@@ -73,8 +73,11 @@ const V = B + 'api/v1';
   const q = R1 && cmEl(R1.id)?.querySelector('.mquote');
   check(q && /Bob Baker/.test(q.textContent) && /Do we mention the search\?/.test(q.textContent), 'comment: the quote above the answer ' + (q?.textContent || '-'));
   check(!bar(), 'comment: the bar is gone after sending');
-  click(w, q); await until(() => cmEl(c1.id)?.classList.contains('msg-hit'));
-  check(cmEl(c1.id)?.classList.contains('msg-hit'), 'comment: a tap on the quote marks the original (msg-hit)');
+  // 2.50.2: the mark is noted when it is set - it lasts 1.6 s and a redraw of the comments in between (slow CI) dropped it
+  let hit = false; const mo = new w.MutationObserver(ms => { if (ms.some(m => m.target.classList?.contains('msg-hit') && m.target.dataset?.mid === `c:${c1.id}`)) hit = true; });
+  mo.observe(d.body, {attributes: true, attributeFilter: ['class'], subtree: true});
+  click(w, q); await until(() => hit || cmEl(c1.id)?.classList.contains('msg-hit')); mo.disconnect();
+  check(hit || cmEl(c1.id)?.classList.contains('msg-hit'), 'comment: a tap on the quote marks the original (msg-hit)');
   check(await w.eval(`msgJump({art: 'c', id: 999999, task: ${T}})`) === false && /Message not found/.test(d.querySelector('#toast')?.textContent || ''), 'msgJump: an unknown comment says "Message not found"');
   await call('DELETE', `/api/comments/${c1.id}`, null, BCK);
   w.eval(`loadTimeline(${T})`); await until(() => R1 && cmEl(R1.id)?.querySelector('.mquote.del'));
