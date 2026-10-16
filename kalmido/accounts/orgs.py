@@ -624,7 +624,7 @@ def org_delete(oid):
         fs_files = fs_org_purge(c, oid)
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
-        c.execute("UPDATE books SET org_id=NULL WHERE org_id=?", (oid,))
+        c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))  # 2.52.0 C (#1438): its own books -> the managers'
         # 2.42.0 (#828): files of lists that left the organisation are sealed with their new organisation's key (or plain),
         # then the organisation's key is destroyed (what is left encrypted with it can no longer be read) and its office
         # folder (stored invoices, archive) removed
@@ -771,6 +771,8 @@ def org_leave(c, oid, uid, heir):
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
         c.execute("DELETE FROM task_people WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
+    from ..contacts.orgbooks import obk_leave
+    obk_leave(c, oid, uid, heir)  # 2.52.0 C (#1438): the organisation's own address books stay with it (another manager)
     # 2.30.0 (#1036): the organisation's calendars and address books follow the same way: the leaver's go to heir (else
     # they become private), the leaver leaves the ones of others
     for table, mt, key in (("ev_cals", "ev_cal_members", "cal_id"), ("books", "book_members", "book_id")):
