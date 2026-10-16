@@ -409,7 +409,7 @@ function viewCal() {
     const ts = byDay.get(d) || [];
     const out = pd(d).getMonth() !== m - 1;
     const evs = evOn ? cevOn(d).sort(cevSort) : [];
-    const chips = [...evs.map(e => cevChip(e, d)), ...ts.map(t => `<div class="ev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}">${msGlyph(t)}${t.due_time ? `<span class="muted">${t.due_time}</span> ` : ''}${mdTitleNL(t.title)}</div>`)];
+    const chips = [...evs.map(e => cevChip(e, d)), ...ts.map(t => `<div class="ev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}${lp_cls(t)}" data-id="${t.id}"${lp_attr(t) /* 2.53.0 (#1426) */} draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}">${msGlyph(t)}${t.due_time ? `<span class="muted">${t.due_time}</span> ` : ''}${mdTitleNL(t.title)}</div>`)];
     cells += `<div class="cell ${out ? 'out' : ''} ${d === t0 ? 'today' : ''} ${d === S.calSel ? 'sel' : ''}" data-day="${d}">
       <span class="dn">${pd(d).getDate()}</span>
       ${chips.slice(0, 3).join('')}
@@ -436,13 +436,13 @@ function viewWeek() {
   if (evOn) ensureCalEv(days[0], days[days.length - 1]);
   const evsOf = d => evOn ? cevOn(d).sort(cevSort) : [];
   const t0 = today(), H = weekH();
-  const chip = t => `<div class="ev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}">${msGlyph(t)}${mdTitleNL(t.title)}</div>`;
+  const chip = t => `<div class="ev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}${lp_cls(t)}" data-id="${t.id}"${lp_attr(t) /* 2.53.0 (#1426) */} draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}">${msGlyph(t)}${mdTitleNL(t.title)}</div>`;
   const now = new Date(), nowTop = (now.getHours() * 60 + now.getMinutes()) / 60 * H;
   const cols = days.map(d => {
     const blocks = layoutDay((map.get(d) || []).filter(t => t.due_time), evsOf(d).filter(e => cevTimed(e, d)).map(e => ({c: e, ...cevMin(e, d)}))).map(it => {
       const t = it.t, top = it.s / 60 * H, h = Math.max((it.e - it.s) / 60 * H, 20);
       if (it.c) return `<div class="wcev${ap_draftCls(it.c)}${cg_canDrag(it.c) ? ' cgok' : ''}" data-cev="${it.c.id}" style="--cc:${cevColor(it.c)};top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)"><b>${it.c.d0 === d ? fmtHM(it.c.s) : '…'}</b> ${esc(cevTitle(it.c))}</div>`;  // 2.52.0 (#1016): cgok = may be moved / resized (caldrag.js)
-      return `<div class="wev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}" style="top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)">${msGlyph(t)}<b>${t.due_time}</b> ${mdTitleNL(t.title)}</div>`;
+      return `<div class="wev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}${lp_cls(t)}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}" style="${lp_sty(t) ? lp_sty(t) + ';' : '' /* 2.53.0 (#1426) */}top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)">${msGlyph(t)}<b>${t.due_time}</b> ${mdTitleNL(t.title)}</div>`;
     }).join('');
     return `<div class="wcol ${d === t0 ? 'today' : ''}" data-day="${d}">${blocks}${d === t0 ? `<i class="nowline" style="top:${nowTop}px"></i>` : ''}</div>`;
   }).join('');

@@ -209,11 +209,15 @@ function newsText(it, U) {
       lrestore: d.member ? tr('{0} restored the list {1} from the archive (list admin)', who, q(d.name || '')) : tr('{0} restored your list {1} from the archive (list admin)', who, q(d.name || '')),
       ldelete: tr('{0} deleted your list {1} for good (list admin). Its tasks are in the trash of your basket.', who, q(d.name || '')),
       lrename: tr('{0} renamed your list {1} to {2} (list admin)', who, q(d.old || ''), q(d.name || '')),  // 2.40.0 (#1431)
-      owner: tr('{0} handed the list {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);
+      owner: tr('{0} handed the list {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || '')),
+      // 2.56.0 (#1795): an organisation admin renamed it / changed its icon or colour
+      rename: tr('{0} renamed the list {1} to {2} (admin of {3})', who, q(d.old || ''), q(d.name || ''), q(d.org || '')),
+      restyle: tr('{0} changed the icon or colour of the list {1} (admin of {2})', who, q(d.name || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);
     case 'unblock': return d.hidden ? tr('{0} completed a task you cannot see: your task is unblocked', who) : tr('{0} completed {1}: your task is unblocked', who, q(d.title || ''));
     case 'newtask': return tr('{0} added a task', who);
     case 'connreq': return tr('{0} wants to connect with you', who);  // 2.49.0 (#1106)
     case 'connok': return tr('{0} accepted your connection request', who);
+    case 'lytpl': return tr('{0} sent you the arrangement {1}', who, q(d.name || ''));  // 2.55.0 (#1068)
     case 'dispo': return tr('{0} booked you: {1} ({2})', who, q(d.title || ''), d.start ? esc(fmtDayAbs(d.start.slice(0, 10))) : '');  // 2.50.0 (#1194)
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
     case 'approval': return tr('{0} is waiting for your approval', who);
@@ -239,7 +243,7 @@ function newsItemHtml(it, i, pop) {
   const task = many ? `<div class="ntask"><span class="nt">${esc(it.tasks.slice(0, 2).map(x => x.title).join(' · '))}</span>${it.tasks.length > 2 ? `<span class="muted">+${it.tasks.length - 2}</span>` : ''}</div>`
     : it.task_id ? `<div class="ntask"><span class="nt">${esc(it.task_title || '')}</span><span class="muted nl">${esc(newsListName(it))}</span></div>` : '';
   const ex = it.excerpt ? `<div class="nexc">${newsExcerpt(it.excerpt, U)}</div>` : '';
-  return `<div class="nitem ${it.read ? '' : 'unread'} k-${esc(it.kind)} ${it.to_me ? 'tome' : ''}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
+  return `<div class="nitem ${it.read ? '' : 'unread'}${it.actor_id && isAgentUser(it.actor_id) ? ' agc' : ''} k-${esc(it.kind)} ${it.to_me ? 'tome' : ''}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
     ${it.actor_id ? `<button type="button" class="avb" data-mcard="${+it.actor_id}" data-mname="${esc(uname(it.actor_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(it.actor_id, U)))}" aria-label="${esc(tr('Show {0}', uname(it.actor_id, U)))}">` : ''}${av(it.actor_id, uname(it.actor_id, U), 'avatar', '', `<i class="nk">${ic(NEWS_ICON[it.kind] || 'bell', 's')}</i>`)}${it.actor_id ? '</button>' : ''}
     <div class="nmain"><div class="ntext">${newsText(it, U)}</div>${task}${ex}</div>
     <time title="${esc(fmtWhen(it.created_at))}">${relTime(it.created_at)}</time>${isTouch() ? '' : `<button class="iconbtn ndel" ${pop ? 'data-bp="dismiss"' : 'data-act="news-dismiss"'} data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</div>`;
@@ -381,6 +385,7 @@ async function newsOpen(i) {
   if (it.kind === 'evshare') { go('cal'); setTimeout(evCalsModal, 150); return; }
   if (it.kind === 'abshare') { go('contacts'); return; }
   if (it.kind === 'connreq' || it.kind === 'connok') { dsc_open(); return; }  // 2.49.0 (#1106)
+  if (it.kind === 'lytpl') { lyv_offerOpen(it.data?.offer); return; }  // 2.55.0 (#1068)
   if (it.kind === 'dispo') { if (workloadOn()) { WLV.tab = dp_on() ? 'dispo' : 'wl'; go('workload'); } return; }  // 2.50.0 (#1194)
   if (it.kind === 'usage') { if (feat('agents') && agentsOn()) go('agents'); else settingsModal('usage'); return; }  // 2.1.1 (#326)
   if (it.kind === 'approval' && !it.task_id && feat('agents') && agentsOn()) { go('agents'); return; }
@@ -587,7 +592,7 @@ function commentHtml(c, U, ro = false) {
     : `${ro ? '' : replyQuoteHtml(c, 'c')}${c.body ? `<div class="cbody">${commentBody(c.body, U, taskById(c.task_id || S.sel)?.list_id)}</div>` : ''}${files}${sugHtml(c, ro)}${ccCommentHtml(c, ro)}${reactHtml(c, ro)}`;
   // 2.5.1 (#395): the author's avatar opens the same card as an @mention (only in the comment list, not read-only copies)
   const cav = ro || c.ext_name ? av(c.user_id, cv_who(c, U)) : `<button type="button" class="cmav" data-mcard="${c.user_id}" data-mname="${esc(uname(c.user_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(c.user_id, U)))}">${av(c.user_id, uname(c.user_id, U))}</button>`;  // 2.50.0 (#329): a customer's comment: their name, no card
-  return `<div class="cm ${isNew ? 'new' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;
+  return `<div class="cm ${isNew ? 'new' : ''}${isAgentUser(c.user_id) ? ' agc' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;
 }
 function timelineItems(ro = false) {
   const T = S.tl, soc = cmSocial(taskById(T.id));
@@ -630,7 +635,7 @@ function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the bo
   return `<div class="dcomp ${top ? 'dctop' : ''}">${replyBarHtml('c:' + t.id)}<div class="ccomp ${used ? 'used' : ''}"><textarea id="c-input" rows="1" name="kalmido-comment" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${soc ? tr('Write a comment… (@ mentions someone)') : tr('Write a comment…')}" aria-label="${tr('Comment')}">${esc(S.drafts[t.id] || '')}</textarea>
       <div class="mpick hidden"></div>
       <div class="cfiles" id="c-files">${composerFiles(t.id)}</div>
-      <div class="cbar"><label class="iconbtn" title="${tr('Attach files')}">${ic('clip', 's')}<input type="file" id="c-file" multiple hidden></label><span class="muted chint">${isMobile() ? '' : tr('Ctrl+Enter sends')}</span><span class="spacer"></span><button class="btn sm pri" data-act="c-send">${ic('send', 's')} ${tr('Send')}</button></div></div></div>`;
+      <div class="cbar"><label class="iconbtn" title="${tr('Attach files')}">${ic('clip', 's')}<input type="file" id="c-file" multiple hidden></label>${typeof rf_btnHtml === 'function' ? rf_btnHtml('c') : '' /* 2.53.0 (#1449) */}<span class="muted chint">${isMobile() ? '' : tr('Ctrl+Enter sends')}</span><span class="spacer"></span><button class="btn sm pri" data-act="c-send">${ic('send', 's')} ${tr('Send')}</button></div></div></div>`;
 }
 function drawTimeline() {
   if (S.tl.id !== S.sel) return;

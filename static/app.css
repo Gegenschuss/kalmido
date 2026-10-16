@@ -7487,3 +7487,185 @@ body.cgdrag .week,body.cgdrag .cal{cursor:grabbing}
 @media (pointer:coarse){.cgnew .cgin{font-size:16px}.cgnew .cgdet{min-height:2.75rem}}
 @media (prefers-reduced-motion:no-preference){.cgnew{animation:cgin .16s ease-out}}
 @keyframes cgin{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+
+/* 2.53.0 D (#1449 #1440): reference cards in rendered text and the preview card at the pointer (refs.js) */
+.rfcard{display:inline-flex;align-items:center;gap:.25rem;max-width:min(18rem,100%);padding:0 .375rem;margin:0 .0625rem;border:1px solid var(--line2);border-radius:var(--r-s);background:var(--bg3);color:var(--text);font-size:.92em;line-height:1.5;vertical-align:baseline;text-decoration:none;white-space:nowrap}
+.rfcard .i{flex:none;color:var(--muted)}
+.rfcard .rfn{overflow:hidden;text-overflow:ellipsis}
+a.rfcard:hover{border-color:var(--muted);text-decoration:none}
+.rfcard.rfno,.rfcard.rfwait{color:var(--faint);background:transparent;border-style:dashed}
+.rfcard.rfno{cursor:default}
+.rfcard.rfdone .rfn{text-decoration:line-through;color:var(--muted)}
+.rfins.btn{margin-top:.375rem}
+.rfpv{position:fixed;z-index:9000;left:0;top:0;width:min(20rem,calc(100vw - 1rem));padding:.625rem .75rem;border-radius:var(--r-l);background:var(--bg2);box-shadow:var(--shadow);color:var(--text);font-size:var(--fs-m);line-height:1.4;cursor:pointer;opacity:0;transform:translateY(.25rem);transition:opacity .16s ease,transform .16s ease;pointer-events:auto}
+.rfpv.on{opacity:1;transform:none}
+.rfpvh{display:flex;align-items:flex-start;gap:.375rem;margin-bottom:.25rem}
+.rfpvh b{font-weight:600;overflow-wrap:anywhere}
+.rfpvh .i{flex:none;margin-top:.125rem;color:var(--muted)}
+.rfpvh.rfdone b{text-decoration:line-through;color:var(--muted)}
+.rfpvh.rfno b{color:var(--faint);font-weight:400}
+.rfpvr{display:flex;align-items:center;gap:.375rem;color:var(--text2);font-size:var(--fs-s);margin-top:.125rem}
+.rfpvr .i{flex:none;color:var(--faint)}
+.rfpvr span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rfpvd{margin-top:.375rem;color:var(--muted);font-size:var(--fs-s);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+@media (prefers-reduced-motion:reduce){.rfpv{transition:none;transform:none}}
+/* 2.53.0 E (#1451 #446) agent tone for comments / News / chat bubbles (own variables, never --accent) + the tags overview */
+:root{--agent-bg:#1d1d27;--agent-ink:#c4c1e4}
+:root[data-theme="light"]{--agent-bg:#f0eff7;--agent-ink:#4a4670}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"]{--agent-bg:#f0eff7;--agent-ink:#4a4670} }
+.cm.agc,.nitem.agc{background:var(--agent-bg)}
+.cm.agc .chead>b{color:var(--agent-ink)}
+.cm.agc.new,.nitem.agc.unread{background:var(--agent-bg);box-shadow:inset 2px 0 0 var(--accent)}
+.cmsg.agc .cbub{background:var(--agent-bg);color:var(--text)}
+.cmsg.agc.apv{background:var(--agent-bg)}
+.tgview{padding:1rem}
+.tgintro{margin:0 0 .75rem;font-size:var(--fs-m)}
+.tggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(14rem,1fr));gap:.625rem}
+.tgcard{display:flex;flex-direction:column;gap:.375rem;align-items:flex-start;text-align:left;padding:.75rem .875rem;min-height:3.5rem;border:1px solid var(--line2);border-radius:var(--r-l);background:var(--bg2);color:var(--text);font-size:var(--fs-m)}
+.tgcard:hover{background:var(--bg3)}
+.tgcard:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tgtop{display:flex;align-items:center;gap:.5rem;min-width:0}
+.tgtop b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tgdot{flex:none;width:.625rem;height:.625rem;border-radius:50%;background:var(--tc,var(--faint))}
+.tgnum{display:flex;gap:.875rem;color:var(--text2)}
+.tgnum b{color:var(--text)}
+.tgdue{display:inline-flex;align-items:center;gap:.25rem;color:var(--text2)}
+.tgdue.over{color:var(--danger)}
+.tglists,.tgused{font-size:var(--fs-xs)}
+/* 2.53.0 B (#1426) list colours (12 tones, listcolor.js): the open list's colour is the accent of the list view (header,
+   ticks, progress, buttons; #main + #fab, never global) and a thin edge on task cards (boards, calendar, the collected
+   views); the edge is the list, the background stays the priority's. The theme picks the tone: dark --lpd, light --lpl. */
+.lpv,.lp-acc{--lpc:var(--lpd)}
+:root[data-theme="light"] :is(.lpv,.lp-acc){--lpc:var(--lpl)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] :is(.lpv,.lp-acc){--lpc:var(--lpl)} }
+#main.lp-acc,#fab.lp-acc{--accent:var(--lpd);--accent-ink:var(--lpid);--accent-soft:color-mix(in srgb,var(--accent) 9%,var(--bg));--st-complete:var(--accent)}
+:root[data-theme="light"] :is(#main,#fab).lp-acc{--accent:var(--lpl);--accent-ink:var(--lpil)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] :is(#main,#fab).lp-acc{--accent:var(--lpl);--accent-ink:var(--lpil)} }
+#main:not(.lp-one) #view .trow.lpc,#view .kcards .trow.lpc{box-shadow:inset .1875rem 0 0 var(--lpc)}
+#main:not(.lp-one) #view .trow.lpc::before,#view .kcards .trow.lpc::before{left:.375rem}
+.cal .ev.lpc,.week .ev.lpc,.wev.lpc{border-left-color:var(--lpc)}
+.wev.lpc{background:color-mix(in srgb,var(--lpc) 16%,var(--bg2))}
+:is(.cal,.week) .ev.lpc.p5{background:color-mix(in srgb,var(--p5) 20%,var(--bg3))}
+:is(.cal,.week) .ev.lpc.p3{background:color-mix(in srgb,var(--p3) 20%,var(--bg3))}
+:is(.cal,.week) .ev.lpc.p1{background:color-mix(in srgb,var(--p1) 20%,var(--bg3))}
+.wev.lpc.p5{background:color-mix(in srgb,var(--p5) 22%,var(--bg2))}.wev.lpc.p3{background:color-mix(in srgb,var(--p3) 22%,var(--bg2))}.wev.lpc.p1{background:color-mix(in srgb,var(--p1) 22%,var(--bg2))}
+/* 2.53.0 B (#1474) workspace colours (wscolor.js): an organisation's lists carry its colour as a stripe (header, sidebar)
+   and a frame (quick add, comment field), the sign / chip / switch take it; Private stays neutral. Dark --wsd, light --wsl. */
+[data-wsc],.wsc-on{--wsc:var(--wsd)}
+:root[data-theme="light"] :is([data-wsc],.wsc-on){--wsc:var(--wsl)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] :is([data-wsc],.wsc-on){--wsc:var(--wsl)} }
+#main.wsc-on #top{box-shadow:inset 0 .1875rem 0 var(--wsc)}
+#side .srow[data-wsc]{background-image:linear-gradient(var(--wsc),var(--wsc));background-size:.1875rem 60%;background-repeat:no-repeat;background-position:0 50%}
+.wsbadge[data-wsc]{color:var(--text);background:color-mix(in srgb,var(--wsc) 14%,transparent);border-color:color-mix(in srgb,var(--wsc) 55%,transparent)}
+.wsbadge[data-wsc]:hover{border-color:var(--wsc)}
+:is(.wsbadge,.wschip,.wsbar)[data-wsc] svg.i:first-child,:is(.wsbadge,.wschip,.wsbar)[data-wsc] .wsemo{color:var(--wsc)}
+.wschip[data-wsc]{background:color-mix(in srgb,var(--wsc) 14%,transparent);border-color:color-mix(in srgb,var(--wsc) 40%,transparent)}
+.wschip[data-wsc]:hover{border-color:var(--wsc)}
+.wsbar.on[data-wsc]{border-color:color-mix(in srgb,var(--wsc) 55%,transparent);background:color-mix(in srgb,var(--wsc) 10%,transparent)}
+.wsbar.on[data-wsc]:hover{border-color:var(--wsc)}
+.wsc-on .qadd:not(.dock) .box,.wsc-on .qadd.dock,.wsc-on .ccomp{border-color:color-mix(in srgb,var(--wsc) 65%,var(--line2))}
+.wscpick .colors button[disabled]{cursor:default}
+
+/* 2.55.0 E (#1455) the newsletter connection (newsletter.js): the sheet in Contacts > More, the consent in the contact card */
+.nwl-md .nwl-body, .nwl-smd { display: flex; flex-direction: column; gap: .45rem; }
+.nwl-md { max-width: 640px; }
+.nwl-why { margin: 0 0 .3rem; }
+.nwl-conn { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .6rem; margin: .2rem 0; }
+.nwl-err { color: var(--danger, #c0392b); margin: .3rem 0; }
+.nwl-err:empty { display: none; }
+.nwl-prev { font-size: .85rem; color: var(--muted); border-left: 3px solid var(--accent); padding: .2rem .6rem; margin: 0; }
+.nwl-tag { font-size: .75rem; padding: .05rem .45rem; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); }
+.nwl-segs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
+.nwl-segs li { display: flex; align-items: center; gap: .4rem; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: 10px; min-height: 44px; }
+.nwl-sn { flex: 1; min-width: 0; }
+.nwl-sn .muted { font-size: .85rem; overflow-wrap: anywhere; }
+.nwl-log ul { list-style: none; margin: .3rem 0 0; padding: 0; font-size: .88rem; display: flex; flex-direction: column; gap: .3rem; }
+.nwl-chips { flex-wrap: wrap; }
+.nwl-st { font-weight: 600; }
+.nwl-st-yes { color: var(--accent); }
+.nwl-st-unsub, .nwl-st-bounce { color: var(--muted); }
+/* 2.55.0 C (#1065) the settings of a block: the gear in Customize, the popover (computer) / sheet (phone), the "Only: …" note */
+.lyo-gear{color:var(--muted)}
+.lyo-gear:hover,.lyo-gear:focus-visible{color:var(--accent)}
+#pop .lyo-h{display:flex;align-items:center;gap:.5rem;padding:.625rem .75rem .25rem;font-size:.9rem}
+#pop .lyo{display:flex;flex-direction:column;gap:.625rem;padding:.5rem .75rem .75rem;min-width:17rem;max-width:22rem}
+#pop.sheet .lyo{max-width:none;padding:.5rem 1rem 1rem}
+.lyo-r{display:flex;flex-direction:column;gap:.3rem}
+.lyo-r.lyo-b{flex-direction:row;align-items:center;justify-content:space-between;gap:.75rem}
+.lyo-l{font-size:.85rem;color:var(--text2,var(--text))}
+.lyo-seg{display:flex;flex-wrap:wrap}
+.lyo-seg button{flex:1 1 auto}
+.lyo select{width:100%}
+.lyo-gone{font-size:.8rem}
+.lyo-reset{align-self:flex-start}
+.lyo-note{display:flex;align-items:center;gap:.375rem;margin:0 0 .375rem;font-size:.8rem}
+@media (pointer:coarse){ .lyo-seg button,.lyo select{min-height:2.75rem} }
+/* 2.55.0 A (#1069 #1068) saved arrangements: the switch in a view's header, the bar while customizing, manage / send / template dialogs */
+.lyvsw{display:inline-flex;align-items:center;gap:.25rem;max-width:12rem;margin-left:.25rem}
+.lyvsw .lyvnm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.lyvsw.on{border-color:color-mix(in srgb,var(--accent) 45%,var(--line2));color:var(--accent)}
+.lyvbar{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin:.25rem 0 .75rem}
+.lyvlist{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0}
+.lyvrow{display:flex;align-items:center;gap:.25rem;padding:.25rem .25rem .25rem .5rem;border-radius:10px;background:var(--bg2)}
+.lyvrow .lyvrn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lyvs .fl{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0}
+.lyvs #lyvs-q{width:100%;margin:.25rem 0}
+.lyvppl{display:flex;flex-direction:column;gap:.125rem;max-height:40vh;overflow:auto;margin:.25rem 0 .5rem}
+.lyvppl .chkl{padding:.375rem .25rem;border-radius:8px}
+.lyvprev{margin:.5rem 0;padding-left:1.25rem}
+.lyvprev li{display:flex;justify-content:space-between;gap:1rem;padding:.125rem 0}
+@media (max-width:700px){
+  .lyvsw{max-width:9rem;min-height:36px}
+  .lyvrow .iconbtn,.lyvppl .chkl{min-height:44px}
+}
+/* 2.55.0 B (#1066) an agent's arrangement proposal: before / after as two small schematic grids (lyprop.js) */
+.lyp-head{font-size:13px;margin:2px 0 8px;color:var(--muted)}
+.lyp-head b{color:var(--text)}
+.lyp-by{color:var(--accent)}
+.lyp-ba{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}
+@media (max-width:560px){.lyp-ba{grid-template-columns:1fr}}
+.lyp-f{margin:0;min-width:0}
+.lyp-f figcaption{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.lyp-g{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;padding:6px;border:1px solid var(--line);border-radius:10px;background:var(--bg2)}
+.lyp-c{grid-column:span 6;min-height:26px;display:flex;align-items:center;padding:2px 6px;border-radius:6px;border:1px solid var(--line);
+  background:var(--accent-soft);font-size:var(--fs-xs);line-height:1.2;overflow:hidden;min-width:0}
+.lyp-c span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lyp-w2{grid-column:span 2}.lyp-w3{grid-column:span 3}.lyp-w4{grid-column:span 4}.lyp-w6{grid-column:span 6}
+.lyp-h1{min-height:18px}.lyp-h3{min-height:40px}
+.lyp-new{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.lyp-hid{font-size:12px;margin-top:4px}
+.lyp-use{margin:6px 0}
+/* 2.55.0 D (#1067) statistics, the client card and family on the view builder: the blocks keep the spacing the cards had (the cards bring their own top margin) */
+.mscly .lybar,.stats > .lybar{display:flex;justify-content:flex-end}
+
+/* 2.56.0 C (#1797) share symbols in two fixed columns at the right edge (agent | person) on every sidebar row: a missing
+   symbol keeps its empty column, the count / dots / marks stay left of them, nesting only moves the name */
+#side .sbc-sl{display:inline-grid;grid-template-columns:1rem 1rem;column-gap:.125rem;align-items:center;justify-items:center;flex:none;margin-left:0}
+#side .sbc-sl>span{display:inline-flex;align-items:center;justify-content:center;width:1rem;min-height:1rem}
+#side .sbc-sl svg.i{width:.875rem;height:.875rem}
+#side .sbc-ph{visibility:hidden}
+#side .srow .sbc-sl,#side .fhead .sbc-sl{margin-left:0;gap:0;column-gap:.125rem}
+/* the folder rows' "…" button takes room at the end on touch: the list rows keep the same room, so the columns line up */
+@media (max-width:899px),(hover:none){
+  #side .srow:not(.reorder){padding-right:calc(.5rem + var(--sbc-mw,3rem))}
+}
+/* 2.56.0 B (#1795) organisation admins edit name, icon and colour of an organisation list: the mark in the overview row */
+.oadmrow .n b{display:flex;align-items:center;gap:.375rem}
+.oadmrow .ole-ic{width:1.125rem;height:1.125rem;border-radius:.25rem;flex:none}
+.oadmrow .ole-sw{width:.625rem;height:.625rem;border-radius:50%;flex:none}
+/* 2.56.0 A (#1791 #1793) talking to a job: the job tag and a job's name at the start of its message open the job's own chat (a bar under the header, back to the whole chat); the message dialog of a job card */
+button.jobtag{border:0;font:inherit;font-size:var(--fs-xs);cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent}
+button.jobtag::before{content:"";position:absolute;inset:-.75rem -.25rem}
+button.jobtag:hover,button.jobtag:focus-visible{background:color-mix(in srgb,var(--jcol) 28%,var(--bg3))}
+button.jobtag:disabled{cursor:default;opacity:1}
+button.jobtag b{font-weight:600}
+.jc-name{display:inline;border:0;padding:0;background:none;font:inherit;font-weight:600;color:inherit;text-decoration:underline;text-decoration-color:var(--jcol,var(--accent));text-underline-offset:.2em;cursor:pointer;position:relative}
+.jc-name::before{content:"";position:absolute;inset:-.75rem -.375rem}
+.jcbar{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;padding:.25rem .75rem .25rem .375rem;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--jcol) 10%,var(--bg))}
+.jcbar .jcback{min-width:2.75rem;min-height:2.75rem}
+.jcdot{flex:0 0 auto;width:.625rem;height:.625rem;border-radius:50%;background:var(--jcol)}
+.jcn{display:flex;flex-direction:column;min-width:0;flex:1 1 auto;line-height:1.3}
+.jcn span{color:var(--muted);font-size:var(--fs-xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
+.jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
+.jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}

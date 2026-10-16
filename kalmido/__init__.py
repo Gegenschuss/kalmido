@@ -51,6 +51,7 @@ ORDER = (
     "accounts.settings",
     "lists.favorites",  # 2.40.0 (#1361)
     "accounts.layouts",  # 2.32.0 (#1063, #983)
+    "accounts.layoutsets",  # 2.55.0 (#1069, #1068, #1066)
     "accounts.onboarding",
     "accounts.users",
     "accounts.orgs",
@@ -81,6 +82,7 @@ ORDER = (
     "agents.core",
     "collab.reactions",
     "agents.chat",
+    "agents.jobchat",  # 2.56.0 A (#1791 / #1793)
     "agents.steps",  # 2.32.0 (#1081 / #1079)
     "agents.quota",  # 2.33.0 (#1045)
     "agents.schedules",  # 2.34.0 (#272)
@@ -182,6 +184,7 @@ ORDER = (
     "personal.timegaps",  # 2.34.0 (#269)
     "agents.agentpin",  # 2.51.0 C (#1352): agents on the pin board + the weekly status of a project
     "agents.agenttime",  # 2.51.0 C (#1353): agents check time tracking + propose entries from events
+    "agents.lyprop",  # 2.55.0 B (#1066): agents propose arrangements of views (the person accepts)
     "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
     "admin.orgcrypt_cli",  # 2.42.0 (#828): the organisation keys' start-up pass + command line (no routes)
     "docs.extract",  # 2.48.0 (#1111): date / due date / amount from a text (no routes, standard library only)
@@ -194,7 +197,11 @@ ORDER = (
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
     "paperless.ngx",  # 2.48.0 (#1152): Paperless-ngx connection + import into the documents (self-hosted only)
     "paperless.web",  # 2.48.0 (#1152): the routes of the Paperless-ngx connection (self-hosted only)
+    "newsletter.adapters",  # 2.55.0 (#1455): listmonk / Brevo / CleverReach (no routes)
+    "newsletter.sync",  # 2.55.0 (#1455): connection, segments, consent, the sync runs (no routes)
+    "newsletter.web",  # 2.55.0 (#1455): the routes of the newsletter connection
     "receipts.suggest",  # 2.48.0 (#1356): receipts: project / category, agents suggest, people confirm
+    "accounts.layouts_more",  # 2.55.0 (#1067): the new views' blocks for the agents' proposals (after agents.lyprop)
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

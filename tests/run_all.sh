@@ -827,9 +827,36 @@ fresh; run p252_b_api "$PY" p252_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p252_b_ui node p252_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.52.0 part A: the calendar like macOS - drag to create, move, resize, all-day and month ranges, touch (#1016)
 fresh; run p252_a_ui node p252_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part D: references by dragging into comment / description, reference cards, the preview card (#1449 #1440)
+fresh; run p253_d_ui node p253_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part E: agent tone for comments / News / chat (#1451) + tags overview (#446)
+fresh; run p253_e_ui node p253_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part B: list colours as accent, folder colours, card edges, "only as a dot" (#1426); workspace colours (#1474)
+fresh; run p253_b_ui node p253_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.52.0 part C: #1438 address books an organisation owns (hand-over, roles, leaving / account deletion, CardDAV, way back)
 fresh; run p252_c_api "$PY" p252_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p252_c_ui node p252_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.55.0 part E: the newsletter connection (#1455): fake listmonk / Brevo / CleverReach inside the container
+fresh; run p255_e_api "$PY" p255_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p255_e_ui node p255_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.55.0 part C: #1065 settings per block (gear in Customize, popover / sheet, time tracking per client, numbers)
+fresh; run p255_c_ui node p255_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.55.0 part A: saved arrangements per view (#1069) and arrangements sent as templates (#1068)
+fresh; run p255_a_api "$PY" p255_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p255_a_ui node p255_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.55.0 part B: agents propose arrangements of views, the person accepts / declines (#1066)
+fresh; run p255_b_api "$PY" p255_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p255_b_ui node p255_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.55.0 part D: statistics, client card and family on the view builder (#1067)
+fresh; run p255_d_ui node p255_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.56.0 part C: the sidebar's share symbols in fixed columns (#1797)
+fresh; run p256_c_ui node p256_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.56.0 part B: organisation admins change name, icon and colour of the organisation's lists (#1795)
+fresh; run p256_b_api "$PY" p256_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p256_b_ui node p256_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.56.0 part A: a message to a job from its card, a job's own chat history (#1791 #1793)
+fresh; run p256_a_api "$PY" p256_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p256_a_ui node p256_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

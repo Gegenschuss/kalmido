@@ -47,6 +47,7 @@ KINDS = {
     "list": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: a list by id (read, change, members, sections, fields, notes, owner)"),
     "folder": ("matrix", "p2300_tenant_test.py: folder settings / people / groups are the own folders' only"),
     "news": ("matrix", "p2280_api_test.py: News of other workspaces"),
+    "lytpl": ("matrix", "p255_a_api_test.py: arrangement templates only to people of the own organisations, never to agents, a project page only with access (#1068)"),
     "team": ("matrix", "p2280_api_test.py: team chat rooms and direct messages"),
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
@@ -72,6 +73,8 @@ KINDS = {
     # Paperless-ngx connection of one workspace, receipt data / agent suggestions on a visible document
     "file": ("matrix", "p248_a_api_test.py: a node of another organisation / person: 404 (read, list, content, versions, share, move); shares only to people and agents of the node's workspace"),
     "paperless": ("matrix", "p248_d_paperless_api_test.py: the connection of another workspace: 404; organisation admins only change it; agents never"),
+    # 2.55.0 (#1455): the newsletter connection of one workspace (segments, log, sync) + the consent of a contact
+    "newsletter": ("matrix", "p255_e_api_test.py: the connection, segments, log and sync of another workspace: 404 / 403; organisation admins only; agents never; consent only on writable contacts; address books of other workspaces refused in a segment"),
     "receipt": ("matrix", "p248_d_receipts_api_test.py: receipt data and suggestions only on a visible document; projects of another workspace refused; outsiders 404"),
     "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
@@ -368,6 +371,11 @@ ROUTES = {
     "GET /api/lists/{}/time/delete-all": "list", "POST /api/lists/{}/time/delete-all": "list", "POST /api/lists/{}/time/restore": "list",
     # 2.43.0 (#1452): the default arrangement of the views: a layout without data of a person, set by the operator
     "GET /api/layouts/std": "public", "PUT /api/layouts/std/{}": "admin",
+    # 2.55.0 (#1069): the person's own saved arrangements; (#1068) templates between people who see each other
+    "GET /api/layouts/saved": "own", "POST /api/layouts/saved": "own", "PATCH /api/layouts/saved/{}": "own",
+    "DELETE /api/layouts/saved/{}": "own", "POST /api/layouts/saved/{}/activate": "own", "POST /api/layouts/saved/standard": "own",
+    "POST /api/layouts/offers": "lytpl", "GET /api/layouts/offers/{}": "lytpl", "POST /api/layouts/offers/{}/accept": "lytpl",
+    "POST /api/layouts/offers/{}/decline": "lytpl",
     "PATCH /api/lists/{}/milestones/{}": "list", "DELETE /api/lists/{}/milestones/{}": "list",
     "POST /api/lists/{}/checklist": "list", "POST /api/sections": "list", "PATCH /api/sections/{}": "list",
     "POST /api/lists/{}/sections/order": "list", "DELETE /api/sections/{}": "list", "POST /api/lists/{}/shift": "list",
@@ -383,6 +391,9 @@ ROUTES = {
     # 2.35.0 (#1101): an organisation admin's lists of the organisation (p2350_c_api_test.py: other organisation, private list, member 403)
     "GET /api/orgs/{}/lists": "org", "POST /api/orgs/{}/lists/{}/archive": "org", "DELETE /api/orgs/{}/lists/{}": "org",
     "POST /api/orgs/{}/lists/{}/owner": "org",
+    # 2.56.0 (#1795): an organisation admin changes name, icon and colour of a list of the organisation (p256_b_api_test.py)
+    "PATCH /api/orgs/{}/lists/{}": "org", "PUT /api/orgs/{}/lists/{}/icon": "org", "POST /api/orgs/{}/lists/{}/icon": "org",
+    "DELETE /api/orgs/{}/lists/{}/icon": "org",
     # 2.42.0 (#828): an organisation's encryption state + recovery key (its admins only; p2420_b_api_test.py: member 403, other
     # organisation 404, agent refused); the instance switch org_encrypt is the operator's
     "GET /api/orgs/{}/encryption": "org", "POST /api/orgs/{}/encryption/recovery": "org",
@@ -574,7 +585,13 @@ ROUTES = {
     "GET /api/v1/lists/{}/notepads": "list", "POST /api/v1/lists/{}/notepads": "list", "PATCH /api/v1/notepads/{}": "list",
     "DELETE /api/v1/notepads/{}": "list", "PUT /api/v1/lists/{}/status-pad": "list", "GET /api/v1/lists/{}/weekly-status": "list",
     "GET /api/v1/time/check": "aggregate", "GET /api/v1/time/from-events": "aggregate", "POST /api/v1/agent/proposals/time": "agent",
+    # 2.55.0 (#1066): an agent reads / proposes arrangements of its person's views (p255_b_api_test.py: other person / org 404)
+    "GET /api/v1/layouts/blocks": "agent", "GET /api/v1/layouts/{}": "agent", "POST /api/v1/layouts/proposals": "agent",
     "GET /api/v1/dispo": "hub", "GET /api/v1/dispo/free": "hub", "POST /api/v1/agent/proposals/shoot": "hub",
+    # 2.55.0 (#1455): the newsletter connection of one workspace (its admins / the person), consent on writable contacts
+    "GET /api/newsletter": "newsletter", "PUT /api/newsletter": "newsletter", "DELETE /api/newsletter": "newsletter",
+    "GET /api/newsletter/lists": "newsletter", "POST /api/newsletter/segments": "newsletter", "PATCH /api/newsletter/segments/{}": "newsletter",
+    "DELETE /api/newsletter/segments/{}": "newsletter", "POST /api/newsletter/sync": "newsletter", "PUT /api/newsletter/consent": "newsletter",
 }
 
 # ---- 1. every route is classified, nothing stale

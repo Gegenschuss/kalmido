@@ -132,7 +132,12 @@ function viewOverview() {
   if (S.ly.view === 'projects') return h + lyHtml('projects', P) + '</div>';  // 2.35.0 (#1097): the totals as they are
   if (!shown.length) return h + lyHtml('projects', P) + `<div class="empty">${ic('done')}${tr('Nothing stuck. No overdue or blocked tasks.')}</div></div>`;
   P.projects = '';
-  for (const r of shown) {
+  // 2.55.0 (#1065): the block's settings (lyopts.js): only active projects, the order, how many
+  const pso = n => lyo_get('projects', 'projects', n), psrt = pso('sort'), pmax = pso('n');
+  let pshown = pso('active') ? shown.filter(r => !['complete', 'on_hold'].includes(r.l.status)) : shown.slice();
+  if (psrt === 'name') pshown.sort((a, b) => lname(a.l).localeCompare(lname(b.l), LOCALE())); else if (psrt === 'overdue') pshown.sort((a, b) => b.overdue.length - a.overdue.length || a.risk - b.risk);
+  if (pmax) pshown = pshown.slice(0, pmax);
+  for (const r of pshown) {
     const l = r.l, p = l.progress || {done: 0, total: 0};
     const who = t => t.assignee_id ? personName(l.id, t.assignee_id) || '?' : '';
     let body = '';
@@ -145,7 +150,7 @@ function viewOverview() {
     }
     if (r.blocked.length) body += `<h4>${ic('lock', 's')}${tr('Blocked')} <span class="c">${r.blocked.length}</span></h4>` + ovMore(r.blocked, t => ovTask(t, `<span class="muted ovw-on">${esc(blockedTitle(t))}</span>`));
     if (r.unassigned.length) body += `<h4>${ic('user', 's')}${tr('Without assignee')} <span class="c">${r.unassigned.length}</span></h4>` + ovMore(r.unassigned, t => ovTask(t, t.due ? `<span class="muted">${esc(dayLabel(t.due))}</span>` : ''));
-    P.projects += `<section class="stcard ovcard ${r.risk < 2 ? 'risk st-' + esc(l.status) : ''}"><div class="ovhead"><button class="ovname" data-go="l/${l.id}"><span class="sw" style="${cssColor(l.color) ? 'background:' + cssColor(l.color) : ''}"></span>${esc(lname(l))}${l.shared && collab() ? ic('users', 's') : ''}</button><span class="spacer"></span>${statusPill(l)}</div>
+    P.projects += `<section class="stcard ovcard ${r.risk < 2 ? 'risk st-' + esc(l.status) : ''}"><div class="ovhead"><button class="ovname" data-go="l/${l.id}"><span class="sw" style="${cssColor(lp_col(l)) ? 'background:' + cssColor(lp_col(l)) : ''}"></span>${esc(lname(l))}${l.shared && collab() ? ic('users', 's') : ''}</button><span class="spacer"></span>${statusPill(l)}</div>
       ${p.total ? `<div class="ovprog">${progBar(p)}${progMeta(p)}</div>` : ''}${statusNote(l)}
       ${body || `<div class="muted ovok">${ic('check', 's')}${tr('Nothing stuck')}</div>`}</section>`;
   }

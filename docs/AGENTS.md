@@ -670,7 +670,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `assigned` / `unassigned` | a task is assigned to the agent or taken away from it | `task`, `list` |
 | `chat` | a person writes in their chat with the agent | `message` `{id, body, task_id, created_at, attachments}`, `user` `{id, name}`; fetching it marks the message *delivered* (2.7.2); 2.13.1: `attachments` `[{id, name, mime, size, url}]` (images / files, `body` may then be empty) |
 | `reaction` | someone reacts to one of the agent's comments; 2.7.2: or to one of its chat messages | comments: `task`, `list`, `comment` `{id, text}`, `reaction` `{emoji, user}`, `approval`: `approved`, `rejected` or `null`; chat: `chat_message` `{id, text, from, created_at}`, `reaction`, `approval`, `user`; 2.30.0: `stale: true` when a 👍 / 👎 hit a permission question that is already answered or expired (act on `approval`, never on the emoji) ([Chat reactions](#chat-reactions-and-delivery-272)) |
-| `job` | someone presses Approve, Reject or Stop on one of the agent's jobs; 2.3.0: a proposal was applied (`approve`) or discarded (`reject`) | `job`, `action`: `approve`, `reject` or `stop`, `user`; for proposals also `proposal` `{state: applied \| discarded, created, changed, list_id}` |
+| `job` | someone presses Approve, Reject or Stop on one of the agent's jobs; 2.3.0: a proposal was applied (`approve`) or discarded (`reject`); 2.56.0: someone wrote to a running job from its card (`message`) | `job`, `action`: `approve`, `reject`, `stop` or `message` (2.56.0, with `text`; the job itself does not change), `user`; for proposals also `proposal` `{state: applied \| discarded, created, changed, list_id}` |
 | `tidy` | a person creates a task in a list with tidy mode `suggest` or `auto`; 2.4.1: only to the list's tidy agent (`list.tidy_agent_id`); 2.29.0: not for tasks created in bulk through the API beyond the first five; 2.30.0: also for a task a person moves into the list (not in a bulk move beyond the first five) | `task`, `list`, `mode` |
 | `tasks_added` | 2.29.0: more than five tasks added to one list by one person within a minute ([No backlog floods](#polling-no-public-endpoint-needed)); 2.30.0: only to agents that [listen in](#agent-listens-in-2300) | `list`, `list_id`, `task_ids`, `count`, `how`, `moved_from`?, `source`?, `truncated` |
 | `missed` | 2.29.0: events older than two days (`KALMIDO_AGENT_EVENTS_STALE_H`), folded into one at the next poll | `count`, `events` `{type: n}`, `from`, `to`, `stale_hours` |
@@ -1163,6 +1163,19 @@ same agent, only together with `job_id`, else `400`) and the message takes the l
 field comes back in the message as `job_parent` (`null` without); older servers answer `400` for the unknown field, so send
 it only together with `job_id` and retry without both.
 
+2.56.0 (#1791 / #1793): **talking to one job.** A job whose title starts with a name (`Clara: Release 2.50`, part jobs
+`Clara B: …`) carries that name in the job's JSON (`name`, `null` without). A message tied to a job (`job_id`, or the
+`Job #N` start) shows a tag with the name; a tap on it (or on the name at the start of such a message) opens the job's own
+history: `GET /api/agents/{id}/chat?job=<job id>` returns only the agent's messages with that `job_id`, the person's
+messages addressed to it (`Clara: …`, `Job 82: …`, `#82: …`) and the agent's direct answers to those (`reply_to`), from the
+person's own conversation (with `?after=`, `?before=`, `?limit=` like the whole chat; a job of another agent or one the
+person cannot see = 404). What the person types there goes out as a normal chat message `Job 82: …` (the number, also for jobs
+with a name; a typed `Clara: …` stays as it is), so route such messages to the job. Running jobs with a name are listed in the agent menu of the top bar. The card
+of a running job has **Message**: `POST /api/agents/jobs/{id}/action {action: "message", text}` (at most 4000 characters,
+the same people as Stop; empty 400, an ended job 409) sends the `job` event with `action: "message"` and `text`; the job's
+state, action fields and approval stay as they are. Hand the text to the running job if you can; else treat it as a chat
+message of that person about the job (the reference starter does the latter).
+
 **What the person sees in the chat header (2.4.1).** Under the agent's name: typing dots while it writes to this person,
 then its state in words: *working on #51* (the status task, a link), *working*, *waiting for you*, *ready* (idle),
 *paused*, *limit reached* or *not connected* (2.6.0; was *offline*). The dots show while the agent's status is `working` on nothing in particular, on a
@@ -1623,6 +1636,38 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
   creating it (`time` / `calendar`).
 - The disposition: an agent of an organisation reads that organisation, a personal agent its owner's personal area
   (freelancers without an organisation get the same); absences only as away, never the reason; booking notes are left out.
+
+## Arrangements of views (2.55.0)
+
+An agent may PROPOSE how a view of the person it works for is arranged (which blocks, their order, widths and heights);
+it never changes a view itself, and the routes people use to arrange views stay closed to agents (403). The scope
+`layouts` is off for new agents (and not part of the legacy `write`): an admin, or without an organisation the person
+itself, turns it on per agent. Whose views: a personal agent's owner, a team agent's person given as `user_id` (someone who
+may chat with it, in the agent's organisation); everyone else 404. The project page (view `list:<id>`) only for a list
+shared with the agent (within its list limit) that is a project and that the person sees.
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| The blocks of a view (key, name, default width, fixed) | `GET /api/v1/layouts/blocks?view=` | `list_layout_blocks` | layouts |
+| How a view is arranged now (blocks only, never content) | `GET /api/v1/layouts/{view}` | `get_view_layout` | layouts |
+| Propose an arrangement (kind `layout`) | `POST /api/v1/layouts/proposals` | `propose_layout` | layouts |
+
+- **Views**: `dashboard` (start page), `view_today`, `view_time`, `view_agents`, `view_projects`, `view_review`, further
+  views of the builder, `list:<id>`. `source` of the current arrangement: `own`, `standard` (the admins' standard) or
+  `default`.
+- **The layout**: `{order, hidden, widths, heights, mobile}`; widths in columns of six (2 = a third, 3 = half, 4 = two
+  thirds, 6 = full), heights 1 compact / 2 normal / 3 tall, `mobile` = `{order, hidden}` for phones. It starts from what the
+  person sees now: the blocks named in `order` come first, the others keep their order after them; `hidden`, a block's
+  width / height and `mobile` left out stay as they are. Unknown blocks, hiding a fixed block, other values or a proposal
+  that changes nothing: 400 with the reason. The person's own block settings are kept when they accept.
+- **The proposal** is a ready proposal job (kind `layout`): News + push "Proposal ready" per the person's settings and a card
+  with before / after (two small grids with the block names and widths). 👍 *Accept* stores it as a saved arrangement
+  "<name> (proposal by <agent>)" of that view and, ticked by default, uses it at once; 👎 *Decline* discards it. Only the
+  person decides (never the agent's token or session); undo = one step back to the previous arrangement. The agent gets the
+  event `job` with `action` approve / reject (`proposal`: `state`, `view`, `layout_id`, `used`).
+- **Limits**: one open proposal per agent, person and view (a new one replaces the old one); it expires after 14 days; at
+  most 20 per agent and person a day; the agent's usage limit applies. After a decline the agent does not propose the same
+  again unasked.
   It needs the module *Disposition* switched on at the owner (personal agent) or at an admin of the organisation (else 409).
   An agent with a list limit sees bookings of other lists only as time + resource: title "Booked", no list, job or event
   (`hidden: true`); the same goes for the titles in the proposal warnings.

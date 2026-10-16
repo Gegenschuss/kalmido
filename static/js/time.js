@@ -287,7 +287,7 @@ function tvListsLabel() {
 function tvPomoCard() {
   const p = S.pomo; if (!p || !feat('pomo')) return '';
   const k = p.kind === 'stopwatch' ? 'stopwatch' : p.kind === 'focus' ? 'focus' : 'break', [icn, name] = RUN_KIND[k];
-  const t = p.task_id && taskById(p.task_id), l = t && listById(t.list_id), col = l && cssColor(l.color);
+  const t = p.task_id && taskById(p.task_id), l = t && listById(t.list_id), col = l && cssColor(lp_col(l));
   const stop = k === 'stopwatch' ? tr('Stop stopwatch') : k === 'focus' ? tr('Stop focus session') : tr('End break');
   return `<section class="tvrun tvpomo k-${k}${p.paused_at ? ' paused' : ''}" aria-label="${esc(tr(name))}">
     <div class="tvr-time">${ic(icn, 's rk')}<b data-pomo-mini>${pomoDisplay()}</b></div>
@@ -303,7 +303,7 @@ function tvRunCard() {
     const recent = Object.entries(S.timeTotals || {}).map(([id, v]) => [taskById(+id), v[1]]).filter(([x, m]) => x && x.status === 0 && m > 0 && tFor(x)).sort((a, b) => b[1] - a[1]).slice(0, 3);
     return `<section class="tvrun idle"><span class="tvr-idle">${ic('clock', 's')}${tr('No timer running')}</span>${recent.map(([x]) => `<button class="btn sm tvr-go" data-act="timer-toggle" data-id="${x.id}" title="${esc(tr('Start timer'))}">${ic('play', 's')}<span>${esc(x.title)}</span></button>`).join('')}</section>`;
   }
-  const t = r.task_id && taskById(r.task_id), l = listById(r.list_id ?? t?.list_id), col = l && cssColor(l.color);
+  const t = r.task_id && taskById(r.task_id), l = listById(r.list_id ?? t?.list_id), col = l && cssColor(lp_col(l));
   return `<section class="tvrun" aria-label="${esc(tr('Timer running'))}">
     <div class="tvr-time"><span class="rec"></span><b data-timer-live>${fmtT(timerElapsed())}</b></div>
     <div class="tvr-info">${t ? `<button class="tvr-task" data-act="open-id" data-id="${t.id}" title="${esc(tr('Open task'))}">${esc(t.title)}</button>` : `<span class="tvr-task muted">${esc(r.title || tr('No task'))}</span>`}
@@ -329,31 +329,37 @@ function viewTime() {
       <button class="btn sm" data-act="tv-sheet" ${j ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet')}</button>${lyCustomBtn('time')}</div>`;
   if (S.ly.view === 'time') return h + lyHtml('time', {}) + '</div>';
   if (!j) return h + lyHtml('time', P) + `<div class="empty">${tv.err ? (tv.err === 'offline' ? tr('Reports are only available online.') : esc(tv.err)) : tr('Loading…')}</div></div>`;
-  const tot = j.total, rm = j.rounding, hasAmt = j.lists.some(l => l.rate), tgt = j.today.target_h;
+  const rm = j.rounding, tgt = j.today.target_h;
+  // 2.55.0 (#1065): a block may show one client / list only (its settings, lyopts.js lyo_tvReport); jt / jc / jl / je = its report
+  const jx = k => lyo_tvReport(j, k) || j, jt = jx('tiles'), jc = jx('chart'), jl = jx('lists'), je = jx('entries');
+  let tot = jt.total, hasAmt = jt.lists.some(l => l.rate);
   // U20: one tile for the range (time and decimal hours together), "today" only when the range is longer than today
   const tiles = [[hmm(tot.seconds), tr('tracked'), [rm ? tr('rounded: {0}', `${hmm(tot.rounded)} (${hoursDec(tot.rounded)} h)`) : `${hoursDec(tot.rounded)} h`, trn('{0} entry', '{0} entries', tot.count)].join(' · ')]];
-  if (!(f === t && f === today())) tiles.push([hmm(j.today.seconds), tr('today'), tgt ? tr('{0}% of the daily target ({1} h)', Math.round(100 * j.today.seconds / 3600 / tgt), String(tgt).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : tr('your time')]);
-  else if (tgt) tiles[0][2] += ' · ' + tr('{0}% of the daily target ({1} h)', Math.round(100 * j.today.seconds / 3600 / tgt), String(tgt).replace('.', LOCALE().startsWith('de') ? ',' : '.'));
+  if (!(f === t && f === today())) tiles.push([hmm(jt.today.seconds), tr('today'), tgt ? tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), String(tgt).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : tr('your time')]);
+  else if (tgt) tiles[0][2] += ' · ' + tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), String(tgt).replace('.', LOCALE().startsWith('de') ? ',' : '.'));
   if (hasAmt) tiles.push([money(tot.amount, j.currency), tr('amount'), tr('hourly rates of the lists')]);
-  P.tiles = `<div class="sttiles">${tiles.map(([v, l, s]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>`;
+  P.tiles = lyo_note(jt.lyoLabel) + `<div class="sttiles">${tiles.map(([v, l, s]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>`;
   // per day (per week for long ranges)
   const days = []; for (let d = f; d <= t && days.length < 400; d = addDays(d, 1)) days.push(d);
-  const per = Object.fromEntries(j.days.map(x => [x.date, x.seconds / 60]));
+  const per = Object.fromEntries(jc.days.map(x => [x.date, x.seconds / 60]));
   if (days.length > 1) {
     const weekly = days.length > 62, keys = weekly ? [...new Set(days.map(weekStartOf))] : days;
     const vals = keys.map(k => weekly ? days.filter(d => weekStartOf(d) === k).reduce((n, d) => n + (per[d] || 0), 0) : per[k] || 0);
-    P.chart = `<section class="stcard"><div class="sthead"><h3>${weekly ? tr('Per week') : tr('Per day')}</h3></div>${barChart(vals, keys.map(k => weekly ? shortDay(k) : days.length <= 7 ? WD[pd(k).getDay()] : String(pd(k).getDate())),
-      {fmt: v => fmtH(Math.round(v)), tip: i => `${weekly ? tr('Week of {0}', fmtDate(keys[i])) : fmtDate(keys[i])}: ${fmtH(Math.round(vals[i]))}`, label: tr('Tracked time')})}</section>`;
+    const labs = keys.map(k => weekly ? shortDay(k) : days.length <= 7 ? WD[pd(k).getDay()] : String(pd(k).getDate())), tip = i => `${weekly ? tr('Week of {0}', fmtDate(keys[i])) : fmtDate(keys[i])}: ${fmtH(Math.round(vals[i]))}`;
+    P.chart = `<section class="stcard"><div class="sthead"><h3>${weekly ? tr('Per week') : tr('Per day')}</h3>${jc.lyoLabel ? `<span class="muted">${esc(tr('Only: {0}', jc.lyoLabel))}</span>` : ''}</div>${lyo_get('time', 'chart', 'kind') === 'line'
+      ? lineChart(vals.map(v => Math.round(v / 6) / 10), labs, {tip, label: tr('Tracked time')})  // 2.55.0 (#1065): hours with one decimal
+      : barChart(vals, labs, {fmt: v => fmtH(Math.round(v)), tip, label: tr('Tracked time')})}</section>`;
   }
   if (!j.lists.length) return h + lyHtml('time', P) + `<div class="empty">${ic('clock')}${tr('No time tracked in this period.')}</div></div>`;
+  tot = jl.total; hasAmt = jl.lists.some(l => l.rate);
   const all = j.scope === 'all', ppl = us => all && us.length ? `<small class="muted">${esc(us.map(([n, s]) => `${n} ${hmm(s)}`).join(', '))}</small>` : '';
-  P.lists = `<section class="stcard"><div class="sthead"><h3>${tr('By list and task')}</h3>${rm ? `<span class="muted">${tr('rounded up to {0} min per entry', rm)}</span>` : ''}</div>
+  P.lists = `<section class="stcard"><div class="sthead"><h3>${tr('By list and task')}</h3>${jl.lyoLabel ? `<span class="muted">${esc(tr('Only: {0}', jl.lyoLabel))}</span>` : ''}${rm ? `<span class="muted">${tr('rounded up to {0} min per entry', rm)}</span>` : ''}</div>
     <table class="ttable"><thead><tr><th>${tr('List / task')}</th><th class="n">${tr('Time|tracked')}</th>${rm ? `<th class="n">${tr('Rounded')}</th>` : ''}${hasAmt ? `<th class="n">${tr('Amount')}</th>` : ''}</tr></thead><tbody>
-    ${j.lists.map(l => { const closed = S.collapsed.has('tvl:' + l.id); return `<tr class="tvl ${closed ? 'closed' : ''}" data-act="tv-toggle" data-key="tvl:${l.id}"><td>${ic('chev', 's')}<span>${esc(tvListName(l))}</span>${ppl(l.users)}</td><td class="n">${hmm(l.seconds)}</td>${rm ? `<td class="n">${hmm(l.rounded)}</td>` : ''}${hasAmt ? `<td class="n">${l.rate ? money(l.amount, j.currency) : ''}</td>` : ''}</tr>` +
+    ${jl.lists.map(l => { const closed = S.collapsed.has('tvl:' + l.id); return `<tr class="tvl ${closed ? 'closed' : ''}" data-act="tv-toggle" data-key="tvl:${l.id}"><td>${ic('chev', 's')}<span>${esc(tvListName(l))}</span>${ppl(l.users)}</td><td class="n">${hmm(l.seconds)}</td>${rm ? `<td class="n">${hmm(l.rounded)}</td>` : ''}${hasAmt ? `<td class="n">${l.rate ? money(l.amount, j.currency) : ''}</td>` : ''}</tr>` +
       (closed ? '' : l.tasks.map(x => `<tr class="tvt" ${x.id ? `data-act="te-open" data-id="${x.id}"` : ''}><td><span>${esc(x.title || tr('No task'))}</span>${ppl(x.users)}</td><td class="n">${hmm(x.seconds)}</td>${rm ? `<td class="n">${hmm(x.rounded)}</td>` : ''}${hasAmt ? `<td class="n">${l.rate ? money(x.amount, j.currency) : ''}</td>` : ''}</tr>`).join('')); }).join('')}
     <tr class="tvsum"><td>${tr('Total')}</td><td class="n">${hmm(tot.seconds)}</td>${rm ? `<td class="n">${hmm(tot.rounded)}</td>` : ''}${hasAmt ? `<td class="n">${money(tot.amount, j.currency)}</td>` : ''}</tr></tbody></table></section>`;
-  const byDay = {}; for (const e of j.entries) (byDay[e.day] ||= []).push(e);
-  P.entries = `<section class="stcard"><div class="sthead tvtoggle" data-act="tv-entries"><h3>${ic('chev', 's' + (tv.entries ? '' : ' closedc'))} ${tr('Entries')}</h3><span class="muted">${tot.count}</span></div>
+  const byDay = {}; for (const e of je.entries) (byDay[e.day] ||= []).push(e);
+  P.entries = `<section class="stcard"><div class="sthead tvtoggle" data-act="tv-entries"><h3>${ic('chev', 's' + (tv.entries ? '' : ' closedc'))} ${tr('Entries')}</h3>${je.lyoLabel ? `<span class="muted">${esc(tr('Only: {0}', je.lyoLabel))}</span>` : ''}<span class="muted">${je.total.count}</span></div>
     ${tv.entries ? Object.keys(byDay).sort().reverse().map(d => `<div class="teday"><span>${esc(dayLabel(d))}</span><b>${hmm(byDay[d].reduce((n, e) => n + e.seconds, 0))}</b></div>${byDay[d].slice().reverse().map(e => teRow(e, {day: false})).join('')}`).join('') : ''}</section>`;
   return h + lyHtml('time', P) + `<p class="muted stnote">${tr('An entry counts on the day it starts. Rounding and the hourly rate (list settings) only apply to the report, CSV and timesheet; the tracked times stay exact.')}</p></div>`;
 }

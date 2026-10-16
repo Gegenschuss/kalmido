@@ -26,7 +26,7 @@ function chatOpen(aid, o = {}) {
   if (chatFull()) { if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); return; }
   const fl = o.float ?? chatFloatOn();
   if (!fl && document.body.classList.contains('chat-yield') && S.sel) closeDetail();  // 2.13.2 (#478 N1): the chat takes its place back
-  S.chat = {aid: +aid, msgs: S.chat.aid === +aid ? S.chat.msgs : [], more: S.chat.aid === +aid && S.chat.more, err: null};
+  S.chat = o.jc && S.chat.job ? {aid: +aid, msgs: [], err: null, job: S.chat.job} : {aid: +aid, msgs: S.chat.aid === +aid && !S.chat.job ? S.chat.msgs : [], more: S.chat.aid === +aid && !S.chat.job && S.chat.more, err: null};  // 2.56.0 (#1793): o.jc = a job's history (jobchat.js)
   LS.set('chatLast', +aid);  // 2.29.0 (#363): the pop-up button opens this one next time
   let p = $('#achat');
   if (!p) { p = document.createElement('aside'); p.id = 'achat'; p.setAttribute('aria-label', tr('Chat')); document.body.appendChild(p); }
@@ -35,7 +35,8 @@ function chatOpen(aid, o = {}) {
   if (fl) chatFloatPlace(p); else p.style.left = p.style.top = p.style.right = p.style.bottom = '';
   p.classList.remove('hidden'); fitLayout(); chatDraw(); chatFabDraw(); chatLoad().then(() => $('#chat-in')?.focus());
 }
-function chatClose() { if (typeof cw_reset === 'function') cw_reset(); S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open', 'chat-float'); fitLayout(); chatFabDraw(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; go(b || 'agents'); } }
+function chatClose() { if (S.chat.job && chatFull()) { jc_enter(S.chat.aid, null); return; }  // 2.56.0 (#1793): Back leaves a job's history first
+  if (typeof cw_reset === 'function') cw_reset(); S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open', 'chat-float'); fitLayout(); chatFabDraw(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; go(b || 'agents'); } }
 // ---- 2.29.0 (#363) desktop: the chat as a pop-up window from anywhere -- the round button bottom right (the agent last
 // chatted with), the key A and "Chat as a window" in the command bar. The window stays open while you switch lists and views,
 // can be moved by its header, folded to the header and docked as the side panel again (remembered per device: chatFloat).
@@ -76,12 +77,12 @@ document.addEventListener('pointerdown', e => {  // move the window by its heade
 });
 const CHAT_PAGE = 30;
 async function chatLoad() {
-  const aid = S.chat.aid; if (!aid) return;
+  const aid = S.chat.aid, jk = jc_key(); if (!aid) return;  // 2.56.0 (#1793): jk = the job's history this load is for
   try {
     // 2.12.2 (#451): first the newest CHAT_PAGE messages ("Load older messages" pages back); a refresh asks for the loaded
     // ones and everything newer (Delivered, reactions), the older pages stay as they are
     const first = S.chat.msgs.length ? S.chat.msgs[0].id : 0, seq = S.chat.seq = (S.chat.seq || 0) + 1;
-    const j = await api('GET', `/api/agents/${aid}/chat?` + (first ? `after=${first - 1}` : `limit=${CHAT_PAGE}`)); if (S.chat.aid !== aid) return;
+    const j = await api('GET', `/api/agents/${aid}/chat?` + (first ? `after=${first - 1}` : `limit=${CHAT_PAGE}`) + jc_q()); if (S.chat.aid !== aid || jc_key() !== jk) return;  // 2.56.0 (#1793): jc_q = a job's history (switched meanwhile: not this one)
     if (S.chat.mutAt && seq < S.chat.mutAt) return chatLoad();  // 2.13.0: an answer older than my own reaction / message: fetch again
     if (first) { const lo = j.messages.length ? j.messages[0].id : Infinity; S.chat.msgs = [...S.chat.msgs.filter(m => m.id < lo), ...j.messages]; }
     else { S.chat.msgs = j.messages; S.chat.more = !!j.has_more; }
@@ -100,8 +101,8 @@ async function chatLoad() {
 const UX_JOB_RE = /^\s*(?:[\u2705\u23F0\u23F9\u26A0]\uFE0F?\s*)?Job #(\d+)\b/;
 function ux_jobOf(m) {
   if (m.from !== 'agent' || m.kind === 'notice') return null;
-  const x = UX_JOB_RE.exec(m.body || ''); if (!x) return null;
-  const no = +x[1], par = +m.job_parent || 0;
+  const x = UX_JOB_RE.exec(m.body || ''); if (!x && !m.job_id) return null;  // 2.56.0 (#1793): or a message the service tied to its job
+  const no = x ? +x[1] : +m.job_id, par = +m.job_parent || 0;
   return {no, parent: par && par !== no ? par : 0};
 }
 const ux_jobColor = n => AC_COLORS[(+n || 0) % AC_COLORS.length];
@@ -119,7 +120,7 @@ function chatMsgs() {
     const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
     const ap = !mine && apvKind(m), apo = ap && chatChoiceSt(m) === 'open', ed = mine && S.chat.edit === m.id;  // 2.39.0 (#1179): my message in edit mode
     const jb = !mine && ux_jobOf(m), jcol = jb ? ux_jobColor(jb.parent || jb.no) : '';  // 2.47.3 (#1764)
-    return `<div class="cmsg ${mine ? 'me' : 'ag'}${jb ? ' jobm' + (jb.parent ? ' jpart' : '') : ''}${rxShow('c' + m.id)}${chatPerm(m) ? ' perm' : ''}${ap ? ' apv' + (apo ? ' apvopen' : '') : ''}" data-k="m${m.id}${m.choice ? 'a' : ''}${ap ? chatChoiceSt(m)[0] : ''}${m.edited_at ? 'e' + m.edited_at : ''}${ed ? 'E' : ''}" data-mid="a:${m.id}" ${ap ? `id="apv-${m.id}"` : ''}${jb ? ` style="--jcol:${jcol}"` : ''}>${!mine && stepsAlwaysOn() ? chatStepsKept(m) : ''}${replyQuoteHtml(m, 'a')}${ap ? apvHead(m, apo) : ''}${jb ? ux_jobTag(jb) : ''}${ed ? chatEditHtml(m) : m.body && !(ap === 'a' && m.body.trim() === m.choices.approval.title) ? `<div class="cbub">${commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${tlkChSug(m) ? '' : chatChoicesHtml(m)}${!mine && m.job_id && m.job_steps ? jobStepsHtml(m.job_id, m.job_steps) : ''}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${!mine && m.offer_save && !m.saved_task_id ? `<div class="csoffer"><button type="button" class="btn sm" data-act="chat-save" data-mid="${m.id}">${ic('bookmark', 's')} ${tr('Save as task')}</button></div>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${mine && m.edited_at ? chatEditedHtml(m) : ''}${chatRxHtml(m, a)}${a?.enabled ? replyBtn('chrbtn mreply') : ''}${chatSavedMark(m)}<button type="button" class="rx rxtog" data-act="chat-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>${tlkChSug(m) ? chatChoicesHtml(m) : ''}</div>`; }).join('')
+    return `<div class="cmsg ${mine ? 'me' : 'ag agc'}${jb ? ' jobm' + (jb.parent ? ' jpart' : '') : ''}${rxShow('c' + m.id)}${chatPerm(m) ? ' perm' : ''}${ap ? ' apv' + (apo ? ' apvopen' : '') : ''}" data-k="m${m.id}${m.choice ? 'a' : ''}${ap ? chatChoiceSt(m)[0] : ''}${m.edited_at ? 'e' + m.edited_at : ''}${ed ? 'E' : ''}" data-mid="a:${m.id}" ${ap ? `id="apv-${m.id}"` : ''}${jb ? ` style="--jcol:${jcol}"` : ''}>${!mine && stepsAlwaysOn() ? chatStepsKept(m) : ''}${replyQuoteHtml(m, 'a')}${ap ? apvHead(m, apo) : ''}${jb ? jc_tagHtml(jb, m) : ''}${ed ? chatEditHtml(m) : m.body && !(ap === 'a' && m.body.trim() === m.choices.approval.title) ? `<div class="cbub">${jb ? jc_bodyHtml(commentBody(m.body, {}), jb) : commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${tlkChSug(m) ? '' : chatChoicesHtml(m)}${!mine && m.job_id && m.job_steps ? jobStepsHtml(m.job_id, m.job_steps) : ''}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${!mine && m.offer_save && !m.saved_task_id ? `<div class="csoffer"><button type="button" class="btn sm" data-act="chat-save" data-mid="${m.id}">${ic('bookmark', 's')} ${tr('Save as task')}</button></div>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${mine && m.edited_at ? chatEditedHtml(m) : ''}${chatRxHtml(m, a)}${a?.enabled ? replyBtn('chrbtn mreply') : ''}${chatSavedMark(m)}<button type="button" class="rx rxtog" data-act="chat-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>${tlkChSug(m) ? chatChoicesHtml(m) : ''}</div>`; }).join('')
     + (off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
 }
 // 2.41.0 (#1206): a notice of the agent ("New session, summary taken over (22:10)"): one grey line in the middle, no bubble,
@@ -682,12 +683,12 @@ function chatInner(aid) {
   const info = `<button type="button" class="ib" data-ii="chat-info" aria-describedby="chat-info" aria-expanded="false" aria-label="${esc(tr('More information'))}">${ic('info', 's')}</button><span class="shint iisrc" id="chat-info" data-ii="1">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the lists shared with it.', esc(a.name))}</span>`;
   return `<div class="chath">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}${info}${chatModeHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatModelHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>
       ${msgSearchBtn('a', a.id)}${chatStepsTog()}${back ? '' : chatWinBtns()}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
-    ${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div><div class="chmsgs" id="chat-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
+    ${jc_barHtml()}${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div><div class="chmsgs" id="chat-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
     <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTypers(a), 'chat-typing')}
     ${chatStepsLiveHtml()}
     <div class="cfiles chfiles" id="chat-files">${chatFilesHtml(a.id)}</div>
-    ${replyBarHtml('a:' + a.id)}<div class="chcomp"><button type="button" class="iconbtn chclip" data-act="chat-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}" ${a.enabled ? '' : 'disabled'}>${ic('clip')}</button><input type="file" id="chat-file" multiple hidden><textarea id="chat-in" rows="1" placeholder="${esc(tr('Message to {0}…', a.name))}" aria-label="${esc(tr('Message to {0}…', a.name))}" ${a.enabled ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><button class="btn sm pri" data-act="chat-send" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button></div>`;
+    ${replyBarHtml('a:' + a.id)}<div class="chcomp"><button type="button" class="iconbtn chclip" data-act="chat-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}" ${a.enabled ? '' : 'disabled'}>${ic('clip')}</button><input type="file" id="chat-file" multiple hidden><textarea id="chat-in" rows="1" placeholder="${esc(jc_ph(a))}" aria-label="${esc(jc_ph(a))}" ${a.enabled && !jc_ended() ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><button class="btn sm pri" data-act="chat-send" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button></div>`;
 }
 function chatViewHtml(aid) {
   if (S.chat.aid !== +aid) { S.chat = {aid: +aid, msgs: [], err: null}; setTimeout(chatLoad, 0); }
@@ -696,8 +697,8 @@ function chatViewHtml(aid) {
 function chatDraw(o = {}) {
   const p = $('#achat');
   if (typeof cw_frame === 'function' && cw_frame(p)) o = {bottom: true};  // 2.47.1 (#1720): several chats one above the other (chatwins.js)
-  if (p && !p.classList.contains('hidden') && !p.classList.contains('cwsplit') && S.chat.aid && !chatFull() && (p.dataset.aid !== String(S.chat.aid) || !$('#chat-msgs', p))) {
-    const d = S.drafts['chat:' + S.chat.aid] = $('#chat-in', p)?.value ?? S.drafts['chat:' + S.chat.aid]; p.innerHTML = chatInner(S.chat.aid); p.dataset.aid = S.chat.aid; if (d !== undefined) $('#chat-in', p).value = d;
+  if (p && !p.classList.contains('hidden') && !p.classList.contains('cwsplit') && S.chat.aid && !chatFull() && (p.dataset.aid !== String(S.chat.aid) || (p.dataset.jc || '') !== jc_key() || !$('#chat-msgs', p))) {  // 2.56.0 (#1793): jc = a job's history
+    const d = S.drafts['chat:' + S.chat.aid] = $('#chat-in', p)?.value ?? S.drafts['chat:' + S.chat.aid]; p.innerHTML = chatInner(S.chat.aid); p.dataset.aid = S.chat.aid; p.dataset.jc = jc_key(); if (d !== undefined) $('#chat-in', p).value = d;
     o = {bottom: true};
   }
   chatPatch(o);  // 2.7.2 (#422) / 2.12.2 (#451): the open chat refreshes in place (the box keeps its focus, the keyboard stays)
@@ -719,9 +720,10 @@ function chatPatch(o = {}) {
   if (o.keep) box.scrollTop = top + box.scrollHeight - h;
   else if (near || o.bottom) { box.scrollTop = box.scrollHeight; chatNewPill(false); S.chat.pin = true; }
   else { if (box.scrollTop !== top) box.scrollTop = top; if (last && nl > last && ms.some(m => m.id > last && m.from === 'agent' && m.kind !== 'notice')) chatNewPill(true); }
-  const on = !!a?.enabled, ci = $('#chat-in'), sb = ci?.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]');  // paused / resumed: the same box; 2.47.1 (#1720): the live window's button
+  const on = !!a?.enabled && !jc_ended(), ci = $('#chat-in'),  /* 2.56.0 (#1793): an ended job's history: box off */ sb = ci?.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]');  // paused / resumed: the same box; 2.47.1 (#1720): the live window's button
   if (ci && ci.disabled === on) ci.disabled = !on;
   if (sb && sb.disabled === on && !S.chat.sending) sb.disabled = !on;
+  jc_patch();  // 2.56.0 (#1793)
 }
 const chatNear = box => box.scrollHeight - box.scrollTop - box.clientHeight <= 3 * remPx();
 // 2.12.2 (#453 N4): the phone chat fills exactly what is visible (the visual viewport minus the header and, without a
@@ -754,10 +756,10 @@ function chatNewPill(on) { const b = $('#chat-new'); if (b && b.classList.contai
 function chatBottom() { const box = $('#chat-msgs'); if (box) box.scrollTop = box.scrollHeight; chatNewPill(false); }
 document.addEventListener('scroll', e => { if (e.target.id !== 'chat-msgs') return; S.chat.pin = chatNear(e.target); if (S.chat.pin) chatNewPill(false); }, true);
 async function chatOlder() {
-  const aid = S.chat.aid; if (!aid || !S.chat.msgs.length || S.chat.busy) return;
+  const aid = S.chat.aid, jk = jc_key(); if (!aid || !S.chat.msgs.length || S.chat.busy) return;
   S.chat.busy = true;
   try {
-    const j = await api('GET', `/api/agents/${aid}/chat?before=${S.chat.msgs[0].id}&limit=${CHAT_PAGE}`); if (S.chat.aid !== aid) return;
+    const j = await api('GET', `/api/agents/${aid}/chat?before=${S.chat.msgs[0].id}&limit=${CHAT_PAGE}` + jc_q()); if (S.chat.aid !== aid || jc_key() !== jk) return;
     const lo = S.chat.msgs.length ? S.chat.msgs[0].id : Infinity;
     S.chat.msgs = [...j.messages.filter(m => m.id < lo), ...S.chat.msgs]; S.chat.more = !!j.has_more;
   } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); return; }
@@ -786,7 +788,7 @@ function patchKids(box, html) {
 }
 async function chatSend() {
   const ta = $('#chat-in'), aid = S.chat.aid, hadF = document.activeElement === ta; if (!ta || !aid) return;
-  const body = ta.value.trim(), files = S.chatFiles[aid] || []; if (!body && !files.length) return;
+  const body = jc_send(ta.value.trim()), files = S.chatFiles[aid] || []; if (!body && !files.length) return;  // 2.56.0 (#1793): "Clara: …" in a job's history
   // 2.13.1 (#465): with files a multipart form (the text may then be empty)
   const rto = replyTo('a:' + aid);  // 2.33.0 (#1076)
   let payload = {body, ...(rto ? {reply_to: rto} : {})};

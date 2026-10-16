@@ -41,6 +41,7 @@ SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "tim
                   "fav_only",  # 2.40.0 (#1361): the sidebar shows only the favourites
                   "fav_quiet", "fav_suggest",  # 2.46.1 (#1361): quieter pushes from lists without a star; favourite suggestions
                   "person_colors",  # 2.47.1 (#1721): people in their account colour (0 = only agents coloured)
+                  "list_color_dot",  # 2.53.0 (#1426): list colours only as the dot
                   "mods_all")  # 2.46.1 (#1591): "Switch on all modules" with the purpose
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
@@ -52,7 +53,7 @@ def clean_setting(k, v):
     The watchdog reads these for every user, so malformed values are never stored."""
     from ..notify.push import PUSH_CHANNELS, PUSH_PRIORITIES
     bad = BadInput(tr("Invalid value: {0}", k))
-    if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views", "group_order", *CAL_LIST_KEYS):
+    if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views", "group_order", "folder_colors", *CAL_LIST_KEYS):
         raise bad
     sv = "" if v is None else str(v).strip()
     if k == "allday_time":
@@ -194,6 +195,8 @@ def clean_setting(k, v):
         if not isinstance(arr, list) or len(arr) > 400 or not all(isinstance(x, str) for x in arr):
             raise bad
         return json.dumps(list(dict.fromkeys(f for f in (clean_folder(x, False) for x in arr) if f)), ensure_ascii=False)
+    if k == "folder_colors":  # 2.53.0 (#1426): {folder path: "#rrggbb"} of my folders
+        return lp_clean_folder_colors(v)
     if k == "show_done_views":
         return clean_done_views(v)
     if k == "wgstd_hide":  # 2.46.2 (#1726): {view key: short signature}
@@ -338,6 +341,26 @@ def clean_roadmap_pref(v):
     return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
 
 
+def lp_clean_folder_colors(v):
+    """2.53.0 (#1426): the colours of my folders as stored json; a folder without colour is left out."""
+    from ..lists.lists import LIST_COLOR_RE, clean_folder
+    bad = BadInput(tr("Invalid value: {0}", "folder_colors"))
+    try:
+        o = json.loads(v or "{}") if isinstance(v, str) else v
+    except ValueError:
+        raise bad from None
+    if not isinstance(o, dict) or len(o) > 400:
+        raise bad
+    out = {}
+    for f, col in o.items():
+        if not isinstance(f, str) or not isinstance(col, str) or (col and not LIST_COLOR_RE.fullmatch(col)):
+            raise bad
+        f = clean_folder(f, False)
+        if f and col:
+            out[f] = col
+    return json.dumps(out, ensure_ascii=False)
+
+
 @app.patch("/api/settings")
 def settings_update():
     b = body()
@@ -369,6 +392,9 @@ def settings_update():
         lc_done_sync(c, me(), usettings(c, me()).get("show_done_views"), vals["show_done_views"])
     for k, v in vals.items():
         uset(c, me(), k, v)
+        if k == "dashboard" or k in LAYOUT_KEYS:  # 2.55.0 (#1069): the active saved arrangement follows
+            from .layoutsets import lyv_follow
+            lyv_follow(c, me(), k, v)
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -532,6 +558,8 @@ def export_json():
         "list_milestones": (f"SELECT * FROM list_milestones WHERE list_id IN {own}", (uid,)),
         "list_files": (f"SELECT * FROM list_files WHERE list_id IN {own}", (uid,)),
         "list_layouts": ("SELECT * FROM list_layouts WHERE user_id=?", (uid,)),
+        "view_layouts": ("SELECT * FROM view_layouts WHERE user_id=?", (uid,)),  # 2.55.0 (#1069): my saved arrangements
+        "view_layout_offers": ("SELECT * FROM view_layout_offers WHERE from_user=? OR to_user=?", (uid, uid)),  # 2.55.0 (#1068)
         "list_notepads": ("SELECT * FROM list_notepads WHERE created_by=?", (uid,)),  # 2.43.0 (#1346)
         "list_notif": (f"SELECT * FROM list_notif WHERE list_id IN {own}", (uid,)),  # 2.33.0 (#927): my notification templates
         "folder_notif": ("SELECT * FROM folder_notif WHERE owner_id=?", (uid,)),
@@ -549,6 +577,11 @@ def export_json():
                             "WHERE k.owner_id=?)", (uid,)),
         "address_books": ("SELECT id, name, color, created_at FROM books WHERE owner_id=? AND owner_org_id IS NULL", (uid,)),  # 2.52.0 C (#1438): own books
         "contacts": ("SELECT * FROM contacts WHERE book_id IN (SELECT id FROM books WHERE owner_id=? AND owner_org_id IS NULL)", (uid,)),
+        # 2.55.0 (#1455): my own newsletter connection (never the access data), its segments and log
+        "newsletter_connection": ("SELECT id, kind, url, mode, auto, synced_at, created_at, updated_at FROM nl_conns WHERE owner_id=? "
+                                  "AND org_id IS NULL", (uid,)),
+        "newsletter_segments": ("SELECT * FROM nl_segments WHERE conn_id IN (SELECT id FROM nl_conns WHERE owner_id=? AND org_id IS NULL)", (uid,)),
+        "newsletter_runs": ("SELECT * FROM nl_runs WHERE conn_id IN (SELECT id FROM nl_conns WHERE owner_id=? AND org_id IS NULL)", (uid,)),
         # 2.22.0 (#663): my journal, whom I stay in touch with, my Karakeep connection (without the API key)
         "journal": ("SELECT day, text, mood, updated_at FROM journal WHERE user_id=? ORDER BY day", (uid,)),
         "contact_care": ("SELECT contact_id, every_days, last, note, updated_at FROM contact_care WHERE user_id=?", (uid,)),

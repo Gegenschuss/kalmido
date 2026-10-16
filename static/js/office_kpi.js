@@ -71,8 +71,9 @@ function kp_tile(card) {
   const d = KPT.data;
   if (!d) return '';
   const row = (label, v, extra = '') => `<li><span class="muted">${esc(label)}</span><span class="spacer"></span><b class="rksum ${extra}">${v}</b></li>`;
-  return card(`<ul class="kptl" role="list">${row(tr('Revenue this month'), ofcMoney(d.revenue.month))}${row(tr('Open invoices'), ofcMoney(d.invoices.open.amount))}
-    ${+d.invoices.overdue.count ? row(tr('Overdue|invoices'), ofcMoney(d.invoices.overdue.amount), 'neg') : ''}${row(tr('Pipeline, weighted'), ofcMoney(d.pipeline.weighted))}</ul>
+  const on = n => lyo_get('home', 'kpi', n, true);  // 2.55.0 (#1065): which figures (the block's settings, lyopts.js)
+  return card(`<ul class="kptl" role="list">${on('rev') ? row(tr('Revenue this month'), ofcMoney(d.revenue.month)) : ''}${on('open') ? row(tr('Open invoices'), ofcMoney(d.invoices.open.amount)) : ''}
+    ${on('over') && +d.invoices.overdue.count ? row(tr('Overdue|invoices'), ofcMoney(d.invoices.overdue.amount), 'neg') : ''}${on('pipe') ? row(tr('Pipeline, weighted'), ofcMoney(d.pipeline.weighted)) : ''}</ul>
     <a class="linkbtn" href="#office/kpi">${tr('All figures')}</a>`);
 }
 

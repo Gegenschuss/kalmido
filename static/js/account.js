@@ -395,6 +395,7 @@ async function wsPaneDraw(md) {
     + (mm ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} list of yours has an agent of another workspace (from before the workspaces). Open the list’s Share dialog to take it out or keep it.', '{0} lists of yours have an agent of another workspace (from before the workspaces). Open the lists’ Share dialogs to take it out or keep it.', mm))}</div>` : '');
   oxDraw(box);  // 2.42.0 (#833): the export sections of the organisations I administer
   ocDraw(box);  // 2.42.0 (#828): their encryption sections
+  wsc_paneDraw(box);  // 2.53.0 (#1474): each organisation's colour (its admins choose)
 }
 function wsPaneWire(md) {
   md.addEventListener('change', async e => {
@@ -424,13 +425,14 @@ function wsPaneWire(md) {
 // ---- 2.35.0 (#1101): an organisation admin's "Lists of the organisation": the lists that belong to the organisation (never
 // private lists, private sharing or inboxes) with owner, numbers and the last change - never their contents. Archive / restore,
 // hand over to another person of the organisation, delete for good from the archive (the name typed to confirm); a history.
-const OADM_ACT = {archive: N_('{0} archived {1}'), restore: N_('{0} restored {1}'), delete: N_('{0} deleted {1} for good'), owner: N_('{0} handed {1} to {2}')};
+const OADM_ACT = {archive: N_('{0} archived {1}'), restore: N_('{0} restored {1}'), delete: N_('{0} deleted {1} for good'), owner: N_('{0} handed {1} to {2}'),
+  edit: N_('{0} changed {1}'), icon: N_('{0} changed the icon of {1}')};  // 2.56.0 (#1795)
 function oadmRow(x) {
   const sub = [x.owner_agent ? tr('Owner: {0} (agent)', x.owner_name) : tr('Owner: {0}', x.owner_name), tr('{0} open', x.open) + ' / ' + trn('{0} task', '{0} tasks', x.tasks),
     trn('{0} member', '{0} members', x.members), tr('changed {0}', fmtDateLoc(String(x.changed_at || '').slice(0, 10)) || '–'), x.folder && tr('Folder: {0}', fDisp(x.folder))].filter(Boolean);  // 2.39.1 (#1188): + folder path
-  return `<div class="mrow oadmrow ${x.archived ? 'off' : ''}" data-olid="${x.id}"><span class="n"><b>${esc(x.name)}</b>${x.archived ? ` <span class="muted">${esc(tr('archived'))}</span>` : ''}<small class="muted">${esc(sub.join(' · '))}</small></span>
+  return `<div class="mrow oadmrow ${x.archived ? 'off' : ''}" data-olid="${x.id}"><span class="n"><b>${ole_mark(x)}${esc(x.name)}</b>${x.archived ? ` <span class="muted">${esc(tr('archived'))}</span>` : ''}<small class="muted">${esc(sub.join(' · '))}</small></span>
     <span class="oadmb">${x.archived ? `<button type="button" class="btn sm" data-oa="restore">${tr('Restore')}</button><button type="button" class="btn sm danger" data-oa="delete">${tr('Delete…')}</button>`
-      : `<button type="button" class="btn sm" data-oa="archive">${tr('Archive')}</button>`}<button type="button" class="btn sm" data-oa="owner">${tr('Hand over…')}</button></span></div>`;
+      : `<button type="button" class="btn sm" data-oa="edit">${tr('Edit')}</button><button type="button" class="btn sm" data-oa="archive">${tr('Archive')}</button>`}<button type="button" class="btn sm" data-oa="owner">${tr('Hand over…')}</button></span></div>`;  // 2.56.0 (#1795): + Edit
 }
 function oadmDraw(md, j) {
   md._j = j;
@@ -438,7 +440,7 @@ function oadmDraw(md, j) {
   // 2.39.1 (#1188): grouped by owner (listadmin.js)
   $('#oadm-body', md).innerHTML = (j.lists.length ? `${lmOadmBody({lists: live}, oadmRow)}${arch.length ? `<h4 class="oadmh">${esc(tr('Archive'))}</h4>${lmOadmBody({lists: arch}, oadmRow)}` : ''}`
     : `<div class="muted mhint">${tr('The organisation has no lists yet.')}</div>`)
-    + (j.log.length ? `<details class="sdet oadmlog"><summary>${tr('History')} <span class="muted">${j.log.length}</span></summary>${j.log.filter(r => OADM_ACT[r.action]).map(r => `<div class="mrow"><span class="n">${tr(OADM_ACT[r.action], `<b>${esc(r.by || '?')}</b>`, `<b>${esc(r.list_name)}</b>`, `<b>${esc(r.to || '')}</b>`)}<small class="muted">${esc(fmtWhen(r.at))}${r.owner && r.action !== 'owner' ? ' · ' + esc(tr('Owner: {0}', r.owner)) : ''}</small></span></div>`).join('')}</details>` : '');
+    + (j.log.length ? `<details class="sdet oadmlog"><summary>${tr('History')} <span class="muted">${j.log.length}</span></summary>${j.log.filter(r => OADM_ACT[r.action]).map(r => `<div class="mrow"><span class="n">${tr(OADM_ACT[r.action], `<b>${esc(r.by || '?')}</b>`, `<b>${esc(r.list_name)}</b>`, `<b>${esc(r.to || '')}</b>`)}<small class="muted">${esc(fmtWhen(r.at))}${r.owner && r.action !== 'owner' ? ' · ' + esc(tr('Owner: {0}', r.owner)) : ''}${ole_logDetail(r)}</small></span></div>`).join('')}</details>` : '');
 }
 async function oadmOpen(oid, name) {
   const md = modal(`<h3>${esc(tr('Lists of the organisation {0}', name))}</h3>
@@ -453,6 +455,7 @@ async function oadmOpen(oid, name) {
     const b = e.target.closest('[data-oa]'); if (!b) return;
     const x = (md._j?.lists || []).find(l => l.id === +b.closest('[data-olid]').dataset.olid); if (!x) return;
     const k = b.dataset.oa, base = `/api/orgs/${oid}/lists/${x.id}`;
+    if (k === 'edit') { ole_edit(md, oid, x); return; }  // 2.56.0 (#1795)
     try {
       let j = null;
       if (k === 'archive') {
@@ -480,6 +483,90 @@ async function oadmOpen(oid, name) {
       await load(); render();
     } catch { /* api() showed it */ }
   });
+}
+// ---- 2.56.0 (#1795): an organisation admin changes the name (with its emoji), the icon and the colour of a list of the
+// organisation -- nothing else, never its contents (PATCH /api/orgs/{id}/lists/{id}, .../icon). The same pickers as the list
+// dialog; Save = one undo step (name / colour), a picture is set at once like in the list dialog. The owner and the members
+// are told by the server.
+const ole_mark = x => x.icon ? `<img class="licon ole-ic" src="${esc(x.icon)}" alt="" loading="lazy" decoding="async">`
+  : x.color ? `<i class="ole-sw" style="background:${esc(lp_col({color: x.color}) || x.color)}" aria-hidden="true"></i>` : '';
+function ole_logDetail(r) {
+  const d = r.detail || {}, out = [];
+  if (d.name) out.push(tr('Name: {0} → {1}', d.name[0], d.name[1]));
+  if (d.color) out.push(d.color[1] ? tr('new colour') : tr('colour removed'));
+  if (d.icon) out.push(d.icon[1] === 'picture' ? tr('own picture') : d.icon[1] ? tr('preset picture') : tr('picture removed'));
+  return out.length ? ' · ' + esc(out.join(' · ')) : '';
+}
+function ole_edit(om, oid, x) {
+  const base = `/api/orgs/${oid}/lists/${x.id}`;
+  let m0 = x.name.match(EMO_RE);
+  let emo = m0 ? m0[1] : '';
+  const nm0 = m0 ? x.name.slice(m0[0].length) : x.name, col0 = lp_col({color: x.color});
+  const pick = () => `<span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(x)}`;
+  const emoBtn = () => x.icon ? licon(x, 'licon m') : sbiEmo(emo) || ic('list');
+  const md = modal(`<h3>${esc(tr('Edit “{0}”', x.name))}</h3>
+    <div class="shint keep">${esc(tr('Only the name, the icon and the colour: the contents stay with the people of the list. {0} and the members are told.', x.owner_name || '?'))}</div>
+    <div class="row"><label for="ole-name">${tr('Name')}</label><button type="button" class="emobtn" id="ole-emo" title="${tr('Choose icon')}" aria-label="${tr('Choose icon')}">${emoBtn()}</button><input id="ole-name" value="${esc(nm0)}" maxlength="200"></div>
+    <div class="emogrid hidden" id="ole-emogrid"><button type="button" data-emo="" class="none" title="${tr('No icon')}">${ic('ban', 's')}</button>${sbiGrid().map(e => `<button type="button" data-emo="${e}" class="${e === emo && !x.icon ? 'on' : ''}">${sbiEmo(e)}</button>`).join('')}
+      <div class="lipickw">${pick()}</div></div>
+    <div class="row"><label>${tr('Color')}</label><div class="colors" id="ole-col" role="group" aria-label="${esc(tr('Color'))}">${lp_dlgBtns(col0)}</div></div>
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="cancel">${tr('Cancel')}</button><button type="button" class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  md.classList.add('olemd');
+  const redraw = j => { if (j && om.isConnected) oadmDraw(om, j); };
+  const iconSet = async how => {  // like liconSet, through the organisation's route; the emoji leaves the name with a picture
+    let j;
+    try {
+      if (how === 'none') j = await api('DELETE', base + '/icon');
+      else if (how instanceof Blob) { const fd = new FormData(); fd.append('file', how, 'icon.png'); j = await api('POST', base + '/icon', fd); }
+      else j = await api('PUT', base + '/icon', {preset: how});
+    } catch { return; }
+    x.icon = j.icon || ''; redraw(j);
+    if (x.icon && emo && m0 && x.name.startsWith(m0[0])) {  // the emoji leaves the name at once (as in the list dialog)
+      const nm = x.name.slice(m0[0].length).trim() || nm0;
+      try { redraw(await api('PATCH', base, {name: nm})); x.name = nm; m0 = null; } catch { /* api() said why */ }
+    }
+    if (x.icon) { emo = ''; $$('#ole-emogrid [data-emo]', md).forEach(y => y.classList.remove('on')); $('#ole-emogrid', md).classList.add('hidden'); }
+    $('#ole-emo', md).innerHTML = emoBtn(); $('.lipickw', md).innerHTML = pick();
+  };
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.m === 'cancel') { md.remove(); return; }
+    if (b.id === 'ole-emo') { $('#ole-emogrid', md).classList.toggle('hidden'); return; }
+    if (b.dataset.c !== undefined) { $$('#ole-col button', md).forEach(y => { y.classList.toggle('on', y === b); y.setAttribute('aria-pressed', String(y === b)); }); return; }
+    if (b.dataset.licon) {
+      const k = b.dataset.licon;
+      if (k !== 'upload') { await iconSet(k); return; }
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
+      inp.addEventListener('change', async () => {
+        const f = inp.files?.[0]; if (!f) return;
+        if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); return; }
+        const bl = await avCropModal(f, {title: tr('List icon'), png: true, square: true}); if (bl) await iconSet(bl);
+      });
+      inp.click(); return;
+    }
+    if (b.dataset.emo !== undefined) {
+      if (x.icon && b.dataset.emo) await iconSet('none');  // an emoji replaces the picture
+      emo = b.dataset.emo;
+      $$('#ole-emogrid [data-emo]', md).forEach(y => y.classList.toggle('on', y === b && !!emo));
+      $('#ole-emo', md).innerHTML = emoBtn(); $('#ole-emogrid', md).classList.add('hidden');
+      return;
+    }
+    if (b.dataset.m !== 'save') return;
+    const nm = $('#ole-name', md).value.trim();
+    if (!nm) { toast(tr('Name missing')); $('#ole-name', md).focus(); return; }
+    const name = emo === (m0 ? m0[1] : '') && nm === nm0 ? x.name : (x.icon ? '' : emo) + nm, c = $('#ole-col button.on', md)?.dataset.c ?? col0;
+    const before = {}, after = {};
+    if (name !== x.name) { before.name = x.name; after.name = name; }
+    if (c !== col0) { before.color = x.color || ''; after.color = lp_keep(x, c); }
+    if (!Object.keys(after).length) { md.remove(); return; }
+    const put = v => async () => { const j = await api('PATCH', base, v); redraw(j); await load().catch(() => {}); render(); };
+    try { await put(after)(); } catch { return; }  // api() said why
+    md.remove();
+    offerUndo(tr('Saved'), histAdd({label: tr('List “{0}” changed', after.name || x.name), undo: put(before), redo: put(after)}));
+  });
+  md.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'ole-name') { e.preventDefault(); $('[data-m="save"]', md).click(); } });
+  if (!isTouch()) setTimeout(() => $('#ole-name', md).focus(), 50);
+  return md;
 }
 function accountWire(md) {
   let users = [];

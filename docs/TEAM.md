@@ -51,6 +51,25 @@ Book crew and equipment for shoot days and see who and what is free.
   event, *Discard* deletes it (undo brings it back).
 
 
+## References in comments and descriptions (2.53.0)
+
+- **Drag to reference:** drag a list or folder from the sidebar, a task from a list or the calendar, a file from the
+  Ablage, a contact or a calendar entry onto the comment field or the description. Kalmido puts a reference in at the
+  drop point: a task as `#123`, everything else as a Markdown link to this instance (`[Name](https://…/#l/80)`). Other
+  drops (moving tasks, attaching files) work as before; only the text fields take references.
+- **Phone / tablet:** the link button next to the comment box (and *Insert reference* under the description) opens the
+  search; the pick goes in at the cursor. It finds lists, folders, open tasks, contacts, appointments of the coming
+  months and the files of the Ablage folder that is open.
+- **Cards:** a link to this instance shows as a small card with an icon (list, folder, task, contact, appointment,
+  document) and the name *the reader* sees now - never the label the author typed. A target the reader cannot see (or one
+  that was deleted) is a grey *No access* card without a name and without a link.
+- **Preview:** with a mouse, resting 0.4 s on a task number or a card shows a preview next to the pointer - for a task its
+  status, list, priority, due date, assignee, tags, subtask progress, the start of the description and the number of
+  comments and attachments; for a contact company and phone, for an appointment time and place, for a list its open
+  tasks, for a document size and date. Clicking opens the target as before. On touch screens a tap opens it directly.
+- Names and previews come from what is already loaded or from the normal read routes, which check access; agents see
+  references in comments as plain Markdown text.
+
 ## Address books of the organisation (2.52.0)
 
 - An address book in an organisation's workspace can belong to the organisation instead of a person: **Contacts > Address
@@ -65,3 +84,19 @@ Book crew and equipment for shoot days and see who and what is free.
 - It always stays in its organisation's workspace and is seen only by its members. Phones get it over CardDAV like any other
   address book (read-only when members may only view).
 - **Make personal again…** (an admin) turns it back into that admin's own address book; one undo step, like the hand-over.
+
+## Saved arrangements and templates (2.55.0)
+
+- **Several arrangements per view.** The start page, Today, Time tracking, the overviews, the review and every project page
+  can keep named arrangements of their blocks, e.g. "Focus" and "Overview". *Save as arrangement…* sits in a block's "…"
+  menu and in *Customize*; once a view has one, its header shows a switch (Today: in the view's "…" menu) with *Standard*,
+  the saved ones and *Manage arrangements…* (rename, order, delete). They are the same on every device.
+- **Switching** shows the saved arrangement as your own arrangement of the view; changes you make while one is active go
+  into it. *Reset to the standard* or choosing *Standard* ends that, the saved one stays. Saving, renaming, deleting and
+  switching are each one undo step. At most 12 per view.
+- **Send as template…** sends the current arrangement to people you see (your organisations and connections; never to
+  agents, at most 20 at once; a project page only to people with access to it). Only the arrangement travels (blocks,
+  order, widths, heights, a block's switches), never content: a block the recipient cannot see simply stays empty. They get a
+  News item ("For you", switched off together with the sharing News) with a preview and *Take over* / *Decline*; taken over,
+  it is their own saved arrangement, named after the sender, with no link back.
+- Agents cannot use any of this (403); they propose arrangements their own way (2.55.0, #1066).

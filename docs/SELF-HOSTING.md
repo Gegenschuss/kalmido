@@ -96,6 +96,13 @@ organisation admin adds and removes members. A server without any organisation l
 once there is one, people see the members of their organisations and the people they share something with; private lists
 reach anybody else by e-mail address.
 
+**Lists of the organisation (2.35, 2.56).** Organisation admins find the organisation's shared lists under *Settings >
+Organisation > Lists of the organisation*: names, owners and numbers, never the contents. They can archive, restore, delete
+from the archive and hand a list over to another member; since 2.56 also *Edit* its name, icon (emoji or picture) and
+colour, without needing a role in the list. That is all: tasks, sections, members and settings stay with the owner and the
+list's admins. Private lists are never shown or changed, agents cannot use these functions, every change lands in the
+dialog's history (old and new value) and the owner and the members get a News entry.
+
 **Finding people by e-mail (2.49).** Under *Settings > Account > Find people* a person can find someone by their full
 e-mail address and send a connection request; once it is accepted, both see each other like after sharing a list. Only
 accounts that switched on *Findable by e-mail* (off by default) and confirmed their address with a mailed link can be
@@ -655,6 +662,39 @@ once per workspace -- by an organisation's admin for the organisation, by a pers
   `KALMIDO_CALENDAR_ALLOW_HOSTS=paperless.example.com:8000`), the same allow-list as for calendar subscriptions.
 - The token is always stored sealed with a key derived from `KALMIDO_SECRET_KEY` (also when the encryption of
   organisation data is off) and never shown again. Without a server key the connection cannot be set up.
+
+### Newsletter: listmonk, Brevo, CleverReach (2.55)
+
+Kalmido sends no newsletters itself. It keeps the contacts, segments and consent and syncs them with a newsletter
+service, which does the sending, the double opt-in, the unsubscribe link, bounces and statistics (the proof of consent,
+one-click unsubscribe and deliverability belong there, not on a shared task server). Under *Contacts > More >
+Newsletter…* an organisation's admin connects the service for the organisation, a person for their own space.
+
+- **Contacts that go out:** only from the workspace's own address books (an organisation's address books, or a person's
+  own books outside every organisation -- never a member's private book), only with an e-mail address and the consent
+  *Consented* (with a source, e.g. the sign-up form). Option for listmonk: also *Double opt-in pending* -- they go as
+  unconfirmed and listmonk sends its opt-in mail.
+- **Segments:** groups, companies and address books (any match within one kind, all kinds must match) -> one list at the
+  service (an existing one, or a new one named like the segment).
+- **Both directions:** each run first takes unsubscriptions, bounces and confirmed opt-ins from the service back to the
+  contacts, then adds, renames and takes off the list what Kalmido put there and no longer matches. An unsubscribed or
+  bounced address is never subscribed again by Kalmido and stays blocked in Kalmido; if the person
+  subscribes again through the service's own form, Kalmido leaves that subscription alone. Manually with
+  *Sync now*, or once a day. Every run is logged (numbers and error codes, never addresses or access data).
+- **Access data** are stored sealed with a key derived from `KALMIDO_SECRET_KEY` (needed) and never shown again; the
+  address goes through the same SSRF guard as calendar subscriptions (an instance in the local network: allow its host,
+  e.g. `KALMIDO_CALENDAR_ALLOW_HOSTS=listmonk.example.com:9000`).
+- **Brevo and CleverReach** follow their public API documentation and are marked *Preview*: they are not yet tried
+  against the real services.
+
+Setting up listmonk (version 4 or newer) for Kalmido:
+
+1. Run listmonk (its own docker compose file) next to Kalmido, reachable over https or in the local network.
+2. In listmonk: *Admin > Users > New*, type **API**, a role that may manage lists and subscribers (and *subscribers:sql_query*,
+   used to find an address that is already known). Copy the token shown once.
+3. In Kalmido: *Contacts > More > Newsletter…*, service *listmonk*, its address (e.g. `https://listmonk.example.com`),
+   the API user's name and the token.
+4. Mark the consent of your contacts (contact card > *Newsletter*), create a segment and press *Sync now*.
 
 ## Moving to a new server
 

@@ -107,6 +107,7 @@ function ctCardHtml(c) {
       ${c.nickname ? `<div class="ctf">${ic('user', 's')}<span class="ctfl muted">${tr('Nickname')}</span><span>${esc(c.nickname)}</span></div>` : ''}
       ${(c.groups || []).length ? `<div class="ctf">${ic('tag', 's')}<span class="ctfl muted">${tr('Groups')}</span><span>${c.groups.map(g => `<button type="button" class="tagchip" data-ctgroup="${esc(g)}">${esc(g)}</button>`).join(' ')}</span></div>` : ''}
       ${b ? `<div class="ctf">${ic('folder', 's')}<span class="ctfl muted">${tr('Address book')}</span><span>${esc(b.name)}</span></div>` : ''}
+      ${typeof nwl_ctf === 'function' ? nwl_ctf(c, w) : ''}${''/* 2.55.0 (#1455): the newsletter consent (newsletter.js) */}
     </div>
     ${c.note ? `<div class="ctnote md">${renderMd(c.note, false, {})}</div>` : ''}
     ${lifeCareHtml(c)}
@@ -144,14 +145,16 @@ document.addEventListener('click', async e => {
     menu(b, [{label: tr('Address books…'), icon: 'folder', fn: ctBooksModal},
       {label: tr('Import a vCard file…'), icon: 'upload', fn: () => ctImport()},
       ...(S.books || []).map(x => ({label: tr('Export {0} (vCard)', x.name), icon: 'download', fn: () => { location.href = `/api/books/${x.id}/export.vcf`; }})),
-      {label: tr('On the phone…'), icon: 'phone', fn: davGuide}]);
+      {label: tr('On the phone…'), icon: 'phone', fn: davGuide},
+      typeof nwl_open === 'function' && {label: tr('Newsletter…'), icon: 'mail', fn: nwl_open}]);  // 2.55.0 (#1455)
   } else if (k === 'cmenu' && CT.card) {
     const c = CT.card, w = ctWrite(ctBook(c.book_id));
     menu(b, [w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
       if (!await askConfirm(tr('Delete the contact “{0}”?', c.fn), tr('It is also removed from the phones that sync this address book.'), {ok: tr('Delete'), danger: true})) return;
       try { await api('DELETE', `/api/contacts/${c.id}`); } catch { return; }
       CT.sel = null; CT.card = null; toast(tr('Contact deleted')); await load().catch(() => {}); if (isMobile()) go('contacts'); ctLoad(); }},
-      feat('events') && {label: tr('Invite to a new event'), icon: 'cal', fn: () => evEditor({attendees: [{contact_id: c.id, name: c.fn, email: c.emails?.[0]?.value || '', partstat: 'needs-action'}]})}]);
+      feat('events') && {label: tr('Invite to a new event'), icon: 'cal', fn: () => evEditor({attendees: [{contact_id: c.id, name: c.fn, email: c.emails?.[0]?.value || '', partstat: 'needs-action'}]})},
+      typeof nwl_ctItem === 'function' && nwl_ctItem(c, w, b)]);  // 2.55.0 (#1455): the newsletter consent
   }
 });
 

@@ -220,6 +220,7 @@ had been made in the app. Webhooks fire too.
 | `POST /agents/{id}/chat/{message_id}/reactions` | comments | 2.7.2: react to a message in your chat with the agent: `{emoji: up \| down \| heart, on?}` (toggles without `on`); your 👍 / 👎 on an agent message that asks something (`asks`, 2.13.0) is sent to it as an approval (`reaction` event, see [AGENTS.md](AGENTS.md#chat-reactions-and-delivery-272)) |
 | (app) `PATCH /api/agents/{id}/chat/{message_id}` | session | 2.39.0 (#1179): a person edits the text of their own message to an agent `{body}` (in the app, not with a token; the agent's messages 403, others' 404, same limits as sending, same text = no change); the answer carries `edited_at` and `edits` (the earlier versions `[{body, at}]`, only for the person). The agent sees `edited_at` + the current text in `GET /agent/chats` and gets the event `message_edited` once it had the message, see [AGENTS.md](AGENTS.md) |
 | (app) `GET /api/agents/jobs?limit=&before=` · `GET /api/tasks?scope=done\|trash&limit=&before=` · `GET /api/news?limit=&before=` | session | 2.40.0 (#1432): "Load more" pages in the app (not with a token). The answer carries `next` (null = the end); pass it as `before` for the following page. Jobs: `limit` 20 by default (at most 200), the first page also brings every running / waiting job, the pages hold the ended ones (newest change first, cursor = change time + id); without `limit` / `before` the list is unchanged (up to 200 visible jobs), `id=` still returns one job. Completed / trash: `limit` as before (default 300, at most 2000), cursor = completion resp. deletion time + id; the first trash page also says `deletable` and `kept` for the whole trash (`DELETE /api/trash` empties all of it, not only the loaded page). News: the pages count read items (`limit` at most 500); the first page also brings every unread item; `unread`, `unread_me`, "mark all as read" and `filter=` always cover the whole feed; without `limit` the whole feed as before |
+| (app) `POST /api/agents/jobs/{id}/action` · `GET /api/agents/{id}/chat?job=` | session | 2.56.0 (#1791 / #1793): `{action: message, text}` writes to a running job (the agent gets the `job` event, the job does not change; the same people as Stop, empty 400, ended 409); `?job=<job id>` = only that job's messages in my chat with the agent (its `job_id` messages, mine addressed to it, the agent's answers to those); jobs carry `name` |
 | `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); `POST /agent/jobs/{id}/proposal` answers a `job_request` (2.39.0: kind `cleanup` = tidy up a list, see AGENTS.md *Tidy up a list*; 2.51.0: kinds `inquiry` and `setup`, also as the agent's own proposal `POST /agent/proposals {kind, user_id, proposal}`, see AGENTS.md *An inquiry becomes a project, the setup assistant*); the status may name the task it works on (`task_id`, shows "… is writing" there); 2.37.0: a chat message with `offer_save: true` offers the person "Save as task" (saving itself is a click in the app, never an API call of an agent); 2.41.0: `kind: "notice"` on `POST /agent/chats/{user_id}` = a small grey line in the chat (e.g. a new session of the agent), no push, never unread, see AGENTS.md *Notices in the chat*; 2.44.0: `host` in `PUT /agent/status` names the computer (kept on the token in use, see AGENTS.md *Set up on a computer with one command*); 2.47.3: `job_parent` (with `job_id`) on `POST /agent/chats/{user_id}` = the leading job of a part job, the chat colours a message `Job #N: …` by its job (AGENTS.md *Chat*) |
 | `POST /agent/usage` · `GET /agent/usage?from=&to=&group=` | agent | **Agent tokens only** (2.1.1): report model usage (numbers and ids only), read it grouped by day, task, list or model; over its hard limit an agent gets `429` on every other call, see [AGENTS.md](AGENTS.md#usage-and-limits) |
 | `GET /search?q=` | read | Search titles, notes, links and custom field values |
@@ -436,6 +437,8 @@ a task needs `tasks:write` too. A contact is only visible to people who see its 
 `emails` / `phones` / `urls`: `[{value, type: [home|work|cell|other], pref?, label?}]`; `addresses`: `[{street, code,
 city, region, country, pobox?, ext?, type?}]`; `bday` / `anniversary`: `YYYY-MM-DD`, or `--MM-DD` without the year;
 `photo`: `data:image/jpeg;base64,...` (JPEG, PNG, GIF, WebP).
+2.55.0 (#1455): every contact carries `newsletter`: `{status: ""|yes|pending|unsub|bounce, at, source}` -- the
+newsletter consent, read only here (people change it in the app; unsub / bounce come from the newsletter service).
 
 ## Roadmap
 
@@ -1136,6 +1139,29 @@ The web app's own routes (`/api/docs`, a signed-in person, never an agent): `GET
 (levels per feature, the inbox folder), `POST` / `PATCH` / `DELETE /api/docs/rules`, `PATCH` / `DELETE /api/docs/labels/{kind}/{id}` (the delete answers the documents it touched; `POST /api/docs/labels/{kind}` `{ws, name, ids}` is its undo),
 `POST` / `DELETE /api/docs/mail` (the forwarding address). Deleting and restoring use the file store
 (`DELETE /api/files/nodes/{id}`, `POST /api/files/nodes/{id}/restore`).
+
+## Arrangements of views for agents (2.55.0)
+
+New scope `layouts` (agents only; off for new agents and not part of the legacy `write`). The agent reads and proposes, the
+person accepts or declines (see docs/AGENTS.md *Arrangements of views*).
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "https://kalmido.example/api/v1/layouts/blocks?view=dashboard&user_id=3"
+curl -s -H "Authorization: Bearer $TOKEN" "https://kalmido.example/api/v1/layouts/dashboard?user_id=3"
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"view": "dashboard", "user_id": 3, "name": "Focus", "summary": "Today and the projects first",
+       "layout": {"order": ["today", "projects", "news"], "hidden": ["search"], "widths": {"today": 4}}}' \
+  https://kalmido.example/api/v1/layouts/proposals
+```
+
+| Route | Scope | |
+|---|---|---|
+| `GET /layouts/blocks?view=&user_id=` | layouts | the blocks of a view: `key`, `name`, `width`, `fixed`; the views |
+| `GET /layouts/{view}?user_id=` | layouts | `source` own / standard / default, `layout` {order, hidden, widths, heights, mobile} |
+| `POST /layouts/proposals` | layouts | `view`, `name`, `layout`, `summary`, `title`, `user_id`; 201 = a ready proposal job (kind `layout`) |
+
+The answer comes as the event `job`. A proposal job can be replaced with `POST /agent/jobs/{id}/proposal` (scope `layouts`)
+while it is open. People decide with `POST /api/proposals/{id}/apply` (`{"select": ["0"], "use": true}`) or `.../discard`.
 
 ## Pin board, time check and shoot planning for agents (2.51.0)
 
