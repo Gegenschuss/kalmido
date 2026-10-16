@@ -106,3 +106,7 @@ a.sgreq:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 section.fb{margin-top:2rem;padding-top:1rem;border-top:1px solid var(--line)}
 section.fb .ok{color:var(--accent)}
 .fform select{background:var(--bg3);border:1px solid var(--line2);border-radius:.375rem;padding:.5rem .75rem;color:var(--text);font:inherit;width:100%;min-height:2.75rem}
+/* 2.63.0 A (#1513): the report form's file field and the status link on the thank-you page */
+.fform input[type=file]{padding:.5rem .75rem}
+.msg .frm-link{display:block;width:100%;max-width:32rem;margin:.75rem auto;background:var(--bg3);border:1px solid var(--line2);border-radius:.375rem;padding:.625rem .75rem;color:var(--text);font:inherit;min-height:2.75rem;text-align:center}
+.msg .frm-link:focus-visible{outline:2px solid var(--accent);outline-offset:1px}

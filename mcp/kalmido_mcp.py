@@ -1348,7 +1348,10 @@ _CLIENT = {"name": {"type": "string"}, "icon": {"type": "string"}, "color": {"ty
            "contacts": {"type": "array", "description": "2.40.0: the contact persons [{id?, name, role?, email?, phone?, is_default?}]: "
                         "the whole list (with id = keep, without = new, missing = deleted)", "items": {"type": "object"}}}
 _FORM = {"title": {"type": "string"}, "intro": {"type": "string"}, "access": {"type": "string", "enum": ["org", "public"]},
-         "section_id": {"type": "integer"}, "ask_email": {"type": "boolean"}}
+         "section_id": {"type": "integer"}, "ask_email": {"type": "boolean"},
+         # 2.63.0 (#1513): a report form: the task type, one file, a status link for a sender without an account
+         "ttype": {"type": "string", "enum": ["", "bug", "feature", "task"]}, "files": {"type": "boolean"},
+         "portal": {"type": "boolean", "description": "2.63.0: a sender without an account gets a status link (page + one mail); turns ask_email on"}}
 TOOLS += [
     ("list_clients", "2.23.0 (module clients): the clients of the user's organisation with their lists, hours (this month / in total), "
                      "amounts and budget level (ok / warn at 80 % / over); 2.40.0: contacts = the contact persons, the default first.", _obj({"month": {"type": "string", "description": "YYYY-MM"},

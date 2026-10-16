@@ -538,7 +538,7 @@ def burst_tick(c):
     return sent
 
 
-def agent_added_events(c, tid, from_lid=None, source=None):
+def agent_added_events(c, tid, from_lid=None, source=None, info=None):
     """2.23.0 (#795): a top-level task was created in (from_lid None) or moved into (from_lid = the list it came from) a list:
     'task_added' to every agent of that list that sees the task (the agent's own actions excluded by agent_emit). moved_from
     {id, name} only when the agent may see the list it came from; source: 'form' / 'mail' / 'errors' / 'capture' ...
@@ -568,6 +568,7 @@ def agent_added_events(c, tid, from_lid=None, source=None):
             extra["moved_from"] = {"id": from_lid, "name": lst_brief(c, from_lid)["name"]}
         if source:
             extra["source"] = source
+        extra.update(info or {})  # 2.63.0 (#1513): a form's report: portal, ttype
         agent_emit(c, aid, "task_added", agent_task_data(c, tid, aid, **extra))
 
 
