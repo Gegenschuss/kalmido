@@ -7648,3 +7648,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 @media (max-width:899px),(hover:none){
   #side .srow:not(.reorder){padding-right:calc(.5rem + var(--sbc-mw,3rem))}
 }
+/* 2.56.0 B (#1795) organisation admins edit name, icon and colour of an organisation list: the mark in the overview row */
+.oadmrow .n b{display:flex;align-items:center;gap:.375rem}
+.oadmrow .ole-ic{width:1.125rem;height:1.125rem;border-radius:.25rem;flex:none}
+.oadmrow .ole-sw{width:.625rem;height:.625rem;border-radius:50%;flex:none}

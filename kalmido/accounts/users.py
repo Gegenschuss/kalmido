@@ -611,6 +611,13 @@ def list_icon_upload(lid):
     """multipart "file": an own picture for the list (JPEG / PNG / WebP, up to AVATAR_MAX_MB MB), stored as a square PNG."""
     c = db()
     need_list(c, lid, manage=True)  # 2.40.0 (#1431): owner and list admins
+    v = list_icon_store(lid)
+    return v if not isinstance(v, str) else _list_icon_set(c, lid, v)
+
+
+def list_icon_store(lid):
+    """The uploaded picture (multipart "file") of list lid stored as its new icon file -> the icon value "u:<token>", or an
+    error response. 2.56.0 (#1795): shared with an organisation admin's icon change (orglists.ole_icon_upload)."""
     f = request.files.get("file")
     if not f:
         return err(tr("No file"))
@@ -627,7 +634,7 @@ def list_icon_upload(lid):
     with open(tmp, "wb") as fh:
         fh.write(png)
     os.replace(tmp, list_icon_path(lid, tok))
-    return _list_icon_set(c, lid, "u:" + tok)
+    return "u:" + tok
 
 
 @app.delete("/api/lists/<int:lid>/icon")
@@ -643,7 +650,9 @@ def list_icon_get(lid, tok):
     c = db()
     r = c.execute("SELECT id, icon FROM lists WHERE id=?", (lid,)).fetchone()
     if not r or r["icon"] != "u:" + tok or not re.fullmatch(r"[A-Za-z0-9_-]{8,40}", tok) or not list_role(c, lid):
-        raise Denied(404)
+        from ..accounts.orglists import ole_org_admin
+        if not r or r["icon"] != "u:" + tok or not ole_org_admin(c, lid):  # 2.56.0 (#1795): and the admins of its organisation
+            raise Denied(404)
     p = list_icon_path(lid, tok)
     if not os.path.isfile(p):
         raise Denied(404)
