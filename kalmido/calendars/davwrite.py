@@ -35,6 +35,7 @@ from ..events.model import ev_zone, tz_ok, wall
 CDW_LIMIT = 60          # writes per user within FAIL_WINDOW (own bucket next to cal_rate: dragging is quick)
 CDW_TEXT = {"title": 500, "location": 500, "description": 20000}
 CDW_UNDO_S = 15 * 60    # how long a deleted event can be put back (the old resource, in memory)
+CDW_UNDO_MAX = 512 * 1024  # bytes of one kept resource
 _CDW_UNDO, _CDW_UNDO_LOCK = {}, threading.Lock()
 _CDW_PRIV = f"{{{DAV_NS}}}current-user-privilege-set"
 
@@ -460,6 +461,9 @@ def cdw_delete(sid):
         if e.code == "not_found":
             return _conflict(c, sid)
         return _cal_fail(e)
+    cal_sync(c, sid, force=True)
+    if len(data) > CDW_UNDO_MAX:  # a huge resource is not kept in memory: no undo
+        return jsonify(ok=True, undo=None)
     tok = uuidlib.uuid4().hex
     with _CDW_UNDO_LOCK:
         now = time.time()
@@ -468,7 +472,6 @@ def cdw_delete(sid):
         if len(_CDW_UNDO) > 500:
             _CDW_UNDO.clear()
         _CDW_UNDO[tok] = (now, me(), sid, res["href"], data)
-    cal_sync(c, sid, force=True)
     return jsonify(ok=True, undo=tok)
 
 

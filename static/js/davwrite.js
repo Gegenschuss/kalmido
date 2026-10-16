@@ -76,6 +76,7 @@ async function dvw_delete(e) {
   let tok;
   try { tok = (await dvw_req('DELETE', `/api/calendars/${e.sub}/events?uid=${encodeURIComponent(e.uid)}`)).undo; } catch { return; }
   dvw_redraw();
+  if (!tok) { toast(tr('Event deleted')); return; }  // a very large event is not kept for undo
   histToast(tr('Event deleted'), histAdd({label: tr('Event deleted'),
     undo: async () => { await dvw_req('POST', `/api/calendars/${e.sub}/events/restore`, {undo: tok}); dvw_redraw(); },
     redo: async () => { tok = (await dvw_req('DELETE', `/api/calendars/${e.sub}/events?uid=${encodeURIComponent(e.uid)}`)).undo; dvw_redraw(); }}));
