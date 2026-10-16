@@ -97,6 +97,7 @@ APP_TO_API = {
     "POST /api/lists/{}/sections/order": ["PUT /lists/{}/sections/order"],
     "GET /api/lists/{}/overview": ["GET /lists/{}/overview"],
     "GET /api/lists/{}/kpis": ["GET /lists/{}/kpis"],  # 2.43.0 (#1328): key figures
+    "GET /api/tasks/{}/related": ["GET /tasks/{}/related"],  # 2.59.0 (#1375): related tasks
     "POST /api/lists/{}/join": ["POST /lists/{}/join"],  # 2.46.0 (#1603): join a list visible to the organisation
     "PATCH /api/lists/{}/overview": ["PATCH /lists/{}/overview"],
     "POST /api/lists/{}/links": ["POST /lists/{}/links"],
@@ -210,6 +211,8 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.59.0 (#1375): the hint while a person types a new task's title and the client's on / off of the related tasks; agents "
+     "use related_tasks and search_tasks with semantic", ("=POST /api/tasks/similar", "=GET /api/related/config")),
     ("2.48.0 (#1207): managing the file store stays with people -- rename, move, trash, restore a version, shares, organisation-wide "
      "access, links to task / project files, the move targets; agents list, read and write files where they may edit",
      ("=PATCH /api/files/nodes/{}", "=DELETE /api/files/nodes/{}", "=POST /api/files/nodes/{}/restore", "=POST /api/files/nodes/{}/versions/{}/restore",
