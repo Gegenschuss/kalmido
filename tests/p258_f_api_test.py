@@ -124,5 +124,40 @@ check(r.ok and any(j["id"] == JN and j.get("name") == "Clara" for j in r.json()[
 r = A.get(B + "/api/agents/jobs?state=all")
 check(r.ok and any(j["id"] == JN and j.get("name") == "Clara" for j in r.json()["jobs"]), "#1803: the person's job list carries it")
 
+# ================================================================== #1805 sealed list pictures
+TEAM = Bo.post(B + "/api/lists", json={"name": "Team", "org_id": ORG}).json()["id"]
+PRIV = Bo.post(B + "/api/lists", json={"name": "Private", "org_id": None}).json()["id"]
+check(A.put(B + "/api/admin/orgcrypt", json={"org_encrypt": False}).ok, "setup: encryption off for a while")
+r = Bo.post(B + f"/api/lists/{TEAM}/icon", files={"file": ("i.png", png(), "image/png")}, headers=H)
+check(r.ok, "#1805: a picture while the encryption is off " + r.text[:160])
+p_old, v_old = icon_file(TEAM)
+check(os.path.isfile(p_old) and head(p_old) == b"\x89PNG\r\n", "#1805: stored plain while off (the state before 2.58)")
+url = r.json().get("icon", "") if r.ok else ""
+r = Bo.get(B + url)
+check(r.status_code == 200 and r.content[:8] == b"\x89PNG\r\n\x1a\n", "#1805: a plain picture is served as before")
+check(A.put(B + "/api/admin/orgcrypt", json={"org_encrypt": True}).ok, "setup: encryption on again")
+for _ in range(60):  # the encryption pass runs in the background
+    if head(p_old) == b"KENC1\n":
+        break
+    time.sleep(0.5)
+check(head(p_old) == b"KENC1\n", "#1805: the encryption pass seals the older picture too")
+r = Bo.get(B + url)
+check(r.status_code == 200 and r.content[:8] == b"\x89PNG\r\n\x1a\n", "#1805: ... and it is still served decrypted")
+r = Bo.post(B + f"/api/lists/{TEAM}/icon", files={"file": ("i.png", png(6, 6), "image/png")}, headers=H)
+check(r.ok, "#1805: a new picture " + r.text[:160])
+p_new, _v = icon_file(TEAM)
+check(p_new != p_old and head(p_new) == b"KENC1\n" and not os.path.exists(p_old), "#1805: the new picture is sealed, the old file gone")
+r = Bo.get(B + r.json().get("icon", ""))
+check(r.status_code == 200 and r.content[:8] == b"\x89PNG\r\n\x1a\n" and r.headers.get("Content-Type", "").startswith("image/png"),
+      "#1805: the sealed picture is served as a PNG")
+r = Bo.post(B + f"/api/lists/{PRIV}/icon", files={"file": ("i.png", png(), "image/png")}, headers=H)
+pp, _v = icon_file(PRIV)
+check(r.ok and head(pp) == b"\x89PNG\r\n" and Bo.get(B + r.json()["icon"]).status_code == 200, "#1805: a private list's picture stays plain (as attachments)")
+base = f"/api/orgs/{ORG}/lists/{TEAM}"
+r = A.post(B + base + "/icon", files={"file": ("i.png", png(5, 5), "image/png")}, headers=H)
+pa, _v = icon_file(TEAM)
+check(r.ok and head(pa) == b"KENC1\n", "#1805: the organisation admin's way seals as well " + r.text[:160])
+check(A.get(B + r.json().get("icon", "")).status_code == 200 if r.ok else False, "#1805: the admin sees it decrypted")
+
 print(f"p258_f_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
