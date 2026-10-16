@@ -9,8 +9,8 @@ books outside every organisation -- never a member's private book, never another
   with the organisation's encryption off) and never leave the server; the app only gets "set" + the last four characters.
 - Consent per contact (contacts.nl_status): '' unknown | yes | pending (double opt-in at the service) | unsub | bounce.
   Only contacts with an address and consent go to the service (mode doi: also the pending ones, as unconfirmed -- the
-  service sends the opt-in mail). unsub / bounce never go there again, and only the service can turn them back (a person
-  subscribing again through the service's own form).
+  service sends the opt-in mail). unsub / bounce never go there again; a run does not turn them back either (also not when the
+  service reports the address active again).
 - A run: first service -> Kalmido (unsubscriptions, bounces, confirmed opt-ins of every segment's list come back to the
   contacts), then Kalmido -> service (add, rename, take off the list what Kalmido put there and no longer matches; what
   somebody else put on the list stays). Every run is logged (numbers + error codes, never access data or addresses).
@@ -367,11 +367,11 @@ def _run_conn(c, conn_id, rid):
                         if m["state"] in NWL_BLOCKED:
                             counts["skipped"] += 1
                             continue
+                        if email not in mine:
+                            continue  # somebody else put it on the list: it stays theirs (not even renamed)
                         if name and m.get("name") != name:
                             a.rename(s["remote_id"], m["ref"], email, name)
                             counts["renamed"] += 1
-                        if email not in mine:
-                            continue  # somebody else put it on the list: it stays theirs
                         ref = m["ref"]
                         st_r = m["state"]
                     else:
@@ -394,7 +394,10 @@ def _run_conn(c, conn_id, rid):
                 if email in want:
                     continue
                 try:
-                    if email in rem and rem[email]["state"] not in NWL_BLOCKED:
+                    # blocked here but active at the service = the person subscribed again through the service's own form:
+                    # that stays theirs (Kalmido only lets go of it)
+                    if email in rem and rem[email]["state"] not in NWL_BLOCKED and \
+                            (status_of.get(email) or ("",))[0] not in NWL_BLOCKED:
                         a.remove(s["remote_id"], m["remote_ref"] or rem[email]["ref"], email)
                         counts["removed"] += 1
                     c.execute("DELETE FROM nl_members WHERE seg_id=? AND email=?", (s["id"], email))

@@ -63,7 +63,8 @@ OX_NO_KEY = N_("The organisation export needs the server key KALMIDO_SECRET_KEY 
 OX_SECRET_COLS = frozenset((
     "password_hash", "password", "pw_hash", "pw_rev", "token", "token_hash", "secret", "hook_secret", "totp_secret", "totp_step",
     "drop_token", "ical_token", "p256dh", "auth", "code_hash", "webauthn_handle", "oidc_subject", "proxy_login", "endpoint",
-    "etags", "api_key", "access_token", "refresh_token"))
+    "etags", "api_key", "access_token", "refresh_token",
+    "hint"))  # 2.55.0 (#1455): the last characters of a newsletter connection's access data (nl_conns)
 
 _OX = {}  # org id -> the running thread
 _OX_LOCK = threading.Lock()

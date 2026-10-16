@@ -671,7 +671,8 @@ Newsletter…* an organisation's admin connects the service for the organisation
   service (an existing one, or a new one named like the segment).
 - **Both directions:** each run first takes unsubscriptions, bounces and confirmed opt-ins from the service back to the
   contacts, then adds, renames and takes off the list what Kalmido put there and no longer matches. An unsubscribed or
-  bounced address is never subscribed again (only the person, through the service's own form). Manually with
+  bounced address is never subscribed again by Kalmido and stays blocked in Kalmido; if the person
+  subscribes again through the service's own form, Kalmido leaves that subscription alone. Manually with
   *Sync now*, or once a day. Every run is logged (numbers and error codes, never addresses or access data).
 - **Access data** are stored sealed with a key derived from `KALMIDO_SECRET_KEY` (needed) and never shown again; the
   address goes through the same SSRF guard as calendar subscriptions (an instance in the local network: allow its host,
