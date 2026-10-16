@@ -2,14 +2,15 @@
 the master data of an organisation (services, equipment + sets, text blocks, framework contracts, number counters).
 
 Everything belongs to an organisation (tenant): every table has org_id; every query filters by it. The module exists only
-in the business area: the person needs the feature "office" AND a membership in an organisation. Agent tokens and kid
+for every person with the feature "office": in an organisation's workspace its office, in "Private" (and without any
+organisation) the person's own personal office (2.47.3, #1360: pb_personal, a hidden orgs row). Agent tokens and kid
 accounts never get in (403 before any data is read). Org admins manage settings and master data; org members read the
 master data and write documents (see docs.py); foreign ids are 404, never 403 with content."""
 import json
 import re
 from datetime import date
 
-from flask import g
+from flask import g, has_request_context
 
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, like_escape, table_columns
@@ -20,7 +21,7 @@ from ..personal.timetrack import BadInput
 from .packs import office_pack, office_pack_codes
 
 OFFICE_FEAT = "office"
-OFFICE_NO_ORG = N_("Office & finance belongs to an organisation: choose your organisation's workspace at the top")
+OFFICE_NO_ORG = N_("Choose a workspace at the top (Private or an organisation) to open its office")  # 2.47.3 (#1360)
 OFFICE_ADMIN_ONLY = N_("Only an admin of this organisation can do this")
 OFFICE_OFF = N_("Office & finance is turned off in your settings")
 UNITS = ("day", "hour", "piece", "minute", "flat", "percent")  # 2.47.0 (#1649): percent = a rate on the external fees (KSK)
@@ -48,11 +49,15 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.40.0 (#1379): producing (markup by production days) and the raw data surcharge are switched on per
                      # organisation; new organisations start without them, fe_office_rules_migrate keeps them for those using them
                      "producing_on": 0, "raw_on": 0,
+                     # 2.47.3 (#1360): small business (section 19 UStG): new documents without VAT + the note (also orgs)
+                     "small_business": 0,
                      # 2.47.0 (#1216): industry packs switched on (office/packs/industry/<code>.json; "film" = shoot calculation)
                      "industry_packs": [],
                      # 2.47.0 (#1215): an invoice from a quotation with parts: "full" (like the quotation), "title" (the title
                      # page with its positions) or "summary" (one position per tax rate with this title)
-                     "parts_invoice_mode": "full", "parts_summary_title_de": "Filmherstellung", "parts_summary_title_en": "Film production"}
+                     "parts_invoice_mode": "full", "parts_summary_title_de": "Filmherstellung", "parts_summary_title_en": "Film production",
+                     # 2.47.3 (#1460): the DATEV booking batch export (office.datev: advisor / client number, chart, accounts)
+                     "datev_extf": {}}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -76,21 +81,25 @@ def office_gate(c):
 
 
 def office_org(c, uid, admin=False):
-    """The organisation uid works in: the one of the setting "workspace" (org:<id>), else the person's only organisation.
-    None of them -> 400 with a readable text. admin=True also requires org_role admin (403)."""
+    """The office area uid works in (its id, the org_id of every office_* row): the organisation of the setting "workspace"
+    (org:<id>, a membership); 2.47.3 (#1360): the workspace "private", no organisation at all or the mode shared -> the
+    person's own personal office (pb_personal, the person is its admin); "all" with exactly one organisation -> that one
+    (as before). Otherwise 400 with a readable text. admin=True also requires the admin role (403)."""
     from ..accounts.orgs import org_role, user_orgs
     orgs = user_orgs(c, uid)
     ws = (usettings(c, uid).get("workspace") or "").strip()
-    oid = None
     m = re.fullmatch(r"org:(\d{1,9})", ws)
     if m and int(m.group(1)) in orgs:
         oid = int(m.group(1))
+        role = org_role(c, uid, oid)
+    elif ws == "private" or not orgs:  # 2.47.3 (#1360): no silent fallback to the only organisation in "private"
+        oid, role = pb_personal(c, uid), "admin"
     elif len(orgs) == 1:
         oid = orgs[0]
-    if not oid:
+        role = org_role(c, uid, oid)
+    else:
         raise BadInput(tr(OFFICE_NO_ORG))
-    role = org_role(c, uid, oid)
-    if not role:
+    if not oid or not role:
         raise BadInput(tr(OFFICE_NO_ORG))
     if admin and role != "admin":
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
@@ -98,8 +107,81 @@ def office_org(c, uid, admin=False):
 
 
 def office_role(c, uid, oid):
+    """The role of uid in office area oid: admin | member | None. 2.47.3 (#1360): a personal office has exactly one
+    person, its owner (admin); nobody else has a role there."""
+    owner = pb_owner(c, oid)
+    if owner is not None:
+        return "admin" if owner == uid else None
     from ..accounts.orgs import org_role
     return org_role(c, uid, oid)
+
+
+# ---------------------------------------------------------------- 2.47.3 (#1360): the personal office
+def pb_owner(c, oid):
+    """The owner of office area oid when it is a personal office, else None (cached per request)."""
+    if not oid:
+        return None
+    cache = g.setdefault("pb_owner", {}) if has_request_context() else {}
+    if oid not in cache:
+        from ..core.pg import system_ctx
+        with system_ctx(c):  # instance structure: which person a personal office belongs to
+            r = c.execute("SELECT personal_of FROM orgs WHERE id=?", (oid,)).fetchone()
+        cache[oid] = r[0] if r else None
+    return cache[oid]
+
+
+def pb_personal(c, uid, create=True):
+    """The id of uid's personal office: a hidden orgs row (personal_of = uid, no members) that shows nowhere as an
+    organisation; made on the first use (create=False: None while there is none). The owner's access context carries it
+    (core/access.py _ctx_build), so row-level security lets only the owner read and write its office_* rows."""
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # instance structure: the person's own hidden area, never somebody else's
+        r = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()
+        if r or not create:
+            return r[0] if r else None
+        c.execute("INSERT INTO orgs(name,icon,created_at,personal_of) VALUES(?,?,?,?) ON CONFLICT (personal_of) WHERE personal_of IS NOT NULL DO NOTHING",
+                  (f"private-{int(uid)}", "", iso(now_utc()), uid))
+        oid = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()[0]
+    c.commit()  # at once (also on a reading request): the area exists before anything is written into it
+    from ..core.access import acx_drop
+    acx_drop()  # the next statement runs with the new id in app.org_ids
+    return oid
+
+
+def pb_cl_sql(c, oid, col="org_id", by="created_by"):
+    """The SQL condition on clients of office area oid (only integers, no parameters): an organisation's clients
+    (org_id), in a personal office the owner's private clients (org_id NULL, created by the owner = the same clients the
+    workspace "Private" shows)."""
+    owner = pb_owner(c, oid)
+    if owner is not None:
+        return f"({col} IS NULL AND {by}={int(owner)})"
+    return f"{col}={int(oid)}"
+
+
+def pb_cl_where(c, oid, col="org_id", by="created_by"):
+    """(sql, args) form of pb_cl_sql (announced in iface.txt for the other parts' modules)."""
+    return pb_cl_sql(c, oid, col, by), ()
+
+
+def pb_info(c, uid, oid):
+    """The fields of GET /api/office/settings about the area: personal (1 = the person's own office) and, while that
+    office is still empty, the organisations of the person (their offices are in their workspaces: the hint + switch)."""
+    if pb_owner(c, oid) is None:
+        return {"personal": 0}
+    from ..accounts.orgs import instance_mode, user_orgs
+    orgs = user_orgs(c, uid)
+    u = getattr(g, "user", None) if has_request_context() else None
+    move = {"can_move": 1 if u is not None and u["is_admin"] and instance_mode(c) == "workspaces" else 0}  # POST /api/office/move
+    used = c.execute("SELECT 1 FROM office_docs WHERE org_id=? UNION ALL SELECT 1 FROM office_services WHERE org_id=? LIMIT 1", (oid, oid)).fetchone()
+    if used or not orgs:
+        return {"personal": 1, "org_offices": [], **move}
+    from ..accounts.orgs import workspaces_for
+    return {"personal": 1, "org_offices": [{"id": w["id"], "name": w["name"]} for w in workspaces_for(c, uid)], **move}
+
+
+def pb_cl_org(c, oid):
+    """The org_id a client of office area oid gets (None in a personal office: a private client)."""
+    return None if pb_owner(c, oid) is not None else oid
 
 
 # ---------------------------------------------------------------- settings
@@ -222,7 +304,7 @@ def office_settings_clean(c, oid, b, cur):
         elif k == "industry_packs":  # 2.47.0 (#1216)
             from .sheet import dk_packs_clean
             out[k] = dk_packs_clean(v)
-        elif k in ("datev_auto", "producing_on", "raw_on"):  # 2.40.0 (#1379): the two calculation switches
+        elif k in ("datev_auto", "producing_on", "raw_on", "small_business"):  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "reminder_text_de", "reminder_text_en"):
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""
@@ -232,6 +314,9 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = v
         elif k in ("parts_summary_title_de", "parts_summary_title_en"):
             out[k] = re.sub(r"[\x00-\x1f\x7f]", "", v or "").strip()[:300] if isinstance(v, str) else ""
+        elif k == "datev_extf":  # 2.47.3 (#1460)
+            from .datev import dx_settings_clean
+            out[k] = dx_settings_clean(v, out.get(k) or {})
         elif k == "offer_number_at":
             if v not in ("create", "finalize"):
                 raise BadInput(tr("Invalid value: {0}", k))
@@ -516,7 +601,7 @@ def _clean_col(c, oid, kind, k, v):
         except (TypeError, ValueError):
             raise BadInput(tr("Invalid value: {0}", k))
         if spec == "clients":
-            if not c.execute("SELECT 1 FROM clients WHERE id=? AND org_id=?", (i, oid)).fetchone():
+            if not c.execute(f"SELECT 1 FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (i,)).fetchone():
                 raise BadInput(tr("Invalid value: {0}", k))
         elif not c.execute(f"SELECT 1 FROM {spec} WHERE id=? AND org_id=?", (i, oid)).fetchone():
             raise BadInput(tr("Invalid value: {0}", k))

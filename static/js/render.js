@@ -310,7 +310,7 @@ function renderSide() {
     // 2.25.0 (UX-02): the full name (it wraps), a grip to drag by (touch: at once, no long press) and ONE "…" button with
     // up / down / folder for keyboards and anyone who does not drag (WCAG 2.5.7)
     if (S.listReorder) { const nm = nmOf(l); return `<div class="srow reorder" data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}><span class="sgrip" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>${sw}<span class="n">${esc(nm)}</span>${shr}<span class="rctl"><button class="iconbtn" data-lsort="${l.id}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', nm))}">${ic('dots', 's')}</button></span></div>`; }
-    return row('l:' + l.id, sw, nmOf(l), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}`, shr + pg);
+    return row('l:' + l.id, sw, nmOf(l), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}${typeof dx_marked === 'function' && dx_marked(l.id) ? ' data-mark="1"' : ''}`, shr + pg);  // 2.47.3 (#1727): + marked
   };
   let lh = lists.filter(l => !l.folder).map(listRow).join('');
   // 2.4.0 (#361): a tree: top folder, its own lists, then its subfolders (header + lists, one level deeper)
@@ -471,6 +471,7 @@ function renderTop0() {
   if (fk && feat('matrix') && !isMobile()) acts += `<div class="seg vseg fseg tf" role="group" aria-label="${esc(tr('View'))}"><button class="${m === 'tasks' ? 'on' : ''}" data-act="fview" data-k="list" data-ico="list" data-f="${esc(fk)}" title="${esc(tr('List'))}" aria-pressed="${m === 'tasks'}">${ic('list', 's')}</button><button class="${m === 'matrix' ? 'on' : ''}" data-act="fview" data-k="matrix" data-ico="grid" data-f="${esc(fk)}" title="${esc(tr('Matrix'))}" aria-pressed="${m === 'matrix'}">${ic('grid', 's')}</button></div>`;
   if (m === 'tasks' && k === 'all' && feat('timeline')) { const v = isRoadmap() ? 'timeline' : 'list'; acts += `<div class="seg tf" role="group" aria-label="${tr('View')}"><button class="${v === 'list' ? 'on' : ''}" data-act="rm-view" data-k="list" data-ico="list" title="${tr('List')}" aria-pressed="${v === 'list'}">${ic('list', 's')}</button><button class="${v === 'timeline' ? 'on' : ''}" data-act="rm-view" data-k="timeline" data-ico="timeline" title="${tr('Timeline')}" aria-pressed="${v === 'timeline'}">${ic('timeline', 's')}</button></div>`; }
   if (m === 'tasks' && k === 'inbox') acts += kbSortBtn();  // 2.39.1 (#1219)
+  if (m === 'tasks' && k.startsWith('lists:') && typeof dx_listsActs === 'function') acts += dx_listsActs(k);  // 2.47.3 (#1727)
   if (m === 'tasks' && k === 'trash' && (S.hist?.k === 'trash' && S.hist.deletable != null ? S.hist.deletable > 0 : (S.extra || []).some(t => !t.keep))) acts += `<button class="btn sm danger" data-act="trash-empty">${tr('Empty')}</button>`;
   if (m === 'tasks' && k === 'done' && (S.extra || []).length) acts += `<button class="btn sm" data-act="done-clean" title="${esc(tr('Move completed tasks to the trash'))}">${ic('trash', 's')}<span class="bl">${tr('Delete completed…')}</span></button>`;
   // 2.24.0 (#906): "Tasks of …" of another person: write to them

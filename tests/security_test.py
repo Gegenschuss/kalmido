@@ -232,7 +232,8 @@ else:
 
 # poisoned rows written straight into the DB (bypassing the API, as old data could be) must not stop reminders
 now = datetime.now(ZoneInfo("Europe/Berlin"))
-today, tm = now.date().isoformat(), (now - timedelta(minutes=10)).strftime("%H:%M")
+# 2.47.3: date and time of the same moment ten minutes ago (between 00:00 and 00:10 "today" + 23:5x lay in the future)
+today, tm = (now - timedelta(minutes=10)).date().isoformat(), (now - timedelta(minutes=10)).strftime("%H:%M")
 inbox_m = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (ids["mallory"],))[0][0]
 ts_now = datetime.now().isoformat()
 for due, dtm, rem, rep in (("not-a-date", None, "0", ""), (today, None, "abc", ""), (today, "25:99", "0", ""),

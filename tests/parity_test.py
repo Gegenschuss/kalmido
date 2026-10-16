@@ -198,6 +198,7 @@ APP_TO_API = {
     # 2.23.0 (#463): clients, workload, approvals, forms
     "GET /api/clients": ["GET /clients"], "POST /api/clients": ["POST /clients"], "GET /api/clients/{}": ["GET /clients/{}"],
     "PATCH /api/clients/{}": ["PATCH /clients/{}"], "DELETE /api/clients/{}": ["DELETE /clients/{}"], "GET /api/workload": ["GET /workload"],
+    "POST /api/clients/bulk": ["POST /clients/bulk"],  # 2.47.3 (#1733)
     "POST /api/tasks/{}/approval": ["POST /tasks/{}/approval"], "GET /api/lists/{}/forms": ["GET /lists/{}/forms"],
     "POST /api/lists/{}/forms": ["POST /lists/{}/forms"], "PATCH /api/forms/{}": ["PATCH /forms/{}"], "DELETE /api/forms/{}": ["DELETE /forms/{}"],
     # 2.48.0 (#1207): the file store -- list, read, add files / folders, new versions

@@ -425,7 +425,7 @@ def init_db(guard=True, load=None):
         if gsetting(c, "migr_orgs2220") != "1":
             from ..accounts.orgs import INSTANCE_ENV
             # 2.46.0 (#1592): only an existing instance from before 2.22 (accounts, no organisation); a new one starts without
-            if not c.execute("SELECT 1 FROM orgs").fetchone() and INSTANCE_ENV != "shared" and c.execute("SELECT 1 FROM users LIMIT 1").fetchone():
+            if not c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL").fetchone() and INSTANCE_ENV != "shared" and c.execute("SELECT 1 FROM users LIMIT 1").fetchone():
                 from ..core.config import PUBLIC_URL
                 host = PUBLIC_URL.split("://", 1)[-1].split("/")[0].split(":")[0]
                 parts = [p for p in host.split(".") if p and not p.isdigit()]
@@ -602,7 +602,7 @@ def init_db(guard=True, load=None):
         if not rls_on and guard:  # 2.37.0 (review W2-2): several organisations rely on it -> no start without it
             from ..accounts.orgs import INSTANCE_ENV
             # 2.46.0 (#1592): needed with several organisations (or the mode workspaces set explicitly, as before)
-            if INSTANCE_ENV == "workspaces" or c.execute("SELECT COUNT(*) FROM orgs").fetchone()[0] > 1:
+            if INSTANCE_ENV == "workspaces" or c.execute("SELECT COUNT(*) FROM orgs WHERE personal_of IS NULL").fetchone()[0] > 1:
                 print(f"FATAL: {OFF_HELP} Several organisations need it. Refusing to start.", flush=True)
                 raise DataDirError(3)
         c.execute("INSERT INTO kalmido_meta(key,value) VALUES('schema_version',?) ON CONFLICT(key) DO UPDATE SET value="

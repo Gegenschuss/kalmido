@@ -6532,7 +6532,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 /* 2.47.0 C (#1216) shoot calculation sheet (office_sheet.js): boxes stacked, head values as a two-column grid on the
    phone, wider on larger screens; rows reuse .ofdit / .ofdnums of the quotation editor */
 .dksheet{display:flex;flex-direction:column;gap:.75rem}
-.dkbox{border:1px solid var(--line2);border-radius:10px;padding:.625rem .75rem}
+.dkbox{border:1px solid var(--line2);border-radius:.625rem;padding:.625rem .75rem}
 .dkbox>summary,.dkbox>h4{margin:0 0 .5rem;font-weight:600;cursor:default}
 .dkbox>summary{cursor:pointer;min-height:2.25rem;display:flex;align-items:center}
 .dkgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem .75rem;align-items:end}
@@ -6784,7 +6784,7 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 .acjob{display:inline-block;width:.5rem;height:.5rem;margin-right:.3125rem;border-radius:50%;background:var(--acol);vertical-align:baseline}
 .pfcol{display:flex;flex-wrap:wrap;gap:.375rem}
 .pfcol button{width:1.75rem;height:1.75rem;padding:0;border:0;border-radius:50%;background:var(--acol);cursor:pointer}
-.pfcol button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--acol)}
+.pfcol button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 .25rem var(--acol)}
 @media (pointer:coarse){ .pfcol{gap:.5rem} .pfcol button{width:2.25rem;height:2.25rem} }
 /* 2.47.1 A (#1720) several chats in the chat panel, one above the other (chatwins.js); phones: a row of the open chats */
 #achat.cwsplit .cwin{display:flex;flex-direction:column;flex:1 1 0;min-height:13.75rem;overflow:hidden;position:relative;background:var(--bg2)}
@@ -6794,19 +6794,19 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 #achat.cwsplit .cwin.cwc [data-cwact="fold"] svg{transform:rotate(-90deg)}
 #achat.cwsplit .cwin>.chath{padding:.5rem .75rem}
 #achat.cwsplit .cwin>.chath,#achat.cwsplit .cwin>.tcrhead{cursor:grab;user-select:none;border-bottom:1px solid var(--line)}
-#achat.cwsplit .cwin.cwact>.chath,#achat.cwsplit .cwin.cwact>.tcrhead{box-shadow:inset 3px 0 0 var(--accent)}
-#achat.cwsplit .cwin.cwcol>.chath,#achat.cwsplit .cwin.cwcol>.tcrhead{border-top:3px solid var(--cwcol)}
+#achat.cwsplit .cwin.cwact>.chath,#achat.cwsplit .cwin.cwact>.tcrhead{box-shadow:inset .1875rem 0 0 var(--accent)}
+#achat.cwsplit .cwin.cwcol>.chath,#achat.cwsplit .cwin.cwcol>.tcrhead{border-top:.1875rem solid var(--cwcol)}
 #achat.cwsplit .cwin.cwdrag{z-index:3;opacity:.92;box-shadow:var(--shadow)}
 #achat.cwsplit .cwin .tcback{display:none}
 #achat.cwmany .cwin [data-dwchat],#achat.cwmany .cwin [data-act="chat-dock"]{display:none}  /* in the window menu */
 .cwsep{flex:0 0 auto;height:.5rem;margin:-.25rem 0;position:relative;z-index:2;cursor:row-resize;touch-action:none;outline:0}
 .cwsep::after{content:"";position:absolute;left:0;right:0;top:calc(50% - .5px);height:1px;background:var(--line2)}
-.cwsep:hover::after,.cwsep.on::after,.cwsep:focus-visible::after{top:calc(50% - 1.5px);height:3px;background:var(--accent)}
+.cwsep:hover::after,.cwsep.on::after,.cwsep:focus-visible::after{top:calc(50% - .09375rem);height:.1875rem;background:var(--accent)}
 .cwdot{display:inline-block;width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);flex:0 0 auto}
 .cwdot[hidden]{display:none}
 .cwsw{display:flex;align-items:center;gap:.375rem;overflow-x:auto;padding:.375rem .5rem;border-bottom:1px solid var(--line);scrollbar-width:none;flex:0 0 auto}
 .cwsw::-webkit-scrollbar{display:none}
-.cwswb{display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem;max-width:12rem;padding:0 .75rem 0 .375rem;border:1px solid var(--line);border-radius:999px;background:var(--bg);color:inherit;flex:0 0 auto}
+.cwswb{display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem;max-width:12rem;padding:0 .75rem 0 .375rem;border:1px solid var(--line);border-radius:99rem;background:var(--bg);color:inherit;flex:0 0 auto}
 .cwswb>span:not(.cwdot){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cwswb.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
 .cwswb .tcico{display:inline-flex}
@@ -7022,3 +7022,82 @@ button.lnph:hover{border-color:var(--accent)}
 .abtxt{display:flex;flex-direction:column;min-width:0}
 .abmeta2{display:none;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:899px){.abmeta2{display:block}}
+/* 2.48.0 (#1207, #1642): device test - path links of the file store and the note lock reach 44 px on touch screens */
+@media (pointer: coarse) { .abcrumbs .linkbtn, .lnbar .linkbtn { min-height: 44px; display: inline-flex; align-items: center; } }
+/* 2.47.3 C (#1731, #1733, #1734): the edit sheet of a selection (contacts, clients) */
+.msdlg .msrow{align-items:flex-start}
+.modal .msdlg .row label.msuse,.msdlg .row label.msuse{min-width:8.75rem;color:var(--text);font-size:var(--fs-m);gap:.375rem;padding-top:.375rem}
+.msdlg .msin{display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:12rem}
+.msdlg .msin textarea{width:100%}
+/* 2.47.3 C (#1734): Office > Clients in the layout of the contacts (list + card); a client = briefcase + tag "Client",
+   a contact = person + tag "Contact"; the client card carries a faint tint of the accent (never the only sign) */
+.msclh{display:flex;align-items:center;gap:.375rem;margin:0;font-size:var(--fs-m);font-weight:600}
+.mscav{border-radius:var(--radius);background:color-mix(in srgb,var(--cc,var(--accent)) 16%,var(--bg3));color:var(--cc,var(--accent));font-size:1rem}
+.mscav.big{border-radius:var(--r-l);font-size:1.5rem}
+.mstags{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;margin-top:.125rem;font-size:var(--fs-s)}
+.mstag{display:inline-flex;align-items:center;gap:.25rem;padding:0 .5rem;border-radius:62.5rem;border:1px solid var(--line2);color:var(--text2);font-size:.75rem;line-height:1.5rem}
+.mstag-cl{border-color:color-mix(in srgb,var(--accent) 40%,var(--line2));color:var(--accent)}
+.msclcard:not(.ctnone){background:color-mix(in srgb,var(--accent) 3%,transparent);border-radius:var(--r-l);padding:.5rem .75rem 2rem}
+.msclcard .cldetail{display:flex;flex-direction:column}
+.msclcard .sttiles{grid-template-columns:repeat(auto-fit,minmax(8rem,1fr))}
+.msclients .ctrow.msarch .ctn b{color:var(--muted)}
+.msclients .msbud{width:.5rem;height:.5rem;border-radius:50%;flex:none;background:var(--ok)}
+.msclients .msbud.lv-warn{background:var(--p3)}.msclients .msbud.lv-over{background:var(--danger)}
+.msclempty{max-width:28rem;margin:1rem auto}
+
+/* 2.47.3 D (#1729): uninstall commands of an agent's computers in the delete / remove dialogs */
+.ainsun{margin:.5rem 0;padding:.5rem .625rem;background:var(--bg3);border-radius:var(--radius)}
+.ainsunh{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.ainsunc{display:flex;gap:.5rem;margin-top:.375rem}
+.ainsuncmd{flex:1;min-width:0;font-family:var(--mono);font-size:var(--fs-s)}
+
+/* 2.47.3 D (#1764): messages of background jobs in the agent chat: stripe in the job's colour + tag "Job #N" (no coloured area) */
+.cmsg.jobm .cbub{box-shadow:inset .25rem 0 0 var(--jcol)}
+.cmsg.jobm.jpart .cbub{box-shadow:inset .25rem 0 0 color-mix(in srgb,var(--jcol) 65%,#fff)}
+.jobtag{display:inline-flex;align-items:center;gap:.375rem;align-self:flex-start;padding:.0625rem .5rem;border-radius:62.5rem;background:color-mix(in srgb,var(--jcol) 16%,var(--bg3));color:var(--text);font-size:var(--fs-xs);line-height:1.5}
+.jobtag i{flex:0 0 auto;width:.5rem;height:.5rem;border-radius:50%;background:var(--jcol)}
+.jpart .jobtag i{background:color-mix(in srgb,var(--jcol) 65%,#fff)}
+/* 2.47.3 B (#1022, #1652): travel expenses and cash flow in the office */
+.rkbar select{min-height:2.25rem}
+.rkbadge{display:inline-block;min-width:1.25rem;padding:0 .3rem;border-radius:999rem;background:var(--accent);color:var(--on-accent,#fff);font-size:.75rem;line-height:1.25rem;text-align:center}
+.rksum{font-variant-numeric:tabular-nums;white-space:nowrap}
+.rkmiss{color:var(--accent)}
+.rkhead{margin:.25rem 0 .75rem}.rkhead h3{margin:0 0 .25rem}.rkhead p{margin:.125rem 0}
+.rknote{white-space:pre-wrap}
+.rkits .rkit{display:flex;align-items:center;gap:.5rem}
+.rkits .rkit .ofcrow{flex:1;min-width:0}
+.rksel,.rkdatev{display:flex;align-items:center;min-height:2.75rem;white-space:nowrap}
+.rksel input,.rkdatev input{width:1.25rem;height:1.25rem}
+.rkppl{display:flex;flex-wrap:wrap;gap:.25rem .75rem}
+.rklab{min-width:8rem}
+.rktab,.rkcftab{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.rktab th,.rktab td,.rkcftab th,.rkcftab td{padding:.5rem .5rem;border-bottom:1px solid var(--line2);text-align:left}
+.rktab .num,.rkcftab .num{text-align:right;white-space:nowrap}
+.rktab tfoot th,.rkcftab tfoot th{border-bottom:0}
+@media (max-width:600px){.rkits .rkit{flex-wrap:wrap}.rkits .rkit .ofcrow{flex-basis:calc(100% - 2.5rem)}.rkdatev{margin-left:2rem}}
+.rkcfrange{white-space:nowrap}
+.rkcfms{display:grid;grid-template-columns:repeat(auto-fill,minmax(18rem,1fr));gap:.75rem;margin:.5rem 0}
+.rkcfm{border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);padding:.5rem .75rem}
+.rkcfm.cur{border-color:var(--accent)}
+.rkcfm header{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .5rem;min-height:2rem}
+.rkcfbal{font-variant-numeric:tabular-nums;white-space:nowrap}.rkcfbal.neg{color:var(--danger,#c0392b)}
+.rkcfbars{display:flex;flex-direction:column;gap:2px;margin:.25rem 0}
+.rkcfbars span{display:block;height:.25rem;border-radius:2px;transform-origin:left center;transition:transform .2s ease}
+.rkcfbin{background:var(--accent)}.rkcfbout{background:var(--accent);opacity:.35}
+.rkcftab td,.rkcftab th{padding:0 .25rem;vertical-align:middle}
+.rkcftab td .rkcfv{display:inline-flex;align-items:center;justify-content:flex-end;margin:0;min-height:2.75rem;min-width:4rem;padding:0 .25rem;background:none;border:0;color:var(--text);font:inherit;font-variant-numeric:tabular-nums;cursor:pointer;border-radius:var(--radius)}
+.rkcftab .rkcfv:hover,.rkcftab .rkcfv:focus-visible,.rkcftab .rkcfv[aria-expanded="true"]{color:var(--accent);text-decoration:underline}
+.rkcftab .rkcfv.plan{font-style:italic}
+.rkcftab td .rkcfz{min-width:0;cursor:default}
+.rkcftab th{font-weight:500}
+.rkcfents{margin-top:.25rem}.rkcfents .ofcrow{text-decoration:none}
+/* 2.47.3 E (#1727): marked lists in the sidebar (Shift / Cmd-click, long-press "Select") and the bar of their view */
+#side .srow[data-mark]{background:var(--accent-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent);color:var(--text)}
+.dxbar{display:inline-flex;gap:.4rem;align-items:center}
+@media (pointer:coarse){.dxbar .btn{min-height:2.75rem}}
+/* 2.47.3 E (#1460): the DATEV export settings block */
+.dxset .lacts .numin{max-width:7rem}
+
+/* 2.47.3 G (#1382): the (i) buttons of the quotation editor fields are 24 px targets (every control there >= 24 px) */
+.ofdeditor .ib:not(.ibl),.ofdhead .ib:not(.ibl){width:1.5rem;height:1.5rem}
+.ofdeditor .ib.ibl,.ofdhead .ib.ibl{min-height:1.5rem}

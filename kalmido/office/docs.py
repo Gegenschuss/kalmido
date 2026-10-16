@@ -19,7 +19,7 @@ from ..personal.timetrack import BadInput
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
 from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, RAW_MODES, TAX_KEYS, dec, fmt_money, inv_calc, office_calc
 from .packs import office_pack
-from .model import (NAME_MAX, TEXT_MAX, UNITS, office_gate, office_org, office_number_next, office_role, office_settings,
+from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, office_number_next, office_role, office_settings,
                     office_seed_texts)
 from .ledger import (ofx_company, ofx_company_print, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
                      ofx_number_at_finalize, ofx_snapshot_pack)
@@ -173,7 +173,7 @@ def _service(c, oid, sid):
 def _client(c, oid, cid):
     if not cid:
         return None
-    r = c.execute("SELECT id, name, contact, address, email FROM clients WHERE id=? AND org_id=?", (_iid(cid), oid)).fetchone()
+    r = c.execute(f"SELECT id, name, contact, address, email FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (_iid(cid),)).fetchone()
     return dict(r) if r else None
 
 
@@ -256,7 +256,8 @@ def fk_doc_contact_clean(c, oid, b, cur, f):
 def _calc_doc(r):
     return {"lang": r["lang"], "currency": r["currency"], "fx_rate": r["fx_rate"], "vat_mode": r["vat_mode"], "raw_mode": r["raw_mode"],
             "raw_factor": r["raw_factor"], "prod_quotient": r["prod_quotient"], "producing_rate": r["producing_rate"],
-            "discount_pct": r["discount_pct"], "producing_on": dict(r).get("producing_on")}  # 2.47.0 (#1645)
+            "discount_pct": r["discount_pct"], "producing_on": dict(r).get("producing_on"),  # 2.47.0 (#1645)
+            "vat_note": dict(r).get("vat_note")}  # 2.47.3 (#1360): "small" prints the section 19 note
 
 
 def doc_totals(c, oid, r, items=None):
@@ -665,7 +666,7 @@ def doc_create(c, oid, uid, b, admin):
         rights["note"] = (notes[0]["text_en"] if lang == "en" else notes[0]["text_de"]) or notes[0]["text_de"]
     ts = iso(now_utc())
     row = {"org_id": oid, "kind": kind, "number": "", "status": "draft", "lang": lang, "currency": (s.get("currency") or "EUR").upper(),
-           "fx_rate": s.get("fx_usd") or 1.09, "vat_mode": "vat", "client_id": None, "recipient": json.dumps({"name": "", "lines": []}),
+           "fx_rate": s.get("fx_usd") or 1.09, "vat_mode": "novat" if s.get("small_business") else "vat", "client_id": None, "recipient": json.dumps({"name": "", "lines": []}),
            "project_title": "", "project_ref": "", "date": today.isoformat(),
            "valid_until": (today + timedelta(days=int(s.get("offer_valid_days") or 30))).isoformat(), "contract_id": None,
            "producing_on": 1 if s.get("producing_on") else 0,  # 2.47.0 (#1645): the office setting is the default of a new quotation
@@ -674,6 +675,8 @@ def doc_create(c, oid, uid, b, admin):
            "intro": _default_text(c, oid, s, "intro", lang), "closing": _default_text(c, oid, s, "closing", lang),
            "rights": json.dumps(rights, ensure_ascii=False), "fields": "[]", "totals": "{}", "created_by": uid, "created_at": ts,
            "updated_at": ts, "sent_at": None}
+    if s.get("small_business"):  # 2.47.3 (#1360): section 19 UStG
+        row["vat_note"] = "small"
     if row["currency"] not in ("EUR", "USD"):
         row["currency"] = "EUR"
     cur = dict(row)

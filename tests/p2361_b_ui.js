@@ -50,7 +50,8 @@ const FEAT = 'cal,comments,collab,clients';
 
   // ================= the view (admin)
   w.eval(`go('office/services')`); await until(() => d.querySelector('.office[data-ofctab="services"] .ofcbar'), 60);
-  check(d.querySelectorAll('.office .ofctabs [role=tab]').length === 6, 'the view has six tabs');
+  // 2.47.3 (#1022, #1652): travel expenses and cash flow are two more tabs (admins only)
+  check(d.querySelectorAll('.office .ofctabs [role=tab]').length === 8, 'the view has eight tabs (admin)');
   check(d.querySelector('.office .ofctabs [role=tab][aria-selected="true"]')?.dataset.go === 'office/services', 'tab Services selected');
   check(!!d.querySelector('.office [data-ofc="new"][data-kind="services"]'), 'admin: "New service"');
   check(/Nothing here yet/.test(d.querySelector('.office .ofcbody')?.textContent || ''), 'empty hint');

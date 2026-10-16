@@ -66,7 +66,7 @@ function mg_tabItem(id) {
 const mg_tabOpts = opt => MG_IDS.filter(mg_on).map(id => opt('a:' + id, tr(mg_area(id)[2]))).join('');
 // ---- Settings > Modules: ONE switch per area; its parts below it (each can still be switched on its own)
 const mg_featOn = k => k.startsWith('a:') ? mg_on(k.slice(2)) : feat(k);
-const MG_DESC = {office: N_('Office & finance (quotations, services, documents; needs an organisation), your contacts and the clients'),
+const MG_DESC = {office: N_('Office & finance (quotations, services, documents; your own or your organisation\'s), your contacts and the clients'),
   time: N_('Time tracking on tasks with reports, and the focus timer; finished focus sessions can count as time entries'),
   review: N_('Your day and week in review with a private journal, and the statistics'),
   life: N_('Home & life (contracts, devices, staying in touch, health, trips, read later) and family'),

@@ -60,6 +60,7 @@ msg_de() {
     instance) echo "  Instanz: %s" ;;
     rev_fail) echo "  Kalmido hat nicht geantwortet: entferne den Computer unter Einstellungen > Agenten, falls er noch aufgelistet ist" ;;
     rev_ok) echo "  dieser Computer ist in Kalmido entfernt (sein Token funktioniert nicht mehr)" ;;
+    rev_gone) echo "  der Schlüssel dieses Computers war in Kalmido schon widerrufen (Agent gelöscht oder Computer entfernt): es wird nur hier aufgeräumt" ;;
     rev_err) echo "  das Token kann nicht gesperrt werden: %s" ;;
     s_uninstall) echo "Entferne den Agenten von %s von diesem Computer" ;;
     dry_revoke) echo "  (Probelauf) das Token dieses Computers in Kalmido sperren" ;;
@@ -116,6 +117,7 @@ msg_en() {
     instance) echo "  instance: %s" ;;
     rev_fail) echo "  Kalmido did not answer: remove the computer in Settings > Agents if it is still listed" ;;
     rev_ok) echo "  this computer is removed in Kalmido (its token no longer works)" ;;
+    rev_gone) echo "  the key of this computer was already revoked in Kalmido (agent deleted or computer removed): cleaning up here only" ;;
     rev_err) echo "  cannot revoke the token: %s" ;;
     s_uninstall) echo "Removing the agent of %s from this computer" ;;
     dry_revoke) echo "  (dry run) revoke this computer's token in Kalmido" ;;
@@ -223,8 +225,8 @@ sayf instance "$INST"
 # revoke: this computer's token is revoked in Kalmido (POST /api/agent-setup/remove with the token itself)
 revoke() {
   [ -f "$ENVF" ] || return 0
-  KALMIDO_SETUP_ENV=$ENVF KALMIDO_M_OK="$(msg rev_ok)" KALMIDO_M_ERR="$(msg rev_err)" "$PY" - <<'PYEOF' || sayf rev_fail
-import os, sys, urllib.request
+  KALMIDO_SETUP_ENV=$ENVF KALMIDO_M_OK="$(msg rev_ok)" KALMIDO_M_GONE="$(msg rev_gone)" KALMIDO_M_ERR="$(msg rev_err)" "$PY" - <<'PYEOF' || sayf rev_fail
+import os, sys, urllib.error, urllib.request
 env = {}
 for ln in open(os.environ["KALMIDO_SETUP_ENV"], encoding="utf-8"):
     k, _, v = ln.strip().partition("=")
@@ -234,6 +236,11 @@ req = urllib.request.Request(env["KALMIDO_URL"].rstrip("/") + "/api/agent-setup/
                                       "Content-Type": "application/json"})
 try:
     urllib.request.urlopen(req, timeout=20).read()
+except urllib.error.HTTPError as x:  # 2.47.3 (#1729): 401 = the key is already revoked (agent deleted): only a hint, the cleanup goes on
+    if x.code == 401:
+        print(os.environ["KALMIDO_M_GONE"])
+        sys.exit(0)
+    sys.exit(os.environ["KALMIDO_M_ERR"] % x)
 except Exception as x:  # noqa: BLE001 -- one short line, no traceback
     sys.exit(os.environ["KALMIDO_M_ERR"] % x)
 print(os.environ["KALMIDO_M_OK"])

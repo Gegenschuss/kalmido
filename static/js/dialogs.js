@@ -95,13 +95,14 @@ function modalSub(parent, open) {
   };
   Promise.resolve(open()).then(ch => { if (ch && ch.isConnected) onRemove(ch, show); else show(); }, show);
 }
-function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel}) {
+function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel, after}) {  // after(md): 2.47.3 (#1729) extra wiring of an html body
   return new Promise(res => {
     let done = false;
     const md = modal(`<form class="cdlg-f" novalidate><h3 id="cdlg-t">${esc(title)}</h3>${body || html ? `<div class="cdlg-b" id="cdlg-b">${html || esc(body)}</div>` : ''}
       ${input ? `<input id="cdlg-in" value="${esc(input.value || '')}" placeholder="${esc(input.placeholder || '')}" aria-labelledby="cdlg-t" autocomplete="off" ${input.type ? `type="${input.type}"` : ''} ${input.max ? `maxlength="${input.max}"` : ''}>` : ''}
       <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-cd="no">${esc(cancel || tr('Cancel'))}</button><button type="submit" class="btn ${danger ? 'danger solid' : 'pri'}" data-cd="yes">${esc(ok || tr('OK'))}</button></div></form>`);
     md.classList.add('cdlg');
+    if (after) after(md);
     md.setAttribute('role', input ? 'dialog' : 'alertdialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'cdlg-t');
     if (body || html) md.setAttribute('aria-describedby', 'cdlg-b');
     const prev = document.activeElement;
@@ -358,6 +359,7 @@ function listMenuItems(id, anchor) {
   if (teamOn() && l.shared && !l.archived && l.role !== 'participant') items.push({label: tr('Team chat'), icon: 'comment', fn: () => listChat(id)});
   if (!l.archived && typeof mw_ok === 'function' && mw_ok()) items.push({label: tr('Open in its own window'), icon: 'panel', cls: 'mminiwin', fn: () => mw_open(id)});  // 2.39.1 (#1294): desktop, miniwin.js
   if (!l.is_inbox && !l.archived) items.push({label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(at(), id)});
+  if (!l.is_inbox && !l.archived && typeof dx_start === 'function' && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.push({label: tr('Select several lists'), icon: 'check', fn: () => dx_start(id)});  // 2.47.3 (#1727)
   // 2.27.0 (#991): from the sidebar (right-click / long press): its place among the lists of its folder
   if (!l.is_inbox && !l.archived && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.push('-', ...listMoveItems(id), '-');
   if (propOn() && !l.archived) {  // 2.3.0 (#262 #263)

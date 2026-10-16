@@ -133,6 +133,7 @@ ORDER = (
     "life.web",
     "life.v1",
     "team.clients",
+    "team.clients_bulk",  # 2.47.3 (#1733): several clients at once
     "team.workload",
     "office.packs",  # 2.36.1 (#1021): country packs (data), used by office.model
     "office.model",  # 2.36.1 (#1021): office & finance (B); C/D append office.calc, office.docs, office.pdf
@@ -151,6 +152,9 @@ ORDER = (
     "office.contacts_cl",  # 2.40.0 (#1380): contact persons of a client (no routes; used by team.clients, office.docs, legacyimport)
     "office.legacyimport",  # 2.39.1 (#1182): legacy import (clients / services / equipment from .xlsx, archive of old PDFs)
     "office.parts",  # 2.47.0 (#1215): parts of a quotation (Teilangebote): routes, title page calculation, invoice modes
+    "office.travel",  # 2.47.3 (#1022, part B): travel expenses (trips, receipts, evaluation, billing on)
+    "office.cashflow",  # 2.47.3 (#1652, part B): cash flow per month + fixed costs
+    "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
     "team.approvals",
     "team.forms",
     "team.v1",

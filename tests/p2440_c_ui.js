@@ -73,6 +73,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   md = lastModal(d);
   const row = md.querySelector('[data-ainsm]');
   check(row && /studio-laptop/.test(row.textContent) && /connected/.test(row.textContent) && /Linux/.test(row.textContent) && row.querySelector('.hdot.hs-ready'), 'the computer with name, connected, green dot ' + row?.textContent.trim());
+  w.__dialogs = 'manual';  // 2.47.3 (#1729): the dialog opens after the list of computers was fetched, so the suite answers it itself
   click(w, row.querySelector('[data-m="ains-del"]'));
   await until(() => d.querySelector('.modal .card') && /cannot be undone/.test(lastModal(d).textContent));
   const cf = lastModal(d);

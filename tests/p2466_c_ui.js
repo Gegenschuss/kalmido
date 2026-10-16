@@ -87,7 +87,8 @@ const FEAT = 'cal,comments,collab,time,agents';
   md = await until(() => d.querySelector('.smodal'));
   check(secOn(md) === 'users' && admOn(md) === 'server' && md.querySelector('#s-timeall-a')?.checked === false, "settingsModal('server'): Administration > Server, time tracking for everyone off");
   const ta = md.querySelector('#s-timeall-a'); ta.checked = true; ta.dispatchEvent(new w.Event('change', {bubbles: true}));
-  await until(() => w.eval('S.timeAll') === true && d.querySelector('.smodal #s-timeall-a')?.checked);
+  // 2.47.2: wait for both switches (the own one follows after the redraw; CI is slower than the Mac)
+  await until(() => w.eval('S.timeAll') === true && d.querySelector('.smodal #s-timeall-a')?.checked && d.querySelector('.smodal #s-timeall')?.checked);
   md = d.querySelector('.smodal');
   check(w.eval('S.timeAll') === true && md.querySelector('#s-timeall')?.checked && md.querySelector('#s-timeall-a')?.checked, 'switched on under Administration: both switches on');
   check(secOn(md) === 'users' && admOn(md) === 'server', 'the re-drawn dialog stays on Administration > Server: ' + secOn(md) + '/' + admOn(md));

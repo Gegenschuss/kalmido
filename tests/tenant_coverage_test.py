@@ -62,7 +62,8 @@ KINDS = {
     "form": ("matrix", "p2300_tenant_test.py: forms by id, the form page for another organisation"),
     "client": ("matrix", "p2300_tenant_test.py: clients by id, workload"),
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
-    # one works in); foreign ids 404; agents and kids 403 before any query; a private person 400. No /api/v1, no MCP in stage 1
+    # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
+    # personal office (a hidden area only its owner reaches). No /api/v1, no MCP in stage 1
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share"),
@@ -71,7 +72,7 @@ KINDS = {
     "file": ("matrix", "p248_a_api_test.py: a node of another organisation / person: 404 (read, list, content, versions, share, move); shares only to people and agents of the node's workspace"),
     "paperless": ("matrix", "p248_d_paperless_api_test.py: the connection of another workspace: 404; organisation admins only change it; agents never"),
     "receipt": ("matrix", "p248_d_receipts_api_test.py: receipt data and suggestions only on a visible document; projects of another workspace refused; outsiders 404"),
-    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive)"),
+    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch)"),
     "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
     "stats": ("matrix", "p2300_tenant_test.py: statistics count only own / visible tasks"),
@@ -182,6 +183,7 @@ ROUTES = {
     # ---- client (13)
     "GET /api/clients": "client", "GET /api/clients/{}": "client", "POST /api/clients": "client",
     "PATCH /api/clients/{}": "client", "DELETE /api/clients/{}": "client", "GET /api/v1/clients": "client",
+    "POST /api/clients/bulk": "client", "POST /api/v1/clients/bulk": "client",  # 2.47.3 (#1733): every id checked first (p2473_c_api_test.py)
     "POST /api/v1/clients": "client", "GET /api/v1/clients/{}": "client", "PATCH /api/v1/clients/{}": "client",
     "DELETE /api/v1/clients/{}": "client", "GET /api/v1/workload": "client", "GET /api/workload": "client",
     "PUT /api/workload/capacity/{}": "client",
@@ -190,6 +192,14 @@ ROUTES = {
     "GET /api/office/packs": "office", "GET /api/office/packs/{}": "office", "POST /api/office/packs/validate": "office",
     "GET /api/office/{}": "office", "POST /api/office/{}": "office", "GET /api/office/{}/{}": "office", "PATCH /api/office/{}/{}": "office",
     "DELETE /api/office/{}/{}": "office", "GET /api/office/export": "office", "POST /api/office/import": "office",
+    "POST /api/office/move": "office",  # 2.47.3 (#1360): the personal office becomes an organisation (p2473_a_api_test.py)
+    # 2.47.3 (#1022, #1652): travel expenses and the cash flow, admins of the office area only (p2473_b_api_test.py: other org 404, member 403)
+    "GET /api/office/trips": "office", "POST /api/office/trips": "office", "PATCH /api/office/trips/{}": "office", "DELETE /api/office/trips/{}": "office",
+    "POST /api/office/trips/{}/items": "office", "PATCH /api/office/trips/{}/items/{}": "office", "DELETE /api/office/trips/{}/items/{}": "office",
+    "GET /api/office/trips/report": "office", "GET /api/office/trips/bill-docs": "office", "POST /api/office/trips/bill": "office",
+    "POST /api/office/trips/unbill": "office", "GET /api/office/cashflow": "office", "GET /api/office/fixed-costs": "office",
+    "POST /api/office/fixed-costs": "office", "PATCH /api/office/fixed-costs/{}": "office", "DELETE /api/office/fixed-costs/{}": "office",
+    "GET /api/office/datev/extf": "office",  # 2.47.3 (#1460): DATEV booking batch, admin only (p2473_e_api_test.py)
     # ---- office (C, 2.36.1 #1021): quotations of an organisation (10)
     "GET /api/office/docs": "office", "POST /api/office/docs": "office", "GET /api/office/docs/{}": "office",
     "PATCH /api/office/docs/{}": "office", "DELETE /api/office/docs/{}": "office", "PUT /api/office/docs/{}/items": "office",

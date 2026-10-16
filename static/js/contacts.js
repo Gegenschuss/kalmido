@@ -95,7 +95,7 @@ function ctCardHtml(c) {
     return `<div class="ctf">${ic('mappin', 's')}<span class="ctfl muted">${esc(ctTypeWord('addresses', a))}</span><span>${esc(t)}</span></div>`; }).join('');
   const kinds = Object.fromEntries(CT_LINK);
   return `<article class="ctcard" aria-labelledby="ct-h">
-    <div class="cthead">${isMobile() ? `<button class="iconbtn" data-ct="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ctAv(c, 'avatar ctav big')}<div class="cthn"><h3 id="ct-h">${esc(c.fn || c.org || '?')}</h3>${[c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).length ? `<div class="muted">${esc([c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).join(' · '))}</div>` : ''}</div>
+    <div class="cthead">${isMobile() ? `<button class="iconbtn" data-ct="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ctAv(c, 'avatar ctav big')}<div class="cthn"><h3 id="ct-h">${esc(c.fn || c.org || '?')}</h3>${feat('clients') ? `<div class="mstags">${ms_tag('contact')}</div>` : ''}${[c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).length ? `<div class="muted">${esc([c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).join(' · '))}</div>` : ''}</div>
       <span class="ctacts">${w ? `<button class="btn sm" data-ct="edit">${ic('edit', 's')} ${tr('Edit')}</button>` : `<span class="rotag">${ic('eye', 's')}${tr('View only')}</span>`}<button class="iconbtn" data-ct="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
     <div class="ctfields">
       ${it('phones', 'phone', x => `<a href="tel:${esc(x.value.replace(/[^\d+]/g, ''))}">${esc(x.value)}</a>`)}
@@ -127,8 +127,8 @@ document.addEventListener('click', async e => {
   const bb = e.target.closest('#ct-sbar [data-ctb]');
   if (bb) { bk_barAct(bb.dataset.ctb, bb); return; }
   const o = e.target.closest('[data-ctopen]');
-  if (o && CT.pick) { e.preventDefault(); if (Date.now() - bk_lpDone > 600) bk_toggle(+o.dataset.ctopen); return; }  // 2.46.1 (#1554): the selection mode
-  if (o && Date.now() - bk_lpDone < 600) { e.preventDefault(); return; }  // the click that ends a long press
+  if (o && (CT.pick || (ms_modClick(e) && !isMobile() && bk_canPick()))) { e.preventDefault(); if (!ms_lpRecent(bk_lpS)) bk_click(+o.dataset.ctopen, e.shiftKey); return; }  // 2.46.1 (#1554): the selection mode; 2.47.3 (#1733): Shift- / Cmd-click
+  if (o && ms_lpRecent(bk_lpS)) { e.preventDefault(); return; }  // the click that ends a long press
   if (o) { e.preventDefault(); if (isMobile()) go('contacts/' + o.dataset.ctopen); else ctOpen(+o.dataset.ctopen); return; }
   const tk = e.target.closest('[data-cttask]');
   if (tk) { e.preventDefault(); const id = +tk.dataset.cttask; if (taskById(id)) openDetail(id); else go('t/' + id); return; }
@@ -160,7 +160,7 @@ document.addEventListener('click', async e => {
 // shows the count, "All" (every contact matching the search, group and address book, also beyond the shown 500), Move
 // (an address book one may change) and Delete (one question with the count). One request each (POST /api/contacts/bulk);
 // contacts in read-only address books cannot be ticked. Contacts have no undo (the single delete has none either).
-let bk_lpDone = 0, bk_lp = null;
+// 2.47.3 (#1733): the bar, the long press and Shift- / Cmd-click come from multisel.js (shared with the clients)
 const bk_can = c => ctWrite(ctBook(c.book_id));
 const bk_rowCls = c => !CT.pick ? '' : CT.pick.has(c.id) ? 'picked' : bk_can(c) ? '' : 'ctro';
 const bk_chk = c => `<span class="ctchk ${CT.pick.has(c.id) ? 'on' : ''}" aria-hidden="true">${CT.pick.has(c.id) ? ic('check', 's') : ''}</span>`;
@@ -168,15 +168,21 @@ function bk_toggle(id) {
   const c = (CT.items || []).find(x => x.id === id); if (!c || !CT.pick) return;
   if (!bk_can(c)) { toast(tr('You can only read this address book')); return; }
   if (CT.pick.has(id)) CT.pick.delete(id); else CT.pick.add(id);
+  CT.last = id;
   ctDraw();
+}
+const bk_canPick = () => (S.books || []).some(b => ctWrite(b) && wsObjIn(b));
+function bk_click(id, shift) {  // 2.47.3 (#1733): Shift-click ticks the rows between the last ticked one and this one
+  if (!CT.pick) { CT.pick = new Set(); CT.last = null; }
+  if (!shift || CT.last == null) { bk_toggle(id); return; }
+  const shown = bk_shown(CT.items || []);
+  for (const x of ms_range(shown.map(c => c.id), CT.last, id)) CT.pick.add(x);
+  CT.last = id; ctDraw();
 }
 function bk_start(id) { CT.pick = new Set(); bk_toggle(id); if (!CT.pick.size) ctDraw(); }
 function bk_end() { CT.pick = null; ctDraw(); }
 function bk_barHtml() {
-  const n = CT.pick.size, btn = (k, i, lab, cls = '') => `<button type="button" class="mbb ${cls}" data-ctb="${k}" title="${esc(lab)}" aria-label="${esc(lab)}" ${n || k === 'all' ? '' : 'disabled'}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
-  return `<div id="ct-sbar" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="mcount" role="status">${n ? tr('{0} selected', n) : tr('Tap contacts')}</span>
-    ${btn('all', 'all', bk_allOn() ? tr('Select none') : tr('All'))}${btn('move', 'folder', tr('Move'))}${btn('del', 'trash', tr('Delete'), 'danger')}
-    <button type="button" class="iconbtn mbx" data-ctb="close" title="${esc(tr('Clear selection') + ' (Esc)')}" aria-label="${esc(tr('Clear selection'))}">${ic('x')}</button></div>`;
+  return ms_barHtml('ct-sbar', 'ctb', CT.pick.size, tr('Tap contacts'), [['all', 'all', bk_allOn() ? tr('Select none') : tr('All')], ['edit', 'edit', tr('Edit')], ['move', 'folder', tr('Move')], ['del', 'trash', tr('Delete'), 'danger']]);
 }
 // every contact of the current search / group / address book (the list shows 500, an import has more): fetched as pages
 async function bk_matching() {
@@ -209,7 +215,8 @@ async function bk_barAct(k, el) {
     toast(trn('{0} contact deleted', '{0} contacts deleted', ids.length));
     if (CT.pick && CT.sel && ids.includes(CT.sel)) { CT.sel = null; CT.card = null; }
     bk_end(); await load().catch(() => {}); ctLoad();
-  } else if (k === 'move') {
+  } else if (k === 'edit') bk_edit(ids);
+  else if (k === 'move') {
     const books = (S.books || []).filter(b => ctWrite(b) && wsObjIn(b) && !b.imported);
     if (!books.length) { toast(tr('No address book you may change')); return; }
     menu(el, books.map(b => ({label: b.name, icon: 'folder', fn: () => bk_move(ids, b)})), null, null, tr('Move'));
@@ -218,6 +225,44 @@ async function bk_barAct(k, el) {
 async function bk_send(body, ids) {  // one request per 5000 (the server's limit; an address book holds up to 20000)
   const out = {moved: 0, conflicts: []};
   for (let i = 0; i < ids.length; i += 5000) { const j = await api('POST', '/api/contacts/bulk', {...body, ids: ids.slice(i, i + 5000)}); out.moved += j.moved || 0; out.conflicts.push(...(j.conflicts || [])); }
+  return out;
+}
+// 2.47.3 (#1731): properties of the selected contacts at once (groups added / removed, company, department, kind, a note
+// appended); POST /api/contacts/bulk action set answers with the old values, the undo (toast, Ctrl+Z) sends them back
+// (action restore) as ONE step. Contacts of imported address books stay as they are (counted)
+const bk_csv = v => v.split(',').map(x => x.trim()).filter(Boolean);
+function bk_edit(ids) {
+  const dl = `<datalist id="ms-ct-groups">${CT.groups.map(g => `<option value="${esc(g)}">`).join('')}</datalist>`;
+  const inp = (k, ph = '', more = '') => `<input id="ms-f-${k}" data-msf="${k}" maxlength="300" placeholder="${esc(ph)}" autocomplete="off" ${more}>`;
+  ms_sheet(trn('Edit {0} contact', 'Edit {0} contacts', ids.length), tr('Only what you fill in or tick changes; everything else stays as it is.'), [
+    {k: 'groups_add', label: tr('Add to groups'), input: inp('groups_add', tr('Group, another group'), 'list="ms-ct-groups"') + dl, fill: true},
+    {k: 'groups_remove', label: tr('Remove from groups'), input: inp('groups_remove', tr('Group, another group'), 'list="ms-ct-groups"'), fill: true},
+    {k: 'org', label: tr('Company'), input: inp('org', tr('empty = remove'))},
+    {k: 'dept', label: tr('Department'), input: inp('dept', tr('empty = remove'))},
+    {k: 'kind', label: tr('Kind'), input: `<select id="ms-f-kind" data-msf="kind"><option value="individual">${tr('Person')}</option><option value="org">${tr('Company')}</option></select>`},
+    {k: 'note_append', label: tr('Append to the note'), input: `<textarea id="ms-f-note_append" data-msf="note_append" rows="3" maxlength="4000"></textarea>`, fill: true}],
+  async v => {
+    const body = {action: 'set'};
+    if (v.groups_add) body.groups_add = bk_csv(v.groups_add);
+    if (v.groups_remove) body.groups_remove = bk_csv(v.groups_remove);
+    for (const k of ['org', 'dept', 'kind', 'note_append']) if (k in v) body[k] = v[k];
+    let undo = await bk_set(body, ids);
+    const n = undo.changed;
+    bk_end(); await load().catch(() => {}); ctLoad(); if (CT.sel) ctOpen(CT.sel);
+    const msg = [trn('{0} contact changed', '{0} contacts changed', n), undo.skipped ? trn('{0} in an imported address book stayed', '{0} in imported address books stayed', undo.skipped) : ''].filter(Boolean).join(' · ');
+    const back = async () => { await bk_set({action: 'restore'}, null, undo.undo); ctLoad(); if (CT.sel) ctOpen(CT.sel); };
+    const again = async () => { undo = await bk_set(body, ids); ctLoad(); if (CT.sel) ctOpen(CT.sel); };
+    if (n) ms_hist(msg, tr('Contacts changed'), back, again); else toast(msg);
+    return true;
+  });
+}
+async function bk_set(body, ids, items) {  // 5000 per request; restore sends the old values (items) instead of ids
+  const out = {changed: 0, skipped: 0, undo: []}, all = items || ids;
+  for (let i = 0; i < all.length; i += 5000) {
+    const part = all.slice(i, i + 5000);
+    const j = await rawFetch('POST', '/api/contacts/bulk', items ? {...body, items: part} : {...body, ids: part});
+    out.changed += j.changed || 0; out.skipped += j.skipped || 0; out.undo.push(...(j.undo || []));
+  }
   return out;
 }
 async function bk_move(ids, b) {
@@ -230,14 +275,7 @@ document.addEventListener('keydown', e => {  // capture: before the global Esc (
   if (e.key === 'Escape' && CT.pick && S.route.mod === 'contacts' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); bk_end(); }
 }, true);
 // the phone: a long press on a row starts the selection with it (the click after it does nothing)
-document.addEventListener('pointerdown', e => {
-  const r = e.pointerType === 'touch' && !CT.pick && e.target.closest?.('#view .ctrow[data-ctopen]'); if (!r) return;
-  clearTimeout(bk_lp?.t);
-  bk_lp = {x: e.clientX, y: e.clientY, t: setTimeout(() => { bk_lp = null; bk_lpDone = Date.now(); navigator.vibrate?.(10); bk_start(+r.dataset.ctopen); }, 500)};
-});
-document.addEventListener('pointermove', e => { if (bk_lp && Math.hypot(e.clientX - bk_lp.x, e.clientY - bk_lp.y) > 10) { clearTimeout(bk_lp.t); bk_lp = null; } });
-for (const ev of ['pointerup', 'pointercancel']) document.addEventListener(ev, () => { if (bk_lp) { clearTimeout(bk_lp.t); bk_lp = null; } });
-document.addEventListener('contextmenu', e => { if (e.target.closest?.('#view .ctrow[data-ctopen]') && (bk_lp || Date.now() - bk_lpDone < 600)) e.preventDefault(); });
+const bk_lpS = ms_longPress('#view .ctrow[data-ctopen]', () => !!CT.pick, r => bk_start(+r.dataset.ctopen));
 
 // ---- the editor
 async function ctEditor(c) {

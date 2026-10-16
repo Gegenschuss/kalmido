@@ -65,6 +65,8 @@ starts the agent at every login (launchd / Task Scheduler / systemd --user). Det
 [AGENTS.md, Set up on a computer with one command](AGENTS.md#set-up-on-a-computer-with-one-command-2440). The paths
 below are for a hardened server setup (own user, firewall) and for doing it by hand.
 
+2.47.3 (#1729): *Remove computer* and *Delete agent* show an uninstall command for each computer (run it there first, then delete; it also works after the agent was deleted).
+
 2.46.6 (#1713): the command carries the language of your account (`--lang de` / `-Lang de`); the script's messages are then German, in every other language English.
 
 ## Path A: let Claude Code set it up

@@ -781,3 +781,97 @@ async function folderPropsModal(f, opt = {}) {
   });
   return md;
 }
+// 2.47.3 (#1727): several lists marked at once. Shift-click marks a range (from the last clicked or the open list),
+// Cmd/Ctrl-click adds or removes one list (like the Finder); the marked lists are the route "lists:<id>,<id>…" (one view
+// of their tasks grouped by list, like a folder, with "Archive" and "Clear selection" in the header). Esc and a plain
+// click clear the marks. Touch: the long-press menu's "Select" starts it; in that view a tap on a list adds / removes it.
+// Dragging to reorder is untouched (a modifier click is no drag, a drag never reaches the click).
+const DX = {anchor: null};
+const dx_listIds = (k = S.route?.key || '') => k.startsWith('lists:') ? [...new Set(k.slice(6).split(',').map(Number).filter(id => id > 0 && listById(id) && !listById(id).archived))] : [];
+// the key of the marked view from the address (the route follows a moment later; fast clicks see the newest marks)
+const dx_key = () => (location.hash || '').startsWith('#lists/') ? 'lists:' + location.hash.slice(7) : S.route?.key || '';
+const dx_marked = id => S.route?.mod === 'tasks' && dx_listIds().includes(id);
+const dx_sideIds = () => $$('#side .srow[data-list]').map(r => +r.dataset.list).filter(id => listById(id) && !listById(id).archived);
+function dx_show(ids) {
+  ids = ids.filter(id => listById(id));
+  if (!ids.length) return go(keyToHash(START_KEY));
+  if (ids.length === 1 && !isTouch()) { DX.anchor = ids[0]; return go('l/' + ids[0]); }
+  go('lists/' + ids.join(','));
+}
+const dx_start = id => go('lists/' + id);  // the long-press menu's "Select": the marked view with this one list
+function dx_clear() {
+  const ids = dx_listIds(dx_key()); DX.anchor = null;
+  if (ids.length) go('l/' + ids[0]);
+}
+// what the click on list id with the modifier does: 'add' (Cmd / Ctrl) or 'range' (Shift)
+function dx_pick(id, how) {
+  const k = dx_key(), cur = dx_listIds(k), open = k.startsWith('l:') ? +k.slice(2) : null;
+  const base = cur.length ? cur : open && listById(open) && !listById(open).is_inbox && !listById(open).archived ? [open] : [];
+  if (how === 'range') {
+    const order = dx_sideIds(), from = order.indexOf(DX.anchor ?? base[base.length - 1] ?? id), to = order.indexOf(id);
+    if (from < 0 || to < 0) return dx_show([...new Set([...base, id])]);
+    const rng = order.slice(Math.min(from, to), Math.max(from, to) + 1);
+    return dx_show([...new Set([...base, ...rng])]);
+  }
+  DX.anchor = id;
+  dx_show(base.includes(id) ? base.filter(x => x !== id) : [...base, id]);
+}
+document.addEventListener('click', e => {
+  const r = e.target.closest?.('#side .srow[data-list]');
+  if (!r || S.listReorder || e.target.closest('.iconbtn, [data-lsort], [data-lfolder]')) return;
+  const id = +r.dataset.list, l = listById(id);
+  if (!l || l.archived) return;
+  const how = e.shiftKey ? 'range' : (e.metaKey || e.ctrlKey) ? 'add' : isTouch() && dx_key().startsWith('lists:') ? 'add' : '';
+  if (!how) { DX.anchor = id; return; }  // a plain click opens the list (and leaves the marked view)
+  if (l.is_inbox) return;
+  e.preventDefault(); e.stopPropagation();
+  dx_pick(id, how);
+}, true);
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !(S.route?.key || '').startsWith('lists:') || $('.modal') || $('.tsheet') || !$('#pop')?.classList.contains('hidden') || S.sel || S.multi?.size) return;
+  if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  dx_clear();
+}, true);
+// the header of the marked view: archive them, clear the selection
+function dx_listsActs(k) {
+  const ids = dx_listIds(k);
+  return `<span class="dxbar tf"><button class="btn sm" data-act="dx-archive" data-ico="archive" aria-label="${esc(tr('Archive'))}" ${ids.length ? '' : 'disabled'}>${ic('archive', 's')}<span>${tr('Archive')}</span></button>`
+    + `<button class="btn sm ghost" data-act="dx-clear" data-ico="x" aria-label="${esc(tr('Clear selection'))}">${ic('x', 's')}<span>${tr('Clear selection')}</span></button></span>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-act="dx-archive"], [data-act="dx-clear"]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  if (b.dataset.act === 'dx-clear') dx_clear(); else dx_archive(dx_listIds());
+}, true);
+// archive several lists: one question with the number, then one step back ("Undo") for all of them; lists without the
+// right (not owner / list admin) are skipped and named; each list goes through PATCH /api/lists/<id> like a single one
+async function dx_archive(ids) {
+  const ls = ids.map(listById).filter(l => l && !l.archived && !l.is_inbox);
+  if (!ls.length) return;
+  const ok = ls.filter(canManage), no = ls.filter(l => !canManage(l));
+  const nm = xs => xs.slice(0, 5).map(l => qn(lname(l))).join(', ') + (xs.length > 5 ? ' …' : '');
+  if (!ok.length) { toast(tr('No right to archive: {0}', nm(no))); return; }
+  const go2 = await askConfirm(trn('Archive {0} list?', 'Archive {0} lists?', ok.length), '', {ok: tr('Archive'),
+    html: `<p>${esc(nm(ok))}</p>${no.length ? `<p class="muted">${esc(tr('Skipped (no right): {0}', nm(no)))}</p>` : ''}<p class="muted">${esc(tr('Archived lists are under “Archived” in the sidebar.'))}</p>`});
+  if (!go2) return;
+  const done = [], failed = [...no];
+  for (const l of ok) {
+    try { await api('PATCH', '/api/lists/' + l.id, {archived: 1}); done.push(l.id); } catch (x) { if (x instanceof Offline) break; failed.push(l); }
+  }
+  DX.anchor = null;
+  if ((S.route?.key || '').startsWith('lists:')) go(keyToHash(START_KEY));
+  await load().catch(() => {}); render();
+  if (!done.length) { toast(tr('No right to archive: {0}', nm(failed))); return; }
+  const set = (to, from) => async () => {
+    const skipped = [];
+    for (const id of done) {
+      try { const r = await api('PATCH', '/api/lists/' + id, {archived: to, _prev: {archived: from}}); if ((r.conflicts || []).length) skipped.push(qn(lname(listById(id)) || '')); }
+      catch (x) { if (x instanceof Offline) throw x; skipped.push(qn(lname(listById(id)) || '')); }
+    }
+    return {skipped};
+  };
+  const e = histAdd({label: trn('Archived {0} list', 'Archived {0} lists', done.length), undo: set(0, 1), redo: set(1, 0)});
+  offerUndo(trn('{0} list archived. Find it under “Archived” in the sidebar.', '{0} lists archived. Find them under “Archived” in the sidebar.', done.length)
+    + (failed.length ? ' ' + tr('Skipped (no right): {0}', nm(failed)) : ''), e);
+}

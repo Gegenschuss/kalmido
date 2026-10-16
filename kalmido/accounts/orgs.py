@@ -79,7 +79,7 @@ def instance_mode(c=None):
 
 def main_org(c):
     with system_ctx(c):  # 2.37.0 (#1150): instance structure (the first organisation's id)
-        r = c.execute("SELECT id FROM orgs ORDER BY id LIMIT 1").fetchone()
+        r = c.execute("SELECT id FROM orgs WHERE personal_of IS NULL ORDER BY id LIMIT 1").fetchone()
     return r[0] if r else None
 
 
@@ -88,7 +88,7 @@ def has_workspaces(c):
     if instance_mode(c) == "shared":
         return False
     with system_ctx(c):  # 2.37.0 (#1150): instance structure
-        return bool(c.execute("SELECT 1 FROM orgs LIMIT 1").fetchone())
+        return bool(c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL LIMIT 1").fetchone())
 
 
 def instance_sync(c):
@@ -104,7 +104,7 @@ def instance_sync(c):
     if INSTANCE_ENV not in ("", "organisation"):
         return
     with system_ctx(c):  # instance structure
-        oids = [r[0] for r in c.execute("SELECT id FROM orgs ORDER BY id LIMIT 2")]
+        oids = [r[0] for r in c.execute("SELECT id FROM orgs WHERE personal_of IS NULL ORDER BY id LIMIT 2")]
         if len(oids) != 1:
             return
         n = c.execute("INSERT INTO org_members(org_id,user_id) SELECT ?, id FROM users ON CONFLICT DO NOTHING", (oids[0],)).rowcount
@@ -120,7 +120,7 @@ def om_setup_org(c, uid, name):
     if not nm or instance_mode(c) == "shared":
         return None
     with system_ctx(c):  # instance structure: is there an organisation at all
-        if c.execute("SELECT 1 FROM orgs LIMIT 1").fetchone():
+        if c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL LIMIT 1").fetchone():
             return None
         oid = insert_id(c, "INSERT INTO orgs(name,icon,created_at) VALUES(?,?,?)", (nm, "", iso(now_utc())))
         org_member_add(c, oid, uid, "admin")
@@ -196,7 +196,7 @@ def _visible_people(c, uid):
         if orgs:
             q = ",".join("?" * len(orgs))
             ids = {r[0] for r in c.execute(f"SELECT user_id FROM org_members WHERE org_id IN ({q})", orgs)}
-        elif not c.execute("SELECT 1 FROM orgs LIMIT 1").fetchone():
+        elif not c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL LIMIT 1").fetchone():
             return None  # 2.46.0 (#1592): an instance without any organisation (a household): everyone, as before
         return ids | _connections(c, uid) | {uid}
     if u[0]:
@@ -511,7 +511,7 @@ def orgs_get():
     c = db()
     with system_ctx(c):  # 2.37.0 (#1150): instance admin: organisation structure (names, members, counts) of every organisation, no content
         m = instance_mode(c)
-        rows = [] if m == "shared" else c.execute("SELECT * FROM orgs ORDER BY lower(name), id").fetchall()
+        rows = [] if m == "shared" else c.execute("SELECT * FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id").fetchall()  # 2.47.3 (#1360): never the personal offices
         from ..accounts.tenancy import boundary_summary
         return jsonify(orgs=[org_public(c, r) for r in rows], visibility=vis_mode(c), mode=m, editable=m == "workspaces",
                        creatable=m == "workspaces", name_env=bool(ORG_NAME_ENV),
@@ -550,7 +550,7 @@ def org_create():
         if instance_mode(c) != "workspaces":
             _no_change()
         name = _clean_name(b.get("name"))
-        if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?)", (name,)).fetchone():
+        if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL", (name,)).fetchone():
             return err(tr("An organisation with this name exists"), 409)
         oid = insert_id(c, "INSERT INTO orgs(name,icon,domains,created_at) VALUES(?,?,?,?)",
                         (name, _clean_icon(b.get("icon")), _clean_domains(b.get("domains") or ""), iso(now_utc())))
@@ -574,7 +574,7 @@ def org_update(oid):
     with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
         if instance_mode(c) != "workspaces":
             _no_change()
-        if not c.execute("SELECT 1 FROM orgs WHERE id=?", (oid,)).fetchone():
+        if not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (oid,)).fetchone():  # 2.47.3 (#1360)
             return err(tr("Not found"), 404)
         _org_patch(c, oid, b)
         if "members" in b:
@@ -609,7 +609,7 @@ def org_delete(oid):
     with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
         if instance_mode(c) != "workspaces":
             _no_change()
-        if not c.execute("SELECT 1 FROM orgs WHERE id=?", (oid,)).fetchone():
+        if not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (oid,)).fetchone():  # 2.47.3 (#1360)
             return err(tr("Not found"), 404)
         n = c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (oid,)).fetchone()[0]
         if n:

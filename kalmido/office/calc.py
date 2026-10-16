@@ -292,7 +292,7 @@ def office_calc(doc, items, pack=None):
         "net_incl_raw": _num(net + raw_amount) if raw_mode == "optional" and raw_base > 0 else None,
         "net_excl_raw": _num(net - raw_amount) if raw_mode == "included" and raw_base > 0 else None,
         "costs": _num(costs), "margin": _num(net - costs),
-        "vat_note": label(pack, lang, "novat_note" if novat else "vat_note"),
+        "vat_note": label(pack, lang, ("vat_note_small" if str(doc.get("vat_note") or "") == "small" else "novat_note") if novat else "vat_note"),  # 2.47.3 (#1360)
         "lines": lines,
         "labels": {k: label(pack, lang, k) for k in ("net", "net_incl_raw", "net_excl_raw", "gross", "producing", "discount")},
     }
