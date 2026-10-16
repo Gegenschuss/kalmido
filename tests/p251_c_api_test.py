@@ -296,5 +296,101 @@ r = PAGS.post(V + "/agent/proposals/shoot", json={"list_id": PE, "days": [{"date
 check(r.status_code == 201 and r.json()["proposal"]["crew"][0]["warnings"][0]["kind"] == "double", f"freelancer: shoot proposal with warning ({r.status_code} {r.text[:150]})")
 check(PAGS.get(V + "/time/check").json().get("user_id") == ERIN, "a personal agent checks its owner's time by default")
 
+# =================================================================== 2.51.0 review fixes (part C), one negative test each
+# review 1 (#1352): a blocker in a list the agent does not see shows up only as hidden -- no title, id, assignee, waits
+TX = Bo.post(B + "/api/tasks", json={"list_id": PX, "title": "Hidden blocker", "assignee_id": BOB}).json()["id"]
+dbx("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)", (T1, TX, BOB, "2026-10-01T08:00:00+00:00"), write=True)
+r = AGS.get(V + f"/lists/{P}/weekly-status")
+w = r.json()
+bl = [x for x in w.get("blocked", []) if x["id"] == T1]
+check(r.ok and bl and bl[0]["blocked_by"] == [{"id": None, "title": None, "assignee_id": None, "same_list": False, "hidden": True}]
+      and "Hidden blocker" not in r.text and not [x for x in w["waits"] if x["who"] == CAROL],
+      f"review 1: a blocker of an unshared list stays hidden ({bl} {w.get('waits')})")
+
+# review 4 (#1353): bookings in the time check only with the scope calendar; of a list the agent does not see only "Booked"
+TB, TBS = agent("timebot", ["read", "tasks:write", "time"], org=ORG)
+r = Bo.post(B + "/api/lists", json={"name": "Film Five", "kind": "project"})
+P5 = r.json()["id"]
+dbx("UPDATE lists SET org_id=? WHERE id=?", (ORG, P5), write=True)
+check(Bo.put(B + f"/api/lists/{P5}/members", json={"user_id": TB, "role": "edit"}).ok, "setup: P5 for the time agent")
+DX = today - timedelta(days=20)
+for title, lid in (("Secret shoot", PX), ("Visible shoot", P)):
+    r = Bo.post(B + "/api/team/dispo/bookings", json={"title": title, "start": str(DX), "end": str(DX), "status": "firm", "org": ORG,
+                                                      "resources": [{"kind": "user", "id": BOB}]})
+    check(r.status_code == 201, f"setup: booking {title} ({r.status_code} {r.text[:120]})")
+    dbx("UPDATE hub_bookings SET list_id=? WHERE title=?", (lid, title), write=True)
+r = TBS.get(V + "/time/check", params={"user_id": BOB, "from": str(DX), "to": str(DX)})
+check(r.ok and not [x for x in r.json()["issues"] if x["kind"] == "booking_no_time"] and "Secret shoot" not in r.text,
+      f"review 4: without the scope calendar no bookings ({r.status_code} {r.text[:200]})")
+r = AGS.get(V + "/time/check", params={"user_id": BOB, "from": str(DX), "to": str(DX)})
+bk = {x["title"]: x for x in r.json().get("issues", []) if x["kind"] == "booking_no_time"}
+check(r.ok and "Secret shoot" not in r.text and bk.get("Booked", {}).get("hidden") is True and bk["Booked"]["list_id"] is None
+      and bk.get("Visible shoot", {}).get("list_id") == P, f"review 4: a booking of an unseen list only as Booked ({bk})")
+
+# review 13 (#1353): an agent that is a participant does not see the list-wide entries of that list
+r = Bo.post(B + "/api/lists", json={"name": "Film Four", "kind": "project"})
+P4 = r.json()["id"]
+dbx("UPDATE lists SET org_id=? WHERE id=?", (ORG, P4), write=True)
+Bo.patch(B + f"/api/lists/{P4}", json={"time_tracking": True})
+check(Bo.put(B + f"/api/lists/{P4}/members", json={"user_id": AG, "role": "participant"}).ok, "setup: the agent is a participant of P4")
+DY = today - timedelta(days=25)
+r = Bo.post(B + "/api/time/entries", json={"list_id": P4, "start": f"{DY}T06:00", "end": f"{DY}T18:00"})
+check(r.ok, f"setup: a list-wide entry of 12 h in P4 ({r.status_code} {r.text[:120]})")
+r = AGS.get(V + "/time/check", params={"user_id": BOB, "from": str(DY), "to": str(DY)})
+check(r.ok and not r.json()["issues"], f"review 13: the participant agent does not see the list-wide entry ({r.text[:200]})")
+
+# review 5 (#1355): a list limit hides other lists' bookings; agents need the module disposition too
+LB, LBS = agent("limitbot", ["read", "tasks:write", "calendar"], org=ORG)
+dbx("UPDATE api_tokens SET list_ids=? WHERE user_id=?", (str(P), LB), write=True)
+r = LBS.get(V + "/dispo", params={"start": str(DAY), "days": 2})
+bks = r.json().get("bookings", [])
+hid = [b for b in bks if b.get("hidden")]
+check(r.ok and "Other film" not in r.text and hid and all(b["title"] == "Booked" and b["list_id"] is None and not b["job"] for b in hid)
+      and [b for b in bks if b["list_id"] == P and b["title"].startswith("Shoot day")], f"review 5: list limit, other bookings only as Booked ({bks[:3]})")
+r = AGS.get(V + "/dispo", params={"start": str(DAY), "days": 2})
+check(r.ok and "Other film" in r.text, "review 5: without a list limit the agent still sees the titles")
+Bo.patch(B + "/api/settings", json={"features": FEAT.replace(",dispo", "")})
+check(AGS.get(V + "/dispo").status_code == 409 and AGS.get(V + "/dispo/free", params={"date": str(DAY)}).status_code == 409,
+      "review 5: the module disposition off at the organisation's admin: 409 for its agent")
+Bo.patch(B + "/api/settings", json={"features": FEAT})
+check(AGS.get(V + "/dispo").ok, "review 5: module on again: ok")
+
+# review 8 (#1352): the legacy scope write does not open the pin board
+r = A.post(B + "/api/admin/agents", json={"username": "legacybot", "display_name": "Legacybot", "scopes": ["write"]})
+check(r.status_code == 201 and "pinboard" not in r.json()["effective_scopes"] and "office" not in r.json()["effective_scopes"],
+      f"review 8: write does not include pinboard ({r.json().get('effective_scopes')})")
+
+# review 11 (#1353 #1355): replacing a time / shoot proposal needs the scope of creating it
+old = dbx("SELECT scopes FROM api_tokens WHERE user_id=?", (AG,))[0][0]
+dbx("UPDATE api_tokens SET scopes=? WHERE user_id=?", (",".join(x for x in old.split(",") if x not in ("time", "calendar")), AG), write=True)
+check(AGS.post(V + f"/agent/jobs/{JT}/proposal", json={"items": [ITEM]}).status_code == 403
+      and AGS.post(V + f"/agent/jobs/{JS}/proposal", json=SHOOT).status_code == 403, "review 11: replacing without the scope: 403")
+dbx("UPDATE api_tokens SET scopes=? WHERE user_id=?", (old, AG), write=True)
+check(AGS.post(V + f"/agent/jobs/{JT}/proposal", json={"items": [ITEM]}).status_code == 409, "review 11: with the scope: the applied one 409")
+
+# review 12 (#1352): at most 3 notepads per agent and list; they do not fill the people's 20
+n_ag = len(dbx("SELECT 1 FROM list_notepads WHERE list_id=? AND agent_id=?", (P, AG)))
+codes = [AGS.post(V + f"/lists/{P}/notepads", json={"title": f"A{i}"}).status_code for i in range(4 - n_ag)]
+check(codes[:-1] == [201] * (3 - n_ag) and codes[-1] == 409, f"review 12: the 4th notepad of an agent: 409 ({codes})")
+n_hum = len(dbx("SELECT 1 FROM list_notepads WHERE list_id=? AND agent_id IS NULL", (P,)))
+for i in range(19 - n_hum):
+    dbx("INSERT INTO list_notepads(list_id,title,body,created_by,created_at,updated_by,updated_at) VALUES(?,?,?,?,?,?,?)",
+        (P, f"H{i}", "", BOB, "2026-10-01T08:00:00+00:00", BOB, "2026-10-01T08:00:00+00:00"), write=True)
+check(Bo.post(B + f"/api/lists/{P}/notepads", json={"title": "H20"}).ok, "review 12: the 20th notepad of people despite the agent's 3")
+check(Bo.post(B + f"/api/lists/{P}/notepads", json={"title": "H21"}).status_code == 409, "review 12: the 21st: 409")
+r = AGS.put(V + f"/lists/{P}/status-pad", json={"body": "again"})
+check(r.ok and len(dbx("SELECT 1 FROM list_notepads WHERE list_id=? AND agent_id=? AND agent_key='status'", (P, AG))) == 1,
+      "review 12: still one status block")
+
+# review 14 (#1355): shoot days only from a year ago to three years ahead; undo leaves changed tasks
+for bad in ("0001-01-01", str(today + timedelta(days=4 * 366)), str(today - timedelta(days=400))):
+    r = AGS.post(V + "/agent/proposals/shoot", json={"list_id": P, "days": [{"date": bad, "title": "x"}], "crew": []})
+    check(r.status_code == 400, f"review 14: shoot day {bad}: 400 ({r.status_code})")
+t1, t2 = [x[0] for x in dbx("SELECT task_id FROM events WHERE created_by=? AND deleted_at IS NULL AND title LIKE 'Shoot day%' ORDER BY id", (BOB,))]
+check(Bo.patch(B + f"/api/tasks/{t1}", json={"title": "Shoot day 1 moved"}).ok, "setup: bob changes the task of day 1")
+r = Bo.post(B + f"/api/proposals/{JS}/undo")
+dl = {x[0]: x[1] for x in dbx("SELECT id, deleted_at FROM tasks WHERE id IN (?, ?)", (t1, t2))}
+check(r.ok and dl[t1] is None and dl[t2] is not None, f"review 14: undo keeps the changed task, trashes the unchanged one ({dl} {r.text[:150]})")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

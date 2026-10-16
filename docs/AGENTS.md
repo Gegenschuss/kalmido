@@ -1580,7 +1580,7 @@ the privacy switch is on.
 
 The agent proposes, a person confirms: these routes only read, write the agent's OWN notepads or create proposals and
 drafts. New rights are off for new agents: an admin (or, without an organisation, the person itself) turns on the scopes
-`pinboard`, `time` and `calendar` per agent. Health lists never; the token's list limit and the agent's organisation apply.
+`pinboard`, `time` and `calendar` per agent (`pinboard` is not part of the legacy scope `write`). Health lists never; the token's list limit and the agent's organisation apply.
 
 | What | Endpoint | MCP | Scope |
 |---|---|---|---|
@@ -1597,9 +1597,13 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
 
 - **Weekly status.** A planned job (template *Status on the pin board*, event `scheduled_job` with the list) reads
   `get_weekly_status` and writes the block with `write_status_pad`. People see it on the project page marked "From <agent>,
-  updated ..." and may edit or delete it as usual; the next run overwrites only the agent's own block.
+  updated ..." and may edit or delete it as usual; the next run overwrites only the agent's own block. An agent keeps at
+  most 3 notepads per project (its status block included); they do not count against the 20 of people. A blocker in a list
+  the agent does not see appears only as `hidden: true` (no title, id or assignee, not in `waits` / `people`).
 - **Time check.** `user_id` = a person who may chat with the agent (a personal agent: its owner by default). Only entries and
-  tasks of lists both see, events only of calendars shared with the agent, bookings only of the agent's workspace. Limits:
+  tasks of lists both see, events only of calendars shared with the agent, bookings only of the agent's workspace. Events
+  and bookings only with the scope `calendar`; a booking of a list the agent does not see appears as "Booked"
+  (`hidden: true`, no list). Limits:
   more than 12 h a day, an entry over 10 h, overlaps, weekend entries without an event or booking.
 - **Time proposals** (`items`: `date`, `start`, `end` as local HH:MM, `task_id` or `list_id`, `note`, `event_id`): a ready
   proposal for the person (News + push per their settings); they change times and note and apply it, one undo step. Entries
@@ -1609,9 +1613,14 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
   `day` = index into days). The server stores warnings per row (`double`: already booked, `away`, `other_projects`).
   Applying creates per selected day a task in the project (due = the day) with a draft event (status `tentative`, shown
   dashed with *Confirm* / *Discard* in the calendar; CalDAV keeps TENTATIVE) and per crew row a booking with status `option`.
-  Undo removes drafts that are still drafts, the tasks and the options.
+  Shoot days lie between one year ago and three years ahead. Undo removes drafts that are still drafts, the tasks nobody
+  changed since and the options. Replacing a proposal (`POST /api/v1/agent/jobs/{id}/proposal`) needs the scope of
+  creating it (`time` / `calendar`).
 - The disposition: an agent of an organisation reads that organisation, a personal agent its owner's personal area
   (freelancers without an organisation get the same); absences only as away, never the reason; booking notes are left out.
+  It needs the module *Disposition* switched on at the owner (personal agent) or at an admin of the organisation (else 409).
+  An agent with a list limit sees bookings of other lists only as time + resource: title "Booked", no list, job or event
+  (`hidden: true`); the same goes for the titles in the proposal warnings.
 - Both proposals are made by the agent itself (`POST /api/proposals` with these kinds answers 400) and answered with the
   event `job` (approve / reject) like every proposal.
 
