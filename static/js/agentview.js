@@ -48,7 +48,9 @@ const av_setupBtn = a => a.contact_age == null && !a.webhook
 S.av_open = S.av_open || {};
 const av_isAgent = (l, p) => p.agent || !!agentById(p.user_id) || (p.user_id === l.owner_id && !!agentById(l.owner_id));
 const av_people = l => listPeople(l).filter(p => !av_isAgent(l, p)).length;
-const av_agentLists = a => sideOrder().filter(l => !l.archived && !l.is_inbox && listPeople(l).some(p => p.user_id === a.id));
+// 2.58.0 (#1761): within its list limit (list_ids only reaches the people who manage it; [] / missing = all its lists)
+const av_agentLists = a => sideOrder().filter(l => !l.archived && !l.is_inbox && listPeople(l).some(p => p.user_id === a.id)
+  && !(a.list_ids?.length && !a.list_ids.includes(l.id)));
 function av_whoTxt(a, l) {
   const n = av_people(l);
   if (a.owner_id) return a.owner_id === S.me?.id ? tr('only you') + (n > 1 ? ' · ' + trn('{0} other person sees what it does', '{0} other people see what it does', n - 1) : '') : tr('only its owner');

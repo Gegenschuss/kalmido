@@ -8187,5 +8187,6 @@
   "Look at how my start page is arranged (tools get_view_layout and list_layout_blocks, view dashboard, user_id = my id) and which lists I use most. Only if a clearly better arrangement exists (for example my favourites and what I use every day on top), send me ONE proposal (tool propose_layout) with a short reason. Never repeat one I declined. Change nothing yourself.": "Regarde comment ma page d’accueil est disposée (outils get_view_layout et list_layout_blocks, vue dashboard, user_id = mon id) et quelles listes j’utilise le plus. Seulement s’il existe une disposition nettement meilleure (par exemple mes favoris et ce que j’utilise chaque jour en haut), envoie-moi UNE proposition (outil propose_layout) avec une courte raison. Ne répète jamais une proposition que j’ai refusée. Ne change rien toi-même.",
   "Customize statistics": "Personnaliser les statistiques",
   "Customize the client card": "Personnaliser la fiche client",
-  "Customize Family": "Personnaliser Famille"
+  "Customize Family": "Personnaliser Famille",
+  "Applying creates the project, its tasks and the shoot days as event drafts in your calendar, as you. Nothing is sent. One step, undo takes it back.": "Appliquer crée le projet, ses tâches et les jours de tournage comme brouillons d’événements dans ton calendrier, en ton nom. Rien n’est envoyé. Une étape, annuler la reprend."
 }

@@ -893,7 +893,14 @@ def agent_public(c, a, uid=None):
             # 2.33.0 (#1045): its plan usage (the ring in the chat header; null = never reported)
             "quota": _quota(a),
             # 2.35.0 (#1103): open approval requests + permission questions to the viewer (the badge "1 approval open")
-            "approvals_open": _approvals_open(c, a["user_id"], uid)}
+            "approvals_open": _approvals_open(c, a["user_id"], uid),
+            # 2.58.0 (#1761): its list limit, only for the people who manage it (owner / admin); [] = all its lists
+            **({"list_ids": f8c_list_ids(a)} if uid and may_set_runtime(c, a, uid) else {})}
+
+
+def f8c_list_ids(a):
+    from ..agents.safety import list_ids_out
+    return list_ids_out(a["list_ids"] if "list_ids" in a.keys() else "")
 
 
 def _approvals_open(c, aid, uid):

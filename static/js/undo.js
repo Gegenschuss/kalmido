@@ -71,10 +71,10 @@ async function histGroup(fn, label) {
   }
 }
 // the toast with "Undo" for a step (a shortcut to the newest history entry)
-function histToast(msg, e) {
+function histToast(msg, e, ms = 6000) {  // 2.58.0 (#1810): ms = a longer toast for a big step
   if (!e) { toast(msg); return; }
   if (HIST.group && HIST.group.includes(e)) { HIST.gToast = msg; return; }
-  toast(msg, () => { if (HIST.undo[HIST.undo.length - 1] === e) histStep('undo'); }, 6000);
+  toast(msg, () => { if (HIST.undo[HIST.undo.length - 1] === e) histStep('undo'); }, ms);
   HIST.toastE = e;
 }
 // task field steps: [before, after, fields?] per task -> one batch request each way

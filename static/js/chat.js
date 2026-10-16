@@ -134,7 +134,7 @@ async function tcSend() {
   const text = ta.value.trim(); if (!text) return;
   const hadF = document.activeElement === ta;
   if (!S.tc.room) { try { await loadRoom(rid); } catch { /* sent without the mention lookup */ } }  // 2.24.0: @names need the members
-  let m;
+  let m; const msgs = S.tc.msgs;  // 2.58.0 (#1773): another window may become live during the POST (like chatSend)
   const rto = replyTo('t:' + rid);  // 2.33.0 (#1076)
   try {
     // 2.42.0 (#909): an encrypted DM sends only the ciphertext (encrypted in this browser)
@@ -145,8 +145,10 @@ async function tcSend() {
   }
   catch (e) { toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); return; }
   ta.value = ''; delete S.drafts['team:' + rid]; autosize(ta); replySent('t:' + rid);
-  S.tc.msgs.push(m);
+  const live = S.tc.rid === rid, k = 't:' + rid, arr = live ? S.tc.msgs : S.cw?.home?.rid === rid ? S.cw.home.msgs : typeof cw_has === 'function' && cw_has(k) ? cw_stOf(k).msgs : msgs;
+  if (arr && !arr.some(x => x.id === m.id)) arr.push(m);
   const r = (S.tc.rooms || []).find(x => x.id === rid); if (r) { r.last = {id: m.id, user_id: m.user_id, text, created_at: m.created_at}; r.last_at = m.created_at; }
+  if (!live) { if (typeof cw_has === 'function' && cw_has(k)) cw_patch(k); return; }
   tcPatch(true);
   if (hadF || !isTouch()) ta.focus({preventScroll: true});
 }

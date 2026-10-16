@@ -55,7 +55,9 @@ function chatFabDraw() {
 }
 function chatPop(aid) {
   const p = $('#achat');
-  if (p && !p.classList.contains('hidden') && (!aid || S.chat.aid === aid)) { if (p.classList.contains('float') && p.classList.contains('min')) { chatFloatMin(false); return; } chatClose(); return; }
+  if (p && !p.classList.contains('hidden') && (!aid || S.chat.aid === aid)) { if (p.classList.contains('float') && p.classList.contains('min')) { chatFloatMin(false); return; }
+    if (aid && p.classList.contains('cwsplit') && S.cw?.wins.length > 1 && typeof cw_close === 'function' && cw_has('a:' + aid)) { cw_close('a:' + aid); return; }  // 2.58.0 (#1773): only its window, not the whole split panel
+    chatClose(); return; }
   const a = aid ? agentById(aid) : chatFabAgent(); if (!a) return;
   chatOpen(a.id, {float: LS.get('chatFloat', '') !== '0'});
 }

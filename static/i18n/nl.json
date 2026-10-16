@@ -8187,5 +8187,6 @@
   "Look at how my start page is arranged (tools get_view_layout and list_layout_blocks, view dashboard, user_id = my id) and which lists I use most. Only if a clearly better arrangement exists (for example my favourites and what I use every day on top), send me ONE proposal (tool propose_layout) with a short reason. Never repeat one I declined. Change nothing yourself.": "Bekijk hoe mijn startpagina is ingedeeld (tools get_view_layout en list_layout_blocks, weergave dashboard, user_id = mijn id) en welke lijsten ik het meest gebruik. Alleen als er een duidelijk betere indeling is (bijvoorbeeld mijn favorieten en wat ik dagelijks gebruik bovenaan), stuur me ÉÉN voorstel (tool propose_layout) met een korte reden. Herhaal nooit een voorstel dat ik heb afgewezen. Verander zelf niets.",
   "Customize statistics": "Statistieken aanpassen",
   "Customize the client card": "Klantkaart aanpassen",
-  "Customize Family": "Gezin aanpassen"
+  "Customize Family": "Gezin aanpassen",
+  "Applying creates the project, its tasks and the shoot days as event drafts in your calendar, as you. Nothing is sent. One step, undo takes it back.": "Toepassen maakt het project, de taken en de draaidagen als conceptafspraken in je agenda aan, als jij. Er wordt niets verstuurd. Eén stap, ongedaan maken draait hem terug."
 }
