@@ -20,6 +20,7 @@ as before and the new parts are hidden (enabled: false, empty lists, never an er
 """
 import base64
 import hashlib
+import hmac
 import json
 import math
 import os
@@ -34,8 +35,8 @@ from operator import mul
 
 from flask import g, jsonify, request
 
-from ..core.config import app
-from ..core.db import body, connect, db, err, gset, iso_ms, now_utc
+from ..core.config import app, SECRET_KEY
+from ..core.db import body, connect, db, err, gset, gsetting, iso_ms, now_utc
 from ..core.i18n import tr
 from ..core.pg import system_ctx
 from ..core.access import Denied, need_task, tvis, vis_sql
@@ -61,8 +62,11 @@ EMB_BATCH = 32          # tasks per worker batch (the service takes at most 64 t
 EMB_IDLE = float(os.environ.get("KALMIDO_EMBED_IDLE") or 15)      # seconds between looks when nothing is waiting
 EMB_BUSY = float(os.environ.get("KALMIDO_EMBED_BUSY") or 2)       # pause between batches of a backlog (first start: throttled)
 EMB_DOWN = float(os.environ.get("KALMIDO_EMBED_DOWN") or 60)  # pause after the service failed
+EMB_CLEAN = float(os.environ.get("KALMIDO_EMBED_CLEAN") or 60)  # seconds between two cleanups (emb_cleanup) of a process
 EMB_QUERY_TIMEOUT = 1.5  # a live query (hint while adding, search) waits at most this long for the service
+EMB_RATE = (6, 10.0)     # live queries per account: at most 6 per 10 s (more: an empty answer without asking the service)
 EMB_CTX = "task_vectors.vec"
+EMB_BADKEY = 600.0       # seconds an organisation whose key cannot be opened is left out of the batches (per process)
 RT9_SETTING = "related_on"  # instance switch (Administration > Server), default on: effective only with KALMIDO_EMBED_URL
 
 _REF = re.compile(r"(?<![\w&])#(\d{1,9})\b")
@@ -70,6 +74,10 @@ _REF = re.compile(r"(?<![\w&])#(\d{1,9})\b")
 
 class EmbedDown(Exception):
     """The service is not set, not reachable or answered wrongly."""
+
+
+class EmbedBusy(EmbedDown):
+    """The service is busy (503: its one model run did not come free in time) -- a short pause, not an outage."""
 
 
 # ---- the service ----------------------------------------------------------------------------------------------------------
@@ -86,6 +94,8 @@ def emb_call(texts, kind="passage", timeout=30):
         if not isinstance(vecs, list) or len(vecs) != len(texts) or not model:
             raise ValueError("answer")
         return [[float(x) for x in v] for v in vecs], model
+    except urllib.error.HTTPError as e:
+        raise (EmbedBusy if e.code == 503 else EmbedDown)(type(e).__name__) from None
     except (OSError, ValueError, KeyError, TypeError, urllib.error.URLError) as e:
         raise EmbedDown(type(e).__name__) from None
 
@@ -143,8 +153,23 @@ def emb_text(r):
     return ((pre + ": " if pre else "") + t + ("\n" + n if n else ""))[:EMB_TEXT_MAX]
 
 
-def emb_hash(text):
-    return hashlib.sha256(text.encode()).hexdigest()[:32]
+_HKEY = {}
+
+
+def emb_hash(c, text):
+    """HMAC-SHA-256 of a task's text with a key derived from the server key (KALMIDO_SECRET_KEY; without it the instance's
+    sign-in secret) -- not a plain hash (no word-list oracle), not the organisation's key (a key change recomputes nothing)."""
+    k = _HKEY.get("k")
+    if k is None:
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+        base = SECRET_KEY
+        if not base:
+            with system_ctx(c):  # instance key material, never handed out
+                base = bytes.fromhex(gsetting(c, "auth_secret") or "")
+        k = _HKEY["k"] = HKDF(algorithm=hashes.SHA256(), length=32, salt=None,
+                              info=b"kalmido-related-text-hash-v1").derive(base or b"kalmido-related-without-server-key")
+    return hmac.new(k, text.encode(), hashlib.sha256).hexdigest()[:32]
 
 
 def _sumprod(a, b):
@@ -155,16 +180,17 @@ def _sumprod(a, b):
 
 
 # ---- the worker -----------------------------------------------------------------------------------------------------------
-_W = {"thread": None, "down": False, "model": "", "last": 0.0, "done": 0}
+_W = {"thread": None, "down": False, "model": "", "last": 0.0, "done": 0, "clean": -EMB_CLEAN}
 _WLOCK = threading.Lock()
 _WAKE = threading.Event()
+_BADORG = {}  # org id -> monotonic time until which its tasks are left out (its key could not be opened)
 
 # the tasks whose vector must be (re)computed: missing, other model, older than the task, other list / organisation, or plain
 # in an organisation whose data is encrypted (after "Encrypt organisation data" was switched on)
 _STALE_SQL = """SELECT t.id, t.title, t.content, t.list_id, t.updated_at, l.org_id, l.name AS lname, l.folder, p.title AS ptitle,
        v.task_id AS vid, v.text_hash, v.model AS vmodel, v.vec
   FROM tasks t JOIN lists l ON l.id=t.list_id LEFT JOIN tasks p ON p.id=t.parent_id LEFT JOIN task_vectors v ON v.task_id=t.id
- WHERE t.deleted_at IS NULL AND COALESCE(l.life, '')!='health'
+ WHERE t.deleted_at IS NULL AND COALESCE(l.life, '')!='health'{skip}
    AND (v.task_id IS NULL OR v.model!=? OR v.updated_at < t.updated_at OR v.list_id IS DISTINCT FROM t.list_id
         OR v.org_id IS DISTINCT FROM l.org_id{enc})
  ORDER BY (v.task_id IS NULL) DESC, t.updated_at DESC LIMIT ?"""
@@ -197,6 +223,8 @@ def emb_loop():
                 n = emb_run_once()
             if n:
                 wait = EMB_BUSY
+        except EmbedBusy:
+            wait = EMB_BUSY * 5  # live queries keep the service busy: try again soon, no log line
         except EmbedDown as e:
             if not _W["down"]:  # one line per outage, not one per batch
                 print("embed: the service is not reachable (", str(e), "), related tasks wait", flush=True)
@@ -215,8 +243,15 @@ def emb_run_once(c=None):
     own = c is None
     c = c or connect()
     try:
-        emb_cleanup(c)  # also while switched off / the service is down: nothing stale stays readable in another workspace
-        c.commit()
+        # the cleanup also runs while switched off / the service is down (nothing stale stays readable in another
+        # workspace), but at most once a minute and only in the process that holds the lock
+        if time.monotonic() - _W["clean"] >= EMB_CLEAN:
+            with system_ctx(c):  # the batch lock (no content)
+                got = c.execute("SELECT pg_try_advisory_xact_lock(hashtext('kalmido-embed'))").fetchone()[0]
+            if got:
+                emb_cleanup(c)
+                _W["clean"] = time.monotonic()
+            c.commit()
         if not rt9_on(c):
             return 0
         # the worker sees every organisation's tasks: server-side computation of derived data, nothing handed to a person
@@ -261,14 +296,19 @@ def _emb_batch(c):
     from ..core.orgcrypt import oc_active, OrgCryptError, PREFIX
     model = _emb_model(c)
     enc = " OR (l.org_id IS NOT NULL AND v.vec NOT LIKE ?)" if oc_active(c) else ""
-    rows = c.execute(_STALE_SQL.format(enc=enc), (model, *((PREFIX + "%",) if enc else ()), EMB_BATCH)).fetchall()
+    now = time.monotonic()
+    for k in [k for k, until in _BADORG.items() if until <= now]:
+        del _BADORG[k]
+    bad = sorted(_BADORG)
+    skip = f" AND (l.org_id IS NULL OR l.org_id NOT IN ({','.join('?' * len(bad))}))" if bad else ""
+    rows = c.execute(_STALE_SQL.format(enc=enc, skip=skip), (*bad, model, *((PREFIX + "%",) if enc else ()), EMB_BATCH)).fetchall()
     if not rows:
         return 0
     stamp = iso_ms(now_utc() - timedelta(seconds=2))  # a change in the same second as this batch is looked at again
     todo = []
     for r in rows:
         text = emb_text(r)
-        h = emb_hash(text)
+        h = emb_hash(c, text)
         same = r["vid"] is not None and r["text_hash"] == h and r["vmodel"] == model
         if same and enc and r["org_id"] and not str(r["vec"]).startswith(PREFIX):
             same = False  # plain in an encrypted organisation: computed again (sealed)
@@ -286,7 +326,12 @@ def _emb_batch(c):
             try:
                 val = emb_store_val(c, r["org_id"], v)
             except OrgCryptError:
-                continue  # the organisation's key cannot be opened: no vector (the related tasks just stay empty there)
+                # the organisation's key cannot be opened: no vector (the related tasks just stay empty there); left out
+                # of the batches for EMB_BADKEY instead of being sent to the service again every batch
+                if r["org_id"] not in _BADORG:
+                    print("embed: organisation", r["org_id"], "key cannot be opened, its tasks wait", flush=True)
+                _BADORG[r["org_id"]] = time.monotonic() + EMB_BADKEY
+                continue
             c.execute("INSERT INTO task_vectors(task_id, org_id, list_id, model, dim, vec, text_hash, updated_at) VALUES(?,?,?,?,?,?,?,?) "
                       "ON CONFLICT(task_id) DO UPDATE SET org_id=excluded.org_id, list_id=excluded.list_id, model=excluded.model, "
                       "dim=excluded.dim, vec=excluded.vec, text_hash=excluded.text_hash, updated_at=excluded.updated_at",
@@ -315,8 +360,10 @@ def emb_drop_sealed(c):
 
 
 # ---- the cache: the decoded vectors per organisation -----------------------------------------------------------------------
-_CACHE = {}  # org id (None = private lists) -> {"sig": (count, newest, model), "model": the worker's model, "vecs": {task id: array}}
+_CACHE = {}  # org id (None = private lists) -> {"sig": (count, newest, model), "model": the worker's model, "vecs": {task id: array},
+#              "at": last use (monotonic)}
 _CLOCK = threading.Lock()
+EMB_CACHE_IDLE = 600.0  # an organisation's vectors nobody used for this long leave the memory
 
 
 def rt9_forget(org_id=False):
@@ -338,8 +385,13 @@ def _org_vectors(c, org_id):
     # titles of tasks the asker may see leave this module)
     with system_ctx(c):
         sig = tuple(c.execute(f"SELECT COUNT(*), MAX(updated_at), MAX(model) FROM task_vectors WHERE {cond}", args).fetchone())
+        now = time.monotonic()
         with _CLOCK:
+            for k in [k for k, e in _CACHE.items() if now - e["at"] > EMB_CACHE_IDLE]:
+                del _CACHE[k]
             hit = _CACHE.get(org_id)
+            if hit:
+                hit["at"] = now
         if hit and hit["sig"] == sig and hit["model"] == model:
             return hit["vecs"]
         vecs = {}
@@ -351,7 +403,7 @@ def _org_vectors(c, org_id):
             except (OrgCryptError, ValueError, struct.error):
                 continue
     with _CLOCK:
-        _CACHE[org_id] = {"sig": sig, "model": model, "vecs": vecs}
+        _CACHE[org_id] = {"sig": sig, "model": model, "vecs": vecs, "at": time.monotonic()}
     return vecs
 
 
@@ -507,13 +559,38 @@ def rt9_event(c, tid, aid, k=EMB_K):
         return None
 
 
+_QSEM = threading.BoundedSemaphore(2)  # live queries at once per process: the worker's batches never starve
+_RATE = {}  # user id -> [times of the live queries in the last EMB_RATE[1] seconds]
+_RLOCK = threading.Lock()
+
+
+def rt9_rate_ok(uid):
+    """False when uid asked more than EMB_RATE live queries lately (per process; the answer is then empty, no service call)."""
+    n, win = EMB_RATE
+    now = time.monotonic()
+    with _RLOCK:
+        if len(_RATE) > 1000:  # forget the quiet accounts
+            for k in [k for k, v in _RATE.items() if not v or now - v[-1] > win]:
+                del _RATE[k]
+        q = [t for t in _RATE.get(uid, ()) if now - t < win]
+        ok = len(q) < n
+        if ok:
+            q.append(now)
+        _RATE[uid] = q
+    return ok
+
+
 def rt9_query(c, text, kind):
-    """The vector of a live text (hint while adding, search), or None (off, slow, down): never waits longer than
-    EMB_QUERY_TIMEOUT."""
+    """The vector of a live text (hint while adding, search), or None (off, slow, down, two queries already running):
+    never waits longer than EMB_QUERY_TIMEOUT."""
+    if not _QSEM.acquire(blocking=False):
+        return None
     try:
         vecs, model = emb_call([text[:EMB_TEXT_MAX]], kind, timeout=EMB_QUERY_TIMEOUT)
     except EmbedDown:
         return None
+    finally:
+        _QSEM.release()
     if _W["model"] and model != _W["model"]:
         return None  # the stored vectors are of another model (the worker switches over)
     _W["model"] = model
@@ -526,7 +603,7 @@ def rt9_similar(c, uid, title, notes="", list_id=None, exclude=None, k=EMB_K):
     if not rt9_on(c):
         return {"enabled": False, "items": []}
     title = (title or "").strip()[:500]
-    if len(title) < 3:
+    if len(title) < 3 or not rt9_rate_ok(uid):
         return {"enabled": True, "items": []}
     pre = ""
     if list_id:
@@ -542,7 +619,7 @@ def rt9_similar(c, uid, title, notes="", list_id=None, exclude=None, k=EMB_K):
 
 def rt9_semantic(c, uid, q, have, limit=20):
     """Task ids of a "similar meaning" search: visible tasks whose vector is close to the query, without the ids in have."""
-    if not rt9_on(c) or not q.strip():
+    if not rt9_on(c) or not q.strip() or not rt9_rate_ok(uid):
         return []
     qv = rt9_query(c, q.strip()[:500], "query")
     if qv is None:
@@ -576,7 +653,7 @@ def rt9_config():
 @app.get("/api/tasks/<int:tid>/related")
 def rt9_route_related(tid):
     c = db()
-    need_task(c, tid, write=False)
+    need_task(c, tid, write=False, full=True)  # a participant's context parent (title only) = 404: its cosines echo its notes
     return jsonify(rt9_related(c, g.user["id"], tid))
 
 
@@ -630,7 +707,7 @@ def rt9_v1_related(tid):
     """The related tasks of a task (read): only tasks the token's user may see."""
     v1_args(())
     c = db()
-    need_task(c, tid, write=False)
+    need_task(c, tid, write=False, full=True)  # a participant's context parent (title only) = 404: its cosines echo its notes
     return jsonify(rt9_related(c, g.user["id"], tid))
 
 
