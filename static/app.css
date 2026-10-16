@@ -5062,7 +5062,7 @@ button.lkchip:hover{border-color:var(--accent)}
 #side .fhead [data-fsort]{margin-left:auto}
 /* UX-42 review: wide task panels show Today / Tomorrow with their words too */
 @media (pointer:fine){ @container dtop (min-width:27rem){ .dtop .dq{padding:0 .5rem;width:auto} .dtop .dq .dql{display:inline;font-size:var(--fs-s);white-space:nowrap} } }
-@media (pointer:fine){ @container dtop (max-width:25.99rem){ .dtop .dpw{display:none} .dtop .iconbtn[data-act="prio"]{width:auto;padding:0 .375rem} } }  /* narrow panels with a mouse (chat beside it): the flag alone, its word is the tooltip */
+@media not (pointer:coarse){ @container dtop (max-width:25.99rem){ .dtop .dpw{display:none} .dtop .iconbtn[data-act="prio"]{width:auto;padding:0 .375rem} } }  /* narrow panels with a mouse (chat beside it): the flag alone, its word is the tooltip; 2.53.0: "not coarse" so a pointer-less narrow window (no hover) gets it too */
 /* 2.26.0 (#932 #936 #937) */
 /* #932: the sidebar takes its width from --sideW (the grip on its right edge, see placeGrips) */
 #app:not(.side-rail) #side{min-width:0}
@@ -7455,7 +7455,7 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .apf .ppt{flex:1 1 100%;min-height:2.5rem}
 .apwarn .ic{color:var(--accent)}
 .apalt{border-style:dashed}
-@media (max-width:600px){.apf .aptime{flex:1 1 40%}}
+@media (max-width:600px){.apf .aptime,.apf .dpw{flex:1 1 40%}}
 /* 2.52.0 B (#1128) events of writable CalDAV subscriptions: popover actions, hint under "Allow writing" */
 .cevact.dvwact { display: flex; flex-wrap: wrap; gap: .375rem; }
 .cevact.dvwact .btn.pri { margin-left: auto; }
@@ -7487,3 +7487,99 @@ body.cgdrag .week,body.cgdrag .cal{cursor:grabbing}
 @media (pointer:coarse){.cgnew .cgin{font-size:max(1rem,16px)}.cgnew .cgdet{min-height:2.75rem}}
 @media (prefers-reduced-motion:no-preference){.cgnew{animation:cgin .16s ease-out}}
 @keyframes cgin{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+
+/* 2.53.0 D (#1449 #1440): reference cards in rendered text and the preview card at the pointer (refs.js) */
+.rfcard{display:inline-flex;align-items:center;gap:.25rem;max-width:min(18rem,100%);padding:0 .375rem;margin:0 .0625rem;border:1px solid var(--line2);border-radius:var(--r-s);background:var(--bg3);color:var(--text);font-size:.92em;line-height:1.5;vertical-align:baseline;text-decoration:none;white-space:nowrap}
+.rfcard .i{flex:none;color:var(--muted)}
+.rfcard .rfn{overflow:hidden;text-overflow:ellipsis}
+a.rfcard:hover{border-color:var(--muted);text-decoration:none}
+.rfcard.rfno,.rfcard.rfwait{color:var(--faint);background:transparent;border-style:dashed}
+.rfcard.rfno{cursor:default}
+.rfcard.rfdone .rfn{text-decoration:line-through;color:var(--muted)}
+.rfpv{position:fixed;z-index:9000;left:0;top:0;width:min(20rem,calc(100vw - 1rem));padding:.625rem .75rem;border-radius:var(--r-l);background:var(--bg2);box-shadow:var(--shadow);color:var(--text);font-size:var(--fs-m);line-height:1.4;cursor:pointer;opacity:0;transform:translateY(.25rem);transition:opacity .16s ease,transform .16s ease;pointer-events:auto}
+.rfpv.on{opacity:1;transform:none}
+.rfpvh{display:flex;align-items:flex-start;gap:.375rem;margin-bottom:.25rem}
+.rfpvh b{font-weight:600;overflow-wrap:anywhere}
+.rfpvh .i{flex:none;margin-top:.125rem;color:var(--muted)}
+.rfpvh.rfdone b{text-decoration:line-through;color:var(--muted)}
+.rfpvh.rfno b{color:var(--faint);font-weight:400}
+.rfpvr{display:flex;align-items:center;gap:.375rem;color:var(--text2);font-size:var(--fs-s);margin-top:.125rem}
+.rfpvr .i{flex:none;color:var(--faint)}
+.rfpvr span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rfpvd{margin-top:.375rem;color:var(--muted);font-size:var(--fs-s);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+@media (prefers-reduced-motion:reduce){.rfpv{transition:none;transform:none}}
+/* 2.53.0 E (#1451 #446) agent tone for comments / News / chat bubbles (own variables, never --accent) + the tags overview */
+:root{--agent-bg:#1d1d27;--agent-ink:#c4c1e4}
+:root[data-theme="light"]{--agent-bg:#f0eff7;--agent-ink:#4a4670}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"]{--agent-bg:#f0eff7;--agent-ink:#4a4670} }
+.cm.agc,.nitem.agc{background:var(--agent-bg)}
+.cm.agc .chead>b{color:var(--agent-ink)}
+.cm.agc.new,.nitem.agc.unread{background:var(--agent-bg);box-shadow:inset 2px 0 0 var(--accent)}
+.cmsg.agc .cbub{background:var(--agent-bg);color:var(--text)}
+.cmsg.agc.apv{background:var(--agent-bg)}
+.tgview{padding:1rem}
+.tgintro{margin:0 0 .75rem;font-size:var(--fs-m)}
+.tggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(14rem,1fr));gap:.625rem}
+.tgcard{display:flex;flex-direction:column;gap:.375rem;align-items:flex-start;text-align:left;padding:.75rem .875rem;min-height:3.5rem;border:1px solid var(--line2);border-radius:var(--r-l);background:var(--bg2);color:var(--text);font-size:var(--fs-m)}
+.tgcard:hover{background:var(--bg3)}
+.tgcard:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tgtop{display:flex;align-items:center;gap:.5rem;min-width:0}
+.tgtop b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tgdot{flex:none;width:.625rem;height:.625rem;border-radius:50%;background:var(--tc,var(--faint))}
+.tgnum{display:flex;gap:.875rem;color:var(--text2)}
+.tgnum b{color:var(--text)}
+.tgdue{display:inline-flex;align-items:center;gap:.25rem;color:var(--text2)}
+.tgdue.over{color:var(--danger)}
+.tglists,.tgused{font-size:var(--fs-xs)}
+/* 2.53.0 B (#1426) list colours (12 tones, listcolor.js): the open list's colour is the accent of the list view (header,
+   ticks, progress, buttons; #main + #fab, never global) and a thin edge on task cards (boards, calendar, the collected
+   views); the edge is the list, the background stays the priority's. The theme picks the tone: dark --lpd, light --lpl. */
+.lpv,.lp-acc{--lpc:var(--lpd)}
+:root[data-theme="light"] :is(.lpv,.lp-acc){--lpc:var(--lpl)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] :is(.lpv,.lp-acc){--lpc:var(--lpl)} }
+#main.lp-acc,#fab.lp-acc{--accent:var(--lpd);--accent-ink:var(--lpid);--accent-soft:color-mix(in srgb,var(--accent) 9%,var(--bg));--st-complete:var(--accent)}
+:root[data-theme="light"] :is(#main,#fab).lp-acc{--accent:var(--lpl);--accent-ink:var(--lpil)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] :is(#main,#fab).lp-acc{--accent:var(--lpl);--accent-ink:var(--lpil)} }
+#main:not(.lp-one) #view .trow.lpc,#view .kcards .trow.lpc{box-shadow:inset .1875rem 0 0 var(--lpc)}
+#main:not(.lp-one) #view .trow.lpc::before,#view .kcards .trow.lpc::before{left:.375rem}
+.cal .ev.lpc,.week .ev.lpc,.wev.lpc{border-left-color:var(--lpc)}
+.wev.lpc{background:color-mix(in srgb,var(--lpc) 16%,var(--bg2))}
+:is(.cal,.week) .ev.lpc.p5{background:color-mix(in srgb,var(--p5) 20%,var(--bg3))}
+:is(.cal,.week) .ev.lpc.p3{background:color-mix(in srgb,var(--p3) 20%,var(--bg3))}
+:is(.cal,.week) .ev.lpc.p1{background:color-mix(in srgb,var(--p1) 20%,var(--bg3))}
+.wev.lpc.p5{background:color-mix(in srgb,var(--p5) 22%,var(--bg2))}.wev.lpc.p3{background:color-mix(in srgb,var(--p3) 22%,var(--bg2))}.wev.lpc.p1{background:color-mix(in srgb,var(--p1) 22%,var(--bg2))}
+/* 2.53.0 B (#1474) workspace colours (wscolor.js): an organisation's lists carry its colour as a stripe (header, sidebar)
+   and a frame (quick add, comment field), the sign / chip / switch take it; Private stays neutral. Dark --wsd, light --wsl. */
+[data-wsc],.wsc-on{--wsc:var(--wsd)}
+:root[data-theme="light"] :is([data-wsc],.wsc-on){--wsc:var(--wsl)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] :is([data-wsc],.wsc-on){--wsc:var(--wsl)} }
+#main.wsc-on #top{box-shadow:inset 0 .1875rem 0 var(--wsc)}
+#side .srow[data-wsc]{background-image:linear-gradient(var(--wsc),var(--wsc));background-size:.1875rem 60%;background-repeat:no-repeat;background-position:0 50%}
+.wsbadge[data-wsc]{color:var(--text);background:color-mix(in srgb,var(--wsc) 14%,transparent);border-color:color-mix(in srgb,var(--wsc) 55%,transparent)}
+.wsbadge[data-wsc]:hover{border-color:var(--wsc)}
+:is(.wsbadge,.wschip,.wsbar)[data-wsc] svg.i:first-child,:is(.wsbadge,.wschip,.wsbar)[data-wsc] .wsemo{color:var(--wsc)}
+.wschip[data-wsc]{background:color-mix(in srgb,var(--wsc) 14%,transparent);border-color:color-mix(in srgb,var(--wsc) 40%,transparent)}
+.wschip[data-wsc]:hover{border-color:var(--wsc)}
+.wsbar.on[data-wsc]{border-color:color-mix(in srgb,var(--wsc) 55%,transparent);background:color-mix(in srgb,var(--wsc) 10%,transparent)}
+.wsbar.on[data-wsc]:hover{border-color:var(--wsc)}
+.wsc-on .qadd:not(.dock) .box,.wsc-on .qadd.dock,.wsc-on .ccomp{border-color:color-mix(in srgb,var(--wsc) 65%,var(--line2))}
+.wscpick .colors button[disabled]{cursor:default}
+/* 2.53.0 C (#1424): the bell of one task (taskbell.js): the header button, its menu and "Urgent for others" */
+.dtop .tbl-b.on{color:var(--accent)}
+.dtop .tbl-b.lv-urgent{width:auto;padding:0 .5rem;gap:.25rem;border-radius:var(--r-s);background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.dtop .tbl-b.lv-urgent.off{background:none;color:var(--text2)}
+.dtop .tbl-b.lv-urgent .dpw{color:inherit;font-weight:600}
+@media (max-width:899px){.dtop .tbl-b.lv-urgent{width:2.75rem;padding:0;border-radius:50%}.dtop .tbl-b.lv-urgent .dpw{display:none}}  /* phone: the tinted ring bell alone, its words are in the menu */
+@media (pointer:coarse){ @container dtop (max-width:27.99rem){ .dtop .tbl-b{order:9;flex:none} .dtop .tbl-b .dpw{display:none} } }  /* narrow phones: in the second row, next to the date (the first row is full) */
+.menu-list button.tbl-st[disabled],.menu-list button.tbl-hint[disabled]{opacity:1;cursor:default;white-space:normal;line-height:1.35;color:var(--text2)}
+.menu-list button.tbl-hint[disabled]{font-size:var(--fs-s);color:var(--muted);max-width:22rem}
+.menu-list button.tbl-st[disabled]:hover,.menu-list button.tbl-hint[disabled]:hover{background:none}
+.cdlg .tbl-p,.cdlg .tbl-all{display:flex;align-items:center;gap:.5rem;min-height:2.75rem}
+.cdlg .tbl-all{border-bottom:1px solid var(--line)}
+.cdlg .tbl-until{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem}
+/* 2.53.0 A (#1410) modules loaded on demand: a thin bar at the top while a module loads (shown only after 300 ms) */
+.ldbar { position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 9999; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity .2s ease; }
+.ldbar.on { opacity: 1; }
+.ldbar::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: var(--accent); border-radius: 2px; transform: translateX(-100%); animation: ldbar 1.2s ease-in-out infinite; }
+@keyframes ldbar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { .ldbar::before { animation: none; transform: none; width: 100%; opacity: .5; } }
