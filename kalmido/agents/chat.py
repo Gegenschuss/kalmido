@@ -248,8 +248,8 @@ def jn9_chat_jobs(c, msgs, uid):
         if not m.get("job_id"):
             continue
         j, par = jn.get(m["job_id"]) or {}, m.get("job_parent") if m.get("job_parent") in jn else None
-        par = par or j.get("parent_id")
-        m.update(job_name=j.get("name"), job_parent=par, job_parent_name=(jn.get(par) or {}).get("name") if par else None)
+        pname = (jn[par] or {}).get("name") if par else j.get("parent_name")
+        m.update(job_name=j.get("name"), job_parent=par or j.get("parent_id"), job_parent_name=pname)
     return msgs
 
 
