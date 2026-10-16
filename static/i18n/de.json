@@ -7944,5 +7944,12 @@
   "New event “{0}”": "Neuer Termin „{0}“",
   "Change a repeating event": "Wiederholten Termin ändern",
   "Change every date of this repeating event?": "Alle Termine dieser Serie ändern?",
-  "Single dates of a subscribed calendar cannot be changed here.": "Einzelne Termine eines abonnierten Kalenders lassen sich hier nicht ändern."
+  "Single dates of a subscribed calendar cannot be changed here.": "Einzelne Termine eines abonnierten Kalenders lassen sich hier nicht ändern.",
+  "Overdue since {0}": "Überfällig seit {0}",
+  "Next due {0}": "Nächste Fälligkeit {0}",
+  "Open tag {0}": "Tag {0} öffnen",
+  "Last used {0}": "Zuletzt benutzt {0}",
+  "All your tags. A tap opens the tasks with that tag.": "Alle deine Tags. Ein Tipp öffnet die Aufgaben mit diesem Tag.",
+  "No tags yet. Add a tag to a task and it shows up here.": "Noch keine Tags. Gib einer Aufgabe ein Tag, dann erscheint es hier.",
+  "Tags overview": "Tags-Übersicht"
 }
