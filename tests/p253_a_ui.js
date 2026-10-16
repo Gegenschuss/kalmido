@@ -73,7 +73,9 @@ function swRun(src, {failLazy = false} = {}) {
   const TID = (await call('POST', '/api/tasks', {list_id: LID, title: 'Lazy task'})).id;
   check(LID > 0 && TID > 0, 'setup: a list and a task');
 
+  const ready = w => until(() => { try { return w.eval('!!(S.me && S.lists && S.lists.length)'); } catch { return false; } }, 100);
   let w = await boot({user: 'alice', lazy: true}), d = w.document;
+  await ready(w);
   const lazyTags = () => [...d.querySelectorAll('script[src*="/static/js/"]')].map(s => (s.getAttribute('src').match(/\/static\/js\/([\w-]+)\.js/) || [])[1]).filter(f => LAZY.includes(f));
   check(lazyTags().length === 0 && typeof w.loadModule === 'function', 'cold start: no on-demand module loaded');
   check(typeof w.wpSweep === 'function' && typeof w.badgeSync === 'function' && w.eval('typeof SET_SECS') === 'object' && w.eval('typeof officeOn') === 'function', 'start-up parts (setcore.js, officeOn) are there');
@@ -85,7 +87,7 @@ function swRun(src, {failLazy = false} = {}) {
   await w.eval(`settingsModal('look')`);
   await until(() => d.querySelector('.smodal'));
   check(!!d.querySelector('.smodal [data-pane="look"]') && lazyTags().includes('settings'), 'settingsModal() loads settings.js and opens Appearance');
-  check(w.settingsModal.name === 'settingsModal' && !w.eval('typeof settingsModal.ld'), 'after loading: the real settingsModal');
+  check(w.eval('settingsModal.name') === 'settingsModal' && !/loadModule/.test(w.eval('String(settingsModal)')), 'after loading: the real settingsModal');
   d.querySelector('.smodal')?.remove();
   // the gear in the sidebar works too (already loaded: opens at once)
   d.querySelector('[data-act="settings"]')?.click(); await until(() => d.querySelector('.smodal'));
@@ -105,12 +107,12 @@ function swRun(src, {failLazy = false} = {}) {
   w.close();
 
   // deep links on a cold start
-  w = await boot({user: 'alice', lazy: true, hash: 'contacts'}); d = w.document;
+  w = await boot({user: 'alice', lazy: true, hash: 'contacts'}); d = w.document; await ready(w);
   await until(() => d.querySelector('#view') && w.eval('typeof CT') === 'object' && !/Loading…/.test(d.querySelector('#view').textContent || ''));
   check(w.eval('typeof CT') === 'object' && !/Loading…/.test(d.querySelector('#view').textContent || ''), 'cold start #contacts: the contacts view');
   check(!lazyTags().includes('settings') && !lazyTags().includes('office'), 'cold start #contacts: only contacts loaded');
   w.close();
-  w = await boot({user: 'alice', lazy: true, hash: 'office'}); d = w.document;
+  w = await boot({user: 'alice', lazy: true, hash: 'office'}); d = w.document; await ready(w);
   await until(() => w.eval('typeof OFC') === 'object' && !/^\s*Loading…\s*$/.test(d.querySelector('#view .lempty')?.textContent || ''), 80);
   check(w.eval('typeof OFC') === 'object' && lazyTags().filter(f => f.startsWith('office')).length === LAZY.filter(f => f.startsWith('office')).length, 'cold start #office: all office files loaded');
   check(w.eval('OFC_TABS.map(t => t[0]).join()').endsWith('settings') && w.eval('typeof pp_html') === 'function', 'office: the tabs of the later files are there (run in order)');
