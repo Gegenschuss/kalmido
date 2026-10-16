@@ -337,7 +337,8 @@ def openapi_spec():
         "TagPage": page("Tag"),
         "Comment": {"type": "object", "properties": {
             "id": {"type": "integer"}, "task_id": {"type": "integer"},
-            "author": {"type": "object", "properties": {"id": nul("integer"), "name": {"type": "string"}}},
+            "author": {"type": "object", "properties": {"id": nul("integer"), "name": {"type": "string"},
+                                                        "customer": {"type": "boolean", "description": "2.50.0: written by a customer through a public link (no account; name = what they typed)"}}},
             "body": {"type": "string", "description": "Markdown; mentions as <@user_id>"}, "text": {"type": "string", "description": "Plain text, mentions as @name"},
             "mentions": {"type": "array", "items": {"type": "integer"}}, "created_at": {"type": "string", "format": "date-time"},
             "edited_at": nul("string", format="date-time"), "attachments": {"type": "array", "items": ref("Attachment")},

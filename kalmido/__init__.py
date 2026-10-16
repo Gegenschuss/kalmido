@@ -94,6 +94,7 @@ ORDER = (
     "agents.gates",  # 2.26.0 (#949)
     "agents.safety",  # 2.30.0 (#919)
     "agents.usage",
+    "lists.custview",  # 2.50.0 C (#329): customer view of public links (no routes; used by lists.public)
     "lists.public",
     "integrations.git",
     "integrations.gitfolder",  # 2.33.0 (#934)
@@ -145,6 +146,7 @@ ORDER = (
     "office.pdf",  # 2.36.1 (#1021): the PDF writer (D, no kalmido imports)
     "office.einvoice",  # 2.38.0 (#1021 P5, F2): e-invoice XML (CII EN 16931 / XRechnung) from the snapshot, used by office.pdfweb
     "office.pdfweb",  # 2.36.1 (#1021): quotation PDF + company logo routes (D; the writer office.pdf has no routes)
+    "office.signoff",  # 2.50.0 C (#1200): approval links with a simple electronic signature (quotations, list acceptance)
     "office.ledger",  # 2.36.2 (#1021, #1142, E): finalising, structured company data, office log
     "office.invoices",  # 2.38.0 (#1021, F1): invoices, credit notes, reminders, payments, sending, DATEV inbox
     "office.doclang",  # 2.40.0 (#1381): language switch of drafts swaps the standard texts (no routes; used by office.docs)

@@ -50,6 +50,7 @@ FILE_CTX = b"file"
 FIELDS = {
     "office_company": ("tax_number", "vat_id", "iban", "bic", "bank_name"),
     "office_contracts": ("rates",),
+    "office_signoffs": ("signer_name", "signer_email", "reason", "ip", "user_agent"),  # 2.50.0 (#1200): who signed, from where
     "office_docs": ("sender",),
     "office_doc_log": ("detail",),
     "office_roles": ("costs",),  # 2.47.0 (#1649): the purchase of a role
@@ -67,6 +68,7 @@ JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"
 PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("office_settings", "data"): N_("Bank and tax data of the company"),
                  ("office_docs", "totals"): N_("Purchase prices and margins"), "office_contracts": N_("Framework contract rates"),
                  "office_docs": N_("Senders of finished documents"), "office_doc_log": N_("The log of the documents"),
+                 "office_signoffs": N_("Signatures of customers (name, address, device)"),  # 2.50.0 (#1200)
                  "files": N_("Files of organisations"), "tokens": N_("Stored access tokens (Git, client secret of the single sign-on)"),
                  # 2.47.0 (#1649, #1215, #1216): roles' purchase prices, purchases of accepted quotations, parts and shoot sheets
                  "office_roles": N_("Purchase prices and margins"), "office_purchases": N_("Purchase prices and margins"),

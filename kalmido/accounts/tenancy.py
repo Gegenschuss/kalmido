@@ -51,6 +51,9 @@ CHECKS = {
     # 2.49.0 (#1106): a connection (accepted request) of an agent or a kid account -- requests are for people only
     "conn_agent": ("SELECT l.a_id, l.b_id FROM conn_links l JOIN users u ON u.id IN (l.a_id, l.b_id) "
                    "WHERE l.deleted_at IS NULL AND (u.kind!='user' OR u.kid!=0)"),
+    # 2.50.0 (#1200): an approval link whose organisation differs from its quotation's / list's
+    "signoff_org": ("SELECT s.id, s.created_by FROM office_signoffs s LEFT JOIN office_docs d ON d.id=s.doc_id LEFT JOIN lists l ON l.id=s.list_id "
+                    "WHERE (s.doc_id IS NOT NULL AND d.org_id IS DISTINCT FROM s.org_id) OR (s.list_id IS NOT NULL AND l.org_id IS DISTINCT FROM s.org_id)"),
     # an agent of an organisation that is gone, or a personal agent working in an organisation its owner is not in
     "agent": ("SELECT a.user_id, a.owner_id FROM agents a WHERE a.org_id IS NOT NULL AND (NOT EXISTS (SELECT 1 FROM orgs o WHERE o.id=a.org_id) "
               "OR (a.owner_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=a.org_id AND om.user_id=a.owner_id)))"),
