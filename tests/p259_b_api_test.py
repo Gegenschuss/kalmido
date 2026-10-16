@@ -117,7 +117,7 @@ def ids_of(j):
 
 KEY = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
 EXTRA = (os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_SECRET_KEY=" + KEY
-         + " -e KALMIDO_EMBED_URL=http://127.0.0.1:8090 -e KALMIDO_EMBED_IDLE=0.5 -e KALMIDO_EMBED_BUSY=0.2 -e KALMIDO_EMBED_DOWN=1"
+         + " -e KALMIDO_EMBED_URL=http://127.0.0.1:8090 -e KALMIDO_EMBED_IDLE=0.5 -e KALMIDO_EMBED_BUSY=0.2 -e KALMIDO_EMBED_DOWN=1 -e KALMIDO_EMBED_CLEAN=3"
          + " -e KALMIDO_RELATED_MIN=0.6 -e KALMIDO_RELATED_DUP=0.95 -e KALMIDO_RELATED_SEARCH=0.5")
 subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=dict(os.environ, EXTRA=EXTRA), check=True, stdout=subprocess.DEVNULL)
 s0 = requests.Session()
