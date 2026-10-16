@@ -196,6 +196,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-sideic': ['side_icons', N_('List icons'), 'sel'], 's-sideprog': ['side_progress', N_('Progress in the sidebar'), 'chk'],  // 2.36.0 (#1117)
   's-sdd': ['show_done_default', N_('Completed tasks'), 'sel'],  // 2.39.1 (#1214)
   's-favq': ['fav_quiet', N_('Quieter pushes from lists without a star'), 'chk'], 's-favs': ['fav_suggest', N_('Suggest favourites'), 'chk'],  // 2.46.1 (#1361)
+  's-tblacc': ['tbl_accept', N_('Accept urgent markings from others'), 'chk'],  // 2.53.0 C (#1424)
 };
 const SET_RENDER = ['sidebar', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
@@ -705,7 +706,7 @@ function settingsModal(focus) {
       <div class="row"><label>${tr('Topic')}</label><code class="topic">${esc(s.ntfy_topic)}</code><button class="btn sm" data-m="test">${ic('bell', 's')} ${tr('Send test')}</button></div>
       ${S.webpush?.enabled ? '' : prio}
       ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', with a user that has read access')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
-      ${notifMatrixHtml(s, hint)}
+      ${notifMatrixHtml(s, hint)}${typeof tbl_setHtml === 'function' ? tbl_setHtml(chk, hint) : ''}
       <h4>${tr('Reminders')}</h4>
       <div class="row"><label for="s-allday">${tr('All-day reminder at')}</label>${timeIn('s-allday', s.allday_time, {label: tr('All-day reminder at'), clear: false})}</div>
       <div class="row"><label for="s-defrem">${tr('Default reminder')}</label><select id="s-defrem"><option value="">${tr('none')}</option>${REM_OPTS.map(([v, n]) => `<option value="${v}" ${s.default_reminder === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}${s.default_reminder && !REM_OPTS.some(o => o[0] === s.default_reminder) ? `<option value="${esc(s.default_reminder)}" selected>${esc(s.default_reminder.split(',').map(fmtRem).join(', '))}</option>` : ''}</select></div>

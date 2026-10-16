@@ -1196,6 +1196,14 @@ CREATE TABLE IF NOT EXISTS cal_dav_res (
   href TEXT NOT NULL,                           -- absolute URL of the resource (inside the subscription's collection)
   etag TEXT NOT NULL DEFAULT '', rec BIGINT NOT NULL DEFAULT 0,  -- rec = 1: a repeating series (RRULE / RDATE / overrides)
   PRIMARY KEY (sub_id, uid));
+-- 2.53.0 C (#1424): the bell of one task per person (notify/taskbell.py): level list | mute | urgent, until = last day of
+-- an urgency (NULL = until completed), set_by = who set it, prev / act / act_by = the last change (one undo step).
+-- org_id = the workspace of the task's list when set (row-level security). New table only: 2.52.0 runs on with it
+CREATE TABLE IF NOT EXISTS task_bell (
+  task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  org_id BIGINT REFERENCES orgs(id) ON DELETE CASCADE, level TEXT NOT NULL DEFAULT 'list', until TEXT, set_by BIGINT,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, prev TEXT, act TEXT, act_by BIGINT,
+  PRIMARY KEY (task_id, user_id));
 """
 # Bumped when the database layout changes (stored in kalmido_meta.schema_version; SQLite: PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -1769,6 +1777,8 @@ USER_DEFAULTS = {
     # 2.28.0 (#987): 1 = pushes for what agents do (their comments, new tasks, completions, status); off by default -- an
     # agent's @mention of me and its approval requests push as before
     "agent_push": "0",
+    # 2.53.0 C (#1424): 1 = "Urgent" set by someone else on a task counts for my pushes ('0' = as the list; still shown)
+    "tbl_accept": "1",
 }
 # global, server-internal (table settings); the legacy single-user rows stay there untouched
 GLOBAL_DEFAULTS = {

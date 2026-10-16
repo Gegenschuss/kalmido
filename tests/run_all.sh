@@ -830,6 +830,9 @@ fresh; run p253_d_ui node p253_d_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p253_e_ui node p253_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.53.0 part B: list colours as accent, folder colours, card edges, "only as a dot" (#1426); workspace colours (#1474)
 fresh; run p253_b_ui node p253_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part C: the bell of one task - as the list / muted / urgent, set for others by list admins (#1424)
+fresh; run p253_c_api "$PY" p253_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p253_c_ui node p253_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

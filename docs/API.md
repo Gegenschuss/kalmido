@@ -1159,3 +1159,24 @@ curl -s -H "Authorization: Bearer $TOKEN" "https://kalmido.example/api/v1/time/c
 | `POST /agent/proposals/shoot` | calendar | `list_id`, `days`, `crew`; applied = tentative events + option bookings |
 
 Event drafts are events with `status: "tentative"`; CalDAV sends them as `STATUS:TENTATIVE`.
+
+## The bell of one task (2.53.0)
+
+Next to the bell of a list (`list_bell`) every person has a bell per task: **As the list** (default), **Muted** (no pushes
+about the task; the News stay) or **Urgent** (every change and every comment of the task by someone else is a push at the
+highest priority: ntfy 5 / Web Push urgency high, whatever the list bell, the matrix or the burst rule say). An urgency ends
+on a chosen day (`until`, inclusive) or when the task is completed; afterwards the list counts again. It is a level of the
+existing pushes, not a new kind. Web API only (the signed-in person; agents `403`), no `/api/v1` route and no MCP tool:
+agents get no pushes and never mark people urgent.
+
+- `GET /api/tasks/{id}/bell` (read access to the task): `{mine: {level, until, set_by, by_name, active}, accept, can_others}`;
+  the list's owner and admins also get `people` (the owner and members of the list who see the task, without agents).
+- `PUT /api/tasks/{id}/bell` `{level: "list" | "mute" | "urgent", until?: "YYYY-MM-DD"}` sets the own bell. With
+  `users: [ids] | "all"` (owner / admins of the list only, `403` otherwise) it marks people of the list `urgent` or takes back an
+  urgency someone else set (`level: "list"`; a person's own choice stays). People outside the list, agents and people who do
+  not see the task: `404`. Marked people get a News item (`tbl_urgent`) and a push. The answer carries `act`, the token of
+  this change.
+- `POST /api/tasks/{id}/bell/undo` `{act}` puts back the rows of that change (only the person who made it).
+- Setting `tbl_accept` (`"1"` default, `"0"` = urgency set by others counts as *As the list*; it stays visible on the task).
+- The task history gets a line `bell` for urgency set for others (`{level, until, n}`, a count, no names) and when a person
+  switches off an urgency someone else set (`{level, self: 1}`).

@@ -187,6 +187,7 @@ function newsText(it, U) {
   const d = it.data || {}, who = `<b>${esc(viaName(d, it.actor_id, U))}</b>`, q = x => `<b>${esc(x)}</b>`;
   switch (it.kind) {
     case 'mention': return tr('{0} mentioned you', who);
+    case 'tbl_urgent': return tbl_newsText(it, who);  // 2.53.0 C (#1424)
     case 'comment': if ((it.tasks || []).length > 1) return trn('{1} left {0} comments on {2} tasks', '{1} left {0} comments on {2} tasks', it.count, who, it.tasks.length);  // 2.13.0 (#453 A5)
       return it.count > 1 ? trn('{1} left {0} comments', '{1} left {0} comments', it.count, (it.actors || [it.actor_id]).map(a => `<b>${esc(uname(a, U))}</b>`).join(', ')) : tr('{0} commented', who);
     case 'assign': return d.group ? tr('{0} assigned a task to your group {1}', who, q(d.group)) : tr('{0} assigned a task to you', who);
@@ -435,6 +436,7 @@ function actText0(a, U) {
     case 'proposal': return tr('{0} applied a proposal by {1}', who, q(uname(d.agent, U)));  // 2.3.0 (#262)
     case 'event': return tr('The task became an event; the people who came along are invited to it');  // 2.21.0 (#659)
     case 'title': return tr('{0} renamed the task to “{1}”', who, esc(d.to || ''));
+    case 'bell': return tbl_actText(d, who);  // 2.53.0 C (#1424)
     case 'content': return tr('{0} edited the description', who);
     case 'note_lock': return tr('{0} locked the note', who);  // 2.48.0 (#1642)
     case 'note_unlock': return tr('{0} removed the lock from the note', who);

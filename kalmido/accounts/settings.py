@@ -42,7 +42,8 @@ SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "tim
                   "fav_quiet", "fav_suggest",  # 2.46.1 (#1361): quieter pushes from lists without a star; favourite suggestions
                   "person_colors",  # 2.47.1 (#1721): people in their account colour (0 = only agents coloured)
                   "list_color_dot",  # 2.53.0 (#1426): list colours only as the dot
-                  "mods_all")  # 2.46.1 (#1591): "Switch on all modules" with the purpose
+                  "mods_all",  # 2.46.1 (#1591): "Switch on all modules" with the purpose
+                  "tbl_accept")  # 2.53.0 C (#1424): accept "Urgent" on a task set by someone else
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
@@ -558,6 +559,7 @@ def export_json():
         "list_notepads": ("SELECT * FROM list_notepads WHERE created_by=?", (uid,)),  # 2.43.0 (#1346)
         "list_notif": (f"SELECT * FROM list_notif WHERE list_id IN {own}", (uid,)),  # 2.33.0 (#927): my notification templates
         "folder_notif": ("SELECT * FROM folder_notif WHERE owner_id=?", (uid,)),
+        "task_bell": ("SELECT task_id, level, until, set_by, created_at, updated_at FROM task_bell WHERE user_id=?", (uid,)),  # 2.53.0 C (#1424)
         "agent_steps": ("SELECT id, agent_id, job_id, message_id, text, created_at FROM agent_steps WHERE user_id=?", (uid,)),  # 2.32.0 (#1081)  # 2.32.0 (#1063): my own project page arrangements
         "agent_schedules": ("SELECT * FROM agent_schedules WHERE user_id=?", (uid,)),  # 2.34.0 (#272): my planned agent jobs
         # 2.39.0 (#1168): the Playbooks of my lists and folders (every version) and the agents' proposals for my lists
