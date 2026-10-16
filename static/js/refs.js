@@ -140,7 +140,8 @@ function rf_btnHtml(where, off) {
   if (off || !isTouch()) return '';
   const l = esc(tr('Insert reference'));
   return where === 'c' ? `<button type="button" class="iconbtn rfins" data-rfins="c" title="${l}" aria-label="${l}">${ic('link', 's')}</button>`
-    : `<button type="button" class="btn sm rfins" data-rfins="d">${ic('link', 's')} ${l}</button>`;
+    // the description's button as a quiet link row like "Lock note" (a .btn there widened the narrow panel, p252_ui)
+    : `<div class="lnbar rfinsbar"><button type="button" class="linkbtn lnlock rfins" data-rfins="d">${ic('link', 's')}<span>${l}</span></button></div>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-rfins]'); if (!b) return;

@@ -5062,7 +5062,7 @@ button.lkchip:hover{border-color:var(--accent)}
 #side .fhead [data-fsort]{margin-left:auto}
 /* UX-42 review: wide task panels show Today / Tomorrow with their words too */
 @media (pointer:fine){ @container dtop (min-width:27rem){ .dtop .dq{padding:0 .5rem;width:auto} .dtop .dq .dql{display:inline;font-size:var(--fs-s);white-space:nowrap} } }
-@media (pointer:fine){ @container dtop (max-width:25.99rem){ .dtop .dpw{display:none} .dtop .iconbtn[data-act="prio"]{width:auto;padding:0 .375rem} } }  /* narrow panels with a mouse (chat beside it): the flag alone, its word is the tooltip */
+@media not (pointer:coarse){ @container dtop (max-width:25.99rem){ .dtop .dpw{display:none} .dtop .iconbtn[data-act="prio"]{width:auto;padding:0 .375rem} } }  /* narrow panels with a mouse (chat beside it): the flag alone, its word is the tooltip; 2.53.0: "not coarse" so a pointer-less narrow window (no hover) gets it too */
 /* 2.26.0 (#932 #936 #937) */
 /* #932: the sidebar takes its width from --sideW (the grip on its right edge, see placeGrips) */
 #app:not(.side-rail) #side{min-width:0}
@@ -7495,7 +7495,6 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .rfcard.rfno,.rfcard.rfwait{color:var(--faint);background:transparent;border-style:dashed}
 .rfcard.rfno{cursor:default}
 .rfcard.rfdone .rfn{text-decoration:line-through;color:var(--muted)}
-.rfins.btn{margin-top:.375rem}
 .rfpv{position:fixed;z-index:9000;left:0;top:0;width:min(20rem,calc(100vw - 1rem));padding:.625rem .75rem;border-radius:var(--r-l);background:var(--bg2);box-shadow:var(--shadow);color:var(--text);font-size:var(--fs-m);line-height:1.4;cursor:pointer;opacity:0;transform:translateY(.25rem);transition:opacity .16s ease,transform .16s ease;pointer-events:auto}
 .rfpv.on{opacity:1;transform:none}
 .rfpvh{display:flex;align-items:flex-start;gap:.375rem;margin-bottom:.25rem}
