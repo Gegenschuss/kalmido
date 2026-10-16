@@ -449,9 +449,9 @@ def lyp_run(c, j, sel, ed, extra, rec):
     use = extra.get("use") is not False
     rec.update(view=key, layout_id=vid, used=use, before=own, set=v if use else None,
                before_active=_active("lyv_active_id", c, uid, key) if use else None)
-    if use:
-        _set_own(c, uid, key, v)
+    if use:  # #1069: save, mark it active, then the value (written here directly: no lyv_follow needed)
         _active("lyv_set_active", c, uid, key, vid)
+        _set_own(c, uid, key, v)
     return rec
 
 
@@ -469,8 +469,8 @@ def lyp_undo(c, j, rec, back=True):
                    (rec.get("layout_id"), uid, f"prop:{j['id']}")).rowcount
     if rec.get("used"):
         if lyp_own(c, uid, key) == (rec.get("set") or ""):
-            _set_own(c, uid, key, rec.get("before") or "")
             _active("lyv_set_active", c, uid, key, rec.get("before_active"))
+            _set_own(c, uid, key, rec.get("before") or "")
             n = max(n, 1)
         else:
             skipped.append(lyp_view_name(key))
