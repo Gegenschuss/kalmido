@@ -510,3 +510,9 @@ def conninfo_dict(url):
     """DATABASE_URL as libpq keywords (host, port, dbname, user, password, ...): admin/backup.py hands them to pg_dump /
     pg_restore through the environment."""
     return psycopg.conninfo.conninfo_to_dict(url)
+
+
+def st_ids(ids):
+    """2.65.0 (#1505): a set of ids as ONE parameter for `col = ANY(CAST(? AS BIGINT[]))`: the array literal as text (one value
+    to send instead of thousands of placeholders or one dumped number each)."""
+    return "{" + ",".join(str(int(i)) for i in ids) + "}"

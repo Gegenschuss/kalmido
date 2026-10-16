@@ -248,6 +248,8 @@ def state():
         h["notes"] = notes.get(h["id"], {})
     u = g.user
     nitems = news_items(c, uid, s)[0]
+    # 2.65.0 (#1505): stays jsonify with sorted keys: the client compares parts of it as text with the delta's answer
+    # (liveparts.js lpSideCnt), so the key order is part of the contract
     return jsonify(
         v=v0,
         me={**user_public(u), "orgs": _org_names(c, u["id"]), "is_admin": bool(u["is_admin"]), "auth": g.auth_via, "has_password": bool(u["password_hash"]),

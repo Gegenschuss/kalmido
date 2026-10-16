@@ -22,6 +22,7 @@ from flask import jsonify
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso_ms, now_utc
+from ..core.pg import st_ids
 from ..core.access import Denied, need_task, ov_open
 from ..tasks.validation import CONTENT_MAX, log_act
 from .e2e import E2E_NOTE_MAX, e2e_blob, e2e_has_keys, e2e_person
@@ -35,9 +36,8 @@ def ln_locked_ids(c, ids):
     """{task_id: locker user id} of the tasks in ids that carry a locked note."""
     out = {}
     ids = list(ids or [])
-    for i in range(0, len(ids), 5000):
-        part = ids[i:i + 5000]
-        for r in c.execute(f"SELECT task_id, user_id FROM task_note_locks WHERE task_id IN ({','.join('?' * len(part))})", part):
+    if ids:  # 2.65.0 (#1505): one array parameter instead of thousands of placeholders
+        for r in c.execute("SELECT task_id, user_id FROM task_note_locks WHERE task_id = ANY(CAST(? AS BIGINT[]))", (st_ids(ids),)):
             out[r[0]] = r[1]
     return out
 

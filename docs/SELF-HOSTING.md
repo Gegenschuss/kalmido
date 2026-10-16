@@ -195,6 +195,10 @@ clients (iOS in particular) fail or hang. Open UDP 443, or switch HTTP/3 off in 
 editor or `sed -i` replaces it, so a reload in the container still reads the old content. Mount the folder that holds
 the Caddyfile (or nginx configuration) instead.
 
+**Compression (2.65).** Kalmido compresses its JSON answers itself (gzip, from 1 KB on) when the client accepts it; with
+many tasks the start state shrinks to about a twentieth. A proxy that compresses too (Caddy `encode`, nginx `gzip`) sees the
+`Content-Encoding` header and leaves those answers alone, so it can stay on for the static files.
+
 **Two host names (internal and single sign-on).** Links in mails, push messages and calendar feeds use `PUBLIC_URL`,
 so set it to the name people should open. Logging out of Kalmido does not log you out of the sign-on portal. Point API
 clients and agents at the host or path where `/api/v1/` bypasses the portal (see [API.md](API.md#behind-a-reverse-proxy)),
