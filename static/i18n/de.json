@@ -8253,5 +8253,6 @@
   "This task does not wait for a review": "Diese Aufgabe wartet auf kein Review",
   "Waiting for approval by {0}": "Wartet auf Freigabe durch {0}",
   "Who reviews?": "Wer prüft?",
-  "You cannot approve your own task": "Deine eigene Aufgabe kannst du nicht freigeben"
+  "You cannot approve your own task": "Deine eigene Aufgabe kannst du nicht freigeben",
+  "Waiting for your approval": "Wartet auf deine Freigabe"
 }

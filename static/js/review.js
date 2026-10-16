@@ -34,7 +34,8 @@ function rvw_barHtml(t, ro) {
   if (!cfg && !t.reviewer_id) return '';
   const st = t.review || '', who = t.reviewer_id ? rvw_name(t.reviewer_id) : '';
   const txt = st === 'approved' && !t.review_by ? tr('Approved by a linked pull request')
-    : st ? tr(RVW_TXT[st], st === 'pending' ? who : rvw_name(t.review_by || t.reviewer_id))
+    : st === 'pending' && t.reviewer_id === S.me?.id ? tr('Waiting for your approval')
+      : st ? tr(RVW_TXT[st], st === 'pending' ? who : rvw_name(t.review_by || t.reviewer_id))
       : t.reviewer_id ? tr('Reviewer: {0}', who) : tr('No reviewer yet');
   const may = rvw_may(t) && t.status === 0, b = (k, h) => `<button type="button" class="btn sm${k === 'approve' ? ' pri' : ''}" data-rvw="${k}" data-id="${t.id}">${h}</button>`;
   const acts = [

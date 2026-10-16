@@ -8253,5 +8253,6 @@
   "This task does not wait for a review": "Questa attività non attende una revisione",
   "Waiting for approval by {0}": "In attesa dell’approvazione di {0}",
   "Who reviews?": "Chi revisiona?",
-  "You cannot approve your own task": "Non puoi approvare la tua attività"
+  "You cannot approve your own task": "Non puoi approvare la tua attività",
+  "Waiting for your approval": "In attesa della tua approvazione"
 }

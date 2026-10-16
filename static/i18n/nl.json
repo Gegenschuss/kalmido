@@ -8253,5 +8253,6 @@
   "This task does not wait for a review": "Deze taak wacht niet op een review",
   "Waiting for approval by {0}": "Wacht op goedkeuring van {0}",
   "Who reviews?": "Wie reviewt?",
-  "You cannot approve your own task": "Je kunt je eigen taak niet goedkeuren"
+  "You cannot approve your own task": "Je kunt je eigen taak niet goedkeuren",
+  "Waiting for your approval": "Wacht op jouw goedkeuring"
 }
