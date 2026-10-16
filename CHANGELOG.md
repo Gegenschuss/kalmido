@@ -7,6 +7,24 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.57.0] - 2026-10-17
+
+**In short:** the sidebar gets a **fixed head** - brand, workspace, search and your **favourites** stay while the rest
+scrolls -, **anything in the sidebar can be a favourite** (shown as icon tiles in your own order, the same on all your
+devices), and **every workspace can get your own colour**: a light tint of the sidebar and a dot in the workspace switch.
+
+### Added
+- **Favourites of every kind:** lists, projects, folders, Plan views like Today, views and areas like the calendar,
+  filters, tags, people, groups and agents get a star from the row's menu (right-click or long press). The favourites
+  are icon tiles with the name as hint and without counts; arrange them by dragging (long press and drag on a phone) or
+  with *Move left / Move right* in a tile's menu. The order is personal and synced to every device; *Only favourites*
+  still applies to lists and projects only (#1798).
+- **Fixed sidebar head:** brand, workspace switch, search and favourites stay in place while the sidebar scrolls - on the
+  desktop, the Fold and in the phone's drawer (#1798).
+- **Your colour per workspace:** Settings > Workspaces offers the 12 list tones (or no colour) for Private and every
+  organisation; only you see it. The sidebar takes a light tint of the shown workspace and the workspace switch shows a
+  dot in front of each workspace. Without a choice an organisation keeps the colour its admins chose (#1807).
+
 ## [2.56.1] - 2026-10-16
 
 CI fixes for 2.56.0 (both go live with this version).
