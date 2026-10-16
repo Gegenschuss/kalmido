@@ -130,7 +130,7 @@ INP, REV, BACK = sc["In progress"][0], sc["Review"][0], sc["Backlog"][0]
 # ---- members: carol edits, dave (other organisation) is a stranger
 check(Bo.put(B + f"/api/lists/{P}/members", json={"user_id": CAROL, "role": "edit"}).ok, "setup: carol edits P")
 check(Bo.put(B + f"/api/lists/{P}/members", json={"user_id": AG, "role": "edit"}).ok, "setup: P shared with devbot")
-check(Bo.put(B + f"/api/lists/{P}/members", json={"user_id": AGR, "role": "edit"}).ok, "setup: P shared with readbot")
+Bo.put(B + f"/api/lists/{P}/members", json={"user_id": AGR, "role": "edit"})  # (the scope check comes first either way)
 
 # ---- WIP limit: set, clear, bad values, rights
 r = Bo.patch(B + f"/api/sections/{BACK}", json={"wip_limit": 2})

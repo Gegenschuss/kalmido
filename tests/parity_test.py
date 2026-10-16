@@ -61,6 +61,7 @@ APP_TO_API = {
     "GET /api/tasks/{}/timeline": ["GET /tasks/{}/comments"],
     "GET /api/tasks/{}/deps": ["GET /tasks/{}/dependencies"],
     "GET /api/tasks/{}/milestone": ["GET /tasks/{}/milestone"],  # 2.18.0 (#430)
+    "GET /api/lists/{}/velocity": ["GET /lists/{}/velocity"],  # 2.60.0 (#1511)
     "POST /api/tasks/reorder": ["POST /tasks/{}/move"],
     "POST /api/tasks/batch": ["POST /tasks/batch"],
     "POST /api/tasks/purge-done": ["POST /tasks/batch"],
