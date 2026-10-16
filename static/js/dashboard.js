@@ -92,7 +92,8 @@ document.addEventListener('keydown', e => { const g = e.target.closest?.('.ngmai
 // few numbers and a search field.
 const DASH = [['wait', N_('Waiting for you'), 'hourglass'], ['today', N_('Today'), 'sun'], ['news', N_('News'), 'bell'], ['chat', N_('Team chat'), 'comment'],
   ['projects', N_('Projects'), 'brief'], ['pinned', N_('Pinned|view'), 'pin'], ['notes', N_('Notes'), 'edit'], ['agents', N_('Agents'), 'bot'],
-  ['stats', N_('Statistics'), 'chart'], ['search', N_('Search'), 'search'], ['family', N_('Family'), 'family']];
+  ['stats', N_('Statistics'), 'chart'], ['search', N_('Search'), 'search'], ['family', N_('Family'), 'family'],
+  ['kpi', N_('Figures'), 'trend']];  // 2.50.0 (#1197): office admins only (office_kpi.js kp_tile)
 S.dash = {custom: false};
 // ------------------------------------------------------------------ 2.32.0 (#1063) the view builder ("Customize")
 // One module for every view built from blocks (start page, Today, Time tracking, the project page): show / hide, order,
@@ -305,7 +306,7 @@ LY.project = {quick: true, title: () => tr('Customize the project page'), blocks
     });
   }};
 // the start page (#475) on the view builder
-LY.home = {key: 'dashboard', grid: 'dgrid', title: () => tr('Customize the start page'), blocks: () => DASH.filter(d => d[0] !== 'family' || famOn()).map(d => [d[0], d[1], d[2], 'half', false, 2]),  // 2.43.0 (#1452): a third wide
+LY.home = {key: 'dashboard', grid: 'dgrid', title: () => tr('Customize the start page'), blocks: () => DASH.filter(d => (d[0] !== 'family' || famOn()) && (d[0] !== 'kpi' || (typeof officeOn === 'function' && officeOn()))).map(d => [d[0], d[1], d[2], 'half', false, 2]),  // 2.43.0 (#1452): a third wide
   // 2.45.0 (#1504): the default for accounts without an own arrangement (and no standard set by an admin): Today and News
   // two thirds wide on the left, the rest a third on the right, the phone in this order; Search hidden
   def: () => ({order: ['today', 'agents', 'news', 'projects', 'wait', 'pinned', 'chat', 'notes', 'stats', 'family', 'search'], hidden: ['search'], opts: {today: {lw: 4}, news: {lw: 4}}})};
@@ -340,6 +341,7 @@ function dashCard(k) {
     if (!gs.length) return slim(tr('News: nothing new'));
     return card(`<ul class="dwl hpnl">${gs.map(hpNewsRow).join('')}</ul><a class="linkbtn hpall" href="#news">${tr('All news')}</a>`, '', S.news?.unread || '');
   }
+  if (k === 'kpi') return typeof kp_tile === 'function' ? kp_tile(card) : '';  // 2.50.0 (#1197)
   if (k === 'chat') {
     if (!teamOn()) return '';
     if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'home') renderView(); }); }
