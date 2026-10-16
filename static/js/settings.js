@@ -194,10 +194,11 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-pcol': ['person_colors', N_('Show colours for people'), 'chk'],  // 2.47.1 (#1721)
   's-lpdot': ['list_color_dot', N_('List colours only as a dot'), 'chk'],  // 2.53.0 (#1426)
   's-sideic': ['side_icons', N_('List icons'), 'sel'], 's-sideprog': ['side_progress', N_('Progress in the sidebar'), 'chk'],  // 2.36.0 (#1117)
+  's-sidecnt': ['side_count', N_('Task counts in the sidebar'), 'chk'], 's-sidedot': ['side_dots', N_('Status dots of lists'), 'chk'], 's-sideshr': ['side_share', N_('Share marks (person / robot)'), 'chk'],  // 2.56.1 (#1799)
   's-sdd': ['show_done_default', N_('Completed tasks'), 'sel'],  // 2.39.1 (#1214)
   's-favq': ['fav_quiet', N_('Quieter pushes from lists without a star'), 'chk'], 's-favs': ['fav_suggest', N_('Suggest favourites'), 'chk'],  // 2.46.1 (#1361)
 };
-const SET_RENDER = ['sidebar', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
+const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
@@ -258,7 +259,7 @@ function settingsSync() {
   const s = S.settings;
   for (const [id, [k, , kind]] of Object.entries(SETS)) {
     const el = $('#' + id, md); if (!el || el === document.activeElement) continue;
-    if (kind === 'chk') el.checked = k === 'celebrate' || k === 'list_emoji' || k === 'show_done_new' || k === 'side_progress' || k === 'person_colors' || k === 'ical_alarms' || k === 'cal_today' || k === 'time_focus' ? s[k] !== '0' : s[k] === '1';
+    if (kind === 'chk') el.checked = k === 'celebrate' || k === 'list_emoji' || k === 'show_done_new' || k === 'side_progress' || k === 'person_colors' || k === 'ical_alarms' || k === 'cal_today' || k === 'time_focus' || k === 'side_count' || k === 'side_dots' || k === 'side_share' ? s[k] !== '0' : s[k] === '1';  // 2.56.1 (#1799): side_*
     else { el.value = s[k] ?? ''; if (el.dataset.dp) dpSync(el); }
   }
   for (const el of $$('[data-feat]', md)) el.checked = feat(el.dataset.feat);
@@ -271,6 +272,7 @@ function settingsSync() {
   $$('#s-lang [data-lang-set]', md).forEach(b => b.classList.toggle('on', b.dataset.langSet === (s.lang || 'en')));
   ntfyShow(md);
   const lk = $('#s-lookin', md); if (lk) lk.innerHTML = lookHtml();
+  rsy_sync(md);  // 2.56.1 (#1799)
   md._tabDraw?.();
   md._sideDraw?.();
 }
@@ -665,6 +667,7 @@ function settingsModal(focus) {
       ${hint(tr('Tasks with a priority get a light background in its colour (high red, medium orange, low blue) in lists, Today and on boards; the bar at the edge stays.'))}
       <div class="row">${chk('s-pcol', s.person_colors !== '0', tr('Show colours for people'))}</div>
       ${hint(tr('Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.'))}
+      ${rsy_setHtml() /* 2.56.1 (#1799): symbols in the row */}
       <div class="row">${chk('s-lpdot', s.list_color_dot === '1', tr('List colours only as a dot'))}</div>
       ${hint(tr('An open list takes its colour for the header, ticks and buttons, and tasks show it as a thin edge on boards, in the calendar and in Today or Week. On: only the dot in the sidebar. For all your devices.'))}
       <h4 id="s-side-h">${tr('Sidebar')}</h4>
@@ -673,7 +676,8 @@ function settingsModal(focus) {
       <div class="row" style="margin-top:.5rem"><span class="spacer"></span><button class="btn sm" data-m="side-reset">${tr('Default')}</button></div>
       <div class="row"><label for="s-sideic">${tr('List icons')}</label><select id="s-sideic">${[['line', N_('Lines')], ['emoji', N_('Emoji')], ['dot', N_('Dot')]].map(([v, n]) => `<option value="${v}" ${(s.side_icons || 'line') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       <div class="row">${chk('s-sideprog', s.side_progress !== '0', tr('Progress in the sidebar'))}</div>
-      ${hint(tr('Lines: a calm grey icon for the emoji at the start of a list name (the emoji stays in the name), its dot in the list colour. Dot: only the list colour. A project can also hide its progress in its own settings. For all your devices.'))}${lc_favSetHtml(chk, hint)}`,
+      ${hint(tr('Lines: a calm grey icon for the emoji at the start of a list name (the emoji stays in the name), its dot in the list colour. Dot: only the list colour. A project can also hide its progress in its own settings. For all your devices.'))}
+      ${rsy_sideSetHtml(chk) /* 2.56.1 (#1799) */}${lc_favSetHtml(chk, hint)}`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
       ${hint(tr('Applies to all devices and to the notifications. Quick add understands English, German and the language chosen here.'))}

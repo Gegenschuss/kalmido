@@ -7672,3 +7672,12 @@ button.jobtag b{font-weight:600}
 /* 2.56.1 C (#1808) "Switch on all modules": the hint stands under the title, never in the same line */
 label.pmsw>span:last-child{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;min-width:0;flex:1 1 auto}
 label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;width:100%}
+/* 2.56.1 B (#1799) symbols in the task row: the level as a segment, "Custom" = boxes per group (phone: big targets) */
+#rsy-set .rsy-row{flex-wrap:wrap;gap:.5rem;align-items:center}
+#rsy-set .rsy-l{min-width:8.75rem;color:var(--muted);font-size:var(--fs-m)}
+#rsy-set .rsy-seg button{min-height:2.25rem}
+.rsy-grps{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:.5rem .75rem;margin:.25rem 0 .5rem}
+.rsy-g{border:1px solid var(--line2);border-radius:var(--radius);padding:.375rem .625rem .5rem;margin:0;min-width:0}
+.rsy-g legend{padding:0 .25rem;color:var(--muted);font-size:var(--fs-xs)}
+.rsy-g .chkl{display:flex;min-height:2rem}
+@media (pointer:coarse){#rsy-set .rsy-seg button{min-height:2.75rem}.rsy-g .chkl{min-height:2.75rem}}

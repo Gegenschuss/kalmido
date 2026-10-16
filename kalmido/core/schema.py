@@ -1810,6 +1810,9 @@ USER_DEFAULTS = {
     "list_color_dot": "0",      # 2.53.0 (#1426): 1 = list colours only as the dot in the sidebar (no accent, no card edge)
     "folder_colors": "{}",      # 2.53.0 (#1426): json {folder path: colour} of my folders; a new list in it takes the colour
     "side_progress": "1",       # 2.36.0 (#1117): progress bars of projects in the sidebar (0 = hidden)
+    # 2.56.1 (#1799): symbols in the task row: all | key (default for everyone) | calm | custom; custom = row_icons_custom
+    # (comma list of ROW_ICON_KEYS, '' = not chosen yet, 'none' = none); the sidebar's counts, status dots, share marks (0 = off)
+    "row_icons": "key", "row_icons_custom": "", "side_count": "1", "side_dots": "1", "side_share": "1",
     "cal_today": "1",           # "Events today" block on Today (external calendar subscriptions)
     "cal_tasks": "1",           # 2.36.1 (#1127): tasks with a date in the calendar views (0 = events only; Today, search, feeds unchanged)
     "cal_lists_hidden": "[]",   # 2.36.1 (#1127): json list of list ids whose tasks the calendar views leave out
