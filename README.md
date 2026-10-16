@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.56.1** (2026-10-16): **fewer symbols** in task rows (levels All / Important / Calm / Custom, default Important) and
+  switchable sidebar marks, the archive import finds the **recipient's address** of old PDFs again, "Switch on all
+  modules" switches on every module.
 - **2.52.0** (2026-10-16): the calendar like a desktop app - **drag to create, move and resize** events, also by long
   press on phones; **write into subscribed CalDAV calendars** (switch per subscription, off by default) and **address
   books of an organisation** that stay when a person leaves.
