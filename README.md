@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.56.0** (2026-10-16): a **Message** button on job cards, a **chat history per job** (tap its name), running jobs in
+  the agent menu, **organisation admins rename and restyle** their organisation's lists (no access to contents) and
+  sidebar symbols in fixed columns.
 - **2.55.1** (2026-10-16): start page arrangements save with the office figures card (both go live with this version).
 - **2.55.0** (2026-10-16): **saved arrangements** per view switched in the header, **settings per block**, arrangements
   **sent as templates**, **agents propose arrangements** (you accept), more views on the block builder and a **newsletter

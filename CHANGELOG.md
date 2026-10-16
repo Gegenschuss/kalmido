@@ -7,6 +7,33 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.56.0] - 2026-10-16
+
+**In short:** talking to a running background job of an agent gets direct - a **Message** button on the job card, every
+job with **its own chat history** (tap its name or tag), running jobs in the agent menu of the header - organisation
+admins **rename and restyle** their organisation's lists without access to the contents, and the sidebar's share
+symbols stand in fixed columns.
+
+### Added
+- **Message to a job:** running and waiting job cards get *Message* next to *Stop* (a sheet on phones, sending stays off
+  while empty, up to 4000 characters); the agent gets the `job` event with `action: "message"` and `text`, the job's state
+  is not touched. Same rights as *Stop* (#1791).
+- **A chat history per job:** the job tag ("Clara · Job #220") and the job's name at the start of its messages open the
+  job's own history - its messages, your messages to it and the agent's answers to those; the input writes to the job
+  ("Clara: …"), *Back* returns to the whole chat; an ended job shows "Job has ended" and no input. Running jobs for you
+  appear with their name in the agent menu of the header. API: jobs carry `name`, `GET /api/agents/<id>/chat?job=<id>` (#1793).
+- **Organisation lists:** organisation admins change name, icon (emoji or picture) and colour of their organisation's
+  lists under *Settings > Organisation > Lists of the organisation > Edit*, without a role in the list and without access
+  to its tasks, sections or members. The change is logged (old -> new) and the owner and members get a News item (#1795).
+
+### Changed
+- **Sidebar:** person and agent symbols stand in two fixed columns at the right edge; a missing agent symbol leaves its
+  column empty, folders, sublists and lists line up, the dot and counter sit left of the columns (#1797).
+
+### Agents
+- `job` event: `action: "message"` with `text`; jobs carry `name`; the reference launcher passes a job message on as a chat
+  run with a hint (capability `job_message`).
+
 ## [2.55.1] - 2026-10-16
 
 ### Fixed

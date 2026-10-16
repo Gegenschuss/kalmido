@@ -96,6 +96,13 @@ organisation admin adds and removes members. A server without any organisation l
 once there is one, people see the members of their organisations and the people they share something with; private lists
 reach anybody else by e-mail address.
 
+**Lists of the organisation (2.35, 2.56).** Organisation admins find the organisation's shared lists under *Settings >
+Organisation > Lists of the organisation*: names, owners and numbers, never the contents. They can archive, restore, delete
+from the archive and hand a list over to another member; since 2.56 also *Edit* its name, icon (emoji or picture) and
+colour, without needing a role in the list. That is all: tasks, sections, members and settings stay with the owner and the
+list's admins. Private lists are never shown or changed, agents cannot use these functions, every change lands in the
+dialog's history (old and new value) and the owner and the members get a News entry.
+
 **Finding people by e-mail (2.49).** Under *Settings > Account > Find people* a person can find someone by their full
 e-mail address and send a connection request; once it is accepted, both see each other like after sharing a list. Only
 accounts that switched on *Findable by e-mail* (off by default) and confirmed their address with a mailed link can be

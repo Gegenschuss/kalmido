@@ -71,7 +71,8 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "offer_accepted",  # 2.51.0 A (#1348): a quotation of its office area was accepted (agents with the office switch)
                 )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
-JOB_ACTIONS = ("approve", "reject", "stop")
+JOB_ACTIONS = ("approve", "reject", "stop", "message")  # 2.56.0 (#1791): message = text to a running job, no state change
+JOB_MESSAGE_MAX = 4000                                      # 2.56.0 (#1791): characters of a message to a job
 REACTIONS = ("up", "down", "heart")   # the fixed set; any other single emoji is stored as itself
 REACTION_ALIASES = {**{k: k for k in REACTIONS}, "+1": "up", "-1": "down", "\U0001f44d": "up", "\U0001f44e": "down",
                     "\u2764\ufe0f": "heart", "\u2764": "heart"}
@@ -812,6 +813,16 @@ def need_chat_agent(c, aid):
     return a
 
 
+# 2.56.0 (#1793): the name a background job of an agent service carries in its title ("Clara: Release 2.50",
+# part jobs "Frida B: ..."); None for other titles
+JC_NAME_RE = re.compile(r"^([A-ZÄÖÜ][a-zäöüß]{1,11}(?: [A-Z])?): ")
+
+
+def jc_job_name(title):
+    m = JC_NAME_RE.match(title or "")
+    return m.group(1) if m else None
+
+
 def job_dict(c, j, names=None):
     names = names or user_names(c, [j["agent_id"], j["user_id"], j["action_by"]])
     t = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (j["task_id"],)).fetchone() if j["task_id"] else None
@@ -821,7 +832,8 @@ def job_dict(c, j, names=None):
             "action_by_name": names.get(j["action_by"], "") if j["action_by"] else "", "action_at": j["action_at"],
             "created_at": j["created_at"], "updated_at": j["updated_at"],
             "kind": j["kind"], "proposal_state": j["prop_state"] or None,  # 2.3.0: proposal jobs
-            "approval": bool(j["approval"]) if "approval" in j.keys() else False}  # 2.15.0 (#479): a request waiting for approval
+            "approval": bool(j["approval"]) if "approval" in j.keys() else False,  # 2.15.0 (#479): a request waiting for approval
+            "name": jc_job_name(j["title"])}  # 2.56.0 (#1793): "Clara" of "Clara: Release 2.50" (null without)
 
 
 def job_visible(c, j, uid):

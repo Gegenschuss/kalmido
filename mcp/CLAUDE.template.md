@@ -343,7 +343,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `unassigned`: a task is no longer assigned to you
 - `chat`: a person wrote to you in your chat
 - `reaction`: a reaction (thumbs up / down = approval) on your comment or chat message
-- `job`: a job of yours changed (approved, rejected, stopped)
+- `job`: a job of yours changed (approved, rejected, stopped); 2.56.0: `action` `message` = the person wrote to that running job (`text`): pass it on to the job if you can, else answer it in their chat as a message about the job
 - `tidy`: a new task to tidy up (tidy mode)
 - `wake`: a person woke you (Wake button / endpoint)
 - `ping`: a connection test
