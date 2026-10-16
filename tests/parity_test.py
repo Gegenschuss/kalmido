@@ -359,6 +359,9 @@ APP_ONLY = [
     # 2.55.0 (#1455): the newsletter connection holds access data of an outside service and decides who gets mail: people only
     ("2.55.0 (#1455): the newsletter connection, segments, sync and the consent of contacts are set by people (admins / the "
      "person); agents read the consent with the contact (field newsletter), no new agent rights", ("* /api/newsletter",)),
+    # 2.63.0 B (#1513): whether the reporter of a customer report gets mails is the team's (and the reporter's) decision
+    ("2.63.0 (#1513): the mails to the reporter of a customer report are switched by people (the task's box) or the reporter "
+     "(the link in every mail); agents answer customers with portal comments", ("=PATCH /api/tasks/{}/ticket",)),
 ]
 
 

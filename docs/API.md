@@ -188,7 +188,7 @@ had been made in the app. Webhooks fire too.
 | `GET /tasks/{id}/subtasks` | read | Subtasks |
 | `POST /tasks/{id}/subtasks` | tasks:write | Add a subtask |
 | `GET /tasks/{id}/comments` | read | Comments |
-| `POST /tasks/{id}/comments` | comments | Comment: `{body}`; mention someone with `<@user_id>`; agents may add a tidy `suggestion` (see [AGENTS.md](AGENTS.md)) |
+| `POST /tasks/{id}/comments` | comments | Comment: `{body}`; mention someone with `<@user_id>`; agents may add a tidy `suggestion` (see [AGENTS.md](AGENTS.md)); 2.63.0 (#1513): `portal: true` = a public answer the customer of a customer report sees (only on a task with a ticket and with write access; comments carry `portal`) |
 | `POST /comments/{id}/choice` · `POST /comments/{id}/withdraw` | comments | 2.41.0 (#1383): agents post comments with answer buttons (`choices`, `multi`) or an approval card (`approval: {title, what?, yes_label?, no_label?}`, `expires_in`); comments carry `choices`, `choice` (`{ids, at, user_id, user_name, via}`, written once) and `choice_state` (open, answered, expired, withdrawn). A person (own token, may edit the task and instruct the agent) answers `{choice_ids}` (a plain button is also posted as the person's comment: `answer_comment_id`); the agent withdraws its open buttons `{outcome?: denied \| expired}`. The app: `POST /api/comments/{id}/choice`, `GET /api/comments/{id}/choice` (the state); tasks carry `approvals_open` when an agent's approval card waits in their comments |
 | `GET /tasks/{id}/attachments` | read | 2.13.1: the files of a task and of its comments: `id`, `task_id`, `comment_id` (`null` = the task's own), `name`, `mime`, `size`, `created_at`, `url` |
 | `GET /attachments/{id}` | attachments:read | 2.13.1: the file itself (images, PDF and text inline, everything else as a download; `?dl=1` always a download; `410` = damaged on the server). Same rights as in the app |
@@ -889,6 +889,14 @@ organisation's state. Never the kind (vacation, sick leave, day off) or the note
 `POST /tasks/{id}/approval` (`tasks:write`): `{action: request, approver_id, note?}` / `{action: cancel}`; the approver
 (a person in the app) decides with `approve`, `changes` or `reject`. Tasks carry `approval` (`pending | approved |
 changes | rejected | null`) and `approver_id`.
+
+2.63.0 (#1513) customer reports (web app only, no `/api/v1`): `GET /api/tasks/{id}/timeline` carries `ticket` for a task
+that came in through a form with a status link (`name`, `created_at`, `client_id` / `client_name`; for people who may change
+the task also `email`, `url` = the status link, `notify`, `last_seen_at`); `PATCH /api/tasks/{id}/ticket` `{notify}` turns
+the mails to the reporter on / off. `GET /clients/{id}` adds `tickets` (`task_id`, `title`, `done`, `created_at`; only tasks
+the person sees). The reporter's pages are server-rendered HTML without an account: `/p/{token}` (status, public answers,
+answer form, "All my reports"), `/p/{token}/stop` (mails off), `/portal/login/{token}` (one-time sign-in link by mail, 30 min)
+and `/portal` (the reporter's tickets of the same space, cookie for 7 days).
 
 `GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / list admins): a form's `url`, `access`
 (`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link. 2.63.0: `ttype` (`''` | `bug` | `feature` |

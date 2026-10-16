@@ -138,3 +138,24 @@ mails per address and day) and at most 5 links in the text.
   News item ("For you", switched off together with the sharing News) with a preview and *Take over* / *Decline*; taken over,
   it is their own saved arrangement, named after the sender, with no link back.
 - Agents cannot use any of this (403); they propose arrangements their own way (2.55.0, #1066).
+
+## The customer portal (2.63.0)
+
+A form with **status link** turns every report sent without an account into a customer report: the reporter gets a link to
+its status page (on the thank-you page and by mail). There they see the title, the state (received, in progress, done), the
+text they sent, the team's public answers and their own comments, and they can answer. **All my reports** sends a sign-in
+link (valid 30 minutes, once) to their address; it opens a page with all their reports in the same organisation (or the same
+private list owner) - never reports of another organisation, even with the same address. Nobody needs an account.
+
+- **Internal stays internal.** In the task panel, a customer report shows the box *Customer report* (who sent it; the
+  address, *Copy the status link* and *Mails to the customer* only for people who may change the task). The comment box
+  gets a switch *Internal* / *To the customer*: it starts on *Internal* every time. Only comments sent with *To the
+  customer* reach the customer; they are marked "to the customer", the customer's own ones "Customer". A public answer
+  cannot be made internal later (the customer may have it by mail already); delete it if needed.
+- **Mails.** The customer gets a mail for a public answer and when the report is done - at most one mail per report every
+  10 minutes, every mail with a link that turns them off. *Mails to the customer* in the box does the same for the team.
+- **Clients.** A report belongs to the list's client, else to the client of the organisation whose e-mail (or a contact
+  person's) is the reporter's address. The client's card lists its reports (block *Customer reports*).
+- **What the customer never sees:** internal comments, the notes once the team changed them, assignees, files, other tasks,
+  names of team members other than the name of an answer's author.
+- Agents answer customers the same way (`add_comment` with `portal: true`, see AGENTS.md).

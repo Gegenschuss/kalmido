@@ -61,6 +61,8 @@ KINDS = {
     "group": ("matrix", "p2300_tenant_test.py: groups without a visible member stay unknown (B1)"),
     "template": ("matrix", "p2300_tenant_test.py: templates by id, from / into lists of others"),
     "form": ("matrix", "p2300_tenant_test.py: forms by id, the form page for another organisation"),
+    # 2.63.0 B (#1513): customer reports: the status page / the portal never across organisations, a task's ticket by id
+    "portal": ("matrix", "p263_b_api_test.py: status links and the portal show one space's tickets only, a task's ticket by id"),
     "client": ("matrix", "p2300_tenant_test.py: clients by id, workload"),
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
     # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
@@ -320,6 +322,10 @@ ROUTES = {
     "GET /api/lists/{}/forms": "form", "POST /api/lists/{}/forms": "form", "PATCH /api/forms/{}": "form",
     "DELETE /api/forms/{}": "form", "GET /f/{}": "form", "POST /f/{}": "form", "GET /api/v1/lists/{}/forms": "form",
     "POST /api/v1/lists/{}/forms": "form", "PATCH /api/v1/forms/{}": "form", "DELETE /api/v1/forms/{}": "form",
+    # 2.63.0 B (#1513): the customer portal
+    "GET /p/{}": "portal", "POST /p/{}/comment": "portal", "GET /p/{}/stop": "portal", "POST /p/{}/notify": "portal",
+    "POST /p/{}/login": "portal", "GET /portal/login/{}": "portal", "POST /portal/login/{}": "portal", "GET /portal": "portal",
+    "POST /portal/logout": "portal", "PATCH /api/tasks/{}/ticket": "portal",
     # ---- group (6)
     "GET /api/v1/groups": "group", "GET /api/v1/groups/{}": "group", "GET /api/groups": "group",
     "POST /api/admin/groups": "group", "PATCH /api/admin/groups/{}": "group", "DELETE /api/admin/groups/{}": "group",
