@@ -1051,8 +1051,10 @@ def _rem_set(csv_):
 def dav_patch(c, u, cur, v, caps, lid):
     """The task_update body that turns the stored task into what the client sent (only what changed)."""
     tid, p = cur["id"], {}
+    from ..collab.notelock import ln_is_locked
+    locked = ln_is_locked(c, tid)  # 2.48.0 (#1642): a locked note is never overwritten (nor unlocked) by a calendar app
     for k in ("title", "content", "priority", "due", "due_time", "url"):
-        if (cur[k] or None) != (v[k] or None):
+        if (cur[k] or None) != (v[k] or None) and not (k == "content" and locked):
             p[k] = v[k]
     if cur["status"] == 0 or v["status"] == 0:  # completing moves a recurring task on: dates of a done task are kept
         start = v["start"]

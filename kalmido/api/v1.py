@@ -74,12 +74,14 @@ API_TOKEN_RE = re.compile(r"abk_[A-Za-z0-9_-]{20,100}")
 # 2.21.0 (#659 / #658): "calendar" (events and event calendars, reading included) and "contacts" (address books and
 # contacts, reading included: sensitive, so never part of the legacy "write"); a new agent gets neither by default
 SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export",
-          "calendar", "contacts", "private", "account", "admin-read")
+          "calendar", "contacts", "private", "account", "admin-read",
+          "files:read", "files:write")  # 2.48.0 (#1207): the file store (folders / files shared with the token's account)
 # 2.22.0 (#663): "private" = health lists and the journal (reading included); like "contacts" never part of the legacy
 # "write" and never in an agent's default (agents never see health lists at all, see core/access.py)
 SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private"))   # what the legacy "write" stands for
 SCOPES_AGENT_NEVER = ("account", "admin-read", "private")   # never for an agent: credentials / settings of the account, admin data, health + journal (2.22.0)
-SCOPES_AGENT_DEFAULT = ("read", "tasks:write", "comments")
+# 2.48.0 (#1207): a new agent may use the file store: it sees only what is shared with it (and its own folder) anyway
+SCOPES_AGENT_DEFAULT = ("read", "tasks:write", "comments", "files:read", "files:write")
 API_SCOPES = SCOPES + ("write",)
 API_PAGE_MAX, API_PAGE_DEFAULT = 500, 100
 API_USED_EVERY = 60                           # s between two last_used_at updates of one token
@@ -369,6 +371,8 @@ def v1_task(d):
                             for a in d.get("attachments") or []])
     if d.get("encrypted_note"):  # 2.42.0 (#828): only that there is one (the content is end-to-end encrypted)
         out["encrypted_note"] = True
+    if d.get("note_locked"):  # 2.48.0 (#1642): the note is locked with its owner's password: notes stays empty
+        out["note_locked"] = True
     return out
 
 
@@ -384,6 +388,8 @@ def task_for(c, row, uid):
     out = {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"])}
     if c.execute("SELECT 1 FROM task_enc_notes WHERE task_id=? LIMIT 1", (row["id"],)).fetchone():
         out["encrypted_note"] = True  # 2.42.0 (#828): agents learn only that there is an encrypted note
+    if c.execute("SELECT 1 FROM task_note_locks WHERE task_id=?", (row["id"],)).fetchone():
+        out["note_locked"] = True  # 2.48.0 (#1642): the note is locked with its owner's password (never readable here)
     return out
 
 

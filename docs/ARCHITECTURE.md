@@ -170,6 +170,7 @@ The most used helpers:
 | `wiki/outline.py` | 2.49.0 (#1201): parses an outline (Markdown list, OPML, FreeMind `.mm`; no DOCTYPE / entities) for the mind map import; stores nothing. |
 | `collab/teamchat.py` | Team chat (rooms and direct messages). |
 | `collab/msgsearch.py` | 2.33.0: search in comments, team chat and agent chats; since 2.37.0 a trigram index (`pg_trgm`) on `kalmido_fold(body)` (unaccent + umlaut folding) per message table, visibility, snippets. |
+| `collab/notelock.py` | 2.48.0 (#1642): a task's note locked with its owner's password (`task_note_locks`, ciphertext only, `tasks.content` emptied; only own unshared lists); `ln_guard` keeps every other write (app, API, agents, proposals, CalDAV) off a locked note; flags `note_locked` / `note_locked_mine`. |
 | `collab/e2e.py` | 2.42.0 (#828, #909): end-to-end encryption in the browser: the person's public key + wrapped key bundle (`e2e_keys`), the encrypted note of a task (`task_enc_notes`), encrypted task files (`attachments.enc`), the switch of an encrypted DM (`tchat_rooms.e2e`, `tchat_msgs.enc`). Stores ciphertext only; see *End-to-end encryption* below. |
 | `collab/chatsave.py` | 2.37.0 (#1159): a chat message (agent chat, team chat) saved as a task by a person: text, file copies, link back (`#msg/...`); `chat_saves` per person, `saved_task_id` in the chat pages. 2.42.0 (#1383): also an agent's comment on a task (kind `comment`: a subtask of the task or a new task in its list). |
 | `collab/replies.py` | 2.33.0: replies to one message (comments, team chat, agent chat): `reply_to` checks and the short quotes. |
@@ -263,6 +264,7 @@ registering the ones of its area.
 | `detail.js` | The detail panel of a task. |
 | `multiedit.js` | 2.26.0: several selected tasks edited at once in the task panel (common values, "Mixed", one undo step). |
 | `sheetdrag.js` | 2.39.1: bottom sheets on phones (menus, date picker, quick add, dialogs) dragged taller / shorter at their grip and swiped down to close. |
+| `notelock.js` | 2.48.0 (#1642): lock a task's note with one's own password (the keys of `e2e.js`): "Lock note" under the description (own, unshared lists), the locked placeholder, unlocked editing (saved as ciphertext), "Remove lock"; drops undo steps that still hold the old text. |
 | `e2e.js` | 2.42.0 (#828, #909): end-to-end encryption with WebCrypto: set up / unlock / lock / change / reset the keys (Settings > Account), the encrypted note in the task detail, encrypted files (*Attach encrypted*), encrypted DMs (lock in the DM head, safety number). |
 | `miniwin.js` | 2.39.1: a list in its own small browser window (double / middle click in the sidebar, list menu); the window (`/?mini=1#l/<id>`) shows only the list and keeps its UI state to itself. 2.43.0 (#1500): a task in its own window too (`/?mini=1#t/<id>`, middle click on the row, task menu, button in the task panel). |
 | `chatwins.js` | 2.47.1 (#1720): several chats at once in the chat side panel, one above the other (agents, team chats, direct messages): Ctrl / Cmd + click or *Open in split window*, a divider between them, fold, close, reorder, remembered per device; one window holds the usual ids and state (`S.chat` / `S.tc`), the others are parked. Phones: a row of the open chats above the chat. |
@@ -273,6 +275,7 @@ registering the ones of its area.
 | `countries.js` | 2.40.0: the country picker (names from the browser, ISO 3166 alpha-2 codes) of the client card, company data and import preview. |
 | `collab.js` | News and comments + activity (module "collab"). |
 | `attachments.js` | Attachments and the share target. |
+| `pdfview.js` | 2.48.0 (#1367): the PDF preview `pdfView({url, name, size, dlUrl})` (lightbox: pages drawn on demand, turn pages, zoom, swipe, a clear message offline or for a damaged file) for attachments, project files, office documents and archive PDFs; links carry `data-pview`. Uses the bundled pdf.js (`static/vendor/pdfjs/`, loaded on first use, `isEvalSupported: false`, no scripting). |
 | `undo.js` | Undo / redo history. |
 | `popovers.js` | Popovers (date, priority, list, tags, reminders, repeat ...). |
 | `dialogs.js` | Modals: the app's own dialogs, the list dialog and the share dialog. |
@@ -452,6 +455,7 @@ re-wraps the same bundle. Removing the keys deletes the person's encrypted notes
 | Content | Key | AAD | Who reads it |
 |---|---|---|---|
 | Task note (`task_enc_notes.body` = `{v, iv, ct}`) | content key | `kalmido-note:v1:<task_id>:<user_id>` | only its author |
+| Locked task note, 2.48.0 (`task_note_locks.body` = `{v, iv, ct}`, `tasks.content` empty) | content key | `kalmido-locknote:v1:<task_id>:<user_id>` | only the person who locked it |
 | Task file (`attachments.enc = 1`, blob `KENC` 0x01, IV, ciphertext of header length + `{name, type, size}` + bytes) | content key | `kalmido-file:v1:<task_id>:<user_id>` | only its uploader |
 | Direct message in an encrypted DM (`tchat_msgs.enc` = `{v, iv, ct}`, `body` empty) | AES-256-GCM from HKDF-SHA256(ECDH(own private, other public), salt = room id, info `kalmido-dm:v1`) | `kalmido-dm:v1:<room_id>:<sender_id>` | the two people of the DM |
 

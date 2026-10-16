@@ -66,6 +66,8 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "scheduled_job",  # 2.34.0 (#272): a planned job of a person is due (agents/schedules.py); answer in their chat
                 "playbook_proposal",  # 2.39.0 (#1168): people applied / discarded the agent's proposed change of a list's Playbook
                 "message_edited",  # 2.39.0 (#1179): a person changed a chat message / comment / team message the agent already had
+                "file_shared",  # 2.48.0 (#1207): a folder / file of the file store was shared with the agent (node, role)
+                "document_added",  # 2.48.0 (#1356): a new document was recognised in a folder / file shared with the agent
                 )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop")

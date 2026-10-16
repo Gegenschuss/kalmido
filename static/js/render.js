@@ -206,7 +206,7 @@ const SIDE_FOLDED = ['views', 'areas', 'tags', 'more'];  // 2.39.1 (#1185): "Are
 const SIDE_GROUPS = ['focus', 'lists', 'views', 'areas', 'filters', 'tags', 'team', 'more'];
 const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Lists'), filters: N_('Filters'), tags: N_('Tags'), views: N_('Views'), areas: N_('Areas|nav'), team: N_('Conversations|nav'), more: N_('More')};
 const SIDE_VIEW_KEYS = ['cal', 'timeline', 'matrix', 'overview', 'workload', 'notes'];  // 2.45.0 (#1516): + the notes of all lists
-const SIDE_AREA_KEYS = ['office', 'wiki', 'time', 'habits', 'review', 'life', 'agents'];  // 2.44.0 (#1187): office, time, review, life = areas (areas.js)
+const SIDE_AREA_KEYS = ['office', 'ablage', 'wiki', 'time', 'habits', 'review', 'life', 'agents'];  // 2.48.0 (#1207): + the file store  // 2.44.0 (#1187): office, time, review, life = areas (areas.js)
 const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['stale', N_('Lying idle')], ['assigned', N_('My tasks')], ['byme', N_('Assigned by me')]];
 const sideModEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
   ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
@@ -451,6 +451,7 @@ function renderTop0() {
   const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload'), wiki: N_('Knowledge pages')};  // 2.49.0 (#1199): + wiki
   let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? (S.nt.lid ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : tr('Notes')) : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
+  if (!title && (m === 'ablage' || m === 'docs')) title = tr(m === 'ablage' ? 'File store' : 'Documents');  // 2.48.0 (#1207, #1111)
   if (mg_title(m) && !S.me?.kid) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below
   let acts = '';
   if (m === 'tasks' && (k.startsWith('l:') || k === 'inbox')) {
@@ -869,6 +870,8 @@ function renderView0() {
   else if (m === 'workload') setHtml(el, viewWorkload());
   else if (m === 'office') setHtml(el, mg_wrap(m, viewOffice()));  // 2.36.1 (#1021)
   else if (m === 'wiki') setHtml(el, viewWiki());  // 2.49.0 (#1199)
+  else if (m === 'ablage') setHtml(el, mg_wrap(m, viewAblage()));  // 2.48.0 (#1207)
+  else if (m === 'docs') setHtml(el, mg_wrap(m, typeof viewDocs === 'function' ? viewDocs() : ''));  // 2.48.0 (#1111): docs.js
   else if (S.route.key === 'search') setHtml(el, viewSearch());
   else if (S.route.key === 'done' || S.route.key === 'trash') setHtml(el, viewHistory());
   else if (S.route.key === 'archived') setHtml(el, viewArchived());

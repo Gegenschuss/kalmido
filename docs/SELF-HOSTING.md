@@ -22,6 +22,8 @@ addresses and paths to your setup.
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
 - [Mail](#mail)
+- [Documents: text recognition](#documents-text-recognition)
+  - [Import from Paperless-ngx (2.48)](#import-from-paperless-ngx-248)
 - [Moving to a new server](#moving-to-a-new-server)
 - [Production updates](#production-updates)
 
@@ -378,7 +380,9 @@ docker compose up -d kalmido
 - **In-app backups (2.37.0).** *Back up now* and the automatic backups write a zip with a `pg_dump` of the database
   (`kalmido.dump`), the attachments, the office files and a manifest with checksums (format 2); restoring runs in
   maintenance mode with a safety backup first. Backups from before 2.37 (SQLite, a `tasks.db` in the zip) can
-  still be restored: the database file goes through the same move to PostgreSQL as an upgrade.
+  still be restored: the database file goes through the same move to PostgreSQL as an upgrade. Since 2.48 the archive
+  also holds the file store (`attachments/files/<id>/`, every version) and the project files (`attachments/lists/<id>/`,
+  which earlier archives left out); a server before 2.48 restores such an archive without them.
 
 - **Fail closed when the data disk is missing.** Keep the data folder on its own disk or volume and mount it so that
   Docker refuses to start without it, instead of creating an empty folder (an empty start shows the setup page again;
@@ -470,8 +474,9 @@ and download is written to the office log (who, when, size).
   (subtasks, field values, dependencies, history, the trash), comments, attachments, time entries on those lists, the
   team chat channels of those lists, the organisation's calendars with their events, its address books with their
   contacts, its clients, the whole office (company data, services, equipment, packages, texts, framework contracts,
-  quotations / invoices / credit notes with positions, payments, PDF and XML files, the archive, the office log) and the
-  members with their roles (name, user name, e-mail address).
+  quotations / invoices / credit notes with positions, payments, PDF and XML files, the archive, the office log), its
+  file store (2.48: folders, files with every version, shares, the access history, the trash; `store/*.json`,
+  `files/store/`) and the members with their roles (name, user name, e-mail address).
 - **What is not in it.** Lists outside the organisation (the members' private space), other organisations, passwords,
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
   personal data (settings, own tags, filters, templates, direct messages, agent chats).
@@ -603,6 +608,53 @@ Trigger every alert once on purpose after setting it up, the dead man's switch t
   account in five minutes, rate limited per address and sender. Kid accounts, agents, disabled accounts and accounts
   without a password (single sign-on only) get no link: their parents or an admin reset them. Two-factor sign-in stays
   required: after the new password the second step follows, and all other sessions of the account end.
+
+## Documents: text recognition
+
+The area *Documents* (2.48.0) reads the text of uploaded PDFs and images: the text layer of a PDF, and for scans the
+local text recognition Tesseract (German and English) with `pdftoppm` -- both are part of the image (about 120 MB more).
+Nothing leaves the server, no external service and no language model is involved. An image without them (an older own
+build) keeps working: such documents show *Text recognition is not available on this server*.
+
+Each tool runs as a short-lived process with limits; tune them for small hosts:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KALMIDO_OCR_PARALLEL` | `1` | Documents recognised at the same time |
+| `KALMIDO_OCR_PAGES` | `30` | Pages of one document recognised at most |
+| `KALMIDO_OCR_PAGE_S` | `60` | Seconds per page (raster + recognition) |
+| `KALMIDO_OCR_MEM_MB` | `1024` | Memory of one tool |
+| `KALMIDO_OCR_LANGS` | `deu+eng` | Tesseract languages (installed ones only) |
+| `KALMIDO_DOCS_SCAN_S` | `60` | Seconds between two looks into the inbox folders "Dokumente/Eingang" |
+
+The recognised text, amounts, sender names, rules and the learnt models are sealed with the workspace's key when
+`KALMIDO_SECRET_KEY` is set (see [Encryption of organisation data](#encryption-of-organisation-data)); the search uses
+keyed hashes of the words, no plain index. Without `KALMIDO_SECRET_KEY` the hash key of the word index is a fixed one
+(the same on every server): whoever reads the database can then test words against it -- set the server key. With *Tasks by e-mail* set up, every person and organisation can create a
+forwarding address for documents in the documents' settings: PDFs and images attached to mails sent there become
+documents.
+
+### Import from Paperless-ngx (2.48)
+
+Only on a self-hosted server (a hosted server shows nothing of it): an existing Paperless-ngx instance can be connected
+once per workspace -- by an organisation's admin for the organisation, by a person for their own space -- under
+*Documents > Settings > Paperless-ngx* with its address and an API token (Paperless-ngx: *My profile > API auth token*).
+
+- **Read only:** Kalmido only sends GET requests. Nothing in Paperless-ngx is changed, moved or deleted.
+- **Preview first:** the number of documents and how tags, correspondents and document types are taken over: a tag
+  becomes a tag, a folder of the documents or is left out; correspondents become senders, document types types (names can be
+  changed in the preview).
+- **What comes along:** the original file, the recognised text (no new recognition), the date, tags, correspondent, type,
+  and custom fields, notes and the archive serial number as text below the document's text.
+- **Never twice:** a document already imported (Paperless-ngx id per instance address) or the same file already in the
+  workspace (checksum) is left out, also when the import runs again.
+- **In the background:** progress and *Stop* in the settings; optionally *Bring in new documents automatically* every
+  15 minutes up to once a day (only Paperless-ngx -> Kalmido).
+- **Network:** http/https only, timeouts, no redirects, at most `TASKS_MAX_FILE_MB` per file. An instance in the local
+  network is an internal address: allow its host under *Settings > Administration > Advanced* (or
+  `KALMIDO_CALENDAR_ALLOW_HOSTS=paperless.example.com:8000`), the same allow-list as for calendar subscriptions.
+- The token is always stored sealed with a key derived from `KALMIDO_SECRET_KEY` (also when the encryption of
+  organisation data is off) and never shown again. Without a server key the connection cannot be set up.
 
 ## Moving to a new server
 
