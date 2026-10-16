@@ -240,6 +240,9 @@ check(row and row[0][0].startswith("kenc") and not any(x in row[0][0] for x in S
 check(row and row[0][2] == ALPHA and row[0][3] is None, "the connection belongs to Alpha")
 check(j["facets"]["books"] == [{"id": BK, "name": "Customers"}], "only Alpha's own address books (carol's private book stays out)")
 check("VIP" in j["facets"]["tags"] and "Firm One" in j["facets"]["companies"], "tags and companies of the workspace's contacts")
+r = Bo.put(B + "/api/newsletter", json={"ws": WA, "url": "http://127.0.0.1:8087"})
+check(r.status_code == 400 and "access data" in r.text, f"another address without the token again: 400, the stored token never goes there ({r.status_code})")
+check(not [x for x in nl_log() if x["port"] == 8087], "nothing was sent to the other address")
 r = Bo.put(B + "/api/newsletter", json={"ws": WA, "auto": True})
 check(r.ok and r.json()["conn"]["auto"] is True, "planned sync on, without typing the access data again")
 

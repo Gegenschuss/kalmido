@@ -102,8 +102,6 @@ def nwl_put_conn():
     kind = d.get("kind", r["kind"] if r else None)
     if kind not in NWL_KINDS:
         return err(tr("Invalid value: {0}", "kind"))
-    if r and kind != r["kind"] and "token" not in d:
-        return err(tr("Please enter the access data"))
     url = r["url"] if r and kind == r["kind"] else ""
     if "url" in d:
         if d["url"] in ("", None) and kind != "listmonk":
@@ -115,7 +113,10 @@ def nwl_put_conn():
                 return err(tr("Invalid value: {0}", tr("Address")))
     if kind == "listmonk" and not url:
         return err(tr("Please enter the address of the newsletter service"))
-    secret = N.nwl_secret(r) if r and kind == r["kind"] else {}
+    # the stored access data only ever go to the address they were entered for: another service or address needs them again
+    # (the user name is no secret and stays)
+    old = N.nwl_secret(r) if r and kind == r["kind"] else {}
+    secret = old if r and url == r["url"] else {"user": old.get("user", "")}
     if "token" in d:
         t = _str(d, "token", NWL_SECRET_MAX)
         if not t or any(ord(ch) < 33 for ch in t):
@@ -130,7 +131,7 @@ def nwl_put_conn():
         return err(tr("Please enter the access data"))
     if not N.nwl_key_ok(ws):
         return err(tr("The server key is missing: the access data cannot be stored safely"), 409)
-    mode = d.get("mode", r["mode"] if r else "consented")
+    mode = d.get("mode", r["mode"] if r and kind == "listmonk" else "consented")  # double opt-in through Kalmido: listmonk only
     if mode not in N.NWL_MODES or (mode == "doi" and kind != "listmonk"):
         return err(tr("Invalid value: {0}", "mode"))
     auto = r["auto"] if r else 0
