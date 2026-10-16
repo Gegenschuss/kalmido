@@ -47,6 +47,7 @@ KINDS = {
     "list": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: a list by id (read, change, members, sections, fields, notes, owner)"),
     "folder": ("matrix", "p2300_tenant_test.py: folder settings / people / groups are the own folders' only"),
     "news": ("matrix", "p2280_api_test.py: News of other workspaces"),
+    "lytpl": ("matrix", "p255_a_api_test.py: arrangement templates only to people of the own organisations, never to agents, a project page only with access (#1068)"),
     "team": ("matrix", "p2280_api_test.py: team chat rooms and direct messages"),
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
@@ -368,6 +369,11 @@ ROUTES = {
     "GET /api/lists/{}/time/delete-all": "list", "POST /api/lists/{}/time/delete-all": "list", "POST /api/lists/{}/time/restore": "list",
     # 2.43.0 (#1452): the default arrangement of the views: a layout without data of a person, set by the operator
     "GET /api/layouts/std": "public", "PUT /api/layouts/std/{}": "admin",
+    # 2.55.0 (#1069): the person's own saved arrangements; (#1068) templates between people who see each other
+    "GET /api/layouts/saved": "own", "POST /api/layouts/saved": "own", "PATCH /api/layouts/saved/{}": "own",
+    "DELETE /api/layouts/saved/{}": "own", "POST /api/layouts/saved/{}/activate": "own", "POST /api/layouts/saved/standard": "own",
+    "POST /api/layouts/offers": "lytpl", "GET /api/layouts/offers/{}": "lytpl", "POST /api/layouts/offers/{}/accept": "lytpl",
+    "POST /api/layouts/offers/{}/decline": "lytpl",
     "PATCH /api/lists/{}/milestones/{}": "list", "DELETE /api/lists/{}/milestones/{}": "list",
     "POST /api/lists/{}/checklist": "list", "POST /api/sections": "list", "PATCH /api/sections/{}": "list",
     "POST /api/lists/{}/sections/order": "list", "DELETE /api/sections/{}": "list", "POST /api/lists/{}/shift": "list",
