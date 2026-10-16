@@ -78,7 +78,7 @@ function ab2_sheet(it) {
   const md = modal(`<h3>${it ? tr('Edit absence') : tr('Enter an absence')}</h3>
     ${ppl.length > 1 ? `<div class="row"><label for="ab2-who">${tr('Person')}</label><select id="ab2-who">${ppl.map(p => `<option value="${p.id}" ${p.own ? 'selected' : ''}>${esc(p.display_name)}</option>`).join('')}</select></div>` : ''}
     <div class="row"><span class="lbl">${tr('Kind')}</span><div class="seg ab2kinds" role="group" aria-label="${esc(tr('Kind'))}">${AB2_KINDS.map(([k, n]) => `<button type="button" data-k="${k}" class="${k === kind ? 'on' : ''}" aria-pressed="${k === kind}">${esc(tr(n))}</button>`).join('')}</div></div>
-    <div class="row ab2dates"><label>${tr('From')}<input type="date" id="ab2-from" value="${st}"></label><label>${tr('To')}<input type="date" id="ab2-to" value="${en}"></label></div>
+    <div class="row ab2dates"><label>${tr('From')}${dateIn('ab2-from', st)}</label><label>${tr('To')}${dateIn('ab2-to', en)}</label></div>
     <div class="row" id="ab2-halfrow"><label for="ab2-half">${tr('Duration')}</label><select id="ab2-half"><option value="">${tr('Whole day')}</option><option value="am" ${it?.half_day === 'am' ? 'selected' : ''}>${tr('Half day (morning)')}</option><option value="pm" ${it?.half_day === 'pm' ? 'selected' : ''}>${tr('Half day (afternoon)')}</option></select></div>
     <div class="row"><label for="ab2-note">${tr('Note')}</label><input id="ab2-note" maxlength="500" value="${esc(it?.note || '')}" placeholder="${esc(tr('optional'))}"></div>
     <div class="shint lhint keep">${tr('The team only sees that you are away. The kind and the note stay with you and the admins of the organisation.')}</div>
@@ -86,7 +86,7 @@ function ab2_sheet(it) {
   md.classList.add('ab2md');
   const sync = () => { const one = $('#ab2-from', md).value && $('#ab2-from', md).value === $('#ab2-to', md).value; $('#ab2-halfrow', md).hidden = !one; if (!one) $('#ab2-half', md).value = ''; };
   sync();
-  md.addEventListener('change', e => { if (e.target.id === 'ab2-from' && $('#ab2-to', md).value < e.target.value) $('#ab2-to', md).value = e.target.value; sync(); });
+  md.addEventListener('change', e => { if (e.target.id === 'ab2-from' && $('#ab2-to', md).value < e.target.value) { $('#ab2-to', md).value = e.target.value; dpSync($('#ab2-to', md)); } sync(); });
   md.addEventListener('click', async e => {
     const k = e.target.closest('[data-k]');
     if (k) { $$('.ab2kinds button', md).forEach(b => { b.classList.toggle('on', b === k); b.setAttribute('aria-pressed', b === k); }); return; }

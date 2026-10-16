@@ -46,7 +46,7 @@ function dp_view() {
   const rowsOf = (kind, r) => d.bookings.filter(b => (b.kind === kind && b.rid === r.id) || (kind === 'equipment' && b.kind === 'set' && (setItems[b.rid] || []).includes(r.id)));
   const groups = DP_GROUPS.filter(([g]) => DPV.filter === 'all' || (DPV.filter === 'people' ? ['people', 'contacts'].includes(g) : ['equipment', 'sets'].includes(g)));
   const kindOf = {people: 'user', contacts: 'contact', equipment: 'equipment', sets: 'set'};
-  const bar = (b, via) => `<button type="button" class="dpbar ${b.status}${dp_warn(b) ? ' warn' : ''}" data-act="dp-edit" data-id="${b.id}" title="${esc([b.title, dp_when(b), dp_status(b), via ? tr('via {0}', via) : '', dp_warnText(b)].filter(Boolean).join(' · '))}">${dp_warn(b) ? ic('alert', 's') : ''}<span>${esc(b.title)}</span></button>`;
+  const bar = (b, via) => `<button type="button" class="dpbk ${b.status}${dp_warn(b) ? ' warn' : ''}" data-act="dp-edit" data-id="${b.id}" title="${esc([b.title, dp_when(b), dp_status(b), via ? tr('via {0}', via) : '', dp_warnText(b)].filter(Boolean).join(' · '))}">${dp_warn(b) ? ic('alert', 's') : ''}<span>${esc(b.title)}</span></button>`;
   let body = '';
   for (const [g, gname] of groups) {
     let list = d.resources[g];
@@ -80,7 +80,7 @@ function dp_view() {
     <div class="wlwrap dpgrid"><table class="wltable dptable"><thead><tr><th scope="col">${tr('Resource')}</th>${head}</tr></thead><tbody>${body || `<tr><td colspan="${days.length + 1}" class="muted">${tr('Nothing to show yet: add people to the organisation or equipment in Office & finance.')}</td></tr>`}</tbody></table></div>
     <ul class="dpdays">${dayList || `<li class="muted">${tr('No bookings this week.')}</li>`}</ul>
     <p class="muted dplegend"><span class="dpk firm"></span>${tr('Firm')} <span class="dpk option"></span>${tr('Option')} <span class="dpk away"></span>${tr('Away')} ${ic('alert', 's')} ${tr('Double booking or away: a warning, the booking stays')}</p>
-    <div class="dpfreebox"><label for="dp-freeday">${tr('Who is free on …?')}</label><input type="date" id="dp-freeday" value="${fr?.date || d.today}"><button class="btn sm" data-act="dp-free">${tr('Show')}</button></div>${freeHtml}
+    <div class="dpfreebox"><label for="dp-freeday">${tr('Who is free on …?')}</label>${dateIn('dp-freeday', fr?.date || d.today)}<button class="btn sm" data-act="dp-free">${tr('Show')}</button></div>${freeHtml}
     <h4 class="ab2h">${tr('My bookings')}</h4>${mine ? `<ul class="ab2list dpminel">${mine}</ul>` : `<p class="muted">${tr('You are not booked.')}</p>`}</div>`;
 }
 
@@ -93,8 +93,8 @@ async function dp_sheet(day) {
   const grp = (g, kind, label) => res[g].length ? `<fieldset class="dppick"><legend>${esc(tr(label))}</legend>${res[g].map(r => `<label class="dpopt"><input type="checkbox" data-k="${kind}" value="${r.id}"><span>${esc(r.name)}</span><small class="dpbusy" data-k="${kind}" data-id="${r.id}"></small></label>`).join('')}</fieldset>` : '';
   const md = modal(`<h3>${tr('Book')}</h3>
     <div class="row"><label for="dp-title">${tr('What')}</label><input id="dp-title" maxlength="200" placeholder="${esc(tr('e.g. Shoot day, interview'))}"></div>
-    <div class="row ab2dates"><label>${tr('From')}<input type="date" id="dp-from" value="${st}"></label><label>${tr('To')}<input type="date" id="dp-to" value="${st}"></label></div>
-    <div class="row ab2dates"><label>${tr('Start time')}<input type="time" id="dp-t0" step="900"></label><label>${tr('End time')}<input type="time" id="dp-t1" step="900"></label></div>
+    <div class="row ab2dates"><label>${tr('From')}${dateIn('dp-from', st)}</label><label>${tr('To')}${dateIn('dp-to', st)}</label></div>
+    <div class="row ab2dates"><label>${tr('Start time')}${timeIn('dp-t0', '')}</label><label>${tr('End time')}${timeIn('dp-t1', '')}</label></div>
     <div class="row"><span class="lbl">${tr('Status')}</span><div class="seg dpstat" role="group" aria-label="${esc(tr('Status'))}"><button type="button" data-s="option" class="on" aria-pressed="true">${tr('Option')}</button><button type="button" data-s="firm" aria-pressed="false">${tr('Firm')}</button></div></div>
     ${lists.length ? `<div class="row"><label for="dp-list">${tr('Project')}</label><select id="dp-list"><option value="">${tr('None')}</option>${lists.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
     <div class="dppicks">${grp('people', 'user', 'People')}${grp('contacts', 'contact', 'Contacts')}${grp('equipment', 'equipment', 'Equipment')}${grp('sets', 'set', 'Equipment sets')}</div>
@@ -111,7 +111,7 @@ async function dp_sheet(day) {
     } catch { /* no marks offline */ }
   };
   busy();
-  md.addEventListener('change', e => { if (e.target.id === 'dp-from') { if ($('#dp-to', md).value < e.target.value) $('#dp-to', md).value = e.target.value; busy(); } });
+  md.addEventListener('change', e => { if (e.target.id === 'dp-from') { if ($('#dp-to', md).value < e.target.value) { $('#dp-to', md).value = e.target.value; dpSync($('#dp-to', md)); } busy(); } });
   md.addEventListener('click', async e => {
     const s = e.target.closest('[data-s]');
     if (s) { $$('.dpstat button', md).forEach(b => { b.classList.toggle('on', b === s); b.setAttribute('aria-pressed', b === s); }); return; }
@@ -140,8 +140,8 @@ function dp_editSheet(b) {
   const md = modal(`<h3>${esc(b.title)}</h3><p class="muted">${esc(dp_when(b))}</p>
     <ul class="dpjobres">${job.map(x => `<li class="${dp_warn(x) ? 'warn' : ''}"><span>${dp_warn(x) ? ic('alert', 's') : ''}${esc(x.label)}</span>${dp_warn(x) ? `<small>${esc(dp_warnText(x))}</small>` : ''}<button type="button" class="iconbtn" data-m="delone" data-id="${x.id}" aria-label="${esc(tr('Remove {0}', x.label))}" title="${esc(tr('Remove {0}', x.label))}">${ic('x', 's')}</button></li>`).join('')}</ul>
     <div class="row"><label for="dpe-title">${tr('What')}</label><input id="dpe-title" maxlength="200" value="${esc(b.title)}"></div>
-    <div class="row ab2dates"><label>${tr('From')}<input type="date" id="dpe-from" value="${b.start.slice(0, 10)}"></label><label>${tr('To')}<input type="date" id="dpe-to" value="${b.end.slice(0, 10)}"></label></div>
-    <div class="row ab2dates"><label>${tr('Start time')}<input type="time" id="dpe-t0" step="900" value="${dp_time(b.start)}"></label><label>${tr('End time')}<input type="time" id="dpe-t1" step="900" value="${dp_time(b.end) === '23:59' && !dp_time(b.start) ? '' : dp_time(b.end)}"></label></div>
+    <div class="row ab2dates"><label>${tr('From')}${dateIn('dpe-from', b.start.slice(0, 10))}</label><label>${tr('To')}${dateIn('dpe-to', b.end.slice(0, 10))}</label></div>
+    <div class="row ab2dates"><label>${tr('Start time')}${timeIn('dpe-t0', dp_time(b.start))}</label><label>${tr('End time')}${timeIn('dpe-t1', dp_time(b.end) === '23:59' && !dp_time(b.start) ? '' : dp_time(b.end))}</label></div>
     <div class="row"><span class="lbl">${tr('Status')}</span><div class="seg dpstat" role="group" aria-label="${esc(tr('Status'))}">${['option', 'firm'].map(s => `<button type="button" data-s="${s}" class="${b.status === s ? 'on' : ''}" aria-pressed="${b.status === s}">${s === 'firm' ? tr('Firm') : tr('Option')}</button>`).join('')}</div></div>
     <div class="row"><label for="dpe-note">${tr('Note')}</label><input id="dpe-note" maxlength="1000" value="${esc(b.note || '')}"></div>
     <div class="foot"><button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${ic('check', 's')} ${tr('Save')}</button></div>`);

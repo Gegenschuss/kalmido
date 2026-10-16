@@ -28,16 +28,16 @@ function pp_html() {
   const top = `<div class="ofcbar"><span class="spacer"></span><button class="btn sm pri" data-pp="new">${ic('plus', 's')}<span>${tr('New inquiry')}</span></button></div>
     <div class="pptiles"><div class="pptile"><small class="muted">${tr('Open|pipeline')}</small><b>${ofcMoney(s.open)}</b><small class="muted">${esc(trn('{0} deal', '{0} deals', s.count_open))}</small></div>
     <div class="pptile"><small class="muted">${tr('Weighted')}</small><b>${ofcMoney(s.weighted)}</b><small class="muted">${tr('value × probability')}</small></div></div>
-    <section class="ppfc" aria-label="${esc(tr('Expected to come in'))}"><h3 class="ofcgrp">${tr('Expected to come in')}</h3><ol class="ppfcl" role="list">${s.forecast.map(f => `<li class="${f.next ? 'next' : ''}"><small>${esc(pp_month(f.month))}${f.next ? ` <span class="rotag">${tr('next month')}</span>` : ''}</small><b>${ofcMoney(f.weighted)}</b></li>`).join('')}</ol>
+    <section class="pipfc" aria-label="${esc(tr('Expected to come in'))}"><h3 class="ofcgrp">${tr('Expected to come in')}</h3><ol class="ppfcl" role="list">${s.forecast.map(f => `<li class="${f.next ? 'next' : ''}"><small>${esc(pp_month(f.month))}${f.next ? ` <span class="rotag">${tr('next month')}</span>` : ''}</small><b>${ofcMoney(f.weighted)}</b></li>`).join('')}</ol>
     ${+s.undated ? `<p class="muted ofchint">${tr('Without an expected date: {0}', ofcMoney(s.undated))}</p>` : ''}</section>`;
   if (!items.length) return top + `<div class="empty nempty eact">${ic('target')}<span>${tr('No deals yet. Note every inquiry here and follow it to the order.')}</span><button class="btn pri" data-pp="new">${ic('plus', 's')}<span>${tr('New inquiry')}</span></button></div>`;
   const sw = `<div class="seg ppseg" role="tablist" aria-label="${esc(tr('Stage'))}">${PP_STAGES.map(([k, n]) => `<button type="button" role="tab" data-pp="stage" data-v="${k}" aria-selected="${PPS.stage === k}" class="${PPS.stage === k ? 'on' : ''}">${tr(n)} <span class="muted">${items.filter(x => x.stage === k).length}</span></button>`).join('')}</div>`;
   const cols = PP_STAGES.map(([k, n]) => {
     const its = items.filter(x => x.stage === k), sum = its.reduce((a, x) => a + +x.value, 0);
-    return `<section class="ppcol ${PPS.stage === k ? 'on' : ''}" data-ppcol="${k}" aria-label="${esc(tr(n))}"><header><b>${tr(n)}</b><span class="muted">${its.length}</span><span class="spacer"></span><span class="rksum muted">${ofcMoney(sum)}</span></header>
+    return `<section class="pipcol ${PPS.stage === k ? 'on' : ''}" data-pipcol="${k}" aria-label="${esc(tr(n))}"><header><b>${tr(n)}</b><span class="muted">${its.length}</span><span class="spacer"></span><span class="rksum muted">${ofcMoney(sum)}</span></header>
       <ul class="ppcards" role="list">${its.map(pp_card).join('') || `<li class="muted ppnone">${tr('Nothing here')}</li>`}</ul></section>`;
   }).join('');
-  return top + sw + `<div class="ppcols">${cols}</div><p class="muted ofchint">${tr('Drag a card into another column to change its stage. Values net, in the office currency.')}</p>`;
+  return top + sw + `<div class="pipcols">${cols}</div><p class="muted ofchint">${tr('Drag a card into another column to change its stage. Values net, in the office currency.')}</p>`;
 }
 function pp_card(x) {
   const who = x.client_name || x.contact;
@@ -147,15 +147,15 @@ document.addEventListener('dragstart', e => {
   PPS.drag = +b.dataset.id; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(PPS.drag));
   b.classList.add('dragging');
 });
-document.addEventListener('dragend', e => { e.target.closest?.('.ppcard')?.classList.remove('dragging'); $$('.ppcol.over').forEach(x => x.classList.remove('over')); });
+document.addEventListener('dragend', e => { e.target.closest?.('.ppcard')?.classList.remove('dragging'); $$('.pipcol.over').forEach(x => x.classList.remove('over')); });
 document.addEventListener('dragover', e => {
-  const col = PPS.drag && e.target.closest?.('.ppcol'); if (!col) return;
+  const col = PPS.drag && e.target.closest?.('.pipcol'); if (!col) return;
   e.preventDefault(); e.dataTransfer.dropEffect = 'move';
-  $$('.ppcol.over').forEach(x => x !== col && x.classList.remove('over')); col.classList.add('over');
+  $$('.pipcol.over').forEach(x => x !== col && x.classList.remove('over')); col.classList.add('over');
 });
 document.addEventListener('drop', e => {
-  const col = PPS.drag && e.target.closest?.('.ppcol'); if (!col) return;
+  const col = PPS.drag && e.target.closest?.('.pipcol'); if (!col) return;
   e.preventDefault(); col.classList.remove('over');
   const id = PPS.drag; PPS.drag = null;
-  pp_move(id, col.dataset.ppcol);
+  pp_move(id, col.dataset.pipcol);
 });

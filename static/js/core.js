@@ -595,7 +595,9 @@ function applyState(j) {
   S.storage = j.storage || null; S.announce = j.announce || null;  // 2.24.0 (#910 / #907)  // 2.23.0 (#799): organisation | shared | multi
   S.clients = j.clients || [];  // 2.23.0 (#463): the clients I see, with their lists
   if (S.booted && S.route?.mod === 'clients') clReload();  // a change elsewhere: the client's sums again
-  if (S.booted && S.route?.mod === 'workload') { WLV.data = null; AB2.data = null; DPV.data = null; }  // 2.50.0 (#1195, #1194)
+  // 2.50.0 (#1195, #1194); 2.50.1: the shown tab loads again and keeps its rows until the new ones are there (a null
+  // without a redraw left absence and booking rows that no longer opened on a tap)
+  if (S.booted && S.route?.mod === 'workload') { const t = WLV.tab === 'dispo' && !dp_on() ? 'wl' : WLV.tab; if (t !== 'abs') AB2.data = null; if (t !== 'dispo') DPV.data = null; if (t !== 'wl') WLV.data = null; if (t === 'abs') ab2_load(); else if (t === 'dispo') dp_load(); else wlLoad(); }
   // 2.21.0 (#659 / #658): event calendars (a changed event refetches the calendar range), address books, links of tasks
   S.evcals = j.evcals || []; S.evlinks = j.evlinks || {}; S.books = j.books || []; S.tcontacts = j.tcontacts || {};
   if (j.evsig !== undefined && j.evsig !== S.evsig) { S.evsig = j.evsig; if (S.booted) calInvalidate(); }
