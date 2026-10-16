@@ -8264,5 +8264,6 @@
   "Only a planned sprint can be started": "Alleen een geplande sprint kan worden gestart",
   "Another sprint of this list is running: close it first": "Er loopt al een andere sprint van deze lijst: sluit die eerst af",
   "Only a running sprint can be closed": "Alleen een lopende sprint kan worden afgesloten",
-  "Backlog|sprint": "Achterstand"
+  "Backlog|sprint": "Achterstand",
+  "The burndown starts on {0}.": "De burndown begint op {0}."
 }

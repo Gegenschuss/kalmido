@@ -107,6 +107,8 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
     check(!(await ev(`!!document.querySelector('#view .sprh .sprbody')`)), 'phone: the header starts folded');
     const w = await ev(`(() => { const r = document.querySelector('#view .sprseg').getBoundingClientRect(); return r.right <= window.innerWidth + 1 && r.height >= 30; })()`);
     check(w, 'phone: the filter fits and has big targets');
+    const one = await ev(`[...document.querySelectorAll('#view .sprseg button')].every(b => b.getBoundingClientRect().height < 44)`);
+    check(one, 'phone: the filter labels stay on one line');
     await ev(`(() => { document.querySelector('#view .sprh [data-spr="tog"]').click(); return 1; })()`); await sleep(700);
     check(await ev(`!!document.querySelector('#view .sprh .sprbody')`), 'phone: a tap on the name opens it');
     await shot('p260a-phone-390.png');

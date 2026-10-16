@@ -7718,5 +7718,8 @@ button.jobtag b{font-weight:600}
 .sprall li{padding:.5rem .75rem;border:1px solid var(--line2);border-radius:.625rem;display:flex;flex-direction:column;gap:.25rem}
 .sprall li.active{border-color:var(--accent)}
 .spract{display:flex;gap:.5rem;margin-top:.25rem}
-@media (max-width:40rem){.sprtop .sprp{flex:1 1 100%}.sprtop .sprseg{flex:1 1 100%}.sprseg button{flex:1}}
+.sprseg button,.sprunit button{white-space:nowrap}
+.sprtop .btn.sm{align-self:center}
+@media (max-width:40rem){.sprh{padding:.5rem .625rem}.sprtop{gap:.25rem .5rem}.sprsoon{display:none}.sprtop .sprp{order:5;flex:1 1 100%}.sprtop .sprp .pbar{flex:1;width:auto}
+  .sprseg{display:flex}.sprtop .sprseg{flex:1 1 100%;order:6}.sprseg button{flex:1;padding:0 .5rem}}
 @media (prefers-reduced-motion:reduce){.sprp .pbar i{transition:none}}

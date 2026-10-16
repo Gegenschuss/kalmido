@@ -8264,5 +8264,6 @@
   "Only a planned sprint can be started": "Seul un sprint planifié peut être démarré",
   "Another sprint of this list is running: close it first": "Un autre sprint de cette liste est en cours : clôturez-le d’abord",
   "Only a running sprint can be closed": "Seul un sprint en cours peut être clôturé",
-  "Backlog|sprint": "Backlog"
+  "Backlog|sprint": "Backlog",
+  "The burndown starts on {0}.": "Le burndown commence le {0}."
 }
