@@ -570,8 +570,8 @@ def export_json():
         "events": ("SELECT * FROM events WHERE cal_id IN (SELECT id FROM ev_cals WHERE owner_id=?)", (uid,)),
         "event_attendees": ("SELECT * FROM event_attendees WHERE event_id IN (SELECT e.id FROM events e JOIN ev_cals k ON k.id=e.cal_id "
                             "WHERE k.owner_id=?)", (uid,)),
-        "address_books": ("SELECT id, name, color, created_at FROM books WHERE owner_id=?", (uid,)),
-        "contacts": ("SELECT * FROM contacts WHERE book_id IN (SELECT id FROM books WHERE owner_id=?)", (uid,)),
+        "address_books": ("SELECT id, name, color, created_at FROM books WHERE owner_id=? AND owner_org_id IS NULL", (uid,)),  # 2.52.0 C (#1438): own books
+        "contacts": ("SELECT * FROM contacts WHERE book_id IN (SELECT id FROM books WHERE owner_id=? AND owner_org_id IS NULL)", (uid,)),
         # 2.22.0 (#663): my journal, whom I stay in touch with, my Karakeep connection (without the API key)
         "journal": ("SELECT day, text, mood, updated_at FROM journal WHERE user_id=? ORDER BY day", (uid,)),
         "contact_care": ("SELECT contact_id, every_days, last, note, updated_at FROM contact_care WHERE user_id=?", (uid,)),

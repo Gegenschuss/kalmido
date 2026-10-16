@@ -1604,6 +1604,10 @@ MIGRATIONS = [
     # (current-user-privilege-set); events are only written when both are 1
     ("cal_subs", "dav_write", "ALTER TABLE cal_subs ADD COLUMN dav_write BIGINT NOT NULL DEFAULT 0"),
     ("cal_subs", "dav_can_write", "ALTER TABLE cal_subs ADD COLUMN dav_can_write BIGINT NOT NULL DEFAULT 0"),
+    # 2.52.0 C (#1438): an address book owned by an organisation (owner_org_id = its org_id; NULL = a person's book as before;
+    # owner_id stays filled as its technical manager), org_role = what the organisation's members may: view | edit | none
+    ("books", "owner_org_id", "ALTER TABLE books ADD COLUMN owner_org_id BIGINT REFERENCES orgs(id) ON DELETE SET NULL"),
+    ("books", "org_role", "ALTER TABLE books ADD COLUMN org_role TEXT NOT NULL DEFAULT 'view'"),
     # 2.53.0 B (#1474): an organisation's colour (set by its admins, the same for every member; '' = the default tone of
     # its id, see static/js/wscolor.js). Private has none.
     ("orgs", "color", "ALTER TABLE orgs ADD COLUMN color TEXT NOT NULL DEFAULT ''"),
@@ -1642,6 +1646,8 @@ CREATE INDEX IF NOT EXISTS office_signoffs_list ON office_signoffs(list_id) WHER
 CREATE UNIQUE INDEX IF NOT EXISTS doc_meta_asn ON doc_meta(ws, asn) WHERE asn IS NOT NULL;
 -- 2.51.0 A (#1350): the open payment suggestions of an area
 CREATE INDEX IF NOT EXISTS office_pay_props_org ON office_pay_props(org_id, state);
+-- 2.52.0 C (#1438): the address books an organisation owns
+CREATE INDEX IF NOT EXISTS books_owner_org ON books(owner_org_id) WHERE owner_org_id IS NOT NULL;
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 3  # task > subtask > sub-subtask
