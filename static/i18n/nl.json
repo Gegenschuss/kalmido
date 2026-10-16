@@ -7948,5 +7948,12 @@
   "No access": "Geen toegang",
   "Insert reference": "Verwijzing invoegen",
   "Nothing found": "Niets gevonden",
-  "{0} attachment": ["{0} bijlage", "{0} bijlagen"]
+  "{0} attachment": ["{0} bijlage", "{0} bijlagen"],
+  "Overdue since {0}": "Te laat sinds {0}",
+  "Next due {0}": "Volgende deadline {0}",
+  "Open tag {0}": "Tag {0} openen",
+  "Last used {0}": "Laatst gebruikt {0}",
+  "All your tags. A tap opens the tasks with that tag.": "Al je tags. Een tik opent de taken met die tag.",
+  "No tags yet. Add a tag to a task and it shows up here.": "Nog geen tags. Geef een taak een tag, dan verschijnt die hier.",
+  "Tags overview": "Overzicht van tags"
 }

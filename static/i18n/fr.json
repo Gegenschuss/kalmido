@@ -7948,5 +7948,12 @@
   "No access": "Pas d’accès",
   "Insert reference": "Insérer une référence",
   "Nothing found": "Rien trouvé",
-  "{0} attachment": ["{0} pièce jointe", "{0} pièces jointes"]
+  "{0} attachment": ["{0} pièce jointe", "{0} pièces jointes"],
+  "Overdue since {0}": "En retard depuis {0}",
+  "Next due {0}": "Prochaine échéance {0}",
+  "Open tag {0}": "Ouvrir le tag {0}",
+  "Last used {0}": "Dernière utilisation {0}",
+  "All your tags. A tap opens the tasks with that tag.": "Tous vos tags. Un appui ouvre les tâches portant ce tag.",
+  "No tags yet. Add a tag to a task and it shows up here.": "Aucun tag pour l’instant. Ajoutez un tag à une tâche, il apparaîtra ici.",
+  "Tags overview": "Aperçu des tags"
 }

@@ -178,6 +178,17 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   check(/Akzentfarbe: Violett/.test(d.querySelector('.palette .plist').textContent), 'German palette entries');
   w.close();
 
+  // ---- 2.53.0 E (#1451): agent tone readable in both themes (text and ink on the tone background, tone vs page background)
+  {
+    const ev = css.match(/:root\{--agent-bg:(#\w{6});--agent-ink:(#\w{6})\}/), el = css.match(/:root\[data-theme="light"\]\{--agent-bg:(#\w{6});--agent-ink:(#\w{6})\}/);
+    check(!!ev && !!el, 'agent tone variables for dark + light');
+    if (ev && el) {
+      check(ratio(ev[2], ev[1]) >= 4.5, `agent ink on tone (dark): ${ratio(ev[2], ev[1]).toFixed(2)}`);
+      check(ratio(el[2], el[1]) >= 4.5, `agent ink on tone (light): ${ratio(el[2], el[1]).toFixed(2)}`);
+      check(ratio(root.text, ev[1]) >= 4.5 && ratio(light.text, el[1]) >= 4.5, 'body text on the agent tone: AA in both themes');
+      check(ratio(root.muted, ev[1]) >= 4.5 && ratio(light.muted, el[1]) >= 4.5, 'muted text on the agent tone: AA in both themes');
+    }
+  }
   check(errs.length === 0, 'no JS errors: ' + errs.slice(0, 3).join(' | '));
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

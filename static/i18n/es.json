@@ -7948,5 +7948,12 @@
   "No access": "Sin acceso",
   "Insert reference": "Insertar referencia",
   "Nothing found": "No se encontró nada",
-  "{0} attachment": ["{0} adjunto", "{0} adjuntos"]
+  "{0} attachment": ["{0} adjunto", "{0} adjuntos"],
+  "Overdue since {0}": "Vencida desde {0}",
+  "Next due {0}": "Próximo vencimiento {0}",
+  "Open tag {0}": "Abrir etiqueta {0}",
+  "Last used {0}": "Usada por última vez {0}",
+  "All your tags. A tap opens the tasks with that tag.": "Todas tus etiquetas. Un toque abre las tareas con esa etiqueta.",
+  "No tags yet. Add a tag to a task and it shows up here.": "Aún no hay etiquetas. Añade una etiqueta a una tarea y aparecerá aquí.",
+  "Tags overview": "Resumen de etiquetas"
 }

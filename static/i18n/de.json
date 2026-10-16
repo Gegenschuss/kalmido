@@ -7948,5 +7948,12 @@
   "No access": "Kein Zugriff",
   "Insert reference": "Verweis einfügen",
   "Nothing found": "Nichts gefunden",
-  "{0} attachment": ["{0} Anhang", "{0} Anhänge"]
+  "{0} attachment": ["{0} Anhang", "{0} Anhänge"],
+  "Overdue since {0}": "Überfällig seit {0}",
+  "Next due {0}": "Nächste Fälligkeit {0}",
+  "Open tag {0}": "Tag {0} öffnen",
+  "Last used {0}": "Zuletzt benutzt {0}",
+  "All your tags. A tap opens the tasks with that tag.": "Alle deine Tags. Ein Tipp öffnet die Aufgaben mit diesem Tag.",
+  "No tags yet. Add a tag to a task and it shows up here.": "Noch keine Tags. Gib einer Aufgabe ein Tag, dann erscheint es hier.",
+  "Tags overview": "Tags-Übersicht"
 }

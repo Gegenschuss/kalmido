@@ -403,7 +403,7 @@ function renderSide() {
     focus: `${grp('focus', tr('Plan|nav'), focus)}`,
     lists: `<div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${S.listReorder ? `<div class="sreobar" role="group" aria-label="${esc(tr('Sort lists'))}"><span class="sreot"><b>${tr('Sort lists')}</b><small>${esc(tr('Drag by the handle on the left, or use “…”'))}</small></span><button type="button" class="btn sm pri" data-act="lists-reorder">${tr('Done')}</button></div>` : ''}${sideOpen('lists') || S.listReorder ? (lh && favListsHtml(lh, lists)) || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>`,
     filters: `${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine lists, dates, priorities, tags'))}`,
-    tags: `${tags.length ? grp('tags', tr('Tags'), tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join(''), '', tags.length) : ''}`,  // 2.45.0 (#1502): a header like the others
+    tags: `${tags.length ? grp('tags', tr('Tags'), tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join(''), `<button data-go="tags" class="${S.route.mod === 'tags' ? 'on' : ''}" title="${esc(tr('Tags overview'))}" aria-label="${esc(tr('Tags overview'))}">${ic('all', 's')}</button>`, tags.length) : ''}`,  // 2.45.0 (#1502): a header like the others
     views: `${views ? grp('views', tr('Views'), views, '', (views.match(/class="srow smod/g) || []).length) : ''}`,
     areas: `${areas ? grp('areas', tr('Areas|nav'), areas, '', (areas.match(/class="srow smod/g) || []).length) : ''}`,
     team: `${team ? grp('team', tr('Conversations|nav'), team, '', ppl.length + ags.length + grps.length + (convo.match(/class="srow/g) || []).length) : ''}`,
@@ -448,7 +448,7 @@ $('#skip')?.addEventListener('click', skipToContent);
 function renderTop() { return keepFocus($('#top'), renderTop0); }
 function renderTop0() {
   const m = S.route.mod, k = S.route.key;
-  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload'), wiki: N_('Knowledge pages')};  // 2.49.0 (#1199): + wiki
+  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload'), wiki: N_('Knowledge pages'), tags: N_('Tags')};  // 2.49.0 (#1199): + wiki
   let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? (S.nt.lid ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : tr('Notes')) : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
   if (!title && (m === 'ablage' || m === 'docs')) title = tr(m === 'ablage' ? 'File store' : 'Documents');  // 2.48.0 (#1207, #1111)
@@ -868,6 +868,7 @@ function renderView0() {
   else if (m === 'review') setHtml(el, mg_wrap(m, viewReview()));
   else if (m === 'clients') setHtml(el, mg_wrap(m, viewClients()));  // 2.23.0 (#463)
   else if (m === 'workload') setHtml(el, viewWorkload());
+  else if (m === 'tags') setHtml(el, viewTags());  // 2.53.0 (#446)
   else if (m === 'office') setHtml(el, mg_wrap(m, viewOffice()));  // 2.36.1 (#1021)
   else if (m === 'wiki') setHtml(el, viewWiki());  // 2.49.0 (#1199)
   else if (m === 'ablage') setHtml(el, mg_wrap(m, viewAblage()));  // 2.48.0 (#1207)
