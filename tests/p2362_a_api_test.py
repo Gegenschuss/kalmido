@@ -283,7 +283,8 @@ check(len(routes) > 200, f"route scan: routes found ({len(routes)})")
 # ids that exist and belong to alice / Alpha (lists, tasks, comments, calendars, events, books, contacts ...): the first rows
 FOREIGN = {"lid": LA, "tid": TA, "cid": CTA, "eid": EA, "bid": BA, "aid": AA or 1}
 Z = S["zed"]
-tok = Z.post(B + "/api/me/tokens", json={"name": "scan", "scopes": ["read", "tasks:write", "comments", "calendar", "contacts", "export"]})
+# 2.48.0 (#1207, #1111): files:read too, so the file store / documents routes get past the scope check and are scanned
+tok = Z.post(B + "/api/me/tokens", json={"name": "scan", "scopes": ["read", "tasks:write", "comments", "calendar", "contacts", "export", "files:read"]})
 ZH = {"Authorization": "Bearer " + tok.json().get("token", "")} if tok.ok else None
 # routes whose answer is not about a stored object (public pages with their own token, admin / instance routes answering 403 for
 # everybody but admins, the caller's own resources looked up by position): a refusal other than 404 is fine there
