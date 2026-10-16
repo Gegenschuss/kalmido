@@ -357,6 +357,11 @@ row = dbx("SELECT wrapped_by, wrapper_pub FROM list_keys WHERE list_id=? AND use
 check(r.ok and row and row[0][0] == 1 and json.loads(row[0][1])["x"] == AK["pub"]["x"], "release: stored with the wrapper's public key from the server")
 check(not dbx("SELECT 1 FROM list_key_pending WHERE list_id=? AND user_id=?", (L, ERIN)), "release: off the waiting list")
 check(dbx("SELECT COUNT(*) FROM notifications WHERE user_id=? AND kind='e2e_key' AND list_id=?", (ERIN, L))[0][0] == 1, "release: a News item for the recipient")
+nw = Er.get(B + "/api/news").json()
+items = nw.get("items", nw.get("news", [])) if isinstance(nw, dict) else nw
+ek = [x for x in items if x.get("kind") == "e2e_key"]
+check(len(ek) == 1 and ek[0]["list_id"] == L and ek[0]["data"].get("by_name") == "Alice" and ek[0].get("to_me") is True,
+      "release: the News item shows in the feed (for me) " + json.dumps(ek)[:200])
 ke = Er.get(B + f"/api/lists/{L}/e2e").json()["keys"]
 check(len(ke) == 1 and ke[0]["wrapped_by"] == 1, "release: erin loads her wrapped key")
 
