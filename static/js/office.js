@@ -16,7 +16,15 @@ const ofcTab = () => OFC_TABS.some(t => t[0] === S.route.tab) ? S.route.tab : S.
 // money / numbers of the master data: in the person's locale, the organisation's currency
 const ofcCur = () => OFC.info?.settings?.currency || 'EUR';
 const ofcMoney = n => n == null || n === '' ? '' : `${(+n).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${ofcCur() === 'USD' ? '$' : '€'}`;
-const ofcNum = v => { const s = String(v ?? '').trim().replace(/\s/g, ''); if (s === '') return null; const f = parseFloat(s.replace(',', '.')); return Number.isFinite(f) ? f : null; };
+// 2.50.1: thousands separators of the locale ("1.500,00", "1,500.00", "1.500") are read as such - a field filled with
+// fmtNum(1500, 2) = "1.500" came back as 1.5 on save; a single separator without three digits after it stays the decimal one
+const ofcNum = v => {
+  let s = String(v ?? '').trim().replace(/[\s\u00a0\u202f']/g, ''); if (s === '') return null;
+  const dec = (1.5).toLocaleString(LOCALE()).charAt(1) === ',' ? ',' : '.', grp = dec === ',' ? '.' : ',';
+  if (s.includes(dec)) s = s.split(grp).join('');
+  else if (new RegExp(`^-?\\d{1,3}(\\${grp}\\d{3})+$`).test(s)) s = s.split(grp).join('');
+  const f = parseFloat(s.replace(',', '.')); return Number.isFinite(f) ? f : null;
+};
 const ofcTax = k => { const t = OFC.info?.pack?.tax; const pct = t ? t[k] : null; return pct == null ? tr(OFC_TAXES.find(x => x[0] === k)?.[1] || k) : `${fmtNum(pct, 1)} %`; };
 
 // ---- loading
