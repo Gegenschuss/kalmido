@@ -8228,5 +8228,6 @@
   "Task counts in the sidebar": "Taaktellers in de zijbalk",
   "Status dots of lists": "Statusstippen van lijsten",
   "Share marks (person / robot)": "Deelmarkeringen (persoon / robot)",
-  "Without counts, Today keeps its red number while something is overdue.": "Zonder tellers houdt Vandaag zijn rode getal zolang er iets te laat is."
+  "Without counts, Today keeps its red number while something is overdue.": "Zonder tellers houdt Vandaag zijn rode getal zolang er iets te laat is.",
+  "App passwords (CalDAV) and API tokens stay valid. If someone else may have had access, check them under Settings > Account (API tokens: Advanced · for developers).": "App-wachtwoorden (CalDAV) en API-tokens blijven geldig. Als iemand anders toegang kan hebben gehad, controleer ze onder Instellingen > Account (API-tokens: Geavanceerd · voor ontwikkelaars)."
 }

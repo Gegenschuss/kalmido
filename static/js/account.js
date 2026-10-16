@@ -609,7 +609,7 @@ function accountWire(md) {
         $('#a-cur', md).value = ''; $('#a-new', md).value = ''; toast(tr('Password changed'));
       }
       if (a === 'logout') logout();
-      if (a === 'user-new') userModal(null, drawUsers);
+      if (a === 'user-new') userModal(null, () => { drawUsers(); orgsDraw(md); });  // 2.58.0 (#1724): the organisations' member counts follow at once
       if (a === 'user-approve') { await api('POST', `/api/users/${b.dataset.uid}/approve`, {}); toast(tr('Approved: the person can log in now')); drawUsers(); }  // 2.23.0 (#711)
       if (a === 'org-edit') orgModal((S.orgs || []).find(o => o.id === +b.dataset.oid), () => orgsDraw(md));
       if (a === 'org-new') orgModal(null, () => { orgsDraw(md); load().then(render).catch(() => {}); });  // 2.28.0 (#935)
@@ -617,7 +617,7 @@ function accountWire(md) {
         const o = (S.orgs || []).find(x => x.id === +b.dataset.oid);
         if (o && await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('Only possible while it has no lists. Its members keep their accounts.'), {ok: tr('Delete'), danger: true})) { await api('DELETE', `/api/admin/orgs/${o.id}`); toast(tr('Deleted')); orgsDraw(md); load().then(render).catch(() => {}); }
       }
-      if (a === 'user-edit') userModal(users.find(u => u.id === +b.dataset.uid), drawUsers);
+      if (a === 'user-edit') userModal(users.find(u => u.id === +b.dataset.uid), () => { drawUsers(); orgsDraw(md); });
       if (a === 'agent-edit') {
         const aj = await calReq('GET', '/api/admin/agents'), ag = aj.agents.find(x => x.id === +b.dataset.uid);
         S.agOffer = aj.scopes;
@@ -767,6 +767,7 @@ async function inviteScreen(tok) {
         <label class="chkl"><input type="checkbox" id="inv-2fa"> ${tr('Set up two-factor sign-in right after (recommended)')}</label>
         <div class="aerr" role="alert" id="inv-err"></div>
         <button class="btn pri" type="submit">${info.kind === 'reset' ? tr('Save and log in') : tr('Set up my account')}</button>
+        ${info.kind === 'reset' ? `<p class="muted">${esc(tr('App passwords (CalDAV) and API tokens stay valid. If someone else may have had access, check them under Settings > Account (API tokens: Advanced · for developers).'))}</p>` : ''}${''/* 2.58.0 (#1792): L3, a hint only -- nothing is revoked */}
       </form></div>`;
     el.querySelector('#inv-form').addEventListener('submit', async e => {
       e.preventDefault();

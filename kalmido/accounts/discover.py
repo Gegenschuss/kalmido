@@ -175,8 +175,9 @@ def disc_get():
         ppl = lambda sql, *a: c.execute(sql, a).fetchall()  # noqa: E731
         inc = ppl("""SELECT r.id, r.created_at, u.id AS uid, u.display_name, u.username, u.avatar FROM conn_requests r
                      JOIN users u ON u.id=r.from_id WHERE r.to_id=? AND r.status='open' AND u.disabled=0 ORDER BY r.id DESC""", uid)
+        # 2.58.0 (#1792): a disabled target stays in "sent" (L4) -- dropping the row would tell the sender about the deactivation
         out = ppl("""SELECT r.id, r.created_at, u.id AS uid, u.display_name, u.username, u.avatar FROM conn_requests r
-                     JOIN users u ON u.id=r.to_id WHERE r.from_id=? AND u.disabled=0 AND r.status NOT IN ('wd_open','wd_declined','wd_hidden')
+                     JOIN users u ON u.id=r.to_id WHERE r.from_id=? AND r.status NOT IN ('wd_open','wd_declined','wd_hidden')
                      AND NOT EXISTS (SELECT 1 FROM conn_links l WHERE l.deleted_at IS NULL AND
                                      ((l.a_id=r.from_id AND l.b_id=r.to_id) OR (l.b_id=r.from_id AND l.a_id=r.to_id)))
                      ORDER BY r.id DESC""", uid)

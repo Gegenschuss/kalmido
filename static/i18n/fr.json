@@ -8228,5 +8228,6 @@
   "Task counts in the sidebar": "Compteurs de tâches dans la barre latérale",
   "Status dots of lists": "Points d'état des listes",
   "Share marks (person / robot)": "Marques de partage (personne / robot)",
-  "Without counts, Today keeps its red number while something is overdue.": "Sans compteurs, Aujourd'hui garde son nombre rouge tant que quelque chose est en retard."
+  "Without counts, Today keeps its red number while something is overdue.": "Sans compteurs, Aujourd'hui garde son nombre rouge tant que quelque chose est en retard.",
+  "App passwords (CalDAV) and API tokens stay valid. If someone else may have had access, check them under Settings > Account (API tokens: Advanced · for developers).": "Les mots de passe d'application (CalDAV) et les tokens API restent valides. Si quelqu’un d’autre a pu y accéder, vérifie-les sous Paramètres > Compte (tokens API : Avancé · pour les développeurs)."
 }

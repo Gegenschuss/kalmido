@@ -7699,3 +7699,5 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .rsy-g legend{padding:0 .25rem;color:var(--muted);font-size:var(--fs-xs)}
 .rsy-g .chkl{display:flex;min-height:2rem}
 @media (pointer:coarse){#rsy-set .rsy-seg button{min-height:2.75rem}.rsy-g .chkl{min-height:2.75rem}}
+/* 2.58.0 A (#1724) "Join" in a list seen through the organisation: a full touch target on phones */
+@media (pointer:coarse){ .rohint.ovbar .btn{min-height:2.75rem} }
