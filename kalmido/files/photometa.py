@@ -20,9 +20,10 @@ import io
 import re
 import struct
 import threading
+import zlib
 from datetime import datetime
 
-PM_MAX_PIXELS = 60_000_000          # the re-encode of a turned photo (as accounts/pictures.py); bigger: orientation-only EXIF
+PM_MAX_PIXELS = 40_000_000          # the re-encode of a turned photo (memory); bigger: an orientation-only EXIF instead
 PM_JPEG_QUALITY = 92
 _PM_ENC = threading.BoundedSemaphore(2)  # at most two re-encodes at once (memory)
 _PM_ENC_WAIT = 20                   # s; a busy server writes the orientation-only EXIF instead
@@ -316,10 +317,16 @@ def _pm_png(data, on):
     if not on:
         return None, taken
     clean = data[:8] + b"".join(data[s:e] for t, s, e in ch if t not in _PNG_DROP)
-    if orient != 1 and not any(t == b"acTL" for t, _, _ in ch):
-        turned = _pm_turn(clean, "PNG", orient)
+    if orient != 1:
+        turned = None if any(t == b"acTL" for t, _, _ in ch) else _pm_turn(clean, "PNG", orient)
         if turned:
             return turned, taken
+        i = next(s for t, s, e in ch if t == b"IDAT") if any(t == b"IDAT" for t, _, _ in ch) else None
+        if i is not None:  # not turned: the orientation alone stays (before the first IDAT, as the PNG spec wants it)
+            tiff = _pm_orient_exif(orient)[6:]
+            exif_chunk = struct.pack(">I", len(tiff)) + b"eXIf" + tiff + struct.pack(">I", zlib.crc32(b"eXIf" + tiff) & 0xffffffff)
+            k = len(data[:8] + b"".join(data[s:e] for t, s, e in ch if t not in _PNG_DROP and s < i))
+            return clean[:k] + exif_chunk + clean[k:], taken
     return clean, taken
 
 
@@ -367,10 +374,14 @@ def _pm_webp(data, on):
     if not on:
         return None, taken
     clean = _pm_webp_clean(data)
-    if clean and orient != 1 and not any(t == b"ANIM" for t, _, _ in ch):
-        turned = _pm_turn(clean, "WEBP", orient)
+    if clean and orient != 1:
+        turned = None if any(t == b"ANIM" for t, _, _ in ch) else _pm_turn(clean, "WEBP", orient)
         if turned:
             return turned, taken
+        if clean[12:16] == b"VP8X":  # not turned: the orientation alone stays (an EXIF chunk at the end, its flag set)
+            tiff = _pm_orient_exif(orient)[6:]
+            body = clean[12:20] + bytes([clean[20] | 0x08]) + clean[21:] + b"EXIF" + struct.pack("<I", len(tiff)) + tiff + b"\x00" * (len(tiff) & 1)
+            return b"RIFF" + struct.pack("<I", len(body) + 4) + b"WEBP" + body, taken
     return clean, taken
 
 
@@ -440,7 +451,7 @@ def _pm_heif_items(data):
     base_sz, idx_sz = data[p + 1] >> 4, (data[p + 1] & 15) if ver in (1, 2) else 0
     p += 2
     cnt, p = _pm_uint(data, p, 2 if ver < 2 else 4)
-    locs = {}
+    locs, total = {}, 0
     for _ in range(min(cnt, 100_000)):
         if p >= e:
             break
@@ -454,6 +465,9 @@ def _pm_heif_items(data):
         ext_n, p = _pm_uint(data, p, 2)
         ext = []
         for _ in range(min(ext_n, 10_000)):
+            total += 1
+            if p > e or total > 100_000:  # a crafted box: zero-size fields would loop without reading
+                return None
             if idx_sz:
                 p += idx_sz
             eo, p = _pm_uint(data, p, off_sz)
@@ -485,6 +499,8 @@ def _pm_heif(data, on):
             continue
         ext = [(o, ln) for o, ln in locs.get(iid, []) if 0 <= o and ln > 0 and o + ln <= n]
         if not ext:
+            continue
+        if sum(ln for _, ln in ext) > n:  # overlapping extents: no repeated writes over the whole file
             continue
         hits.append((ityp, ext))
         if ityp == b"Exif" and not taken:
