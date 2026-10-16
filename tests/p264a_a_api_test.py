@@ -356,6 +356,11 @@ j = A.get(B + f"/api/lists/{L}/e2e").json()
 pend = {p["user_id"]: p for p in j["pending"]}
 check({CAROL, DAVE, ERIN} <= set(pend) and pend[ERIN]["has_keys"] and not pend[DAVE]["has_keys"], "waiting list: with has_keys " + json.dumps(j["pending"]))
 
+# a child account takes part only as a participant: it leaves a list with the lock (no 500 from the members trigger)
+r = A.patch(B + f"/api/users/{CAROL}", json={"kid": True})
+check(r.ok and not dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (L, CAROL))
+      and dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (LO, BOB)), "kid: leaves the list with the lock " + r.text[:200])
+
 # release (M9)
 r = Bo.post(B + f"/api/lists/{L}/e2e/keys", json={"keys": [{"user_id": ERIN, "gen": 1, "wrapped": wrapped()}]})
 check(r.status_code == 403, "release: not by a member with the role edit")
@@ -384,13 +389,15 @@ check(Fr.get(B + "/api/e2e/pub/1").status_code == 404, "pub: not for strangers")
 
 # owner transfer: only to someone with the key; their keys stay
 check(A.post(B + f"/api/lists/{L}/owner", json={"user_id": DAVE}).status_code == 409, "owner: not to someone without the key")
+rot0 = dbx("SELECT e2e_rotate FROM lists WHERE id=?", (L,))[0][0]
 r = A.post(B + f"/api/lists/{L}/owner", json={"user_id": BOB})
 check(r.ok and dbx("SELECT owner_id FROM lists WHERE id=?", (L,))[0][0] == BOB, "owner: to someone holding the key " + r.text[:200])
 check(len(dbx("SELECT 1 FROM list_keys WHERE list_id=? AND gen=1 AND user_id IN (1, ?)", (L, BOB))) == 2
-      and dbx("SELECT e2e_rotate FROM lists WHERE id=?", (L,))[0][0] == 0, "owner: both keep their keys, no rotation")
+      and dbx("SELECT e2e_rotate FROM lists WHERE id=?", (L,))[0][0] == rot0, "owner: both keep their keys, no new rotation mark")
 check(Bo.post(B + f"/api/lists/{L}/owner", json={"user_id": 1}).ok and dbx("SELECT owner_id FROM lists WHERE id=?", (L,))[0][0] == 1, "owner: and back")
 
 # leaving: keys go, the rotation is marked (E8)
+dbx("UPDATE lists SET e2e_rotate=0 WHERE id=?", (L,))  # (the kid above left too)
 assert A.delete(B + f"/api/lists/{L}/groups/{gid}").ok  # erin came through the group
 check(not dbx("SELECT 1 FROM list_keys WHERE list_id=? AND user_id=?", (L, ERIN)) and dbx("SELECT e2e_rotate FROM lists WHERE id=?", (L,))[0][0] == 1,
       "leave: the keys go, rotation pending")
