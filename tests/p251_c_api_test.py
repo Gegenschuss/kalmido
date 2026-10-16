@@ -368,5 +368,19 @@ check(AGS.post(V + f"/agent/jobs/{JT}/proposal", json={"items": [ITEM]}).status_
 dbx("UPDATE api_tokens SET scopes=? WHERE user_id=?", (old, AG), write=True)
 check(AGS.post(V + f"/agent/jobs/{JT}/proposal", json={"items": [ITEM]}).status_code == 409, "review 11: with the scope: the applied one 409")
 
+# review 12 (#1352): at most 3 notepads per agent and list; they do not fill the people's 20
+n_ag = len(dbx("SELECT 1 FROM list_notepads WHERE list_id=? AND agent_id=?", (P, AG)))
+codes = [AGS.post(V + f"/lists/{P}/notepads", json={"title": f"A{i}"}).status_code for i in range(4 - n_ag)]
+check(codes[:-1] == [201] * (3 - n_ag) and codes[-1] == 409, f"review 12: the 4th notepad of an agent: 409 ({codes})")
+n_hum = len(dbx("SELECT 1 FROM list_notepads WHERE list_id=? AND agent_id IS NULL", (P,)))
+for i in range(19 - n_hum):
+    dbx("INSERT INTO list_notepads(list_id,title,body,created_by,created_at,updated_by,updated_at) VALUES(?,?,?,?,?,?,?)",
+        (P, f"H{i}", "", BOB, "2026-10-01T08:00:00+00:00", BOB, "2026-10-01T08:00:00+00:00"), write=True)
+check(Bo.post(B + f"/api/lists/{P}/notepads", json={"title": "H20"}).ok, "review 12: the 20th notepad of people despite the agent's 3")
+check(Bo.post(B + f"/api/lists/{P}/notepads", json={"title": "H21"}).status_code == 409, "review 12: the 21st: 409")
+r = AGS.put(V + f"/lists/{P}/status-pad", json={"body": "again"})
+check(r.ok and len(dbx("SELECT 1 FROM list_notepads WHERE list_id=? AND agent_id=? AND agent_key='status'", (P, AG))) == 1,
+      "review 12: still one status block")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

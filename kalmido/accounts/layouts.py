@@ -275,7 +275,8 @@ def wg_pad_create(lid):
     v = _wg_pad_text(b, False)
     c = db()
     role = _wg_role(c, lid, True)
-    if c.execute("SELECT COUNT(*) FROM list_notepads WHERE list_id=?", (lid,)).fetchone()[0] >= WG_PADS_MAX:
+    # 2.51.0 (#1352): the agents' notepads (at most 3 each, agents/agentpin.py) do not fill the people's pin board
+    if c.execute("SELECT COUNT(*) FROM list_notepads WHERE list_id=? AND agent_id IS NULL", (lid,)).fetchone()[0] >= WG_PADS_MAX:
         raise Denied(409, tr("At most {0} notepads", WG_PADS_MAX))
     ts = iso(now_utc())
     nid = insert_id(c, "INSERT INTO list_notepads(list_id,title,body,created_by,created_at,updated_by,updated_at) VALUES(?,?,?,?,?,?,?)",

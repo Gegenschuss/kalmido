@@ -14,7 +14,7 @@ from datetime import date, timedelta
 from flask import g, jsonify
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.i18n import tr
 from ..core.db import bump, db, iso, local_now, now_utc
 from ..core.access import Denied, tvis
@@ -25,6 +25,7 @@ from ..accounts.layouts import WG_PADS_MAX, _wg_pad_text
 from ..collab.comments import user_names
 
 APIN_KEYS = ("status",)       # agent_key values: one block per agent + list and key
+APIN_PADS_MAX = 3             # 2.51.0 (#1352): notepads per agent and list (they do not count against the people's WG_PADS_MAX)
 APIN_DAYS, APIN_DAYS_MAX = 7, 31
 APIN_ITEMS = 50               # tasks per group in the weekly status
 
@@ -68,9 +69,12 @@ def _apin_out(c, rows):
 
 
 def _apin_create(c, lid, v, key=""):
-    if c.execute("SELECT COUNT(*) FROM list_notepads WHERE list_id=?", (lid,)).fetchone()[0] >= WG_PADS_MAX:
-        raise Denied(409, tr("At most {0} notepads", WG_PADS_MAX))
     ts, uid = iso(now_utc()), g.user["id"]
+    if is_agent(g.user):
+        if c.execute("SELECT COUNT(*) FROM list_notepads WHERE list_id=? AND agent_id=?", (lid, uid)).fetchone()[0] >= APIN_PADS_MAX:
+            raise Denied(409, tr("At most {0} notepads", APIN_PADS_MAX))
+    elif c.execute("SELECT COUNT(*) FROM list_notepads WHERE list_id=? AND agent_id IS NULL", (lid,)).fetchone()[0] >= WG_PADS_MAX:
+        raise Denied(409, tr("At most {0} notepads", WG_PADS_MAX))
     return insert_id(c, "INSERT INTO list_notepads(list_id,title,body,created_by,created_at,updated_by,updated_at,agent_id,agent_key) "
                         "VALUES(?,?,?,?,?,?,?,?,?)",
                      (lid, v["title"], v["body"], uid, ts, uid, ts, uid if is_agent(g.user) else None, key))
@@ -97,6 +101,7 @@ def v1_apin_create(lid):
     v = _wg_pad_text(b, False)
     c = db()
     _apin_list(c, lid, True)
+    write_lock(c, f"apin:{lid}")  # 2.51.0 (#1352): the count limits hold under parallel requests
     pid = _apin_create(c, lid, v)
     bump(c)
     c.commit()
@@ -157,6 +162,7 @@ def v1_apin_status(lid):
     v = _wg_pad_text({"title": b.get("title") or tr("Status"), "body": b["body"]}, False)
     c = db()
     _apin_list(c, lid, True)
+    write_lock(c, f"apin:{lid}")  # 2.51.0 (#1352): one status block even when two runs PUT at once
     r = c.execute("SELECT id FROM list_notepads WHERE list_id=? AND agent_id=? AND agent_key='status' ORDER BY id LIMIT 1", (lid, aid)).fetchone()
     code = 200
     if r:
@@ -266,7 +272,7 @@ def apin_spec(paths, schemas, op, ok, errs, ref, pid, q):
             "data": {"type": "array", "items": ref("Notepad")}}}) | errs("403", "404", "409"), [lid]),
         "post": op("2.51.0 (#1352): add a notepad to a project page (an agent's stays marked as its own)", T,
                    ok(ref("Notepad"), "Created", "201") | errs("400", "403", "404", "409"), [lid], body=ref("NotepadInput"), scope="pinboard",
-                   desc="Needs write access to the list. At most 20 notepads per project.")}
+                   desc="Needs write access to the list. At most 20 notepads of people per project; an agent at most 3 of its own per project.")}
     paths["/notepads/{id}"] = {
         "patch": op("2.51.0 (#1352): change a notepad (an agent: only its own)", T, ok(ref("Notepad")) | errs("400", "403", "404", "409"),
                     [pid("id", "Notepad id")], body=ref("NotepadInput"), scope="pinboard"),
