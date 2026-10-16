@@ -7,6 +7,28 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.52.0] - 2026-10-16
+
+**In short:** the calendar feels like a desktop calendar app - **drag to create** an event right in the grid, **move**
+and **resize** events, multi-day events from the all-day row and the month view, also by **long press on phones and
+tablets**. Events can now be **written into subscribed CalDAV calendars**, and **address books can belong to an
+organisation**.
+
+### Added
+- **Calendar like a desktop app:** drag over free time and type the title right in the new block (Enter saves,
+  *Details* opens the full editor); drag events to another time or day, drag the bottom edge to change the length; drag
+  over several days in the all-day row or the month view for a multi-day event. On touch screens: hold for 0.4 s, then
+  drag; a normal swipe still scrolls. Repeating events ask *only this one / all*. Esc cancels, every change can be
+  undone (#1016).
+- **Write into subscribed CalDAV calendars** (iCloud, Nextcloud, Fastmail, mailbox.org, Radicale ...): a switch
+  *Allow writing* per CalDAV subscription, off by default and only possible when the server grants write access. New,
+  changed, moved and deleted events go to the other calendar; properties of other apps (guests, alarms) are kept. If the
+  event was changed elsewhere, Kalmido overwrites nothing and reloads. Calendar links (ICS, also Google) stay read-only (#1128).
+- **Address books of an organisation:** *Transfer to organisation…* (org admins) - members view or edit depending on the
+  book's setting, single shares stay possible; when the managing person leaves or deletes the account, the book stays
+  with its contacts, birthday list and task links and another admin takes over. *Make personal again…* is the way back;
+  nothing is moved automatically (#1438).
+
 ## [2.51.1] - 2026-10-16
 
 **In short:** the checks of 2.51.0 green again; 2.51.0 and 2.51.1 go live together.

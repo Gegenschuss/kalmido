@@ -1189,6 +1189,13 @@ CREATE TABLE IF NOT EXISTS office_pay_props (
   requested_by BIGINT, date TEXT NOT NULL DEFAULT '', amount NUMERIC(14,4) NOT NULL DEFAULT 0, reference TEXT NOT NULL DEFAULT '',
   confidence TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', state TEXT NOT NULL DEFAULT 'open',
   payment_id BIGINT, decided_by BIGINT, decided_at TEXT, created_at TEXT NOT NULL);
+-- 2.52.0 B (#1128): the CalDAV resources of a subscription (one row per event UID: where it lives + its ETag), so an event
+-- of a writable subscription can be changed / deleted with If-Match. Private per user like cal_subs (no org_id). New table only
+CREATE TABLE IF NOT EXISTS cal_dav_res (
+  sub_id BIGINT NOT NULL REFERENCES cal_subs(id) ON DELETE CASCADE, uid TEXT NOT NULL,
+  href TEXT NOT NULL,                           -- absolute URL of the resource (inside the subscription's collection)
+  etag TEXT NOT NULL DEFAULT '', rec BIGINT NOT NULL DEFAULT 0,  -- rec = 1: a repeating series (RRULE / RDATE / overrides)
+  PRIMARY KEY (sub_id, uid));
 """
 # Bumped when the database layout changes (stored in kalmido_meta.schema_version; SQLite: PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -1593,6 +1600,14 @@ MIGRATIONS = [
     # = its one weekly status block per list (upsert)
     ("list_notepads", "agent_id", "ALTER TABLE list_notepads ADD COLUMN agent_id BIGINT REFERENCES users(id) ON DELETE SET NULL"),
     ("list_notepads", "agent_key", "ALTER TABLE list_notepads ADD COLUMN agent_key TEXT NOT NULL DEFAULT ''"),
+    # 2.52.0 B (#1128): "Allow writing" per CalDAV subscription (off by default) and the result of the last privilege check
+    # (current-user-privilege-set); events are only written when both are 1
+    ("cal_subs", "dav_write", "ALTER TABLE cal_subs ADD COLUMN dav_write BIGINT NOT NULL DEFAULT 0"),
+    ("cal_subs", "dav_can_write", "ALTER TABLE cal_subs ADD COLUMN dav_can_write BIGINT NOT NULL DEFAULT 0"),
+    # 2.52.0 C (#1438): an address book owned by an organisation (owner_org_id = its org_id; NULL = a person's book as before;
+    # owner_id stays filled as its technical manager), org_role = what the organisation's members may: view | edit | none
+    ("books", "owner_org_id", "ALTER TABLE books ADD COLUMN owner_org_id BIGINT REFERENCES orgs(id) ON DELETE SET NULL"),
+    ("books", "org_role", "ALTER TABLE books ADD COLUMN org_role TEXT NOT NULL DEFAULT 'view'"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -1628,6 +1643,8 @@ CREATE INDEX IF NOT EXISTS office_signoffs_list ON office_signoffs(list_id) WHER
 CREATE UNIQUE INDEX IF NOT EXISTS doc_meta_asn ON doc_meta(ws, asn) WHERE asn IS NOT NULL;
 -- 2.51.0 A (#1350): the open payment suggestions of an area
 CREATE INDEX IF NOT EXISTS office_pay_props_org ON office_pay_props(org_id, state);
+-- 2.52.0 C (#1438): the address books an organisation owns
+CREATE INDEX IF NOT EXISTS books_owner_org ON books(owner_org_id) WHERE owner_org_id IS NOT NULL;
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 3  # task > subtask > sub-subtask

@@ -69,6 +69,7 @@ ORDER = (
     "notify.alerts",
     "notify.sev",  # 2.36.2 (#1133)
     "calendars.subscriptions",
+    "calendars.davwrite",  # 2.52.0 B (#1128): writing into CalDAV subscriptions
     "admin.backup",
     "api.v1",
     "notify.caps",  # 2.33.0 (#927)
@@ -134,6 +135,7 @@ ORDER = (
     "contacts.web",
     "contacts.v1",
     "contacts.bulk",  # 2.46.1 (#1554): delete / move several contacts at once
+    "contacts.orgbooks",  # 2.52.0 C (#1438): address books an organisation owns
     "life.model",
     "life.karakeep",
     "life.web",

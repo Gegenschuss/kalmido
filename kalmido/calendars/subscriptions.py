@@ -44,8 +44,8 @@ from ..notify.alerts import _env_int, aa_count, aa_now
 # calendar-home-set -> the calendars of that home). A background thread fetches each subscription every 15 or
 # 60 minutes, expands recurrences (RRULE, RDATE, EXDATE, RECURRENCE-ID overrides, time zones) in a window of
 # CAL_BACK_DAYS back and CAL_AHEAD_DAYS ahead and stores the occurrences in cal_events; the client asks only for
-# the range it shows (GET /api/calendars/events), not via /api/state. Events are read-only: nothing is ever
-# written back to a calendar.
+# the range it shows (GET /api/calendars/events), not via /api/state. Events are read-only unless the
+# owner turns on "Allow writing" for a CalDAV subscription (2.52.0 #1128, calendars/davwrite.py).
 # Outbound requests (cal_http): http(s) only, no proxy from the environment, time-outs, a size limit, redirects
 # followed by hand, and an SSRF guard AT CONNECT TIME: every address the host name resolves to must be public
 # (not private, loopback, link-local, CGNAT, multicast, reserved, ... also inside IPv4-mapped / NAT64 / 6to4
@@ -704,18 +704,25 @@ def caldav_tag(url, auth, allow):
     return ""
 
 
-def caldav_fetch(url, auth, allow):
-    """calendar-data of every event resource that overlaps the window (REPORT calendar-query with a time range)."""
+def caldav_fetch(url, auth, allow, res=None):
+    """calendar-data of every event resource that overlaps the window (REPORT calendar-query with a time range).
+    2.52.0 B (#1128): res (a list) also gets (href, etag, calendar-data) of each resource (for writing back)."""
     today = local_now().date()
     a = (today - timedelta(days=CAL_BACK_DAYS + 1)).strftime("%Y%m%dT000000Z")
     b = (today + timedelta(days=CAL_AHEAD_DAYS + 2)).strftime("%Y%m%dT000000Z")
     body = ('<?xml version="1.0" encoding="utf-8"?><c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
             '<d:prop><d:getetag/><c:calendar-data/></d:prop><c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT">'
             f'<c:time-range start="{a}" end="{b}"/></c:comp-filter></c:comp-filter></c:filter></c:calendar-query>')
-    st, _, data, _ = cal_http(url, "REPORT", body.encode(), {"Depth": "1", "Content-Type": "application/xml; charset=utf-8"}, auth, allow)
+    st, _, data, final = cal_http(url, "REPORT", body.encode(), {"Depth": "1", "Content-Type": "application/xml; charset=utf-8"}, auth, allow)
     if st != 207:
         raise CalError("not_calendar")
-    return [el.text for el in _dav_xml(data).iter(f"{{{CALDAV_NS}}}calendar-data") if el.text and el.text.strip()]
+    root = _dav_xml(data)
+    if res is not None:
+        for href, props in _dav_responses(root, final):
+            cd, et = props.get(f"{{{CALDAV_NS}}}calendar-data"), props.get(f"{{{DAV_NS}}}getetag")
+            if cd is not None and cd.text and cd.text.strip():
+                res.append((href, (et.text or "").strip() if et is not None else "", cd.text))
+    return [el.text for el in root.iter(f"{{{CALDAV_NS}}}calendar-data") if el.text and el.text.strip()]
 
 
 # ---- sync
@@ -769,10 +776,15 @@ def cal_sync(c, sid, force=False):
             c.commit()  # 2.37.0 (#1150): no open transaction while the calendar server is asked (snapshot, pool)
             res = None
             if s["kind"] == "caldav":
+                from .davwrite import cdw_check, cdw_store_res  # 2.52.0 B (#1128)
+                if s["dav_write"]:
+                    upd["dav_can_write"] = cdw_check(c, s, url, auth, allow)
                 tag = caldav_tag(url, auth, allow)
                 if not (tag and tag == s["ctag"] and fresh):
-                    raws = caldav_fetch(url, auth, allow)
+                    items = []
+                    raws = caldav_fetch(url, auth, allow, items)
                     res = cal_expand(raws) if raws else ([], False, "")
+                    cdw_store_res(c, sid, url, items)
                     upd["ctag"] = tag
             else:
                 hd = {}
@@ -876,7 +888,7 @@ def cal_public(r):
             "password_saved": bool(r["password"]), "status": r["status"],
             "error": r["error"], "error_text": cal_err_text(r["error"]) if r["error"] else "",
             "synced_at": r["synced_at"], "tried_at": r["tried_at"], "events": r["events"], "truncated": bool(r["truncated"]),
-            "fails": r["fails"]}
+            "fails": r["fails"], "write": bool(r["dav_write"]), "can_write": bool(r["dav_can_write"])}  # 2.52.0 B (#1128)
 
 
 def cal_list(c, uid):
@@ -1096,11 +1108,15 @@ def cal_events():
     own = own + dsp_cal(c, uid, lo, hi)  # 2.50.0 (#1194): my bookings of the disposition, read-only
     if not CAL_ON:
         return jsonify(events=own, subs={}, evcals=evcals)
-    subs = {r["id"]: {"name": r["name"], "color": r["color"]}
-            for r in c.execute("SELECT id, name, color FROM cal_subs WHERE user_id=? AND visible=1", (uid,))}
-    rows = c.execute("""SELECT e.* FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id
+    # 2.52.0 B (#1128): w = a writable CalDAV subscription; its events carry uid, dvw_write and dvw_rec (a repeating series)
+    subs = {r["id"]: {"name": r["name"], "color": r["color"], "w": bool(r["kind"] == "caldav" and r["dav_write"] and r["dav_can_write"])}
+            for r in c.execute("SELECT id, name, color, kind, dav_write, dav_can_write FROM cal_subs WHERE user_id=? AND visible=1", (uid,))}
+    rows = c.execute("""SELECT e.*, d.href AS dvw_href, d.rec AS dvw_rec FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id
+                        LEFT JOIN cal_dav_res d ON d.sub_id=e.sub_id AND d.uid=e.uid
                         WHERE s.user_id=? AND s.visible=1 AND e.d1>=? AND e.d0<=? ORDER BY e.start, e.id LIMIT 20000""",
                      (uid, lo.isoformat(), hi.isoformat())).fetchall()
     return jsonify(events=[{"id": r["id"], "sub": r["sub_id"], "title": r["title"], "location": r["location"],
-                            "description": r["description"], "all_day": bool(r["all_day"]), "start": r["start"], "end": r["end"]}
+                            "description": r["description"], "all_day": bool(r["all_day"]), "start": r["start"], "end": r["end"],
+                            **({"uid": r["uid"], "dvw_write": True, "dvw_rec": bool(r["dvw_rec"])}
+                               if subs.get(r["sub_id"], {}).get("w") and r["dvw_href"] else {})}
                            for r in rows] + own, subs=subs, evcals=evcals)

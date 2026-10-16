@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.52.0** (2026-10-16): the calendar like a desktop app - **drag to create, move and resize** events, also by long
+  press on phones; **write into subscribed CalDAV calendars** (switch per subscription, off by default) and **address
+  books of an organisation** that stay when a person leaves.
 - **2.51.1** (2026-10-16): CI fixes for 2.51.0, own time picker in agent proposals (both go live with this version).
 - **2.51.0** (2026-10-16): **agents pitch in with business work** - quotation drafts in the office, invoice and reminder
   drafts and payment suggestions, an inquiry becomes a project with one yes, a setup assistant, a weekly status on project

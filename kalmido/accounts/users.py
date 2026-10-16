@@ -403,6 +403,8 @@ def user_purge(c, uid):
         c.execute("DELETE FROM webhooks WHERE id=?", (a["webhook_id"],))
     from ..files.store import fs_user_purge
     files += fs_user_purge(c, uid)  # 2.48.0 (#1207): the file store (organisation branches go to an admin, the own tree goes)
+    from ..contacts.orgbooks import obk_user_purge
+    obk_user_purge(c, uid)  # 2.52.0 C (#1438): the organisations' address books it manages get another manager and stay
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     return files
 
