@@ -123,6 +123,9 @@ def v1_file_text(nid):
     from ..tasks.attachtext import text_of_bytes
     data = fs_read(c, nid)
     out = text_of_bytes(n["name"], n["mime"], data, owner=me())
+    if n["kind"] == "file":
+        from .textscan import ts_fill
+        ts_fill(c, "fs", nid, out)  # 2.61.0 (#1820): a scan / photo: the text recognised in the background
     fs_log_add(c, nid, "text")
     c.commit()
     return jsonify({"id": nid, "name": n["name"], **out})
@@ -223,6 +226,30 @@ def v1_file_version(nid):
     return jsonify({**_v1_node(c, need_node(c, nid)), "version": no}), 201
 
 
+@app.get("/api/v1/files/search")
+@v1_view
+def v1_files_search():
+    """2.61.0 (#1820): files whose name or recognised text matches ?q= -- only what the asker may see (agents: what is shared
+    with them and their own folder); every hit an agent gets is in the file's history like a listing."""
+    from .textscan import ts_files_find
+    a = v1_args(("q", "space"))
+    q = (a.get("q") or "").strip()
+    if not q or len(q) > 200:
+        raise BadInput(tr("Invalid value: {0}", "q"))
+    c = db()
+    rows, hit = ts_files_find(c, me(), q, (a.get("space") or "").strip())
+    out = []
+    for r in rows:
+        try:
+            n = need_node(c, r["id"])
+        except Denied:  # a link whose original the asker may not open
+            continue
+        fs_log_add(c, r["id"], "list")
+        out.append({**_v1_node(c, n), "hit": hit.get(r["id"], "name")})
+    c.commit()
+    return jsonify(data=out, next_cursor=None)
+
+
 def files_spec(paths, schemas, op, ok, errs, ref, pid, q):
     """OpenAPI of the file store (called from api/openapi.py)."""
     node = {"type": "object", "properties": {
@@ -250,6 +277,11 @@ def files_spec(paths, schemas, op, ok, errs, ref, pid, q):
                    body=new, scope="files:write",
                    desc="Needs the role edit on the folder (or an agent's own folder). A name that is taken gets \" (2)\"; an agent's "
                         "executable ending gets \".txt\".")}
+    paths["/files/search"] = {"get": op("Find files by name or recognised text (2.61.0)", T, ok(ref("FileNodePage")) | errs("400", "403", "404"),
+                                         [q("q", "Words (a word of 4+ letters also matches as a prefix)", {"type": "string"}),
+                                          q("space", "private | org:<id> | shared (default: all)", {"type": "string"})], scope="files:read",
+                                         desc="Names, the text of PDFs and the text the server recognised in scans and photos (local OCR). "
+                                              "Each item has hit: name | text. Only files you may open; at most 100, newest first.")}
     paths["/files/{id}"] = {"get": op("A folder with its children or a file with its versions (2.48.0)", T, ok(ref("FileNode")) | errs("403", "404"),
                                       [nid], scope="files:read")}
     paths["/files/{id}/content"] = {"get": {**op("Download a file (2.48.0)", T, errs("400", "403", "404", "409"),

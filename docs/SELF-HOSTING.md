@@ -662,6 +662,18 @@ Each tool runs as a short-lived process with limits; tune them for small hosts:
 | `KALMIDO_OCR_MEM_MB` | `1024` | Memory of one tool |
 | `KALMIDO_OCR_LANGS` | `deu+eng` | Tesseract languages (installed ones only) |
 | `KALMIDO_DOCS_SCAN_S` | `60` | Seconds between two looks into the inbox folders "Dokumente/Eingang" |
+| `KALMIDO_FILE_OCR` | `on` | 2.61.0: `off` switches the text recognition of normal files off (below) |
+| `KALMIDO_FILE_OCR_BACKFILL` | `on` | 2.61.0: `off` switches only the catch-up of files stored before off |
+| `KALMIDO_FILE_OCR_BACKFILL_S` | `20` | Seconds between two files of the catch-up |
+| `KALMIDO_FILE_OCR_MAX_MB` | `50` | Larger files are not read |
+
+2.61.0: the same tools also read the text of normal files in the background -- task and comment files, project files and
+files in the file store (PDF, JPEG, PNG; HEIC cannot be read by them and gets no mark). The upload never waits for it;
+documents go first, and the same file content in a workspace is read only once. The text makes the file findable: a task
+by the text of its files (task search, "Found in the file ..."), a file by its text in the file store's search -- only
+for people who can open the file anyway. The file shows *Text recognised* or *No text found*. Files stored before 2.61.0
+are caught up slowly (one file every 20 seconds, only while nothing else waits, newest first; the position survives a
+restart). Browser-encrypted files and chat files are never read. The text is sealed like the documents' text below.
 
 The recognised text, amounts, sender names, rules and the learnt models are sealed with the workspace's key when
 `KALMIDO_SECRET_KEY` is set (see [Encryption of organisation data](#encryption-of-organisation-data)); the search uses

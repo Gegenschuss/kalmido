@@ -265,6 +265,8 @@ def v1_attachment_text_get(aid):
     r = text_of_bytes(att["name"], att["mime"], data, max_chars, owner=me())
     if r.get("error") == "busy":
         return v1_err(503, r["message"], headers={"Retry-After": "10"}, name="busy")
+    from ..files.textscan import ts_fill
+    ts_fill(c, "att", att["id"], r, max_chars)  # 2.61.0 (#1820): a scan / photo: the text recognised in the background
     return jsonify({**base, **r})
 
 

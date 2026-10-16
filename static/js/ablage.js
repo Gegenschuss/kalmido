@@ -60,8 +60,10 @@ function viewAblage() {
   else if (!d) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
   else if (!d.items.length) body = `<div class="empty abempty">${ic(trash ? 'trash' : 'folder')}<span>${trash ? tr('The trash is empty') : sp === 'shared' && !r.nid ? tr('Nothing is shared with you yet') : canAdd ? tr('Drop files here or use “Upload”') : tr('This folder is empty')}</span></div>`;
   else body = `<div class="ablist" role="list">${d.items.map(n => ab_rowHtml(n, trash)).join('')}</div>`;
+  const search = !trash && typeof ftxtBox === 'function' ? ftxtBox() : '';  // 2.61.0 (#1820): names + recognised text
+  if (search && ftxtActive()) body = ftxtResults();
   const hint = !r.nid && sp === 'private' && d && !d.items.length ? `<p class="muted abhint">${tr('Share a folder with a person or an agent: they see exactly that folder, nothing else.')}</p>` : '';
-  return `<div class="abview ${canAdd ? 'abdropok' : ''}" data-abzone="${r.nid || ''}">${spaces}<div class="abmain">${crumbs}${tools}${body}${hint}</div></div>`;
+  return `<div class="abview ${canAdd ? 'abdropok' : ''}" data-abzone="${r.nid || ''}">${spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools}${body}${search && ftxtActive() ? '' : hint}</div></div>`;
 }
 function ab_rowHtml(n, trash) {
   const meta = [n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(trash ? n.deleted_at : n.updated_at), n.created_by_name && n.created_by !== S.me?.id ? n.created_by_name : ''].filter(Boolean).join(' · ');
@@ -75,7 +77,7 @@ function ab_rowHtml(n, trash) {
     : `<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>`;
   return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? 'draggable="true"' : ''}>${main}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
 }
-const ab_item = id => (AB.data?.items || []).find(x => x.id === +id) || (AB.data?.node?.id === +id ? AB.data.node : null);
+const ab_item = id => (AB.data?.items || []).find(x => x.id === +id) || (AB.data?.node?.id === +id ? AB.data.node : null) || (typeof ftxtItem === 'function' ? ftxtItem(id) : null);  // 2.61.0 (#1820): + search hits
 
 // ---- opening a file: images in the lightbox, PDFs in the PDF view, text in the text view, the rest downloads
 function ab_openFile(n) {
