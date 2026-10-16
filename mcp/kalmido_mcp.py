@@ -848,7 +848,7 @@ TOOLS += [
                       "one you may not change -> nothing happens. move: book_id = the target address book; contacts it has already stay "
                       "(conflicts). 2.47.3: set changes properties of all of them (groups_add / groups_remove, org, dept, kind, note_append "
                       "is appended; read-only or imported address books are skipped); its answer's undo, sent back with action restore as "
-                      "items, puts the old values back. Ask the person before deleting many.",
+                      "items, puts the old values back. 2.58.0: an imported address book as move target -> 409. Ask the person before deleting many.",
      _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "move", "set", "restore"]}, "book_id": S_ID,
            "groups_add": {"type": "array", "items": {"type": "string"}}, "groups_remove": {"type": "array", "items": {"type": "string"}},
            "org": {"type": "string"}, "dept": {"type": "string"}, "kind": {"type": "string", "enum": ["individual", "org"]},

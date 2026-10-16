@@ -1038,7 +1038,8 @@ def fi_undo(c, oid, uid, rid, kinds=None):
         counts = json.loads(r["counts"] or "{}")
     except ValueError:
         counts = {}
-    if kinds is None or all(k in undone for k in bk_area_counts(counts if isinstance(counts, dict) else {})):
+    areas = bk_area_counts(counts if isinstance(counts, dict) else {}) or FI_AREAS  # 2.58.0 (#1557): a run without entries: every area
+    if kinds is None or all(k in undone for k in areas):
         c.execute("UPDATE office_import_runs SET undone_at=?, undone_by=? WHERE id=? AND org_id=?", (ts, uid, rid, oid))
     return removed, kept, files
 

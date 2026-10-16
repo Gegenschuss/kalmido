@@ -300,6 +300,8 @@ def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozen
                 if q.scheme not in ("http", "https") or (p.scheme == "https" and q.scheme != "https") or \
                         (not same and not (cross_redirects and not auth and q.scheme == "https")):
                     raise CalError("redirect") from None
+                if method in ("PUT", "DELETE"):  # 2.58.0 (#1789): a write never follows a redirect
+                    raise CalError("redirect") from None
                 if code == 303:
                     method, body = "GET", None
                 url = new

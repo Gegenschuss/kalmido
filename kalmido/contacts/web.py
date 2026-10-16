@@ -157,7 +157,8 @@ def op_contact_edit(c, uid, cid, b):
     b = {k: v for k, v in b.items() if k != "expect"}
     if "book_id" in b and b["book_id"] not in (None, "") and as_int(b["book_id"], "book_id", 1) != r["book_id"]:
         nb = as_int(b["book_id"], "book_id", 1)
-        need_book(c, nb, write=True)
+        if need_book(c, nb, write=True)[0]["src_id"]:  # 2.58.0 (#1656): as the bulk move
+            raise Denied(409, tr("An imported address book is updated from its source; contacts cannot be moved into it"))
         if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?)", (nb, r["uid"], r["href"])).fetchone():
             raise Denied(409, tr("The address book has this contact already"))
         nbk = c.execute("SELECT occ_list_id FROM books WHERE id=?", (nb,)).fetchone()
