@@ -178,10 +178,15 @@ if dt is not None:
 st = A.get(B + "/api/admin/related").json()
 check(st["reachable"] is True and st["model"] == "stub" and st["dim"] == 384 and st["done"] >= len(ALL), f"admin status: reachable, model, counts {st}")
 rows = {r[0]: r for r in dbx("SELECT task_id, org_id, list_id, model, dim, vec, text_hash FROM task_vectors")}
-check(all(rows[t][1] == ALPHA and rows[t][2] in (LA, LA2) for t in ALPHA_IDS) and rows[TB][1] == BETA and rows[TP][1] is None,
-      "org_id / list_id of the vectors follow the task's list")
+LORG = {r[0]: r[1] for r in dbx("SELECT t.id, l.org_id FROM tasks t JOIN lists l ON l.id=t.list_id")}
+check(all(rows[t][1] == ALPHA and rows[t][2] in (LA, LA2) for t in ALPHA_IDS) and rows[TB][1] == BETA and rows[TP][1] == LORG[TP],
+      f"org_id / list_id of the vectors follow the task's list (private: {rows[TP][1]} / {LORG[TP]})")
 check(all(str(rows[t][5]).startswith("kenc1:") for t in ALPHA_IDS | BETA_IDS), "an encrypted organisation's vectors are sealed (kenc1:)")
-check(not str(rows[TP][5]).startswith("kenc1:") and len(rows[TP][5]) > 100, "a private list's vector is plain base64 (float16)")
+# a list without an organisation keeps its vector plain (like every field orgcrypt leaves alone without an organisation)
+dbx("UPDATE lists SET org_id=NULL WHERE id=?", (LP,), write=True)
+wait_for(lambda: (dbx("SELECT org_id, vec FROM task_vectors WHERE task_id=?", (TP,)) or [(0, "kenc1:")])[0][0] is None, "a list moved out of the workspace: its vectors follow")
+r = dbx("SELECT vec FROM task_vectors WHERE task_id=?", (TP,))
+check(r and not str(r[0][0]).startswith("kenc1:") and len(r[0][0]) > 100, "a vector without an organisation is plain base64 (float16)")
 check(all(rows[t][3] == "stub" and rows[t][4] == 384 for t in ALL), "model + dim stored")
 
 # ================================================================== related: only what the asker sees
