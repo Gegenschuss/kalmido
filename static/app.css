@@ -7696,3 +7696,26 @@ button.jobtag b{font-weight:600}
 .clkc .cklk{display:inline-flex;align-items:center;gap:.25rem;color:var(--accent);font-size:.8125rem}
 .clkc [data-clk-unlink]{min-height:2.75rem;font-size:.8125rem}
 #pop .cklpick .ctpl{max-height:min(20rem,50dvh)}
+
+/* 2.59.0 B (#1375) related tasks: the folded section in a task, the hint while adding, the search switch (related.js) */
+.rt9sec>summary{display:flex;align-items:center;gap:.5rem;cursor:pointer;list-style:none;min-height:2.75rem;font-size:var(--fs-s);font-weight:600;color:var(--text2)}
+.rt9sec>summary::-webkit-details-marker{display:none}
+.rt9sec>summary::before{content:'';width:.4rem;height:.4rem;border-right:.125rem solid currentColor;border-bottom:.125rem solid currentColor;transform:rotate(-45deg);transition:transform .2s ease;flex:none}
+.rt9sec[open]>summary::before{transform:rotate(45deg)}
+.rt9list{display:flex;flex-direction:column;gap:.125rem;padding:0 0 .5rem}
+.rt9it{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;padding:.25rem .5rem;border:0;border-radius:var(--radius);background:none;color:var(--text);text-align:left;font:inherit;font-size:var(--fs-s);cursor:pointer;min-width:0}
+.rt9it:hover,.rt9it:focus-visible{background:var(--bg3)}
+.rt9n{flex:none;color:var(--muted);font-family:var(--mono);font-size:var(--fs-xs)}
+.rt9t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rt9done .rt9t{color:var(--muted);text-decoration:line-through}
+.rt9dup,.rt9dupb{flex:none;padding:.0625rem .5rem;border-radius:62.5rem;background:var(--accent-soft);color:var(--accent-ink);font-size:var(--fs-xs);font-weight:500}
+.rt9empty{padding:.25rem .5rem;font-size:var(--fs-s)}
+.rt9refh{padding:.5rem .5rem .125rem;color:var(--muted);font-size:var(--fs-xs);font-weight:600}
+.rt9qh{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;margin:.25rem 0 0;padding:.25rem .5rem;font-size:var(--fs-s);color:var(--text2);min-width:0;animation:rt9in .2s ease}
+.rt9ql{display:inline-flex;align-items:center;gap:.25rem;color:var(--muted)}
+.rt9qi{color:var(--accent);text-align:left;min-height:2rem;max-width:100%;overflow-wrap:anywhere}
+.rt9semw:empty{display:none}
+.rt9sem{display:inline-flex;align-items:center;gap:.5rem;min-height:2.75rem;padding:0 .25rem;font-size:var(--fs-s);color:var(--text2)}
+.rt9simh{margin-top:.75rem}
+@keyframes rt9in{from{opacity:0;transform:translateY(-.25rem)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.rt9qh{animation:none}.rt9sec>summary::before{transition:none}}

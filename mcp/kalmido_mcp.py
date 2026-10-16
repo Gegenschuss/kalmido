@@ -424,9 +424,16 @@ TOOLS = [
                        "working day.",
      _obj({"date": {"type": "string", "description": "YYYY-MM-DD, default today"}}),
      lambda api, a: api.call("GET", "/dayplan/review", _pick(a, ("date",)))),
-    ("search_tasks", "Full-text search in titles, notes, links and custom fields of visible tasks.",
-     _obj({"q": {"type": "string", "minLength": 1}, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}, ["q"]),
-     lambda api, a: api.call("GET", "/search", _pick(a, ("q", "limit")))),
+    ("search_tasks", "Full-text search in titles, notes, links and custom fields of visible tasks. 2.59.0: semantic=true adds "
+                     "tasks of similar meaning after the text hits (flag similar; needs the server's embedding service).",
+     _obj({"q": {"type": "string", "minLength": 1}, "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+           "semantic": {"type": "boolean"}}, ["q"]),
+     lambda api, a: api.call("GET", "/search", {**_pick(a, ("q", "limit")), **({"semantic": "1"} if a.get("semantic") else {})})),
+    ("related_tasks", "2.59.0: up to 5 tasks close in meaning to a task (local text vectors on the server, similar titles, "
+                      "#references), only tasks you may see: {enabled, pending, items: [{id, title, list_id, done, score, dup, ref}]}. "
+                      "dup = probably a duplicate, ref = named by #number in either direction. enabled false = the server has no embedding service; pending = not computed yet. "
+                      "Use it before creating a task (duplicates) and to find context. Read-only.",
+     _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/related")),
     ("search_messages", "2.33.0: full-text search in task comments, team chat and your own chats with people (only what you may read: "
                         "the lists shared with you, their channels, your chats). Words match word beginnings; case, accents and ä/ae do not "
                         "matter. Newest first; each hit: art (c comment | t team chat | a agent chat), chat_type, task_id / room_id / "

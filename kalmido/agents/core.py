@@ -267,6 +267,10 @@ def agent_task_data(c, tid, aid, full=None, **extra):
     task, lst = task_for(c, row, aid), lst_brief(c, row["list_id"])
     from ..tasks.snippets import snip_event, snip_parse  # 2.35.0 (#1095): a shortened copy (full code: get_task)
     task["snippets"], task["snippets_total"] = snip_event(row["snippets"]), len(snip_parse(row["snippets"]))
+    from ..tasks.related import rt9_event  # 2.59.0 B (#1375): the related tasks the agent sees (cache only; none without a vector)
+    rel = rt9_event(c, tid, aid)
+    if rel is not None:
+        task["related"] = rel
     if full is None:
         full = task_visible(c, tid, aid, full=True)
     if full:

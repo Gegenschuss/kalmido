@@ -8214,5 +8214,19 @@
   "No contacts found": "Keine Kontakte gefunden",
   "No contacts to choose from: only the address books of the organisation of the client can be linked (without an organisation: your own).": "Keine Kontakte zur Auswahl: verknüpfbar sind nur die Adressbücher der Organisation des Kunden (ohne Organisation: deine eigenen).",
   "Open contact": "Kontakt öffnen",
-  "Contact person at": "Ansprechpartner bei"
+  "Contact person at": "Ansprechpartner bei",
+  "Related tasks": "Verwandte Aufgaben",
+  "probably a duplicate": "vermutlich doppelt",
+  "Nothing similar found.": "Nichts Ähnliches gefunden.",
+  "Being computed, please check again in a minute.": "Wird gerade berechnet, bitte in einer Minute noch einmal schauen.",
+  "Similar:": "Ähnlich:",
+  "also similar meaning": "auch ähnliche Bedeutung",
+  "Similar meaning": "Ähnliche Bedeutung",
+  "Shows tasks of similar meaning in a task, a hint on likely duplicates while adding and “also similar meaning” in the search; agents get them too. A small local model on this server computes them (the optional service kalmido-embed); nothing leaves the server.": "Zeigt in einer Aufgabe Aufgaben mit ähnlicher Bedeutung, beim Anlegen einen Hinweis auf mögliche Dubletten und in der Suche „auch ähnliche Bedeutung“; Agenten bekommen sie ebenfalls. Berechnet werden sie von einem kleinen lokalen Modell auf diesem Server (der optionale Dienst kalmido-embed); nichts verlässt den Server.",
+  "Off: the embedding service is not set up (KALMIDO_EMBED_URL), see SELF-HOSTING.md.": "Aus: Der Embedding-Dienst ist nicht eingerichtet (KALMIDO_EMBED_URL), siehe SELF-HOSTING.md.",
+  "Service reachable": "Dienst erreichbar",
+  "Service not reachable": "Dienst nicht erreichbar",
+  "{0} tasks computed, {1} waiting": "{0} Aufgaben berechnet, {1} offen",
+  "Show related tasks": "Verwandte Aufgaben zeigen",
+  "Mentioned": "Erwähnt"
 }

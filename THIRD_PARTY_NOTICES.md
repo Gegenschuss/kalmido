@@ -92,6 +92,17 @@ loaded when a PDF is opened; the browser never loads them from a third party.
 - Pillow (MIT-CMU / HPND), profile photos (resize, orientation, metadata removal)
 - pypdf 6.19.0 (BSD-3-Clause), reads the text layer of PDF attachments for agents and the briefing field
 
+## Optional embedding service kalmido-embed (embed/, 2.59.0)
+
+Built only with `docker compose --profile embed`; not part of the Kalmido image.
+
+- multilingual-e5-small by intfloat (Liang Wang et al.), MIT License ([intfloat/multilingual-e5-small](https://huggingface.co/intfloat/multilingual-e5-small)),
+  as the int8 ONNX export and tokenizer of [Xenova/multilingual-e5-small](https://huggingface.co/Xenova/multilingual-e5-small),
+  downloaded at build time at a fixed revision (SHA-256 checked)
+- ONNX Runtime (MIT), runs the model on the CPU
+- Hugging Face tokenizers (Apache-2.0)
+- NumPy (BSD-3-Clause)
+
 ## Liberation Sans font (PDF documents)
 
 The PDF writer of the office module embeds Liberation Sans Regular and Bold (`kalmido/office/fonts/LiberationSans-*.ttf`,
