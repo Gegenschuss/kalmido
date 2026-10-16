@@ -373,7 +373,8 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 | `playbook` | `playbook.js` | the playbook area of a list / folder dialog, Settings |
 | `timeline` | `timeline.js`, `roadmap.js` | a list's timeline, the roadmap, the calendar's timeline |
 
-`contacts` now also loads `newsletter.js`. What the start needs of them stays at start: `chatbase.js` (the phone /
+`contacts` now also loads `newsletter.js`, `settings` first `acctset.js` (the settings sections of `account.js`; sign-in,
+invitations and logout stay in `account.js`). What the start needs of them stays at start: `chatbase.js` (the phone /
 desktop switch of the chat, the pop-up button, reaction rows, `patchKids`, the task panel's usage line), `calendar.js`
 (the events' data, the kanban board, the agenda's bar, `calReq`), `templates.js` (the charts) and small parts in
 `lazyload.js` (`pv_attr`, the documents switch, `lifeOn` / `fmtMoney`, `pbOn` / `pbMenuItem`, `isRoadmap` / `tlReaches`,
