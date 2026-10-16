@@ -8,7 +8,8 @@
  - the hidden area never shows as an organisation (admin list, own workspaces, agent workspace, client workspace)
  - a second person sees nothing of it (every route 404 / empty; row-level security with the second person's context)
  - a person with one organisation: "Private" = the personal office, the organisation's workspace = its office, separate
-   clients (no silent fallback to the only organisation); the empty personal office points to the organisation's office
+   clients (no silent fallback to the only organisation); the empty personal office points to the organisation's office;
+   /api/state names the org_id of every client (2.56.3, #1842)
  - agents never reach it; the move into a new organisation (one way: confirmation, only the owner, instance admin) keeps
    documents, numbers and clients; afterwards "Private" is a new, empty personal office
  - mode shared (no organisations): the personal office, strictly per person
@@ -206,6 +207,10 @@ r = A.post(B + D, json={"client_id": OCL, "project_title": "Org"})
 check(r.status_code == 201, "organisation: a quotation for the organisation's client")
 ODOC = r.json()["id"]
 check({d["id"] for d in A.get(B + D).json()["docs"]} == {ODOC}, "organisation: only its documents")
+# 2.56.3 (#1842): /api/state names the area of every client (the office's client picker filters by it)
+st = {x["id"]: x for x in A.get(B + "/api/state").json()["clients"]}
+check(st.get(OCL, {}).get("org_id") == ORG and CL in st and "org_id" in st[CL] and st[CL]["org_id"] is None,
+      f"state: the clients carry their org_id {[(k, v.get('org_id')) for k, v in st.items()]}")
 ws(A, "private")
 check(A.post(B + D, json={"client_id": OCL}).status_code == 404, "private: the organisation's client is not usable")
 check(ODOC not in {d["id"] for d in A.get(B + D).json()["docs"]} and A.get(B + f"{D}/{ODOC}").status_code == 404, "private: no document of the organisation")

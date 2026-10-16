@@ -7,6 +7,12 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.56.3] - 2026-10-16
+
+### Fixed
+- In an organisation's office the client field of a quotation or invoice offers the organisation's clients again (it
+  stayed empty there, #1842).
+
 ## [2.56.1] - 2026-10-16
 
 CI fixes for 2.56.0 (both go live with this version).
