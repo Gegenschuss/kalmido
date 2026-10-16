@@ -6,7 +6,7 @@ Invented companies, people and figures only.
    services / clients (no purchase prices); a quotation draft WITHOUT a number, free positions / other prices / discounts
    marked, the marks kept on an unchanged save and gone on a changed or confirmed position; only its own drafts and only
    as drafts; never status, number, finalising, deleting; the chat card with link buttons; every request in the office
-   log; another organisation's documents / clients 404; a freelancer without organisation (personal office)
+   log; another organisation's documents / clients 404 (tenant-matrix: office); a freelancer without organisation (personal office)
  - #1348: the event offer_accepted to the area's office agents
  - #1350: an invoice draft from an accepted quotation, a reminder draft over an open invoice, payment suggestions that
    an admin accepts (booked) or rejects (a member: 403)
