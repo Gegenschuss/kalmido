@@ -7946,5 +7946,10 @@
   "Change every date of this repeating event?": "Modificare tutte le date di questo evento ricorrente?",
   "Single dates of a subscribed calendar cannot be changed here.": "Le singole date di un calendario in abbonamento non si possono modificare qui.",
   "List colours only as a dot": "Colori delle liste solo come punto",
-  "An open list takes its colour for the header, ticks and buttons, and tasks show it as a thin edge on boards, in the calendar and in Today or Week. On: only the dot in the sidebar. For all your devices.": "Una lista aperta usa il suo colore per intestazione, spunte e pulsanti, e le attività lo mostrano come un bordo sottile nelle bacheche, nel calendario e in Oggi o Settimana. Attivo: solo il punto nella barra laterale. Per tutti i tuoi dispositivi."
+  "An open list takes its colour for the header, ticks and buttons, and tasks show it as a thin edge on boards, in the calendar and in Today or Week. On: only the dot in the sidebar. For all your devices.": "Una lista aperta usa il suo colore per intestazione, spunte e pulsanti, e le attività lo mostrano come un bordo sottile nelle bacheche, nel calendario e in Oggi o Settimana. Attivo: solo il punto nella barra laterale. Per tutti i tuoi dispositivi.",
+  "Will be visible to everyone in {0}": "Sarà visibile a tutti in {0}",
+  "Workspace of {0}": "Area di lavoro di {0}",
+  "Colour of the workspace": "Colore dell’area di lavoro",
+  "Lists of the organisation show it as a stripe in the header and the sidebar, for every member. Private stays without colour.": "Le liste dell’organizzazione la mostrano come una striscia nell’intestazione e nella barra laterale, per tutti i membri. Il privato resta senza colore.",
+  "Only an admin of this organisation can change it.": "Solo un amministratore di questa organizzazione può cambiarlo."
 }

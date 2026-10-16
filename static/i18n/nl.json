@@ -7946,5 +7946,10 @@
   "Change every date of this repeating event?": "Alle datums van deze terugkerende afspraak wijzigen?",
   "Single dates of a subscribed calendar cannot be changed here.": "Losse datums van een geabonneerde agenda kunnen hier niet worden gewijzigd.",
   "List colours only as a dot": "Lijstkleuren alleen als stip",
-  "An open list takes its colour for the header, ticks and buttons, and tasks show it as a thin edge on boards, in the calendar and in Today or Week. On: only the dot in the sidebar. For all your devices.": "Een geopende lijst gebruikt haar kleur voor de kop, vinkjes en knoppen, en taken tonen haar als een dunne rand op borden, in de agenda en in Vandaag of Week. Aan: alleen de stip in de zijbalk. Voor al je apparaten."
+  "An open list takes its colour for the header, ticks and buttons, and tasks show it as a thin edge on boards, in the calendar and in Today or Week. On: only the dot in the sidebar. For all your devices.": "Een geopende lijst gebruikt haar kleur voor de kop, vinkjes en knoppen, en taken tonen haar als een dunne rand op borden, in de agenda en in Vandaag of Week. Aan: alleen de stip in de zijbalk. Voor al je apparaten.",
+  "Will be visible to everyone in {0}": "Wordt zichtbaar voor iedereen in {0}",
+  "Workspace of {0}": "Werkruimte van {0}",
+  "Colour of the workspace": "Kleur van de werkruimte",
+  "Lists of the organisation show it as a stripe in the header and the sidebar, for every member. Private stays without colour.": "Lijsten van de organisatie tonen haar als streep in de kop en de zijbalk, voor alle leden. Privé blijft zonder kleur.",
+  "Only an admin of this organisation can change it.": "Alleen een beheerder van deze organisatie kan dit wijzigen."
 }

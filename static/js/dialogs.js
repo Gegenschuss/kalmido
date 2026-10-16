@@ -301,6 +301,7 @@ function fl_nameEnd(id) {
 }
 async function listPatch(id, body, label, o = {}) {
   const l = listById(id); if (!l) return false;
+  const ws0 = l.org_id || null;  // 2.53.0 (#1474)
   const before = {}, after = {};
   for (const k of LIST_HIST) if (k in body && lv(k, l[k]) !== lv(k, body[k])) { before[k] = lv(k, l[k]); after[k] = lv(k, body[k]); }
   // 2.41.2 (#1501): what only changes the list itself shows at once (optimistic, no GET /api/state); folder, type, archive
@@ -313,6 +314,7 @@ async function listPatch(id, body, label, o = {}) {
     try { await optWrite(optSet(() => listById(id), vals), () => api('PATCH', '/api/lists/' + id, body)); } catch { return false; }
     await load(); render();
   }
+  if ('org_id' in body) wsc_listMoved(id, ws0, body.org_id || null);  // 2.53.0 (#1474): moved into an organisation: who sees it now
   if (!Object.keys(before).length) return null;
   const go = (to, from) => async () => {
     const r = await api('PATCH', '/api/lists/' + id, {...to, _prev: from});
