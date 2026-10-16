@@ -326,6 +326,11 @@ t = one(T9)
 check(r.ok and r.json().get("next_due") and t["status"] == 0 and not t.get("review") and t.get("reviewer_id") == CAROL, f"repeat: next occurrence without approval {t.get('review')}")
 check(Bo.post(B + f"/api/tasks/{T9}/complete").status_code == 409, "repeat: the next tick waits again")
 
+# 2.60.0 (leader, review): a task waiting behind the gate keeps its list (no detour through a list without the gate)
+BL = Bo.post(B + "/api/lists", json={"name": "Bob's own"}).json()["id"]
+r = Bo.patch(B + f"/api/tasks/{T9}", json={"list_id": BL})
+check(not r.ok and one(T9)["list_id"] == P, f"moving a gated task to another list is refused ({r.status_code})")
+
 # ---------------------------------------------------------------- gate off: completing is free again
 check(Bo.put(B + f"/api/lists/{P}/review", json={"on": True, "reviewer": CAROL, "gate": False}).ok, "gate off")
 check(Bo.post(B + f"/api/tasks/{T5}/complete").ok, "without the gate a waiting task completes")
