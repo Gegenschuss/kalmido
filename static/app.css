@@ -7403,3 +7403,20 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .sgrow .sghead{font-size:.875rem;overflow-wrap:anywhere}
 .sgrow.st-accepted .sghead b{color:var(--accent)}
 .sgproto{margin-top:.25rem;font-size:.8125rem;color:var(--text2);overflow-wrap:anywhere}
+/* 2.51.0 C (#1352 #1353 #1355): an agent's notepad on the pin board, drafts (tentative events) in the calendar, time / shoot proposals */
+.wgpadag{display:flex;align-items:center;gap:.35rem;font-size:.82em;margin:-.15rem 0 .35rem}
+.wgpadag .ic{opacity:.7}
+.wgpadagt{border-left:3px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+.evdraft{opacity:.68;border-style:dashed!important;border-width:1px;border-color:var(--ccb,var(--line2))!important;background:color-mix(in srgb,var(--cct,var(--bg2)) 55%,transparent)!important}
+.cev.evdraft,.tl-cev.evdraft{outline:1px dashed color-mix(in srgb,var(--text) 35%,transparent);outline-offset:-1px}
+.evdraftb{border:1px dashed currentColor;background:none}
+.apdraftact{margin-top:.25rem}
+.apri .aph{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .5rem;min-width:0}
+.apri .aph b{overflow-wrap:anywhere}
+.apf{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
+.apf .aptime{width:6.5rem;min-height:2.5rem}
+.apf .apnote{flex:1 1 10rem;min-width:0;min-height:2.5rem}
+.apf .ppt{flex:1 1 100%;min-height:2.5rem}
+.apwarn .ic{color:var(--accent)}
+.apalt{border-style:dashed}
+@media (max-width:600px){.apf .aptime{flex:1 1 40%}}

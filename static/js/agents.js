@@ -673,6 +673,7 @@ async function propOpen(jid) {
   });
 }
 function propEdit(el) {
+  if (ap_propEdit(el)) return;  // 2.51.0 C (#1353 #1355): times / place of time and shoot proposals (agentplan.js)
   const f = el.dataset?.f, row = el.closest?.('.ppi'); if (!f || !row || !S.prop) return;
   const k = row.dataset.k, v = el.value, e = S.prop.ed[k] ||= {};
   if (f === 'title') e.title = v.trim();
@@ -703,6 +704,7 @@ function propItemsHtml() {
   const {v} = S.prop, p = v.proposal, inp = v.input;
   if (v.kind === 'dayplan') return propDayplanHtml();  // 2.10.0 (#440)
   if (v.kind === 'cleanup') return clnItemsHtml();  // 2.39.0 (#1151): cleanup.js
+  if (AP_KINDS.includes(v.kind)) return ap_propItemsHtml();  // 2.51.0 C (#1353 #1355): agentplan.js
   if (v.kind === 'project') {
     const secOpts = cur => `<option value="">${tr('No section')}</option>${p.sections.map(s => `<option ${s === cur ? 'selected' : ''}>${esc(s)}</option>`).join('')}`;
     return p.tasks.map((t, i) => propItemHtml(String(i), t, {
@@ -746,7 +748,7 @@ function propDraw() {
         <label class="ppshare"><input type="checkbox" id="pp-share"> ${tr('Share the new list with {0}', esc(v.agent.name))}</label>` : ''}
       <div class="ppbar"><button class="btn sm" data-pp="all">${tr('Select all')}</button><button class="btn sm" data-pp="none">${tr('Select none')}</button></div>
       <div class="ppl">${propItemsHtml()}</div>
-      <div class="shint keep">${v.kind === 'cleanup' ? tr('Applying changes the selected tasks as you. Tasks someone is editing right now or that changed since the request are skipped. One step, undo takes it back.') : v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected basket items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
+      <div class="shint keep">${AP_KINDS.includes(v.kind) ? ap_propHint(v) : v.kind === 'cleanup' ? tr('Applying changes the selected tasks as you. Tasks someone is editing right now or that changed since the request are skipped. One step, undo takes it back.') : v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected basket items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
     // 2.5.2 (K03): the footer stays visible below the entries (sticky), with the count next to Apply
     foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
   } else {

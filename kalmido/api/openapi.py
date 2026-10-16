@@ -659,6 +659,12 @@ def openapi_spec():
     stale_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#266)
     from ..personal.timegaps import timegaps_spec
     timegaps_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#269)
+    from ..agents.agentpin import apin_spec
+    apin_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 C (#1352)
+    from ..agents.agenttime import atm_spec
+    atm_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 C (#1353)
+    from ..hub.agentdispo import adz_spec
+    adz_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 C (#1355)
     from ..files.v1 import files_spec
     files_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1207)
     from ..receipts.suggest import rc_spec
