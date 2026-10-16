@@ -7276,7 +7276,7 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .ppcard{display:flex;flex-direction:column;gap:.125rem;padding:.5rem .625rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg);cursor:pointer;min-height:2.75rem;user-select:none;transition:transform .15s ease,opacity .15s ease}
 .ppcard:hover,.ppcard:focus-visible{border-color:var(--accent)}
 .ppcard.dragging{opacity:.5}
-.ppcard.warn{border-left:3px solid var(--danger,#c0392b)}
+.ppcard.warn{border-left:.1875rem solid var(--danger,#c0392b)}
 .pptitle{font-weight:600;overflow-wrap:anywhere}
 .ppmeta{display:flex;flex-wrap:wrap;gap:.25rem .5rem;align-items:center;font-size:.875rem}
 .ppacts{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0}
@@ -7301,13 +7301,13 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .kpm.cur small{color:var(--accent);font-weight:600}
 .kpm small{font-size:.6875rem}
 .kpb{display:flex;align-items:flex-end;justify-content:center;gap:2px;height:6rem;width:100%}
-.kpb i{display:block;width:40%;max-width:.75rem;height:100%;border-radius:4px 4px 0 0;transform-origin:bottom center;transition:transform .2s ease}
+.kpb i{display:block;width:40%;max-width:.75rem;height:100%;border-radius:.25rem .25rem 0 0;transform-origin:bottom center;transition:transform .2s ease}
 .kpcur{background:var(--accent)}.kpprev{background:var(--accent);opacity:.3}
 .kpcl li.kpclient{display:block;padding:.625rem .25rem;border-bottom:1px solid var(--line2)}
 .kpch{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .kprow{display:grid;grid-template-columns:minmax(6rem,auto) 1fr auto auto;gap:.5rem;align-items:center;font-size:.875rem;margin-top:.25rem;font-variant-numeric:tabular-nums}
 .kpproj a{display:inline-flex;align-items:center;gap:.25rem;color:var(--text);min-height:2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.kpbud{display:block;width:5rem;height:.375rem;border-radius:3px;background:var(--line2);overflow:hidden}
+.kpbud{display:block;width:5rem;height:.375rem;border-radius:.1875rem;background:var(--line2);overflow:hidden}
 .kpbud i{display:block;height:100%;background:var(--accent);transform-origin:left center;transition:transform .2s ease}
 .kpbud i.warn{opacity:.7}.kpbud i.over,.kppct.over{background:var(--danger,#c0392b);color:var(--danger,#c0392b)}
 .kppct.over{background:none}
@@ -7356,7 +7356,7 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .dptable td.dpc{padding:.125rem;vertical-align:top;border-left:1px solid var(--line)}
 .dptable td.we{background:color-mix(in srgb,var(--muted) 7%,transparent)}
 .dptable td.hol{background:color-mix(in srgb,var(--muted) 14%,transparent)}
-.dptable td.away{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 18%,transparent) 0 4px,transparent 4px 8px)}
+.dptable td.away{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 18%,transparent) 0 .25rem,transparent .25rem .5rem)}
 .dpic{display:inline-flex;width:1.5rem;justify-content:center;color:var(--muted)}
 .dpbar{display:flex;align-items:center;gap:.25rem;width:100%;min-height:1.75rem;margin:.0625rem 0;padding:.125rem .375rem;border-radius:var(--r-s);font-size:var(--fs-xs);text-align:left;overflow:hidden;white-space:nowrap;cursor:pointer}
 .dpbar span{overflow:hidden;text-overflow:ellipsis}
@@ -7372,15 +7372,15 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .dpres{display:flex;flex-wrap:wrap;gap:.25rem .625rem;font-size:var(--fs-s)}
 .dpres .warn{color:var(--danger)}
 .dplegend{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
-.dpk{display:inline-block;width:.875rem;height:.875rem;border-radius:3px;margin-left:.5rem}
+.dpk{display:inline-block;width:.875rem;height:.875rem;border-radius:.1875rem;margin-left:.5rem}
 .dpk.firm{background:var(--accent)}
 .dpk.option{background:var(--accent-soft);border:1px dashed var(--accent)}
-.dpk.away{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 30%,transparent) 0 3px,transparent 3px 6px)}
+.dpk.away{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 30%,transparent) 0 .1875rem,transparent .1875rem .375rem)}
 .dpfreebox{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:1rem 0 .25rem}
 .dpfree p{margin:.25rem 0}
 .dpmine{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;min-height:2.75rem;padding:.375rem .25rem;border-bottom:1px solid var(--line)}
 .dpmine .muted{font-size:var(--fs-s)}
-.dpst{margin-left:auto;font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:999px}
+.dpst{margin-left:auto;font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:999rem}
 .dpst.firm{background:var(--accent);color:var(--accent-ink)}
 .dpst.option{border:1px dashed var(--accent)}
 .dpmd .dppicks{max-height:40vh;overflow:auto;margin:.5rem 0}
@@ -7420,12 +7420,12 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .tcard .pk2setup,.tour .pk2setup{margin:.5rem 0 0}
 .ppl .pk2hint{margin-top:.5rem}
 /* 2.51.0 A (#1348, #1350): agents in the office -- marked positions, "drafted by", suggested payments, chat link buttons */
-.ofdit.oa_flag{box-shadow:inset 3px 0 0 var(--accent);background:var(--accent-soft)}
+.ofdit.oa_flag{box-shadow:inset .1875rem 0 0 var(--accent);background:var(--accent-soft)}
 .oa_flags{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.25rem;font-size:var(--fs-s)}
 .oa_flagt{color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:.25rem}
 .oa_flags .btn{min-height:2.25rem}
 .oa_by{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;margin:.25rem 0 .5rem}
-.oa_pp{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--radius);padding:.5rem .75rem;margin:.5rem 0}
+.oa_pp{border:1px solid var(--line);border-left:.1875rem solid var(--accent);border-radius:var(--radius);padding:.5rem .75rem;margin:.5rem 0}
 .oa_pp h3{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem;font-size:var(--fs-m)}
 .oa_pp ul{list-style:none;margin:0;padding:0}
 .oa_pp li{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem 0;border-top:1px solid var(--line)}
@@ -7441,7 +7441,7 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 /* 2.51.0 C (#1352 #1353 #1355): an agent's notepad on the pin board, drafts (tentative events) in the calendar, time / shoot proposals */
 .wgpadag{display:flex;align-items:center;gap:.35rem;font-size:.82em;margin:-.15rem 0 .35rem}
 .wgpadag .ic{opacity:.7}
-.wgpadagt{border-left:3px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+.wgpadagt{border-left:.1875rem solid color-mix(in srgb,var(--accent) 45%,transparent)}
 .evdraft{opacity:.68;border-style:dashed!important;border-width:1px;border-color:var(--ccb,var(--line2))!important;background:color-mix(in srgb,var(--cct,var(--bg2)) 55%,transparent)!important}
 .cev.evdraft,.tl-cev.evdraft{outline:1px dashed color-mix(in srgb,var(--text) 35%,transparent);outline-offset:-1px}
 .evdraftb{border:1px dashed currentColor;background:none}
@@ -7456,9 +7456,9 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .apalt{border-style:dashed}
 @media (max-width:600px){.apf .aptime{flex:1 1 40%}}
 /* 2.52.0 B (#1128) events of writable CalDAV subscriptions: popover actions, hint under "Allow writing" */
-.cevact.dvwact { display: flex; flex-wrap: wrap; gap: 6px; }
+.cevact.dvwact { display: flex; flex-wrap: wrap; gap: .375rem; }
 .cevact.dvwact .btn.pri { margin-left: auto; }
-.dvwhint { margin: -2px 0 8px; }
+.dvwhint { margin: -2px 0 .5rem; }
 
 /* 2.52.0 A (#1016) the calendar like macOS: drag to move / resize events, the block "New event" in the grid, all-day and month ranges */
 .week .wcol,.week .wad,.cal .cell,.wcev{-webkit-touch-callout:none}
@@ -7471,19 +7471,19 @@ body.cgdrag,body.cgdrag *{user-select:none;-webkit-user-select:none}
 body.cgdrag #wbody{touch-action:none}
 body.cgdrag .week,body.cgdrag .cal{cursor:grabbing}
 .wcev.cgsrc{opacity:.35}
-.wcev.cgghost{z-index:3;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.25);border-color:var(--cc);background:color-mix(in srgb,var(--cc) 28%,var(--bg2))}
+.wcev.cgghost{z-index:3;pointer-events:none;box-shadow:0 .25rem .875rem rgba(0,0,0,.25);border-color:var(--cc);background:color-mix(in srgb,var(--cc) 28%,var(--bg2))}
 .cgsaving{opacity:.6}
 .wad.cgsel,.cal .cell.cgsel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
 .week .wallday,.cal{position:relative}
 .cgnew{position:absolute;left:2px;right:2px;z-index:4;display:flex;flex-wrap:wrap;align-items:center;gap:.125rem .25rem;min-height:2.75rem;padding:2px .3125rem;
-  background:color-mix(in srgb,var(--accent) 22%,var(--bg2));border:1px solid var(--accent);border-radius:.3125rem;box-shadow:0 4px 14px rgba(0,0,0,.2);overflow:hidden;align-content:flex-start}
+  background:color-mix(in srgb,var(--accent) 22%,var(--bg2));border:1px solid var(--accent);border-radius:.3125rem;box-shadow:0 .25rem .875rem rgba(0,0,0,.2);overflow:hidden;align-content:flex-start}
 .cgnew.cgday{right:auto;min-height:0;flex-wrap:nowrap}
 .cgnew .cgtm{font:var(--fs-xs) var(--mono);color:var(--muted);flex:1 1 100%}
 .cgnew.cgday .cgtm{flex:0 0 auto}
 .cgnew .cgin{flex:1 1 6rem;min-width:0;background:transparent;border:0;outline:0;padding:1px 0;font:inherit;font-size:var(--fs-s);font-weight:600;color:var(--text)}
 .cgnew .cgin::placeholder{color:var(--muted);font-weight:400}
 .cgnew .cgdet{flex:0 0 auto}
-@media (pointer:coarse){.cgnew .cgin{font-size:16px}.cgnew .cgdet{min-height:2.75rem}}
+@media (pointer:coarse){.cgnew .cgin{font-size:max(1rem,16px)}.cgnew .cgdet{min-height:2.75rem}}
 @media (prefers-reduced-motion:no-preference){.cgnew{animation:cgin .16s ease-out}}
 @keyframes cgin{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
 

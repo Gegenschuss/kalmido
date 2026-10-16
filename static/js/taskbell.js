@@ -106,7 +106,7 @@ async function tbl_others(tid) {
       <label class="chkl tbl-all"><input type="checkbox" id="tbl-all"> <b>${esc(tr('All people of the list'))}</b></label>
       <label class="chkl tbl-p"><input type="checkbox" data-tblp="${S.me?.id}" ${mine.level === 'urgent' ? 'checked' : ''}> ${esc(tr('Me'))}</label>
       ${ppl.map(row).join('')}
-      <div class="row tbl-until"><label for="tbl-u">${esc(tr('Until (empty = until completed)'))}</label><input type="date" id="tbl-u" min="${today()}"></div>`,
+      <div class="row tbl-until"><label>${esc(tr('Until (empty = until completed)'))}</label>${dateIn('tbl-u', '', {label: tr('Until (empty = until completed)'), min: today()})}</div>`,
     after: d => {
       md = d;
       const all = $('#tbl-all', d), boxes = () => $$('[data-tblp]:not([disabled])', d);
