@@ -59,6 +59,15 @@ def ofa_area(c, a):
     return None
 
 
+def ofa_agent_ok(c, agent_id, oid):
+    """Part B (iface 04:35): agent agent_id may work in office area oid -- its office switch on, oid its area, the area's
+    privacy switch on. (The person's office role is checked by ofa_draft_create.)"""
+    from ..agents.core import agent_row
+    with system_ctx(c):  # the agent's settings row (structure), whoever asks
+        a = agent_row(c, agent_id)
+    return bool(a and a["office_drafts"] and oid and ofa_area(c, a) == oid and office_settings(c, oid).get("agents_read"))
+
+
 def ofa_area_agents(c, oid):
     """The agents working in office area oid (ids), with their switch: [(id, office_drafts)]."""
     owner = pb_owner(c, oid)
@@ -247,7 +256,7 @@ def ofa_draft_create(c, uid, oid, data, agent_id=None):
         raise PermissionError("office")
     if not isinstance(data, dict) or any(k not in OFA_DATA_KEYS for k in data):
         raise BadInput(tr("Invalid data"))
-    lid = _list_ok(c, oid, uid, data.get("list_id"), agent_id)
+    lid = _list_ok(c, oid, uid, data.get("list_id"))  # a person applies it (part B) or the v1 route checked the agent's view
     office_seed_texts(c, oid)
     b = {"project_title": _text(data.get("title"), "title", NAME_MAX)}
     if data.get("client_id") not in (None, "", 0):
@@ -450,6 +459,7 @@ def v1_office_offer_post():
     c = db()
     notify = _flag_notify(b)
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="offer")
+    _list_ok(c, oid, uid, b.get("list_id"), aid)  # the agent itself must see the project list
     try:
         did = ofa_draft_create(c, uid, oid, {k: v for k, v in b.items() if k in OFA_DATA_KEYS}, agent_id=aid)
     except PermissionError:
