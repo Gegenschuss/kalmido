@@ -1490,10 +1490,13 @@ kind, text, chars, truncated, message}`:
 - `kind: "pdf"`: the PDF's text layer, pages separated by a blank line, plus `pages` / `pages_read`. The server reads it
   in a separate, limited process (at most 20 MB, 1000 pages, 20 seconds, a memory limit); `text` stops at `max_chars`
   (default and at most 200000) with `truncated: true`. A scanned PDF without a text layer answers `no_text_layer: true`
-  and an empty `text` -- there is no text recognition (OCR); say so instead of guessing. A password-protected, damaged or
+  and an empty `text` -- unless the server recognised its text in the background (2.61.0, local OCR): then `text` holds
+  it and `source: "ocr"` (recognised text can contain reading errors). Without either, say so instead of guessing. A password-protected, damaged or
   too complex PDF answers `error` (`encrypted`, `unreadable`, `too_complex`) and a `message`.
 - `kind: "text"`: the text of a text file (Markdown, CSV, JSON, ...).
-- `kind: "image"`: no text, `url` points to the file; `read_attachment` returns the image itself (up to 5 MB).
+- `kind: "image"`: no text, `url` points to the file; `read_attachment` returns the image itself (up to 5 MB). 2.61.0: a
+  photo of a JPEG / PNG whose text the server recognised brings it as `text` with `source: "ocr"`. The same holds for
+  `GET /api/v1/files/{id}/text` (`read_file`).
 - `kind: "other"`: nothing to read (`message` says so).
 
 Results are cached per file content. `413` = larger than 20 MB, `503` = several PDFs are being read right now (wait for

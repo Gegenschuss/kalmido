@@ -686,7 +686,8 @@ TOOLS = [
            "max_bytes": {"type": "integer", "minimum": 1, "maximum": ATT_CAP_MAX}}, ["attachment_id"]), t_get_attachment),
     ("read_attachment", "Read a task / comment file as text (2.34.0): a PDF's text layer (read on the server; pages separated by "
                         "a blank line) or a text file, at most max_chars characters (default and maximum 200000; truncated: true when "
-                        "cut). A scanned PDF without a text layer answers no_text_layer: true (no OCR: say so, do not guess its content); "
+                        "cut). A scanned PDF without a text layer answers no_text_layer: true -- since 2.61.0 with the text the server recognised "
+                        "in the background (source: ocr; may contain reading errors) when it has one, else say so, do not guess its content; "
                         "an image is returned as an image you can look at. Ids from list_attachments, get_task or comment events. Use it "
                         "when someone asks you to work from a PDF (a briefing, an offer, minutes).",
      _obj({"attachment_id": S_ID, "max_chars": {"type": "integer", "minimum": 1, "maximum": 200000}}, ["attachment_id"]), t_read_attachment),
