@@ -51,6 +51,7 @@ ORDER = (
     "accounts.settings",
     "lists.favorites",  # 2.40.0 (#1361)
     "accounts.layouts",  # 2.32.0 (#1063, #983)
+    "accounts.layoutsets",  # 2.55.0 (#1069, #1068, #1066)
     "accounts.onboarding",
     "accounts.users",
     "accounts.orgs",
