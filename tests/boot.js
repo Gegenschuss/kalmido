@@ -66,13 +66,22 @@ exports.dialogBridge = w => {
   }).observe(w.document.documentElement, {childList: true, subtree: true});
   if (w.document.readyState === 'loading') w.addEventListener('DOMContentLoaded', hook); else hook();
 };
-exports.login = async (user, pw = 'password123') => {
+// 2.56.1 (#1799): legacy suites check every row symbol; the default level "Important" hides some, so every login of a
+// suite sets row_icons=all for that person (o.rowIcons: another level, null = leave the default; p2561_b_ui.js)
+const rowIconsSet = async (hd, o = {}) => {
+  if (o.rowIcons === null) return;
+  try { await fetch(B + 'api/settings', {method: 'PATCH', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido', ...hd}, body: JSON.stringify({row_icons: o.rowIcons || 'all'})}); } catch { /* best effort */ }
+};
+exports.login = async (user, pw = 'password123', o = {}) => {
   const r = await fetch(B + 'api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: user, password: pw})});
   if (!r.ok) throw new Error('login ' + user + ' ' + r.status);
-  return r.headers.get('set-cookie').split(';')[0];
+  const ck = r.headers.get('set-cookie').split(';')[0];
+  await rowIconsSet({Cookie: ck}, o);
+  return ck;
 };
-exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = 2500, proxy = null, path = '', media = {}, setup = null} = {}) {
-  const cookie = proxy ? '' : await exports.login(user);
+exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = 2500, proxy = null, path = '', media = {}, setup = null, rowIcons} = {}) {
+  const cookie = proxy ? '' : await exports.login(user, undefined, {rowIcons});
+  if (proxy) await rowIconsSet({'Remote-User': proxy}, {rowIcons});  // 2.56.1 (#1799)
   // 1.8.1: the start view is the Inbox; the suites written before start on Today as a device that was there last
   // (pass ls: {'tasks.lastKey': null} for a real first start, p181_ui.js)
   // 2.17.0 (#452): News are bundled per task by default; the suites written before test the plain list (that device

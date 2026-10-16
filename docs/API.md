@@ -1093,6 +1093,13 @@ agents have none (`403`).
 assigned) stands above the placed ones, newest first; assigning a task to a person takes its old position away. The setting
 `mine_view` (`PATCH /api/settings`) is `own` (default) or `lists`.
 
+2.56.1 (#1799): the symbols of a task row and the sidebar's markers are settings too (`PATCH /api/settings`): `row_icons`
+is `all`, `key` (default), `calm` or `custom`; `row_icons_custom` is a comma list of the symbols shown with `custom` (`due`,
+`repeat`, `remind`, `deadline`, `occ`, `note`, `attach`, `link`, `sub`, `cmt`, `code`, `tracked`, `plan`, `ttype`, `ms`, `blocked`,
+`wait`, `stale`, `pin`, `list`, `tags`, `fields`, `created`, `num`, `person`, `turns`; `none` = none, `""` = the `key` set); an
+unknown value is a 400. `side_count`, `side_dots`, `side_share` (`"0"` = hidden, default `"1"`) switch the sidebar's task
+counts, the status dots of lists and the share marks. Only the web app's display changes; the API returns every field.
+
 ## Office: drafts of agents (2.51.0)
 
 Scope `office` (never in the legacy `write` or a new agent's default). Agents only, and only with their switch *May draft
