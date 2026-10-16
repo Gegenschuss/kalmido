@@ -445,7 +445,7 @@ async function ctBooksModal() {
     <div class="foot"><button class="btn" data-cb="phone">${ic('phone', 's')} ${tr('On the phone…')}</button><span class="spacer"></span><button class="btn pri" data-cb="new">${ic('plus', 's')} ${tr('New address book')}</button></div>`);
   const draw = () => {
     const bs = S.books || [];
-    $('#cb-body', md).innerHTML = bs.length ? `<ul class="evclist">${bs.map(b => `<li class="evcrow" style="--cc:${cssColor(b.color) || 'var(--accent)'}"><i class="cevdot"></i><span class="evcn">${esc(b.name)} <span class="muted">· ${esc(trn('{0} contact', '{0} contacts', b.count))}${wsOn() && b.role === 'owner' ? ' · ' + esc(wsLabel(b.org_id)) : ''}${b.role !== 'owner' ? ' · ' + esc(b.owner_name || '') + ' · ' + esc(b.role === 'edit' ? tr('can edit') : tr('can view')) : b.members?.length ? ' · ' + esc(trn('shared with {0} person', 'shared with {0} people', b.members.length)) : ''}${b.imported ? ' · ' + esc(tr('imported')) : ''}</span></span>
+    $('#cb-body', md).innerHTML = bs.length ? `<ul class="evclist">${bs.map(b => `<li class="evcrow" style="--cc:${cssColor(b.color) || 'var(--accent)'}"><i class="cevdot"></i><span class="evcn">${esc(b.name)} <span class="muted">· ${esc(trn('{0} contact', '{0} contacts', b.count))}${wsOn() && b.role === 'owner' ? ' · ' + esc(wsLabel(b.org_id)) : ''}${b.org_owned ? ' · ' + esc(tr('Belongs to {0}', wsLabel(b.org_id))) : ''}${b.role !== 'owner' ? (b.org_owned ? '' : ' · ' + esc(b.owner_name || '')) + ' · ' + esc(b.role === 'edit' ? tr('can edit') : tr('can view')) : b.members?.length ? ' · ' + esc(trn('shared with {0} person', 'shared with {0} people', b.members.length)) : ''}${b.imported ? ' · ' + esc(tr('imported')) : ''}</span></span>
       <button class="iconbtn" data-cbmenu="${b.id}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', b.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('No address book yet. A new contact creates one.')}</p>`;
   };
   draw();
@@ -456,8 +456,11 @@ async function ctBooksModal() {
       const b = ctBook(+m.dataset.cbmenu); if (!b) return;
       const own = b.role === 'owner';
       menu(m, [own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the address book'), b.name, {input: {max: 100}}); if (n && n.trim()) { const nm = n.trim(); optWrite(optSet(() => ctBook(b.id), {name: nm}), () => api('PATCH', `/api/books/${b.id}`, {name: nm}), () => { draw(); ctDraw(); }).catch(() => {}); } }},  // 2.46.2 (#1659): at once
-        own && wsOn() && {label: tr('Workspace…'), icon: 'brief', fn: () => wsMoveMenu(m, b.org_id, async org => { try { await api('PATCH', `/api/books/${b.id}`, {org_id: org}); } catch { return; } refresh(); })},
+        own && wsOn() && !b.org_owned && {label: tr('Workspace…'), icon: 'brief', fn: () => wsMoveMenu(m, b.org_id, async org => { try { await api('PATCH', `/api/books/${b.id}`, {org_id: org}); } catch { return; } refresh(); })},
         own && collab() && {label: tr('Share…'), icon: 'users', fn: () => ctShareModal(b, users, names, refresh)},
+        b.can_org && {label: tr('Hand over to the organisation…'), icon: 'building', fn: () => ob_take(b, refresh)},  // 2.52.0 (#1438)
+        own && b.org_owned && {label: tr('Members of the organisation'), icon: 'building', more: ob_roleItems(b, refresh)},
+        own && b.org_owned && {label: tr('Make personal again…'), icon: 'home', fn: () => ob_drop(b, refresh)},
         own && famOn() && !b.imported && {label: tr('Birthdays as tasks…'), icon: 'cake', fn: () => ctBdayModal(b, refresh)},
         ctWrite(b) && {label: tr('Import a vCard file…'), icon: 'upload', fn: () => ctImport(b.id)},
         {label: tr('Export (vCard)'), icon: 'download', fn: () => { location.href = `/api/books/${b.id}/export.vcf`; }},
@@ -518,3 +521,31 @@ function ctBdayModal(b, done) {  // module Family: the birthdays + anniversaries
 }
 
 // 2.53.0 (#1410): the task panel part ("People and dates", linking a contact) lives in ctlinks.js (loaded at start)
+
+// 2.52.0 (#1438): address books an organisation owns. Its admins hand a book of its workspace over (ob_take) and make it
+// personal again (ob_drop); the members read or change it as its role says (ob_roleItems). Each is one undo step.
+const OB_ROLES = () => [['view', tr('They can view')], ['edit', tr('They can edit')], ['none', tr('Only admins and people it is shared with')]];
+async function ob_take(b, done) {
+  if (!await askConfirm(tr('Hand “{0}” over to {1}?', b.name, wsLabel(b.org_id)),
+    tr('The address book then belongs to the organisation: its admins manage it, its members can view it, and it stays when you leave.'), {ok: tr('Hand over')})) return;
+  const go = role => async () => { await api('POST', `/api/books/${b.id}/org`, {org_role: role}); done(); };  // the step is recorded before the reload
+  const back = async () => { await api('DELETE', `/api/books/${b.id}/org`); done(); };
+  try { await go('view')(); } catch { return; }
+  offerUndo(tr('Handed over to {0}', wsLabel(b.org_id)), histAdd({label: tr('Address book handed over'), undo: back, redo: go('view')}));
+}
+async function ob_drop(b, done) {
+  if (!await askConfirm(tr('Make “{0}” your personal address book again?', b.name),
+    tr('The members of the organisation then only see it where it is shared with them.'), {ok: tr('Make personal')})) return;
+  const back = async () => { await api('POST', `/api/books/${b.id}/org`, {}); done(); };  // keeps the members' role it had
+  const go = async () => { await api('DELETE', `/api/books/${b.id}/org`); done(); };
+  try { await go(); } catch { return; }
+  offerUndo(tr('Personal address book again'), histAdd({label: tr('Address book made personal'), undo: back, redo: go}));
+}
+function ob_roleItems(b, done) {
+  const put = v => async () => { await api('PATCH', `/api/books/${b.id}/org`, {org_role: v}); done(); };
+  return OB_ROLES().map(([k, n]) => ({label: n, on: (b.org_role || 'view') === k, fn: async () => {
+    const from = b.org_role || 'view'; if (from === k) return;
+    try { await put(k)(); } catch { return; }
+    offerUndo(tr('Saved'), histAdd({label: tr('Changed setting: {0}', tr('Members of the organisation')), undo: put(from), redo: put(k)}));
+  }}));
+}
