@@ -201,6 +201,15 @@ print(f"PERF state_ms_median={ms:.0f} (runs {', '.join('%.0f' % x for x in times
 print(f"PERF state_ms_median_gzip={statistics.median(gtimes):.0f}", flush=True)
 print(f"PERF state_kb_raw={len(raw) / 1024:.0f} state_kb_gzip5_local={gz_local / 1024:.0f} "
       f"state_kb_wire_gzip={len(graw) / 1024:.0f} content_encoding={genc or '-'}", flush=True)
+done = [t for t in st.get("tasks", []) if t["status"] != 0]
+print(f"PERF done_in_state={len(done)} done_kb={len(json.dumps(done, separators=(',', ':'))) / 1024:.0f} (of {len(raw) / 1024:.0f} KB)", flush=True)
+one = st["tasks"][len(st["tasks"]) // 2]["id"]
+ot = []
+for _ in range(5):
+    t0 = time.perf_counter()
+    A.get(B + f"/api/tasks/{one}")
+    ot.append((time.perf_counter() - t0) * 1000)
+print(f"PERF one_task_ms_median={statistics.median(ot):.1f}", flush=True)
 check(len(st.get("tasks", [])) > NT * .5, f"the state has the tasks ({len(st.get('tasks', []))})")
 check(ms < 5000, f"/api/state in {ms:.0f} ms (median)")
 
