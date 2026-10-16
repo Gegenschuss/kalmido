@@ -444,7 +444,7 @@ function ofxClientBillingHtml(b) {
 function clm_histHtml(c) {
   const hs = c.merges || [];
   if (!hs.length) return '';
-  const row = h => `<li>${ic('deps', 's')} <span>${esc(tr('Merged with {0}', h.merged.map(x => x.name).join(', ')))}<span class="muted"> – ${esc(fmtDateLoc((h.at || '').slice(0, 10)))}${h.by_name ? `, ${esc(h.by_name)}` : ''}${h.undone_at ? ` · ${tr('undone')}` : ''}</span></span>${h.undo === '' && h.can_undo ? `<button class="btn sm" data-clm-undo="${h.id}">${ic('undo', 's')} ${tr('Undo')}</button>` : ''}</li>`;
+  const row = h => `<li>${ic('collapse', 's')} <span>${esc(tr('Merged with {0}', h.merged.map(x => x.name).join(', ')))}<span class="muted"> – ${esc(fmtDateLoc((h.at || '').slice(0, 10)))}${h.by_name ? `, ${esc(h.by_name)}` : ''}${h.undone_at ? ` · ${tr('undone')}` : ''}</span></span>${h.undo === '' && h.can_undo ? `<button class="btn sm" data-clm-undo="${h.id}">${ic('undo', 's')} ${tr('Undo')}</button>` : ''}</li>`;
   return `<section class="stcard clmhist"><div class="sthead"><h3>${tr('History')}</h3></div><ul class="ctlinks">${hs.map(row).join('')}</ul></section>`;
 }
 async function clm_undo(rid) {

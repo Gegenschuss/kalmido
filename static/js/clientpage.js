@@ -90,8 +90,8 @@ function ms_clBar() {
   const n = MSC.pick.size, sel = (MSC.items || []).filter(c => MSC.pick.has(c.id)), allArch = sel.length && sel.every(c => c.archived);
   const shown = ms_clShown(), allOn = n && shown.every(c => MSC.pick.has(c.id));
   return ms_barHtml('ct-sbar', 'clb', n, tr('Tap clients'), [['all', 'all', allOn ? tr('Select none') : tr('All')], ['edit', 'edit', tr('Edit')],
-    ['arch', allArch ? 'undo' : 'archive', allArch ? tr('Restore') : tr('Archive')], ['merge', 'deps', tr('Merge')], ['del', 'trash', tr('Delete'), 'danger']])
-    .replace('data-clb="merge"', n < 2 ? 'data-clb="merge" disabled' : 'data-clb="merge"');  // 2.66.0 B (#1835): from two clients on
+    ['arch', allArch ? 'undo' : 'archive', allArch ? tr('Restore') : tr('Archive')], ['merge', 'collapse', tr('Merge'), '', 2], ['del', 'trash', tr('Delete'), 'danger']])
+    .replace('data-clb="merge"', n < 2 ? 'data-clb="merge" disabled' : 'data-clb="merge"');  // 2.66.0 B (#1835): from two clients on (min 2 = part A's ms_barHtml)
 }
 function ms_clClick(id, shift) {
   if (!MSC.pick) { MSC.pick = new Set(); MSC.last = null; }
