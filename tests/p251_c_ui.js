@@ -117,9 +117,10 @@ const FEAT = 'cal,collab,comments,time,events,dispo';
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await nav(B + '#prop/' + js.id);
     for (let i = 0; i < 30 && !(await fev('!!document.querySelector(".ppm .ppi.apri")').catch(() => false)); i++) await sleep(300);
+    // 2.51.1 (#1355): times use the app's own picker (hidden input + button): measure the visible fields
     const o = await fev(`(() => { const vw = document.documentElement.clientWidth, card = document.querySelector('.ppm .card').getBoundingClientRect();
       const bad = [...document.querySelectorAll('.ppm .ppi *')].filter(e => { const r = e.getBoundingClientRect(); return r.width && r.right > vw + 1; }).map(e => e.tagName + '.' + e.className).slice(0, 5);
-      const hs = [...document.querySelectorAll('.ppm .apf input')].map(e => e.getBoundingClientRect().height);
+      const hs = [...document.querySelectorAll('.ppm .apf input:not([type=hidden]), .ppm .apf .dpbtn')].map(e => e.getBoundingClientRect().height);
       return {vw, right: card.right, bad, minh: Math.min(...hs)}; })()`);
     check(o.right <= o.vw + 1 && !o.bad.length && o.minh >= 40, '390 px: the shoot review inside the screen, fields >= 40 px ' + JSON.stringify(o));
     await shot('p251c-shoot-390.png');
