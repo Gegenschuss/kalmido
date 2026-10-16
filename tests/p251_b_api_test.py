@@ -347,5 +347,11 @@ def own_apply(prop, sel):
 J14, res = own_apply({**OWN, "shoot_days": [{"title": "Two-day shoot", "date": "2027-07-01", "end_date": "2027-07-02", "start_time": "08:00"}]}, ["0", "300"])
 e14 = q("SELECT start, \"end\" FROM events WHERE title='Two-day shoot' AND deleted_at IS NULL")
 check(e14 and e14[0]["start"] == "2027-07-01T08:00" and (e14[0]["end"] or "").startswith("2027-07-02"), f"review 14: the end date stays ({[dict(x) for x in e14]})")
+# #1351 review 9: each draft's own updated_at is in the undo record
+ap14 = q("SELECT applied FROM agent_jobs WHERE id=?", (J14,))
+check(ap14 and len(json.loads(ap14[0][0] or "{}").get("events_at") or {}) == 1, "review 9: the undo record keeps the draft's updated_at")
+r = A.post(B + f"/api/proposals/{J14}/undo")
+check(r.ok and not q("SELECT 1 FROM events WHERE title='Two-day shoot' AND deleted_at IS NULL"), f"review 9: an unchanged draft goes on undo ({r.text[:120]})")
+
 print(f"p251_b_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
