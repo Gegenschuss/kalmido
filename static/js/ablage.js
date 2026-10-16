@@ -226,7 +226,7 @@ async function ab_share(id) {
         ${t.groups.length ? `<optgroup label="${esc(tr('Groups'))}">${t.groups.map(p => `<option value="group_id:${p.id}">${esc(p.name)}</option>`).join('')}</optgroup>` : ''}
         ${t.agents.length ? `<optgroup label="${esc(tr('Agents'))}">${t.agents.map(p => `<option value="agent_id:${p.id}">${esc(p.name)}</option>`).join('')}</optgroup>` : ''}</select>
       ${roleSel('id="ab-shr"', 'view')}
-      <label class="abexp"><span class="muted">${tr('until')}</span><input type="date" id="ab-she" aria-label="${esc(tr('Valid until (optional)'))}"></label>
+      <span class="abexp"><span class="muted">${tr('until')}</span>${dateIn('ab-she', '', {label: tr('Valid until (optional)'), min: today()})}</span>
       <button type="button" class="btn sm" data-abs="add">${ic('plus', 's')} ${tr('Add')}</button></div>
     ${n.org_id ? `<h4>${tr('Whole organisation')}</h4><div class="row"><select id="ab-sho" aria-label="${esc(tr('Whole organisation'))}"><option value="">${tr('Only the people it is shared with')}</option><option value="view" ${n.org_access === 'view' ? 'selected' : ''}>${tr('Every member can view')}</option><option value="edit" ${n.org_access === 'edit' ? 'selected' : ''}>${tr('Every member can edit')}</option></select></div>${n.org_access_from ? `<div class="muted">${esc(tr('Already open through the folder “{0}”', n.org_access_from.name))}</div>` : ''}<div class="muted abhint">${tr('Never for agents. The organisation’s admins always see everything.')}</div>` : ''}
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);

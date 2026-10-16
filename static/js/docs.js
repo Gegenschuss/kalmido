@@ -18,7 +18,7 @@ FEATS.push(['docs', N_('Documents')]);
 FEAT_DESC.docs = N_('Scanned letters, invoices and contracts: text recognition, full-text search, sorting by rules and by what Kalmido learns from your corrections, due dates as tasks');
 const dc_ws = () => (typeof wsCur === 'function' ? wsCur() : 'all');
 const dc_upWs = () => { const w = dc_ws(); return w.startsWith('org:') ? w : 'private'; };
-const dc_hashId = () => { const m = location.hash.match(/^#docs\/(\d+)/); return m ? +m[1] : null; };
+const dc_hashId = () => { try { const m = location.hash.match(/^#docs\/(\d+)/); return m ? +m[1] : null; } catch { return null; } };  // the sheet may close after its window is gone
 const dc_money = (a, cur) => a == null || a === '' ? '' : `${(+a).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${cur === 'EUR' ? '€' : cur === 'USD' ? '$' : (cur || '')}`.trim();
 const dc_day = d => d ? dayLabel(d, true) : '';
 const dc_isPdf = d => d && (d.mime === 'application/pdf' || /\.pdf$/i.test(d.name));
@@ -72,7 +72,7 @@ function viewDocs() {
       <button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
     </div>
     ${DC.more || active ? `<div class="dc-filters">${sel('sender', fc.senders, N_('Sender'))}${sel('type', fc.types, N_('Document type'))}${sel('tag', fc.tags, N_('Tag'))}
-      <label class="dc-range">${tr('from')} <input type="date" data-dcf="from" value="${esc(DC.f.from)}"></label><label class="dc-range">${tr('to')} <input type="date" data-dcf="to" value="${esc(DC.f.to)}"></label>
+      <span class="dc-range">${tr('from')} ${dateIn('dc-ffrom', DC.f.from, {label: tr('from'), attrs: 'data-dcf="from"'})}</span><span class="dc-range">${tr('to')} ${dateIn('dc-fto', DC.f.to, {label: tr('to'), attrs: 'data-dcf="to"'})}</span>
       ${active ? `<button type="button" class="linkbtn" data-dc="clear">${tr('Reset filters')}</button>` : ''}</div>` : ''}
     ${DC.waiting ? `<p class="muted dc-wait" role="status">${ic('hourglass', 's')} ${esc(trn('{0} document is being recognised…', '{0} documents are being recognised…', DC.waiting))}</p>` : ''}`;
   let body;
@@ -173,8 +173,8 @@ function dc_mdDraw(md) {
       ${field('type', tr('Document type'), `<input id="dc-type" data-dcp="type" value="${esc(d.type?.name || '')}" list="dc-tl" autocomplete="off" maxlength="120" placeholder="${esc(tr('e.g. Invoice, Contract, Letter'))}" ${ro}>${dl('dc-tl', set.types)}`)}
       ${field('tags', tr('Tags'), `<input id="dc-tags" data-dcp="tags" value="${esc(d.tags.map(t => t.name).join(', '))}" list="dc-gl" autocomplete="off" placeholder="${esc(tr('comma-separated'))}" ${ro}>${dl('dc-gl', set.tags)}`)}
       ${field('folder', tr('Folder'), `<select id="dc-folder" data-dcp="folder" ${ro}><option value="">${tr('Documents (no subfolder)')}</option>${(set.folders || []).map(f => `<option value="${f.id}" ${d.folder?.id === f.id ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}${w ? `<option value="new">${tr('New folder…')}</option>` : ''}</select>`)}
-      ${field('date', tr('Date'), `<input type="date" id="dc-date" data-dcp="date" value="${esc(d.date || '')}" ${ro}>`)}
-      ${field('due', tr('Due'), `<input type="date" id="dc-due" data-dcp="due" value="${esc(d.due || '')}" ${ro}>`)}
+      ${field('date', tr('Date'), dateIn('dc-date', d.date || '', {label: tr('Date'), ro: !!ro, attrs: 'data-dcp="date"'}))}
+      ${field('due', tr('Due'), dateIn('dc-due', d.due || '', {label: tr('Due'), ro: !!ro, attrs: 'data-dcp="due"'}))}
       ${field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>`)}
       ${field('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? String(d.amount).replace('.', LOCALE().startsWith('en') ? '.' : ',') : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`)}
     </div>
