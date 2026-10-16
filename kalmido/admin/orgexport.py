@@ -214,6 +214,11 @@ OX_AREAS = (
     ("books.json", "books", "org_id=?"),
     ("books/members.json", "book_members", "book_id IN (SELECT id FROM books WHERE org_id=?)"),
     ("books/contacts.json", "contacts", "book_id IN (SELECT id FROM books WHERE org_id=?)"),
+    # 2.55.0 (#1455): the newsletter connection (its column "secret" never: see the list above), segments, members, log
+    ("newsletter/connection.json", "nl_conns", "org_id=?"),
+    ("newsletter/segments.json", "nl_segments", "org_id=?"),
+    ("newsletter/members.json", "nl_members", "org_id=?"),
+    ("newsletter/runs.json", "nl_runs", "org_id=?"),
     ("clients.json", "clients", "org_id=?"),
     ("office/company.json", "office_company", "org_id=?"),
     ("office/settings.json", "office_settings", "org_id=?"),

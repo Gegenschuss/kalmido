@@ -7564,3 +7564,22 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .wsbar.on[data-wsc]:hover{border-color:var(--wsc)}
 .wsc-on .qadd:not(.dock) .box,.wsc-on .qadd.dock,.wsc-on .ccomp{border-color:color-mix(in srgb,var(--wsc) 65%,var(--line2))}
 .wscpick .colors button[disabled]{cursor:default}
+
+/* 2.55.0 E (#1455) the newsletter connection (newsletter.js): the sheet in Contacts > More, the consent in the contact card */
+.nwl-md .nwl-body, .nwl-smd { display: flex; flex-direction: column; gap: .45rem; }
+.nwl-md { max-width: 640px; }
+.nwl-why { margin: 0 0 .3rem; }
+.nwl-conn { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .6rem; margin: .2rem 0; }
+.nwl-err { color: var(--danger, #c0392b); margin: .3rem 0; }
+.nwl-err:empty { display: none; }
+.nwl-prev { font-size: .85rem; color: var(--muted); border-left: 3px solid var(--accent); padding: .2rem .6rem; margin: 0; }
+.nwl-tag { font-size: .75rem; padding: .05rem .45rem; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); }
+.nwl-segs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
+.nwl-segs li { display: flex; align-items: center; gap: .4rem; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: 10px; min-height: 44px; }
+.nwl-sn { flex: 1; min-width: 0; }
+.nwl-sn .muted { font-size: .85rem; overflow-wrap: anywhere; }
+.nwl-log ul { list-style: none; margin: .3rem 0 0; padding: 0; font-size: .88rem; display: flex; flex-direction: column; gap: .3rem; }
+.nwl-chips { flex-wrap: wrap; }
+.nwl-st { font-weight: 600; }
+.nwl-st-yes { color: var(--accent); }
+.nwl-st-unsub, .nwl-st-bounce { color: var(--muted); }

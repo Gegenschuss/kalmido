@@ -656,6 +656,38 @@ once per workspace -- by an organisation's admin for the organisation, by a pers
 - The token is always stored sealed with a key derived from `KALMIDO_SECRET_KEY` (also when the encryption of
   organisation data is off) and never shown again. Without a server key the connection cannot be set up.
 
+### Newsletter: listmonk, Brevo, CleverReach (2.55)
+
+Kalmido sends no newsletters itself. It keeps the contacts, segments and consent and syncs them with a newsletter
+service, which does the sending, the double opt-in, the unsubscribe link, bounces and statistics (the proof of consent,
+one-click unsubscribe and deliverability belong there, not on a shared task server). Under *Contacts > More >
+Newsletter…* an organisation's admin connects the service for the organisation, a person for their own space.
+
+- **Contacts that go out:** only from the workspace's own address books (an organisation's address books, or a person's
+  own books outside every organisation -- never a member's private book), only with an e-mail address and the consent
+  *Consented* (with a source, e.g. the sign-up form). Option for listmonk: also *Double opt-in pending* -- they go as
+  unconfirmed and listmonk sends its opt-in mail.
+- **Segments:** groups, companies and address books (any match within one kind, all kinds must match) -> one list at the
+  service (an existing one, or a new one named like the segment).
+- **Both directions:** each run first takes unsubscriptions, bounces and confirmed opt-ins from the service back to the
+  contacts, then adds, renames and takes off the list what Kalmido put there and no longer matches. An unsubscribed or
+  bounced address is never subscribed again (only the person, through the service's own form). Manually with
+  *Sync now*, or once a day. Every run is logged (numbers and error codes, never addresses or access data).
+- **Access data** are stored sealed with a key derived from `KALMIDO_SECRET_KEY` (needed) and never shown again; the
+  address goes through the same SSRF guard as calendar subscriptions (an instance in the local network: allow its host,
+  e.g. `KALMIDO_CALENDAR_ALLOW_HOSTS=listmonk.example.com:9000`).
+- **Brevo and CleverReach** follow their public API documentation and are marked *Preview*: they are not yet tried
+  against the real services.
+
+Setting up listmonk (version 4 or newer) for Kalmido:
+
+1. Run listmonk (its own docker compose file) next to Kalmido, reachable over https or in the local network.
+2. In listmonk: *Admin > Users > New*, type **API**, a role that may manage lists and subscribers (and *subscribers:sql_query*,
+   used to find an address that is already known). Copy the token shown once.
+3. In Kalmido: *Contacts > More > Newsletter…*, service *listmonk*, its address (e.g. `https://listmonk.example.com`),
+   the API user's name and the token.
+4. Mark the consent of your contacts (contact card > *Newsletter*), create a segment and press *Sync now*.
+
 ## Moving to a new server
 
 1. **Before:** lower the DNS TTL of the name a day ahead; make a backup (*Back up now*).

@@ -195,6 +195,9 @@ ORDER = (
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
     "paperless.ngx",  # 2.48.0 (#1152): Paperless-ngx connection + import into the documents (self-hosted only)
     "paperless.web",  # 2.48.0 (#1152): the routes of the Paperless-ngx connection (self-hosted only)
+    "newsletter.adapters",  # 2.55.0 (#1455): listmonk / Brevo / CleverReach (no routes)
+    "newsletter.sync",  # 2.55.0 (#1455): connection, segments, consent, the sync runs (no routes)
+    "newsletter.web",  # 2.55.0 (#1455): the routes of the newsletter connection
     "receipts.suggest",  # 2.48.0 (#1356): receipts: project / category, agents suggest, people confirm
     "startup",
 )

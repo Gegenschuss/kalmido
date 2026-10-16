@@ -817,6 +817,8 @@ def contact_dict(c, r, uid=None, links=True):
     for k in ("emails", "phones", "addresses", "urls", "groups"):
         d[k] = _jl(r[k])
     d["created_at"], d["updated_at"] = r["created_at"], r["updated_at"]
+    from ..newsletter.sync import nwl_contact_json
+    d["newsletter"] = nwl_contact_json(r)  # 2.55.0 (#1455): the newsletter consent (read only here, set via /api/newsletter/consent)
     if links and uid:
         d["tasks"] = [{"task_id": x["task_id"], "kind": x["kind"], "title": x["title"], "status": x["status"]}
                       for x in c.execute("""SELECT l.task_id, l.kind, t.title, t.status FROM contact_tasks l JOIN tasks t ON t.id=l.task_id

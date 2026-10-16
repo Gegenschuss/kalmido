@@ -436,6 +436,8 @@ a task needs `tasks:write` too. A contact is only visible to people who see its 
 `emails` / `phones` / `urls`: `[{value, type: [home|work|cell|other], pref?, label?}]`; `addresses`: `[{street, code,
 city, region, country, pobox?, ext?, type?}]`; `bday` / `anniversary`: `YYYY-MM-DD`, or `--MM-DD` without the year;
 `photo`: `data:image/jpeg;base64,...` (JPEG, PNG, GIF, WebP).
+2.55.0 (#1455): every contact carries `newsletter`: `{status: ""|yes|pending|unsub|bounce, at, source}` -- the
+newsletter consent, read only here (people change it in the app; unsub / bounce come from the newsletter service).
 
 ## Roadmap
 
