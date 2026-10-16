@@ -355,5 +355,10 @@ check(AGS.get(V + "/dispo").status_code == 409 and AGS.get(V + "/dispo/free", pa
 Bo.patch(B + "/api/settings", json={"features": FEAT})
 check(AGS.get(V + "/dispo").ok, "review 5: module on again: ok")
 
+# review 8 (#1352): the legacy scope write does not open the pin board
+r = A.post(B + "/api/admin/agents", json={"username": "legacybot", "display_name": "Legacybot", "scopes": ["write"]})
+check(r.status_code == 201 and "pinboard" not in r.json()["effective_scopes"] and "office" not in r.json()["effective_scopes"],
+      f"review 8: write does not include pinboard ({r.json().get('effective_scopes')})")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

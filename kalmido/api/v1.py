@@ -80,7 +80,8 @@ SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments
           "pinboard")  # 2.51.0 (#1352): notepads on project pages (an agent changes only its own; off for new agents)
 # 2.22.0 (#663): "private" = health lists and the journal (reading included); like "contacts" never part of the legacy
 # "write" and never in an agent's default (agents never see health lists at all, see core/access.py)
-SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private", "office"))   # what the legacy "write" stands for
+# 2.51.0 (#1352): nor "pinboard" (an old "write" token must not open the pin board for agents)
+SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private", "office", "pinboard"))   # what the legacy "write" stands for
 SCOPES_AGENT_NEVER = ("account", "admin-read", "private")   # never for an agent: credentials / settings of the account, admin data, health + journal (2.22.0)
 # 2.48.0 (#1207): a new agent may use the file store: it sees only what is shared with it (and its own folder) anyway
 SCOPES_AGENT_DEFAULT = ("read", "tasks:write", "comments", "files:read", "files:write")

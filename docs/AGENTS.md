@@ -1580,7 +1580,7 @@ the privacy switch is on.
 
 The agent proposes, a person confirms: these routes only read, write the agent's OWN notepads or create proposals and
 drafts. New rights are off for new agents: an admin (or, without an organisation, the person itself) turns on the scopes
-`pinboard`, `time` and `calendar` per agent. Health lists never; the token's list limit and the agent's organisation apply.
+`pinboard`, `time` and `calendar` per agent (`pinboard` is not part of the legacy scope `write`). Health lists never; the token's list limit and the agent's organisation apply.
 
 | What | Endpoint | MCP | Scope |
 |---|---|---|---|
