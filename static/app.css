@@ -7413,3 +7413,4 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .pk2setup .btn{min-height:2.75rem}
 .pk2setup .muted{font-size:.8125rem;flex:1 1 14rem}
 .tcard .pk2setup,.tour .pk2setup{margin:.5rem 0 0}
+.ppl .pk2hint{margin-top:.5rem}

@@ -170,7 +170,7 @@ check(evs and evs[0]["all_day"] == 1 and evs[0]["start"] == "2027-05-10" and evs
 check(len(evs) > 1 and evs[1]["start"] == "2027-05-12T08:00" and evs[1]["end"] == "2027-05-12T18:00", "timed shoot day, edited date")
 check("events" in feats(A), "the calendar module was switched on")
 ap = [e for e in events(cl, "job") if e["data"]["job"]["id"] == J]
-check(ap and ap[-1]["data"]["proposal"]["state"] == "applied" and ap[-1]["data"]["proposal"].get("list_id") == LID, "the agent hears: applied + list")
+check(ap and ap[-1]["data"]["proposal"]["state"] == "applied" and ap[-1]["data"]["proposal"].get("project_list_id") == LID, "the agent hears: applied + list")
 check(A.post(B + f"/api/proposals/{J}/apply", json={"select": SEL}).status_code == 409, "apply twice: 409")
 
 check(Bo.post(B + f"/api/proposals/{J}/undo").status_code == 404, "another person cannot undo")

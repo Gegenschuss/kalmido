@@ -1042,7 +1042,7 @@ may receive one: the same rule as for asking (*Proposals for* of the agent; a pe
   your agent* in Settings > Modules and on the last card of the welcome tour: it opens the chat with a prepared text
   (without an agent: Settings > Agents).
 - The agent's `job` event after applying: `{action: "approve", proposal: {state: "applied", created, events, offer_id,
-  lists, modules, parts_skipped, list_id}}`.
+  lists, modules, parts_skipped, project_list_id}}`.
 
 ### Requests that wait for a person (2.15.0)
 

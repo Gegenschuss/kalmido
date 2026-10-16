@@ -41,7 +41,8 @@ function pk2_itemsHtml() {
     return (p.modules.length ? pk2_h(tr('Modules')) + p.modules.map((m, i) => pk2_plain(String(i), m.on ? tr('Switch on: {0}', fname(m.key)) : tr('Switch off: {0}', fname(m.key)))).join('') : '')
       + (p.lists.length ? pk2_h(tr('Lists')) + p.lists.map((x, i) => pk2_named(String(PK2_LIST + i), x.name,
         (x.folder ? pk2_chip('folder', x.folder) : '') + x.sections.map(s => `<span class="ppchip">${esc(s)}</span>`).join(''))).join('') : '')
-      + (p.project ? pk2_h(tr('First project')) + pk2_named(String(PK2_PROJECT), p.project.name, pk2_chip('folder', tr(pt ? pt[1] : p.project.type))) : '');
+      + (p.project ? pk2_h(tr('First project')) + pk2_named(String(PK2_PROJECT), p.project.name, pk2_chip('folder', tr(pt ? pt[1] : p.project.type))) : '')
+      + `<div class="shint keep pk2hint">${esc(pk2_hint(v))}</div>`;
   }
   const secOpts = cur => `<option value="">${tr('No section')}</option>${p.sections.map(s => `<option ${s === cur ? 'selected' : ''}>${esc(s)}</option>`).join('')}`;
   let h = '';
@@ -60,7 +61,7 @@ function pk2_itemsHtml() {
       + p.offer.items.map((x, j) => pk2_plain(`${PK2_OFFER}.${j}`, x.text, `<span class="ppchip">${esc(`${x.qty} ${x.unit || ''}`.trim())}${x.price == null ? '' : ' × ' + esc(pk2_money(x.price))}</span>`
         + (x.service_id ? '' : pk2_chip('flag', tr('free item'))) + (x.discount ? `<span class="ppchip">${esc(tr('Discount {0} %', x.discount))}</span>` : ''), {sub: true, off: !ok})).join('');
   }
-  return h;
+  return h + `<div class="shint keep pk2hint">${esc(pk2_hint(v))}</div>`;
 }
 function pk2_hint(v) {
   if (v.kind === 'setup') return tr('Applying switches the modules and creates the lists as you, only for you. One step, undo takes it back (lists only while they are empty).');

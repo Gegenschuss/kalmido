@@ -505,7 +505,7 @@ def _pk2_setup(c, uid, prop, selected, edits, rec):
 
 def pk2_result(rec):
     """Counts for the apply answer / the agent's event."""
-    return {"events": len(rec.get("events") or []), "offer_id": rec.get("offer"), "lists": len(rec.get("lists") or []),
+    return {"events": len(rec.get("events") or []), "offer_id": rec.get("offer"), "lists": len(rec.get("lists") or []), "project_list_id": rec.get("list"),
             "modules": len([x for x in (rec.get("features_after") or "").split(",") if x not in (rec.get("features_before") or "").split(",")])
             + len([x for x in (rec.get("features_before") or "").split(",") if x and x not in (rec.get("features_after") or "").split(",")]),
             "parts_skipped": rec.get("parts_skipped") or []}
