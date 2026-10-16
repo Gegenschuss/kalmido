@@ -31,11 +31,11 @@ const closeAll = d => d.querySelectorAll('.modal').forEach(m => m.remove());
   check(r.ok, 'setup');
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT, show_done_default: '1', show_done_new: '0'});  // 2.49.0 (#1535): the old defaults (completed stay visible)
   const uid = {};
   for (const u of ['bob', 'carol', 'dave']) uid[u] = (await call('POST', '/api/users', {username: u, display_name: u[0].toUpperCase() + u.slice(1), password: 'password123', email: u + '@example.com'})).id;
   const CB = await login('bob'), CC = await login('carol'), CD = await login('dave');
-  for (const c of [CB, CC, CD]) await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, c);
+  for (const c of [CB, CC, CD]) await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT, show_done_default: '1', show_done_new: '0'}, c);  // 2.49.0 (#1535): the old defaults
   const SH = (await call('POST', '/api/lists', {name: 'Fair stand', folder: 'Events'}, CB)).id;
   await call('PUT', `/api/lists/${SH}/members`, {user_id: uid.carol, role: 'admin'}, CB);
   await call('PUT', `/api/lists/${SH}/members`, {user_id: uid.dave, role: 'edit'}, CB);

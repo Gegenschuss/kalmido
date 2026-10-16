@@ -226,13 +226,13 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   await call('PATCH', '/api/settings', {lang: 'en'});
   // K13: undo / redo in the header of a touch tablet with room
   w = await boot({user: 'alice', hash: 'l/' + L, media: {'(hover: none)': true}}); d = w.document;
-  check(d.querySelector('#top [data-act="hist-undo"]') && !w.eval('topMoreItems()').some(x => x.icon === 'undo'), 'touch tablet: ← → in the header, not in "…"');
+  check(d.querySelector('#top [data-act="hist-undo"]') && !w.eval('topMoreItems()').some(x => x.icon === 'undo' && /hmi/.test(x.cls || ''))  /* 2.49.0 (#1535): a new list's "Completed: like the default" row carries the undo icon too */, 'touch tablet: ← → in the header, not in "…"');
   w.close();
   w = await boot({user: 'alice', hash: 'l/' + L, mobile: true}); d = w.document;
   // 2.25.0 (UX-12): on a phone "…" lists Undo / Redo only when there is something to undo / redo
-  check(!d.querySelector('#top [data-act="hist-undo"]') && !w.eval('topMoreItems()').some(x => x.icon === 'undo'), 'phone: nothing to undo: no dead "Undo" row in "…"');
+  check(!d.querySelector('#top [data-act="hist-undo"]') && !w.eval('topMoreItems()').some(x => x.icon === 'undo' && /hmi/.test(x.cls || ''))  /* 2.49.0 (#1535): a new list's "Completed: like the default" row carries the undo icon too */, 'phone: nothing to undo: no dead "Undo" row in "…"');
   await w.eval(`patchUndoable(S.lists[0] && [...S.tasks.values()][0]?.id, {priority: 5}, 'p')`).catch?.(() => {}); await sleep(300);
-  check(!w.eval('HIST.undo.length') || w.eval('topMoreItems()').some(x => x.icon === 'undo'), 'phone: ← in "…" once there is something to undo');
+  check(!w.eval('HIST.undo.length') || w.eval('topMoreItems()').some(x => x.icon === 'undo' && /hmi/.test(x.cls || ''))  /* 2.49.0 (#1535): a new list's "Completed: like the default" row carries the undo icon too */, 'phone: ← in "…" once there is something to undo');
   w.close();
   if (errs.length) { check(false, 'JS errors: ' + [...new Set(errs)].join(' | ')); }
 

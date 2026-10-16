@@ -66,7 +66,7 @@ async function firefox(fn) {
   check(/const CACHE = 'tasks-shell-v(?:(6[6-9]|7[0-9])|8[0-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v66 (2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76, 2.8.0: v77, 2.9.0: v78, 2.10.0: v79, 2.11.0: v80)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
-  await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
+  await call('PATCH', '/api/settings', {features: ALL, lang: 'en', show_done_default: '1', show_done_new: '0'});  // 2.49.0 (#1535): the old defaults (completed stay visible)
   const L = async (name, folder = '', extra = {}) => (await call('POST', '/api/lists', {name, ...(folder ? {folder} : {}), ...extra})).id;
   const RET = await L('Retainer', 'Clients'), WEB = await L('Website', 'Clients/Company X'), SHOP = await L('Shop', 'Clients/Company Y'), HOME = await L('Garden');
   await call('PATCH', '/api/settings', {folders: JSON.stringify(['Clients', 'Clients/Company X', 'Clients/Company Y'])});
