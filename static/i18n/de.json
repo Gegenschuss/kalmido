@@ -1587,7 +1587,6 @@
   "Secure connection failed (certificate)": "Sichere Verbindung fehlgeschlagen (Zertifikat)",
   "Server address, username and password are needed": "Serveradresse, Benutzername und Passwort werden benötigt",
   "Server": "Server",
-  "Show events from Google Calendar, iCloud, Outlook or any CalDAV server next to your tasks: in the calendar, the timeline and on Today. Read-only, and only you see them.": "Termine aus Google Kalender, iCloud, Outlook oder einem CalDAV-Server neben deinen Aufgaben anzeigen: im Kalender, in der Zeitleiste und unter Heute. Nur lesend, und nur du siehst sie.",
   "show today’s events at the top": "heutige Termine oben anzeigen",
   "synced {0}": "synchronisiert {0}",
   "Task created from the event": "Aufgabe aus dem Termin erstellt",
