@@ -116,13 +116,27 @@ const M = 'ZQXmark';  // every plain text of a locked list carries it: no storag
     await ev(`rawFetch('POST', '/api/tasks/${T}/comments', {body: '${M} hello <@${BOB}>'}).then(() => 1)`);
     const tl = (await call('GET', `/api/tasks/${T}/timeline`)).j;
     check((tl.comments || []).length === 1 && tl.comments[0].body.startsWith('e2e1:') && !tl.comments[0].body.includes(M), 'outgoing: a comment is encrypted');
+    // sections, notes (note_title / note_body), text fields
+    const FID = (await call('POST', `/api/lists/${L}/fields`, {name: 'Memo', type: 'text'})).j.id;
+    await ev(`api('POST', '/api/sections', {list_id: ${L}, name: '${M} section'}).then(() => load()).then(() => 1, e => e.message)`);
+    const secs = ((await call('GET', '/api/state')).j.sections || []).filter(x => x.list_id === L);
+    check(secs.length === 1 && secs[0].name.startsWith('e2e1:') && await waitFor(`(S.sections || []).some(x => x.list_id === ${L} && x.name === '${M} section')`), 'a section name is encrypted on the server, plain in the page ' + JSON.stringify(secs).slice(0, 120));
+    await ev(`rawFetch('POST', '/api/lists/${L}/notes', {title: '${M} note', body: '${M} note body'}).then(() => 1)`);
+    const ns = (await call('GET', `/api/lists/${L}/notes`)).j.notes || [];
+    check(ns.length === 1 && ns[0].title.startsWith('e2e1:') && ns[0].body.startsWith('e2e1:'), 'a note: title and body encrypted');
+    const NN = await ev(`(LE2E.memo.clear(), rawFetch('GET', '/api/lists/${L}/notes')).then(async j => { for (let i = 0; i < 40 && j.notes[0]._le2e; i++) await new Promise(r => setTimeout(r, 100)); return j.notes[0].title + '|' + j.notes[0].body; })`);
+    check(NN === `${M} note|${M} note body`, 'a note opens in the page (its own AAD fields) ' + NN);
+    await ev(`load().then(() => api('PATCH', '/api/tasks/${T}', {fields: {${FID}: '${M} field'}})).then(j => (putTask(j), 1))`);
+    const fv = (((await call('GET', '/api/state')).j.tasks || []).find(t => t.id === T)?.fields || {})[FID];
+    check(String(fv || '').startsWith('e2e1:') && await waitFor(`S.tasks.get(${T}).fields[${FID}] === '${M} field'`), 'a text field value is encrypted, plain in the page ' + String(fv).slice(0, 40));
     // offline: the outbox holds ciphers only, the screen the plain text; _prev is the cipher the server holds
     await ev(`(window.__f0 = window.fetch, window.fetch = () => Promise.reject(new TypeError('offline')), 1)`);
     await ev(`api('PATCH', '/api/tasks/${T}', {title: '${M} offline'}).then(() => 1, () => 1)`);
     const ob = await ev(`(() => { const q = JSON.parse(localStorage.getItem('tasks.outbox') || '[]'); const e = q.find(x => x.url === '/api/tasks/${T}'); return e ? {t: e.body.title, p: e.body._prev?.title} : null; })()`);
     check(ob && ob.t.startsWith('e2e1:') && ob.p === row.title, 'H1: the outbox holds the cipher, _prev = the cipher on the server ' + JSON.stringify(ob));
     check(await ev(`S.tasks.get(${T}).title === '${M} offline'`), 'offline: the screen shows the plain text');
-    await ev(`(LS.set('cache', {tasks: [...S.tasks.values()], lists: S.lists}), LS.set('probe', [{id: -5, list_id: ${L}, title: '${M} unsent', content: ''}]), 1)`);
+    await ev(`(S.tasks.get(${T3}).content = '${M} typed', 1)`);  // typed here, no cipher yet
+    await ev(`(LS.set('cache', {tasks: [...S.tasks.values()], lists: S.lists, sections: S.sections}), LS.set('probe', [{id: -5, list_id: ${L}, title: '${M} unsent', content: ''}]), 1)`);
     const cache = await ev(`localStorage.getItem('tasks.cache') || ''`);
     check(cache.includes('e2e1:') && !cache.includes(M), 'H1: the offline cache holds ciphers only');
     check(!(await sweep()), 'H1: no localStorage entry holds a plain text of the locked list ' + await sweep());
