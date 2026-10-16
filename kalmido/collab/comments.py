@@ -390,6 +390,9 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     snippet = snippet[:280] + ("…" if len(snippet) > 280 else "")
     out = []
     ag = agent_ids(c)
+    # 2.62.0 (#1854): approval cards / questions with buttons / suggestions of an agent always arrive (they wait for the person)
+    asks = author in ag and bool(c.execute("SELECT choices IS NOT NULL OR suggestion IS NOT NULL FROM comments WHERE id=?",
+                                           (cid,)).fetchone()[0])
     for uid in sorted(ids):
         s = collab_user(c, uid, t["list_id"]) if uid not in ag else None  # 2.0.0: agents get events (agent_comment_events)
         if not s or not task_visible(c, t["id"], uid, full=True):  # 1.10.0: participants only about their tasks
@@ -398,7 +401,7 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
             continue
         # 2.62.0 (#1854): an agent's comment with "only replies to me" (also against a list bell "All": the person chose it for
         # agents explicitly; only the task's "Urgent" still wants every comment)
-        if not bl9_agent_comment_ok(s, uid, author, ag, prev, replied, uid in notify_mentions) and \
+        if not asks and not bl9_agent_comment_ok(s, uid, author, ag, prev, replied, uid in notify_mentions) and \
                 tbl_level(c, uid, t["id"], s) != "urgent":
             continue
         mentioned = uid in notify_mentions or uid == replied

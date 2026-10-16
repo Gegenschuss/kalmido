@@ -58,7 +58,9 @@ function dc_draw() {
 function viewDocs() {
   // 2.62.0 (#1844): opening the tab always loads again (the list shown before could be empty / old: files that arrived since, a
   // changed workspace, an earlier error); the old list stays until the new one is there, redraws within 3 s do not reload
-  if (!DC.loading && ((!DC.docs && !DC.err) || Date.now() - (DC.at || 0) > 3000 || DC.atWs !== dc_ws())) setTimeout(dc_load, 0);
+  // (review: only when the tab is opened anew - a redraw of the open tab never reloads; an error waits for the next opening)
+  const open = !document.querySelector('.dc-view');  // not on screen yet = the tab is being opened
+  if (!DC.loading && ((!DC.docs && !DC.err) || (open && (Date.now() - (DC.at || 0) > 3000 || DC.atWs !== dc_ws())))) setTimeout(dc_load, 0);
   const id = dc_hashId();
   if (id && (!DC.doc || DC.doc.id !== id) && !$('.dc-md')) setTimeout(() => dc_open(id), 0);
   const fc = DC.facets || {senders: [], types: [], tags: []};
