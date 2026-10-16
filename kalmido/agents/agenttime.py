@@ -76,9 +76,12 @@ def _both_lists(c, pid, viewer, lid):
 
 def _entries(c, pid, viewer, frm, to):
     """The person's finished entries in [frm, to] that the viewer may see (lists both see; list-less ones only for the person)."""
+    from ..personal.timetrack import evis
     lo, hi = local_bounds(frm, to)
-    rows = c.execute("""SELECT e.id, e.task_id, e.list_id, e.task_title, e.start, e."end", e.seconds, e.note FROM time_entries e
-                        WHERE e.user_id=? AND e.start>=? AND e.start<? AND e."end" IS NOT NULL ORDER BY e.start, e.id""",
+    # 2.51.0 (#1353): evis as in the time views -- a viewer that is a participant somewhere sees there only its own tasks' entries
+    rows = c.execute(f"""SELECT e.id, e.task_id, e.list_id, e.task_title, e.start, e."end", e.seconds, e.note FROM time_entries e
+                        WHERE e.user_id=? AND e.start>=? AND e.start<? AND e."end" IS NOT NULL AND {evis(c, viewer)}
+                        ORDER BY e.start, e.id""",
                      (pid, lo, hi)).fetchall()
     out, cache = [], {}
     for r in rows:

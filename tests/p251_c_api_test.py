@@ -327,5 +327,17 @@ bk = {x["title"]: x for x in r.json().get("issues", []) if x["kind"] == "booking
 check(r.ok and "Secret shoot" not in r.text and bk.get("Booked", {}).get("hidden") is True and bk["Booked"]["list_id"] is None
       and bk.get("Visible shoot", {}).get("list_id") == P, f"review 4: a booking of an unseen list only as Booked ({bk})")
 
+# review 13 (#1353): an agent that is a participant does not see the list-wide entries of that list
+r = Bo.post(B + "/api/lists", json={"name": "Film Four", "kind": "project"})
+P4 = r.json()["id"]
+dbx("UPDATE lists SET org_id=? WHERE id=?", (ORG, P4), write=True)
+Bo.patch(B + f"/api/lists/{P4}", json={"time_tracking": True})
+check(Bo.put(B + f"/api/lists/{P4}/members", json={"user_id": AG, "role": "participant"}).ok, "setup: the agent is a participant of P4")
+DY = today - timedelta(days=25)
+r = Bo.post(B + "/api/time/entries", json={"list_id": P4, "start": f"{DY}T06:00", "end": f"{DY}T18:00"})
+check(r.ok, f"setup: a list-wide entry of 12 h in P4 ({r.status_code} {r.text[:120]})")
+r = AGS.get(V + "/time/check", params={"user_id": BOB, "from": str(DY), "to": str(DY)})
+check(r.ok and not r.json()["issues"], f"review 13: the participant agent does not see the list-wide entry ({r.text[:200]})")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
