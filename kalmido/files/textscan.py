@@ -38,6 +38,7 @@ ON = os.environ.get("KALMIDO_FILE_OCR", "on").strip().lower() not in ("off", "0"
 BACKFILL = ON and os.environ.get("KALMIDO_FILE_OCR_BACKFILL", "on").strip().lower() not in ("off", "0", "false", "no")
 BACKFILL_S = max(1, int(os.environ.get("KALMIDO_FILE_OCR_BACKFILL_S", "20") or 20))  # s between two files of the catch-up
 MAX_MB = max(1, int(os.environ.get("KALMIDO_FILE_OCR_MAX_MB", "50") or 50))  # larger files are not read
+REHOME_S = max(1, int(os.environ.get("KALMIDO_FILE_OCR_REHOME_S", "300") or 300))  # s between two workspace sweeps
 MIMES = ("application/pdf", "image/jpeg", "image/png", "image/heic", "image/heif")
 EXTS = (".pdf", ".jpg", ".jpeg", ".png", ".heic", ".heif")
 IDLE = 5             # s the queue sleeps when there is nothing to do
@@ -204,7 +205,7 @@ _REHOME_SQL = {  # kind -> (FROM / WHERE joining the file's workspace owner as "
 def _rehome(c):
     """2.61.0 review: a file whose workspace changed (its list / task / folder moved between organisations or into a
     private space) is recognised again under the new workspace (key, index, row rights); every 5 minutes."""
-    if time.time() - _REHOME["at"] < 300:
+    if time.time() - _REHOME["at"] < REHOME_S:
         return
     _REHOME["at"] = time.time()
     moved = []

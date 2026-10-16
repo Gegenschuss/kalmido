@@ -286,5 +286,16 @@ check(T3 in tsearch(Bo, "pflaumenkuchen"), "#1820: after the catch-up the task i
 bf = dbx("SELECT value FROM settings WHERE key='ts_backfill'")
 check(bf and str(A3) in bf[0][0], f"#1820: the catch-up keeps its position ({bf})")
 
+# 2.61.0 review: a file whose workspace changed (list moved between organisations / private) is recognised again under
+# the new one - simulated by a stale ws on the row; the app restarts with a fast sweep (data and sessions kept)
+dbx("UPDATE file_text SET ws='u999999' WHERE kind='att' AND ref_id=?", (A3,), write=True)
+r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=dict(os.environ, KEEP="1", EXTRA="-e KALMIDO_FILE_OCR_REHOME_S=1"),
+                   capture_output=True, text=True)
+check(r.returncode == 0, "restart with a fast workspace sweep " + (r.stdout + r.stderr)[-300:])
+row = until(lambda: (lambda x: x and x[0][0] != "u999999" and x[0][1] == "found" and x[0])(
+    dbx("SELECT ws, state FROM file_text WHERE kind='att' AND ref_id=?", (A3,))), 180)
+check(bool(row), f"#1820: the sweep re-queues the file under its real workspace and it is found again ({row})")
+check(T3 in tsearch(Bo, "pflaumenkuchen"), "#1820: after the sweep the task is found again")
+
 print(f"{OKS[0]} checks ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
