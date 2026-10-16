@@ -586,8 +586,9 @@ TOOLS = [
     ("list_jobs", "The agent's jobs. state: running | waiting | done | failed | stopped.",
      _obj({"state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}}),
      lambda api, a: api.call("GET", "/agent/jobs", _pick(a, ("state",)))),
-    ("create_job", "Report a job (shown in the Agents tab with Approve / Reject / Stop). state defaults to running.",
-     _obj({"title": {"type": "string", "minLength": 1}, "task_id": S_ID, "user_id": S_ID,
+    ("create_job", "Report a job (shown in the Agents tab with Approve / Reject / Stop). state defaults to running. name (optional): "
+     "a short first name for the job (letters, up to 24), shown on its badge; people address it with \"Name: ...\".",
+     _obj({"title": {"type": "string", "minLength": 1}, "task_id": S_ID, "user_id": S_ID, "name": {"type": "string", "maxLength": 24},
            "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"}}, ["title"]),
      lambda api, a: api.call("POST", "/agent/jobs", body=a)),
     ("get_job", "One of the agent's jobs. A proposal job (event job_request) also carries kind (project | subtasks | triage | "

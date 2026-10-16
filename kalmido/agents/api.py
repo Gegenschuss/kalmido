@@ -20,7 +20,7 @@ from ..agents.core import (
     _AGENT_COND, _AGENT_GEN, _AGENT_WAITERS, agent_active, AGENT_EVENTS, AGENT_EVENTS_STALE_H, agent_ids, AGENT_JOBS_KEEP, AGENT_OFFLINE_S,
     AGENT_POLL_WRITE_S, agent_public, agent_row, agent_runtime, agent_shares, AGENT_STATUSES, AGENT_WAIT_MAX,
     AGENT_WAITERS_ALL, AGENT_WAITERS_PER, job_dict, JOB_LOG_MAX, JOB_STATES, JOB_TITLE_MAX, job_visible, need_agent,
-    STATUS_TEXT_MAX,
+    STATUS_TEXT_MAX, f8f_job_name_in,
 )
 from ..agents.chat import chat_delivered, chat_event_mids
 
@@ -208,7 +208,7 @@ def v1_agent_events():
 
 
 def v1_job_in(c, aid, b, create):
-    allowed = ("title", "task_id", "state", "log", "append_log", "user_id")
+    allowed = ("title", "task_id", "state", "log", "append_log", "user_id", "name")  # 2.58.0 (#1803): name (create only)
     unknown = sorted(k for k in b if k not in allowed)
     if unknown:
         raise UnknownFields(unknown)
@@ -236,8 +236,12 @@ def v1_job_in(c, aid, b, create):
             if not u or u["kind"] == "agent" or not agent_shares(c, aid, uid):
                 raise BadInput(tr("Invalid value: {0}", "user_id"))
             f["user_id"] = uid
-    elif "task_id" in b or "user_id" in b:
-        raise UnknownFields([k for k in ("task_id", "user_id") if k in b])
+        try:
+            f["name"] = f8f_job_name_in(b.get("name"))  # 2.58.0 (#1803)
+        except ValueError:
+            raise BadInput(tr("Invalid value: {0}", "name"))
+    elif "task_id" in b or "user_id" in b or "name" in b:
+        raise UnknownFields([k for k in ("task_id", "user_id", "name") if k in b])
     return f
 
 
@@ -259,7 +263,7 @@ def v1_agent_jobs():
 @app.post("/api/v1/agent/jobs")
 @v1_view
 def v1_agent_job_create():
-    """{title, task_id?, state? (running), log?, user_id?} -- a job shown in the Agents tab (and linked to the task)."""
+    """{title, task_id?, state? (running), log?, user_id?, name?} -- a job shown in the Agents tab (and linked to the task)."""
     v1_args(())
     aid = need_agent()
     c = db()
@@ -267,8 +271,8 @@ def v1_agent_job_create():
     f = v1_job_in(c, aid, b, True)
     ts = iso(now_utc())
     log = (b.get("log") or b.get("append_log") or "")[-JOB_LOG_MAX:]
-    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)""",
-                    (aid, f.get("task_id"), f.get("user_id"), f["title"], f.get("state", "running"), log, ts, ts))
+    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,name) VALUES(?,?,?,?,?,?,?,?,?)""",
+                    (aid, f.get("task_id"), f.get("user_id"), f["title"], f.get("state", "running"), log, ts, ts, f.get("name")))
     c.execute("""DELETE FROM agent_jobs WHERE agent_id=? AND state NOT IN ('running','waiting') AND id<=(SELECT id FROM agent_jobs
                  WHERE agent_id=? ORDER BY id DESC LIMIT 1 OFFSET ?)""", (aid, aid, AGENT_JOBS_KEEP))
     job_notify(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), None)

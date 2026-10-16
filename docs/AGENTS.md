@@ -1140,12 +1140,15 @@ POST /api/v1/agent/progress   {"text": "Build runs on the test runner", "job_id"
 
 ```
 GET   /api/v1/agent/jobs?state=running
-POST  /api/v1/agent/jobs        {"title": "Fix #51", "task_id": 51, "state": "running", "log": "started", "user_id": 1}
+POST  /api/v1/agent/jobs        {"title": "Fix #51", "task_id": 51, "state": "running", "log": "started", "user_id": 1,
+                                 "name": "Clara"}
 PATCH /api/v1/agent/jobs/{id}   {"state": "waiting" | "running" | "done" | "failed" | "stopped", "title": "…",
                                  "log": "replace", "append_log": "add a line"}
 ```
 
-A job object: `{id, agent_id, task_id, user_id, title, state, log, action, action_by, action_at, created_at, updated_at}`. Keep the log short: it is a summary, not a build log.
+A job object: `{id, agent_id, task_id, user_id, title, state, log, action, action_by, action_at, created_at, updated_at, name}`.
+2.58.0 (#1803): `name` (optional, only when creating) is the job's own short name: letters, spaces, `.`, `'`, `-`, up to 24
+characters, no digits or colons, no plain words such as `Release` or `Fix` (else 400). Keep the log short: it is a summary, not a build log.
 
 **Chat.** Every person has their own conversation with an agent, stored in Kalmido. Each message a person sends is a `chat` event.
 
@@ -1164,7 +1167,9 @@ field comes back in the message as `job_parent` (`null` without); older servers 
 it only together with `job_id` and retry without both.
 
 2.56.0 (#1791 / #1793): **talking to one job.** A job whose title starts with a name (`Clara: Release 2.50`, part jobs
-`Clara B: …`) carries that name in the job's JSON (`name`, `null` without). A message tied to a job (`job_id`, or the
+`Clara B: …`) carries that name in the job's JSON (`name`, `null` without). 2.58.0 (#1803): better give the name as its own
+field (`POST /agent/jobs {name}`, MCP `create_job`, `agent_job.py start --name`); the title is only the fallback for jobs
+without one, and ordinary words (`Release: 2.56`, `Fix: Login`) are never read as a name. A message tied to a job (`job_id`, or the
 `Job #N` start) shows a tag with the name; a tap on it (or on the name at the start of such a message) opens the job's own
 history: `GET /api/agents/{id}/chat?job=<job id>` returns only the agent's messages with that `job_id`, the person's
 messages addressed to it (`Clara: …`, `Job 82: …`, `#82: …`) and the agent's direct answers to those (`reply_to`), from the

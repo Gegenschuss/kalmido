@@ -1667,6 +1667,8 @@ MIGRATIONS = [
     ("view_layouts", "active", "ALTER TABLE view_layouts ADD COLUMN active BIGINT NOT NULL DEFAULT 0"),
     # 2.56.0 B (#1795): what an organisation admin changed in a list (JSON {field: [old, new]}; actions edit / icon), NULL before
     ("org_list_log", "detail", "ALTER TABLE org_list_log ADD COLUMN detail TEXT"),
+    # 2.58.0 F (#1803): the name an agent gives its job (POST /agent/jobs {name}); NULL = read from the title as before
+    ("agent_jobs", "name", "ALTER TABLE agent_jobs ADD COLUMN name TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

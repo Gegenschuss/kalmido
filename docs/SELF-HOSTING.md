@@ -440,7 +440,8 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
 - **What is encrypted:** the office's bank and tax data (IBAN, BIC, bank, tax number, VAT ID), the free company lines,
   the frozen sender of finalised documents, purchase prices of positions (and the costs / margin of a document), the
   special rates of framework contracts, office log entries that carry such values, and the stored files: attachments
-  of tasks in the organisation's lists (comments included), project files of its lists, stored invoices / credit notes
+  of tasks in the organisation's lists (comments included), project files of its lists, the lists' own pictures
+  (2.58.0; older ones are sealed by the encryption pass at the next start), stored invoices / credit notes
   (PDF/A-3 and e-invoice XML) and the archived PDFs of the legacy import. A stored PDF stays a PDF/A-3 without a
   password: it is sealed only on disk and served as the original (same checksum). Not encrypted: names, addresses,
   task texts, logos, profile pictures, files in agent chats and private lists, the search index. The cache of texts read

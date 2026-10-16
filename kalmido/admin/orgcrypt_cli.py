@@ -13,6 +13,7 @@ value that was read (compare and set), in batches with a commit each. Output: co
 """
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -192,21 +193,30 @@ def _office_files(oid):
     return out
 
 
+def f8f_icon_files(c, oid=None):
+    """2.58.0 (#1805): {path: org id} of the lists' own pictures (all lists, or only those of organisation oid)."""
+    from ..accounts.pictures import list_icon_path
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        rows = c.execute("SELECT id, icon, org_id FROM lists WHERE icon LIKE 'u:%'" + ("" if oid is None else " AND org_id=?"),
+                         () if oid is None else (oid,)).fetchall()
+    return {list_icon_path(r[0], r[1][2:]): r[2] for r in rows if re.fullmatch(r"u:[A-Za-z0-9_-]{8,40}", r[1])}
+
+
 def org_files(c, oid):
     """Every stored file that belongs to organisation oid now: attachments of tasks in its lists (comments included),
-    project files of its lists, its office files."""
+    project files of its lists, its office files, the lists' own pictures (2.58.0)."""
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         rows = c.execute("SELECT a.path FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id "
                          "WHERE l.org_id=? UNION ALL SELECT f.path FROM list_files f JOIN lists l ON l.id=f.list_id WHERE l.org_id=?",
                          (oid, oid)).fetchall()
-    return [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + _office_files(oid)
+    return [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + _office_files(oid) + list(f8f_icon_files(c, oid))
 
 
 def all_files(c):
     """Every stored attachment / project file / office file of the instance (for decrypt-all and the key deletion)."""
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         rows = c.execute("SELECT path FROM attachments UNION ALL SELECT path FROM list_files").fetchall()
-    out = [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]]
+    out = [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + list(f8f_icon_files(c))  # 2.58.0 (#1805)
     if os.path.isdir(OFFICE_DIR):
         for name in sorted(os.listdir(OFFICE_DIR)):
             if name.isdigit():
@@ -356,6 +366,7 @@ def before_org_delete(c, oid):
             "SELECT a.path, l.org_id FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id WHERE a.path<>''")}
         att.update({os.path.join(ATT_DIR, r[0]): r[1] for r in c.execute(
             "SELECT f.path, l.org_id FROM list_files f JOIN lists l ON l.id=f.list_id WHERE f.path<>''")})
+    att.update(f8f_icon_files(c))  # 2.58.0 (#1805): the lists' own pictures
     active = oc.oc_active(c)
 
     def target(p):
