@@ -4,7 +4,7 @@ import re
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, st_ids
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import me
@@ -305,10 +305,9 @@ def ltags_for(c, ids):
     """{task id: [list tag names]} (only tags of the task's current list)."""
     out = {}
     ids = list(ids)
-    for i in range(0, len(ids), 900):
-        part = ids[i:i + 900]
-        for r in c.execute(f"""SELECT x.task_id, lt.name FROM task_list_tags x JOIN list_tags lt ON lt.id=x.tag_id JOIN tasks t ON t.id=x.task_id
-                               WHERE x.task_id IN ({','.join('?' * len(part))}) AND lt.list_id=t.list_id ORDER BY lt.sort, lower(lt.name)""", part):
+    if ids:  # 2.65.0 (#1505): one array parameter instead of chunks of placeholders
+        for r in c.execute("""SELECT x.task_id, lt.name FROM task_list_tags x JOIN list_tags lt ON lt.id=x.tag_id JOIN tasks t ON t.id=x.task_id
+                              WHERE x.task_id = ANY(CAST(? AS BIGINT[])) AND lt.list_id=t.list_id ORDER BY lt.sort, lower(lt.name)""", (st_ids(ids),)):
             out.setdefault(r["task_id"], []).append(r["name"])
     return out
 
