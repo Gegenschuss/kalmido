@@ -7449,12 +7449,12 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .apri .aph{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .5rem;min-width:0}
 .apri .aph b{overflow-wrap:anywhere}
 .apf{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
-.apf .aptime{width:6.5rem;min-height:2.5rem}
+.apf .aptime,.apf .dpw{width:6.5rem;min-height:2.5rem}.apf .dpbtn{width:100%;min-height:2.5rem}
 .apf .apnote{flex:1 1 10rem;min-width:0;min-height:2.5rem}
 .apf .ppt{flex:1 1 100%;min-height:2.5rem}
 .apwarn .ic{color:var(--accent)}
 .apalt{border-style:dashed}
-@media (max-width:600px){.apf .aptime{flex:1 1 40%}}
+@media (max-width:600px){.apf .aptime,.apf .dpw{flex:1 1 40%}}
 /* 2.52.0 B (#1128) events of writable CalDAV subscriptions: popover actions, hint under "Allow writing" */
 .cevact.dvwact { display: flex; flex-wrap: wrap; gap: .375rem; }
 .cevact.dvwact .btn.pri { margin-left: auto; }
