@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.60.0** (2026-10-17): Software team - **sprints** with burndown and review, **WIP limits** per kanban column,
+  **story points** and velocity, a **review step** (done only after approval) and **environments** (Staging, Live:
+  where a milestone runs since when). All off until a list switches it on.
 - **2.56.1** (2026-10-16): CI fixes for 2.56.0 (both go live with this version).
 - **2.56.0** (2026-10-16): a **Message** button on job cards, a **chat history per job** (tap its name), running jobs in
   the agent menu, **organisation admins rename and restyle** their organisation's lists (no access to contents) and
@@ -371,7 +374,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Calendar subscriptions**: events from Google Calendar, iCloud, Outlook or any CalDAV server (Nextcloud, Radicale,
   Fastmail, ...) right next to your tasks, read-only, with "Create task from event"
 - Eisenhower matrix (priority x due date)
-- Kanban per list
+- Kanban per list, with WIP limits per column, story points and sprints with burndown and velocity (2.60.0)
+- Review step per list: reviewer, done only after approval; environments (Staging, Live) per project (2.60.0)
 - **Statistics**: completions per week / day and per list, on-time rate, overdue trend, focus time, habit streaks
 
 **Habits, focus and time**
