@@ -7669,3 +7669,6 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+/* 2.56.1 C (#1808) "Switch on all modules": the hint stands under the title, never in the same line */
+label.pmsw>span:last-child{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;min-width:0;flex:1 1 auto}
+label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;width:100%}
