@@ -530,6 +530,8 @@ def watchdog_tick(c):
     _wd_section(c, "org export cleanup", ox_cleanup)  # 2.42.0 (#833): archives after 24 h
     _wd_section(c, "tidy events", tidy_tick)  # 2.27.0 (#999)
     _wd_section(c, "agent bursts", burst_tick)  # 2.29.0 (#1031)
+    from ..lists.sprints import spr_tick
+    _wd_section(c, "sprints", spr_tick)  # 2.60.0 (#343): a sprint past its last day closes, the next one starts
     from ..agents.schedules import sched_tick
     _wd_section(c, "agent schedules", sched_tick)  # 2.34.0 (#272): planned agent jobs
     _wd_section(c, "time", time_watchdog, users, S, LG)

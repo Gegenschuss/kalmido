@@ -7687,3 +7687,36 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+/* 2.60.0 A (#343): sprints -- the sprint header above a list / Kanban (filter, progress, burndown), the sprint in the task
+   row, the review dialog and the list of sprints. One accent; the header folds away on the phone */
+.sprh{margin:.25rem 0 .75rem;padding:.5rem .75rem;border:1px solid var(--line2);border-radius:.75rem;background:var(--bg2);font-size:.8125rem;color:var(--muted)}
+.sprh.drop{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.sprtop{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem .75rem;min-height:2.25rem}
+.sprtg{display:inline-flex;align-items:center;gap:.5rem;min-height:2.25rem;padding:0 .25rem;margin-left:-.25rem;background:none;border:0;border-radius:.5rem;color:var(--text);font:inherit;cursor:pointer}
+.sprtg b{font-weight:600}
+.sprtg .i{color:var(--accent)}
+.sprtg:hover,.sprtg:focus-visible{background:var(--bg3)}
+.sprp{display:inline-flex;align-items:center;gap:.5rem}
+.sprp .pbar{width:6.25rem;height:.25rem;border-radius:.125rem;background:var(--bg4);overflow:hidden;flex:none}
+.sprp .pbar i{display:block;height:100%;border-radius:.125rem;background:var(--accent);transition:width .2s}
+.sprp .muted{white-space:nowrap;font-variant-numeric:tabular-nums}
+.sprseg,.sprunit{display:inline-flex;gap:.125rem;padding:.125rem;margin:.375rem 0 0;border-radius:.5rem;background:var(--bg3)}
+.sprtop .sprseg{margin:0}
+.sprseg button,.sprunit button{min-height:2rem;padding:0 .75rem;border:0;border-radius:.375rem;background:none;color:var(--muted);font:inherit;cursor:pointer}
+.sprseg button.on,.sprunit button.on{background:var(--bg);color:var(--text);box-shadow:0 0 0 1px var(--line2)}
+.sprbody{margin-top:.5rem;display:flex;flex-direction:column;gap:.5rem}
+.sprbody .msburn{max-width:25rem;height:5rem}
+.sprgoal{margin:0;color:var(--text2)}
+.sprsoon{font-size:var(--fs-xs)}
+.sprm{display:inline-flex;align-items:center;gap:.25rem;color:var(--muted)}
+.sprm.cur .i{color:var(--accent)}
+.sprrv{list-style:none;margin:.25rem 0 .75rem;padding:0;display:flex;flex-wrap:wrap;gap:.5rem 1.25rem}
+.sprrv b{font-size:1.125rem;color:var(--text);font-variant-numeric:tabular-nums}
+.sprto{border:0;margin:0 0 .5rem;padding:0;display:flex;flex-direction:column;gap:.375rem}
+.sprto legend{padding:0;margin-bottom:.25rem;color:var(--muted)}
+.sprall{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem;max-height:60vh;overflow:auto}
+.sprall li{padding:.5rem .75rem;border:1px solid var(--line2);border-radius:.625rem;display:flex;flex-direction:column;gap:.25rem}
+.sprall li.active{border-color:var(--accent)}
+.spract{display:flex;gap:.5rem;margin-top:.25rem}
+@media (max-width:40rem){.sprtop .sprp{flex:1 1 100%}.sprtop .sprseg{flex:1 1 100%}.sprseg button{flex:1}}
+@media (prefers-reduced-motion:reduce){.sprp .pbar i{transition:none}}
