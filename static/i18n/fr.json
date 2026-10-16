@@ -8206,5 +8206,18 @@
   "Back to the whole chat": "Retour au chat complet",
   "Job has ended": "La tâche est terminée",
   "The job reads it after its next step.": "La tâche le lit après sa prochaine étape.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)",
+  "Related tasks": "Tâches liées",
+  "probably a duplicate": "probablement en double",
+  "Nothing similar found.": "Rien de similaire trouvé.",
+  "Being computed, please check again in a minute.": "Calcul en cours, revenez dans une minute.",
+  "Similar:": "Similaire :",
+  "also similar meaning": "aussi un sens proche",
+  "Similar meaning": "Sens proche",
+  "Shows tasks of similar meaning in a task, a hint on likely duplicates while adding and “also similar meaning” in the search; agents get them too. A small local model on this server computes them (the optional service kalmido-embed); nothing leaves the server.": "Affiche dans une tâche les tâches de sens proche, un avis de doublons probables lors de l’ajout et « aussi un sens proche » dans la recherche ; les agents les reçoivent aussi. Un petit modèle local sur ce serveur les calcule (le service optionnel kalmido-embed) ; rien ne quitte le serveur.",
+  "Off: the embedding service is not set up (KALMIDO_EMBED_URL), see SELF-HOSTING.md.": "Désactivé : le service d’embeddings n’est pas configuré (KALMIDO_EMBED_URL), voir SELF-HOSTING.md.",
+  "Service reachable": "Service joignable",
+  "Service not reachable": "Service injoignable",
+  "{0} tasks computed, {1} waiting": "{0} tâches calculées, {1} en attente",
+  "Show related tasks": "Afficher les tâches liées"
 }

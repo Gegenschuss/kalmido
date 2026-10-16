@@ -441,6 +441,7 @@ function admSubShow(md, want, save) {
   $$('[data-admsub]', md).forEach(b => { const on = b.dataset.admsub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
   segReveal($(`[data-admsub="${k}"]`, md));
   $$('[data-admp]', md).forEach(p => { p.hidden = p.dataset.admp !== k; });
+  if (k === 'server' && typeof rt9_adminDraw === 'function') rt9_adminDraw(md);  // 2.59.0 B (#1375)
   if (k === 'agents') return Promise.all([ad_agPolicyDraw(md), audDraw(md)]);  // 2.46.6 (#1710): loaded when shown
 }
 // 2.46.6 (#1710): Administration > Agents: the rules for every agent, the admins' alert on usage limits, the API log
@@ -634,7 +635,7 @@ function settingsModal(focus) {
       signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
       org: orgsHtml() + orgAgentsHtml(hint) + ocAdminHtml(hint),  // 2.42.0 (#828): + encryption of organisation data
       agents: ad_agentsHtml(hint),  // 2.46.6 (#1710)
-      server: instanceHtml(chk, hint) + ad_updHtml(hint) + hostHtml(hint) + bkHtml() + stoHtml(),  // 2.46.6 (#1710): + the update check result (was Help)
+      server: instanceHtml(chk, hint) + ad_updHtml(hint) + hostHtml(hint) + bkHtml() + stoHtml() + (typeof rt9_adminHtml === 'function' ? rt9_adminHtml(hint) : ''),  // 2.59.0 B (#1375): + related tasks  // 2.46.6 (#1710): + the update check result (was Help)
       log: aaHtml()}, ad_admFocus(focus)) : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>

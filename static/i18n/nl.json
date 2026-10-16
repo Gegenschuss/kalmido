@@ -8206,5 +8206,18 @@
   "Back to the whole chat": "Terug naar de hele chat",
   "Job has ended": "Job is beëindigd",
   "The job reads it after its next step.": "De job leest het na zijn volgende stap.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)",
+  "Related tasks": "Verwante taken",
+  "probably a duplicate": "waarschijnlijk dubbel",
+  "Nothing similar found.": "Niets vergelijkbaars gevonden.",
+  "Being computed, please check again in a minute.": "Wordt berekend, kijk over een minuut nog eens.",
+  "Similar:": "Vergelijkbaar:",
+  "also similar meaning": "ook vergelijkbare betekenis",
+  "Similar meaning": "Vergelijkbare betekenis",
+  "Shows tasks of similar meaning in a task, a hint on likely duplicates while adding and “also similar meaning” in the search; agents get them too. A small local model on this server computes them (the optional service kalmido-embed); nothing leaves the server.": "Toont in een taak taken met een vergelijkbare betekenis, bij het toevoegen een hint op mogelijke dubbele taken en „ook vergelijkbare betekenis” in de zoekfunctie; agents krijgen ze ook. Een klein lokaal model op deze server berekent ze (de optionele dienst kalmido-embed); er verlaat niets de server.",
+  "Off: the embedding service is not set up (KALMIDO_EMBED_URL), see SELF-HOSTING.md.": "Uit: de embeddingdienst is niet ingesteld (KALMIDO_EMBED_URL), zie SELF-HOSTING.md.",
+  "Service reachable": "Dienst bereikbaar",
+  "Service not reachable": "Dienst niet bereikbaar",
+  "{0} tasks computed, {1} waiting": "{0} taken berekend, {1} wachtend",
+  "Show related tasks": "Verwante taken tonen"
 }

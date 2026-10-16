@@ -54,6 +54,10 @@ CHECKS = {
     "nl_segment": ("SELECT s.id, s.conn_id FROM nl_segments s JOIN nl_conns n ON n.id=s.conn_id WHERE s.org_id IS DISTINCT FROM n.org_id"),
     "nl_member": ("SELECT m.seg_id, s.conn_id FROM nl_members m JOIN nl_segments s ON s.id=m.seg_id WHERE m.org_id IS DISTINCT FROM s.org_id"),
     "nl_run": ("SELECT r.id, r.conn_id FROM nl_runs r JOIN nl_conns n ON n.id=r.conn_id WHERE r.org_id IS DISTINCT FROM n.org_id"),
+    # 2.59.0 B (#1375): a task's text vector in another workspace / list than the task (the embedding worker drops such rows,
+    # tasks/related.py emb_cleanup; reported when the worker is off)
+    "task_vector": ("SELECT v.task_id, v.org_id FROM task_vectors v JOIN tasks t ON t.id=v.task_id JOIN lists l ON l.id=t.list_id "
+                    "WHERE v.org_id IS DISTINCT FROM l.org_id OR v.list_id IS DISTINCT FROM t.list_id"),
     # 2.49.0 (#1106): a connection (accepted request) of an agent or a kid account -- requests are for people only
     "conn_agent": ("SELECT l.a_id, l.b_id FROM conn_links l JOIN users u ON u.id IN (l.a_id, l.b_id) "
                    "WHERE l.deleted_at IS NULL AND (u.kind!='user' OR u.kid!=0)"),
