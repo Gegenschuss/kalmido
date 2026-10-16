@@ -6,7 +6,7 @@
 
 // module -> its files in static/js/, in load order (the same files as LAZY in sw.js)
 const LD_MODS = {
-  settings: ['settings'],
+  settings: ['acctset', 'settings'],  // 2.65.0 (#1823): acctset.js = the settings sections of account.js
   contacts: ['contacts', 'newsletter'],  // 2.65.0 (#1823): newsletter.js
   office: ['office', 'office_docs', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow',
     'office_pipeline', 'office_kpi', 'office_datev', 'officeagents'],
