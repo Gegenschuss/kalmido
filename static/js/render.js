@@ -286,16 +286,21 @@ function licShareTip(l) {  // "Shared with 2 people and agent X" / "Shared by <n
 function licShareHtml(l) {  // people: grey, agents: the robot in blue, both: side by side; always shown
   const hasAg = (l.shared_agents || []).length > 0, hasP = (l.shared_people || 0) > 0 || !hasAg;
   const tip = licShareTip(l);
-  return `<span class="shr shk" role="img" aria-label="${esc(tip)}" title="${esc(tip)}">${hasP ? ic('users', 's') : ''}${hasAg ? licBot() : ''}</span>`;
+  return sbc_slots('shr shk', tip, hasAg ? licBot() : '', hasP ? ic('users', 's') : '');
 }
+// 2.56.0 (#1797): the share symbols sit in two fixed columns at the row's right edge: agent | person (an empty slot keeps its room)
+let sbc_res = false;  // set by renderSide: some row shows a symbol, so every row keeps the two columns
+const sbc_slots = (cls, tip, ag, pe) => `<span class="${cls} sbc-sl" ${tip ? `role="img" aria-label="${esc(tip)}" title="${esc(tip)}"` : 'aria-hidden="true"'}><span class="sbc-ag">${ag}</span><span class="sbc-pe">${pe}</span></span>`;
+const sbc_ph = () => sbc_res ? sbc_slots('shr sbc-ph', '', '', '') : '';
 function renderSide() {
   const c = counts(), k = S.route.key, onTasks = S.route.mod === 'tasks';
   const row = (key, icon, name, n, extra = '', after = '') =>
-    `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}">${n || ''}</span>${after}</button>`;
+    `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}">${(rsy_sideCnt() || (key === 'today' && c.over)) && n || ''}</span>${after}</button>`;  // 2.56.1 (#1799): counts can be off (red Today stays)
   const mrow = (mod, icon, name, after = '', attrs = '') => `<button class="srow smod ${S.route.mod === mod ? 'on' : ''}" data-go="${mod}" ${GO_KEY[mod] && !isTouch() ? `title="${esc(kt(name, GO_KEY[mod]))}"` : ''} ${attrs}>${ic(icon)}<span class="n">${esc(name)}</span>${after}</button>`;
   // 2.45.0 (#1502): on = a folded group holds the open view (its header shows it, like a folded folder)
   const head = (g, label, acts = '', n = '', tip = '', on = false) => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'} ${on ? 'sgon' : ''}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}${on ? `<span class="sr"> ${esc(tr('contains the open view'))}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
   const lists = S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));  // 2.28.0 (#935): the shown workspace
+  sbc_res = false; sbc_res = collab() && rsy_sideShr() && (lists.some(l => l.shared) || folderNames().some(f => folderShrHtml(f)));  // 2.56.0 (#1797)
   const listRow = l => {
     // 2.23.0 (#794): ONE fixed icon column for a picture, an emoji (taken from the name) or the dot, so the names line up
     // 2.36.0 (#1117): what the column shows follows Settings > Appearance > Sidebar: a grey line icon for the name's emoji with its
@@ -306,9 +311,9 @@ function renderSide() {
     const nmOf = x => em ? listName(x._live ?? x.name).slice(em.length).trim() : listName(x._live ?? x.name);
     // 2.25.0 (UX-07): one number per row (the open tasks); a project's progress is a thin bar along the row's bottom
     const pg = progressFor(l) && l.progress?.total && sbiProg() && !progHidden(l.id) ? `<span class="sprog" role="img" style="--p:${pct(l.progress)}%" aria-label="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}" title="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}"></span>` : '';
-    const shr = (l.status && statusFor(l) ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
+    const shr = (l.status && statusFor(l) && rsy_sideDot() ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
       (l.shared && collab() && l.bell === 'mute' ? `<span class="shr bellm" title="${esc(tr('Notifications: {0}', bellLabel('mute')))}">${ic('belloff', 's')}</span>` : '') +
-      (l.shared && collab() ? licShareHtml(l) : '') + ovSideMark(l);  // 2.36.2 (#1139): person / robot, always shown; 2.46.0 (#1603): not joined
+      ovSideMark(l) + (l.shared && collab() && rsy_sideShr() ? licShareHtml(l) : sbc_ph());  // 2.56.0 (#1797): the symbol columns come last  // 2.36.2 (#1139): person / robot, always shown; 2.46.0 (#1603): not joined
     // 2.22.0 (#692): sort mode: a grip on the left, the name shortens with …, the buttons in a fixed column on the right
     // 2.25.0 (UX-02): the full name (it wraps), a grip to drag by (touch: at once, no long press) and ONE "…" button with
     // up / down / folder for keyboards and anyone who does not drag (WCAG 2.5.7)
@@ -322,7 +327,7 @@ function renderSide() {
     const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
     const active = fl.some(l => onTasks && k === 'l:' + l.id);
     const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the rest of the row folds
-    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() ? '' : 'draggable="true"'}>${S.listReorder ? `<span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>` : ic('chev', 's fcar') /* 2.46.1 (#1607): the arrow before the folder icon */}<span class="sic" aria-hidden="true"${lp_folderSty(f) /* 2.53.0 (#1426) */}>${ic('folder', 's')}</span><span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span>${S.listReorder ? '' : `<span class="c" ${n ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${n || ''}</span>` /* 2.46.1 (#1607): the number right after the name, the share icon at the right like a list's */}${folderShrHtml(f) /* 2.41.0 (#1428) */}<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
+    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() ? '' : 'draggable="true"'}>${S.listReorder ? `<span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>` : ic('chev', 's fcar') /* 2.46.1 (#1607): the arrow before the folder icon */}<span class="sic" aria-hidden="true"${lp_folderSty(f) /* 2.53.0 (#1426) */}>${ic('folder', 's')}</span><span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span>${S.listReorder ? '' : `<span class="c" ${n && rsy_sideCnt() ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${rsy_sideCnt() && n || ''}</span>` /* 2.46.1 (#1607): the number right after the name, the share icon at the right like a list's */}${rsy_sideShr() ? folderShrHtml(f) : '' /* 2.41.0 (#1428); 2.56.1 (#1799): can be off */}<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
       ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
       : `<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
   };
@@ -916,63 +921,66 @@ function taskRow(t, opts = {}) {
   const due = dueLabel(t);
   const lst = opts.showList && listById(t.list_id) ? lname(listById(t.list_id)) : '';
   let time = null, who = '';
-  if (t.ttype && !opts.trash && ticketsOn(t.list_id)) meta.push(ttChip(t));  // 2.4.0 (#340)
-  if (isMs(t)) meta.push(`<span class="msm${t.due ? ' sr' : ''}">${t.due ? esc(tr('Milestone')) : `<i class="msd" aria-hidden="true"></i>${esc(tr('Milestone without a date'))}`}</span>`);  // 2.18.0 (#430)
-  else if (t.milestone_id && !opts.trash && !opts.subRow) meta.push(msChip(t));
-  if (isOcc(t) && famOn() && t.status === 0 && occWhat(t)) meta.push(`<span class="occm">${ic('cake', 's')}${esc(occWhat(t))}</span>`);  // 2.19.0 (#653)
-  if (t.rotation?.who?.length > 1 && famOn() && t.status === 0 && !opts.trash) meta.push(`<span class="rotm" title="${esc(tr('Takes turns'))}">${ic('turns', 's')}<span class="sr">${esc(tr('Takes turns'))}</span></span>`);
+  const rs = opts.trash ? () => true : rsy_on;  // 2.56.1 (#1799): the row's symbol level (rowsym.js RSY_SYMS); the trash shows all
+  if (t.ttype && !opts.trash && ticketsOn(t.list_id) && rs('ttype')) meta.push(ttChip(t));  // 2.4.0 (#340)
+  if (isMs(t)) { if (rs('ms')) meta.push(`<span class="msm${t.due ? ' sr' : ''}">${t.due ? esc(tr('Milestone')) : `<i class="msd" aria-hidden="true"></i>${esc(tr('Milestone without a date'))}`}</span>`); }  // 2.18.0 (#430)
+  else if (t.milestone_id && !opts.trash && !opts.subRow && rs('ms')) meta.push(msChip(t));
+  if (isOcc(t) && famOn() && t.status === 0 && occWhat(t) && rs('occ')) meta.push(`<span class="occm">${ic('cake', 's')}${esc(occWhat(t))}</span>`);  // 2.19.0 (#653)
+  if (t.rotation?.who?.length > 1 && famOn() && t.status === 0 && !opts.trash && rs('turns')) meta.push(`<span class="rotm" title="${esc(tr('Takes turns'))}">${ic('turns', 's')}<span class="sr">${esc(tr('Takes turns'))}</span></span>`);
   if (t.context) meta.push(`<span class="ctxm" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`);
   // 2.0.4 (#308): "Ready to start" only when the view has dependencies at all (see renderList); a button: tap / click
   // explains where it comes from (toast), without opening the task
-  if (opts.next && !opts.depth) meta.push(`<button type="button" class="nxt" data-act="flow-why" title="${esc(tr(FLOW_WHY))}" aria-label="${esc(tr('Ready to start|flow') + ': ' + tr(FLOW_WHY))}">${ic('arrow', 's')}<span class="nxl">${tr('Ready to start|flow')}</span></button>`);
-  if (!lc && t.blocked && t.status === 0 && !opts.trash && dFor(t)) meta.push(`<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}${tr('blocked')}</span>`);
-  if (t.waiting_at && t.status === 0 && !opts.trash) meta.push(waitChip(t));  // 2.1.0 (#335)
-  if (S.route.key === 'stale' && !opts.trash && staleOf(t)) meta.push(staleChipHtml(t));  // 2.34.0 (#266)
+  if (opts.next && !opts.depth && rs('blocked')) meta.push(`<button type="button" class="nxt" data-act="flow-why" title="${esc(tr(FLOW_WHY))}" aria-label="${esc(tr('Ready to start|flow') + ': ' + tr(FLOW_WHY))}">${ic('arrow', 's')}<span class="nxl">${tr('Ready to start|flow')}</span></button>`);
+  if (!lc && t.blocked && t.status === 0 && !opts.trash && dFor(t) && rs('blocked')) meta.push(`<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}${tr('blocked')}</span>`);
+  if (t.waiting_at && t.status === 0 && !opts.trash && rs('wait')) meta.push(waitChip(t));  // 2.1.0 (#335)
+  if (S.route.key === 'stale' && !opts.trash && staleOf(t) && rs('stale')) meta.push(staleChipHtml(t));  // 2.34.0 (#266)
   if (t.approval === 'pending' && t.status === 0 && !opts.trash) meta.push(approvalChip(t));  // 2.23.0 (#463)
-  if (t.pinned && !opts.trash) meta.push(`<span class="pinm">${ic('pin', 's')}</span>`);
-  if (lst && moOwn() && !opts.depth) meta.unshift(moSubHtml(t));  // 2.40.0 (#1344): My tasks, own order: "List › Section"
+  if (t.pinned && !opts.trash && rs('pin')) meta.push(`<span class="pinm">${ic('pin', 's')}</span>`);
+  if (lst && !rs('list')) { /* 2.56.1 (#1799): the list is switched off */ }
+  else if (lst && moOwn() && !opts.depth) meta.unshift(moSubHtml(t));  // 2.40.0 (#1344): My tasks, own order: "List › Section"
   else if (lst) meta.push(`<span class="lst${mc}" title="${esc(lst)}">${licMark(listById(t.list_id), 'lsm')}${esc(lst)}</span>`);  // 2.36.2 (#1135)
   // 2.16.0 (#473): overdue is not only red: the alert icon + a word for screen readers
   // 2.31.0 (#1051): in Today a task due today carries no "Today" chip (the view says it), only its time
   const inDay = opts.inToday && t.due === today() && t.status === 0;
-  if (t.due && !opts.checklist && !lc && !(inDay && !t.due_time)) meta.push(`<span class="dt ${dueClass(t)}${mc}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ic(inDay ? 'clock' : 'cal', 's')}${inDay ? esc(t.due_time) : due}</span>`);
-  if (t.repeat && !opts.checklist) meta.push(`<span>${ic('repeat', 's')}</span>`);
-  if (t.reminders && t.due && !opts.checklist) meta.push(`<span${nagOf(t) ? ` class="nagm" title="${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}"` : ''}>${ic('bell', 's')}${nagOf(t) ? ic('repeat', 's') : ''}</span>`);
-  if (t.deadline && t.due && !opts.checklist && !opts.trash) meta.push(dlChip(t));  // 2.7.0 (#412)
-  if (kids.length && !lc) meta.push(`<span class="subc">${ic('sub', 's')}${kids.length - openKids}/${kids.length}</span>`);
-  if (t.content && !opts.compact) meta.push(`<span>${ic('edit', 's')}</span>`);
-  if (t.attachments?.length) meta.push(`<span>${ic('clip', 's')}${t.attachments.length}</span>`);
-  if (t.url) meta.push(flkLink(t.url, 'lnk', `${ic(flkIs(t.url) ? 'folder' : 'link', 's')}${esc(urlHost(t.url))}`, true));  // 2.35.0 (#186): file links
+  const dueOn = rs('due') || dueClass(t) === 'over';  // 2.56.1 (#1799): overdue always shows
+  if (t.due && !opts.checklist && !lc && !(inDay && !t.due_time) && dueOn) meta.push(`<span class="dt ${dueClass(t)}${mc}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ic(inDay ? 'clock' : 'cal', 's')}${inDay ? esc(t.due_time) : due}</span>`);
+  if (t.repeat && !opts.checklist && rs('repeat')) meta.push(`<span>${ic('repeat', 's')}</span>`);
+  if (t.reminders && t.due && !opts.checklist && rs('remind')) meta.push(`<span${nagOf(t) ? ` class="nagm" title="${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}"` : ''}>${ic('bell', 's')}${nagOf(t) ? ic('repeat', 's') : ''}</span>`);
+  if (t.deadline && t.due && !opts.checklist && !opts.trash && (rs('deadline') || dueClass(t) === 'over')) meta.push(dlChip(t));  // 2.7.0 (#412)
+  if (kids.length && !lc && rs('sub')) meta.push(`<span class="subc">${ic('sub', 's')}${kids.length - openKids}/${kids.length}</span>`);
+  if (t.content && !opts.compact && rs('note')) meta.push(`<span>${ic('edit', 's')}</span>`);
+  if (t.attachments?.length && rs('attach')) meta.push(`<span>${ic('clip', 's')}${t.attachments.length}</span>`);
+  if (t.url && rs('link')) meta.push(flkLink(t.url, 'lnk', `${ic(flkIs(t.url) ? 'folder' : 'link', 's')}${esc(urlHost(t.url))}`, true));  // 2.35.0 (#186): file links
   if (tFor(t) && t.id > 0) {
     const [ta, tm] = taskTime(t.id), live = S.timer && S.timer.task_id === t.id;
     if (ta >= 60 || live) {
       const tip = esc(live ? tr('Timer running') : ta - tm >= 60 ? tr('{0} in total, {1} by you', fmtDur(ta), fmtDur(tm)) : tr('Tracked: {0}', fmtDur(ta)));
-      if (!lc) meta.push(`<span class="tchip ${live ? 'live' : ''}${mc}" data-tt="${t.id}" title="${tip}">${ic('clock', 's')}<b>${fmtDur(ta)}</b></span>`);
+      if (!lc && rs('tracked')) meta.push(`<span class="tchip ${live ? 'live' : ''}${mc}" data-tt="${t.id}" title="${tip}">${ic('clock', 's')}<b>${fmtDur(ta)}</b></span>`);
       time = {live, tip, txt: fmtDur(ta)};
     }
   }
-  if (planOf(t) && !opts.trash) meta.push(`<span class="pchip" title="${esc(tr('Planned: {0}', planLabel(t)))}">${ic('clock', 's')}<b>${esc(planLabel(t, true))}</b></span>`);  // 2.11.0
-  if (t.code?.prs?.length && !opts.trash) meta.push(codeChip(t));  // 2.2.0 (#271)
-  if (t.comment_count && cmtOn()) meta.push(`<span class="cmc ${t.unread ? 'unread' : ''}" title="${esc(t.unread ? trn('{0} new comment', '{0} new comments', t.unread) : trn('{0} comment', '{0} comments', t.comment_count))}">${ic('comment', 's')}${t.comment_count}</span>`);
+  if (planOf(t) && !opts.trash && rs('plan')) meta.push(`<span class="pchip" title="${esc(tr('Planned: {0}', planLabel(t)))}">${ic('clock', 's')}<b>${esc(planLabel(t, true))}</b></span>`);  // 2.11.0
+  if (t.code?.prs?.length && !opts.trash && rs('code')) meta.push(codeChip(t));  // 2.2.0 (#271)
+  if (t.comment_count && cmtOn() && rs('cmt')) meta.push(`<span class="cmc ${t.unread ? 'unread' : ''}" title="${esc(t.unread ? trn('{0} new comment', '{0} new comments', t.unread) : trn('{0} comment', '{0} comments', t.comment_count))}">${ic('comment', 's')}${t.comment_count}</span>`);
   if (t.approvals_open) meta.push(`<span class="apvc" title="${esc(apvCount(t.approvals_open))}">${ic('lock', 's')}${t.approvals_open}<span class="sr"> ${esc(apvCount(t.approvals_open))}</span></span>`);  // 2.41.0 (#1383): open approval cards in its comments
   const ac = !lc && !opts.trash && t.id > 0 && acolOn(t.list_id);  // 1.10.0: assignee column (own cell, click = assign)
   if (ac) who = whoCell(t);
   else if (lc) { /* 2.14.0: the assignee is a column or not shown */ }
   else if (t.assignee_group_id && collab()) {  // 2.10.0 (#441): assigned to a group
     const gc = grpChip(t);
-    meta.push(gc);
+    if (rs('person')) meta.push(gc);
     if (tc) who = gc;
   } else if (t.assignee_id && collab()) {
     const name = personName(t.list_id, t.assignee_id), cls = `who ${S.me && t.assignee_id === S.me.id ? 'me' : ''}`, tip = esc(tr('Assigned to {0}', name || '?'));
     const pv = isTouch() ? av : avBtn;  // 2.7.2 (#418): the picture opens the person card (touch: the row opens the task)
-    meta.push(pv(t.assignee_id, name, cls + mc, `title="${tip}"`));
+    if (rs('person')) meta.push(pv(t.assignee_id, name, cls + mc, `title="${tip}"`));
     if (tc) who = pv(t.assignee_id, name, cls, `title="${tip}"`);
   }
-  if (!opts.cols && !opts.trash && !lc) for (const f of fieldsOf(t.list_id).filter(x => x.pinned)) { const c = fieldChip(f, t.fields?.[f.id], t.list_id); if (c) meta.push(c); }
-  if (!lc) for (const g of t.ltags || []) meta.push(ltagChip(g, t.list_id));
-  if (!lc) for (const g of t.tags) meta.push(ptagChip(g, t.list_id));
+  if (!opts.cols && !opts.trash && !lc && rs('fields')) for (const f of fieldsOf(t.list_id).filter(x => x.pinned)) { const c = fieldChip(f, t.fields?.[f.id], t.list_id); if (c) meta.push(c); }
+  if (!lc && rs('tags')) for (const g of t.ltags || []) meta.push(ltagChip(g, t.list_id));
+  if (!lc && rs('tags')) for (const g of t.tags) meta.push(ptagChip(g, t.list_id));
   // 2.0.8 (#319): sorted by "Created": a small creation date on the row
-  if (!lc && !opts.trash && !opts.checklist && t.created_at && opts.crd) meta.push(`<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>`);
+  if (!lc && !opts.trash && !opts.checklist && t.created_at && opts.crd && rs('created')) meta.push(`<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>`);
   if (opts.trash) meta.push(`<span>${tr('deleted {0}', dayLabel(t.deleted_at.slice(0, 10)))}</span>`);
   if (opts.trash && t.keep) meta.push(`<span class="tkeep" title="${esc(tr('Only the list owner can delete it for good'))}">${ic('lock', 's')}${tr('stays')}</span>`);  // 2.0.5
   // 2.8.0 (#434): the status glyph (circle; priority = its colour; an agent working on it = an open arc + dot) and, in
@@ -987,16 +995,16 @@ function taskRow(t, opts = {}) {
   }
   // 2.31.0 (#1051): the number is part of the tap area (opens the task); phones show it in the meta line instead (.mid), so
   // titles with and without a number start at the same x
-  const gut = !opts.checklist && t.id > 0 && (lc ? lc.includes('id') : ticketsOn(t.list_id) || idsOn(t.list_id)) ? `<span class="tgut" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}"${opts.trash ? '' : ' data-act="open"'}>#${t.id}</span>` : '';
+  const gut = !opts.checklist && t.id > 0 && (lc ? lc.includes('id') : (ticketsOn(t.list_id) || idsOn(t.list_id)) && rs('num')) ? `<span class="tgut" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}"${opts.trash ? '' : ' data-act="open"'}>#${t.id}</span>` : '';
   if (gut) meta.unshift(`<span class="mid" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}">#${t.id}</span>`);
   const collapsed = S.collapsed.has('t' + t.id);
   const ro = !opts.trash && !canEdit(t);
   const caret = opts.tree && treeKids ? `<button class="caret ${collapsed ? 'closed' : ''}" data-act="collapse" data-key="t${t.id}" aria-expanded="${!collapsed}" aria-label="${esc(trn('{0} subtask', '{0} subtasks', treeKids))}">${ic('chev', 's')}</button>` : '';
-  const cols = tc ? `<div class="tcols" data-act="open">${timeOn() && (opts.tcols.list || mtTime(t.list_id)) ? `<span class="c-time ${time?.live ? 'live' : ''}" title="${time ? time.tip : ''}">${time ? time.txt : ''}</span>` : ''}${collab() ? `<span class="c-who">${who}</span>` : ''}${opts.tcols.list ? `<span class="c-list" title="${esc(lst)}"><span>${esc(lst)}</span></span>` : ''}<span class="c-date ${dueClass(t)}" title="${esc(due)}">${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(inDay ? t.due_time || '' : dueLabel(t, false))}</span></span></div>` : '';
+  const cols = tc ? `<div class="tcols" data-act="open">${timeOn() && (opts.tcols.list || mtTime(t.list_id)) && rs('tracked') ? `<span class="c-time ${time?.live ? 'live' : ''}" title="${time ? time.tip : ''}">${time ? time.txt : ''}</span>` : ''}${collab() && rs('person') ? `<span class="c-who">${who}</span>` : ''}${opts.tcols.list && rs('list') ? `<span class="c-list" title="${esc(lst)}"><span>${esc(lst)}</span></span>` : ''}<span class="c-date ${dueClass(t)}" title="${esc(due)}">${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${dueOn ? esc(inDay ? t.due_time || '' : dueLabel(t, false)) : ''}</span></span></div>` : '';
   let h = `<div class="trow ${t.priority && !opts.checklist ? 'pr' + t.priority : ''} ${opts.checklist ? 'ck' : ''} ${tc || lc ? 'hascols' : ''} ${lc ? 'haslc' : ''} ${t.status ? 'done' : ''} ${opts.depth ? 'sub d' + opts.depth : ''} ${opts.subRow ? 'subrow' : ''} ${S.sel === t.id ? 'sel' : ''} ${gut ? 'hasgut' : ''} ${S.kf === t.id && !opts.subRow ? 'kfocus' : ''} ${S.multi.has(t.id) ? 'msel' : ''} ${ro ? 'ro' : ''} ${opts.next && !opts.depth ? 'flownext' : ''}${lp_cls(t)}" data-id="${t.id}"${lp_attr(t) /* 2.53.0 (#1426): the list's colour as the card edge */} ${opts.drag !== false && !opts.trash && !ro && !isMobile() ? 'draggable="true"' : ''}>
     ${caret}
     ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(isMs(t) ? tr('Complete milestone: {0}', mdPlain(t.title)) : tr('Complete: {0}', mdPlain(t.title)))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}${gut}
-    <div class="tmain" data-act="${opts.trash ? '' : 'open'}"><div class="ttl"${opts.trash ? '' : ` data-kt role="button" tabindex="-1" aria-describedby="${lc ? `tc-${t.id} ` : ''}tm-${t.id}"`}>${mdTitle(t.title)}${tlkIs(t) && !opts.trash ? `<span class="tlkr" role="img" title="${esc(tr('Locked'))}" aria-label="${esc(tr('Locked'))}">${ic('lock', 's')}</span>` : ''}${t.priority && !opts.checklist && !opts.trash && t.status === 0 && !(lc && lc.includes('prio')) ? prioMark(t.priority) : ''}</div><div class="meta" id="tm-${t.id}">${meta.join('')}</div></div>
+    <div class="tmain" data-act="${opts.trash ? '' : 'open'}"><div class="ttl"${opts.trash ? '' : ` data-kt role="button" tabindex="-1" aria-describedby="${lc ? `tc-${t.id} ` : ''}tm-${t.id}"`}>${mdTitle(t.title)}${tlkIs(t) && !opts.trash && rs('blocked') ? `<span class="tlkr" role="img" title="${esc(tr('Locked'))}" aria-label="${esc(tr('Locked'))}">${ic('lock', 's')}</span>` : ''}${t.priority && !opts.checklist && !opts.trash && t.status === 0 && !(lc && lc.includes('prio')) ? prioMark(t.priority) : ''}</div><div class="meta" id="tm-${t.id}">${meta.join('')}</div></div>
     ${!opts.trash && !ro && t.id > 0 && !isTouch() ? `<button class="iconbtn rpin ${t.pinned ? 'on' : ''}" data-act="pin" title="${esc(t.pinned ? tr('Unpin') : tr('Pin'))}" aria-label="${esc(t.pinned ? tr('Unpin') : tr('Pin'))}" aria-pressed="${!!t.pinned}">${ic('pin', 's')}</button>` : ''}
     ${opts.cols ? `<div class="fcols" data-act="open">${opts.cols.map(f => `<span class="fcell t-${esc(f.type)}">${fieldCell(f, t.fields?.[f.id], t.list_id)}</span>`).join('')}</div>` : ''}
     ${cols}${lcH}

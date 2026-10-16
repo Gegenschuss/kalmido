@@ -776,10 +776,21 @@ def pm_purpose_on(purpose, all_mods=None):
     True = every module ("Switch on all modules"), False = none (lists and tasks only, whatever the purpose)."""
     if all_mods is None:
         return set(PURPOSE_ON[purpose]) | set(PURPOSE_EXTRA.get(purpose, ()))
-    return set(PURPOSE_MODS) | set(PURPOSE_EXTRA.get(purpose, ())) if all_mods else set()
+    return set(pma_full()) if all_mods else set()  # 2.56.1 (#1808): was PURPOSE_MODS + the purpose's extras
 
 
 PM_EXTRA_ALL = tuple(dict.fromkeys(x for v in PURPOSE_EXTRA.values() for x in v))
+# 2.56.1 (#1808): every module of Settings > Modules (the keys of the client's FEATS, static/js/core.js); "Switch on all
+# modules" turns on all of them, PURPOSE_MODS stays what the purpose package and the switch-off touch
+PM_FULL = ("cal", "timeline", "matrix", "habits", "pomo", "kanban", "collab", "stats", "time", "progress", "deps", "fields",
+           "agents", "comments", "family", "events", "contacts", "contracts", "home", "care", "health", "review", "travel",
+           "reading", "clients", "workload", "forms", "office", "wiki", "files", "dispo")
+
+
+def pma_full():
+    """2.56.1 (#1808): PM_FULL without what the instance switched off for everybody (collaboration, time tracking)."""
+    from ..core.access import collab_all, time_all
+    return tuple(x for x in PM_FULL if not (x == "collab" and not collab_all()) and not (x == "time" and not time_all()))
 
 
 def purpose_apply(c, uid, purpose, examples=False, all_mods=None):
@@ -790,9 +801,10 @@ def purpose_apply(c, uid, purpose, examples=False, all_mods=None):
         raise BadInput(tr("Invalid value: {0}", "purpose"))
     fs = [x for x in (usettings(c, uid).get("features") or "").split(",") if x]
     on = pm_purpose_on(purpose, all_mods)
-    sw = PURPOSE_MODS + (PM_EXTRA_ALL if all_mods is False else ())
+    sw = PURPOSE_MODS + (PM_FULL if all_mods is False else ())  # 2.56.1 (#1808): off = every module off (was PURPOSE_MODS + office extras)
     fs = [x for x in fs if x not in sw or x in on] + [x for x in PURPOSE_MODS if x in on and x not in fs]
     fs += [x for x in PURPOSE_EXTRA.get(purpose, ()) if x in on and x not in fs]
+    fs += [x for x in PM_FULL if x in on and x not in fs]  # 2.56.1 (#1808): "all on" = every module of the list
     if all_mods is not None:
         uset(c, uid, "mods_all", "1" if all_mods else "0")
     uset(c, uid, "features", ",".join(fs))

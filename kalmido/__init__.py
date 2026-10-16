@@ -83,6 +83,7 @@ ORDER = (
     "agents.core",
     "collab.reactions",
     "agents.chat",
+    "agents.jobchat",  # 2.56.0 A (#1791 / #1793)
     "agents.steps",  # 2.32.0 (#1081 / #1079)
     "agents.quota",  # 2.33.0 (#1045)
     "agents.schedules",  # 2.34.0 (#272)

@@ -7,6 +7,27 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.56.1] - 2026-10-16
+
+**In short:** the archive import finds the recipient's address in old invoices and quotations again, the symbols of the
+task row and the sidebar can be switched off, and "Switch on all modules" really switches on every module.
+
+### Changed
+- **Fewer symbols in the task row:** *Settings > Appearance > Task rows > Symbols in the row* with the levels *All*
+  (as before), *Important* (due date, reminder, deadline, person, approvals and locks), *Calm* (title, status circle,
+  due date) and *Custom* (boxes per group: dates, content, time, status, placement, people). The status circle, overdue
+  tasks and an agent waiting for your yes always show; the task itself shows everything. Per person, on every device.
+  **Default for every account: Important** (#1799).
+- **Sidebar:** task counts, the status dots of lists and the share marks (person / robot) can be switched off (#1799).
+
+### Fixed
+- **Archive import:** the recipient's address of a PDF is found on the whole first page, also behind long position
+  lists; the organisation's own sender block (a name on two lines, eGbR, the city in English, "/ Germany") no longer
+  slips into the address; US ("New York NY 10017") and UK ("EC1A 1BB London") addresses are read; a client in the own
+  street of another town and quantities like "10000 pieces" are told apart (#1813).
+- **Switch on all modules** switches on every module of *Settings > Modules* (also agents, knowledge pages, file store,
+  dispatch and the business modules); switching it off leaves only lists and tasks. Its explanation stands below the
+  title (#1808).
 ## [2.55.1] - 2026-10-16
 
 ### Fixed

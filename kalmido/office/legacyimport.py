@@ -239,6 +239,7 @@ ZIP_PREFIX = {"D": "DE", "DE": "DE", "A": "AT", "AT": "AT", "CH": "CH", "F": "FR
 ZIP_RE = re.compile(r"^(?:(?P<pre>[A-Z]{1,2})\s?[-–]\s?)?(?P<zip>\d{4,5})\s+(?P<city>\S.*)$")
 NL_ZIP_RE = re.compile(r"^(?P<zip>\d{4}\s?[A-Z]{2})\s+(?P<city>\S.*)$")
 UK_ZIP_RE = re.compile(r"^(?P<city>.*?)[,\s]+(?P<zip>[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})$", re.I)
+UK_ZIP_FRONT_RE = re.compile(r"^(?P<zip>[A-Z]{1,2}\d[A-Z\d]?\s\d[A-Z]{2})\s+(?P<city>[A-Z][A-Za-z .'-]{1,30})$")
 US_ZIP_RE = re.compile(r"^(?P<city>.+?),?\s+(?P<st>[A-Z]{2})\s+(?P<zip>\d{5}(?:-\d{4})?)$")
 ATTN_RE = re.compile(r"^(?:z\.\s?h(?:d|än)?\.?|zu\s+händen|zh\.?|attn\.?:?|attention:?|to the attention of)\s*:?\s*", re.I)
 CO_RE = re.compile(r"^c\s?/\s?o\b\.?\s*", re.I)
@@ -324,7 +325,9 @@ def fi_split_address(text):
             country = country or "US"
             break
         m = UK_ZIP_RE.match(ln) if country in ("GB", "IE") else None
+        m = m or (UK_ZIP_FRONT_RE.match(ln) if country in ("GB", "IE", "") else None)  # 2.56.1 (#1813): "EC4M 7RB London"
         if m:
+            country = country or "GB"
             out["zip"], out["city"], zi = m.group("zip").upper(), m.group("city").strip(" ,"), i
             break
     if zi is None:
@@ -1347,42 +1350,129 @@ def fk_value_line(ln, near=()):
     return False
 
 
-FK_PDF_LINES = 45  # lines of the first page looked at
+FK_PDF_LINES = 100  # 2.56.1 (#1813): the whole first page (pdf_text joins pages without a mark; a dense page has 60-75 lines)
+# 2.56.1 (#1813): postcode lines with the city first: "New York NY 10017" (a real US state), "London SW1A 1AA", and the
+# UK postcode in front ("EC4M 7RB London"); amounts and totals are never an address line
+FKA_US_STATES = set("AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK "
+                    "OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split())
+FKA_US_RE = re.compile(r"^[A-Za-z][A-Za-z .'-]{1,30}?,?\s+(?P<st>[A-Z]{2})\s+\d{5}(?:-\d{4})?$")
+FKA_UK_PC = r"[A-Z]{1,2}\d[A-Z\d]?\s\d[A-Z]{2}"
+FKA_UK_RE = re.compile(rf"^(?:{FKA_UK_PC}\s+[A-Z][A-Za-z .'-]{{1,30}}|[A-Z][A-Za-z .'-]{{1,30}}?,?\s+{FKA_UK_PC})$")
+FKA_AMOUNT_RE = re.compile(r"[€$£%]|\d,\d{2}(?!\d)|\d[.,]\d{3}[.,]\d{2}(?!\d)|\b(?:summe|zwischensumme|mwst|netto|brutto|subtotal|total)\b", re.I)
+# a quantity of a line item ("10000 Stück Flyer", "1200 x A4", "2026 konzept"): a unit or a lower-case word after the number
+FKA_QTY_RE = re.compile(r"^\d{4,5}\s+(?:[a-zäöüß]|(?i:stück|stk|std|stunden|tage|seiten|exemplare|minuten|min|kg|x)\b)")
+FKA_TAIL_COUNTRY_RE = re.compile(r"^(?P<head>.*?\S)\s*(?:[,/]|\s[-–])\s*(?P<country>[A-Za-zÄÖÜäöü. ]{2,30})$")
+
+
+def fka_zipline(ln, i):
+    """2.56.1 (#1813): True for a postcode + city line (German / European postcode first, Dutch, US, UK)."""
+    if len(ln) > 60 or FKA_AMOUNT_RE.search(ln) or FKA_QTY_RE.match(ln):
+        return False
+    if FK_ZIPLINE_RE.match(ln) or (NL_ZIP_RE.match(ln) and i):
+        return True
+    m = FKA_US_RE.match(ln)
+    return bool(m and m.group("st") in FKA_US_STATES) or bool(FKA_UK_RE.match(ln))
+
+
+def fka_norm(s):
+    """2.56.1 (#1813): a name for comparing with the organisation's own: fi_norm, also without eGbR / e.K. / PartG and the
+    space a PDF puts before a comma ("Name , Name & Name eGbR")."""
+    s = re.sub(r"\b(?:e\.?\s?gbr|e\.\s?k(?:fm|fr)?\.?|partg(?:\s?mbb)?)(?=\W|$)", " ", (s or "").lower())
+    return fi_norm(s)
+
+
+def fka_street(s):
+    s = _cname(s).replace("ß", "ss")
+    s = re.sub(r"stra?sse\b|str\b\.?", "str", s)
+    return re.sub(r"[^a-z0-9äöü]+", "", s)
+
+
+def fka_split_country(ln):
+    """2.56.1 (#1813): "50733 Cologne / Germany", "10178 Berlin, Germany" -> ("50733 Cologne", "Germany"); else (ln, "")."""
+    m = FKA_TAIL_COUNTRY_RE.match(ln)
+    if m and m.group("country").strip(" .").lower() in COUNTRIES:
+        return m.group("head"), m.group("country").strip()
+    return ln, ""
 
 
 def fk_pdf_block(text, own):
     """The recipient block (list of lines) of a document's text, [] when none is found. own: the organisation's company
-    fields (name, zip, city) -- their lines are the sender, not the recipient."""
+    fields (name, street, zip, city; each may be empty) -- their lines are the sender, not the recipient. 2.56.1 (#1813):
+    the first block on the first page that is not the organisation's own; the walk up stops at another postcode line and at
+    the own name / street (a name on two lines, eGbR, a city in another language: the own block is its street or name)."""
     first = (text or "").split("\f")[0]
     lines = [re.sub(r"\s+", " ", x).strip() for x in first.replace("\r", "\n").split("\n")]
     lines = [x for x in lines if x][:FK_PDF_LINES]
-    oname = fi_norm(own.get("name") or "")
+    oname = fka_norm(own.get("name") or "")
     ozip, ocity = (own.get("zip") or "").replace(" ", ""), (own.get("city") or "").strip().lower()
-    ostreet = _cname(own.get("street")).replace(" ", "")
+    ostreet = fka_street(own.get("street"))
+    norms = [fka_norm(x) for x in lines]
 
-    def own_line(ln):
-        n = fi_norm(ln)
-        return bool(oname) and len(oname) >= 4 and oname in n
+    def part(k):  # a piece of the own name (4+ characters), e.g. one line of a name on two lines
+        return 0 <= k < len(lines) and len(oname) >= 4 and len(norms[k]) >= 4 and norms[k] in oname
+
+    def own_line(k):
+        n = norms[k]
+        if len(oname) >= 4 and oname in n:
+            return True
+        if not part(k):
+            return False
+        # alone a line counts only when it covers two thirds of the own name (a client "Name" of "Name Film GmbH" stays a client)
+        return len(n) >= 6 and 3 * len(n) >= 2 * len(oname) or part(k - 1) or part(k + 1) \
+            or k > 0 and len(norms[k - 1] + n) >= 4 and (norms[k - 1] + n) in oname
+
+    def own_street(k):
+        st = fka_street(lines[k])
+        return bool(ostreet) and len(ostreet) >= 4 and (st == ostreet or st.startswith(ostreet) and not st[len(ostreet):][:1].isdigit())
+    zips = [fka_zipline(ln, i) for i, ln in enumerate(lines)]
     for i, ln in enumerate(lines):
-        if not (FK_ZIPLINE_RE.match(ln) or (NL_ZIP_RE.match(ln) and i)) or len(ln) > 60 or FK_SENDER_RE.search(ln) or own_line(ln):
+        if not zips[i] or FK_SENDER_RE.search(ln) or own_line(i):
             continue
-        m = ZIP_RE.match(ln)
-        if m and ozip and m.group("zip") == ozip and m.group("city").strip().lower() == ocity and any(
-                own_line(x) or (ostreet and _cname(x).replace(" ", "") == ostreet) for x in lines[max(0, i - 3):i]):
-            continue  # the organisation's own address block (letterhead); a client in the same town stays
-        top = i
+        zl, country = fka_split_country(ln)
+        m = ZIP_RE.match(zl)
+        same_zip = bool(m and ozip and m.group("zip") == ozip)
+        top, own_seen = i, False
         while top > 0 and i - top < 5:
             up = lines[top - 1]
-            if FK_SENDER_RE.search(up) or FK_STOP_RE.search(up) and not ATTN_RE.match(up) or own_line(up) or len(up) > 70 or fk_value_line(up, (lines[top - 2] if top > 1 else "", lines[top])):
+            # the own street counts only with the own postcode (or none known): a client in the same street of another town stays
+            if own_line(top - 1) or own_street(top - 1) and (same_zip or not ozip):
+                own_seen = True
+                break
+            if zips[top - 1] or FK_SENDER_RE.search(up) or FK_STOP_RE.search(up) and not ATTN_RE.match(up) or len(up) > 70 \
+                    or FKA_AMOUNT_RE.search(up) or up.endswith(":") or len(up.split()) > 8 \
+                    or fk_value_line(up, (lines[top - 2] if top > 1 else "", lines[top])) \
+                    or len(up) <= 14 and " " in up and fk_value_line(up.replace(" ", "")):  # a BIC split by the PDF: "COL SDE33"
                 break
             top -= 1
+        if own_seen and (top == i or same_zip or not ozip):
+            continue  # the organisation's own address block (letterhead / sender column); a client in the same town stays
+        if same_zip and m.group("city").strip().lower() == ocity and top == i:
+            continue
         if top == i:
             continue  # a postcode line without anything above it is no address
-        block = lines[top:i + 1]
-        if i + 1 < len(lines) and lines[i + 1].strip(" .").lower() in COUNTRIES:
+        block = lines[top:i] + [zl] + ([country] if country else [])
+        if not country and i + 1 < len(lines) and lines[i + 1].strip(" .").lower() in COUNTRIES:
             block.append(lines[i + 1])
         return block
     return []
+
+
+def fka_own(c, oid, own):
+    """2.56.1 (#1813): the company fields, empty ones filled from the free company lines of the settings (an organisation
+    that never filled the fields prints those)."""
+    own = dict(own)
+    if own.get("name") and own.get("street") and own.get("zip"):
+        return own
+    free = (office_settings(c, oid) or {}).get("company") or {}
+    own["name"] = own.get("name") or free.get("name") or ""
+    for ln in (x for y in free.get("lines") or [] for x in str(y).split(",")):  # "Straße 1, 12345 Ort" on one line too
+        ln = _clean_line(ln)
+        m = ZIP_RE.match(ln)
+        if m and not own.get("zip"):
+            own["zip"], own["city"] = m.group("zip"), own.get("city") or m.group("city")
+        elif not m and STREET_RE.search(ln) and not own.get("street"):
+            own["street"] = ln
+    return own
 
 
 def fk_pdf_address(c, oid, raw, uid, client_id=None):
@@ -1396,7 +1486,7 @@ def fk_pdf_address(c, oid, raw, uid, client_id=None):
         return {"status": "busy" if t["error"] == "busy" else "error"}
     if t.get("no_text_layer"):
         return {"status": "no_text"}
-    block = fk_pdf_block(t.get("text") or "", ofx_company(c, oid) or {})
+    block = fk_pdf_block(t.get("text") or "", fka_own(c, oid, ofx_company(c, oid) or {}))
     if not block:
         return {"status": "none"}
     a = fi_split_address("\n".join(block))

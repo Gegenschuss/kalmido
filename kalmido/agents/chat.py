@@ -109,7 +109,8 @@ def ag_jobs_page(c, where, args):
 
 @app.post("/api/agents/jobs/<int:jid>/action")
 def agent_job_action(jid):
-    """{action: approve|reject|stop} -- sent to the agent as a 'job' event, shown in the task's history."""
+    """{action: approve|reject|stop|message} -- sent to the agent as a 'job' event, shown in the task's history.
+    2.56.0 (#1791): message {text} goes to the agent only (state, action fields and approval stay as they are)."""
     from ..api.scopes import approval_run
     c = db()
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
@@ -118,10 +119,13 @@ def agent_job_action(jid):
     action = body().get("action")
     if action not in JOB_ACTIONS:
         return err(tr("Invalid value: {0}", "action"))
-    if not job_may_act(c, j, me(), action):
+    if not job_may_act(c, j, me(), "stop" if action == "message" else action):  # 2.56.0 (#1791): who may stop may write
         raise Denied(403, tr("Only the list owner, a list admin, the assignee or the person the job is for can do this"))
     if j["state"] in ("done", "failed", "stopped"):
         return err(tr("This job has already ended"), 409)
+    if action == "message":  # 2.56.0 (#1791)
+        from ..agents.jobchat import jc_job_message
+        return jc_job_message(c, j)
     if j["approval"] and action == "approve":  # 2.15.0 (#479): run the agent's stored request now
         if j["state"] != "waiting":
             return err(tr("This job has already ended"), 409)
@@ -739,7 +743,8 @@ def agent_permission_mode(aid):
 @app.get("/api/agents/<int:aid>/chat")
 def agent_chat_get(aid):
     """My conversation with an agent, oldest first: the newest ?limit= messages (default 300, max 300); ?after=<id>: only
-    newer ones; 2.12.2 (#451) ?before=<id>: the page of older ones (has_more: there are even older ones). Marks its answers read."""
+    newer ones; 2.12.2 (#451) ?before=<id>: the page of older ones (has_more: there are even older ones). Marks its answers read.
+    2.56.0 (#1793) ?job=<id>: only that job's messages (jobchat.jc_chat_rows), with ?after= / ?before= / ?limit=."""
     c = db()
     a = need_chat_agent(c, aid)
     after = as_int(request.args.get("after", 0), "after", 0)
@@ -752,6 +757,9 @@ def agent_chat_get(aid):
     rows = c.execute(q + " ORDER BY id DESC LIMIT ?", (*args, limit)).fetchall()[::-1]
     more = bool(rows) and bool(c.execute("SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND id<? LIMIT 1",
                                          (aid, me(), rows[0]["id"])).fetchone())
+    if request.args.get("job"):  # 2.56.0 (#1793): the history of one job of this agent, only from my own conversation
+        from ..agents.jobchat import jc_chat_rows
+        rows, more = jc_chat_rows(c, aid, as_int(request.args["job"], "job", 1), before, limit, after)
     if c.execute("UPDATE agent_chat SET read_at=? WHERE agent_id=? AND user_id=? AND sender='agent' AND read_at IS NULL",
                  (iso(now_utc()), aid, me())).rowcount:
         c.commit()

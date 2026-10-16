@@ -38,6 +38,11 @@ the app has not yet been tested by people who use a screen reader every day (see
   *Settings > Workspaces*): its lists show a stripe in the header and the sidebar and a frame around the input fields,
   and the header's sign names the organisation in words; Private stays without colour. Moving a task or list from
   Private into an organisation says so in the message ("Will be visible to everyone in …", with Undo).
+- **Calmer rows (2.56.1).** *Settings > Appearance > Task rows > Symbols in the row* sets how many small symbols a task
+  row shows: *All*, *Important* (the default: due date, reminder, person, approvals and locks), *Calm* (only the title,
+  the status circle and the due date) or *Custom* (a box per symbol, in groups). Overdue tasks, an agent waiting for
+  your yes and the status circle always show; the task itself still shows everything. *Settings > Appearance > Sidebar*
+  can hide the task counts, the status dots of lists and the share marks (person / robot). Per person, on every device.
 - **Dragging is never the only way.** Tasks: *Move up / Move down* in the task menu or Alt+↑ / Alt+↓, *Move to
   section…*, *Move to list* (m), the date picker; the panels and columns that can be resized by dragging have a grip
   that works with ← → and Enter (standard width) or a double-click. The divider between the chats of the split chat

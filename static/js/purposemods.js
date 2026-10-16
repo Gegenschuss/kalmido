@@ -4,9 +4,11 @@
 const pm_allOn = () => (S.settings.mods_all ?? '1') !== '0';
 const PM_EXTRA_ALL = [...new Set(Object.values(PURPOSE_EXTRA).flat())];
 // the modules a purpose switches on with the switch on / off (all null = the purpose's own package, as before 2.46.1)
-const pm_purposeOn = (p, all) => new Set(all == null ? PURPOSE_MODS[p] || [] : all ? [...PURPOSE_ALL, ...(PURPOSE_EXTRA[p] || [])] : []);
+// 2.56.1 (#1808): "all on" = every module of Settings > Modules (FEATS), minus what the instance switched off (server: pma_full)
+const pma_full = () => FEATS.map(x => x[0]).filter(k => !(k === 'collab' && S.collabAll === false) && !(k === 'time' && S.timeAll === false));
+const pm_purposeOn = (p, all) => new Set(all == null ? PURPOSE_MODS[p] || [] : all ? pma_full() : []);
 // the modules the switch itself touches (off also the business modules)
-const pm_touched = all => [...PURPOSE_ALL, ...(all === false ? PM_EXTRA_ALL : [])];
+const pm_touched = all => all ? pma_full() : all === false ? FEATS.map(x => x[0]) : [...PURPOSE_ALL];  // 2.56.1 (#1808): off = lists and tasks only, every module off
 function pm_featsWith(all, p = S.settings.purpose || '') {
   const on = pm_purposeOn(p, all), fs = new Set((S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').filter(Boolean));
   for (const k of pm_touched(all)) on.has(k) ? fs.add(k) : fs.delete(k);
