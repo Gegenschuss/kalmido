@@ -188,13 +188,14 @@ function stChipMenu(a) {
 async function agentChipMenu(a) {
   const ags = S.agents || [], sh = shownAgents(), list = sh.length ? sh : ags;
   // 2.13.0 (#453 A6): what waits for me comes first, with its buttons
-  const wj = (await waitJobsFresh()).slice(0, 3);
+  const wj = (await Promise.all([waitJobsFresh(), jc_sync()]))[0].slice(0, 3);  // 2.56.0 (#1793): + the running jobs with a name
   const wait = wj.flatMap(j => [{label: `${tr('{0} waits for you', j.agent_name)}: ${j.title}`, dot: 'waiting', cls: 'minfo mwait', fn: () => go('agents')},
     j.kind ? {label: tr('Review the proposal'), icon: 'bot', fn: () => propOpen(j.id)}
       : {row: [{label: '\u{1F44D} ' + tr('Approve'), cls: 'pri', fn: () => jobDo(j.id, 'approve')}, {label: tr('Reject'), icon: 'x', fn: () => jobDo(j.id, 'reject')}]}, '-']);
   menu(a, [...wait, ...list.map(x => ({label: agentHstLine(x), dot: agentHst(x), cls: 'minfo', fn: () => x.enabled ? chatOpen(x.id) : go('agents')})),
     '-', {label: tr('Agents and jobs'), icon: 'bot', fn: () => go('agents')},
     ...ags.filter(x => x.enabled).map(x => ({label: tr('Chat with {0}', x.name) + (x.chat_unread ? ` (${x.chat_unread})` : ''), icon: 'comment', fn: () => chatOpen(x.id)})),
+    ...jc_menuItems(),  // 2.56.0 (#1793): running jobs ("Clara · Release …") open their own chat
     {label: tr('Choose the agents shown…'), icon: 'gear', fn: () => settingsModal('agentdots')}]);
 }
 
@@ -485,6 +486,7 @@ function jobHtml(j) {
   const acts = [mine && ['requested', 'ready'].includes(j.proposal_state) && `<button class="btn sm ${j.proposal_state === 'ready' ? 'pri' : ''}" data-act="prop-open" data-jid="${j.id}">${ic('bot', 's')} ${j.proposal_state === 'ready' ? tr('Review the proposal') : tr('Open')}</button>`,
     !j.kind && j.can_act && j.state === 'waiting' && `<button class="btn sm pri" data-act="job-do" data-jid="${j.id}" data-a="approve">${thumbIc(true)} ${tr('Approve')}</button>`,
     !j.kind && j.can_act && j.state === 'waiting' && `<button class="btn sm" data-act="job-do" data-jid="${j.id}" data-a="reject">${thumbIc(false)} ${tr('Reject')}</button>`,
+    jc_cardBtn(j),  // 2.56.0 (#1791): Message to a running job
     j.can_stop && ['running', 'waiting'].includes(j.state) && `<button class="btn sm danger" data-act="job-do" data-jid="${j.id}" data-a="stop">${ic('stop', 's')} ${tr('Stop')}</button>`].filter(Boolean).join('');
   const last = String(j.log || '').trim().split('\n').pop();
   const fo = S.jobFocus === j.id;  // 2.36.2 (#1141): opened by a "Job #id" link: highlighted, log + history unfolded
