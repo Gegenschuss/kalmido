@@ -1115,6 +1115,8 @@ def member_remove(lid, uid):
         return jsonify(ok=True, via_group=True)
     c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
+    # 2.53.0 (#1424, review): a removed member's task bells of this list go (no old "Urgent" coming back on re-invite)
+    c.execute("DELETE FROM task_bell WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
     c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE list_id=? AND type='person')",
               (str(uid), lid))
     agent_share_skip(c, lid, uid, True)  # 2.4.2 (#391): unshared by hand -> "Share all" leaves it out

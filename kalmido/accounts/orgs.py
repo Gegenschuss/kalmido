@@ -807,6 +807,8 @@ def org_leave(c, oid, uid, heir):
         c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, aid))
     c.execute("UPDATE agents SET org_id=NULL WHERE owner_id=? AND org_id=?", (uid, oid))
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
+    # 2.53.0 (#1424, review): the leaver's task bells in the organisation go too (else the nightly boundary check alarms)
+    c.execute("DELETE FROM task_bell WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
     from ..core.access import acx_drop
     acx_drop()  # 2.36.2 (#1142): the request's access contexts follow the new memberships
     return n

@@ -194,7 +194,9 @@ def tbl_info(c, tid, role):
     if role in MANAGE_ROLES:  # only the list's owner / admins see for whom it is set
         ppl = _people(c, tid, lid)
         pn = _names(c, ppl)
-        out["people"] = [{"id": u, "name": pn.get(u, "?"), **_row_out(rows.get(u), names, st)} for u in ppl if u != uid]
+        # 2.53.0 (#1424, review): someone's own "Muted" is private -- admins see it as "As the list"
+        out["people"] = [{"id": u, "name": pn.get(u, "?"), **_row_out(rows.get(u) if (rows.get(u) or {"level": ""})["level"] != "mute" else None, names, st)}
+                         for u in ppl if u != uid]
     return out
 
 
