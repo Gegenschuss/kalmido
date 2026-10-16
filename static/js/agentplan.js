@@ -14,7 +14,8 @@ SCHED_TPL.splice(SCHED_TPL.findIndex(t => t.k === 'own'), 0,
     p: N_('Check my time tracking of this week (tools check_time_entries and time_from_events with user_id = my id). Tell me in this chat what looks wrong, and send me ONE proposal with entries for events without time (tool propose_time_entries). Change nothing yourself.')});
 
 // ---- the review rows (agents.js propItemsHtml / propEdit hand over for these kinds)
-const ap_hm = (id, v, label, f) => `<input type="time" class="aptime" id="${id}" data-f="${f}" value="${esc(v || '')}" aria-label="${esc(label)}" step="300">`;
+// 2.51.1: the app's own time picker (no native time inputs, ux1_ui); the hidden input carries data-f
+const ap_hm = (id, v, label, f) => `<span class="aptime">${timeIn(id, v || '', {label, attrs: `data-f="${f}"`})}</span>`;
 function ap_warn(w) {
   if (!w?.length) return '';
   return w.map(x => `<span class="ppchip apwarn">${ic('alert', 's')}${esc(x.kind === 'away' ? tr('Absent that day') : x.kind === 'double'
