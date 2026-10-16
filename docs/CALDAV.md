@@ -130,6 +130,9 @@ calendar added as a **CalDAV account** (iCloud, Nextcloud, Fastmail, mailbox.org
   another service cannot be changed on its own.
 - **Changed elsewhere:** if the event was changed on another device in the meantime, Kalmido overwrites nothing. It shows
   "This event was changed elsewhere", reloads the calendar, and you can make your change again.
+- **Weak version tags:** some servers only send weak version tags (ETags starting with `W/`). Kalmido cannot guard a
+  change with them, so it does not try: changing or deleting shows "This calendar server only sends weak version tags;
+  Kalmido cannot save there safely." (2.58.0). Changes and deletions never follow a redirect of the server.
 - Deleting can be undone for a few minutes (Undo puts the event back).
 - Calendar links (ICS / iCal, also Google's "secret address in iCal format") stay read-only and never show up in the
   "Calendar" field. Google calendars cannot be written to.
