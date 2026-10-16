@@ -64,6 +64,12 @@ const today = new Date().toISOString().slice(0, 10);
     await ev(`(() => { const m = document.querySelector('.modal'); m.querySelector('#pp-title').value = 'Messefilm'; m.querySelector('#pp-value').value = '2500'; m.querySelector('[data-m="save"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal') && [...document.querySelectorAll('[data-pipcol="inquiry"] .ppcard')].some(c => /Messefilm/.test(c.textContent))`), '#1196: the new inquiry is in its column');
     check(await ev(`${deals}.then(j => j.items.some(x => x.title === 'Messefilm' && x.stage === 'inquiry' && x.probability === 20))`), '#1196: saved as an inquiry with 20 %');
+    // 2.50.1: open + save keeps a value >= 1,000 (the field shows "2,500.00"; ofcNum read it as 2.5)
+    check(await ev(`ofcNum(fmtNum(2500, 2)) === 2500 && ofcNum('2,500.00') === 2500 && ofcNum('1.5') === 1.5`), '2.50.1: ofcNum reads the thousands separator');
+    await ev(`(() => { [...document.querySelectorAll('.ppcard')].find(x => /Messefilm/.test(x.textContent)).click(); return 1; })()`);
+    check(await ready(ev, `document.querySelector('.modal #pp-value')?.value === '2,500'`), '2.50.1: the dialog shows the value with its separator');
+    await ev(`(() => { document.querySelector('.modal [data-m="save"]').click(); return 1; })()`);
+    check(await ready(ev, `!document.querySelector('.modal') && ${deals}.then(j => j.items.some(x => x.title === 'Messefilm' && +x.value === 2500))`), '2.50.1: open + save keeps 2,500');
     // drag a card into "Order"
     await ev(`(() => { const c = [...document.querySelectorAll('.ppcard')].find(x => /Imagefilm/.test(x.textContent)), col = document.querySelector('[data-pipcol="won"]'); const dt = new DataTransfer();
       c.dispatchEvent(new DragEvent('dragstart', {bubbles: true, dataTransfer: dt})); col.dispatchEvent(new DragEvent('dragover', {bubbles: true, cancelable: true, dataTransfer: dt})); col.dispatchEvent(new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: dt})); return 1; })()`);
