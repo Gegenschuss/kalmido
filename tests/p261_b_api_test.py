@@ -248,6 +248,27 @@ fid = dbx("SELECT id FROM list_files WHERE list_id=? ORDER BY id DESC LIMIT 1", 
 got = Bo.get(B + f"/api/list-files/{fid[0][0]}").content if fid else b""
 check(got == base, "#1819 JPEG (project file): the original minus the metadata, byte for byte")
 
+# too big to turn (over 40 million pixels): the metadata goes, the orientation alone stays (the photo still shows upright)
+def big(fmt):
+    im = Image.new("RGB", (8200, 5000), (90, 90, 90))
+    out = io.BytesIO()
+    im.save(out, fmt, **({"quality": 10} if fmt == "JPEG" else {"compress_level": 9}), exif=exif(6))
+    return out.getvalue()
+
+
+for fmt, name in (("JPEG", "big.jpg"), ("PNG", "big.png")):
+    raw = big(fmt)
+    print(f"{fmt} 41 MP test picture: {len(raw)} bytes", flush=True)
+    _, got = put_fs(Bo, name, raw)
+    check(all(x not in got for x in SECRETS), f"#1819 {fmt} too big to turn: no metadata left")
+    try:
+        im = Image.open(io.BytesIO(got))
+        ex = im.getexif()
+        check(im.size == (8200, 5000) and ex.get(0x0112) == 6 and 0x010F not in ex and not ex.get_ifd(0x8825) and not ex.get_ifd(0x8769),
+              f"#1819 {fmt} too big to turn: only the orientation stays ({im.size}, {dict(ex)})")
+    except Exception as e:  # noqa: BLE001
+        check(False, f"#1819 {fmt} too big to turn: the stored picture opens ({e})")
+
 # broken / fake: stored as it came
 fake = b"\xff\xd8\xff\xe1\x00\x10Exif\x00\x00GPS-COMMENT-but-truncated"
 _, got = put_fs(Bo, "broken.jpg", fake)
