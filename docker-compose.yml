@@ -75,7 +75,7 @@ services:
   # 2.59.0 (#1375): optional -- "Related tasks" (similar tasks in a task, a hint on likely duplicates while adding, "also similar
   # meaning" in the search). A small local embedding model on your CPU turns task texts into numbers; it writes no text and
   # sends nothing anywhere. Start it with: docker compose --profile embed up -d --build
-  # and set KALMIDO_EMBED_URL=http://embed:8090 in .env (then restart kalmido). About 0.6 GB image, ~0.5 GB RAM.
+  # and set KALMIDO_EMBED_URL=http://embed:8090 in .env (then restart kalmido). About 0.5 GB image, ~0.6 GB RAM, one CPU thread.
   # Without it (the default) Kalmido works as before and hides the related tasks.
   embed:
     build: ./embed

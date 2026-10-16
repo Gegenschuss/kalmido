@@ -199,7 +199,7 @@ check(r.ok and j["enabled"] and not j["pending"] and T3 in got and T2 in got, f"
 check(not (got & BETA_IDS) and T1 not in got and T4 not in got, f"related: never Beta, never itself, not the unrelated one {got}")
 check(any(x["id"] == T3 and x["dup"] for x in j["items"]) and not any(x["id"] == T2 and x["dup"] for x in j["items"]),
       "dup only above the duplicate threshold")
-check(all(set(x) == {"id", "title", "list_id", "done", "score", "dup"} for x in j["items"]), "item fields as agreed")
+check(all(set(x) == {"id", "title", "list_id", "done", "score", "dup", "ref"} for x in j["items"]), "item fields as agreed")
 check(len(j["items"]) <= 5, "at most 5")
 r = Ca.get(B + f"/api/tasks/{TB}/related")
 check(r.ok and TB2 in ids_of(r.json()) and not (ids_of(r.json()) & (ALPHA_IDS | {TP})), f"carol (Beta): only Beta {r.text[:200]}")
@@ -209,7 +209,8 @@ check(Da.get(B + f"/api/tasks/{TP}/related").status_code == 404, "dave: bob's pr
 TR = task(Bo, "Follow-up", LA, notes=f"see #{T4} and #{TB}")
 wait_for(lambda: TR in vec_ids(), "the new task gets its vector")
 got = ids_of(Bo.get(B + f"/api/tasks/{TR}/related").json())
-check(T4 in got and TB not in got, f"an explicit #reference is related, a foreign one never {got}")
+jr = Bo.get(B + f"/api/tasks/{TR}/related").json()
+check(T4 in got and TB not in got and any(x["id"] == T4 and x["ref"] and not x["dup"] for x in jr["items"]), f"an explicit #reference is related (ref), a foreign one never {got}")
 j = Bo.get(B + f"/api/tasks/{T4}/related").json()
 check(TR in ids_of(j) and not any(x["id"] == TR and x["dup"] for x in j["items"]), f"... also the other way round (a task naming T4), never as a duplicate {j}")
 check(TR not in ids_of(Ca.get(B + f"/api/tasks/{TB}/related").json()), "a task of another organisation naming TB stays hidden from carol")

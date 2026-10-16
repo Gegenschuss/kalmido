@@ -430,8 +430,8 @@ TOOLS = [
            "semantic": {"type": "boolean"}}, ["q"]),
      lambda api, a: api.call("GET", "/search", {**_pick(a, ("q", "limit")), **({"semantic": "1"} if a.get("semantic") else {})})),
     ("related_tasks", "2.59.0: up to 5 tasks close in meaning to a task (local text vectors on the server, similar titles, "
-                      "#references), only tasks you may see: {enabled, pending, items: [{id, title, list_id, done, score, dup}]}. "
-                      "dup = probably a duplicate. enabled false = the server has no embedding service; pending = not computed yet. "
+                      "#references), only tasks you may see: {enabled, pending, items: [{id, title, list_id, done, score, dup, ref}]}. "
+                      "dup = probably a duplicate, ref = named by #number in either direction. enabled false = the server has no embedding service; pending = not computed yet. "
                       "Use it before creating a task (duplicates) and to find context. Read-only.",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/related")),
     ("search_messages", "2.33.0: full-text search in task comments, team chat and your own chats with people (only what you may read: "

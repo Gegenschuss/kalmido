@@ -96,8 +96,9 @@ loaded when a PDF is opened; the browser never loads them from a third party.
 
 Built only with `docker compose --profile embed`; not part of the Kalmido image.
 
-- multilingual-e5-small by intfloat (Liang Wang et al.), MIT License, the model weights (ONNX export) and tokenizer, downloaded
-  at build time from [intfloat/multilingual-e5-small](https://huggingface.co/intfloat/multilingual-e5-small) at a fixed revision
+- multilingual-e5-small by intfloat (Liang Wang et al.), MIT License ([intfloat/multilingual-e5-small](https://huggingface.co/intfloat/multilingual-e5-small)),
+  as the int8 ONNX export and tokenizer of [Xenova/multilingual-e5-small](https://huggingface.co/Xenova/multilingual-e5-small),
+  downloaded at build time at a fixed revision (SHA-256 checked)
 - ONNX Runtime (MIT), runs the model on the CPU
 - Hugging Face tokenizers (Apache-2.0)
 - NumPy (BSD-3-Clause)

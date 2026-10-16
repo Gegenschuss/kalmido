@@ -60,8 +60,7 @@ class Model:
         self.name = MODEL_NAME
         self.tok = Tokenizer.from_file(os.path.join(MODEL_DIR, "tokenizer.json"))
         self.tok.enable_truncation(MAX_TOKENS)
-        pad = self.tok.token_to_id("<pad>")  # XLM-R based models (e5, bge-m3): <pad> = 1; BERT style: [PAD] = 0
-        self.tok.enable_padding(pad_id=pad if pad is not None else 0, pad_token="<pad>" if pad is not None else "[PAD]")
+        self.tok.no_padding()  # one text per run
         so = ort.SessionOptions()
         if THREADS:
             so.intra_op_num_threads = THREADS
@@ -70,8 +69,12 @@ class Model:
         self.lock = threading.Lock()  # one batch at a time: the CPU is shared with Kalmido and its database
 
     def embed(self, texts, kind):
+        # one text per run: on a small CPU batches are not faster, but need far more memory (16 x 512 tokens)
+        return [self._one(PREFIX.get(kind, "") + t) for t in texts]
+
+    def _one(self, text):
         np = self.np
-        enc = self.tok.encode_batch([PREFIX.get(kind, "") + t for t in texts])
+        enc = [self.tok.encode(text)]
         ids = np.array([e.ids for e in enc], dtype=np.int64)
         mask = np.array([e.attention_mask for e in enc], dtype=np.int64)
         feed = {"input_ids": ids, "attention_mask": mask}
@@ -85,7 +88,7 @@ class Model:
             m = mask[..., None].astype(hidden.dtype)
             pooled = (hidden * m).sum(1) / np.clip(m.sum(1), 1e-9, None)
         pooled = pooled / np.clip(np.linalg.norm(pooled, axis=1, keepdims=True), 1e-12, None)
-        return [[round(float(x), 6) for x in row] for row in pooled]
+        return [round(float(x), 6) for x in pooled[0]]
 
 
 def _norm(v):

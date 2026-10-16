@@ -707,7 +707,7 @@ internet: the model is part of its image, the container sits only on an internal
 itself never calls a language model or an outside service for this.
 
 1. Build and start it: `docker compose --profile embed up -d --build` (downloads the model once while building, about
-   0.5 GB; the container needs about 0.5 GB RAM).
+   120 MB; the container needs about 0.6 GB RAM, one CPU thread).
 2. Set `KALMIDO_EMBED_URL=http://embed:8090` in `.env` and restart Kalmido (`docker compose up -d`).
 3. *Settings > Administration > Server > Related tasks* shows whether the service answers, the model and how many tasks
    are computed. The first start computes every task in the background, throttled (a few minutes per thousand tasks on a
@@ -717,7 +717,7 @@ Without the service (or with the switch off) everything works as before and the 
 stored in the table `task_vectors`: per organisation like its tasks (row-level security), sealed with the organisation's
 key when its data is encrypted, deleted with the task; they are not part of the organisation export (Kalmido computes them
 again). Thresholds for another model: `KALMIDO_RELATED_MIN`, `KALMIDO_RELATED_DUP`, `KALMIDO_RELATED_SEARCH`,
-`KALMIDO_RELATED_MIX` (see `.env.example`). A Raspberry Pi works too, only slower; leave the service out if the box is busy.
+`KALMIDO_RELATED_MIX`, `KALMIDO_RELATED_NORM` (see `.env.example`). A Raspberry Pi works too, only slower; leave the service out if the box is busy.
 
 ## Moving to a new server
 
