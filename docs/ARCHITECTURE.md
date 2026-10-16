@@ -308,6 +308,7 @@ registering the ones of its area.
 | `formula.js` | 2.43.0 (#1328): formula fields in the client, the totals row under number columns and the key figures on the project page (server side `kalmido/lists/formula.py`, `kalmido/lists/kpis.py`). |
 | `widgets.js` | 2.43.0 (#1452): blocks adjusted in place (… menu, width 1/3 to full, height, resize handle, move by the header, default for everyone / reset). |
 | `pinboard.js` | 2.43.0 (#1346): project page as a pinboard: a colour per block and notepads (Markdown) for everyone in the project. |
+| `lysets.js` | 2.55.0 (#1069, #1068): several saved arrangements per view (switch in the header, manage, save as; server `kalmido/accounts/layoutsets.py`, table `view_layouts`) and arrangements sent to people as templates (`view_layout_offers`, News item `lytpl`). |
 | `projtime.js` | 2.43.0 (#1434): tracked time of a project in a window (by person and task, period, CSV) and deleting all of its times with Undo. |
 | `dashboard.js` | News bundled per task, the view builder (2.32.0: blocks per view, "Customize", project page standard + own arrangement; server side `kalmido/accounts/layouts.py`), the start page (dashboard) and Settings > Tasks by e-mail. |
 | `family.js` | The module "Family". |
