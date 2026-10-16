@@ -382,6 +382,25 @@ if os.path.exists(os.path.join(N, "..", "kalmido", "office", "agentdocs.py")) or
           "review 2: the person's request carries no office data either")
     A.patch(B + f"/api/my/agents/{PAG}", json={"scopes": ["write", "office"]})
 
+    # #1351 review 3: undo keeps a draft with a number or with changes; a clean undo is logged
+    def offer_apply():
+        r_ = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "proposal": OWN2})
+        jid = r_.json().get("id") if r_.status_code == 201 else None
+        r_ = A.post(B + f"/api/proposals/{jid}/apply", json={"select": ["0", "400", "400.0"]})
+        return jid, (r_.json().get("offer_id") if r_.ok else None)
+    J3a, D3a = offer_apply()
+    check(D3a and A.post(O + f"/docs/{D3a}/number", json={}).ok, "review 3: the person reserves a number")
+    r = A.post(B + f"/api/proposals/{J3a}/undo")
+    check(r.ok and q("SELECT 1 FROM office_docs WHERE id=?", (D3a,)) and r.json().get("skipped"), f"review 3: a draft with a number stays, named ({r.text[:160]})")
+    J3b, D3b = offer_apply()
+    check(D3b and A.put(O + f"/docs/{D3b}/items", json={"items": [{"kind": "service", "title": "Changed", "qty": 1, "unit": "day", "rate": 500}]}).ok,
+          "review 3: the person changes the draft")
+    r = A.post(B + f"/api/proposals/{J3b}/undo")
+    check(r.ok and q("SELECT 1 FROM office_docs WHERE id=?", (D3b,)), f"review 3: a changed draft stays ({r.text[:160]})")
+    J3c, D3c = offer_apply()
+    r = A.post(B + f"/api/proposals/{J3c}/undo")
+    check(r.ok and not q("SELECT 1 FROM office_docs WHERE id=?", (D3c,)), f"review 3: an unchanged draft goes ({r.text[:160]})")
+    check(q("SELECT 1 FROM office_doc_log WHERE doc_id=? AND action='delete' AND user_id=?", (D3c, ALICE)), "review 3: the deletion is in the office log")
     A.put(O + "/settings", json={"agents_read": 0})
 
 print(f"p251_b_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
