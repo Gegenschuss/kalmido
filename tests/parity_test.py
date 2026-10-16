@@ -202,9 +202,25 @@ APP_TO_API = {
     "POST /api/clients/bulk": ["POST /clients/bulk"],  # 2.47.3 (#1733)
     "POST /api/tasks/{}/approval": ["POST /tasks/{}/approval"], "GET /api/lists/{}/forms": ["GET /lists/{}/forms"],
     "POST /api/lists/{}/forms": ["POST /lists/{}/forms"], "PATCH /api/forms/{}": ["PATCH /forms/{}"], "DELETE /api/forms/{}": ["DELETE /forms/{}"],
+    # 2.48.0 (#1207): the file store -- list, read, add files / folders, new versions
+    "GET /api/files": ["GET /files"], "GET /api/files/nodes/{}": ["GET /files/{}"], "GET /api/files/nodes/{}/content": ["GET /files/{}/content"],
+    "POST /api/files/folders": ["POST /files"], "POST /api/files/upload": ["POST /files"], "POST /api/files/nodes/{}/versions": ["POST /files/{}/versions"],
+    # 2.48.0 (#1111): documents (agents read / set the fields of documents shared with them)
+    "GET /api/docs": ["GET /documents"], "GET /api/docs/{}": ["GET /documents/{}"], "PATCH /api/docs/{}": ["PATCH /documents/{}"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.48.0 (#1207): managing the file store stays with people -- rename, move, trash, restore a version, shares, organisation-wide "
+     "access, links to task / project files, the move targets; agents list, read and write files where they may edit",
+     ("=PATCH /api/files/nodes/{}", "=DELETE /api/files/nodes/{}", "=POST /api/files/nodes/{}/restore", "=POST /api/files/nodes/{}/versions/{}/restore",
+      "=GET /api/files/nodes/{}/share-targets", "=POST /api/files/nodes/{}/shares", "* /api/files/shares/", "=POST /api/files/links",
+      "=GET /api/files/folders")),
+    ("2.48.0 (#1111): documents -- a person's own steps (upload by hand / share sheet, review and accept, recognise again, the "
+     "preview image, a task for the due date, the workspace's levels / rules / labels / mail address); agents read and set fields "
+     "with /documents and add files with /files", ("=POST /api/docs", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",
+                                                   "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
+                                                   "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
+                                                   "* /api/docs/mail")),
     ("2.36.1 (#1021): Office & finance, stage 1 -- no agent API and no MCP tool before the security audit (#476); agents see only what is shared",
      ("* /api/office/",)),
     ("2.49.0 (#1199, #1201): knowledge pages, stage 1 -- no agent access yet (shares of pages / folders for organisation agents with "
@@ -272,6 +288,9 @@ APP_ONLY = [
     ("2.42.0 (#828, #909): end-to-end encryption happens in a person's browser (keys, encrypted note / files, the switch of an encrypted DM); "
      "agents see only placeholders (encrypted_note, encrypted files) and never take part in DMs", (
         "* /api/e2e/", "* /api/tasks/{}/enc-note", "=POST /api/tasks/{}/enc-attachments", "=POST /api/team/rooms/{}/e2e")),
+    # 2.48.0 (#1642): a task's note locked with its owner's password, encrypted in the browser; agents see note_locked only
+    ("2.48.0 (#1642): locking a task's note with one's own password happens in that person's browser (end-to-end); agents see only "
+     "note_locked and get 409 when they write the notes", ("* /api/tasks/{}/note-lock",)),
     ("2.37.0 (#1159): a person saves a chat message as a task with a click; agents only offer it (send_chat offer_save), never save",
      ("=POST /api/chat-save",)),
     ("2.28.0 (#1005): a person answers an agent's question with a button: in the API as POST /agents/{id}/chat/{mid}/choice (a person's token); agents never answer",
@@ -319,6 +338,12 @@ APP_ONLY = [
      ("=POST /api/agent-setup/redeem", "=POST /api/agent-setup/remove")),
     # 2.49.0 (#1106): finding people by e-mail is for people only -- agents must not look accounts up
     ("2.49.0 (#1106): find people by e-mail, address book check, connection requests, blocks; not for agents", ("* /api/disc",)),
+    ("2.48.0 (#1152): the Paperless-ngx connection of a workspace (self-hosted only): its API token is entered by an admin / the "
+     "person, the import runs in the background; agents read the imported documents through the documents API",
+     ("* /api/paperless",)),
+    ("2.48.0 (#1356): a receipt's project / category is set and agents' suggestions are accepted / rejected / reopened by people "
+     "only; agents suggest with POST /documents/{id}/receipt-suggestion",
+     ("* /api/docs/{}/receipt", "* /api/receipt-suggestions/")),
 ]
 
 
@@ -386,6 +411,7 @@ def sample(schema):
 
 
 TOOL_VARIANTS = {  # extra arguments that reach other routes of the same tool
+    "list_files": [{"folder_id": 1}], "read_file": [{"as": "base64"}], "write_file": [{"file_id": 1}],  # 2.48.0 (#1207)
     "get_attachment": [{"source": "chat"}, {"source": "project", "list_id": 1}],
     "react": [{"remove": True}],
     "upload_attachment": [],

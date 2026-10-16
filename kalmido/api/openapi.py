@@ -643,6 +643,8 @@ def openapi_spec():
     fx_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.43.0 (#1328)
     from ..lists.orgvis import ov_spec
     ov_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.46.0 (#1603)
+    from ..docs.v1 import docs_spec
+    docs_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1111)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
     from ..hub.absence import abs_spec
     abs_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.50.0 (#1195)
@@ -657,6 +659,10 @@ def openapi_spec():
     stale_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#266)
     from ..personal.timegaps import timegaps_spec
     timegaps_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#269)
+    from ..files.v1 import files_spec
+    files_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1207)
+    from ..receipts.suggest import rc_spec
+    rc_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1356)
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",

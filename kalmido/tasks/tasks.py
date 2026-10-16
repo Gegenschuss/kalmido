@@ -440,6 +440,9 @@ def task_update(tid):
     conflicts = []
     old = c.execute("SELECT due, status, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
     b = web_fields(field_alias(body(), "content", "notes"), WEB_TASK_EDIT, "PATCH /api/tasks/{tid}")
+    from ..collab.notelock import ln_guard
+    if ln_guard(c, tid, b):  # 2.48.0 (#1642): app, API and agents: a locked note is not overwritten (409, a clear message)
+        return err(ln_guard(c, tid, b), 409)
     e = apply_update(c, tid, b, conflicts, lock=True)
     if e:
         return err(e)

@@ -81,7 +81,9 @@ BK_LEGACY = "tasks.db"      # format 1 (up to 2.36, SQLite): listed / checked, n
 BK_PG_TIMEOUT = _env_int("KALMIDO_BACKUP_PG_TIMEOUT", 6 * 3600)   # s for one pg_dump / pg_restore run
 # members: attachments/<task>/<file>; 2.36.1 (#1021): office/<org>/<file> (the logos of the office module, same rules);
 # 2.46.0 (#1605): + attachments/avatars/<file> and attachments/listicons/<file> (pictures of people, groups and lists)
-BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|avatars|listicons)/([^/\\\x00-\x1f]{1,255})")
+# 2.48.0 (#1207): + attachments/files/<node>/<file> (the file store) and attachments/lists/<list>/<file> (project files, #410:
+# they were left out of the archive before)
+BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|avatars|listicons|(?:files|lists)/\d{1,12})/([^/\\\x00-\x1f]{1,255})")
 BK_ERR = {"busy": N_("Another backup or restore is running, please try again in a moment."),
           "disk": N_("Not enough free disk space for the backup."),
           "io": N_("The backup could not be written ({0})."),

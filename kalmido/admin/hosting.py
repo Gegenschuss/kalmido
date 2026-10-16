@@ -62,7 +62,9 @@ def _user_bytes(c, uids):
     b = c.execute(f"SELECT COALESCE(SUM(size),0) FROM list_files WHERE user_id IN ({q})", uids).fetchone()[0]
     d = c.execute(f"""SELECT COALESCE(SUM(f.size),0) FROM chat_files f JOIN agent_chat m ON m.id=f.message_id
                       WHERE m.sender='user' AND m.user_id IN ({q})""", uids).fetchone()[0]
-    return int(a + b + d)
+    from ..files.store import fs_bytes_of
+    e = fs_bytes_of(c, uids)  # 2.48.0 (#1207): every version in the file store counts for its uploader
+    return int(a + b + d + e)
 
 
 def quota_info(c, uid):

@@ -292,7 +292,7 @@ async function setLang(code) {
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 // 2.44.0 (#1187): Office, Time, Review and Home are ONE switch each ("a:<area>", areas.js), their parts below it
 const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events']], [N_('For you'), ['habits', 'comments']],
-  [N_('Projects and team'), ['collab', 'progress', 'deps', 'fields', 'agents', 'workload', 'dispo', 'forms', 'wiki']], [N_('Areas|nav'), ['a:office', 'a:time', 'a:review', 'a:life']]];
+  [N_('Projects and team'), ['collab', 'progress', 'deps', 'fields', 'agents', 'workload', 'dispo', 'forms', 'wiki']], [N_('Areas|nav'), ['a:office', 'a:ablage', 'a:time', 'a:review', 'a:life']]];  // 2.48.0 (#1207): + the file store
 const MOD_DESC = {office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents; your own office (Private) or your organisation\'s'),  // 2.36.1 (#1021)
   cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Pomodoro timer and stopwatch'),
@@ -763,6 +763,8 @@ function settingsModal(focus) {
       <div class="shelp">${tr('A list is a plain task list; a project adds the project modules you switched on (list menu … > Project). For shopping or packing lists: list menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap.')}</div>
       <h4>${tr('Favourites')}</h4>
       <div class="shelp">${tr(VW_FAV_HELP)}</div>
+      <h4>${tr('Locked notes')}</h4>
+      <div class="shelp">${tr('In a task of your own list that is not shared: “Lock note” under the description encrypts the note in your browser with your encryption passphrase (set up once, with a recovery code to print). The server keeps only the encrypted text; title, dates and list stay readable. Search, agents, exports, calendar apps, e-mails and public links leave a locked note out. Unlock once per session to read or change it; “Remove lock” makes it a normal note again. Passphrase and recovery code lost = the note is lost, nobody can restore it, not even the operator. Copies made before locking (older backups of the server) still hold the old text.')}</div>${''/* 2.48.0 (#1642) */}
       <h4>${tr('Templates')}</h4>
       <div class="shelp">${tr('Task menu (…) or list dialog > Save as template. The template button in the add bar creates the task in the current list, Lists > + > New list from template a whole list. Manage them under Settings > Data.')}</div>
       ${timeOn() ? `<h4>${tr('Time tracking')}</h4><div class="shelp">${tr('Start a timer from a task (detail panel, task menu …) or add time by hand; the running timer shows in the top bar on every device. Sidebar > Time tracking: hours per list and task for a week, month or any range, CSV export and a printable timesheet. In shared lists everyone sees the time of all members, but only changes their own entries. Finished focus sessions on a task count as time unless a timer ran at the same time.')}</div>` : ''}

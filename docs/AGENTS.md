@@ -687,6 +687,8 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `scheduled_job` | 2.34.0 (#272): a [planned job](#planned-jobs-2340) of a person is due (once per due time; after an outage only the one missed run, `late: true`), or the person pressed *Run now* (`manual: true`). Answer in your chat with `by.id` | `schedule_id`, `title`, `prompt` (the person's words: what to do), `list_id` + `list` (or `null`), `by` / `user` `{id, name}`, `chat_with` (= `by.id`), `rhythm` `{freq, days, time, tz}`, `due_at`, `late`, `manual`, `manual_by` (`{id, name}` when a manager of the agent pressed *Run now* on another person's plan, else `null`; you still answer `by.id`), `hint`; 2.39.0: a [scheduled check of a list](#playbook-2390) adds `list_check: true`, `open_task_ids`, `open_tasks_more` (and the `playbook`) |
 | `message_edited` | 2.39.0 (#1179): a person edited a message the agent already had: their chat message after the agent fetched (`delivered_at`) or answered it, a comment the agent got as `comment` / `mention` / `assigned`, a team chat message it got as `team_message`. Only to the agent(s) that had it, only while they still see the task / room (health lists never). A chat message not fetched yet is simply replaced (the queued `chat` event carries the new text, no `message_edited`). Comments and team messages count as had while the original event is still in your event history (30 days). Treat it as a correction: confirm briefly, keep your running work, adjust only what the change affects | `kind`: `chat` \| `comment` \| `team`, `old`, `new`, `user` `{id, name}`; chat: `message` `{id, user_id, task_id, created_at, edited_at}`, `answered` (you wrote after it); comment: `comment` `{id, task_id, created_at, edited_at}`, `task`, `list`, `list_id`; team: `room` `{id, kind, list_id}`, `message` |
 | `playbook_proposal` | 2.39.0 (#1168): a person applied or discarded the agent's proposed change of a list's [Playbook](#playbook-2390) | `list_id`, `proposal_id`, `state`: `applied` or `discarded`, `version` (applied: the new version of the list's part), `note` (yours), `by` `{id, name}`, `hint`; like every event of the list it carries the current `playbook` |
+| `file_shared` | 2.48.0 (#1207): the owner shared a folder or file of the [file store](#file-store-2480) with the agent (only for a new share, not for a changed role) | `node` `{id, name, kind}`, `role`: `view` \| `edit` |
+| `document_added` | 2.48.0 (#1356): a new document was recognised (once, after its first recognition) in a folder or file of the file store the agent sees (a share or its own result folder); read it with `get_document`, e.g. to [suggest project and category of a receipt](#receipts-suggest-project-and-category-2480) | `document` `{id, name, state, date, url}` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1359,6 +1361,29 @@ Treat it as a correction: confirm it briefly in the chat, do not throw away runn
 only what the change affects. Edited task comments and team chat messages reach the agents that got them as an event
 the same way (`kind: comment` with `comment`, `task`, `list`; `kind: team` with `room`), never a new push to people.
 
+## File store (2.48.0)
+
+The file store ("Ablage", #1207) holds folders and files of a person and of an organisation. People share a folder or a
+file with an agent on purpose (role *view* or *edit*, optionally until a date; a folder's share covers everything below
+it). An agent sees exactly that, plus its **own result folder**: created on first use at the top of its owner's space (an
+organisation's agent: of the organisation), named like the agent; the agent may write there without a share and its owner
+(an organisation's admins) sees it. Put results people should read there instead of a local work folder. Every access of
+an agent (listing, reading, downloading, writing) is written into the file's history, which its owner sees. Nothing
+crosses a workspace: an organisation's folder is never shared with a private agent or an agent of another organisation.
+Scopes: `files:read` (list, read) and `files:write` (add files and folders, new versions); new agents get both.
+
+| What | Endpoint | MCP |
+|---|---|---|
+| The top: what is shared with you + your own folder | `GET /api/v1/files` | `list_files` |
+| A folder's children (`?parent_id=`) / one node with its children or versions | `GET /api/v1/files?parent_id=<id>`, `GET /api/v1/files/{id}` | `list_files` with `folder_id` |
+| A file's bytes (`?version=` an older one) | `GET /api/v1/files/{id}/content` | `read_file` with `as: "base64"` |
+| A file as text (UTF-8, PDF text layer) | `GET /api/v1/files/{id}/text` | `read_file` |
+| A new file / folder (`{parent_id?, name, content \| content_base64, mime?, kind?}`; without `parent_id`: your own folder) | `POST /api/v1/files` | `write_file`, `create_file_folder` |
+| A new version of a file (`{content \| content_base64}`, role edit; the older versions stay) | `POST /api/v1/files/{id}/versions` | `write_file` with `file_id` |
+
+A name that is taken gets " (2)"; an agent's executable ending gets ".txt" (#380). Renaming, moving, the trash and shares
+stay with people. Without a share the answer is 404 (the file does not exist for you); a view share answers 403 on writes.
+
 ## Files in the chat and on tasks (2.13.1)
 
 People can send images and files to an agent in the chat: the paperclip, pasting a screenshot, drag and drop, or the
@@ -1396,6 +1421,10 @@ placeholders only: a task says `encrypted_note: true` (never the text), an encry
 `encrypted: true` and a neutral name, and downloading it or reading its text answers `404`. Encrypted direct messages
 never reach agents (agents take no part in DMs). Do not ask anyone to paste encrypted content into a comment.
 
+**Locked notes (2.48.0).** A person can lock the notes of a task in their own, unshared list with their own password. The
+task then has empty `notes` and `note_locked: true`; locked notes are not readable for agents, and writing `notes` on such a
+task answers `409` (other fields can still change). Work with the title, dates and comments; do not ask for the note's text.
+
 **Reading a file as text (2.34.0).** `GET /api/v1/attachments/{id}/text` (MCP `read_attachment`, scope
 `attachments:read`, same rights as the file itself, else `404`) answers `{id, task_id, comment_id, name, mime, size, url,
 kind, text, chars, truncated, message}`:
@@ -1426,6 +1455,41 @@ curl -H "Authorization: Bearer $KALMIDO_TOKEN" "$KALMIDO_URL/api/v1/tasks/51/att
 curl -H "Authorization: Bearer $KALMIDO_TOKEN" -o shot.png "$KALMIDO_URL/api/v1/attachments/18"
 curl -H "Authorization: Bearer $KALMIDO_TOKEN" -F body="Here is the fixed layout" -F file=@after.png "$KALMIDO_URL/api/v1/agent/chats/1"
 ```
+
+## Documents (2.48.0)
+
+*Documents* are files of the file store with recognised text and fields: date, due date, amount, sender, document type,
+tags and folder. Kalmido recognises them itself (text layer, local text recognition, rules and a classifier that learns
+from the people's corrections); no agent is needed. An agent is an optional extra: it sees only documents whose file (or
+a folder above it) is shared with it, and every access is written into the file's history.
+
+| What | Endpoint | MCP |
+|---|---|---|
+| Documents shared with you (`q` = words of the text, `review=1` = waiting in *To review*) | `GET /api/v1/documents` | `list_documents` |
+| One document with its fields, open suggestions and the recognised text | `GET /api/v1/documents/{id}` | `get_document` |
+| Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names) | `PATCH /api/v1/documents/{id}` | `update_document` |
+| The file itself | `GET /api/v1/files/{id}/content` | -- |
+
+Scopes: `files:read` / `files:write` (the file store's). Values an agent sets are marked *set by an agent*. Where the
+workspace leaves a feature to an agent (level *Left to an agent* in the documents' settings), the value is not set but
+waits as a suggestion in *To review* until a person accepts it. Agents never move a document and never see documents of
+another workspace.
+
+### Receipts: suggest project and category (2.48.0)
+
+An incoming invoice or receipt can be assigned to a **project** (a list of kind project of the document's workspace) and
+a **category** (short text such as *Travel*, *Material*, *Software*). Only people set it. An agent the document is shared
+with suggests, a person accepts (also with changed values) or rejects it in the document's sheet:
+
+| What | Endpoint | MCP |
+|---|---|---|
+| Suggest `project_id` and / or `category` (`note` = why) | `POST /api/v1/documents/{id}/receipt-suggestion` | `suggest_receipt` |
+| Your suggestions and what became of them (`state=open\|accepted\|rejected\|all`) | `GET /api/v1/receipt-suggestions` | `list_receipt_suggestions` |
+
+Flow *assign a receipt*: `list_documents` (e.g. `review=1`) -> `get_document` (text, sender, amount) -> `list_lists` (the
+projects you can see) -> `suggest_receipt`. The project must be one you can see, in the document's workspace and within
+your list restriction (else `400`); a new suggestion replaces your open one. The document then waits in *To review*. You
+can never set, move or delete it yourself.
 
 ## Behaviour rules template (2.13.1)
 
@@ -2181,7 +2245,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
 `add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`, `chat_typing`, `check_in_habit`,
 `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `create_address_book`, `create_client`,
-`create_contact`, `create_event`, `create_event_calendar`, `create_field`, `create_filter`, `create_form`,
+`create_contact`, `create_event`, `create_event_calendar`, `create_field`, `create_file_folder`, `create_filter`, `create_form`,
 `create_habit`, `create_job`, `create_list`, `create_list_tag`, `create_note`, `create_packing_list`,
 `create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`, `decide_reward`,
 `delete_address_book`, `delete_attachment`, `delete_chat_attachment`, `delete_client`, `delete_comment`,
@@ -2190,30 +2254,30 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`, `delete_task`, `delete_team_message`,
 `delete_template`, `delete_time_entry`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`,
 `export_vcards`, `get_absences`, `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`,
-`get_day_review`, `get_dependencies`, `get_event`, `get_family`, `get_group`, `get_job`, `get_life`, `get_list`,
+`get_day_review`, `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_life`, `get_list`,
 `get_me`, `get_milestone`, `get_note`, `get_plan_usage`, `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`,
 `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`, `get_usage`, `get_workload`, `give_stars`,
 `import_ics`, `import_vcards`, `ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`,
-`list_attachments`, `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`,
-`list_event_calendars`, `list_events`, `list_fields`, `list_filters`, `list_folders`, `list_forms`, `list_groups`,
+`list_attachments`, `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`,
+`list_event_calendars`, `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`,
 `list_habits`, `list_jobs`, `list_kids`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`,
-`list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_repos`, `list_schedules`,
+`list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
-`read_attachment`, `read_briefing`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
+`read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
 `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`,
 `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`,
 `search_contacts`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
 `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
-`stop_timer`, `submit_proposal`, `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`,
+`stop_timer`, `submit_proposal`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`,
 `unshare_address_book`, `unshare_event_calendar`, `unshare_list`, `unshare_list_from_group`, `update_address_book`,
-`update_client`, `update_comment`, `update_contact`, `update_event`, `update_event_calendar`, `update_field`,
+`update_client`, `update_comment`, `update_contact`, `update_document`, `update_event`, `update_event_calendar`, `update_field`,
 `update_filter`, `update_form`, `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`,
 `update_note`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
-`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_journal`
+`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`, `write_journal`
 <!-- kalmido-tool-index:end -->
 
 ## Use agents safely (2.30.0)

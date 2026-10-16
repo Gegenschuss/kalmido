@@ -617,6 +617,11 @@ def org_delete(oid):
         n = c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (oid,)).fetchone()[0]
         if n:
             return err(tr("This organisation still has {0} lists: their owners move or delete them first", n), 409)
+        from ..files.store import fs_org_live, fs_org_purge
+        n = fs_org_live(c, oid)  # 2.48.0 (#1207): nothing of the file store disappears with it (the trash does)
+        if n:
+            return err(tr("This organisation still has {0} folders and files in its file store: delete them first", n), 409)
+        fs_files = fs_org_purge(c, oid)
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
         c.execute("UPDATE books SET org_id=NULL WHERE org_id=?", (oid,))
@@ -631,6 +636,8 @@ def org_delete(oid):
         bump(c)
         c.commit()
         oc_drop_office_dir(oid)
+        from ..core.serializers import unlink_files
+        unlink_files(fs_files)
         return jsonify(ok=True)
 
 

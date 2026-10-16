@@ -119,6 +119,8 @@ def load_tasks(c, where, args=(), full_snips=False):
     gcode = git_code_for(c, ids) if ids else {}  # 2.2.0 (#271): linked pull requests + commits
     from ..collab.e2e import e2e_note_flags
     encn = e2e_note_flags(c, ids, viewer)  # 2.42.0 (#828): tasks with an encrypted note (never its content)
+    from ..collab.notelock import ln_locked_ids
+    lockn = ln_locked_ids(c, ids)  # 2.48.0 (#1642): tasks whose note is locked with a password (never its content)
     ppl = people_of(c, ids)  # 2.19.0 (#653): who comes along
     out = []
     for r in rows:
@@ -131,6 +133,10 @@ def load_tasks(c, where, args=(), full_snips=False):
             d["encrypted_note"] = True
             if encn[r["id"]]:
                 d["encrypted_note_mine"] = True
+        if r["id"] in lockn and r["id"] not in ctx:
+            d["note_locked"] = True
+            if lockn[r["id"]] == viewer:
+                d["note_locked_mine"] = True
         d["comment_count"], d["unread"], apv = cms.get(r["id"], (0, 0, 0))
         if apv:
             d["approvals_open"] = apv  # 2.41.0 (#1383)

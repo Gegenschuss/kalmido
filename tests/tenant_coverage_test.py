@@ -65,6 +65,14 @@ KINDS = {
     # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
     # personal office (a hidden area only its owner reaches). No /api/v1, no MCP in stage 1
     "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures)"),
+    # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
+    # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
+    "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share"),
+    # 2.48.0 (#1207 / #1152 / #1356): the file store (fs_role / need_node / fs_visible_sql, org boundary before shares), the
+    # Paperless-ngx connection of one workspace, receipt data / agent suggestions on a visible document
+    "file": ("matrix", "p248_a_api_test.py: a node of another organisation / person: 404 (read, list, content, versions, share, move); shares only to people and agents of the node's workspace"),
+    "paperless": ("matrix", "p248_d_paperless_api_test.py: the connection of another workspace: 404; organisation admins only change it; agents never"),
+    "receipt": ("matrix", "p248_d_receipts_api_test.py: receipt data and suggestions only on a visible document; projects of another workspace refused; outsiders 404"),
     "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
     "stats": ("matrix", "p2300_tenant_test.py: statistics count only own / visible tasks"),
@@ -72,6 +80,8 @@ KINDS = {
     # 2.50.0 (#329, #1200): files / logo of a customer view, approval links of quotations and lists (and their customer pages)
     "signoff": ("matrix", "p250_c_api_test.py: approval links of another organisation's quotation / another person's list by id, "
                           "files of other lists through a link"),
+    # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
+    "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions)"),
     # ---- not relevant for the boundary between organisations (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account (before a session or about the session's own person)"),
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
@@ -81,10 +91,12 @@ KINDS = {
                      "is trusted with the whole server (architecture review 2.1 / B4); people in it are filtered by visible_people"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, robots, manifest, QR code of a given text)"),
     "family": ("n/a", "the household of the Family module: private by definition (kid_parents), never an organisation's object"),
+    "pure": ("n/a", "a pure transformation of the request body (an outline file into a tree): no stored data is read or written"),
     "token": ("n/a", "an inbound hook addressed by the unguessable secret of one list (sealed, looked up by its hash): nothing to "
                      "guess by id"),
-    # 2.49.0 (#1106): finding people by e-mail (accounts/discover.py)
-    "people": ("n/a", "finding people by e-mail and connection requests: person to person, outside every workspace; the "
+    # 2.49.0 (#1106): finding people by e-mail (accounts/discover.py) -- its own kind (a second "people" key here silently
+    # replaced the matrix kind of the user list above)
+    "discover": ("n/a", "finding people by e-mail and connection requests: person to person, outside every workspace; the "
                       "person's own requests / connections / blocks only, a hit only through an exact confirmed address "
                       "(p249_e_api_test.py: no account disclosure, no probing by id, organisations unchanged)"),
     # 2.50.0 A (#1195, #1194): absences and bookings of an organisation / a personal area (row-level security + the app)
@@ -461,7 +473,9 @@ ROUTES = {
     # tchat_coworkers); the encrypted note (need_task) and an encrypted file (need_task + attachment rules) of a task
     "GET /api/e2e/keys": "own", "PUT /api/e2e/keys": "own", "DELETE /api/e2e/keys": "own", "GET /api/e2e/pub/{}": "team",
     "POST /api/team/rooms/{}/e2e": "team", "GET /api/tasks/{}/enc-note": "task", "PUT /api/tasks/{}/enc-note": "task",
-    "DELETE /api/tasks/{}/enc-note": "task", "POST /api/tasks/{}/enc-attachments": "attachment", "GET /api/v1/team/rooms": "team", "POST /api/v1/team/dm": "team",
+    "DELETE /api/tasks/{}/enc-note": "task", "POST /api/tasks/{}/enc-attachments": "attachment",
+    # 2.48.0 (#1642): the locked note of a task (need_task; only the person who locked it)
+    "GET /api/tasks/{}/note-lock": "task", "PUT /api/tasks/{}/note-lock": "task", "DELETE /api/tasks/{}/note-lock": "task", "GET /api/v1/team/rooms": "team", "POST /api/v1/team/dm": "team",
     "GET /api/v1/team/rooms/{}/messages": "team", "POST /api/v1/team/rooms/{}/messages": "team",
     "PATCH /api/v1/team/messages/{}": "team", "DELETE /api/v1/team/messages/{}": "team",
     "POST /api/v1/team/messages/{}/reactions": "team", "POST /api/v1/team/rooms/{}/read": "team",
@@ -505,11 +519,41 @@ ROUTES = {
     "GET /api/admin/agents/{}/machines": "admin", "DELETE /api/admin/agents/{}/machines/{}": "admin",
     "POST /api/agent-setup/redeem": "auth", "POST /api/agent-setup/remove": "auth",
     "GET /agent-setup.sh": "public", "GET /agent-setup.ps1": "public",
+    # 2.49.0 (#1531, #1199, #1201): Forgot your password?, knowledge pages, outline import
+    "POST /api/auth/forgot": "auth", "POST /api/outline/parse": "pure",
+    "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
+    "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
+    "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
+    "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
     # 2.49.0 (#1106): find people by e-mail, connection requests, blocks
-    "GET /api/disc": "people", "PUT /api/disc": "people", "POST /api/disc/confirm": "people", "POST /api/disc/find": "people",
-    "POST /api/disc/check": "people", "POST /api/disc/requests": "people", "POST /api/disc/requests/{}/{}": "people",
-    "DELETE /api/disc/requests/{}": "people", "DELETE /api/disc/connections/{}": "people",
-    "POST /api/disc/connections/{}/restore": "people", "POST /api/disc/blocks/{}": "people", "DELETE /api/disc/blocks/{}": "people",
+    "GET /api/disc": "discover", "PUT /api/disc": "discover", "POST /api/disc/confirm": "discover", "POST /api/disc/find": "discover",
+    "POST /api/disc/check": "discover", "POST /api/disc/requests": "discover", "POST /api/disc/requests/{}/{}": "discover",
+    "DELETE /api/disc/requests/{}": "discover", "DELETE /api/disc/connections/{}": "discover",
+    "POST /api/disc/connections/{}/restore": "discover", "POST /api/disc/blocks/{}": "discover", "DELETE /api/disc/blocks/{}": "discover",
+    # 2.48.0 (#1111): documents
+    "GET /api/docs": "document", "POST /api/docs": "document", "GET /api/docs/{}": "document", "PATCH /api/docs/{}": "document",
+    "POST /api/docs/{}/accept": "document", "POST /api/docs/{}/review": "document", "POST /api/docs/{}/redo": "document",
+    "GET /api/docs/{}/thumb": "document", "GET /api/docs/{}/file": "document", "POST /api/docs/{}/task": "document",
+    "DELETE /api/docs/{}/task": "document", "GET /api/docs/settings": "document", "PUT /api/docs/settings": "document",
+    "POST /api/docs/rules": "document", "PATCH /api/docs/rules/{}": "document", "DELETE /api/docs/rules/{}": "document",
+    "PATCH /api/docs/labels/{}/{}": "document", "DELETE /api/docs/labels/{}/{}": "document", "POST /api/docs/labels/{}": "document", "POST /api/docs/mail": "document",
+    "DELETE /api/docs/mail": "document", "GET /api/v1/documents": "document", "GET /api/v1/documents/{}": "document",
+    "PATCH /api/v1/documents/{}": "document",
+    # 2.48.0 (#1207 / #1152 / #1356)
+    "DELETE /api/files/nodes/{}": "file", "DELETE /api/files/shares/{}": "file", "DELETE /api/paperless": "paperless",
+    "GET /api/docs/{}/receipt": "receipt", "GET /api/files": "file", "GET /api/files/folders": "file",
+    "GET /api/files/nodes/{}": "file", "GET /api/files/nodes/{}/content": "file",
+    "GET /api/files/nodes/{}/share-targets": "file", "GET /api/paperless": "paperless",
+    "GET /api/paperless/preview": "paperless", "GET /api/v1/files": "file", "GET /api/v1/files/{}": "file",
+    "GET /api/v1/files/{}/content": "file", "GET /api/v1/files/{}/text": "file", "GET /api/v1/receipt-suggestions": "receipt",
+    "PATCH /api/files/nodes/{}": "file", "PATCH /api/files/shares/{}": "file", "POST /api/files/folders": "file",
+    "POST /api/files/links": "file", "POST /api/files/nodes/{}/restore": "file", "POST /api/files/nodes/{}/shares": "file",
+    "POST /api/files/nodes/{}/versions": "file", "POST /api/files/nodes/{}/versions/{}/restore": "file",
+    "POST /api/files/upload": "file", "POST /api/paperless/import": "paperless", "POST /api/paperless/stop": "paperless",
+    "POST /api/receipt-suggestions/{}/accept": "receipt", "POST /api/receipt-suggestions/{}/reject": "receipt",
+    "POST /api/receipt-suggestions/{}/reopen": "receipt", "POST /api/v1/documents/{}/receipt-suggestion": "receipt",
+    "POST /api/v1/files": "file", "POST /api/v1/files/{}/versions": "file", "PUT /api/docs/{}/receipt": "receipt",
+    "PUT /api/paperless": "paperless",
     # 2.50.0 A (#1195): absences; (#1194): resources and disposition
     "GET /api/team/absences": "hub", "POST /api/team/absences": "hub", "PATCH /api/team/absences/{}": "hub",
     "DELETE /api/team/absences/{}": "hub", "POST /api/team/absences/{}/restore": "hub", "PUT /api/team/absences/holidays": "hub",

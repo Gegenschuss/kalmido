@@ -436,6 +436,8 @@ function actText0(a, U) {
     case 'event': return tr('The task became an event; the people who came along are invited to it');  // 2.21.0 (#659)
     case 'title': return tr('{0} renamed the task to “{1}”', who, esc(d.to || ''));
     case 'content': return tr('{0} edited the description', who);
+    case 'note_lock': return tr('{0} locked the note', who);  // 2.48.0 (#1642)
+    case 'note_unlock': return tr('{0} removed the lock from the note', who);
     case 'choice': return d.approval ? (d.approval === 'approved' ? tr('{0} approved “{1}”', who, esc(d.title || '')) : tr('{0} rejected “{1}”', who, esc(d.title || ''))) : tr('{0} answered: {1}', who, esc((d.labels || []).join(', ')));  // 2.41.0 (#1383)
     case 'md_subtasks': return tr('{0} turned checklist items into subtasks', who) + (d.prev && canEdit(taskById(S.sel)) ? ` <button type="button" class="linkbtn" data-act="md-restore" data-aid="${+a.id}">${esc(tr('Restore the description'))}</button>` : '');  // 2.40.0 (#1409)
     case 'due': return d.due ? tr('{0} set the due date to {1}', who, due()) : tr('{0} removed the due date', who);

@@ -50,7 +50,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   click(w, d.querySelector('[data-tok="new"]')); await sleep(300);
   let md = lastModal(d);
   const boxes = [...md.querySelectorAll('.scopes [data-scope]')];
-  check(boxes.length === 14 && boxes.map(b => b.dataset.scope).includes('admin-read'), 'new token: 14 permissions for an admin (admin read included; 2.21.0: calendar, contacts; 2.22.0: private) ' + boxes.map(b => b.dataset.scope).join(','));
+  check(boxes.length === 16 && boxes.map(b => b.dataset.scope).includes('admin-read'), 'new token: 16 permissions for an admin (admin read included; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0: files:read, files:write) ' + boxes.map(b => b.dataset.scope).join(','));
   const rd = md.querySelector('[data-scope="read"]');
   check(rd.checked && rd.disabled && boxes.filter(b => b.checked).length === 1, 'new token: only Read, always on');
   check(md.querySelector('.scopes legend .ib[data-ii]') && /Tasks: Create, change/.test(md.querySelector('.scopes .shint.pl')?.textContent || ''), 'the explanations behind (i) on the legend');
@@ -103,7 +103,8 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   w.eval(`agModal(null, () => {})`); await sleep(300);
   md = lastModal(d);
   const on = [...md.querySelectorAll('.scopes [data-scope]:checked')].map(b => b.dataset.scope);
-  check(JSON.stringify(on) === '["read","tasks:write","comments"]', 'new agent: Read, Tasks, Comments ' + on);
+  // 2.48.0 (#1207): + the file store (files:read / files:write)
+  check(JSON.stringify(on) === '["read","tasks:write","comments","files:read","files:write"]', 'new agent: Read, Tasks, Comments, the file store ' + on);
   check(md.querySelector('[data-scope="export"]').disabled && md.querySelector('[data-scope="export"]').closest('.chkl').classList.contains('off'), 'over the limit: greyed out');
   check(!md.querySelector('[data-scope="account"]') && !md.querySelector('[data-scope="admin-read"]'), 'agents: no account / admin read');
   check(/always wait for a person’s approval/.test(md.textContent), 'the approval note');
@@ -113,7 +114,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   await until(async () => (await call('GET', '/api/admin/agents')).agents.length);
   await sleep(300);
   const ag = (await call('GET', '/api/admin/agents')).agents.find(a => a.username === 'claude');
-  check(ag && JSON.stringify(ag.effective_scopes) === '["read","tasks:write","comments","structure"]', 'agent created with them ' + JSON.stringify(ag?.effective_scopes));
+  check(ag && JSON.stringify(ag.effective_scopes) === '["read","tasks:write","comments","structure","files:read","files:write"]', 'agent created with them ' + JSON.stringify(ag?.effective_scopes));  // 2.48.0 (#1207): + files
   [...d.querySelectorAll('.modal:not(.smodal)')].forEach(m => m.remove());
   await call('PUT', '/api/admin/agent-policy', {scope_limit: {agents: ['read', 'tasks:write', 'comments', 'structure', 'delete', 'attachments:read', 'attachments:write', 'time', 'export']}});
   w.close();
@@ -242,7 +243,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
     await ev(`(() => { settingsModal('agentpolicy'); return 1; })()`); await sleep(600);  // 2.46.6 (#1710): Administration > Agents
     for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('#s-sclim .sclim')`)); i++) await sleep(300);
     const lm = await ev(`(() => { const rows = [...document.querySelectorAll('#s-sclim .chkl')].map(x => x.getBoundingClientRect()); return {n: rows.length, over: document.documentElement.scrollWidth - innerWidth, out: rows.filter(x => x.right > innerWidth + 1).length, minH: Math.round(Math.min(...rows.map(x => x.height)))}; })()`);
-    check(lm.n === 24 &&  // 2.41.0 (#1476): the agents grid no longer offers "private" (25 -> 24)
+    check(lm.n === 28 &&  // 2.41.0 (#1476): the agents grid no longer offers "private" (25 -> 24); 2.48.0 (#1207): + files:read / files:write in both grids (28)
        lm.over <= 1 && lm.out === 0 && lm.minH >= 44, `${tag}: the limit grids fit ` + JSON.stringify(lm));
     await ev(`(() => { document.querySelector('#s-sclim').scrollIntoView({block: 'start'}); return 1; })()`); await sleep(200);
     await shot(`p2150-${tag}-limit.png`);

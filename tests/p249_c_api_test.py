@@ -9,6 +9,7 @@
  - list view "mindmap" is stored; the outline parser (Markdown, OPML, FreeMind) and hostile XML (DOCTYPE / ENTITY)
  - rollback: only new tables
 usage: p249_c_api_test.py <datadir>      (a fresh container; the suite restarts it in mode workspaces)"""
+# tenant-matrix: wiki
 import io
 import os
 import subprocess

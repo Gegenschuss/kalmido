@@ -129,6 +129,11 @@ def _jdef(v):
 def _ox_dec_row(c, oid, table, row):
     """The row with every field the server encrypted with the organisation key in plain text (core/orgcrypt.py)."""
     from ..core.orgcrypt import oc_dec, oc_dec_row
+    if table.startswith("doc_") and row.get("ws"):  # 2.48.0 (#1111): documents seal with the workspace in the context (docs/store.py)
+        from ..docs.store import doc_open
+        for k, v in list(row.items()):
+            if isinstance(v, str) and v.startswith("kenc1:"):
+                row[k] = doc_open(c, row["ws"], f"{table}.{k}", v, default=None)
     row = oc_dec_row(c, oid, table, row)  # the protected columns (core/orgcrypt.py FIELDS; office_doc_items: cost from cost_enc)
     for k, v in list(row.items()):  # a second floor: any other value with the field prefix
         if isinstance(v, str) and v.startswith("kenc1:"):
@@ -190,10 +195,16 @@ OX_AREAS = (
     ("tasks/people.json", "task_people", f"task_id IN ({TSQ})"),
     ("tasks/history.json", "activity", f"task_id IN ({TSQ})"),
     ("tasks/encrypted_notes.json", "task_enc_notes", f"task_id IN ({TSQ})"),  # 2.42.0 (#828, agent A): browser-encrypted, as stored
+    ("tasks/locked_notes.json", "task_note_locks", f"task_id IN ({TSQ})"),  # 2.48.0 (#1642): locked notes, browser-encrypted, as stored
     ("time_entries.json", "time_entries", f"list_id IN ({LSQ})"),
     ("comments.json", "comments", f"task_id IN ({TSQ})"),
     ("comments/reactions.json", "comment_reactions", f"comment_id IN (SELECT id FROM comments WHERE task_id IN ({TSQ}))"),
     ("attachments.json", "attachments", f"task_id IN ({TSQ})"),
+    # 2.48.0 (#1207): the organisation's file store (folders, files, versions, shares, history; the trash too)
+    ("store/nodes.json", "fs_nodes", "org_id=?"),
+    ("store/versions.json", "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
+    ("store/shares.json", "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
+    ("store/history.json", "fs_log", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
     ("chat/channels.json", "tchat_rooms", f"kind='list' AND list_id IN ({LSQ})"),
     ("chat/messages.json", "tchat_msgs", f"room_id IN (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id IN ({LSQ}))"),
     ("calendars.json", "ev_cals", "org_id=?"),
@@ -228,6 +239,15 @@ OX_AREAS = (
     ("office/import_runs.json", "office_import_runs", "org_id=?"),
     ("office/log.json", "office_doc_log", "org_id=?"),
     ("wiki/pages.json", "wiki_pages", "org_id=?"),  # 2.49.0 (#1199): knowledge pages
+    # 2.48.0 (#1111): documents (recognised text, amounts, sender names and rules decrypted); not the learnt models, not the
+    # keyed word index (both are rebuilt from the documents), not the forwarding addresses (their token is a secret)
+    ("documents/meta.json", "doc_meta", "org_id=?"),
+    ("documents/senders.json", "doc_senders", "org_id=?"),
+    ("documents/types.json", "doc_types", "org_id=?"),
+    ("documents/tags.json", "doc_tags", "org_id=?"),
+    ("documents/document_tags.json", "doc_node_tags", "node_id IN (SELECT node_id FROM doc_meta WHERE org_id=?)"),
+    ("documents/rules.json", "doc_rules", "org_id=?"),
+    ("documents/settings.json", "doc_cfg", "org_id=?"),
     ("hub/absences.json", "hub_absences", "org_id=?"),  # 2.50.0 (#1195): absences (kind + note decrypted like the others)
     ("hub/bookings.json", "hub_bookings", "org_id=?"),  # 2.50.0 (#1194): bookings of the disposition
 )
@@ -321,6 +341,12 @@ def ox_build(c, oid, out, by=None):
             full = _under(ATT_DIR, r.get("path"))
             if full:
                 _put_bytes(zf, man, f"files/list_files/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
+        if "fs_versions" in have:  # 2.48.0 (#1207): every version of the file store's files (decrypted like the attachments)
+            for r in _rows(c, oid, "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)", (oid,)):
+                full = _under(ATT_DIR, r.get("path"))
+                nm = c.execute("SELECT name FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
+                if full and nm:
+                    _put_bytes(zf, man, f"files/store/{int(r['node_id'])}-v{int(r['no'])}-{_safe_part(nm[0])}", _read(c, full))
         odir = os.path.join(OFFICE_DIR, str(int(oid)))
         if os.path.isdir(odir):
             for root, dirs, files in os.walk(odir):
@@ -336,6 +362,8 @@ def ox_build(c, oid, out, by=None):
                 (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id IN ({LSQ}))""", (oid,)).fetchone()[0]
         if "tasks/encrypted_notes.json" in man.counts:
             man.client_enc["task_notes"] = man.counts["tasks/encrypted_notes.json"]
+        if "tasks/locked_notes.json" in man.counts:
+            man.client_enc["locked_notes"] = man.counts["tasks/locked_notes.json"]
         manifest = {
             "format": "kalmido-org-export", "format_version": OX_FORMAT, "kalmido_version": APP_VERSION,
             "org": {"id": int(oid), "name": org["name"]}, "created_at": iso(now_utc()), "created_by": by,

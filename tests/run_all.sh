@@ -770,6 +770,22 @@ fresh; run p249_e_ui node p249_e_ui.js "$KALMIDO_TEST_DATA"
 run p249_d_mailtrim "$PY" p249_d_mailtrim_test.py
 fresh; run p249_d_api "$PY" p249_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p249_d_ui node p249_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.48.0 part C: the PDF preview (#1367)
+fresh; run p248_c_pdf_ui node p248_c_pdf_ui.js "$KALMIDO_TEST_DATA"
+# 2.48.0 part C: lock a note with one's own password (#1642)
+fresh; run p248_c_lock_api "$PY" p248_c_lock_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p248_c_lock_ui node p248_c_lock_ui.js "$KALMIDO_TEST_DATA"
+# 2.48.0 part A: the file store "Ablage" (#1207): rights, organisation boundary, agents, versions, trash, links, backup; the UI
+fresh; run p248_a_api "$PY" p248_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p248_a_ui node p248_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.48.0 part D: #1152 Paperless-ngx connection + import (fake Paperless-ngx in the container), #1356 agents suggest project / category of receipts
+fresh; run p248_d_paperless_api "$PY" p248_d_paperless_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p248_d_receipts_api "$PY" p248_d_receipts_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p248_d_ui node p248_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.48.0 part B: #1111 documents (recognition without a server; API with OCR, mail, agents, the boundary; the area)
+       run p248_b_unit "$PY" p248_b_unit_test.py
+fresh; run p248_b_api "$PY" p248_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p248_b_ui node p248_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.3 part C: contacts / clients several at once, the clients page like the contacts (#1731, #1733, #1734)
 fresh; run p2473_c_api "$PY" p2473_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2473_c_ui node p2473_c_ui.js "$KALMIDO_TEST_DATA"

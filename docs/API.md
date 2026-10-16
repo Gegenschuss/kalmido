@@ -34,6 +34,8 @@ Create a token under **Settings > Account > API tokens**:
   | `delete` | move tasks to the trash, restore, empty the trash, undo an import; delete sections, lists, fields, templates, habits, filters (list tags, links and milestones: `structure`) |
   | `attachments:read` | download files of tasks, comments and projects (their names come with `read`) |
   | `attachments:write` | upload and remove them |
+  | `files:read` (2.48.0) | the file store: list and read the folders and files shared with the token's account (agents: plus their own result folder) |
+  | `files:write` (2.48.0) | the file store: add files and folders, upload new versions where the account may edit; new agents get both `files:` scopes |
   | `time` | the timer and time entries |
   | `export` | `GET /export` |
   | `calendar` (2.21.0) | events and event calendars, reading included: `/event-calendars…`, `/events…`, `/tasks/{id}/events` |
@@ -249,6 +251,9 @@ had been made in the app. Webhooks fire too.
 | `POST /tasks/{id}/attachments` | attachments:write | 2.15.0: upload files (multipart, field `file`, repeatable; the server's size limit, no empty files) |
 | `POST /tasks/{id}/attachments/text` | attachments:write | 2.30.0: a text file from JSON `{name, content}` (Markdown, plain text, HTML / CSS / JS, JSON / CSV, code; UTF-8, at most 1 MB). An ending that is not a text type (`.sh`, `.ps1`, `.bat`, `.exe` …) gets `.txt` appended; a name the task already has becomes a new version next to it (`report (v2).md`, the old file stays). Answer `201` `{id, task_id, name, mime, size, created_at, version, replaces, url}` |
 | `DELETE /attachments/{id}` | attachments:write | 2.15.0: remove a file of a task (or of your comment) |
+| `GET /files` · `GET /files/{id}` | files:read | 2.48.0 (#1207): the file store: without `parent_id` the top of what is shared with you (agents: plus their own result folder), `?parent_id=` a folder's children; one node with `children` (folder) or `versions` (file) and `path`. Each item: `{id, parent_id, kind: folder \| file \| link, name, org_id, owner_id, agent_id, mime, size, version, role: owner \| edit \| view, url, content_url}` |
+| `GET /files/{id}/content` · `GET /files/{id}/text` | files:read | 2.48.0: the bytes (`?version=` an older one; always a download) / the text (UTF-8, the text layer of a PDF; like `/attachments/{id}/text`) |
+| `POST /files` · `POST /files/{id}/versions` | files:write | 2.48.0: a new file `{parent_id?, name, content \| content_base64, mime?}` or folder (`kind: "folder"`) in a folder with role edit (agents without `parent_id`: their own folder); a new version of a file `{content \| content_base64}` (the older ones stay). A taken name gets " (2)". Every access of an agent is in the file's history |
 | `PATCH /comments/{id}` · `DELETE …` | comments | 2.15.0: edit your comment `{body}`; delete (author, list owner / admins) |
 | `GET /folders` · `POST /folders/rename` · `POST /folders/delete` | read · structure | 2.15.0: your folders `{path, lists}`; rename / move `{old, new}`; remove `{name}` (its lists move up). Agents: approval |
 | `DELETE /lists/{id}` | delete | 2.15.0: delete an archived list for good (owner; 2.39.1: also a list admin, the owner is told; archive it with `PATCH {archived: true}` first, else `409`); its tasks go to the owner's trash. Agents: approval |
@@ -310,6 +315,13 @@ and decrypts it there). Encrypted direct messages (`/team/...`) carry `enc` (`{v
 the notice that switched it) with an empty `body`; such a conversation refuses plain text (`409`). The keys never leave
 the browser; the app's own endpoints for them (`/api/e2e/keys`, `/api/e2e/pub/{user_id}`, `/api/tasks/{id}/enc-note`,
 `/api/tasks/{id}/enc-attachments`, `/api/team/rooms/{id}/e2e`) are for the signed-in person only (agents `403`).
+
+**Locked notes** (2.48.0): a person can lock the notes of a task in their own, unshared list with their own password
+(end-to-end, in the browser). Then `notes` is empty and the task carries `"note_locked": true` (absent otherwise) in every
+output (REST, webhooks, MCP). Nothing can read or overwrite a locked note: `PATCH /tasks/{id}` with non-empty `notes`
+answers `409` (other fields still change); CalDAV clients keep the lock (their description is ignored). Search, exports
+and calendar feeds leave the note out. Only the person who locked it unlocks it, in the app (`/api/tasks/{id}/note-lock`,
+signed-in person only, agents `403`).
 
 **Locked tasks** (2.36.0): `locked: true` makes a task read-only **in the app**: title, notes, date and time,
 priority, list, tags, repeat and assignee stay as they are until someone who may change the task unlocks it there
@@ -1077,3 +1089,25 @@ agents have none (`403`).
 `GET /api/state` carries it as `mine_order` (`{task id: position}`, 0 = on top). A task without a position (new, or newly
 assigned) stands above the placed ones, newest first; assigning a task to a person takes its old position away. The setting
 `mine_view` (`PATCH /api/settings`) is `own` (default) or `lists`.
+
+## Documents (2.48.0)
+
+Documents are files of the file store (`/files`) with recognised text and fields. Scopes `files:read` / `files:write`;
+a token sees only the documents whose file it may see (an agent: shared with it).
+
+| Call | Scope | What it does |
+|---|---|---|
+| `GET /documents` | files:read | `?q=` words of the text (whole words; words of 4+ letters also as a prefix), `review=1`, `state=wait\|run\|done\|failed`, `from` / `to` (document date), `limit`, `cursor` -> `{data: [Document], next_cursor}`, newest document date first |
+| `GET /documents/{id}` | files:read | One document: `date`, `due`, `amount` (decimal text), `currency`, `sender` / `type` / `folder` (`{id, name}` or null), `tags`, `auto` (feature -> `rule` \| `learn` \| `agent` \| `import`), `suggest` (feature -> a suggestion waiting for review), `review`, `state`, `error`, `method` (`pdf` \| `ocr` \| `text` \| `import`), `text` (the recognised text) |
+| `PATCH /documents/{id}` | files:write | Role *edit*: `{date?, due?, amount?, currency?, sender?, type?, tags?: [names], text?}` (`text` only while none was recognised). An agent's values are marked `agent`; a feature the workspace leaves to an agent becomes a suggestion in *To review*. Unknown fields: `400` |
+| `POST /documents/{id}/receipt-suggestion` | files:read | 2.48.0 (#1356), agents only, the document shared with you: `{project_id?, category?, note?}` (at least one of the first two; `project_id` = a project you can see in the document's workspace) -> `201` ReceiptSuggestion `{id, document_id, agent, state, project, category, note, created_at, decided_at}`. A person accepts or rejects it in the app; your open suggestion of the same document is replaced |
+| `GET /receipt-suggestions` | files:read | `?state=open` (default) `\| accepted \| rejected \| all` -> `{data: [ReceiptSuggestion]}`: an agent's own suggestions |
+
+The web app's own routes (`/api/docs`, a signed-in person, never an agent): `GET /api/docs` (list with filters, the counter
+*To review*, the filter labels of visible documents), `POST /api/docs` (multipart `files`, `ws` = `private` \| `org:<id>`),
+`GET` / `PATCH /api/docs/{id}`, `POST /api/docs/{id}/accept` (take suggestions), `POST /api/docs/{id}/review`
+(`{done: true}` = checked; the models learn the current values), `POST /api/docs/{id}/redo`, `GET /api/docs/{id}/thumb`,
+`GET /api/docs/{id}/file`, `POST` / `DELETE /api/docs/{id}/task` (a task for the due date), `GET` / `PUT /api/docs/settings`
+(levels per feature, the inbox folder), `POST` / `PATCH` / `DELETE /api/docs/rules`, `PATCH` / `DELETE /api/docs/labels/{kind}/{id}` (the delete answers the documents it touched; `POST /api/docs/labels/{kind}` `{ws, name, ids}` is its undo),
+`POST` / `DELETE /api/docs/mail` (the forwarding address). Deleting and restoring use the file store
+(`DELETE /api/files/nodes/{id}`, `POST /api/files/nodes/{id}/restore`).

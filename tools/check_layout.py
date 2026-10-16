@@ -70,6 +70,11 @@ TENANT_EXEMPT = {
     "wait_hidden": _OWN + " (2.41.0 #1205: Waiting-on texts the person took out of their own suggestions)",
     "e2e_keys": _OWN + " (2.42.0 #828: the person's public key + wrapped key bundle; others only get the public key of a DM partner)",
     "task_enc_notes": "2.42.0 (#828): one person's encrypted note of a task, bound through the task (need_task) and readable only by its author",
+    "task_note_locks": "2.48.0 (#1642): the locked note of a task, bound through the task (need_task), readable only by the person who locked it",
+    # 2.48.0 (#1207): the file store's rows below a node, bound through fs_nodes (org_id + row-level security, files/store.py fs_role)
+    "fs_versions": "2.48.0 (#1207): the versions of a file store node, bound through the node (need_node)",
+    "fs_shares": "2.48.0 (#1207): shares of a file store node, bound through the node; share targets are checked against its workspace (tenancy CHECKS)",
+    "fs_log": "2.48.0 (#1207): the access history of a file store node, bound through the node (shown to its owners and editors)",
     "filters": _OWN, "user_settings": _OWN, "sessions": _OWN, "push_subs": _OWN, "templates": _OWN, "cal_subs": _OWN,
     "recovery_codes": _OWN, "webauthn_creds": _OWN, "api_tokens": _OWN, "webhooks": _OWN + " (deliveries only for visible tasks)",
     "imports": _OWN, "sample_items": _OWN, "app_passwords": _OWN, "dav_sync2": _OWN, "journal": _OWN, "contact_care": _OWN,
@@ -142,6 +147,20 @@ for f in sorted(glob.glob(os.path.join(ROOT, "static", "js", "*.js"))):
         if n in _seen and _seen[n] != os.path.basename(f):
             ERR.append(f"client: function {n} is defined in {_seen[n]} and {os.path.basename(f)} (one replaces the other)")
         _seen.setdefault(n, os.path.basename(f))
+
+# 2.48.0: the stylesheet's braces balance -- a lost "}" after a merge nests every later rule into the block before it
+# (the end of an @media print block made the rules of three parts apply only when printing)
+_css, _depth, _open = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group()), read("static", "app.css"), flags=re.S), 0, 0
+for _no, _line in enumerate(_css.split("\n"), 1):
+    for ch in _line:
+        _depth += (ch == "{") - (ch == "}")
+        if _depth < 0:
+            ERR.append(f"app.css line {_no}: a closing brace too many")
+            _depth = 0
+    if _depth == 0:
+        _open = _no
+if _depth:
+    ERR.append(f"app.css: {_depth} block(s) not closed -- the first after line {_open}")
 
 for e in ERR:
     print("ERROR:", e)

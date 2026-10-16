@@ -102,6 +102,10 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     e = lock_problem(c, cur, f, b) if lock else None  # 2.36.0 (#1118): a locked task keeps its locked fields (app writes)
     if e:
         return e
+    from ..collab.notelock import ln_guard
+    e = ln_guard(c, tid, f)  # 2.48.0 (#1642): a note locked with a password is changed only through its own routes
+    if e:
+        return e
     if f.get("ttype") and f["ttype"] != cur["ttype"] and "content" not in f and not (cur["content"] or "").strip():
         tpl = ticket_template(c, f.get("list_id") or cur["list_id"], f["ttype"])  # 2.4.0 (#340): empty notes get the template
         if tpl:

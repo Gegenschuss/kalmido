@@ -1,0 +1,261 @@
+"""2.48.0 (#1207): the file store in the REST API (agents and personal tokens; scopes files:read / files:write).
+
+An agent sees only what is shared with exactly it plus its own result folder (created on first use, named like the agent,
+at the top of its owner's space -- an organisation's agent: of the organisation). Every access of an agent is written into
+the node's history (fs_log), which the owner sees on the file. Writing needs the role 'edit' (or the own folder).
+"""
+import base64
+import binascii
+
+from flask import jsonify
+
+from ..core.config import app
+from ..core.i18n import tr
+from ..core.db import bump, db
+from ..accounts.session import me
+from ..core.access import Denied, acx_of
+from ..api.v1 import BadInput, v1_args, v1_json, v1_view, UnknownFields
+from .store import (fs_chain, fs_log_add, fs_new_version, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name, _free_name,
+                    _now, _place)
+from .web import fs_agent_folder, fs_node_json, _crumbs, _items, _send, _versions
+
+V1_TEXT_MAX = 20 * 1024 * 1024  # bytes a request may send as content / content_base64
+
+
+def _v1_node(c, n):
+    out = fs_node_json(c, n, n.get("role"))
+    out["url"] = f"/api/v1/files/{n['id']}"
+    if n["kind"] in ("file", "link"):
+        out["content_url"] = f"/api/v1/files/{n['id']}/content"
+    return out
+
+
+def _is_agent(c):
+    return acx_of(c, me()).role == "agent"
+
+
+@app.get("/api/v1/files")
+@v1_view
+def v1_files_list():
+    """?parent_id=<folder>: its children; without: the top -- what is shared with you whose folder above is not (an agent:
+    plus its own result folder)."""
+    a = v1_args(("parent_id",))
+    c = db()
+    uid = me()
+    if a.get("parent_id"):
+        try:
+            pid = int(a["parent_id"])
+        except ValueError:
+            raise BadInput(tr("Invalid value: {0}", "parent_id")) from None
+        n = need_node(c, pid)
+        if n["kind"] != "folder":
+            raise Denied(409, tr("Not a folder"))
+        rows = c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (pid,)).fetchall()
+        fs_log_add(c, pid, "list")
+        c.commit()
+        items = _items(c, rows, n["role"])
+    else:
+        if _is_agent(c):
+            if fs_agent_folder(c, uid):
+                c.commit()
+        vis = fs_visible_ids(c, uid)
+        rows = []
+        if vis:
+            q = ",".join(str(int(x)) for x in vis)
+            rows = [r for r in c.execute(f"SELECT * FROM fs_nodes WHERE id IN ({q}) ORDER BY id") if r["parent_id"] not in vis]
+        for r in rows:
+            fs_log_add(c, r["id"], "list")
+        c.commit()
+        items = _items(c, rows)
+    for x in items:
+        x["url"] = f"/api/v1/files/{x['id']}"
+    return jsonify(data=items, next_cursor=None)
+
+
+@app.get("/api/v1/files/<int:nid>")
+@v1_view
+def v1_file_get(nid):
+    """A node: a folder with its children, a file with its versions."""
+    v1_args(())
+    c = db()
+    n = need_node(c, nid)
+    out = _v1_node(c, n)
+    if n["kind"] == "folder":
+        rows = c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (nid,)).fetchall()
+        out["children"] = _items(c, rows, n["role"])
+    elif n["kind"] == "file":
+        out["versions"] = _versions(c, nid)
+    out["path"] = [x["name"] for x in _crumbs(c, fs_chain(c, nid))]  # only the folders the caller sees
+    fs_log_add(c, nid, "meta")
+    c.commit()
+    return jsonify(out)
+
+
+@app.get("/api/v1/files/<int:nid>/content")
+@v1_view
+def v1_file_content(nid):
+    """The file's bytes (?version=<no>: an older version)."""
+    a = v1_args(("version",))
+    c = db()
+    n = need_node(c, nid)
+    if n["kind"] not in ("file", "link"):
+        raise Denied(409, tr("Not a file"))
+    ver = None
+    if a.get("version"):
+        try:
+            ver = int(a["version"])
+        except ValueError:
+            raise BadInput(tr("Invalid value: {0}", "version")) from None
+    fs_log_add(c, nid, "download", str(ver or ""))
+    c.commit()
+    return _send(c, n, ver, dl=True)  # always as a download for the API
+
+
+@app.get("/api/v1/files/<int:nid>/text")
+@v1_view
+def v1_file_text(nid):
+    """The text of a file: UTF-8 text as it is, the text layer of a PDF (like /attachments/{id}/text)."""
+    v1_args(())
+    c = db()
+    n = need_node(c, nid)
+    if n["kind"] not in ("file", "link"):
+        raise Denied(409, tr("Not a file"))
+    from ..tasks.attachtext import text_of_bytes
+    data = fs_read(c, nid)
+    out = text_of_bytes(n["name"], n["mime"], data, owner=me())
+    fs_log_add(c, nid, "text")
+    c.commit()
+    return jsonify({"id": nid, "name": n["name"], **out})
+
+
+def _content_arg(b):
+    if "content" in b and "content_base64" in b:
+        raise BadInput(tr("Expected {0}", "content | content_base64"))
+    if isinstance(b.get("content"), str):
+        data = b["content"].encode("utf-8")
+    elif isinstance(b.get("content_base64"), str):
+        try:
+            data = base64.b64decode(b["content_base64"], validate=True)
+        except (binascii.Error, ValueError):
+            raise BadInput(tr("Invalid value: {0}", "content_base64")) from None
+    else:
+        raise BadInput(tr("Expected {0}", '{"name": "...", "content": "..."}'))
+    if len(data) > V1_TEXT_MAX:
+        raise BadInput(tr("{0}: larger than {1} MB", "content", V1_TEXT_MAX // (1024 * 1024)))
+    return data
+
+
+def _v1_body(allowed):
+    b = v1_json()
+    extra = sorted(k for k in b if k not in allowed)
+    if extra:
+        raise UnknownFields(extra)
+    return b
+
+
+@app.post("/api/v1/files")
+@v1_view
+def v1_file_create():
+    """{parent_id?, name, kind?: file | folder, content? (UTF-8 text) | content_base64?, mime?}: a new file (or folder) in a
+    folder you may edit; without parent_id: an agent's own result folder (a person: the top of their own space)."""
+    v1_args(())
+    b = _v1_body(("parent_id", "name", "kind", "content", "content_base64", "mime"))
+    c = db()
+    uid = me()
+    name = str(b.get("name") or "").strip()
+    if not name:
+        raise BadInput(tr("Name missing"))
+    kind = b.get("kind") or "file"
+    if kind not in ("file", "folder"):
+        raise BadInput(tr("Invalid value: {0}", "kind"))
+    pid = b.get("parent_id")
+    if pid in (None, "", 0):
+        pid = fs_agent_folder(c, uid) if _is_agent(c) else None
+        if _is_agent(c) and not pid:
+            raise Denied(409, tr("This agent has no folder of its own (no owner)"))
+    else:
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            raise BadInput(tr("Invalid value: {0}", "parent_id")) from None
+    if kind == "folder":
+        owner, org = _place(c, uid, pid, None)
+        from ..core.db import insert_id
+        ts = _now()
+        nid = insert_id(c, "INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                        (pid, "folder", _free_name(c, pid, owner, org, safe_fs_name(name)), owner, org, uid, ts, ts))
+        fs_log_add(c, nid, "create")
+    else:
+        data = _content_arg(b)
+        mime = b.get("mime") if isinstance(b.get("mime"), str) else None
+        if mime is None and "content" in b:
+            mime = "text/plain" if not name.lower().endswith((".md", ".markdown")) else "text/markdown"
+        try:
+            nid = fs_put(c, uid, pid, name, data, mime)
+        except ValueError as e:
+            c.rollback()
+            raise BadInput(str(e)) from None
+        fs_log_add(c, nid, "write")
+    bump(c)
+    c.commit()
+    return jsonify(_v1_node(c, need_node(c, nid))), 201
+
+
+@app.post("/api/v1/files/<int:nid>/versions")
+@v1_view
+def v1_file_version(nid):
+    """{content | content_base64, mime?}: a new version of the file (the older ones stay; role edit)."""
+    v1_args(())
+    b = _v1_body(("content", "content_base64", "mime"))
+    c = db()
+    n = need_node(c, nid, write=True)
+    if n["kind"] != "file":
+        raise Denied(409, tr("Not a file"))
+    data = _content_arg(b)
+    try:
+        no = fs_new_version(c, nid, data, b.get("mime") if isinstance(b.get("mime"), str) else None)
+    except ValueError as e:
+        c.rollback()
+        raise BadInput(str(e)) from None
+    fs_log_add(c, nid, "version", str(no))
+    bump(c)
+    c.commit()
+    return jsonify({**_v1_node(c, need_node(c, nid)), "version": no}), 201
+
+
+def files_spec(paths, schemas, op, ok, errs, ref, pid, q):
+    """OpenAPI of the file store (called from api/openapi.py)."""
+    node = {"type": "object", "properties": {
+        "id": {"type": "integer"}, "parent_id": {"type": ["integer", "null"]}, "kind": {"type": "string", "enum": ["folder", "file", "link"]},
+        "name": {"type": "string"}, "org_id": {"type": ["integer", "null"]}, "owner_id": {"type": "integer"}, "agent_id": {"type": ["integer", "null"],
+        "description": "Set on an agent's own result folder"}, "mime": {"type": "string"}, "size": {"type": "integer"},
+        "version": {"type": "integer"}, "role": {"type": ["string", "null"], "enum": ["owner", "edit", "view", None]},
+        "updated_at": {"type": "string"}, "url": {"type": "string"}, "content_url": {"type": "string"}}}
+    schemas["FileNode"] = node
+    schemas["FileNodePage"] = {"type": "object", "properties": {"data": {"type": "array", "items": ref("FileNode")}, "next_cursor": {"type": "null"}}}
+    T = "Files"
+    nid = pid("id", "File or folder id")
+    new = {"type": "object", "required": ["name"], "properties": {
+        "parent_id": {"type": "integer", "description": "Folder (role edit); default: an agent's own result folder"},
+        "name": {"type": "string"}, "kind": {"type": "string", "enum": ["file", "folder"]},
+        "content": {"type": "string", "description": "UTF-8 text"}, "content_base64": {"type": "string", "description": "Any bytes, base64"},
+        "mime": {"type": "string"}}}
+    ver = {"type": "object", "properties": {"content": {"type": "string"}, "content_base64": {"type": "string"}, "mime": {"type": "string"}}}
+    paths["/files"] = {
+        "get": op("Folders and files shared with you (2.48.0)", T, ok(ref("FileNodePage")) | errs("400", "403", "404", "409"),
+                  [q("parent_id", "A folder: its children (default: the top of what you may see)", {"type": "integer"})], scope="files:read",
+                  desc="An agent sees exactly the folders and files shared with it plus its own result folder (created on first use). "
+                       "Every access of an agent is in the file's history, visible to its owner."),
+        "post": op("Create a file or folder (2.48.0)", T, ok(ref("FileNode"), "Created", "201") | errs("400", "403", "404", "409", "413"),
+                   body=new, scope="files:write",
+                   desc="Needs the role edit on the folder (or an agent's own folder). A name that is taken gets \" (2)\"; an agent's "
+                        "executable ending gets \".txt\".")}
+    paths["/files/{id}"] = {"get": op("A folder with its children or a file with its versions (2.48.0)", T, ok(ref("FileNode")) | errs("403", "404"),
+                                      [nid], scope="files:read")}
+    paths["/files/{id}/content"] = {"get": {**op("Download a file (2.48.0)", T, errs("400", "403", "404", "409"),
+                                                 [nid, q("version", "An older version number", {"type": "integer"})], scope="files:read"),
+                                            "responses": {"200": {"description": "The file's bytes"}, **errs("400", "403", "404", "409")}}}
+    paths["/files/{id}/text"] = {"get": op("The text of a file: UTF-8 text, the text layer of a PDF (2.48.0)", T,
+                                           ok({"type": "object"}) | errs("403", "404", "409"), [nid], scope="files:read")}
+    paths["/files/{id}/versions"] = {"post": op("Upload a new version of a file (2.48.0)", T, ok(ref("FileNode"), "Created", "201") | errs("400", "403", "404", "409", "413"),
+                                                [nid], body=ver, scope="files:write", desc="Role edit; the older versions stay and can be restored in the app.")}

@@ -1,0 +1,15 @@
+pdf.js (Mozilla), used by static/js/pdfview.js for the in-app PDF preview (2.48.0, #1367).
+
+Package:  pdfjs-dist 6.4.299 (Apache-2.0, see LICENSE)
+Source:   https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-6.4.299.tgz
+Tarball:  sha512-AVl138zALtfaAPvADulE0PZThbYzCBS79nL4pOSL/6Sm/4AH5A21BD9VHt97OlCuzJuCpmeZtAtkinisF4Vb1g==
+          (the npm registry's "integrity" value, checked on download)
+Files:    legacy/build/pdf.min.mjs, legacy/build/pdf.worker.min.mjs, LICENSE -- unchanged copies. The legacy build because
+          the modern one needs very new browser functions (Uint8Array.toHex, Map.getOrInsertComputed) that older
+          Android WebViews lack (2.48.0 device test).
+Not bundled: cmaps, standard_fonts, wasm (only needed for rare CJK / non-embedded fonts / JPEG 2000 images;
+          pdf.js falls back to the browser's fonts).
+Update:   download the new tarball, compare its sha512 with the registry's "integrity", copy the same files,
+          update this README and THIRD_PARTY_NOTICES.md.
+          sha256 bccc24ea711db8e44503629519904a5292d73b9daaa214bbe7cdcc282b0f4259  pdf.min.mjs
+          sha256 145d2dd3ab0c86151011dba95acfa2d5336e2accd59388ea43dbee0efddaaec6  pdf.worker.min.mjs
