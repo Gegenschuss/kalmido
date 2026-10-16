@@ -7,6 +7,46 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.49.0] - 2026-10-16
+
+**In short:** **Forgot your password?** on the login page and a calmer, friendlier login page; **kid accounts** start
+without errors, get their own tour and a **parents' PIN**; **knowledge pages** per organisation and a **mind map** view
+of every list; **find people by e-mail** like in a messenger (opt-in).
+
+### Added
+- **Forgot your password?** on the login page sends a one-time reset link by e-mail (only when the server sends mail).
+  The answer is the same for every address, requests are rate limited, and two-factor stays required afterwards (#1531).
+- **Find people** (Settings > Account, and the share dialog): enter a full e-mail address, send a connection request; the
+  other person accepts or declines. Being findable is off by default and confirmed by a link in a mail. Kalmido never
+  reveals whether an address has an account. Optional address book check, withdraw, disconnect, block (#1106).
+- **Knowledge pages** (module, off by default): a small wiki per organisation or private, folders from the page name,
+  `[[links]]` with suggestions, backlinks, templates, frontmatter fields, "Mentioned in" on tasks, ZIP export / import
+  of Markdown files (#1199).
+- **Mind map** as a view of every list: branches are tasks, typing like in a mind map tool (Enter, Tab, Shift+Tab, Delete,
+  Space), drag to re-hang, pinch to zoom, outline view; export as Markdown, SVG or PNG, import of Markdown, OPML and
+  FreeMind outlines; ```mindmap blocks on knowledge pages (#1201).
+- **Parents' PIN** per kid: with a PIN the kid needs it for settings, account and logging out; ticking off stays free.
+  Five wrong tries pause it for 15 minutes and notify the parents (#1551).
+- **Kids' tour**: three big cards in simple words instead of the grown-up tour (#1533).
+- **Shorten forwarded mails** (Settings > Integrations > Tasks by mail, off by default): the forward header becomes one
+  line, signatures, disclaimers and older quotes go; the original can stay attached as .eml (#971).
+- A small **x** closes notices with a button or a longer display time (#1769).
+- A fixed **Private / organisation sign** in a list's header, from the list's own workspace (#1770).
+
+### Changed
+- The **login page** has a soft purple background, a calm light that follows the pointer (fixed on phones, still with
+  reduced motion), a greeting by time of day, and light and dark; invitation, setup and password pages look the same (#1553).
+- **Ticking off** first draws a line across the title; with "Hide completed" the row then fades out softly (#1766).
+- **New lists hide completed tasks** by default (Settings > Appearance > New lists); new accounts hide them by default
+  too. Existing lists and accounts stay as they are (#1535).
+- Switching the workspace leaves a list of another workspace for the inbox; opening such a list directly switches the
+  filter along (#1770).
+- A reset link from an admin now also leads into the two-factor step when the account has two-factor (#1531).
+
+### Fixed
+- Kid accounts no longer show "Not possible with a kid account" at the start; buttons and settings a kid cannot use are
+  hidden; shared lists appear in "My day" as their own sections (#1537).
+
 ## [2.48.0] - 2026-10-16
 
 **In short:** **Files** for you and your organisation with shares to people, groups and agents, **Documents** that read

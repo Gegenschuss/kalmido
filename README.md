@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.49.0** (2026-10-16): **Forgot your password?** on a calmer login page, **kid accounts** without errors, with their
+  own tour and a **parents' PIN**, **knowledge pages** per organisation and a **mind map** view of every list, **find
+  people by e-mail** (opt-in, with connection requests), a softer tick-off, an x on notices and new lists that hide
+  completed tasks.
 - **2.48.0** (2026-10-16): **Files** with folders, versions and shares to people, groups and agents (each agent sees
   only what is shared with it and gets its own result folder); **Documents** that read scans locally, find date, due
   date and amount, sort themselves in by rules or by learning from your corrections and are searchable in full text;
