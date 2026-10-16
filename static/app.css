@@ -7634,3 +7634,5 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .lyp-new{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .lyp-hid{font-size:12px;margin-top:4px}
 .lyp-use{margin:6px 0}
+/* 2.55.0 D (#1067) statistics, the client card and family on the view builder: the blocks keep the spacing the cards had (the cards bring their own top margin) */
+.mscly .lybar,.stats > .lybar{display:flex;justify-content:flex-end}

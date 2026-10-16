@@ -1717,6 +1717,7 @@ USER_DEFAULTS = {
     # ('' = default; accounts/layouts.py). The start page keeps "dashboard" (same shape)
     "view_today": "", "view_time": "", "view_agents": "", "view_projects": "",
     "view_review": "",          # 2.43.0 (#1452): the review (day / week, journal) on the builder
+    "view_stats": "", "view_clients": "", "view_family": "",  # 2.55.0 (#1067): statistics, the client card, family
     # 2.25.0 (UX-03): the sidebar: json {"order": [groups], "hidden": ["g:<group>" | "e:<entry>"]} ('' = default)
     "sidebar": "",
     "work_start": "09:00", "work_end": "17:00",  # 2.10.0 (#440): working hours of the day planner

@@ -314,6 +314,15 @@ LY.home = {key: 'dashboard', grid: 'dgrid', title: () => tr('Customize the start
 // 2.43.0 (#1452): the review (day / week) and its journal on the builder
 LY.review = {key: 'view_review', grid: 'dgrid', title: () => tr('Customize the review'), blocks: () => [['done', N_('Done'), 'done', 'half', false, 3], ['open', N_('Still open'), 'alert', 'half', false, 3],
   ['moved', N_('Moved'), 'skip', 'half', false, 3], ['next', N_('Coming up'), 'cal', 'half', false, 3], ['journal', N_('Journal'), 'journal', 'half', false, 3]]};
+// 2.55.0 (#1067): statistics, the client card and family on the builder (same order and widths as before: the default shows what it did)
+LY.stats = {key: 'view_stats', title: () => tr('Customize statistics'), blocks: () => [['tiles', N_('Totals'), 'chart', 'full'], ['done', N_('Completed tasks'), 'done', 'full'],
+  ['bylist', N_('By list'), 'list', 'full'], ['overdue', N_('Overdue'), 'alert', 'full'], ['focus', N_('Focus time'), 'timer', 'full'], ['time', N_('Tracked time'), 'clock', 'full'],
+  ['habits', N_('Habits'), 'repeat', 'full']]};
+LY.clients = {key: 'view_clients', title: () => tr('Customize the client card'), blocks: () => [['details', N_('Details'), 'brief', 'full'], ['persons', N_('Contact persons'), 'users', 'full'],
+  ['invoices', N_('Open invoices'), 'receipt', 'full'], ['month', N_('Month'), 'clock', 'full'], ['lists', N_('Lists and projects'), 'list', 'full'], ['note', N_('Note'), 'edit', 'full']]};
+LY.family = {key: 'view_family', grid: 'dgrid', title: () => tr('Customize Family'), blocks: () => [['occ', N_('Birthdays & anniversaries'), 'cake', 'half', false, 3], ['rot', N_('Whose turn'), 'turns', 'half', false, 3],
+  ['meals', N_('Meal plan'), 'meal', 'half', false, 3], ['shop', N_('Shopping'), 'cart', 'half', false, 3], ['dl', N_('Deadlines'), 'hourglass', 'half', false, 3],
+  ['kids', N_('Kids'), 'star', 'half', false, 3], ['pack', N_('Packing lists'), 'bag', 'half', false, 3]]};
 function dashCard(k) {
   const [_, name, icon] = DASH.find(d => d[0] === k), t0 = today();
   const card = (body, more = '', n = '', title = tr(name)) => `<section class="dcard dc-${k}" aria-labelledby="dh-${k}"><h3 id="dh-${k}">${ic(icon, 's')}<span>${esc(title)}</span>${n !== '' ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span>${more}</h3>${body}</section>`;

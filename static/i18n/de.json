@@ -8139,5 +8139,8 @@
   "This proposal has expired": "Dieser Vorschlag ist abgelaufen",
   " (proposal by {0})": " (Vorschlag von {0})",
   "Propose a better start page": "Bessere Startseite vorschlagen",
-  "Look at how my start page is arranged (tools get_view_layout and list_layout_blocks, view dashboard, user_id = my id) and which lists I use most. Only if a clearly better arrangement exists (for example my favourites and what I use every day on top), send me ONE proposal (tool propose_layout) with a short reason. Never repeat one I declined. Change nothing yourself.": "Sieh dir an, wie meine Startseite angeordnet ist (Werkzeuge get_view_layout und list_layout_blocks, Ansicht dashboard, user_id = meine id) und welche Listen ich am meisten nutze. Nur wenn es eine deutlich bessere Anordnung gibt (zum Beispiel meine Favoriten und was ich täglich nutze nach oben), schick mir EINEN Vorschlag (Werkzeug propose_layout) mit kurzer Begründung. Wiederhole nie einen, den ich abgelehnt habe. Ändere selbst nichts."
+  "Look at how my start page is arranged (tools get_view_layout and list_layout_blocks, view dashboard, user_id = my id) and which lists I use most. Only if a clearly better arrangement exists (for example my favourites and what I use every day on top), send me ONE proposal (tool propose_layout) with a short reason. Never repeat one I declined. Change nothing yourself.": "Sieh dir an, wie meine Startseite angeordnet ist (Werkzeuge get_view_layout und list_layout_blocks, Ansicht dashboard, user_id = meine id) und welche Listen ich am meisten nutze. Nur wenn es eine deutlich bessere Anordnung gibt (zum Beispiel meine Favoriten und was ich täglich nutze nach oben), schick mir EINEN Vorschlag (Werkzeug propose_layout) mit kurzer Begründung. Wiederhole nie einen, den ich abgelehnt habe. Ändere selbst nichts.",
+  "Customize statistics": "Statistik anpassen",
+  "Customize the client card": "Kundenkarte anpassen",
+  "Customize Family": "Familie anpassen"
 }

@@ -15,7 +15,8 @@ from ..accounts.session import me
 from ..personal.timetrack import BadInput
 
 LAYOUT_KEYS = ("view_today", "view_time", "view_agents", "view_projects",
-               "view_review")  # 2.43.0 (#1452): the review (and its journal) on the builder
+               "view_review",  # 2.43.0 (#1452): the review (and its journal) on the builder
+               "view_stats", "view_clients", "view_family")  # 2.55.0 (#1067): statistics, the client card, family
 LAYOUT_BLOCK_RE = re.compile(r"[a-z][a-z0-9_]{0,23}")
 LAYOUT_BLOCKS_MAX = 40
 LAYOUT_OPTS_MAX = 10          # saved switches per block
