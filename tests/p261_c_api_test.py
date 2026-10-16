@@ -170,6 +170,8 @@ A1 = dbx("SELECT id FROM attachments WHERE task_id=? ORDER BY id DESC LIMIT 1", 
 check(ft("att", A1) is not None, "#1820: the upload queues the file (a file_text row at once)")
 st = settled("att", A1)
 check(st and st[0] == "found" and st[2] == "pdf", f"#1820: the PDF's text layer is read in the background ({st})")
+att = {x["name"]: x for x in Bo.get(B + f"/api/tasks/{T1}").json().get("attachments", [])}.get("bill.pdf") or {}
+check((att.get("up") or {}).get("text") == "found", f"#1820 (with #1818's marks): the task file carries up.text found ({att.get('up')})")
 n_words = dbx("SELECT COUNT(*) FROM file_words w JOIN file_text f ON f.id=w.ft_id WHERE f.kind='att' AND f.ref_id=?", (A1,))[0][0]
 check(n_words > 0, f"#1820: the words are in the keyed index ({n_words})")
 hits = tsearch(Bo, "wolkenkratzer")

@@ -98,10 +98,11 @@ const post = async (url, field, name, data, extra = {}) => {
   check(await until(() => d.querySelector('#sresults .task, #sresults [data-id]') && !d.querySelector('#sresults .ftxthit'), 60), '#1820: a title hit has no file note');
 
   // ================= the mark at a file
-  check(w.eval(`ftxtMark({text: 'found'})`).includes('Text recognised') || w.eval(`typeof scnMark`) !== 'function', '#1820: "Text recognised" mark');
-  check(w.eval(`ftxtMark({text: 'none'})`).includes('No text found') || w.eval(`typeof scnMark`) !== 'function', '#1820: "No text found" mark');
+  check(w.eval(`ftxtMark({text: 'found'})`).includes('Text recognised'), '#1820: "Text recognised" mark');
+  check(w.eval(`ftxtMark({text: 'none'})`).includes('No text found'), '#1820: "No text found" mark');
   check(w.eval(`ftxtMark({scan: 'unchecked'})`) === '' && w.eval(`ftxtMark(null)`) === '', '#1820: no mark without a text state');
-  if (w.eval(`typeof scnMakers`) !== 'undefined') check(w.eval(`scnMakers.includes(ftxtMark)`), '#1820: the mark joins the marks of the upload checks');
+  // 2.61.0: after the merge with part A the guard is gone - the mark must join the upload check marks
+  check(w.eval(`scnMakers.includes(ftxtMark)`) && w.eval(`upMarkHtml({text: 'found'})`).includes('Text recognised'), '#1820: the mark joins the marks of the upload checks');
   w.close();
 
   // ================= Firefox: the phone (390, touch)
