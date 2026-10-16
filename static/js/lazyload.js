@@ -15,6 +15,9 @@ const LD_MODS = {
 // module's own function declaration replaces the stand-in on window)
 const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved'], contacts: ['ctRoute', 'ctEditor']};
 // drawing functions: the stand-in draws "Loading…" (views) or nothing (parts of another view), loads, and redraws the view
+// 2.65.0 (#1824): module -> its stylesheets in static/css/ (the same files as LAZY_CSS in sw.js, same order); loadModule loads
+// them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
+const LD_CSS = {};
 const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office']};
 // stays at start (core.js modOn, areas, dashboard, the client page ask it before anything of the office is loaded)
 const officeOn = () => feat('office') && !S.me?.kid;
@@ -32,6 +35,17 @@ function ld_bar(d) {  // the thin bar at the top: only when loading takes longer
   }, 300);
 }
 const ld_url = f => `/static/js/${f}.js` + (APP_VER ? '?v=' + encodeURIComponent(APP_VER) : '');
+const LD_CSSP = {};  // stylesheet -> the promise of its link (each once)
+function loadCss(f) {  // 2.65.0 (#1824): one stylesheet of static/css/; also usable alone (an area that is no module)
+  if (LD_CSSP[f]) return LD_CSSP[f];
+  return LD_CSSP[f] = new Promise((res, rej) => {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet'; l.href = `/static/css/${f}.css` + (APP_VER ? '?v=' + encodeURIComponent(APP_VER) : ''); l.dataset.ldcss = f;
+    l.onload = () => res();
+    l.onerror = () => { l.remove(); delete LD_CSSP[f]; rej(new Error('could not load ' + f + '.css')); };
+    document.head.appendChild(l);
+  });
+}
 const LD_RAN = new Set();  // files that have run (a retry after a failure loads only the rest: a second run would declare twice)
 function ld_script(f) {
   if (LD_RAN.has(f)) return Promise.resolve();
@@ -56,7 +70,8 @@ function loadModule(name, again) {
   for (const f of files.slice(1)) {
     const l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = ld_url(f); l.dataset.ld = f; document.head.appendChild(l);
   }
-  const p = LD_P[name] = files.reduce((q, f) => q.then(() => ld_script(f)), Promise.resolve()).then(() => { ld_bar(-1); }, e => {
+  const css = Promise.all((LD_CSS[name] || []).map(loadCss));
+  const p = LD_P[name] = Promise.all([css, files.reduce((q, f) => q.then(() => ld_script(f)), Promise.resolve())]).then(() => { ld_bar(-1); }, e => {
     ld_bar(-1); delete LD_P[name];
     for (const f of files) if (!LD_RAN.has(f)) document.querySelectorAll(`[data-ld="${f}"]`).forEach(x => x.remove());
     toast(tr('Could not be loaded'), again || (() => loadModule(name)), 8000, tr('Try again'));
@@ -65,7 +80,7 @@ function loadModule(name, again) {
   return p;
 }
 const LD_DONE = new Set();  // modules that have run
-function ld_all() { return Promise.all(Object.keys(LD_MODS).map(m => loadModule(m))); }  // the test suites (tests/boot.js: window.ld_all)
+function ld_all() { return Promise.all(Object.keys(LD_MODS).map(m => loadModule(m)).concat(Object.values(LD_CSS).flat().map(loadCss))); }  // the test suites (tests/boot.js: window.ld_all)
 let ld_rv = 0;
 function ld_later(name) {  // a view part asked for a module: load it, then draw the view again (once per load)
   if (LD_DONE.has(name)) return;  // loaded: a stand-in still asked (should not happen) - no redraw loop
