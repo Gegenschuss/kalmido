@@ -51,6 +51,12 @@ CHECKS = {
     # 2.49.0 (#1106): a connection (accepted request) of an agent or a kid account -- requests are for people only
     "conn_agent": ("SELECT l.a_id, l.b_id FROM conn_links l JOIN users u ON u.id IN (l.a_id, l.b_id) "
                    "WHERE l.deleted_at IS NULL AND (u.kind!='user' OR u.kid!=0)"),
+    # 2.50.0 B (#1196): a deal of the sales pipeline bound to a client or project of another workspace (a personal office's
+    # deals bind the owner's private clients / lists, org_id NULL)
+    "deal_ref": ("SELECT d.id, d.created_by FROM office_deals d JOIN orgs o ON o.id=d.org_id LEFT JOIN clients cl ON cl.id=d.client_id "
+                 "LEFT JOIN lists l ON l.id=d.list_id WHERE d.deleted_at IS NULL AND ("
+                 "(cl.id IS NOT NULL AND cl.org_id IS DISTINCT FROM d.org_id AND NOT (cl.org_id IS NULL AND o.personal_of=cl.created_by)) OR "
+                 "(l.id IS NOT NULL AND l.org_id IS DISTINCT FROM d.org_id AND NOT (l.org_id IS NULL AND o.personal_of=l.owner_id)))"),
     # an agent of an organisation that is gone, or a personal agent working in an organisation its owner is not in
     "agent": ("SELECT a.user_id, a.owner_id FROM agents a WHERE a.org_id IS NOT NULL AND (NOT EXISTS (SELECT 1 FROM orgs o WHERE o.id=a.org_id) "
               "OR (a.owner_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=a.org_id AND om.user_id=a.owner_id)))"),

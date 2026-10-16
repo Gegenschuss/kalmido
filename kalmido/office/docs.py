@@ -988,6 +988,8 @@ def odoc_status(did):
         ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": st}})
         if r["kind"] == "offer":
             ek_purchases_write(c, oid, did)  # 2.47.0 (#1649): accepted = its purchase is written, left = removed
+            from .pipeline import pl2_offer_status
+            pl2_offer_status(c, oid, did, st)  # 2.50.0 (#1196): accepted = its deal of the pipeline is won
     bump(c)
     c.commit()
     return jsonify(doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin", items=False))
