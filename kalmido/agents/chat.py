@@ -179,6 +179,9 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
             **chat_reply(r),  # 2.33.0 (#1076): reply_to + reply (the quote of the answered message)
             # 2.39.0 (#1179): the person edited their message (null = never); edits = the earlier versions, only for the person
             "edited_at": r["edited_at"] if "edited_at" in r.keys() else None,
+            # 2.62.0 (#1848): pinned (collab/chatpins.py; null = not pinned)
+            "pinned_at": r["pinned_at"] if "pinned_at" in r.keys() else None,
+            "pinned_by": r["pinned_by"] if "pinned_by" in r.keys() and r["pinned_at"] else None,
             **({"edits": med_edits(r)} if edits else {}),
             "attachments": [{**f, "url": (f"/api/v1/chat-attachments/{f['id']}" if api else f"/api/chat-files/{f['id']}")}
                             for f in (files or {}).get(r["id"], [])]}
@@ -784,9 +787,11 @@ def agent_chat_get(aid):
     # 2.7.2 (#422): the server's clock, so the app can tell how long ago a message was delivered
     # 2.35.0 (#1103): the open approval requests (pinned at the top, also when older than this page)
     ap = chat_approvals_open(c, aid, me())[-APPROVAL_PIN_MAX:]
+    from ..collab.chatpins import cpin_agent_list
     return jsonify(agent=agent_public(c, a, me()), messages=msgs, now=iso_ms(now_utc()), has_more=more,
                    steps_live=steps_live(c, aid, me()),
-                   approvals_open=[chat_dict(r, None, None, newest=nw) for r in ap])
+                   approvals_open=[chat_dict(r, None, None, newest=nw) for r in ap],
+                   pins=cpin_agent_list(c, aid, me()))  # 2.62.0 (#1848): the pinned messages, also older than this page
 
 
 def chat_task(c, v, uid_a, uid_b):

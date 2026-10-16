@@ -1670,6 +1670,11 @@ MIGRATIONS = [
     # 2.62.0 A (#1530): the app's key of a sent message (the same on a retry): a second send within seconds returns the first
     ("tchat_msgs", "client_id", "ALTER TABLE tchat_msgs ADD COLUMN client_id TEXT"),
     ("agent_chat", "client_id", "ALTER TABLE agent_chat ADD COLUMN client_id TEXT"),
+    # 2.62.0 A (#1848): a pinned chat message (since when, by whom; NULL = not pinned)
+    ("tchat_msgs", "pinned_at", "ALTER TABLE tchat_msgs ADD COLUMN pinned_at TEXT"),
+    ("tchat_msgs", "pinned_by", "ALTER TABLE tchat_msgs ADD COLUMN pinned_by BIGINT"),
+    ("agent_chat", "pinned_at", "ALTER TABLE agent_chat ADD COLUMN pinned_at TEXT"),
+    ("agent_chat", "pinned_by", "ALTER TABLE agent_chat ADD COLUMN pinned_by BIGINT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -1710,6 +1715,9 @@ CREATE INDEX IF NOT EXISTS books_owner_org ON books(owner_org_id) WHERE owner_or
 -- 2.55.0 A (#1068): templates waiting for a person / sent by a person
 CREATE INDEX IF NOT EXISTS view_layout_offers_to ON view_layout_offers(to_user, state);
 CREATE INDEX IF NOT EXISTS view_layout_offers_from ON view_layout_offers(from_user);
+-- 2.62.0 A (#1848): the pinned messages of a conversation
+CREATE INDEX IF NOT EXISTS tchat_msgs_pinned ON tchat_msgs(room_id) WHERE pinned_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS agent_chat_pinned ON agent_chat(agent_id, user_id) WHERE pinned_at IS NOT NULL;
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 3  # task > subtask > sub-subtask

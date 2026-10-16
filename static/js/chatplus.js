@@ -25,3 +25,63 @@ function csdWake() {
 }
 document.addEventListener('visibilitychange', csdWake);
 window.addEventListener('online', () => setTimeout(csdWake, 300));
+
+// ---- 2.62.0 (#1848): pinned chat messages (team chat and agent chat). "Pin" / "Unpin" in a message's menu (next to
+// Reply; phones: press and hold) puts it into the bar above the messages: the newest pin, "1/3" and an arrow through the
+// others when there are several, a tap on the text jumps to the message (msgJump also loads older pages), the x unpins.
+// At most 5 per conversation (the server says so). One Undo step per pin / unpin. The pins come with every load of the
+// conversation (also when older than the loaded page): S.tc.pins / S.chat.pins.
+const CPN = {idx: {}};
+const cpnPins = k => k[0] === 't' ? (S.tc?.rid === +k.slice(2) ? S.tc.pins || [] : []) : (S.chat?.aid === +k.slice(2) ? S.chat.pins || [] : []);
+function cpnText(m, art) {
+  let body = m.body || '';
+  if (art === 't' && m.enc) {  // an encrypted DM: the text this browser decrypted (the server has only the ciphertext)
+    const d = (S.tc.msgs || []).find(x => x.id === m.id && x._dec) || null;
+    body = d ? d.body : (typeof E2E !== 'undefined' && E2E.dec?.[m.id + ':' + (m.edited_at || '')]) || '';
+    if (!body) return tr('Encrypted message');
+  }
+  const t = mdBrief(decodeMentions(body, art === 't' ? S.tc.users || {} : {})) || (m.attachments || [])[0]?.name || '';
+  return t.length > 140 ? t.slice(0, 140) + '…' : t;
+}
+function cpnBarHtml(k) {
+  const pins = cpnPins(k), art = k[0];
+  if (!pins.length) return `<div class="cpnbar" data-cpn="${k}" hidden></div>`;
+  const i = (CPN.idx[k] || 0) % pins.length, m = pins[i], n = pins.length;
+  return `<div class="cpnbar" data-cpn="${k}" role="region" aria-label="${esc(tr('Pinned messages'))}">${ic('pin', 's')}<button type="button" class="cpngo" data-act="cpn-go" data-art="${art}" data-id="${m.id}" title="${esc(tr('Show the message'))}"><b>${n > 1 ? esc(tr('Pinned {0}/{1}', i + 1, n)) : esc(tr('Pinned'))}</b><span>${esc(cpnText(m, art))}</span></button>${n > 1 ? `<button type="button" class="iconbtn cpnnext" data-act="cpn-next" data-k="${k}" title="${esc(tr('Next pinned message'))}" aria-label="${esc(tr('Next pinned message'))}">${ic('chev', 's')}</button>` : ''}<button type="button" class="iconbtn cpnx" data-act="cpn-x" data-art="${art}" data-id="${m.id}" title="${esc(tr('Unpin'))}" aria-label="${esc(tr('Unpin'))}">${ic('x', 's')}</button></div>`;
+}
+// the bars on the screen follow the state (called by tcPatch / chatPatch and after a pin)
+function cpnSync() {
+  for (const el of document.querySelectorAll('[data-cpn]')) { const h = cpnBarHtml(el.dataset.cpn); if (el._h !== h) { const t = document.createElement('template'); t.innerHTML = h; const n = t.content.firstElementChild; n._h = h; el.replaceWith(n); } }
+}
+// the small pin in a pinned message's line
+const cpnMark = m => m.pinned_at && !m.deleted ? `<span class="cpnmark" title="${esc(tr('Pinned'))}" aria-label="${esc(tr('Pinned'))}">${ic('pin', 's')}</span>` : '';
+const cpnItem = (art, m) => ({label: m.pinned_at ? tr('Unpin') : tr('Pin'), icon: 'pin', fn: () => cpnToggle(art, m.id, !m.pinned_at)});
+async function cpnSet(art, place, id, on) {
+  const url = art === 't' ? `/api/team/messages/${id}/pin` : `/api/agents/${place}/chat/${id}/pin`;
+  const r = await rawFetch('POST', url, {pinned: on});
+  if (art === 't' && S.tc.rid === place) {
+    S.tc.pins = r.pins || []; const m = S.tc.msgs.find(x => x.id === id); if (m) Object.assign(m, {pinned_at: r.message.pinned_at, pinned_by: r.message.pinned_by});
+    tcPatch();
+  } else if (art === 'a' && S.chat.aid === place) {
+    S.chat.pins = r.pins || []; const m = S.chat.msgs.find(x => x.id === id); if (m) Object.assign(m, {pinned_at: r.message.pinned_at, pinned_by: r.message.pinned_by});
+    S.chat.mutAt = (S.chat.seq || 0) + 1;  // a refresh that started before this answer fetches again
+    chatPatch({keep: true});
+  }
+  cpnSync();
+  return r;
+}
+async function cpnToggle(art, id, on) {
+  const place = art === 't' ? S.tc.rid : S.chat.aid, k = art + ':' + place;
+  try { await cpnSet(art, place, id, on); } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); return; }
+  if (on) CPN.idx[k] = 0;  // the new pin shows first
+  const e = histAdd({label: on ? tr('Message pinned') : tr('Message unpinned'), undo: () => cpnSet(art, place, id, !on), redo: () => cpnSet(art, place, id, on)});
+  offerUndo(on ? tr('Message pinned') : tr('Message unpinned'), e);
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act="cpn-go"],[data-act="cpn-next"],[data-act="cpn-x"]'); if (!a) return;
+  e.preventDefault(); e.stopPropagation();
+  if (a.dataset.act === 'cpn-next') { const k = a.dataset.k; CPN.idx[k] = ((CPN.idx[k] || 0) + 1) % Math.max(1, cpnPins(k).length); cpnSync(); $(`[data-cpn="${k}"] .cpnnext`)?.focus({preventScroll: true}); return; }
+  const art = a.dataset.art, id = +a.dataset.id;
+  if (a.dataset.act === 'cpn-x') { cpnToggle(art, id, false); return; }
+  msgJump({art, id, chat: art === 't' ? S.tc.rid : null, agent: art === 'a' ? S.chat.aid : null});
+});

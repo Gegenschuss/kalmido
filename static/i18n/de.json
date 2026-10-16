@@ -8207,5 +8207,11 @@
   "Job has ended": "Job ist beendet",
   "The job reads it after its next step.": "Der Job liest sie nach seinem nächsten Schritt.",
   "The agent does not get this message now (paused, or the job's list is not shared with it)": "Der Agent bekommt diese Nachricht gerade nicht (pausiert, oder die Liste des Jobs ist nicht mit ihm geteilt)",
-  "Sending…": "Wird gesendet…"
+  "Sending…": "Wird gesendet…",
+  "Pinned {0}/{1}": "Angeheftet {0}/{1}",
+  "Pinned messages": "Angeheftete Nachrichten",
+  "Next pinned message": "Nächste angeheftete Nachricht",
+  "Message pinned": "Nachricht angeheftet",
+  "Message unpinned": "Nachricht gelöst",
+  "At most {0} pinned messages. Unpin one first.": "Höchstens {0} angeheftete Nachrichten. Löse zuerst eine."
 }

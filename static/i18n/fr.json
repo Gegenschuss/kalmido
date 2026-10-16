@@ -8207,5 +8207,11 @@
   "Job has ended": "La tâche est terminée",
   "The job reads it after its next step.": "La tâche le lit après sa prochaine étape.",
   "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)",
-  "Sending…": "Envoi…"
+  "Sending…": "Envoi…",
+  "Pinned {0}/{1}": "Épinglé {0}/{1}",
+  "Pinned messages": "Messages épinglés",
+  "Next pinned message": "Message épinglé suivant",
+  "Message pinned": "Message épinglé",
+  "Message unpinned": "Message désépinglé",
+  "At most {0} pinned messages. Unpin one first.": "Au maximum {0} messages épinglés. Désépingle d’abord un message."
 }

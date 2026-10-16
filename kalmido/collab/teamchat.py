@@ -151,13 +151,13 @@ def tchat_sig(c, uid):
     """Change marker for /api/version: the newest message id of my conversations + my read marks."""
     if not collab_all():
         return ""
-    r = c.execute("""SELECT COALESCE(MAX(m.id),0), COUNT(m.id) FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
+    r = c.execute("""SELECT COALESCE(MAX(m.id),0), COUNT(m.id), COUNT(m.pinned_at), COALESCE(MAX(m.pinned_at),'') FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
                      WHERE (r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN """ + vis_sql(ov=False) + ")",
                   (uid, uid, uid, uid)).fetchone()
     e = c.execute("SELECT COALESCE(MAX(edited_at),'') FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id WHERE "
                   "(r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN " + vis_sql(ov=False) + ")", (uid, uid, uid, uid)).fetchone()[0]
     rd = c.execute("SELECT COALESCE(SUM(last_id),0) FROM tchat_reads WHERE user_id=?", (uid,)).fetchone()[0]
-    return f"{r[0]}.{r[1]}.{rd}.{e[-6:] if e else ''}"
+    return f"{r[0]}.{r[1]}.{rd}.{e[-6:] if e else ''}.{r[2]}{r[3][-6:]}"  # 2.62.0 (#1848): + the pins
 
 
 def tchat_unread(c, uid):
@@ -223,7 +223,10 @@ def tchat_msg_dict(c, m, rx=None, quotes=None):
             "task": {"id": t["id"], "title": t["title"]} if t and task_visible(c, t["id"], me()) else None,
             "created_at": m["created_at"], "edited_at": m["edited_at"], "deleted": bool(m["deleted_at"]),
             "reactions": (rx or {}).get(m["id"], []), "reply_to": rt, "reply": rq,
-            "enc": None if m["deleted_at"] or not m["enc"] else _e2e_parse(m["enc"])}  # 2.42.0 (#909): {v, iv, ct} | {sys}
+            "enc": None if m["deleted_at"] or not m["enc"] else _e2e_parse(m["enc"]),  # 2.42.0 (#909): {v, iv, ct} | {sys}
+            # 2.62.0 (#1848): pinned (collab/chatpins.py); a deleted message is never pinned
+            "pinned_at": None if m["deleted_at"] or "pinned_at" not in m.keys() else m["pinned_at"],
+            "pinned_by": None if m["deleted_at"] or "pinned_by" not in m.keys() or not m["pinned_at"] else m["pinned_by"]}
 
 
 def _e2e_parse(v):
@@ -295,11 +298,12 @@ def tchat_messages(rid):
     names = user_names(c, mem | {m["user_id"] for m in rows if m["user_id"]})
     lr, muted = tchat_last_read(c, rid, me())
     from ..collab.chatsave import chat_save_of
+    from ..collab.chatpins import cpin_team_list
     saved = chat_save_of(c, me(), "team", [m["id"] for m in rows])  # 2.37.0 (#1159): saved as a task by me
     return jsonify(room={"id": r["id"], "kind": r["kind"], "list_id": r["list_id"], "muted": muted, "last_read": lr, "e2e": bool(r["e2e"]),
                          "members": [{"id": u, "name": names.get(u, "?"), "agent": u in agent_ids(c)} for u in sorted(mem)]},
                    messages=[{**tchat_msg_dict(c, m, rx, qs), "saved_task_id": saved.get(m["id"])} for m in rows], has_more=more,
-                   users={str(k): v for k, v in names.items()})
+                   users={str(k): v for k, v in names.items()}, pins=cpin_team_list(c, rid))  # 2.62.0 (#1848): also older than the page
 
 
 @app.post("/api/team/rooms/<int:rid>/messages")
@@ -566,7 +570,7 @@ def v1_tchat_dm():
 def v1_tchat_messages(rid):
     v1_args(("before", "limit"))
     j = v1_call(tchat_messages, rid)
-    return jsonify(data=j["messages"], room=j["room"], has_more=j["has_more"], next_cursor=None)
+    return jsonify(data=j["messages"], room=j["room"], has_more=j["has_more"], next_cursor=None, pins=j["pins"])  # 2.62.0 (#1848): pins
 
 
 @app.post("/api/v1/team/rooms/<int:rid>/messages")
@@ -630,7 +634,9 @@ def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "reply_to": nul("integer", description="2.33.0: the answered message of this conversation"),
         "reply": {"anyOf": [ref("ReplyQuote"), {"type": "null"}]},
         "enc": nul("object", description="2.42.0: an end-to-end encrypted DM: {v, iv, ct} (body empty, only the two people can "
-                   "decrypt it in their browser) or {sys: on | off} (the notice that switched it)")}}
+                   "decrypt it in their browser) or {sys: on | off} (the notice that switched it)"),
+        "pinned_at": nul("string", description="2.62.0 (#1848): pinned since (null = not pinned); the conversation's page carries pins"),
+        "pinned_by": nul("integer", description="2.62.0 (#1848): who pinned it")}}
     schemas["TeamMessagePage"] = page("TeamMessage")
     rp, mp = pid(desc="Conversation (room) id"), pid(desc="Message id")
     paths["/team/rooms"] = {"get": op("2.17.0: your team chat conversations (channels of shared lists, direct messages) with unread counts",
@@ -639,7 +645,7 @@ def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                     ok({"type": "object"}) | errs("403", "404"), body={"type": "object", "properties": {"user_id": {"type": "integer"}},
                                                                                      "required": ["user_id"]}, scope="comments")}
     paths["/team/rooms/{id}/messages"] = {
-        "get": op("Messages of a conversation, oldest first (?before=<id> for older ones)", TC, ok(ref("TeamMessagePage")) | errs("400", "404"),
+        "get": op("Messages of a conversation, oldest first (?before=<id> for older ones); 2.62.0 (#1848): pins = its pinned messages", TC, ok(ref("TeamMessagePage")) | errs("400", "404"),
                   [rp, q("before", "Only messages older than this id", {"type": "integer"}), q("limit", "At most this many (1-100)", {"type": "integer"})]),
         "post": op("Write in a conversation; mention people as <@id>", TC, ok(ref("TeamMessage"), "Created", "201") | errs("400", "404"), [rp],
                    body={"type": "object", "properties": {"body": {"type": "string"}, "task_id": {"type": "integer"},
