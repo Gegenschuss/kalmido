@@ -353,5 +353,18 @@ check(ap14 and len(json.loads(ap14[0][0] or "{}").get("events_at") or {}) == 1, 
 r = A.post(B + f"/api/proposals/{J14}/undo")
 check(r.ok and not q("SELECT 1 FROM events WHERE title='Two-day shoot' AND deleted_at IS NULL"), f"review 9: an unchanged draft goes on undo ({r.text[:120]})")
 
+# #1351 review 10: a list with a new member stays; modules stay while a changed draft stays
+A.patch(B + "/api/settings", json={"features": ",".join(sorted(feats(A) - {"events"}))})
+J10, res = own_apply({**OWN, "name": "Review ten", "shoot_days": [{"title": "Ten shoot", "date": "2027-08-01"}]}, ["0", "300"])
+L10 = res.get("list_id")
+check(A.put(B + f"/api/lists/{L10}/members", json={"user_id": BOB, "role": "view"}).ok, "review 10: bob joins the project list")
+E10 = q("SELECT id FROM events WHERE title='Ten shoot' AND deleted_at IS NULL")
+check(E10 and A.patch(B + f"/api/events/{E10[0][0]}", json={"title": "Ten shoot (moved)"}).ok, "review 10: the person changes the draft")
+r = A.post(B + f"/api/proposals/{J10}/undo")
+check(r.ok and q("SELECT 1 FROM lists WHERE id=?", (L10,)), f"review 10: a list with another member stays ({r.text[:160]})")
+check(not q("SELECT 1 FROM tasks WHERE list_id=? AND deleted_at IS NULL", (L10,)), "review 10: the proposal's tasks went to the trash")
+check(q("SELECT 1 FROM events WHERE id=? AND deleted_at IS NULL", (E10[0][0] if E10 else 0,)), "review 10: the changed draft stays")
+check("events" in feats(A), "review 10: the calendar module stays on while a draft stayed")
+
 print(f"p251_b_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
