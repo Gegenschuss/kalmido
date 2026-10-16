@@ -8206,5 +8206,18 @@
   "Back to the whole chat": "Zurück zum ganzen Chat",
   "Job has ended": "Job ist beendet",
   "The job reads it after its next step.": "Der Job liest sie nach seinem nächsten Schritt.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "Der Agent bekommt diese Nachricht gerade nicht (pausiert, oder die Liste des Jobs ist nicht mit ihm geteilt)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "Der Agent bekommt diese Nachricht gerade nicht (pausiert, oder die Liste des Jobs ist nicht mit ihm geteilt)",
+  "{0}: malware found ({1}), not uploaded": "{0}: Schadsoftware gefunden ({1}), nicht hochgeladen",
+  "Locked: malware was found in this file ({0})": "Gesperrt: In dieser Datei wurde Schadsoftware gefunden ({0})",
+  "Locked: malware found": "Gesperrt: Schadsoftware gefunden",
+  "The virus scanner found {0} in this file. Download and preview are blocked; the file can be deleted.": "Der Virenscanner hat {0} in dieser Datei gefunden. Herunterladen und Vorschau sind gesperrt; die Datei kann gelöscht werden.",
+  "Unchecked": "Ungeprüft",
+  "Too large for the virus scanner: this file was not checked.": "Zu groß für den Virenscanner: Diese Datei wurde nicht geprüft.",
+  "The virus scanner was not reachable. The check follows automatically.": "Der Virenscanner war nicht erreichbar. Die Prüfung wird automatisch nachgeholt.",
+  "The virus scanner found {0} in your file {1}. The file is locked.": "Der Virenscanner hat {0} in deiner Datei {1} gefunden. Die Datei ist gesperrt.",
+  "Virus scanner: off (KALMIDO_CLAMD is not set). Uploads are not checked.": "Virenscanner: aus (KALMIDO_CLAMD ist nicht gesetzt). Uploads werden nicht geprüft.",
+  "Virus scanner: active.": "Virenscanner: aktiv.",
+  "Virus scanner: not reachable. Uploads are taken and marked “Unchecked”; the check follows once it runs again.": "Virenscanner: nicht erreichbar. Uploads werden angenommen und als „Ungeprüft“ markiert; die Prüfung folgt, sobald er wieder läuft.",
+  "{0} file waits for the check": ["{0} Datei wartet auf die Prüfung", "{0} Dateien warten auf die Prüfung"],
+  "{0} locked file (malware found)": ["{0} gesperrte Datei (Schadsoftware gefunden)", "{0} gesperrte Dateien (Schadsoftware gefunden)"]
 }

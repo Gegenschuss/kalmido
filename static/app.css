@@ -7687,3 +7687,15 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+
+/* 2.61.0 A (#1818): virus scan marks of stored files ("Unchecked", "Locked: malware found"); a tap shows the explanation */
+.scnmark{display:inline-flex;align-items:center;gap:.25rem;margin-left:.375rem;padding:0 .375rem;border-radius:62.5rem;background:var(--bg4);color:var(--text2);font-size:var(--fs-xs);line-height:1.5;white-space:nowrap;cursor:pointer;vertical-align:middle}
+.scnmark svg{width:.75rem;height:.75rem;color:inherit}
+.scnmark.scnbad{background:var(--danger);color:#fff}
+.att .as .scnmark:first-child,.abbadges .scnmark:first-child{margin-left:0}
+.scnover{position:absolute;left:.25rem;bottom:.25rem;max-width:calc(100% - .5rem);display:flex}
+.scnover .scnmark{margin:0;overflow:hidden;text-overflow:ellipsis}
+.scnlock{opacity:.85}
+.att.scnlock .attx svg,.povf.scnlock svg{color:var(--danger)}
+.povfx{display:flex;align-items:center;gap:.5rem;flex:1;min-width:0}
+@media (pointer:coarse){ .scnmark{padding:.125rem .5rem} }

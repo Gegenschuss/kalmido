@@ -8206,5 +8206,18 @@
   "Back to the whole chat": "Torna alla chat completa",
   "Job has ended": "Il job è terminato",
   "The job reads it after its next step.": "Il job lo legge dopo il suo prossimo passo.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agente non riceve questo messaggio ora (in pausa, oppure la lista del lavoro non è condivisa con lui)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agente non riceve questo messaggio ora (in pausa, oppure la lista del lavoro non è condivisa con lui)",
+  "{0}: malware found ({1}), not uploaded": "{0}: trovato malware ({1}), non caricato",
+  "Locked: malware was found in this file ({0})": "Bloccato: in questo file è stato trovato malware ({0})",
+  "Locked: malware found": "Bloccato: malware trovato",
+  "The virus scanner found {0} in this file. Download and preview are blocked; the file can be deleted.": "L’antivirus ha trovato {0} in questo file. Download e anteprima sono bloccati; il file può essere eliminato.",
+  "Unchecked": "Non verificato",
+  "Too large for the virus scanner: this file was not checked.": "Troppo grande per l’antivirus: questo file non è stato verificato.",
+  "The virus scanner was not reachable. The check follows automatically.": "L’antivirus non era raggiungibile. Il controllo verrà eseguito automaticamente in seguito.",
+  "The virus scanner found {0} in your file {1}. The file is locked.": "L’antivirus ha trovato {0} nel tuo file {1}. Il file è bloccato.",
+  "Virus scanner: off (KALMIDO_CLAMD is not set). Uploads are not checked.": "Antivirus: disattivato (KALMIDO_CLAMD non è impostato). I caricamenti non vengono verificati.",
+  "Virus scanner: active.": "Antivirus: attivo.",
+  "Virus scanner: not reachable. Uploads are taken and marked “Unchecked”; the check follows once it runs again.": "Antivirus: non raggiungibile. I caricamenti vengono accettati e segnati come «Non verificato»; il controllo seguirà appena torna attivo.",
+  "{0} file waits for the check": ["{0} file attende il controllo", "{0} file attendono il controllo"],
+  "{0} locked file (malware found)": ["{0} file bloccato (malware trovato)", "{0} file bloccati (malware trovato)"]
 }

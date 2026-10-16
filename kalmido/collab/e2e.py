@@ -280,7 +280,7 @@ def e2e_attachment_upload(tid):
         return err(tr("Invalid value: {0}", "file"))
     blob = FileStorage(stream=f.stream, filename="encrypted.kenc", content_type="application/octet-stream")
     saved, ids = [], []
-    e = save_attachments(c, tid, [blob], saved=saved, uid=uid, ids=ids)
+    e = save_attachments(c, tid, [blob], saved=saved, uid=uid, ids=ids, sealed=True)  # 2.61.0: never scanned (unreadable)
     if e:
         c.rollback()
         unlink_files(saved)

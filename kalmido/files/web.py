@@ -30,8 +30,9 @@ def _names(c, ids):
     return {r[0]: r[1] for r in c.execute(f"SELECT id, display_name FROM users WHERE id IN ({q})", ids)}
 
 
-def fs_node_json(c, n, role=None, names=None, shared=None):
-    """The public form of a node row (role: the asker's; shared: has shares / organisation access)."""
+def fs_node_json(c, n, role=None, names=None, shared=None, up=None):
+    """The public form of a node row (role: the asker's; shared: has shares / organisation access; up: the marks of
+    files/upsafe.up_marks for a list, None = read for this node)."""
     names = names if names is not None else _names(c, [n["owner_id"], n["created_by"]])
     out = {"id": n["id"], "parent_id": n["parent_id"], "kind": n["kind"], "name": n["name"], "org_id": n["org_id"],
            "owner_id": n["owner_id"], "owner": names.get(n["owner_id"], ""), "created_by": n["created_by"],
@@ -42,6 +43,12 @@ def fs_node_json(c, n, role=None, names=None, shared=None):
         out["ref_kind"], out["ref_id"] = n["ref_kind"], n["ref_id"]
     if shared is not None:
         out["shared"] = shared
+    if n["kind"] == "file":  # 2.61.0 (#1818): + up (not checked by the virus scanner yet / locked)
+        if up is None:
+            from .upsafe import up_marks
+            up = up_marks(c, "fs", [n["id"]])
+        if up.get(n["id"]):
+            out["up"] = up[n["id"]]
     return out
 
 
@@ -56,12 +63,14 @@ def _items(c, rows, parent_role=None):
     uid = me()
     names = _names(c, [x for r in rows for x in (r["owner_id"], r["created_by"])])
     sh = _shared_flags(c, [r["id"] for r in rows])
+    from .upsafe import up_marks
+    up = up_marks(c, "fs", [r["id"] for r in rows if r["kind"] == "file"])  # 2.61.0 (#1818)
     out = []
     for r in rows:
         role = parent_role
         if role != "owner":
             role = fs_role(c, r["id"], uid) or role
-        x = fs_node_json(c, r, role, names, r["id"] in sh or bool(r["org_access"]))
+        x = fs_node_json(c, r, role, names, r["id"] in sh or bool(r["org_access"]), up)
         if r["kind"] == "link":
             try:
                 fs_link_target(c, dict(r))
@@ -312,6 +321,8 @@ def _send(c, n, version=None, dl=False):
         if not v:
             raise Denied(404)
         path, name, mime, size = v["path"], n["name"], v["mime"] or n["mime"], v["size"]
+        from .scan import sc_guard
+        sc_guard(c, "fs", n["id"], v["no"])  # 2.61.0 (#1818): a version found infected later is locked
     full = os.path.join(ATT_DIR, path)
     if not os.path.isfile(full):
         return err(tr("File damaged or missing"), 404)

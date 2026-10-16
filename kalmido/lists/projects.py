@@ -239,6 +239,7 @@ def overview_build(c, lid, uid):
                               WHERE m.list_id=? ORDER BY m.added_at, u.id""", (lid,)):
             members.append({"user_id": m["user_id"], "name": m["display_name"] or m["username"], "role": m["role"],
                             **({"agent": True} if m["user_id"] in ag else {})})
+    from ..files.scan import sc_up
     status = []
     if collab_all():
         srows = c.execute("SELECT * FROM list_status WHERE list_id=? ORDER BY id DESC LIMIT 10", (lid,)).fetchall()
@@ -247,8 +248,8 @@ def overview_build(c, lid, uid):
                    "created_at": r["created_at"]} for r in srows]
     out = {"list_id": lid, "name": lst["name"], "role": role, "can_edit": role in WRITE_ROLES,
            "description": lst["description"] or "", "links": links, "milestones": ms,
-           "files": [ov_file_dict(r, names) for r in frows],
-           "task_files": tfiles, "members": members,
+           "files": sc_up(c, "list", [ov_file_dict(r, names) for r in frows]),  # 2.61.0 (#1818): + up (virus scan marks)
+           "task_files": sc_up(c, "att", tfiles), "members": members,
            "status": {"current": lst["status"] or None, "note": lst["status_note"] or "", "at": lst["status_at"], "history": status},
            "time": None}
     if time_all() and lst["time_tracking"]:  # 2.41.0 (#1471): "Tracked" only with the list's time tracking on
@@ -535,11 +536,20 @@ def list_file_upload(lid):
             unlink_files(saved)
             return err(tr("{0}: the file is empty and was not uploaded", name))
         from ..core.orgcrypt import oc_list_org, oc_seal_path
-        oc_seal_path(c, oc_list_org(c, lid), full)  # 2.42.0 (#828): a project file of an organisation's list is sealed at rest
+        from ..files.upsafe import up_check_path, up_after_store, UploadRefused
         mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
-        c.execute("INSERT INTO list_files(list_id,name,mime,size,path,user_id,created_at) VALUES(?,?,?,?,?,?,?)",
-                  (lid, name, mime, size, rel, me(), ts))
+        lorg = oc_list_org(c, lid)
+        try:  # 2.61.0 (#1818 #1819 #1820): scan + metadata before the file is sealed
+            size, mime, info = up_check_path(c, full, name, mime, me(), lorg or None, "list")
+        except UploadRefused as e:
+            c.rollback()
+            unlink_files(saved)
+            return err(str(e))
+        oc_seal_path(c, lorg, full)  # 2.42.0 (#828): a project file of an organisation's list is sealed at rest
+        fid = insert_id(c, "INSERT INTO list_files(list_id,name,mime,size,path,user_id,created_at) VALUES(?,?,?,?,?,?,?)",
+                        (lid, name, mime, size, rel, me(), ts))
+        up_after_store(c, "list", fid, lorg or None, info)
     bump(c)
     c.commit()
     return jsonify(overview_build(c, lid, me()))
@@ -550,6 +560,9 @@ def need_list_file(c, fid, write):
     if not r:
         raise Denied(404)
     need_overview(c, r["list_id"], write=write)
+    if not write:
+        from ..files.scan import sc_guard
+        sc_guard(c, "list", fid)  # 2.61.0 (#1818): a file found infected later is locked
     return r
 
 

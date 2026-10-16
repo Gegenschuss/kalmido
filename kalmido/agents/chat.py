@@ -229,6 +229,9 @@ def chat_files_of(c, mids):
         return out
     for r in c.execute(f"SELECT id, message_id, name, mime, size FROM chat_files WHERE message_id IN ({','.join('?' * len(mids))}) ORDER BY id", mids):
         out.setdefault(r["message_id"], []).append({"id": r["id"], "name": r["name"], "mime": r["mime"], "size": r["size"]})
+    if out:  # 2.61.0 (#1818): + up (virus scan marks)
+        from ..files.scan import sc_up
+        sc_up(c, "chat", [d for v in out.values() for d in v])
     return out
 
 
@@ -289,8 +292,14 @@ def chat_save_files(c, m, files, saved):
             return tr("{0}: the file is empty and was not uploaded", name)
         mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
-        c.execute("INSERT INTO chat_files(message_id,name,mime,size,path,created_at) VALUES(?,?,?,?,?,?)",
-                  (m["id"], name, mime, size, rel, ts))
+        from ..files.upsafe import up_check_path, up_after_store, UploadRefused
+        try:  # 2.61.0 (#1818 #1819): scan + metadata (chat files are personal: no organisation)
+            size, mime, info = up_check_path(c, full, name, mime, m["user_id"], None, "chat")
+        except UploadRefused as e:
+            return str(e)
+        cid = insert_id(c, "INSERT INTO chat_files(message_id,name,mime,size,path,created_at) VALUES(?,?,?,?,?,?)",
+                        (m["id"], name, mime, size, rel, ts))
+        up_after_store(c, "chat", cid, None, info)
     return None
 
 
@@ -631,6 +640,9 @@ def chat_file_access(c, fid, write=False):
         side = "user"
     if write and r["sender"] != side:
         raise Denied(403, tr("Only the sender can remove this file"))
+    if not write:
+        from ..files.scan import sc_guard
+        sc_guard(c, "chat", fid)  # 2.61.0 (#1818): a file found infected later is locked
     return r
 
 
