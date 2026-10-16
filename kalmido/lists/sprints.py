@@ -91,8 +91,8 @@ def spr_tasks(c, s, uid=None):
     rv = spr_review(s) if s["state"] == "closed" else None
     if rv is not None:
         ids = [int(x) for x in (rv.get("done") or []) + (rv.get("moved") or []) if isinstance(x, int)][:5000]
-        rows = c.execute(f"SELECT * FROM tasks WHERE id IN ({','.join('?' * len(ids))}) AND deleted_at IS NULL AND ms=0",
-                         ids).fetchall() if ids else []
+        rows = c.execute(f"SELECT * FROM tasks WHERE id IN ({','.join('?' * len(ids))}) AND list_id=? AND deleted_at IS NULL AND ms=0",
+                         [*ids, s["list_id"]]).fetchall() if ids else []  # review: a task moved to another list since drops out
         moved = set(rv.get("moved") or [])
         rows = [dict(r, status=0, completed_at=None) if r["id"] in moved else dict(r) for r in rows]
     else:
@@ -139,6 +139,14 @@ def spr_dict(c, s, uid=None, rows=None):
     if rv and uid and list_role(c, s["list_id"], uid) == "participant":  # a participant: only the ids of tasks they fully see
         _, wr, _ = pvis(c, uid, s["list_id"])
         rv = {**rv, **{k: [i for i in (rv.get(k) or []) if i in wr] for k in ("done", "moved", "added")}}
+        # review: the totals from the filtered ids too (the whole sprint's numbers would tell of hidden tasks)
+        ids = [i for k in ("done", "moved", "added") for i in rv[k] if isinstance(i, int)]
+        pts = {r["id"]: r["points"] or 0 for r in c.execute(
+            f"SELECT id, points FROM tasks WHERE id IN ({','.join('?' * len(ids))})", ids)} if ids else {}
+        rv.update(count_done=len(rv["done"]), count_total=len(rv["done"]) + len(rv["moved"]),
+                  points_done=sum(pts.get(i, 0) for i in rv["done"]),
+                  points_total=sum(pts.get(i, 0) for i in rv["done"] + rv["moved"]),
+                  points_added=sum(pts.get(i, 0) for i in rv["added"]))
     return {"id": s["id"], "list_id": s["list_id"], "num": s["num"], "name": s["name"], "title": spr_title(s),
             "start": s["start"], "end": s["end_day"], "goal": s["goal"], "state": s["state"],
             "closed_at": s["closed_at"], "created_at": s["created_at"], "review": rv, "progress": spr_progress(rows)}

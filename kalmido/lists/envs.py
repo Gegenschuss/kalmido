@@ -298,6 +298,8 @@ def env_hook(eid, token):
         r = c.execute("SELECT e.*, l.org_id, l.archived FROM list_envs e JOIN lists l ON l.id=e.list_id WHERE e.id=? AND e.deleted_at IS NULL", (eid,)).fetchone()
     if not r or not r["token_hash"] or len(token) > 200 or not hmac.compare_digest(r["token_hash"], hashlib.sha256(token.encode()).hexdigest()):
         return err(tr("unknown"), 403)
+    if r["archived"]:  # review: an archived project takes no deployments
+        return err(tr("unknown"), 403)
     acx_anon_bind(c, r["org_id"])  # ... then write inside exactly the list's organisation
     import time
     now = time.time()

@@ -35,10 +35,11 @@ function env_row(e, can) {
   const now = c ? `${esc(c.milestone || c.version)}${c.milestone && c.version && c.version !== c.milestone ? ' (' + esc(c.version) + ')' : ''} <span class="muted">· ${esc(tr('since {0}', env_day(c.at)))}</span>` : `<span class="muted">${esc(tr('Nothing put here yet'))}</span>`;
   return `<div class="envrow"><b class="envn">${esc(e.name)}</b><span class="envnow">${now}</span>${can ? `<button type="button" class="btn sm" data-env="set" data-id="${e.id}">${esc(tr('Put here…'))}</button><button type="button" class="iconbtn" data-env="edit" data-id="${e.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div>`;
 }
-function env_ovHtml(l, can) {  // inside the "Milestones" block of the project page
+function env_ovHtml(l, can, hasMs = true) {  // inside the "Milestones" block of the project page
   const d = ENV.d[l.id];
   if (!d || (!d.busy && d.v !== S.v)) setTimeout(() => env_load(l.id), 0);
   const j = d?.j;
+  if (!hasMs && !j?.envs?.length) return '';  // 2.60.0 (#1514, #1061): an empty Milestones block stays one line
   if (!j) return d?.err ? '' : `<div class="muted envbox">${esc(tr('Loading…'))}</div>`;
   const rows = j.envs.map(e => env_row(e, can)).join('');
   const sug = can && l.ptype === 'software' ? j.suggest.filter(n => !j.envs.some(e => e.name.toLowerCase() === n.toLowerCase())) : [];

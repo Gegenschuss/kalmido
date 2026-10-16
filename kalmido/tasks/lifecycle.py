@@ -159,6 +159,10 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
             return e
     elif lid != cur["list_id"] and cur["milestone_id"]:
         f["milestone_id"] = None  # moved to another list: the milestone stays behind
+    if lid != cur["list_id"] and cur["status"] == 0:  # 2.60.0 (#1512, review): a task waiting for its approval keeps its list
+        from ..tasks.review import _gate_holds, rvw_gate, rvw_may
+        if _gate_holds(c, cur) and not rvw_may(c, cur, me()):
+            return rvw_gate(c, tid) or tr("Changed in the meantime, nothing to undo")
     if "sprint_id" in f or (lid != cur["list_id"] and cur["sprint_id"]):  # 2.60.0 (#343): a sprint of the same list
         from ..lists.sprints import spr_apply
         e = spr_apply(c, f, cur, lid)
@@ -432,6 +436,11 @@ def undo_status(c, tid, u):
         st = int(u.get("status") or 0)
         if t["status"] != 0 or st not in (2, -1):
             return tr("Changed in the meantime, nothing to undo")
+        if st == 2:  # 2.60.0 (#1512, review): undoing a reopen completes again -- only past an open review gate
+            from ..tasks.review import rvw_gate
+            e = rvw_gate(c, tid)
+            if e:
+                return e
         c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=?",
                   (st, when(u.get("completed_at")), who(u.get("completed_by")), ts, tid))
         if st == 2:  # 2.19.0 (#653): the kid's stars of that completion come back

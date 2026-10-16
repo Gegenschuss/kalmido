@@ -218,6 +218,8 @@ def rvw_apply(c, tid, b):
         if not rvw_may(c, t, uid):
             raise Denied(403, tr("Only the reviewer or a list admin can decide on this review") if uid != t["assignee_id"]
                          else tr("You cannot approve your own task"))
+        if t["status"] != 0:  # 2.60.0 review: only an open task is decided on (a done one cannot be sent back)
+            raise BadInput(tr("This task does not wait for a review"))
         if act == "approve" and t["review"] not in ("pending", "changes") or act == "changes" and t["review"] not in ("pending", "approved"):
             raise BadInput(tr("This task does not wait for a review"))
         ts = iso(now_utc())
