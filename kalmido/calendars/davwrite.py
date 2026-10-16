@@ -143,7 +143,7 @@ def _cdw_fields(b, need_times):
         if k in b:
             if not isinstance(b[k], str):
                 raise ValueError(k)
-            v = b[k].replace("\r\n", "\n")
+            v = b[k].replace("\r\n", "\n").replace("\r", "\n")  # 2.52.0 review: a lone CR too
             out[k] = (" ".join(v.split()) if k != "description" else v)[:n]
     if "start" in b or "end" in b or need_times:
         ad = b.get("all_day")

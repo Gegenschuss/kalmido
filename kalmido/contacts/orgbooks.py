@@ -11,7 +11,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db
 from ..core.pg import system_ctx
 from ..accounts.session import me
-from ..core.access import Denied, need_feat
+from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..personal.timetrack import BadInput
 from ..contacts.model import book_public, book_touch, need_book, obk_can_take
 
@@ -32,6 +32,11 @@ def obk_heir(c, oid, uid):
 def obk_hand_on(c, bid, heir):
     c.execute("DELETE FROM book_members WHERE book_id=? AND user_id=?", (bid, heir))  # the manager needs no share of its own
     c.execute("UPDATE books SET owner_id=? WHERE id=?", (heir, bid))
+    # 2.52.0 review: a birthday list the new manager cannot write (e.g. the old manager's private list) is unset, so the
+    # book shows "no birthday list" and an admin picks one, instead of occ_sync skipping silently
+    r = c.execute("SELECT occ_list_id FROM books WHERE id=?", (bid,)).fetchone()
+    if r and r[0] and list_role(c, r[0], heir) not in WRITE_ROLES:
+        c.execute("UPDATE books SET occ_list_id=NULL WHERE id=?", (bid,))
 
 
 def obk_leave(c, oid, uid, heir):
