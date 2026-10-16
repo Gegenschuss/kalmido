@@ -87,7 +87,7 @@ function ofdListHtml() {
   const grp = k === 'reminder' && list.some(r => r.settled) && list.some(r => !r.settled);
   if (k === 'reminder') list.sort((a, b) => (a.settled ? 1 : 0) - (b.settled ? 1 : 0));
   const feeTxt = r => +r.fee_open > 0 ? `<small class="ofdfee">${esc(k === 'reminder' ? tr('fee open: {0}', r.fee_open_text || r.fee_open) : tr('reminder fee open: {0}', r.fee_open_text || r.fee_open))}</small>` : '';
-  return bar + `<ul class="ofclist ofdlist" role="list">${list.map((r, i) => `${grp && r.settled && !list[i - 1]?.settled ? `<li class="ofdgrp muted" role="presentation">${tr('Settled')}</li>` : ''}<li><button type="button" class="ofcrow ofdrow st-${r.state || r.status}" data-ofd="open" data-id="${r.id}">
+  return bar + (k === 'invoice' && typeof oa_ppBox === 'function' ? oa_ppBox() : '') + `<ul class="ofclist ofdlist" role="list">${list.map((r, i) => `${grp && r.settled && !list[i - 1]?.settled ? `<li class="ofdgrp muted" role="presentation">${tr('Settled')}</li>` : ''}<li><button type="button" class="ofcrow ofdrow st-${r.state || r.status}" data-ofd="open" data-id="${r.id}">
     <span class="ofcn"><b>${r.locked ? `<span class="ofdlk" title="${esc(tr('Finalised'))}">${ic('lock', 's')}</span>` : ''}${esc(r.number || tr('(no number)'))}${r.recipient_name ? ` · ${esc(r.recipient_name)}` : ''}</b><small class="muted">${esc([r.project_title, r.date ? fmtDateLoc(r.date) : '', inv && r.due_date && !['paid', 'cancelled'].includes(r.state) ? tr('due {0}', fmtDateLoc(r.due_date)) : ''].filter(Boolean).join(' · '))}</small></span>
     <span class="ofdsum"><b>${esc(inv ? r.gross_text : r.net_text)}</b>${inv && r.open && !['draft', 'paid', 'cancelled'].includes(r.state) && r.open !== r.gross ? `<small class="muted">${esc(tr('open: {0}', r.open_text || r.open))}</small>` : ''}${feeTxt(r)}<small class="rotag st-${r.state || r.status}">${esc(r.status_text)}</small></span>${ic('chev', 's')}</button></li>`).join('')}</ul>`;
 }
@@ -173,7 +173,7 @@ function ofdEditorHtml() {
   const logSec = adm ? ofdSec('log', tr('History'), ofdLogHtml(d)) : '';
   const ln = OFD.langNotes && OFD.langNotes.id === d.id && !lk ? OFD.langNotes.notes : [];  // 2.40.0 (#1381): what the language switch left as it was
   const langNote = ln.length ? `<div class="ofdlnote" role="status">${ic('info', 's')}<span>${tr('Language changed. Standard texts were translated; these stayed as they were:')}<br>${ln.map(esc).join('<br>')}</span><button type="button" class="ib" data-ofd="ln-x" aria-label="${esc(tr('Close'))}">${ic('x', 's')}</button></div>` : '';
-  return `${head}${banner}${langNote}${typeof sg_box === 'function' ? sg_box(d) : ''}<div class="ofdeditor" data-fg="ofd:${d.id}" data-fg-live><fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${headSec}${kind === 'offer' && typeof tpOpenId === 'function' && tpPart(d, tpOpenId(d)) ? `<section class="ofdsec open tpsec"><h3>${esc(tr('Part'))}</h3>${tpPartEditorHtml(d, adm)}</section>` /* 2.47.0 (#1215): an open part */ : `<section class="ofdsec open"><h3>${kind === 'reminder' ? tr('Reminded invoices') : tr('Positions')}</h3>${items}${auto}${totals}</section>${typeof tpPartsHtml === 'function' ? tpPartsHtml(d, adm) : ''}`}${kind === 'reminder' ? '' : rightsSec}${textsSec}${kind === 'reminder' ? '' : fieldsSec}</fieldset>${ofdFeeHtml(d, adm)}${paySec}${logSec}</div>`;  // 2.50.0 (#1200): sg_box = the approval link of a sent quotation
+  return `${head}${banner}${typeof oa_docBanner === 'function' ? oa_docBanner(d) : ''}${langNote}${typeof sg_box === 'function' ? sg_box(d) : ''}<div class="ofdeditor" data-fg="ofd:${d.id}" data-fg-live><fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${headSec}${kind === 'offer' && typeof tpOpenId === 'function' && tpPart(d, tpOpenId(d)) ? `<section class="ofdsec open tpsec"><h3>${esc(tr('Part'))}</h3>${tpPartEditorHtml(d, adm)}</section>` /* 2.47.0 (#1215): an open part */ : `<section class="ofdsec open"><h3>${kind === 'reminder' ? tr('Reminded invoices') : tr('Positions')}</h3>${items}${auto}${totals}</section>${typeof tpPartsHtml === 'function' ? tpPartsHtml(d, adm) : ''}`}${kind === 'reminder' ? '' : rightsSec}${textsSec}${kind === 'reminder' ? '' : fieldsSec}</fieldset>${ofdFeeHtml(d, adm)}${paySec}${logSec}</div>`;  // 2.50.0 (#1200): sg_box = the approval link of a sent quotation
 }
 // 2.38.0 (#1021, F1): the invoices a reminder lists (read-only rows), the payments of an invoice
 function ofdRefsHtml(d, t) {
@@ -211,7 +211,7 @@ function ofdItemsHtml(d, adm) {
       <span class="ofdnums"><span class="muted">−</span><input data-i="${i}" data-k="rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(it.rate))}" aria-label="${esc(tr('Amount'))}"><span class="muted">€</span>
       <select data-i="${i}" data-k="tax" aria-label="${esc(tr('VAT'))}">${taxes.map(([v, n]) => `<option value="${v}" ${it.tax === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
       <b class="ofdlt">${line ? esc(line.total_text || ofdMoney(line.total, d)) : ''}</b></span></div>${mv}</li>`;
-    return `<li class="ofdit"><span class="ofdpos">${line?.pos || ''}</span>
+    return `<li class="ofdit${it.agent_flag ? ' oa_flag' : ''}"><span class="ofdpos">${line?.pos || ''}</span>
       <div class="ofditb"><input class="ofdtt" data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(tr('Service'))}" aria-label="${esc(tr('Service'))}">
       <input class="ofddt" data-i="${i}" data-k="detail" value="${esc(it.detail)}" maxlength="4000" placeholder="${esc(tr('Detail (optional)'))}" aria-label="${esc(tr('Detail'))}">
       <span class="ofdnums">${it.unit === 'percent' ? ekPctHtml(it, i, line, d) : `<input data-i="${i}" data-k="qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.qty))}" aria-label="${esc(tr('Quantity'))}">
@@ -220,7 +220,7 @@ function ofdItemsHtml(d, adm) {
       <select data-i="${i}" data-k="tax" aria-label="${esc(tr('VAT'))}">${taxes.map(([v, n]) => `<option value="${v}" ${it.tax === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
       <b class="ofdlt">${line ? esc(line.total_text || ofdMoney(line.total, d)) : ''}</b></span>
       <span class="ofdflags">${inv ? '' : `<label class="chkl"><input type="checkbox" data-i="${i}" data-k="raw_fee" ${it.raw_fee ? 'checked' : ''}> ${tr('raw data')}</label><label class="chkl"><input type="checkbox" data-i="${i}" data-k="producing" ${it.producing ? 'checked' : ''}> ${tr('producing')}</label><label class="chkl"><input type="checkbox" data-i="${i}" data-k="discountable" ${it.discountable ? 'checked' : ''}> ${tr('discount')}</label>`}
-      ${adm ? `<label class="chkl ofdcost">${tr('Purchase')} <input data-i="${i}" data-k="cost" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.cost))}" aria-label="${esc(tr('External cost per unit (internal)'))}"></label>${it.margin != null ? `<span class="ofdmargin${it.margin < 0 ? ' neg' : ''}">${esc(tr('Surplus {0}', ofdMoney(it.margin, d)))}</span>` : ''}` : ''}</span></div>${mv}</li>`;
+      ${adm ? `<label class="chkl ofdcost">${tr('Purchase')} <input data-i="${i}" data-k="cost" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.cost))}" aria-label="${esc(tr('External cost per unit (internal)'))}"></label>${it.margin != null ? `<span class="ofdmargin${it.margin < 0 ? ' neg' : ''}">${esc(tr('Surplus {0}', ofdMoney(it.margin, d)))}</span>` : ''}` : ''}</span>${typeof oa_flagHtml === 'function' ? oa_flagHtml(it, i) : ''}</div>${mv}</li>`;  // 2.51.0 A (#1348): an agent's marks
   }).join('');
   return `<ul class="ofdits" role="list">${rows}</ul><div class="ofdadd"><button type="button" class="btn sm pri" data-ofd="it-svc">${ic('plus', 's')}<span>${tr('Add service')}</span></button><button type="button" class="btn sm" data-ofd="it-head">${ic('list', 's')}<span>${tr('Heading')}</span></button><button type="button" class="btn sm" data-ofd="it-text">${ic('note', 's')}<span>${tr('Text block')}</span></button>${inv ? `<button type="button" class="btn sm" data-ofd="it-disc">${ic('calc', 's')}<span>${tr('Discount')}</span></button>` : ''}</div>`;
 }
@@ -271,7 +271,8 @@ const ekPctHtml = (it, i, line, d) => `<input data-i="${i}" data-k="rate" inputm
 const OFD_ACTIONS = {create: N_('created'), update: N_('changed'), items: N_('positions changed'), number: N_('number set'), status: N_('status changed'),
   finalize: N_('finalised'), duplicate: N_('created as a copy'), delete: N_('deleted'), open: N_('opened'), pdf: N_('PDF opened'), render: N_('preview opened'),
   export: N_('exported'), import: N_('imported'), archive: N_('archived'), upload: N_('uploaded'),
-  payment: N_('payment recorded'), payment_delete: N_('payment removed'), send: N_('sent by e-mail'), datev: N_('sent to the DATEV inbox'), undo: N_('import undone'), reminder_fee: N_('reminder fee waived / paid / open again'), recovery_key: N_('recovery key shown')};  // 2.42.0 (#828): + recovery_key  // 2.39.1 (#1182): + undo; 2.40.0 (#1368): + reminder_fee
+  payment: N_('payment recorded'), payment_delete: N_('payment removed'), send: N_('sent by e-mail'), datev: N_('sent to the DATEV inbox'), undo: N_('import undone'), reminder_fee: N_('reminder fee waived / paid / open again'), recovery_key: N_('recovery key shown'),
+  agent_read: N_('read (agent)'), agent_write: N_('drafted (agent)')};  // 2.51.0 A (#1348)  // 2.42.0 (#828): + recovery_key  // 2.39.1 (#1182): + undo; 2.40.0 (#1368): + reminder_fee
 const ofdActText = a => tr(OFD_ACTIONS[a] || a);
 const ofdWhen = iso => { try { return new Date(iso).toLocaleString(LOCALE(), {dateStyle: 'short', timeStyle: 'short'}); } catch { return iso || ''; } };
 function ofdLogHtml(d) {
@@ -301,7 +302,7 @@ function ofdSaveHint() { const s = $('.ofdsave'); if (s) s.textContent = OFD.sav
 const ofdPatch = body => typeof tpView === 'function' && tpView() ? tpPatch(body) : ofdSave('PATCH', `/api/office/docs/${OFD.doc.id}`, body);
 function ofdItemsBody() {
   return (OFD.doc.items || []).map(it => ({id: it.id, kind: it.kind, service_id: it.service_id, title: it.title, detail: it.detail, qty: it.qty, unit: it.unit, rate: it.rate, tax: it.tax,
-    raw_fee: it.raw_fee, producing: it.producing, intext: it.intext, cost: it.cost, discountable: it.discountable, ref_part_id: it.ref_part_id}));  // 2.47.0 (#1215): + ref_part_id
+    raw_fee: it.raw_fee, producing: it.producing, intext: it.intext, cost: it.cost, discountable: it.discountable, ref_part_id: it.ref_part_id, confirm: it.confirm || undefined}));  // 2.47.0 (#1215): + ref_part_id; 2.51.0 A (#1348): + confirm (an agent's mark)
 }
 // 2.47.0 (#1215): with a part open, positions and calculation values go to the part (office_parts.js)
 const ofdPutItems = () => typeof tpView === 'function' && tpView() ? tpPutItems() : ofdSave('PUT', `/api/office/docs/${OFD.doc.id}/items`, {items: ofdItemsBody()});

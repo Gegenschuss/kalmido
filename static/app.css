@@ -7408,3 +7408,50 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .sgrow .sghead{font-size:.875rem;overflow-wrap:anywhere}
 .sgrow.st-accepted .sghead b{color:var(--accent)}
 .sgproto{margin-top:.25rem;font-size:.8125rem;color:var(--text2);overflow-wrap:anywhere}
+/* 2.51.0 B (#1351 #1358): the proposal kinds inquiry / setup (propkinds2.js) and "Set up with your agent" */
+.pk2h{margin:.75rem 0 .25rem;font-size:.8125rem;font-weight:600;color:var(--text2)}
+.pk2h:first-child{margin-top:0}
+.pk2info{display:flex;flex-wrap:wrap;gap:.375rem;margin-bottom:.25rem}
+.ppi.pk2p .pk2t{display:block;padding:.375rem 0;min-height:1.75rem;overflow-wrap:anywhere;cursor:pointer}
+.pk2no{margin:.25rem 0}
+.pk2setup{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.625rem 0}
+.pk2setup .btn{min-height:2.75rem}
+.pk2setup .muted{font-size:.8125rem;flex:1 1 14rem}
+.tcard .pk2setup,.tour .pk2setup{margin:.5rem 0 0}
+.ppl .pk2hint{margin-top:.5rem}
+/* 2.51.0 A (#1348, #1350): agents in the office -- marked positions, "drafted by", suggested payments, chat link buttons */
+.ofdit.oa_flag{box-shadow:inset 3px 0 0 var(--accent);background:var(--accent-soft)}
+.oa_flags{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.25rem;font-size:var(--fs-s)}
+.oa_flagt{color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:.25rem}
+.oa_flags .btn{min-height:2.25rem}
+.oa_by{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;margin:.25rem 0 .5rem}
+.oa_pp{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--radius);padding:.5rem .75rem;margin:.5rem 0}
+.oa_pp h3{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem;font-size:var(--fs-m)}
+.oa_pp ul{list-style:none;margin:0;padding:0}
+.oa_pp li{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem 0;border-top:1px solid var(--line)}
+.oa_pp li:first-child{border-top:0}
+.oa_ppm{display:flex;flex-direction:column;min-width:0;flex:1 1 12rem;overflow-wrap:anywhere}
+.oa_ppa{white-space:nowrap}
+.oa_ppb{display:flex;gap:.375rem}
+.oa_ppb .btn{min-height:2.5rem}
+.oa_logf{margin:.25rem 0 .5rem}
+.cchoices.oa_links a.cchb{text-decoration:none;display:inline-flex;align-items:center;gap:.375rem}
+.oa_sw .chkl{min-height:2.5rem}
+@media (max-width:600px){.oa_ppb{width:100%}.oa_ppb .btn{flex:1}}
+/* 2.51.0 C (#1352 #1353 #1355): an agent's notepad on the pin board, drafts (tentative events) in the calendar, time / shoot proposals */
+.wgpadag{display:flex;align-items:center;gap:.35rem;font-size:.82em;margin:-.15rem 0 .35rem}
+.wgpadag .ic{opacity:.7}
+.wgpadagt{border-left:3px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+.evdraft{opacity:.68;border-style:dashed!important;border-width:1px;border-color:var(--ccb,var(--line2))!important;background:color-mix(in srgb,var(--cct,var(--bg2)) 55%,transparent)!important}
+.cev.evdraft,.tl-cev.evdraft{outline:1px dashed color-mix(in srgb,var(--text) 35%,transparent);outline-offset:-1px}
+.evdraftb{border:1px dashed currentColor;background:none}
+.apdraftact{margin-top:.25rem}
+.apri .aph{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .5rem;min-width:0}
+.apri .aph b{overflow-wrap:anywhere}
+.apf{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
+.apf .aptime{width:6.5rem;min-height:2.5rem}
+.apf .apnote{flex:1 1 10rem;min-width:0;min-height:2.5rem}
+.apf .ppt{flex:1 1 100%;min-height:2.5rem}
+.apwarn .ic{color:var(--accent)}
+.apalt{border-style:dashed}
+@media (max-width:600px){.apf .aptime{flex:1 1 40%}}

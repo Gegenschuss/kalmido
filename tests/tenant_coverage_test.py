@@ -64,7 +64,7 @@ KINDS = {
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
     # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
     # personal office (a hidden area only its owner reaches). No /api/v1, no MCP in stage 1
-    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures)"),
+    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions)"),
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share"),
@@ -217,6 +217,12 @@ ROUTES = {
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
     "GET /api/office/deals/summary": "office", "GET /api/office/kpi": "office",
+    # 2.51.0 (#1348, #1350): agents in the office (drafts only) and the switches / payment suggestions of people (p251_a_api_test.py)
+    "GET /api/office/agents/{}": "office", "PATCH /api/office/agents/{}": "office", "GET /api/office/pay-props": "office",
+    "POST /api/office/pay-props/{}": "office", "GET /api/v1/office": "office", "GET /api/v1/office/{}": "office",
+    "GET /api/v1/office/docs": "office", "GET /api/v1/office/docs/{}": "office", "GET /api/v1/office/docs/{}/pdf": "office",
+    "POST /api/v1/office/offers": "office", "PATCH /api/v1/office/offers/{}": "office", "POST /api/v1/office/offers/{}/invoice": "office",
+    "POST /api/v1/office/reminders": "office", "GET /api/v1/office/payment-suggestions": "office", "POST /api/v1/office/payment-suggestions": "office",
     "GET /api/office/datev/extf": "office",  # 2.47.3 (#1460): DATEV booking batch, admin only (p2473_e_api_test.py)
     # ---- office (C, 2.36.1 #1021): quotations of an organisation (10)
     "GET /api/office/docs": "office", "POST /api/office/docs": "office", "GET /api/office/docs/{}": "office",
@@ -560,6 +566,11 @@ ROUTES = {
     "GET /api/team/absences/check": "hub", "GET /api/team/dispo": "hub", "GET /api/team/dispo/free": "hub",
     "POST /api/team/dispo/bookings": "hub", "PATCH /api/team/dispo/bookings/{}": "hub", "DELETE /api/team/dispo/bookings/{}": "hub",
     "POST /api/team/dispo/bookings/restore": "hub", "GET /api/team/bookings/mine": "hub", "GET /api/v1/absences": "hub",
+    # 2.51.0 C (#1352 #1353 #1355): agents on the pin board, time check / proposals, the disposition + shoot proposals (p251_c_api_test.py)
+    "GET /api/v1/lists/{}/notepads": "list", "POST /api/v1/lists/{}/notepads": "list", "PATCH /api/v1/notepads/{}": "list",
+    "DELETE /api/v1/notepads/{}": "list", "PUT /api/v1/lists/{}/status-pad": "list", "GET /api/v1/lists/{}/weekly-status": "list",
+    "GET /api/v1/time/check": "aggregate", "GET /api/v1/time/from-events": "aggregate", "POST /api/v1/agent/proposals/time": "agent",
+    "GET /api/v1/dispo": "hub", "GET /api/v1/dispo/free": "hub", "POST /api/v1/agent/proposals/shoot": "hub",
 }
 
 # ---- 1. every route is classified, nothing stale

@@ -35,3 +35,18 @@ Book crew and equipment for shoot days and see who and what is free.
 - **My bookings** lists your own bookings; a firm booking also shows up in your News (event "assigned to me", with
   its usual switch in the notification settings).
 - Changing or deleting a booking applies to the whole job (one shoot day); deleting can be undone.
+
+## Agents plan with you (2.51.0)
+
+- **Weekly status on the project page**: plan a job for an agent with the template *Status on the pin board*. The agent writes
+  one block "Status" on the project page (done, stuck, overdue, who waits on whom) and overwrites only that block each week. It
+  is marked "From <agent>, updated ..."; you can edit or delete it as usual. The agent needs the permission *Pin board*.
+- **Time tracking**: with the template *Check time tracking and propose entries* the agent points out implausible entries and
+  sends one proposal with entries for past events without time. You change times and note and apply it (one undo step). Share
+  your calendar with the agent so that it sees your events.
+- **Shoot planning**: an agent proposes shoot days and crew / equipment for a project. Warnings show double bookings, absences
+  and other projects that day. Applying creates per day a task in the project with a draft in your calendar and pencils in
+  crew and equipment as options, never firm.
+- **Drafts in the calendar** (tentative events) look pale and dashed and say *Draft*. Tap one: *Confirm* makes it a normal
+  event, *Discard* deletes it (undo brings it back).
+

@@ -39,6 +39,7 @@ TABLES = (
     "hub_absences",  # 2.50.0 A (#1195): absences (the area they were entered in; the app hides the kind)
     "hub_bookings",  # 2.50.0 A (#1194): bookings of the disposition
     "office_signoffs",  # 2.50.0 C (#1200): approval links (NULL = a private list's acceptance, the app checks the list)
+    "office_pay_props",  # 2.51.0 A (#1350): payment suggestions of agents
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

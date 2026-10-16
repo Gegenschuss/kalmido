@@ -689,6 +689,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `playbook_proposal` | 2.39.0 (#1168): a person applied or discarded the agent's proposed change of a list's [Playbook](#playbook-2390) | `list_id`, `proposal_id`, `state`: `applied` or `discarded`, `version` (applied: the new version of the list's part), `note` (yours), `by` `{id, name}`, `hint`; like every event of the list it carries the current `playbook` |
 | `file_shared` | 2.48.0 (#1207): the owner shared a folder or file of the [file store](#file-store-2480) with the agent (only for a new share, not for a changed role) | `node` `{id, name, kind}`, `role`: `view` \| `edit` |
 | `document_added` | 2.48.0 (#1356): a new document was recognised (once, after its first recognition) in a folder or file of the file store the agent sees (a share or its own result folder); read it with `get_document`, e.g. to [suggest project and category of a receipt](#receipts-suggest-project-and-category-2480) | `document` `{id, name, state, date, url}` |
+| `offer_accepted` | 2.51.0 (#1348): a quotation of the agent's office area was accepted (by a person or the customer's approval); only agents with the switch *May draft office documents* (a personal agent in an organisation only while its owner works in the office), while the area lets agents read office data (see [Office](#office-drafts-only-2510)) | `doc_id`, `number`, `title`, `client_id`, `list_id`, `net`, `gross`, `currency` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1004,6 +1005,50 @@ When an agent needs a change in a list it cannot see (another team's topic, a sh
 `propose_to_other_topic`). The proposal lands with that list's **owner** (News + push), never as an event for the agent
 working in that list; tasks exist only when the owner applies it. Allowed targets: lists owned by a person the agent
 already works with; anything else answers `404`. At most 10 open ones per agent.
+
+### An inquiry becomes a project, the setup assistant (2.51.0)
+
+Two more kinds of proposals. The agent sends them on its own for a person it works with (no `job_request` needed):
+`POST /api/v1/agent/proposals {"kind": "inquiry" | "setup", "user_id", "title?", "offer_id?", "proposal"}` (MCP
+`propose_to_person`), or a person asks for one (`POST /api/proposals {agent_id, kind: "inquiry", text, file_name?,
+offer_id?}` / `{agent_id, kind: "setup", text?}`, event `job_request`, answer with `submit_proposal`). Either way the
+person gets *Proposal ready*, reviews every part (checkboxes, titles, dates, sections), and ONE *Apply* creates it all
+as that person; one undo step takes it back. The agent never creates, sends, finalises or books anything itself. Who
+may receive one: the same rule as for asking (*Proposals for* of the agent), and in any case only a person who shares a
+list with the agent (also with *Proposals for: everyone*; a person it does not work with answers `404`); at most 10
+undecided ones per agent and person and 50 per agent (`429`).
+
+- **`inquiry`** (#1351): a customer inquiry (chat text, a mail as attachment) becomes a project. `proposal`: `name`,
+  `folder?`, `project_type?` (one of `input.project_types`: agency, software, private), `client?` (`{id}` from
+  `input.clients`, or `{name}`: a suggestion, used when a client of that exact name exists, else shown as *New client:
+  create it in the office*), `sections`, `tasks` (as kind `project`, at least one), `shoot_days: [{title, date,
+  end_date?, start_time?, end_time?, location?, notes?}]` and `offer?: {title?, intro?, items: [{service_id?, text, qty,
+  unit?, price?, discount?}]}`. Applying creates the project list (in the agent's organisation when the person is a
+  member there, otherwise private), its sections and tasks, every shoot day as an **event draft** (`status: tentative`,
+  all-day without times) in the person's own calendar (the module *Events* is switched on when it was off), and the
+  quotation as a **draft** through the office (prices and free items are marked as with every agent draft, see
+  [OFFICE.md](OFFICE.md)). The quotation part needs the agent's switch *May draft office documents*, the office's
+  privacy switch *Agents may read office data* and the agent's scope `office` (`input.office.ok`, else
+  `input.office.reason`; `input.clients` only then); otherwise the dialog shows it as *not possible* and it is left out.
+  An end date without an end time runs to the end of that day. Undo removes the list while nobody added anything to it
+  (no other tasks, files, sign-off links, office documents or members; else the proposal's tasks go to the trash), the
+  event drafts while nobody changed them, the quotation while it is an unchanged draft without a number (the deletion is
+  in the office log; otherwise it stays and is named); modules it switched on go off again unless an event draft stayed.
+  Redo brings it back.
+- **An accepted quotation becomes a project** (from #1021): after the event `offer_accepted`, send kind `inquiry` with
+  `offer_id`. The input then holds `offer` (number, title, client, items with title / quantity / unit), the project gets
+  the offer's client, a deal of the sales pipeline with this offer gets the project; make one task per item and the
+  shoot-day items event drafts. No new quotation (`offer` in the proposal answers 400). Needs the same office switches
+  (`403` otherwise).
+- **`setup`** (#1358): the setup assistant for a new person (also a freelancer without an organisation). Ask what they
+  use Kalmido for, then propose `modules: [{key, on}]` (keys of `input.modules`; only real changes count), `lists:
+  [{name, color?, folder?, sections?}]` and `project?: {type, name}` (a first project of that type with its standard
+  sections). It changes only the person's own settings and lists, nothing of an organisation. Undo switches the modules
+  back and removes the new lists while they are empty (a used list stays and is named). The app offers *Set up with
+  your agent* in Settings > Modules and on the last card of the welcome tour: it opens the chat with a prepared text
+  (without an agent: Settings > Agents).
+- The agent's `job` event after applying: `{action: "approve", proposal: {state: "applied", created, events, offer_id,
+  lists, modules, parts_skipped, project_list_id}}`.
 
 ### Requests that wait for a person (2.15.0)
 
@@ -1491,6 +1536,99 @@ projects you can see) -> `suggest_receipt`. The project must be one you can see,
 your list restriction (else `400`); a new suggestion replaces your open one. The document then waits in *To review*. You
 can never set, move or delete it yourself.
 
+### Office: drafts only (2.51.0)
+
+An agent can prepare quotations, invoices and reminders in *Office & finance* and suggest incoming payments, **as drafts
+only**: a person reserves the number, finalises, sends, deletes and books. Three things must be on, all **off by default**:
+
+- the scope `office` of the agent's token (Settings > Agents > Permissions: *Office drafts*);
+- the agent's switch **May draft office documents** (in its settings dialog; set by an admin of its office area, in a
+  personal office by the person);
+- the area's privacy switch **Agents may read office data** (Office > Settings > Agents): client and price data go to the
+  agent's AI model.
+
+The agent works in the office area of its workspace (`agents.org_id`); a personal agent without one works in its owner's
+personal office (a freelancer without an organisation has the same functions). It acts for one person, `requested_by`
+(default: its owner; a team agent must name one), who must work in that office and share a list with the agent. Another
+area's clients, documents or lists answer `404`.
+
+| What | Endpoint | MCP |
+|---|---|---|
+| The area, the person, the rules | `GET /api/v1/office` | `get_office` |
+| Services, text blocks, framework contracts, clients (`q`) -- never purchase prices | `GET /api/v1/office/{services\|texts\|contracts\|clients}` | `list_office_data` |
+| Documents (`kind` offer / invoice / credit / reminder, `client_id`, `status`, `open=1`) | `GET /api/v1/office/docs` | `list_office_documents` |
+| One document with its positions | `GET /api/v1/office/docs/{id}` | `get_office_document` |
+| The PDF preview of a draft (marked as a draft) | `GET /api/v1/office/docs/{id}/pdf` | -- (binary; the chat card links it) |
+| A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`) | `POST /api/v1/office/offers` | `create_offer_draft` |
+| Change your own draft (only while it is a draft) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
+| An invoice draft from an accepted quotation | `POST /api/v1/office/offers/{id}/invoice` | `draft_invoice_from_offer` |
+| A reminder draft over open invoices of one client | `POST /api/v1/office/reminders` | `draft_reminder` |
+| Suggest an incoming payment / your suggestions | `POST` / `GET /api/v1/office/payment-suggestions` | `suggest_payment` / `list_payment_suggestions` |
+
+Positions: `{service_id, qty}` takes title, unit and price from the catalogue (or the client's framework contract); `text`
++ `price` without a service is a **free** position, a `price` other than the catalogue's is marked **price changed**, a
+`discount` (percent) is taken off the price and marked **discount**. The editor shows the marks in the accent colour with
+the text until a person changes the position or presses *Confirm*. A draft of an agent never gets a number; the document
+shows *Drafted by the agent ...*. `notify: true` posts a card in the person's chat with the sum and two link buttons,
+*Open in the office* and *PDF preview* (link buttons are choices with `href`: only app targets `#...` and the PDF preview).
+
+Payments: Kalmido has no bank access. The agent reads an incoming payment from what a person gave it (e.g. a pasted bank
+statement) and suggests it for a finalised, open invoice (`amount`, `date`, `reference`, `confidence` high / medium /
+low, `note`). The office shows *Suggested payments* above the invoices; an admin books (the normal payment, with all its
+checks) or rejects each one.
+
+Every request of an agent is one line in the office's access log (agent, read / drafted, what, the document; no contents);
+the log has the filter *Agents*. The event `offer_accepted` reaches the agents of the area with the office switch on while
+the privacy switch is on.
+
+## Pin board, weekly status, time check, shoot planning (2.51.0)
+
+The agent proposes, a person confirms: these routes only read, write the agent's OWN notepads or create proposals and
+drafts. New rights are off for new agents: an admin (or, without an organisation, the person itself) turns on the scopes
+`pinboard`, `time` and `calendar` per agent (`pinboard` is not part of the legacy scope `write`). Health lists never; the token's list limit and the agent's organisation apply.
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| Notepads of a project page (`agent_id`, `mine`) | `GET /api/v1/lists/{id}/notepads` | `list_notepads` | read |
+| New notepad (marked as the agent's) | `POST /api/v1/lists/{id}/notepads` | `create_notepad` | pinboard |
+| Change / remove an own notepad (others: 403) | `PATCH` / `DELETE /api/v1/notepads/{id}` | `update_notepad`, `delete_notepad` | pinboard |
+| The agent's status block (one per agent and list, upsert) | `PUT /api/v1/lists/{id}/status-pad` | `write_status_pad` | pinboard |
+| A project's week: done, overdue, blocked, waiting, who waits on whom | `GET /api/v1/lists/{id}/weekly-status` | `get_weekly_status` | read |
+| Implausible entries, events / shoot days without time | `GET /api/v1/time/check` | `check_time_entries` | time |
+| Past events without a matching entry | `GET /api/v1/time/from-events` | `time_from_events` | time + calendar |
+| Propose time entries to a person (kind `time`) | `POST /api/v1/agent/proposals/time` | `propose_time_entries` | time |
+| Disposition of the agent's workspace (#1785) | `GET /api/v1/dispo`, `GET /api/v1/dispo/free` | `get_dispo`, `get_dispo_free` | calendar |
+| Propose shoot days + crew / equipment (kind `shoot`) | `POST /api/v1/agent/proposals/shoot` | `propose_shoot` | calendar |
+
+- **Weekly status.** A planned job (template *Status on the pin board*, event `scheduled_job` with the list) reads
+  `get_weekly_status` and writes the block with `write_status_pad`. People see it on the project page marked "From <agent>,
+  updated ..." and may edit or delete it as usual; the next run overwrites only the agent's own block. An agent keeps at
+  most 3 notepads per project (its status block included); they do not count against the 20 of people. A blocker in a list
+  the agent does not see appears only as `hidden: true` (no title, id or assignee, not in `waits` / `people`).
+- **Time check.** `user_id` = a person who may chat with the agent (a personal agent: its owner by default). Only entries and
+  tasks of lists both see, events only of calendars shared with the agent, bookings only of the agent's workspace. Events
+  and bookings only with the scope `calendar`; a booking of a list the agent does not see appears as "Booked"
+  (`hidden: true`, no list). Limits:
+  more than 12 h a day, an entry over 10 h, overlaps, weekend entries without an event or booking.
+- **Time proposals** (`items`: `date`, `start`, `end` as local HH:MM, `task_id` or `list_id`, `note`, `event_id`): a ready
+  proposal for the person (News + push per their settings); they change times and note and apply it, one undo step. Entries
+  never lie in the future; every list must track time.
+- **Shoot proposals** (`list_id` of a project the agent may write in and of its workspace; `days`: `date`, `start` / `end` or
+  all day, `title`, `location`, `note`, `alt_of`; `crew`: `kind` user | contact | equipment | set, `id` from `get_dispo`,
+  `day` = index into days). The server stores warnings per row (`double`: already booked, `away`, `other_projects`).
+  Applying creates per selected day a task in the project (due = the day) with a draft event (status `tentative`, shown
+  dashed with *Confirm* / *Discard* in the calendar; CalDAV keeps TENTATIVE) and per crew row a booking with status `option`.
+  Shoot days lie between one year ago and three years ahead. Undo removes drafts that are still drafts, the tasks nobody
+  changed since and the options. Replacing a proposal (`POST /api/v1/agent/jobs/{id}/proposal`) needs the scope of
+  creating it (`time` / `calendar`).
+- The disposition: an agent of an organisation reads that organisation, a personal agent its owner's personal area
+  (freelancers without an organisation get the same); absences only as away, never the reason; booking notes are left out.
+  It needs the module *Disposition* switched on at the owner (personal agent) or at an admin of the organisation (else 409).
+  An agent with a list limit sees bookings of other lists only as time + resource: title "Booked", no list, job or event
+  (`hidden: true`); the same goes for the titles in the proposal warnings.
+- Both proposals are made by the agent itself (`POST /api/proposals` with these kinds answers 400) and answered with the
+  event `job` (approve / reject) like every proposal.
+
 ## Behaviour rules template (2.13.1)
 
 `mcp/CLAUDE.template.md` ("Kalmido agent behaviour rules", English with a German note) is the rule block every agent's
@@ -1671,13 +1809,20 @@ big task, a tidy inbox, tasks from meeting notes. An agent must not create that 
 they want. Everything applied belongs to the person (owner, creator; the history says *created the task from a proposal
 by <agent>*), and it is one undo step.
 
+2.51.0: two more, usually started in the chat. Send your agent a customer inquiry (text or the mail as an attachment):
+it proposes the whole project at once - the list, first tasks, the shoot days as event drafts in your calendar (shown as
+drafts until you confirm them) and, when the office switches allow it, a quotation draft. Or tap *Set up with your
+agent* (Settings > Modules, or the last card of the welcome tour), say what you use Kalmido for, and it proposes modules,
+lists and a first project. Nothing is sent or booked; you tick what you want and apply it in one step. Details:
+[An inquiry becomes a project, the setup assistant](#an-inquiry-becomes-a-project-the-setup-assistant-2510).
+
 **Flow.**
 
 1. A person starts it in the app: *New project from briefing…* (Lists > +, command palette), *Break down with
    <agent>…* (task menu, palette), *Sort the basket with <agent>…* (the inbox's menu - in the app the inbox is called “Basket” since 2.39.1 -, palette,
    or the bot button when inbox items are selected), *Tasks from notes…* (a list's menu, palette), *Tidy up the list…* (2.39.0: a list's menu, or
    *Tidy up…* for selected tasks; always the list's tidy agent). With several agents they pick one.
-2. Kalmido creates a job (kind `project`, `subtasks`, `triage`, `extract`, `dayplan` or `cleanup`; state `running`, `proposal_state`
+2. Kalmido creates a job (kind `project`, `subtasks`, `triage`, `extract`, `dayplan`, `cleanup`, `inquiry` or `setup`; state `running`, `proposal_state`
    `requested`) and sends the agent the event `job_request` with the input.
 3. The agent reads the input, sets its status to `working`, and submits ONE proposal:
    `POST /api/v1/agent/jobs/{id}/proposal` (MCP `submit_proposal`). Kalmido validates it (400 with the reason,
@@ -2229,7 +2374,7 @@ with the scope it needs). The tools:
   answer 404 for it)
 - waiting on someone: `set_waiting`, `clear_waiting`, `list_waiting`, `list_stale_tasks` (2.34.0: tasks lying idle)
 - agent channel (agent tokens only): `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`,
-  `create_job`, `get_job`, `update_job`, `submit_proposal`, `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
+  `create_job`, `get_job`, `update_job`, `submit_proposal`, `propose_to_person` (2.51.0), `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
   `chat_typing`, `react_to_chat`, `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`
 
 Setup is in [mcp/README.md](../mcp/README.md).
@@ -2243,41 +2388,46 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
 `add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
-`add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`, `chat_typing`, `check_in_habit`,
-`clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `create_address_book`, `create_client`,
-`create_contact`, `create_event`, `create_event_calendar`, `create_field`, `create_file_folder`, `create_filter`, `create_form`,
-`create_habit`, `create_job`, `create_list`, `create_list_tag`, `create_note`, `create_packing_list`,
-`create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`, `decide_reward`,
-`delete_address_book`, `delete_attachment`, `delete_chat_attachment`, `delete_client`, `delete_comment`,
-`delete_contact`, `delete_event`, `delete_event_calendar`, `delete_field`, `delete_filter`, `delete_folder`,
-`delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`, `delete_milestone`, `delete_note`,
-`delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`, `delete_task`, `delete_team_message`,
-`delete_template`, `delete_time_entry`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`,
-`export_vcards`, `get_absences`, `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`,
-`get_day_review`, `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_life`, `get_list`,
-`get_me`, `get_milestone`, `get_note`, `get_plan_usage`, `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`,
-`get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`, `get_usage`, `get_workload`, `give_stars`,
-`import_ics`, `import_vcards`, `ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`,
-`list_attachments`, `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`,
-`list_event_calendars`, `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`,
-`list_habits`, `list_jobs`, `list_kids`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`,
-`list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
-`list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
-`list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
-`move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
-`read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
-`rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`,
-`report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
-`request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`,
-`search_contacts`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
-`set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
-`share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
-`stop_timer`, `submit_proposal`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`,
-`unshare_address_book`, `unshare_event_calendar`, `unshare_list`, `unshare_list_from_group`, `update_address_book`,
-`update_client`, `update_comment`, `update_contact`, `update_document`, `update_event`, `update_event_calendar`, `update_field`,
-`update_filter`, `update_form`, `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`,
-`update_note`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
-`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`, `write_journal`
+`add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
+`chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`,
+`create_address_book`, `create_client`, `create_contact`, `create_event`, `create_event_calendar`, `create_field`,
+`create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_job`, `create_list`, `create_list_tag`,
+`create_note`, `create_offer_draft`, `create_packing_list`, `create_section`, `create_task`, `create_template`,
+`create_text_file`, `create_trip`, `decide_reward`, `delete_address_book`, `delete_attachment`,
+`delete_chat_attachment`, `delete_client`, `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`,
+`delete_field`, `delete_filter`, `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`,
+`delete_milestone`, `delete_note`, `delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`,
+`delete_task`, `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`,
+`draft_reminder`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
+`get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
+`get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_life`, `get_list`, `get_me`,
+`get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
+`get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`,
+`get_timer`, `get_usage`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,
+`link_contact`, `list_address_books`, `list_agents`, `list_attachments`, `list_calendar_events`, `list_chats`,
+`list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`, `list_events`, `list_fields`,
+`list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_jobs`, `list_kids`,
+`list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,
+`list_office_documents`, `list_packing_templates`, `list_payment_suggestions`, `list_project_files`,
+`list_receipt_suggestions`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,
+`list_tags`, `list_tasks`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
+`list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `post_team_message`,
+`propose_playbook`, `propose_to_other_topic`, `propose_to_person`, `react`, `react_team_message`, `react_to_chat`,
+`read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `remove_dependency`,
+`rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
+`report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
+`request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
+`request_reward`, `restore_event`, `restore_task`, `search_contacts`, `search_messages`, `search_notes`, `search_tasks`,
+`send_chat`, `set_contact_care`, `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`,
+`set_waiting`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
+`skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
+`sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unshare_address_book`, `unshare_event_calendar`,
+`unshare_list`, `unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
+`update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
+`update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_offer_draft`,
+`update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`, `upload_attachment`,
+`upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`,
+`write_journal`
 <!-- kalmido-tool-index:end -->
 
 ## Use agents safely (2.30.0)

@@ -220,7 +220,7 @@ had been made in the app. Webhooks fire too.
 | `POST /agents/{id}/chat/{message_id}/reactions` | comments | 2.7.2: react to a message in your chat with the agent: `{emoji: up \| down \| heart, on?}` (toggles without `on`); your 👍 / 👎 on an agent message that asks something (`asks`, 2.13.0) is sent to it as an approval (`reaction` event, see [AGENTS.md](AGENTS.md#chat-reactions-and-delivery-272)) |
 | (app) `PATCH /api/agents/{id}/chat/{message_id}` | session | 2.39.0 (#1179): a person edits the text of their own message to an agent `{body}` (in the app, not with a token; the agent's messages 403, others' 404, same limits as sending, same text = no change); the answer carries `edited_at` and `edits` (the earlier versions `[{body, at}]`, only for the person). The agent sees `edited_at` + the current text in `GET /agent/chats` and gets the event `message_edited` once it had the message, see [AGENTS.md](AGENTS.md) |
 | (app) `GET /api/agents/jobs?limit=&before=` · `GET /api/tasks?scope=done\|trash&limit=&before=` · `GET /api/news?limit=&before=` | session | 2.40.0 (#1432): "Load more" pages in the app (not with a token). The answer carries `next` (null = the end); pass it as `before` for the following page. Jobs: `limit` 20 by default (at most 200), the first page also brings every running / waiting job, the pages hold the ended ones (newest change first, cursor = change time + id); without `limit` / `before` the list is unchanged (up to 200 visible jobs), `id=` still returns one job. Completed / trash: `limit` as before (default 300, at most 2000), cursor = completion resp. deletion time + id; the first trash page also says `deletable` and `kept` for the whole trash (`DELETE /api/trash` empties all of it, not only the loaded page). News: the pages count read items (`limit` at most 500); the first page also brings every unread item; `unread`, `unread_me`, "mark all as read" and `filter=` always cover the whole feed; without `limit` the whole feed as before |
-| `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); `POST /agent/jobs/{id}/proposal` answers a `job_request` (2.39.0: kind `cleanup` = tidy up a list, see AGENTS.md *Tidy up a list*); the status may name the task it works on (`task_id`, shows "… is writing" there); 2.37.0: a chat message with `offer_save: true` offers the person "Save as task" (saving itself is a click in the app, never an API call of an agent); 2.41.0: `kind: "notice"` on `POST /agent/chats/{user_id}` = a small grey line in the chat (e.g. a new session of the agent), no push, never unread, see AGENTS.md *Notices in the chat*; 2.44.0: `host` in `PUT /agent/status` names the computer (kept on the token in use, see AGENTS.md *Set up on a computer with one command*); 2.47.3: `job_parent` (with `job_id`) on `POST /agent/chats/{user_id}` = the leading job of a part job, the chat colours a message `Job #N: …` by its job (AGENTS.md *Chat*) |
+| `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); `POST /agent/jobs/{id}/proposal` answers a `job_request` (2.39.0: kind `cleanup` = tidy up a list, see AGENTS.md *Tidy up a list*; 2.51.0: kinds `inquiry` and `setup`, also as the agent's own proposal `POST /agent/proposals {kind, user_id, proposal}`, see AGENTS.md *An inquiry becomes a project, the setup assistant*); the status may name the task it works on (`task_id`, shows "… is writing" there); 2.37.0: a chat message with `offer_save: true` offers the person "Save as task" (saving itself is a click in the app, never an API call of an agent); 2.41.0: `kind: "notice"` on `POST /agent/chats/{user_id}` = a small grey line in the chat (e.g. a new session of the agent), no push, never unread, see AGENTS.md *Notices in the chat*; 2.44.0: `host` in `PUT /agent/status` names the computer (kept on the token in use, see AGENTS.md *Set up on a computer with one command*); 2.47.3: `job_parent` (with `job_id`) on `POST /agent/chats/{user_id}` = the leading job of a part job, the chat colours a message `Job #N: …` by its job (AGENTS.md *Chat*) |
 | `POST /agent/usage` · `GET /agent/usage?from=&to=&group=` | agent | **Agent tokens only** (2.1.1): report model usage (numbers and ids only), read it grouped by day, task, list or model; over its hard limit an agent gets `429` on every other call, see [AGENTS.md](AGENTS.md#usage-and-limits) |
 | `GET /search?q=` | read | Search titles, notes, links and custom field values |
 | `GET /search?scope=messages&q=&art=&sender=&room=&agent=&task=&limit=&cursor=` | read | 2.33.0 (#1080): search task comments, team chat (channels, direct messages) and agent chats -- only what you may read (comments of tasks you see, rooms you are in, your own agent chats; an agent: the lists shared with it, their channels, its own chats, never direct messages). Words match word beginnings; case, accents and ä / ae do not matter. Newest first, `{data, total, next_cursor}`; a hit `{art: c \| t \| a, chat_type: task \| list \| dm \| agent, id, task_id?, list_id?, room_id?, agent_id?, user_id?, chat_name, sender {id, name, agent}, created_at, snippet, marks}`: `snippet` is plain text (never HTML) around the hit, `marks` the `[start, end)` ranges of the hits in it (characters = Unicode code points). Filters: `art` (comma-separated), `sender` (user id), `room`, `agent` (an agent: the person), `task`; a foreign id simply finds nothing |
@@ -1090,6 +1090,31 @@ agents have none (`403`).
 assigned) stands above the placed ones, newest first; assigning a task to a person takes its old position away. The setting
 `mine_view` (`PATCH /api/settings`) is `own` (default) or `lists`.
 
+## Office: drafts of agents (2.51.0)
+
+Scope `office` (never in the legacy `write` or a new agent's default). Agents only, and only with their switch *May draft
+office documents* and the area's privacy switch *Agents may read office data* on (else `403`). `requested_by` (query or
+body) = the person the agent acts for (default: its owner; a team agent must name one). Drafts only: no route sets a
+number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENTS.md#office-drafts-only-2510).
+
+| Call | Scope | What it does |
+|---|---|---|
+| `GET /office` | office | The area (`{id, personal}`), `person_id`, `role`, currency, language, the rules |
+| `GET /office/{services\|texts\|contracts\|clients}` | office | Master data of the area (`q` = search); never purchase prices or markups |
+| `GET /office/docs` | office | `?kind=offer\|invoice\|credit\|reminder&client_id=&status=&open=1` -> `{data: [brief documents]}` |
+| `GET /office/docs/{id}` | office | One document with positions (`agent_flag` per position: `free`, `price`, `discount:<pct>`), sums, `agent_id` |
+| `GET /office/docs/{id}/pdf` | office | The PDF preview of a draft (marked as a draft); `409` for others |
+| `POST /office/offers` | office | `{client_id?, title, intro?, items: [{service_id?, text?, detail?, qty?, unit?, price?, discount?, kind?}], list_id?, notify?}` -> `201 {doc, chat_message_id?}` |
+| `PATCH /office/offers/{id}` | office | The agent's own draft while it is a draft (`items` replaces the list); `403` for a person's draft, `409` once sent |
+| `POST /office/offers/{id}/invoice` | office | An accepted quotation -> `201 {doc}` an invoice draft (`parts_mode?`, `notify?`) |
+| `POST /office/reminders` | office | `{invoice_ids, level?: 1-3, notify?}` -> `201 {doc}` a reminder draft over open invoices of one client |
+| `POST /office/payment-suggestions` | office | `{invoice_id, amount, date?, reference?, confidence?: high\|medium\|low, note?}` -> `201` an open suggestion (`exceeds_open` when above the open amount) |
+| `GET /office/payment-suggestions` | office | `?state=open` (default) `\| accepted \| rejected \| all`: the agent's own suggestions |
+
+The people's side (web app, signed in): `GET` / `PATCH /api/office/agents/{id}` (`{office_drafts: bool}`, an admin of the
+agent's office area), `GET /api/office/pay-props`, `POST /api/office/pay-props/{id}` `{action: accept|reject}` (admins;
+accept books the payment like *Record payment*), the settings key `agents_read` of `PUT /api/office/settings`.
+
 ## Documents (2.48.0)
 
 Documents are files of the file store (`/files`) with recognised text and fields. Scopes `files:read` / `files:write`;
@@ -1111,3 +1136,26 @@ The web app's own routes (`/api/docs`, a signed-in person, never an agent): `GET
 (levels per feature, the inbox folder), `POST` / `PATCH` / `DELETE /api/docs/rules`, `PATCH` / `DELETE /api/docs/labels/{kind}/{id}` (the delete answers the documents it touched; `POST /api/docs/labels/{kind}` `{ws, name, ids}` is its undo),
 `POST` / `DELETE /api/docs/mail` (the forwarding address). Deleting and restoring use the file store
 (`DELETE /api/files/nodes/{id}`, `POST /api/files/nodes/{id}/restore`).
+
+## Pin board, time check and shoot planning for agents (2.51.0)
+
+New scope `pinboard` (write notepads on project pages; an agent changes only its own, at most 3 per project). Off for new agents and not part of the legacy `write`.
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" https://kalmido.example/api/v1/lists/12/weekly-status
+curl -s -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"body": "## Status\n- 4 done, 1 overdue"}' https://kalmido.example/api/v1/lists/12/status-pad
+curl -s -H "Authorization: Bearer $TOKEN" "https://kalmido.example/api/v1/time/check?user_id=3&from=2026-10-05&to=2026-10-11"
+```
+
+| Route | Scope | |
+|---|---|---|
+| `GET /lists/{id}/notepads`, `POST /lists/{id}/notepads`, `PATCH` / `DELETE /notepads/{id}` | read / pinboard | an agent: only its own notepads |
+| `PUT /lists/{id}/status-pad` | pinboard | agents: one status block per list, overwritten |
+| `GET /lists/{id}/weekly-status?days=7` | read | done, overdue, blocked, waiting, `waits` (who waits on whom) |
+| `GET /time/check`, `GET /time/from-events` | time (+ calendar) | `user_id`, `from`, `to` (at most 62 days) |
+| `POST /agent/proposals/time` | time | items `date`, `start`, `end` (local HH:MM), `task_id` or `list_id`, `note`, `event_id` |
+| `GET /dispo`, `GET /dispo/free` | calendar | the agent's workspace; absences only as away |
+| `POST /agent/proposals/shoot` | calendar | `list_id`, `days`, `crew`; applied = tentative events + option bookings |
+
+Event drafts are events with `status: "tentative"`; CalDAV sends them as `STATUS:TENTATIVE`.

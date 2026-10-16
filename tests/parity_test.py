@@ -221,7 +221,10 @@ APP_ONLY = [
                                                    "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
                                                    "* /api/docs/mail")),
-    ("2.36.1 (#1021): Office & finance, stage 1 -- no agent API and no MCP tool before the security audit (#476); agents see only what is shared",
+    # 2.51.0 (#1348, #1350): agents get drafts only, through /office (v1 + MCP); the rest of the office stays with people
+    ("2.36.1 (#1021) / 2.51.0 (#1348): Office & finance -- people finalise, number, send, delete, book payments and keep master data and "
+     "settings; agents (two switches) read and draft through /api/v1/office (quotation / invoice / reminder drafts, payment suggestions); "
+     "the agent's office switch and the decision on suggested payments are the people's side",
      ("* /api/office/",)),
     ("2.49.0 (#1199, #1201): knowledge pages, stage 1 -- no agent access yet (shares of pages / folders for organisation agents with "
      "scopes wiki:read / wiki:write come as their own step); the outline parser only serves the mind map import of the web app",
@@ -434,6 +437,7 @@ for name, _, schema, fn in mcp.TOOLS:
             check(False, f"tool {name} {extra}: {e.message}")
 reached = {c for s in CALLS.values() for c in s}
 API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
+    "GET /office/docs/{}/pdf": "2.51.0 (#1348): the PDF preview of a draft is binary; the chat card (notify) links it for the person",
     "GET /openapi.json": "the API description itself",
     "GET /lists/{}/notify-template": "2.33.0 (#927): the owner's notification ceiling of a list; agents get no pushes, it is read by scripts",
     "POST /import/{}": "imports of other apps' files: people upload them (multipart) in the app or with the REST API",

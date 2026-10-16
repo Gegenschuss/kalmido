@@ -48,13 +48,13 @@ function tokWire(md) {
 }
 // ---- 2.15.0 (#479) permissions (scopes) of tokens and agents: one compact grid of switches, the explanations behind (i),
 // scopes outside the admin's limit greyed out; "write" (a token from before 2.15) shows as every permission
-const SCOPE_ALL = ['read', 'tasks:write', 'comments', 'structure', 'delete', 'attachments:read', 'attachments:write', 'files:read', 'files:write', 'time', 'export', 'account', 'admin-read'];  // 2.48.0 (#1207): + files
-const SCOPE_SHORT = {read: N_('Read'), 'tasks:write': N_('Tasks'), comments: N_('Comments'), structure: N_('Structure'), delete: N_('Delete & trash'), 'attachments:read': N_('Read files'), 'attachments:write': N_('Upload files'), 'files:read': N_('Read the file store'), 'files:write': N_('Write to the file store'), time: N_('Time tracking'), export: N_('Export'), calendar: N_('Calendar'), contacts: N_('Contacts'), private: N_('Health & journal'), account: N_('Account settings'), 'admin-read': N_('Admin read')};  // 2.41.0 (#1476): calendar / contacts / private had no name
+const SCOPE_ALL = ['read', 'tasks:write', 'comments', 'structure', 'delete', 'attachments:read', 'attachments:write', 'files:read', 'files:write', 'pinboard', 'time', 'export', 'account', 'admin-read'];  // 2.48.0 (#1207): + files; 2.51.0 (#1352): + pinboard
+const SCOPE_SHORT = {read: N_('Read'), 'tasks:write': N_('Tasks'), comments: N_('Comments'), structure: N_('Structure'), delete: N_('Delete & trash'), 'attachments:read': N_('Read files'), 'attachments:write': N_('Upload files'), 'files:read': N_('Read the file store'), 'files:write': N_('Write to the file store'), pinboard: N_('Pin board'), time: N_('Time tracking'), export: N_('Export'), calendar: N_('Calendar'), contacts: N_('Contacts'), private: N_('Health & journal'), account: N_('Account settings'), 'admin-read': N_('Admin read'), office: N_('Office drafts')};  // 2.41.0 (#1476): calendar / contacts / private had no name; 2.51.0 A (#1348): office
 const scopeExpand = sc => (sc || []).includes('write') ? SCOPE_ALL.filter(x => x !== 'admin-read' || sc.includes('admin-read')) : (sc || []);
 function scopeSummary(sc) {
   const e = scopeExpand(sc);
   if (e.length <= 1) return tr('read only');
-  if (SCOPE_ALL.filter(x => x !== 'admin-read' && x !== 'account').every(x => e.includes(x))) return tr('all permissions');
+  if (SCOPE_ALL.filter(x => x !== 'admin-read' && x !== 'account' && x !== 'pinboard').every(x => e.includes(x))) return tr('all permissions');  // 2.51.0 (#1352): pinboard is opt-in, never part of the legacy write
   return e.filter(x => x !== 'read').map(x => tr(SCOPE_SHORT[x] || x)).join(', ');
 }
 function scopesHtml(offer, sel, legend) {

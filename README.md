@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.51.0** (2026-10-16): **agents pitch in with business work** - quotation drafts in the office, invoice and reminder
+  drafts and payment suggestions, an inquiry becomes a project with one yes, a setup assistant, a weekly status on project
+  pages, a time tracking check and shoot planning. The agent proposes, a person confirms; all new rights are off by default.
 - **2.50.2** (2026-10-16): office amounts from 1,000 keep their value on save (live together with 2.50.0 and 2.50.1).
 - **2.50.1** (2026-10-16): CI fixes for 2.50.0 and hidden form rows on phones (both go live with this version).
 - **2.50.0** (2026-10-16): business hub part 2 - **absences** with public holidays, a **disposition** for crew and
