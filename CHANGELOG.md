@@ -7,6 +7,38 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.53.0] - 2026-10-16
+
+**In short:** the interface - **list colours** as the accent of an open list, a fixed palette of 12 tones and coloured
+task edges; **organisations get a colour** (private stays neutral); a **bell per task** with *Urgent*; **references by
+drag and drop** with cards and a **preview on hover**; agents' comments in their **own tone**; a **tags overview**; and
+the web app **loads rarely used areas on demand**.
+
+### Added
+- **Bell per task** (task menu > *Notifications for this task*): *As the list*, *Muted* or *Urgent* (until completed or until a
+  date). Urgent sends every change and comment as a push at the highest priority. List owners and admins can mark a task
+  urgent for members; everyone can switch it off for themselves (noted in the history), and *Settings > Notifications >
+  Accept urgent markings from others* turns it off entirely. On iPhone an urgent push is prominent but cannot break
+  through Focus (#1424).
+- **References by drag and drop:** drag a list, folder, task, Ablage file, contact or event onto a comment or the
+  description to insert a reference; on phones *Insert reference* with search. Links to this instance show as small
+  cards with the name the reader sees; without access only *No access* (#1449).
+- **Preview card:** resting the mouse 0.4 s on a task number or a reference card shows status, list, due date, assignee
+  and more (#1440).
+- **Organisation colour** (Settings > Workspaces, set by the organisation's admins): a stripe in the list header and the
+  sidebar, the workspace badge and switch in that colour, a frame around quick add and the comment box; moving something
+  from Private into an organisation shows *Visible to everyone in X* with Undo. Private stays neutral (#1474).
+- **Tags overview:** all tags as cards with open/done, next due date, lists and last use (button in the *Tags* header) (#446).
+
+### Changed
+- **List colours:** a fixed palette of 12 tones (readable in light and dark); an older free colour stays stored and is shown
+  as the nearest tone. An open list uses its colour as the accent; tasks carry their list colour as a thin edge in board,
+  calendar and the collection views; folders have a colour that new lists take over; *Appearance > List colours only as a
+  dot* for a calmer look (#1426).
+- **Agents' comments** have their own soft tone in comments, News and chats, in light and dark (#1451).
+- **Faster start:** settings, contacts and Office & finance load when you first open them (about 430 KB less code at start,
+  12 % less to download) and stay cached for offline use; if loading fails, *Retry* (#1410).
+
 ## [2.51.0] - 2026-10-16
 
 **In short:** connected agents pitch in with business work - **quotation drafts** in the office, the way **from quotation

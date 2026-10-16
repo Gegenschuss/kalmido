@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.53.0** (2026-10-16): **the interface** - list colours as the accent with a fixed 12-tone palette and coloured task
+  edges, a colour per organisation (private stays neutral), a bell per task with *Urgent*, references by drag and drop with
+  cards and a hover preview, agents' comments in their own tone, a tags overview, and a faster start (rarely used areas load
+  on demand).
 - **2.51.0** (2026-10-16): **agents pitch in with business work** - quotation drafts in the office, invoice and reminder
   drafts and payment suggestions, an inquiry becomes a project with one yes, a setup assistant, a weekly status on project
   pages, a time tracking check and shoot planning. The agent proposes, a person confirms; all new rights are off by default.
