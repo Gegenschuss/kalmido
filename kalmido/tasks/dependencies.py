@@ -212,6 +212,9 @@ def unblock_events(c, done_ids):
         if not s or "deps" not in (s.get("features") or "").split(",") or not task_visible(c, w, uid, full=True):
             continue  # module "deps" off: no News / push about dependencies (the activity line stays)
         news_add(c, uid, "unblock", task_id=w, data={"blocker": bl}, actor=actor, s=s)
+        from ..notify.taskbell import tbl_level
+        if tbl_level(c, uid, w, s):  # 2.53.0 C (#1424): muted / urgent (pushed by tbl_note of the history line above)
+            continue
         if not notif_ok(c, uid, s, "unblock", "push", t["list_id"]) or not push_reachable(c, uid, s) or \
                 not burst_gate(c, uid, w, event=True):
             continue

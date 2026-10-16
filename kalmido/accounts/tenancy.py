@@ -86,6 +86,10 @@ CHECKS = {
     # refuses it anyway: docs/ingest.py docs_mail_import)
     "doc_mail_person": ("SELECT m.org_id, m.user_id FROM doc_mail m JOIN users u ON u.id=m.user_id WHERE m.org_id IS NOT NULL AND "
                         + _PERSON.format(o="m", m="m")),
+    # 2.53.0 C (#1424): a task bell of an organisation's task held by a person outside it, or by an agent (only people get
+    # bells; the read layer ignores rows of another workspace: notify/taskbell.py tbl_rows)
+    "task_bell_person": ("SELECT b.task_id, b.user_id FROM task_bell b JOIN users u ON u.id=b.user_id WHERE b.org_id IS NOT NULL AND "
+                         "(u.kind='agent' OR " + _PERSON.format(o="b", m="b") + ")"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
@@ -112,7 +116,8 @@ def boundary_check(c):
 REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", "list_id"),
           "cal_person": ("ev_cal_members", "cal_id"), "book_person": ("book_members", "book_id"),
           "file_person": ("fs_shares", "node_id"),  # 2.48.0 (#1207)
-          "doc_mail_person": ("doc_mail", "org_id")}  # 2.48.0 (#1111)
+          "doc_mail_person": ("doc_mail", "org_id"),  # 2.48.0 (#1111)
+          "task_bell_person": ("task_bell", "task_id")}  # 2.53.0 C (#1424)
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Administration > Organisations")
 
 

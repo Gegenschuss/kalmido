@@ -12,6 +12,8 @@ function render0() {
   document.body.classList.toggle('in-team', S.route.mod === 'team');  // 2.17.0 (#419): the conversation fills the view, only its messages scroll
   document.body.classList.toggle('kidmode', !!S.me?.kid);  // 2.19.0 (#653): a kid's simple view (no sidebar, tab bar, + button)
   for (const k of ['soft', 'strong']) document.body.classList.toggle('prbg-' + k, S.settings?.prio_bg === k);  // 2.40.0 (#1416)
+  lp_sync();  // 2.53.0 (#1426): the open list's colour as the accent of the list view (listcolor.js)
+  wsc_sync();  // 2.53.0 (#1474): its workspace's colour as the header stripe and the frame of the input fields (wscolor.js)
   sideSearchSync(); badgeSync();
   if (S.shop) shopDraw();  // 2.19.0: shopping mode follows every reload (the app's own poll included)
   fitLayout(true); renderSide(); annSync(); ntfAskSync(); renderTop(); renderView(); renderTabs(); quotaNudge();
@@ -263,7 +265,7 @@ const sb_kindIcon = l => l.family === 'shopping' ? 'cart' : '';
 function listIconHtml(l, opts = {}) {
   const {cls = '', full = true, emoji = false, pic = true} = opts;
   if (!l || l.is_inbox) return '';
-  const sm = sbiMode(), col = cssColor(l.color), st = col ? ` style="--lc:${col};--lcl:${licDim(col)}"` : '', cc = col ? ' lcol' : '';
+  const sm = sbiMode(), col = cssColor(lp_col(l)), st = col ? ` style="--lc:${col};--lcl:${licDim(col)}"` : '', cc = col ? ' lcol' : '';  // 2.53.0 (#1426): lp_col = the nearest palette tone
   if (l.icon) return pic && sm !== 'dot' ? `<span class="lic lict${cc} ${cls}" aria-hidden="true"${st}>${licon(l, 'licon')}</span>` : '';
   const em = leadEmoji(l.name), kic = !em && sb_kindIcon(l);
   if (sm === 'emoji') return em ? (emoji ? `<span class="lic lict lemo${cc} ${cls}" aria-hidden="true"${st}>${esc(em)}</span>` : '')
@@ -311,7 +313,7 @@ function renderSide() {
     // 2.25.0 (UX-02): the full name (it wraps), a grip to drag by (touch: at once, no long press) and ONE "…" button with
     // up / down / folder for keyboards and anyone who does not drag (WCAG 2.5.7)
     if (S.listReorder) { const nm = nmOf(l); return `<div class="srow reorder" data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}><span class="sgrip" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>${sw}<span class="n">${esc(nm)}</span>${shr}<span class="rctl"><button class="iconbtn" data-lsort="${l.id}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', nm))}">${ic('dots', 's')}</button></span></div>`; }
-    return row('l:' + l.id, sw, nmOf(l), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}${typeof dx_marked === 'function' && dx_marked(l.id) ? ' data-mark="1"' : ''}`, shr + pg);  // 2.47.3 (#1727): + marked
+    return row('l:' + l.id, sw, nmOf(l), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}${typeof dx_marked === 'function' && dx_marked(l.id) ? ' data-mark="1"' : ''}${wsc_rowAttr(l)}`, shr + pg);  /* 2.53.0 (#1474): workspace stripe */  // 2.47.3 (#1727): + marked
   };
   let lh = lists.filter(l => !l.folder).map(listRow).join('');
   // 2.4.0 (#361): a tree: top folder, its own lists, then its subfolders (header + lists, one level deeper)
@@ -320,7 +322,7 @@ function renderSide() {
     const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
     const active = fl.some(l => onTasks && k === 'l:' + l.id);
     const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the rest of the row folds
-    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() ? '' : 'draggable="true"'}>${S.listReorder ? `<span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>` : ic('chev', 's fcar') /* 2.46.1 (#1607): the arrow before the folder icon */}<span class="sic" aria-hidden="true">${ic('folder', 's')}</span><span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span>${S.listReorder ? '' : `<span class="c" ${n ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${n || ''}</span>` /* 2.46.1 (#1607): the number right after the name, the share icon at the right like a list's */}${folderShrHtml(f) /* 2.41.0 (#1428) */}<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
+    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() ? '' : 'draggable="true"'}>${S.listReorder ? `<span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>` : ic('chev', 's fcar') /* 2.46.1 (#1607): the arrow before the folder icon */}<span class="sic" aria-hidden="true"${lp_folderSty(f) /* 2.53.0 (#1426) */}>${ic('folder', 's')}</span><span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span>${S.listReorder ? '' : `<span class="c" ${n ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${n || ''}</span>` /* 2.46.1 (#1607): the number right after the name, the share icon at the right like a list's */}${folderShrHtml(f) /* 2.41.0 (#1428) */}<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
       ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
       : `<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
   };
@@ -403,7 +405,7 @@ function renderSide() {
     focus: `${grp('focus', tr('Plan|nav'), focus)}`,
     lists: `<div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${S.listReorder ? `<div class="sreobar" role="group" aria-label="${esc(tr('Sort lists'))}"><span class="sreot"><b>${tr('Sort lists')}</b><small>${esc(tr('Drag by the handle on the left, or use “…”'))}</small></span><button type="button" class="btn sm pri" data-act="lists-reorder">${tr('Done')}</button></div>` : ''}${sideOpen('lists') || S.listReorder ? (lh && favListsHtml(lh, lists)) || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>`,
     filters: `${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine lists, dates, priorities, tags'))}`,
-    tags: `${tags.length ? grp('tags', tr('Tags'), tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join(''), '', tags.length) : ''}`,  // 2.45.0 (#1502): a header like the others
+    tags: `${tags.length ? grp('tags', tr('Tags'), tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join(''), `<button data-go="tags" class="${S.route.mod === 'tags' ? 'on' : ''}" title="${esc(tr('Tags overview'))}" aria-label="${esc(tr('Tags overview'))}">${ic('all', 's')}</button>`, tags.length) : ''}`,  // 2.45.0 (#1502): a header like the others
     views: `${views ? grp('views', tr('Views'), views, '', (views.match(/class="srow smod/g) || []).length) : ''}`,
     areas: `${areas ? grp('areas', tr('Areas|nav'), areas, '', (areas.match(/class="srow smod/g) || []).length) : ''}`,
     team: `${team ? grp('team', tr('Conversations|nav'), team, '', ppl.length + ags.length + grps.length + (convo.match(/class="srow/g) || []).length) : ''}`,
@@ -448,7 +450,7 @@ $('#skip')?.addEventListener('click', skipToContent);
 function renderTop() { return keepFocus($('#top'), renderTop0); }
 function renderTop0() {
   const m = S.route.mod, k = S.route.key;
-  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload'), wiki: N_('Knowledge pages')};  // 2.49.0 (#1199): + wiki
+  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload'), wiki: N_('Knowledge pages'), tags: N_('Tags')};  // 2.49.0 (#1199): + wiki
   let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? (S.nt.lid ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : tr('Notes')) : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
   if (!title && (m === 'ablage' || m === 'docs')) title = tr(m === 'ablage' ? 'File store' : 'Documents');  // 2.48.0 (#1207, #1111)
@@ -868,6 +870,7 @@ function renderView0() {
   else if (m === 'review') setHtml(el, mg_wrap(m, viewReview()));
   else if (m === 'clients') setHtml(el, mg_wrap(m, viewClients()));  // 2.23.0 (#463)
   else if (m === 'workload') setHtml(el, viewWorkload());
+  else if (m === 'tags') setHtml(el, viewTags());  // 2.53.0 (#446)
   else if (m === 'office') setHtml(el, mg_wrap(m, viewOffice()));  // 2.36.1 (#1021)
   else if (m === 'wiki') setHtml(el, viewWiki());  // 2.49.0 (#1199)
   else if (m === 'ablage') setHtml(el, mg_wrap(m, viewAblage()));  // 2.48.0 (#1207)
@@ -989,7 +992,7 @@ function taskRow(t, opts = {}) {
   const ro = !opts.trash && !canEdit(t);
   const caret = opts.tree && treeKids ? `<button class="caret ${collapsed ? 'closed' : ''}" data-act="collapse" data-key="t${t.id}" aria-expanded="${!collapsed}" aria-label="${esc(trn('{0} subtask', '{0} subtasks', treeKids))}">${ic('chev', 's')}</button>` : '';
   const cols = tc ? `<div class="tcols" data-act="open">${timeOn() && (opts.tcols.list || mtTime(t.list_id)) ? `<span class="c-time ${time?.live ? 'live' : ''}" title="${time ? time.tip : ''}">${time ? time.txt : ''}</span>` : ''}${collab() ? `<span class="c-who">${who}</span>` : ''}${opts.tcols.list ? `<span class="c-list" title="${esc(lst)}"><span>${esc(lst)}</span></span>` : ''}<span class="c-date ${dueClass(t)}" title="${esc(due)}">${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(inDay ? t.due_time || '' : dueLabel(t, false))}</span></span></div>` : '';
-  let h = `<div class="trow ${t.priority && !opts.checklist ? 'pr' + t.priority : ''} ${opts.checklist ? 'ck' : ''} ${tc || lc ? 'hascols' : ''} ${lc ? 'haslc' : ''} ${t.status ? 'done' : ''} ${opts.depth ? 'sub d' + opts.depth : ''} ${opts.subRow ? 'subrow' : ''} ${S.sel === t.id ? 'sel' : ''} ${gut ? 'hasgut' : ''} ${S.kf === t.id && !opts.subRow ? 'kfocus' : ''} ${S.multi.has(t.id) ? 'msel' : ''} ${ro ? 'ro' : ''} ${opts.next && !opts.depth ? 'flownext' : ''}" data-id="${t.id}" ${opts.drag !== false && !opts.trash && !ro && !isMobile() ? 'draggable="true"' : ''}>
+  let h = `<div class="trow ${t.priority && !opts.checklist ? 'pr' + t.priority : ''} ${opts.checklist ? 'ck' : ''} ${tc || lc ? 'hascols' : ''} ${lc ? 'haslc' : ''} ${t.status ? 'done' : ''} ${opts.depth ? 'sub d' + opts.depth : ''} ${opts.subRow ? 'subrow' : ''} ${S.sel === t.id ? 'sel' : ''} ${gut ? 'hasgut' : ''} ${S.kf === t.id && !opts.subRow ? 'kfocus' : ''} ${S.multi.has(t.id) ? 'msel' : ''} ${ro ? 'ro' : ''} ${opts.next && !opts.depth ? 'flownext' : ''}${lp_cls(t)}" data-id="${t.id}"${lp_attr(t) /* 2.53.0 (#1426): the list's colour as the card edge */} ${opts.drag !== false && !opts.trash && !ro && !isMobile() ? 'draggable="true"' : ''}>
     ${caret}
     ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(isMs(t) ? tr('Complete milestone: {0}', mdPlain(t.title)) : tr('Complete: {0}', mdPlain(t.title)))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}${gut}
     <div class="tmain" data-act="${opts.trash ? '' : 'open'}"><div class="ttl"${opts.trash ? '' : ` data-kt role="button" tabindex="-1" aria-describedby="${lc ? `tc-${t.id} ` : ''}tm-${t.id}"`}>${mdTitle(t.title)}${tlkIs(t) && !opts.trash ? `<span class="tlkr" role="img" title="${esc(tr('Locked'))}" aria-label="${esc(tr('Locked'))}">${ic('lock', 's')}</span>` : ''}${t.priority && !opts.checklist && !opts.trash && t.status === 0 && !(lc && lc.includes('prio')) ? prioMark(t.priority) : ''}</div><div class="meta" id="tm-${t.id}">${meta.join('')}</div></div>

@@ -287,7 +287,7 @@ function tvListsLabel() {
 function tvPomoCard() {
   const p = S.pomo; if (!p || !feat('pomo')) return '';
   const k = p.kind === 'stopwatch' ? 'stopwatch' : p.kind === 'focus' ? 'focus' : 'break', [icn, name] = RUN_KIND[k];
-  const t = p.task_id && taskById(p.task_id), l = t && listById(t.list_id), col = l && cssColor(l.color);
+  const t = p.task_id && taskById(p.task_id), l = t && listById(t.list_id), col = l && cssColor(lp_col(l));
   const stop = k === 'stopwatch' ? tr('Stop stopwatch') : k === 'focus' ? tr('Stop focus session') : tr('End break');
   return `<section class="tvrun tvpomo k-${k}${p.paused_at ? ' paused' : ''}" aria-label="${esc(tr(name))}">
     <div class="tvr-time">${ic(icn, 's rk')}<b data-pomo-mini>${pomoDisplay()}</b></div>
@@ -303,7 +303,7 @@ function tvRunCard() {
     const recent = Object.entries(S.timeTotals || {}).map(([id, v]) => [taskById(+id), v[1]]).filter(([x, m]) => x && x.status === 0 && m > 0 && tFor(x)).sort((a, b) => b[1] - a[1]).slice(0, 3);
     return `<section class="tvrun idle"><span class="tvr-idle">${ic('clock', 's')}${tr('No timer running')}</span>${recent.map(([x]) => `<button class="btn sm tvr-go" data-act="timer-toggle" data-id="${x.id}" title="${esc(tr('Start timer'))}">${ic('play', 's')}<span>${esc(x.title)}</span></button>`).join('')}</section>`;
   }
-  const t = r.task_id && taskById(r.task_id), l = listById(r.list_id ?? t?.list_id), col = l && cssColor(l.color);
+  const t = r.task_id && taskById(r.task_id), l = listById(r.list_id ?? t?.list_id), col = l && cssColor(lp_col(l));
   return `<section class="tvrun" aria-label="${esc(tr('Timer running'))}">
     <div class="tvr-time"><span class="rec"></span><b data-timer-live>${fmtT(timerElapsed())}</b></div>
     <div class="tvr-info">${t ? `<button class="tvr-task" data-act="open-id" data-id="${t.id}" title="${esc(tr('Open task'))}">${esc(t.title)}</button>` : `<span class="tvr-task muted">${esc(r.title || tr('No task'))}</span>`}

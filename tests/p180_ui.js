@@ -84,7 +84,7 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
   check(/Write the concept and treatment/.test(doable) && !/Get the quote and budget approved/.test(doable), 'Now doable: the overdue concept, not the budget that waits on it');
   // ================= (3) Settings > Data: remove (dialog), create again, palette
   w.__dialogs = 'manual';
-  w.eval(`settingsModal('sample')`); await sleep(300);
+  await w.eval(`settingsModal('sample')`); await sleep(300);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   const row = () => d.querySelector('.smodal #s-sample');
   check(d.querySelector('.smodal [data-sec="data"].on') && d.querySelector('.smodal #s-sample-h'), 'Settings opens on Data > Sample project');
   check(row()?.querySelector('[data-m="sample-rm"]') && /Image film/.test(row().textContent), 'row: Remove + the list names');

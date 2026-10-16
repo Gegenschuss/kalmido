@@ -108,7 +108,7 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
 
   // ---- Settings > Account > Two-factor: TOTP
   let w = await page({cookie: await login('bob')}), d = w.document;
-  w.eval(`settingsModal('account')`); await sleep(700);
+  await w.eval(`settingsModal('account')`); await sleep(700);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   let md = d.querySelector('.smodal');
   check(md.querySelector('#s-2fa-h')?.textContent === 'Two-factor authentication' && /Authenticator app\s*Off/.test(md.querySelector('#s-2fa').textContent), 'account: 2FA section, app off');
   check(!!md.querySelector('[data-tfa="pk-add"]') && !md.querySelector('[data-tfa="pk-add"]').disabled, 'passkey button enabled on localhost with WebAuthn');
@@ -185,7 +185,7 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
 
   // ---- Settings > Users > Whole server: sign-in + backups
   w = await page({cookie: ac}); d = w.document;
-  w.eval(`settingsModal('users')`); await sleep(900);
+  await w.eval(`settingsModal('users')`); await sleep(900);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   md = d.querySelector('.smodal');
   check(!!md.querySelector('#s-2fareq') && !md.querySelector('#s-2fareq').checked && md.querySelector('#s-pklogin').checked, 'sign-in switches (2FA off, passkey login on)');
   check(md.querySelector('#s-oidcredir')?.textContent === 'https://kalmido.example/api/auth/oidc/callback' && /id\.example/.test(md.querySelector('#sp-users').textContent), 'OIDC block: provider + redirect URI');
@@ -223,12 +223,12 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   const cc = await login('alice');
   await fetch(B + 'api/settings', {method: 'PATCH', headers: {...H, Cookie: cc}, body: JSON.stringify({lang: 'de'})});
   w = await page({cookie: cc, lang: 'de'}); d = w.document;
-  w.eval(`settingsModal('users')`); await sleep(900);
+  await w.eval(`settingsModal('users')`); await sleep(900);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   md = d.querySelector('.smodal');
   check(md.querySelector('#s-bk-h')?.textContent === 'Backups' && /Automatische Backups/.test(md.querySelector('#s-bk').textContent)
     && /Zwei-Faktor-Anmeldung für die eingebaute Anmeldung vorschreiben/.test(md.textContent), 'German labels (users pane)');
   md.remove();
-  w.eval(`settingsModal('account')`); await sleep(700);
+  await w.eval(`settingsModal('account')`); await sleep(700);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   check(/Zwei-Faktor-Anmeldung/.test(d.querySelector('.smodal #s-2fa-h').textContent), 'German labels (account)');
   w.close();
 

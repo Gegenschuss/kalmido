@@ -187,6 +187,7 @@ function newsText(it, U) {
   const d = it.data || {}, who = `<b>${esc(viaName(d, it.actor_id, U))}</b>`, q = x => `<b>${esc(x)}</b>`;
   switch (it.kind) {
     case 'mention': return tr('{0} mentioned you', who);
+    case 'tbl_urgent': return tbl_newsText(it, who);  // 2.53.0 C (#1424)
     case 'comment': if ((it.tasks || []).length > 1) return trn('{1} left {0} comments on {2} tasks', '{1} left {0} comments on {2} tasks', it.count, who, it.tasks.length);  // 2.13.0 (#453 A5)
       return it.count > 1 ? trn('{1} left {0} comments', '{1} left {0} comments', it.count, (it.actors || [it.actor_id]).map(a => `<b>${esc(uname(a, U))}</b>`).join(', ')) : tr('{0} commented', who);
     case 'assign': return d.group ? tr('{0} assigned a task to your group {1}', who, q(d.group)) : tr('{0} assigned a task to you', who);
@@ -239,7 +240,7 @@ function newsItemHtml(it, i, pop) {
   const task = many ? `<div class="ntask"><span class="nt">${esc(it.tasks.slice(0, 2).map(x => x.title).join(' · '))}</span>${it.tasks.length > 2 ? `<span class="muted">+${it.tasks.length - 2}</span>` : ''}</div>`
     : it.task_id ? `<div class="ntask"><span class="nt">${esc(it.task_title || '')}</span><span class="muted nl">${esc(newsListName(it))}</span></div>` : '';
   const ex = it.excerpt ? `<div class="nexc">${newsExcerpt(it.excerpt, U)}</div>` : '';
-  return `<div class="nitem ${it.read ? '' : 'unread'} k-${esc(it.kind)} ${it.to_me ? 'tome' : ''}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
+  return `<div class="nitem ${it.read ? '' : 'unread'}${it.actor_id && isAgentUser(it.actor_id) ? ' agc' : ''} k-${esc(it.kind)} ${it.to_me ? 'tome' : ''}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
     ${it.actor_id ? `<button type="button" class="avb" data-mcard="${+it.actor_id}" data-mname="${esc(uname(it.actor_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(it.actor_id, U)))}" aria-label="${esc(tr('Show {0}', uname(it.actor_id, U)))}">` : ''}${av(it.actor_id, uname(it.actor_id, U), 'avatar', '', `<i class="nk">${ic(NEWS_ICON[it.kind] || 'bell', 's')}</i>`)}${it.actor_id ? '</button>' : ''}
     <div class="nmain"><div class="ntext">${newsText(it, U)}</div>${task}${ex}</div>
     <time title="${esc(fmtWhen(it.created_at))}">${relTime(it.created_at)}</time>${isTouch() ? '' : `<button class="iconbtn ndel" ${pop ? 'data-bp="dismiss"' : 'data-act="news-dismiss"'} data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</div>`;
@@ -435,6 +436,7 @@ function actText0(a, U) {
     case 'proposal': return tr('{0} applied a proposal by {1}', who, q(uname(d.agent, U)));  // 2.3.0 (#262)
     case 'event': return tr('The task became an event; the people who came along are invited to it');  // 2.21.0 (#659)
     case 'title': return tr('{0} renamed the task to “{1}”', who, esc(d.to || ''));
+    case 'bell': return tbl_actText(d, who);  // 2.53.0 C (#1424)
     case 'content': return tr('{0} edited the description', who);
     case 'note_lock': return tr('{0} locked the note', who);  // 2.48.0 (#1642)
     case 'note_unlock': return tr('{0} removed the lock from the note', who);
@@ -587,7 +589,7 @@ function commentHtml(c, U, ro = false) {
     : `${ro ? '' : replyQuoteHtml(c, 'c')}${c.body ? `<div class="cbody">${commentBody(c.body, U, taskById(c.task_id || S.sel)?.list_id)}</div>` : ''}${files}${sugHtml(c, ro)}${ccCommentHtml(c, ro)}${reactHtml(c, ro)}`;
   // 2.5.1 (#395): the author's avatar opens the same card as an @mention (only in the comment list, not read-only copies)
   const cav = ro || c.ext_name ? av(c.user_id, cv_who(c, U)) : `<button type="button" class="cmav" data-mcard="${c.user_id}" data-mname="${esc(uname(c.user_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(c.user_id, U)))}">${av(c.user_id, uname(c.user_id, U))}</button>`;  // 2.50.0 (#329): a customer's comment: their name, no card
-  return `<div class="cm ${isNew ? 'new' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;
+  return `<div class="cm ${isNew ? 'new' : ''}${isAgentUser(c.user_id) ? ' agc' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;
 }
 function timelineItems(ro = false) {
   const T = S.tl, soc = cmSocial(taskById(T.id));
@@ -630,7 +632,7 @@ function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the bo
   return `<div class="dcomp ${top ? 'dctop' : ''}">${replyBarHtml('c:' + t.id)}<div class="ccomp ${used ? 'used' : ''}"><textarea id="c-input" rows="1" name="kalmido-comment" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${soc ? tr('Write a comment… (@ mentions someone)') : tr('Write a comment…')}" aria-label="${tr('Comment')}">${esc(S.drafts[t.id] || '')}</textarea>
       <div class="mpick hidden"></div>
       <div class="cfiles" id="c-files">${composerFiles(t.id)}</div>
-      <div class="cbar"><label class="iconbtn" title="${tr('Attach files')}">${ic('clip', 's')}<input type="file" id="c-file" multiple hidden></label><span class="muted chint">${isMobile() ? '' : tr('Ctrl+Enter sends')}</span><span class="spacer"></span><button class="btn sm pri" data-act="c-send">${ic('send', 's')} ${tr('Send')}</button></div></div></div>`;
+      <div class="cbar"><label class="iconbtn" title="${tr('Attach files')}">${ic('clip', 's')}<input type="file" id="c-file" multiple hidden></label>${typeof rf_btnHtml === 'function' ? rf_btnHtml('c') : '' /* 2.53.0 (#1449) */}<span class="muted chint">${isMobile() ? '' : tr('Ctrl+Enter sends')}</span><span class="spacer"></span><button class="btn sm pri" data-act="c-send">${ic('send', 's')} ${tr('Send')}</button></div></div></div>`;
 }
 function drawTimeline() {
   if (S.tl.id !== S.sel) return;

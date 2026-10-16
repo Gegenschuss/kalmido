@@ -391,6 +391,7 @@ function cmxScrollSet(s, endOnly = false) {
 function renderDetail() {
   const s = cmxScrollGet(), r = keepFocus($('#detail'), renderDetail0);
   cmxShown = S.sel; cmxScrollSet(s);
+  wsc_detail();  // 2.53.0 (#1474): the comment field framed in the colour of the task's workspace
   return r;
 }
 function renderDetail0() {
@@ -468,6 +469,7 @@ function renderDetail0() {
       <button class="iconbtn ${t.priority ? 'flag-' + t.priority : ''}" data-act="prio" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Priority') + ': ' + prioWord(t.priority))}" aria-label="${esc(tr('Priority') + ': ' + prioWord(t.priority))}">${ic('flag')}<span class="dpw">${esc(t.priority ? prioWord(t.priority) : tr('Priority'))}</span></button>`}
       ${ck || !(t.id > 0) ? '' : `<button class="iconbtn tlkb ${tlkL ? 'on' : ''}" data-act="tlk-toggle" data-id="${t.id}" title="${esc(tlkL ? tr('Locked: tap to unlock') : tr('Lock: title, description, date and more stay as they are'))}" aria-label="${esc(tr('Lock'))}" aria-pressed="${tlkL}">${ic('lock')}<span class="dpw">${esc(tlkL ? tr('Locked') : tr('Lock'))}</span></button>`}
       <button class="iconbtn" data-act="task-menu" data-id="${t.id}" title="${tr('More')}" aria-label="${tr('More')}">${ic('dots')}</button>`}
+      ${typeof tbl_btnHtml === 'function' ? tbl_btnHtml(t, ck) : ''}${''/* 2.53.0 C (#1424): the bell of this task (taskbell.js) */}
       ${typeof mw_ok === 'function' && mw_ok() && t.id > 0 ? `<button class="iconbtn" data-mwtask="${t.id}" title="${esc(tr('Open in its own window'))}" aria-label="${esc(tr('Open in its own window'))}">${ic('panel')}</button>` : ''}
       <button class="iconbtn dchatb" data-act="chat-unyield" title="${esc(tr('Chat'))}" aria-label="${esc(tr('Chat'))}">${ic('bot')}</button>
       <button class="iconbtn dclose" data-act="close-detail" title="${tr('Close (Esc)')}" aria-label="${tr('Close (Esc)')}">${ic('x')}</button>
@@ -487,7 +489,7 @@ function renderDetail0() {
       ${mdLong ? `<button class="linkbtn mdmore" data-act="md-more" aria-expanded="${!mdClamp}">${mdClamp ? tr('Show more') : tr('Show less')}</button>` : ''}
       ${mdOpen && mdMode ? `<button class="btn sm mdsub" data-act="md-subtasks">${ic('sub', 's')} ${tr('Turn the open checklist items into subtasks')}</button>` : ''}
       <textarea id="d-content" class="dcontent ${mdMode ? 'hidden' : ''}" placeholder="${ck ? tr('Note') : tr('Description')}" aria-label="${ck ? tr('Note') : tr('Description')}" ${tlkR ? 'readonly' : ''}>${esc(t.content)}</textarea>
-      ${typeof ln_btnHtml === 'function' ? ln_btnHtml(t, ro || ck || tlkR) : ''}`}
+      ${typeof ln_btnHtml === 'function' ? ln_btnHtml(t, ro || ck || tlkR) : ''}${typeof rf_btnHtml === 'function' ? rf_btnHtml('d', ro || tlkR || t.id < 0) : '' /* 2.53.0 (#1449): Insert reference (touch) */}`}
       ${ck ? '' : e2eNoteHtml(t)}${''/* 2.42.0 (#828): my encrypted note (e2e.js) */}
       ${ck ? '' : wk_mentionHtml(t)}${''/* 2.49.0 (#1199): mentioned in knowledge pages (wiki.js) */}
       ${msT && t.id > 0 ? `<div class="dsec mssec" id="d-ms">${msReportHtml(t)}</div>` : ''}

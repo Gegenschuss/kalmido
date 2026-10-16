@@ -330,16 +330,20 @@ def cv_fb_post(token):
     cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,ext_name) VALUES(?,?,?,?,?,?)",
                     (tid, None, text, "", iso_ms(now_utc()), name))
     t = c.execute("SELECT t.*, l.owner_id AS l_owner FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
-    rcpt = {t["l_owner"], t["created_by"], t["assignee_id"]} - {None} - agent_ids(c)
+    from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
+    rcpt = ({t["l_owner"], t["created_by"], t["assignee_id"]} | tbl_urgent_users(c, tid)) - {None} - agent_ids(c)  # 2.53.0 C (#1424): + "Urgent"
     for uid in sorted(rcpt):  # News + push like a comment on my task, the notification switch "comment"
         s = collab_user(c, uid, t["list_id"])
         if not s or not task_visible(c, tid, uid, full=True):
             continue
         news_add(c, uid, "comment", task_id=tid, comment_id=cid, actor=0, s=s, data={"excerpt": text[:300], "ext_name": name})
-        if notif_ok(c, uid, s, KIND_ROW["comment"], "push", t["list_id"]) and push_reachable(c, uid, s):
+        lv = tbl_level(c, uid, tid, s)  # 2.53.0 C (#1424): the task's bell first (muted: no push; urgent: always, priority 5)
+        if lv == "urgent" and tbl_sent(uid, tid):
+            continue
+        if lv != "mute" and (lv == "urgent" or notif_ok(c, uid, s, KIND_ROW["comment"], "push", t["list_id"])) and push_reachable(c, uid, s):
             ulg = lang_of(s)
             g.pushes.append((uid, tr("{0} (customer, via the link)", name, lg=ulg) + ": " + t["title"], text[:200],
-                             f"{PUBLIC_URL}/#t/{tid}", push_prio(s)))
+                             f"{PUBLIC_URL}/#t/{tid}", TBL_PRIO if lv == "urgent" else push_prio(s)))
     bump(c)
     c.commit()
     print("public link comment on task", tid, flush=True)

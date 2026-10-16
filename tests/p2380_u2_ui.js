@@ -27,8 +27,8 @@ const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .0
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'});
-  const CART = (await call('POST', '/api/lists', {name: '\u{1F6D2} Shopping', color: '#e8590c'})).id;
-  const PLAIN = (await call('POST', '/api/lists', {name: 'Plain', color: '#2f9e44'})).id;
+  const CART = (await call('POST', '/api/lists', {name: '\u{1F6D2} Shopping', color: '#fb923c'})).id;  // 2.53.0 (#1426): palette tones (a free colour shows its nearest tone)
+  const PLAIN = (await call('POST', '/api/lists', {name: 'Plain', color: '#4ade80'})).id;
   const GREY = (await call('POST', '/api/lists', {name: 'Grey'})).id;
   const T1 = (await call('POST', '/api/tasks', {title: 'Locked task', list_id: PLAIN})).id;
   const T2 = (await call('POST', '/api/tasks', {title: 'Free task', list_id: PLAIN})).id;
@@ -42,23 +42,24 @@ const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .0
   const sic = id => d.querySelector(`#side .srow[data-list="${id}"] .sic`);
   const LIST = (() => { const t = d.createElement('div'); t.innerHTML = w.eval(`ic('list')`); return t.querySelector('svg').innerHTML; })();
   let x = sic(CART);
-  check(x.querySelector('.lic.lcol svg.i') && /--lc:#e8590c/.test(x.querySelector('.lic').getAttribute('style') || '') && !x.querySelector('.licd, .sw') && x.querySelector('svg').innerHTML !== LIST,
+  check(x.querySelector('.lic.lcol svg.i') && /--lc:#fb923c/.test(x.querySelector('.lic').getAttribute('style') || '') && !x.querySelector('.licd, .sw') && x.querySelector('svg').innerHTML !== LIST,
     'sidebar: the cart line icon carries the list colour, no dot ' + x.innerHTML.slice(0, 160));
   x = sic(PLAIN);
-  check(x.querySelector('.lic.lcol svg') && x.querySelector('svg').innerHTML === LIST && /--lc:#2f9e44/.test(x.querySelector('.lic').getAttribute('style') || ''), 'sidebar: no emoji -> the list icon in the list colour');
+  check(x.querySelector('.lic.lcol svg') && x.querySelector('svg').innerHTML === LIST && /--lc:#4ade80/.test(x.querySelector('.lic').getAttribute('style') || ''), 'sidebar: no emoji -> the list icon in the list colour');
   x = sic(GREY);
   check(x.querySelector('.lic svg') && !x.querySelector('.lic.lcol') && !x.querySelector('.lic').getAttribute('style'), 'sidebar: no colour -> grey icon as before (no --lc)');
   check(!!d.querySelector('#top h1 .lic.h.lcol svg'), 'header: the open list\'s icon in its colour');
   check(/--lcl:#[0-9a-f]{6}/.test(sic(CART).querySelector('.lic').getAttribute('style')), 'the darker light-theme colour travels along (--lcl)');
   // the light theme's colour: >= 3:1 on the light sidebar for every list colour of the picker
-  const pal = w.eval('LCOLORS').filter(Boolean), dim = pal.map(c => [c, w.eval(`licDim(${JSON.stringify(c)})`)]);
+  // 2.53.0 (#1426): the list colours of the picker = the 12 tones
+  const pal = w.eval('LP_TONES.map(t => t[2])'), dim = pal.map(c => [c, w.eval(`licDim(${JSON.stringify(c)})`)]);
   const low = dim.filter(([, c]) => cr(c, '#f8f8f9') < 3);
   check(dim.every(([, c]) => /^#[0-9a-f]{6}$/.test(c)) && !low.length, 'licDim: every picker colour >= 3:1 on the light sidebar ' + JSON.stringify(low));
   check(w.eval(`licDim('#abc')`) === w.eval(`licDim('#aabbcc')`), 'licDim: short hex works');
   // pictures and emoji: a tinted tile
   const frag = h => { const t = d.createElement('div'); t.innerHTML = h; return t.firstElementChild; };
-  let e = frag(w.eval(`listIconHtml({id: 9001, name: 'Pic', icon: '/static/icon.svg', color: '#c084fc'})`));
-  check(e && e.matches('.lic.lict.lcol') && e.querySelector('img.licon') && /--lc:#c084fc/.test(e.getAttribute('style')), 'a picture sits on a tile tinted in the list colour');
+  let e = frag(w.eval(`listIconHtml({id: 9001, name: 'Pic', icon: '/static/icon.svg', color: '#d07cf0'})`));
+  check(e && e.matches('.lic.lict.lcol') && e.querySelector('img.licon') && /--lc:#d07cf0/.test(e.getAttribute('style')), 'a picture sits on a tile tinted in the list colour');
   e = frag(w.eval(`listIconHtml({id: 9002, name: 'Pic', icon: '/static/icon.svg'})`));
   check(e && e.matches('.lic.lict') && !e.matches('.lcol') && !e.getAttribute('style'), 'a picture without colour: no tint');
   check(w.eval(`listIconHtml({id: 1, is_inbox: 1, name: 'Inbox'})`) === '' && w.eval('listIconHtml(null)') === '', 'inbox / none -> empty (the caller falls back)');
@@ -72,11 +73,11 @@ const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .0
   // emoji / dot settings (per person): the emoji on a tinted tile; "Dot" keeps its round dot
   w.eval(`S.settings.side_icons = 'emoji'`);
   e = frag(w.eval(`listIconHtml(listById(${CART}), {emoji: true})`));
-  check(e && e.matches('.lic.lict.lemo.lcol') && e.textContent === '\u{1F6D2}' && /--lc:#e8590c/.test(e.getAttribute('style')), 'emoji mode: the emoji on a tinted tile');
+  check(e && e.matches('.lic.lict.lemo.lcol') && e.textContent === '\u{1F6D2}' && /--lc:#fb923c/.test(e.getAttribute('style')), 'emoji mode: the emoji on a tinted tile');
   check(w.eval(`listIconHtml(listById(${CART}))`) === '', 'emoji mode without emoji: true -> nothing (the name keeps its emoji)');
   w.eval(`S.settings.side_icons = 'dot'`);
   e = frag(w.eval(`listIconHtml(listById(${CART}))`));
-  check(e && e.querySelector('.licd') && /#e8590c/.test(e.querySelector('.licd').getAttribute('style')), 'dot mode: the round dot stays');
+  check(e && e.querySelector('.licd') && /#fb923c/.test(e.querySelector('.licd').getAttribute('style')), 'dot mode: the round dot stays');
   w.eval(`S.settings.side_icons = 'line'`);
   w.close();
 

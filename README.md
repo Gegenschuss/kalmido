@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.53.0** (2026-10-16): **the interface** - list colours as the accent with a fixed 12-tone palette and coloured task
+  edges, a colour per organisation (private stays neutral), a bell per task with *Urgent*, references by drag and drop with
+  cards and a hover preview, agents' comments in their own tone, a tags overview, and a faster start (rarely used areas load
+  on demand).
 - **2.52.1** (2026-10-16): CI fixes for 2.52.0, calendar styles in rem (both go live with this version).
 - **2.52.0** (2026-10-16): the calendar like a desktop app - **drag to create, move and resize** events, also by long
   press on phones; **write into subscribed CalDAV calendars** (switch per subscription, off by default) and **address

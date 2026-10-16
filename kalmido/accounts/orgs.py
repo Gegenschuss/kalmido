@@ -239,8 +239,9 @@ def workspaces_for(c, uid):
     if not oids:
         return []
     q = ",".join("?" * len(oids))
-    return [{"id": r["id"], "name": r["name"], "icon": r["icon"], "role": org_role(c, uid, r["id"]) or "member"}
-            for r in c.execute(f"SELECT id, name, icon FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
+    # 2.53.0 B (#1474): + color (the organisation's colour, '' = the default tone of its id)
+    return [{"id": r["id"], "name": r["name"], "icon": r["icon"], "color": r["color"] or "", "role": org_role(c, uid, r["id"]) or "member"}
+            for r in c.execute(f"SELECT id, name, icon, color FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
 
 
 def list_org(c, lid):
@@ -594,6 +595,17 @@ def org_update(oid):
         return jsonify(org_public(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone()))
 
 
+def wsc_clean_color(v):
+    """2.53.0 B (#1474): an organisation's colour: '' or #rrggbb (the app offers its own palette and shows the nearest tone)."""
+    from ..lists.lists import LIST_COLOR_RE
+    v = v.strip() if isinstance(v, str) else v
+    if v in ("", None):
+        return ""
+    if not isinstance(v, str) or not LIST_COLOR_RE.fullmatch(v):
+        raise Denied(400, tr("Invalid value: {0}", tr("Color")))
+    return v
+
+
 def _org_patch(c, oid, b):
     if "name" in b:
         c.execute("UPDATE orgs SET name=? WHERE id=?", (_clean_name(b["name"]), oid))
@@ -675,7 +687,7 @@ def org_mine_dict(c, r, uid):
     from ..collab.comments import user_names
     mem = c.execute("SELECT m.user_id, m.role, u.kind, u.disabled FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY lower(u.display_name), u.id", (r["id"],)).fetchall()
     names = user_names(c, [m["user_id"] for m in mem])
-    return {"id": r["id"], "name": r["name"], "icon": r["icon"], "domains": r["domains"], "role": org_role(c, uid, r["id"]) or "member",
+    return {"id": r["id"], "name": r["name"], "icon": r["icon"], "color": r["color"] or "", "domains": r["domains"], "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "member",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
             "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (r["id"],)).fetchone()[0]}
@@ -700,11 +712,15 @@ def orgs_mine():
 @app.patch("/api/orgs/<int:oid>")
 def org_mine_update(oid):
     """2.28.0 (#935): {name?, icon?, domains?} -- an organisation admin renames it / sets its e-mail domains (modes multi /
-    workspaces; in the mode organisation the name comes from the configuration or the instance admin)."""
+    workspaces; in the mode organisation the name comes from the configuration or the instance admin).
+    2.53.0 B (#1474): {color?} -- its colour for every member ('' = the default tone); only here (an admin of this
+    organisation), not in the instance admin's routes."""
     c, b = db(), body()
     _need_org_admin(c, oid)
     if instance_mode(c) != "workspaces":
         _no_change()
+    if "color" in b:
+        c.execute("UPDATE orgs SET color=? WHERE id=?", (wsc_clean_color(b["color"]), oid))
     _org_patch(c, oid, b)
     bump(c)
     c.commit()
@@ -793,6 +809,8 @@ def org_leave(c, oid, uid, heir):
         c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, aid))
     c.execute("UPDATE agents SET org_id=NULL WHERE owner_id=? AND org_id=?", (uid, oid))
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
+    # 2.53.0 (#1424, review): the leaver's task bells in the organisation go too (else the nightly boundary check alarms)
+    c.execute("DELETE FROM task_bell WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
     from ..core.access import acx_drop
     acx_drop()  # 2.36.2 (#1142): the request's access contexts follow the new memberships
     return n

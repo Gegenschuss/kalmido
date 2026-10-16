@@ -10,7 +10,9 @@ const WS = globalThis.WebSocket || require('ws');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // prefs: extra Firefox preferences for one suite (2.13.0)
-module.exports = ({tag, check, shots, prefs: extra = []}) => async function firefox(fn, touch) {
+// 2.53.0 (#1410): nav() loads the modules the app loads on demand (settings, contacts, office) after each page load, so
+// suites can call their functions directly; lazy: true leaves them to the app (tests/p253_a_ui.js)
+module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async function firefox(fn, touch) {
   try { execFileSync('firefox', ['--version'], {stdio: 'ignore'}); } catch { console.log(`${tag}: Firefox part skipped (no firefox on PATH)`); return; }
   const prof = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), `kalmido-${tag}-`));
   const prefs = [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1],
@@ -39,7 +41,11 @@ module.exports = ({tag, check, shots, prefs: extra = []}) => async function fire
     await cmd('session.new', {capabilities: {}});
     const ctx = (await cmd('browsingContext.getTree', {})).contexts[0].context;
     const ev = async expr => { const r = await cmd('script.evaluate', {expression: expr, target: {context: ctx}, awaitPromise: true, resultOwnership: 'none', serializationOptions: {maxObjectDepth: 6}}); if (r.type === 'exception') throw new Error('JS: ' + r.exceptionDetails.text); return unwrap(r.result); };
-    const nav = url => cmd('browsingContext.navigate', {context: ctx, url, wait: 'complete'});
+    const nav = async url => {
+      const r = await cmd('browsingContext.navigate', {context: ctx, url, wait: 'complete'});
+      if (!lazy) await ev(`typeof ld_all === 'function' ? ld_all().then(() => 1, () => 0) : 0`).catch(() => 0);
+      return r;
+    };
     const shot = async name => { const dir = shots && process.env[shots]; if (!dir) return; const r = await cmd('browsingContext.captureScreenshot', {context: ctx}); fs.writeFileSync(path.join(dir, name), Buffer.from(r.data, 'base64')); };
     // a drag with the mouse (desktop) or one finger (touch) from (x0, y0) by (dx, dy)
     const drag = (x0, y0, dx, dy, kind = 'mouse') => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'p1', parameters: {pointerType: kind},

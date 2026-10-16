@@ -73,6 +73,7 @@ ORDER = (
     "admin.backup",
     "api.v1",
     "notify.caps",  # 2.33.0 (#927)
+    "notify.taskbell",  # 2.53.0 C (#1424): the bell of one task per person
     "tasks.dayplan",
     "tasks.briefing",  # 2.34.0 (#264)
     "lists.report",  # 2.34.0 (#265)

@@ -827,6 +827,17 @@ fresh; run p252_b_api "$PY" p252_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p252_b_ui node p252_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.52.0 part A: the calendar like macOS - drag to create, move, resize, all-day and month ranges, touch (#1016)
 fresh; run p252_a_ui node p252_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part D: references by dragging into comment / description, reference cards, the preview card (#1449 #1440)
+fresh; run p253_d_ui node p253_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part E: agent tone for comments / News / chat (#1451) + tags overview (#446)
+fresh; run p253_e_ui node p253_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part B: list colours as accent, folder colours, card edges, "only as a dot" (#1426); workspace colours (#1474)
+fresh; run p253_b_ui node p253_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part C: the bell of one task - as the list / muted / urgent, set for others by list admins (#1424)
+fresh; run p253_c_api "$PY" p253_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p253_c_ui node p253_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part A: modules loaded on demand (#1410)
+fresh; run p253_a_ui node p253_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.52.0 part C: #1438 address books an organisation owns (hand-over, roles, leaving / account deletion, CardDAV, way back)
 fresh; run p252_c_api "$PY" p252_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p252_c_ui node p252_c_ui.js "$KALMIDO_TEST_DATA"

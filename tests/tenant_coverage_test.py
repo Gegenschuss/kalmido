@@ -485,6 +485,7 @@ ROUTES = {
     "POST /api/team/rooms/{}/e2e": "team", "GET /api/tasks/{}/enc-note": "task", "PUT /api/tasks/{}/enc-note": "task",
     "DELETE /api/tasks/{}/enc-note": "task", "POST /api/tasks/{}/enc-attachments": "attachment",
     # 2.48.0 (#1642): the locked note of a task (need_task; only the person who locked it)
+    "GET /api/tasks/{}/bell": "task", "PUT /api/tasks/{}/bell": "task", "POST /api/tasks/{}/bell/undo": "task",  # 2.53.0 C (#1424): need_task + people of the list (p253_c_api_test.py)
     "GET /api/tasks/{}/note-lock": "task", "PUT /api/tasks/{}/note-lock": "task", "DELETE /api/tasks/{}/note-lock": "task", "GET /api/v1/team/rooms": "team", "POST /api/v1/team/dm": "team",
     "GET /api/v1/team/rooms/{}/messages": "team", "POST /api/v1/team/rooms/{}/messages": "team",
     "PATCH /api/v1/team/messages/{}": "team", "DELETE /api/v1/team/messages/{}": "team",
