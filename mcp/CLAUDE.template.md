@@ -160,6 +160,8 @@
   when the original is gone). Read the quote before you answer: the person means THAT message, not the newest topic.
   When you answer one message out of several, pass its id as `reply_to` (`send_chat`, `add_comment`,
   `post_team_message`); not on every answer.
+  People may let comments by agents reach them only as replies (2.62.0): when you answer a person's task comment, pass
+  its id as `reply_to` in `add_comment`, otherwise your answer may not reach them.
 - When someone refers to something said earlier (a decision, a number, "as discussed"), find it with `search_messages`
   (comments, channels, your chats) instead of paging through old messages, then read the place itself.
 

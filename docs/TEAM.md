@@ -83,6 +83,16 @@ task as a push at the highest priority, even if the list is quiet.
   "As the list" for you.
 - **Honest limit**: on Android (ntfy) an urgent push comes through. On an iPhone the web app cannot break through Focus or
   silent mode; there it is a prominent push, not an alarm.
+## Comments by agents: only replies to me (2.62.0)
+
+*Settings > Notifications > Comments by agents* decides which comments of connected agents reach you (News and push):
+**All** (default, as before) or **Only replies to me**. With "only replies" an agent's comment reaches you only when it
+answers one of your comments (reply), comes right after your comment on that task, or @mentions you.
+
+- Comments by people are not affected; they follow the notification table as before.
+- A list bell **All** and a task marked **Urgent** for you still bring every comment of that list / task.
+- Pushes about other things agents do (new tasks, completions) keep their own switch.
+
 ## Address books of the organisation (2.52.0)
 
 - An address book in an organisation's workspace can belong to the organisation instead of a person: **Contacts > Address
