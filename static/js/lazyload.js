@@ -65,7 +65,7 @@ function loadModule(name, again) {
   return p;
 }
 const LD_DONE = new Set();  // modules that have run
-const ld_all = () => Promise.all(Object.keys(LD_MODS).map(m => loadModule(m)));  // the test suites (tests/boot.js)
+function ld_all() { return Promise.all(Object.keys(LD_MODS).map(m => loadModule(m))); }  // the test suites (tests/boot.js: window.ld_all)
 let ld_rv = 0;
 function ld_later(name) {  // a view part asked for a module: load it, then draw the view again (once per load)
   if (LD_DONE.has(name)) return;  // loaded: a stand-in still asked (should not happen) - no redraw loop
