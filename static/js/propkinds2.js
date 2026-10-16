@@ -22,10 +22,16 @@ function pk2_plain(k, text, chips = '', o = {}) {
     <label class="ppcl"><input type="checkbox" class="ppc" id="ppc-${id}" ${on ? 'checked' : ''} ${o.off ? 'disabled' : ''} aria-label="${esc(tr('Select {0}', text))}"></label>
     <div class="ppb"><div class="pprow"><label class="pk2t" for="ppc-${id}">${esc(text)}</label></div>${chips ? `<div class="ppf">${chips}</div>` : ''}</div></div>`;
 }
+// a line with an editable name and no date (a list, the first project)
+function pk2_named(k, title, chips = '') {
+  const on = S.prop.sel.has(k), id = ppSafe(k);
+  return `<div class="ppi ${on ? '' : 'off'}" data-k="${k}">
+    <label class="ppcl"><input type="checkbox" class="ppc" id="ppc-${id}" ${on ? 'checked' : ''} aria-label="${esc(tr('Select {0}', title))}"></label>
+    <div class="ppb"><div class="pprow"><input class="ppt" data-f="title" value="${esc(title)}" maxlength="120" aria-label="${esc(tr('Name'))}"></div>${chips ? `<div class="ppf">${chips}</div>` : ''}</div></div>`;
+}
 const pk2_money = (n, cur) => { try { return new Intl.NumberFormat(S.settings?.lang || undefined, {style: 'currency', currency: cur || 'EUR'}).format(n); } catch { return String(n); } };
-function pk2_shootWhen(s) {
-  const t = s.start_time ? ` ${s.start_time}${s.end_time ? '–' + s.end_time : ''}` : ` · ${tr('All day')}`;
-  return (s.end_date ? `${fmtDate(s.date)} – ${fmtDate(s.end_date)}` : '') + t;
+function pk2_shootWhen(s) {  // the date is the field; the chip says the span and the time
+  return [s.end_date ? `${fmtDate(s.date)} – ${fmtDate(s.end_date)}` : '', s.start_time ? `${s.start_time}${s.end_time ? '–' + s.end_time : ''}` : tr('All day')].filter(Boolean).join(' · ');
 }
 function pk2_itemsHtml() {
   const {v} = S.prop, p = v.proposal;
@@ -33,9 +39,9 @@ function pk2_itemsHtml() {
     const fname = k => tr((FEATS.find(f => f[0] === k) || [k, k])[1]);
     const pt = p.project && PTYPE_UI.find(x => x[0] === p.project.type);
     return (p.modules.length ? pk2_h(tr('Modules')) + p.modules.map((m, i) => pk2_plain(String(i), m.on ? tr('Switch on: {0}', fname(m.key)) : tr('Switch off: {0}', fname(m.key)))).join('') : '')
-      + (p.lists.length ? pk2_h(tr('Lists')) + p.lists.map((x, i) => propItemHtml(String(PK2_LIST + i), {title: x.name, due: null},
-        {chips: (x.folder ? pk2_chip('folder', x.folder) : '') + x.sections.map(s => `<span class="ppchip">${esc(s)}</span>`).join('')})).join('') : '')
-      + (p.project ? pk2_h(tr('First project')) + propItemHtml(String(PK2_PROJECT), {title: p.project.name, due: null}, {chips: pk2_chip('folder', tr(pt ? pt[1] : p.project.type))}) : '');
+      + (p.lists.length ? pk2_h(tr('Lists')) + p.lists.map((x, i) => pk2_named(String(PK2_LIST + i), x.name,
+        (x.folder ? pk2_chip('folder', x.folder) : '') + x.sections.map(s => `<span class="ppchip">${esc(s)}</span>`).join(''))).join('') : '')
+      + (p.project ? pk2_h(tr('First project')) + pk2_named(String(PK2_PROJECT), p.project.name, pk2_chip('folder', tr(pt ? pt[1] : p.project.type))) : '');
   }
   const secOpts = cur => `<option value="">${tr('No section')}</option>${p.sections.map(s => `<option ${s === cur ? 'selected' : ''}>${esc(s)}</option>`).join('')}`;
   let h = '';
@@ -46,7 +52,7 @@ function pk2_itemsHtml() {
     fields: p.sections.length ? `<select data-f="section" aria-label="${esc(tr('Section'))}">${secOpts(t.section)}</select>` : '',
     chips: propPrio(t.priority)}) + t.subtasks.map((s, k) => propItemHtml(`${i}.${k}`, s, {sub: true})).join('')).join('');
   if (p.shoot_days.length) h += pk2_h(tr('Shoot days (event drafts)')) + p.shoot_days.map((s, i) => propItemHtml(String(PK2_SHOOT + i), {title: s.title, due: s.date, notes: s.notes},
-    {chips: pk2_chip('cal', pk2_shootWhen(s).trim()) + (s.location ? pk2_chip('pin', s.location) : '')})).join('');
+    {chips: pk2_chip('cal', pk2_shootWhen(s)) + (s.location ? pk2_chip('pin', s.location) : '')})).join('');
   if (p.offer) {
     const ok = pk2_offerOk(v), sum = p.offer.items.reduce((a, x) => a + (x.price == null ? 0 : x.qty * x.price * (1 - (x.discount || 0) / 100)), 0);
     h += pk2_h(tr('Quotation draft')) + (ok ? '' : `<div class="shint keep pk2no">${esc(tr('Not possible: no office rights (the agent’s switch “May draft office documents” and the office’s privacy switch)'))}</div>`)
