@@ -77,6 +77,8 @@ KINDS = {
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
     "stats": ("matrix", "p2300_tenant_test.py: statistics count only own / visible tasks"),
     "publiclink": ("matrix", "p2300_tenant_test.py: the public link of another person's list by id"),
+    # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
+    "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions)"),
     # ---- not relevant for the boundary between organisations (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account (before a session or about the session's own person)"),
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
@@ -86,10 +88,12 @@ KINDS = {
                      "is trusted with the whole server (architecture review 2.1 / B4); people in it are filtered by visible_people"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, robots, manifest, QR code of a given text)"),
     "family": ("n/a", "the household of the Family module: private by definition (kid_parents), never an organisation's object"),
+    "pure": ("n/a", "a pure transformation of the request body (an outline file into a tree): no stored data is read or written"),
     "token": ("n/a", "an inbound hook addressed by the unguessable secret of one list (sealed, looked up by its hash): nothing to "
                      "guess by id"),
-    # 2.49.0 (#1106): finding people by e-mail (accounts/discover.py)
-    "people": ("n/a", "finding people by e-mail and connection requests: person to person, outside every workspace; the "
+    # 2.49.0 (#1106): finding people by e-mail (accounts/discover.py) -- its own kind (a second "people" key here silently
+    # replaced the matrix kind of the user list above)
+    "discover": ("n/a", "finding people by e-mail and connection requests: person to person, outside every workspace; the "
                       "person's own requests / connections / blocks only, a hit only through an exact confirmed address "
                       "(p249_e_api_test.py: no account disclosure, no probing by id, organisations unchanged)"),
 }
@@ -501,11 +505,17 @@ ROUTES = {
     "GET /api/admin/agents/{}/machines": "admin", "DELETE /api/admin/agents/{}/machines/{}": "admin",
     "POST /api/agent-setup/redeem": "auth", "POST /api/agent-setup/remove": "auth",
     "GET /agent-setup.sh": "public", "GET /agent-setup.ps1": "public",
+    # 2.49.0 (#1531, #1199, #1201): Forgot your password?, knowledge pages, outline import
+    "POST /api/auth/forgot": "auth", "POST /api/outline/parse": "pure",
+    "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
+    "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
+    "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
+    "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
     # 2.49.0 (#1106): find people by e-mail, connection requests, blocks
-    "GET /api/disc": "people", "PUT /api/disc": "people", "POST /api/disc/confirm": "people", "POST /api/disc/find": "people",
-    "POST /api/disc/check": "people", "POST /api/disc/requests": "people", "POST /api/disc/requests/{}/{}": "people",
-    "DELETE /api/disc/requests/{}": "people", "DELETE /api/disc/connections/{}": "people",
-    "POST /api/disc/connections/{}/restore": "people", "POST /api/disc/blocks/{}": "people", "DELETE /api/disc/blocks/{}": "people",
+    "GET /api/disc": "discover", "PUT /api/disc": "discover", "POST /api/disc/confirm": "discover", "POST /api/disc/find": "discover",
+    "POST /api/disc/check": "discover", "POST /api/disc/requests": "discover", "POST /api/disc/requests/{}/{}": "discover",
+    "DELETE /api/disc/requests/{}": "discover", "DELETE /api/disc/connections/{}": "discover",
+    "POST /api/disc/connections/{}/restore": "discover", "POST /api/disc/blocks/{}": "discover", "DELETE /api/disc/blocks/{}": "discover",
     # 2.48.0 (#1111): documents
     "GET /api/docs": "document", "POST /api/docs": "document", "GET /api/docs/{}": "document", "PATCH /api/docs/{}": "document",
     "POST /api/docs/{}/accept": "document", "POST /api/docs/{}/review": "document", "POST /api/docs/{}/redo": "document",
