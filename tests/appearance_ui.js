@@ -188,6 +188,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
       check(ratio(root.text, ev[1]) >= 4.5 && ratio(light.text, el[1]) >= 4.5, 'body text on the agent tone: AA in both themes');
       check(ratio(root.muted, ev[1]) >= 4.5 && ratio(light.muted, el[1]) >= 4.5, 'muted text on the agent tone: AA in both themes');
     }
+  }
   // ---- 2.53.0 part B (#1426 #1474): the list palette (12 tones: value + ink per theme) and the workspace palette (8 tones),
   // WCAG AA in both themes, kept apart; the accent of an open list follows the theme
   {
