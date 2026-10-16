@@ -1261,7 +1261,9 @@ def v1_time_entries():
          "scope": a.get("scope", "mine")}
     if a.get("task_id"):
         q["task_id"] = str(as_int(a["task_id"], "task_id", 1))
-    rows, _, _, _ = time_rows(c, uid, q)
+    from ..personal.timetrack import n43_admin_lists
+    # 2.63.0 (#1523): as /api/time/entries (agents and the entries of one task: unchanged)
+    rows, _, _, _ = time_rows(c, uid, q, own=None if q.get("task_id") else n43_admin_lists(c, uid))
     vis, ref, rm = vis_ids(c, uid), now_utc(), time_rounding(usettings(c, uid))
     out = [entry_out(r, uid, vis, ref, rm) for r in rows]
     if a.get("list_id"):

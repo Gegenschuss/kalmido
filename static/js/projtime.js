@@ -28,7 +28,7 @@ function tz_body(ids, d) {
   const dtxt = Math.abs(days - 1) < .05 ? tr('{0} day|time', fmtNum(1)) : tr('{0} days|time', fmtNum(days));
   const users = d.users.map(u => [u.name, u.seconds]), tasks = d.lists.flatMap(l => l.tasks).sort((a, b) => b.seconds - a.seconds).slice(0, 8).map(t => [t.title || tr('No task'), t.seconds]);
   const last = d.entries.slice().reverse().slice(0, 8);
-  return `<div class="tzsum ${bud && h > bud ? 'over' : ''}"><b>${esc(fmtNum(h))} h</b><span class="muted">${esc(dtxt)}</span>${bud ? `<span class="tbud" role="img" aria-label="${esc(tr('{0} % of the budget', Math.round(h / bud * 100)))}"><i style="width:${pct}%"></i></span><span class="tbn">${esc(fmtNum(h))}/${esc(fmtNum(bud))} h</span>` : ''}</div>
+  return `<div class="tzsum ${bud && h > bud ? 'over' : ''}"><b>${esc(fmtNum(h))} h</b><span class="muted">${esc(dtxt)}</span>${d.own_only ? `<span class="muted tzown">${tr('Your time only')}</span>` : ''}${bud ? `<span class="tbud" role="img" aria-label="${esc(tr('{0} % of the budget', Math.round(h / bud * 100)))}"><i style="width:${pct}%"></i></span><span class="tbn">${esc(fmtNum(h))}/${esc(fmtNum(bud))} h</span>` : ''}</div>
     ${d.total.count ? `<h4>${tr('By person')}</h4>${tz_bars(users, sec)}<h4>${tr('By task')}</h4>${tz_bars(tasks, sec)}
     <h4>${tr('Latest entries')}</h4>${last.map(e => `<div class="tzent"><span class="muted">${esc(fmtDate(e.day))}</span><span class="tzn">${esc(e.title || tr('No task'))}${e.user_name ? ` · ${esc(e.user_name)}` : ''}</span><b>${esc(fmtDur(e.seconds))}</b></div>`).join('')}`
     : `<div class="muted mhint">${tr('No time tracked in this period.')}</div>`}`;

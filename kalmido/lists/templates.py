@@ -188,7 +188,75 @@ def tpl_clean(kind, d):
             "rel": bool(d.get("rel")), "span": span(tasks), "deps": deps, "tickets": 1 if d.get("tickets") else 0,
             "ticket_tpl": tt, "dep_shift": 1 if d.get("dep_shift") else 0,
             # 2.39.0 (#1168): the list's own Playbook (its text; the new list gets it as its first version, source template)
-            "playbook": _tpl_playbook(d.get("playbook"))}
+            "playbook": _tpl_playbook(d.get("playbook")),
+            # 2.63.0 (#1523): the project page - its notepads, the standard arrangement and the block colours
+            **n43_clean_page(d)}
+
+
+def n43_clean_page(d):
+    """2.63.0 (#1523): {notepads, page_layout, page_style} of a list template as stored (wrong parts are dropped, never an error):
+    notepads [{k: "np<old id>", title, body}] (at most WG_PADS_MAX), page_layout = the standard arrangement (clean_layout), page_style =
+    {block: colour}. Notepad keys in the arrangement / colours that the template does not carry go when the template is used."""
+    from ..accounts.layouts import (LAYOUT_BLOCK_RE, LAYOUT_BLOCKS_MAX, WG_COLORS, WG_PAD_BODY_MAX, WG_PAD_TITLE_MAX, WG_PADS_MAX,
+                                    clean_layout)
+    pads, seen = [], set()
+    for n in (d.get("notepads") if isinstance(d.get("notepads"), list) else [])[:WG_PADS_MAX]:
+        if not isinstance(n, dict) or not isinstance(n.get("k"), str) or not re.fullmatch(r"np[0-9]{1,18}", n["k"]) or n["k"] in seen:
+            continue
+        t, bd = n.get("title") or "", n.get("body") or ""
+        if isinstance(t, str) and isinstance(bd, str) and len(t) <= WG_PAD_TITLE_MAX and len(bd) <= WG_PAD_BODY_MAX:
+            seen.add(n["k"])
+            pads.append({"k": n["k"], "title": t.strip(), "body": bd})
+    try:
+        lay = clean_layout(d.get("page_layout") or "")
+    except (BadInput, ValueError, TypeError):
+        lay = ""
+    st = d.get("page_style") if isinstance(d.get("page_style"), dict) else {}
+    st = {k: v for k, v in list(st.items())[:LAYOUT_BLOCKS_MAX]
+          if isinstance(k, str) and LAYOUT_BLOCK_RE.fullmatch(k) and v in WG_COLORS}
+    return {"notepads": pads, "page_layout": lay, "page_style": st}
+
+
+def n43_page_of(c, lid):
+    """2.63.0 (#1523): the project page of list lid for a template: the people's notepads (agents' own notepads stay with
+    the list), the standard arrangement and the block colours. Notepads are stored plain (orgcrypt PM_CRYPT_PLAIN "Notes")."""
+    r = c.execute("SELECT page_layout, page_style FROM lists WHERE id=?", (lid,)).fetchone()
+    try:
+        st = json.loads(r["page_style"] or "{}") if r else {}
+    except ValueError:
+        st = {}
+    pads = [{"k": f"np{x['id']}", "title": x["title"], "body": x["body"]}
+            for x in c.execute("SELECT id, title, body FROM list_notepads WHERE list_id=? AND agent_id IS NULL ORDER BY id", (lid,))]
+    return {"notepads": pads, "page_layout": (r["page_layout"] if r else "") or "", "page_style": st if isinstance(st, dict) else {}}
+
+
+def n43_page_apply(c, lid, d, uid):
+    """2.63.0 (#1523): the template's project page onto the new list lid: new notepads, and the arrangement and colours with
+    their notepad keys rewritten to the new ids (a notepad key without its notepad goes; other blocks stay as they are)."""
+    page = n43_clean_page(d)
+    ts, kmap = iso(now_utc()), {}
+    for n in page["notepads"]:
+        kmap[n["k"]] = "np%d" % insert_id(c, """INSERT INTO list_notepads(list_id,title,body,created_by,created_at,updated_by,updated_at)
+                                               VALUES(?,?,?,?,?,?,?)""", (lid, n["title"], n["body"], uid, ts, uid, ts))
+
+    def key(k):
+        return kmap.get(k) if re.fullmatch(r"np[0-9]+", k) else k
+
+    def part(o):
+        out = {}
+        for k, v in o.items():
+            if k in ("order", "hidden", "half", "full"):
+                out[k] = [key(x) for x in v if key(x)]
+            elif k == "opts":
+                out[k] = {key(x): y for x, y in v.items() if key(x)}
+            elif k == "mobile":
+                out[k] = part(v)
+        return out
+    lay = part(json.loads(page["page_layout"])) if page["page_layout"] else {}
+    st = {key(k): v for k, v in page["page_style"].items() if key(k)}
+    if lay or st:
+        c.execute("UPDATE lists SET page_layout=?, page_style=? WHERE id=?",
+                  (json.dumps(lay, separators=(",", ":")) if lay else "", json.dumps(st, separators=(",", ":")) if st else "", lid))
 
 
 def _tpl_playbook(v):
@@ -281,6 +349,7 @@ def template_create():
                                   "rel": rel, "deps": deps, "tickets": lst["tickets"], "dep_shift": lst["dep_shift"],
                                   "done_at_bottom": lst["checklist"],
                                   "playbook": _tpl_list_playbook(c, lid),  # 2.39.0 (#1168)
+                                  **n43_page_of(c, lid),  # 2.63.0 (#1523): notepads, page arrangement, block colours
                                   "ticket_tpl": json.loads(lst["ticket_tpl"] or "{}") if role == "owner" else {}}
         else:
             kind = b.get("kind") if b.get("kind") in ("task", "list") else None
@@ -486,6 +555,7 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=
     if d.get("playbook"):  # 2.39.0 (#1168): the template's Playbook becomes the new list's first version
         from ..lists.playbook import pb_save
         pb_save(c, _tpl_playbook(d["playbook"]), "template", uid, lid=lid)
+    n43_page_apply(c, lid, d, uid)  # 2.63.0 (#1523): notepads + the page's arrangement and colours with the new notepad ids
     list_created(c, uid, lid)  # 2.4.2 (#391): project types + templates are new lists too; 2.25.0 (#931): + a shared folder's people
     return lid
 

@@ -8206,5 +8206,6 @@
   "Back to the whole chat": "Volver al chat completo",
   "Job has ended": "El trabajo ha terminado",
   "The job reads it after its next step.": "El trabajo lo lee después de su próximo paso.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "El agente no recibe este mensaje ahora (en pausa, o la lista del trabajo no está compartida con él)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "El agente no recibe este mensaje ahora (en pausa, o la lista del trabajo no está compartida con él)",
+  "Your time only": "Solo tu tiempo"
 }
