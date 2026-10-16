@@ -39,6 +39,7 @@ NEWS_KINDS = ("mention", "comment", "assign", "unassign", "take", "complete", "s
               "playbook_proposal",  # 2.39.0 (#1168): an agent proposes a change of the Playbook of a list I decide on (row "proposal")
               "connreq", "connok",  # 2.49.0 (#1106): someone asks to connect / accepted my request (row "share", accounts/discover.py)
               "lytpl")  # 2.55.0 (#1068): someone sent me an arrangement as a template (row "share", accounts/layoutsets.py)
+NEWS_KINDS += ("review",)  # 2.60.0 C (#1512): a review asked of me / my task sent back (row "review", tasks/review.py)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -48,6 +49,7 @@ NEWS_TO_ME = ("mention", "assign", "unassign", "take")  # filter "Mentions & ass
 # 2.28.0 (#987): "For you": messages from PEOPLE to me -- @mentions, assignments, replies to my comments (data.reply), an
 # approver's decision; everything agents do and every plain change is "Activity". The bell counts only "For you".
 NEWS_FOR_ME = ("mention", "assign", "take", "apdecide", "orglist", "connreq", "connok", "dispo", "lytpl")  # 2.55.0 (#1068): lytpl  # 2.50.0 (#1194): dispo; 2.35.0 (#1101): an organisation admin acted on my list
+NEWS_FOR_ME += ("review",)  # 2.60.0 C (#1512)
 
 
 def news_to_me(kind, actor_id, data, agents):
@@ -98,13 +100,16 @@ NOTIF_ROWS = ("comment", "reply", "follow", "mention", "assign", "newtask", "com
               "nag",  # 2.7.0 (#413): a reminder that repeats until the task is done (push only; a muted list bell stops it)
               "chat",  # 2.17.0 (#419): a direct message / a team chat message (push only; mentions follow "mention")
               "errreport")  # 2.18.0 (owner decision): exactly one News item + push when a NEW error first becomes a ticket
+NOTIF_ROWS += ("review",)  # 2.60.0 C (#1512): a review asked of me / my task sent back by the reviewer (News + push on by default)
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
 NOTIF_NEWS_NEW = {"newtask": 0, "approval": 0, "followup": 1, "usage": 1, "proposal": 1, "errreport": 1}
+NOTIF_NEWS_NEW["review"] = 1  # 2.60.0 C (#1512)
 NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assign": 1, "newtask": 0, "complete": 1,
                       "status": 0, "share": 0, "unblock": 1, "approval": 1, "followup": 1, "reminder": 1, "usage": 1,
                       "proposal": 1, "nag": 1, "chat": 1, "errreport": 1}
+NOTIF_PUSH_DEFAULT["review"] = 1  # 2.60.0 C (#1512)
 NOTIF_NO_NEWS = ("reminder", "nag", "chat")
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
@@ -119,6 +124,7 @@ KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "una
             "newtask": "newtask", "approval": "approval", "dispo": "assign", "followup": "followup", "usage": "usage", "owner": "share",
             "proposal": "proposal", "take": "assign", "errreport": "errreport", "apdecide": "assign", "signup": "usage",
             "orglist": "share", "playbook_proposal": "proposal", "connreq": "share", "connok": "share", "lytpl": "share"}  # 2.35.0 (#1101): an organisation admin archived / restored / deleted / handed over a list
+KIND_ROW["review"] = "review"  # 2.60.0 C (#1512)
 
 
 def notif_stored(s):

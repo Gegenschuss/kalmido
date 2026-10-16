@@ -113,3 +113,21 @@ task as a push at the highest priority, even if the list is quiet.
   News item ("For you", switched off together with the sharing News) with a preview and *Take over* / *Decline*; taken over,
   it is their own saved arrangement, named after the sender, with no link back.
 - Agents cannot use any of this (403); they propose arrangements their own way (2.55.0, #1066).
+
+## Review step (2.60.0)
+
+For software teams and anything that needs a second look. Off until a list switches it on: list settings > *Review
+step*, with an optional default reviewer, the review section (default: the section named *Review*) and *Done only after
+approval*.
+
+- A task shows its reviewer and the review state in the task panel (*Choose reviewer*, *Send for review*). The reviewer
+  is a person or an agent of the list.
+- Moving a task into the review section (dragging on the board or changing the section) asks its reviewer; they get a
+  News item and a push (Settings > Notifications, row *Reviews*).
+- The reviewer (or an owner / admin of the list) presses 👍 *Approve* or 👎 *Back* (with an optional note). *Back*
+  returns the task to the section it came from and tells the assignee. Nobody approves their own task unless they are a
+  list admin.
+- With *Done only after approval*, ticking off waits for the approval: the tick explains it and offers *Send for
+  review*. Without a reviewer ticking off stays free.
+- A linked pull request that is merged, or approved with 👍 in Kalmido, counts as the approval.
+- Every step can be undone.

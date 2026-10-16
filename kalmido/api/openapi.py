@@ -675,6 +675,8 @@ def openapi_spec():
     files_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1207)
     from ..receipts.suggest import rc_spec
     rc_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1356)
+    from ..tasks.review import rvw_spec
+    rvw_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.60.0 C (#1512)
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",

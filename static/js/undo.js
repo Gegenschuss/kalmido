@@ -322,6 +322,7 @@ async function toggleTask(id) {
     offerUndo(tr('Reopened {0}', n), histReopen(tr('Reopened {0}', n), id, snaps, r));
     return;
   }
+  if (rvw_blocked(t)) { rvw_blockedAsk(t); return; }  // 2.60.0 C (#1512): waits for the review approval (the server says 409)
   if (t.blocked && dFor(t) && !await askConfirm(tr('“{0}” is still blocked by {1}. Complete it anyway?', t.title, blockedNames(t)), '', {ok: tr('Complete anyway')})) return;
   // optimistic: strike the row through, then sync
   $$(`.trow[data-id="${id}"] .chk`).forEach(c => { c.classList.add('on'); c.innerHTML = ic('check'); });

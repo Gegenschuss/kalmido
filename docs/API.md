@@ -891,6 +891,17 @@ organisation's state. Never the kind (vacation, sick leave, day off) or the note
 (a person in the app) decides with `approve`, `changes` or `reject`. Tasks carry `approval` (`pending | approved |
 changes | rejected | null`) and `approver_id`.
 
+`POST /tasks/{id}/review` (`tasks:write`, 2.60.0, #1512): the review step. `{action: reviewer, reviewer_id}` (a person or
+agent with access to the list, `null` = none), `{action: request, reviewer_id?, note?}` (send for review: into the list's
+review section, state `pending`, the reviewer gets a News item + push or the agent event `review_requested`),
+`{action: approve | changes, note?}` (only the reviewer or a list admin; never the assignee on their own task; an agent
+only as the reviewer; `changes` returns the task to the section it came from), `{action: restore, reviewer_id, review,
+section_id?}` (undo). Tasks carry `reviewer_id`, `review` (`pending | approved | changes`), `review_at`, `review_by`
+(`null` with `approved` = a linked pull request was merged or approved) and `review_sec` when set.
+`PUT /lists/{id}/review` (`structure`, editors): `{on, reviewer?, section?, gate?}`; lists carry `review_cfg` (json, empty
+= off). With `gate` on, completing a task that has a reviewer and is not approved answers **409** on every way (complete,
+batch, repeats, git keywords).
+
 `GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / list admins): a form's `url`, `access`
 (`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link.
 

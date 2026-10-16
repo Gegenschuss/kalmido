@@ -7699,3 +7699,8 @@ button.jobtag b{font-weight:600}
 .envhb{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem}
 #env-urlin{width:100%;box-sizing:border-box;margin:.5rem 0 .25rem}
 .rm-env{position:absolute;top:50%;transform:translateY(-50%);font-size:var(--fs-xs);color:var(--accent);white-space:nowrap;pointer-events:none;z-index:2}
+/* 2.60.0 C (#1512) review step: the bar in the task panel (shape of the approval bar), its states */
+.apbar.rvwbar.rvw-none{background:var(--bg2);border:.0625rem dashed var(--line2)}
+.apbar.rvwbar.rvw-approved{background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.apbar.rvwbar .apacts{display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
+.apbar.rvwbar .apacts .btn{min-height:2.25rem}

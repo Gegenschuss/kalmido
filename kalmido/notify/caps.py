@@ -32,9 +32,10 @@ NOTIF_TPLS = ("read", "work", "all", "custom")
 # the events an owner can choose for "custom" (rows of the notification settings, see collab/news.py NOTIF_ROWS)
 CUSTOM_ROWS = ("mention", "reply", "assign", "approval", "comment", "follow", "newtask", "complete", "status", "unblock",
                "chat", "reminder", "errreport", "share")
+CUSTOM_ROWS += ("review",)  # 2.60.0 C (#1512): a review asked of me / my task sent back
 CUSTOM_KEY = {"nag": "reminder", "followup": "reminder"}  # a nag / follow-up is a due reminder
 CAP_ROWS = CUSTOM_ROWS + ("nag", "followup")  # events of a list that the ceiling applies to (usage, proposals: never)
-TPL_ROWS = {"read": {"mention", "reply", "assign", "approval"}}
+TPL_ROWS = {"read": {"mention", "reply", "assign", "approval", "review"}}  # 2.60.0 C (#1512): review like approval
 TPL_ROWS["work"] = TPL_ROWS["read"] | {"comment", "reminder", "nag", "followup"}
 # what a share without any template gets: "read" (new shares start quiet); KALMIDO_NOTIF_TEMPLATE = read | work | all
 TPL_DEFAULT = os.environ.get("KALMIDO_NOTIF_TEMPLATE", "read").strip().lower()

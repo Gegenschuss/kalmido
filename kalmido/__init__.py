@@ -175,6 +175,7 @@ ORDER = (
     "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
     "office.agentdocs",  # 2.51.0 A (#1348, #1350): agents in the office: drafts, payment suggestions, the switches (API v1 + routes)
     "team.approvals",
+    "tasks.review",  # 2.60.0 C (#1512): review step (reviewer, gate, list setting, API v1)
     "team.forms",
     "team.v1",
     "accounts.signup",

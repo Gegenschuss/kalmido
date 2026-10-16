@@ -41,7 +41,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
     w.eval(`settingsModal('notify')`); await sleep(700);
     const mx = d.querySelector('#sp-notify .nmx');
     const rows = [...(mx?.querySelectorAll('.nmr') || [])];
-    check(mx && rows.length === 16 &&  /* 2.18.0: + errreport */  /Event.*News.*Push/.test(mx.querySelector('.nmh').textContent), `${lab}: matrix with every event (${rows.length}: ${rows.map(r => r.querySelector('[data-nm]')?.dataset.nm || '-').join(',')})`);
+    check(mx && rows.length === 17 &&  /* 2.18.0: + errreport; 2.60.0 (#1512): + review */  /Event.*News.*Push/.test(mx.querySelector('.nmh').textContent), `${lab}: matrix with every event (${rows.length}: ${rows.map(r => r.querySelector('[data-nm]')?.dataset.nm || '-').join(',')})`);
     const rem = rows.find(r => /Reminders/.test(r.textContent));
     check(rem && !rem.querySelector('[data-ch="news"]') && rem.querySelector('.nmna') && rem.querySelector('[data-nm="reminder"][data-ch="push"]').checked, `${lab}: reminders push only`);
     check(d.querySelector('[data-nm="reply"][data-ch="push"]').checked && d.querySelector('[data-nm="newtask"][data-ch="push"]').checked === mobile  // the desktop run switched it on

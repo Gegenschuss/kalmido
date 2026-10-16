@@ -94,6 +94,10 @@ CHECKS = {
     # bells; the read layer ignores rows of another workspace: notify/taskbell.py tbl_rows)
     "task_bell_person": ("SELECT b.task_id, b.user_id FROM task_bell b JOIN users u ON u.id=b.user_id WHERE b.org_id IS NOT NULL AND "
                          "(u.kind='agent' OR " + _PERSON.format(o="b", m="b") + ")"),
+    # 2.60.0 C (#1512): the reviewer of an organisation's task who is neither its list's owner nor a member of the list
+    "task_reviewer": ("SELECT t.id, t.reviewer_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.reviewer_id IS NOT NULL "
+                      "AND l.org_id IS NOT NULL AND t.reviewer_id<>l.owner_id AND NOT EXISTS (SELECT 1 FROM list_members m "
+                      "WHERE m.list_id=t.list_id AND m.user_id=t.reviewer_id)"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
