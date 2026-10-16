@@ -33,7 +33,8 @@ from ..core.pg import system_ctx
 from ..docs import store as S
 
 PL_TIMEOUT = 20               # s per request
-PL_API_VERSION = 5            # Accept: application/json; version=5 (custom fields, notes as a list)
+PL_API_VERSIONS = (10, 9, 5)  # 2.56.4 (#1859): Accept: application/json; version=N, the first one the server takes. Paperless-ngx
+                              # 3.x only allows 9 / 10 (406 on anything else), 2.x up to 9, 1.x up to 5 (custom fields, notes as a list)
 PL_PAGE = 50                  # documents per page of the import
 PL_LABEL_PAGES = 20           # pages of 100 tags / correspondents / types at most
 PL_JSON_MAX = 8 * 1024 * 1024
@@ -42,6 +43,7 @@ PL_EVERY = (15, 30, 60, 240, 1440)  # minutes between two looks for new document
 PL_IDLE = 5                   # s the worker sleeps when there is nothing to do
 PL_STALE = 10                 # min without a heartbeat: a run that was cut off (restart) is taken up again
 PL_TEXT_MAX = 200_000
+_VER = {}                     # address -> the API version that server took last (per process; a 406 asks again)
 _W = {"thread": None}
 _WAKE = threading.Event()
 _LOCK = threading.Lock()
@@ -51,6 +53,7 @@ PL_ERR = {"key": N_("The API token is not set (or the server key changed): enter
           "network": N_("Paperless-ngx could not be reached"),
           "redirect": N_("Paperless-ngx answered with a redirect: check the address"),
           "answer": N_("Paperless-ngx sent an answer Kalmido does not understand: check the address"),
+          "version": N_("This Paperless-ngx version speaks no API version Kalmido understands (5, 9 or 10)"),
           "too_large": N_("The file is larger than {0} MB"),
           "owner": N_("The person who set up the connection can no longer import here"),
           "quota": N_("The storage space is full: the import stopped"),
@@ -166,13 +169,33 @@ def pl_mapping(c, r):
 
 # ---- HTTP ---------------------------------------------------------------------------------------------------------------
 def pl_get(c, url, token, path, raw=False, limit=PL_JSON_MAX):
-    """GET url + path from Paperless-ngx with the token. JSON (raw: (bytes, content type, file name)). Raises PlError."""
-    from ..calendars.subscriptions import _cal_opener, cal_allow, CalError
+    """GET url + path from Paperless-ngx with the token. JSON (raw: (bytes, content type, file name)). Raises PlError.
+    2.56.4 (#1859): the API version is negotiated -- the one this server took last first, then PL_API_VERSIONS in order; a 406
+    (version not allowed) tries the next one, none left = PlError('version')."""
     if not token:
         raise PlError("key")
-    hdr = {"Authorization": f"Token {token}", "Accept": f"application/json; version={PL_API_VERSION}"}
     if raw:
-        hdr["Accept"] = "*/*"
+        return _pl_get1(c, url, token, path, None, True, limit)
+    last = _VER.get(url)
+    for v in ([last] if last else []) + [x for x in PL_API_VERSIONS if x != last]:
+        try:
+            j = _pl_get1(c, url, token, path, v, False, limit)
+        except PlError as e:
+            if e.code == "http" and e.detail == "406":
+                continue
+            raise
+        if last != v:
+            if len(_VER) > 1000:
+                _VER.clear()
+            _VER[url] = v
+        return j
+    _VER.pop(url, None)
+    raise PlError("version")
+
+
+def _pl_get1(c, url, token, path, ver, raw, limit):
+    from ..calendars.subscriptions import _cal_opener, cal_allow, CalError
+    hdr = {"Authorization": f"Token {token}", "Accept": "*/*" if raw else f"application/json; version={ver}"}
     req = urllib.request.Request(url + path, headers=hdr, method="GET")
     try:
         with _cal_opener(cal_allow(c)).open(req, timeout=PL_TIMEOUT) as resp:
@@ -212,7 +235,7 @@ def pl_check(c, url, token):
 
 
 def pl_labels(c, url, token, kind):
-    """All tags / correspondents / document_types / custom_fields: [{id, name, count}]."""
+    """All tags / correspondents / document_types: [{id, name, count}]."""
     out, page = [], 1
     while page <= PL_LABEL_PAGES:
         j = pl_get(c, url, token, f"/api/{kind}/?page_size=100&page={page}")
@@ -226,6 +249,46 @@ def pl_labels(c, url, token, kind):
             break
         page += 1
     return out
+
+
+def pl_fields(c, url, token):
+    """The custom fields: {id: {name, type, options}}; options = the select options (API 7+: [{id, label}], before: [label])."""
+    out, page = {}, 1
+    while page <= PL_LABEL_PAGES:
+        j = pl_get(c, url, token, f"/api/custom_fields/?page_size=100&page={page}")
+        if not isinstance(j, dict) or not isinstance(j.get("results"), list):
+            raise PlError("answer")
+        for x in j["results"]:
+            if isinstance(x, dict) and isinstance(x.get("id"), int):
+                ed = x.get("extra_data") if isinstance(x.get("extra_data"), dict) else {}
+                opts = ed.get("select_options") if isinstance(ed.get("select_options"), list) else []
+                out[x["id"]] = {"name": str(x.get("name") or "")[:S.NAME_MAX], "type": str(x.get("data_type") or ""), "options": opts}
+        if not j.get("next"):
+            break
+        page += 1
+    return out
+
+
+def _field_text(fd, v):
+    """A custom field's value as text: a select option's label (API 7+: the option's id, before: its index), Yes / No,
+    an amount 'EUR12.50' as '12.50 EUR', document links as 'Paperless #12'."""
+    t = fd.get("type") if isinstance(fd, dict) else ""
+    if isinstance(v, bool) or t == "boolean":
+        return tr("Yes") if v else tr("No")
+    if t == "select":
+        for i, o in enumerate(fd.get("options") or []):
+            if isinstance(o, dict) and o.get("id") == v and o.get("label") is not None:
+                return str(o["label"])
+            if isinstance(o, str) and isinstance(v, int) and i == v:
+                return o
+        return str(v)
+    if t == "monetary":
+        m = re.fullmatch(r"([A-Za-z]{3})?(-?\d+(?:\.\d+)?)", str(v))
+        if m:
+            return f"{m.group(2)} {(m.group(1) or '').upper()}".strip()
+    if isinstance(v, list):
+        return ", ".join(f"Paperless #{x}" if isinstance(x, int) else str(x) for x in v)
+    return str(v)
 
 
 def _map_default(kind, lid, name):
@@ -275,7 +338,8 @@ def _doc_text(doc, notes, fields):
         extra.append(f"{tr('Archive serial number')}: {doc['archive_serial_number']}")
     for f in doc.get("custom_fields") or []:
         if isinstance(f, dict) and f.get("value") not in (None, "", []):
-            extra.append(f"{fields.get(f.get('field'), tr('Field'))}: {f['value']}")
+            fd = fields.get(f.get("field")) or {}
+            extra.append(f"{fd.get('name') or tr('Field')}: {_field_text(fd, f['value'])}")
     if extra:
         parts.append("\n".join(extra))
     if notes:
@@ -327,7 +391,7 @@ def pl_import_doc(c, r, uid, tok, doc, labels, fields):
             folder = folder or name
         elif name not in tags:
             tags.append(name)
-    meta = {"ext_id": f"pl:{src}:{pid}", "date": _day(doc.get("created_date") or doc.get("created")), "tags": tags,
+    meta = {"ext_id": f"pl:{src}:{pid}", "date": _day(doc.get("created") or doc.get("created_date")), "tags": tags,
             "text": _doc_text(doc, _notes(c, r, tok, doc), fields)}
     for key, kind, field in (("senders", "correspondents", "correspondent"), ("types", "document_types", "document_type")):
         lid = doc.get(field)
@@ -392,7 +456,7 @@ def pl_run(c, sid):
     counts = {"new": 0, "skip": 0, "dup": 0, "fail": 0, "done": 0}
     try:
         labels = {k: {x["id"]: x["name"] for x in pl_labels(c, r["url"], tok, k)} for k in ("tags", "correspondents", "document_types")}
-        fields = {x["id"]: x["name"] for x in pl_labels(c, r["url"], tok, "custom_fields")}
+        fields = pl_fields(c, r["url"], tok)
         order = "id" if r["run_kind"] == "all" else "-id"
         page, stop = 1, False
         while not stop:
@@ -413,7 +477,7 @@ def pl_run(c, sid):
                     with c.savepoint():
                         res = pl_import_doc(c, r, uid, tok, doc, labels, fields)
                 except PlError as e:
-                    if e.code in ("auth", "network", "key", "blocked"):
+                    if e.code in ("auth", "network", "key", "blocked", "version"):
                         raise
                     res = "fail"
                 except (Denied, ValueError, QuotaExceeded) as e:

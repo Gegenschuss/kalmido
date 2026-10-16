@@ -10,6 +10,9 @@ Invented names only, generated file contents.
  - rights: organisation admins only (members see, cannot change), no agents, not across workspaces; a person without an
    organisation for their own space
  - a hosted server: every route 404
+ - 2.56.4 (#1859): the API version is negotiated (Paperless-ngx 3.x: only 9 / 10, 406 on 5; an old server: only up to 5;
+   none in common: a readable reason), custom fields of API 7+ (select option ids, amounts, yes / no, document links) and of
+   before (select option index) as text
 usage: p248_d_paperless_api_test.py <datadir>"""
 import json
 import os
@@ -93,16 +96,28 @@ def doc(i, title, **kw):
     return d
 
 
+# 2.56.4 (#1859): like Paperless-ngx 3.x -- API 9 / 10 only, tags with parent / children, select options with ids, notes
+# with a user object, created a date
 PLDATA = {
-    "tags": [{"id": 1, "name": "Tax", "document_count": 2}, {"id": 2, "name": "Archive 2025", "document_count": 1},
-             {"id": 3, "name": "Ignore me", "document_count": 1}],
+    "versions": ["9", "10"],
+    "tags": [{"id": 1, "name": "Tax", "document_count": 2, "parent": None, "children": []},
+             {"id": 2, "name": "Archive 2025", "document_count": 1, "parent": None, "children": []},
+             {"id": 3, "name": "Ignore me", "document_count": 1, "parent": None, "children": []}],
     "correspondents": [{"id": 7, "name": "Example Utility", "document_count": 1}],
     "document_types": [{"id": 9, "name": "Invoice", "document_count": 2}],
-    "custom_fields": [{"id": 4, "name": "Contract number", "data_type": "string"}],
+    "custom_fields": [{"id": 4, "name": "Contract number", "data_type": "string", "extra_data": {}},
+                      {"id": 5, "name": "Status", "data_type": "select",
+                       "extra_data": {"select_options": [{"id": "aB3xY9", "label": "Open"}, {"id": "Qw7rT2", "label": "Paid"}]}},
+                      {"id": 6, "name": "Amount", "data_type": "monetary", "extra_data": {"default_currency": None}},
+                      {"id": 8, "name": "Signed", "data_type": "boolean", "extra_data": {}},
+                      {"id": 10, "name": "Related", "data_type": "documentlink", "extra_data": {}}],
     "documents": [
         doc(11, "Power bill May", content="Power bill May total 42.00 EUR", created="2025-05-03", created_date="2025-05-03",
             correspondent=7, document_type=9, tags=[1, 2], archive_serial_number=17, original_file_name="power.pdf",
-            custom_fields=[{"field": 4, "value": "C-123"}], notes=[{"id": 1, "note": "Paid on 10 May"}]),
+            custom_fields=[{"field": 4, "value": "C-123"}, {"field": 5, "value": "Qw7rT2"}, {"field": 6, "value": "EUR42.00"},
+                           {"field": 8, "value": True}, {"field": 10, "value": [12]}],
+            notes=[{"id": 1, "note": "Paid on 10 May", "created": "2025-05-10T09:00:00+02:00",
+                    "user": {"id": 3, "username": "someone", "first_name": "", "last_name": ""}}]),
         doc(12, "Tax notice", content="Notice of assessment", created="2025-02-01T10:00:00+01:00", document_type=9, tags=[1, 3],
             notes=1),
         doc(13, "Copy", file=tiny_pdf("Power bill May"))],
@@ -188,6 +203,9 @@ r = A.put(B + "/api/paperless", json={"ws": "private", "url": "http://10.255.255
 check(r.status_code == 400 and "private network" in r.json().get("error", ""), f"an internal host that is not allowed: blocked ({r.text[:200]})")
 r = A.put(B + "/api/paperless", json={"ws": "private", "url": PL + "/api/", "token": "pl-secret"})
 check(r.ok and r.json()["conn"]["token_set"] is True and r.json()["conn"]["url"] == PL, f"connected, /api/ cut off ({r.status_code} {r.text[:200]})")
+# 2.56.4 (#1859): Paperless-ngx 3.x allows only API 9 / 10 -> Kalmido asks for 10 (not 5 any more: that was the 406)
+acc = [x.get("accept") or "" for x in pl_log() if x.get("auth")]
+check(acc and acc[-1].endswith("version=10") and not any("version=5" in a for a in acc), f"Paperless-ngx 3.x: API version 10 ({acc[-3:]})")
 check("pl-secret" not in r.text and "pl-secret" not in A.get(B + "/api/paperless?ws=private").text, "the token never comes back")
 check(A.put(B + "/api/paperless", json={"ws": "private", "foo": 1}).status_code == 400, "unknown field refused")
 check(A.put(B + "/api/paperless", json={"ws": "private", "every_min": 7}).status_code == 400, "only the offered intervals")
@@ -233,6 +251,8 @@ if pb and tn:
     t = full.get("text") or ""
     check("Power bill May total 42.00 EUR" in t and "Archive serial number: 17" in t and "Contract number: C-123" in t and "Paid on 10 May" in t,
           f"text + serial number + custom field + note ({t[:300]!r})")
+    check("Status: Paid" in t and "Amount: 42.00 EUR" in t and "Signed: Yes" in t and "Related: Paperless #12" in t and "Qw7rT2" not in t,
+          f"API 10 custom fields: the select option's label, amount, yes / no, document link ({t[:400]!r})")
     t2 = A.get(B + f"/api/docs/{tn['id']}").json().get("text") or ""
     check("Check the objection period" in t2, "notes fetched when the list only counts them")
     f = A.get(B + f"/api/docs/{pb['id']}/file")
@@ -246,13 +266,30 @@ run = (j or {}).get("conn", {}).get("run", {})
 check(run.get("new") == 0 and run.get("skipped") == 3 and len(docs(A)) == 2, f"a second import brings nothing twice ({run})")
 check(A.get(B + "/api/paperless/preview?ws=private").json().get("already") == 3, "preview counts what came in")
 
-# ---- following
-PLDATA["documents"].append(doc(14, "New letter", content="A new letter", tags=[1]))
+# ---- 2.56.4 (#1859): a server without any version in common -> a readable reason, not "(406)"
+PLDATA["versions"] = ["11"]
 pl_write()
-r = A.put(B + "/api/paperless", json={"ws": "private", "follow": True, "every_min": 15})
-check(r.ok and r.json()["conn"]["follow"] is True, "following switched on")
+r = A.put(B + "/api/paperless", json={"ws": "private", "token": "pl-secret"})
+check(r.status_code == 400 and "API version" in r.json().get("error", "") and "406" not in r.json().get("error", ""),
+      f"no common API version: refused with a readable reason ({r.status_code} {r.text[:200]})")
+
+# ---- an old server (API up to 5, select options as a plain list, the value its index): Kalmido falls back to 5
+PLDATA["versions"] = ["1", "2", "3", "4", "5"]
+PLDATA["custom_fields"][1]["extra_data"] = {"select_options": ["Open", "Paid", "Overdue"]}
+PLDATA["documents"].append(doc(14, "New letter", content="A new letter", tags=[1], created="2025-06-02T23:30:00+02:00",
+                               custom_fields=[{"field": 5, "value": 2}]))
+pl_write()
+open(os.path.join(DATA, "pl.log"), "w").close()
+r = A.put(B + "/api/paperless", json={"ws": "private", "token": "pl-secret", "follow": True, "every_min": 15})
+check(r.ok and r.json()["conn"]["follow"] is True, f"old server: connected again, following switched on ({r.status_code} {r.text[:200]})")
+acc = [x.get("accept") or "" for x in pl_log() if x.get("auth")]
+check(any(a.endswith("version=5") for a in acc), f"old server: falls back to API version 5 ({acc[:4]})")
 dbx("UPDATE pl_sources SET synced_at='2000-01-01T00:00:00+00:00' WHERE ws LIKE 'u%'", write=True)
 check(until(lambda: any(d["name"] == "New letter.pdf" for d in docs(A)), 40), "following: the new document came in by itself")
+nl = next((d for d in docs(A) if d["name"] == "New letter.pdf"), None)
+if nl:
+    t3 = A.get(B + f"/api/docs/{nl['id']}").json().get("text") or ""
+    check("Status: Overdue" in t3 and nl["date"] == "2025-06-02", f"old server: select option by index, date of a timestamp ({nl['date']}, {t3[:200]!r})")
 log = pl_log()
 check(log and all(x["m"] == "GET" for x in log), f"Kalmido only reads in Paperless-ngx ({sorted({x['m'] for x in log})})")
 check(any("version=" in (x.get("accept") or "") for x in log), "API version header sent")
