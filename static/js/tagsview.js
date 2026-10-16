@@ -21,7 +21,7 @@ function tg_collect() {
 function tg_card(r) {
   const ls = [...r.lists.values()], shown = ls.slice(0, 3).map(esc).join(' · ') + (ls.length > 3 ? ` +${ls.length - 3}` : '');
   const due = r.due ? `<span class="tgdue ${r.over ? 'over' : ''}">${ic('cal', 's')}${esc(r.over ? tr('Overdue since {0}', fmtDateLoc(r.due)) : tr('Next due {0}', fmtDateLoc(r.due)))}</span>` : '';
-  return `<button type="button" class="tgcard" data-go="tag/${encodeURIComponent(r.name)}" ${r.color ? `style="--tc:${r.color}"` : ''} aria-label="${esc(tr('Open tag {0}', '#' + r.name))}">
+  return `<button type="button" class="tgcard" data-go="tag/${encodeURIComponent(r.name)}" ${r.color ? `style="--tc:${cssColor(r.color)}"` : ''} aria-label="${esc(tr('Open tag {0}', '#' + r.name))}">
     <span class="tgtop"><span class="tgdot"></span><b>#${esc(r.name)}</b></span>
     <span class="tgnum"><span><b>${r.open}</b> ${esc(tr('open'))}</span><span><b>${r.done}</b> ${esc(tr('done'))}</span></span>
     ${due}${ls.length ? `<span class="tglists muted">${shown}</span>` : ''}${r.used ? `<span class="tgused muted">${esc(tr('Last used {0}', relTime(r.used)))}</span>` : ''}</button>`;
