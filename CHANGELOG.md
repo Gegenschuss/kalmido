@@ -7,6 +7,13 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.52.1] - 2026-10-16
+
+**In short:** the checks of 2.52.0 green again; 2.52.0 and 2.52.1 go live together.
+
+### Fixed
+- The new calendar styles (drag preview, new-event block, actions of subscribed calendars) follow the font size.
+
 ## [2.52.0] - 2026-10-16
 
 **In short:** the calendar feels like a desktop calendar app - **drag to create** an event right in the grid, **move**
