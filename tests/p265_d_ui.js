@@ -152,6 +152,31 @@ c.close()
       return {k, order: t2.indexOf(mover.id) === t2.indexOf(target.id) + 1 && t2.indexOf(next.id) === t2.indexOf(mover.id) + 1, sort: [S.tasks.get(target.id).sort, m.sort, S.tasks.get(next.id).sort], sec: m.section_id === target.section_id};
     })()`);
     check(dr.k >= 0 && dr.order && dr.sec, `${tag}: a drop after the last drawn row lands between it and its neighbour from the data ` + JSON.stringify(dr));
+    // a mouse drag held at the bottom edge: the list scrolls and draws on, the dragged row stays, the drop lands where it is
+    if (!touch) {
+      const dd = await ev(`(async () => {
+        const v = document.getElementById('view'); v.scrollTop = 0; vl_sync(); ${frame};
+        const top0 = vl_ids().map(i => S.tasks.get(i)).filter(t => t && !t.parent_id), mover = top0[3], src = document.querySelector('#view .trow[data-id="' + mover.id + '"]');
+        const dt = new DataTransfer(), vr = v.getBoundingClientRect();
+        src.dispatchEvent(new DragEvent('dragstart', {bubbles: true, cancelable: true, dataTransfer: dt}));
+        ${frame};
+        for (let i = 0; i < 20; i++) { document.elementFromPoint(vr.left + vr.width / 2, vr.bottom - 8)?.dispatchEvent(new DragEvent('dragover', {bubbles: true, cancelable: true, dataTransfer: dt, clientX: vr.left + vr.width / 2, clientY: vr.bottom - 8})); v.scrollTop += 300; ${frame}; }
+        DSE.v = 0;
+        const kept = src.isConnected, st = v.scrollTop, drawn = new Set([...document.querySelectorAll('#view .trow[data-id]')].map(r => +r.dataset.id));
+        const top = vl_ids().map(i => S.tasks.get(i)).filter(t => t && !t.parent_id);
+        const k = top.findIndex((t, i) => { const r = drawn.has(t.id) && document.querySelector('#view .trow[data-id="' + t.id + '"]').getBoundingClientRect(); return r && r.top > vr.top + 40 && r.bottom < vr.bottom - 40 && top[i + 1] && top[i + 1].section_id === t.section_id && t.section_id === mover.section_id; });
+        if (k < 0) return {kept, st, k};
+        const target = top[k], next = top[k + 1], tt = document.querySelector('#view .trow[data-id="' + target.id + '"] .ttl'), rr = tt.closest('.trow').getBoundingClientRect();
+        tt.dispatchEvent(new DragEvent('dragover', {bubbles: true, cancelable: true, dataTransfer: dt, clientX: rr.left + 40, clientY: rr.bottom - 3}));
+        tt.dispatchEvent(new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: dt, clientX: rr.left + 40, clientY: rr.bottom - 3}));
+        src.isConnected ? src.dispatchEvent(new DragEvent('dragend', {bubbles: true, dataTransfer: dt})) : document.dispatchEvent(new DragEvent('dragend', {bubbles: true, dataTransfer: dt}));
+        for (let i = 0; i < 40; i++) { await new Promise(r => setTimeout(r, 100)); const t2 = vl_ids().map(x => S.tasks.get(x)).filter(t => t && !t.parent_id).map(t => t.id); if (t2.indexOf(mover.id) === t2.indexOf(target.id) + 1) break; }
+        ${frame};
+        const t2 = vl_ids().map(x => S.tasks.get(x)).filter(t => t && !t.parent_id).map(t => t.id);
+        return {kept, st, k, order: t2.indexOf(mover.id) === t2.indexOf(target.id) + 1 && t2.indexOf(next.id) === t2.indexOf(mover.id) + 1, rows: document.querySelectorAll('#view .trow').length};
+      })()`);
+      check(dd.kept && dd.st >= 5000 && dd.k >= 0 && dd.order, `${tag}: a drag at the bottom edge scrolls on, keeps its row and drops in place ` + JSON.stringify(dd));
+    }
     // a live update keeps the place
     const lu = await ev(`(async () => {
       const v = document.getElementById('view'); v.scrollTop = 40000; vl_sync(); ${frame};
