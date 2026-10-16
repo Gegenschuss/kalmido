@@ -824,6 +824,8 @@ fresh; run p252_b_api "$PY" p252_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p252_b_ui node p252_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.52.0 part A: the calendar like macOS - drag to create, move, resize, all-day and month ranges, touch (#1016)
 fresh; run p252_a_ui node p252_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part A: modules loaded on demand (#1410)
+fresh; run p253_a_ui node p253_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

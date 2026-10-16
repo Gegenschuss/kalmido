@@ -32,6 +32,9 @@ exports.clientSource = async () => {
   const html = await (await fetch(B)).text();
   const mods = [...html.matchAll(/<script src="\/static\/js\/([\w-]+\.js)"><\/script>/g)].map(m => m[1]);
   if (!mods.length) throw new Error('index.html loads no static/js/ modules');
+  // 2.53.0 (#1410): + the modules loaded on demand (LAZY in sw.js)
+  const lazy = ((await (await fetch(B + 'sw.js')).text()).match(/const LAZY = \[(.*?)\];/s) || [, ''])[1];
+  mods.push(...[...lazy.matchAll(/'\/static\/js\/([\w-]+\.js)'/g)].map(m => m[1]));
   return (await Promise.all(mods.map(async f => (await fetch(B + 'static/js/' + f)).text()))).join('\n');
 };
 // 2.0.5 / 2.0.6: app code that is still running when a suite closes its window (an awaited fetch returning after
@@ -71,7 +74,9 @@ exports.login = async (user, pw = 'password123') => {
   if (!r.ok) throw new Error('login ' + user + ' ' + r.status);
   return r.headers.get('set-cookie').split(';')[0];
 };
-exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = 2500, proxy = null, path = '', media = {}, setup = null} = {}) {
+// 2.53.0 (#1410): lazy = false (the default) loads the modules the app loads on demand (settings, contacts, office) right after
+// the start, so suites can call their functions directly; lazy: true leaves them to the app (tests/p253_a_ui.js)
+exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = 2500, proxy = null, path = '', media = {}, setup = null, lazy = false} = {}) {
   const cookie = proxy ? '' : await exports.login(user);
   // 1.8.1: the start view is the Inbox; the suites written before start on Today as a device that was there last
   // (pass ls: {'tasks.lastKey': null} for a real first start, p181_ui.js)
@@ -94,6 +99,7 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
       if (setup) setup(w);  // extra browser APIs for one suite (webpush_ui.js: Notification, PushManager, ...)
     }});
   await new Promise(r => setTimeout(r, wait));
+  if (!lazy && typeof dom.window.ld_all === 'function') await dom.window.ld_all().catch(e => console.log('ld_all:', e.message));
   dom.window.__cookie = cookie; dom.window.__store = store;
   const close = dom.window.close.bind(dom.window), realmTE = dom.window.TypeError;
   dom.window.close = () => { if (!closedRealms.includes(realmTE)) closedRealms.push(realmTE); close(); };

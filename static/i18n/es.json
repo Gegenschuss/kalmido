@@ -7944,5 +7944,6 @@
   "New event “{0}”": "Nuevo evento «{0}»",
   "Change a repeating event": "Cambiar un evento periódico",
   "Change every date of this repeating event?": "¿Cambiar todas las fechas de este evento periódico?",
-  "Single dates of a subscribed calendar cannot be changed here.": "Las fechas sueltas de un calendario suscrito no se pueden cambiar aquí."
+  "Single dates of a subscribed calendar cannot be changed here.": "Las fechas sueltas de un calendario suscrito no se pueden cambiar aquí.",
+  "Could not be loaded": "No se pudo cargar"
 }

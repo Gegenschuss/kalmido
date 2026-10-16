@@ -2,7 +2,8 @@
 """Checks that the module lists agree (2.20.0, #646; see docs/ARCHITECTURE.md):
 
   * web client: every static/js/*.js is loaded by a <script> tag in static/index.html, main.js last, and the service
-    worker (static/sw.js, SHELL) precaches exactly these files in the same order
+    worker (static/sw.js, SHELL) precaches exactly these files in the same order; 2.53.0 (#1410): or it is loaded on
+    demand -- then it stands in LAZY (sw.js) and in LD_MODS (static/js/lazyload.js), in the same order, and has no tag
   * server: kalmido/__init__.py ORDER names every module of the package exactly once (and nothing else)
   * schema (2.30.0, #1036): every table with a reference to a person (a column REFERENCES users(id) or named user_id,
     owner_id, created_by, ...) carries org_id or list_id -- the workspace boundary can be checked on it -- or stands in
@@ -26,9 +27,21 @@ def read(*p):
 
 files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "static", "js", "*.js")))
 tags = re.findall(r'<script src="/static/js/([\w-]+\.js)"></script>', read("static", "index.html"))
-shell = re.findall(r"'/static/js/([\w-]+\.js)'", read("static", "sw.js"))
-if sorted(tags) != files:
-    ERR.append(f"index.html script tags vs static/js/: missing {sorted(set(files) - set(tags))}, unknown {sorted(set(tags) - set(files))}")
+sw = read("static", "sw.js")
+_list = lambda name: re.findall(r"'/static/js/([\w-]+\.js)'", (re.search(name + r" = \[(.*?)\];", sw, re.S) or [None, ""])[1])
+shell = _list("SHELL")
+# 2.53.0 (#1410): the modules loaded on demand: LAZY in sw.js = the files of LD_MODS in lazyload.js (same order), no script tag
+lazy = _list("LAZY")
+_ld = re.search(r"const LD_MODS = \{(.*?)\n\};", read("static", "js", "lazyload.js"), re.S)
+ld_files = [f + ".js" for f in re.findall(r"'([\w-]+)'", re.sub(r"^\s*\w+:", "", _ld.group(1), flags=re.M))] if _ld else []
+if lazy != ld_files:
+    ERR.append(f"sw.js LAZY differs from LD_MODS in static/js/lazyload.js (same files, same order): {lazy} vs {ld_files}")
+if set(lazy) & set(tags):
+    ERR.append(f"index.html loads modules that are loaded on demand (LAZY): {sorted(set(lazy) & set(tags))}")
+if len(set(lazy)) != len(lazy):
+    ERR.append("sw.js LAZY names a module twice")
+if sorted(tags + lazy) != files:
+    ERR.append(f"index.html script tags + LAZY vs static/js/: missing {sorted(set(files) - set(tags) - set(lazy))}, unknown {sorted(set(tags + lazy) - set(files))}")
 if len(set(tags)) != len(tags):
     ERR.append("index.html loads a module twice")
 if tags and tags[-1] != "main.js":

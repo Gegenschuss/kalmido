@@ -47,7 +47,7 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   let w = await boot({user: 'alice', hash: 'clients'}), d = w.document;
   await sleep(300);
   check(w.eval('S.route.mod') === 'tasks' && !d.querySelector('#side .sg-clients') && !d.querySelector('#side [data-go="workload"]'), 'off: no clients group, no workload row');
-  w.eval(`settingsModal('modules')`); await sleep(400);
+  await w.eval(`settingsModal('modules')`); await sleep(400);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   check(['clients', 'workload', 'forms'].every(k => d.querySelector(`.smodal [data-feat="${k}"]`) && !d.querySelector(`.smodal [data-feat="${k}"]`).checked), 'Settings > Modules: three switches, off');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   // #794: the icon column in the sidebar (2.46.1 (#1607): the arrow moved before the folder icon)
@@ -159,7 +159,7 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   // ================= users: sign-in link + QR, approve a registration, the organisation, registration settings
   const KID = (await call('POST', '/api/users', {username: 'tim', display_name: 'Tim', password: 'password123', kid: true, parents: [1]})).id;
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
-  w.eval(`settingsModal('users')`); await until(() => d.querySelector(`.smodal [data-acc="user-edit"][data-uid="${KID}"]`));
+  await w.eval(`settingsModal('users')`); await until(() => d.querySelector(`.smodal [data-acc="user-edit"][data-uid="${KID}"]`));  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   click(w, d.querySelector(`.smodal [data-acc="user-edit"][data-uid="${KID}"]`)); await sleep(300);
   md = [...d.querySelectorAll('.modal')].pop();
   click(w, md.querySelector('[data-m="signin"]'));

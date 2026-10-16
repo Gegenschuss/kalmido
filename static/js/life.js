@@ -346,7 +346,7 @@ function lifeCareHtml(c) {
 async function careSet(cid, body) {
   try {
     const cr = await api('PUT', `/api/contacts/${cid}/care`, body);
-    if (CT.card?.id === cid) { CT.card = {...CT.card, care: cr}; ctDraw(); }
+    if (typeof CT === 'object' && CT.card?.id === cid) { CT.card = {...CT.card, care: cr}; ctDraw(); }  // 2.53.0 (#1410): contacts.js loads on demand
     LF.data = null; if (S.route.mod === 'life') lifeLoad();
     return cr;
   } catch { return null; }

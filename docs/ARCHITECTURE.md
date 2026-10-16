@@ -283,7 +283,7 @@ registering the ones of its area.
 | `undo.js` | Undo / redo history. |
 | `popovers.js` | Popovers (date, priority, list, tags, reminders, repeat ...). |
 | `dialogs.js` | Modals: the app's own dialogs, the list dialog and the share dialog. |
-| `settings.js` | Settings: notifications, Web Push, autosave settings, personal agents, import. |
+| `settings.js` | Settings: the dialog, notifications, autosave settings, personal agents, import. Loaded on demand (2.53.0). |
 | `integrations.js` | API tokens + scopes, webhooks, public links, calendar apps (CalDAV). |
 | `custview.js` | 2.50.0 (#329): Share dialog > Public link > *What does the customer see?* |
 | `signoff.js` | 2.50.0 (#1200): approval links on a sent quotation and in the Share dialog (acceptance), with their protocol. |
@@ -312,7 +312,7 @@ registering the ones of its area.
 | `dashboard.js` | News bundled per task, the view builder (2.32.0: blocks per view, "Customize", project page standard + own arrangement; server side `kalmido/accounts/layouts.py`), the start page (dashboard) and Settings > Tasks by e-mail. |
 | `family.js` | The module "Family". |
 | `calevents.js` | Events (module "events"): the editor and popover, the agenda, creating in the week grid, calendars, the phone setup. |
-| `contacts.js` | Contacts (module "contacts"): the view, the editor, the card, links between contacts and tasks, import / export. |
+| `contacts.js` | Contacts (module "contacts"): the view, the editor, the card, import / export. Loaded on demand (2.53.0). |
 | `clients.js` | Clients, the workload view, approvals in the task panel, forms of a list, sign-in links with a QR code. |
 | `absence.js` | 2.50.0 (#1195): the tabs of the workload view, the absences tab (month grid, list, "Enter an absence" sheet, public holidays), the day plan hint, the warning when assigning to somebody away. |
 | `dispo.js` | 2.50.0 (#1194): the disposition tab (week grid per resource, a day list on phones, booking sheet, who is free, my bookings). |
@@ -322,6 +322,9 @@ registering the ones of its area.
 | `wiki.js` | 2.49.0 (#1199): `#wiki` / `#wiki/<id>` = the knowledge pages of a space (an organisation or private): tree from the paths, editor with `[[` suggestions and autosave, backlinks, templates, ZIP export / import. |
 | `mindmap.js` | 2.49.0 (#1201): the list view "Mind map" (SVG, keys like Mindjet, drag to rehang, pan / pinch, outline, export Markdown / SVG / PNG, outline import) and the ```mindmap block of knowledge pages. |
 | `notesall.js` | 2.45.0 (#1516): `#notes` = the notes of all lists and projects (pinned first, a filter by list, a search in title and text, a new note in a picked list). |
+| `lazyload.js` | 2.53.0 (#1410): modules loaded on demand (`loadModule`, the stand-ins of their functions, `officeOn`), see below. |
+| `setcore.js` | 2.53.0 (#1410): the parts of the settings needed from the start: Web Push on this device, the app badge, the service worker's messages, the settings sections and modules, the project links. |
+| `ctlinks.js` | 2.53.0 (#1410): the contacts in the task panel ("People and dates", linking a contact). |
 | `main.js` | Start-up: loading the state, polling, the service worker. Loaded last. |
 
 ### Adding a client file
@@ -330,6 +333,25 @@ registering the ones of its area.
 2. Add its `<script>` tag to `static/index.html` (before `main.js`, after the files whose functions it calls while it
    loads), add it to `SHELL` in `static/sw.js` in the same order and bump `CACHE` there.
 3. `python3 tools/check_layout.py` compares the three lists; `node --check` runs on every file in CI.
+
+### Modules loaded on demand (2.53.0)
+
+Rarely opened areas have no `<script>` tag: `static/js/lazyload.js` loads them the first time they are used
+(`loadModule(name)` -> a promise; each module once, a failure shows a toast with "Try again"). Today: the settings dialog
+(`settings.js`), the contacts view (`contacts.js`) and Office & finance (`office*.js`, `officeagents.js`, run one after the
+other). What the start needs from them stays in files loaded at start: `setcore.js` (Web Push, the app badge, the
+settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn` in `lazyload.js`.
+
+- `LD_MODS` in `lazyload.js` names the files of each module; `LAZY` in `static/sw.js` lists the same files in the same
+  order (cached right after the shell, so they open offline); `tools/check_layout.py` compares both and checks that none
+  of them has a script tag.
+- Code loaded at start calls a module's functions only through the stand-ins in `lazyload.js` (`LD_CALL`: load, then
+  call; `LD_VIEW`: draw "Loading…", load, draw the view again) or after `await loadModule(...)`. Constants of an
+  on-demand module do not exist before it is loaded (`typeof X` to ask).
+- Moving a file to on demand: check with `grep` which of its globals other files use, keep those in a file loaded at
+  start or give them a stand-in, then move the file from the script tags / `SHELL` to `LD_MODS` / `LAZY`.
+- Tests: `tests/boot.js` (jsdom) and `tests/ff.js` (Firefox) load every on-demand module right after the start, so suites
+  may call their functions directly; `lazy: true` leaves them to the app (`tests/p253_a_ui.js`).
 
 ## Database: PostgreSQL (2.37)
 
