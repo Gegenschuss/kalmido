@@ -87,7 +87,7 @@ function wgMenu(a) {
   if (i > 0) its.push({label: tr('Move up'), icon: 'up', fn: () => set(wgMoveFn(k, -1), tr('Moved up'))});
   if (i >= 0 && i < vis.length - 1) its.push({label: tr('Move down'), icon: 'down', fn: () => set(wgMoveFn(k, 1), tr('Moved down'))});
   if (!pr.fixed.has(k)) its.push({label: tr('Hide'), icon: 'eyeoff', fn: () => { set(st => st.hidden.add(k), tr('{0} hidden', nm)); setTimeout(() => $(`#view [data-act="ly-add"][data-lyv="${v}"]`)?.focus(), 30); }});
-  const more = d.blockItems?.(k) || [];
+  const more = [...lyo_items(v, k, a), ...(d.blockItems?.(k) || [])];  // 2.55.0 (#1065): the block's settings
   if (more.length) its.push('-', ...more);
   its.push('-', {label: tr('Arrange blocks…'), icon: 'sliders', fn: () => lyOpen(v, true)});
   menu(a, its, null, null, nm);

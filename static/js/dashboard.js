@@ -329,15 +329,18 @@ function dashCard(k) {
   }
   if (k === 'today') {
     const ts = openTasks().filter(t => !t.parent_id && t.due && t.due <= t0).sort((a, b) => dueKey(a).localeCompare(dueKey(b)) || b.priority - a.priority);
+    // 2.55.0 (#1065): the block's settings (lyopts.js): only mine, one list or folder, how many
+    const tl = lyo_get('home', 'today', 'list'), mine = lyo_get('home', 'today', 'mine');
+    if (tl != null || mine) ts.splice(0, ts.length, ...ts.filter(t => (!mine || t.assignee_id === S.me?.id) && lyo_inList(tl, listById(t.list_id))));
     // 2.45.0 (#1504): a box to add a task for today right here
     const add = `<form class="hpadd" data-hpadd><input id="hp-add" type="text" placeholder="${esc(tr('New task for today …'))}" aria-label="${esc(tr('New task for today'))}" autocomplete="off" enterkeyhint="done" maxlength="500"></form>`;
-    return card(add + (tasksList(ts, 8) || `<p class="muted">${tr('Nothing left for today.')}</p>`), '', ts.length || '');  // 2.45.0 (#1504): no "Open" (the draft; Today is in the sidebar)
+    return card(add + (tasksList(ts, lyo_get('home', 'today', 'n', 8)) || `<p class="muted">${tr('Nothing left for today.')}</p>`), '', ts.length || '');  // 2.45.0 (#1504): no "Open" (the draft; Today is in the sidebar)
   }
   if (k === 'news') {
     if (S.nf.items === null || S.nf.sig !== (S.news?.sig ?? '')) { if (!S.nf.loading) loadNews().then(() => { if (S.route.mod === 'home') renderView(); }); }
     const vis = (S.nf.items || []).map((it, i) => [it, i]).filter(([it]) => !it.read);
     // 2.45.0 (#1504): compact, at most 5, a bundle is one line (what needs me first), "All news" below
-    const all = newsGroups(vis), gs = [...all.filter(g => g.needs), ...all.filter(g => !g.needs)].slice(0, 5);
+    const all = newsGroups(vis), gs = [...all.filter(g => g.needs), ...all.filter(g => !g.needs)].slice(0, lyo_get('home', 'news', 'n', 5));  // 2.55.0 (#1065)
     if (!gs.length) return slim(tr('News: nothing new'));
     return card(`<ul class="dwl hpnl">${gs.map(hpNewsRow).join('')}</ul><a class="linkbtn hpall" href="#news">${tr('All news')}</a>`, '', S.news?.unread || '');
   }
@@ -351,15 +354,19 @@ function dashCard(k) {
   }
   if (k === 'projects') {
     // 2.45.0 (#1504): only active projects (not complete, not on hold), at most 5; none at all = no card
-    const all = S.lists.filter(l => l.kind === 'project' && !l.archived && !l.is_inbox), ps = all.filter(l => !['complete', 'on_hold'].includes(l.status));
+    // 2.55.0 (#1065): settings (lyopts.js): all projects or only active ones, the order, how many
+    const act = lyo_get('home', 'projects', 'active', true), srt = lyo_get('home', 'projects', 'sort', 'side');
+    const all = S.lists.filter(l => l.kind === 'project' && !l.archived && !l.is_inbox), ps = all.filter(l => !act || !['complete', 'on_hold'].includes(l.status));
     if (!all.length) return '';
     if (!ps.length) return slim(tr('Active projects: nothing'));
-    return card(`<ul class="dpl">${ps.slice(0, 5).map(l => { const all = [...S.tasks.values()].filter(t => t.list_id === l.id && !t.parent_id), dn = all.filter(t => t.status === 2).length, pc = all.length ? Math.round(dn / all.length * 100) : 0;
-      return `<li><a href="#l/${l.id}"><span class="dpn">${esc(lname(l))}</span><span class="dpb" role="img" aria-label="${esc(tr('{0} % done', pc))}"><i style="width:${pc}%"></i></span><span class="dpp">${pc} %</span></a></li>`; }).join('')}</ul>${overviewOn() ? `<a class="linkbtn hpall" href="#overview">${tr('All projects')}</a>` : ''}`, '', ps.length, tr('Active projects'));
+    const prog = l => { const a = [...S.tasks.values()].filter(t => t.list_id === l.id && !t.parent_id); return a.length ? a.filter(t => t.status === 2).length / a.length : 0; };
+    if (srt === 'name') ps.sort((a, b) => lname(a).localeCompare(lname(b), LOCALE())); else if (srt === 'progress') ps.sort((a, b) => prog(b) - prog(a));
+    return card(`<ul class="dpl">${ps.slice(0, lyo_get('home', 'projects', 'n', 5)).map(l => { const all = [...S.tasks.values()].filter(t => t.list_id === l.id && !t.parent_id), dn = all.filter(t => t.status === 2).length, pc = all.length ? Math.round(dn / all.length * 100) : 0;
+      return `<li><a href="#l/${l.id}"><span class="dpn">${esc(lname(l))}</span><span class="dpb" role="img" aria-label="${esc(tr('{0} % done', pc))}"><i style="width:${pc}%"></i></span><span class="dpp">${pc} %</span></a></li>`; }).join('')}</ul>${overviewOn() ? `<a class="linkbtn hpall" href="#overview">${tr('All projects')}</a>` : ''}`, '', ps.length, act ? tr('Active projects') : tr('Projects'));
   }
   if (k === 'pinned') {
     const ts = openTasks().filter(t => t.pinned && !t.parent_id);
-    return ts.length ? card(tasksList(ts), `<a class="linkbtn" href="#pinned">${tr('Open')}</a>`, ts.length) : slim();
+    return ts.length ? card(tasksList(ts, lyo_get('home', 'pinned', 'n', 6)), `<a class="linkbtn" href="#pinned">${tr('Open')}</a>`, ts.length) : slim();
   }
   if (k === 'notes') {
     const ns = (S.notes || []).slice(0, 5);
@@ -509,7 +516,7 @@ function lydragCanvas(v, pr, parts) {
     const body = h || `<div class="lyempty">${ic(icon, 's')}<b>${esc(tr(nm))}</b><span class="muted">${esc(p === undefined ? tr('Shown here') : tr('Nothing to show right now'))}</span></div>`;
     const wbtn = d.nosize || !desk ? '' : `<button type="button" class="btn sm lysz" data-act="ly-size" data-lyv="${v}" data-k="${k}" aria-pressed="${sz === 'full'}" title="${esc(tr('Width'))}" aria-label="${esc(tr('Width') + ': ' + tr(nm) + ', ' + (sz === 'full' ? tr('full width') : tr('half width')))}">${sz === 'full' ? tr('Full') : tr('Half')}</button>`;
     const hbtn = fixed.has(k) ? '' : `<button type="button" class="iconbtn" data-act="ly-cvhide" data-lyv="${v}" data-k="${k}" title="${esc(tr('Hide {0}', tr(nm)))}" aria-label="${esc(tr('Hide {0}', tr(nm)))}">${ic('eyeoff', 's')}</button>`;
-    return `<div class="lyb ly-${sz} lyedb" data-lyk="${k}"><div class="lytool"><button type="button" class="lyhandle" data-lyhandle="${k}" title="${esc(desk ? tr('Drag to move; arrow keys move it too') : tr('Hold the block, then drag; arrow keys move it too'))}" aria-label="${esc(tr('Move {0}', tr(nm)))}" aria-describedby="lycvh-${v}">${ic('grip', 's')}<span>${esc(tr(nm))}</span></button><span class="spacer"></span>${wbtn}${hbtn}</div><div class="lybody" inert>${body}</div></div>`;
+    return `<div class="lyb ly-${sz} lyedb" data-lyk="${k}"><div class="lytool"><button type="button" class="lyhandle" data-lyhandle="${k}" title="${esc(desk ? tr('Drag to move; arrow keys move it too') : tr('Hold the block, then drag; arrow keys move it too'))}" aria-label="${esc(tr('Move {0}', tr(nm)))}" aria-describedby="lycvh-${v}">${ic('grip', 's')}<span>${esc(tr(nm))}</span></button><span class="spacer"></span>${lyo_gear(v, k)}${wbtn}${hbtn}</div><div class="lybody" inert>${body}</div></div>`;
   };
   const hid = order.filter(k => hidden.has(k));
   const tray = hid.length ? `<div class="lyhid" aria-labelledby="lyhidh-${v}"><h3 id="lyhidh-${v}">${tr('Hidden')}</h3><div class="lyhidl">${hid.map(k => { const b = bs.find(x => x[0] === k); return b ? `<button type="button" class="btn sm" data-act="ly-cvshow" data-lyv="${v}" data-k="${k}" aria-label="${esc(tr('Show {0}', tr(b[1])))}">${ic('plus', 's')}${ic(b[2], 's')}<span>${esc(tr(b[1]))}</span></button>` : ''; }).join('')}</div></div>` : '';

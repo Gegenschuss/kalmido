@@ -44,7 +44,9 @@ the app has not yet been tested by people who use a screen reader every day (see
   panel works with ↑ ↓ and Enter (even heights); a chat window's menu moves it up / down, folds and closes it, and Esc
   in its message box closes only that window. *Customize* on the start page, Today, Time
   tracking, the overviews and the project page: ↑ / ↓ buttons, Alt+↑ / Alt+↓ on a row and a switch per block (each move
-  is announced); dragging the rows is only an extra on a computer. Dependencies (Alt + drop onto a task) also via
+  is announced); dragging the rows is only an extra on a computer. A block's settings (2.55.0) open from the gear at the
+  block in *Customize* or *Settings…* in its … menu: real buttons, switches and selects in a popover (a sheet on the
+  phone), each change announced and undoable. Dependencies (Alt + drop onto a task) also via
   *Waiting on a task…* in the task menu; several selected tasks also via *Subtasks of…* / *Out of the parent task* in the
   multi panel and the phone's selection menu. Calendar events (2.52.0): creating by dragging over free time, moving an
   event and dragging its lower edge are extras (on a touch screen after holding 0.4 s); *+ Event*, the quick add's

@@ -836,6 +836,8 @@ fresh; run p252_c_ui node p252_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.55.0 part E: the newsletter connection (#1455): fake listmonk / Brevo / CleverReach inside the container
 fresh; run p255_e_api "$PY" p255_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p255_e_ui node p255_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.55.0 part C: #1065 settings per block (gear in Customize, popover / sheet, time tracking per client, numbers)
+fresh; run p255_c_ui node p255_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
