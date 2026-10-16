@@ -255,9 +255,75 @@ ev = [e for e in events(cl, "job_request") if e["data"]["job"]["id"] == (r.json(
 check(ev and ev[0]["data"]["input"].get("text") == "I run a small video agency" and len(ev[0]["data"]["input"].get("modules", [])) > 20
       and "lists" not in ev[0]["data"]["input"], "setup input: text + modules, no list names")
 
-# ================================================================== the quotation part (part A)
-if not os.path.exists(os.path.join(N, "..", "kalmido", "office", "agentdocs.py")):
+# ================================================================== the quotation part (part A's office switches)
+if not os.path.exists(os.path.join(N, "..", "kalmido", "office", "agentdocs.py")) and not os.environ.get("PK2_OFFICE"):
     print("SKIP: office/agentdocs.py (part A) not in this build: quotation part not tested", flush=True)
+else:
+    O = B + "/api/office"
+    A.patch(B + "/api/settings", json={"features": ",".join(sorted(feats(A) | {"office", "clients"}))})
+    A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
+    r = A.post(B + "/api/my/agents", json={"username": "officeplanner", "display_name": "Office Planner", "scopes": ["write", "office"]})
+    check(r.status_code == 201, f"office: a personal agent ({r.status_code} {r.text[:120]})")
+    PAG, pcl = r.json()["id"], Api(r.json()["token"])
+    A.put(B + f"/api/lists/{W}/members", json={"user_id": PAG, "role": "edit"})
+    A.get(O + "/settings")  # the personal office
+    CLP = A.post(B + "/api/clients", json={"name": "Example Ltd"}).json()["id"]
+    OWN2 = {**{k: GOOD[k] for k in ("name", "sections", "tasks", "shoot_days", "offer")}, "client": {"name": "example ltd"}}
+    r = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "proposal": OWN2})
+    check(r.status_code == 201 and r.json()["input"]["office"]["ok"] is False and r.json()["input"]["clients"] == [],
+          f"office: switches off -> no office data, the quotation not possible ({r.status_code} {r.text[:160]})")
+    JX = r.json().get("id")
+    check(A.get(B + f"/api/proposals/{JX}").json()["input"]["office"]["ok"] is False, "office: the dialog knows the quotation is not possible")
+    check(A.patch(O + f"/agents/{PAG}", json={"office_drafts": True}).ok, "office: the agent's switch on")
+    r = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "proposal": OWN2})
+    check(r.status_code == 201 and r.json()["input"]["office"] == {"ok": False, "reason": "privacy_off"}, f"office: privacy switch still off ({r.text[:160]})")
+    check(A.put(O + "/settings", json={"agents_read": 1}).ok, "office: the privacy switch on")
+    r = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "proposal": OWN2})
+    check(r.status_code == 201 and r.json()["input"]["office"]["ok"] is True and [x["id"] for x in r.json()["input"]["clients"]] == [CLP],
+          f"office: both switches on -> the area's clients ({r.text[:200]})")
+    JO = r.json().get("id")
+    check(cl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "proposal": {**OWN2, "client": {"id": CLP}}}).status_code == 400,
+          "office: another agent (no office right) cannot name the client id")
+    r = A.post(B + f"/api/proposals/{JO}/apply", json={"select": ["0", "300", "400", "400.0", "400.1"]})
+    check(r.ok and r.json().get("offer_id"), f"office: apply creates the quotation draft ({r.text[:200]})")
+    OFF = r.json().get("offer_id") if r.ok else None
+    PL = r.json().get("list_id") if r.ok else None
+    d = q("SELECT status, number, agent_id, list_id, client_id FROM office_docs WHERE id=?", (OFF,))
+    check(d and d[0]["status"] == "draft" and d[0]["number"] == "" and d[0]["agent_id"] == PAG and d[0]["list_id"] == PL and d[0]["client_id"] == CLP,
+          f"office: a draft without a number, by the agent, bound to the project and the client ({[dict(x) for x in d]})")
+    check(q("SELECT client_id FROM lists WHERE id=?", (PL,))[0][0] == CLP, "office: the client name found the existing client")
+    check(len(q("SELECT 1 FROM office_doc_items WHERE doc_id=?", (OFF,))) == 2, "office: two items")
+    lg = [x["action"] for x in q("SELECT action FROM office_doc_log WHERE user_id=? ORDER BY id", (PAG,))]
+    check("agent_read" in lg and "agent_write" in lg, f"office: the access log names the agent ({lg})")
+    r = A.post(B + f"/api/proposals/{JO}/undo")
+    check(r.ok and not q("SELECT 1 FROM office_docs WHERE id=?", (OFF,)), f"office: undo removes the draft ({r.text[:120]})")
+    r = A.post(B + f"/api/proposals/{JO}/redo")
+    check(r.ok and q("SELECT 1 FROM office_docs WHERE status='draft' AND agent_id=? AND list_id=?", (PAG, r.json().get("list_id"))), "office: redo drafts it again")
+    # an accepted quotation becomes a project (with a deal of the pipeline)
+    DL = A.post(O + "/deals", json={"title": "Image film", "client_id": CLP, "value": 5000}).json()
+    QD = A.post(O + f"/deals/{DL['id']}/offer").json().get("doc_id")
+    A.put(O + f"/docs/{QD}", json={"items": [{"kind": "service", "title": "Camera day", "qty": 2, "unit": "day", "rate": 900}]})
+    for st_ in ("sent", "accepted"):
+        A.post(O + f"/docs/{QD}/status", json={"status": st_})
+    acc = [e for e in events(pcl, "offer_accepted") if e["data"].get("doc_id") == QD]
+    check(len(acc) == 1, "office: the agent hears offer_accepted")
+    r = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "offer_id": QD, "proposal": OWN2})
+    check(r.status_code == 400, f"office: an accepted quotation gets no new one ({r.status_code})")
+    FROM = {"name": "Image film (accepted)", "sections": [], "tasks": [{"title": "Camera day"}], "shoot_days": [{"title": "Camera day 1", "date": "2027-06-01"}]}
+    r = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "offer_id": QD, "proposal": FROM})
+    check(r.status_code == 201 and r.json()["input"]["offer"]["id"] == QD and r.json()["proposal"]["client"]["id"] == CLP,
+          f"office: the project from the accepted quotation takes its client ({r.text[:200]})")
+    JA = r.json().get("id")
+    r = A.post(B + f"/api/proposals/{JA}/apply", json={"select": ["0", "300"]})
+    PA = r.json().get("list_id") if r.ok else None
+    check(r.ok and q("SELECT list_id FROM office_deals WHERE id=?", (DL["id"],))[0][0] == PA, f"office: the deal gets the project ({r.text[:120]})")
+    A.post(B + f"/api/proposals/{JA}/undo")
+    check(q("SELECT list_id FROM office_deals WHERE id=?", (DL["id"],))[0][0] is None, "office: undo unbinds the deal")
+    r = cl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "offer_id": QD, "proposal": FROM})
+    check(r.status_code == 403, f"office: an agent without the office right never reads the quotation ({r.status_code})")
+    A.put(O + "/settings", json={"agents_read": 0})
+    r = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "offer_id": QD, "proposal": FROM})
+    check(r.status_code == 403, f"office: privacy switch off again -> 403 ({r.status_code})")
 
 print(f"p251_b_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
