@@ -84,7 +84,9 @@ st = Bo.get(B + "/api/state").json()["settings"]
 check(st["mods_all"] == "0" and st["purpose"] == "office", "#1591: the switch is stored (mods_all)")
 r = Bo.post(B + "/api/me/purpose", json={"purpose": "me", "all_modules": True})
 fs = set(r.json()["features"].split(","))
-check(ALLM <= fs and not {"clients", "office"} & fs, f"#1591: switch on = every module (the business ones only with Office) {fs}")
+# 2.56.1 (#1808): "all on" = every module of Settings > Modules, whatever the purpose
+FULLM = ALLM | {"agents", "clients", "workload", "forms", "office", "wiki", "files", "dispo"}
+check(FULLM <= fs, f"#1591/#1808: switch on = every module, also agents, wiki, file store, business {FULLM - fs}")
 fs = set(Bo.post(B + "/api/me/purpose", json={"purpose": "office", "all_modules": True}).json()["features"].split(","))
 check(ALLM | {"clients", "workload", "forms", "office"} <= fs, "#1591: Office + switch on adds the business modules")
 check(Bo.get(B + "/api/state").json()["settings"]["mods_all"] == "1", "#1591: stored on")
