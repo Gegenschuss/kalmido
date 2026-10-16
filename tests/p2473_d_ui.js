@@ -89,7 +89,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(msg(904).classList.contains('jobm') && col(904) && col(904) !== col(901), 'another job: another colour (neighbouring numbers differ)');
   check(!msg(905).classList.contains('jobm') && !msg(905).querySelector('.jobtag'), 'a normal answer that only mentions a job stays plain');
   check(!msg(906).classList.contains('jobm'), 'my own message is never marked');
-  const css2 = require('fs').readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
+  const css2 = require('./boot').allCssSync(); // 2.65.0 (#1824): + the module stylesheets
   check(/\.cmsg\.jobm \.cbub\{box-shadow:inset \.25rem 0 0 var\(--jcol\)\}/.test(css2) && /\.jobtag\{[^}]*color:var\(--text\)/.test(css2), 'CSS: stripe at the bubble, tag text in the normal text colour (no coloured text)');
 
   // ================= #1382 (i) in the editor rows and ux_info for the office

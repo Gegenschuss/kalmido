@@ -142,7 +142,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   check(sh && sh.querySelector('h1').textContent === 'Timesheet' && /Alice|All members/.test(sh.querySelector('.tssub').textContent), 'timesheet: title and subtitle');
   check(sh.querySelectorAll('.tskpi > div').length === 4 && sh.querySelector('tr.g') && sh.querySelector('.tsdays') && sh.querySelector('.tsentries table'), 'timesheet: KPIs, totals, per day, entries');
   check(d.body.classList.contains('tsprint'), 'print mode class');
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   check(/@media print\{\s*body\.tsprint>\*:not\(\.tsheet\)\{display:none!important\}/.test(css), 'print stylesheet hides the app');
   sh.querySelector('#ts-entries').checked = false; sh.querySelector('#ts-entries').dispatchEvent(new w.Event('change', {bubbles: true}));
   check(sh.querySelector('.tspage').classList.contains('noentries'), 'hide individual entries');

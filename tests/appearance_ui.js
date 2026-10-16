@@ -22,7 +22,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   // ---- static checks on the shipped files
   // the files the container serves (= the image under test)
   const get = async f => (await fetch(B + f)).text();
-  const css = await get('static/app.css'), js = await clientSource(), sw = await get('sw.js');
+  const css = await require('./boot').allCss(), js = await clientSource(), sw = await get('sw.js'); // 2.65.0 (#1824): + the module stylesheets
   const vars = sel => { const m = css.match(new RegExp(sel.replace(/[[\]()"=]/g, '\\$&') + '\\{([^}]*)\\}')); const o = {}; if (m) for (const [, k, v] of m[1].matchAll(/--([\w-]+):([^;]+)/g)) o[k] = v.trim(); return o; };
   const root = vars(':root'), light = vars(':root[data-theme="light"]');
   check(light.accent === 'var(--acc-l)' && light['accent-ink'] === 'var(--acc-ink-l)', 'light theme takes the light accent variables');
