@@ -199,7 +199,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(d.activeElement === cd?.querySelector('[data-cd="no"]'), 'focus on "Cancel" for a destructive action');
   key(w, d.activeElement, 'Escape'); 
   check(await p === false && !d.querySelector('.modal.cdlg') && (await st()).lists.some(l => l.id === WORK), 'Esc = no, nothing deleted');
-  p = w.eval(`listDeleteForGood(${WORK})`); await sleep(100);
+  p = w.eval(`listDeleteForGood(${WORK})`);  // 2.50.2: wait for the dialog (100 ms were too short on slow CI)
+  for (let i = 0; i < 40 && !d.querySelector('.modal.cdlg [data-cd="yes"]'); i++) await sleep(100);
   click(w, d.querySelector('.modal.cdlg [data-cd="yes"]'));
   check(await p === true && !(await st()).lists.some(l => l.id === WORK), 'confirmed: deleted for good');
   // other confirms: the own dialog, never window.confirm; undoable things ask nothing
