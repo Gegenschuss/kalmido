@@ -645,7 +645,7 @@ TOOLS = [
                                                "show what the person answered)"},
            "job_id": {**S_ID, "description": "2.32.0: this message is the result of your job for this person (its history shows under it)"},
            "job_parent": {**S_ID, "description": "2.47.3: with job_id: the leading job of this part job (another job of yours); the app colours a message "
-                                                 "'Job #N: ...' by its job and gives a part job the colour of its leader"},
+                                                 "'Job #N: ...' by its job and gives a part job the colour of its leader; 2.59.0: the job keeps it (parent_id)"},
            "permission": {"type": "boolean"}, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800},
            "choices": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {
                "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},

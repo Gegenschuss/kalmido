@@ -1176,6 +1176,15 @@ the same people as Stop; empty 400, an ended job 409) sends the `job` event with
 state, action fields and approval stay as they are. Hand the text to the running job if you can; else treat it as a chat
 message of that person about the job (the reference starter does the latter).
 
+2.59.0 (#1827): **job names and colours.** Every message with a `job_id` also carries `job_name` (the job's name, `null`
+without), `job_parent` (the leader of a part job: the one sent with the message, else the one the job keeps) and
+`job_parent_name` -- only for jobs the reader may see, else `null`. The first chat answer with `job_id` and `job_parent`
+stores the leader at the job (`parent_id` in the job's JSON, set once). The tag shows the name (`Job #N` without one); the
+colour comes from the name (the same name, e.g. a follow-up `Walker (Fortsetzung): …`, keeps the same colour), without a
+name from the number; a part job takes the colour of its leader, a little lighter. Give your jobs a name at the start of
+the title (`Alma: Release 2.29`, part jobs `Alma B: …`); the reference starter does it for you (`agent_job.py start --name`
+or a name of its own, `--parent ID` for a part job).
+
 **What the person sees in the chat header (2.4.1).** Under the agent's name: typing dots while it writes to this person,
 then its state in words: *working on #51* (the status task, a link), *working*, *waiting for you*, *ready* (idle),
 *paused*, *limit reached* or *not connected* (2.6.0; was *offline*). The dots show while the agent's status is `working` on nothing in particular, on a

@@ -234,8 +234,23 @@ def chat_files_of(c, mids):
 
 def chat_one(c, r, api=False, edits=False):
     """chat_dict of one row with its reactions and files (edits: the earlier versions, for the person only)."""
-    return chat_dict(r, chat_reactions_of(c, [r["id"]]), chat_files_of(c, [r["id"]]), api=api,
-                     newest=chat_newest(c, r["agent_id"], r["user_id"]), edits=edits)
+    d = chat_dict(r, chat_reactions_of(c, [r["id"]]), chat_files_of(c, [r["id"]]), api=api,
+                  newest=chat_newest(c, r["agent_id"], r["user_id"]), edits=edits)
+    return jn9_chat_jobs(c, [d], r["agent_id"] if api else r["user_id"])[0]  # 2.59.0 (#1827): api = the agent reads it
+
+
+def jn9_chat_jobs(c, msgs, uid):
+    """2.59.0 (#1827): each message with a job_id gets job_name, job_parent (the message's, else the job's leader) and
+    job_parent_name -- only of jobs uid may see (job_visible), else null. The app shows the name and derives the colour."""
+    from ..agents.core import jn9_job_names
+    jn = jn9_job_names(c, [m.get("job_id") for m in msgs] + [m.get("job_parent") for m in msgs], uid)
+    for m in msgs:
+        if not m.get("job_id"):
+            continue
+        j, par = jn.get(m["job_id"]) or {}, m.get("job_parent") if m.get("job_parent") in jn else None
+        par = par or j.get("parent_id")
+        m.update(job_name=j.get("name"), job_parent=par, job_parent_name=(jn.get(par) or {}).get("name") if par else None)
+    return msgs
 
 
 def chat_upload_files():
@@ -781,12 +796,13 @@ def agent_chat_get(aid):
         if r["job_id"]:
             d["job_steps"] = jc.get(r["job_id"], 0)
         msgs.append(d)
+    jn9_chat_jobs(c, msgs, me())  # 2.59.0 (#1827)
     # 2.7.2 (#422): the server's clock, so the app can tell how long ago a message was delivered
     # 2.35.0 (#1103): the open approval requests (pinned at the top, also when older than this page)
     ap = chat_approvals_open(c, aid, me())[-APPROVAL_PIN_MAX:]
     return jsonify(agent=agent_public(c, a, me()), messages=msgs, now=iso_ms(now_utc()), has_more=more,
                    steps_live=steps_live(c, aid, me()),
-                   approvals_open=[chat_dict(r, None, None, newest=nw) for r in ap])
+                   approvals_open=jn9_chat_jobs(c, [chat_dict(r, None, None, newest=nw) for r in ap], me()))
 
 
 def chat_task(c, v, uid_a, uid_b):

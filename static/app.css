@@ -7687,3 +7687,7 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+/* 2.59.0 C (#1827) job colours from the name: a part job takes its leader's tone, a little lighter -- mixed with the
+   page background, so it turns lighter in the light theme and softer in the dark one */
+.cmsg.jobm.jpart .cbub{box-shadow:inset .25rem 0 0 color-mix(in srgb,var(--jcol) 70%,var(--bg))}
+.jpart .jobtag i,.jcbar.jpart .jcdot{background:color-mix(in srgb,var(--jcol) 70%,var(--bg))}

@@ -833,7 +833,31 @@ def job_dict(c, j, names=None):
             "created_at": j["created_at"], "updated_at": j["updated_at"],
             "kind": j["kind"], "proposal_state": j["prop_state"] or None,  # 2.3.0: proposal jobs
             "approval": bool(j["approval"]) if "approval" in j.keys() else False,  # 2.15.0 (#479): a request waiting for approval
-            "name": jc_job_name(j["title"])}  # 2.56.0 (#1793): "Clara" of "Clara: Release 2.50" (null without)
+            "name": jc_job_name(j["title"]),  # 2.56.0 (#1793): "Clara" of "Clara: Release 2.50" (null without)
+            "parent_id": j["parent_id"] if "parent_id" in j.keys() else None}  # 2.59.0 (#1827): the leading job of a part job
+
+
+# 2.59.0 (#1827): name + leading job of the jobs ids that uid may see ({id: {"name", "parent_id", "parent_name"}}; jobs
+# uid may not see are left out, so is the name of a leader uid may not see). The one place that derives a job's name for
+# the chat (jc_job_name), so a name column only needs adding here.
+def jn9_job_names(c, ids, uid):
+    ids = sorted({int(i) for i in ids if i})
+    if not ids:
+        return {}
+    rows = {j["id"]: j for j in c.execute(f"SELECT * FROM agent_jobs WHERE id IN ({','.join('?' * len(ids))})", ids)}
+    pids = sorted({j["parent_id"] for j in rows.values() if "parent_id" in j.keys() and j["parent_id"]} - set(rows))
+    if pids:
+        rows.update({j["id"]: j for j in c.execute(f"SELECT * FROM agent_jobs WHERE id IN ({','.join('?' * len(pids))})", pids)})
+    seen = {i: j for i, j in rows.items() if job_visible(c, j, uid)}
+    out = {}
+    for i in ids:
+        j = seen.get(i)
+        if not j:
+            continue
+        par = seen.get(j["parent_id"]) if "parent_id" in j.keys() and j["parent_id"] else None
+        out[i] = {"name": jc_job_name(j["title"]), "parent_id": par["id"] if par else None,
+                  "parent_name": jc_job_name(par["title"]) if par else None}
+    return out
 
 
 def job_visible(c, j, uid):
