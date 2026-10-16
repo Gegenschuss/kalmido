@@ -135,13 +135,13 @@ def _bookings(c, pid, viewer, frm, to):
     today = local_now().date()
     out, seen = [], {}
     for r in rows:
-        d0, d1 = date.fromisoformat(r["start"][:10]), date.fromisoformat(r["end"][:10])
-        d = max(d0, frm)
-        while d <= min(d1, to, today - timedelta(days=1)):
         lid = r["list_id"]
         if lid and lid not in seen:
             seen[lid] = bool(list_role(c, lid, viewer)) and (viewer == pid or bool(list_role(c, lid, pid)))
         show = bool(lid) and seen[lid]
+        d0, d1 = date.fromisoformat(r["start"][:10]), date.fromisoformat(r["end"][:10])
+        d = max(d0, frm)
+        while d <= min(d1, to, today - timedelta(days=1)):
             out.append({"id": r["id"], "title": r["title"] if show else tr("Booked"), "date": d, "list_id": lid if show else None,
                         "hidden": not show})
             d += timedelta(days=1)
