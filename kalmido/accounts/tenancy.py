@@ -48,6 +48,8 @@ CHECKS = {
                    "WHERE COALESCE(a.org_id,0)!=COALESCE(b.org_id,0)"),
     "book_owner": ("SELECT b.id, b.owner_id FROM books b JOIN users u ON u.id=b.owner_id WHERE b.org_id IS NOT NULL AND u.kind!='agent' "
                    "AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=b.org_id AND om.user_id=b.owner_id)"),
+    # 2.52.0 C (#1438): an address book an organisation owns outside that organisation's workspace
+    "book_org": "SELECT b.id, b.owner_id FROM books b WHERE b.owner_org_id IS NOT NULL AND b.org_id IS DISTINCT FROM b.owner_org_id",
     # 2.49.0 (#1106): a connection (accepted request) of an agent or a kid account -- requests are for people only
     "conn_agent": ("SELECT l.a_id, l.b_id FROM conn_links l JOIN users u ON u.id IN (l.a_id, l.b_id) "
                    "WHERE l.deleted_at IS NULL AND (u.kind!='user' OR u.kid!=0)"),

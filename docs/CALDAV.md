@@ -113,6 +113,7 @@ name, nickname, company and department, job title, e-mails, phones, addresses, w
 custom labels), birthday (also without the year), anniversary, notes, groups (`CATEGORIES`) and the photo are fields in
 Kalmido; every other property (social profiles, Apple's contact groups, …) is kept as it came. Each address book is one
 collection (`/dav/addressbooks/<user>/b<id>/`). An address book shared with you *view only* is read-only in the apps.
+An address book of your organisation (2.52.0, see TEAM.md) appears the same way, read-only when its members may only view it.
 
 ## Writing into subscribed calendars
 

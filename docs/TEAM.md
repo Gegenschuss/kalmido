@@ -83,3 +83,17 @@ task as a push at the highest priority, even if the list is quiet.
   "As the list" for you.
 - **Honest limit**: on Android (ntfy) an urgent push comes through. On an iPhone the web app cannot break through Focus or
   silent mode; there it is a prominent push, not an alarm.
+## Address books of the organisation (2.52.0)
+
+- An address book in an organisation's workspace can belong to the organisation instead of a person: **Contacts > Address
+  books > More > Hand over to the organisation…** (the owner, if they are an admin of that organisation). Nothing is handed
+  over automatically.
+- Admins of the organisation manage it (rename, colour, shares, birthdays, delete). **Members of the organisation** sets what
+  the other members may: *They can view* (the default), *They can edit*, or *Only admins and people it is shared with*.
+  Sharing it with single people of the organisation keeps working; kid accounts and agents get it only through a share.
+- It stays when people leave: if the person who handed it over (or the admin who chose its birthday list) leaves the
+  organisation or their account is deleted, another admin (else another member) takes over. Its contacts, its birthday list
+  and the links to tasks stay. Only when nobody else is left in the organisation does it go with that person as before.
+- It always stays in its organisation's workspace and is seen only by its members. Phones get it over CardDAV like any other
+  address book (read-only when members may only view).
+- **Make personal again…** (an admin) turns it back into that admin's own address book; one undo step, like the hand-over.

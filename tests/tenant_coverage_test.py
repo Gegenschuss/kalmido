@@ -182,6 +182,7 @@ ROUTES = {
     "PATCH /api/books/{}": "book", "DELETE /api/books/{}": "book", "PUT /api/books/{}/members": "book",
     "DELETE /api/books/{}/members/{}": "book", "POST /api/books/{}/import": "book", "GET /api/books/imports/{}": "own",  # 2.41.0 (#1437): only the starter's own import
     "GET /api/books/{}/export.vcf": "book",
+    "POST /api/books/{}/org": "book", "PATCH /api/books/{}/org": "book", "DELETE /api/books/{}/org": "book",  # 2.52.0 (#1438)
     # ---- calendar (16)
     "POST /api/evcals/{}/import": "calendar", "GET /api/v1/event-calendars": "calendar",
     "POST /api/v1/event-calendars": "calendar", "PATCH /api/v1/event-calendars/{}": "calendar",
@@ -409,7 +410,10 @@ ROUTES = {
     "POST /api/v1/imports/{}/undo": "own", "GET /api/me/app-passwords": "own", "POST /api/me/app-passwords": "own",
     "DELETE /api/me/app-passwords/{}": "own", "GET /api/calendars": "own", "POST /api/calendars/discover": "own",
     "POST /api/calendars": "own", "PATCH /api/calendars/{}": "own", "DELETE /api/calendars/{}": "own",
-    "POST /api/calendars/{}/refresh": "own", "POST /api/import/ticktick": "own", "POST /api/import/{}": "own",
+    "POST /api/calendars/{}/refresh": "own",
+    # 2.52.0 (#1128): writing into the person's own CalDAV subscription (need_calsub: the subscription's owner only)
+    "POST /api/calendars/{}/events": "own", "PATCH /api/calendars/{}/events": "own", "DELETE /api/calendars/{}/events": "own",
+    "POST /api/calendars/{}/events/restore": "own", "POST /api/calendars/{}/write": "own", "POST /api/import/ticktick": "own", "POST /api/import/{}": "own",
     "POST /api/imports/{}/undo": "own", "GET /api/imports": "own", "GET /api/me/mail": "own",
     "POST /api/me/mail/token": "own", "DELETE /api/me/mail/token": "own", "POST /api/me/mail/test": "own",
     "GET /api/v1/life": "own", "GET /api/v1/life/upkeep-presets": "own",

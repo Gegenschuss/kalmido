@@ -51,11 +51,41 @@ def contacts_on(c, uid):
 
 
 # ---- address books and rights
+# 2.52.0 C (#1438): an address book can belong to an organisation (owner_org_id = its org_id, NULL = a person's book). Its
+# admins manage it (role 'owner'), its other members (people, no kid accounts, no agents) read or change it as org_role
+# says (view | edit | none); shares (book_members) add to that. owner_id stays filled: the technical manager (whose lists the
+# birthdays go to), without rights of its own -- leaving the organisation or deleting the account hands it on (orgbooks.py).
+BOOK_RANK = {None: 0, "view": 1, "edit": 2, "owner": 3}
+
+
+def obk_org(b):
+    return (b["owner_org_id"] if "owner_org_id" in b.keys() else None) or None
+
+
+def obk_org_role(c, uid, oid, org_role):
+    """The role person uid has in an address book of organisation oid through that organisation: 'owner' for its admins,
+    org_role ('view' | 'edit') for its other members, else None. Agents and kid accounts only through a share."""
+    from ..accounts.orgs import org_role as om_role
+    u = c.execute("SELECT kind, kid FROM users WHERE id=?", (uid,)).fetchone()
+    if not u or (u["kind"] or "user") == "agent" or u["kid"] or c.execute("SELECT 1 FROM agents WHERE user_id=?", (uid,)).fetchone():
+        return None
+    r = om_role(c, uid, oid)
+    if r == "admin":
+        return "owner"
+    return org_role if r and collab_all() and org_role in BOOK_ROLES else None
+
+
 def book_role(c, uid, b):
     if b is None:
         return None
     if "org_id" in b.keys() and not acx_org_ok(c, uid, b["org_id"]):  # 2.36.2 (#1142): organisation books: members only
         return None
+    if obk_org(b):  # 2.52.0 C (#1438): an organisation's address book -- its roles, plus a share; the manager's account does not matter
+        if b["org_id"] != b["owner_org_id"]:
+            return None  # never across the boundary (the nightly check counts such a row)
+        role = obk_org_role(c, uid, b["owner_org_id"], b["org_role"])
+        r = c.execute("SELECT role FROM book_members WHERE book_id=? AND user_id=?", (b["id"], uid)).fetchone() if collab_all() else None
+        return max(role, r[0] if r else None, key=lambda x: BOOK_RANK.get(x, 0))
     if b["owner_id"] != uid and c.execute("SELECT disabled FROM users WHERE id=?", (b["owner_id"],)).fetchone()[0]:
         return None  # a disabled owner's address books are gone for the members too (like in the lists of books)
     if b["owner_id"] == uid:
@@ -80,12 +110,25 @@ def need_book(c, bid, write=False, manage=False, uid=None):
 
 
 def my_book_ids(c, uid):
-    out = {r[0]: "owner" for r in c.execute("SELECT id, org_id FROM books WHERE owner_id=?", (uid,)) if acx_org_ok(c, uid, r[1])}
+    out = {r[0]: "owner" for r in c.execute("SELECT id, org_id FROM books WHERE owner_id=? AND owner_org_id IS NULL", (uid,))
+           if acx_org_ok(c, uid, r[1])}
+    from ..accounts.orgs import user_orgs
+    oids = user_orgs(c, uid)
+    if oids:  # 2.52.0 C (#1438): the address books of my organisations, as their roles allow
+        base = {}  # per organisation: admin ('owner') or a member who gets the book's org_role (one lookup each)
+        for r in c.execute(f"SELECT id, owner_org_id, org_role FROM books WHERE owner_org_id IN ({','.join('?' * len(oids))}) "
+                           "AND org_id=owner_org_id", oids).fetchall():
+            if r[1] not in base:
+                base[r[1]] = obk_org_role(c, uid, r[1], "edit") if acx_org_ok(c, uid, r[1]) else None
+            role = base[r[1]] if base[r[1]] in (None, "owner") else (r[2] if r[2] in BOOK_ROLES else None)
+            if role:
+                out[r[0]] = role
     if collab_all():
-        for r in c.execute("SELECT m.book_id, m.role, b.org_id FROM book_members m JOIN books b ON b.id=m.book_id JOIN users u ON u.id=b.owner_id "
-                           "WHERE m.user_id=? AND u.disabled=0", (uid,)):
-            if acx_org_ok(c, uid, r[2]):  # 2.36.2 (#1142): organisation books only for its members
-                out.setdefault(r[0], r[1])
+        for r in c.execute("SELECT m.book_id, m.role, b.org_id, b.owner_org_id FROM book_members m JOIN books b ON b.id=m.book_id "
+                           "JOIN users u ON u.id=b.owner_id WHERE m.user_id=? AND (u.disabled=0 OR b.owner_org_id IS NOT NULL)", (uid,)):
+            if acx_org_ok(c, uid, r[2]) and (not r[3] or r[3] == r[2]):  # 2.36.2 (#1142): organisation books only for its members
+                if BOOK_RANK.get(r[1], 0) > BOOK_RANK.get(out.get(r[0]), 0):  # 2.52.0 C (#1438): the better of share + organisation role
+                    out[r[0]] = r[1]
     return out
 
 
@@ -97,10 +140,21 @@ def book_public(c, b, uid, names=None):
          "count": c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND kind!='group'", (b["id"],)).fetchone()[0]}
     if names is not None:
         d["owner_name"] = names.get(b["owner_id"], "?")
+    oo = obk_org(b)  # 2.52.0 C (#1438): owned by the organisation (org_role: what its members may), or may go to it (can_org)
+    d["org_owned"], d["org_role"] = bool(oo), (b["org_role"] if oo else None)
+    d["can_org"] = bool(not oo and role == "owner" and b["org_id"] and not b["src_id"] and obk_can_take(c, uid, b["org_id"]))
     if role == "owner":
         d["members"] = [{"user_id": m[0], "role": m[1]} for m in
                         c.execute("SELECT user_id, role FROM book_members WHERE book_id=? ORDER BY added_at", (b["id"],))]
     return d
+
+
+def obk_can_take(c, uid, oid):
+    """May person uid hand an address book over to organisation oid? Only its admins; never a personal office."""
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # the organisation row itself (a personal office is a hidden orgs row)
+        real = c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (oid,)).fetchone()
+    return bool(real) and obk_org_role(c, uid, oid, "none") == "owner"
 
 
 def books_for(c, uid):
@@ -134,7 +188,7 @@ def book_create(c, uid, b, src_id=None):
     from ..accounts.orgs import clean_org_id, ws_obj_default
     f = book_fields(b, True)
     oid = clean_org_id(c, b["org_id"], uid) if "org_id" in b else (None if src_id else ws_obj_default(c, uid))
-    if c.execute("SELECT COUNT(*) FROM books WHERE owner_id=?", (uid,)).fetchone()[0] >= BOOKS_MAX:
+    if c.execute("SELECT COUNT(*) FROM books WHERE owner_id=? AND owner_org_id IS NULL", (uid,)).fetchone()[0] >= BOOKS_MAX:  # 2.52.0 C (#1438): own books
         raise Denied(409, tr("At most {0} address books", BOOKS_MAX))
     used = [r[0] for r in c.execute("SELECT color FROM books WHERE owner_id=?", (uid,))]
     col = f.get("color") or next((x for x in BOOK_COLORS if x not in used), BOOK_COLORS[0])
@@ -144,7 +198,7 @@ def book_create(c, uid, b, src_id=None):
 
 
 def default_book(c, uid, create=True):
-    r = c.execute("SELECT id FROM books WHERE owner_id=? AND src_id IS NULL ORDER BY id LIMIT 1", (uid,)).fetchone()
+    r = c.execute("SELECT id FROM books WHERE owner_id=? AND src_id IS NULL AND owner_org_id IS NULL ORDER BY id LIMIT 1", (uid,)).fetchone()
     if r:
         return r[0]
     return book_create(c, uid, {"name": tr("Contacts", lg=lang(c, uid))}) if create else None
@@ -164,7 +218,7 @@ def book_member_set(c, bid, uid, role):
         raise BadInput(tr("Invalid value: {0}", "role"))
     b = c.execute("SELECT * FROM books WHERE id=?", (bid,)).fetchone()
     u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
-    if not u or uid == b["owner_id"] or personal_agent_foreign(c, uid, me()):
+    if not u or (uid == b["owner_id"] and not obk_org(b)) or personal_agent_foreign(c, uid, me()):  # 2.52.0 C (#1438): an org book's manager may be shared with
         raise Denied(404, tr("unknown user"))
     if is_agent(u) and not has_request_context():
         raise Denied(404, tr("unknown user"))

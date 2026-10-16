@@ -311,7 +311,9 @@ for meth, path in routes:
         bad.append(f"{meth} {path} -> {r.status_code} (answer to a person outside) {r.text[:60]!r}")
 # refused before any lookup, without content: agent-only endpoint (role check) and token scope checks
 SCAN_EXCEPT = {"GET /api/v1/agent/jobs/<int:jid>", "GET /api/v1/attachments/<int:aid>", "GET /api/v1/attachments/<int:aid>/text",
-               "GET /api/v1/lists/<int:lid>/files/<file_id>"}
+               "GET /api/v1/lists/<int:lid>/files/<file_id>",
+               # 2.51.0 (#1348): the office draft routes check the token's "Office" permission before any lookup
+               "GET /api/v1/office/docs/<int:did>", "GET /api/v1/office/docs/<int:did>/pdf"}
 bad = [b for b in bad if " ".join(b.split(" ")[:2]) not in SCAN_EXCEPT]
 check(not bad, f"route scan: every id route refuses a person outside ({len(bad)} of {len(routes)}):\n  " + "\n  ".join(bad[:80]))
 check(S["alice"].get(B + f"/api/tasks/{TA}").ok and MARK in S["alice"].get(B + f"/api/tasks/{TA}").text, "route scan: alice's data is untouched")

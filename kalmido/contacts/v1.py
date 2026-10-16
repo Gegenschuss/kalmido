@@ -166,7 +166,11 @@ def contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "owner_name": {"type": "string"}, "role": {"type": "string", "enum": ["owner", *BOOK_ROLES]}, "count": {"type": "integer"},
         "imported": {"type": "boolean", "description": "Mirrors an external CardDAV account (module Family)"},
         "birthdays_list_id": nul("integer", description="Birthdays + anniversaries of its contacts become tasks of this list (owner)"),
-        "members": {"type": "array", "items": {"type": "object"}}}}
+        "members": {"type": "array", "items": {"type": "object"}},
+        # 2.52.0 C (#1438): owned by its organisation (org_id); org_role = what the organisation's members may there
+        "org_owned": {"type": "boolean", "description": "Belongs to its organisation (managed by the organisation's admins)"},
+        "org_role": nul("string", description="Organisation's book: what its members may (view | edit | none)"),
+        "can_org": {"type": "boolean", "description": "The caller may hand it over to its organisation (in the app)"}}}
     schemas["AddressBookPage"] = page("AddressBook")
     item = {"type": "object", "properties": {"value": {"type": "string"}, "type": {"type": "array", "items": {"type": "string"}},
                                              "pref": {"type": "boolean"}, "label": {"type": "string"}}}

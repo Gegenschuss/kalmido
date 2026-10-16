@@ -56,7 +56,9 @@ def op_book_new(c, uid, b):
 def op_book_edit(c, uid, bid, b):
     _unknown(b, ("name", "color", "birthdays_list_id", "org_id"))
     bk, role = need_book(c, bid, manage=True)
-    if "org_id" in b:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
+    if "org_id" in b and bk["owner_org_id"] and b["org_id"] != bk["owner_org_id"]:  # 2.52.0 C (#1438)
+        raise Denied(409, tr("An address book of an organisation stays in it"))
+    if "org_id" in b and not bk["owner_org_id"]:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
         from ..accounts.orgs import obj_org_set
         if obj_org_set(c, "books", "book_id", "book_members", bid, b["org_id"], "book"):
             book_touch(c, bid)
@@ -72,6 +74,9 @@ def op_book_edit(c, uid, bid, b):
             if bk["src_id"]:
                 raise BadInput(tr("The birthdays of an imported address book come from its source"))
             f["occ_list_id"] = lid
+            if bk["owner_org_id"] and bk["owner_id"] != uid:  # 2.52.0 C (#1438): the birthdays go to the admin who chose the list
+                f["owner_id"] = uid
+                c.execute("DELETE FROM book_members WHERE book_id=? AND user_id=?", (bid, uid))
     if f:
         c.execute(f"UPDATE books SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), bid])
         book_touch(c, bid)
