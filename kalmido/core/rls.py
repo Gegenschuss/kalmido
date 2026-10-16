@@ -35,6 +35,10 @@ TABLES = (
     "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "doc_models", "doc_cfg", "doc_mail",  # 2.48.0 (#1111): documents
     "pl_sources", "pl_imported",  # 2.48.0 (#1152): the Paperless-ngx connection + what came in
     "rc_receipts", "rc_suggest",  # 2.48.0 (#1356): receipts: project / category, the agents' suggestions
+    "office_deals",  # 2.50.0 B (#1196): the sales pipeline
+    "hub_absences",  # 2.50.0 A (#1195): absences (the area they were entered in; the app hides the kind)
+    "hub_bookings",  # 2.50.0 A (#1194): bookings of the disposition
+    "office_signoffs",  # 2.50.0 C (#1200): approval links (NULL = a private list's acceptance, the app checks the list)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

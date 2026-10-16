@@ -29,6 +29,7 @@ NEWS_KEEP_DAYS = int(os.environ.get("TASKS_NEWS_DAYS", "90"))
 NEWS_KEEP_MAX = int(os.environ.get("TASKS_NEWS_MAX", "500"))
 NEWS_KINDS = ("mention", "comment", "assign", "unassign", "take", "complete", "share", "role", "unshare", "unblock", "status",
               "newtask", "approval", "followup",  # 2.1.0
+              "dispo",  # 2.50.0 (#1194): somebody booked me firmly in the disposition (row "assign", hub/dispo.py)
               "usage",  # 2.1.1 (#326): an agent reached 80 % / 100 % of a usage limit (admins)
               "owner",  # 2.1.2 (#349): I am the new owner of a list
               "errreport",  # 2.18.0: a NEW error (new fingerprint) of the list's error-report webhook became a ticket
@@ -45,7 +46,7 @@ NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take")
 NEWS_TO_ME = ("mention", "assign", "unassign", "take")  # filter "Mentions & assigned to me"
 # 2.28.0 (#987): "For you": messages from PEOPLE to me -- @mentions, assignments, replies to my comments (data.reply), an
 # approver's decision; everything agents do and every plain change is "Activity". The bell counts only "For you".
-NEWS_FOR_ME = ("mention", "assign", "take", "apdecide", "orglist", "connreq", "connok")  # 2.35.0 (#1101): an organisation admin acted on my list
+NEWS_FOR_ME = ("mention", "assign", "take", "apdecide", "orglist", "connreq", "connok", "dispo")  # 2.50.0 (#1194): dispo; 2.35.0 (#1101): an organisation admin acted on my list
 
 
 def news_to_me(kind, actor_id, data, agents):
@@ -114,7 +115,7 @@ BELL_CUSTOM_ROWS = ("newtask", "comment", "mention", "assign", "complete", "stat
 BELL_CUSTOM_KEY = {"reply": "comment", "follow": "comment"}
 KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "unassign": "assign", "complete": "complete",
             "share": "share", "role": "share", "unshare": "share", "unblock": "unblock", "status": "status",
-            "newtask": "newtask", "approval": "approval", "followup": "followup", "usage": "usage", "owner": "share",
+            "newtask": "newtask", "approval": "approval", "dispo": "assign", "followup": "followup", "usage": "usage", "owner": "share",
             "proposal": "proposal", "take": "assign", "errreport": "errreport", "apdecide": "assign", "signup": "usage",
             "orglist": "share", "playbook_proposal": "proposal", "connreq": "share", "connok": "share"}  # 2.35.0 (#1101): an organisation admin archived / restored / deleted / handed over a list
 
@@ -371,6 +372,13 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 continue
         elif kind == "connok":
             pass
+        elif kind == "dispo":  # 2.50.0 (#1194): while the booking is still there (row-level security: my areas only)
+            try:
+                bk = json.loads(r["data"] or "{}").get("booking_id")
+            except ValueError:
+                bk = None
+            if not c.execute("SELECT 1 FROM hub_bookings WHERE id=? AND resource_kind='user' AND resource_id=? AND deleted_at IS NULL", (bk, uid)).fetchone():
+                continue
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):
                 continue

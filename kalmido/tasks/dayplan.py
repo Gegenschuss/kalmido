@@ -196,6 +196,10 @@ def dayplan_compute(c, uid, day, mode="day", now=None):
         return None
     plan, nofit = [], []
     cands = ([] if mode == "fill" else [(r, True) for r in today]) + [(r, False) for r in later]
+    from ..hub.absence import abs_mine_today
+    away = abs_mine_today(c, uid, day)  # 2.50.0 (#1195): away the whole day / a holiday -> a hint instead of a proposal
+    if away and not away["half_day"]:
+        cands = []
     for r, is_today in cands[:DAYPLAN_MAX_TASKS]:
         dur = min(r["duration"] or DAYPLAN_DEFAULT_MIN, w1 - w0)
         a = place(dur)
@@ -210,7 +214,7 @@ def dayplan_compute(c, uid, day, mode="day", now=None):
             "from": _min_hm(start) if start < 1440 else "24:00", "default_duration": DAYPLAN_DEFAULT_MIN,
             "events": [{k: e[k] for k in ("title", "all_day", "start", "end")} for e in events],
             "fixed": fixed, "plan": plan, "nofit": nofit, "free_min": free_min,
-            "open_today": len(today), "candidates": len(today) + len(later)}
+            "open_today": len(today), "candidates": len(today) + len(later), **({"away": away} if away else {})}
 
 
 def dayplan_day(v):

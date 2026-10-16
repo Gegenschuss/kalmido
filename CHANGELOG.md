@@ -7,6 +7,32 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.50.0] - 2026-10-16
+
+**In short:** the second part of the business hub: **absences** with public holidays, a **disposition** for crew and
+equipment, a **sales pipeline** and **key figures** in the office, a **customer view** for public links with a choice of
+what customers see, and **approvals by customers** (accept a quotation, sign off a project) with a simple electronic signature.
+
+### Added
+- **Absences** (Team > Workload > Absences): holiday, sick leave, day off, other; whole or half days. The team only sees
+  "away" and the dates, the kind and the note only the person and the admins (encrypted at rest). Public holidays per
+  German state. Workload, *Plan my day* and assignments take them into account (a warning, never a block) (#1195).
+- **Disposition** (module, off by default): book members, contacts, devices and device kits for shoot days, as an option
+  or firm; week grid on large screens, a day list on phones; double bookings and absences are flagged, "Who is free on …?".
+  Booked people see *My bookings*, the booking in their calendar and a News item for firm bookings (#1194).
+- **Sales pipeline** (Office, admins): inquiry, quotation sent, won, lost; value, probability per stage (editable), weighted
+  sum and the expected income per month. A deal turns into a quotation with one tap, a won deal into a project; an accepted
+  quotation moves its deal to won (#1196).
+- **Key figures** (Office, admins; freelancers for their own office): revenue with last year's comparison, open and
+  overdue invoices, pipeline, cash flow of the next months, hours against budget and margin per client, and a home
+  screen block (#1197).
+- **Customer view** for public links: choose what customers see (progress, sections, due dates, assignees, tags, fields,
+  files, logo), optionally only tasks with one tag, and let them leave a comment; team comments are never shown (#329).
+- **Customer approvals** with a simple electronic signature: customers accept or decline a sent quotation through a link,
+  or sign off a project, section or milestone; the record keeps name, time, address and a checksum. Suitable for accepting
+  quotations and sign-offs, not for contracts that need the written form (#1200).
+- Agents: `get_absences` / `GET /api/v1/absences` returns only "away" and the dates within the agent's organisation.
+
 ## [2.49.1] - 2026-10-16
 
 **In short:** the checks of 2.49.0 green again; 2.49.0 and 2.49.1 go live together.
