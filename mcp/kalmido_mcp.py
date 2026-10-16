@@ -1358,6 +1358,10 @@ TOOLS += [
                      "their duration as the estimate).", _obj({"start": D, "weeks": {"type": "integer", "minimum": 1, "maximum": 12},
                                                                "org": {"type": "integer"}}),
      lambda api, a: api.call("GET", "/workload", _pick(a, ("start", "weeks", "org")))),
+    ("get_absences", "2.50.0 (#1195): who of your organisation is away when (vacation, sick leave, days off) - only 'away' and the "
+                     "period, never the reason; your own workspace only; plus the public holidays of its state.",
+     _obj({"start": D, "end": D, "org": {"type": "integer"}}),
+     lambda api, a: api.call("GET", "/absences", _pick(a, ("start", "end", "org")))),
     ("request_approval", "2.23.0: ask a person of the task's list to approve it (action request + approver_id; the task is assigned to "
                          "them) or withdraw the request (action cancel). Only people decide; agents never approve.",
      _obj({"task_id": S_ID, "action": {"type": "string", "enum": ["request", "cancel"]}, "approver_id": {"type": "integer"},

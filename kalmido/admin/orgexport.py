@@ -227,6 +227,8 @@ OX_AREAS = (
     ("office/import_runs.json", "office_import_runs", "org_id=?"),
     ("office/log.json", "office_doc_log", "org_id=?"),
     ("wiki/pages.json", "wiki_pages", "org_id=?"),  # 2.49.0 (#1199): knowledge pages
+    ("hub/absences.json", "hub_absences", "org_id=?"),  # 2.50.0 (#1195): absences (kind + note decrypted like the others)
+    ("hub/bookings.json", "hub_bookings", "org_id=?"),  # 2.50.0 (#1194): bookings of the disposition
 )
 OX_NOT_INCLUDED = (
     "private lists and private sharing of the members (lists without the organisation), other organisations",

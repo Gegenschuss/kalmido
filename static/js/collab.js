@@ -214,6 +214,7 @@ function newsText(it, U) {
     case 'newtask': return tr('{0} added a task', who);
     case 'connreq': return tr('{0} wants to connect with you', who);  // 2.49.0 (#1106)
     case 'connok': return tr('{0} accepted your connection request', who);
+    case 'dispo': return tr('{0} booked you: {1} ({2})', who, q(d.title || ''), d.start ? esc(fmtDayAbs(d.start.slice(0, 10))) : '');  // 2.50.0 (#1194)
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
     case 'approval': return tr('{0} is waiting for your approval', who);
     case 'apdecide': return {approved: tr('{0} approved {1}', who, q(it.task_title || '')), changes: tr('{0} asks for changes to {1}', who, q(it.task_title || '')),
@@ -380,6 +381,7 @@ async function newsOpen(i) {
   if (it.kind === 'evshare') { go('cal'); setTimeout(evCalsModal, 150); return; }
   if (it.kind === 'abshare') { go('contacts'); return; }
   if (it.kind === 'connreq' || it.kind === 'connok') { dsc_open(); return; }  // 2.49.0 (#1106)
+  if (it.kind === 'dispo') { if (workloadOn()) { WLV.tab = dp_on() ? 'dispo' : 'wl'; go('workload'); } return; }  // 2.50.0 (#1194)
   if (it.kind === 'usage') { if (feat('agents') && agentsOn()) go('agents'); else settingsModal('usage'); return; }  // 2.1.1 (#326)
   if (it.kind === 'approval' && !it.task_id && feat('agents') && agentsOn()) { go('agents'); return; }
   if (it.kind === 'signup') { settingsModal('users'); return; }  // 2.23.0 (#711): approve it under Users  // 2.15.0 (#479): an agent's request
@@ -550,7 +552,7 @@ function personCard(anchor, id) {
     else if (k === 'chat') chatOpen(id);
     else if (k === 'cwsplit') { if (a) cw_split('a:' + id); else { try { const r = await rawFetch('POST', '/api/team/dm', {user_id: id}); if (!(S.tc.rooms || []).some(x => x.id === r.id)) S.tc.rooms = [{...r, unread: 0, mention: false, muted: false, last: null, last_at: null}, ...(S.tc.rooms || [])]; cw_split('t:' + r.id); } catch (er) { dmWhy('err', er.message, name); } } }  // 2.47.1 (#1720)
     else if (k === 'jobs') go('agents');
-    else if (k === 'assign') patchTask(t.id, {assignee_id: id});
+    else if (k === 'assign') { patchTask(t.id, {assignee_id: id}); ab2_warnAssign(id, t); }  // 2.50.0 (#1195): warn when away
     else if (k === 'mention') { const ta = $('#c-input'); if (!ta) return; const add = (ta.value && !/\s$/.test(ta.value) ? ' ' : '') + '@' + name + ' '; ta.value += add; S.drafts[S.sel] = ta.value; ta.closest('.ccomp')?.classList.add('used'); autosize(ta); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
   };
 }

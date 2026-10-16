@@ -59,6 +59,7 @@ FIELDS = {
     "office_trip_items": ("amount", "amount_home"),  # 2.47.3 (#1022): the amounts of a travel receipt
     "office_fixed_costs": ("amount",),  # 2.47.3 (#1652): fixed costs of the cash flow
     "office_deals": ("value", "contact", "note", "lost_reason"),  # 2.50.0 (#1196): the sales pipeline
+    "hub_absences": ("kind", "note"),  # 2.50.0 (#1195): the kind of an absence (sick leave = health data) and its note
 }
 JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"): ("costs", "margin"),
              ("office_doc_parts", "totals"): ("costs", "margin")}  # 2.47.0 (#1215)
@@ -74,7 +75,8 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_doc_parts": N_("Purchase prices and margins"), ("office_doc_parts", "totals"): N_("Purchase prices and margins"),
                  # 2.47.3 (#1022, #1652): travel expenses (participants, amounts) and fixed costs
                  "office_trips": N_("Travel expenses"), "office_trip_items": N_("Travel expenses"), "office_fixed_costs": N_("Fixed costs"),
-                 "office_deals": N_("Sales pipeline")}  # 2.50.0 (#1196)
+                 "office_deals": N_("Sales pipeline"),  # 2.50.0 (#1196)
+                 "hub_absences": N_("Kind and note of absences")}  # 2.50.0 (#1195)
 PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))
 
 

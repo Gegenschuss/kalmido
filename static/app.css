@@ -7099,3 +7099,85 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 @media (max-width:899px){ .kprow{grid-template-columns:1fr auto} .kprow .kpbud{display:none} }
 .kptl{list-style:none;margin:0;padding:0}.kptl li{display:flex;align-items:center;gap:.5rem;min-height:2rem}.kptl b.neg{color:var(--danger,#c0392b)}
 @media (prefers-reduced-motion:reduce){ .ppcard,.ppcol,.kpb i,.kpbud i{transition:none} }
+
+/* 2.50.0 A (#1195) absences: tabs of the workload view, month grid (away = dimmed accent), list, sheet */
+.ab2tabs{margin:0 0 .5rem}
+.ab2tabs button{min-height:2.25rem}
+.ab2mon{margin:0;font-size:var(--fs-l);font-weight:600}
+.ab2table{table-layout:fixed;min-width:44rem}
+.ab2table th:first-child{width:11rem}
+.ab2table thead th{text-align:center;padding:.25rem 0;font-size:var(--fs-xs)}
+.ab2table thead th:first-child{text-align:left}
+.ab2table td.ab2c{padding:0;height:2rem;border-left:1px solid var(--line);position:relative}
+.ab2table .we{background:color-mix(in srgb,var(--muted) 7%,transparent)}
+.ab2table .hol{background:color-mix(in srgb,var(--muted) 14%,transparent)}
+.ab2table thead .tdy{color:var(--accent);font-weight:600}
+.ab2table td.off{background:color-mix(in srgb,var(--accent) 34%,transparent)}
+.ab2table td.off.half{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 34%,transparent) 50%,transparent 50%)}
+.ab2b{position:absolute;inset:0;width:100%;height:100%;background:none;border:0;cursor:pointer}
+.ab2h{margin:1rem 0 .375rem;font-size:var(--fs-m);font-weight:600}
+.ab2list,.ab2hol{list-style:none;margin:0;padding:0}
+.ab2li{display:flex;align-items:center;gap:.625rem;width:100%;min-height:2.75rem;padding:.375rem .25rem;border-bottom:1px solid var(--line);text-align:left;background:none}
+.ab2lt{display:flex;flex-direction:column;flex:1;min-width:0}
+.ab2lt .muted{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis}
+.ab2hol li{padding:.25rem 0;font-size:var(--fs-s)}
+.ab2foot{margin-top:1rem}
+.ab2st{display:inline-flex;align-items:center;gap:.5rem}
+.ab2md .ab2kinds{flex-wrap:wrap}
+.ab2md .ab2kinds button{min-height:2.25rem}
+.ab2md .ab2dates{display:flex;gap:.75rem}
+.ab2md .ab2dates label{display:flex;flex-direction:column;gap:.25rem;flex:1}
+.ab2hint{margin:.5rem 0}
+.wlc.ab2wl .wlbar{outline:1px dashed color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:1px}
+@media (max-width:599px){.ab2grid{display:none}.ab2tabs{display:flex}.ab2tabs button{flex:1;justify-content:center}}
+
+/* 2.50.0 A (#1194) disposition: week grid (firm = accent, option = outlined), warnings, day list on phones, booking sheet */
+.dptable{table-layout:fixed;min-width:48rem}
+.dptable th:first-child{width:12rem}
+.dptable thead th{text-align:center;font-size:var(--fs-xs)}
+.dptable thead th:first-child{text-align:left}
+.dptable thead .tdy{color:var(--accent);font-weight:600}
+.dptable .dpgrp th{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding-top:.75rem;border-bottom:0}
+.dptable td.dpc{padding:.125rem;vertical-align:top;border-left:1px solid var(--line)}
+.dptable td.we{background:color-mix(in srgb,var(--muted) 7%,transparent)}
+.dptable td.hol{background:color-mix(in srgb,var(--muted) 14%,transparent)}
+.dptable td.away{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 18%,transparent) 0 4px,transparent 4px 8px)}
+.dpic{display:inline-flex;width:1.5rem;justify-content:center;color:var(--muted)}
+.dpbar{display:flex;align-items:center;gap:.25rem;width:100%;min-height:1.75rem;margin:.0625rem 0;padding:.125rem .375rem;border-radius:var(--r-s);font-size:var(--fs-xs);text-align:left;overflow:hidden;white-space:nowrap;cursor:pointer}
+.dpbar span{overflow:hidden;text-overflow:ellipsis}
+.dpbar.firm{background:var(--accent);color:var(--accent-ink)}
+.dpbar.option{background:var(--accent-soft);color:var(--text);border:1px dashed var(--accent)}
+.dpbar.warn{box-shadow:inset 0 0 0 2px var(--danger)}
+.dpbar .i,.dpres .i,.dpjobres .i{color:var(--danger);flex:none}
+.dpbar.firm .i{color:var(--accent-ink)}
+.dpdays{display:none;list-style:none;margin:.5rem 0;padding:0}
+.dpdays h4{margin:.75rem 0 .375rem;font-size:var(--fs-m)}
+.dpjob{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;width:100%;min-height:2.75rem;padding:.5rem .625rem;margin-bottom:.375rem;border:1px solid var(--line2);border-radius:var(--radius);text-align:left;background:none}
+.dpjob.warn{border-color:var(--danger)}
+.dpres{display:flex;flex-wrap:wrap;gap:.25rem .625rem;font-size:var(--fs-s)}
+.dpres .warn{color:var(--danger)}
+.dplegend{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
+.dpk{display:inline-block;width:.875rem;height:.875rem;border-radius:3px;margin-left:.5rem}
+.dpk.firm{background:var(--accent)}
+.dpk.option{background:var(--accent-soft);border:1px dashed var(--accent)}
+.dpk.away{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 30%,transparent) 0 3px,transparent 3px 6px)}
+.dpfreebox{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:1rem 0 .25rem}
+.dpfree p{margin:.25rem 0}
+.dpmine{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;min-height:2.75rem;padding:.375rem .25rem;border-bottom:1px solid var(--line)}
+.dpmine .muted{font-size:var(--fs-s)}
+.dpst{margin-left:auto;font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:999px}
+.dpst.firm{background:var(--accent);color:var(--accent-ink)}
+.dpst.option{border:1px dashed var(--accent)}
+.dpmd .dppicks{max-height:40vh;overflow:auto;margin:.5rem 0}
+.dpmd .dppick{border:0;margin:0 0 .5rem;padding:0}
+.dpmd .dppick legend{font-size:var(--fs-s);color:var(--muted);padding:0;margin-bottom:.25rem}
+.dpmd .dpopt{display:flex;align-items:center;gap:.5rem;min-height:2.5rem}
+.dpmd .dpbusy{margin-left:auto;color:var(--danger);font-size:var(--fs-xs)}
+.dpmd .dpstat button{min-height:2.25rem}
+.dpjobres{list-style:none;margin:.5rem 0;padding:0}
+.dpjobres li{display:flex;align-items:center;gap:.5rem;min-height:2.5rem;border-bottom:1px solid var(--line)}
+.dpjobres li span{flex:1;display:flex;align-items:center;gap:.25rem}
+.dpjobres li small{color:var(--danger);font-size:var(--fs-xs)}
+.dp .clhead{flex-wrap:wrap;gap:.5rem}
+@media (max-width:599px){.dpgrid{display:none}.dpdays{display:block}}
+@media (max-width:599px){.dp .clhead>.seg{display:flex;width:100%}.dp .clhead>.seg button{flex:1;justify-content:center;min-height:2.25rem}.dp .clhead>.spacer{flex:1}}

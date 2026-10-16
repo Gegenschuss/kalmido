@@ -643,6 +643,8 @@ def openapi_spec():
     from ..lists.orgvis import ov_spec
     ov_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.46.0 (#1603)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
+    from ..hub.absence import abs_spec
+    abs_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.50.0 (#1195)
     hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.24.0 (#907 #910)
     from ..notify.caps import notif_tpl_spec
     notif_tpl_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)  # 2.33.0 (#927)

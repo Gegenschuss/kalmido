@@ -198,6 +198,7 @@ APP_TO_API = {
     # 2.23.0 (#463): clients, workload, approvals, forms
     "GET /api/clients": ["GET /clients"], "POST /api/clients": ["POST /clients"], "GET /api/clients/{}": ["GET /clients/{}"],
     "PATCH /api/clients/{}": ["PATCH /clients/{}"], "DELETE /api/clients/{}": ["DELETE /clients/{}"], "GET /api/workload": ["GET /workload"],
+    "GET /api/team/absences": ["GET /absences"],  # 2.50.0 (#1195): "away" only
     "POST /api/clients/bulk": ["POST /clients/bulk"],  # 2.47.3 (#1733)
     "POST /api/tasks/{}/approval": ["POST /tasks/{}/approval"], "GET /api/lists/{}/forms": ["GET /lists/{}/forms"],
     "POST /api/lists/{}/forms": ["POST /lists/{}/forms"], "PATCH /api/forms/{}": ["PATCH /forms/{}"], "DELETE /api/forms/{}": ["DELETE /forms/{}"],
@@ -209,6 +210,10 @@ APP_ONLY = [
     ("2.49.0 (#1199, #1201): knowledge pages, stage 1 -- no agent access yet (shares of pages / folders for organisation agents with "
      "scopes wiki:read / wiki:write come as their own step); the outline parser only serves the mind map import of the web app",
      ("* /api/wiki", "=POST /api/outline/parse")),
+    ("2.50.0 (#1195, #1194): entering absences (the kind is health data), the public holiday state, the assign check and the "
+     "disposition (booking crew and equipment): people only; agents read GET /absences (\"away\" only)",
+     ("POST /api/team/absences", "PATCH /api/team/absences/", "DELETE /api/team/absences/", "PUT /api/team/absences/",
+      "=GET /api/team/absences/check", "* /api/team/dispo", "=GET /api/team/bookings/mine")),
     ("2.27.0 (#999): the web panel says a person edits a task (tidy-up waits); agents never edit in a panel", ("=POST /api/tasks/{}/editing",)),
     ("2.42.0 (#1376): the web app's live updates (only the tasks changed since its state); agents follow their events and GET /tasks",
      ("=GET /api/state/delta",)),

@@ -57,13 +57,16 @@ const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix',
   // 2.36.1 (#1021): Office & finance (business area: needs an organisation), off by default
   ['office', N_('Office & finance')],
   // 2.49.0 (#1199): knowledge pages (a small wiki per organisation), off by default
-  ['wiki', N_('Knowledge pages')]];
+  ['wiki', N_('Knowledge pages')],
+  // 2.50.0 (#1194): resources and disposition (a tab of the workload view), off by default
+  ['dispo', N_('Disposition')]];
 const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and linking in the timeline, what is stuck in the project status, a notice when a task is unblocked'),
   fields: N_('Own fields per list (text, number, selection, date, person, link), as columns and in the task details'),collab: N_('Comments, activity history, @mentions, News, sharing lists and assigning tasks'), stats: N_('Completed tasks, on-time rate, overdue trend, focus time and habit streaks'),
   time: N_('Timer on tasks, manual entries, reports per list and task, CSV export and a printable timesheet'),
   clients: N_('Clients above the lists: contact, hourly rate, budget in hours or money, estimate vs. actual and the timesheet per client and month (only within your organisation)'),
   workload: N_('How much each person of your organisation has on their plate per week, against their hours per week'),
   forms: N_('A link with a small form (requests, bug reports) that creates a task in a list; agents can sort it in'),
+  dispo: N_('Book crew and equipment for shoot days as option or firm, see who and what is free per day, double bookings and absences as warnings (a tab of the workload)'),  // 2.50.0 (#1194)
   agents: N_('A tab with the agents (AI assistants, bots) you share lists with: their status, jobs to approve and the chat'),
   office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents - your own or your organisation\'s'),
   wiki: N_('Pages in Markdown for processes, checklists and know-how of your organisation (or only for you), with links between them and to tasks'),  // 2.49.0 (#1199)
@@ -591,7 +594,7 @@ function applyState(j) {
   S.storage = j.storage || null; S.announce = j.announce || null;  // 2.24.0 (#910 / #907)  // 2.23.0 (#799): organisation | shared | multi
   S.clients = j.clients || [];  // 2.23.0 (#463): the clients I see, with their lists
   if (S.booted && S.route?.mod === 'clients') clReload();  // a change elsewhere: the client's sums again
-  if (S.booted && S.route?.mod === 'workload') { WLV.data = null; }
+  if (S.booted && S.route?.mod === 'workload') { WLV.data = null; AB2.data = null; DPV.data = null; }  // 2.50.0 (#1195, #1194)
   // 2.21.0 (#659 / #658): event calendars (a changed event refetches the calendar range), address books, links of tasks
   S.evcals = j.evcals || []; S.evlinks = j.evlinks || {}; S.books = j.books || []; S.tcontacts = j.tcontacts || {};
   if (j.evsig !== undefined && j.evsig !== S.evsig) { S.evsig = j.evsig; if (S.booted) calInvalidate(); }

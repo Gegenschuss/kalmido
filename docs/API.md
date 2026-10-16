@@ -863,7 +863,13 @@ A list's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is
 `GET /time/entries?lists=1,2&from=&to=` (web) or `/api/time/export.csv`.
 
 `GET /workload?start=&weeks=&org=`: per person and week `minutes` (sum of the tasks' `duration`), `tasks`,
-`unestimated`, `pct` of `capacity_h`, `level`; `nodate` for tasks without a date.
+`unestimated`, `pct` of `capacity_h`, `level`; `nodate` for tasks without a date. 2.50.0 (#1195): each week also
+carries `capacity_h` (the person's hours of that week: absent workdays and public holidays taken off) and `absent_days`.
+
+`GET /absences?start=&end=&org=` (2.50.0, #1195, MCP `get_absences`): who of the organisation is away when -
+`people` and `items` (`user_id`, `start_date`, `end_date`, `half_day` `""|am|pm`) plus the `holidays` of the
+organisation's state. Never the kind (vacation, sick leave, day off) or the note. An agent sees its own workspace only
+(a private agent: 404); entering absences and the disposition (#1194, booking crew and equipment) are the web app's.
 
 `POST /tasks/{id}/approval` (`tasks:write`): `{action: request, approver_id, note?}` / `{action: cancel}`; the approver
 (a person in the app) decides with `approve`, `changes` or `reject`. Tasks carry `approval` (`pending | approved |

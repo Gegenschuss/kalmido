@@ -1039,7 +1039,7 @@ function assignMenu(anchor, id) {
   const take = myGroup(t.assignee_group_id) ? [{label: tr('Take it'), icon: 'check', cls: 'mtake', fn: () => takeTask(id)}] : [];  // 2.10.0 (#441)
   if (!canAssign(t)) { if (take.length) menu(anchor, take); else roToast(); return; }
   if (!take.length && tlkStop(t)) return;  // 2.36.0 (#1118): locked
-  const set = uid => { if ((t.assignee_id || null) !== uid || t.assignee_group_id) patchTask(id, {assignee_id: uid, ...(t.assignee_group_id ? {assignee_group_id: null} : {})}); };
+  const set = uid => { if ((t.assignee_id || null) !== uid || t.assignee_group_id) { patchTask(id, {assignee_id: uid, ...(t.assignee_group_id ? {assignee_group_id: null} : {})}); ab2_warnAssign(uid, t); } };  // 2.50.0 (#1195): warn when away
   const setG = gid => { if (t.assignee_group_id !== gid) patchTask(id, {assignee_group_id: gid, ...(t.assignee_id ? {assignee_id: null} : {})}); };
   const cur = t.assignee_id ? personName(t.list_id, t.assignee_id) || personNameAny(t.assignee_id) : '';
   const gs = listGroups(t.list_id);

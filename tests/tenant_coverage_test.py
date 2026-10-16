@@ -84,6 +84,9 @@ KINDS = {
     "people": ("n/a", "finding people by e-mail and connection requests: person to person, outside every workspace; the "
                       "person's own requests / connections / blocks only, a hit only through an exact confirmed address "
                       "(p249_e_api_test.py: no account disclosure, no probing by id, organisations unchanged)"),
+    # 2.50.0 A (#1195, #1194): absences and bookings of an organisation / a personal area (row-level security + the app)
+    "hub": ("matrix", "p250_a_api_test.py: absences and bookings by id of another organisation 404 (read, change, delete, restore), "
+                      "the kind of an absence only for the person and the admins, resources of another organisation cannot be booked"),
 }
 
 ROUTES = {
@@ -500,6 +503,12 @@ ROUTES = {
     "POST /api/disc/check": "people", "POST /api/disc/requests": "people", "POST /api/disc/requests/{}/{}": "people",
     "DELETE /api/disc/requests/{}": "people", "DELETE /api/disc/connections/{}": "people",
     "POST /api/disc/connections/{}/restore": "people", "POST /api/disc/blocks/{}": "people", "DELETE /api/disc/blocks/{}": "people",
+    # 2.50.0 A (#1195): absences; (#1194): resources and disposition
+    "GET /api/team/absences": "hub", "POST /api/team/absences": "hub", "PATCH /api/team/absences/{}": "hub",
+    "DELETE /api/team/absences/{}": "hub", "POST /api/team/absences/{}/restore": "hub", "PUT /api/team/absences/holidays": "hub",
+    "GET /api/team/absences/check": "hub", "GET /api/team/dispo": "hub", "GET /api/team/dispo/free": "hub",
+    "POST /api/team/dispo/bookings": "hub", "PATCH /api/team/dispo/bookings/{}": "hub", "DELETE /api/team/dispo/bookings/{}": "hub",
+    "POST /api/team/dispo/bookings/restore": "hub", "GET /api/team/bookings/mine": "hub", "GET /api/v1/absences": "hub",
 }
 
 # ---- 1. every route is classified, nothing stale

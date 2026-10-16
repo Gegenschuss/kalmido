@@ -53,7 +53,7 @@ async function dayplanModal(mode = 'day', day = today()) {
       <div class="dptabs"><div class="seg" role="group" aria-label="${esc(tr('What to plan'))}"><button data-dp="mode" data-v="day" class="${st.mode === 'day' ? 'on' : ''}" aria-pressed="${st.mode === 'day'}">${tr('Plan my day')}</button><button data-dp="mode" data-v="fill" class="${st.mode === 'fill' ? 'on' : ''}" aria-pressed="${st.mode === 'fill'}">${tr('Fill free time')}</button></div>
         <div class="seg" role="group" aria-label="${esc(tr('Day'))}"><button data-dp="day" data-v="${today()}" class="${st.day === today() ? 'on' : ''}" aria-pressed="${st.day === today()}">${tr('Today')}</button><button data-dp="day" data-v="${alt}" class="${st.day === alt ? 'on' : ''}" aria-pressed="${st.day === alt}">${alt === addDays(today(), 1) ? tr('Tomorrow') : esc(fmtDayAbs(alt))}</button></div></div>
       <div class="dpsum muted">${esc(tr('{0}, working hours {1}–{2}', fmtDayAbs(p.date), p.work.start, p.work.end))} · ${esc(trn('{0} event', '{0} events', ev))} · ${esc(tr('{0} planned', fmtH(p.plan.reduce((n, t) => n + (t.duration || 0), 0))))} · ${esc(tr('{0} still free', fmtH(p.free_min)))}${allDay.length ? ' · ' + esc(tr('all day: {0}', allDay.map(e => e.title).join(', '))) : ''}</div>
-      <div class="calerr" role="alert" id="dp-err" hidden></div>
+      ${ab2_dayHint(p.away)}<div class="calerr" role="alert" id="dp-err" hidden></div>
       ${cvxPlanRow(st.cals)}
       ${dpTimeline(rows, defer, {sel: st.sel, acts: true})}
       <div class="shint keep">${tr('Applying sets the planned start and duration of the selected tasks (a task without a duration gets {0} minutes); due dates and deadlines stay as they are. One step, undo takes it back.', p.default_duration)}</div>
