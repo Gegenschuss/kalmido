@@ -532,6 +532,8 @@ def watchdog_tick(c):
     _wd_section(c, "agent bursts", burst_tick)  # 2.29.0 (#1031)
     from ..agents.schedules import sched_tick
     _wd_section(c, "agent schedules", sched_tick)  # 2.34.0 (#272): planned agent jobs
+    from ..team.portal import pt_mail_tick
+    _wd_section(c, "portal mails", pt_mail_tick)  # 2.63.0 B (#1513): answers / "done" to the reporters of customer reports
     _wd_section(c, "time", time_watchdog, users, S, LG)
     now = local_now()
     _wd_section(c, "reminders", _wd_reminders, users, S, LG, now)

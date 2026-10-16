@@ -54,6 +54,10 @@ CHECKS = {
     "nl_segment": ("SELECT s.id, s.conn_id FROM nl_segments s JOIN nl_conns n ON n.id=s.conn_id WHERE s.org_id IS DISTINCT FROM n.org_id"),
     "nl_member": ("SELECT m.seg_id, s.conn_id FROM nl_members m JOIN nl_segments s ON s.id=m.seg_id WHERE m.org_id IS DISTINCT FROM s.org_id"),
     "nl_run": ("SELECT r.id, r.conn_id FROM nl_runs r JOIN nl_conns n ON n.id=r.conn_id WHERE r.org_id IS DISTINCT FROM n.org_id"),
+    # 2.63.0 B (#1513): a customer report in another workspace than its list, or bound to a client of another workspace
+    "portal_ticket": ("SELECT p.id, p.list_id FROM portal_tickets p JOIN lists l ON l.id=p.list_id WHERE p.org_id IS DISTINCT FROM l.org_id "
+                      "OR (p.org_id IS NULL AND p.owner_id IS DISTINCT FROM l.owner_id)"),
+    "portal_client": ("SELECT p.id, p.client_id FROM portal_tickets p JOIN clients k ON k.id=p.client_id WHERE k.org_id IS DISTINCT FROM p.org_id"),
     # 2.49.0 (#1106): a connection (accepted request) of an agent or a kid account -- requests are for people only
     "conn_agent": ("SELECT l.a_id, l.b_id FROM conn_links l JOIN users u ON u.id IN (l.a_id, l.b_id) "
                    "WHERE l.deleted_at IS NULL AND (u.kind!='user' OR u.kid!=0)"),

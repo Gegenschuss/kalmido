@@ -121,3 +121,34 @@ function jc_menuItems() {
   const js = Object.values(S.jc.jobs).filter(j => jc_live(j) && j.name && j.user_id === S.me?.id && ags.has(j.agent_id)).sort((a, b) => a.id - b.id);
   return js.map(j => { const r = jc_rest(j); return {label: j.name + (r ? ' · ' + (r.length > 48 ? r.slice(0, 47) + '…' : r) : ''), icon: 'comment', fn: () => jc_enter(j.agent_id, j)}; });
 }
+
+// ---- 2.63.0 (#1482): "Conversation" on the job card: the last messages of the job's own history (same endpoint as the chat,
+// ?job=), loaded when unfolded, refreshed on live updates while open; 403 / 404 (not my agent) = no section
+S.jth = {};  // job id -> {msgs, v, at, busy, hide}
+function jth_html(j) {
+  if (j.kind || !j.agent_id) return '';
+  const t = S.jth[j.id] || {}, open = !!S.jobThOpen?.[j.id];
+  if (t.hide) return '';
+  if (open && !t.busy && (!t.at || (t.v !== S.v && Date.now() - t.at > 3000))) setTimeout(() => jth_load(j), 0);
+  const body = !t.msgs ? `<p class="muted">${tr('Loading…')}</p>` : t.msgs.length
+    ? t.msgs.map(m => `<div class="jthm ${m.from === 'agent' ? 'ag' : 'me'}"><span class="muted">${esc(fmtWhen(m.created_at))}</span><p>${esc(String(m.body || '').slice(0, 400))}</p></div>`).join('') : `<p class="muted">${tr('No messages yet.')}</p>`;
+  return `<details class="jobth" data-jid="${j.id}"${open ? ' open' : ''}><summary>${tr('Conversation')}</summary><div class="jthbody">${open ? body : ''}${open ? `<button type="button" class="btn sm" data-act="jc-open" data-jid="${j.id}" data-aid="${j.agent_id}">${ic('comment', 's')} ${tr('Open the whole conversation')}</button>` : ''}</div></details>`;
+}
+async function jth_load(j) {
+  const t = S.jth[j.id] || (S.jth[j.id] = {});
+  if (t.busy) return;
+  t.busy = true;
+  try {
+    const r = await rawFetch('GET', `/api/agents/${+j.agent_id}/chat?limit=5&job=${+j.id}`);
+    t.msgs = (r.messages || []).slice(-5); t.v = S.v; t.at = Date.now();
+  } catch (e) { if (e && [403, 404].includes(e.status)) t.hide = true; else t.at = Date.now(); }
+  t.busy = false;
+  const d = document.querySelector(`details.jobth[data-jid="${j.id}"]`);
+  if (d) d.outerHTML = jth_html(j);
+}
+document.addEventListener('toggle', e => {
+  const d = e.target instanceof Element && e.target.matches?.('details.jobth') ? e.target : null; if (!d) return;
+  (S.jobThOpen || (S.jobThOpen = {}))[d.dataset.jid] = d.open;
+  const j = (S.jobs?.items || []).find(x => x.id === +d.dataset.jid);
+  if (d.open && j) { const t = S.jth[j.id]; if (!t || !t.msgs) jth_load(j); else { d.outerHTML = jth_html(j); } }
+}, true);

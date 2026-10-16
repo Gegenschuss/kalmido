@@ -82,7 +82,8 @@ def comment_dict(r, atts):
             "edited_at": r["edited_at"], "mentions": [int(x) for x in (r["mentions"] or "").split(",") if x],
             "attachments": atts.get(r["id"], []), "suggestion": json.loads(r["suggestion"]) if r["suggestion"] else None,
             "reply_to": r["reply_to"] if "reply_to" in r.keys() else None,  # 2.33.0 (#1076): + reply (with_replies)
-            "ext_name": r["ext_name"] if "ext_name" in r.keys() else None}  # 2.50.0 (#329): written by a customer through the public link
+            "ext_name": r["ext_name"] if "ext_name" in r.keys() else None,  # 2.50.0 (#329): written by a customer through the public link
+            "portal": bool(r["portal"]) if "portal" in r.keys() else False}  # 2.63.0 B (#1513): the customer sees it (answer / their own)
 
 
 def need_live_comment(c, cid):
@@ -100,6 +101,7 @@ def timeline(tid):
     there is no activity and nobody to mention."""
     from ..personal.timetrack import vis_ids
     from ..tasks.dependencies import DEP_ACTS
+    from ..team.portal import pt_ticket_info
     from ..agents.core import agent_ids, is_approver
     from ..collab.reactions import with_reactions
     c = db()
@@ -140,7 +142,8 @@ def timeline(tid):
                    people=ppl, seen=seen[0] if seen else 0, moderator=role in MANAGE_ROLES,
                    agents=sorted(i for i in ids | {p["id"] for p in ppl} if i in ag),
                    can_write=task_visible(c, tid, me(), write=True),
-                   approver=is_approver(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), me()))  # 2.2.0 (#339)
+                   approver=is_approver(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), me()),  # 2.2.0 (#339)
+                   ticket=pt_ticket_info(c, tid, me()))  # 2.63.0 B (#1513): a customer's report (box in the task panel)
 
 
 @app.post("/api/tasks/<int:tid>/seen")
@@ -162,7 +165,7 @@ def comment_input():
     """(text, files) from a JSON body or a multipart form (comment with files)."""
     from ..personal.timetrack import web_fields
     if request.files or request.form:
-        web_fields({k: 1 for k in [*request.form, *request.files]}, {"body", "file", "reply_to"}, "POST /api/tasks/{tid}/comments (form)")
+        web_fields({k: 1 for k in [*request.form, *request.files]}, {"body", "file", "reply_to", "portal"}, "POST /api/tasks/{tid}/comments (form)")
         return (request.form.get("body") or "").strip(), [f for f in request.files.getlist("file") if f and f.filename]
     web_fields(body(), WEB_COMMENT, "POST /api/tasks/{tid}/comments")
     return (body().get("body") or "").strip(), []
@@ -232,14 +235,21 @@ def comment_create(tid):
             sug = {**clean_suggestion(c, t, sug), "state": "open"}
         except BadInput as e:
             return err(str(e))
+    from ..team.portal import pt_comment_flag
+    try:  # 2.63.0 B (#1513): portal = an answer the customer sees (only on a task with a ticket, by people who may change it)
+        portal = pt_comment_flag(c, tid, me(), request.form.get("portal") if (request.files or request.form) else body().get("portal"))
+    except BadInput as e:
+        return err(str(e))
     from .cchoice import lv_choices_in, lv_with_choices
     try:  # 2.41.0 (#1383): an agent's answer buttons / approval card (the chat's format)
         chs = lv_choices_in(body(), is_agent(g.user)) if not (request.files or request.form) else None
     except BadInput as e:
         return err(str(e))
-    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to,choices) VALUES(?,?,?,?,?,?,?,?)",
+    if portal and (sug or chs):  # 2.63.0 B (#1513): the customer sees text (and the files are not shown to them)
+        return err(tr("Suggestions and answer buttons cannot go to a customer"))
+    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to,choices,portal) VALUES(?,?,?,?,?,?,?,?,?)",
                     (tid, me(), text, ",".join(map(str, mentions)), iso_ms(now_utc()),
-                     json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None, chs))
+                     json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None, chs, portal))
     replied = orig["user_id"] if orig and orig["user_id"] != me() else None
     if sug and sug.get("kind") == "merge_request":
         git_merge_link(c, t, sug)

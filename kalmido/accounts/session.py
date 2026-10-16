@@ -38,10 +38,14 @@ def _peer_trusted():
 
 def proxy_login_value():
     """The trusted proxy header of this request, or '' (not configured / untrusted peer / bypassed path)."""
-    if not AUTH_HEADER or request.path in PROXY_IGNORE or request.path.startswith(("/static/", ICAL_PREFIX, API_PREFIX, PUB_PREFIX, "/dav", "/.well-known/")):
+    if not AUTH_HEADER or request.path in PROXY_IGNORE or request.path.startswith(("/static/", ICAL_PREFIX, API_PREFIX, PUB_PREFIX, "/dav", "/.well-known/")) \
+            or request.path.startswith(PT_PREFIXES) or request.path == "/portal":  # 2.63.0 B (#1513): the reporter has no account
         return ""
     v = (request.headers.get(AUTH_HEADER) or "").strip()
     return v if v and _peer_trusted() else ""
+
+
+PT_PREFIXES = ("/p/", "/portal/")  # 2.63.0 B (#1513): a customer report's status link, the portal's sign-in / sign-out
 
 
 def _token_hash(t):
@@ -56,7 +60,8 @@ def client_ip():
 
 
 def _is_open(path, method):
-    return path in OPEN_PATHS or path.startswith(("/static/", ICAL_PREFIX, PUB_PREFIX, "/f/")) or (path in ("/share", "/capture") and method == "GET")  # 2.4.0: /capture (#187)
+    return path in OPEN_PATHS or path.startswith(("/static/", ICAL_PREFIX, PUB_PREFIX, "/f/")) or (path in ("/share", "/capture") and method == "GET") \
+        or path.startswith(PT_PREFIXES) or path == "/portal"  # 2.4.0: /capture (#187); 2.63.0 B (#1513): status links + the customer portal
 
 
 def rate_ip():

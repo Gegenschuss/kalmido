@@ -1692,6 +1692,10 @@ MIGRATIONS = [
     ("forms", "ttype", "ALTER TABLE forms ADD COLUMN ttype TEXT NOT NULL DEFAULT ''"),
     ("forms", "files", "ALTER TABLE forms ADD COLUMN files BIGINT NOT NULL DEFAULT 0"),
     ("forms", "portal", "ALTER TABLE forms ADD COLUMN portal BIGINT NOT NULL DEFAULT 0"),
+    # 2.63.0 B (#1513): the task state the reporter last got a mail about (2 = "done" was mailed) and the language of the
+    # status page the reporter opened (their mails use it; '' = the list owner's)
+    ("portal_tickets", "mailed_status", "ALTER TABLE portal_tickets ADD COLUMN mailed_status BIGINT NOT NULL DEFAULT 0"),
+    ("portal_tickets", "lang", "ALTER TABLE portal_tickets ADD COLUMN lang TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

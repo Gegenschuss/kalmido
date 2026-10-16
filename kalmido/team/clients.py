@@ -264,6 +264,9 @@ def client_get(cid):
         st = client_stats(c, uid, cid, [lid], request.args.get("month"))
         per.append({"id": lid, "name": l["name"], "kind": l["kind"], "rate": l["rate"], "status": l["status"], **st})
     d["per_list"] = per
+    if (g.user["kind"] or "user") != "agent":  # 2.63.0 B (#1513): the client's reports (customer portal) the person sees
+        from .portal import pt_client_tickets
+        d["tickets"] = pt_client_tickets(c, uid, cid)
     return jsonify(d)
 
 

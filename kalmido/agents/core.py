@@ -252,6 +252,8 @@ def agent_event_comments(c, tid):
             d["truncated"] = True
         if r["ext_name"]:  # 2.50.0 (#329): a customer's comment through the public link (no account, the name they typed)
             d["author"].update(name=r["ext_name"], customer=True)
+        if "portal" in r.keys() and r["portal"]:  # 2.63.0 B (#1513): the customer of a customer report sees it
+            d["portal"] = True
         if r["suggestion"]:
             d["suggestion"] = json.loads(r["suggestion"])
         out.append(d)
@@ -284,6 +286,9 @@ def agent_comment(c, k):
     rt, rq = reply_of(c, "c", k)  # 2.33.0 (#1076): the comment answers this one (a short quote)
     return {"id": k["id"], "author_id": k["user_id"], "text": comment_plain(c, k["body"]), "body": k["body"], "created_at": k["created_at"],
             "suggestion": json.loads(k["suggestion"]) if k["suggestion"] else None, "reply_to": rt, "reply": rq,
+            # 2.63.0 B (#1513): portal = the customer sees it (a public answer, or the customer's own: author_id null + ext_name)
+            "portal": bool(k["portal"]) if "portal" in k.keys() else False,
+            **({"ext_name": k["ext_name"]} if "ext_name" in k.keys() and k["ext_name"] else {}),
             **_lv_comment_choices(k)}
 
 

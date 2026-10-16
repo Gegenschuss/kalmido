@@ -348,7 +348,9 @@ def openapi_spec():
             "choices": {"type": ["object", "null"], "description": "2.41.0 (#1383): {choices: [{id, label, style?}], multi, approval?: {title, what, std?}, "
                         "expires_at?, withdrawn_at?, outcome?}"},
             "choice": {"type": ["object", "null"], "description": "2.41.0: the answer {ids, at, user_id, user_name, via}, written once"},
-            "choice_state": nul("string", description="2.41.0: open | answered | expired | withdrawn")}},
+            "choice_state": nul("string", description="2.41.0: open | answered | expired | withdrawn"),
+            "portal": {"type": "boolean", "description": "2.63.0 (#1513): the customer sees it: a public answer, or the customer's own comment "
+                       "(author id null, author.customer true)"}}},
         # 2.33.0 (#1076): the short quote of an answered message (comments, team chat, agent chat)
         "ReplyQuote": {"type": "object", "description": "2.33.0 (#1076): a short quote of the answered message; deleted = the original is gone "
                        "(deleted or trimmed: no text then)", "properties": {
@@ -357,6 +359,8 @@ def openapi_spec():
             "from": {"type": "string", "enum": ["user", "agent"], "description": "Agent chat only"}}},
         "CommentInput": {"type": "object", "additionalProperties": False, "required": ["body"], "properties": {"body": {"type": "string", "maxLength": MAX_COMMENT},
                          "reply_to": {"type": "integer", "description": "2.33.0 (#1076): answer this comment of the same task (else 400); its author is notified like a mention"},
+                         "portal": {"type": "boolean", "description": "2.63.0 (#1513): a public answer the customer sees on the status page and by mail "
+                                    "(only on a task with a customer report and with write access; default false = internal)"},
                          # 2.41.0 (#1383): answer buttons / an approval card like in the agent chat (agents only)
                          "choices": {"type": "array", "description": "2.41.0 (#1383, agents): answer buttons [{id, label, style?}] (or strings); only the newest "
                                      "comment's buttons stay live", "items": {"anyOf": [{"type": "string"}, {"type": "object"}]}},
