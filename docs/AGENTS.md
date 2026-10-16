@@ -1710,6 +1710,13 @@ big task, a tidy inbox, tasks from meeting notes. An agent must not create that 
 they want. Everything applied belongs to the person (owner, creator; the history says *created the task from a proposal
 by <agent>*), and it is one undo step.
 
+2.51.0: two more, usually started in the chat. Send your agent a customer inquiry (text or the mail as an attachment):
+it proposes the whole project at once - the list, first tasks, the shoot days as event drafts in your calendar (shown as
+drafts until you confirm them) and, when the office switches allow it, a quotation draft. Or tap *Set up with your
+agent* (Settings > Modules, or the last card of the welcome tour), say what you use Kalmido for, and it proposes modules,
+lists and a first project. Nothing is sent or booked; you tick what you want and apply it in one step. Details:
+[An inquiry becomes a project, the setup assistant](#an-inquiry-becomes-a-project-the-setup-assistant-2510).
+
 **Flow.**
 
 1. A person starts it in the app: *New project from briefing…* (Lists > +, command palette), *Break down with
