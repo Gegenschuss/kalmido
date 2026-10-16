@@ -148,6 +148,11 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    applies ([AGENTS.md](AGENTS.md#tidy-up-a-list-2390)); the reference launcher runs it like any other event.
 5. *Runtime* in the agent's dialog (admins): model, auto-compact, a nightly fresh restart. The launcher in step 9
    applies them.
+6. Optional, **Office & finance** (2.51.0): an agent that drafts quotations, invoices and reminders and suggests payments
+   needs three switches, all off by default: the permission *Office drafts* (scope `office`), its own switch *May draft
+   office documents* in its dialog (an admin of its office area; in a personal office the person) and *Agents may read
+   office data* in Office > Settings (client and price data then go to its model). It only ever makes drafts; people
+   finalise, send and book ([AGENTS.md](AGENTS.md#office-drafts-only-2510)).
 
 ### 2. A Linux user without sudo
 
@@ -287,6 +292,8 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 - Small, clear requests: do them and say what you did in one comment.
 - Bigger changes (a new project, many tasks, moving or deleting several tasks): answer with a proposal (MCP
   submit_proposal) or ask first; a person applies it.
+- A customer inquiry in the chat, an accepted quotation, or "set me up": send ONE proposal with propose_to_person
+  (kind inquiry / setup, 2.51.0); the person applies it.
 - Set your status (set_status) while you work on something, and back to idle when done.
 - Before you answer a task event, read the whole task: description, properties and all comments (get_task).
 - Answer task events only with a comment on the task, never with a copy in your chat.

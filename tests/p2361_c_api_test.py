@@ -281,7 +281,8 @@ check(Da.get(B + f"{D}/{DOC}").status_code == 404, "private person: nothing of t
 r = requests.get(B + D, headers=AGH)
 check(r.status_code in (401, 403), f"an agent token is refused: 401/403 ({r.status_code})")
 check(requests.get(B + f"{D}/{DOC}", headers=AGH).status_code in (401, 403) and requests.post(B + D, headers=AGH, json={}).status_code in (401, 403), "agent: refused on every docs route")
-check(requests.get(B + "/api/v1/office/docs", headers=AGH).status_code == 404, "no /api/v1 route for the module in stage 1")
+# 2.51.0 (#1348): agents have /api/v1/office routes now (drafts only); without the scope office and both switches they are refused
+check(requests.get(B + "/api/v1/office/docs", headers=AGH).status_code in (401, 403), "the agents' office route refuses an agent without the scope office and the switches")
 # a member of the organisation
 r = Bo.get(B + D)
 check(r.ok and r.json()["role"] == "member" and len(r.json()["docs"]) >= 5, "bob (member) sees the organisation's quotations")

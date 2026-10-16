@@ -58,13 +58,16 @@ const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix',
   ['office', N_('Office & finance')],
   // 2.49.0 (#1199): knowledge pages (a small wiki per organisation), off by default
   ['wiki', N_('Knowledge pages')],
-  ['files', N_('File store')]];  // 2.48.0 (#1207): folders and files with shares (ablage.js), on for everyone
+  ['files', N_('File store')],  // 2.48.0 (#1207): folders and files with shares (ablage.js), on for everyone
+  // 2.50.0 (#1194): resources and disposition (a tab of the workload view), off by default
+  ['dispo', N_('Disposition')]];
 const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and linking in the timeline, what is stuck in the project status, a notice when a task is unblocked'),
   fields: N_('Own fields per list (text, number, selection, date, person, link), as columns and in the task details'),collab: N_('Comments, activity history, @mentions, News, sharing lists and assigning tasks'), stats: N_('Completed tasks, on-time rate, overdue trend, focus time and habit streaks'),
   time: N_('Timer on tasks, manual entries, reports per list and task, CSV export and a printable timesheet'),
   clients: N_('Clients above the lists: contact, hourly rate, budget in hours or money, estimate vs. actual and the timesheet per client and month (only within your organisation)'),
   workload: N_('How much each person of your organisation has on their plate per week, against their hours per week'),
   forms: N_('A link with a small form (requests, bug reports) that creates a task in a list; agents can sort it in'),
+  dispo: N_('Book crew and equipment for shoot days as option or firm, see who and what is free per day, double bookings and absences as warnings (a tab of the workload)'),  // 2.50.0 (#1194)
   agents: N_('A tab with the agents (AI assistants, bots) you share lists with: their status, jobs to approve and the chat'),
   office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents - your own or your organisation\'s'),
   wiki: N_('Pages in Markdown for processes, checklists and know-how of your organisation (or only for you), with links between them and to tasks'),  // 2.49.0 (#1199)
@@ -83,7 +86,7 @@ const tlForeign = t => !!t && collab() && S.tl.id === t.id ? (S.tl.activity || [
 // admins: a newer release was found by the server's daily update check (dot on the settings gear)
 const updDot = () => !!(S.me?.is_admin && S.about?.available);
 // module views: tasks always, News with the collaboration module, the overview with "progress" (see overviewOn), the rest by their own switch
-const modOn = m => m === 'tasks' || m === 'home' || m === 'notes' || (m === 'team' ? teamOn() : m === 'agents' ? agentsTab() : m === 'news' ? collab() : m === 'overview' ? overviewOn() : m === 'time' ? timeOn() : m === 'family' ? feat(m) || !!S.me?.kid : m === 'life' ? lifeOn() : m === 'workload' ? workloadOn() : m === 'office' ? officeOn() : m === 'ablage' ? ab_on() : m === 'docs' ? typeof viewDocs === 'function' && feat('docs') : feat(m));  // 2.48.0 (#1207, #1111)
+const modOn = m => m === 'tasks' || m === 'home' || m === 'notes' || m === 'tags' || (m === 'team' ? teamOn() : m === 'agents' ? agentsTab() : m === 'news' ? collab() : m === 'overview' ? overviewOn() : m === 'time' ? timeOn() : m === 'family' ? feat(m) || !!S.me?.kid : m === 'life' ? lifeOn() : m === 'workload' ? workloadOn() : m === 'office' ? officeOn() : m === 'ablage' ? ab_on() : m === 'docs' ? typeof viewDocs === 'function' && feat('docs') : feat(m));  // 2.48.0 (#1207, #1111)
 // no "+" button on views without tasks
 // views of the tasks module that are not a task list (no quick add, no selection, no open-count)
 const NOLIST_KEYS = ['done', 'trash', 'search', 'archived'];
@@ -116,7 +119,7 @@ document.addEventListener('scroll', e => {
   if (e.target !== v || QS.top == null || Date.now() - QS.at > 400 || document.activeElement?.id !== 'qinput') return;
   if (Math.abs(v.scrollTop - QS.top) > 1) v.scrollTop = QS.top;
 }, true);
-const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts', 'life', 'review', 'clients', 'workload', 'office', 'ablage', 'docs', 'wiki'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
+const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts', 'life', 'review', 'clients', 'workload', 'office', 'ablage', 'docs', 'wiki', 'tags'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
 // package 3: progress bar / overview (switch "progress"), project status (+ collaboration), custom fields, dependencies
 // 2.13.0 (#453, Fold screenshots): the round + only on phones; tablets / an unfolded Fold add with the docked "Add task"
 // bar or, in views without it (calendar, Kanban, timeline), the header's "New task" button
@@ -592,7 +595,7 @@ function applyState(j) {
   S.storage = j.storage || null; S.announce = j.announce || null;  // 2.24.0 (#910 / #907)  // 2.23.0 (#799): organisation | shared | multi
   S.clients = j.clients || [];  // 2.23.0 (#463): the clients I see, with their lists
   if (S.booted && S.route?.mod === 'clients') clReload();  // a change elsewhere: the client's sums again
-  if (S.booted && S.route?.mod === 'workload') { WLV.data = null; }
+  if (S.booted && S.route?.mod === 'workload') { WLV.data = null; AB2.data = null; DPV.data = null; }  // 2.50.0 (#1195, #1194)
   // 2.21.0 (#659 / #658): event calendars (a changed event refetches the calendar range), address books, links of tasks
   S.evcals = j.evcals || []; S.evlinks = j.evlinks || {}; S.books = j.books || []; S.tcontacts = j.tcontacts || {};
   if (j.evsig !== undefined && j.evsig !== S.evsig) { S.evsig = j.evsig; if (S.booted) calInvalidate(); }
@@ -881,7 +884,7 @@ function parseHash() {
   if (a === 'ablage') return {mod: 'ablage', key: 'ablage', nid: +b || null};  // 2.48.0 (#1207): ablage/<folder or file id>
   if (a === 'docs') return {mod: 'docs', key: 'docs', id: +b || null};  // 2.48.0 (#1111): documents (docs.js)
   if (a === 'office') return {mod: 'office', key: 'office', tab: b || '', id: +(h.split('/')[2]) || null};  // 2.36.1 (#1021): office/<tab>/<id>
-  if (['cal', 'matrix', 'habits', 'pomo', 'news', 'stats', 'time', 'overview', 'family', 'life', 'review', 'clients', 'workload'].includes(a)) return {mod: a, key: a};  // 2.22.0 (#663): life, review
+  if (['cal', 'matrix', 'habits', 'pomo', 'news', 'stats', 'time', 'overview', 'family', 'life', 'review', 'clients', 'workload', 'tags'].includes(a)) return {mod: a, key: a};  // 2.22.0 (#663): life, review
   if (SMART[a]) return {mod: 'tasks', key: a};
   return {mod: 'tasks', key: START_KEY};
 }

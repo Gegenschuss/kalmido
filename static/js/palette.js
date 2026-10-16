@@ -293,7 +293,7 @@ function palAll() {
     if (!chatFull()) for (const a of (S.agents || []).filter(x => x.enabled)) add('a:pop-' + a.id, 'action', tr('Chat with {0} as a window', a.name), 'comment', () => chatOpen(a.id, {float: true}));  // 2.29.0 (#363)
   }
   // lists, filters, tags
-  for (const l of S.lists.filter(x => !x.archived && !x.is_inbox && inWs(x))) add('l:' + l.id, 'list', lname(l), 'list', () => go('l/' + l.id), {sw: cssColor(l.color), img: l.icon || '', lic: l, ...(l.folder ? {sub: fDisp(l.folder)} : {})});
+  for (const l of S.lists.filter(x => !x.archived && !x.is_inbox && inWs(x))) add('l:' + l.id, 'list', lname(l), 'list', () => go('l/' + l.id), {sw: cssColor(lp_col(l)), img: l.icon || '', lic: l, ...(l.folder ? {sub: fDisp(l.folder)} : {})});
   for (const f of folderNames()) add('folder:' + f, 'folder', fDisp(f), 'folder', () => go('folder/' + encodeURIComponent(f)));  // 2.4.0 (#361)
   for (const f of S.filters) add('f:' + f.id, 'filter', f.name, 'filter', () => go('f/' + f.id));
   for (const g of Object.keys(counts().tags).sort()) add('tag:' + g, 'tag', '#' + g, 'tag', () => go('tag/' + encodeURIComponent(g)));
@@ -313,9 +313,10 @@ function palAll() {
 const PAL_KIND = {note: N_('note|palette kind'), folder: N_('folder|palette kind'), action: N_('action'), task: N_('task|palette kind'), view: N_('view'), list: N_('list|palette kind'), filter: N_('filter'), tag: N_('tag'), setting: N_('setting'), tasks: N_('task|palette kind')};
 function palItems() {
   const q = PAL.q.trim();
+  if (PAL.mode === 'ref') return rf_palItems(q);  // 2.53.0 (#1449): pick a reference for the comment / description (refs.js)
   if (PAL.mode === 'move') {
     const t = curTask(); if (!t) return [];
-    return (canEditList(t.list_id) ? S.lists : []).filter(l => !l.archived && canEditList(l.id) && l.id !== t.list_id).map(l => ({id: 'mv:' + l.id, kind: 'list', label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, sw: cssColor(l.color),
+    return (canEditList(t.list_id) ? S.lists : []).filter(l => !l.archived && canEditList(l.id) && l.id !== t.list_id).map(l => ({id: 'mv:' + l.id, kind: 'list', label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, sw: cssColor(lp_col(l)),
       fn: () => patchUndoable(t.id, {list_id: l.id, section_id: null}, tr('Moved to {0}', lname(l)))}))
       .map(x => ({...x, score: fuzzy(q, x.label)})).filter(x => x.score > 0).map(x => ({...x, score: x.score + lc_favBoost(x)})).sort((a, b) => b.score - a.score);
   }
@@ -375,7 +376,7 @@ function palDraw() {
     [ic('plus', 's'), tr('Text + Enter creates a task: “Dentist tomorrow 3pm !high”')],
     ...(ags.length ? [[ic('bot', 's'), tr('Ask {0}: type the question, then pick “Ask {0}”', ags[0].name)]] : [])].map(([i, t]) => `<div class="phint">${i}<span>${esc(t)}</span></div>`).join('')}</div>` : '';
   const hw = $('.phintw', el); if (hw) hw.innerHTML = hints;  // outside the listbox (only options in there)
-  $('.plist', el).innerHTML = h || (hints ? '' : `<div class="pempty">${tr('Nothing found. Enter adds it as a new task.')}</div>`);
+  $('.plist', el).innerHTML = h || (hints ? '' : `<div class="pempty">${PAL.mode === 'ref' ? tr('Nothing found') : tr('Nothing found. Enter adds it as a new task.')}</div>`);
   $('.pqin', el).setAttribute('aria-activedescendant', PAL.items.length ? 'pi-' + PAL.i : '');
   $('.plist .pitem.on', el)?.scrollIntoView({block: 'nearest'});
 }
@@ -388,7 +389,7 @@ function openPalette(mode = null) {
   const md = document.createElement('div');
   md.className = 'modal palette';
   md.innerHTML = `<div class="card" role="dialog" aria-label="${tr('Search and commands')}">
-    <div class="pqbar">${ic('search')}${mode === 'move' && t ? `<span class="pmode">${esc(tr('Move “{0}” to', t.title.slice(0, 30)))}</span>` : ''}<input class="pqin" role="combobox" aria-expanded="true" aria-controls="plist" autocomplete="off" spellcheck="false" placeholder="${mode === 'move' ? tr('List…') : tr('Search tasks, lists, views and actions…')}">${kb('Esc')}</div>
+    <div class="pqbar">${ic('search')}${mode === 'move' && t ? `<span class="pmode">${esc(tr('Move “{0}” to', t.title.slice(0, 30)))}</span>` : mode === 'ref' ? `<span class="pmode">${esc(tr('Insert reference'))}</span>` : ''}<input class="pqin" role="combobox" aria-expanded="true" aria-controls="plist" autocomplete="off" spellcheck="false" placeholder="${mode === 'move' ? tr('List…') : tr('Search tasks, lists, views and actions…')}">${kb('Esc')}</div>
     <div class="phintw"></div><div class="plist" id="plist" role="listbox" aria-label="${esc(tr('Search and commands'))}"></div>
     <div class="pfoot">${kb('↑')}${kb('↓')}<span>${tr('select')}</span>${kb('Enter')}<span>${tr('run')}</span><span class="spacer"></span>${kb('?')}<span>${tr('all shortcuts')}</span></div></div>`;
   md.addEventListener('mousedown', e => { if (e.target === md) closePalette(); });
@@ -399,8 +400,8 @@ function openPalette(mode = null) {
     if (e.key === 'ArrowDown' || (e.key === 'n' && e.ctrlKey)) { e.preventDefault(); PAL.i = Math.min(PAL.items.length - 1, PAL.i + 1); palDraw(); }
     else if (e.key === 'ArrowUp' || (e.key === 'p' && e.ctrlKey)) { e.preventDefault(); PAL.i = Math.max(0, PAL.i - 1); palDraw(); }
     else if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); e.stopPropagation(); palRun(PAL.i); }
-    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (PAL.mode) openPalette(); else closePalette(); }
-    else if (e.key === 'Backspace' && !inp.value && PAL.mode) { e.preventDefault(); openPalette(); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (PAL.mode && PAL.mode !== 'ref') openPalette(); else closePalette(); }
+    else if (e.key === 'Backspace' && !inp.value && PAL.mode && PAL.mode !== 'ref') { e.preventDefault(); openPalette(); }
   });
   $('.plist', md).addEventListener('click', e => { const b = e.target.closest('[data-pi]'); if (b) palRun(+b.dataset.pi); });
   $('.plist', md).addEventListener('mousemove', e => { const b = e.target.closest('[data-pi]'); if (b && +b.dataset.pi !== PAL.i) { PAL.i = +b.dataset.pi; $$('.pitem', md).forEach(x => x.classList.toggle('on', x === b)); } });
@@ -423,7 +424,7 @@ function palRun(i) {
     closePalette(); palCreate(q);
     return;
   }
-  if (!x.id.startsWith('mv:') && !x.id.startsWith('ask:') && !x.id.startsWith('new:') && !x.id.startsWith('a:move') && !x.id.startsWith('rv:') && !x.id.startsWith('msg:')) LS.set('palRecent', [x.id, ...LS.get('palRecent', []).filter(y => y !== x.id)].slice(0, 8));
+  if (!x.id.startsWith('mv:') && !x.id.startsWith('ask:') && !x.id.startsWith('new:') && !x.id.startsWith('a:move') && !x.id.startsWith('rv:') && !x.id.startsWith('msg:') && !x.id.startsWith('rf:')) LS.set('palRecent', [x.id, ...LS.get('palRecent', []).filter(y => y !== x.id)].slice(0, 8));
   if (!x.keep) closePalette();
   x.fn();
 }
@@ -506,6 +507,7 @@ function tourGo(i) {
   card.innerHTML = `<div class="tstep"><span>${TOUR.i + 1}/${n}</span><span class="tdots">${TOUR.steps.map((_, j) => `<i class="${j === TOUR.i ? 'on' : j < TOUR.i ? 'past' : ''}"></i>`).join('')}</span></div>
     <h3>${TOUR.i === 0 ? heron('stand', 'htour') : ''}${tr(st.t)}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
     ${last && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.')}</small></span></label>` : ''}
+    ${last ? pk2_setupHtml() : ''}
     <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
   const r = st.r && st.r();
   let pl = tourPlace(r, innerWidth, innerHeight);

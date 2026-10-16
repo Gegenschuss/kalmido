@@ -16,6 +16,57 @@ minor one, anything that needs action on your side a major one.
 - The mind map's second tap on a branch opens its actions on phones.
 - Withdrawn connection requests and moving knowledge page folders work the same on PostgreSQL.
 - The new views of 2.49 follow the text size setting (rem instead of px); "Check your e-mail" wording on the login page.
+## [2.51.0] - 2026-10-16
+
+**In short:** connected agents pitch in with business work - **quotation drafts** in the office, the way **from quotation
+to invoice** (invoice and reminder drafts, payment suggestions), an **inquiry becomes a project** with one yes, a
+**setup assistant**, a **weekly status** on project pages, a **time tracking check** and **shoot planning**. The agent
+proposes, a person confirms: agents never send, finalise, book or delete. All new agent rights are off by default.
+
+### Added
+- **Agents in the office** (Office & finance): on request a connected agent drafts quotations with services and prices from
+  the master data; free positions, changed prices and discounts are marked for review. A card in the chat shows the sum,
+  the PDF preview and *Open in the office*. Two switches (per agent and a privacy switch per office), every agent request
+  in the access log; freelancers without an organisation get the same in their personal office (#1348).
+- **From quotation to invoice:** invoice drafts from accepted quotations, reminder drafts for open invoices, and payment
+  suggestions an admin books or rejects (#1350).
+- **An inquiry becomes a project:** one proposal with the project list, first tasks, shoot days as draft events and
+  (with office rights) a quotation draft; an accepted quotation becomes a project the same way (#1351).
+- **Set up with your agent** (Settings > Modules and the tour): the agent suggests modules, lists and a first project (#1358).
+- **Weekly status on the pin board:** an agent keeps its own *Status* notepad on a project page (done, overdue, blocked,
+  who waits for whom); new permission *Pin board* and a template for scheduled checks (#1352).
+- **Time tracking check:** agents find too long days, overlaps and events without time and suggest entries from calendar
+  events; you review and take them over (#1353).
+- **Shoot planning:** agents propose shoot days as draft events and crew / equipment as options, with warnings for double
+  bookings and absences; draft events show dashed in the calendar with *Confirm* / *Discard* (#1355).
+- **For agents:** the scopes *Office drafts* and *Pin board*, the event `offer_accepted`, reading the disposition of the own
+  organisation, and new MCP tools (office, pin board, time check, shoot planning, `propose_to_person`).
+
+## [2.50.0] - 2026-10-16
+
+**In short:** the second part of the business hub: **absences** with public holidays, a **disposition** for crew and
+equipment, a **sales pipeline** and **key figures** in the office, a **customer view** for public links with a choice of
+what customers see, and **approvals by customers** (accept a quotation, sign off a project) with a simple electronic signature.
+
+### Added
+- **Absences** (Team > Workload > Absences): holiday, sick leave, day off, other; whole or half days. The team only sees
+  "away" and the dates, the kind and the note only the person and the admins (encrypted at rest). Public holidays per
+  German state. Workload, *Plan my day* and assignments take them into account (a warning, never a block) (#1195).
+- **Disposition** (module, off by default): book members, contacts, devices and device kits for shoot days, as an option
+  or firm; week grid on large screens, a day list on phones; double bookings and absences are flagged, "Who is free on …?".
+  Booked people see *My bookings*, the booking in their calendar and a News item for firm bookings (#1194).
+- **Sales pipeline** (Office, admins): inquiry, quotation sent, won, lost; value, probability per stage (editable), weighted
+  sum and the expected income per month. A deal turns into a quotation with one tap, a won deal into a project; an accepted
+  quotation moves its deal to won (#1196).
+- **Key figures** (Office, admins; freelancers for their own office): revenue with last year's comparison, open and
+  overdue invoices, pipeline, cash flow of the next months, hours against budget and margin per client, and a home
+  screen block (#1197).
+- **Customer view** for public links: choose what customers see (progress, sections, due dates, assignees, tags, fields,
+  files, logo), optionally only tasks with one tag, and let them leave a comment; team comments are never shown (#329).
+- **Customer approvals** with a simple electronic signature: customers accept or decline a sent quotation through a link,
+  or sign off a project, section or milestone; the record keeps name, time, address and a checksum. Suitable for accepting
+  quotations and sign-offs, not for contracts that need the written form (#1200).
+- Agents: `get_absences` / `GET /api/v1/absences` returns only "away" and the dates within the agent's organisation.
 
 ## [2.49.0] - 2026-10-16
 

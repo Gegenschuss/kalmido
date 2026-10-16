@@ -140,6 +140,7 @@ const mdSafeUrl = u => /^(https?:\/\/[^\s"'<>()\[\]`\\]+|mailto:[^\s"'<>()\[\]`\
 const mdOwn = u => { try { const x = new URL(u); return x.origin === location.origin && x.pathname === '/' && x.hash.length > 1 ? x : null; } catch { return null; } };
 const mdLink = (url, label) => {
   const own = mdOwn(url), tm = own && /^#t\/(\d{1,9})$/.exec(own.hash);
+  const rc = own && typeof rf_card === 'function' && rf_card(own.hash); if (rc) return rc;  // 2.53.0 (#1449): a card with the name the reader sees (refs.js)
   return own ? `<a href="${esc(own.hash)}"${tm ? ` data-tref="${tm[1]}"` : ''}>${label}</a>` : `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
 };
 function mdFmt(t) {  // escaped text only (no attribute takes anything from the text)

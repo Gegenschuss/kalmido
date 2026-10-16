@@ -198,6 +198,7 @@ APP_TO_API = {
     # 2.23.0 (#463): clients, workload, approvals, forms
     "GET /api/clients": ["GET /clients"], "POST /api/clients": ["POST /clients"], "GET /api/clients/{}": ["GET /clients/{}"],
     "PATCH /api/clients/{}": ["PATCH /clients/{}"], "DELETE /api/clients/{}": ["DELETE /clients/{}"], "GET /api/workload": ["GET /workload"],
+    "GET /api/team/absences": ["GET /absences"],  # 2.50.0 (#1195): "away" only
     "POST /api/clients/bulk": ["POST /clients/bulk"],  # 2.47.3 (#1733)
     "POST /api/tasks/{}/approval": ["POST /tasks/{}/approval"], "GET /api/lists/{}/forms": ["GET /lists/{}/forms"],
     "POST /api/lists/{}/forms": ["POST /lists/{}/forms"], "PATCH /api/forms/{}": ["PATCH /forms/{}"], "DELETE /api/forms/{}": ["DELETE /forms/{}"],
@@ -220,11 +221,18 @@ APP_ONLY = [
                                                    "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
                                                    "* /api/docs/mail")),
-    ("2.36.1 (#1021): Office & finance, stage 1 -- no agent API and no MCP tool before the security audit (#476); agents see only what is shared",
+    # 2.51.0 (#1348, #1350): agents get drafts only, through /office (v1 + MCP); the rest of the office stays with people
+    ("2.36.1 (#1021) / 2.51.0 (#1348): Office & finance -- people finalise, number, send, delete, book payments and keep master data and "
+     "settings; agents (two switches) read and draft through /api/v1/office (quotation / invoice / reminder drafts, payment suggestions); "
+     "the agent's office switch and the decision on suggested payments are the people's side",
      ("* /api/office/",)),
     ("2.49.0 (#1199, #1201): knowledge pages, stage 1 -- no agent access yet (shares of pages / folders for organisation agents with "
      "scopes wiki:read / wiki:write come as their own step); the outline parser only serves the mind map import of the web app",
      ("* /api/wiki", "=POST /api/outline/parse")),
+    ("2.50.0 (#1195, #1194): entering absences (the kind is health data), the public holiday state, the assign check and the "
+     "disposition (booking crew and equipment): people only; agents read GET /absences (\"away\" only)",
+     ("POST /api/team/absences", "PATCH /api/team/absences/", "DELETE /api/team/absences/", "PUT /api/team/absences/",
+      "=GET /api/team/absences/check", "* /api/team/dispo", "=GET /api/team/bookings/mine")),
     ("2.27.0 (#999): the web panel says a person edits a task (tidy-up waits); agents never edit in a panel", ("=POST /api/tasks/{}/editing",)),
     ("2.42.0 (#1376): the web app's live updates (only the tasks changed since its state); agents follow their events and GET /tasks",
      ("=GET /api/state/delta",)),
@@ -244,7 +252,8 @@ APP_ONLY = [
         "* /api/agents/{}/autoshare", "GET /api/agents/usage")),
     ("devices and pushes of a person", ("* /api/push/", "POST /api/ntfy/test")),
     ("2.17.0 (#443): a person's e-mail addresses for new tasks and the summary by mail (secrets of the account)", ("* /api/me/mail",)),
-    ("public links: sharing outside the instance, people only", ("* /api/lists/{}/public-link",)),
+    ("public links: sharing outside the instance, people only", ("* /api/lists/{}/public-link",
+                                                                  "* /api/lists/{}/signoffs")),  # 2.50.0 (#1200): acceptance links of a list
     ("2.33.0 (#927): notification templates are set by the owner in the app; agents only read a list's template",
      ("PUT /api/lists/{}/notify-template", "* /api/folders/notify-template", "POST /api/notify-templates/asked")),
     ("repositories: their secrets are entered by people; the API reads them (GET /lists/{id}/repos)", (
@@ -428,6 +437,7 @@ for name, _, schema, fn in mcp.TOOLS:
             check(False, f"tool {name} {extra}: {e.message}")
 reached = {c for s in CALLS.values() for c in s}
 API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
+    "GET /office/docs/{}/pdf": "2.51.0 (#1348): the PDF preview of a draft is binary; the chat card (notify) links it for the person",
     "GET /openapi.json": "the API description itself",
     "GET /lists/{}/notify-template": "2.33.0 (#927): the owner's notification ceiling of a list; agents get no pushes, it is read by scripts",
     "POST /import/{}": "imports of other apps' files: people upload them (multipart) in the app or with the REST API",

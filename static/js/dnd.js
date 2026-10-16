@@ -132,6 +132,7 @@ async function dropTask0(id, el, clientY) {
   // a move to another list or day can be undone (plain reordering not)
   const after = snapTask(S.tasks.get(id)), rev = after && (before.list_id !== after.list_id || before.due !== after.due || (before.due_time || null) !== (after.due_time || null) || (before.section_id || null) !== (after.section_id || null) || before.priority !== after.priority) && reverseOf(before, after);
   if (res?.shifted?.length) { shiftUndo(before, {...after, shifted: res.shifted}, after?.due ? tr('Date: {0}', dayLabel(after.due)) : ''); return; }
+  { const wn = rev && before.list_id !== after.list_id && wsc_moveMsg(before.list_id, after.list_id, ''); if (wn) { offerUndo(wn, histFields(histLabel(before, after), [[before, after, UNDO_FIELDS]], {res})); return; } }  // 2.53.0 (#1474): Private -> organisation
   if (rev) offerUndo(before.list_id !== after.list_id ? tr('Moved to {0}', lname(listById(after.list_id))) : (before.section_id || null) !== (after.section_id || null) && before.due === after.due ? tr('Moved to section {0}', secName(after.section_id)) : before.priority !== after.priority && before.due === after.due ? tr('Priority: {0}', tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][after.priority] || N_('None'))) : after.due ? tr('Date: {0}', dayLabel(after.due)) : tr('Date removed'),
     histFields(histLabel(before, after), [[before, after, UNDO_FIELDS]], {res}));
 }

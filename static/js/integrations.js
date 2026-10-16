@@ -48,13 +48,13 @@ function tokWire(md) {
 }
 // ---- 2.15.0 (#479) permissions (scopes) of tokens and agents: one compact grid of switches, the explanations behind (i),
 // scopes outside the admin's limit greyed out; "write" (a token from before 2.15) shows as every permission
-const SCOPE_ALL = ['read', 'tasks:write', 'comments', 'structure', 'delete', 'attachments:read', 'attachments:write', 'files:read', 'files:write', 'time', 'export', 'account', 'admin-read'];  // 2.48.0 (#1207): + files
-const SCOPE_SHORT = {read: N_('Read'), 'tasks:write': N_('Tasks'), comments: N_('Comments'), structure: N_('Structure'), delete: N_('Delete & trash'), 'attachments:read': N_('Read files'), 'attachments:write': N_('Upload files'), 'files:read': N_('Read the file store'), 'files:write': N_('Write to the file store'), time: N_('Time tracking'), export: N_('Export'), calendar: N_('Calendar'), contacts: N_('Contacts'), private: N_('Health & journal'), account: N_('Account settings'), 'admin-read': N_('Admin read')};  // 2.41.0 (#1476): calendar / contacts / private had no name
+const SCOPE_ALL = ['read', 'tasks:write', 'comments', 'structure', 'delete', 'attachments:read', 'attachments:write', 'files:read', 'files:write', 'pinboard', 'time', 'export', 'account', 'admin-read'];  // 2.48.0 (#1207): + files; 2.51.0 (#1352): + pinboard
+const SCOPE_SHORT = {read: N_('Read'), 'tasks:write': N_('Tasks'), comments: N_('Comments'), structure: N_('Structure'), delete: N_('Delete & trash'), 'attachments:read': N_('Read files'), 'attachments:write': N_('Upload files'), 'files:read': N_('Read the file store'), 'files:write': N_('Write to the file store'), pinboard: N_('Pin board'), time: N_('Time tracking'), export: N_('Export'), calendar: N_('Calendar'), contacts: N_('Contacts'), private: N_('Health & journal'), account: N_('Account settings'), 'admin-read': N_('Admin read'), office: N_('Office drafts')};  // 2.41.0 (#1476): calendar / contacts / private had no name; 2.51.0 A (#1348): office
 const scopeExpand = sc => (sc || []).includes('write') ? SCOPE_ALL.filter(x => x !== 'admin-read' || sc.includes('admin-read')) : (sc || []);
 function scopeSummary(sc) {
   const e = scopeExpand(sc);
   if (e.length <= 1) return tr('read only');
-  if (SCOPE_ALL.filter(x => x !== 'admin-read' && x !== 'account').every(x => e.includes(x))) return tr('all permissions');
+  if (SCOPE_ALL.filter(x => x !== 'admin-read' && x !== 'account' && x !== 'pinboard').every(x => e.includes(x))) return tr('all permissions');  // 2.51.0 (#1352): pinboard is opt-in, never part of the legacy write
   return e.filter(x => x !== 'read').map(x => tr(SCOPE_SHORT[x] || x)).join(', ');
 }
 function scopesHtml(offer, sel, legend) {
@@ -287,11 +287,13 @@ function pubDraw(md, lid, j) {
   box._j = j;
   const st = $('#sh-st-pub', md); if (st) st.textContent = k ? (k.expired ? tr('Expired') : tr('On')) : tr('Off');  // 2.32.0 (#1058): the folded line
   box.innerHTML = `${k ? `<div class="row icalrow"><input id="lp-url" readonly value="${esc(k.url)}" aria-label="${tr('Public link')}"><button class="btn sm pri" data-lp="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
-      <div class="shint">${k.expired ? `<span class="calerr" role="alert">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint keep">${tr('People without an account can open the list through a secret link: only this list, without comments, assignees or files.')}</div>`}
+      <div class="shint">${k.expired ? `<span class="calerr" role="alert">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint keep">${tr('People without an account can open the list through a secret link: only this list and only what you choose here.')}</div>`}
     <div class="row"><label for="lp-mode">${tr('Access')}</label><select id="lp-mode"><option value="view">${tr('View only')}</option><option value="tick" ${k?.mode === 'tick' ? 'selected' : ''}>${tr('View and tick off')}</option></select></div>
     <div class="row"><label for="lp-exp">${tr('Valid until')}</label>${dateIn('lp-exp', pubDate(k?.expires_at), {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
     <div class="row"><label for="lp-pw">${tr('Password')}</label><input type="password" id="lp-pw" autocomplete="new-password" placeholder="${k?.has_password ? tr('saved, empty = keep') : tr('optional')}">${k?.has_password ? `<label class="chkl"><input type="checkbox" id="lp-nopw"> ${tr('remove')}</label>` : ''}</div>
     <div class="row"><label></label><label class="chkl"><input type="checkbox" id="lp-notes" ${k?.notes ? 'checked' : ''}> ${tr('Show task notes')}</label></div>
+    ${cv_html(k, j.options)}
+    ${k ? sg_list_box(lid) : ''}
     <div class="row">${k ? `<button class="btn sm" data-lp="save">${tr('Save link settings')}</button><button class="btn sm" data-lp="regen">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-lp="off">${tr('Turn off')}</button>` : `<button class="btn sm pri" data-lp="save">${ic('link', 's')} ${tr('Create public link')}</button>`}</div>
     <div class="calerr" role="alert" id="lp-err" hidden></div>`;
 }
@@ -309,6 +311,7 @@ function pubWire(md, lid) {
       let j;
       if (a === 'save') {
         const body = {mode: $('#lp-mode', md).value, notes: $('#lp-notes', md).checked, expires: $('#lp-exp', md).value || null};
+        const cv = cv_read(md); if (cv) body.show = cv;  // 2.50.0 (#329)
         if ($('#lp-pw', md).value) body.password = $('#lp-pw', md).value; else if ($('#lp-nopw', md)?.checked) body.password = '';
         j = await calReq('PUT', `/api/lists/${lid}/public-link`, body);
         toast(tr('Public link saved'));

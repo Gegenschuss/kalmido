@@ -257,6 +257,45 @@ END:VCALENDAR
 """]
 
 
+# 2.52.0 B (#1128): writable CalDAV collections for p252_b_api_test.py: /dav/calendars/alice/rw/ (read + write) and
+# /dav/calendars/alice/ro/ (read only: no write privilege, PUT / DELETE 403). Resources live in memory (ETags count up);
+# every change is mirrored to /data/rwstore.json so the test can read what the server got.
+RW_LOCK = __import__('threading').Lock()
+RW_N = [0]
+
+
+def rw_seed():
+    one = f"""BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//stub//rw//EN\r\nBEGIN:VEVENT\r\nUID:rw-1@stub\r\nDTSTAMP:20260101T000000Z\r
+DTSTART;TZID=Europe/Berlin:{d(2)}T090000\r\nDTEND;TZID=Europe/Berlin:{d(2)}T100000\r\nSUMMARY:Writable one\r\nX-STUB-KEEP:yes\r
+ATTENDEE;CN=Guest:mailto:guest@example.com\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:ring\r\nTRIGGER:-PT10M\r\nEND:VALARM\r
+END:VEVENT\r\nEND:VCALENDAR\r\n"""
+    rec = f"""BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//stub//rw//EN\r\nBEGIN:VEVENT\r\nUID:rw-rec@stub\r\nDTSTAMP:20260101T000000Z\r
+DTSTART;TZID=Europe/Berlin:{d(1)}T080000\r\nDTEND;TZID=Europe/Berlin:{d(1)}T083000\r\nRRULE:FREQ=DAILY;COUNT=5\r\nSUMMARY:Daily standup\r
+END:VEVENT\r\nEND:VCALENDAR\r\n"""
+    ro = f"""BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//stub//ro//EN\r\nBEGIN:VEVENT\r\nUID:ro-1@stub\r\nDTSTAMP:20260101T000000Z\r
+DTSTART;VALUE=DATE:{d(3)}\r\nDTEND;VALUE=DATE:{d(4)}\r\nSUMMARY:Read only\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"""
+    return {'rw': {'one.ics': ('"rw-a"', one), 'rec.ics': ('"rw-b"', rec)}, 'ro': {'ro.ics': ('"ro-a"', ro)}}
+
+
+RW = rw_seed()
+
+
+def rw_dump():
+    with open('/data/rwstore.json', 'w') as f:
+        json.dump({c: {n: list(v) for n, v in x.items()} for c, x in RW.items()}, f)
+
+
+def rw_path(p):
+    """'/dav/calendars/alice/rw/x.ics' -> ('rw', 'x.ics'); the collection itself -> ('rw', ''); else (None, None)."""
+    for c in ('rw', 'ro'):
+        base = f'/dav/calendars/alice/{c}/'
+        if p == base or p == base[:-1]:
+            return c, ''
+        if p.startswith(base) and '/' not in p[len(base):]:
+            return c, p[len(base):]
+    return None, None
+
+
 def esc(s):
     return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
@@ -277,6 +316,7 @@ class H(BaseHTTPRequestHandler):
     def _log(self):
         LOG.write(json.dumps({'port': self.server.server_address[1], 'method': self.command, 'path': self.path, 'host': self.headers.get('Host'),
                               'auth': self.headers.get('Authorization'), 'inm': self.headers.get('If-None-Match'),
+                              'im': self.headers.get('If-Match'),
                               't': time.time()}) + '\n')
 
     def _send(self, code, body=b'', ctype='text/calendar; charset=utf-8', extra=None, length=True):
@@ -303,6 +343,13 @@ class H(BaseHTTPRequestHandler):
         port, p = self.server.server_address[1], self.path.split('?')[0]
         if port == 8096:
             return self._send(200, 'internal-secret', 'text/plain')
+        c, n = rw_path(p)
+        if c and n:  # 2.52.0 B (#1128)
+            if not self._authed():
+                return
+            if n not in RW[c]:
+                return self._send(404, 'nope', 'text/plain')
+            return self._send(200, RW[c][n][1], extra={'ETag': RW[c][n][0]})
         if p == '/good.ics':
             body = good_ics()
             etag = '"good-' + str(abs(hash(body)) % 10 ** 8) + '"'
@@ -366,6 +413,12 @@ class H(BaseHTTPRequestHandler):
         if p == '/dav/calendars/alice/work/':
             tag = open('/data/ctag').read().strip() if os.path.exists('/data/ctag') else 'ctag-1'
             return self._send(207, ms([(p, f'<cs:getctag>{tag}</cs:getctag><d:resourcetype><d:collection/><c:calendar/></d:resourcetype>')]), x)
+        c, n = rw_path(p)
+        if c and not n:  # 2.52.0 B (#1128): ctag, privileges
+            if 'current-user-privilege-set' in req:
+                pv = '<d:privilege><d:read/></d:privilege>' + ('<d:privilege><d:write/></d:privilege>' if c == 'rw' else '')
+                return self._send(207, ms([(p, f'<d:current-user-privilege-set>{pv}</d:current-user-privilege-set>')]), x)
+            return self._send(207, ms([(p, f'<cs:getctag>{c}-{RW_N[0]}</cs:getctag><d:resourcetype><d:collection/><c:calendar/></d:resourcetype>')]), x)
         if p == '/dav/xxe/':
             return self._send(207, '<?xml version="1.0"?><!DOCTYPE x [<!ENTITY e SYSTEM "file:///etc/passwd">]><d:multistatus xmlns:d="DAV:">&e;</d:multistatus>', x)
         return self._send(404, 'nope', 'text/plain')
@@ -376,11 +429,61 @@ class H(BaseHTTPRequestHandler):
         self.rfile.read(n)
         if not self._authed():
             return
+        c, n = rw_path(self.path.split('?')[0])
+        if c and not n:  # 2.52.0 B (#1128)
+            body = ms([(f'/dav/calendars/alice/{c}/{k}', f'<d:getetag>{esc(v[0])}</d:getetag><c:calendar-data>{esc(v[1])}</c:calendar-data>')
+                       for k, v in RW[c].items()])
+            return self._send(207, body, 'application/xml; charset=utf-8')
         if self.path.split('?')[0] != '/dav/calendars/alice/work/':
             return self._send(404, 'nope', 'text/plain')
         body = ms([(f'/dav/calendars/alice/work/{i}.ics', f'<d:getetag>"e{i}"</d:getetag><c:calendar-data>{esc(cd)}</c:calendar-data>')
                    for i, cd in enumerate(dav_cal_data())])
         return self._send(207, body, 'application/xml; charset=utf-8')
+
+    def do_PUT(self):  # 2.52.0 B (#1128): If-None-Match: * / If-Match like a CalDAV server; X-Stub-External = a change elsewhere
+        self._log()
+        n = int(self.headers.get('Content-Length') or 0)
+        data = self.rfile.read(n).decode() if n else ''
+        c, name = rw_path(self.path.split('?')[0])
+        if not c or not name:
+            return self._send(404, 'nope', 'text/plain')
+        if not self._authed():
+            return
+        if c == 'ro':
+            return self._send(403, 'read only', 'text/plain')
+        with RW_LOCK:
+            have = RW[c].get(name)
+            if not self.headers.get('X-Stub-External'):
+                if self.headers.get('If-None-Match') == '*' and have:
+                    return self._send(412, 'exists', 'text/plain')
+                im = self.headers.get('If-Match')
+                if im and (not have or have[0] != im):
+                    return self._send(412, 'changed', 'text/plain')
+            RW_N[0] += 1
+            RW[c][name] = (f'"rw-{RW_N[0]}"', data)
+            rw_dump()
+        return self._send(204 if have else 201, b'', 'text/plain', {'ETag': RW[c][name][0]})
+
+    def do_DELETE(self):
+        self._log()
+        c, name = rw_path(self.path.split('?')[0])
+        if not c or not name:
+            return self._send(404, 'nope', 'text/plain')
+        if not self._authed():
+            return
+        if c == 'ro':
+            return self._send(403, 'read only', 'text/plain')
+        with RW_LOCK:
+            have = RW[c].get(name)
+            if not have:
+                return self._send(404, 'nope', 'text/plain')
+            im = self.headers.get('If-Match')
+            if im and have[0] != im:
+                return self._send(412, 'changed', 'text/plain')
+            RW[c].pop(name)
+            RW_N[0] += 1
+            rw_dump()
+        return self._send(204, b'', 'text/plain')
 
 
 for port in (8095, 8096):

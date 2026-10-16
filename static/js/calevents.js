@@ -46,7 +46,7 @@ async function evPop(anchor, e) {
   const t = ev.task_id ? taskById(ev.task_id) : null;
   const desc = (e.description || '').slice(0, 2000);
   p.innerHTML = `<div class="cevpop evpop" style="--cc:${evCalColor(e)}">
-    <div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b>${e.status === 'cancelled' ? `<span class="evst">${tr('Cancelled')}</span>` : e.status === 'tentative' ? `<span class="evst">${tr('Tentative')}</span>` : ''}</div>
+    <div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b>${e.status === 'cancelled' ? `<span class="evst">${tr('Cancelled')}</span>` : e.status === 'tentative' ? `<span class="evst evdraftb">${tr('Draft')}</span>` : ''}</div>
     <div class="cevm">${ic('clock', 's')}<span>${esc(evWhen(e))}</span></div>
     ${e.recurring ? `<div class="cevm">${ic('repeat', 's')}<span>${esc(repeatLabel(ev.rrule) || tr('Repeats'))}${e.changed ? ' · ' + esc(tr('this date changed')) : ''}</span></div>` : ''}
     ${e.location ? `<div class="cevm">${ic('mappin', 's')}<span>${esc(e.location)}</span></div>` : ''}
@@ -56,7 +56,8 @@ async function evPop(anchor, e) {
     ${desc ? `<div class="cevdesc">${cevLinkify(desc)}</div>` : ''}
     ${t ? `<button class="linkbtn evtask" data-evp="task">${ic('done', 's')} ${esc(tr('Preparation: {0}', t.title))}</button>` : ''}
     ${me ? `<div class="evrsvp" role="group" aria-label="${esc(tr('Your answer'))}">${EV_PS.map(([k, n, i]) => `<button class="btn sm ${me.partstat === k ? 'on' : ''}" data-evps="${k}" aria-pressed="${me.partstat === k}">${ic(i, 's')} ${tr(n)}</button>`).join('')}</div>` : ''}
-    <div class="cevact">${w ? `<button class="btn sm pri" data-evp="edit">${ic('edit', 's')} ${tr('Edit')}</button>${!ev.task_id ? `<button class="btn sm" data-evp="prep">${ic('plus', 's')} ${tr('Preparation task')}</button>` : ''}<button class="btn sm danger" data-evp="del">${ic('trash', 's')} ${tr('Delete')}</button>` : `<button class="btn sm" data-evp="totask">${ic('plus', 's')} ${tr('Create task from event')}</button>`}</div></div>`;
+    ${w && ev.status === 'tentative' && !e.recurring ? `<div class="cevact apdraftact"><button class="btn sm pri" data-evp="apok">${ic('check', 's')} ${tr('Confirm')}</button><button class="btn sm" data-evp="del">${ic('x', 's')} ${tr('Discard')}</button></div>` : ''}
+    <div class="cevact">${w ? `<button class="btn sm${ev.status === 'tentative' && !e.recurring ? '' : ' pri'}" data-evp="edit">${ic('edit', 's')} ${tr('Edit')}</button>${!ev.task_id ? `<button class="btn sm" data-evp="prep">${ic('plus', 's')} ${tr('Preparation task')}</button>` : ''}<button class="btn sm danger" data-evp="del">${ic('trash', 's')} ${tr('Delete')}</button>` : `<button class="btn sm" data-evp="totask">${ic('plus', 's')} ${tr('Create task from event')}</button>`}</div></div>`;
   p.onclick = async ev2 => {
     const ps = ev2.target.closest('[data-evps]');
     if (ps) { try { await api('POST', `/api/events/${ev.id}/rsvp`, {partstat: ps.dataset.evps}); } catch { return; } closePop(); toast(tr('Answer sent: {0}', tr(EV_PS_WORD[ps.dataset.evps]))); calInvalidate(); renderView(); return; }
@@ -66,6 +67,7 @@ async function evPop(anchor, e) {
     if (k === 'edit') evEditor({ev, occ: e.recurring ? e.occ : null});
     else if (k === 'del') evDelete(ev, e.recurring ? e.occ : null);
     else if (k === 'task') openDetail(ev.task_id);
+    else if (k === 'apok') ap_evConfirm(ev);  // 2.51.0 C (#1355): a draft (tentative) becomes confirmed (agentplan.js)
     else if (k === 'prep') evPrepTask(ev);
     else if (k === 'totask') cevToTask(cevPrep({...e}));
   };
@@ -129,13 +131,13 @@ function evRepKey(rule, start) {
 }
 async function evEditor(o = {}) {
   const ev = o.ev || null, cals = evWritable().concat(ev && !evWritable().some(c => c.id === ev.cal_id) && evCal(ev.cal_id) ? [evCal(ev.cal_id)] : []);
-  if (!cals.length) { try { const c = await api('POST', '/api/evcals', {name: tr('Calendar'), org_id: wsDefaultOrg()}); await load(); cals.push(c); } catch { return; } }
+  if (!cals.length && !o.dvw) { try { const c = await api('POST', '/api/evcals', {name: tr('Calendar'), org_id: wsDefaultOrg()}); await load(); cals.push(c); } catch { return; } }
   const t0 = today();
-  const st = ev ? {...ev} : {title: o.title || '', all_day: !!o.all_day, start: o.start || `${S.calSel || t0}T09:00`, end: o.end || '', location: '',
+  const st = ev ? {...ev} : {title: o.title || '', all_day: !!o.all_day, start: o.start || `${S.calSel || t0}T09:00`, end: o.end || '', location: o.location || '',
     description: o.description || '', rrule: '', reminders: o.all_day ? [-540] : [15], attendees: [], cal_id: o.cal_id || +LS.get('evCal', 0) || cals[0].id,
     task_id: o.task_id || null, status: 'confirmed', busy: true, url: null, tz: evTz()};
   if (!ev && o.attendees) st.attendees = o.attendees;
-  if (!cals.some(c => c.id === st.cal_id)) st.cal_id = cals[0].id;
+  if (!cals.some(c => c.id === st.cal_id) && !dvw_cals(o).some(c => c.id === st.cal_id)) st.cal_id = cals[0].id;  // 2.52.0 (#1128): or a writable subscription
   if (!st.end) st.end = st.all_day ? addDays(st.start.slice(0, 10), 1) : evAddMin(st.start, 60);
   let scope = o.occ ? 'all' : null;
   if (o.occ && ev) {  // opened from one date of a repeating event: that date's times are the ones shown for "Only this date"
@@ -148,10 +150,10 @@ async function evEditor(o = {}) {
   const atts = (st.attendees || []).map(a => ({...a}));
   const endDay = s => st.all_day ? addDays(s, -1) : s.slice(0, 10);  // all day: the shown end is the last day (stored exclusive)
   const repK = evRepKey(st.rrule, st.start);
-  const md = modal(`<div class="lhdr"><h3>${ev ? tr('Edit event') : tr('New event')}</h3><span class="spacer"></span><button class="iconbtn" data-evm="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
+  const md = modal(`<div class="lhdr"><h3>${ev || o.dvw ? tr('Edit event') : tr('New event')}</h3><span class="spacer"></span><button class="iconbtn" data-evm="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
     ${o.occ ? `<div class="row"><span class="rlab">${tr('Change')}</span><div class="seg" role="radiogroup" aria-label="${esc(tr('Change'))}"><button type="button" role="radio" data-evsc="one" aria-checked="false">${tr('Only this date')}</button><button type="button" role="radio" data-evsc="all" class="on" aria-checked="true">${tr('All dates')}</button></div></div>` : ''}
     <div class="row"><label for="ev-title">${tr('Title')}</label><input id="ev-title" maxlength="500" value="${esc(st.title)}" autocomplete="off" enterkeyhint="done"></div>
-    <div class="row"><label for="ev-cal">${tr('Calendar')}</label><select id="ev-cal" data-sheet-ico="cal">${cals.map(c => `<option value="${c.id}" ${c.id === st.cal_id ? 'selected' : ''}>${esc(c.name)}${c.role !== 'owner' ? ' · ' + esc(c.owner_name || '') : ''}</option>`).join('')}</select></div>
+    <div class="row"><label for="ev-cal">${tr('Calendar')}</label><select id="ev-cal" data-sheet-ico="cal">${o.dvw ? '' : cals.map(c => `<option value="${c.id}" ${c.id === st.cal_id ? 'selected' : ''}>${esc(c.name)}${c.role !== 'owner' ? ' · ' + esc(c.owner_name || '') : ''}</option>`).join('')}${dvw_options(o, st.cal_id)}</select></div>
     <div class="row"><label for="ev-allday">${tr('All day')}</label><label class="swc"><input type="checkbox" id="ev-allday" ${st.all_day ? 'checked' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('All day'))}</span></label></div>
     <div class="row evdt"><span class="rlab">${tr('Starts')}</span>${dateIn('ev-sd', st.start.slice(0, 10), {label: tr('Start date'), clear: false})}<span class="evtm" ${st.all_day ? 'hidden' : ''}>${timeIn('ev-stm', st.all_day ? '09:00' : st.start.slice(11, 16), {label: tr('Start time'), clear: false})}</span></div>
     <div class="row evdt"><span class="rlab">${tr('Ends')}</span>${dateIn('ev-ed', endDay(st.end), {label: tr('End date'), clear: false})}<span class="evtm" ${st.all_day ? 'hidden' : ''}>${timeIn('ev-etm', st.all_day ? '10:00' : st.end.slice(11, 16), {label: tr('End time'), clear: false})}</span></div>
@@ -184,7 +186,7 @@ async function evEditor(o = {}) {
     $('#ev-atts', md).innerHTML = atts.length ? atts.map((a, i) => `<span class="evatp ps-${esc(a.partstat || 'needs-action')}">${a.user_id ? av(a.user_id, a.name || ppl.get(a.user_id) || '') : ic(a.contact_id ? 'user' : 'at', 's')}<span>${esc(a.name || ppl.get(a.user_id) || a.email)}</span><span class="muted evps">${esc(tr(EV_PS_WORD[a.partstat || 'needs-action']))}</span><button type="button" class="iconbtn" data-evatrm="${i}" aria-label="${esc(tr('Remove {0}', a.name || a.email || ''))}">${ic('x', 's')}</button></span>`).join('')
       : `<span class="muted">${tr('Only you')}</span>`;
   };
-  drawRems(); drawAtts();
+  drawRems(); drawAtts(); dvw_rows(md);
   const attList = async q => {  // suggestions: people of this server + contacts (name / e-mail)
     const opts = people.filter(u => !atts.some(a => a.user_id === u.id) && (!q || u.display_name.toLowerCase().includes(q.toLowerCase()))).slice(0, 8).map(u => ({v: u.display_name, k: 'u' + u.id}));
     if (feat('contacts') && q.length >= 2) {
@@ -206,6 +208,7 @@ async function evEditor(o = {}) {
   md.addEventListener('keydown', e => { if (e.target.id === 'ev-attin' && e.key === 'Enter') { e.preventDefault(); attAdd(); } });
   md.addEventListener('change', e => {
     const id = e.target.id;
+    if (id === 'ev-cal') dvw_rows(md);  // 2.52.0 (#1128)
     if (id === 'ev-allday') { const ad = e.target.checked; $$('.evtm', md).forEach(x => { x.hidden = ad; }); st.reminders = ad ? [-540] : [15]; drawRems(); }
     if (id === 'ev-rep') { const k = e.target.value; $('#ev-repend', md).hidden = !k; if (!k) { $('#ev-reu', md).hidden = true; $('#ev-count', md).hidden = true; } }
     if (id === 'ev-repend') { $('#ev-reu', md).hidden = e.target.value !== 'until'; $('#ev-count', md).hidden = e.target.value !== 'count'; }
@@ -242,6 +245,7 @@ async function evEditor(o = {}) {
         body.start = `${sd}T${val('ev-stm') || '09:00'}`; body.end = `${ed}T${val('ev-etm') || '10:00'}`;
         if (body.end < body.start) { toast(tr('The end must be after the start')); return; }
       }
+      if (dvw_isSub(val('ev-cal'))) { b.disabled = true; if (await dvw_save(o, val('ev-cal'), body)) md.remove(); else b.disabled = false; return; }  // 2.52.0 (#1128): a subscribed CalDAV calendar
       if (scope === 'one') {
         try { await api('PATCH', `/api/events/${ev.id}?occ=${encodeURIComponent(o.occ)}`, body); } catch { return; }
       } else {
@@ -269,46 +273,13 @@ async function evEditor(o = {}) {
 const evMin = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000));
 function evAddMin(s, m) { const d = new Date(s.length === 10 ? s + 'T00:00' : s); d.setMinutes(d.getMinutes() + m); return `${ds(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 
-// ---- creating: the "+ Event" button of the calendar bar, the quick sheet ("Event"), dragging over free time in the week grid
+// ---- creating: the "+ Event" button of the calendar bar, the quick sheet ("Event")
 function evNewAt(day, hm, endHm) {
   if (!evOn()) return;
   if (!hm) { evEditor({all_day: true, start: day, end: addDays(day, 1)}); return; }
   evEditor({start: `${day}T${hm}`, end: endHm ? `${day}T${endHm}` : ''});
 }
-const EVD = {on: false};
-document.addEventListener('pointerdown', e => {
-  if (!evOn() || e.button !== 0 || e.pointerType === 'touch') return;
-  const col = e.target.closest?.('#view .week .wcol');
-  if (!col || e.target.closest('.wev, .wcev')) return;
-  const top = col.getBoundingClientRect().top, H = weekH();
-  const at = y => Math.max(0, Math.min(24 * 60, Math.round((y - top) / H * 4) * 15));
-  Object.assign(EVD, {on: true, col, a: at(e.clientY), b: at(e.clientY), y0: e.clientY, moved: false, at, ghost: null});
-});
-document.addEventListener('pointermove', e => {
-  if (!EVD.on) return;
-  if (!EVD.moved && Math.abs(e.clientY - EVD.y0) < 8) return;
-  EVD.moved = true;
-  EVD.b = EVD.at(e.clientY);
-  if (!EVD.ghost) { EVD.ghost = document.createElement('div'); EVD.ghost.className = 'evghost'; EVD.col.appendChild(EVD.ghost); }
-  const s = Math.min(EVD.a, EVD.b), en = Math.max(EVD.a, EVD.b, s + 15), H = weekH();
-  EVD.ghost.style.top = s / 60 * H + 'px'; EVD.ghost.style.height = (en - s) / 60 * H + 'px';
-  EVD.ghost.textContent = `${pad(Math.floor(s / 60))}:${pad(s % 60)}–${pad(Math.floor(en / 60) % 24)}:${pad(en % 60)}`;
-});
-document.addEventListener('pointerup', e => {
-  if (!EVD.on) return;
-  EVD.on = false;
-  const g = EVD.ghost; EVD.ghost = null;
-  if (!EVD.moved) return;
-  e.preventDefault();
-  EVD.swallow = Date.now();  // the click that follows the drag does not open the quick sheet
-  const s = Math.min(EVD.a, EVD.b), en = Math.min(Math.max(EVD.a, EVD.b, s + 15), 24 * 60 - 1);
-  const day = EVD.col.dataset.day;
-  setTimeout(() => g?.remove(), 300);
-  evNewAt(day, `${pad(Math.floor(s / 60))}:${pad(s % 60)}`, `${pad(Math.floor(en / 60))}:${pad(en % 60)}`);
-});
-document.addEventListener('click', e => {
-  if (EVD.swallow && Date.now() - EVD.swallow < 400 && e.target.closest?.('#view .week .wcol')) { e.stopImmediatePropagation(); e.preventDefault(); EVD.swallow = 0; }
-}, true);
+// 2.52.0 (#1016): dragging over free time (and moving / resizing events) lives in caldrag.js: a block "New event" in the grid
 // the quick sheet opened from a free slot of the calendar: "Event" turns what was typed into an event at that time
 function evSheetBtn(preset) {
   const q = $('.qadd.sheet'); if (!q || !evOn() || !preset?.due || q.querySelector('.qevbtn')) return;
@@ -364,7 +335,7 @@ async function evCalsModal() {
     const tl = `<div class="cvxgrp">${tr('Tasks')}</div><div class="cvxrow" style="--cc:var(--accent)">
       ${sw('tasks', 'tasks', tasksOn, false, tr('Show tasks in my calendar'))}<i class="cevdot"></i><span class="evcn">${tr('Tasks with a date')}${hidL.length && tasksOn ? `<span class="muted"> · ${esc(trn('{0} list hidden', '{0} lists hidden', hidL.length))}</span>` : ''}</span>
       <button class="iconbtn cvxfold" data-evc="lists" aria-expanded="${st.lists}" aria-label="${esc(tr('Per list'))}" title="${esc(tr('Per list'))}">${ic('right', 's')}</button></div>
-      ${st.lists ? lists.map(l => `<div class="cvxrow sub" style="--cc:${cssColor(l.color) || 'var(--muted)'}">${sw(String(l.id), 'list', !hidL.includes(l.id), !tasksOn, tr('Show {0} in my calendar', lname(l)))}<i class="cevdot"></i><span class="evcn">${esc(lname(l))}</span></div>`).join('') : ''}`;
+      ${st.lists ? lists.map(l => `<div class="cvxrow sub" style="--cc:${cssColor(lp_col(l)) || 'var(--muted)'}">${sw(String(l.id), 'list', !hidL.includes(l.id), !tasksOn, tr('Show {0} in my calendar', lname(l)))}<i class="cevdot"></i><span class="evcn">${esc(lname(l))}</span></div>`).join('') : ''}`;
     const own = !feat('events') ? '' : `<div class="cvxgrp">${tr('My calendars')}</div>${cs.length ? head + `<ul class="evclist">${cs.map(c => `<li class="evcrow" style="--cc:${cssColor(c.color) || 'var(--accent)'}">
       <i class="cevdot"></i><span class="evcn">${esc(c.name)}${wsOn() && c.role === 'owner' ? `<span class="muted wslbl"> · ${esc(wsLabel(c.org_id))}</span>` : ''}${c.role !== 'owner' ? `<span class="muted"> · ${esc(c.owner_name || '')} · ${esc(c.role === 'edit' ? tr('can edit') : tr('can view'))}</span>` : c.members?.length ? `<span class="muted"> · ${esc(trn('shared with {0} person', 'shared with {0} people', c.members.length))}</span>` : ''}</span>
       <label class="swc" title="${esc(tr('Show in my calendar'))}"><input type="checkbox" data-evcshow="${c.id}" ${c.hidden ? '' : 'checked'}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show {0} in my calendar', c.name))}</span></label>

@@ -1,0 +1,71 @@
+# Team: workload, absences, disposition
+
+Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.50.0 the view has three tabs:
+**Workload**, **Absences** and - with the module "Disposition" switched on - **Disposition**.
+
+## Absences (2.50.0)
+
+- Everybody enters their own absences: **Absences > Enter an absence** - vacation, sick leave, day off or other,
+  one day or a period, optionally half a day (morning / afternoon) and a note. There is no approval: entering is enough.
+- The admins of an organisation can also enter absences for its members.
+- **Who sees what:** the team sees *that* somebody is away and when. The kind (above all sick leave) and the note
+  only the person and the organisation's admins see. Kind and note are stored encrypted when the server's
+  encryption at rest is on.
+- **Public holidays:** an organisation's admins pick a German state at the bottom of the tab; Kalmido computes the
+  statutory holidays itself (no external service). People without an organisation set their own.
+- **Effect:** in the workload a week's capacity shrinks by the absent workdays and holidays (a week away = no
+  capacity). *Plan my day* shows a hint instead of a proposal on a day away. Assigning a task to somebody who is
+  away on its day shows a warning - the assignment still happens.
+- Deleting an absence can be undone.
+- Agents read only "away" and the period of their own organisation (`GET /api/v1/absences`, MCP `get_absences`),
+  never the kind.
+
+## Disposition (2.50.0)
+
+Book crew and equipment for shoot days and see who and what is free.
+
+- Switch it on in **Settings > Modules > Disposition** (off by default; for organisations and for freelancers in their
+  own area).
+- **Book:** a title, the day(s), optional times, *Option* (pencilled in) or *Firm*, optionally a project list, and the
+  resources: members of the organisation, contacts from the organisation's address books (crew without an account),
+  devices and device sets from *Office & finance* (a set books its devices along).
+- **Warnings, never blocks:** a person or device booked twice at the same time, or a person who is away
+  (vacation, sick leave, day off), is marked; the booking stays.
+- **Week grid** with one row per resource (phones: a list per day), **Who is free on ...?** for a single day.
+- **My bookings** lists your own bookings; a firm booking also shows up in your News (event "assigned to me", with
+  its usual switch in the notification settings).
+- Changing or deleting a booking applies to the whole job (one shoot day); deleting can be undone.
+
+## Agents plan with you (2.51.0)
+
+- **Weekly status on the project page**: plan a job for an agent with the template *Status on the pin board*. The agent writes
+  one block "Status" on the project page (done, stuck, overdue, who waits on whom) and overwrites only that block each week. It
+  is marked "From <agent>, updated ..."; you can edit or delete it as usual. The agent needs the permission *Pin board*.
+- **Time tracking**: with the template *Check time tracking and propose entries* the agent points out implausible entries and
+  sends one proposal with entries for past events without time. You change times and note and apply it (one undo step). Share
+  your calendar with the agent so that it sees your events.
+- **Shoot planning**: an agent proposes shoot days and crew / equipment for a project. Warnings show double bookings, absences
+  and other projects that day. Applying creates per day a task in the project with a draft in your calendar and pencils in
+  crew and equipment as options, never firm.
+- **Drafts in the calendar** (tentative events) look pale and dashed and say *Draft*. Tap one: *Confirm* makes it a normal
+  event, *Discard* deletes it (undo brings it back).
+
+
+## References in comments and descriptions (2.53.0)
+
+- **Drag to reference:** drag a list or folder from the sidebar, a task from a list or the calendar, a file from the
+  Ablage, a contact or a calendar entry onto the comment field or the description. Kalmido puts a reference in at the
+  drop point: a task as `#123`, everything else as a Markdown link to this instance (`[Name](https://…/#l/80)`). Other
+  drops (moving tasks, attaching files) work as before; only the text fields take references.
+- **Phone / tablet:** the link button next to the comment box (and *Insert reference* under the description) opens the
+  search; the pick goes in at the cursor. It finds lists, folders, open tasks, contacts, appointments of the coming
+  months and the files of the Ablage folder that is open.
+- **Cards:** a link to this instance shows as a small card with an icon (list, folder, task, contact, appointment,
+  document) and the name *the reader* sees now - never the label the author typed. A target the reader cannot see (or one
+  that was deleted) is a grey *No access* card without a name and without a link.
+- **Preview:** with a mouse, resting 0.4 s on a task number or a card shows a preview next to the pointer - for a task its
+  status, list, priority, due date, assignee, tags, subtask progress, the start of the description and the number of
+  comments and attachments; for a contact company and phone, for an appointment time and place, for a list its open
+  tasks, for a document size and date. Clicking opens the target as before. On touch screens a tap opens it directly.
+- Names and previews come from what is already loaded or from the normal read routes, which check access; agents see
+  references in comments as plain Markdown text.

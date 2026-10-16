@@ -395,6 +395,7 @@ async function wsPaneDraw(md) {
     + (mm ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} list of yours has an agent of another workspace (from before the workspaces). Open the list’s Share dialog to take it out or keep it.', '{0} lists of yours have an agent of another workspace (from before the workspaces). Open the lists’ Share dialogs to take it out or keep it.', mm))}</div>` : '');
   oxDraw(box);  // 2.42.0 (#833): the export sections of the organisations I administer
   ocDraw(box);  // 2.42.0 (#828): their encryption sections
+  wsc_paneDraw(box);  // 2.53.0 (#1474): each organisation's colour (its admins choose)
 }
 function wsPaneWire(md) {
   md.addEventListener('change', async e => {

@@ -337,7 +337,8 @@ def openapi_spec():
         "TagPage": page("Tag"),
         "Comment": {"type": "object", "properties": {
             "id": {"type": "integer"}, "task_id": {"type": "integer"},
-            "author": {"type": "object", "properties": {"id": nul("integer"), "name": {"type": "string"}}},
+            "author": {"type": "object", "properties": {"id": nul("integer"), "name": {"type": "string"},
+                                                        "customer": {"type": "boolean", "description": "2.50.0: written by a customer through a public link (no account; name = what they typed)"}}},
             "body": {"type": "string", "description": "Markdown; mentions as <@user_id>"}, "text": {"type": "string", "description": "Plain text, mentions as @name"},
             "mentions": {"type": "array", "items": {"type": "integer"}}, "created_at": {"type": "string", "format": "date-time"},
             "edited_at": nul("string", format="date-time"), "attachments": {"type": "array", "items": ref("Attachment")},
@@ -645,6 +646,10 @@ def openapi_spec():
     from ..docs.v1 import docs_spec
     docs_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1111)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
+    from ..office.agentdocs import ofa_spec
+    ofa_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 A (#1348, #1350)
+    from ..hub.absence import abs_spec
+    abs_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.50.0 (#1195)
     hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.24.0 (#907 #910)
     from ..notify.caps import notif_tpl_spec
     notif_tpl_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)  # 2.33.0 (#927)
@@ -656,6 +661,12 @@ def openapi_spec():
     stale_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#266)
     from ..personal.timegaps import timegaps_spec
     timegaps_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#269)
+    from ..agents.agentpin import apin_spec
+    apin_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 C (#1352)
+    from ..agents.agenttime import atm_spec
+    atm_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 C (#1353)
+    from ..hub.agentdispo import adz_spec
+    adz_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 C (#1355)
     from ..files.v1 import files_spec
     files_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1207)
     from ..receipts.suggest import rc_spec

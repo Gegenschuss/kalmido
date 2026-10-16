@@ -20,6 +20,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.51.0** (2026-10-16): **agents pitch in with business work** - quotation drafts in the office, invoice and reminder
+  drafts and payment suggestions, an inquiry becomes a project with one yes, a setup assistant, a weekly status on project
+  pages, a time tracking check and shoot planning. The agent proposes, a person confirms; all new rights are off by default.
+- **2.50.0** (2026-10-16): business hub part 2 - **absences** with public holidays, a **disposition** for crew and
+  equipment, a **sales pipeline** and **key figures** in the office, a **customer view** for public links and **customer
+  approvals** with a simple electronic signature.
 - **2.49.0** (2026-10-16): **Forgot your password?** on a calmer login page, **kid accounts** without errors, with their
   own tour and a **parents' PIN**, **knowledge pages** per organisation and a **mind map** view of every list, **find
   people by e-mail** (opt-in, with connection requests), a softer tick-off, an x on notices and new lists that hide

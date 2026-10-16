@@ -64,6 +64,7 @@ KINDS = {
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
     # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
     # personal office (a hidden area only its owner reaches). No /api/v1, no MCP in stage 1
+    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions)"),
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share"),
@@ -72,11 +73,13 @@ KINDS = {
     "file": ("matrix", "p248_a_api_test.py: a node of another organisation / person: 404 (read, list, content, versions, share, move); shares only to people and agents of the node's workspace"),
     "paperless": ("matrix", "p248_d_paperless_api_test.py: the connection of another workspace: 404; organisation admins only change it; agents never"),
     "receipt": ("matrix", "p248_d_receipts_api_test.py: receipt data and suggestions only on a visible document; projects of another workspace refused; outsiders 404"),
-    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch)"),
     "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
     "stats": ("matrix", "p2300_tenant_test.py: statistics count only own / visible tasks"),
     "publiclink": ("matrix", "p2300_tenant_test.py: the public link of another person's list by id"),
+    # 2.50.0 (#329, #1200): files / logo of a customer view, approval links of quotations and lists (and their customer pages)
+    "signoff": ("matrix", "p250_c_api_test.py: approval links of another organisation's quotation / another person's list by id, "
+                          "files of other lists through a link"),
     # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
     "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions)"),
     # ---- not relevant for the boundary between organisations (with the reason)
@@ -96,6 +99,9 @@ KINDS = {
     "discover": ("n/a", "finding people by e-mail and connection requests: person to person, outside every workspace; the "
                       "person's own requests / connections / blocks only, a hit only through an exact confirmed address "
                       "(p249_e_api_test.py: no account disclosure, no probing by id, organisations unchanged)"),
+    # 2.50.0 A (#1195, #1194): absences and bookings of an organisation / a personal area (row-level security + the app)
+    "hub": ("matrix", "p250_a_api_test.py: absences and bookings by id of another organisation 404 (read, change, delete, restore), "
+                      "the kind of an absence only for the person and the admins, resources of another organisation cannot be booked"),
 }
 
 ROUTES = {
@@ -207,6 +213,16 @@ ROUTES = {
     "GET /api/office/trips/report": "office", "GET /api/office/trips/bill-docs": "office", "POST /api/office/trips/bill": "office",
     "POST /api/office/trips/unbill": "office", "GET /api/office/cashflow": "office", "GET /api/office/fixed-costs": "office",
     "POST /api/office/fixed-costs": "office", "PATCH /api/office/fixed-costs/{}": "office", "DELETE /api/office/fixed-costs/{}": "office",
+    # 2.50.0 (#1196, #1197): the sales pipeline and the business figures, admins of the office area only (p250_b_api_test.py: other org 404, member 403)
+    "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
+    "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
+    "GET /api/office/deals/summary": "office", "GET /api/office/kpi": "office",
+    # 2.51.0 (#1348, #1350): agents in the office (drafts only) and the switches / payment suggestions of people (p251_a_api_test.py)
+    "GET /api/office/agents/{}": "office", "PATCH /api/office/agents/{}": "office", "GET /api/office/pay-props": "office",
+    "POST /api/office/pay-props/{}": "office", "GET /api/v1/office": "office", "GET /api/v1/office/{}": "office",
+    "GET /api/v1/office/docs": "office", "GET /api/v1/office/docs/{}": "office", "GET /api/v1/office/docs/{}/pdf": "office",
+    "POST /api/v1/office/offers": "office", "PATCH /api/v1/office/offers/{}": "office", "POST /api/v1/office/offers/{}/invoice": "office",
+    "POST /api/v1/office/reminders": "office", "GET /api/v1/office/payment-suggestions": "office", "POST /api/v1/office/payment-suggestions": "office",
     "GET /api/office/datev/extf": "office",  # 2.47.3 (#1460): DATEV booking batch, admin only (p2473_e_api_test.py)
     # ---- office (C, 2.36.1 #1021): quotations of an organisation (10)
     "GET /api/office/docs": "office", "POST /api/office/docs": "office", "GET /api/office/docs/{}": "office",
@@ -426,6 +442,10 @@ ROUTES = {
     "GET /s/{}": "publiclink", "POST /s/{}/unlock": "publiclink", "POST /s/{}/tick": "publiclink",
     "GET /api/lists/{}/public-link": "publiclink", "PUT /api/lists/{}/public-link": "publiclink",
     "POST /api/lists/{}/public-link/regenerate": "publiclink", "DELETE /api/lists/{}/public-link": "publiclink",
+    # 2.50.0 (#329, #1200)
+    "GET /s/{}/file/{}": "signoff", "GET /s/{}/logo": "signoff", "POST /s/{}/feedback": "signoff", "GET /s/q/{}": "signoff", "GET /s/q/{}/pdf": "signoff", "POST /s/q/{}": "signoff",
+    "GET /api/lists/{}/signoffs": "signoff", "POST /api/lists/{}/signoffs": "signoff", "POST /api/lists/{}/signoffs/{}/revoke": "signoff",
+    "GET /api/office/docs/{}/signoffs": "signoff", "POST /api/office/docs/{}/signoff": "signoff", "POST /api/office/signoffs/{}/revoke": "signoff",
     # ---- stats (2)
     "GET /api/pomo/stats": "stats", "GET /api/stats": "stats",
     # ---- task (52)
@@ -540,6 +560,17 @@ ROUTES = {
     "POST /api/receipt-suggestions/{}/reopen": "receipt", "POST /api/v1/documents/{}/receipt-suggestion": "receipt",
     "POST /api/v1/files": "file", "POST /api/v1/files/{}/versions": "file", "PUT /api/docs/{}/receipt": "receipt",
     "PUT /api/paperless": "paperless",
+    # 2.50.0 A (#1195): absences; (#1194): resources and disposition
+    "GET /api/team/absences": "hub", "POST /api/team/absences": "hub", "PATCH /api/team/absences/{}": "hub",
+    "DELETE /api/team/absences/{}": "hub", "POST /api/team/absences/{}/restore": "hub", "PUT /api/team/absences/holidays": "hub",
+    "GET /api/team/absences/check": "hub", "GET /api/team/dispo": "hub", "GET /api/team/dispo/free": "hub",
+    "POST /api/team/dispo/bookings": "hub", "PATCH /api/team/dispo/bookings/{}": "hub", "DELETE /api/team/dispo/bookings/{}": "hub",
+    "POST /api/team/dispo/bookings/restore": "hub", "GET /api/team/bookings/mine": "hub", "GET /api/v1/absences": "hub",
+    # 2.51.0 C (#1352 #1353 #1355): agents on the pin board, time check / proposals, the disposition + shoot proposals (p251_c_api_test.py)
+    "GET /api/v1/lists/{}/notepads": "list", "POST /api/v1/lists/{}/notepads": "list", "PATCH /api/v1/notepads/{}": "list",
+    "DELETE /api/v1/notepads/{}": "list", "PUT /api/v1/lists/{}/status-pad": "list", "GET /api/v1/lists/{}/weekly-status": "list",
+    "GET /api/v1/time/check": "aggregate", "GET /api/v1/time/from-events": "aggregate", "POST /api/v1/agent/proposals/time": "agent",
+    "GET /api/v1/dispo": "hub", "GET /api/v1/dispo/free": "hub", "POST /api/v1/agent/proposals/shoot": "hub",
 }
 
 # ---- 1. every route is classified, nothing stale

@@ -801,6 +801,35 @@ fresh; run p2473_a_ui node p2473_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.3 part E: DATEV booking batch (#1460), archive several lists (#1727)
 fresh; run p2473_e_api "$PY" p2473_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2473_e_ui node p2473_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.50.0 part B: sales pipeline (#1196) + business figures (#1197)
+fresh; run p250_b_api "$PY" p250_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p250_b_ui node p250_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.50.0 part A: absences (#1195), resources and disposition (#1194)
+fresh; run p250_a_api "$PY" p250_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p250_a_ui node p250_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.50.0 part C: customer view of public links (#329), approval links with a simple electronic signature (#1200)
+fresh; run p250_c_api "$PY" p250_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p250_c_ui node p250_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.51.0 part B: an inquiry becomes a project (#1351), the setup assistant (#1358)
+fresh; run p251_b_api "$PY" p251_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p251_b_ui node p251_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.51.0 part A: agents in the office (#1348 quotation drafts, #1350 invoice / reminder drafts, payment suggestions)
+fresh; run p251_a_api "$PY" p251_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p251_a_ui node p251_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.51.0 part C: agents on the pin board + weekly status (#1352), time check + proposals (#1353), shoot planning (#1355)
+fresh; run p251_c_api "$PY" p251_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p251_c_ui node p251_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.52.0 part B: writing events into subscribed CalDAV calendars (#1128), fake CalDAV server inside the container
+fresh; run p252_b_api "$PY" p252_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p252_b_ui node p252_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.52.0 part A: the calendar like macOS - drag to create, move, resize, all-day and month ranges, touch (#1016)
+fresh; run p252_a_ui node p252_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part D: references by dragging into comment / description, reference cards, the preview card (#1449 #1440)
+fresh; run p253_d_ui node p253_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part E: agent tone for comments / News / chat (#1451) + tags overview (#446)
+fresh; run p253_e_ui node p253_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.53.0 part B: list colours as accent, folder colours, card edges, "only as a dot" (#1426); workspace colours (#1474)
+fresh; run p253_b_ui node p253_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

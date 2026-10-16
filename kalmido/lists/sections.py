@@ -130,6 +130,8 @@ def folder_rename():
     pb_folder_rename(c, uid, old, new)  # 2.39.0 (#1168): the folder's Playbook (and its subfolders') go along
     from ..lists.foldershare import sh_folder_rename
     sh_folder_rename(c, uid, old, new)  # 2.41.0 (#1420): the folder's agents go along
+    from ..lists.lists import lp_folder_rename
+    lp_folder_rename(c, uid, old, new)  # 2.53.0 (#1426): the folder's colour (and its subfolders') go along
     bump(c)
     c.commit()
     return jsonify(ok=True)

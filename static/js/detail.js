@@ -391,6 +391,7 @@ function cmxScrollSet(s, endOnly = false) {
 function renderDetail() {
   const s = cmxScrollGet(), r = keepFocus($('#detail'), renderDetail0);
   cmxShown = S.sel; cmxScrollSet(s);
+  wsc_detail();  // 2.53.0 (#1474): the comment field framed in the colour of the task's workspace
   return r;
 }
 function renderDetail0() {
@@ -487,7 +488,7 @@ function renderDetail0() {
       ${mdLong ? `<button class="linkbtn mdmore" data-act="md-more" aria-expanded="${!mdClamp}">${mdClamp ? tr('Show more') : tr('Show less')}</button>` : ''}
       ${mdOpen && mdMode ? `<button class="btn sm mdsub" data-act="md-subtasks">${ic('sub', 's')} ${tr('Turn the open checklist items into subtasks')}</button>` : ''}
       <textarea id="d-content" class="dcontent ${mdMode ? 'hidden' : ''}" placeholder="${ck ? tr('Note') : tr('Description')}" aria-label="${ck ? tr('Note') : tr('Description')}" ${tlkR ? 'readonly' : ''}>${esc(t.content)}</textarea>
-      ${typeof ln_btnHtml === 'function' ? ln_btnHtml(t, ro || ck || tlkR) : ''}`}
+      ${typeof ln_btnHtml === 'function' ? ln_btnHtml(t, ro || ck || tlkR) : ''}${typeof rf_btnHtml === 'function' ? rf_btnHtml('d', ro || tlkR || t.id < 0) : '' /* 2.53.0 (#1449): Insert reference (touch) */}`}
       ${ck ? '' : e2eNoteHtml(t)}${''/* 2.42.0 (#828): my encrypted note (e2e.js) */}
       ${ck ? '' : wk_mentionHtml(t)}${''/* 2.49.0 (#1199): mentioned in knowledge pages (wiki.js) */}
       ${msT && t.id > 0 ? `<div class="dsec mssec" id="d-ms">${msReportHtml(t)}</div>` : ''}

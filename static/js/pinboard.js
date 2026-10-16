@@ -21,7 +21,7 @@ function wgColorItems(k) {
     ...WG_COLORS.map(([c, n]) => ({label: tr(n), title: tr(n), cls: `wgsw wgsw-${c}`, on: cur === c, fn: () => wgColorSet(k, c)}))];
 }
 function wgPadAddItems() {
-  const P = wgPov(); if (!P?.y.can_style || P.l.archived || (P.y.pads || []).length >= 20) return [];
+  const P = wgPov(); if (!P?.y.can_style || P.l.archived || (P.y.pads || []).filter(x => !x.agent_id).length >= 20) return [];  // 2.51.0 (#1352): agents' notepads do not count
   return [{label: tr('Notepad'), icon: 'edit', sub: tr('Text right on the page (Markdown)'), fn: () => wgPadNew()}];
 }
 async function wgPadNew(title, body) {
@@ -60,7 +60,9 @@ function wgPadHtml(l, p, can) {
   const body = ed ? `<textarea class="wgpadin" data-wgpad="${p.id}" rows="8" maxlength="20000" aria-label="${esc(nm)}" placeholder="${esc(tr('Write in Markdown: lists, links, **bold**…'))}">${esc(WG.pad.body)}</textarea><p class="muted wgpadh">${tr('Saved when you leave the field.')}</p>`
     : p.body ? `<div class="md povmd wgpadmd" ${edit}>${renderMd(p.body, false, {lid: l.id}).replace(/<input type="checkbox"/g, '<input type="checkbox" disabled')}</div>`
       : `<div class="muted povempty wgpadmd" ${edit}>${can ? tr('Empty. Tap to write (Markdown).') : tr('Empty.')}</div>`;
-  return `<section class="povs wgpad" id="pov-np${p.id}"><div class="povh"><h3>${esc(nm)}</h3><span class="spacer"></span></div>${body}</section>`;
+  // 2.51.0 (#1352): a notepad an agent wrote is marked (who, when); people edit / delete it as usual
+  const ag = p.agent_id ? `<div class="muted wgpadag">${ic('bot', 's')}<span>${esc(tr('From {0}, updated {1}', personNameAny(p.agent_id) || tr('Agent'), relTime(p.updated_at)))}</span></div>` : '';
+  return `<section class="povs wgpad${p.agent_id ? ' wgpadagt' : ''}" id="pov-np${p.id}"><div class="povh"><h3>${esc(nm)}</h3><span class="spacer"></span></div>${ag}${body}</section>`;
 }
 function wgPadEdit(p) {
   WG.pad = {id: p.id, body: S.drafts['np:' + p.id] ?? p.body, orig: p.body, base: p.updated_at};

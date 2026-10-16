@@ -178,6 +178,36 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   check(/Akzentfarbe: Violett/.test(d.querySelector('.palette .plist').textContent), 'German palette entries');
   w.close();
 
+  // ---- 2.53.0 E (#1451): agent tone readable in both themes (text and ink on the tone background, tone vs page background)
+  {
+    const ev = css.match(/:root\{--agent-bg:(#\w{6});--agent-ink:(#\w{6})\}/), el = css.match(/:root\[data-theme="light"\]\{--agent-bg:(#\w{6});--agent-ink:(#\w{6})\}/);
+    check(!!ev && !!el, 'agent tone variables for dark + light');
+    if (ev && el) {
+      check(ratio(ev[2], ev[1]) >= 4.5, `agent ink on tone (dark): ${ratio(ev[2], ev[1]).toFixed(2)}`);
+      check(ratio(el[2], el[1]) >= 4.5, `agent ink on tone (light): ${ratio(el[2], el[1]).toFixed(2)}`);
+      check(ratio(root.text, ev[1]) >= 4.5 && ratio(light.text, el[1]) >= 4.5, 'body text on the agent tone: AA in both themes');
+      check(ratio(root.muted, ev[1]) >= 4.5 && ratio(light.muted, el[1]) >= 4.5, 'muted text on the agent tone: AA in both themes');
+    }
+  }
+  // ---- 2.53.0 part B (#1426 #1474): the list palette (12 tones: value + ink per theme) and the workspace palette (8 tones),
+  // WCAG AA in both themes, kept apart; the accent of an open list follows the theme
+  {
+    const grab = name => { const m = js.match(new RegExp(`const ${name} = (\\[[\\s\\S]*?\\]);\\n`)); return m ? JSON.parse(m[1].replace(/N_\(('[^']*')\)/g, '$1').replace(/'/g, '"').replace(/,\s*\]/g, ']')) : null; };
+    const LP = grab('LP_TONES'), WS = grab('WSC_TONES');
+    check(LP && LP.length === 12 && WS && WS.length === 8, '#1426 / #1474: 12 list tones, 8 workspace tones');
+    for (const [k, , d, id, l, il] of LP || []) {
+      for (const bg of darkBg) check(ratio(d, bg) >= 4.5, `#1426 ${k}: dark tone as text on ${bg}: ${ratio(d, bg).toFixed(2)}`);
+      for (const bg of lightBg) check(ratio(l, bg) >= 4.5, `#1426 ${k}: light tone as text on ${bg}: ${ratio(l, bg).toFixed(2)}`);
+      check(ratio(d, id) >= 4.5 && ratio(l, il) >= 4.5, `#1426 ${k}: ink on the tone (dark ${ratio(d, id).toFixed(2)}, light ${ratio(l, il).toFixed(2)})`);
+    }
+    for (const [d, l] of WS || []) {
+      for (const bg of darkBg) check(ratio(d, bg) >= 4.5, `#1474 ${d}: on ${bg}: ${ratio(d, bg).toFixed(2)}`);
+      for (const bg of lightBg) check(ratio(l, bg) >= 4.5, `#1474 ${l}: on ${bg}: ${ratio(l, bg).toFixed(2)}`);
+    }
+    check(!(WS || []).some(([d, l]) => (LP || []).some(t => t[2] === d || t[4] === l)), '#1474: the workspace palette is its own');
+    check(/#main\.lp-acc,#fab\.lp-acc\{--accent:var\(--lpd\);--accent-ink:var\(--lpid\)/.test(css) && /:root\[data-theme="light"\] :is\(#main,#fab\)\.lp-acc\{--accent:var\(--lpl\);--accent-ink:var\(--lpil\)\}/.test(css), '#1426: the accent of an open list (#main / #fab, light theme: the light tone)');
+    check(/\.wsc-on \.ccomp\{border-color:/.test(css) && /#main\.wsc-on #top\{box-shadow:inset/.test(css), '#1474: header stripe + frame of the input fields');
+  }
   check(errs.length === 0, 'no JS errors: ' + errs.slice(0, 3).join(' | '));
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
