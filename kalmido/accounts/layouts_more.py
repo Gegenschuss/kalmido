@@ -1,9 +1,7 @@
 """2.55.0 (#1067): the blocks of the views that came to the builder late (statistics, client card, family) for the agents'
-arrangement proposals (agents/lyprop.py). Without that module (an older build) nothing happens."""
-try:
-    from ..agents.lyprop import lyp_reg
-except ImportError:  # the proposals are not part of this build
-    lyp_reg = None
+arrangement proposals (agents/lyprop.py)."""
+from ..core.i18n import N_
+from ..agents.lyprop import lyp_reg
 
 # (key, English name, width in sixths, fixed): the order is the default order
 LYX_BLOCKS = {
@@ -15,6 +13,6 @@ LYX_BLOCKS = {
     "view_family": [("occ", "Birthdays & anniversaries", 3, False), ("rot", "Whose turn", 3, False), ("meals", "Meal plan", 3, False),
                     ("shop", "Shopping", 3, False), ("dl", "Deadlines", 3, False), ("kids", "Kids", 3, False), ("pack", "Packing lists", 3, False)],
 }
-if lyp_reg:
-    for _k, _bs in LYX_BLOCKS.items():
-        lyp_reg(_k, _bs)
+LYX_NAMES = {"view_stats": N_("Statistics"), "view_clients": N_("Clients"), "view_family": N_("Family")}
+for _k, _bs in LYX_BLOCKS.items():
+    lyp_reg(_k, _bs, LYX_NAMES[_k])
