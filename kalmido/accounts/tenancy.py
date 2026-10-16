@@ -94,6 +94,13 @@ CHECKS = {
     # bells; the read layer ignores rows of another workspace: notify/taskbell.py tbl_rows)
     "task_bell_person": ("SELECT b.task_id, b.user_id FROM task_bell b JOIN users u ON u.id=b.user_id WHERE b.org_id IS NOT NULL AND "
                          "(u.kind='agent' OR " + _PERSON.format(o="b", m="b") + ")"),
+    # 2.59.0 A (#1735): a client's contact person linked to a contact outside the client's address books (an organisation's
+    # client: a book the organisation owns; a client without one: its creator's own private books). (client, its creator);
+    # boundary_repair drops such a link (the contact person stays)
+    "client_contact": ("SELECT DISTINCT cl.id, cl.created_by FROM office_client_contacts k JOIN clients cl ON cl.id=k.client_id "
+                       "JOIN contacts ct ON ct.id=k.contact_id JOIN books b ON b.id=ct.book_id WHERE CASE WHEN cl.org_id IS NOT NULL "
+                       "THEN b.owner_org_id IS DISTINCT FROM cl.org_id OR b.org_id IS DISTINCT FROM cl.org_id "
+                       "ELSE b.owner_org_id IS NOT NULL OR b.org_id IS NOT NULL OR b.owner_id IS DISTINCT FROM cl.created_by END"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
@@ -130,6 +137,12 @@ def boundary_repair(c):
     that organisation. {kind: [[object id, user id], ...]} of what was removed; the
     caller commits."""
     out = {}
+    ckl = c.execute(CHECKS["client_contact"] + " ORDER BY 1, 2").fetchall()  # 2.59.0 A (#1735): also without workspaces (freelancers)
+    for cid, _ in ckl:
+        c.execute("UPDATE office_client_contacts k SET contact_id=NULL FROM contacts ct, books b, clients cl WHERE k.client_id=? "
+                  "AND cl.id=k.client_id AND ct.id=k.contact_id AND b.id=ct.book_id AND " + CHECKS["client_contact"].split(" WHERE ", 1)[1], (cid,))
+    if ckl:
+        out["client_contact"] = [[r[0], r[1]] for r in ckl]
     if not has_workspaces(c):
         return out
     for k, (table, col) in REPAIR.items():
@@ -190,7 +203,8 @@ def boundary_tick(c):
 
 
 # 2.46.0 (#1563): what each finding is, for the administration (kind prefix -> (type, table of the object))
-OA_OBJ = {"list": ("list", "lists"), "group": ("list", "lists"), "cal": ("calendar", "ev_cals"), "book": ("book", "books")}
+OA_OBJ = {"list": ("list", "lists"), "group": ("list", "lists"), "cal": ("calendar", "ev_cals"), "book": ("book", "books"),
+          "client": ("client", "clients")}  # 2.59.0 A (#1735)
 OA_DETAIL_MAX = 100
 
 
@@ -212,7 +226,7 @@ def oa_details(c, limit=OA_DETAIL_MAX):
                 name, who, ag = (row[0] if row else ""), oid_, True
             u = c.execute("SELECT display_name FROM users WHERE id=?", (who,)).fetchone()
             out.append({"kind": k, "type": ot, "id": oid_, "name": name, "user_id": who, "user": u[0] if u else "", "agent": ag,
-                        "fixable": k in REPAIR})
+                        "fixable": k in REPAIR or k == "client_contact"})
     return out
 
 

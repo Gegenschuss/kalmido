@@ -308,6 +308,8 @@ def client_update(cid):
         c.execute(f"UPDATE clients SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), cid])
         if "org_id" in f:  # 2.40.0 (#1380, review): the contacts move with their client into the other workspace
             c.execute("UPDATE office_client_contacts SET org_id=? WHERE client_id=?", (f["org_id"], cid))
+            from ..office.contacts_cl import ckl_unlink_client
+            ckl_unlink_client(c, cid)  # 2.59.0 (#1735): the address books stay in the old workspace
     _contacts_from_body(c, cid, need_client(c, cid, uid)["org_id"], body(), f)
     bump(c)
     c.commit()

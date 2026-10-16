@@ -7687,3 +7687,8 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+/* 2.59.0 A (#1735) a client's contact person linked to an address book contact: the mark in the client dialog, the search */
+.clkc .lacts{flex-wrap:wrap}
+.clkc .cklk{display:inline-flex;align-items:center;gap:.25rem;color:var(--accent);font-size:.8125rem}
+.clkc [data-clk-unlink]{min-height:2.75rem;font-size:.8125rem}
+#pop .cklpick .ctpl{max-height:min(20rem,50dvh)}

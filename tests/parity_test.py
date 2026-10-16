@@ -359,6 +359,9 @@ APP_ONLY = [
     # 2.55.0 (#1455): the newsletter connection holds access data of an outside service and decides who gets mail: people only
     ("2.55.0 (#1455): the newsletter connection, segments, sync and the consent of contacts are set by people (admins / the "
      "person); agents read the consent with the contact (field newsletter), no new agent rights", ("* /api/newsletter",)),
+    # 2.59.0 (#1735): the search of the client dialog; the API sets contact_id with PATCH /clients/{id} and finds contacts with GET /contacts
+    ("2.59.0 (#1735): the address book search of the client dialog (contacts a person may link to a client's contact persons); "
+     "the API links with PATCH /clients/{id} contacts[].contact_id and searches with GET /contacts", ("=GET /api/clients/{}/book-contacts",)),
 ]
 
 

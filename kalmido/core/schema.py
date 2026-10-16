@@ -1667,6 +1667,9 @@ MIGRATIONS = [
     ("view_layouts", "active", "ALTER TABLE view_layouts ADD COLUMN active BIGINT NOT NULL DEFAULT 0"),
     # 2.56.0 B (#1795): what an organisation admin changed in a list (JSON {field: [old, new]}; actions edit / icon), NULL before
     ("org_list_log", "detail", "ALTER TABLE org_list_log ADD COLUMN detail TEXT"),
+    # 2.59.0 A (#1735): a client's contact person linked to an address book contact (NULL = not linked; deleting the contact
+    # or its book only drops the link, name / e-mail / phone stay as the copy documents read)
+    ("office_client_contacts", "contact_id", "ALTER TABLE office_client_contacts ADD COLUMN contact_id BIGINT REFERENCES contacts(id) ON DELETE SET NULL"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -1707,6 +1710,8 @@ CREATE INDEX IF NOT EXISTS books_owner_org ON books(owner_org_id) WHERE owner_or
 -- 2.55.0 A (#1068): templates waiting for a person / sent by a person
 CREATE INDEX IF NOT EXISTS view_layout_offers_to ON view_layout_offers(to_user, state);
 CREATE INDEX IF NOT EXISTS view_layout_offers_from ON view_layout_offers(from_user);
+-- 2.59.0 A (#1735): the client contact persons of an address book contact (contact card, ON DELETE SET NULL)
+CREATE INDEX IF NOT EXISTS office_client_contacts_contact ON office_client_contacts(contact_id) WHERE contact_id IS NOT NULL;
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 3  # task > subtask > sub-subtask
