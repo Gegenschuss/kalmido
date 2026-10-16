@@ -121,3 +121,20 @@ def lc_fav_suggestion():
         name = c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone()[0]
         return jsonify(list_id=r["list_id"], name=name)
     return jsonify(list_id=None)
+
+
+def fv2_folder_rename(c, uid, old, new):
+    """2.57.0 (#1798): a renamed / moved folder keeps its place among the favourites (fav_items), its subfolders too."""
+    import json
+    from .lists import FOLDER_SEP
+    raw = usettings(c, uid).get("fav_items") or "[]"
+    try:
+        items = [x for x in json.loads(raw) if isinstance(x, str)]
+    except ValueError:
+        return
+    def mv(x):
+        p = x[7:] if x.startswith("folder:") else None
+        return "folder:" + new + p[len(old):] if p is not None and (p == old or p.startswith(old + FOLDER_SEP)) else x
+    out = json.dumps(list(dict.fromkeys(mv(x) for x in items)), ensure_ascii=False, separators=(",", ":"))
+    if out != json.dumps(items, ensure_ascii=False, separators=(",", ":")):
+        uset(c, uid, "fav_items", out)

@@ -132,6 +132,8 @@ def folder_rename():
     sh_folder_rename(c, uid, old, new)  # 2.41.0 (#1420): the folder's agents go along
     from ..lists.lists import lp_folder_rename
     lp_folder_rename(c, uid, old, new)  # 2.53.0 (#1426): the folder's colour (and its subfolders') go along
+    from ..lists.favorites import fv2_folder_rename
+    fv2_folder_rename(c, uid, old, new)  # 2.57.0 (#1798): a favourite folder (and its subfolders) stays a favourite
     bump(c)
     c.commit()
     return jsonify(ok=True)

@@ -52,6 +52,10 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   await call('DELETE', `/api/lists/${HOME}/favorite`);
   check(!(await items()).includes('l:' + HOME), 'an unstarred list leaves fav_items');
   check(JSON.parse((await call('GET', '/api/state', null, await login('bob'))).settings.fav_items || '[]').length === 0, 'bob notices nothing of alice\'s favourites');
+  await call('PATCH', '/api/settings', {fav_items: ['folder:Work', 'v:today']});
+  await call('POST', '/api/folders/rename', {old: 'Work', new: 'Job'});
+  check((await items()).join() === 'folder:Job,v:today', 'a renamed folder stays a favourite ' + (await items()).join());
+  await call('POST', '/api/folders/rename', {old: 'Job', new: 'Work'});
   await call('PATCH', '/api/settings', {fav_items: []});
 
   // ================= stars from the row menus
