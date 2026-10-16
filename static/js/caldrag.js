@@ -123,7 +123,7 @@ function cg_start() {
   if (st.kind === 'new') { st.a = cg_at(st.col, st.y0); st.ghost = document.createElement('div'); st.ghost.className = 'evghost'; st.col.appendChild(st.ghost); }
   else if (st.kind === 'move' || st.kind === 'size') {
     const day = st.col.dataset.day, m = cevMin(st.ev, day);
-    Object.assign(st, {day, s: m.s, e: m.e, multi: st.ev.d0 !== st.ev.d1});
+    Object.assign(st, {day, s: m.s, e: m.e, multi: st.ev.d0 !== st.ev.d1, sc0: $('#wbody')?.scrollTop || 0});
     st.ghost = st.el.cloneNode(true); st.ghost.classList.add('cgghost'); st.ghost.removeAttribute('data-cev');
     st.el.classList.add('cgsrc');
     st.col.appendChild(st.ghost);
@@ -142,7 +142,7 @@ function cg_move() {
     st.ghost.textContent = `${cg_lab(s)}–${cg_lab(en)}`;
   } else if (st.kind === 'move') {
     const col = cg_colAt(st.x) || st.col, dd = diffDays(st.day, col.dataset.day);
-    let dm = cg_snap((st.y - st.y0) / H * 60);
+    let dm = cg_snap((st.y - st.y0 + ($('#wbody')?.scrollTop || 0) - st.sc0) / H * 60);  // the hours may have scrolled along
     if (!st.multi) dm = Math.max(-st.s, Math.min(1440 - st.e, dm));  // a one-day event stays inside its day
     Object.assign(st, {dd, dm});
     if (st.ghost.parentNode !== col) col.appendChild(st.ghost);
