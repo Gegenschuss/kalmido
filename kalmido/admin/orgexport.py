@@ -63,7 +63,8 @@ OX_NO_KEY = N_("The organisation export needs the server key KALMIDO_SECRET_KEY 
 OX_SECRET_COLS = frozenset((
     "password_hash", "password", "pw_hash", "pw_rev", "token", "token_hash", "secret", "hook_secret", "totp_secret", "totp_step",
     "drop_token", "ical_token", "p256dh", "auth", "code_hash", "webauthn_handle", "oidc_subject", "proxy_login", "endpoint",
-    "etags", "api_key", "access_token", "refresh_token"))
+    "etags", "api_key", "access_token", "refresh_token",
+    "hint"))  # 2.55.0 (#1455): the last characters of a newsletter connection's access data (nl_conns)
 
 _OX = {}  # org id -> the running thread
 _OX_LOCK = threading.Lock()
@@ -214,6 +215,11 @@ OX_AREAS = (
     ("books.json", "books", "org_id=?"),
     ("books/members.json", "book_members", "book_id IN (SELECT id FROM books WHERE org_id=?)"),
     ("books/contacts.json", "contacts", "book_id IN (SELECT id FROM books WHERE org_id=?)"),
+    # 2.55.0 (#1455): the newsletter connection (its column "secret" never: see the list above), segments, members, log
+    ("newsletter/connection.json", "nl_conns", "org_id=?"),
+    ("newsletter/segments.json", "nl_segments", "org_id=?"),
+    ("newsletter/members.json", "nl_members", "org_id=?"),
+    ("newsletter/runs.json", "nl_runs", "org_id=?"),
     ("clients.json", "clients", "org_id=?"),
     ("office/company.json", "office_company", "org_id=?"),
     ("office/settings.json", "office_settings", "org_id=?"),

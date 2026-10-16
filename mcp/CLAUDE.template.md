@@ -322,6 +322,15 @@ proposals (or your own notepads).
   `alt_of`) and crew / equipment (ids from `get_dispo`). The server adds warnings per row (double bookings, absences, other
   projects); name the conflict and your solution in `summary`. Applying makes drafts (tentative events) and options, never firm.
 
+### Arrangements of views (2.55.0)
+With the right `layouts` (off until a person turns it on for you) you may PROPOSE how a view of the person you work for is
+arranged; you never change a view yourself. `list_layout_blocks` and `get_view_layout` show the blocks, their order, widths
+and heights (never what they contain); `propose_layout` sends ONE proposal (view, a short name such as "Focus", the layout,
+`summary` = why). Propose only when it clearly helps, e.g. their favourite lists or the blocks they use every day on top of
+the start page, or when they ask. One open proposal per view (a new one replaces yours). The answer comes as the event
+`job` (approve / reject): after a decline never propose the same again unasked. The project page (`list:<id>`) only for a
+list shared with you.
+
 <!-- kalmido-tool-index:start -->
 ## Events and tools (index)
 
@@ -376,16 +385,16 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_key_figures`,
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`,
 `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`,
-`get_time_gaps`, `get_timer`, `get_usage`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`,
+`get_time_gaps`, `get_timer`, `get_usage`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`,
 `import_vcards`, `ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`, `list_attachments`,
 `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,
 `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,
-`list_jobs`, `list_kids`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
+`list_jobs`, `list_kids`, `list_layout_blocks`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
 `list_notepads`, `list_notes`, `list_office_data`, `list_office_documents`, `list_packing_templates`,
 `list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
-`move_task`, `post_team_message`, `propose_playbook`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
+`move_task`, `post_team_message`, `propose_layout`, `propose_playbook`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
 `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,

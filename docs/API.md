@@ -436,6 +436,8 @@ a task needs `tasks:write` too. A contact is only visible to people who see its 
 `emails` / `phones` / `urls`: `[{value, type: [home|work|cell|other], pref?, label?}]`; `addresses`: `[{street, code,
 city, region, country, pobox?, ext?, type?}]`; `bday` / `anniversary`: `YYYY-MM-DD`, or `--MM-DD` without the year;
 `photo`: `data:image/jpeg;base64,...` (JPEG, PNG, GIF, WebP).
+2.55.0 (#1455): every contact carries `newsletter`: `{status: ""|yes|pending|unsub|bounce, at, source}` -- the
+newsletter consent, read only here (people change it in the app; unsub / bounce come from the newsletter service).
 
 ## Roadmap
 
@@ -1136,6 +1138,29 @@ The web app's own routes (`/api/docs`, a signed-in person, never an agent): `GET
 (levels per feature, the inbox folder), `POST` / `PATCH` / `DELETE /api/docs/rules`, `PATCH` / `DELETE /api/docs/labels/{kind}/{id}` (the delete answers the documents it touched; `POST /api/docs/labels/{kind}` `{ws, name, ids}` is its undo),
 `POST` / `DELETE /api/docs/mail` (the forwarding address). Deleting and restoring use the file store
 (`DELETE /api/files/nodes/{id}`, `POST /api/files/nodes/{id}/restore`).
+
+## Arrangements of views for agents (2.55.0)
+
+New scope `layouts` (agents only; off for new agents and not part of the legacy `write`). The agent reads and proposes, the
+person accepts or declines (see docs/AGENTS.md *Arrangements of views*).
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "https://kalmido.example/api/v1/layouts/blocks?view=dashboard&user_id=3"
+curl -s -H "Authorization: Bearer $TOKEN" "https://kalmido.example/api/v1/layouts/dashboard?user_id=3"
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"view": "dashboard", "user_id": 3, "name": "Focus", "summary": "Today and the projects first",
+       "layout": {"order": ["today", "projects", "news"], "hidden": ["search"], "widths": {"today": 4}}}' \
+  https://kalmido.example/api/v1/layouts/proposals
+```
+
+| Route | Scope | |
+|---|---|---|
+| `GET /layouts/blocks?view=&user_id=` | layouts | the blocks of a view: `key`, `name`, `width`, `fixed`; the views |
+| `GET /layouts/{view}?user_id=` | layouts | `source` own / standard / default, `layout` {order, hidden, widths, heights, mobile} |
+| `POST /layouts/proposals` | layouts | `view`, `name`, `layout`, `summary`, `title`, `user_id`; 201 = a ready proposal job (kind `layout`) |
+
+The answer comes as the event `job`. A proposal job can be replaced with `POST /agent/jobs/{id}/proposal` (scope `layouts`)
+while it is open. People decide with `POST /api/proposals/{id}/apply` (`{"select": ["0"], "use": true}`) or `.../discard`.
 
 ## Pin board, time check and shoot planning for agents (2.51.0)
 

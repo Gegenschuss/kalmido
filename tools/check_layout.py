@@ -81,6 +81,7 @@ TENANT_EXEMPT = {
     "pl_conn_users": "who could use a shared Paperless connection (unused since 2.36.0, kept)", "pl_tokens": _OWN,
     "user_task_order": _OWN + " (2.40.0 #1344: the own order of My tasks; rows only for tasks the person sees)",
     "wait_hidden": _OWN + " (2.41.0 #1205: Waiting-on texts the person took out of their own suggestions)",
+    "view_layouts": _OWN + " (2.55.0 #1069: saved arrangements of a view; layout json only, no content)",
     "e2e_keys": _OWN + " (2.42.0 #828: the person's public key + wrapped key bundle; others only get the public key of a DM partner)",
     "task_enc_notes": "2.42.0 (#828): one person's encrypted note of a task, bound through the task (need_task) and readable only by its author",
     "task_note_locks": "2.48.0 (#1642): the locked note of a task, bound through the task (need_task), readable only by the person who locked it",
@@ -111,6 +112,7 @@ TENANT_EXEMPT = {
     "chat_saves": _OWN + " (2.37.0 #1159: which chat message a person saved as a task; the task itself keeps its list)",
     "kid_parents": _FAM, "kid_stars": _FAM, "kid_rewards": _FAM,
     "kid_pins": _FAM, "kid_pin_open": _OWN + " (2.49.0 #1551: the session of a kid)",
+    "view_layout_offers": "2.55.0 (#1068): an arrangement template from one person to another (no workspace, no content); only the two see it",
     # 2.49.0 (#1106): finding people by e-mail is person to person, outside every workspace (accounts/discover.py)
     "disc_profiles": _OWN, "disc_tokens": _OWN, "disc_quota": _OWN, "conn_blocks": _OWN,
     "conn_requests": "2.49.0 (#1106): a request between two people (no workspace); only the two see it",

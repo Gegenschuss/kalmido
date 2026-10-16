@@ -15,7 +15,8 @@ from ..accounts.session import me
 from ..personal.timetrack import BadInput
 
 LAYOUT_KEYS = ("view_today", "view_time", "view_agents", "view_projects",
-               "view_review")  # 2.43.0 (#1452): the review (and its journal) on the builder
+               "view_review",  # 2.43.0 (#1452): the review (and its journal) on the builder
+               "view_stats", "view_clients", "view_family")  # 2.55.0 (#1067): statistics, the client card, family
 LAYOUT_BLOCK_RE = re.compile(r"[a-z][a-z0-9_]{0,23}")
 LAYOUT_BLOCKS_MAX = 40
 LAYOUT_OPTS_MAX = 10          # saved switches per block
@@ -127,12 +128,17 @@ def list_layout_put(lid):
         c.execute("UPDATE lists SET page_layout=? WHERE id=?", (v, lid))
         if scope == "promote":  # 2.43.0 (#1452): my arrangement becomes the standard, I follow it from now on
             c.execute("DELETE FROM list_layouts WHERE list_id=? AND user_id=?", (lid, me()))
+            from .layoutsets import lyv_follow  # 2.55.0 (#1069): no own arrangement now -> none saved is active
+            lyv_follow(c, me(), f"list:{lid}", "")
     elif v:
         c.execute("""INSERT INTO list_layouts(list_id,user_id,layout,updated_at) VALUES(?,?,?,?)
                      ON CONFLICT(list_id,user_id) DO UPDATE SET layout=excluded.layout, updated_at=excluded.updated_at""",
                   (lid, me(), v, iso(now_utc())))
     else:
         c.execute("DELETE FROM list_layouts WHERE list_id=? AND user_id=?", (lid, me()))
+    if scope == "mine":  # 2.55.0 (#1069): the active saved arrangement follows
+        from .layoutsets import lyv_follow
+        lyv_follow(c, me(), f"list:{lid}", v)
     bump(c)
     c.commit()
     return jsonify(page_layouts(c, lid, me(), role))
@@ -185,6 +191,8 @@ def wg_std_put(key):
     gset(c, "lystd_" + key, v)
     if b.get("promote"):
         c.execute("DELETE FROM user_settings WHERE user_id=? AND key=?", (me(), key))
+        from .layoutsets import lyv_follow  # 2.55.0 (#1069)
+        lyv_follow(c, me(), key, "")
     bump(c)
     c.commit()
     return jsonify({"layouts": wg_std_all(c), "can": True})

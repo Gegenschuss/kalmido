@@ -97,3 +97,19 @@ task as a push at the highest priority, even if the list is quiet.
 - It always stays in its organisation's workspace and is seen only by its members. Phones get it over CardDAV like any other
   address book (read-only when members may only view).
 - **Make personal again…** (an admin) turns it back into that admin's own address book; one undo step, like the hand-over.
+
+## Saved arrangements and templates (2.55.0)
+
+- **Several arrangements per view.** The start page, Today, Time tracking, the overviews, the review and every project page
+  can keep named arrangements of their blocks, e.g. "Focus" and "Overview". *Save as arrangement…* sits in a block's "…"
+  menu and in *Customize*; once a view has one, its header shows a switch (Today: in the view's "…" menu) with *Standard*,
+  the saved ones and *Manage arrangements…* (rename, order, delete). They are the same on every device.
+- **Switching** shows the saved arrangement as your own arrangement of the view; changes you make while one is active go
+  into it. *Reset to the standard* or choosing *Standard* ends that, the saved one stays. Saving, renaming, deleting and
+  switching are each one undo step. At most 12 per view.
+- **Send as template…** sends the current arrangement to people you see (your organisations and connections; never to
+  agents, at most 20 at once; a project page only to people with access to it). Only the arrangement travels (blocks,
+  order, widths, heights, a block's switches), never content: a block the recipient cannot see simply stays empty. They get a
+  News item ("For you", switched off together with the sharing News) with a preview and *Take over* / *Decline*; taken over,
+  it is their own saved arrangement, named after the sender, with no link back.
+- Agents cannot use any of this (403); they propose arrangements their own way (2.55.0, #1066).

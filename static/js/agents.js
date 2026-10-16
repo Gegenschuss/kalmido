@@ -499,13 +499,17 @@ function viewAgents() {
   if (S.jobs.items === null) { S.jobs.items = []; S.jobs.older = []; S.jobs.next = S.jobs.more = null; loadJobs(); aiuLoad().then(() => { if (S.route.mod === 'agents') renderView(); }); }  // 2.1.1: the usage card
   if (S.route.agent && chatFull()) return chatViewHtml(S.route.agent);
   const ags = (S.agents || []).filter(a => wsAgentIn(a));  // 2.28.0 (#935)
+  // 2.55.0 (#1065): the agents block's settings (lyopts.js): only switched-on ones, the order (the other blocks see all)
+  const agOn = lyo_get('agents', 'agents', 'on'), agSort = lyo_get('agents', 'agents', 'sort'), agNeed = a => ['error', 'waiting', 'paused'].includes(agentHst(a)) || a.waiting || a.approvals_open ? 0 : 1;
+  const agShow = ags.filter(a => !agOn || a.enabled);
+  if (agSort === 'name') agShow.sort((a, b) => a.name.localeCompare(b.name, LOCALE())); else if (agSort === 'need') agShow.sort((a, b) => agNeed(a) - agNeed(b));
   const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}" data-k="ag${a.id}">${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
       <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · '))}</span></div>
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button>${a.approvals_open ? `<button class="btn sm apvcard" data-act="chat-open" data-aid="${a.id}">${ic('lock', 's')} ${esc(apvCount(a.approvals_open))}</button>` : ''}
       <button class="btn sm" data-act="sched-open" data-aid="${a.id}" title="${esc(tr('Planned jobs'))}">${ic('clock', 's')} ${tr('Plans')}</button></div>${av_listsHtml(a)}</div>`;  // 2.46.6 (#1708): its lists
   const items = S.jobs.items || [];
   if (ags.length) {  // 2.32.0 (#1063): the overview is built from blocks (Customize)
-    const P = {agents: `<div class="agcards">${ags.map(card).join('')}</div>`, usage: aiuCardHtml(),
+    const P = {agents: `<div class="agcards">${agShow.map(card).join('')}</div>`, usage: aiuCardHtml(),
       jobs: `<div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
         ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}<div class="jobs">${items.length ? items.map(jobHtml).join('') : `<div class="muted mhint">${S.jobs.f === 'open' ? tr('No running or waiting jobs.') : tr('No jobs yet.')}</div>`}</div>${jobsMoreHtml()}`,
       hint: `<div class="shint">${tr('Agents report their jobs here. Approve, Reject and Stop go to the agent at once and show up in the task’s history. On a comment of an agent, 👍 / 👎 by the list owner, a list admin or the assignee counts as approval or rejection.')}</div>`};
@@ -636,6 +640,7 @@ S.prop = null;
 function propKeys(v) {
   const p = v.proposal; if (!p) return [];
   if (pk2_is(v.kind)) return pk2_keys(v);  // 2.51.0 (#1351 #1358): propkinds2.js
+  if (lyp_is(v)) return ['0'];  // 2.55.0 (#1066): one arrangement (lyprop.js)
   if (v.kind === 'project') return p.tasks.flatMap((t, i) => [String(i), ...t.subtasks.map((s, k) => `${i}.${k}`)]);
   if (v.kind === 'dayplan') return p.items.map((x, i) => String(i));  // 2.10.0 (#440); 2.11.0: "does not fit" entries change nothing
   return (v.kind === 'extract' ? p.tasks : p.items).map((x, i) => String(i));
@@ -704,6 +709,7 @@ function propItemHtml(k, x, o = {}) {  // one entry: checkbox, title, date and t
 function propItemsHtml() {
   const {v} = S.prop, p = v.proposal, inp = v.input;
   if (pk2_is(v.kind)) return pk2_itemsHtml();  // 2.51.0 B (#1351 #1358): propkinds2.js
+  if (lyp_is(v)) return '';  // 2.55.0 (#1066): lyp_draw shows it
   if (v.kind === 'dayplan') return propDayplanHtml();  // 2.10.0 (#440)
   if (v.kind === 'cleanup') return clnItemsHtml();  // 2.39.0 (#1151): cleanup.js
   if (AP_KINDS.includes(v.kind)) return ap_propItemsHtml();  // 2.51.0 C (#1353 #1355): agentplan.js
@@ -734,6 +740,7 @@ function propItemsHtml() {
 }
 function propCount() {
   const P = S.prop, n = P.sel.size, all = propKeys(P.v).length, b = $('[data-pp="apply"]', P.md);
+  if (lyp_is(P.v)) return;  // 2.55.0 (#1066): its own buttons
   $$('.ppcount', P.md).forEach(c => { c.textContent = tr('{0} of {1} selected', n, all); });
   if (b) { b.disabled = !n; b.innerHTML = `${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', n))}`; }
 }
@@ -753,6 +760,7 @@ function propDraw() {
       <div class="shint keep">${AP_KINDS.includes(v.kind) ? ap_propHint(v) : v.kind === 'cleanup' ? tr('Applying changes the selected tasks as you. Tasks someone is editing right now or that changed since the request are skipped. One step, undo takes it back.') : v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected basket items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
     // 2.5.2 (K03): the footer stays visible below the entries (sticky), with the count next to Apply
     foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
+    if (lyp_is(v)) ({main, foot} = lyp_draw(v));  // 2.55.0 (#1066): before / after, 👍 / 👎 (lyprop.js)
   } else {
     main = `<div class="ppwait">${ic(st === 'applied' ? 'check' : 'x')}<p>${st === 'applied' ? (v.applied?.undone ? tr('Applied, then undone.') : tr('Applied.')) : tr('Discarded. {0} was told.', agent)}</p></div>`;
   }
@@ -765,16 +773,17 @@ async function propApply(b) {
   const P = S.prop; if (!P || !P.sel.size) return;
   const v = P.v, q = {select: [...P.sel], edits: Object.fromEntries(Object.entries(P.ed).filter(([k]) => P.sel.has(k)))};
   if (v.kind === 'project' || v.kind === 'inquiry') { q.name = $('#pp-name', P.md).value.trim() || v.proposal.name; q.folder = $('#pp-folder', P.md).value.trim(); q.share_agent = $('#pp-share', P.md).checked; }
+  if (lyp_is(v)) q.use = $('#lyp-use', P.md)?.checked !== false;  // 2.55.0 (#1066)
   b.disabled = true;
   let r;
   try { r = await calReq('POST', `/api/proposals/${P.jid}/apply`, q); } catch (x) { const e = $('#pp-err', P.md); e.textContent = x.message; e.hidden = false; b.disabled = false; return; }
   P.md.remove(); S.prop = null;
-  await load().catch(() => {}); render();
-  const name = v.agent.name, jid = P.jid;
+  await load().catch(() => {}); if (lyp_is(v)) await lyp_after(v); render();
+  const name = v.agent.name, jid = P.jid, ly = lyp_is(v) ? () => load().then(() => lyp_after(v)).then(render).catch(() => {}) : () => {};  // 2.55.0 (#1066)
   const e = histAdd({label: tr('Applied the proposal of {0}', name), snaps: [], after: [], ids: [], lids: r.list_id ? [r.list_id] : [],
-    undo: async () => { const x = await api('POST', `/api/proposals/${jid}/undo`); return {skipped: x.skipped || [], none: !!x.none}; },
-    redo: async () => { const x = await api('POST', `/api/proposals/${jid}/redo`); return {skipped: x.skipped || [], none: !!x.none}; }});
-  histToast(pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e);
+    undo: async () => { const x = await api('POST', `/api/proposals/${jid}/undo`); ly(); return {skipped: x.skipped || [], none: !!x.none}; },
+    redo: async () => { const x = await api('POST', `/api/proposals/${jid}/redo`); ly(); return {skipped: x.skipped || [], none: !!x.none}; }});
+  histToast(lyp_is(v) ? lyp_toast(v, r) : pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e);
   if ((v.kind === 'project' || v.kind === 'inquiry') && r.list_id && listById(r.list_id)) go('l/' + r.list_id);
   if (S.route.mod === 'agents') loadJobs();
 }

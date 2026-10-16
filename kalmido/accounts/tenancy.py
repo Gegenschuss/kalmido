@@ -50,6 +50,10 @@ CHECKS = {
                    "AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=b.org_id AND om.user_id=b.owner_id)"),
     # 2.52.0 C (#1438): an address book an organisation owns outside that organisation's workspace
     "book_org": "SELECT b.id, b.owner_id FROM books b WHERE b.owner_org_id IS NOT NULL AND b.org_id IS DISTINCT FROM b.owner_org_id",
+    # 2.55.0 (#1455): a newsletter segment / member / run in another workspace than its connection
+    "nl_segment": ("SELECT s.id, s.conn_id FROM nl_segments s JOIN nl_conns n ON n.id=s.conn_id WHERE s.org_id IS DISTINCT FROM n.org_id"),
+    "nl_member": ("SELECT m.seg_id, s.conn_id FROM nl_members m JOIN nl_segments s ON s.id=m.seg_id WHERE m.org_id IS DISTINCT FROM s.org_id"),
+    "nl_run": ("SELECT r.id, r.conn_id FROM nl_runs r JOIN nl_conns n ON n.id=r.conn_id WHERE r.org_id IS DISTINCT FROM n.org_id"),
     # 2.49.0 (#1106): a connection (accepted request) of an agent or a kid account -- requests are for people only
     "conn_agent": ("SELECT l.a_id, l.b_id FROM conn_links l JOIN users u ON u.id IN (l.a_id, l.b_id) "
                    "WHERE l.deleted_at IS NULL AND (u.kind!='user' OR u.kid!=0)"),

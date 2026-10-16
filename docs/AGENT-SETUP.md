@@ -153,6 +153,10 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    office documents* in its dialog (an admin of its office area; in a personal office the person) and *Agents may read
    office data* in Office > Settings (client and price data then go to its model). It only ever makes drafts; people
    finalise, send and book ([AGENTS.md](AGENTS.md#office-drafts-only-2510)).
+7. Optional, **Arrangements of views** (2.55.0): turn on the permission *Propose arrangements* (scope `layouts`, off by
+   default) when the agent may suggest how the start page, Today or a shared project page could be arranged. It reads only
+   block names and widths, never their content, and every proposal waits for the person's 👍 / 👎
+   ([AGENTS.md](AGENTS.md#arrangements-of-views-2550)).
 
 ### 2. A Linux user without sudo
 

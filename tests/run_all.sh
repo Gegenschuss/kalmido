@@ -842,6 +842,19 @@ fresh; run p253_a_ui node p253_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.52.0 part C: #1438 address books an organisation owns (hand-over, roles, leaving / account deletion, CardDAV, way back)
 fresh; run p252_c_api "$PY" p252_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p252_c_ui node p252_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.55.0 part E: the newsletter connection (#1455): fake listmonk / Brevo / CleverReach inside the container
+fresh; run p255_e_api "$PY" p255_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p255_e_ui node p255_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.55.0 part C: #1065 settings per block (gear in Customize, popover / sheet, time tracking per client, numbers)
+fresh; run p255_c_ui node p255_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.55.0 part A: saved arrangements per view (#1069) and arrangements sent as templates (#1068)
+fresh; run p255_a_api "$PY" p255_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p255_a_ui node p255_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.55.0 part B: agents propose arrangements of views, the person accepts / declines (#1066)
+fresh; run p255_b_api "$PY" p255_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p255_b_ui node p255_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.55.0 part D: statistics, client card and family on the view builder (#1067)
+fresh; run p255_d_ui node p255_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

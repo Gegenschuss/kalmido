@@ -7,6 +7,37 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.55.0] - 2026-10-16
+
+**In short:** views you arrange become more personal - **several saved arrangements** per view ("Focus", "Overview")
+switched in the header, **settings per block** behind a small gear, an arrangement **sent as a template** to others,
+**agents may propose** an arrangement (you accept with a thumbs up), more views on the block builder, and a **newsletter
+connection** that hands contacts and segments to listmonk (Brevo and CleverReach as a preview) instead of sending mail itself.
+
+### Added
+- **Saved arrangements:** *Save as arrangement…* in the block menu or while customising; with one saved arrangement a
+  switcher appears in the view's header (a sheet on phones) with *Standard*, your arrangements and *Manage* (rename,
+  reorder, delete with undo). The same on all your devices; changes while one is active go into it (#1069).
+- **Send as a template:** send the arrangement you see to people who see you; they get a News item with a preview and
+  take it over or decline. Only the arrangement travels, never content; a block they cannot see stays empty (#1068).
+- **Settings per block:** a gear on blocks with settings while customising (also *Settings…* in the block menu): e.g.
+  time tracking blocks only for one client or project and the day chart as a line, Today on the start page for one list
+  or folder, only mine and how many, sorting and filters for the project and agent overviews, which key figures show (#1065).
+- **Agents propose arrangements:** with the new agent right *Propose arrangements* (off by default) a connected agent
+  reads which blocks a view has (never their content) and proposes an arrangement; a card shows before and after, a thumbs
+  up saves it as an arrangement of yours, a thumbs down discards it. Agents never change a view themselves. API
+  `GET /api/v1/layouts/<view>`, `GET /api/v1/layouts/blocks`, `POST /api/v1/layouts/proposals`, MCP `get_view_layout`,
+  `list_layout_blocks`, `propose_layout`; reference launcher capability `layout_answer` (#1066).
+- **More views on the block builder:** statistics, the client card and family can be arranged like the start page
+  (show / hide, order, width, a different arrangement on phones, a standard for everyone); without an own arrangement they
+  look as before. Roadmap, calendar and habits stay one area each (#1067).
+- **Newsletter connection** (Contacts > … > *Newsletter…*): per workspace a connection to listmonk (Brevo and
+  CleverReach as a preview, not yet tested against the real services); segments from groups, companies and address books
+  become lists at the service; a consent status per contact (with date and source); only consented contacts are sent,
+  unsubscribes, bounces and confirmed double opt-ins come back to the contact and unsubscribed addresses are never added
+  again. Sync by hand or daily (off by default), a log for admins, access data sealed and never shown again. Kalmido
+  itself sends no newsletters (#1455).
+
 ## [2.53.1] - 2026-10-16
 
 **In short:** the checks of 2.53.0 green again; 2.53.0 and 2.53.1 go live together.

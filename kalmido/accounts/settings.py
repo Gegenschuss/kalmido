@@ -393,6 +393,9 @@ def settings_update():
         lc_done_sync(c, me(), usettings(c, me()).get("show_done_views"), vals["show_done_views"])
     for k, v in vals.items():
         uset(c, me(), k, v)
+        if k == "dashboard" or k in LAYOUT_KEYS:  # 2.55.0 (#1069): the active saved arrangement follows
+            from .layoutsets import lyv_follow
+            lyv_follow(c, me(), k, v)
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -556,6 +559,8 @@ def export_json():
         "list_milestones": (f"SELECT * FROM list_milestones WHERE list_id IN {own}", (uid,)),
         "list_files": (f"SELECT * FROM list_files WHERE list_id IN {own}", (uid,)),
         "list_layouts": ("SELECT * FROM list_layouts WHERE user_id=?", (uid,)),
+        "view_layouts": ("SELECT * FROM view_layouts WHERE user_id=?", (uid,)),  # 2.55.0 (#1069): my saved arrangements
+        "view_layout_offers": ("SELECT * FROM view_layout_offers WHERE from_user=? OR to_user=?", (uid, uid)),  # 2.55.0 (#1068)
         "list_notepads": ("SELECT * FROM list_notepads WHERE created_by=?", (uid,)),  # 2.43.0 (#1346)
         "list_notif": (f"SELECT * FROM list_notif WHERE list_id IN {own}", (uid,)),  # 2.33.0 (#927): my notification templates
         "folder_notif": ("SELECT * FROM folder_notif WHERE owner_id=?", (uid,)),
@@ -574,6 +579,11 @@ def export_json():
                             "WHERE k.owner_id=?)", (uid,)),
         "address_books": ("SELECT id, name, color, created_at FROM books WHERE owner_id=? AND owner_org_id IS NULL", (uid,)),  # 2.52.0 C (#1438): own books
         "contacts": ("SELECT * FROM contacts WHERE book_id IN (SELECT id FROM books WHERE owner_id=? AND owner_org_id IS NULL)", (uid,)),
+        # 2.55.0 (#1455): my own newsletter connection (never the access data), its segments and log
+        "newsletter_connection": ("SELECT id, kind, url, mode, auto, synced_at, created_at, updated_at FROM nl_conns WHERE owner_id=? "
+                                  "AND org_id IS NULL", (uid,)),
+        "newsletter_segments": ("SELECT * FROM nl_segments WHERE conn_id IN (SELECT id FROM nl_conns WHERE owner_id=? AND org_id IS NULL)", (uid,)),
+        "newsletter_runs": ("SELECT * FROM nl_runs WHERE conn_id IN (SELECT id FROM nl_conns WHERE owner_id=? AND org_id IS NULL)", (uid,)),
         # 2.22.0 (#663): my journal, whom I stay in touch with, my Karakeep connection (without the API key)
         "journal": ("SELECT day, text, mood, updated_at FROM journal WHERE user_id=? ORDER BY day", (uid,)),
         "contact_care": ("SELECT contact_id, every_days, last, note, updated_at FROM contact_care WHERE user_id=?", (uid,)),

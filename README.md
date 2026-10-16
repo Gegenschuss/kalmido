@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.55.0** (2026-10-16): **saved arrangements** per view switched in the header, **settings per block**, arrangements
+  **sent as templates**, **agents propose arrangements** (you accept), more views on the block builder and a **newsletter
+  connection** to listmonk (Kalmido sends nothing itself; only consented contacts, unsubscribes come back).
 - **2.53.1** (2026-10-16): CI fixes for 2.53.0, the browser demo loads the on-demand areas (both go live with this version).
 - **2.53.0** (2026-10-16): **the interface** - list colours as the accent with a fixed 12-tone palette and coloured task
   edges, a colour per organisation (private stays neutral), a bell per task with *Urgent*, references by drag and drop with
