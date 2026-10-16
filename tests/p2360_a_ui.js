@@ -68,17 +68,19 @@ const settings = async () => (await call('GET', '/api/state')).settings;
   const row = id => d.querySelector(`#side .srow[data-list="${id}"]`);
   const LISTSVG = () => { const t = d.createElement('div'); t.innerHTML = w.eval(`ic('list')`); return t.querySelector('svg').innerHTML; };
   // 2.38.0 (#1174): the icon itself carries the list colour (--lc on .lic), the dot setting keeps its round dot (.licd)
+  // 2.53.0 (#1426): the sidebar shows the nearest palette tone of the stored colour (listcolor.js lp_near)
+  const tone = h => w.eval(`lp_near('${h}')[2]`);
   const col = id => { const x = row(id); return {svg: !!x?.querySelector('.sic .lic svg'), emo: x?.querySelector('.sic .lemo')?.textContent || '', rd: !!x?.querySelector('.sic .licd'),
     list: !!x?.querySelector('.sic .lic svg') && x.querySelector('.sic .lic svg').innerHTML === LISTSVG(),
     dot: x?.querySelector('.sic .lic')?.getAttribute('style') || '', bg: x?.querySelector('.sic .licd')?.getAttribute('style') || '', name: x?.querySelector('.n')?.textContent,
     prog: !!x?.querySelector('.sprog'), shr: !!x?.querySelector('.shr')}; };
   let c = col(CART);
-  check(c.svg && /--lc:#e8590c/.test(c.dot) && !c.list && !c.rd && !c.emo && c.name === 'Shopping', 'line: the cart as a line icon in the list colour, the name without the emoji ' + JSON.stringify(c));
+  check(c.svg && c.dot.includes('--lc:' + tone('#e8590c')) && !c.list && !c.rd && !c.emo && c.name === 'Shopping', 'line: the cart as a line icon in the list colour, the name without the emoji ' + JSON.stringify(c));
   check(c.shr, 'line: the shared list keeps its share icon in the markup');
   c = col(RED);
-  check(c.svg && c.list && !c.rd && /--lc:#1c7ed6/.test(c.dot) && c.name === 'Red things', 'line: no matching icon -> the list icon in the list colour (#1174) ' + JSON.stringify(c));
+  check(c.svg && c.list && !c.rd && c.dot.includes('--lc:' + tone('#1c7ed6')) && c.name === 'Red things', 'line: no matching icon -> the list icon in the list colour (#1174) ' + JSON.stringify(c));
   c = col(PLAIN);
-  check(c.svg && c.list && !c.rd && /--lc:#2f9e44/.test(c.dot), 'line: no emoji -> the list icon in the list colour (#1174) ' + JSON.stringify(c));
+  check(c.svg && c.list && !c.rd && c.dot.includes('--lc:' + tone('#2f9e44')), 'line: no emoji -> the list icon in the list colour (#1174) ' + JSON.stringify(c));
   c = col(PRJ);
   check(c.svg && c.prog && c.name === 'Releases', 'line: the project in its folder with a line icon and its progress bar ' + JSON.stringify(c));
   check(!/\p{Extended_Pictographic}/u.test([...d.querySelectorAll('#side .srow[data-list]')].map(x => x.textContent).join('')), 'line: no emoji anywhere in the list rows');
@@ -89,15 +91,15 @@ const settings = async () => (await call('GET', '/api/state')).settings;
   w = await boot({user: 'alice', hash: 'l/' + CART}); d = w.document;
   await until(() => row(CART));
   c = col(CART);
-  check(!c.svg && c.emo === '🛒' && /--lc:#e8590c/.test(c.dot) && c.name === 'Shopping', 'emoji: the emoji in the column on a tile tinted in the list colour (#1174) ' + JSON.stringify(c));
+  check(!c.svg && c.emo === '🛒' && c.dot.includes('--lc:' + tone('#e8590c')) && c.name === 'Shopping', 'emoji: the emoji in the column on a tile tinted in the list colour (#1174) ' + JSON.stringify(c));
   c = col(PLAIN);
-  check(c.svg && c.list && !c.rd && /--lc:#2f9e44/.test(c.dot), 'emoji: a list without an emoji gets the list icon in its colour (#1174) ' + JSON.stringify(c));
+  check(c.svg && c.list && !c.rd && c.dot.includes('--lc:' + tone('#2f9e44')), 'emoji: a list without an emoji gets the list icon in its colour (#1174) ' + JSON.stringify(c));
   w.close();
   await call('PATCH', '/api/settings', {side_icons: 'dot'});
   w = await boot({user: 'alice', hash: 'l/' + CART}); d = w.document;
   await until(() => row(CART));
   c = col(CART);
-  check(!c.svg && !c.emo && c.rd && /#e8590c/.test(c.bg) && c.name === 'Shopping', 'dot: only the round dot in the list colour ' + JSON.stringify(c));
+  check(!c.svg && !c.emo && c.rd && c.bg.includes(tone('#e8590c')) && c.name === 'Shopping', 'dot: only the round dot in the list colour ' + JSON.stringify(c));
 
   // ================= progress: the switch and the per-list hiding
   await call('PATCH', '/api/settings', {side_progress: '0'});
@@ -177,7 +179,7 @@ const settings = async () => (await call('GET', '/api/state')).settings;
       const m = await ev(MEASURE);
       // 2.38.0 (#1174): the whole icon in the list colour (light: a little darker), >= 3:1; its dot the same colour
       check(m.grey >= 3, `${tag}: the coloured line icon >= 3:1 against the sidebar (WCAG 1.4.11) ` + JSON.stringify(m));
-      check(m.dot === m.icol && (theme === 'dark' ? m.icol === 'rgb(112, 72, 232)' : m.icol !== m.text), `${tag}: the whole icon in the list colour, no separate dot ` + JSON.stringify([m.icol, m.dot]));
+      check(m.dot === m.icol && m.icol !== m.text /* 2.53.0 (#1426): the colour is the nearest palette tone now, not the stored #7048e8 */, `${tag}: the whole icon in the list colour, no separate dot ` + JSON.stringify([m.icol, m.dot]));
       check(m.onRow && m.active !== m.text && m.activeCr >= 3, `${tag}: the open list's icon keeps its colour and stays readable ` + JSON.stringify([m.active, m.activeCr]));
       check(m.bar > 0 && m.bar <= 1.01, `${tag}: the progress bar is 1 px ` + m.bar);
       check(m.fhFs < m.rowFs && m.fhGrey >= 4.5 && m.fhText !== m.text, `${tag}: the folder head is smaller and grey (still >= 4.5:1) ` + JSON.stringify([m.fhFs, m.rowFs, m.fhGrey]));
