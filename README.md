@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.58.0** (2026-10-16): a collection of **fixes** - Back on Android closes dialogs, invoices from quotations with parts
+  exact to the cent, share expiry on the chosen day, constant-time password reset, sealed list pictures in encrypted
+  organisations, and **job names** for agents.
 - **2.56.1** (2026-10-16): **fewer symbols** in task rows (levels All / Important / Calm / Custom, default Important) and
   switchable sidebar marks, the archive import finds the **recipient's address** of old PDFs again, "Switch on all
   modules" switches on every module.
