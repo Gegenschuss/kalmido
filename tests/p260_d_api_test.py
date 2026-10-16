@@ -176,6 +176,14 @@ check(A.patch(B + f"/api/envs/{LIVE}", json={"auto_close": False}).ok, "auto clo
 T3 = A.post(B + "/api/tasks", json={"title": "Late task", "list_id": P, "milestone_id": M1}).json()["id"]
 r = hook(lurl, json={"version": "Release 2.61.0"})
 check(r.status_code == 201 and st(T3) == 0, "with auto close off a later task stays open")
+# 2.60.0 (leader, #1514 + #1512): with "done only after approval" a task still waiting for its reviewer stays open on arrival
+check(A.put(B + f"/api/lists/{P}/review", json={"on": 1, "gate": 1}).ok, "the review step with its gate on")
+T4 = A.post(B + "/api/tasks", json={"title": "Reviewed task", "list_id": P, "milestone_id": M1}).json()["id"]
+check(A.post(B + f"/api/tasks/{T4}/review", json={"action": "reviewer", "reviewer_id": uid["carol"]}).ok, "carol reviews the new task")
+check(A.patch(B + f"/api/envs/{LIVE}", json={"auto_close": True}).ok, "auto close on")
+r = hook(lurl, json={"version": "Release 2.61.0"})
+check(r.status_code == 201 and st(T3) == 2 and st(T4) == 0, f"auto close completes the free task, the one waiting for review stays open {st(T3)} {st(T4)} " + r.text[:120])
+check(A.patch(B + f"/api/envs/{LIVE}", json={"auto_close": False}).ok and A.put(B + f"/api/lists/{P}/review", json={"on": 0}).ok, "both off again")
 
 # ================================================================== soft delete and restore
 check(A.delete(B + f"/api/envs/{LIVE}").ok, "remove Live")
