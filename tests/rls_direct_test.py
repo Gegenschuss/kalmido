@@ -107,6 +107,11 @@ check(sorted(x[0] for x in sql("SELECT user_id FROM org_members WHERE org_id=?",
 # ---- objects through the API (each organisation)
 LA = Bo.post(B + "/api/lists", json={"name": f"{MARK} list", "org_id": ALPHA}).json()["id"]
 LB = Ca.post(B + "/api/lists", json={"name": "Beta list", "org_id": BETA}).json()["id"]
+# 2.53.0 (#1424): task_bell points at a task (tasks have no org_id, fill_row would take the same one for both): one task and
+# one bell row per organisation
+for s, lid, uid, org in ((Bo, LA, BOB, ALPHA), (Ca, LB, CAROL, BETA)):
+    tid = s.post(B + "/api/tasks", json={"title": "bell", "list_id": lid}).json()["id"]
+    sql("INSERT INTO task_bell(task_id,user_id,org_id,level,created_at,updated_at) VALUES(?,?,?,'mute','2026-01-01','2026-01-01') ON CONFLICT DO NOTHING", (tid, uid, org))
 for s, nm in ((Bo, f"{MARK} cal"), (Ca, "Beta cal")):
     assert s.post(B + "/api/evcals", json={"name": nm}).ok
     assert s.post(B + "/api/books", json={"name": nm.replace("cal", "book")}).ok
