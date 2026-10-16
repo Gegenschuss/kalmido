@@ -434,12 +434,13 @@ def agent_owner_set(c, aid, owner, given):
     if not given:
         return
     if owner in (None, "", 0, "team"):
-        c.execute("UPDATE agents SET owner_id=NULL, admin_paused=0 WHERE user_id=?", (aid,))
+        c.execute("UPDATE agents SET owner_id=NULL, admin_paused=0, office_drafts=CASE WHEN owner_id IS NULL THEN office_drafts ELSE 0 END WHERE user_id=?", (aid,))  # 2.51.0 A (#1348)
         return
     if isinstance(owner, bool) or not isinstance(owner, int) or \
             not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (owner,)).fetchone():
         raise BadInput(tr("Invalid value: {0}", "owner_id"))
-    c.execute("UPDATE agents SET owner_id=? WHERE user_id=?", (owner, aid))
+    # 2.51.0 A (#1348): another owner = maybe another office area (a personal one): the office switch starts off again
+    c.execute("UPDATE agents SET owner_id=?, office_drafts=CASE WHEN owner_id IS NOT DISTINCT FROM ? THEN office_drafts ELSE 0 END WHERE user_id=?", (owner, owner, aid))
 
 
 def agent_org_set(c, aid, v):
@@ -460,7 +461,7 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
         oids = user_orgs(c, a["owner_id"]) if a["owner_id"] else []
         v = oids[0] if oids else (None if a["owner_id"] else main_org(c))
     if v in (None, "", 0, "0", "private"):
-        c.execute("UPDATE agents SET org_id=NULL WHERE user_id=?", (aid,))
+        c.execute("UPDATE agents SET org_id=NULL, office_drafts=CASE WHEN org_id IS NULL THEN office_drafts ELSE 0 END WHERE user_id=?", (aid,))  # 2.51.0 A (#1348)
         if a["org_id"]:  # 2.46.0 (#1592, review fix): a private agent is no member of its former organisation
             c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (a["org_id"], aid))
             from ..core.access import acx_drop
@@ -481,7 +482,8 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
                       (aid, v or 0, aid, v or 0)).fetchone()[0]
         if n:
             raise BadInput(tr("The agent is still in {0} calendars or address books of another workspace: take it out of them first", n))
-    c.execute("UPDATE agents SET org_id=? WHERE user_id=?", (v, aid))
+    # 2.51.0 A (#1348): another workspace = another office area: the office switch (its admin's decision) starts off again
+    c.execute("UPDATE agents SET org_id=?, office_drafts=CASE WHEN org_id IS NOT DISTINCT FROM ? THEN office_drafts ELSE 0 END WHERE user_id=?", (v, v, aid))
     # 2.46.0 (#1592): an agent of an organisation is one of its members (seen and shared with there, as every agent of the
     # former mode organisation); it leaves the membership of its former workspace
     if a["org_id"] and a["org_id"] != v:

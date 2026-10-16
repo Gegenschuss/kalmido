@@ -262,6 +262,14 @@
   them in without you; your values are marked as set by an agent and may wait in *To review*. For a receipt or incoming
   invoice only **suggest** project and category (`suggest_receipt`, event `document_added`); a person accepts it, you never
   set, move or delete it yourself.
+- **Office (2.51.0).** Where the office lets you in (scope `office`, your switch *May draft office documents* and the
+  area's privacy switch *Agents may read office data*), you prepare **drafts only**: `get_office`, `list_office_data`,
+  `list_office_documents`, `get_office_document`, `create_offer_draft` / `update_offer_draft` (your own drafts),
+  `draft_invoice_from_offer` (an accepted quotation, event `offer_accepted`), `draft_reminder`, `suggest_payment` /
+  `list_payment_suggestions`. Take positions from the services (`service_id`); free positions, other prices and discounts
+  are marked for the person. A person reserves the number, finalises, sends, deletes and books payments; never ask them to
+  let you. Client and price data go to your model: read only what the order needs. Pass `requested_by` = the person you
+  work for; `notify: true` puts a card with the sum, the PDF preview and *Open in the office* into their chat.
 
 ### Usage
 - Report your model usage with the hook `mcp/claude_usage_hook.py`, registered as **Stop and SubagentStop** hook in
@@ -331,48 +339,49 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `message_edited`: a person changed a chat message, comment or team message you already had (a correction)
 - `file_shared`: a folder or file of the file store was shared with you (`node`, `role` view | edit)
 - `document_added`: a new document was recognised in a folder / file shared with you (`document`); a receipt? see *assign a receipt* below
+- `offer_accepted`: a quotation of your office area was accepted (`doc_id`, `client_id`, `list_id`, sums); only with your office switch on
 
 Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get_document` (text, sender, amount) ->
-`list_lists` (the projects you can see) -> `suggest_receipt` with project and / or category and a short note why. A person
-accepts or rejects it; you never set it yourself (`list_receipt_suggestions` shows what became of it).
-
-The MCP tools of the Kalmido MCP server (it lists only the ones your token may use; each tool describes itself):
-
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
 `add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
-`add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`, `chat_typing`, `check_in_habit`,
-`clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `create_address_book`, `create_client`,
-`create_contact`, `create_event`, `create_event_calendar`, `create_field`, `create_file_folder`, `create_filter`, `create_form`,
-`create_habit`, `create_job`, `create_list`, `create_list_tag`, `create_note`, `create_packing_list`,
-`create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`, `decide_reward`,
-`delete_address_book`, `delete_attachment`, `delete_chat_attachment`, `delete_client`, `delete_comment`,
-`delete_contact`, `delete_event`, `delete_event_calendar`, `delete_field`, `delete_filter`, `delete_folder`,
-`delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`, `delete_milestone`, `delete_note`,
-`delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`, `delete_task`, `delete_team_message`,
-`delete_template`, `delete_time_entry`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`,
-`export_vcards`, `get_absences`, `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`,
-`get_day_review`, `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_key_figures`, `get_life`, `get_list`,
-`get_me`, `get_milestone`, `get_note`, `get_plan_usage`, `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`,
-`get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`, `get_usage`, `get_workload`, `give_stars`,
-`import_ics`, `import_vcards`, `ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`,
-`list_attachments`, `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`,
-`list_event_calendars`, `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`,
-`list_habits`, `list_jobs`, `list_kids`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`,
-`list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
-`list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
-`list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
-`move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `propose_to_person`, `react`, `react_team_message`, `react_to_chat`,
-`read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
-`rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`,
-`report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
-`request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`,
-`search_contacts`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
-`set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
-`share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
-`stop_timer`, `submit_proposal`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`,
-`unshare_address_book`, `unshare_event_calendar`, `unshare_list`, `unshare_list_from_group`, `update_address_book`,
-`update_client`, `update_comment`, `update_contact`, `update_document`, `update_event`, `update_event_calendar`, `update_field`,
-`update_filter`, `update_form`, `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`,
-`update_note`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
-`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`, `write_journal`
+`add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
+`chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `client_id`, `comment_typing`, `complete_task`,
+`create_address_book`, `create_client`, `create_contact`, `create_event`, `create_event_calendar`, `create_field`,
+`create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_job`, `create_list`, `create_list_tag`,
+`create_note`, `create_offer_draft`, `create_packing_list`, `create_section`, `create_task`, `create_template`,
+`create_text_file`, `create_trip`, `decide_reward`, `delete_address_book`, `delete_attachment`,
+`delete_chat_attachment`, `delete_client`, `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`,
+`delete_field`, `delete_filter`, `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`,
+`delete_milestone`, `delete_note`, `delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`,
+`delete_task`, `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`,
+`draft_reminder`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
+`get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
+`get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_key_figures`, `get_life`,
+`get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`,
+`get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`,
+`get_time_gaps`, `get_timer`, `get_usage`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
+`ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`, `list_attachments`,
+`list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,
+`list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,
+`list_jobs`, `list_kids`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`,
+`list_office_data`, `list_office_documents`, `list_packing_templates`, `list_payment_suggestions`, `list_project_files`,
+`list_receipt_suggestions`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,
+`list_tags`, `list_tasks`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
+`list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `post_team_message`,
+`propose_playbook`, `propose_to_other_topic`, `propose_to_person`, `react`, `react_team_message`, `react_to_chat`,
+`read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `remove_dependency`,
+`rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
+`report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
+`request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
+`request_reward`, `restore_event`, `restore_task`, `search_contacts`, `search_messages`, `search_notes`, `search_tasks`,
+`send_chat`, `set_contact_care`, `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`,
+`set_waiting`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
+`skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
+`sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unshare_address_book`, `unshare_event_calendar`,
+`unshare_list`, `unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
+`update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
+`update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_offer_draft`,
+`update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`, `upload_attachment`,
+`upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`,
+`write_journal`
 <!-- kalmido-tool-index:end -->

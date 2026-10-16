@@ -323,6 +323,7 @@ function ofcSettingsHtml() {
     <h3>${tr('Country pack')}</h3>
     ${ofcRowF('os-pack', tr('Country pack'), `<span class="lacts">${ofcSel('os-pack', s.pack, (OFC.packs || [[p.code, p.name]]))}<span class="muted">${esc(tr('VAT: {0} standard, {1} reduced, {2} exempt', `${fmtNum(p.tax.standard, 1)} %`, `${fmtNum(p.tax.reduced, 1)} %`, `${fmtNum(p.tax.exempt, 1)} %`))}</span></span>`)}${ofcII('pack')}
     ${adm ? `<div class="foot stfoot"><span class="aerr" role="alert"></span><span class="spacer"></span><button type="submit" class="btn pri" data-ofc="save-settings">${tr('Save')}</button></div>` : ''}
+    ${typeof oa_settingsHtml === 'function' ? oa_settingsHtml(s, dis) : ''}
     <h3>${tr('Master data file')}</h3>
     <p class="muted">${tr('Export writes services, equipment, sets, text blocks, contracts and these settings into one JSON file; import reads such a file (also one made from a spreadsheet) and adds what is missing.')}</p>
     <div class="lacts"><a class="btn sm" href="/api/office/export" download="office-master-data.json">${ic('download', 's')} ${tr('Export')}</a>
@@ -439,7 +440,9 @@ function ofcLogHtml() {
   if (!OFC.log.length) return `<p class="muted">${tr('No entries yet.')}</p>`;
   const tg = {doc: N_('Document'), settings: N_('Settings'), company: N_('Company'), logo: N_('Logo'), master_data: N_('Master data'), services: N_('Services'),
     equipment: N_('Equipment'), sets: N_('Sets'), texts: N_('Text blocks'), contracts: N_('Framework contracts'), legacy: N_('Legacy import'), archive: N_('Archive|documents'), datev: N_('DATEV export')};  // 2.47.3 (#1460): + datev
-  return `<ul class="ofdlog" role="list">${OFC.log.map(x => `<li><span class="muted">${esc(typeof ofdWhen === 'function' ? ofdWhen(x.at) : x.at)}</span> <b>${esc(x.user_name || '?')}</b> ${esc(typeof ofdActText === 'function' ? ofdActText(x.action) : x.action)} · ${esc(tr(tg[x.target] || x.target))}${x.doc_id ? ` <a href="#office/offers/${x.doc_id}">#${x.doc_id}</a>` : ''}</li>`).join('')}</ul>`;
+  if (typeof OA_LOG_TG === 'object') Object.assign(tg, OA_LOG_TG);  // 2.51.0 A (#1348): what agents read / drafted, the filter "Agents"
+  const rows = OFC.logAg ? OFC.log.filter(x => /^agent_/.test(x.action)) : OFC.log;
+  return (typeof oa_logFilter === 'function' ? oa_logFilter() : '') + `<ul class="ofdlog" role="list">${rows.map(x => `<li><span class="muted">${esc(typeof ofdWhen === 'function' ? ofdWhen(x.at) : x.at)}</span> <b>${esc(x.user_name || '?')}</b> ${esc(typeof ofdActText === 'function' ? ofdActText(x.action) : x.action)} · ${esc(tr(tg[x.target] || x.target))}${x.doc_id ? ` <a href="#office/offers/${x.doc_id}">#${x.doc_id}</a>` : ''}</li>`).join('')}</ul>`;
 }
 async function ofcSaveSettings(form) {
   const v = id => $(id, form)?.value ?? '', lines = id => v(id).split('\n').map(x => x.trim()).filter(Boolean);
@@ -458,6 +461,7 @@ async function ofcSaveSettings(form) {
     invoice_closing_de: v('#os-inv-close-de'), invoice_closing_en: v('#os-inv-close-en'), reminder_text_de: v('#os-rm-text-de'), reminder_text_en: v('#os-rm-text-en')};
   if (typeof tpSettingsBody === 'function') Object.assign(body, tpSettingsBody(form));  // 2.47.0 (#1215)
   if (typeof dx_settingsBody === 'function') Object.assign(body, dx_settingsBody(form));  // 2.47.3 (#1460)
+  if (typeof oa_settingsBody === 'function') Object.assign(body, oa_settingsBody(form));  // 2.51.0 A (#1348): agents_read
   try { const j = await api('PUT', '/api/office/settings', body); OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null; fgDone(form.dataset.fg); toast(tr('Saved')); ofcDraw(); }
   catch (x) { const el = $('.aerr', form); if (el) el.textContent = x.message || ''; }
 }
@@ -487,6 +491,7 @@ document.addEventListener('click', async e => {
   if (a === 'pb-ws') { if (typeof wsSet === 'function') wsSet(b.dataset.ws); return; }  // 2.47.3 (#1360)
   if (a === 'new') { e.preventDefault(); ofcModal(b.dataset.kind, null); }
   else if (a === 'open') { e.preventDefault(); const r = ofcRow(b.dataset.kind, +b.dataset.id); if (r) ofcModal(b.dataset.kind, r); }
+  else if (a === 'log-all' || a === 'log-ag') { e.preventDefault(); OFC.logAg = a === 'log-ag'; ofcDraw(); }  // 2.51.0 A (#1348)
   else if (a === 'import') { e.preventDefault(); const inp = $('#os-import'); if (inp) { inp.onchange = () => { ofcImport(inp.files[0], $('#os-overwrite')?.checked); inp.value = ''; }; inp.click(); } }
   else if (a === 'log') { e.preventDefault(); try { const j = await api('GET', '/api/office/log?limit=50'); OFC.log = j.log || []; } catch (x) { toast(x.message || ''); OFC.log = []; } ofcDraw(); }
   else if (a === 'bb') { e.preventDefault(); const inp = $('#' + b.dataset.for); if (!inp || inp.disabled) return;  // 2.40.0 (#1382): a building block at the caret

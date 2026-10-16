@@ -80,6 +80,7 @@ SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("
                 "time": N_("Time tracking"), "export": N_("Export"), "calendar": N_("Calendar"), "contacts": N_("Contacts"), "private": N_("Health & journal"),
                 "account": N_("Account settings"), "admin-read": N_("Admin read"),
                 "files:read": N_("Read the file store"), "files:write": N_("Write to the file store"),  # 2.48.0 (#1207)
+                "office": N_("Office drafts"),  # 2.51.0 A (#1348)
                 "write": N_("Everything (old token)")}
 SCOPE_HELP = {"read": N_("Lists, tasks, comments, time entries, habits, search"),
               "tasks:write": N_("Create, change, complete and move tasks; dependencies, habits"),
@@ -93,6 +94,8 @@ SCOPE_HELP = {"read": N_("Lists, tasks, comments, time entries, habits, search")
               "private": N_("Health lists and the journal (sensitive personal data; never for agents)"),
               "files:read": N_("List and read the folders and files shared with you"),  # 2.48.0 (#1207)
               "files:write": N_("Add files and new versions where you may edit"),
+              # 2.51.0 A (#1348): also needs the agent's switch and the office's privacy switch
+              "office": N_("Read clients, services and prices of the office; quotation, invoice and reminder drafts, payment suggestions"),
               "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("Users and server status (admins only)")}
 ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Viewer")}
 BATCH_TITLE = {"update": N_("Change {0} tasks at once"), "complete": N_("Complete {0} tasks at once"), "reopen": N_("Reopen {0} tasks at once"),
@@ -195,7 +198,7 @@ def scopes_offer(c, u, agent=False):
     cap = set(scope_cap(c, "agents" if agent else "tokens"))
     out = []
     for s in SCOPES:
-        if (agent and s in SCOPES_AGENT_NEVER) or (s == "admin-read" and not u["is_admin"]):
+        if (agent and s in SCOPES_AGENT_NEVER) or (s == "admin-read" and not u["is_admin"]) or (s == "office" and not agent):  # 2.51.0 A: office = agents only
             continue
         out.append({"scope": s, "label": tr(SCOPE_LABELS[s]), "help": tr(SCOPE_HELP[s]), "allowed": s in cap})
     return out

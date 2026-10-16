@@ -813,6 +813,9 @@ fresh; run p250_c_ui node p250_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.51.0 part B: an inquiry becomes a project (#1351), the setup assistant (#1358)
 fresh; run p251_b_api "$PY" p251_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p251_b_ui node p251_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.51.0 part A: agents in the office (#1348 quotation drafts, #1350 invoice / reminder drafts, payment suggestions)
+fresh; run p251_a_api "$PY" p251_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p251_a_ui node p251_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
