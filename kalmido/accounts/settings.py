@@ -54,6 +54,8 @@ def clean_setting(k, v):
     The watchdog reads these for every user, so malformed values are never stored."""
     from ..notify.push import PUSH_CHANNELS, PUSH_PRIORITIES
     bad = BadInput(tr("Invalid value: {0}", k))
+    if k == "fav_items":  # 2.57.0 (#1798): the sidebar's favourites of every kind, in their order (a json list)
+        return fv2_clean_items(v)
     if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views", "group_order", "folder_colors", *CAL_LIST_KEYS):
         raise bad
     sv = "" if v is None else str(v).strip()
@@ -605,3 +607,42 @@ def export_json():
     name = f"kalmido-export-{local_now():%Y-%m-%d}.json"
     return Response(json.dumps(data, ensure_ascii=False, indent=1), mimetype="application/json",
                     headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+# 2.57.0 (#1798): favourites of every kind (lists, folders, views, areas, filters, tags, people, groups, agents) as one json
+# list of keys in the order the person arranged them. Lists stay starred in fav_lists (pushes, agents, "Only favourites" read
+# that); their "l:<id>" here only holds the place. A key the person cannot see (any more) is kept but never shown.
+FV2_MAX = 200
+FV2_VIEWS = ("inbox", "assigned", "today", "tomorrow", "week", "doable", "pinned", "waiting", "stale", "byme", "all", "done",
+             "trash", "archived")
+FV2_KEY_RE = re.compile(r"(?:[lafpg]:\d{1,11}|m:[a-z]{2,16}|v:[a-z]{2,12})")
+
+
+def fv2_clean_items(v):
+    """The stored json of fav_items: a list of known keys (or its json text), doubles dropped; BadInput otherwise."""
+    from ..lists.lists import clean_folder
+    bad = BadInput(tr("Invalid value: {0}", "fav_items"))
+    try:
+        arr = json.loads(v or "[]") if isinstance(v, str) else v
+    except ValueError:
+        raise bad from None
+    if not isinstance(arr, list) or len(arr) > FV2_MAX:
+        raise bad
+    out = []
+    for x in arr:
+        if not isinstance(x, str) or not 2 < len(x) <= 220:
+            raise bad
+        if x.startswith("folder:"):
+            f = clean_folder(x[7:], False)
+            if not f:
+                raise bad
+            x = "folder:" + f
+        elif x.startswith("tag:"):
+            t = re.sub(r"[\x00-\x1f]", "", x[4:]).strip()
+            if not t or len(t) > 100:
+                raise bad
+            x = "tag:" + t
+        elif not FV2_KEY_RE.fullmatch(x) or (x.startswith("v:") and x[2:] not in FV2_VIEWS):
+            raise bad
+        out.append(x)
+    return json.dumps(list(dict.fromkeys(out)), ensure_ascii=False, separators=(",", ":"))

@@ -1835,6 +1835,10 @@ USER_DEFAULTS = {
     "agent_push": "0",
     # 2.53.0 C (#1424): 1 = "Urgent" set by someone else on a task counts for my pushes ('0' = as the list; still shown)
     "tbl_accept": "1",
+    # 2.57.0 A (#1798): the sidebar's favourites of every kind in the person's order, json list of keys: "l:<list id>" (the
+    # star itself stays in fav_lists), "folder:<path>", "v:<view>" (today, tomorrow, ...), "m:<module or area>", "f:<filter id>",
+    # "tag:<name>", "p:<user id>", "g:<group id>", "a:<agent id>"; synced to every device like the other settings
+    "fav_items": "[]",
 }
 # global, server-internal (table settings); the legacy single-user rows stay there untouched
 GLOBAL_DEFAULTS = {

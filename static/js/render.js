@@ -412,10 +412,12 @@ function renderSide() {
     more: grp('more', tr('More'), moreRows, '', (moreRows.match(/class="srow/g) || []).length)};
   const oldAcct = $('#side .sbacct');  // 2.47.0 (#1654): keep the account node (same <img>) when nothing about it changed
   $('#side').innerHTML = `
+    <div class="sbfix">${'' /* 2.57.0 (#1798): the fixed head (brand, workspace, search, favourites) stays while the rest scrolls */}
     <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span class="sbtxt"><span>${esc(APP_NAME)}</span></span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${kbFoldAllBtn()}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
     ${wsBarHtml()}
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
-    ${favSideHtml(lists, listRow, head)}${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => SB[g] || '').join('')}
+    ${favSideHtml(lists, listRow, head)}</div>
+    ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => SB[g] || '').join('')}
     <div class="sgroup sfoot">
       <button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
     </div>`;
@@ -647,7 +649,7 @@ function topMoreItems() {
 // personal: only my tag goes, from every task that has it (the tasks stay); one step in the undo history.
 const tagDeleteItem = tag => ({label: tr('Delete tag…'), icon: 'trash', cls: 'danger', fn: () => tagDelete(tag)});
 function tagMenu(anchor, tag) {
-  menu(anchor, [{label: tr('Open'), icon: 'tag', fn: () => go('tag/' + encodeURIComponent(tag))}, '-', tagDeleteItem(tag)]);
+  menu(anchor, [{label: tr('Open'), icon: 'tag', fn: () => go('tag/' + encodeURIComponent(tag))}, ...fv2_menuRow('tag:' + tag) /* 2.57.0 (#1798) */, '-', tagDeleteItem(tag)]);
 }
 async function tagDelete(tag) {
   let n;

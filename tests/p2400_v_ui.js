@@ -76,7 +76,8 @@ const ORGNAME = 'Northwind Trading Company';
   const favs = await until(() => d.querySelector('#side .sg-favs'));
   const groups = [...d.querySelectorAll('#side .sgroup')];
   check(favs && groups[0] === favs, '#1361: the section "Favourites" is the first group of the sidebar');
-  check(favs && [...favs.querySelectorAll('.srow[data-list]')].map(x => +x.dataset.list).join() === `${TEAM},${PRJ}`, '#1361: both favourites in it');
+  // 2.57.0 (#1798): the favourites are icon tiles now (data-fv2 = "l:<id>"), no list rows
+  check(favs && [...favs.querySelectorAll('.fv2-tile[data-fv2]')].map(x => x.dataset.fv2).join() === `l:${TEAM},l:${PRJ}`, '#1361: both favourites in it');
   check(w.eval(`listMenuItems(${TEAM}).some(x => x.label === 'Remove from favourites')`), '#1361: the menu offers to remove it');
   // Only favourites
   const lists = () => d.querySelector('#side .sg-lists');
