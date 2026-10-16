@@ -296,7 +296,7 @@ async function rawFetch0(method, url, body) {
   if (OUT.down) { OUT.down = false; if (S.booted && !OUT.online) renderTop(); }
   setOnline(true);
   if (r.type === 'opaqueredirect' || (r.headers.get('content-type') || '').includes('text/html')) {
-    location.reload();  // Authelia session expired -> login page
+    location.reload();  // login session expired -> login page
     throw new Error('auth');
   }
   const j = await r.json().catch(() => ({}));
