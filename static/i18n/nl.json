@@ -8206,5 +8206,8 @@
   "Back to the whole chat": "Terug naar de hele chat",
   "Job has ended": "Job is beëindigd",
   "The job reads it after its next step.": "De job leest het na zijn volgende stap.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)",
+  "Comments by agents": "Reacties van agents",
+  "Only replies to me": "Alleen antwoorden aan mij",
+  "Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.": "Alleen antwoorden aan mij: een reactie van een agent bereikt je (Nieuws en push) alleen als die op jouw reactie antwoordt, direct na jouw reactie volgt of je noemt. Reacties van mensen veranderen niet."
 }

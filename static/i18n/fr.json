@@ -8206,5 +8206,8 @@
   "Back to the whole chat": "Retour au chat complet",
   "Job has ended": "La tâche est terminée",
   "The job reads it after its next step.": "La tâche le lit après sa prochaine étape.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)",
+  "Comments by agents": "Commentaires des agents",
+  "Only replies to me": "Seulement les réponses à moi",
+  "Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.": "Seulement les réponses à moi : un commentaire d’un agent ne vous parvient (Actualités et push) que s’il répond à votre commentaire, suit directement votre commentaire ou vous mentionne. Les commentaires des personnes ne sont pas concernés."
 }
