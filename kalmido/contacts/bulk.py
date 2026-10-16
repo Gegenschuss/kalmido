@@ -33,17 +33,45 @@ def bk_in(ids):
 
 def bk_occ_drop(c, uid, cids):
     """The birthday / anniversary tasks of these contacts go to the trash (when uid may change their list) and the links
-    are removed: used before a contact is deleted or moves to an address book with another birthday list (one or many)."""
+    are removed: used before a contact is deleted or moves to an address book with another birthday list (one or many).
+    2.58.0 (#1656): a task in a list uid may not change stays, and so does its link (no orphaned task)."""
     from ..tasks.lifecycle import trash_task
     roles = {}
     for blk in bk_blocks(list(cids), 500):
-        for r in c.execute(f"SELECT o.task_id, t.list_id FROM contact_occ o JOIN tasks t ON t.id=o.task_id "
+        keep = set()
+        for r in c.execute(f"SELECT o.contact_id, o.kind, o.task_id, t.list_id FROM contact_occ o JOIN tasks t ON t.id=o.task_id "
                            f"WHERE o.contact_id IN ({bk_in(blk)}) AND t.deleted_at IS NULL", blk).fetchall():
             if r["list_id"] not in roles:
                 roles[r["list_id"]] = list_role(c, r["list_id"], uid)
             if roles[r["list_id"]] in WRITE_ROLES:
                 trash_task(c, r["task_id"])
-        c.execute(f"DELETE FROM contact_occ WHERE contact_id IN ({bk_in(blk)})", blk)
+            else:
+                keep.add((r["contact_id"], r["kind"]))
+        for cid, kind in [(r[0], r[1]) for r in c.execute(f"SELECT contact_id, kind FROM contact_occ WHERE contact_id IN ({bk_in(blk)})", blk).fetchall()]:
+            if (cid, kind) not in keep:
+                c.execute("DELETE FROM contact_occ WHERE contact_id=? AND kind=?", (cid, kind))
+
+
+class f8b_BulkStopped(Exception):
+    """2.58.0 (#1656): a block of a bulk delete / move failed: the blocks before it are committed (done of total)."""
+    def __init__(self, action, done, total):
+        super().__init__(action)
+        self.action, self.done, self.total = action, done, total
+
+
+@app.errorhandler(f8b_BulkStopped)
+def f8b_bulk_stopped(e):
+    return jsonify(error=tr("Stopped after {0} of {1} contacts; the rest is unchanged. Please try again.", e.done, e.total),
+                   code="partial", action=e.action, done=e.done, total=e.total), 500
+
+
+def f8b_stop(c, action, done, total):
+    app.logger.exception("contacts bulk %s stopped after %s of %s", action, done, total)
+    try:
+        c.rollback()
+    except Exception:  # noqa: BLE001 -- the connection may be gone; the answer still tells what was done
+        pass
+    return f8b_BulkStopped(action, done, total)
 
 
 def bk_ids(b):
@@ -240,16 +268,23 @@ def op_contacts_bulk(c, uid, b):
         raise Denied(403, tr("You can only read this address book"))
     if action == "delete":
         bk_gate(c, N_("Delete {0} contacts at once"), len(ids))
-        for blk in bk_blocks(ids):
-            bk_occ_drop(c, uid, blk)
-            c.execute(f"DELETE FROM contacts WHERE id IN ({bk_in(blk)})", blk)
-            for bid in sorted({rows[i]["book_id"] for i in blk}):
-                book_touch(c, bid)
-            bump(c)
-            c.commit()
+        done = 0
+        try:
+            for blk in bk_blocks(ids):
+                bk_occ_drop(c, uid, blk)
+                c.execute(f"DELETE FROM contacts WHERE id IN ({bk_in(blk)})", blk)
+                for bid in sorted({rows[i]["book_id"] for i in blk}):
+                    book_touch(c, bid)
+                bump(c)
+                c.commit()
+                done += len(blk)
+        except Exception:  # 2.58.0 (#1656): the answer tells how many are gone
+            raise f8b_stop(c, "delete", done, len(ids)) from None
         return {"action": "delete", "deleted": len(ids)}
     nb = as_int(b.get("book_id"), "book_id", 1)
     bk, _ = need_book(c, nb, write=True, uid=uid)
+    if bk["src_id"]:  # 2.58.0 (#1656): an imported (mirrored) address book is written by its source only
+        raise Denied(409, tr("An imported address book is updated from its source; contacts cannot be moved into it"))
     bk_gate(c, N_("Move {0} contacts at once"), len(ids))
     seen = {(r["uid"], "u") for r in c.execute("SELECT uid FROM contacts WHERE book_id=?", (nb,)).fetchall()}
     seen |= {(r["href"], "h") for r in c.execute("SELECT href FROM contacts WHERE book_id=?", (nb,)).fetchall()}
@@ -267,19 +302,24 @@ def op_contacts_bulk(c, uid, b):
     if mv and have + len(mv) > CONTACTS_PER_BOOK:
         raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
     occ = {r[0]: r[1] for r in c.execute(f"SELECT id, occ_list_id FROM books WHERE id IN ({bk_in(list(books))})", list(books)).fetchall()}
-    for blk in bk_blocks(mv):
-        # a new birthday list: the old tasks go, the target's list gets new ones (the same list: they stay)
-        drop = [i for i in blk if occ.get(rows[i]["book_id"]) != bk["occ_list_id"]]
-        if drop:
-            bk_occ_drop(c, uid, drop)
-        c.execute(f"UPDATE contacts SET book_id=?, updated_at=? WHERE id IN ({bk_in(blk)})", [nb, iso_ms(now_utc()), *blk])
-        for i in drop:
-            if rows[i]["bday"] or rows[i]["anniversary"]:
-                occ_sync(c, i)
-        for bid in sorted({rows[i]["book_id"] for i in blk} | {nb}):
-            book_touch(c, bid)
-        bump(c)
-        c.commit()
+    done = 0
+    try:
+        for blk in bk_blocks(mv):
+            # a new birthday list: the old tasks go, the target's list gets new ones (the same list: they stay)
+            drop = [i for i in blk if occ.get(rows[i]["book_id"]) != bk["occ_list_id"]]
+            if drop:
+                bk_occ_drop(c, uid, drop)
+            c.execute(f"UPDATE contacts SET book_id=?, updated_at=? WHERE id IN ({bk_in(blk)})", [nb, iso_ms(now_utc()), *blk])
+            for i in drop:
+                if rows[i]["bday"] or rows[i]["anniversary"]:
+                    occ_sync(c, i)
+            for bid in sorted({rows[i]["book_id"] for i in blk} | {nb}):
+                book_touch(c, bid)
+            bump(c)
+            c.commit()
+            done += len(blk)
+    except Exception:  # 2.58.0 (#1656): the answer tells how many moved
+        raise f8b_stop(c, "move", done, len(mv)) from None
     return {"action": "move", "moved": len(mv), "unchanged": same, "conflicts": conflicts}
 
 
