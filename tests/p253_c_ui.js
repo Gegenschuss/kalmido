@@ -1,5 +1,5 @@
 // 2.53.0 UI tests, part C (#1424 the bell of one task), own container (start.sh). jsdom:
-// - the task header has a bell button; its menu offers As the list / Muted / Urgent until completed / Urgent until a
+// - the task menu "…" has "Notifications for this task…" (a header button only while it is not "As the list"); the bell menu offers As the list / Muted / Urgent until completed / Urgent until a
 //   date, with the honest hint (Android / ntfy comes through, the iPhone web app cannot break through Focus)
 // - "Urgent until completed" saves, the button shows "Urgent"; ONE undo step puts it back
 // - the list's owner gets "Urgent for others…": ticking Bob marks him (server), Bob sees "Urgent, set by Alice";
@@ -43,10 +43,13 @@ const item = (d, re) => items(d).find(b => re.test(b.textContent));
   let w = await boot({user: 'alice', hash: `l/${L}`}), d = w.document;
   await booted(w);
   w.eval(`openDetail(${T})`);
-  const btn = await until(() => d.querySelector(`#detail [data-tblb="${T}"]`));
-  check(!!btn && /As the list/.test(btn.getAttribute('aria-label') || ''), 'the task header has the bell, "As the list"');
-  click(w, d.querySelector(`[data-tblb="${T}"]`));
-  check(await until(() => items(d).length >= 5), 'the bell opens a menu');
+  await until(() => d.querySelector(`#detail [data-tblph="${T}"]`) && w.eval(`!!S.tbl && !!S.tbl[${T}]`));
+  check(!d.querySelector(`#detail [data-tblb="${T}"]`), 'as the list: no extra button in the crowded task header');
+  w.eval(`taskMenu(document.querySelector('#detail .dtop [data-act="task-menu"]'), ${T})`);
+  const mi = await until(() => item(d, /Notifications for this task…/));
+  check(!!mi, 'the task menu "…" has "Notifications for this task…"');
+  click(w, mi);
+  check(await until(() => items(d).length >= 5 && item(d, /^Muted$/)), 'it opens the bell menu');
   check(item(d, /^As the list$/) && item(d, /^Muted$/) && item(d, /Urgent until completed/) && item(d, /Urgent until a date/), 'menu: the four choices ' + items(d).map(b => b.textContent.trim()).join(' | '));
   const hint = items(d).find(b => b.classList.contains('tbl-hint'));
   check(hint && /Android \(ntfy\)/.test(hint.textContent) && /iPhone/.test(hint.textContent) && /not an alarm/.test(hint.textContent), 'menu: the honest hint about Android / iPhone');
@@ -57,11 +60,11 @@ const item = (d, re) => items(d).find(b => re.test(b.textContent));
   check(/Urgent/.test(d.querySelector(`[data-tblb="${T}"]`)?.textContent || ''), 'the button says "Urgent"');
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await call('GET', `/api/tasks/${T}/bell`)).mine?.level === 'list'), 'one undo step: back to as the list');
-  check(await until(() => d.querySelector(`[data-tblb="${T}"].lv-list`)), 'undo: the button follows');
+  check(await until(() => !d.querySelector(`[data-tblb="${T}"]`) && d.querySelector(`[data-tblph="${T}"]`)), 'undo: the button goes again');
 
   // ---- for others: tick Bob in the dialog
   w.confirm = () => { const x = d.querySelector(`.cdlg [data-tblp="${BOB}"]`); if (x) x.checked = true; return true; };
-  click(w, d.querySelector(`[data-tblb="${T}"]`));
+  w.eval(`tbl_menu(document.querySelector('#detail .dtop'), ${T})`);
   await until(() => item(d, /Urgent for others/));
   click(w, item(d, /Urgent for others/));
   check(await until(async () => (await call('GET', `/api/tasks/${T}/bell`, null, CB)).mine?.level === 'urgent', 60), 'for others: Bob is marked urgent');

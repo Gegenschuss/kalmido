@@ -16,18 +16,24 @@ function tbl_untilTxt(m) {
 }
 const tbl_state = tid => tbl_cache()[tid] || null;
 const TBL_LOADING = new Map();  // task id -> the running request
-// the header button: icon + word (the word shows on wide screens; "Urgent" always)
+// the header button: only when the bell is not "As the list" (or for someone who cannot edit the task: their only way,
+// the "…" menu is not there); the menu "…" of the task always has "Notifications for this task…" (tbl_menuItems).
+// Not loaded yet / as the list: an empty placeholder that tbl_paint fills in.
 function tbl_btnHtml(t, ck) {
   if (ck || !(t?.id > 0) || t.context || typeof collab !== 'function' || !collab()) return '';
   const j = tbl_state(t.id);
   if (S.tblLast !== t.id) { S.tblLast = t.id; tbl_load(t.id, true); }  // fresh each time a task opens (others may have changed it)
   else if (!j) tbl_load(t.id);
   const m = j?.mine || {level: 'list'}, lv = m.level || 'list';
+  if (!j || (lv === 'list' && (typeof canEdit !== 'function' || canEdit(t)))) return `<i class="tbl-ph" data-tblph="${t.id}" hidden></i>`;
   const by = m.by_name && m.set_by !== S.me?.id ? m.by_name : '';
   const word = lv === 'urgent' ? (by ? tr('Urgent, set by {0}', by) : tr('Urgent')) : tr(TBL_LABEL[lv]);
   const tip = tr('Notifications for this task') + ': ' + word + (lv === 'urgent' ? ' · ' + tbl_untilTxt(m) : '') + (lv === 'urgent' && m.active === false ? ' · ' + tr('not active') : '');
-  return `<button type="button" class="iconbtn tbl-b lv-${lv}${lv !== 'list' ? ' on' : ''}${m.active === false && lv === 'urgent' ? ' off' : ''}" data-tblb="${t.id}" aria-haspopup="menu" title="${esc(tip)}" aria-label="${esc(tip)}">${ic(TBL_ICON[lv] || 'bell')}<span class="dpw${lv === 'urgent' ? ' tbl-w' : ''}">${esc(lv === 'urgent' ? tr('Urgent') : tr(TBL_LABEL[lv]))}</span></button>`;
+  return `<button type="button" class="iconbtn tbl-b lv-${lv}${lv !== 'list' ? ' on' : ''}${m.active === false && lv === 'urgent' ? ' off' : ''}" data-tblb="${t.id}" aria-haspopup="menu" title="${esc(tip)}" aria-label="${esc(tip)}">${ic(TBL_ICON[lv] || 'bell')}<span class="dpw">${esc(lv === 'urgent' ? tr('Urgent') : tr(TBL_LABEL[lv]))}</span></button>`;
 }
+// the item of the task's menu "…" (popovers.js taskMenu)
+const tbl_menuItems = (t, anchor) => t?.id > 0 && !t.context && typeof collab === 'function' && collab()
+  ? [{label: tr('Notifications for this task…'), icon: TBL_ICON[tbl_state(t.id)?.mine?.level] || 'bell', fn: () => tbl_menu(anchor?.isConnected ? anchor : $('#detail .dtop') || document.body, t.id)}] : [];
 function tbl_load(tid, force) {
   const C = tbl_cache();
   if (TBL_LOADING.has(tid)) return TBL_LOADING.get(tid);
@@ -39,7 +45,7 @@ function tbl_load(tid, force) {
 }
 function tbl_paint(tid) {
   const t = typeof taskById === 'function' ? taskById(tid) : null;
-  for (const b of $$(`[data-tblb="${tid}"]`)) {
+  for (const b of $$(`[data-tblb="${tid}"],[data-tblph="${tid}"]`)) {
     if (!t) continue;
     const h = tbl_btnHtml(t, false); if (!h) continue;
     const w = document.createElement('div'); w.innerHTML = h;

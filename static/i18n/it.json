@@ -1,5 +1,6 @@
 {
   "_meta": {"name": "Italiano", "locale": "it-IT", "beta": true},
+  "Notifications for this task…": "Notifiche per questa attività…",
   "{0} added a file": "{0} ha aggiunto un file",
   "{0} added a subtask": "{0} ha aggiunto una sottoattività",
   "{0} changed the assignee": "{0} ha cambiato l'assegnatario",

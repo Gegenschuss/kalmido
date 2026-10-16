@@ -1,5 +1,6 @@
 {
   "_meta": {"name": "Nederlands", "locale": "nl-NL", "beta": true},
+  "Notifications for this task…": "Meldingen voor deze taak…",
   "{0} added a file": "{0} heeft een bestand toegevoegd",
   "{0} added a subtask": "{0} heeft een subtaak toegevoegd",
   "{0} changed the assignee": "{0} heeft de toegewezen persoon gewijzigd",

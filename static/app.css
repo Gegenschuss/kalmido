@@ -7491,8 +7491,8 @@ body.cgdrag .week,body.cgdrag .cal{cursor:grabbing}
 .dtop .tbl-b.on{color:var(--accent)}
 .dtop .tbl-b.lv-urgent{width:auto;padding:0 .5rem;gap:.25rem;border-radius:var(--r-s);background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .dtop .tbl-b.lv-urgent.off{background:none;color:var(--text2)}
-.dtop .tbl-b.lv-urgent .tbl-w{display:inline-flex;color:inherit;font-weight:600}
-@media (max-width:899px){.dtop .tbl-b.lv-urgent{width:2.75rem;padding:0;border-radius:50%}.dtop .tbl-b.lv-urgent .tbl-w{display:none}}  /* phone: the tinted ring bell alone, its words are in the menu */
+.dtop .tbl-b.lv-urgent .dpw{color:inherit;font-weight:600}
+@media (max-width:899px){.dtop .tbl-b.lv-urgent{width:2.75rem;padding:0;border-radius:50%}.dtop .tbl-b.lv-urgent .dpw{display:none}}  /* phone: the tinted ring bell alone, its words are in the menu */
 @media (pointer:coarse){ @container dtop (max-width:27.99rem){ .dtop .tbl-b{order:9;flex:none} .dtop .tbl-b .dpw{display:none} } }  /* narrow phones: in the second row, next to the date (the first row is full) */
 .menu-list button.tbl-st[disabled],.menu-list button.tbl-hint[disabled]{opacity:1;cursor:default;white-space:normal;line-height:1.35;color:var(--text2)}
 .menu-list button.tbl-hint[disabled]{font-size:var(--fs-s);color:var(--muted);max-width:22rem}
