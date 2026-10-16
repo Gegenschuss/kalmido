@@ -214,8 +214,7 @@ def admin_setup():
     e = _apply_instance(c, {k: b[k] for k in ("collab_all", "time_all") if k in b})
     if e:
         return e
-    # 2.48.0 (#1207, #1111): the file store and the documents are not offered in this step -> they stay on (as for everyone in features_rev 11)
-    fs = ",".join(f for f in USER_DEFAULTS["features"].split(",") + ["family"] if f in ("collab", "time", "files", "docs") or f in mods)
+    fs = ",".join(f for f in USER_DEFAULTS["features"].split(",") + ["family"] if f in ("collab", "time") or f in mods)
     gset(c, "default_features", fs)
     # 2.44.0 (#1187): the areas Review and Home bring the journal and Home & life: on for the admin only (as with a purpose)
     from ..family.family import _LIFE
