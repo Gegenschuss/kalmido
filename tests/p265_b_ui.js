@@ -1,6 +1,7 @@
 // 2.65.0 part B (#1823, #1824): more areas load on demand (static/js/lazyload.js), their styles with them (static/css/). Own
 // container (start.sh).
-// - layout: no script tag for the new modules (agentchat, pdf, mindmap, wiki, stats, calendar, docs), sw.js precaches their files
+// - layout: no script tag for the new modules (agentchat, pdf, mindmap, wiki, stats, calendar, docs, life, integrations, playbook,
+//   timeline), sw.js precaches their files
 //   (LAZY = LD_MODS) and their stylesheets (LAZY_CSS = LD_CSS = static/css/*.css); the start parts (chatbase.js) load at start;
 //   the start is smaller than 2.56.3 (scripts with a tag + app.css + i18n.js)
 // - jsdom (boot lazy: true): a cold start loads no module and no module stylesheet, no script error; the no-op stand-ins answer
@@ -21,7 +22,8 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = t; } return j; };
 const until = async (fn, n = 50) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(100); } return fn(); };
 const get = async u => (await fetch(B + u)).text();
-const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview'], mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag'], docs: ['docs', 'paperless', 'receipts']};
+const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview'], mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag'], docs: ['docs', 'paperless', 'receipts'],
+  life: ['life'], integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline', 'roadmap']};
 
 (async () => {
   // ================= layout (no browser)
@@ -50,7 +52,7 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview'], mindmap: 
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en'});
   const st0 = await call('GET', '/api/state');
   const feats = (st0.settings.features || '').split(',').filter(Boolean);
-  await call('PATCH', '/api/settings', {features: [...new Set([...feats, 'cal', 'stats', 'wiki', 'docs', 'agents', 'events'])].join(',')});
+  await call('PATCH', '/api/settings', {features: [...new Set([...feats, 'cal', 'stats', 'wiki', 'docs', 'agents', 'events', 'timeline', 'contracts'])].join(',')});
   const LID = (st0.lists || []).find(l => !l.archived)?.id || (await call('POST', '/api/lists', {name: 'Lazy'})).id;
   const TID = (await call('POST', '/api/tasks', {list_id: LID, title: 'Lazy task'})).id;
   check(LID > 0 && TID > 0, 'setup: a list and a task');
@@ -63,6 +65,7 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview'], mindmap: 
   const cssOn = m => { const l = d.querySelector(`link[data-ldcss="${m}"]`); return !!l && !!l.sheet && l.sheet.cssRules.length > 3; };
   const why = () => ` [modules ${lazyTags().join(' ')}; sheets ${[...d.querySelectorAll('link[data-ldcss]')].map(l => l.dataset.ldcss + ':' + (l.sheet ? l.sheet.cssRules.length : 'none')).join(' ')}; view ${(d.querySelector('#view')?.textContent || '').trim().slice(0, 60)}]`;
   check(lazyTags().length === 0 && !d.querySelector('link[data-ldcss]'), 'cold start: no module, no module stylesheet loaded');
+  check(w.eval('typeof isRoadmap') === 'function' && w.eval('typeof tlReaches') === 'function' && w.eval('typeof lifeOn') === 'function' && w.eval('typeof pbMenuItem') === 'function' && w.eval('typeof API_DOCS') === 'string' && w.eval('typeof fmtMoney') === 'function', 'start parts of timeline, life, playbook, integrations there');
   check(w.eval('typeof chatFull') === 'function' && w.eval('typeof rxRow') === 'function' && w.eval('typeof patchKids') === 'function' && w.eval('typeof pv_attr') === 'function' && w.eval('typeof calReq') === 'function' && w.eval('typeof barChart') === 'function', 'start parts there: chatbase.js, pv_attr, calReq, the charts');
   check(w.eval(`[chatPatch(), chatFit(), chatTypers(null), stepsChanged()].join('')`) === '' && lazyTags().length === 0, 'no-op stand-ins answer without loading the chat');
   check(w.eval(`FEATS.some(f => f[0] === 'docs')`) && w.eval(`typeof dc_shareOk`) === 'function', 'the documents module switch is there before docs.js');
@@ -91,6 +94,15 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview'], mindmap: 
   w.eval(`go('wiki')`);
   await until(() => d.querySelector('#view .wkspace, #view .wkside, #view .wk-view') || !/Loading…/.test(d.querySelector('#view').textContent || ''), 80);
   check(cssOn('wiki') && cssOn('mindmap') && !/^\s*Loading…\s*$/.test(d.querySelector('#view').textContent || ''), 'knowledge pages: wiki.css + mindmap.css, the view drawn' + why());
+  // timeline / roadmap: the command bar's "Timeline" (rmSet loads the module, then shows the roadmap)
+  w.eval(`rmSet({v: 'timeline'}, 'none'); go('all')`);
+  await until(() => lazyTags().includes('roadmap') && d.querySelector('#view #tlscroll, #view .rm-empty'), 80);
+  check(['timeline', 'roadmap'].every(f => lazyTags().includes(f)) && cssOn('timeline') && !!d.querySelector('#view #tlscroll, #view .rm-empty') && w.eval('isRoadmap()'), 'timeline: timeline.js + roadmap.js + timeline.css, the roadmap drawn' + why());
+  w.eval(`rmSet({v: 'list'}, 'none')`);
+  // home & life
+  w.eval(`go('life')`);
+  await until(() => w.eval('S.route.mod') === 'life' && d.querySelector('#view .lcard, #view .dcard'), 80);
+  check(lazyTags().includes('life') && cssOn('life') && !!d.querySelector('#view .lcard, #view .dcard'), 'home & life: life.js + life.css, the view drawn' + why());
   // PDF preview: a preview link drawn at start, the click loads pdfview.js
   const a = d.createElement('a'); a.href = '/static/x.pdf'; a.setAttribute('data-pview', JSON.stringify({url: '/static/x.pdf', name: 'x.pdf'})); a.textContent = 'x'; d.body.appendChild(a);
   a.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, button: 0}));
@@ -100,7 +112,7 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview'], mindmap: 
   // settings: needs the agent chat (its panes) and the calendar (Integrations > Calendars) first
   await w.eval(`settingsModal('look')`);
   await until(() => d.querySelector('.smodal'));
-  check(['agentchat', 'agentsetup', 'settings'].every(f => lazyTags().includes(f)) && lazyTags().indexOf('agentchat') < lazyTags().indexOf('settings') && cssOn('agentchat') && cssOn('settings'), 'settings: agentchat.js + agentsetup.js before settings.js, with their stylesheets' + why());
+  check(['agentchat', 'agentsetup', 'integrations', 'playbook', 'settings'].every(f => lazyTags().includes(f)) && lazyTags().indexOf('integrations') < lazyTags().indexOf('agentchat') && lazyTags().indexOf('agentchat') < lazyTags().indexOf('settings') && cssOn('agentchat') && cssOn('settings'), 'settings: integrations.js, agentchat.js + agentsetup.js, playbook.js before settings.js, with their stylesheets' + why());
   check(!/loadModule/.test(w.eval('String(chatOpen)')) && w.eval('chatPatch.name') === 'chatPatch', 'after loading: the real chatOpen / chatPatch replace the stand-ins');
   d.querySelector('.smodal')?.remove();
   const own = errs.slice(e0).filter(e => !/pdf\.min\.mjs|dynamic import|import\(\)|Could not parse CSS/i.test(e));
@@ -110,7 +122,7 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview'], mindmap: 
   // cold start straight into the calendar: it loads at once (no empty view)
   w = await boot({user: 'alice', lazy: true, hash: 'cal'}); d = w.document; await ready(w);
   await until(() => d.querySelector('#view .calbar'), 80);
-  check(!!d.querySelector('#view .calbar') && cssOn('calendar') && !['stats', 'docs', 'pdfview'].some(f => lazyTags().includes(f)), 'cold start #cal: the calendar, not the other new modules' + why());
+  check(!!d.querySelector('#view .calbar') && cssOn('calendar') && !['stats', 'pdfview'].some(f => lazyTags().includes(f)), 'cold start #cal: the calendar, not the other new modules' + why());
   w.close();
 
   // ================= Firefox: real browser + service worker

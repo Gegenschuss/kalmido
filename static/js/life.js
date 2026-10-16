@@ -8,8 +8,7 @@
 // renewal), a device a task due when the warranty ends, upkeep a repeating task, a health entry a task in a private health
 // list (never visible to agents), a trip a list with dates. The view loads GET /api/life (contacts and Karakeep are not in
 // /api/state); the review has its own view with the private journal.
-const LIFE_MODS = ['contracts', 'home', 'care', 'health', 'travel', 'reading'];
-const lifeOn = () => LIFE_MODS.some(m => feat(m));
+// 2.65.0 (#1823): LIFE_MODS, lifeOn and fmtMoney are in lazyload.js (this file loads on demand, module life)
 const LF = {data: null, loading: false, seq: 0};
 const RV = {period: 'day', date: null, data: null, loading: false, seq: 0, edit: null, t: null};
 const HEALTH_TYPES = [['appointment', N_('Appointment'), '🩺'], ['checkup', N_('Check-up'), '📋'], ['vaccination', N_('Vaccination'), '💉'], ['medication', N_('Medication'), '💊']];
@@ -17,12 +16,6 @@ const PERIOD_WORD = {month: N_('per month'), quarter: N_('per quarter'), year: N
 const MOODS = [[1, '😞', N_('Bad')], [2, '😕', N_('Not so good')], [3, '😐', N_('Okay')], [4, '🙂', N_('Good')], [5, '😄', N_('Great')]];
 const lifeKind = t => t?.fam?.kind;
 const isLifeTask = t => ['contract', 'device', 'upkeep', 'health', 'bookmark'].includes(lifeKind(t));
-function fmtMoney(n) {
-  if (n == null) return '';
-  let s; try { s = new Intl.NumberFormat(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(n); } catch { s = n.toFixed(2); }
-  const cur = S.settings.time_currency ?? '€';
-  return cur ? s + ' ' + cur : s;
-}
 const lifeWhen = (d, soon = 30) => { if (!d) return ''; const n = daysTo(d); return `<span class="fwhen ${n < 0 ? 'over' : n <= soon ? 'soon' : ''}">${esc(Math.abs(n) <= 14 ? daysWord(n) : fmtDateLoc(d))}</span>`; };
 const noticeWord = (n, u) => !n ? tr('no notice period') : u === 'd' ? trn('{0} day', '{0} days', n) : u === 'w' ? trn('{0} week', '{0} weeks', n) : trn('{0} month', '{0} months', n);
 
