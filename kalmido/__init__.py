@@ -87,6 +87,7 @@ ORDER = (
     "agents.api",
     "agents.proposals",
     "agents.cleanup",  # 2.39.0 (#1151)
+    "agents.propkinds2",  # 2.51.0 B (#1351 #1358)
     "agents.setup",  # 2.44.0 (#1517)
     "lists.playbook",  # 2.39.0 (#1168)
     "tasks.attachtext",  # 2.34.0 (#368)
