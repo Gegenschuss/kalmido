@@ -8187,5 +8187,6 @@
   "Look at how my start page is arranged (tools get_view_layout and list_layout_blocks, view dashboard, user_id = my id) and which lists I use most. Only if a clearly better arrangement exists (for example my favourites and what I use every day on top), send me ONE proposal (tool propose_layout) with a short reason. Never repeat one I declined. Change nothing yourself.": "Bekijk hoe mijn startpagina is ingedeeld (tools get_view_layout en list_layout_blocks, weergave dashboard, user_id = mijn id) en welke lijsten ik het meest gebruik. Alleen als er een duidelijk betere indeling is (bijvoorbeeld mijn favorieten en wat ik dagelijks gebruik bovenaan), stuur me ÉÉN voorstel (tool propose_layout) met een korte reden. Herhaal nooit een voorstel dat ik heb afgewezen. Verander zelf niets.",
   "Customize statistics": "Statistieken aanpassen",
   "Customize the client card": "Klantkaart aanpassen",
-  "Customize Family": "Gezin aanpassen"
+  "Customize Family": "Gezin aanpassen",
+  "App passwords (CalDAV) and API tokens stay valid. If someone else may have had access, check them under Settings > Account (API tokens: Advanced · for developers).": "App-wachtwoorden (CalDAV) en API-tokens blijven geldig. Als iemand anders toegang kan hebben gehad, controleer ze onder Instellingen > Account (API-tokens: Geavanceerd · voor ontwikkelaars)."
 }

@@ -21,7 +21,8 @@ from ..integrations.mail import MAIL_OUT_ON, mail_send
 
 PW_LIMITS = (3, 10, 20)  # requests per 15 min: address + sender IP, sender IP, address (any IP)
 PW_GAP = 300             # s: at most one self-service link per account in this time
-PW_PAD = 0.45            # s: every answer takes at least this long (the found and the unknown path look alike)
+PW_PAD = 0.9             # s: every answer ends at this total time (the found and the unknown path look alike)
+# 2.58.0 (#1792): 0.45 -> 0.9 s, so the database part under load stays well inside the padding (L1)
 
 
 def pw_forgot_on():

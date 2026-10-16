@@ -7655,3 +7655,6 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .lyp-use{margin:.375rem 0}
 /* 2.55.0 D (#1067) statistics, the client card and family on the view builder: the blocks keep the spacing the cards had (the cards bring their own top margin) */
 .mscly .lybar,.stats > .lybar{display:flex;justify-content:flex-end}
+
+/* 2.58.0 A (#1724) "Join" in a list seen through the organisation: a full touch target on phones */
+@media (pointer:coarse){ .rohint.ovbar .btn{min-height:2.75rem} }
