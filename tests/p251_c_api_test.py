@@ -339,5 +339,21 @@ check(r.ok, f"setup: a list-wide entry of 12 h in P4 ({r.status_code} {r.text[:1
 r = AGS.get(V + "/time/check", params={"user_id": BOB, "from": str(DY), "to": str(DY)})
 check(r.ok and not r.json()["issues"], f"review 13: the participant agent does not see the list-wide entry ({r.text[:200]})")
 
+# review 5 (#1355): a list limit hides other lists' bookings; agents need the module disposition too
+LB, LBS = agent("limitbot", ["read", "tasks:write", "calendar"], org=ORG)
+dbx("UPDATE api_tokens SET list_ids=? WHERE user_id=?", (str(P), LB), write=True)
+r = LBS.get(V + "/dispo", params={"start": str(DAY), "days": 2})
+bks = r.json().get("bookings", [])
+hid = [b for b in bks if b.get("hidden")]
+check(r.ok and "Other film" not in r.text and hid and all(b["title"] == "Booked" and b["list_id"] is None and not b["job"] for b in hid)
+      and [b for b in bks if b["list_id"] == P and b["title"].startswith("Shoot day")], f"review 5: list limit, other bookings only as Booked ({bks[:3]})")
+r = AGS.get(V + "/dispo", params={"start": str(DAY), "days": 2})
+check(r.ok and "Other film" in r.text, "review 5: without a list limit the agent still sees the titles")
+Bo.patch(B + "/api/settings", json={"features": FEAT.replace(",dispo", "")})
+check(AGS.get(V + "/dispo").status_code == 409 and AGS.get(V + "/dispo/free", params={"date": str(DAY)}).status_code == 409,
+      "review 5: the module disposition off at the organisation's admin: 409 for its agent")
+Bo.patch(B + "/api/settings", json={"features": FEAT})
+check(AGS.get(V + "/dispo").ok, "review 5: module on again: ok")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

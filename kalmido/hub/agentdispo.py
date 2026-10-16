@@ -67,6 +67,7 @@ def adz_area(c, want=None):
             oid, personal = None, False
         if not oid or (want is not None and want != oid):
             raise Denied(404)
+        _adz_feat(c, oid, r["owner_id"] if personal else None)
         return oid, personal
     if u["kid"]:
         raise Denied(403)
@@ -75,6 +76,32 @@ def adz_area(c, want=None):
     if not oid:
         raise Denied(404)
     return oid, False
+
+
+def _adz_feat(c, oid, owner):
+    """2.51.0 (#1355): an agent reads the disposition only while the module is on -- for a personal agent at its owner, for
+    an organisation's agent at one of the organisation's admins (people need it themselves, need_feat("dispo"))."""
+    from ..core.access import FEAT_OFF
+    from ..core.db import usettings
+    if owner:
+        uids = [owner]
+    else:
+        uids = [x[0] for x in c.execute("SELECT user_id FROM org_members WHERE org_id=? AND role='admin' ORDER BY user_id", (oid,))]
+    if not any("dispo" in (usettings(c, u).get("features") or "").split(",") for u in uids):
+        raise Denied(409, tr(FEAT_OFF["dispo"]))
+
+
+def adz_hidden(lid):
+    """2.51.0 (#1355): a booking of a list outside the token's list limit (agents.list_ids) is shown only as "booked"."""
+    from ..core.access import token_lists
+    tl = token_lists()
+    return tl is not None and lid not in tl
+
+
+def adz_mask(d):
+    if adz_hidden(d.get("list_id")):
+        d.update(job="", title=tr("Booked"), list_id=None, event_id=None, hidden=True)
+    return d
 
 
 def _Ctx(c, personal):
@@ -113,7 +140,7 @@ def v1_adz_dispo():
         gone = abs_days(c, [p["id"] for p in res["people"]], first, last, oid)
         hol = abs_holidays(abs_state(c, oid), first, last)
     return jsonify(org_id=oid, start=first.isoformat(), end=last.isoformat(), resources=res,
-                   bookings=[{k: v for k, v in dsp_public(r, conf.get(r["id"])).items() if k != "note"} for r in rows],
+                   bookings=[adz_mask({k: v for k, v in dsp_public(r, conf.get(r["id"])).items() if k != "note"}) for r in rows],
                    away={str(k): sorted(v) if isinstance(v, (set, dict, list)) else v for k, v in gone.items()},
                    holidays=[{"date": k, "name": v} for k, v in sorted(hol.items())])
 
@@ -167,9 +194,10 @@ def adz_warnings(c, oid, personal, lid, days, crew):
     with _Ctx(c, personal):
         for d in days:
             s, e = _span(d)
-            other = c.execute("SELECT DISTINCT title FROM hub_bookings WHERE org_id=? AND deleted_at IS NULL AND start<=? AND \"end\">=? "
-                              "AND (list_id IS NULL OR list_id!=?) ORDER BY title LIMIT 5", (oid, e[:10] + "T99", s[:10], lid or 0)).fetchall()
-            d["warnings"] = [{"kind": "other_projects", "titles": [r[0] for r in other]}] if other else []
+            other = c.execute("SELECT title, list_id FROM hub_bookings WHERE org_id=? AND deleted_at IS NULL AND start<=? AND \"end\">=? "
+                              "AND (list_id IS NULL OR list_id!=?) ORDER BY title", (oid, e[:10] + "T99", s[:10], lid or 0)).fetchall()
+            other = sorted({tr("Booked") if adz_hidden(r[1]) else r[0] for r in other})[:5]  # 2.51.0 (#1355): the list limit
+            d["warnings"] = [{"kind": "other_projects", "titles": other}] if other else []
         if crew:
             rows = []
             for i, x in enumerate(crew):
@@ -183,8 +211,8 @@ def adz_warnings(c, oid, personal, lid, days, crew):
                 w = []
                 if cf.get("double"):
                     q = ",".join("?" * len(cf["double"]))
-                    w.append({"kind": "double", "titles": [r[0] for r in c.execute(
-                        f"SELECT DISTINCT title FROM hub_bookings WHERE id IN ({q}) LIMIT 5", cf["double"])]})
+                    w.append({"kind": "double", "titles": sorted({tr("Booked") if adz_hidden(r[1]) else r[0] for r in c.execute(
+                        f"SELECT title, list_id FROM hub_bookings WHERE id IN ({q})", cf["double"])})[:5]})
                 if cf.get("away"):
                     w.append({"kind": "away"})
                 x["warnings"] = w

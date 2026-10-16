@@ -1618,6 +1618,9 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
   (freelancers without an organisation get the same); absences only as away, never the reason; booking notes are left out.
 - Both proposals are made by the agent itself (`POST /api/proposals` with these kinds answers 400) and answered with the
   event `job` (approve / reject) like every proposal.
+  It needs the module *Disposition* switched on at the owner (personal agent) or at an admin of the organisation (else 409).
+  An agent with a list limit sees bookings of other lists only as time + resource: title "Booked", no list, job or event
+  (`hidden: true`); the same goes for the titles in the proposal warnings.
 
 ## Behaviour rules template (2.13.1)
 
