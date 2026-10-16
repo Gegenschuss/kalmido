@@ -45,6 +45,34 @@ def clean_color(v):
     return v
 
 
+def lp_folder_color(c, uid, folder):
+    """2.53.0 (#1426): the colour uid gave the folder (or its nearest parent folder) in the setting folder_colors, '' = none."""
+    try:
+        cols = json.loads(usettings(c, uid).get("folder_colors") or "{}")
+    except ValueError:
+        return ""
+    parts = folder.split(FOLDER_SEP)
+    for i in range(len(parts), 0, -1):
+        v = cols.get(FOLDER_SEP.join(parts[:i])) if isinstance(cols, dict) else None
+        if isinstance(v, str) and LIST_COLOR_RE.fullmatch(v):
+            return v
+    return ""
+
+
+def lp_folder_rename(c, uid, old, new):
+    """2.53.0 (#1426): a renamed / moved folder keeps its colour (and its subfolders theirs) in folder_colors."""
+    try:
+        cols = json.loads(usettings(c, uid).get("folder_colors") or "{}")
+    except ValueError:
+        return
+    if not isinstance(cols, dict) or not any(folder_under(f, old) for f in cols):
+        return
+    out = {}
+    for f, v in cols.items():
+        out[new + f[len(old):] if folder_under(f, old) else f] = v
+    uset(c, uid, "folder_colors", json.dumps(out, ensure_ascii=False))
+
+
 # 2.4.0 (#361): a folder is a path of at most FOLDER_DEPTH names joined by FOLDER_SEP ("Clients/Company X"), per user as
 # before (lists.folder for the owner, list_members.folder for a member; the order in the user setting "folders"). A name
 # itself can never hold the separator (folder_seg turns it into the look-alike U+2215).
@@ -205,6 +233,8 @@ def list_create():
     b = web_fields(body(), WEB_LIST_NEW, "POST /api/lists")
     name = clean_list_value("name", b.get("name"))
     color, folder = clean_color(b.get("color", "")), clean_folder(b.get("folder", ""))
+    if "color" not in b and folder:  # 2.53.0 (#1426): a new list takes the colour of its folder (the nearest one that has one)
+        color = lp_folder_color(db(), me(), folder)
     if b.get("ptype"):  # 2.4.0 (#243): a project of a built-in type (sections, fields, view, ticket types, modules)
         c = db()
         if "sections" in b and not isinstance(b["sections"], bool):

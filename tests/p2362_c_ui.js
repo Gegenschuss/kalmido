@@ -72,11 +72,12 @@ const FEAT = 'cal,events,comments,collab,office,agents';
   row.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
   await until(() => d.querySelector('.menu-list .mquick.mcols'));
   const cols = [...d.querySelectorAll('.menu-list .mquick.mcols button.mcol')];
-  check(cols.length === 10 && cols[0].classList.contains('on'), 'right-click: the colour row with 9 colours + none (none is on): ' + cols.length);
+  // 2.53.0 (#1426): the fixed palette of 12 tones (LP_TONES) + none
+  check(cols.length === 13 && cols[0].classList.contains('on'), 'right-click: the colour row with 12 tones + none (none is on): ' + cols.length);
   check(!!d.querySelector('.menu-list [role="menuitem"]:not(.mcol)'), 'the rest of the list menu stays below');
   cols[3].click();
   const col = await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === L_NONE)?.color);
-  check(col === w.eval('LCOLORS[3]'), 'a tap sets the list colour: ' + col);
+  check(col === w.eval('LP_TONES[2][2]'), 'a tap sets the list colour: ' + col);  // 2.53.0 (#1426): the third tone
   // the typing line of an agent
   check(!!new w.DOMParser().parseFromString(w.typingHtml([{name: 'Claude', typing: 0, busy: false}], 'chat-typing'), 'text/html').querySelector('.ttx svg.lbot'), 'typing line: robot before the agent');
   // "More" on the phone: Office & finance

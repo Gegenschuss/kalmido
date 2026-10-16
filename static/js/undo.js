@@ -290,6 +290,7 @@ function offerUndo(msg, e) { histToast(msg, e); }
 async function patchUndoable(id, body, msg) {
   const before = snapTask(taskById(id));
   if (body?.list_id && typeof ln_moveHint === 'function') ln_moveHint(id, body.list_id);  // 2.48.0 (#1642): a locked note stays locked
+  if (body?.list_id) msg = wsc_moveMsg(taskById(id)?.list_id, body.list_id, msg);  // 2.53.0 (#1474): Private -> organisation: who sees it now
   const t = await patchTask(id, body, true);
   if (t?.shifted?.length) { shiftUndo(before, t, msg); return t; }
   const after = snapTask(S.tasks.get(id) || t);

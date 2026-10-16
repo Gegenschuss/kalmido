@@ -255,7 +255,7 @@ function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks
   if (v.group === 'list') {
     const g = new Map();
     for (const t of arr) { if (!g.has(t.list_id)) g.set(t.list_id, []); g.get(t.list_id).push(t); }
-    return (v.folder ? sideOrder() : kbListOrder()).filter(l => g.has(l.id)).map(l => ({id: 'l:' + l.id, name: lname(l), tasks: g.get(l.id), color: cssColor(l.color) || '', img: l.icon || '', lic: l,
+    return (v.folder ? sideOrder() : kbListOrder()).filter(l => g.has(l.id)).map(l => ({id: 'l:' + l.id, name: lname(l), tasks: g.get(l.id), color: cssColor(lp_col(l)) || '', img: l.icon || '', lic: l,
       ...(v.folder && l.folder !== v.folder ? {sub: l.folder} : {})}));  // 2.4.0 (#361): the lists of a subfolder get its header
   }
   if (v.group === 'section') {

@@ -41,6 +41,7 @@ SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "tim
                   "fav_only",  # 2.40.0 (#1361): the sidebar shows only the favourites
                   "fav_quiet", "fav_suggest",  # 2.46.1 (#1361): quieter pushes from lists without a star; favourite suggestions
                   "person_colors",  # 2.47.1 (#1721): people in their account colour (0 = only agents coloured)
+                  "list_color_dot",  # 2.53.0 (#1426): list colours only as the dot
                   "mods_all")  # 2.46.1 (#1591): "Switch on all modules" with the purpose
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
@@ -52,7 +53,7 @@ def clean_setting(k, v):
     The watchdog reads these for every user, so malformed values are never stored."""
     from ..notify.push import PUSH_CHANNELS, PUSH_PRIORITIES
     bad = BadInput(tr("Invalid value: {0}", k))
-    if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views", "group_order", *CAL_LIST_KEYS):
+    if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views", "group_order", "folder_colors", *CAL_LIST_KEYS):
         raise bad
     sv = "" if v is None else str(v).strip()
     if k == "allday_time":
@@ -194,6 +195,8 @@ def clean_setting(k, v):
         if not isinstance(arr, list) or len(arr) > 400 or not all(isinstance(x, str) for x in arr):
             raise bad
         return json.dumps(list(dict.fromkeys(f for f in (clean_folder(x, False) for x in arr) if f)), ensure_ascii=False)
+    if k == "folder_colors":  # 2.53.0 (#1426): {folder path: "#rrggbb"} of my folders
+        return lp_clean_folder_colors(v)
     if k == "show_done_views":
         return clean_done_views(v)
     if k == "wgstd_hide":  # 2.46.2 (#1726): {view key: short signature}
@@ -336,6 +339,26 @@ def clean_roadmap_pref(v):
         else:
             raise bad
     return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
+
+
+def lp_clean_folder_colors(v):
+    """2.53.0 (#1426): the colours of my folders as stored json; a folder without colour is left out."""
+    from ..lists.lists import LIST_COLOR_RE, clean_folder
+    bad = BadInput(tr("Invalid value: {0}", "folder_colors"))
+    try:
+        o = json.loads(v or "{}") if isinstance(v, str) else v
+    except ValueError:
+        raise bad from None
+    if not isinstance(o, dict) or len(o) > 400:
+        raise bad
+    out = {}
+    for f, col in o.items():
+        if not isinstance(f, str) or not isinstance(col, str) or (col and not LIST_COLOR_RE.fullmatch(col)):
+            raise bad
+        f = clean_folder(f, False)
+        if f and col:
+            out[f] = col
+    return json.dumps(out, ensure_ascii=False)
 
 
 @app.patch("/api/settings")

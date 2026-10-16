@@ -7531,3 +7531,36 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .tgdue{display:inline-flex;align-items:center;gap:.25rem;color:var(--text2)}
 .tgdue.over{color:var(--danger)}
 .tglists,.tgused{font-size:var(--fs-xs)}
+/* 2.53.0 B (#1426) list colours (12 tones, listcolor.js): the open list's colour is the accent of the list view (header,
+   ticks, progress, buttons; #main + #fab, never global) and a thin edge on task cards (boards, calendar, the collected
+   views); the edge is the list, the background stays the priority's. The theme picks the tone: dark --lpd, light --lpl. */
+.lpv,.lp-acc{--lpc:var(--lpd)}
+:root[data-theme="light"] :is(.lpv,.lp-acc){--lpc:var(--lpl)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] :is(.lpv,.lp-acc){--lpc:var(--lpl)} }
+#main.lp-acc,#fab.lp-acc{--accent:var(--lpd);--accent-ink:var(--lpid);--accent-soft:color-mix(in srgb,var(--accent) 9%,var(--bg));--st-complete:var(--accent)}
+:root[data-theme="light"] :is(#main,#fab).lp-acc{--accent:var(--lpl);--accent-ink:var(--lpil)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] :is(#main,#fab).lp-acc{--accent:var(--lpl);--accent-ink:var(--lpil)} }
+#main:not(.lp-one) #view .trow.lpc,#view .kcards .trow.lpc{box-shadow:inset .1875rem 0 0 var(--lpc)}
+#main:not(.lp-one) #view .trow.lpc::before,#view .kcards .trow.lpc::before{left:.375rem}
+.cal .ev.lpc,.week .ev.lpc,.wev.lpc{border-left-color:var(--lpc)}
+.wev.lpc{background:color-mix(in srgb,var(--lpc) 16%,var(--bg2))}
+:is(.cal,.week) .ev.lpc.p5{background:color-mix(in srgb,var(--p5) 20%,var(--bg3))}
+:is(.cal,.week) .ev.lpc.p3{background:color-mix(in srgb,var(--p3) 20%,var(--bg3))}
+:is(.cal,.week) .ev.lpc.p1{background:color-mix(in srgb,var(--p1) 20%,var(--bg3))}
+.wev.lpc.p5{background:color-mix(in srgb,var(--p5) 22%,var(--bg2))}.wev.lpc.p3{background:color-mix(in srgb,var(--p3) 22%,var(--bg2))}.wev.lpc.p1{background:color-mix(in srgb,var(--p1) 22%,var(--bg2))}
+/* 2.53.0 B (#1474) workspace colours (wscolor.js): an organisation's lists carry its colour as a stripe (header, sidebar)
+   and a frame (quick add, comment field), the sign / chip / switch take it; Private stays neutral. Dark --wsd, light --wsl. */
+[data-wsc],.wsc-on{--wsc:var(--wsd)}
+:root[data-theme="light"] :is([data-wsc],.wsc-on){--wsc:var(--wsl)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] :is([data-wsc],.wsc-on){--wsc:var(--wsl)} }
+#main.wsc-on #top{box-shadow:inset 0 .1875rem 0 var(--wsc)}
+#side .srow[data-wsc]{background-image:linear-gradient(var(--wsc),var(--wsc));background-size:.1875rem 60%;background-repeat:no-repeat;background-position:0 50%}
+.wsbadge[data-wsc]{color:var(--text);background:color-mix(in srgb,var(--wsc) 14%,transparent);border-color:color-mix(in srgb,var(--wsc) 55%,transparent)}
+.wsbadge[data-wsc]:hover{border-color:var(--wsc)}
+:is(.wsbadge,.wschip,.wsbar)[data-wsc] svg.i:first-child,:is(.wsbadge,.wschip,.wsbar)[data-wsc] .wsemo{color:var(--wsc)}
+.wschip[data-wsc]{background:color-mix(in srgb,var(--wsc) 14%,transparent);border-color:color-mix(in srgb,var(--wsc) 40%,transparent)}
+.wschip[data-wsc]:hover{border-color:var(--wsc)}
+.wsbar.on[data-wsc]{border-color:color-mix(in srgb,var(--wsc) 55%,transparent);background:color-mix(in srgb,var(--wsc) 10%,transparent)}
+.wsbar.on[data-wsc]:hover{border-color:var(--wsc)}
+.wsc-on .qadd:not(.dock) .box,.wsc-on .qadd.dock,.wsc-on .ccomp{border-color:color-mix(in srgb,var(--wsc) 65%,var(--line2))}
+.wscpick .colors button[disabled]{cursor:default}

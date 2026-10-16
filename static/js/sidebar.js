@@ -49,6 +49,7 @@ async function batch(action, data, clear, ids = [...S.multi], note = '') {
   await load(); render();
   if (cs && !j.errors?.length) celeCheck(cs);
   if (j.errors?.length) return;
+  { const wn = action === 'patch' && data?.list_id ? snaps.filter(b => ids.includes(b.id)).map(b => wsc_moveMsg(b.list_id, data.list_id, '')).find(Boolean) : ''; if (wn) note = [note, wn].filter(Boolean).join(' · '); }  // 2.53.0 (#1474)
   const msg = (action === 'complete' ? trn('{0} task completed', '{0} tasks completed', ids.length) : action === 'delete' ? trn('{0} task deleted', '{0} tasks deleted', ids.length) : trn('{0} task changed', '{0} tasks changed', ids.length)) + (note ? ' · ' + note : '');
   const one = ids.length === 1 ? qn((snaps.find(x => x.id === ids[0])?.title || '').slice(0, 40)) : '';
   if (action === 'complete') offerUndo(msg, histDone(one ? tr('Completed {0}', one) : trn('Completed {0} task', 'Completed {0} tasks', ids.length), ids, snaps, j, data?.status ?? 2));
@@ -398,6 +399,7 @@ function folderMenu(anchor, f) {
   const into = folderNames().filter(t => !fParent(t) && t !== f && t !== fParent(f));
   const own = folderLists(f).some(l => isOwner(l)), noOwn = tr('Only your own lists can be shared');
   menu(anchor, [
+    ...lp_folderMenuRow(f),  // 2.53.0 (#1426): the folder's colour (new lists in it take it)
     {label: tr('New list in this folder'), icon: 'plus', fn: () => listModal(null, f)},
     // 2.37.0 (#1158): the folder settings always (they hold for new lists too); without lists of my own the share entries
     // stay visible but greyed out with the reason (lists of others cannot be shared)

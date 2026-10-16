@@ -7955,5 +7955,12 @@
   "Last used {0}": "Usada por última vez {0}",
   "All your tags. A tap opens the tasks with that tag.": "Todas tus etiquetas. Un toque abre las tareas con esa etiqueta.",
   "No tags yet. Add a tag to a task and it shows up here.": "Aún no hay etiquetas. Añade una etiqueta a una tarea y aparecerá aquí.",
-  "Tags overview": "Resumen de etiquetas"
+  "Tags overview": "Resumen de etiquetas",
+  "List colours only as a dot": "Colores de lista solo como punto",
+  "An open list takes its colour for the header, ticks and buttons, and tasks show it as a thin edge on boards, in the calendar and in Today or Week. On: only the dot in the sidebar. For all your devices.": "Una lista abierta usa su color en la cabecera, las marcas y los botones, y las tareas lo muestran como un borde fino en los tableros, en el calendario y en Hoy o Semana. Activado: solo el punto en la barra lateral. Para todos tus dispositivos.",
+  "Will be visible to everyone in {0}": "Será visible para todos en {0}",
+  "Workspace of {0}": "Espacio de trabajo de {0}",
+  "Colour of the workspace": "Color del espacio de trabajo",
+  "Lists of the organisation show it as a stripe in the header and the sidebar, for every member. Private stays without colour.": "Las listas de la organización la muestran como una franja en la cabecera y en la barra lateral, para todos los miembros. Lo privado queda sin color.",
+  "Only an admin of this organisation can change it.": "Solo un administrador de esta organización puede cambiarlo."
 }

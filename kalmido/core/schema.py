@@ -1604,6 +1604,9 @@ MIGRATIONS = [
     # (current-user-privilege-set); events are only written when both are 1
     ("cal_subs", "dav_write", "ALTER TABLE cal_subs ADD COLUMN dav_write BIGINT NOT NULL DEFAULT 0"),
     ("cal_subs", "dav_can_write", "ALTER TABLE cal_subs ADD COLUMN dav_can_write BIGINT NOT NULL DEFAULT 0"),
+    # 2.53.0 B (#1474): an organisation's colour (set by its admins, the same for every member; '' = the default tone of
+    # its id, see static/js/wscolor.js). Private has none.
+    ("orgs", "color", "ALTER TABLE orgs ADD COLUMN color TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -1746,6 +1749,8 @@ USER_DEFAULTS = {
     "side_icons": "line",       # 2.36.0 (#1117): the sidebar's list icons: line (grey line icon for the name's emoji) | emoji | dot
     "prio_bg": "",              # 2.40.0 (#1416): tasks with a priority tinted in its colour: '' (off) | soft | strong
     "person_colors": "1",       # 2.47.1 (#1721): people in their account colour ('0' = only agents coloured)
+    "list_color_dot": "0",      # 2.53.0 (#1426): 1 = list colours only as the dot in the sidebar (no accent, no card edge)
+    "folder_colors": "{}",      # 2.53.0 (#1426): json {folder path: colour} of my folders; a new list in it takes the colour
     "side_progress": "1",       # 2.36.0 (#1117): progress bars of projects in the sidebar (0 = hidden)
     "cal_today": "1",           # "Events today" block on Today (external calendar subscriptions)
     "cal_tasks": "1",           # 2.36.1 (#1127): tasks with a date in the calendar views (0 = events only; Today, search, feeds unchanged)

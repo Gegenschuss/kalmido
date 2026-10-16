@@ -391,6 +391,7 @@ function cmxScrollSet(s, endOnly = false) {
 function renderDetail() {
   const s = cmxScrollGet(), r = keepFocus($('#detail'), renderDetail0);
   cmxShown = S.sel; cmxScrollSet(s);
+  wsc_detail();  // 2.53.0 (#1474): the comment field framed in the colour of the task's workspace
   return r;
 }
 function renderDetail0() {

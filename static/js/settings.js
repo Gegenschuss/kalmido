@@ -192,11 +192,12 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-sdn': ['show_done_new', N_('Hide completed tasks in new lists'), 'chk'],  // 2.49.0 (#1535)
   's-prbg': ['prio_bg', N_('Priority as background'), 'sel'],  // 2.40.0 (#1416)
   's-pcol': ['person_colors', N_('Show colours for people'), 'chk'],  // 2.47.1 (#1721)
+  's-lpdot': ['list_color_dot', N_('List colours only as a dot'), 'chk'],  // 2.53.0 (#1426)
   's-sideic': ['side_icons', N_('List icons'), 'sel'], 's-sideprog': ['side_progress', N_('Progress in the sidebar'), 'chk'],  // 2.36.0 (#1117)
   's-sdd': ['show_done_default', N_('Completed tasks'), 'sel'],  // 2.39.1 (#1214)
   's-favq': ['fav_quiet', N_('Quieter pushes from lists without a star'), 'chk'], 's-favs': ['fav_suggest', N_('Suggest favourites'), 'chk'],  // 2.46.1 (#1361)
 };
-const SET_RENDER = ['sidebar', 'prio_bg', 'person_colors', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
+const SET_RENDER = ['sidebar', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
@@ -664,6 +665,8 @@ function settingsModal(focus) {
       ${hint(tr('Tasks with a priority get a light background in its colour (high red, medium orange, low blue) in lists, Today and on boards; the bar at the edge stays.'))}
       <div class="row">${chk('s-pcol', s.person_colors !== '0', tr('Show colours for people'))}</div>
       ${hint(tr('Every person and every agent has a fixed colour: the circle behind the initials, a thin ring around a photo. Off: only agents are coloured.'))}
+      <div class="row">${chk('s-lpdot', s.list_color_dot === '1', tr('List colours only as a dot'))}</div>
+      ${hint(tr('An open list takes its colour for the header, ticks and buttons, and tasks show it as a thin edge on boards, in the calendar and in Today or Week. On: only the dot in the sidebar. For all your devices.'))}
       <h4 id="s-side-h">${tr('Sidebar')}</h4>
       ${hint(tr('The order of the groups and what they show; the same on every device. The eye hides a group, the boxes single entries.'))}
       <div class="navlist sidecfg" id="s-sidebar"></div>
