@@ -180,6 +180,8 @@ clear()
 comment(A, T2, "normal")
 check(len(to("t-bob")) == 1, "baseline: a comment on bob's task pushes")
 check(put(Bo, T2, level="mute").ok and bell(Bo, T2).json()["mine"]["level"] == "mute", "bob mutes his task")
+# 2.53.0 (#1424, review): someone's own "Muted" is private -- the admin sees it as "As the list"
+check(all(p["level"] == "list" for p in bell(Ca, T2).json().get("people", []) if p["id"] == BOB), "admin does not see bob's mute")
 time.sleep(3.2)  # TASKS_PUSH_GAP: the next comment would push again
 clear()
 comment(A, T2, "muted")
