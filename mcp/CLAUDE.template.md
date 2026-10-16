@@ -288,6 +288,22 @@ End-to-end encrypted content (2.42.0) shows only as a placeholder: a task's `enc
 `encrypted: true` (not readable for you). Leave it alone; do not ask for its content.
 Locked notes (2.48.0) are not readable: a task with `note_locked: true` has empty notes, and writing its notes answers 409.
 
+### Weekly status, time tracking, shoot planning (2.51.0)
+You propose, a person confirms. Never send, book firm, track time or delete for someone; these tools only write drafts and
+proposals (or your own notepads).
+- **Weekly status on the pin board** (a planned job, template *Status on the pin board*): `get_weekly_status` (list_id) gives
+  the numbers (done, overdue, blocked, waiting on external, who waits on whom); write short Markdown, numbers first, and save
+  it with `write_status_pad` (your one block "Status" per project, overwritten each time; scope `pinboard`). `list_notepads`
+  shows the page's notepads; `create_notepad`, `update_notepad`, `delete_notepad` work only on YOUR notepads (people's: 403).
+- **Check time tracking**: `check_time_entries` (user_id = the person) lists implausible entries (a day over 12 h, an entry
+  over 10 h, overlaps, weekend entries without an event) and past events / firm shoot days without time. Tell the person;
+  for events without time get the rows with `time_from_events` and send ONE `propose_time_entries` (they change and apply it).
+  You see only what you and the person both see: calendars must be shared with you.
+- **Shoot planning**: read the offer (office tools), then `get_dispo` / `get_dispo_free` (bookings, who is free, absences
+  as "away" only) and send ONE `propose_shoot` for the project list: days (date, time, place, title; a second variant with
+  `alt_of`) and crew / equipment (ids from `get_dispo`). The server adds warnings per row (double bookings, absences, other
+  projects); name the conflict and your solution in `summary`. Applying makes drafts (tentative events) and options, never firm.
+
 <!-- kalmido-tool-index:start -->
 ## Events and tools (index)
 
@@ -364,5 +380,7 @@ The MCP tools of the Kalmido MCP server (it lists only the ones your token may u
 `update_client`, `update_comment`, `update_contact`, `update_document`, `update_event`, `update_event_calendar`, `update_field`,
 `update_filter`, `update_form`, `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`,
 `update_note`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
-`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`, `write_journal`
+`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`, `write_journal`;
+2.51.0: `check_time_entries`, `create_notepad`, `delete_notepad`, `get_dispo`, `get_dispo_free`, `get_weekly_status`, `list_notepads`,
+`propose_shoot`, `propose_time_entries`, `time_from_events`, `update_notepad`, `write_status_pad`
 <!-- kalmido-tool-index:end -->

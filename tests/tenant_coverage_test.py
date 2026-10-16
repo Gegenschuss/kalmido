@@ -560,6 +560,11 @@ ROUTES = {
     "GET /api/team/absences/check": "hub", "GET /api/team/dispo": "hub", "GET /api/team/dispo/free": "hub",
     "POST /api/team/dispo/bookings": "hub", "PATCH /api/team/dispo/bookings/{}": "hub", "DELETE /api/team/dispo/bookings/{}": "hub",
     "POST /api/team/dispo/bookings/restore": "hub", "GET /api/team/bookings/mine": "hub", "GET /api/v1/absences": "hub",
+    # 2.51.0 C (#1352 #1353 #1355): agents on the pin board, time check / proposals, the disposition + shoot proposals (p251_c_api_test.py)
+    "GET /api/v1/lists/{}/notepads": "list", "POST /api/v1/lists/{}/notepads": "list", "PATCH /api/v1/notepads/{}": "list",
+    "DELETE /api/v1/notepads/{}": "list", "PUT /api/v1/lists/{}/status-pad": "list", "GET /api/v1/lists/{}/weekly-status": "list",
+    "GET /api/v1/time/check": "aggregate", "GET /api/v1/time/from-events": "aggregate", "POST /api/v1/agent/proposals/time": "agent",
+    "GET /api/v1/dispo": "hub", "GET /api/v1/dispo/free": "hub", "POST /api/v1/agent/proposals/shoot": "hub",
 }
 
 # ---- 1. every route is classified, nothing stale

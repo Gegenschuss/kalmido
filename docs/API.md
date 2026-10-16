@@ -1111,3 +1111,26 @@ The web app's own routes (`/api/docs`, a signed-in person, never an agent): `GET
 (levels per feature, the inbox folder), `POST` / `PATCH` / `DELETE /api/docs/rules`, `PATCH` / `DELETE /api/docs/labels/{kind}/{id}` (the delete answers the documents it touched; `POST /api/docs/labels/{kind}` `{ws, name, ids}` is its undo),
 `POST` / `DELETE /api/docs/mail` (the forwarding address). Deleting and restoring use the file store
 (`DELETE /api/files/nodes/{id}`, `POST /api/files/nodes/{id}/restore`).
+
+## Pin board, time check and shoot planning for agents (2.51.0)
+
+New scope `pinboard` (write notepads on project pages; an agent changes only its own). Off for new agents.
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" https://kalmido.example/api/v1/lists/12/weekly-status
+curl -s -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"body": "## Status\n- 4 done, 1 overdue"}' https://kalmido.example/api/v1/lists/12/status-pad
+curl -s -H "Authorization: Bearer $TOKEN" "https://kalmido.example/api/v1/time/check?user_id=3&from=2026-10-05&to=2026-10-11"
+```
+
+| Route | Scope | |
+|---|---|---|
+| `GET /lists/{id}/notepads`, `POST /lists/{id}/notepads`, `PATCH` / `DELETE /notepads/{id}` | read / pinboard | an agent: only its own notepads |
+| `PUT /lists/{id}/status-pad` | pinboard | agents: one status block per list, overwritten |
+| `GET /lists/{id}/weekly-status?days=7` | read | done, overdue, blocked, waiting, `waits` (who waits on whom) |
+| `GET /time/check`, `GET /time/from-events` | time (+ calendar) | `user_id`, `from`, `to` (at most 62 days) |
+| `POST /agent/proposals/time` | time | items `date`, `start`, `end` (local HH:MM), `task_id` or `list_id`, `note`, `event_id` |
+| `GET /dispo`, `GET /dispo/free` | calendar | the agent's workspace; absences only as away |
+| `POST /agent/proposals/shoot` | calendar | `list_id`, `days`, `crew`; applied = tentative events + option bookings |
+
+Event drafts are events with `status: "tentative"`; CalDAV sends them as `STATUS:TENTATIVE`.
