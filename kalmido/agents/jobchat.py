@@ -52,7 +52,7 @@ def jc_chat_rows(c, aid, jid, before, limit, after=0):
     pre = jc_prefixes(j)
     # review: my addressed messages only from the job's start on (a reused first name must not pull in an older job's)
     q = ("SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND (job_id=? OR (sender='user' AND created_at>=? AND ("
-         + " OR ".join("LOWER(body) LIKE ?" for _p in pre) + ")))")
+         + " OR ".join("body ILIKE ?" for _p in pre) + ")))")
     args = [aid, uid, jid, j["created_at"] or "", *[p + "%" for p in pre]]
     if after:
         q += " AND id>?"

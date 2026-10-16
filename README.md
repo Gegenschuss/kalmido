@@ -26,6 +26,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **2.56.1** (2026-10-16): **fewer symbols** in task rows (levels All / Important / Calm / Custom, default Important) and
   switchable sidebar marks, the archive import finds the **recipient's address** of old PDFs again, "Switch on all
   modules" switches on every module.
+- **2.56.1** (2026-10-16): CI fixes for 2.56.0 (both go live with this version).
+- **2.56.0** (2026-10-16): a **Message** button on job cards, a **chat history per job** (tap its name), running jobs in
+  the agent menu, **organisation admins rename and restyle** their organisation's lists (no access to contents) and
+  sidebar symbols in fixed columns.
 - **2.55.1** (2026-10-16): start page arrangements save with the office figures card (both go live with this version).
 - **2.55.0** (2026-10-16): **saved arrangements** per view switched in the header, **settings per block**, arrangements
   **sent as templates**, **agents propose arrangements** (you accept), more views on the block builder and a **newsletter

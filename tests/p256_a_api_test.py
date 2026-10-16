@@ -179,6 +179,9 @@ m7 = post(A, "Frida: not for clara")
 m8 = post(A, "I like Clara a lot")  # the name only somewhere in the text: not addressed
 m9 = say(1, "Something else")
 m10 = say(1, f"Clara: done", job_id=JC)
+# 2.56.1: bob's job starts before his message (history counts addressed messages from the job's start on; Postgres keeps
+# sub-second times, SQLite whole seconds)
+JB = job("Clara: Bob's run", task_id=T, user_id=BOB)
 mb = post(Bo, "Clara: bob writes to her too")  # bob's own conversation: never in alice's history
 r = A.get(B + f"/api/agents/{CL}/chat?job={JC}")
 check(r.ok, "#1793: alice reads the job's history " + r.text[:200])
@@ -195,7 +198,6 @@ r = A.get(B + f"/api/agents/{CL}/chat?job={JC}&after={m5}")
 check([m["id"] for m in r.json()["messages"]] == [m6, m10], "#1793: ?after= only newer ones (the refresh) " + str([m["id"] for m in r.json()["messages"]]))
 r = Bo.get(B + f"/api/agents/{CL}/chat?job={JC}")
 check(r.status_code == 404, "#1793: bob cannot open a job that is not for him (and not on a task he sees) " + str(r.status_code))
-JB = job("Clara: Bob's run", task_id=T, user_id=BOB)
 r = Bo.get(B + f"/api/agents/{CL}/chat?job={JB}")
 check(r.ok and [m["id"] for m in r.json()["messages"]] == [mb], "#1793: bob's job history = his own conversation only")
 r = A.get(B + f"/api/agents/{CL}/chat?job={JB}")
