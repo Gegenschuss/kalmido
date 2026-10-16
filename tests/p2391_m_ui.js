@@ -92,7 +92,7 @@ const FEAT = 'comments,collab,agents,stats,time';
     check(p && /gradient/.test(sh.grip) && sh.x >= 44, '#1181: the sheet has its grip; 2.58.0 (#1757): the X stays visible, 44 px wide ' + JSON.stringify(sh));
     await shot('p2391m-390-sheet.png');
     if (p) {
-      await drag(195, p.top + 12, 0, -Math.min(220, 2 * (p.top + 4)), 'touch');  // 2.58.0 (#1757): the visible X makes the sheet taller, stay inside the viewport await sleep(400);
+      await drag(195, p.top + 12, 0, -Math.min(220, 2 * (p.top + 4)), 'touch'); await sleep(400);  // 2.58.0 (#1757): the visible X makes the sheet taller, stay inside the viewport
       const p2 = await rect(ev, '#pop.sheet');
       check(p2 && p2.h > p.h + 40, `#1181: dragged up, the sheet is taller (${p.h} -> ${p2 && p2.h})`);
       await shot('p2391m-390-sheet-tall.png');
