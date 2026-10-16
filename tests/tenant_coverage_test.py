@@ -69,6 +69,9 @@ KINDS = {
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
     "stats": ("matrix", "p2300_tenant_test.py: statistics count only own / visible tasks"),
     "publiclink": ("matrix", "p2300_tenant_test.py: the public link of another person's list by id"),
+    # 2.50.0 (#329, #1200): files / logo of a customer view, approval links of quotations and lists (and their customer pages)
+    "signoff": ("matrix", "p250_c_api_test.py: approval links of another organisation's quotation / another person's list by id, "
+                          "files of other lists through a link"),
     # ---- not relevant for the boundary between organisations (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account (before a session or about the session's own person)"),
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
@@ -414,6 +417,10 @@ ROUTES = {
     "GET /s/{}": "publiclink", "POST /s/{}/unlock": "publiclink", "POST /s/{}/tick": "publiclink",
     "GET /api/lists/{}/public-link": "publiclink", "PUT /api/lists/{}/public-link": "publiclink",
     "POST /api/lists/{}/public-link/regenerate": "publiclink", "DELETE /api/lists/{}/public-link": "publiclink",
+    # 2.50.0 (#329, #1200)
+    "GET /s/{}/file/{}": "signoff", "GET /s/{}/logo": "signoff", "GET /s/q/{}": "signoff", "GET /s/q/{}/pdf": "signoff", "POST /s/q/{}": "signoff",
+    "GET /api/lists/{}/signoffs": "signoff", "POST /api/lists/{}/signoffs": "signoff", "POST /api/lists/{}/signoffs/{}/revoke": "signoff",
+    "GET /api/office/docs/{}/signoffs": "signoff", "POST /api/office/docs/{}/signoff": "signoff", "POST /api/office/signoffs/{}/revoke": "signoff",
     # ---- stats (2)
     "GET /api/pomo/stats": "stats", "GET /api/stats": "stats",
     # ---- task (52)
