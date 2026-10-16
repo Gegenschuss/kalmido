@@ -125,8 +125,9 @@ function swRun(src, {failLazy = false} = {}) {
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
     await nav(B);
     for (let i = 0; i < 40 && !(await ev('!!(window.S && S.me)').catch(() => false)); i++) await sleep(250);
-    const fetched = await ev(`performance.getEntriesByType('resource').map(e => e.name).filter(u => /\\/static\\/js\\/(settings|contacts|office[a-z_]*)\\.js/.test(u)).length`);
-    check(fetched === 0, 'Firefox: the start fetches no on-demand module (' + fetched + ')');
+    // settings.js may come later on its own (the idle preload 5 s after the start): only what started before counts
+    const fetched = await ev(`JSON.stringify(performance.getEntriesByType('resource').filter(e => /\\/static\\/js\\/(settings|contacts|office[a-z_]*)\\.js/.test(e.name) && (e.startTime < 4500 || !/settings/.test(e.name))).map(e => e.name.split('/').pop() + '@' + Math.round(e.startTime)))`);
+    check(fetched === '[]', 'Firefox: the start fetches no on-demand module ' + fetched);
     await ev(`(document.querySelector('[data-act="settings"]').click(), 1)`);
     for (let i = 0; i < 40 && !(await ev('!!document.querySelector(".smodal")')); i++) await sleep(150);
     check(await ev('!!document.querySelector(".smodal")'), 'Firefox: the gear loads + opens the settings');
