@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.53.1** (2026-10-16): CI fixes for 2.53.0, the browser demo loads the on-demand areas (both go live with this version).
 - **2.53.0** (2026-10-16): **the interface** - list colours as the accent with a fixed 12-tone palette and coloured task
   edges, a colour per organisation (private stays neutral), a bell per task with *Urgent*, references by drag and drop with
   cards and a hover preview, agents' comments in their own tone, a tags overview, and a faster start (rarely used areas load

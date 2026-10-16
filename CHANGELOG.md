@@ -7,6 +7,14 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.53.1] - 2026-10-16
+
+**In short:** the checks of 2.53.0 green again; 2.53.0 and 2.53.1 go live together.
+
+### Fixed
+- The browser demo loads settings, contacts and Office & finance again (the areas that load on demand, #1410).
+- The colour of a tag card goes through the colour check like every other colour (#446).
+
 ## [2.53.0] - 2026-10-16
 
 **In short:** the interface - **list colours** as the accent of an open list, a fixed palette of 12 tones and coloured
