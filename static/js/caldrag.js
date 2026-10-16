@@ -2,7 +2,7 @@
    others (load order: index.html). Week / day grid: a drag over free time leaves a block "New event" with its title field
    in the grid (Enter saves, Esc / a click beside it without a title drops it, "Details" opens the editor); an own event is
    moved by dragging it (also into another day) and made longer / shorter at its lower edge; a drag over the all-day row
-   or over days of the month makes an all-day event. Mouse / pen at once (from a few pixels), touch after a 0.4 s hold
+   or over days of the month makes an all-day event, an event there is dragged into other days. Mouse / pen at once (from a few pixels), touch after a 0.4 s hold
    (a swipe before that scrolls as before). Esc cancels a drag. Every save goes through cg_commit (B: dvw_commit for a
    writable CalDAV subscription). Tasks (.wev, .ev) keep their own drag (dnd.js). */
 'use strict';
@@ -103,10 +103,13 @@ function cg_down(e) {
     const near = touch && [...col.querySelectorAll('.wcev')].find(x => { const r = x.getBoundingClientRect(), ev = cg_evOf(x); return e.clientX >= r.left && e.clientX <= r.right && e.clientY - r.bottom >= 0 && e.clientY - r.bottom <= 12 && cg_canDrag(ev) && ev.d1 === col.dataset.day; });
     if (near) st = {kind: 'size', ev: cg_evOf(near), el: near, col};
     else if (evOn()) st = {kind: 'new', col};
-  } else if (t.closest('.week .wad') && !t.closest('.cev')) { if (evOn()) st = {kind: 'aday'}; }
-  else if (t.closest('.cal .cell') && !t.closest('.cev')) { if (evOn()) st = {kind: 'mday'}; }
+  } else if (t.closest('.week .wad .cev, .cal .cell .cev')) {  // an event in the all-day row / the month: into other days
+    const ev = cg_evOf(t.closest('.cev')); if (!cg_canDrag(ev)) return;
+    st = {kind: 'dmove', ev, el: t.closest('.cev'), sel: t.closest('.wad') ? '#view .week .wad' : '#view .cal .cell'};
+  } else if (t.closest('.week .wad')) { if (evOn()) st = {kind: 'aday'}; }
+  else if (t.closest('.cal .cell')) { if (evOn()) st = {kind: 'mday'}; }
   if (!st) return;
-  if (st.kind === 'aday' || st.kind === 'mday') st.d0 = st.d1 = t.closest('[data-day]').dataset.day;
+  if (st.kind === 'aday' || st.kind === 'mday' || st.kind === 'dmove') st.d0 = st.d1 = t.closest('[data-day]').dataset.day;
   Object.assign(st, {touch, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, active: false, pid: e.pointerId});
   CG.st = st;
   if (touch) st.timer = setTimeout(() => { if (CG.st === st) cg_start(); }, CG_HOLD);
@@ -124,7 +127,7 @@ function cg_start() {
     st.ghost = st.el.cloneNode(true); st.ghost.classList.add('cgghost'); st.ghost.removeAttribute('data-cev');
     st.el.classList.add('cgsrc');
     st.col.appendChild(st.ghost);
-  }
+  } else if (st.kind === 'dmove') st.el.classList.add('cgsrc');
   cg_move();
 }
 function cg_move() {
@@ -152,6 +155,11 @@ function cg_move() {
     st.ne = en;
     st.ghost.style.height = Math.max(20, (en - st.s) / 60 * H) + 'px';
     const b = st.ghost.querySelector('b'); if (b) b.textContent = `${cg_lab(st.s)}–${cg_lab(en)}`;
+  } else if (st.kind === 'dmove') {  // the days the event will cover
+    const el = cg_dayEl(st.sel, st.x, st.y);
+    if (el?.dataset.day) st.d1 = el.dataset.day;
+    const dd = diffDays(st.d0, st.d1), lo = addDays(st.ev.d0, dd), hi = addDays(st.ev.d1, dd);
+    $$(st.sel).forEach(c => c.classList.toggle('cgsel', c.dataset.day >= lo && c.dataset.day <= hi));
   } else {
     const el = cg_dayEl(st.kind === 'aday' ? '#view .week .wad' : '#view .cal .cell', st.x, st.y);
     if (el?.dataset.day) st.d1 = el.dataset.day;
@@ -192,7 +200,12 @@ async function cg_end(e) {
   if (st.kind === 'aday' || st.kind === 'mday') { const lo = st.d0 < st.d1 ? st.d0 : st.d1, hi = st.d0 < st.d1 ? st.d1 : st.d0; cg_newBlock({d0: lo, d1: hi, month: st.kind === 'mday'}); return; }
   const ev = st.ev;
   let patch;
-  if (st.kind === 'move') {
+  if (st.kind === 'dmove') {
+    const dd = diffDays(st.d0, st.d1); if (!dd) return;
+    const sh = d => { const x = new Date(d); x.setDate(x.getDate() + dd); return `${ds(x)}T${fmtHM(x)}`; };
+    patch = ev.all_day ? {start: addDays(ev.start, dd), end: addDays(ev.end, dd), all_day: true} : {start: sh(ev.s), end: sh(ev.e), all_day: false};
+    st.ghost = document.createElement('i');  // a stand-in: the save below marks / drops it like the grid's ghost
+  } else if (st.kind === 'move') {
     if (!st.dd && !st.dm) { st.ghost.remove(); return; }
     const mv = st.dd * 1440 + st.dm, sh = d => { const x = new Date(d); x.setMinutes(x.getMinutes() + mv); return `${ds(x)}T${fmtHM(x)}`; };
     // the shift in wall minutes of the day it was grabbed on: days + the snapped minutes (keeps the length)
@@ -274,7 +287,7 @@ function cg_place() {  // into the grid as it is drawn now (again after a re-ren
 // the view is drawn anew (a poll, the events of the week arriving): the open block goes back into the new grid
 const cg_mo = typeof MutationObserver === 'function' ? new MutationObserver(() => {
   const n = CG.nw; if (!n || n.el.isConnected) return;
-  if (!cg_place()) { CG.nw = null; return; }
+  if (!cg_place()) { cg_newDone(true); return; }  // its day is no longer shown (another week): saved with a title, else dropped
   if (n.focus) n.el.querySelector('.cgin')?.focus({preventScroll: true});
 }) : null;
 const cg_obs = () => { const v = $('#view'); if (v && cg_mo) cg_mo.observe(v, {childList: true, subtree: true}); };
@@ -316,7 +329,7 @@ document.addEventListener('pointermove', e => {
   if (!st.active) {
     const d = Math.hypot(st.x - st.x0, st.y - st.y0);
     if (st.touch) { if (d > CG_TOL) { clearTimeout(st.timer); CG.st = null; } return; }  // a swipe: the page scrolls
-    if (d < (st.kind === 'move' || st.kind === 'size' ? 4 : CG_TOL)) return;
+    if (d < (['move', 'size', 'dmove'].includes(st.kind) ? 4 : CG_TOL)) return;
     cg_start();
   }
   e.preventDefault();

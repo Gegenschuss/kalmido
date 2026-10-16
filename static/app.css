@@ -7453,9 +7453,11 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 
 /* 2.52.0 A (#1016) the calendar like macOS: drag to move / resize events, the block "New event" in the grid, all-day and month ranges */
 .week .wcol,.week .wad,.cal .cell,.wcev{-webkit-touch-callout:none}
+@media (pointer:coarse){.week .wcol,.week .wad,.cal .cell,.wcev{-webkit-user-select:none;user-select:none}}
 .wcev.cgok::after{content:"";position:absolute;left:35%;right:35%;bottom:1px;height:2px;border-radius:1px;background:var(--ccb);opacity:0}
 .wcev.cgok:hover::after{opacity:1}
-@media (hover:hover){.wcev.cgok{cursor:grab}.wcev.cgok:active{cursor:grabbing}}
+@media (hover:hover){.wcev.cgok,.cev.cgok{cursor:grab}.wcev.cgok:active,.cev.cgok:active{cursor:grabbing}}
+.cev.cgsrc{opacity:.35}
 body.cgdrag,body.cgdrag *{user-select:none;-webkit-user-select:none}
 body.cgdrag #wbody{touch-action:none}
 body.cgdrag .week,body.cgdrag .cal{cursor:grabbing}

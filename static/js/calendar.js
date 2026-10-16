@@ -120,7 +120,8 @@ function cevTime(e, d) {
   if (!cevTimed(e, d)) return tr('all day');
   return `${e.d0 === d ? fmtHM(e.s) : '…'}–${e.d1 === d ? fmtHM(e.e) : '…'}`;
 }
-const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}${ap_draftCls(e)}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}">${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtHM(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
+// 2.52.0 (#1016): cgok = may be dragged into other days (caldrag.js)
+const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}${ap_draftCls(e)}${cg_canDrag(e) ? ' cgok' : ''}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}">${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtHM(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
 const cevRow = (e, d) => `<div class="cevrow${ap_draftCls(e)}" data-cev="${e.id}" style="--cc:${cevColor(e)}" role="button" tabindex="0"><i class="cevdot"></i><span class="cevt">${cevTime(e, d)}</span><span class="cevn">${esc(cevTitle(e))}</span>${e.location ? `<span class="cevl">${esc(e.location)}</span>` : ''}<span class="cevc">${esc(cevCal(e))}</span></div>`;
 function cevTodayBlock() {  // "Events today" at the top of Today (setting cal_today)
   if (!feat('cal') || !calEvOn() || S.settings.cal_today === '0') return '';  // Calendar module off: gone here too

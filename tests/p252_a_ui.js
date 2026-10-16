@@ -5,7 +5,7 @@
 // (undo removes it again), Esc cancels a drag and drops an empty block, an event is moved into another day and made longer
 // at its lower edge (one undo step), a click without moving still opens the popover, a repeating event asks "Only this
 // date / All dates", a draft stays a draft, a read-only event does not move; the all-day row and the month make all-day
-// events over several days. Firefox, phone (390, touch): hold 0.4 s and drag = a block "New event", a quick swipe scrolls
+// events over several days, an event there is dragged into other days. Firefox, phone (390, touch): hold 0.4 s and drag = a block "New event", a quick swipe scrolls
 // and makes nothing, hold an event and drag = moved. Screenshots with P252A_SHOTS=<dir>.
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -175,6 +175,13 @@ const ALL = 'cal,events,comments';
     const TR = await until(() => find('Trip'));
     const tr = TR && await get(TR.eid);
     check(tr && tr.all_day && tr.start === W1 && tr.end === day(3), 'desktop: the month: an all-day event Wednesday to Friday ' + JSON.stringify(tr && [tr.start, tr.end]));
+    // the event in the month dragged one day later (all days move, the length stays)
+    await until(() => e(`[...document.querySelectorAll('#view .cal .cell[data-day="${W1}"] .cev')].some(x => x.textContent.includes('Trip'))`));
+    const tc = await e(`(() => { const x = [...document.querySelectorAll('#view .cal .cell[data-day="${W1}"] .cev')].find(x => x.textContent.includes('Trip')), r = x.getBoundingClientRect(), z = document.querySelector('#view .cal .cell[data-day="${W2}"]').getBoundingClientRect(); return {x: r.left + 10, y: r.top + r.height / 2, dx: z.left - r.left + 10, ok: x.classList.contains('cgok')}; })()`);
+    check(tc.ok, 'desktop: the month: an own event is marked draggable');
+    await drag(tc.x, tc.y, tc.dx, 0);
+    const tr2 = await until(async () => { const x = await get(TR.eid); return x.start !== W1 ? x : null; });
+    check(tr2 && tr2.start === W2 && tr2.end === day(4), 'desktop: the month: dragged one day later ' + JSON.stringify(tr2 && [tr2.start, tr2.end]));
     // a plain click on a day still picks the day (its quick add makes a task on that day)
     await e(`(() => { document.querySelector('#view .cal .cell[data-day="${W2}"] .dn').click(); return 1; })()`); await sleep(300);
     check(await e(`S.calSel === '${W2}' && !document.querySelector('#view .cgnew')`), 'desktop: the month: a click picks the day');
