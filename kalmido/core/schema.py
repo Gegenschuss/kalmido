@@ -1837,6 +1837,9 @@ USER_DEFAULTS = {
     "agent_push": "0",
     # 2.53.0 C (#1424): 1 = "Urgent" set by someone else on a task counts for my pushes ('0' = as the list; still shown)
     "tbl_accept": "1",
+    # 2.62.0 (#1854): comments by agents in the bell and as push: all | replies (only replies to me: reply_to my comment,
+    # my comment right before, or an @mention of me)
+    "agent_comments": "all",
 }
 # global, server-internal (table settings); the legacy single-user rows stay there untouched
 GLOBAL_DEFAULTS = {

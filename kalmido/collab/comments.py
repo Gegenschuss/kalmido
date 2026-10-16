@@ -365,7 +365,7 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     """Decides who gets a push for this comment (burst state updated in c, caller commits).
     Returns [(user id, title, message, click, priority)] to send after the commit.
     2.33.0 (#1076): replied = the author of the answered comment: "replied to your message", counted like a mention."""
-    from ..collab.news import agent_push_ok, bell_all_users, news_add, notif_ok
+    from ..collab.news import agent_push_ok, bell_all_users, bl9_agent_comment_ok, news_add, notif_ok
     from ..notify.push import push_prio, push_reachable
     from ..agents.core import agent_ids
     author = me()
@@ -373,7 +373,8 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     before = {r[0] for r in c.execute("SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id<?",
                                       (t["id"], cid))}
     ids |= before
-    ids |= bell_all_users(c, t["list_id"], "comment")  # 2.1.0 (#317): the bell "All" of a list: every comment (2.6.1: or "custom")
+    ball = bell_all_users(c, t["list_id"], "comment")  # 2.62.0 (#1854): kept, a list bell "All" outranks "only replies"
+    ids |= ball  # 2.1.0 (#317): the bell "All" of a list: every comment (2.6.1: or "custom")
     from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
     ids |= tbl_urgent_users(c, t["id"])  # 2.53.0 C (#1424): "Urgent" on the task: every comment
     if only is not None:
@@ -396,6 +397,10 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
             continue
         if "comments" not in (s.get("features") or "").split(","):  # 2.0.6: comments off -> no comment News / pushes
             continue
+        # 2.62.0 (#1854): an agent's comment with "only replies to me" (unless the list bell "All" / the task's "Urgent" wants it)
+        if not bl9_agent_comment_ok(s, uid, author, ag, prev, replied, uid in notify_mentions) and uid not in ball and \
+                tbl_level(c, uid, t["id"], s) != "urgent":
+            continue
         mentioned = uid in notify_mentions or uid == replied
         # 2.1.0 (#317): which event of the notification settings this comment is for uid (first match)
         row = "mention" if mentioned else "comment" if uid in (t["assignee_id"], t["created_by"]) else \
@@ -416,8 +421,9 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
         if not notif_ok(c, uid, s, row, "push", t["list_id"]) or not push_reachable(c, uid, s) or \
                 not burst_gate(c, uid, t["id"], mentioned=mentioned):
             continue
-        if not mentioned and not agent_push_ok(c, uid, s, author):  # 2.28.0 (#987): an agent's comments push only when wanted
-            continue
+        if not mentioned and not agent_push_ok(c, uid, s, author) and \
+                not (s.get("agent_comments") == "replies" and uid == prev):  # 2.28.0 (#987): an agent's comments push only when wanted
+            continue  # 2.62.0 (#1854): with "only replies to me" a reply right after my comment pushes like one with reply_to
         lg = lang_of(s)
         what = snippet or trn("{0} file", "{0} files", nfiles, lg=lg)
         who = names.get(author, "?")

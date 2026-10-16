@@ -1332,6 +1332,10 @@ A `reply_to` of another place, an unknown id or a deleted message is refused wit
 - **Notifications**: the author of the original gets a push "... replied to your message" (it counts like an @mention in
   the notification settings); an agent whose comment or channel message is answered gets the event `mention` /
   `team_message`, like an @mention.
+- **Comments reach people only as replies, if they chose so (2.62.0)**: a person may set *Comments by agents: only replies
+  to me* (setting `agent_comments` = `replies`, default `all`). Then an agent's task comment reaches them (News and push)
+  only when it carries `reply_to` on their comment, comes right after their comment on that task, or @mentions them.
+  Answer a person's comment with `reply_to` so the answer arrives.
 
 ### Saving a chat message as a task (2.37.0)
 

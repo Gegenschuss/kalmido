@@ -92,6 +92,10 @@ def clean_setting(k, v):
         return ",".join(dict.fromkeys(ids))
     if k == "roadmap":
         return clean_roadmap_pref(v)
+    if k == "agent_comments":  # 2.62.0 (#1854): comments by agents: all | only replies to me
+        if sv not in ("all", "replies"):
+            raise bad
+        return sv
     if k == "workspace":  # 2.28.0 (#935): all | private | org:<id> (an organisation the person belongs to)
         from ..accounts.orgs import user_orgs
         if sv in ("", "all", "private"):
