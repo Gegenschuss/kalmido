@@ -39,7 +39,8 @@ LYP_BLOCKS = {
     "dashboard": (("wait", "Waiting for you", 2, False), ("today", "Today", 2, False), ("news", "News", 2, False),
                   ("chat", "Team chat", 2, False), ("projects", "Projects", 2, False), ("pinned", "Pinned", 2, False),
                   ("notes", "Notes", 2, False), ("agents", "Agents", 2, False), ("stats", "Statistics", 2, False),
-                  ("search", "Search", 2, False), ("family", "Family", 2, False)),
+                  ("search", "Search", 2, False), ("family", "Family", 2, False),
+                  ("kpi", "Figures", 2, False)),  # 2.55.1: shown only to office admins (2.50.0 #1197)
     "view_today": (("brief", "Briefing", 6, False), ("wait", "Waiting for you", 6, False), ("review", "Daily review", 6, False),
                    ("overdue", "Overdue", 6, False), ("events", "Events today", 6, False), ("tasks", "Tasks", 6, True),
                    ("inbox", "Basket", 6, False)),

@@ -7,6 +7,12 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.55.1] - 2026-10-16
+
+### Fixed
+- Start page: with Office & finance on, saving an arrangement or changing the layout no longer fails ("Invalid layout") -
+  the figures card is a known start page block on the server, also for agent proposals.
+
 ## [2.55.0] - 2026-10-16
 
 **In short:** views you arrange become more personal - **several saved arrangements** per view ("Focus", "Overview")

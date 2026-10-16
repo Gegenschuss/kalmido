@@ -126,6 +126,9 @@ check(r.ok and [x["name"] for x in saved(A)] == ["Overview", "Focus", "Current"]
 # the start page: only its cards
 check(A.post(B + "/api/layouts/saved", json={"key": "dashboard", "name": "X", "layout": json.dumps({"order": ["nope"]})}).status_code == 400,
       "#1069: the start page takes only its cards")
+# 2.55.1: the office figures card (2.50.0 #1197) is a start page card too (device test: saving with it gave 400)
+r = A.post(B + "/api/layouts/saved", json={"key": "dashboard", "name": "Figures", "layout": json.dumps({"order": ["today", "kpi"]})})
+check(r.ok, "2.55.1: the start page saves with the figures card " + r.text[:200])
 check(A.post(B + "/api/layouts/saved", json={"key": "view_nope", "name": "X", "layout": ""}).status_code == 400, "#1069: unknown view 400")
 check(A.post(B + "/api/layouts/saved", json={"key": "view_time", "name": "X", "layout": "{" * 3}).status_code == 400, "#1069: broken json 400")
 # LYV_MAX
