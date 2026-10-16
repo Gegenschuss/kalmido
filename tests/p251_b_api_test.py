@@ -336,5 +336,16 @@ check(r.status_code == 404, f"review 6: mode all, inquiry for a person without a
 A.patch(B + f"/api/admin/agents/{AG}", json={"proposals": "shared"})
 
 
+def own_apply(prop, sel):
+    r_ = cl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "proposal": prop})
+    jid = r_.json().get("id") if r_.status_code == 201 else None
+    r_ = A.post(B + f"/api/proposals/{jid}/apply", json={"select": sel})
+    return jid, (r_.json() if r_.ok else {})
+
+
+# #1351 review 14: an end date without an end time keeps the end date
+J14, res = own_apply({**OWN, "shoot_days": [{"title": "Two-day shoot", "date": "2027-07-01", "end_date": "2027-07-02", "start_time": "08:00"}]}, ["0", "300"])
+e14 = q("SELECT start, \"end\" FROM events WHERE title='Two-day shoot' AND deleted_at IS NULL")
+check(e14 and e14[0]["start"] == "2027-07-01T08:00" and (e14[0]["end"] or "").startswith("2027-07-02"), f"review 14: the end date stays ({[dict(x) for x in e14]})")
 print(f"p251_b_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
