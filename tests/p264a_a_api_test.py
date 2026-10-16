@@ -414,5 +414,16 @@ check(A.patch(B + f"/api/tasks/{T1}", json={"title": "Plant roses again"}).ok, "
 check(A.patch(B + f"/api/tasks/{T1}", json={"title": ct(1)}).status_code == 400, "open again: no ciphertext")
 check(A.put(B + f"/api/lists/{L}/members", json={"user_id": ag["id"], "role": "edit"}).ok, "open again: agents may join")
 
+# ================================================================== deleting a list with the lock: the ciphertexts go with it
+L2 = A.post(B + "/api/lists", json={"name": "Short lived"}).json()["id"]
+T3 = A.post(B + "/api/tasks", json={"title": "temp", "list_id": L2}).json()["id"]
+assert A.post(B + f"/api/lists/{L2}/e2e/start", json={"keys": [{"user_id": 1, "wrapped": wrapped()}]}).ok
+assert A.post(B + f"/api/lists/{L2}/e2e/bulk", json={"tasks": [{"id": T3, "title": ct(1)}]}).ok
+assert A.post(B + f"/api/lists/{L2}/e2e/finish").ok
+assert A.patch(B + f"/api/lists/{L2}", json={"archived": True}).ok
+r = A.delete(B + f"/api/lists/{L2}")
+check(r.ok and not dbx("SELECT 1 FROM tasks WHERE id=?", (T3,)) and not dbx("SELECT 1 FROM list_keys WHERE list_id=?", (L2,)),
+      "delete: tasks and keys go with the list (no unreadable ciphertexts in the trash) " + r.text[:200])
+
 print(f"p264a_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
