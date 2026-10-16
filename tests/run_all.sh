@@ -827,6 +827,7 @@ fresh; run p252_b_api "$PY" p252_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p252_b_ui node p252_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.52.0 part A: the calendar like macOS - drag to create, move, resize, all-day and month ranges, touch (#1016)
 fresh; run p252_a_ui node p252_a_ui.js "$KALMIDO_TEST_DATA"
+shard 10  # 2.53.0: the 2.53 suites (and 2.52 C) run in shard 10 (shard 2 reached the 30 min CI job limit, shard 10 took 18 min)
 # 2.53.0 part D: references by dragging into comment / description, reference cards, the preview card (#1449 #1440)
 fresh; run p253_d_ui node p253_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.53.0 part E: agent tone for comments / News / chat (#1451) + tags overview (#446)
