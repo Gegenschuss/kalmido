@@ -188,6 +188,10 @@ def apin_weekly(c, lid, uid, days=APIN_DAYS):
     ids = [r["id"] for r in opn]
     blockers = {}
     if ids:
+        from ..personal.timetrack import vis_ids
+        # 2.51.0 (#1352): a blocker in a list the token does not see (not shared, outside the agent's list limit, health)
+        # shows up as in the app: hidden, without title, id or assignee -- and never in waits / people.
+        bvis = vis_ids(c, uid)
         q = ",".join("?" * len(ids))
         for r in c.execute(f"""SELECT d.task_id, b.id, b.title, b.assignee_id, b.list_id FROM task_deps d JOIN tasks b ON b.id=d.blocker_id
                                WHERE d.task_id IN ({q}) AND b.deleted_at IS NULL AND b.status=0 ORDER BY b.id""", ids):
@@ -198,10 +202,6 @@ def apin_weekly(c, lid, uid, days=APIN_DAYS):
                 blockers.setdefault(r[0], []).append({"id": None, "title": None, "assignee_id": None, "same_list": False, "hidden": True})
     ppl = set()
     overdue, blocked, waiting, waits = [], [], [], {}
-        from ..personal.timetrack import vis_ids
-        # 2.51.0 (#1352): a blocker in a list the token does not see (not shared, outside the agent's list limit, health)
-        # shows up as in the app: hidden, without title, id or assignee -- and never in waits / people.
-        bvis = vis_ids(c, uid)
     for r in opn:
         if r["due"] and r["due"][:10] < today.isoformat():
             overdue.append({"id": r["id"], "title": r["title"], "due": r["due"][:10], "assignee_id": r["assignee_id"],
@@ -212,14 +212,14 @@ def apin_weekly(c, lid, uid, days=APIN_DAYS):
             blocked.append({"id": r["id"], "title": r["title"], "assignee_id": r["assignee_id"], "blocked_by": bl})
             ppl.add(r["assignee_id"])
             for x in bl:
+                if x["hidden"]:
+                    continue
                 ppl.add(x["assignee_id"])
                 if r["assignee_id"] and x["assignee_id"] and r["assignee_id"] != x["assignee_id"]:
                     w = waits.setdefault((r["assignee_id"], x["assignee_id"]), [])
                     if r["id"] not in w:
                         w.append(r["id"])
         if r["waiting_at"]:
-                if x["hidden"]:
-                    continue
             waiting.append({"id": r["id"], "title": r["title"], "since": r["waiting_at"], "on": r["wait_note"] or "",
                             "assignee_id": r["assignee_id"]})
             ppl.add(r["assignee_id"])
