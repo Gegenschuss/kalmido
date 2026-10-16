@@ -156,7 +156,8 @@ def fill_row(t, org):
             continue
         names.append(name)
         vals.append("'" + str(v).replace("'", "''") + "'")
-    sql(f"INSERT INTO {t}({','.join(names)}) VALUES({','.join(vals)}) ON CONFLICT DO NOTHING")
+    # 2.50.1 (#1194): quoted names - hub_bookings has the columns start / end (end is a reserved word)
+    sql(f"INSERT INTO {t}({','.join(chr(34) + n + chr(34) for n in names)}) VALUES({','.join(vals)}) ON CONFLICT DO NOTHING")
 
 
 for _ in range(3):  # a few rounds: tables that point at others of the same organisation
