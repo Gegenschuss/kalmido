@@ -129,6 +129,7 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   w.confirm = t => { asked = t; return true; };
   await until(() => d.querySelectorAll('#view .msclients .ctrow').length === 3, 40);
   d.querySelector('[data-mscl="pick"]').click(); await sleep(50);
+  await until(() => crow('Beta AG') && crow('Gamma KG'), 40);  // 2.48.1: the list may be drawn again after the undo (slow CI runner)
   crow('Beta AG').click(); crow('Gamma KG').click(); await sleep(50);
   d.querySelector('#ct-sbar [data-clb="del"]').click();
   await until(async () => (await call('GET', `/api/clients/${cl[1]}`)).http === 404, 40);
