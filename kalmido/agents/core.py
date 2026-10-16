@@ -248,6 +248,8 @@ def agent_event_comments(c, tid):
              "attachments": nat.get(r["id"], 0)}
         if len(txt) > AGENT_EVENT_COMMENT_CHARS:
             d["truncated"] = True
+        if r["ext_name"]:  # 2.50.0 (#329): a customer's comment through the public link (no account, the name they typed)
+            d["author"].update(name=r["ext_name"], customer=True)
         if r["suggestion"]:
             d["suggestion"] = json.loads(r["suggestion"])
         out.append(d)

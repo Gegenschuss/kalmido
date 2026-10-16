@@ -106,8 +106,8 @@ function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; }
 const cevWs = e => !e.own || e.cal == null || wsObjIn(evCal(e.cal));
 const cevOn = d => S.cal.items.filter(e => e.d0 <= d && e.d1 >= d && cevWs(e));
 const cevSort = (a, b) => (b.all_day - a.all_day) || a.start.localeCompare(b.start) || a.title.localeCompare(b.title);
-const cevColor = e => e.own ? evCalColor(e) : cssColor(S.cal.subs[e.sub]?.color) || '#94a3b8';
-const cevCal = e => e.own ? evCalName(e) : S.cal.subs[e.sub]?.name || tr('Calendar');
+const cevColor = e => e.booking ? 'var(--accent)' : e.own ? evCalColor(e) : cssColor(S.cal.subs[e.sub]?.color) || '#94a3b8';  // 2.50.0 (#1194): bookings
+const cevCal = e => e.booking ? tr('Disposition') : e.own ? evCalName(e) : S.cal.subs[e.sub]?.name || tr('Calendar');
 const cevTitle = e => e.title || tr('(no title)');
 // a timed event on day d is a block in the week grid, except on the middle days of a multi-day event (all-day row)
 const cevTimed = (e, d) => !e.all_day && !(e.d0 < d && e.d1 > d);

@@ -969,6 +969,16 @@ def odoc_status(did):
     r = doc_row(c, oid, did)
     b = body()
     st = _choice((b if isinstance(b, dict) else {}).get("status"), "status", STATUSES if r["kind"] == "offer" else INV_STATUSES[r["kind"]])
+    odoc_set_status(c, oid, did, st, uid, r)
+    bump(c)
+    c.commit()
+    return jsonify(doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin", items=False))
+
+
+def odoc_set_status(c, oid, did, st, uid, r=None):
+    """2.50.0 (#1200): the status change of document did (checked, logged, purchase, pipeline), shared by the route above
+    and the customer's approval (office/signoff.py, uid None). Denied 403 / 409 when not allowed; the caller commits."""
+    r = r or doc_row(c, oid, did)
     if r["kind"] == "offer" and st == "draft" and r["status"] != "draft":  # 2.39.0 (#1209 audit N1): sent = locked, a copy for changes
         raise Denied(409, tr("This status change is not allowed ({0} to {1})", r["status"], st))
     ts = iso(now_utc())
@@ -988,9 +998,8 @@ def odoc_status(did):
         ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": st}})
         if r["kind"] == "offer":
             ek_purchases_write(c, oid, did)  # 2.47.0 (#1649): accepted = its purchase is written, left = removed
-    bump(c)
-    c.commit()
-    return jsonify(doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin", items=False))
+            from .pipeline import pl2_offer_status  # 2.50.0 (#1196): a linked deal of the pipeline follows (one place for both callers)
+            pl2_offer_status(c, oid, did, st)
 
 
 # 2.36.2: columns a copy never takes over (identity, state, the frozen snapshot of a finalised original)
@@ -1042,6 +1051,8 @@ def odoc_delete(did):
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     ofx_need_editable(r)
+    if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (did, oid)).fetchone():
+        raise Denied(409, tr("The customer has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net")})
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
     bump(c)

@@ -161,6 +161,8 @@ The most used helpers:
 | `agents/safety.py` | 2.30.0: agents stay inside one circle of people: bridges between lists with different people (409 + approval), moving tasks across circles waits for approval, the list restriction of agents / tokens, the agents' list access log. |
 | `agents/usage.py` | Model usage of agents, limits and the agents' audit log. |
 | `lists/public.py` | Public links of lists and checklist mode. |
+| `lists/custview.py` | 2.50.0 (#329): the customer view of a public link (`public_links.cv_show`: what the customer sees, filtered on the server). |
+| `office/signoff.py` | 2.50.0 (#1200): approval links with a simple electronic signature (`office_signoffs`): accept / decline a sent quotation, acceptance of a list, section or milestone; the customer page `/s/q/<token>`. |
 | `integrations/git.py` | Git integration of project lists (GitHub, GitLab, Gitea / Forgejo, Bitbucket) and tickets for agents. |
 | `integrations/errorreports.py` | Error reports (Sentry, GlitchTip ...) -> tickets. |
 | `api/projects.py` | The project page in the token API. |
@@ -198,6 +200,8 @@ The most used helpers:
 | `life/v1.py` | Home & life: the REST API v1 (+ MCP) and its OpenAPI part (health + journal: scope "private"). |
 | `team/clients.py` | Clients (module "clients"): clients of an organisation above the lists, hours, budget, estimate vs. actual. |
 | `team/workload.py` | Workload (module "workload"): planned hours per person and week against their capacity. |
+| `hub/absence.py` | 2.50.0 (#1195): absences per person and area (the team sees "away", the kind only the person and the admins; kind + note encrypted at rest), German public holidays per state, the effect on workload, day plan and assigning, `GET /api/v1/absences`. See docs/TEAM.md. |
+| `hub/dispo.py` | 2.50.0 (#1194): resources and disposition (module "dispo"): bookings of members, contacts, equipment and sets (option / firm), double bookings and absences as warnings, "who is free", my bookings. See docs/TEAM.md. |
 | `team/approvals.py` | Approvals as a step of a task: request, approve / changes / reject, withdraw. |
 | `team/forms.py` | Forms (module "forms"): a link whose page (/f/<token>) creates a task in a list. |
 | `team/v1.py` | Clients, workload, approvals, forms: the REST API v1 (+ MCP) and its OpenAPI part. |
@@ -281,6 +285,8 @@ registering the ones of its area.
 | `dialogs.js` | Modals: the app's own dialogs, the list dialog and the share dialog. |
 | `settings.js` | Settings: notifications, Web Push, autosave settings, personal agents, import. |
 | `integrations.js` | API tokens + scopes, webhooks, public links, calendar apps (CalDAV). |
+| `custview.js` | 2.50.0 (#329): Share dialog > Public link > *What does the customer see?* |
+| `signoff.js` | 2.50.0 (#1200): approval links on a sent quotation and in the Share dialog (acceptance), with their protocol. |
 | `account.js` | Account, users (admin), login, groups, passkeys, two-factor, sign-in policy, backups, the sample project. |
 | `templates.js` | Templates and statistics. |
 | `time.js` | Time tracking (module "time"). |
@@ -308,6 +314,8 @@ registering the ones of its area.
 | `calevents.js` | Events (module "events"): the editor and popover, the agenda, creating in the week grid, calendars, the phone setup. |
 | `contacts.js` | Contacts (module "contacts"): the view, the editor, the card, links between contacts and tasks, import / export. |
 | `clients.js` | Clients, the workload view, approvals in the task panel, forms of a list, sign-in links with a QR code. |
+| `absence.js` | 2.50.0 (#1195): the tabs of the workload view, the absences tab (month grid, list, "Enter an absence" sheet, public holidays), the day plan hint, the warning when assigning to somebody away. |
+| `dispo.js` | 2.50.0 (#1194): the disposition tab (week grid per resource, a day list on phones, booking sheet, who is free, my bookings). |
 | `life.js` | Home & life: the view, its dialogs (contract, device, upkeep, health, trip, Karakeep), the review + journal, staying in touch on a contact's card. |
 | `areas.js` | 2.44.0 (#1187): the areas Office, Time, Review and Home: one sidebar row / tab each, the tabs of their parts on top of the page (each part keeps its route), one switch per area in Settings > Modules. |
 | `sbnav.js` | 2.45.0 (#1509): the messenger in the sidebar: "Messages" with the unread count, the last five conversations, a speech bubble at every person for a direct message. |

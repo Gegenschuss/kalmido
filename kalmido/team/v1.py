@@ -160,7 +160,9 @@ def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
             "note_append": {"type": "string"}, "items": {"type": "array", "items": {"type": "object"}}}}, scope="structure")}
     cell = {"type": "object", "properties": {"minutes": {"type": "integer"}, "tasks": {"type": "integer"},
                                              "unestimated": {"type": "integer"}, "ids": {"type": "array", "items": {"type": "integer"}},
-                                             "pct": nul("integer"), "level": {"type": "string", "enum": ["none", "ok", "warn", "over"]}}}
+                                             "pct": nul("integer"), "level": {"type": "string", "enum": ["none", "ok", "warn", "over"]},
+                                             # 2.50.0 (#1195): the week's capacity after absences / public holidays
+                                             "capacity_h": {"type": "number"}, "absent_days": {"type": "number"}}}
     paths["/workload"] = {"get": op(
         "2.23.0 (module workload): planned hours per person of your organisation and week (open assigned tasks, weighed with their "
         "duration as the estimate; by planned start, else due, else start; overdue in this week) against their capacity", W,

@@ -1092,6 +1092,8 @@ def cal_events():
         for i, e in enumerate(own):
             e["id"], e["own"] = f"k{i}", True
         evcals = {x["id"]: {"name": x["name"], "color": x["color"], "role": x["role"]} for x in cals_for(c, uid)}
+    from ..hub.dispo import dsp_cal
+    own = own + dsp_cal(c, uid, lo, hi)  # 2.50.0 (#1194): my bookings of the disposition, read-only
     if not CAL_ON:
         return jsonify(events=own, subs={}, evcals=evcals)
     subs = {r["id"]: {"name": r["name"], "color": r["color"]}
