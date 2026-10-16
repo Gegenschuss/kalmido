@@ -20,6 +20,9 @@ def task_dict(r, tags, full_snips=False):
         d.pop("ms", None)
     if d.get("milestone_id") is None:
         d.pop("milestone_id", None)
+    for k in ("sprint_id", "sprint_at", "points"):  # 2.60.0 (#343 / #1511): only when set
+        if d.get(k) is None:
+            d.pop(k, None)
     if not d.get("approval"):  # 2.23.0 (#463): only on tasks that wait for / had an approval
         d.pop("approval", None)
         d.pop("approver_id", None)
