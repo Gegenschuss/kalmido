@@ -307,6 +307,7 @@
   Say 'Backups:    daily into data\backups\ (Settings > Users > Whole server > Backups); copy them to another disk too'
   if ($script:Image) { Say "Image:      $($script:Image) (prebuilt)" } else { Say 'Image:      kalmido:local (built on this computer)' }
   Say "Update:     powershell -ExecutionPolicy Bypass -File `"$Dir\update.ps1`"  (backs up the database first; admins also see new versions in Settings > Help)"
+  Say 'Virus scan: ClamAV checks every upload (about 1-1.5 GB RAM); small server: KALMIDO_CLAMD= in .env, see docs\SELF-HOSTING.md'  # 2.61.0
   Say "Stop:       cd `"$Dir`"; docker compose down"
   $img = if ($script:Image) { $script:Image } else { 'kalmido:local' }
   Say "Uninstall:  cd `"$Dir`"; docker compose down; docker image rm $img"
