@@ -203,7 +203,8 @@ ags = [requests.get(B + f"{D}/{DOC}/pdf", headers=AGH).status_code, requests.get
 check(all(x in (401, 403) for x in ags), f"an agent token: refused on pdf and logo {ags}")
 check(requests.get(B + f"{D}/{DOC}/pdf", headers=H).status_code in (401, 303) and requests.get(B + "/api/office/logo", headers=H).status_code in (401, 303),
       "signed out: refused")
-check(requests.get(B + "/api/v1/office/docs/1/pdf", headers=AGH).status_code == 404, "no /api/v1 route for the PDF in stage 1")
+# 2.51.1 (#1348): 2.51.0 brings GET /api/v1/office/docs/<id>/pdf for agents with the office right; this token has none
+check(requests.get(B + "/api/v1/office/docs/1/pdf", headers=AGH).status_code in (403, 404), "an agent without the office right: no PDF over /api/v1")
 Bo.patch(B + "/api/settings", json={"features": "cal,comments"})
 check(Bo.get(B + f"{D}/{DOC}/pdf").status_code == 403 and Bo.get(B + "/api/office/logo").status_code == 403, "feature off: 403")
 Bo.patch(B + "/api/settings", json={"features": FEAT})
