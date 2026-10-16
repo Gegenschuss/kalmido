@@ -7586,15 +7586,15 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 
 /* 2.55.0 E (#1455) the newsletter connection (newsletter.js): the sheet in Contacts > More, the consent in the contact card */
 .nwl-md .nwl-body, .nwl-smd { display: flex; flex-direction: column; gap: .45rem; }
-.nwl-md { max-width: 640px; }
+.nwl-md { max-width: 40rem; }
 .nwl-why { margin: 0 0 .3rem; }
 .nwl-conn { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .6rem; margin: .2rem 0; }
 .nwl-err { color: var(--danger, #c0392b); margin: .3rem 0; }
 .nwl-err:empty { display: none; }
-.nwl-prev { font-size: .85rem; color: var(--muted); border-left: 3px solid var(--accent); padding: .2rem .6rem; margin: 0; }
-.nwl-tag { font-size: .75rem; padding: .05rem .45rem; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); }
+.nwl-prev { font-size: .85rem; color: var(--muted); border-left: .1875rem solid var(--accent); padding: .2rem .6rem; margin: 0; }
+.nwl-tag { font-size: .75rem; padding: .05rem .45rem; border-radius: 9999px; border: 1px solid var(--accent); color: var(--accent); }
 .nwl-segs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
-.nwl-segs li { display: flex; align-items: center; gap: .4rem; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: 10px; min-height: 44px; }
+.nwl-segs li { display: flex; align-items: center; gap: .4rem; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: .625rem; min-height: 2.75rem; }
 .nwl-sn { flex: 1; min-width: 0; }
 .nwl-sn .muted { font-size: .85rem; overflow-wrap: anywhere; }
 .nwl-log ul { list-style: none; margin: .3rem 0 0; padding: 0; font-size: .88rem; display: flex; flex-direction: column; gap: .3rem; }
@@ -7624,34 +7624,34 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .lyvsw.on{border-color:color-mix(in srgb,var(--accent) 45%,var(--line2));color:var(--accent)}
 .lyvbar{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin:.25rem 0 .75rem}
 .lyvlist{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0}
-.lyvrow{display:flex;align-items:center;gap:.25rem;padding:.25rem .25rem .25rem .5rem;border-radius:10px;background:var(--bg2)}
+.lyvrow{display:flex;align-items:center;gap:.25rem;padding:.25rem .25rem .25rem .5rem;border-radius:.625rem;background:var(--bg2)}
 .lyvrow .lyvrn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lyvs .fl{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0}
 .lyvs #lyvs-q{width:100%;margin:.25rem 0}
 .lyvppl{display:flex;flex-direction:column;gap:.125rem;max-height:40vh;overflow:auto;margin:.25rem 0 .5rem}
-.lyvppl .chkl{padding:.375rem .25rem;border-radius:8px}
+.lyvppl .chkl{padding:.375rem .25rem;border-radius:.5rem}
 .lyvprev{margin:.5rem 0;padding-left:1.25rem}
 .lyvprev li{display:flex;justify-content:space-between;gap:1rem;padding:.125rem 0}
 @media (max-width:700px){
-  .lyvsw{max-width:9rem;min-height:36px}
-  .lyvrow .iconbtn,.lyvppl .chkl{min-height:44px}
+  .lyvsw{max-width:9rem;min-height:2.25rem}
+  .lyvrow .iconbtn,.lyvppl .chkl{min-height:2.75rem}
 }
 /* 2.55.0 B (#1066) an agent's arrangement proposal: before / after as two small schematic grids (lyprop.js) */
-.lyp-head{font-size:13px;margin:2px 0 8px;color:var(--muted)}
+.lyp-head{font-size:.8125rem;margin:2px 0 .5rem;color:var(--muted)}
 .lyp-head b{color:var(--text)}
 .lyp-by{color:var(--accent)}
-.lyp-ba{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}
+.lyp-ba{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin:.5rem 0}
 @media (max-width:560px){.lyp-ba{grid-template-columns:1fr}}
 .lyp-f{margin:0;min-width:0}
-.lyp-f figcaption{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
-.lyp-g{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;padding:6px;border:1px solid var(--line);border-radius:10px;background:var(--bg2)}
-.lyp-c{grid-column:span 6;min-height:26px;display:flex;align-items:center;padding:2px 6px;border-radius:6px;border:1px solid var(--line);
+.lyp-f figcaption{font-size:.75rem;font-weight:600;color:var(--muted);margin-bottom:.25rem}
+.lyp-g{display:grid;grid-template-columns:repeat(6,1fr);gap:.1875rem;padding:.375rem;border:1px solid var(--line);border-radius:.625rem;background:var(--bg2)}
+.lyp-c{grid-column:span 6;min-height:1.625rem;display:flex;align-items:center;padding:2px .375rem;border-radius:.375rem;border:1px solid var(--line);
   background:var(--accent-soft);font-size:var(--fs-xs);line-height:1.2;overflow:hidden;min-width:0}
 .lyp-c span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lyp-w2{grid-column:span 2}.lyp-w3{grid-column:span 3}.lyp-w4{grid-column:span 4}.lyp-w6{grid-column:span 6}
-.lyp-h1{min-height:18px}.lyp-h3{min-height:40px}
+.lyp-h1{min-height:1.125rem}.lyp-h3{min-height:2.5rem}
 .lyp-new{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-.lyp-hid{font-size:12px;margin-top:4px}
-.lyp-use{margin:6px 0}
+.lyp-hid{font-size:.75rem;margin-top:.25rem}
+.lyp-use{margin:.375rem 0}
 /* 2.55.0 D (#1067) statistics, the client card and family on the view builder: the blocks keep the spacing the cards had (the cards bring their own top margin) */
 .mscly .lybar,.stats > .lybar{display:flex;justify-content:flex-end}
