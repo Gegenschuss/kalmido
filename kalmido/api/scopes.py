@@ -198,7 +198,7 @@ def scopes_offer(c, u, agent=False):
     cap = set(scope_cap(c, "agents" if agent else "tokens"))
     out = []
     for s in SCOPES:
-        if (agent and s in SCOPES_AGENT_NEVER) or (s == "admin-read" and not u["is_admin"]):
+        if (agent and s in SCOPES_AGENT_NEVER) or (s == "admin-read" and not u["is_admin"]) or (s == "office" and not agent):  # 2.51.0 A: office = agents only
             continue
         out.append({"scope": s, "label": tr(SCOPE_LABELS[s]), "help": tr(SCOPE_HELP[s]), "allowed": s in cap})
     return out

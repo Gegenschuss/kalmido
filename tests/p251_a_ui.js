@@ -88,8 +88,10 @@ const today = new Date().toISOString().slice(0, 10);
     await shot('p251-a-draft-phone.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     // ================= the chat card
-    await nav(B + `#agents/${ag.id}`);
-    check(await ready(ev, `!!document.querySelector('.oa_links a[href="#office/offers/${qid}"]')`, 80), '#1348: the chat card has "Open in the office"');
+    await nav(B + '#home');
+    await ready(ev, `!!document.querySelector('.dash')`, 80);
+    await ev(`(() => { chatOpen(${ag.id}, {float: false}); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.oa_links a[href="#office/offers/${qid}"]')`, 80), '#1348: the chat card has "Open in the office" ' + await ev(`document.querySelector('#achat')?.textContent.slice(0, 300)`));
     check(await ev(`!!document.querySelector('.oa_links a[href="/api/office/docs/${qid}/pdf?inline=1"][target="_blank"]')`), '#1348: ... and the PDF preview (new tab)');
     check(await ev(`oa_linkBtns([{id: 'a', label: 'x', href: 'javascript:alert(1)'}, {id: 'b', label: 'y', href: 'https://example.com'}]).includes('<a') === false`), '#1348: only app targets become links');
     await ev(`(() => { document.querySelector('.oa_links a[href="#office/offers/${qid}"]').click(); return 1; })()`);
