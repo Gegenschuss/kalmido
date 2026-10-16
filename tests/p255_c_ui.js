@@ -34,7 +34,7 @@ const opts = async key => { const s = (await call('GET', '/api/state')).settings
   await call('POST', '/api/time/entries', {task_id: TA, start: new Date(Date.now() - 3 * 36e5).toISOString(), minutes: 30});
   await call('POST', '/api/time/entries', {task_id: TB, start: new Date(Date.now() - 2 * 36e5).toISOString(), minutes: 50});
   const today = new Date().toISOString().slice(0, 10);
-  for (let i = 0; i < 7; i++) await call('POST', '/api/tasks', {title: 'Today ' + i, list_id: BL, due: today});
+  for (let i = 0; i < 12; i++) await call('POST', '/api/tasks', {title: 'Today ' + i, list_id: BL, due: today});
 
   // ---- time tracking: the gear only in Customize, a block with one client only
   let w = await boot({user: 'alice', hash: 'time'}), d = w.document;
@@ -72,7 +72,7 @@ const opts = async key => { const s = (await call('GET', '/api/state')).settings
   // ---- the start page: gear only at blocks with settings, the number of tasks, a list no longer visible
   w = await boot({user: 'alice', hash: 'home'}), d = w.document;
   const rows = () => d.querySelectorAll('#view .dc-today .dtl li').length;
-  const total = () => +(d.querySelector('#view .dc-today .dcn')?.textContent || 0);  // the welcome tasks are due today too
+  const total = () => +(d.querySelector('#view .dc-today .dcn')?.textContent || 0);  // 12 (+ welcome tasks due today, if any)
   await until(() => total() > 8 && rows() === 8);
   check(total() > 8 && rows() === 8, '#1065: Today on the start page shows 8 by default ' + rows() + '/' + total());
   // "Settings…" in the "…" menu
