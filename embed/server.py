@@ -60,7 +60,8 @@ class Model:
         self.name = MODEL_NAME
         self.tok = Tokenizer.from_file(os.path.join(MODEL_DIR, "tokenizer.json"))
         self.tok.enable_truncation(MAX_TOKENS)
-        self.tok.enable_padding()
+        pad = self.tok.token_to_id("<pad>")  # XLM-R based models (e5, bge-m3): <pad> = 1; BERT style: [PAD] = 0
+        self.tok.enable_padding(pad_id=pad if pad is not None else 0, pad_token="<pad>" if pad is not None else "[PAD]")
         so = ort.SessionOptions()
         if THREADS:
             so.intra_op_num_threads = THREADS
