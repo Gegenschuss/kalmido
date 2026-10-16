@@ -16,6 +16,7 @@
    person, undo puts the modules back and removes the lists while they are empty (a list with a task stays, named)
  - the quotation part (part A's office/agentdocs.py): skipped when the module is missing in this build
 usage: p251_b_api_test.py <datadir>"""
+import json
 import os
 import subprocess
 import sys
@@ -324,6 +325,83 @@ else:
     A.put(O + "/settings", json={"agents_read": 0})
     r = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "offer_id": QD, "proposal": FROM})
     check(r.status_code == 403, f"office: privacy switch off again -> 403 ({r.status_code})")
+
+# ================================================================== 2.51.0 review fixes (negative tests)
+# #1351 review 6: the mode "all" never reaches a person who shares no list with the agent
+check(A.patch(B + f"/api/admin/agents/{AG}", json={"proposals": "all"}).ok, "review 6: proposals mode all")
+r = cl.post("/agent/proposals", json={"kind": "setup", "user_id": BOB, "proposal": {"modules": [{"key": "habits", "on": True}]}})
+check(r.status_code == 404, f"review 6: mode all, setup for a person without a shared list: 404 ({r.status_code})")
+r = cl.post("/agent/proposals", json={"kind": "inquiry", "user_id": BOB, "proposal": OWN})
+check(r.status_code == 404, f"review 6: mode all, inquiry for a person without a shared list: 404 ({r.status_code})")
+A.patch(B + f"/api/admin/agents/{AG}", json={"proposals": "shared"})
+
+
+def own_apply(prop, sel):
+    r_ = cl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "proposal": prop})
+    jid = r_.json().get("id") if r_.status_code == 201 else None
+    r_ = A.post(B + f"/api/proposals/{jid}/apply", json={"select": sel})
+    return jid, (r_.json() if r_.ok else {})
+
+
+# #1351 review 14: an end date without an end time keeps the end date
+J14, res = own_apply({**OWN, "shoot_days": [{"title": "Two-day shoot", "date": "2027-07-01", "end_date": "2027-07-02", "start_time": "08:00"}]}, ["0", "300"])
+e14 = q("SELECT start, \"end\" FROM events WHERE title='Two-day shoot' AND deleted_at IS NULL")
+check(e14 and e14[0]["start"] == "2027-07-01T08:00" and (e14[0]["end"] or "").startswith("2027-07-02"), f"review 14: the end date stays ({[dict(x) for x in e14]})")
+# #1351 review 9: each draft's own updated_at is in the undo record
+ap14 = q("SELECT applied FROM agent_jobs WHERE id=?", (J14,))
+check(ap14 and len(json.loads(ap14[0][0] or "{}").get("events_at") or {}) == 1, "review 9: the undo record keeps the draft's updated_at")
+r = A.post(B + f"/api/proposals/{J14}/undo")
+check(r.ok and not q("SELECT 1 FROM events WHERE title='Two-day shoot' AND deleted_at IS NULL"), f"review 9: an unchanged draft goes on undo ({r.text[:120]})")
+
+# #1351 review 10: a list with a new member stays; modules stay while a changed draft stays
+A.patch(B + "/api/settings", json={"features": ",".join(sorted(feats(A) - {"events"}))})
+J10, res = own_apply({**OWN, "name": "Review ten", "shoot_days": [{"title": "Ten shoot", "date": "2027-08-01"}]}, ["0", "300"])
+L10 = res.get("list_id")
+check(A.put(B + f"/api/lists/{L10}/members", json={"user_id": BOB, "role": "view"}).ok, "review 10: bob joins the project list")
+E10 = q("SELECT id FROM events WHERE title='Ten shoot' AND deleted_at IS NULL")
+check(E10 and A.patch(B + f"/api/events/{E10[0][0]}", json={"title": "Ten shoot (moved)"}).ok, "review 10: the person changes the draft")
+r = A.post(B + f"/api/proposals/{J10}/undo")
+check(r.ok and q("SELECT 1 FROM lists WHERE id=?", (L10,)), f"review 10: a list with another member stays ({r.text[:160]})")
+check(not q("SELECT 1 FROM tasks WHERE list_id=? AND deleted_at IS NULL", (L10,)), "review 10: the proposal's tasks went to the trash")
+check(q("SELECT 1 FROM events WHERE id=? AND deleted_at IS NULL", (E10[0][0] if E10 else 0,)), "review 10: the changed draft stays")
+check("events" in feats(A), "review 10: the calendar module stays on while a draft stayed")
+
+if os.path.exists(os.path.join(N, "..", "kalmido", "office", "agentdocs.py")) or os.environ.get("PK2_OFFICE"):
+    A.put(O + "/settings", json={"agents_read": 1})
+    # #1351 review 2: office data only with the agent's scope office
+    check(A.patch(B + f"/api/my/agents/{PAG}", json={"scopes": ["write"]}).ok, "review 2: the agent loses the scope office")
+    r = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "proposal": OWN2})
+    check(r.status_code == 201 and r.json()["input"]["office"] == {"ok": False, "reason": "no_scope"} and r.json()["input"]["clients"] == [],
+          f"review 2: without the scope no clients, no quotation ({r.text[:200]})")
+    r = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "offer_id": QD, "proposal": FROM})
+    check(r.status_code == 403, f"review 2: without the scope the accepted quotation stays closed ({r.status_code})")
+    r = A.post(B + "/api/proposals", json={"kind": "inquiry", "agent_id": PAG, "text": MAIL})
+    jx = r.json().get("id") if r.ok else 0
+    ev2 = [e for e in events(pcl, "job_request") if e["data"]["job"]["id"] == jx]
+    check(ev2 and ev2[0]["data"]["input"]["office"].get("reason") == "no_scope" and ev2[0]["data"]["input"]["clients"] == [],
+          "review 2: the person's request carries no office data either")
+    A.patch(B + f"/api/my/agents/{PAG}", json={"scopes": ["write", "office"]})
+
+    # #1351 review 3: undo keeps a draft with a number or with changes; a clean undo is logged
+    def offer_apply():
+        r_ = pcl.post("/agent/proposals", json={"kind": "inquiry", "user_id": ALICE, "proposal": OWN2})
+        jid = r_.json().get("id") if r_.status_code == 201 else None
+        r_ = A.post(B + f"/api/proposals/{jid}/apply", json={"select": ["0", "400", "400.0"]})
+        return jid, (r_.json().get("offer_id") if r_.ok else None)
+    J3a, D3a = offer_apply()
+    check(D3a and A.post(O + f"/docs/{D3a}/number", json={}).ok, "review 3: the person reserves a number")
+    r = A.post(B + f"/api/proposals/{J3a}/undo")
+    check(r.ok and q("SELECT 1 FROM office_docs WHERE id=?", (D3a,)) and r.json().get("skipped"), f"review 3: a draft with a number stays, named ({r.text[:160]})")
+    J3b, D3b = offer_apply()
+    check(D3b and A.put(O + f"/docs/{D3b}/items", json={"items": [{"kind": "service", "title": "Changed", "qty": 1, "unit": "day", "rate": 500}]}).ok,
+          "review 3: the person changes the draft")
+    r = A.post(B + f"/api/proposals/{J3b}/undo")
+    check(r.ok and q("SELECT 1 FROM office_docs WHERE id=?", (D3b,)), f"review 3: a changed draft stays ({r.text[:160]})")
+    J3c, D3c = offer_apply()
+    r = A.post(B + f"/api/proposals/{J3c}/undo")
+    check(r.ok and not q("SELECT 1 FROM office_docs WHERE id=?", (D3c,)), f"review 3: an unchanged draft goes ({r.text[:160]})")
+    check(q("SELECT 1 FROM office_doc_log WHERE doc_id=? AND action='delete' AND user_id=?", (D3c, ALICE)), "review 3: the deletion is in the office log")
+    A.put(O + "/settings", json={"agents_read": 0})
 
 print(f"p251_b_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

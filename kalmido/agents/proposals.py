@@ -980,6 +980,9 @@ def v1_agent_job_proposal(jid):
         raise Denied(404)
     if not j["kind"]:
         raise BadInput(tr("This job did not ask for a proposal"))
+    if j["kind"] in PROP_KINDS_AGENT:  # 2.51.0 C (#1353 #1355): replacing needs the scope of creating it
+        from ..api.scopes import need_scope
+        need_scope({"time": "time", "shoot": "calendar"}[j["kind"]])
     if j["prop_state"] not in ("requested", "ready") or j["state"] not in ("running", "waiting"):
         raise Denied(409, tr("This proposal was already applied or discarded"))
     if len(request.data or b"") > PROP_MAX_BYTES:

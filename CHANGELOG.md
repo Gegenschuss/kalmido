@@ -7,6 +7,32 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.51.0] - 2026-10-16
+
+**In short:** connected agents pitch in with business work - **quotation drafts** in the office, the way **from quotation
+to invoice** (invoice and reminder drafts, payment suggestions), an **inquiry becomes a project** with one yes, a
+**setup assistant**, a **weekly status** on project pages, a **time tracking check** and **shoot planning**. The agent
+proposes, a person confirms: agents never send, finalise, book or delete. All new agent rights are off by default.
+
+### Added
+- **Agents in the office** (Office & finance): on request a connected agent drafts quotations with services and prices from
+  the master data; free positions, changed prices and discounts are marked for review. A card in the chat shows the sum,
+  the PDF preview and *Open in the office*. Two switches (per agent and a privacy switch per office), every agent request
+  in the access log; freelancers without an organisation get the same in their personal office (#1348).
+- **From quotation to invoice:** invoice drafts from accepted quotations, reminder drafts for open invoices, and payment
+  suggestions an admin books or rejects (#1350).
+- **An inquiry becomes a project:** one proposal with the project list, first tasks, shoot days as draft events and
+  (with office rights) a quotation draft; an accepted quotation becomes a project the same way (#1351).
+- **Set up with your agent** (Settings > Modules and the tour): the agent suggests modules, lists and a first project (#1358).
+- **Weekly status on the pin board:** an agent keeps its own *Status* notepad on a project page (done, overdue, blocked,
+  who waits for whom); new permission *Pin board* and a template for scheduled checks (#1352).
+- **Time tracking check:** agents find too long days, overlaps and events without time and suggest entries from calendar
+  events; you review and take them over (#1353).
+- **Shoot planning:** agents propose shoot days as draft events and crew / equipment as options, with warnings for double
+  bookings and absences; draft events show dashed in the calendar with *Confirm* / *Discard* (#1355).
+- **For agents:** the scopes *Office drafts* and *Pin board*, the event `offer_accepted`, reading the disposition of the own
+  organisation, and new MCP tools (office, pin board, time check, shoot planning, `propose_to_person`).
+
 ## [2.50.0] - 2026-10-16
 
 **In short:** the second part of the business hub: **absences** with public holidays, a **disposition** for crew and

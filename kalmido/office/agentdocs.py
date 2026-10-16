@@ -293,6 +293,10 @@ def ofa_offer_accepted(c, oid, did):
     if not office_settings(c, oid).get("agents_read"):
         return
     ids = [aid for aid, on in ofa_area_agents(c, oid) if on]
+    if ids and pb_owner(c, oid) is None:  # 2.51.0 (#1348) review: a personal agent in an organisation only while its owner works in its office
+        with system_ctx(c):  # the agents' owners and their office role (structure, no content)
+            own = {r[0]: r[1] for r in c.execute(f"SELECT user_id, owner_id FROM agents WHERE user_id IN ({','.join('?' * len(ids))})", ids)}
+            ids = [aid for aid in ids if not own.get(aid) or (office_role(c, own[aid], oid) in ("admin", "member") and office_on(c, own[aid]))]
     if not ids:
         return
     from ..agents.core import agent_emit

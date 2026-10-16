@@ -230,6 +230,7 @@ OX_AREAS = (
     ("office/document_parts.json", "office_doc_parts", "org_id=?"),  # 2.47.0 (#1215): the parts of quotations
     ("office/purchases.json", "office_purchases", "org_id=?"),  # 2.47.0 (#1649): purchase of accepted quotations (amount decrypted)
     ("office/payments.json", "office_payments", "org_id=?"),
+    ("office/pay-props.json", "office_pay_props", "org_id=?"),  # 2.51.0 (#1350): agents' payment match proposals
     ("office/signoffs.json", "office_signoffs", "org_id=?"),  # 2.50.0 (#1200): approval links + protocol (the token never)
     ("office/trips.json", "office_trips", "org_id=?"),  # 2.47.3 (#1022): travel expenses (decrypted like the others)
     ("office/trip_items.json", "office_trip_items", "org_id=?"),

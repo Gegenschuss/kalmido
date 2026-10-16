@@ -21,7 +21,7 @@ function wgColorItems(k) {
     ...WG_COLORS.map(([c, n]) => ({label: tr(n), title: tr(n), cls: `wgsw wgsw-${c}`, on: cur === c, fn: () => wgColorSet(k, c)}))];
 }
 function wgPadAddItems() {
-  const P = wgPov(); if (!P?.y.can_style || P.l.archived || (P.y.pads || []).length >= 20) return [];
+  const P = wgPov(); if (!P?.y.can_style || P.l.archived || (P.y.pads || []).filter(x => !x.agent_id).length >= 20) return [];  // 2.51.0 (#1352): agents' notepads do not count
   return [{label: tr('Notepad'), icon: 'edit', sub: tr('Text right on the page (Markdown)'), fn: () => wgPadNew()}];
 }
 async function wgPadNew(title, body) {

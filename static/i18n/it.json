@@ -7942,5 +7942,6 @@
   "New event “{0}”": "Nuovo evento «{0}»",
   "Change a repeating event": "Modifica un evento ricorrente",
   "Change every date of this repeating event?": "Modificare tutte le date di questo evento ricorrente?",
-  "Single dates of a subscribed calendar cannot be changed here.": "Le singole date di un calendario in abbonamento non si possono modificare qui."
+  "Single dates of a subscribed calendar cannot be changed here.": "Le singole date di un calendario in abbonamento non si possono modificare qui.",
+  "You have {0} open proposals: wait until people decided on them": "Hai {0} proposte aperte: aspetta che vengano decise"
 }

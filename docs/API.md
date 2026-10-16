@@ -1139,7 +1139,7 @@ The web app's own routes (`/api/docs`, a signed-in person, never an agent): `GET
 
 ## Pin board, time check and shoot planning for agents (2.51.0)
 
-New scope `pinboard` (write notepads on project pages; an agent changes only its own). Off for new agents.
+New scope `pinboard` (write notepads on project pages; an agent changes only its own, at most 3 per project). Off for new agents and not part of the legacy `write`.
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" https://kalmido.example/api/v1/lists/12/weekly-status

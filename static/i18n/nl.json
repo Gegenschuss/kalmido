@@ -7942,5 +7942,6 @@
   "New event “{0}”": "Nieuwe afspraak ‘{0}’",
   "Change a repeating event": "Een terugkerende afspraak wijzigen",
   "Change every date of this repeating event?": "Alle datums van deze terugkerende afspraak wijzigen?",
-  "Single dates of a subscribed calendar cannot be changed here.": "Losse datums van een geabonneerde agenda kunnen hier niet worden gewijzigd."
+  "Single dates of a subscribed calendar cannot be changed here.": "Losse datums van een geabonneerde agenda kunnen hier niet worden gewijzigd.",
+  "You have {0} open proposals: wait until people decided on them": "Je hebt {0} open voorstellen: wacht tot erover beslist is"
 }

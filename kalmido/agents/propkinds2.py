@@ -37,6 +37,7 @@ PK2_MODS = ("cal", "timeline", "matrix", "habits", "pomo", "kanban", "collab", "
             "agents", "comments", "family", "events", "contacts", "contracts", "home", "care", "health", "review", "travel",
             "reading", "clients", "workload", "forms", "office", "wiki", "files", "dispo")
 PK2_OPEN_MAX = 10   # open (ready, undecided) inquiry / setup proposals an agent made on its own per person
+PK2_OPEN_AGENT_MAX = 50   # 2.51.0 (#1351) review: ... and per agent in all
 
 
 # ---------------------------------------------------------------- where it lands, what the agent may see
@@ -69,7 +70,8 @@ def pk2_area(c, uid, aid):
 def pk2_office(c, uid, aid, oid):
     """May agent aid draft a quotation for person uid in office area oid? -> (ok, reason). Part A's rules
     (office/agentdocs.py): the agent's switch office_drafts, its office area (ofa_area: its organisation, a personal agent
-    its owner's personal office) is oid, the area's privacy switch agents_read; and the person works in that office."""
+    its owner's personal office) is oid, the area's privacy switch agents_read, the agent's scope office; and the person
+    works in that office."""
     if not oid:
         return False, "no_office"
     try:
@@ -81,6 +83,12 @@ def pk2_office(c, uid, aid, oid):
     a = agent_row(c, aid)
     if not a or not ("office_drafts" in a.keys() and a["office_drafts"]) or ofa_area(c, a) != oid:
         return False, "agent_no_office"
+    # 2.51.0 (#1351) review: office data only with the scope office too (like part A's v1 routes; agentdocs.py)
+    from ..api.scopes import scopes_effective
+    from ..api.v1 import SCOPES_AGENT_DEFAULT
+    au = c.execute("SELECT * FROM users WHERE id=?", (aid,)).fetchone()
+    if not au or "office" not in scopes_effective(c, {"scopes": a["scopes"] or ",".join(SCOPES_AGENT_DEFAULT)}, au):
+        return False, "no_scope"
     if not office_on(c, uid) or office_role(c, uid, oid) not in ("admin", "member"):
         return False, "no_office_rights"
     if not office_settings(c, oid).get("agents_read"):
@@ -360,13 +368,22 @@ def _pk2_event(c, uid, s, e, lid):
     d = e.get("due") or s["date"]
     end_d = s["end_date"] if s["end_date"] and s["end_date"] >= d else d
     if s["start_time"]:
+        # 2.51.0 (#1351) review: an end date without an end time keeps the end date (until the end of that day)
         f = {"title": e.get("title", s["title"]), "all_day": False, "start": f"{d}T{s['start_time']}",
-             "end": f"{end_d}T{s['end_time']}" if s["end_time"] else None}
+             "end": f"{end_d}T{s['end_time']}" if s["end_time"] else f"{end_d}T23:59" if end_d > d else None}
     else:
         f = {"title": e.get("title", s["title"]), "all_day": True, "start": d,
              "end": (date.fromisoformat(end_d) + timedelta(days=1)).isoformat()}
     f.update(location=s["location"], description=s["notes"], status="tentative")
     return ev_store(c, uid, default_cal(c, uid), ev_fields(c, uid, f))
+
+
+def _pk2_events_at(c, rec):
+    """2.51.0 (#1351) review: each event draft's updated_at as it stands now (undo compares with it; rec["at"] has seconds
+    and is taken before the drafts are written)."""
+    ids = rec.get("events") or []
+    rec["events_at"] = {str(r["id"]): r["updated_at"] for r in c.execute(
+        f"SELECT id, updated_at FROM events WHERE id IN ({','.join('?' * len(ids)) or 'NULL'})", ids)}
 
 
 def pk2_run(c, j, sel, ed, extra, rec):
@@ -433,6 +450,7 @@ def pk2_run(c, j, sel, ed, extra, rec):
         _pk2_mod_on(c, uid, "events", rec)
         for i in shoot:
             rec["events"].append(_pk2_event(c, uid, prop["shoot_days"][i], edits.get(str(PK2_SHOOT_KEY + i), {}), lid))
+        _pk2_events_at(c, rec)
     if str(PK2_OFFER_KEY) in selected:
         _pk2_offer_make(c, uid, aid, oid, lid, prop, selected, cid, rec)
     if inp.get("offer"):  # the accepted quotation: its deal (pipeline) gets the project, like pl2_make_project
@@ -468,6 +486,9 @@ def _pk2_offer_make(c, uid, aid, oid, lid, prop, selected, cid, rec):
             rec["offer"] = ofa_draft_create(c, uid, oid, data, agent_id=aid)
             rec["offer_area"] = oid
             _pk2_log(c, oid, aid, uid, True, "offer", rec["offer"])
+            # 2.51.0 (#1351) review: undo deletes only this very draft (no number, unchanged since)
+            rec["offer_at"] = c.execute("SELECT updated_at FROM office_docs WHERE id=? AND org_id=?", (rec["offer"], oid)).fetchone()[0]
+            rec["offer_log"] = c.execute("SELECT COALESCE(MAX(id), 0) FROM office_doc_log WHERE org_id=?", (oid,)).fetchone()[0]
     except (PermissionError, Denied, BadInput, UnknownFields):
         rec["parts_skipped"].append("offer")
 
@@ -511,13 +532,24 @@ def pk2_result(rec):
             "parts_skipped": rec.get("parts_skipped") or []}
 
 
-def _pk2_list_empty(c, lid, ids, at):
-    """Nobody added or changed anything in list lid since `at` (only the tasks ids of this proposal, unchanged)."""
+def _pk2_list_empty(c, lid, ids, at, keep_members=()):
+    """Nobody added or changed anything in list lid since `at` (only the tasks ids of this proposal, unchanged).
+    2.51.0 (#1351) review: purging the list cascades, so also no files, sign-offs, office documents (this proposal's draft
+    is already gone when undo deleted it) and no members besides keep_members (the person, the agent shared with)."""
     q = ",".join("?" * len(ids)) or "NULL"
     others = c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id=? AND id NOT IN ({q})", (lid, *ids)).fetchone()[0]
     changed = c.execute(f"SELECT COUNT(*) FROM tasks WHERE id IN ({q}) AND (deleted_at IS NOT NULL OR updated_at>?)", (*ids, at)).fetchone()[0]
     own = c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=?", (lid, me())).fetchone()
-    return not others and not changed and bool(own)
+    if others or changed or not own:
+        return False
+    km = list(keep_members) or [0]
+    for sql, args in (("SELECT 1 FROM list_files WHERE list_id=? LIMIT 1", (lid,)),
+                      ("SELECT 1 FROM office_signoffs WHERE list_id=? LIMIT 1", (lid,)),
+                      ("SELECT 1 FROM office_docs WHERE list_id=? LIMIT 1", (lid,)),
+                      (f"SELECT 1 FROM list_members WHERE list_id=? AND user_id NOT IN ({','.join('?' * len(km))}) LIMIT 1", (lid, *km))):
+        if c.execute(sql, args).fetchone():
+            return False
+    return True
 
 
 def pk2_undo(c, j, rec):
@@ -547,29 +579,38 @@ def pk2_undo(c, j, rec):
             else:
                 skipped.append(r["name"][:40])
         return n, skipped
+    ev_stayed = False
     for eid in rec.get("events") or []:  # event drafts: only while still a draft nobody changed
         r = c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone()
         if not r or r["deleted_at"]:
             continue
-        if r["status"] == "tentative" and (r["updated_at"] or "")[:19] <= rec["at"][:19]:
+        at = (rec.get("events_at") or {}).get(str(eid))  # 2.51.0 (#1351) review: the draft's own updated_at
+        if r["status"] == "tentative" and (r["updated_at"] == at if at else (r["updated_at"] or "")[:19] <= rec["at"][:19]):
             ev_delete(c, r)
             rec.setdefault("events_deleted", []).append(eid)
             n += 1
         else:
             skipped.append(r["title"][:40])
-    if rec.get("offer"):  # the quotation draft goes while it is a draft (no number, never sent)
-        r = c.execute("SELECT status, project_title FROM office_docs WHERE id=? AND org_id=?", (rec["offer"], rec.get("offer_area"))).fetchone()
-        if r and r["status"] == "draft":
-            c.execute("DELETE FROM office_docs WHERE id=? AND org_id=? AND status='draft'", (rec["offer"], rec.get("offer_area")))
+            ev_stayed = True
+    if rec.get("offer"):  # the quotation draft goes while it is a draft without a number nobody changed since applying
+        oid = rec.get("offer_area")
+        r = c.execute("SELECT status, number, updated_at, project_title FROM office_docs WHERE id=? AND org_id=?", (rec["offer"], oid)).fetchone()
+        if r and r["status"] == "draft" and not r["number"] and rec.get("offer_at") and r["updated_at"] == rec["offer_at"] \
+                and not c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? LIMIT 1", (rec["offer"],)).fetchone() \
+                and not c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND doc_id=? AND id>? AND action IN ('update','items','number','status') LIMIT 1",
+                                  (oid, rec["offer"], rec.get("offer_log") or 0)).fetchone():  # changes within the same second
+            from ..office.ledger import ofx_log
+            c.execute("DELETE FROM office_docs WHERE id=? AND org_id=? AND status='draft' AND number=''", (rec["offer"], oid))
+            ofx_log(c, oid, "delete", doc_id=rec["offer"], detail={"number": "", "status": "draft", "undo": "proposal"})
             rec["offer_deleted"] = True
             n += 1
         elif r:
-            skipped.append(r["project_title"][:40] or tr("Quotation"))
+            skipped.append((r["project_title"] or "")[:40] or tr("Quotation"))
     if rec.get("deals"):
         q = ",".join("?" * len(rec["deals"]))
         c.execute(f"UPDATE office_deals SET list_id=NULL WHERE id IN ({q}) AND list_id=?", (*rec["deals"], rec["list"]))
     ids, lid = rec["tasks"], rec.get("list")
-    if lid and _pk2_list_empty(c, lid, ids, rec["at"]):
+    if lid and _pk2_list_empty(c, lid, ids, rec["at"], [uid] + ([j["agent_id"]] if rec.get("shared") else [])):
         list_row_purge(c, lid, g.setdefault("purge_lists", []))
         rec["list_deleted"] = True
         n += len(ids) or 1
@@ -583,7 +624,8 @@ def pk2_undo(c, j, rec):
                 log_act(c, tid, "delete")
         rec["trashed"] = sorted(mine)
         n += len(mine)
-    if rec.get("modules_on"):  # modules this apply switched on go off again
+    # modules this apply switched on go off again -- 2.51.0 (#1351) review: not while event drafts stayed
+    if rec.get("modules_on") and not ev_stayed:
         fs = [x for x in _pk2_features(c, uid) if x not in rec["modules_on"]]
         uset(c, uid, "features", ",".join(fs))
     return n, skipped
@@ -615,6 +657,7 @@ def pk2_redo(c, j, rec):
         n += c.execute(f"UPDATE events SET deleted_at=NULL, updated_at=? WHERE id IN ({','.join('?' * len(ev))}) AND deleted_at IS NOT NULL",
                        (iso(now_utc()), *ev)).rowcount
         rec["events_deleted"] = []
+        _pk2_events_at(c, rec)
     if rec.get("offer_deleted"):  # a new draft from the same proposal
         prop = json.loads(j["proposal"])
         cid = rec.get("client")
@@ -637,7 +680,7 @@ def pk2_agent_proposal(aid, b):
     chat request (an inquiry, "set me up") or an accepted quotation into a ready proposal for that person. Only for a
     person who may ask this agent for proposals (agents.proposals); the person applies or discards it."""
     from .proposals import _p_keys, _p_int, _p_str, prop_agent_ok, prop_ready_notify, prop_validate, PROP_TITLE_MAX, PROP_MAX_BYTES
-    from ..agents.core import agent_row, job_dict, JOB_TITLE_MAX
+    from ..agents.core import agent_row, agent_shares, job_dict, JOB_TITLE_MAX
     from ..agents.usage import usage_block
     from ..api.v1 import v1_err
     from ..collab.comments import user_names
@@ -652,11 +695,18 @@ def pk2_agent_proposal(aid, b):
     a = agent_row(c, aid)
     if not a or not prop_agent_ok(c, a, uid):
         raise Denied(404)
+    # 2.51.0 (#1351) review: only a person the agent works with (like office/agentdocs.py _v1ctx), also in the mode "all"
+    u = c.execute("SELECT kind, kid FROM users WHERE id=?", (uid,)).fetchone()
+    if not u or u["kind"] != "user" or u["kid"] or not agent_shares(c, aid, uid):
+        raise Denied(404)
     if usage_block(c, aid):
         return v1_err(409, tr("{0} reached its usage limit", a["display_name"] if "display_name" in a.keys() else "?"))
     if c.execute("SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND user_id=? AND kind IN ('inquiry','setup') AND prop_state='ready'",
                  (aid, uid)).fetchone()[0] >= PK2_OPEN_MAX:
         return v1_err(429, tr("You have {0} open proposals for this person: wait until they decided on them", PK2_OPEN_MAX))
+    if c.execute("SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND kind IN ('inquiry','setup') AND prop_state='ready'",
+                 (aid,)).fetchone()[0] >= PK2_OPEN_AGENT_MAX:
+        return v1_err(429, tr("You have {0} open proposals: wait until people decided on them", PK2_OPEN_AGENT_MAX))
     if kind == "setup" and b.get("offer_id") not in (None, ""):
         raise UnknownFields(["offer_id"])
     offer_id = None if b.get("offer_id") in (None, "") else _p_int(b.get("offer_id"), "offer_id")

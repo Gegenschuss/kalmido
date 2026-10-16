@@ -54,7 +54,7 @@ const scopeExpand = sc => (sc || []).includes('write') ? SCOPE_ALL.filter(x => x
 function scopeSummary(sc) {
   const e = scopeExpand(sc);
   if (e.length <= 1) return tr('read only');
-  if (SCOPE_ALL.filter(x => x !== 'admin-read' && x !== 'account').every(x => e.includes(x))) return tr('all permissions');
+  if (SCOPE_ALL.filter(x => x !== 'admin-read' && x !== 'account' && x !== 'pinboard').every(x => e.includes(x))) return tr('all permissions');  // 2.51.0 (#1352): pinboard is opt-in, never part of the legacy write
   return e.filter(x => x !== 'read').map(x => tr(SCOPE_SHORT[x] || x)).join(', ');
 }
 function scopesHtml(offer, sel, legend) {
