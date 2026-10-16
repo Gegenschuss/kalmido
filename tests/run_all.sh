@@ -855,6 +855,8 @@ fresh; run p255_b_api "$PY" p255_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p255_b_ui node p255_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.55.0 part D: statistics, client card and family on the view builder (#1067)
 fresh; run p255_d_ui node p255_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.57.0 part B: my own colour per workspace (#1807)
+fresh; run p257_b_ui node p257_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

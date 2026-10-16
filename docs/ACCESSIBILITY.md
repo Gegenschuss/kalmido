@@ -38,6 +38,12 @@ the app has not yet been tested by people who use a screen reader every day (see
   *Settings > Workspaces*): its lists show a stripe in the header and the sidebar and a frame around the input fields,
   and the header's sign names the organisation in words; Private stays without colour. Moving a task or list from
   Private into an organisation says so in the message ("Will be visible to everyone in …", with Undo).
+- **Your own workspace colours (2.57.0).** In *Settings > Workspaces > Your colour per workspace* everybody picks a
+  colour for Private and for each of their organisations from the same 12 tones, or *No color*; *Default* keeps the
+  colour the organisation's admins chose. Only you see your choice, on every device. The shown workspace tints the
+  sidebar lightly (also the phone drawer; never under *All workspaces*), the switch and its menu show a dot in front of
+  each workspace (a ring when it has no colour), and your tone replaces the organisation's colour in the stripes and
+  the header's sign. Text on the tinted sidebar keeps at least 4.5:1 in light and dark; every change is one Undo step.
 - **Dragging is never the only way.** Tasks: *Move up / Move down* in the task menu or Alt+↑ / Alt+↓, *Move to
   section…*, *Move to list* (m), the date picker; the panels and columns that can be resized by dragging have a grip
   that works with ← → and Enter (standard width) or a double-click. The divider between the chats of the split chat
