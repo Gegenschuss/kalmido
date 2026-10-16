@@ -115,6 +115,15 @@ Kalmido; every other property (social profiles, Apple's contact groups, …) is 
 collection (`/dav/addressbooks/<user>/b<id>/`). An address book shared with you *view only* is read-only in the apps.
 An address book of your organisation (2.52.0, see TEAM.md) appears the same way, read-only when its members may only view it.
 
+**Merging duplicates** (2.66.0): in *Contacts*, tap *Select*, tick two to ten contacts and choose *Merge*. Pick the
+contact that stays and, where the entries differ, which value it keeps; phones, e-mails, addresses, web links and groups
+are joined (doubles dropped). Before anything changes, an overview shows what moves to the kept contact (task links,
+event attendances, contact person at clients, bookings); the birthday task of a merged contact goes to the trash. The
+other contacts are deleted, so the phone removes them on its next sync. The kept contact's card lists the merge under
+*History* with *Undo* for 30 days (also right after the merge in the message at the bottom or with Ctrl+Z): the contacts
+come back with their links. Contacts of a synced external account cannot be merged (they would come back), and contacts
+of an organisation's address book only merge with contacts of the same organisation.
+
 ## Writing into subscribed calendars
 
 Calendars of other services that you subscribed to under **Settings › Calendars** are read-only at first. For a
