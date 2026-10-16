@@ -891,7 +891,9 @@ organisation's state. Never the kind (vacation, sick leave, day off) or the note
 changes | rejected | null`) and `approver_id`.
 
 `GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / list admins): a form's `url`, `access`
-(`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link.
+(`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link. 2.63.0: `ttype` (`''` | `bug` | `feature` |
+`task`, the type of a sent task), `files` (one file allowed), `portal` (a sender without an account gets a status link on
+the thank-you page and once by mail; turns `ask_email` on).
 
 ## Storage and the server's notice (2.24.0)
 

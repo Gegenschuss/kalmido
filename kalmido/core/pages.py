@@ -155,13 +155,15 @@ def split_link(title, content=""):
     return title, content, None
 
 
-def save_attachment_bytes(c, tid, name, mime, data):
+def save_attachment_bytes(c, tid, name, mime, data, owner=None):
     from ..tasks.attachments import safe_name
     from ..notify.alerts import aa_count, aa_oserr
     from ..admin.hosting import quota_fits
     name = safe_name(name)
     who = c.execute("SELECT created_by FROM tasks WHERE id=?", (tid,)).fetchone()
     who = who[0] if who else None
+    if owner is not None:  # 2.63.0 (#1513): a form's file without an account counts against the list owner's storage
+        who = owner
     if not quota_fits(c, who, len(data)):  # 2.24.0 (#910): storage full -> the task comes without the file (never an error)
         print("share / mail file skipped: storage quota of user", who, "reached", flush=True)
         return

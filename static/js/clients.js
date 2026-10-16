@@ -298,12 +298,18 @@ async function formsModal(lid) {
       <div class="row"><label for="fm-intro">${tr('Intro')}</label><textarea id="fm-intro" rows="3" maxlength="2000">${esc(f?.intro || '')}</textarea></div>
       <div class="row"><label for="fm-access">${tr('Who can send it')}</label><select id="fm-access"><option value="org">${tr('Signed-in people of your organisation')}</option><option value="public" ${f?.access === 'public' ? 'selected' : ''} ${j.public_links ? '' : 'disabled'}>${tr('Anyone with the link (no login)')}</option></select></div>
       ${secs.length ? `<div class="row"><label for="fm-sec">${tr('Section')}</label><select id="fm-sec"><option value="">${tr('None')}</option>${secs.map(s => `<option value="${s.id}" ${s.id === f?.section_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>` : ''}
-      <div class="row"><label>${tr('E-mail')}</label><label class="chkl"><input type="checkbox" id="fm-email" ${f?.ask_email !== false ? 'checked' : ''}> ${tr('Ask for an e-mail address (without login)')}</label></div>
+      <div class="row"><label>${tr('E-mail')}</label><label class="chkl"><input type="checkbox" id="fm-email" ${f?.ask_email !== false ? 'checked' : ''} ${f?.portal ? 'disabled' : ''}> ${tr('Ask for an e-mail address (without login)')}</label></div>
+      <div class="row"><label for="fm-ttype">${tr('Type of report')}</label><select id="fm-ttype"><option value="">${tr('None')}</option>${TTYPES.map(([k, n]) => `<option value="${k}" ${f?.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+      <div class="row"><label>${tr('Attachment')}</label><label class="chkl"><input type="checkbox" id="fm-files" ${f?.files ? 'checked' : ''}> ${tr('Allow one file (at most 10 MB)')}</label></div>
+      <div class="row"><label>${tr('Status link')}</label><label class="chkl"><input type="checkbox" id="fm-portal" ${f?.portal ? 'checked' : ''}> ${tr('The sender gets a link to the status')}</label></div>
+      <p class="muted mhint frm-hint">${tr('Without login, the sender sees a link after sending and gets it by mail (e-mail becomes required). It shows only their report: title, status and the answers you send to them, never internal comments or your team.')}</p>
       ${f ? `<div class="row"><label>${tr('Status')}</label><label class="chkl"><input type="checkbox" id="fm-on" ${f.enabled ? 'checked' : ''}> ${tr('Open (accepts requests)')}</label></div>` : ''}
       ${f ? `<div class="row"><label>${tr('Link')}</label><input readonly value="${esc(f.url)}" aria-label="${esc(tr('Link'))}"><button type="button" class="btn sm" data-m="regen">${tr('New link')}</button></div>
       <div class="row qrrow"><label>${tr('QR code')}</label><button type="button" class="btn sm" data-m="qr">${ic('eye', 's')} ${tr('Show QR code')}</button></div>` : ''}
       <div class="aerr" role="alert"></div>
       <div class="foot">${f ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${f ? tr('Save') : tr('Create')}</button></div>`);
+    // 2.63.0 (#1513): the status link goes by mail -> the e-mail field is on while it is
+    $('#fm-portal', ed).addEventListener('change', e => { const m = $('#fm-email', ed); if (e.target.checked) m.checked = true; m.disabled = e.target.checked; });
     ed.addEventListener('click', async e => {
       const b = e.target.closest('[data-m]'); if (!b) return;
       if (b.dataset.m === 'close') { ed.remove(); return; }
@@ -313,6 +319,7 @@ async function formsModal(lid) {
         else if (b.dataset.m === 'regen') { if (!await askConfirm(tr('A new link?'), tr('The old link stops working at once.'), {ok: tr('New link')})) return; await api('PATCH', `/api/forms/${f.id}`, {regenerate: true}); }
         else {
           const body = {title: $('#fm-title', ed).value, intro: $('#fm-intro', ed).value, access: $('#fm-access', ed).value, ask_email: $('#fm-email', ed).checked,
+            ttype: $('#fm-ttype', ed).value, files: $('#fm-files', ed).checked, portal: $('#fm-portal', ed).checked,  // 2.63.0 (#1513)
             ...($('#fm-sec', ed) ? {section_id: $('#fm-sec', ed).value ? +$('#fm-sec', ed).value : null} : {}), ...($('#fm-on', ed) ? {enabled: $('#fm-on', ed).checked} : {})};
           await rawFetch(f ? 'PATCH' : 'POST', f ? `/api/forms/${f.id}` : `/api/lists/${lid}/forms`, body);
         }

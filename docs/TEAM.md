@@ -98,6 +98,20 @@ task as a push at the highest priority, even if the list is quiet.
   address book (read-only when members may only view).
 - **Make personal again…** (an admin) turns it back into that admin's own address book; one undo step, like the hand-over.
 
+## Report forms (2.63.0)
+
+A list's form (list menu, Forms) can work as a report form for customers: **Type of report** gives every sent task a
+type (bug, feature, task), **Allow one file** adds a file field (at most 10 MB, stored like other attachments and counted
+against the list owner's storage; an executable ending gets `.txt`), and **The sender gets a link to the status** asks for
+the e-mail address (required then). After sending, a person without an account sees a status link on the thank-you page
+and gets it once by mail; the link shows only that report (see the customer portal). People of the organisation who
+send a form signed in get no status link: they see the task in the app.
+
+Against spam, without any outside service: the hidden honeypot field, limits per address and per form, a signed time
+stamp in the page (sent sooner than 3 seconds after loading or more than 24 hours later = "please send it once more"),
+at most 5 reports per e-mail address, form and hour, at most 3 confirmation mails per address and hour (plus the server's
+mails per address and day) and at most 5 links in the text.
+
 ## Saved arrangements and templates (2.55.0)
 
 - **Several arrangements per view.** The start page, Today, Time tracking, the overviews, the review and every project page
