@@ -3503,6 +3503,11 @@ button.chmode{cursor:pointer}button.chmode:hover{color:var(--text);border-color:
 .vsegm{display:flex;gap:.25rem;overflow-x:auto;scrollbar-width:none;margin:.25rem 0 .5rem;padding:.1875rem;background:var(--bg3);border-radius:var(--radius)}
 .vsegm::-webkit-scrollbar{display:none}
 .vsegm button{flex:1 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:.375rem;min-height:2.25rem;padding:0 .75rem;border:0;border-radius:calc(var(--radius) - .125rem);background:none;color:var(--text2);font:inherit;font-size:var(--fs-s);white-space:nowrap;cursor:pointer}
+/* 2.49.1 (#1201): five views do not fit a phone: buttons may shrink, inactive ones show only their icon (name in the title) */
+.vsegm.many{container-type:inline-size}
+.vsegm.many button{flex:1 1 auto;min-width:2.75rem}
+.vsegm button>span{overflow:hidden;text-overflow:ellipsis}
+@container (max-width:36rem){ .vsegm.many button{padding:0 .5rem} .vsegm.many button:not(.on)>span{display:none} }
 .vsegm button.on{background:var(--bg);color:var(--text);font-weight:600;box-shadow:0 0 0 1px var(--line2)}
 /* 2.31.0 (#1053): the view switch 36 px high (was 44); a tap target of 24 px at least stays (WCAG 2.5.8) */
 .menu-list .mchk{margin-left:auto;padding-left:.5rem;color:var(--accent);display:inline-flex}

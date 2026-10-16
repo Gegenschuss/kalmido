@@ -33,7 +33,8 @@ function vsegHtml(l) {
   if (!l || !isMobile()) return '';
   const ch = viewChoices(l); if (ch.length < 2) return '';
   const v = curView(l), short = {overview: N_('Project|view')};
-  return `<div class="vsegm" role="group" aria-label="${esc(tr('View'))}">${ch.map(([k, n, i]) => `<button type="button" class="${v === k ? 'on' : ''}" data-act="view-${k}" aria-pressed="${v === k}" title="${esc(tr(n))}">${ic(i, 's')}<span>${esc(tr(short[k] || n))}</span></button>`).join('')}</div>`;
+  // 2.49.1 (#1201): five views (with the mind map) no longer fit side by side: "many" shows only the active one's name
+  return `<div class="vsegm${ch.length > 4 ? ' many' : ''}" role="group" aria-label="${esc(tr('View'))}">${ch.map(([k, n, i]) => `<button type="button" class="${v === k ? 'on' : ''}" data-act="view-${k}" aria-pressed="${v === k}" title="${esc(tr(n))}">${ic(i, 's')}<span>${esc(tr(short[k] || n))}</span></button>`).join('')}</div>`;
 }
 function listHead(l, o = {}) {
   if (!l || l.is_inbox) return vsegHtml(l) + agBandHtml();
