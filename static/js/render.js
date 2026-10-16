@@ -840,7 +840,7 @@ function keepFocus(root, fn) {
   return r;
 }
 function renderView() { FL.vlast = Date.now(); return td_rcRun(() => { const r = an_view(() => keepFocus($('#view'), renderView0));  // 2.46.1 (#1560): a view change / a new empty hint fades in
-    rowRove(); rowMoreWatch(); td_lcSweep(); return r; }); }
+    rowRove(); rowMoreWatch(); vl_after(); td_lcSweep(); return r; }); }  // 2.65.0 (#1825): vl_after = the window of a long list
 function renderView0() {
   const m = S.route.mod, el = $('#view');
   // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
@@ -1499,7 +1499,9 @@ function viewListBody() {
   let lastSub = '';
   // 2.17.0 (#649): a very long view renders its first ROW_CAP rows, then "Show more" (also by itself when it scrolls into
   // view); thousands of rows took seconds to build on every change
-  let budget = rowCap(), cut = 0;
+  // 2.65.0 (#1825): more than VL_MIN rows: every group draws only the rows near the visible part (vlist.js), no "Show more"
+  const vl = vl_begin(total + (showDone() && !ck && S.collapsed.has('done-open') ? v.done.length : 0));
+  let budget = vl ? Infinity : rowCap(), cut = 0;
   for (const g of groups) {
     if (g.sub && g.sub !== lastSub) h += `<div class="fsubhd" data-go="${esc(keyToHash('folder:' + g.sub))}" role="link" tabindex="0">${ic('folder', 's')}<span>${esc(fName(g.sub))}</span></div>`;
     lastSub = g.sub || lastSub;
@@ -1511,7 +1513,7 @@ function viewListBody() {
     // 1.7.0 Flow: the first task of each group that waits on nothing is marked "Next" (2.0.4: "Ready to start", and only
     // when some open task shown here waits on something; without dependencies the badge would say nothing)
     const nx = flow && flowDeps ? g.tasks.find(t => t.status === 0 && !t.context && !(t.blocked && dFor(t)))?.id : 0;
-    if (!closed) { const n = Math.max(0, Math.min(g.tasks.length, budget)); h += g.tasks.slice(0, n).map((t, i) => (g.byList && (!i || g.tasks[i - 1].list_id !== t.list_id) ? mtListHead(t.list_id) : '') + taskRow(t, {showList: showList && !g.lic, tree: true, cols, lc, tcols: {list: showList && !g.lic && !moOwn()}, next: t.id === nx, crd, inToday: S.route.key === 'today', ...(v.dsx ? {dsx: showDone(), ...(t.status ? {drag: false} : {})} : {})})).join(''); budget -= n; cut += g.tasks.length - n; }
+    if (!closed) { const n = Math.max(0, Math.min(g.tasks.length, budget)), row = (t, i) => (g.byList && (!i || g.tasks[i - 1].list_id !== t.list_id) ? mtListHead(t.list_id) : '') + taskRow(t, {showList: showList && !g.lic, tree: true, cols, lc, tcols: {list: showList && !g.lic && !moOwn()}, next: t.id === nx, crd, inToday: S.route.key === 'today', ...(v.dsx ? {dsx: showDone(), ...(t.status ? {drag: false} : {})} : {})}); h += vl ? vl_seg(g.id ?? '-', g.tasks, row, vl_tree(!!v.dsx)) : g.tasks.slice(0, n).map(row).join(''); budget -= n; cut += g.tasks.length - n; }
     // 2.46.2 (#1662): no drop field under an empty section any more; the section name takes the drop (.ghead.drop)
     if (g.name) h += '</div>';
   }
@@ -1533,7 +1535,7 @@ function viewListBody() {
   if (v.done.length && showDone()) {
     const closed = !S.collapsed.has('done-open');
     h += `<div class="group"><div class="ghead ${closed ? 'closed' : ''}" data-act="collapse" data-key="done-open">${ic('chev', 's')}${tr('Completed')} <span class="c">${v.done.length}</span></div>`;
-    if (!closed) h += v.done.sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || '')).map(t => taskRow(t, {showList, drag: false, cols, lc, tcols: {list: showList}})).join('');
+    if (!closed) { const dn = v.done.sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || '')), row = t => taskRow(t, {showList, drag: false, cols, lc, tcols: {list: showList}}); h += vl ? vl_seg('done-open', dn, row) : dn.map(row).join(''); }
     h += '</div>';
   }
   if (tdc) { const i = h.indexOf('\u0001'); return h.slice(0, i) + lyHtml('today', {...tdc, tasks: h.slice(i + 1), inbox: tdc.inbox || ''}); }
@@ -1596,11 +1598,12 @@ function viewHistory() {
   if (trash) {  // 2.0.5: what "Empty" leaves behind (shared lists of other owners) is said up front and marked per row
     const kept = S.hist?.k === 'trash' && S.hist.kept != null ? S.hist.kept : arr.filter(t => t.keep).length;  // 2.40.0 (#1432): the whole trash
     return (kept ? `<div class="shint trkeep">${ic('lock', 's')} ${esc(trn('{0} item stays when you empty the trash: it is in a list of another owner, only they can delete it for good.', '{0} items stay when you empty the trash: they are in lists of other owners, only they can delete them for good.', kept))}</div>` : '')
-      + arr.map(t => taskRow(t, {trash: true, showList: true})).join('') + histMoreHtml();
+      + (vl_begin(arr.length) ? vl_seg('trash', arr, t => taskRow(t, {trash: true, showList: true})) : arr.map(t => taskRow(t, {trash: true, showList: true})).join('')) + histMoreHtml();  // 2.65.0 (#1825)
   }
   const g = new Map();
   for (const t of arr) { const d = (t.completed_at ? new Date(t.completed_at) : new Date()); const k = ds(d); if (!g.has(k)) g.set(k, []); g.get(k).push(t); }
-  return [...g.entries()].map(([k, ts]) => `<div class="group"><div class="ghead">${dayLabel(k, true)} <span class="c">${ts.length}</span></div>${ts.map(t => taskRow(t, {showList: true, drag: false, tcols: {list: true}})).join('')}</div>`).join('') + histMoreHtml();
+  const vl = vl_begin(arr.length), row = t => taskRow(t, {showList: true, drag: false, tcols: {list: true}});  // 2.65.0 (#1825)
+  return [...g.entries()].map(([k, ts]) => `<div class="group"><div class="ghead">${dayLabel(k, true)} <span class="c">${ts.length}</span></div>${vl ? vl_seg(k, ts, row) : ts.map(row).join('')}</div>`).join('') + histMoreHtml();
 }
 // 2.40.0 (#1432): "Load more" under Completed / Trash, only while the server has more
 const histMoreHtml = () => S.hist?.next && S.hist.k === S.route.key ? `<div class="audmore"><button type="button" class="btn sm" data-act="hist-more">${tr('Load more')}</button></div>` : '';
@@ -1609,7 +1612,8 @@ function viewSearch() {
 }
 function renderSearchRes() {
   if (!S.searchRes.length) return heronEmpty('empty', tr('No results.'), tr('Try fewer or other words.'));
-  return S.searchRes.map(t => taskRow(t, {showList: true, drag: false, tcols: {list: true}})).join('');
+  const row = t => taskRow(t, {showList: true, drag: false, tcols: {list: true}});
+  return vl_begin(S.searchRes.length) ? vl_seg('search', S.searchRes, row) : S.searchRes.map(row).join('');  // 2.65.0 (#1825)
 }
 let searchTimer;
 function snavMore(nav) {
@@ -1628,7 +1632,7 @@ async function doSearch(q) {
     const nm = q.trim().match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
     if (hit) j.tasks = [hit, ...j.tasks.filter(t => t.id !== hit.id)];
     S.searchRes = j.tasks; S.extra = j.tasks; S.searchResQ = q;
-    $('#sresults').innerHTML = renderSearchRes();
+    $('#sresults').innerHTML = renderSearchRes(); vl_after();
     if (S.searchEnter === q) { S.searchEnter = null; searchEnterOpen(q); }
   }, 200);
 }

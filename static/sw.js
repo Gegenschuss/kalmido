@@ -10,7 +10,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/fonts/AtkinsonHyperlegible-Regular.woff2', '/static/fonts/AtkinsonHyperlegible-Bold.woff2',
   // 2.20.0 (#646): the web client in modules, the same list and order as the script tags in index.html
   // (tools/check_layout.py compares them)
-  '/static/js/reloadguard.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/lazyload.js', '/static/js/lyopts.js', '/static/js/workspace.js', '/static/js/sharews.js', '/static/js/quickadd.js', '/static/js/views.js', '/static/js/render.js', '/static/js/calendar.js',
+  '/static/js/reloadguard.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/lazyload.js', '/static/js/lyopts.js', '/static/js/workspace.js', '/static/js/sharews.js', '/static/js/quickadd.js', '/static/js/views.js', '/static/js/render.js', '/static/js/vlist.js', '/static/js/calendar.js',
   '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/habits.js', '/static/js/detail.js', '/static/js/collab.js', '/static/js/attachments.js', '/static/js/pdfview.js', '/static/js/mdtitle.js',
   '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js', '/static/js/dlgmove.js', '/static/js/setcore.js', '/static/js/integrations.js', '/static/js/custview.js', '/static/js/signoff.js', '/static/js/account.js',
   '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/projtime.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/sharedlg.js', '/static/js/dnd.js', '/static/js/secdrag.js', '/static/js/dragmulti.js',
@@ -21,7 +21,9 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
 const LAZY = ['/static/js/settings.js', '/static/js/contacts.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_import.js', '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/office_travel.js', '/static/js/office_cashflow.js', '/static/js/office_pipeline.js', '/static/js/office_kpi.js', '/static/js/office_datev.js', '/static/js/officeagents.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).then(() => c.addAll(LAZY).catch(() => 0))).then(() => self.skipWaiting())); });
+// 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)
+const LAZY_CSS = [];
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).then(() => c.addAll(LAZY.concat(LAZY_CSS)).catch(() => 0))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(swCleanup().then(() => self.clients.claim())); });
 async function swCleanup() {
   const c = await caches.open(CACHE);
