@@ -401,7 +401,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,
 `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`,
-`search_contacts`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
+`search_contacts`, `search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
 `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,
