@@ -489,7 +489,7 @@ async function oadmOpen(oid, name) {
 // dialog; Save = one undo step (name / colour), a picture is set at once like in the list dialog. The owner and the members
 // are told by the server.
 const ole_mark = x => x.icon ? `<img class="licon ole-ic" src="${esc(x.icon)}" alt="" loading="lazy" decoding="async">`
-  : x.color ? `<i class="ole-sw" style="background:${esc(lp_col({color: x.color}) || x.color)}" aria-hidden="true"></i>` : '';
+  : x.color ? `<i class="ole-sw" style="background:${cssColor(lp_col({color: x.color}) || x.color)}" aria-hidden="true"></i>` : '';
 function ole_logDetail(r) {
   const d = r.detail || {}, out = [];
   if (d.name) out.push(tr('Name: {0} → {1}', d.name[0], d.name[1]));

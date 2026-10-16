@@ -7,6 +7,15 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.56.1] - 2026-10-16
+
+CI fixes for 2.56.0 (both go live with this version).
+
+### Fixed
+- A job's own chat history now also finds messages addressed to it by name or number on Postgres (the match ignored
+  upper / lower case only on SQLite).
+- The colour swatch in *Lists of the organisation* only takes checked colour values.
+
 ## [2.56.0] - 2026-10-16
 
 **In short:** talking to a running background job of an agent gets direct - a **Message** button on the job card, every
