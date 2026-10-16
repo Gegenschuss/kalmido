@@ -70,6 +70,7 @@ def adz_area(c, want=None):
         return oid, personal
     if u["kid"]:
         raise Denied(403)
+    need_feat("dispo")  # a person's token: like the web app, only with the module on
     oid = abs_org(c, u["id"], want, create=False)
     if not oid:
         raise Denied(404)
@@ -288,6 +289,7 @@ def adz_run(c, j, sel, ed, rec):
     if crew:
         try:
             need_feat("dispo")
+            abs_org(c, uid, oid, create=False)  # books only in an area the person belongs to (else: drafts without options)
         except Denied:
             rec["skipped_crew"] = len(crew)
             crew = []
