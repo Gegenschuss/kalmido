@@ -16,7 +16,7 @@ const vl_map = (m, k) => m.get(k) || m.set(k, new Map()).get(k);
 // a view starts: true = it is windowed (n rows); the groups then call vl_seg instead of joining their rows
 function vl_begin(n) {
   const v = vl_view();
-  if (!(n > VL_MIN && v)) { VL.on = false; return false; }
+  if (!(n > VL_MIN && v) || VL.off) { VL.on = false; return false; }  // VL.off: the drawing before 2.65.0, for measurements (tests)
   const k = typeof fl_sig === 'function' ? fl_sig() : S.route.key;
   VL.fresh = VL.key !== k || !v.querySelector('.vlpad');
   VL.on = true; VL.key = k; VL.segs = []; VL.by = new Map(); VL.w = VL.w || innerWidth;

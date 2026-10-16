@@ -184,7 +184,7 @@ async function submitQuick(input, extra = {}) {
   // 2.13.0 (#453 P8): a task that does not show up in the open view (e.g. "… tomorrow 10:00" typed in Today lands in the
   // Inbox) says where it went, with "Open"
   if (created?.id && !d.files?.length && !d.open) setTimeout(() => {
-    if ($(`#view .trow[data-id="${created.id}"]`)) return;
+    if ($(`#view .trow[data-id="${created.id}"]`) || vl_ids().includes(created.id)) return;  // 2.65.0 (#1825): also a row a long list does not draw
     const t = taskById(created.id) || created, l = listById(t.list_id);
     const tt = t.title || '', tq = tr('“{0}”|quoted', tt.length > 40 ? tt.slice(0, 39) + '…' : tt);  // 2.25.0 (UX-31): which task, where it went
     toast([tt ? tq : '', l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + t.due_time : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));

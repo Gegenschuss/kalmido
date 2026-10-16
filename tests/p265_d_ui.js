@@ -63,6 +63,15 @@ c.close()
     perf(`${tag} start ms`, Date.now() - s0);
     await sleep(400);
     const frame = `await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)))`;
+    // before 2.65.0 (VL.off): the first 400 rows + "Show more"; all rows shown ("Show more" to the end)
+    const b0 = await ev(`(async () => {
+      VL.off = true; let t = performance.now(); render(); ${frame}; const r = {cap: performance.now() - t, rows: document.querySelectorAll('#view .trow').length};
+      S.rowCaps[S.route.key] = 1e9; t = performance.now(); render(); ${frame}; r.all = performance.now() - t; r.allRows = document.querySelectorAll('#view .trow').length;
+      t = performance.now(); render(); ${frame}; r.again = performance.now() - t;
+      delete S.rowCaps[S.route.key]; VL.off = false; render(); ${frame};
+      return r;
+    })()`);
+    perf(`${tag} before: render ms (400 rows)`, b0.cap); perf(`${tag} before: render ms (all ${b0.allRows} rows, first)`, b0.all); perf(`${tag} before: re-render ms (all rows)`, b0.again);
     const rt = await ev(`(async () => { const t = performance.now(); render(); ${frame}; return performance.now() - t; })()`);
     perf(`${tag} render ms`, rt); check(rt < 1500, `${tag}: a render of the long list in ${Math.round(rt)} ms`);
     const i0 = await ev(`(() => ({rows: document.querySelectorAll('#view .trow').length, pads: document.querySelectorAll('#view .vlpad').length, ids: vl_ids().length, more: !!document.querySelector('#view [data-act="rows-more"]'), h: document.getElementById('view').scrollHeight}))()`);
