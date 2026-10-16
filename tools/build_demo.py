@@ -68,6 +68,12 @@ def main(argv):
     if re.search(r"""['"`]/sw\.js""", app):
         fail("app.js still references /sw.js")
     write(os.path.join(st, "app.js"), app)
+    # 2.53.1 (#1410): the modules loaded on demand (LAZY in sw.js, no script tag in index.html) stay own files: loadModule
+    # fetches static/js/<name>.js relative to the demo page
+    lazy = re.findall(r"'/static/js/([\w-]+\.js)'", (re.search(r"const LAZY = \[([^\]]*)\]", read(os.path.join(STATIC, "sw.js"))) or fail("sw.js has no LAZY list")).group(1))
+    os.makedirs(os.path.join(st, "js"), exist_ok=True)
+    for m in lazy:
+        write(os.path.join(st, "js", m), read(os.path.join(STATIC, "js", m)))
     i18n = read(os.path.join(STATIC, "i18n.js"))
     write(os.path.join(st, "i18n.js"), replace(i18n, "/static/i18n/", "static/i18n/", "i18n.js"))
     css = read(os.path.join(STATIC, "app.css"))
