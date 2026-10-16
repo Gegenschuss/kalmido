@@ -90,6 +90,15 @@ what customers see, and **approvals by customers** (accept a quotation, sign off
   or sign off a project, section or milestone; the record keeps name, time, address and a checksum. Suitable for accepting
   quotations and sign-offs, not for contracts that need the written form (#1200).
 - Agents: `get_absences` / `GET /api/v1/absences` returns only "away" and the dates within the agent's organisation.
+## [2.49.1] - 2026-10-16
+
+**In short:** the checks of 2.49.0 green again; 2.49.0 and 2.49.1 go live together.
+
+### Fixed
+- On phones the view switch of a list fits again with the new mind map view: the inactive views show only their icon.
+- The mind map's second tap on a branch opens its actions on phones.
+- Withdrawn connection requests and moving knowledge page folders work the same on PostgreSQL.
+- The new views of 2.49 follow the text size setting (rem instead of px); "Check your e-mail" wording on the login page.
 
 ## [2.49.0] - 2026-10-16
 
