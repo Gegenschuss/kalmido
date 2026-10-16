@@ -90,6 +90,11 @@ check(FULLM <= fs, f"#1591/#1808: switch on = every module, also agents, wiki, f
 fs = set(Bo.post(B + "/api/me/purpose", json={"purpose": "office", "all_modules": True}).json()["features"].split(","))
 check(ALLM | {"clients", "workload", "forms", "office"} <= fs, "#1591: Office + switch on adds the business modules")
 check(Bo.get(B + "/api/state").json()["settings"]["mods_all"] == "1", "#1591: stored on")
+# 2.56.1 (#1808, review): the server's module list is the client's FEATS (a new module must go into both)
+import re as _re
+_feats = _re.findall(r"\['([a-z]+)', N_\(", open(os.path.join(N, "..", "static", "js", "core.js"), encoding="utf-8").read().split("const FEATS = [", 1)[1].split("];", 1)[0])
+_pmf = ast.literal_eval(open(os.path.join(N, "..", "kalmido", "family", "family.py"), encoding="utf-8").read().split("PM_FULL = ", 1)[1].split(")\n", 1)[0] + ")")
+check(_feats and list(_pmf) == _feats, f"#1808: PM_FULL (server) = FEATS (client) {set(_feats) ^ set(_pmf)}")
 # 2.56.1 (#1808): off after "all on" switches every module off again, also agents, wiki, file store, dispatch
 fs = set(Bo.post(B + "/api/me/purpose", json={"purpose": "office", "all_modules": False}).json()["features"].split(",")) - {""}
 check(not fs & FULLM, f"#1808: switch off after all on = lists and tasks only {fs & FULLM}")
