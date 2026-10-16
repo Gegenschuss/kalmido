@@ -41,6 +41,7 @@ TABLES = (
     "office_signoffs",  # 2.50.0 C (#1200): approval links (NULL = a private list's acceptance, the app checks the list)
     "office_pay_props",  # 2.51.0 A (#1350): payment suggestions of agents
     "task_bell",  # 2.53.0 C (#1424): the bell of one task per person (NULL = a private list's task)
+    "nl_conns", "nl_segments", "nl_members", "nl_runs",  # 2.55.0 E (#1455): the newsletter connection (NULL = a person's own)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"
