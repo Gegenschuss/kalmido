@@ -286,8 +286,12 @@ function licShareTip(l) {  // "Shared with 2 people and agent X" / "Shared by <n
 function licShareHtml(l) {  // people: grey, agents: the robot in blue, both: side by side; always shown
   const hasAg = (l.shared_agents || []).length > 0, hasP = (l.shared_people || 0) > 0 || !hasAg;
   const tip = licShareTip(l);
-  return `<span class="shr shk" role="img" aria-label="${esc(tip)}" title="${esc(tip)}">${hasP ? ic('users', 's') : ''}${hasAg ? licBot() : ''}</span>`;
+  return sbc_slots('shr shk', tip, hasAg ? licBot() : '', hasP ? ic('users', 's') : '');
 }
+// 2.56.0 (#1797): the share symbols sit in two fixed columns at the row's right edge: agent | person (an empty slot keeps its room)
+let sbc_res = false;  // set by renderSide: some row shows a symbol, so every row keeps the two columns
+const sbc_slots = (cls, tip, ag, pe) => `<span class="${cls} sbc-sl" ${tip ? `role="img" aria-label="${esc(tip)}" title="${esc(tip)}"` : 'aria-hidden="true"'}><span class="sbc-ag">${ag}</span><span class="sbc-pe">${pe}</span></span>`;
+const sbc_ph = () => sbc_res ? sbc_slots('shr sbc-ph', '', '', '') : '';
 function renderSide() {
   const c = counts(), k = S.route.key, onTasks = S.route.mod === 'tasks';
   const row = (key, icon, name, n, extra = '', after = '') =>
@@ -296,6 +300,7 @@ function renderSide() {
   // 2.45.0 (#1502): on = a folded group holds the open view (its header shows it, like a folded folder)
   const head = (g, label, acts = '', n = '', tip = '', on = false) => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'} ${on ? 'sgon' : ''}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}${on ? `<span class="sr"> ${esc(tr('contains the open view'))}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
   const lists = S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));  // 2.28.0 (#935): the shown workspace
+  sbc_res = false; sbc_res = collab() && (lists.some(l => l.shared) || folderNames().some(f => folderShrHtml(f)));  // 2.56.0 (#1797)
   const listRow = l => {
     // 2.23.0 (#794): ONE fixed icon column for a picture, an emoji (taken from the name) or the dot, so the names line up
     // 2.36.0 (#1117): what the column shows follows Settings > Appearance > Sidebar: a grey line icon for the name's emoji with its
@@ -308,7 +313,7 @@ function renderSide() {
     const pg = progressFor(l) && l.progress?.total && sbiProg() && !progHidden(l.id) ? `<span class="sprog" role="img" style="--p:${pct(l.progress)}%" aria-label="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}" title="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}"></span>` : '';
     const shr = (l.status && statusFor(l) ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
       (l.shared && collab() && l.bell === 'mute' ? `<span class="shr bellm" title="${esc(tr('Notifications: {0}', bellLabel('mute')))}">${ic('belloff', 's')}</span>` : '') +
-      (l.shared && collab() ? licShareHtml(l) : '') + ovSideMark(l);  // 2.36.2 (#1139): person / robot, always shown; 2.46.0 (#1603): not joined
+      ovSideMark(l) + (l.shared && collab() ? licShareHtml(l) : sbc_ph());  // 2.56.0 (#1797): the symbol columns come last  // 2.36.2 (#1139): person / robot, always shown; 2.46.0 (#1603): not joined
     // 2.22.0 (#692): sort mode: a grip on the left, the name shortens with …, the buttons in a fixed column on the right
     // 2.25.0 (UX-02): the full name (it wraps), a grip to drag by (touch: at once, no long press) and ONE "…" button with
     // up / down / folder for keyboards and anyone who does not drag (WCAG 2.5.7)

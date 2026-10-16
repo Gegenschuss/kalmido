@@ -257,12 +257,12 @@ function folderShrHtml(f) {
   const sh = folderShareOf(f), si = !sh && folderSharedIn(f);
   if (sh || si) {
     const tip = sh ? folderShareSay(sh, N_('New lists here are shared with {0}'), N_('New lists here are shared with {0} and {1}')) : tr('Shared by {0}', si.owner_name);
-    return `<span class="shr shk fshr" role="img" aria-label="${esc(tip)}" title="${esc(tip)}">${!sh || sh.people || sh.groups ? ic('users', 's') : ''}${sh?.agents.length ? licBot() : ''}</span>`;
+    return sbc_slots('shr shk fshr', tip, sh?.agents.length ? licBot() : '', !sh || sh.people || sh.groups ? ic('users', 's') : '');  // 2.56.0 (#1797): fixed columns
   }
   const ls = (S.lists || []).filter(l => !l.archived && !l.is_inbox && fUnder(l.folder, f) && l.shared);
-  if (!ls.length || !collab()) return '';
+  if (!ls.length || !collab()) return sbc_ph();  // 2.56.0 (#1797)
   const tip = trn('{0} list in here is shared; new lists stay private', '{0} lists in here are shared; new lists stay private', ls.length);
-  return `<span class="shr shk fshr fshweak" role="img" aria-label="${esc(tip)}" title="${esc(tip)}">${ic('users', 's')}${ls.some(l => (l.shared_agents || []).length) ? licBot() : ''}</span>`;
+  return sbc_slots('shr shk fshr fshweak', tip, ls.some(l => (l.shared_agents || []).length) ? licBot() : '', ic('users', 's'));
 }
 // moved / dragged one of my lists into a shared folder: say so (the caller offers Undo)
 function folderNowShared(id, f) {

@@ -7636,3 +7636,15 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .lyp-use{margin:6px 0}
 /* 2.55.0 D (#1067) statistics, the client card and family on the view builder: the blocks keep the spacing the cards had (the cards bring their own top margin) */
 .mscly .lybar,.stats > .lybar{display:flex;justify-content:flex-end}
+
+/* 2.56.0 C (#1797) share symbols in two fixed columns at the right edge (agent | person) on every sidebar row: a missing
+   symbol keeps its empty column, the count / dots / marks stay left of them, nesting only moves the name */
+#side .sbc-sl{display:inline-grid;grid-template-columns:1rem 1rem;column-gap:.125rem;align-items:center;justify-items:center;flex:none;margin-left:0}
+#side .sbc-sl>span{display:inline-flex;align-items:center;justify-content:center;width:1rem;min-height:1rem}
+#side .sbc-sl svg.i{width:.875rem;height:.875rem}
+#side .sbc-ph{visibility:hidden}
+#side .srow .sbc-sl,#side .fhead .sbc-sl{margin-left:0;gap:0;column-gap:.125rem}
+/* the folder rows' "…" button takes room at the end on touch: the list rows keep the same room, so the columns line up */
+@media (max-width:899px),(hover:none){
+  #side .srow:not(.reorder){padding-right:calc(.5rem + var(--sbc-mw,3rem))}
+}
