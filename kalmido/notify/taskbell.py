@@ -84,7 +84,7 @@ def tbl_effective(r, s, status, done_ok=False):
 
 def tbl_level(c, uid, tid, s=None, done_ok=False):
     """'mute' | 'urgent' | None for pushes about task tid to uid (s = uid's settings)."""
-    if not uid or not tid:
+    if not uid or not tid or not tbl_any(c):
         return None
     r = tbl_rows(c, tid, [uid]).get(uid)
     if not r or r["level"] == "list":
@@ -93,9 +93,23 @@ def tbl_level(c, uid, tid, s=None, done_ok=False):
     return tbl_effective(r, s, t[0] if t else 0, done_ok)
 
 
+def tbl_any(c):
+    """False when no task bell is muted / urgent at all (one look per request; outside requests: True)."""
+    if not has_request_context():
+        return True
+    if g.get("tbl_any") is None:
+        g.tbl_any = bool(c.execute("SELECT 1 FROM task_bell WHERE level IN ('mute','urgent') LIMIT 1").fetchone())
+    return g.tbl_any
+
+
 def tbl_urgent_users(c, tid):
-    """Who has "Urgent" on task tid (raw rows; tbl_level decides per person)."""
-    return {u for u, r in tbl_rows(c, tid).items() if r["level"] == "urgent"}
+    """Who has "Urgent" on task tid (people only, raw rows; tbl_level decides per person)."""
+    if not tbl_any(c):
+        return set()
+    ids = sorted(u for u, r in tbl_rows(c, tid).items() if r["level"] == "urgent")
+    if not ids:
+        return set()
+    return {r[0] for r in c.execute(f"SELECT id FROM users WHERE kind!='agent' AND disabled=0 AND id IN ({','.join('?' * len(ids))})", ids)}
 
 
 def tbl_sent(uid, tid):
@@ -114,10 +128,7 @@ def tbl_note(c, tid, kind, actor):
     task, except the person who made the change. Requests only (the watchdog's own changes push as before)."""
     if not has_request_context() or kind in TBL_SKIP or not tid:
         return
-    try:
-        uids = tbl_urgent_users(c, tid)
-    except Exception:  # noqa: BLE001 -- table not there yet (start-up order) / a failed statement: never break the change
-        return
+    uids = tbl_urgent_users(c, tid)
     uids.discard(actor)
     uids.discard(None)
     if not uids:
@@ -209,6 +220,7 @@ def _until_in(b, level):
 
 
 def _put_row(c, tid, uid, org, level, until, by, act, prev):
+    g.tbl_any = None  # looked up again by later history lines of this request
     ts = iso(now_utc())
     pj = json.dumps({"level": prev["level"], "until": prev["until"], "set_by": prev["set_by"]} if prev else None)
     c.execute("""INSERT INTO task_bell(task_id,user_id,org_id,level,until,set_by,created_at,updated_at,prev,act,act_by)
