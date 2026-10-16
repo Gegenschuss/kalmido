@@ -54,6 +54,7 @@ for n in ("One", "Two"):
     lids.append(lid)
     for p in (BOB, CL):
         assert A.put(B + f"/api/lists/{lid}/members", json={"user_id": p, "role": "edit"}).ok
+    assert A.patch(B + f"/api/lists/{lid}", json={"agent_members": True}).ok  # all members reach the agent there
 
 # ---- #1761: no limit = [] for the admin, nothing for a member
 a = agent_in_state(A, CL)
