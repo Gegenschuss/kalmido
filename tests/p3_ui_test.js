@@ -145,7 +145,8 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   w.eval('S.multi.clear(); S.multiMode = false; render()');
   w.confirm = () => true;
   // remove the dependency via x
-  w.eval(`openDetail(${t3})`); await sleep(700);
+  w.eval(`openDetail(${t3})`);  // 2.53.1: wait for the dependency row (700 ms were too short on a slow CI runner)
+  for (let i = 0; i < 50 && !d.querySelector(`#d-deps [data-act="dep-rm"][data-b="${t2}"]`); i++) await sleep(100);
   d.querySelector(`#d-deps [data-act="dep-rm"][data-b="${t2}"]`).click();
   check(await until(async () => !(await call('GET', `/api/tasks/${t3}/deps`)).blocked_by.length), 'remove dependency');
   w.eval('closeDetail()');
