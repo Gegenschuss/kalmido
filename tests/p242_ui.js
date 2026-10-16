@@ -275,7 +275,10 @@ async function firefox(fn) {
       const m2 = await fit('#pop');
       check(good(m2) && await ev(`!!document.querySelector('#pop .mcard')`), `${W}px: the mention card fits ${JSON.stringify(m2)}`);
       await shot(`p242-card-${W}.png`);
-      await ev(`closePop(); closeDetail(); settingsModal('ai'); document.querySelector('.smodal [data-aisub="lists"]').click()`); await sleep(1500);
+      // 2.53.1 (#1410): settingsModal may load the settings module first - wait for the tab, then click it
+      await ev(`closePop(); closeDetail(); settingsModal('ai'); 1`);
+      for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('.smodal [data-aisub="lists"]')`)); i++) await sleep(150);
+      await ev(`document.querySelector('.smodal [data-aisub="lists"]').click()`); await sleep(1500);
       await ev(`document.querySelector('#s-ai-share').scrollIntoView()`); await sleep(200);
       const m3 = await fit('#s-ai-share');
       check(good(m3, false), `${W}px: the share block fits ${JSON.stringify(m3)}`);
