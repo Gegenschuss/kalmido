@@ -374,6 +374,8 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
                                       (t["id"], cid))}
     ids |= before
     ids |= bell_all_users(c, t["list_id"], "comment")  # 2.1.0 (#317): the bell "All" of a list: every comment (2.6.1: or "custom")
+    from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
+    ids |= tbl_urgent_users(c, t["id"])  # 2.53.0 C (#1424): "Urgent" on the task: every comment
     if only is not None:
         ids = set(only)
     prev = c.execute("SELECT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id<? ORDER BY id DESC LIMIT 1",
@@ -402,6 +404,15 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
         ment = uid in notify_mentions
         news_add(c, uid, "mention" if ment else "comment", task_id=t["id"], comment_id=cid, actor=author, row=row, s=s,
                  data={"reply": 1} if not ment and (uid == prev or uid == replied) else None)
+        lv = tbl_level(c, uid, t["id"], s)  # 2.53.0 C (#1424): the task's bell before the list's
+        if lv == "mute":
+            continue
+        if lv == "urgent":
+            if push_reachable(c, uid, s) and not tbl_sent(uid, t["id"]):
+                lg = lang_of(s)
+                out.append((uid, tr("Urgent: {0}", t["title"], lg=lg), tr("{0} commented: {1}", names.get(author, "?"), snippet or
+                            trn("{0} file", "{0} files", nfiles, lg=lg), lg=lg), f"{PUBLIC_URL}/#t/{t['id']}", TBL_PRIO, comment_push_extra(t, lg)))
+            continue
         if not notif_ok(c, uid, s, row, "push", t["list_id"]) or not push_reachable(c, uid, s) or \
                 not burst_gate(c, uid, t["id"], mentioned=mentioned):
             continue
@@ -451,6 +462,9 @@ def task_event(c, tid, kind, prev_assignee=None):
         if actor and not c.execute("SELECT 1 FROM list_members WHERE list_id=?", (t["list_id"],)).fetchone():
             return
         rcpt = {t["created_by"], t["assigned_by"]} | bell_all_users(c, t["list_id"], "complete")  # 2.1.0: bell "All" (2.6.1: "custom")
+    from ..notify.taskbell import tbl_level, tbl_urgent_users
+    if kind == "complete":
+        rcpt |= tbl_urgent_users(c, tid)  # 2.53.0 C (#1424): "Urgent" on the task (the push itself: tbl_note of the history line)
     rcpt.discard(None)
     rcpt.discard(actor)
     rcpt -= agent_ids(c)  # 2.0.0: agents get events (agent_assign_event), no pushes / News
@@ -464,6 +478,8 @@ def task_event(c, tid, kind, prev_assignee=None):
                 fx2_unassign_hidden(c, uid, t, actor, name, s)
             continue
         news_add(c, uid, kind, task_id=tid, actor=actor, s=s)
+        if tbl_level(c, uid, tid, s, done_ok=kind == "complete"):  # 2.53.0 C (#1424): muted / urgent (pushed by tbl_note)
+            continue
         if not notif_ok(c, uid, s, KIND_ROW[kind], "push", t["list_id"]) or not push_reachable(c, uid, s) or \
                 not burst_gate(c, uid, tid, event=True):
             continue
@@ -545,6 +561,9 @@ def _push_tick_one(c, p, users, S, LG, now):
     c.commit()
     uid = p["user_id"]
     if uid not in users or p["deleted_at"] or not collab_on(S[uid]) or not task_visible(c, p["task_id"], uid, full=True):
+        return
+    from ..notify.taskbell import tbl_level
+    if tbl_level(c, uid, p["task_id"], S[uid]) == "mute":  # 2.53.0 C (#1424): muted since
         return
     lg = LG[uid]
     parts = ([trn("{0} more comment", "{0} more comments", p["pending"], lg=lg)] if p["pending"] else []) + \

@@ -256,6 +256,9 @@ APP_ONLY = [
                                                                   "* /api/lists/{}/signoffs")),  # 2.50.0 (#1200): acceptance links of a list
     ("2.33.0 (#927): notification templates are set by the owner in the app; agents only read a list's template",
      ("PUT /api/lists/{}/notify-template", "* /api/folders/notify-template", "POST /api/notify-templates/asked")),
+    # 2.53.0 (#1424): agents get no pushes, and they never mark people urgent (only people do, in the app)
+    ("2.53.0 (#1424): the bell of one task (as the list / muted / urgent) is a person's own push setting, set in the app",
+     ("* /api/tasks/{}/bell",)),
     ("repositories: their secrets are entered by people; the API reads them (GET /lists/{id}/repos)", (
         "POST /api/lists/{}/repos", "* /api/repos/", "POST /api/hooks/git/", "POST /api/tasks/{}/git-undo",
         "* /api/folders/repos", "PUT /api/lists/{}/folder-repo")),  # 2.33.0 (#934): folder repositories, read through /lists/{id}/repos

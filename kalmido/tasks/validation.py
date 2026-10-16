@@ -47,6 +47,8 @@ def log_act(c, tid, kind, data=None, uid=None):
         data = {**(data or {}), "via": via}
     if has_request_context():
         wh_note(c, tid, kind)  # webhooks: collected per request, queued after a successful response
+        from ..notify.taskbell import tbl_note
+        tbl_note(c, tid, kind, uid)  # 2.53.0 C (#1424): "Urgent" on the task: every change is a push
     ts, js = iso_ms(now_utc()), json.dumps(data or {}, ensure_ascii=False)
     if kind in ACT_MERGE:
         last = c.execute("SELECT id, user_id, kind, data, created_at FROM activity WHERE task_id=? ORDER BY id DESC LIMIT 1",

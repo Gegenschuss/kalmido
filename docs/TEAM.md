@@ -50,3 +50,17 @@ Book crew and equipment for shoot days and see who and what is free.
 - **Drafts in the calendar** (tentative events) look pale and dashed and say *Draft*. Tap one: *Confirm* makes it a normal
   event, *Discard* deletes it (undo brings it back).
 
+
+## Urgent tasks (2.53.0)
+
+The bell in the header of a task decides how that one task notifies you: **As the list** (default), **Muted** (no pushes
+for it, News stay) or **Urgent** - until it is completed or until a date. Urgent sends every change and every comment of the
+task as a push at the highest priority, even if the list is quiet.
+
+- **For others**: the owner and the admins of a list can mark a task urgent for some or all people of the list (*Urgent for
+  others…* in the bell's menu). The people get a News item and see "Urgent, set by ..." on the task. Everyone can switch it
+  off for themselves; the task history notes it.
+- **Refuse it**: *Settings > Notifications > Accept urgent markings from others* off - such a marking then counts as
+  "As the list" for you.
+- **Honest limit**: on Android (ntfy) an urgent push comes through. On an iPhone the web app cannot break through Focus or
+  silent mode; there it is a prominent push, not an alarm.
