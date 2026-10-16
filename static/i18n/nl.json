@@ -7915,5 +7915,13 @@
   "Option for {0}": "Optie voor {0}",
   "Applying adds the selected time entries as you (times and note can be changed above). One step, undo takes it back.": "Toepassen voegt de gekozen tijden voor jou toe (tijden en notitie kun je hierboven wijzigen). Eén stap, ongedaan maken draait hem terug.",
   "Applying creates per selected day a task in the project with a draft in your calendar, and pencils in the selected crew and equipment as options, never firm. Warnings never block. One step, undo takes it back.": "Toepassen maakt per gekozen dag een taak in het project met een concept in je agenda en zet de gekozen crew en techniek als optie, nooit vast. Waarschuwingen blokkeren nooit. Eén stap, ongedaan maken draait hem terug.",
-  "Draft confirmed": "Concept bevestigd"
+  "Draft confirmed": "Concept bevestigd",
+  "Title of the new event": "Titel van de nieuwe afspraak",
+  "Only this date can be moved to another day": "Alleen deze datum kan naar een andere dag worden verplaatst",
+  "Event changed": "Afspraak gewijzigd",
+  "Times of “{0}”": "Tijden van ‘{0}’",
+  "New event “{0}”": "Nieuwe afspraak ‘{0}’",
+  "Change a repeating event": "Een terugkerende afspraak wijzigen",
+  "Change every date of this repeating event?": "Alle datums van deze terugkerende afspraak wijzigen?",
+  "Single dates of a subscribed calendar cannot be changed here.": "Losse datums van een geabonneerde agenda kunnen hier niet worden gewijzigd."
 }

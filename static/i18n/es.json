@@ -7915,5 +7915,13 @@
   "Option for {0}": "Opción para {0}",
   "Applying adds the selected time entries as you (times and note can be changed above). One step, undo takes it back.": "Aplicar añade las entradas de tiempo seleccionadas a tu nombre (puedes cambiar horas y nota arriba). Un paso; deshacer lo revierte.",
   "Applying creates per selected day a task in the project with a draft in your calendar, and pencils in the selected crew and equipment as options, never firm. Warnings never block. One step, undo takes it back.": "Aplicar crea por cada día seleccionado una tarea en el proyecto con un borrador en tu calendario y reserva como opción el equipo y la técnica seleccionados, nunca en firme. Los avisos nunca bloquean. Un paso; deshacer lo revierte.",
-  "Draft confirmed": "Borrador confirmado"
+  "Draft confirmed": "Borrador confirmado",
+  "Title of the new event": "Título del nuevo evento",
+  "Only this date can be moved to another day": "Solo esta fecha se puede mover a otro día",
+  "Event changed": "Evento modificado",
+  "Times of “{0}”": "Horario de «{0}»",
+  "New event “{0}”": "Nuevo evento «{0}»",
+  "Change a repeating event": "Cambiar un evento periódico",
+  "Change every date of this repeating event?": "¿Cambiar todas las fechas de este evento periódico?",
+  "Single dates of a subscribed calendar cannot be changed here.": "Las fechas sueltas de un calendario suscrito no se pueden cambiar aquí."
 }

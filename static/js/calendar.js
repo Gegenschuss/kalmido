@@ -437,7 +437,7 @@ function viewWeek() {
   const cols = days.map(d => {
     const blocks = layoutDay((map.get(d) || []).filter(t => t.due_time), evsOf(d).filter(e => cevTimed(e, d)).map(e => ({c: e, ...cevMin(e, d)}))).map(it => {
       const t = it.t, top = it.s / 60 * H, h = Math.max((it.e - it.s) / 60 * H, 20);
-      if (it.c) return `<div class="wcev${ap_draftCls(it.c)}" data-cev="${it.c.id}" style="--cc:${cevColor(it.c)};top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)"><b>${it.c.d0 === d ? fmtHM(it.c.s) : '…'}</b> ${esc(cevTitle(it.c))}</div>`;
+      if (it.c) return `<div class="wcev${ap_draftCls(it.c)}${cg_canDrag(it.c) ? ' cgok' : ''}" data-cev="${it.c.id}" style="--cc:${cevColor(it.c)};top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)"><b>${it.c.d0 === d ? fmtHM(it.c.s) : '…'}</b> ${esc(cevTitle(it.c))}</div>`;  // 2.52.0 (#1016): cgok = may be moved / resized (caldrag.js)
       return `<div class="wev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}" style="top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)">${msGlyph(t)}<b>${t.due_time}</b> ${mdTitleNL(t.title)}</div>`;
     }).join('');
     return `<div class="wcol ${d === t0 ? 'today' : ''}" data-day="${d}">${blocks}${d === t0 ? `<i class="nowline" style="top:${nowTop}px"></i>` : ''}</div>`;

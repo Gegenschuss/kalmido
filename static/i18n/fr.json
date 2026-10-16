@@ -7915,5 +7915,13 @@
   "Option for {0}": "Option pour {0}",
   "Applying adds the selected time entries as you (times and note can be changed above). One step, undo takes it back.": "Appliquer ajoute les saisies de temps sélectionnées en votre nom (heures et note modifiables ci-dessus). Une étape, annuler la reprend.",
   "Applying creates per selected day a task in the project with a draft in your calendar, and pencils in the selected crew and equipment as options, never firm. Warnings never block. One step, undo takes it back.": "Appliquer crée pour chaque jour sélectionné une tâche dans le projet avec un brouillon dans votre calendrier et pose une option sur l’équipe et le matériel sélectionnés, jamais ferme. Les avertissements ne bloquent jamais. Une étape, annuler la reprend.",
-  "Draft confirmed": "Brouillon confirmé"
+  "Draft confirmed": "Brouillon confirmé",
+  "Title of the new event": "Titre du nouvel événement",
+  "Only this date can be moved to another day": "Seule cette date peut être déplacée à un autre jour",
+  "Event changed": "Événement modifié",
+  "Times of “{0}”": "Horaires de « {0} »",
+  "New event “{0}”": "Nouvel événement « {0} »",
+  "Change a repeating event": "Modifier un événement récurrent",
+  "Change every date of this repeating event?": "Modifier toutes les dates de cet événement récurrent ?",
+  "Single dates of a subscribed calendar cannot be changed here.": "Les dates isolées d’un calendrier abonné ne peuvent pas être modifiées ici."
 }
