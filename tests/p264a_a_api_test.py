@@ -319,6 +319,19 @@ r = A.patch(B + f"/api/tasks/{TO}", json={"list_id": LO})
 check(r.status_code == 409 and code(r) == "list_e2e_move", "move out: without the texts 409")
 r = A.patch(B + f"/api/tasks/{TO}", json={"list_id": LO, "title": "Open task", "content": "open text", "le2e_move": {"tasks": [{"id": TOS, "title": "Open subtask"}]}})
 check(r.ok and dbx("SELECT title FROM tasks WHERE id=?", (TOS,))[0][0] == "Open subtask", "move out: plain texts back " + r.text[:200])
+# multi-select / undo: one change for many tasks, every task's own texts in le2e_move.tasks
+r = A.post(B + "/api/tasks/batch", json={"ids": [TO], "action": "patch", "data": {"list_id": L, "le2e_move": {
+    "tasks": [{"id": TO, "title": ct(1), "content": ct(1)}, {"id": TOS, "title": ct(1)}]}}})
+row = dbx("SELECT list_id, title, content FROM tasks WHERE id=?", (TO,))[0]
+check(r.ok and r.json()["count"] == 1 and row[0] == L and row[1].startswith("e2e1:") and row[2].startswith("e2e1:"),
+      "batch move in: own texts from le2e_move " + r.text[:200])
+r = A.post(B + "/api/tasks/batch", json={"ids": [TO], "action": "patch_each", "data": {"items": {str(TO): {"list_id": LO, "le2e_move": {
+    "tasks": [{"id": TO, "title": "Open task", "content": "open text"}, {"id": TOS, "title": "Open subtask"}]}}}}})
+row = dbx("SELECT list_id, title FROM tasks WHERE id=?", (TO,))[0]
+check(r.ok and r.json()["count"] == 1 and row[0] == LO and row[1] == "Open task", "undo move out: plain texts back " + r.text[:200])
+r = A.post(B + "/api/tasks/batch", json={"ids": [TO], "action": "patch", "data": {"list_id": L}})
+check(r.ok and r.json()["count"] == 0 and r.json()["errors"] and dbx("SELECT list_id FROM tasks WHERE id=?", (TO,))[0][0] == LO,
+      "batch move in without texts: skipped with an error")
 N2 = A.post(B + f"/api/lists/{LO}/notes", json={"title": "Open note", "body": "b"}).json()["id"]
 check(A.patch(B + f"/api/notes/{N2}", json={"list_id": L}).status_code == 409, "note move in: without texts 409")
 check(A.patch(B + f"/api/notes/{N2}", json={"list_id": L, "title": ct(1), "body": ct(1)}).ok, "note move in: with texts")
