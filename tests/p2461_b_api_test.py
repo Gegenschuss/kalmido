@@ -90,6 +90,9 @@ check(FULLM <= fs, f"#1591/#1808: switch on = every module, also agents, wiki, f
 fs = set(Bo.post(B + "/api/me/purpose", json={"purpose": "office", "all_modules": True}).json()["features"].split(","))
 check(ALLM | {"clients", "workload", "forms", "office"} <= fs, "#1591: Office + switch on adds the business modules")
 check(Bo.get(B + "/api/state").json()["settings"]["mods_all"] == "1", "#1591: stored on")
+# 2.56.1 (#1808): off after "all on" switches every module off again, also agents, wiki, file store, dispatch
+fs = set(Bo.post(B + "/api/me/purpose", json={"purpose": "office", "all_modules": False}).json()["features"].split(",")) - {""}
+check(not fs & FULLM, f"#1808: switch off after all on = lists and tasks only {fs & FULLM}")
 fs = set(Bo.post(B + "/api/me/purpose", json={"purpose": "me"}).json()["features"].split(","))
 check("cal" in fs and "kanban" not in fs, f"#1591: without the field the purpose's own set (as before) {fs}")
 check(Bo.post(B + "/api/me/purpose", json={"purpose": "me", "all_modules": "yes"}).status_code == 400, "#1591: all_modules must be a boolean")
