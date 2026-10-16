@@ -80,6 +80,7 @@ SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("
                 "time": N_("Time tracking"), "export": N_("Export"), "calendar": N_("Calendar"), "contacts": N_("Contacts"), "private": N_("Health & journal"),
                 "account": N_("Account settings"), "admin-read": N_("Admin read"),
                 "files:read": N_("Read the file store"), "files:write": N_("Write to the file store"),  # 2.48.0 (#1207)
+                "pinboard": N_("Pin board"),  # 2.51.0 (#1352)
                 "write": N_("Everything (old token)")}
 SCOPE_HELP = {"read": N_("Lists, tasks, comments, time entries, habits, search"),
               "tasks:write": N_("Create, change, complete and move tasks; dependencies, habits"),
@@ -93,6 +94,7 @@ SCOPE_HELP = {"read": N_("Lists, tasks, comments, time entries, habits, search")
               "private": N_("Health lists and the journal (sensitive personal data; never for agents)"),
               "files:read": N_("List and read the folders and files shared with you"),  # 2.48.0 (#1207)
               "files:write": N_("Add files and new versions where you may edit"),
+              "pinboard": N_("Write notepads on project pages (an agent changes only its own, e.g. a weekly status)"),  # 2.51.0 (#1352)
               "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("Users and server status (admins only)")}
 ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Viewer")}
 BATCH_TITLE = {"update": N_("Change {0} tasks at once"), "complete": N_("Complete {0} tasks at once"), "reopen": N_("Reopen {0} tasks at once"),

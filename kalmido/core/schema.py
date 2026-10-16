@@ -1574,6 +1574,10 @@ MIGRATIONS = [
     ("public_links", "cv_show", "ALTER TABLE public_links ADD COLUMN cv_show TEXT NOT NULL DEFAULT ''"),
     # 2.50.0 C (#329): a comment a customer wrote through the public link (no account: user_id NULL, the name they typed)
     ("comments", "ext_name", "ALTER TABLE comments ADD COLUMN ext_name TEXT"),
+    # 2.51.0 C (#1352): a notepad an agent wrote on the pin board (it may change / remove only its own); agent_key 'status'
+    # = its one weekly status block per list (upsert)
+    ("list_notepads", "agent_id", "ALTER TABLE list_notepads ADD COLUMN agent_id BIGINT REFERENCES users(id) ON DELETE SET NULL"),
+    ("list_notepads", "agent_key", "ALTER TABLE list_notepads ADD COLUMN agent_key TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

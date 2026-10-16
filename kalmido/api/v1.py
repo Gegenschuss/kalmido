@@ -75,7 +75,8 @@ API_TOKEN_RE = re.compile(r"abk_[A-Za-z0-9_-]{20,100}")
 # contacts, reading included: sensitive, so never part of the legacy "write"); a new agent gets neither by default
 SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export",
           "calendar", "contacts", "private", "account", "admin-read",
-          "files:read", "files:write")  # 2.48.0 (#1207): the file store (folders / files shared with the token's account)
+          "files:read", "files:write",  # 2.48.0 (#1207): the file store (folders / files shared with the token's account)
+          "pinboard")  # 2.51.0 (#1352): notepads on project pages (an agent changes only its own; off for new agents)
 # 2.22.0 (#663): "private" = health lists and the journal (reading included); like "contacts" never part of the legacy
 # "write" and never in an agent's default (agents never see health lists at all, see core/access.py)
 SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private"))   # what the legacy "write" stands for
