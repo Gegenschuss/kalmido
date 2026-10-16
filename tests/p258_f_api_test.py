@@ -93,7 +93,10 @@ dbx("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=(SELECT id F
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"})
 assert r.ok, r.text
 AG = {"Authorization": "Bearer " + r.json()["token"]}
-A.patch(B + f"/api/admin/agents/{r.json()['id']}", json={"org_id": ORG})
+AID = r.json()["id"]
+A.patch(B + f"/api/admin/agents/{AID}", json={"org_id": ORG})
+W = A.post(B + "/api/lists", json={"name": "Work", "org_id": ORG}).json()["id"]
+check(A.put(B + f"/api/lists/{W}/members", json={"user_id": AID, "role": "edit"}).ok, "setup: claude in alice's list")
 
 
 def job(body):
