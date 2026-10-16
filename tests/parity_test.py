@@ -335,6 +335,9 @@ APP_ONLY = [
     # 2.43.0 (#1452, #1346, #1434): page layout, notepads and wiping a project's time are things people do in the web app
     ("2.43.0 (#1452): the default arrangement of a view for everyone (instance admins); layout only, nothing for an agent",
      ("=GET /api/layouts/std", "=PUT /api/layouts/std/{}")),
+    ("2.55.0 (#1069, #1068): a person's saved arrangements of a view and templates sent between people; agents get 403 (their "
+     "own way is proposing an arrangement, #1066)",
+     ("* /api/layouts/saved", "* /api/layouts/offers")),
     ("2.43.0 (#1346): project page colours and notepads; not shared with agents in 2.43 (open decision)",
      ("=PUT /api/lists/{}/page-style", "=POST /api/lists/{}/notepads", "=PATCH /api/notepads/{}", "=DELETE /api/notepads/{}")),
     ("2.43.0 (#1434): delete all times of a project (typed confirmation, restore); agents get 403 by design",

@@ -89,7 +89,7 @@ function wgMenu(a) {
   if (!pr.fixed.has(k)) its.push({label: tr('Hide'), icon: 'eyeoff', fn: () => { set(st => st.hidden.add(k), tr('{0} hidden', nm)); setTimeout(() => $(`#view [data-act="ly-add"][data-lyv="${v}"]`)?.focus(), 30); }});
   const more = [...lyo_items(v, k, a), ...(d.blockItems?.(k) || [])];  // 2.55.0 (#1065): the block's settings
   if (more.length) its.push('-', ...more);
-  its.push('-', {label: tr('Arrange blocks…'), icon: 'sliders', fn: () => lyOpen(v, true)});
+  its.push('-', ...(typeof lyv_menuItems === 'function' ? lyv_menuItems(v) : []), {label: tr('Arrange blocks…'), icon: 'sliders', fn: () => lyOpen(v, true)});  // 2.55.0 (#1069, #1068)
   menu(a, its, null, null, nm);
 }
 document.addEventListener('click', e => {
@@ -156,6 +156,7 @@ async function wgPromote(v) {
 }
 function wgReset(v) {
   const d = LY[v];
+  if (typeof lyv_active === 'function' && lyv_key(v) && lyv_active(v)) { lyv_standard(v); return; }  // 2.55.0 (#1069): undo makes the saved one active again
   if (d.src) {
     const l = routeList(), y = l && S.povD[l.id]?.j?.layout; if (!y) return;
     const old = y.mine, put = s => () => { LY.project.save(s, false); return {}; };

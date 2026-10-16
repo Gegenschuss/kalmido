@@ -7599,3 +7599,21 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .lyo-reset{align-self:flex-start}
 .lyo-note{display:flex;align-items:center;gap:.375rem;margin:0 0 .375rem;font-size:.8rem}
 @media (pointer:coarse){ .lyo-seg button,.lyo select{min-height:2.75rem} }
+/* 2.55.0 A (#1069 #1068) saved arrangements: the switch in a view's header, the bar while customizing, manage / send / template dialogs */
+.lyvsw{display:inline-flex;align-items:center;gap:.25rem;max-width:12rem;margin-left:.25rem}
+.lyvsw .lyvnm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.lyvsw.on{border-color:color-mix(in srgb,var(--accent) 45%,var(--line2));color:var(--accent)}
+.lyvbar{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin:.25rem 0 .75rem}
+.lyvlist{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0}
+.lyvrow{display:flex;align-items:center;gap:.25rem;padding:.25rem .25rem .25rem .5rem;border-radius:10px;background:var(--bg2)}
+.lyvrow .lyvrn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lyvs .fl{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0}
+.lyvs #lyvs-q{width:100%;margin:.25rem 0}
+.lyvppl{display:flex;flex-direction:column;gap:.125rem;max-height:40vh;overflow:auto;margin:.25rem 0 .5rem}
+.lyvppl .chkl{padding:.375rem .25rem;border-radius:8px}
+.lyvprev{margin:.5rem 0;padding-left:1.25rem}
+.lyvprev li{display:flex;justify-content:space-between;gap:1rem;padding:.125rem 0}
+@media (max-width:700px){
+  .lyvsw{max-width:9rem;min-height:36px}
+  .lyvrow .iconbtn,.lyvppl .chkl{min-height:44px}
+}

@@ -392,6 +392,9 @@ def settings_update():
         lc_done_sync(c, me(), usettings(c, me()).get("show_done_views"), vals["show_done_views"])
     for k, v in vals.items():
         uset(c, me(), k, v)
+        if k == "dashboard" or k in LAYOUT_KEYS:  # 2.55.0 (#1069): the active saved arrangement follows
+            from .layoutsets import lyv_follow
+            lyv_follow(c, me(), k, v)
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -555,6 +558,8 @@ def export_json():
         "list_milestones": (f"SELECT * FROM list_milestones WHERE list_id IN {own}", (uid,)),
         "list_files": (f"SELECT * FROM list_files WHERE list_id IN {own}", (uid,)),
         "list_layouts": ("SELECT * FROM list_layouts WHERE user_id=?", (uid,)),
+        "view_layouts": ("SELECT * FROM view_layouts WHERE user_id=?", (uid,)),  # 2.55.0 (#1069): my saved arrangements
+        "view_layout_offers": ("SELECT * FROM view_layout_offers WHERE from_user=? OR to_user=?", (uid, uid)),  # 2.55.0 (#1068)
         "list_notepads": ("SELECT * FROM list_notepads WHERE created_by=?", (uid,)),  # 2.43.0 (#1346)
         "list_notif": (f"SELECT * FROM list_notif WHERE list_id IN {own}", (uid,)),  # 2.33.0 (#927): my notification templates
         "folder_notif": ("SELECT * FROM folder_notif WHERE owner_id=?", (uid,)),
