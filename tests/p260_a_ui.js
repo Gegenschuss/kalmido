@@ -74,7 +74,8 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
     check(!r.includes('Login page') && r.includes('Profile') && r.includes('Signup mail'), 'filter Backlog: only tasks without a sprint ' + r);
     await ev(`(() => { document.querySelector('#view .sprseg [data-v=""]').click(); return 1; })()`); await sleep(700);
     // progress + burndown open on the desktop
-    await call('POST', `/api/tasks/${T[0]}/complete`); await nav(B + '#l/' + P); await ready(ev, '#view .sprh'); await sleep(1500);
+    await call('POST', `/api/tasks/${T[0]}/complete`);  // as from another device: the app's next state reload brings it
+    await ev(`(async () => { await load(); render(); return 1; })()`); await ready(ev, '#view .sprh'); await sleep(1500);
     const pg = await ev(`document.querySelector('#view .sprh .sprp')?.textContent || ''`);
     check(/1 of 2 done/.test(pg), 'progress 1 of 2 done: ' + pg);
     check(await ev(`!!document.querySelector('#view .sprh .sprbody')`), 'desktop: the header is open (goal / burndown)');
