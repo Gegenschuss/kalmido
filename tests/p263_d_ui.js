@@ -27,6 +27,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'claude', display_name: 'Claude'});
   const CL = ag.id; TOK = ag.token;
   await call('PATCH', `/api/admin/agents/${CL}`, {org_id: ORG});
+  const W = (await call('POST', '/api/lists', {name: 'Work', org_id: ORG})).id;
+  await call('PUT', `/api/lists/${W}/members`, {user_id: CL, role: 'edit'});
   const JA = (await v1('POST', '/agent/jobs', {title: 'Clara: Release 1.0', user_id: me.id})).id;
   const say = (body, kw = {}) => v1('POST', `/agent/chats/${me.id}`, {body, ...kw});
   await say('Clara: halfway there', {job_id: JA});
