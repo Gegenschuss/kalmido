@@ -1,0 +1,138 @@
+// 2.65.0 part B (#1823, #1824): more areas load on demand (static/js/lazyload.js), their styles with them (static/css/). Own
+// container (start.sh).
+// - layout: no script tag for the new modules (agentchat, pdf, mindmap, wiki, stats, calendar, docs), sw.js precaches their files
+//   (LAZY = LD_MODS) and their stylesheets (LAZY_CSS = LD_CSS = static/css/*.css); the start parts (chatbase.js) load at start;
+//   the start is smaller than 2.56.3 (scripts with a tag + app.css + i18n.js)
+// - jsdom (boot lazy: true): a cold start loads no module and no module stylesheet, no script error; the no-op stand-ins answer
+//   without loading; every module opens through its normal way in (route, the settings dialog, a preview link) and brings its
+//   stylesheet (parsed, a rule of it applies); modules a module needs come first (settings -> agentchat + calendar, wiki -> mindmap)
+// - Firefox (real browser, skipped without firefox): the start fetches none of the new modules / stylesheets, the documents view
+//   gets its style, the service worker's cache holds every LAZY and LAZY_CSS file
+const path = require('path');
+const {execFileSync} = require('child_process');
+const {boot, sleep, B, login, errs} = require('./boot');
+const F = []; let ok = 0;
+const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const firefox = require('./ff')({tag: 'p265_b_ui', check: (c, w) => check(c, w), shots: 'P265B_SHOTS', lazy: true});
+const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
+const DATA = process.argv[2] || path.join(__dirname, '.data');
+if (!process.env.P265B_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
+let CK;
+const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = t; } return j; };
+const until = async (fn, n = 50) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(100); } return fn(); };
+const get = async u => (await fetch(B + u)).text();
+const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview'], mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag'], docs: ['docs', 'paperless', 'receipts']};
+
+(async () => {
+  // ================= layout (no browser)
+  const html = await get(''), sw = await get('sw.js'), ld = await get('static/js/lazyload.js');
+  const tags = [...html.matchAll(/<script src="\/static\/js\/([\w-]+)\.js"><\/script>/g)].map(m => m[1]);
+  const LAZY = [...(sw.match(/const LAZY = \[(.*?)\];/s) || [, ''])[1].matchAll(/'\/static\/js\/([\w-]+)\.js'/g)].map(m => m[1]);
+  const LAZY_CSS = [...(sw.match(/const LAZY_CSS = \[(.*?)\];/s) || [, ''])[1].matchAll(/'\/static\/css\/([\w-]+)\.css'/g)].map(m => m[1]);
+  const ldCss = [...(ld.match(/const LD_CSS = \{(.*?)\};/s) || [, ''])[1].replace(/\w+:/g, '').matchAll(/'([\w-]+)'/g)].map(m => m[1]);
+  for (const [m, fs] of Object.entries(NEW)) check(new RegExp(`\\b${m}: \\[${fs.map(f => `'${f}'`).join(', ')}\\]`).test(ld) && fs.every(f => LAZY.includes(f) && !tags.includes(f)), `module ${m}: ${fs.join(', ')} in LD_MODS + LAZY, no script tag`);
+  check(['chatbase', 'calendar', 'templates', 'calevents', 'lazyload'].every(f => tags.includes(f)) && tags.indexOf('lazyload') === tags.indexOf('core') + 1, 'start parts load at start (chatbase.js, calendar.js, templates.js, calevents.js)');
+  check(LAZY_CSS.length >= 10 && JSON.stringify(LAZY_CSS) === JSON.stringify(ldCss), 'sw.js LAZY_CSS = the stylesheets of LD_CSS: ' + LAZY_CSS.join(' '));
+  const sheets = await Promise.all(LAZY_CSS.map(async f => { const r = await fetch(B + 'static/css/' + f + '.css'); return {f, ok: r.ok, n: (await r.text()).length}; }));
+  check(sheets.every(s => s.ok && s.n > 500), 'every module stylesheet is served: ' + sheets.map(s => `${s.f} ${s.n}`).join(', '));
+  const appCss = await get('static/app.css');
+  check(!/^\.dc-view\{/m.test(appCss) && !/^\.wktree\{/m.test(appCss) && /^\.dc-view\{/m.test(await get('static/css/docs.css')), 'area rules moved out of app.css (documents, knowledge pages)');
+  // the start: scripts with a tag + app.css + i18n.js (the budget of tools/perf_budget.py measures the same)
+  const sizes = await Promise.all(tags.map(async f => (await get('static/js/' + f + '.js')).length));
+  const start = sizes.reduce((a, b) => a + b, 0) + appCss.length + (await get('static/i18n.js')).length;
+  console.log(`start: ${tags.length} scripts, ${start} characters (scripts + app.css + i18n.js), app.css ${appCss.length}`);
+  check(start < 3500000 && appCss.length < 580000, `the start is smaller than 2.56.3 (3.76 MB, app.css 611 KB): ${start}`);
+
+  // ================= jsdom: the app
+  await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
+  CK = await login('alice');
+  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
+  await call('PATCH', '/api/settings', {tour: 'done', lang: 'en'});
+  const st0 = await call('GET', '/api/state');
+  const feats = (st0.settings.features || '').split(',').filter(Boolean);
+  await call('PATCH', '/api/settings', {features: [...new Set([...feats, 'cal', 'stats', 'wiki', 'docs', 'agents', 'events'])].join(',')});
+  const LID = (st0.lists || []).find(l => !l.archived)?.id || (await call('POST', '/api/lists', {name: 'Lazy'})).id;
+  const TID = (await call('POST', '/api/tasks', {list_id: LID, title: 'Lazy task'})).id;
+  check(LID > 0 && TID > 0, 'setup: a list and a task');
+
+  const ready = w => until(() => { try { return w.eval('!!(S.me && S.lists && S.lists.length)'); } catch { return false; } }, 100);
+  const e0 = errs.length;
+  let w = await boot({user: 'alice', lazy: true}), d = w.document;
+  await ready(w);
+  const lazyTags = () => [...d.querySelectorAll('script[src*="/static/js/"]')].map(s => (s.getAttribute('src').match(/\/static\/js\/([\w-]+)\.js/) || [])[1]).filter(f => LAZY.includes(f));
+  const cssOn = m => { const l = d.querySelector(`link[data-ldcss="${m}"]`); return !!l && !!l.sheet && l.sheet.cssRules.length > 3; };
+  const why = () => ` [modules ${lazyTags().join(' ')}; sheets ${[...d.querySelectorAll('link[data-ldcss]')].map(l => l.dataset.ldcss + ':' + (l.sheet ? l.sheet.cssRules.length : 'none')).join(' ')}; view ${(d.querySelector('#view')?.textContent || '').trim().slice(0, 60)}]`;
+  check(lazyTags().length === 0 && !d.querySelector('link[data-ldcss]'), 'cold start: no module, no module stylesheet loaded');
+  check(w.eval('typeof chatFull') === 'function' && w.eval('typeof rxRow') === 'function' && w.eval('typeof patchKids') === 'function' && w.eval('typeof pv_attr') === 'function' && w.eval('typeof calReq') === 'function' && w.eval('typeof barChart') === 'function', 'start parts there: chatbase.js, pv_attr, calReq, the charts');
+  check(w.eval(`[chatPatch(), chatFit(), chatTypers(null), stepsChanged()].join('')`) === '' && lazyTags().length === 0, 'no-op stand-ins answer without loading the chat');
+  check(w.eval(`FEATS.some(f => f[0] === 'docs')`) && w.eval(`typeof dc_shareOk`) === 'function', 'the documents module switch is there before docs.js');
+  // the task panel draws without wiki.js ("Mentioned in" loads it in the background)
+  w.location.hash = '#t/' + TID; await until(() => d.querySelector('#detail .dtitle, #detail [data-act="ct-link"]'));
+  check(!!d.querySelector('#detail'), 'task panel opens');
+  await until(() => lazyTags().includes('wiki'));
+  check(lazyTags().includes('wiki') && lazyTags().includes('mindmap') && lazyTags().indexOf('mindmap') < lazyTags().indexOf('wiki'), 'wiki on: the task panel loads wiki.js in the background, mindmap.js first');
+  w.location.hash = '#today';
+  // statistics
+  w.eval(`go('stats')`);
+  await until(() => lazyTags().includes('stats') && cssOn('stats') && d.querySelector('#view .stats, #view .empty') && !/Loading…/.test(d.querySelector('#view').textContent || ''), 80);
+  check(lazyTags().includes('stats') && cssOn('stats') && !!d.querySelector('#view .stats'), 'statistics: stats.js + stats.css loaded, the view drawn' + why());
+  // calendar
+  w.eval(`go('cal')`);
+  await until(() => lazyTags().includes('calview') && d.querySelector('#view .calbar'), 80);
+  check(['calview', 'caldrag'].every(f => lazyTags().includes(f)) && cssOn('calendar') && !!d.querySelector('#view .calbar'), 'calendar: calview.js + caldrag.js + calendar.css, the month drawn' + why());
+  w.eval(`S.calMode = 'week'; renderView()`); await sleep(100);
+  const wt = d.querySelector('#view .wtime');
+  check(!!wt && w.getComputedStyle(wt).position === 'absolute', 'calendar week: a rule of calendar.css applies (.wtime absolute)');
+  // documents
+  w.eval(`go('docs')`);
+  await until(() => lazyTags().includes('docs') && d.querySelector('#view .dc-view'), 80);
+  check(['docs', 'paperless', 'receipts'].every(f => lazyTags().includes(f)) && cssOn('docs') && w.getComputedStyle(d.querySelector('#view .dc-view')).position === 'relative', 'documents: docs.js + paperless.js + receipts.js + docs.css, style applies' + why());
+  // knowledge pages (already loaded by the task panel): the view
+  w.eval(`go('wiki')`);
+  await until(() => d.querySelector('#view .wkspace, #view .wkside, #view .wk-view') || !/Loading…/.test(d.querySelector('#view').textContent || ''), 80);
+  check(cssOn('wiki') && cssOn('mindmap') && !/^\s*Loading…\s*$/.test(d.querySelector('#view').textContent || ''), 'knowledge pages: wiki.css + mindmap.css, the view drawn' + why());
+  // PDF preview: a preview link drawn at start, the click loads pdfview.js
+  const a = d.createElement('a'); a.href = '/static/x.pdf'; a.setAttribute('data-pview', JSON.stringify({url: '/static/x.pdf', name: 'x.pdf'})); a.textContent = 'x'; d.body.appendChild(a);
+  a.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, button: 0}));
+  await until(() => lazyTags().includes('pdfview') && d.querySelector('.lightbox'), 60);
+  check(lazyTags().includes('pdfview') && cssOn('pdf') && !!d.querySelector('.lightbox') && !/loadModule/.test(w.eval('String(pdfView)')), 'a preview link loads pdfview.js + pdf.css and opens the preview' + why());
+  d.querySelector('.lightbox')?.remove(); a.remove();
+  // settings: needs the agent chat (its panes) and the calendar (Integrations > Calendars) first
+  await w.eval(`settingsModal('look')`);
+  await until(() => d.querySelector('.smodal'));
+  check(['agentchat', 'agentsetup', 'settings'].every(f => lazyTags().includes(f)) && lazyTags().indexOf('agentchat') < lazyTags().indexOf('settings') && cssOn('agentchat') && cssOn('settings'), 'settings: agentchat.js + agentsetup.js before settings.js, with their stylesheets' + why());
+  check(!/loadModule/.test(w.eval('String(chatOpen)')) && w.eval('chatPatch.name') === 'chatPatch', 'after loading: the real chatOpen / chatPatch replace the stand-ins');
+  d.querySelector('.smodal')?.remove();
+  const own = errs.slice(e0).filter(e => !/pdf\.min\.mjs|dynamic import|import\(\)|Could not parse CSS/i.test(e));
+  check(!own.length, 'no script errors: ' + own.join(' | '));
+  w.close();
+
+  // cold start straight into the calendar: it loads at once (no empty view)
+  w = await boot({user: 'alice', lazy: true, hash: 'cal'}); d = w.document; await ready(w);
+  await until(() => d.querySelector('#view .calbar'), 80);
+  check(!!d.querySelector('#view .calbar') && cssOn('calendar') && !['stats', 'docs', 'pdfview'].some(f => lazyTags().includes(f)), 'cold start #cal: the calendar, not the other new modules' + why());
+  w.close();
+
+  // ================= Firefox: real browser + service worker
+  await firefox(async ({ev, nav}) => {
+    await nav(B + 'static/icon.svg');
+    await ev('(() => { localStorage.clear(); return 1; })()');
+    check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.ok)`), 'Firefox: login');
+    await nav(B);
+    for (let i = 0; i < 40 && !(await ev('!!(window.S && S.me)').catch(() => false)); i++) await sleep(250);
+    // the idle preload (5 s after the start) may fetch settings + what it needs: only what started before counts
+    const fetched = await ev(`JSON.stringify(performance.getEntriesByType('resource').filter(e => /\\/static\\/(js\\/(${LAZY.join('|')})\\.js|css\\/)/.test(e.name) && e.startTime < 4500).map(e => e.name.replace(/^.*\\/static\\//, '')))`);
+    check(fetched === '[]', 'Firefox: the start fetches no module and no module stylesheet ' + fetched);
+    await nav(B + '#docs');
+    for (let i = 0; i < 60 && !(await ev('!!document.querySelector("#view .dc-view")').catch(() => false)); i++) await sleep(150);
+    check(await ev(`(() => { const v = document.querySelector('#view .dc-view'); return !!v && getComputedStyle(v).maxWidth !== 'none'; })()`), 'Firefox: the documents view is drawn with its style (docs.css)');
+    const cached = await ev(`(async () => { const reg = await navigator.serviceWorker.ready; const want = ${JSON.stringify(LAZY.map(f => '/static/js/' + f + '.js').concat(LAZY_CSS.map(f => '/static/css/' + f + '.css')))};
+      let c, miss = want; for (let i = 0; i < 60 && miss.length; i++) { const ks = (await caches.keys()).filter(k => k.startsWith('tasks-shell')); c = ks.length ? await caches.open(ks.pop()) : null;
+        if (c) { const m = []; for (const u of want) if (!await c.match(u, {ignoreSearch: true})) m.push(u); miss = m; } if (miss.length) await new Promise(r => setTimeout(r, 250)); }
+      return {sw: !!reg.active, miss}; })()`);
+    check(cached.sw && !cached.miss.length, 'Firefox: the service worker cache holds every LAZY + LAZY_CSS file (offline) ' + JSON.stringify(cached));
+  }, false);
+
+  console.log(`${ok} ok, ${F.length} failed`);
+  process.exit(F.length ? 1 : 0);
+})().catch(e => { console.log('FAIL: crash', e); process.exit(1); });

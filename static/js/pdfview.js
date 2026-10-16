@@ -17,16 +17,7 @@ function pv_load() {
   return pv_lib;
 }
 const pv_isPdf = a => a?.mime === 'application/pdf' || /\.pdf$/i.test(String(a?.name || ''));
-// a link that should open the preview: <a href="…" data-pview='{"url","name","size","dlUrl"}'>; a modifier key keeps the
-// browser's own behaviour (Ctrl/Cmd-click = new tab), like the text viewer's links
-document.addEventListener('click', e => {
-  const l = e.target.closest?.('a[data-pview],button[data-pview]');
-  if (!l || e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-  let o; try { o = JSON.parse(l.dataset.pview); } catch { return; }
-  e.preventDefault(); e.stopPropagation();
-  pdfView(o);
-}, true);
-const pv_attr = o => ` data-pview="${esc(JSON.stringify(o))}"`;
+// 2.65.0 (#1823): the click on a preview link and pv_attr moved to lazyload.js (drawn at start, this file loads on demand)
 
 async function pdfView(o) {
   $('.lightbox')?.remove();
