@@ -1580,6 +1580,29 @@ TOOLS += [
            "crew": {"type": "array", "items": {"type": "object"}, "maxItems": 120}}, ["list_id", "days"]),
      lambda api, a: api.call("POST", "/agent/proposals/shoot", body=_pick(a, ("list_id", "user_id", "title", "summary", "days", "crew")))),
 ]
+
+# 2.55.0 (#1066): arrangements of views (scope layouts, off until a person turns it on): read, then propose; the person decides
+_VIEW = {"type": "string", "description": "dashboard (start page), view_today, view_time, view_agents, view_projects, view_review, "
+                                          "further views of the builder, or list:<id> (the project page of a list shared with you)"}
+_LAYOUT = {"type": "object", "description": "{order: [block keys top to bottom], hidden: [keys], widths: {key: 2|3|4|6 of six columns}, "
+                                            "heights: {key: 1|2|3}, mobile: {order, hidden} (different on the phone)}; starts from the "
+                                            "current arrangement: named blocks first, the rest after them, fields left out stay"}
+TOOLS += [
+    ("list_layout_blocks", "2.55.0 (scope layouts): the blocks of a view (key, name, default width, fixed = cannot be hidden) and the views "
+                           "you may propose for. user_id = the person you work for (a personal agent: its owner by default).",
+     _obj({"view": _VIEW, "user_id": S_ID}), lambda api, a: api.call("GET", "/layouts/blocks", _pick(a, ("view", "user_id")))),
+    ("get_view_layout", "2.55.0 (scope layouts): how a view of the person is arranged now: order, hidden, widths, heights (blocks only, "
+                        "never their content); source own / standard / default.",
+     _obj({"view": _VIEW, "user_id": S_ID}, ["view"]),
+     lambda api, a: api.call("GET", f"/layouts/{urllib.parse.quote(str(a['view']), safe=':')}", _pick(a, ("user_id",)))),
+    ("propose_layout", "2.55.0 (scope layouts): ONE proposal how a view could be arranged (e.g. favourites on top of the start page). "
+                       "The person sees before / after and accepts (it becomes a saved arrangement \"<name> (proposal by you)\") or declines; "
+                       "you never change a view yourself. A new proposal for the same view replaces your open one; expires after 14 days. "
+                       "The answer comes as the event job. After a decline do not propose it again unasked.",
+     _obj({"view": _VIEW, "name": {"type": "string", "maxLength": 40}, "layout": _LAYOUT, "summary": {"type": "string"},
+           "title": {"type": "string"}, "user_id": S_ID}, ["view", "name", "layout"]),
+     lambda api, a: api.call("POST", "/layouts/proposals", body=_pick(a, ("view", "name", "layout", "summary", "title", "user_id")))),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -1620,9 +1643,10 @@ TOOL_SCOPES = {
 }
 TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_entries")  # 2.51.0 (#1353)
 TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2.51.0 (#1355)
+TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
-              "private", "files:read", "files:write", "office", "pinboard")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard
+              "private", "files:read", "files:write", "office", "pinboard", "layouts")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts
 _ME = {"at": 0.0, "v": None}
 ME_TTL = 300  # s: a changed scope shows in tools/list within 5 minutes (a call is refused by the server at once anyway)
 

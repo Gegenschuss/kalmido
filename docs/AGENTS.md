@@ -1623,6 +1623,38 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
   creating it (`time` / `calendar`).
 - The disposition: an agent of an organisation reads that organisation, a personal agent its owner's personal area
   (freelancers without an organisation get the same); absences only as away, never the reason; booking notes are left out.
+
+## Arrangements of views (2.55.0)
+
+An agent may PROPOSE how a view of the person it works for is arranged (which blocks, their order, widths and heights);
+it never changes a view itself, and the routes people use to arrange views stay closed to agents (403). The scope
+`layouts` is off for new agents (and not part of the legacy `write`): an admin, or without an organisation the person
+itself, turns it on per agent. Whose views: a personal agent's owner, a team agent's person given as `user_id` (someone who
+may chat with it, in the agent's organisation); everyone else 404. The project page (view `list:<id>`) only for a list
+shared with the agent (within its list limit) that is a project and that the person sees.
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| The blocks of a view (key, name, default width, fixed) | `GET /api/v1/layouts/blocks?view=` | `list_layout_blocks` | layouts |
+| How a view is arranged now (blocks only, never content) | `GET /api/v1/layouts/{view}` | `get_view_layout` | layouts |
+| Propose an arrangement (kind `layout`) | `POST /api/v1/layouts/proposals` | `propose_layout` | layouts |
+
+- **Views**: `dashboard` (start page), `view_today`, `view_time`, `view_agents`, `view_projects`, `view_review`, further
+  views of the builder, `list:<id>`. `source` of the current arrangement: `own`, `standard` (the admins' standard) or
+  `default`.
+- **The layout**: `{order, hidden, widths, heights, mobile}`; widths in columns of six (2 = a third, 3 = half, 4 = two
+  thirds, 6 = full), heights 1 compact / 2 normal / 3 tall, `mobile` = `{order, hidden}` for phones. It starts from what the
+  person sees now: the blocks named in `order` come first, the others keep their order after them; `hidden`, a block's
+  width / height and `mobile` left out stay as they are. Unknown blocks, hiding a fixed block, other values or a proposal
+  that changes nothing: 400 with the reason. The person's own block settings are kept when they accept.
+- **The proposal** is a ready proposal job (kind `layout`): News + push "Proposal ready" per the person's settings and a card
+  with before / after (two small grids with the block names and widths). 👍 *Accept* stores it as a saved arrangement
+  "<name> (proposal by <agent>)" of that view and, ticked by default, uses it at once; 👎 *Decline* discards it. Only the
+  person decides (never the agent's token or session); undo = one step back to the previous arrangement. The agent gets the
+  event `job` with `action` approve / reject (`proposal`: `state`, `view`, `layout_id`, `used`).
+- **Limits**: one open proposal per agent, person and view (a new one replaces the old one); it expires after 14 days; at
+  most 20 per agent and person a day; the agent's usage limit applies. After a decline the agent does not propose the same
+  again unasked.
   It needs the module *Disposition* switched on at the owner (personal agent) or at an admin of the organisation (else 409).
   An agent with a list limit sees bookings of other lists only as time + resource: title "Booked", no list, job or event
   (`hidden: true`); the same goes for the titles in the proposal warnings.

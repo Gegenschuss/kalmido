@@ -7617,3 +7617,20 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
   .lyvsw{max-width:9rem;min-height:36px}
   .lyvrow .iconbtn,.lyvppl .chkl{min-height:44px}
 }
+/* 2.55.0 B (#1066) an agent's arrangement proposal: before / after as two small schematic grids (lyprop.js) */
+.lyp-head{font-size:13px;margin:2px 0 8px;color:var(--muted)}
+.lyp-head b{color:var(--text)}
+.lyp-by{color:var(--accent)}
+.lyp-ba{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}
+@media (max-width:560px){.lyp-ba{grid-template-columns:1fr}}
+.lyp-f{margin:0;min-width:0}
+.lyp-f figcaption{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.lyp-g{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;padding:6px;border:1px solid var(--line);border-radius:10px;background:var(--bg2)}
+.lyp-c{grid-column:span 6;min-height:26px;display:flex;align-items:center;padding:2px 6px;border-radius:6px;border:1px solid var(--line);
+  background:var(--accent-soft);font-size:var(--fs-xs);line-height:1.2;overflow:hidden;min-width:0}
+.lyp-c span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lyp-w2{grid-column:span 2}.lyp-w3{grid-column:span 3}.lyp-w4{grid-column:span 4}.lyp-w6{grid-column:span 6}
+.lyp-h1{min-height:18px}.lyp-h3{min-height:40px}
+.lyp-new{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.lyp-hid{font-size:12px;margin-top:4px}
+.lyp-use{margin:6px 0}
