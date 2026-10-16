@@ -47,7 +47,7 @@ const ALL = 'cal,events,comments';
   const DR = await ev('Draft plan', `${W2}T14:00`, `${W2}T15:00`, {status: 'tentative'});
   const RO = await call('POST', '/api/events', {title: 'Read only', cal_id: BC.id, start: `${W2}T10:00`, end: `${W2}T11:00`, tz: TZ, reminders: []}, CB);
   check(RV.id && SU.id && DR.id && RO.id, 'events set up ' + JSON.stringify([RV.status, SU.status, DR.status, RO.status]));
-  const get = id => call('GET', `/api/events/${id}`);
+  const get = async id => (await fetch(B + `api/events/${id}`, {headers: {...H, Cookie: CK}})).json();  // the event's own status field
   const find = async title => (await call('GET', `/api/events?from=${day(-3)}&to=${day(10)}`)).items?.find(x => x.title === title);
 
   // ================= jsdom: what may be dragged, the rule of a series
