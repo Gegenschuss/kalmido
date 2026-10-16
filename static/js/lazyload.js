@@ -86,7 +86,8 @@ for (const [m, ns] of Object.entries(LD_CALL)) for (const n of ns) {
   };
   window[n] = stub;
 }
-for (const [n, [m, view]] of Object.entries(LD_VIEW)) window[n] = () => { ld_later(m); return view ? `<p class="muted lempty">${tr('Loading…')}</p>` : ''; };
+// a part of another view (the client page's office hints, the start page's figures) loads the office only when it is on
+for (const [n, [m, view]] of Object.entries(LD_VIEW)) window[n] = () => { if (!view && m === 'office' && !officeOn()) return ''; ld_later(m); return view ? `<p class="muted lempty">${tr('Loading…')}</p>` : ''; };
 // the office switch of an agent (Settings > Agents, the agent chat's settings): its row is drawn at once, the office part
 // only loads when the office is on
 window.oa_switchRowHtml = aid => officeOn() ? `<div class="oa_sw" data-oa-aid="${+aid}" hidden></div>` : '';
