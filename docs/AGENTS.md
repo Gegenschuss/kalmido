@@ -1169,8 +1169,8 @@ it only together with `job_id` and retry without both.
 history: `GET /api/agents/{id}/chat?job=<job id>` returns only the agent's messages with that `job_id`, the person's
 messages addressed to it (`Clara: …`, `Job 82: …`, `#82: …`) and the agent's direct answers to those (`reply_to`), from the
 person's own conversation (with `?after=`, `?before=`, `?limit=` like the whole chat; a job of another agent or one the
-person cannot see = 404). What the person types there goes out as a normal chat message `Clara: …` (`Job 82: …` without a
-name), so route such messages to the job. Running jobs with a name are listed in the agent menu of the top bar. The card
+person cannot see = 404). What the person types there goes out as a normal chat message `Job 82: …` (the number, also for jobs
+with a name; a typed `Clara: …` stays as it is), so route such messages to the job. Running jobs with a name are listed in the agent menu of the top bar. The card
 of a running job has **Message**: `POST /api/agents/jobs/{id}/action {action: "message", text}` (at most 4000 characters,
 the same people as Stop; empty 400, an ended job 409) sends the `job` event with `action: "message"` and `text`; the job's
 state, action fields and approval stay as they are. Hand the text to the running job if you can; else treat it as a chat

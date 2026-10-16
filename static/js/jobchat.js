@@ -7,7 +7,7 @@
 // #1793: a job's own history. The tag "Clara · Job #220" on a job's messages in the agent chat (and the job's name at the
 // start of such a message) opens the chat filtered to that job (GET /api/agents/<id>/chat?job=<id>: its messages, mine to
 // it, the agent's answers to those); a bar under the header shows its name + title and leads back to the whole chat. What I
-// type there goes out as "Clara: …" ("Job 220: …" without a name), the way the agent's service routes it (#1456). An ended
+// type there goes out as "Job 220: …" (review: always the number), the way the agent's service routes it (#1456). An ended
 // job keeps its history, the box is off. Running jobs with a name are in the agent menu of the top bar.
 // The chat keeps one state (S.chat); S.chat.job = {id} switches it to the job's history (agentchat.js asks jc_q / jc_send).
 S.jc = {jobs: {}, at: 0, busy: null, asked: new Set()};
