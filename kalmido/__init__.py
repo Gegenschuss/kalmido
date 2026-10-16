@@ -87,6 +87,7 @@ ORDER = (
     "agents.api",
     "agents.proposals",
     "agents.cleanup",  # 2.39.0 (#1151)
+    "agents.propkinds2",  # 2.51.0 B (#1351 #1358)
     "agents.setup",  # 2.44.0 (#1517)
     "lists.playbook",  # 2.39.0 (#1168)
     "tasks.attachtext",  # 2.34.0 (#368)
@@ -94,6 +95,7 @@ ORDER = (
     "agents.gates",  # 2.26.0 (#949)
     "agents.safety",  # 2.30.0 (#919)
     "agents.usage",
+    "lists.custview",  # 2.50.0 C (#329): customer view of public links (no routes; used by lists.public)
     "lists.public",
     "integrations.git",
     "integrations.gitfolder",  # 2.33.0 (#934)
@@ -139,6 +141,9 @@ ORDER = (
     "team.clients",
     "team.clients_bulk",  # 2.47.3 (#1733): several clients at once
     "team.workload",
+    "hub.absence",  # 2.50.0 A (#1195): absences + German public holidays
+    "hub.dispo",  # 2.50.0 A (#1194): resources and disposition (bookings of crew and equipment)
+    "hub.agentdispo",  # 2.51.0 C (#1355): shoot planning by agents (event drafts, options), the disposition in the REST API
     "office.packs",  # 2.36.1 (#1021): country packs (data), used by office.model
     "office.model",  # 2.36.1 (#1021): office & finance (B); C/D append office.calc, office.docs, office.pdf
     "office.web",
@@ -149,6 +154,7 @@ ORDER = (
     "office.pdf",  # 2.36.1 (#1021): the PDF writer (D, no kalmido imports)
     "office.einvoice",  # 2.38.0 (#1021 P5, F2): e-invoice XML (CII EN 16931 / XRechnung) from the snapshot, used by office.pdfweb
     "office.pdfweb",  # 2.36.1 (#1021): quotation PDF + company logo routes (D; the writer office.pdf has no routes)
+    "office.signoff",  # 2.50.0 C (#1200): approval links with a simple electronic signature (quotations, list acceptance)
     "office.ledger",  # 2.36.2 (#1021, #1142, E): finalising, structured company data, office log
     "office.invoices",  # 2.38.0 (#1021, F1): invoices, credit notes, reminders, payments, sending, DATEV inbox
     "office.doclang",  # 2.40.0 (#1381): language switch of drafts swaps the standard texts (no routes; used by office.docs)
@@ -158,7 +164,10 @@ ORDER = (
     "office.parts",  # 2.47.0 (#1215): parts of a quotation (Teilangebote): routes, title page calculation, invoice modes
     "office.travel",  # 2.47.3 (#1022, part B): travel expenses (trips, receipts, evaluation, billing on)
     "office.cashflow",  # 2.47.3 (#1652, part B): cash flow per month + fixed costs
+    "office.pipeline",  # 2.50.0 B (#1196): the sales pipeline
+    "office.kpi",  # 2.50.0 B (#1197): the business figures
     "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
+    "office.agentdocs",  # 2.51.0 A (#1348, #1350): agents in the office: drafts, payment suggestions, the switches (API v1 + routes)
     "team.approvals",
     "team.forms",
     "team.v1",
@@ -169,6 +178,8 @@ ORDER = (
     "admin.clientip",  # 2.33.0 (#834)
     "tasks.stale",  # 2.34.0 (#266)
     "personal.timegaps",  # 2.34.0 (#269)
+    "agents.agentpin",  # 2.51.0 C (#1352): agents on the pin board + the weekly status of a project
+    "agents.agenttime",  # 2.51.0 C (#1353): agents check time tracking + propose entries from events
     "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
     "admin.orgcrypt_cli",  # 2.42.0 (#828): the organisation keys' start-up pass + command line (no routes)
     "docs.extract",  # 2.48.0 (#1111): date / due date / amount from a text (no routes, standard library only)

@@ -8,8 +8,8 @@ e-invoices and bookkeeping exports are planned for later stages.
 A person needs the module switched on (Settings > Modules > Office & finance, or the setup purpose "Office & finance").
 Since 2.47.3 no organisation is needed: everybody also has a **personal office** of their own (see below). Everything the
 module stores belongs to one office area - an organisation's office or one person's personal office; people of another
-organisation, and everybody else in the case of a personal office, never see it. Agents (AI assistants with a token) and child
-accounts have no access at all in this stage - there is no `/api/v1` route and no MCP tool for the module yet.
+organisation, and everybody else in the case of a personal office, never see it. Child accounts have no access. Agents (AI
+assistants with a token) reach the module only through `/api/v1/office` and only for drafts (2.51.0, see "Agents" below).
 
 ## Roles
 
@@ -18,7 +18,8 @@ accounts have no access at all in this stage - there is no `/api/v1` route and n
 | Organisation admin | module settings, master data, framework contracts, logo, import, delete documents |
 | Organisation member | read master data and settings, export the master data file, create / edit quotations, PDF |
 | Owner of a personal office | everything an organisation admin may, in the own personal office |
-| Agents, children | nothing (403) |
+| Agents | with three switches on: read master data and documents, drafts of quotations / invoices / reminders, payment suggestions (2.51.0) |
+| Children | nothing (403) |
 
 Which office you work in follows the workspace switch at the top of the sidebar: an organisation's workspace (`org:<id>`)
 shows its office, **Private** shows your personal office. Without any organisation (a freelancer, or a server in the
@@ -268,6 +269,37 @@ clients and the company take an ISO 3166-1 alpha-2 code, chosen by name (the bro
 Switzerland on top, empty = Germany); `UK` becomes `GB`, `EL` `GR`, anything else is refused, and an old unknown value
 stops the finalising of an invoice instead of turning silently into `DE`.
 
+## Sales pipeline and figures (2.50)
+
+Two tabs for the admins of the office area (a personal office: its owner; members get `403`).
+
+- **Pipeline** - deals from the first inquiry to the order, in four stages: *Inquiry*, *Quotation sent*, *Order*, *Lost*.
+  A deal has a name, a client of the area or a free contact name, a net value in the office currency, a probability
+  (preset 20 / 50 / 100 / 0 % by stage; a value changed by hand stays when the stage changes, *Order* and *Lost* always
+  set 100 / 0), an expected date, a note and a reason when lost. On a computer the stages are columns (drag a card into
+  another column); on a phone one stage at a time with a switcher. On top: the open sum (inquiries + quotations), the
+  weighted sum (value x probability) and what is expected to come in per month for six months (a past date counts in
+  the current month, the next month is marked; deals without a date are shown apart).
+  *Create quotation* makes a draft with the office's own quotation code (client and name taken over), binds it to the
+  deal and moves an inquiry to *Quotation sent*. When the quotation's status becomes *accepted* - by hand or by the
+  client's sign-off - the server moves its deal to *Order* (`pl2_offer_status`). A declined quotation leaves the deal
+  where it is: the card is marked and the admin sets *Lost* or makes a new quotation. *Create project* (a won deal)
+  makes a project list (type "Agency") named like the deal, in the office's workspace (a personal office: private),
+  with the deal's client. Every change is one undo step; a deleted deal can be restored.
+- **Figures** - one view the server computes (`GET /api/office/kpi?year=`): revenue = payments received on invoices,
+  net share of each payment (refunds on credit notes subtracted), this month and this year so far against the same span
+  a year earlier and per month as small bars (this year / the year before); open and overdue invoices (count and open
+  gross; a tap opens the invoice list); the pipeline's weighted value; the next three months of the cash flow (the
+  numbers of the cash flow tab, not computed again); per client the hours of its projects against `budget_h` /
+  `budget_amount`, the net invoiced in the year, the costs in the year (purchases of accepted quotations, travel
+  expenses of the client) and the margin = invoiced minus costs; per project the hours against its "Budget h" field.
+  The start page has a block *Figures* with the main values for the admins of the office.
+
+Routes: `GET /api/office/deals` (`items`, `summary`, `stages`, `probabilities`, `currency`), `POST /api/office/deals`,
+`PATCH /api/office/deals/<id>` (answers `before` = the old values, the undo), `DELETE /api/office/deals/<id>`,
+`POST /api/office/deals/<id>/restore`, `POST /api/office/deals/<id>/offer`, `POST /api/office/deals/<id>/project`,
+`GET /api/office/deals/summary`, `GET /api/office/kpi`. Clients, lists and quotations of another area are refused.
+
 ## Web API
 
 All routes require a signed-in person with the module on; they work in the office of the shown workspace (`400` with a
@@ -282,7 +314,7 @@ allowed) and `org_offices` (`[{id, name}]` while it is empty and the person has 
 `POST /api/office/docs/from-time`, `POST /api/office/docs/reminder`, `GET/POST /api/office/docs/<id>/payments`,
 `DELETE /api/office/docs/<id>/payments/<pid>`, `POST /api/office/docs/<id>/send`, `POST /api/office/docs/<id>/datev` and
 `GET /api/office/mail-status` (see "Invoices and credit notes" below); 2.40.0 adds `POST /api/office/docs/<id>/fee`
-(see "Payments and reminders"). Agents never reach `/api/office/*`.
+(see "Payments and reminders"). Agents never reach `/api/office/*` (their routes are `/api/v1/office`, see "Agents").
 
 ## Quotations and the calculator
 
@@ -523,14 +555,56 @@ street, postcode, city, country, VAT ID, customer number, buyer reference (for e
 invoices and payment terms in days; the free address stays. These fields are for people only and are not part of agent
 answers.
 
+## Approval by the customer (2.50.0)
+
+A sent quotation gets an **approval link** (block *Approval by the customer* in the editor, members of the organisation):
+`POST /api/office/docs/<id>/signoff` `{expires?: YYYY-MM-DD}` (`409` unless the quotation is sent; a new link stops the
+older one), `GET /api/office/docs/<id>/signoffs` (newest first, with the protocol), `POST /api/office/signoffs/<sid>/revoke`.
+The customer opens `/s/q/<token>` without an account: the quotation as a summary (positions, totals) and as PDF, types a
+name (e-mail optional), ticks *I accept the quotation* and presses *Accept bindingly*, or declines with an optional
+reason. Stored in `office_signoffs` and in the office log (`signoff_accepted` / `signoff_declined` with the detail): name,
+e-mail, time (UTC), client address, user agent and the SHA-256 of the quotation's printed content when the link was
+made (`doc_hash`). The quotation is set to accepted / declined through the same code as the status change in the app
+(`odoc_set_status`: purchase, sales pipeline). Afterwards the link shows only the confirmation; a second decision is
+impossible. A quotation that changes after the link was made voids the link. The person who made the link gets a push
+(notification switch *Approval requests*). Token: 256 bits, looked up by its SHA-256 (a sealed copy lets the creator copy
+it again); unknown, expired, stopped and voided links get the same `404`; decisions are limited per client address and
+per link; the form carries a check value bound to the link. Name, e-mail, reason, address and user agent are encrypted at
+rest in organisations with encryption.
+
+This is a **simple electronic signature**: usually enough to accept a quotation or confirm an acceptance; not for contracts
+that the law requires in written form (they need a qualified signature). Kalmido gives no legal advice and builds no
+advanced or qualified signature. The same flow confirms the **acceptance** of a project, a section or a milestone from the
+list's Share dialog > Public link (*Request acceptance*); the customer's list page shows the open request.
+
 ## Access log
 
 Every change and every read of documents and master data is written to the office log (`office_doc_log`): who, when,
 what (create, change with the values before and after, positions, number, status, finalise, duplicate, delete, open,
 PDF, preview, export, import, logo) and on which document or master data. Repeated reads of the same person within ten
 minutes are written once. Organisation admins see the history of a document in its editor ("History") and the latest
-entries under Settings > Access log. The log is never part of alerts. Agents have no access to the module at all: an
-agent token on `/api/office/*` gets `403` without content.
+entries under Settings > Access log. The log is never part of alerts. An agent token on `/api/office/*` gets `403` without
+content; every request of an agent on `/api/v1/office` is one line in the log (2.51.0).
+
+## Agents (2.51.0)
+
+An agent prepares, a person decides. Three things must be on (all off by default): the token's scope `office`, the
+agent's switch **May draft office documents** (its settings dialog; an admin of its office area sets it, in a personal
+office the person) and the area's privacy switch **Agents may read office data** (Settings > Agents, admins; the hint
+says that client and price data go to the agent's AI model). Then the agent may read services (never purchase prices),
+text blocks, framework contracts, clients and the area's documents, and create:
+
+- **quotation drafts** (no number; positions from the services, free positions, other prices and discounts are marked in
+  the accent colour with a text until a person changes the position or presses *Confirm*; *Drafted by the agent ...*);
+- **invoice drafts** from accepted quotations (the same as *Create invoice*), **reminder drafts** over open invoices;
+- **payment suggestions** for open invoices (Kalmido has no bank access; the agent reads them from what a person gave
+  it): *Suggested payments* above the invoice list, an admin books or rejects each one.
+
+It never reserves a number, finalises, sends, changes a status, deletes or books. Its area is its workspace's office (a
+personal agent without a workspace: its owner's personal office), it acts for one person of that office (`requested_by`)
+and never sees another area. Each request is one line in the access log (filter *Agents*). Details: docs/AGENTS.md.
+People's routes: `GET/PATCH /api/office/agents/<id>` (the switch), `GET /api/office/pay-props`, `POST /api/office/pay-props/<id>`
+`{action: accept|reject}` (admins). The event `offer_accepted` tells the area's office agents about an accepted quotation.
 
 ## PDF layout
 
@@ -592,6 +666,8 @@ keys `costs` / `margin` of `office_docs.totals`; office log entries with such va
 sealed on disk and served as the originals (same SHA-256 as recorded). The API answers in plain as before. Before going
 back to an older release run `python -m kalmido.admin.orgcrypt_cli decrypt-all`.
 Since 2.45.1 also the column `name_en` of `office_equipment` (text, default empty); 2.45.0 runs on with it.
+Since 2.50.0 also `office_deals` (the sales pipeline; under row-level security, `value`, `contact`, `note` and
+`lost_reason` encrypted at rest, `deleted_at` = deleted and restorable); 2.49.0 runs on with it.
 
 ## E-invoices (ZUGFeRD / XRechnung) and PDF/A-3
 

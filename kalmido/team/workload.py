@@ -96,9 +96,21 @@ def workload(c, uid, start=None, weeks=4, org=None):
                 cell["unestimated"] += 1
             if len(cell["ids"]) < 200:
                 cell["ids"].append(t["id"])
+    # 2.50.0 (#1195): absent workdays and public holidays of the area lower a week's capacity (0 for a week away)
+    from ..hub.absence import abs_capacity_factor, abs_days, abs_holidays, abs_state
+    from ..office.model import pb_personal
+    aoid = oid or pb_personal(c, uid, create=False)
+    gone = abs_days(c, ids, bounds[0][0], bounds[-1][1], aoid) if aoid else {}
+    hol = abs_holidays(abs_state(c, aoid), bounds[0][0], bounds[-1][1])
+    for pid, p in out.items():
+        for w, (a, b) in zip(p["weeks"], bounds):
+            f = abs_capacity_factor(gone.get(pid, {}), hol, a, b)
+            w["capacity_h"] = round(p["capacity_h"] * f, 2)
+            w["absent_days"] = sum(v for k, v in gone.get(pid, {}).items() if a.isoformat() <= k <= b.isoformat() and date.fromisoformat(k).weekday() < 5)
     for p in out.values():
         for w in p["weeks"]:
-            w["pct"] = round(w["minutes"] / 60 / p["capacity_h"] * 100) if p["capacity_h"] else None
+            cap = w.get("capacity_h", p["capacity_h"])
+            w["pct"] = round(w["minutes"] / 60 / cap * 100) if cap else (None if not w["minutes"] else 999)
             w["level"] = "none" if w["pct"] is None else "over" if w["pct"] > 100 else "warn" if w["pct"] >= 80 else "ok"
     from ..accounts.orgs import user_orgs
     orgs = [{"id": r[0], "name": r[1]} for r in c.execute("SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id")

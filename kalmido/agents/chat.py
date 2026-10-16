@@ -349,7 +349,13 @@ def chat_choices_clean(v, multi, permission=None, expires_in=None):
         if st not in CHOICE_STYLES:
             raise BadInput(tr("Invalid value: {0}", "choices"))
         ids.add(x["id"])
-        out.append({"id": x["id"], "label": str(x.get("label", x["id"])).strip()[:CHOICE_LABEL_MAX], **({"style": st} if st != "default" else {})})
+        href = x.get("href")  # 2.51.0 A (#1348): a link button: opens an app view ("#office/offers/12") instead of answering
+        if href is not None:
+            from ..office.agentdocs import NOTIFY_HREF_RE
+            if not isinstance(href, str) or not NOTIFY_HREF_RE.fullmatch(href) or permission:
+                raise BadInput(tr("Invalid value: {0}", "choices"))
+        out.append({"id": x["id"], "label": str(x.get("label", x["id"])).strip()[:CHOICE_LABEL_MAX], **({"style": st} if st != "default" else {}),
+                    **({"href": href} if href else {})})
     if multi not in (None, True, False, 0, 1):
         raise BadInput(tr("Invalid value: {0}", "multi"))
     d = {"choices": out, "multi": bool(multi)}

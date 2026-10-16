@@ -350,6 +350,8 @@ def doc_public(c, oid, r, admin, items=True):
     d["can_edit"] = not locked and r["status"] != "sent"  # 2.38.0: sent documents are locked as well
     d["can_delete"] = bool(admin) and not locked and r["status"] != "sent"
     d["number_at_finalize"] = ofx_number_at_finalize(office_settings(c, oid), r["kind"])
+    from .agentdocs import ofa_doc_extra
+    ofa_doc_extra(c, d)  # 2.51.0 A (#1348): "drafted by agent X", the project list
     return d
 
 
@@ -630,9 +632,9 @@ def clean_items(c, oid, r, items, admin, part=None):
 
 
 # ---------------------------------------------------------------- creating
-def doc_create(c, oid, uid, b, admin):
+def doc_create(c, oid, uid, b, admin, number=True):
     """A new quotation from the organisation's settings (+ a framework contract / client when given); the number is
-    reserved at once."""
+    reserved at once. 2.51.0 A (#1348): number=False (an agent's draft) reserves none (a person does, or finalising)."""
     s = office_settings(c, oid)
     kind = _choice(b.get("kind") or "offer", "kind", DOC_KINDS)
     lang = _choice(b.get("lang") or s.get("lang") or "de", "lang", ("de", "en"))
@@ -684,7 +686,7 @@ def doc_create(c, oid, uid, b, admin):
     f = clean_doc(c, oid, {k: v for k, v in b.items() if k != "kind"}, cur, admin)
     row.update(f)
     did = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
-    if not ofx_number_at_finalize(s, kind):  # 2.36.2 (P2): kinds numbered at finalising stay without a number as drafts
+    if number and not ofx_number_at_finalize(s, kind):  # 2.36.2 (P2): kinds numbered at finalising stay without a number as drafts
         _assign_number(c, oid, did, s)
     if isinstance(b.get("items"), list):
         _put_items(c, oid, doc_row(c, oid, did), b["items"], admin)
@@ -726,11 +728,18 @@ def _initials(c, uid):
     return "".join(p[0] for p in name.split() if p)[:4].upper()
 
 
-def _put_items(c, oid, r, items, admin):
+def _put_items(c, oid, r, items, admin, flags=None):
+    """2.51.0 A (#1348): flags = the agent's marks per position (office/agentdocs.py); a person's save keeps the mark of an
+    unchanged position and drops it on a changed or confirmed one (item.confirm)."""
     rows = clean_items(c, oid, r, items, admin)
+    if flags is None:
+        from .agentdocs import ofa_keep_flags
+        flags = ofa_keep_flags(c, oid, r["id"], items, rows)
     c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL", (r["id"], oid))  # 2.47.0 (#1215): not the parts'
     c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id IS NULL", (r["id"],))  # rows of an older version
-    for row in rows:
+    for row, fl in zip(rows, flags):
+        if fl:
+            row["agent_flag"] = fl
         row["doc_id"] = r["id"]
         row["org_id"] = oid
         row = oc_item_store(c, oid, row)  # 2.42.0 (#828): the purchase price encrypted at rest
@@ -969,6 +978,16 @@ def odoc_status(did):
     r = doc_row(c, oid, did)
     b = body()
     st = _choice((b if isinstance(b, dict) else {}).get("status"), "status", STATUSES if r["kind"] == "offer" else INV_STATUSES[r["kind"]])
+    odoc_set_status(c, oid, did, st, uid, r)
+    bump(c)
+    c.commit()
+    return jsonify(doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin", items=False))
+
+
+def odoc_set_status(c, oid, did, st, uid, r=None):
+    """2.50.0 (#1200): the status change of document did (checked, logged, purchase, pipeline), shared by the route above
+    and the customer's approval (office/signoff.py, uid None). Denied 403 / 409 when not allowed; the caller commits."""
+    r = r or doc_row(c, oid, did)
     if r["kind"] == "offer" and st == "draft" and r["status"] != "draft":  # 2.39.0 (#1209 audit N1): sent = locked, a copy for changes
         raise Denied(409, tr("This status change is not allowed ({0} to {1})", r["status"], st))
     ts = iso(now_utc())
@@ -988,9 +1007,11 @@ def odoc_status(did):
         ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": st}})
         if r["kind"] == "offer":
             ek_purchases_write(c, oid, did)  # 2.47.0 (#1649): accepted = its purchase is written, left = removed
-    bump(c)
-    c.commit()
-    return jsonify(doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin", items=False))
+            from .pipeline import pl2_offer_status  # 2.50.0 (#1196): a linked deal of the pipeline follows (one place for both callers)
+            pl2_offer_status(c, oid, did, st)
+            if st == "accepted":
+                from .agentdocs import ofa_offer_accepted
+                ofa_offer_accepted(c, oid, did)  # 2.51.0 A (#1348): the event offer_accepted to the area's office agents
 
 
 # 2.36.2: columns a copy never takes over (identity, state, the frozen snapshot of a finalised original)
@@ -1042,6 +1063,8 @@ def odoc_delete(did):
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     ofx_need_editable(r)
+    if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (did, oid)).fetchone():
+        raise Denied(409, tr("The customer has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net")})
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
     bump(c)

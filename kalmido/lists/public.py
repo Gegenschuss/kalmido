@@ -16,7 +16,7 @@ from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_n
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..core.access import acx_anon_bind, Denied, need_list
-from ..core.pg import system_ctx
+from ..core.pg import insert_id, system_ctx
 from ..tasks.validation import log_act, valid_date
 from ..tasks.lifecycle import do_complete, trash_task
 from ..collab.comments import task_event
@@ -24,6 +24,7 @@ from ..personal.timetrack import BadInput
 from ..tasks.dependencies import completed_ids, unblock_events
 from ..notify.alerts import _env_int, aa_count, aa_now
 from ..api.v1 import hit_limit, PUB_ENV
+from .custview import CV_FB_HOUR, CV_FB_NAME, CV_FB_RATE, CV_FB_TEXT, CV_FILE_RATE, cv_brand, cv_clean, cv_extras, cv_file, cv_options, cv_progress, cv_show, cv_size, cv_tag_sql
 
 
 # ---------------------------------------------------------------- package B: public links + checklist mode
@@ -169,10 +170,11 @@ def pub_seen(c, link):
 
 def pub_tasks(c, link):
     cut = iso(now_utc() - timedelta(days=PUB_DONE_DAYS))
+    tsql, targs = cv_tag_sql(cv_show(link))  # 2.50.0 (#329): "only tasks with tag ..." (ticking too: only what is shown)
     return [dict(r) for r in c.execute(
-        """SELECT id, parent_id, section_id, title, content, status, due, due_time, priority, completed_at, sort FROM tasks
-           WHERE list_id=? AND deleted_at IS NULL AND (status=0 OR ? OR completed_at>=?) ORDER BY sort, id LIMIT ?""",
-        (link["list_id"], 1 if link["l_checklist"] else 0, cut, PUB_MAX_TASKS))]
+        """SELECT id, parent_id, section_id, title, content, status, due, due_time, priority, completed_at, sort, assignee_id, ms FROM tasks
+           WHERE list_id=? AND deleted_at IS NULL AND (status=0 OR ? OR completed_at>=?)""" + tsql + " ORDER BY sort, id LIMIT ?",
+        (link["list_id"], 1 if link["l_checklist"] else 0, cut, *targs, PUB_MAX_TASKS))]
 
 
 def pub_render(c, link, token, lg):
@@ -184,6 +186,8 @@ def pub_render(c, link, token, lg):
         kids.setdefault(t["parent_id"] if t["parent_id"] in ids else None, []).append(t)
     tick, check = link["mode"] == "tick", bool(link["l_checklist"])
     today = local_now().date().isoformat()
+    show = cv_show(link)  # 2.50.0 (#329): what the owner lets the customer see (filtered here, never hidden by CSS)
+    ext = cv_extras(c, link, tasks, show, lg, pub_day)
 
     def row(t, depth=0):
         done = t["status"] != 0
@@ -195,7 +199,7 @@ def pub_render(c, link, token, lg):
         else:
             box = f'<span class="chk{" on" if done else ""}" aria-hidden="true"></span>'
         meta = ""
-        if t["due"] and not check and not done:
+        if t["due"] and not check and not done and show["due"]:
             cls = " over" if t["due"] < today else " today" if t["due"] == today else ""
             meta += f'<span class="due{cls}">{e(pub_day(t["due"], lg))}{" " + e(t["due_time"]) if t["due_time"] else ""}</span>'
         notes = ""
@@ -203,13 +207,25 @@ def pub_render(c, link, token, lg):
             txt = t["content"].strip()
             txt = txt[:PUB_NOTES_MAX] + ("…" if len(txt) > PUB_NOTES_MAX else "")
             notes = f'<details class="notes"><summary>{e(tr("Notes", lg=lg))}</summary><p>{e(txt)}</p></details>'
+        x = ext.get(t["id"]) or {}
+        info = ([f'<span class="who">{e(x["who"])}</span>'] if x.get("who") else []) + \
+            [f'<span class="tag">{e(n)}</span>' for n, _ in x.get("tags", [])] + \
+            [f'<span class="fld"><span class="fn">{e(n)}</span> {e(v)}</span>' for n, v in x.get("fields", [])]
+        if info:
+            meta += f'<div class="cvmeta">{"".join(info)}</div>'
+        if x.get("files"):
+            meta += '<ul class="files">' + "".join(
+                (f'<li><a href="/s/{e(token)}/file/{fid}" download rel="nofollow">{e(fn)}</a> <span class="fs">{e(cv_size(sz, lg))}</span></li>' if ok
+                 else f'<li>{e(fn)} <span class="fs">{e(cv_size(sz, lg))}</span></li>') for fid, fn, sz, ok in x["files"]) + '</ul>'
         sub = "".join(row(k, depth + 1) for k in kids.get(t["id"], []))
         pr = f" p{t['priority']}" if t["priority"] and not check else ""
-        return (f'<li id="t{t["id"]}" class="t{" done" if done else ""}{pr}">{box}<div class="tt"><span class="ttl">{e(t["title"])}</span>'
+        ms = " ms" if t.get("ms") else ""
+        return (f'<li id="t{t["id"]}" class="t{" done" if done else ""}{pr}{ms}">{box}<div class="tt"><span class="ttl">{e(t["title"])}</span>'
                 f'{meta}{notes}</div>{"<ul>" + sub + "</ul>" if sub else ""}</li>')
     top = kids.get(None, [])
     open_top, done_top = [t for t in top if t["status"] == 0], [t for t in top if t["status"] != 0]
-    secs = [dict(r) for r in c.execute("SELECT id, name FROM sections WHERE list_id=? ORDER BY sort, id", (link["list_id"],))]
+    secs = [dict(r) for r in c.execute("SELECT id, name FROM sections WHERE list_id=? ORDER BY sort, id", (link["list_id"],))] \
+        if show["sections"] else []
     sec_ids = {s["id"] for s in secs}
     body_ = ""
     groups = [(None, [t for t in open_top if t["section_id"] not in sec_ids])] + \
@@ -231,8 +247,122 @@ def pub_render(c, link, token, lg):
                   f'<ul class="tasks">{"".join(row(t) for t in done_top)}</ul></details>')
     name = tr("Basket") if link["l_inbox"] and inbox_default(link["l_name"]) else link["l_name"]
     mode = tr("You can tick off items on this page.", lg=lg) if tick else tr("View only.", lg=lg)
-    head = (f'<header><h1>{e(name)}</h1><p class="sub">{e(trn("{0} open item", "{0} open items", n_open, lg=lg))} · {e(mode)}</p></header>')
+    brand = ""
+    if show["brand"]:  # 2.50.0 (#329): the organisation's name / logo above the project name
+        bname, blogo = cv_brand(c, link)
+        if bname or blogo:
+            img = f'<img src="/s/{e(token)}/logo" alt="">' if blogo else ""
+            brand = f'<div class="brand">{img}' + (f'<span>{e(bname)}</span>' if bname else "") + '</div>'
+    prog = ""
+    if show["progress"]:
+        d, n = cv_progress(c, link, show)
+        pct = round(100 * d / n) if n else 0
+        prog = (f'<div class="prog" role="img" aria-label="{e(tr("{0} of {1} done", d, n, lg=lg))}"><div class="bar"><i class="w{pct // 5 * 5}"></i></div>'
+                f'<span>{e(tr("{0} of {1} done", d, n, lg=lg))}</span></div>')
+    head = (f'<header>{brand}<h1>{e(name)}</h1><p class="sub">{e(trn("{0} open item", "{0} open items", n_open, lg=lg))} · {e(mode)}</p>{prog}</header>')
+    head += pub_signoffs(c, link, lg)
+    if show["feedback"]:
+        body_ += cv_fb_form(c, link, token, lg, [t for t in top if t["id"] in ids])
     return pub_html(f"{name} · {APP_NAME}", head + body_, lg)
+
+
+# 2.50.0 (#329): the customer's comment (switch "Comments from the customer", off by default) -> a comment on the chosen task,
+# without an account (user_id NULL) and with the name the customer typed (comments.ext_name); plain text, length limits,
+# rate limits per client address and per link, a form check value bound to the link + Sec-Fetch-Site
+def cv_fb_key(c, link):
+    return hmac.new(auth_key(c), f"pubfb:{link['id']}:{link['token_hash']}".encode(), hashlib.sha256).hexdigest()
+
+
+def cv_fb_form(c, link, token, lg, tasks):
+    e = html.escape
+    if not tasks:
+        return ""
+    sent = request.args.get("sent") == "1"
+    opts = "".join(f'<option value="{t["id"]}">{e(t["title"][:120])}</option>' for t in tasks)
+    return (f'<section class="fb" id="fb"><h2>{e(tr("Your comment to the team", lg=lg))}</h2>'
+            + (f'<p class="ok" role="status">{e(tr("Thank you, your comment has arrived.", lg=lg))}</p>' if sent else "")
+            + f'<form method="post" action="/s/{e(token)}/feedback" class="fform"><input type="hidden" name="f" value="{cv_fb_key(c, link)}">'
+            f'<label for="fb-task">{e(tr("About which task?", lg=lg))}</label><select id="fb-task" name="task">{opts}</select>'
+            f'<label for="fb-name">{e(tr("Your name", lg=lg))}</label><input id="fb-name" name="name" maxlength="{CV_FB_NAME}" autocomplete="name" required>'
+            f'<label for="fb-text">{e(tr("Comment", lg=lg))}</label><textarea id="fb-text" name="text" rows="4" maxlength="{CV_FB_TEXT}" required></textarea>'
+            f'<button type="submit">{e(tr("Send", lg=lg))}</button></form></section>')
+
+
+def cv_fb_clean(v, mx):
+    v = "".join(ch for ch in (v or "").replace("\r", "") if ch == "\n" or ord(ch) >= 32)
+    return re.sub(r"<@\d+>", "", v).strip()[:mx]  # no mention tokens of the app
+
+
+@app.post("/s/<token>/feedback")
+def cv_fb_post(token):
+    from ..core.db import iso_ms
+    from ..core.access import task_visible
+    from ..collab.comments import collab_user, lang_of
+    from ..collab.news import KIND_ROW, news_add, notif_ok
+    from ..notify.push import push_prio, push_reachable
+    from ..agents.core import agent_ids
+    c = db()
+    link, bad = pub_open(c, token)
+    if bad:
+        return bad
+    lg = pub_lang(c, link)
+    show = cv_show(link)
+    if request.headers.get("Sec-Fetch-Site", "") == "cross-site" or not show["feedback"] \
+            or not hmac.compare_digest(request.form.get("f") or "", cv_fb_key(c, link)):
+        return pub_html(tr("Not allowed", lg=lg), f'<div class="msg"><h1>{html.escape(tr("Not allowed", lg=lg))}</h1></div>', lg, 403)
+    if not pub_unlocked(c, link):
+        return redirect(f"/s/{token}", 303)
+    if hit_limit("pubfb:" + rate_ip(), CV_FB_RATE) or hit_limit(f"pubfbl:{link['id']}", CV_FB_HOUR, 3600):
+        return pub_limited(lg)
+    try:
+        tid = int(request.form.get("task") or 0)
+    except ValueError:
+        tid = 0
+    visible = {t["id"]: t for t in pub_tasks(c, link)}
+    name = " ".join(cv_fb_clean(request.form.get("name"), CV_FB_NAME).split())
+    text = cv_fb_clean(request.form.get("text"), CV_FB_TEXT)
+    if tid not in visible:
+        return pub_gone(lg)
+    if len(name) < 2 or not text:
+        return pub_html(tr("Please type your name and a comment.", lg=lg),
+                        f'<div class="msg"><p class="err">{html.escape(tr("Please type your name and a comment.", lg=lg))}</p>'
+                        f'<a class="btn" href="/s/{html.escape(token)}#fb">{html.escape(tr("Back", lg=lg))}</a></div>', lg, 400)
+    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,ext_name) VALUES(?,?,?,?,?,?)",
+                    (tid, None, text, "", iso_ms(now_utc()), name))
+    t = c.execute("SELECT t.*, l.owner_id AS l_owner FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
+    rcpt = {t["l_owner"], t["created_by"], t["assignee_id"]} - {None} - agent_ids(c)
+    for uid in sorted(rcpt):  # News + push like a comment on my task, the notification switch "comment"
+        s = collab_user(c, uid, t["list_id"])
+        if not s or not task_visible(c, tid, uid, full=True):
+            continue
+        news_add(c, uid, "comment", task_id=tid, comment_id=cid, actor=0, s=s, data={"excerpt": text[:300], "ext_name": name})
+        if notif_ok(c, uid, s, KIND_ROW["comment"], "push", t["list_id"]) and push_reachable(c, uid, s):
+            ulg = lang_of(s)
+            g.pushes.append((uid, tr("{0} (customer, via the link)", name, lg=ulg) + ": " + t["title"], text[:200],
+                             f"{PUBLIC_URL}/#t/{tid}", push_prio(s)))
+    bump(c)
+    c.commit()
+    print("public link comment on task", tid, flush=True)
+    return pub_headers(redirect(f"/s/{token}?sent=1#fb", 303))
+
+
+def pub_signoffs(c, link, lg):
+    """2.50.0 (#1200): the list's acceptance requests on the customer page (open: a button to the approval page; decided: a line)."""
+    from ..office.signoff import sig_url
+    e, out = html.escape, []
+    for r in c.execute("SELECT * FROM office_signoffs WHERE list_id=? AND kind='acceptance' AND revoked_at IS NULL ORDER BY id DESC LIMIT 10",
+                       (link["list_id"],)):
+        if r["state"] == "open":
+            if r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc():
+                continue
+            url = sig_url(c, r)
+            if url:
+                path = url[len(PUBLIC_URL.rstrip("/")):]
+                out.append(f'<a class="sgreq" href="{e(path)}">{e(tr("Confirm the acceptance: {0}", r["title"], lg=lg))}</a>')
+        else:
+            word = tr("Accepted", lg=lg) if r["state"] == "accepted" else tr("Declined", lg=lg)
+            out.append(f'<p class="sgdone">{e(word)}: {e(r["title"])} · {e((r["signed_at"] or "")[:10])}</p>')
+    return f'<div class="sgbox">{"".join(out)}</div>' if out else ""
 
 
 def pub_day(d, lg):
@@ -329,13 +459,64 @@ def pub_tick(token):
     return pub_headers(redirect(f"/s/{token}#t{tid}", 303))
 
 
+# 2.50.0 (#329): a task file / the organisation's logo of a link that shows them (only through the token, same checks as the page)
+def cv_gate(c, token):
+    if hit_limit("pubf:" + rate_ip(), CV_FILE_RATE):
+        return None, pub_limited(_accept_lang())
+    link, bad = pub_open(c, token)
+    if bad:
+        return None, bad
+    if not pub_unlocked(c, link):
+        return None, pub_gone(pub_lang(c, link))
+    return link, None
+
+
+@app.get("/s/<token>/file/<int:aid>")
+def cv_file_get(token, aid):
+    from ..core.orgcrypt import oc_send_file
+    c = db()
+    link, bad = cv_gate(c, token)
+    if bad:
+        return bad
+    show = cv_show(link)
+    got = cv_file(c, link, show, {t["id"] for t in pub_tasks(c, link)}, aid)
+    if not got:
+        return pub_gone(pub_lang(c, link))
+    a, full = got
+    resp = oc_send_file(c, full, mimetype="application/octet-stream", as_attachment=True, download_name=a["name"], max_age=0)
+    resp.headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    resp.headers["Cache-Control"] = "no-store, private"
+    return resp
+
+
+@app.get("/s/<token>/logo")
+def cv_logo_get(token):
+    from ..core.orgcrypt import oc_send_file
+    c = db()
+    link, bad = cv_gate(c, token)
+    if bad:
+        return bad
+    path = cv_brand(c, link)[1] if cv_show(link)["brand"] else None
+    if not path:
+        return pub_gone(pub_lang(c, link))
+    resp = oc_send_file(c, path, mimetype="image/png", max_age=0)
+    resp.headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Cache-Control"] = "no-store, private"
+    return resp
+
+
 # ---- managing the link (list dialog, owner only)
 def pub_public(c, r):
     tok = unseal(c, f"publink:{r['list_id']}", r["token"])
     return {"url": PUBLIC_URL.rstrip("/") + PUB_PREFIX + tok, "mode": r["mode"], "notes": bool(r["notes"]),
             "has_password": bool(r["password_hash"]), "expires_at": r["expires_at"], "created_at": r["created_at"],
             "last_used_at": r["last_used_at"], "views": r["views"],
-            "expired": bool(r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc())}
+            "expired": bool(r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc()),
+            "show": cv_show(r), "options": cv_options(c, r["list_id"])}  # 2.50.0 (#329)
 
 
 def need_pub_owner(c, lid):
@@ -354,7 +535,7 @@ def pub_get(lid):
     c = db()
     need_list(c, lid, owner=True)
     r = c.execute("SELECT * FROM public_links WHERE list_id=?", (lid,)).fetchone()
-    return jsonify(enabled=public_links_on(c), link=pub_public(c, r) if r else None)
+    return jsonify(enabled=public_links_on(c), link=pub_public(c, r) if r else None, options=cv_options(c, lid))
 
 
 @app.put("/api/lists/<int:lid>/public-link")
@@ -383,6 +564,12 @@ def pub_set(lid):
         else:
             d = date.fromisoformat(v) + timedelta(days=1)  # valid through the end of that day (server time zone)
             exp = iso(datetime(d.year, d.month, d.day, tzinfo=TZ))
+    show = old["cv_show"] if old else ""
+    if "show" in b:  # 2.50.0 (#329): {progress, sections, due, assignees, tags, files, brand: bool, fields: [ids], tag: id|null}
+        try:
+            show = cv_clean(c, lid, b["show"], cv_show(old) if old else cv_show({"cv_show": ""}))
+        except BadInput as x:
+            return err(str(x))
     pw_hash, rev = (old["password_hash"], old["pw_rev"]) if old else (None, 0)
     if "password" in b:
         pw = b["password"]
@@ -392,12 +579,12 @@ def pub_set(lid):
             return err(tr("Password: at least {0} characters", 4))
         pw_hash, rev = (generate_password_hash(pw) if pw else None), rev + 1
     if old:
-        c.execute("UPDATE public_links SET mode=?, notes=?, password_hash=?, pw_rev=?, expires_at=? WHERE id=?",
-                  (mode, 1 if notes else 0, pw_hash, rev, exp, old["id"]))
+        c.execute("UPDATE public_links SET mode=?, notes=?, password_hash=?, pw_rev=?, expires_at=?, cv_show=? WHERE id=?",
+                  (mode, 1 if notes else 0, pw_hash, rev, exp, show, old["id"]))
     else:
         _, h, sealed = pub_new_token(c, lid)
-        c.execute("""INSERT INTO public_links(list_id,token_hash,token,mode,notes,password_hash,pw_rev,expires_at,created_by,created_at)
-                     VALUES(?,?,?,?,?,?,?,?,?,?)""", (lid, h, sealed, mode, 1 if notes else 0, pw_hash, rev, exp, me(), iso(now_utc())))
+        c.execute("""INSERT INTO public_links(list_id,token_hash,token,mode,notes,password_hash,pw_rev,expires_at,created_by,created_at,cv_show)
+                     VALUES(?,?,?,?,?,?,?,?,?,?,?)""", (lid, h, sealed, mode, 1 if notes else 0, pw_hash, rev, exp, me(), iso(now_utc()), show))
         print("public link created for list", lid, "mode", mode, flush=True)
     c.commit()
     return jsonify(enabled=True, link=pub_public(c, c.execute("SELECT * FROM public_links WHERE list_id=?", (lid,)).fetchone()))

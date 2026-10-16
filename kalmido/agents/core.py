@@ -68,6 +68,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "message_edited",  # 2.39.0 (#1179): a person changed a chat message / comment / team message the agent already had
                 "file_shared",  # 2.48.0 (#1207): a folder / file of the file store was shared with the agent (node, role)
                 "document_added",  # 2.48.0 (#1356): a new document was recognised in a folder / file shared with the agent
+                "offer_accepted",  # 2.51.0 A (#1348): a quotation of its office area was accepted (agents with the office switch)
                 )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop")
@@ -248,6 +249,8 @@ def agent_event_comments(c, tid):
              "attachments": nat.get(r["id"], 0)}
         if len(txt) > AGENT_EVENT_COMMENT_CHARS:
             d["truncated"] = True
+        if r["ext_name"]:  # 2.50.0 (#329): a customer's comment through the public link (no account, the name they typed)
+            d["author"].update(name=r["ext_name"], customer=True)
         if r["suggestion"]:
             d["suggestion"] = json.loads(r["suggestion"])
         out.append(d)

@@ -292,7 +292,7 @@ async function setLang(code) {
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 // 2.44.0 (#1187): Office, Time, Review and Home are ONE switch each ("a:<area>", areas.js), their parts below it
 const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events']], [N_('For you'), ['habits', 'comments']],
-  [N_('Projects and team'), ['collab', 'progress', 'deps', 'fields', 'agents', 'workload', 'forms', 'wiki']], [N_('Areas|nav'), ['a:office', 'a:ablage', 'a:time', 'a:review', 'a:life']]];  // 2.48.0 (#1207): + the file store
+  [N_('Projects and team'), ['collab', 'progress', 'deps', 'fields', 'agents', 'workload', 'dispo', 'forms', 'wiki']], [N_('Areas|nav'), ['a:office', 'a:ablage', 'a:time', 'a:review', 'a:life']]];  // 2.48.0 (#1207): + the file store
 const MOD_DESC = {office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents; your own office (Private) or your organisation\'s'),  // 2.36.1 (#1021)
   cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Pomodoro timer and stopwatch'),
@@ -336,6 +336,7 @@ function modulesHtml(hint) {
       <div class="row"><label>${tr('Focus sessions')}</label><label class="chkl"><input type="checkbox" id="s-tfocus" ${s.time_focus !== '0' ? 'checked' : ''}> ${tr('count as time entries (not while a timer runs)')}</label></div></details>` : '';
   const row = k => k.startsWith('a:') ? mg_modAreaHtml(k.slice(2), x => modRowHtml(x, opt)) : modRowHtml(k, opt);  // 2.44.0 (#1187)
   return `<h4 id="s-purpose-h">${tr('What do you use Kalmido for?')}</h4>${purposeCards(S.settings.purpose || '')}${pm_allHtml('s-modsall', pm_allOn())}
+    ${pk2_setupHtml()}
     ${hint(tr('Switch on only what you need; everything else disappears from the menus. Nothing is deleted: switched back on, everything is there again.'))}
     <div class="modtot muted" id="s-modtot">${esc(modCount())}</div>
     ${MOD_GROUPS.map(([g, ks], gi) => { const r = modGroupKeys(ks); return r.length ? `<details class="modgrp" data-modgrp="${gi}"><summary><span class="mgn">${tr(g)}</span><span class="mgc muted">${esc(modGroupCount(r))}</span>${ic('chev', 's fcar')}</summary><div class="modlist">${r.map(row).join('')}</div></details>` : ''; }).join('')}`;
@@ -457,7 +458,7 @@ async function ad_agPolicyDraw(md) {
   try {
     const p = await api('GET', '/api/admin/agent-policy'); const sw = $('#s-uag', md), mx = $('#s-uagmax', md); if (sw) sw.checked = p.user_agents; if (mx) { mx.value = p.max_per_user; mx.disabled = !p.user_agents; }
     const lb = $('#s-sclim', md);  // 2.15.0 (#479): the admin's limit, one grid for agents and one for personal tokens
-    if (lb && p.scope_limit) lb.innerHTML = [['agents', N_('Agents')], ['tokens', N_('Personal API tokens')]].map(([k, n]) => `<fieldset class="sclim"><legend>${tr(n)}</legend><div class="scgrid">${p.scopes.filter(x => k !== 'agents' || (x !== 'account' && x !== 'private')).map(x => `<label class="chkl sc"><input type="checkbox" data-sclim="${k}" data-scope="${x}" ${p.scope_limit[k].includes(x) ? 'checked' : ''} ${x === 'read' ? 'disabled' : ''}><span>${esc(tr(SCOPE_SHORT[x] || x))}</span></label>`).join('')}</div></fieldset>`).join('');
+    if (lb && p.scope_limit) lb.innerHTML = [['agents', N_('Agents')], ['tokens', N_('Personal API tokens')]].map(([k, n]) => `<fieldset class="sclim"><legend>${tr(n)}</legend><div class="scgrid">${p.scopes.filter(x => (k !== 'agents' || (x !== 'account' && x !== 'private')) && (k !== 'tokens' || x !== 'office')).map(x => `<label class="chkl sc"><input type="checkbox" data-sclim="${k}" data-scope="${x}" ${p.scope_limit[k].includes(x) ? 'checked' : ''} ${x === 'read' ? 'disabled' : ''}><span>${esc(tr(SCOPE_SHORT[x] || x))}</span></label>`).join('')}</div></fieldset>`).join('');
   } catch { /* offline */ }
 }
 function agSetupWire(md) {
@@ -487,9 +488,10 @@ function agSetupWire(md) {
       if (k === 'setup') { ains_setupModal(a, `/api/my/agents/${a.id}`); return; }  // 2.44.0 (#1517)
       if (k === 'ws') { av_wsMenu(b, a, () => agSetupDraw(md)); return; }  // 2.46.6 (#1708): its workspace
       if (k === 'perm') {  // 2.15.0 (#479): what my agent may do (within the admin's limit) and from where
-        permModal(tr('Permissions of {0}', a.name), box._j.scopes || [], a.scopes, a.allowed_ips, async (scopes, ips, pm) => {
+        const pmd = permModal(tr('Permissions of {0}', a.name), box._j.scopes || [], a.scopes, a.allowed_ips, async (scopes, ips, pm) => {
           await calReq('PATCH', `/api/my/agents/${a.id}`, {scopes, allowed_ips: ips, list_ids: listCapVal(pm, 'pm-lcap')}); toast(tr('Saved')); agSetupDraw(md);  // 2.30.0 (#919)
-        }, `<div class="row"><label>${tr('Lists')}</label>${listCapHtml(a.list_ids, a.lists, 'pm-lcap')}</div>${bridgesHtml(a)}<div class="shint keep">${tr('Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists, folders and sharing always wait for your approval.')}</div>`);
+        }, `<div class="row"><label>${tr('Lists')}</label>${listCapHtml(a.list_ids, a.lists, 'pm-lcap')}</div>${bridgesHtml(a)}<div class="shint keep">${tr('Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists, folders and sharing always wait for your approval.')}</div>${typeof oa_switchRowHtml === 'function' ? oa_switchRowHtml(a.id) : ''}`);
+        if (typeof oa_switchLoad === 'function') oa_switchLoad(pmd);  // 2.51.0 A (#1348): the office switch of my agent (saved at once)
         return;
       }
       if (k === 'pause') {

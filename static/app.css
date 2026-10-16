@@ -7251,3 +7251,207 @@ button.lnph:hover{border-color:var(--accent)}
 /* 2.47.3 G (#1382): the (i) buttons of the quotation editor fields are 24 px targets (every control there >= 24 px) */
 .ofdeditor .ib:not(.ibl),.ofdhead .ib:not(.ibl){width:1.5rem;height:1.5rem}
 .ofdeditor .ib.ibl,.ofdhead .ib.ibl{min-height:1.5rem}
+/* 2.50.0 B (#1196, #1197): the sales pipeline (columns per stage, on the phone one stage with a switcher) and the business
+   figures (tiles, revenue per month, budget per client) in the office */
+.pptiles,.kptiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:.5rem;margin:.5rem 0}
+.kptiles{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ppdecl{color:var(--danger,#c0392b)}
+.pptile,.kptile{display:flex;flex-direction:column;gap:.125rem;padding:.625rem .75rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);text-align:left;font:inherit;color:var(--text);min-height:2.75rem}
+.pptile b,.kptile b{font-size:1.25rem;font-variant-numeric:tabular-nums}
+button.kptile{cursor:pointer}
+button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
+.kptile.warn b{color:var(--danger,#c0392b)}
+.kpdelta{color:var(--accent);font-variant-numeric:tabular-nums}.kpdelta.neg{color:var(--muted)}
+.ppfc{margin:.5rem 0}
+.ppfcl{display:grid;grid-template-columns:repeat(auto-fill,minmax(7.5rem,1fr));gap:.375rem;list-style:none;margin:0;padding:0}
+.ppfcl li{display:flex;flex-direction:column;padding:.375rem .5rem;border:1px solid var(--line2);border-radius:var(--radius);font-variant-numeric:tabular-nums}
+.ppfcl li.next{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.ppseg{display:none;margin:.5rem 0}
+.ppcols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem;align-items:start;margin:.5rem 0}
+.ppcol{border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);padding:.375rem;min-height:6rem;transition:border-color .15s ease}
+.ppcol.over{border-color:var(--accent)}
+.ppcol header{display:flex;align-items:center;gap:.375rem;padding:.25rem .25rem .5rem}
+.ppcards{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.375rem}
+.ppnone{padding:.5rem .25rem;font-size:.875rem}
+.ppcard{display:flex;flex-direction:column;gap:.125rem;padding:.5rem .625rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg);cursor:pointer;min-height:2.75rem;user-select:none;transition:transform .15s ease,opacity .15s ease}
+.ppcard:hover,.ppcard:focus-visible{border-color:var(--accent)}
+.ppcard.dragging{opacity:.5}
+.ppcard.warn{border-left:3px solid var(--danger,#c0392b)}
+.pptitle{font-weight:600;overflow-wrap:anywhere}
+.ppmeta{display:flex;flex-wrap:wrap;gap:.25rem .5rem;align-items:center;font-size:.875rem}
+.ppacts{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0}
+@media (max-width:899px){
+  .ppseg{display:flex;overflow-x:auto}
+  .ppcols{grid-template-columns:1fr}
+  .ppcol{border:0;background:none;padding:0}
+  .ppcol:not(.on){display:none}
+  .ppcol header{display:none}
+  .ppcard{padding:.75rem}
+  .kptiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ppfcl{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ppfcl li{padding:.25rem .375rem;font-size:.875rem}
+  .ppfcl li .rotag{display:none}
+}
+.kpchart{margin:.75rem 0}
+.kplegend{display:flex;gap:.75rem;font-size:.875rem;color:var(--muted)}
+.kplegend span{display:inline-flex;align-items:center;gap:.25rem}
+.kplegend i{display:inline-block;width:.625rem;height:.625rem;border-radius:2px}
+.kpbars{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:2px;align-items:end}
+.kpm{display:flex;flex-direction:column;align-items:center;gap:.25rem;background:none;border:0;padding:0;color:var(--muted);font:inherit;cursor:pointer;min-height:2.75rem}
+.kpm.cur small{color:var(--accent);font-weight:600}
+.kpm small{font-size:.6875rem}
+.kpb{display:flex;align-items:flex-end;justify-content:center;gap:2px;height:6rem;width:100%}
+.kpb i{display:block;width:40%;max-width:.75rem;height:100%;border-radius:4px 4px 0 0;transform-origin:bottom center;transition:transform .2s ease}
+.kpcur{background:var(--accent)}.kpprev{background:var(--accent);opacity:.3}
+.kpcl li.kpclient{display:block;padding:.625rem .25rem;border-bottom:1px solid var(--line2)}
+.kpch{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.kprow{display:grid;grid-template-columns:minmax(6rem,auto) 1fr auto auto;gap:.5rem;align-items:center;font-size:.875rem;margin-top:.25rem;font-variant-numeric:tabular-nums}
+.kpproj a{display:inline-flex;align-items:center;gap:.25rem;color:var(--text);min-height:2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpbud{display:block;width:5rem;height:.375rem;border-radius:3px;background:var(--line2);overflow:hidden}
+.kpbud i{display:block;height:100%;background:var(--accent);transform-origin:left center;transition:transform .2s ease}
+.kpbud i.warn{opacity:.7}.kpbud i.over,.kppct.over{background:var(--danger,#c0392b);color:var(--danger,#c0392b)}
+.kppct.over{background:none}
+@media (max-width:899px){ .kprow{grid-template-columns:1fr auto} .kprow .kpbud{display:none} }
+.kptl{list-style:none;margin:0;padding:0}.kptl li{display:flex;align-items:center;gap:.5rem;min-height:2rem}.kptl b.neg{color:var(--danger,#c0392b)}
+@media (prefers-reduced-motion:reduce){ .ppcard,.ppcol,.kpb i,.kpbud i{transition:none} }
+
+/* 2.50.0 A (#1195) absences: tabs of the workload view, month grid (away = dimmed accent), list, sheet */
+.ab2tabs{margin:0 0 .5rem}
+.ab2tabs button{min-height:2.25rem}
+.ab2mon{margin:0;font-size:var(--fs-l);font-weight:600}
+.ab2table{table-layout:fixed;min-width:44rem}
+.ab2table th:first-child{width:11rem}
+.ab2table thead th{text-align:center;padding:.25rem 0;font-size:var(--fs-xs)}
+.ab2table thead th:first-child{text-align:left}
+.ab2table td.ab2c{padding:0;height:2rem;border-left:1px solid var(--line);position:relative}
+.ab2table .we{background:color-mix(in srgb,var(--muted) 7%,transparent)}
+.ab2table .hol{background:color-mix(in srgb,var(--muted) 14%,transparent)}
+.ab2table thead .tdy{color:var(--accent);font-weight:600}
+.ab2table td.off{background:color-mix(in srgb,var(--accent) 34%,transparent)}
+.ab2table td.off.half{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 34%,transparent) 50%,transparent 50%)}
+.ab2b{position:absolute;inset:0;width:100%;height:100%;background:none;border:0;cursor:pointer}
+.ab2h{margin:1rem 0 .375rem;font-size:var(--fs-m);font-weight:600}
+.ab2list,.ab2hol{list-style:none;margin:0;padding:0}
+.ab2li{display:flex;align-items:center;gap:.625rem;width:100%;min-height:2.75rem;padding:.375rem .25rem;border-bottom:1px solid var(--line);text-align:left;background:none}
+.ab2lt{display:flex;flex-direction:column;flex:1;min-width:0}
+.ab2lt .muted{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis}
+.ab2hol li{padding:.25rem 0;font-size:var(--fs-s)}
+.ab2foot{margin-top:1rem}
+.ab2st{display:inline-flex;align-items:center;gap:.5rem}
+.ab2md .ab2kinds{flex-wrap:wrap}
+.ab2md .ab2kinds button{min-height:2.25rem}
+.ab2md .ab2dates{display:flex;gap:.75rem}
+.ab2md .ab2dates label{display:flex;flex-direction:column;gap:.25rem;flex:1}
+.ab2hint{margin:.5rem 0}
+.wlc.ab2wl .wlbar{outline:1px dashed color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:1px}
+@media (max-width:599px){.ab2grid{display:none}.ab2tabs{display:flex}.ab2tabs button{flex:1;justify-content:center}}
+
+/* 2.50.0 A (#1194) disposition: week grid (firm = accent, option = outlined), warnings, day list on phones, booking sheet */
+.dptable{table-layout:fixed;min-width:48rem}
+.dptable th:first-child{width:12rem}
+.dptable thead th{text-align:center;font-size:var(--fs-xs)}
+.dptable thead th:first-child{text-align:left}
+.dptable thead .tdy{color:var(--accent);font-weight:600}
+.dptable .dpgrp th{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding-top:.75rem;border-bottom:0}
+.dptable td.dpc{padding:.125rem;vertical-align:top;border-left:1px solid var(--line)}
+.dptable td.we{background:color-mix(in srgb,var(--muted) 7%,transparent)}
+.dptable td.hol{background:color-mix(in srgb,var(--muted) 14%,transparent)}
+.dptable td.away{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 18%,transparent) 0 4px,transparent 4px 8px)}
+.dpic{display:inline-flex;width:1.5rem;justify-content:center;color:var(--muted)}
+.dpbar{display:flex;align-items:center;gap:.25rem;width:100%;min-height:1.75rem;margin:.0625rem 0;padding:.125rem .375rem;border-radius:var(--r-s);font-size:var(--fs-xs);text-align:left;overflow:hidden;white-space:nowrap;cursor:pointer}
+.dpbar span{overflow:hidden;text-overflow:ellipsis}
+.dpbar.firm{background:var(--accent);color:var(--accent-ink)}
+.dpbar.option{background:var(--accent-soft);color:var(--text);border:1px dashed var(--accent)}
+.dpbar.warn{box-shadow:inset 0 0 0 2px var(--danger)}
+.dpbar .i,.dpres .i,.dpjobres .i{color:var(--danger);flex:none}
+.dpbar.firm .i{color:var(--accent-ink)}
+.dpdays{display:none;list-style:none;margin:.5rem 0;padding:0}
+.dpdays h4{margin:.75rem 0 .375rem;font-size:var(--fs-m)}
+.dpjob{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;width:100%;min-height:2.75rem;padding:.5rem .625rem;margin-bottom:.375rem;border:1px solid var(--line2);border-radius:var(--radius);text-align:left;background:none}
+.dpjob.warn{border-color:var(--danger)}
+.dpres{display:flex;flex-wrap:wrap;gap:.25rem .625rem;font-size:var(--fs-s)}
+.dpres .warn{color:var(--danger)}
+.dplegend{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
+.dpk{display:inline-block;width:.875rem;height:.875rem;border-radius:3px;margin-left:.5rem}
+.dpk.firm{background:var(--accent)}
+.dpk.option{background:var(--accent-soft);border:1px dashed var(--accent)}
+.dpk.away{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 30%,transparent) 0 3px,transparent 3px 6px)}
+.dpfreebox{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:1rem 0 .25rem}
+.dpfree p{margin:.25rem 0}
+.dpmine{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;min-height:2.75rem;padding:.375rem .25rem;border-bottom:1px solid var(--line)}
+.dpmine .muted{font-size:var(--fs-s)}
+.dpst{margin-left:auto;font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:999px}
+.dpst.firm{background:var(--accent);color:var(--accent-ink)}
+.dpst.option{border:1px dashed var(--accent)}
+.dpmd .dppicks{max-height:40vh;overflow:auto;margin:.5rem 0}
+.dpmd .dppick{border:0;margin:0 0 .5rem;padding:0}
+.dpmd .dppick legend{font-size:var(--fs-s);color:var(--muted);padding:0;margin-bottom:.25rem}
+.dpmd .dpopt{display:flex;align-items:center;gap:.5rem;min-height:2.5rem}
+.dpmd .dpbusy{margin-left:auto;color:var(--danger);font-size:var(--fs-xs)}
+.dpmd .dpstat button{min-height:2.25rem}
+.dpjobres{list-style:none;margin:.5rem 0;padding:0}
+.dpjobres li{display:flex;align-items:center;gap:.5rem;min-height:2.5rem;border-bottom:1px solid var(--line)}
+.dpjobres li span{flex:1;display:flex;align-items:center;gap:.25rem}
+.dpjobres li small{color:var(--danger);font-size:var(--fs-xs)}
+.dp .clhead{flex-wrap:wrap;gap:.5rem}
+@media (max-width:599px){.dpgrid{display:none}.dpdays{display:block}}
+@media (max-width:599px){.dp .clhead>.seg{display:flex;width:100%}.dp .clhead>.seg button{flex:1;justify-content:center;min-height:2.25rem}.dp .clhead>.spacer{flex:1}}
+/* 2.50.0 C (#329) list dialog > Public link: "What does the customer see?" */
+.cvsec{margin:.5rem 0;padding:.75rem 0 .25rem;border-top:1px solid var(--line)}
+.cvsec .cvh{font-size:.8125rem;font-weight:600;color:var(--text2);margin-bottom:.5rem}
+.cvopts{display:grid;grid-template-columns:repeat(auto-fill,minmax(12rem,1fr));gap:.25rem .75rem}
+.cvopts .chkl{min-height:2.25rem}
+/* 2.50.0 C (#1200) approval links (quotation, list dialog): the protocol rows */
+.sgsec .sgh{font-size:.875rem;font-weight:600;margin:0 0 .5rem}
+.sglist{list-style:none;margin:0 0 .5rem;padding:0}
+.sgrow{padding:.5rem 0;border-bottom:1px solid var(--line)}
+.sgrow .sghead{font-size:.875rem;overflow-wrap:anywhere}
+.sgrow.st-accepted .sghead b{color:var(--accent)}
+.sgproto{margin-top:.25rem;font-size:.8125rem;color:var(--text2);overflow-wrap:anywhere}
+/* 2.51.0 B (#1351 #1358): the proposal kinds inquiry / setup (propkinds2.js) and "Set up with your agent" */
+.pk2h{margin:.75rem 0 .25rem;font-size:.8125rem;font-weight:600;color:var(--text2)}
+.pk2h:first-child{margin-top:0}
+.pk2info{display:flex;flex-wrap:wrap;gap:.375rem;margin-bottom:.25rem}
+.ppi.pk2p .pk2t{display:block;padding:.375rem 0;min-height:1.75rem;overflow-wrap:anywhere;cursor:pointer}
+.pk2no{margin:.25rem 0}
+.pk2setup{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.625rem 0}
+.pk2setup .btn{min-height:2.75rem}
+.pk2setup .muted{font-size:.8125rem;flex:1 1 14rem}
+.tcard .pk2setup,.tour .pk2setup{margin:.5rem 0 0}
+.ppl .pk2hint{margin-top:.5rem}
+/* 2.51.0 A (#1348, #1350): agents in the office -- marked positions, "drafted by", suggested payments, chat link buttons */
+.ofdit.oa_flag{box-shadow:inset 3px 0 0 var(--accent);background:var(--accent-soft)}
+.oa_flags{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.25rem;font-size:var(--fs-s)}
+.oa_flagt{color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:.25rem}
+.oa_flags .btn{min-height:2.25rem}
+.oa_by{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;margin:.25rem 0 .5rem}
+.oa_pp{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--radius);padding:.5rem .75rem;margin:.5rem 0}
+.oa_pp h3{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem;font-size:var(--fs-m)}
+.oa_pp ul{list-style:none;margin:0;padding:0}
+.oa_pp li{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem 0;border-top:1px solid var(--line)}
+.oa_pp li:first-child{border-top:0}
+.oa_ppm{display:flex;flex-direction:column;min-width:0;flex:1 1 12rem;overflow-wrap:anywhere}
+.oa_ppa{white-space:nowrap}
+.oa_ppb{display:flex;gap:.375rem}
+.oa_ppb .btn{min-height:2.5rem}
+.oa_logf{margin:.25rem 0 .5rem}
+.cchoices.oa_links a.cchb{text-decoration:none;display:inline-flex;align-items:center;gap:.375rem}
+.oa_sw .chkl{min-height:2.5rem}
+@media (max-width:600px){.oa_ppb{width:100%}.oa_ppb .btn{flex:1}}
+/* 2.51.0 C (#1352 #1353 #1355): an agent's notepad on the pin board, drafts (tentative events) in the calendar, time / shoot proposals */
+.wgpadag{display:flex;align-items:center;gap:.35rem;font-size:.82em;margin:-.15rem 0 .35rem}
+.wgpadag .ic{opacity:.7}
+.wgpadagt{border-left:3px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+.evdraft{opacity:.68;border-style:dashed!important;border-width:1px;border-color:var(--ccb,var(--line2))!important;background:color-mix(in srgb,var(--cct,var(--bg2)) 55%,transparent)!important}
+.cev.evdraft,.tl-cev.evdraft{outline:1px dashed color-mix(in srgb,var(--text) 35%,transparent);outline-offset:-1px}
+.evdraftb{border:1px dashed currentColor;background:none}
+.apdraftact{margin-top:.25rem}
+.apri .aph{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .5rem;min-width:0}
+.apri .aph b{overflow-wrap:anywhere}
+.apf{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
+.apf .aptime{width:6.5rem;min-height:2.5rem}
+.apf .apnote{flex:1 1 10rem;min-width:0;min-height:2.5rem}
+.apf .ppt{flex:1 1 100%;min-height:2.5rem}
+.apwarn .ic{color:var(--accent)}
+.apalt{border-style:dashed}
+@media (max-width:600px){.apf .aptime{flex:1 1 40%}}
