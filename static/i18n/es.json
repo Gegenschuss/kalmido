@@ -7934,5 +7934,13 @@
   "This event was not found in the calendar. Reload and try again.": "No se encontró el evento en el calendario. Recarga e inténtalo de nuevo.",
   "Only CalDAV calendars can be written to; calendar links stay read-only": "Solo se puede escribir en calendarios CalDAV; los enlaces de calendario siguen siendo de solo lectura",
   "A repeating event of this calendar cannot switch between all-day and timed": "Un evento repetido de este calendario no puede cambiar entre todo el día y con hora",
-  "This can no longer be undone": "Esto ya no se puede deshacer"
+  "This can no longer be undone": "Esto ya no se puede deshacer",
+  "Title of the new event": "Título del nuevo evento",
+  "Only this date can be moved to another day": "Solo esta fecha se puede mover a otro día",
+  "Event changed": "Evento modificado",
+  "Times of “{0}”": "Horario de «{0}»",
+  "New event “{0}”": "Nuevo evento «{0}»",
+  "Change a repeating event": "Cambiar un evento periódico",
+  "Change every date of this repeating event?": "¿Cambiar todas las fechas de este evento periódico?",
+  "Single dates of a subscribed calendar cannot be changed here.": "Las fechas sueltas de un calendario suscrito no se pueden cambiar aquí."
 }

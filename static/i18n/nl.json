@@ -7934,5 +7934,13 @@
   "This event was not found in the calendar. Reload and try again.": "De afspraak is niet gevonden in de agenda. Laad opnieuw en probeer het nog eens.",
   "Only CalDAV calendars can be written to; calendar links stay read-only": "Alleen in CalDAV-agenda’s kan worden geschreven; agendalinks blijven alleen-lezen",
   "A repeating event of this calendar cannot switch between all-day and timed": "Een herhalende afspraak van deze agenda kan niet wisselen tussen hele dag en met tijd",
-  "This can no longer be undone": "Dit kan niet meer ongedaan worden gemaakt"
+  "This can no longer be undone": "Dit kan niet meer ongedaan worden gemaakt",
+  "Title of the new event": "Titel van de nieuwe afspraak",
+  "Only this date can be moved to another day": "Alleen deze datum kan naar een andere dag worden verplaatst",
+  "Event changed": "Afspraak gewijzigd",
+  "Times of “{0}”": "Tijden van ‘{0}’",
+  "New event “{0}”": "Nieuwe afspraak ‘{0}’",
+  "Change a repeating event": "Een terugkerende afspraak wijzigen",
+  "Change every date of this repeating event?": "Alle datums van deze terugkerende afspraak wijzigen?",
+  "Single dates of a subscribed calendar cannot be changed here.": "Losse datums van een geabonneerde agenda kunnen hier niet worden gewijzigd."
 }

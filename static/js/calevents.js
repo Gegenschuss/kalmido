@@ -273,46 +273,13 @@ async function evEditor(o = {}) {
 const evMin = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000));
 function evAddMin(s, m) { const d = new Date(s.length === 10 ? s + 'T00:00' : s); d.setMinutes(d.getMinutes() + m); return `${ds(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 
-// ---- creating: the "+ Event" button of the calendar bar, the quick sheet ("Event"), dragging over free time in the week grid
+// ---- creating: the "+ Event" button of the calendar bar, the quick sheet ("Event")
 function evNewAt(day, hm, endHm) {
   if (!evOn()) return;
   if (!hm) { evEditor({all_day: true, start: day, end: addDays(day, 1)}); return; }
   evEditor({start: `${day}T${hm}`, end: endHm ? `${day}T${endHm}` : ''});
 }
-const EVD = {on: false};
-document.addEventListener('pointerdown', e => {
-  if (!evOn() || e.button !== 0 || e.pointerType === 'touch') return;
-  const col = e.target.closest?.('#view .week .wcol');
-  if (!col || e.target.closest('.wev, .wcev')) return;
-  const top = col.getBoundingClientRect().top, H = weekH();
-  const at = y => Math.max(0, Math.min(24 * 60, Math.round((y - top) / H * 4) * 15));
-  Object.assign(EVD, {on: true, col, a: at(e.clientY), b: at(e.clientY), y0: e.clientY, moved: false, at, ghost: null});
-});
-document.addEventListener('pointermove', e => {
-  if (!EVD.on) return;
-  if (!EVD.moved && Math.abs(e.clientY - EVD.y0) < 8) return;
-  EVD.moved = true;
-  EVD.b = EVD.at(e.clientY);
-  if (!EVD.ghost) { EVD.ghost = document.createElement('div'); EVD.ghost.className = 'evghost'; EVD.col.appendChild(EVD.ghost); }
-  const s = Math.min(EVD.a, EVD.b), en = Math.max(EVD.a, EVD.b, s + 15), H = weekH();
-  EVD.ghost.style.top = s / 60 * H + 'px'; EVD.ghost.style.height = (en - s) / 60 * H + 'px';
-  EVD.ghost.textContent = `${pad(Math.floor(s / 60))}:${pad(s % 60)}–${pad(Math.floor(en / 60) % 24)}:${pad(en % 60)}`;
-});
-document.addEventListener('pointerup', e => {
-  if (!EVD.on) return;
-  EVD.on = false;
-  const g = EVD.ghost; EVD.ghost = null;
-  if (!EVD.moved) return;
-  e.preventDefault();
-  EVD.swallow = Date.now();  // the click that follows the drag does not open the quick sheet
-  const s = Math.min(EVD.a, EVD.b), en = Math.min(Math.max(EVD.a, EVD.b, s + 15), 24 * 60 - 1);
-  const day = EVD.col.dataset.day;
-  setTimeout(() => g?.remove(), 300);
-  evNewAt(day, `${pad(Math.floor(s / 60))}:${pad(s % 60)}`, `${pad(Math.floor(en / 60))}:${pad(en % 60)}`);
-});
-document.addEventListener('click', e => {
-  if (EVD.swallow && Date.now() - EVD.swallow < 400 && e.target.closest?.('#view .week .wcol')) { e.stopImmediatePropagation(); e.preventDefault(); EVD.swallow = 0; }
-}, true);
+// 2.52.0 (#1016): dragging over free time (and moving / resizing events) lives in caldrag.js: a block "New event" in the grid
 // the quick sheet opened from a free slot of the calendar: "Event" turns what was typed into an event at that time
 function evSheetBtn(preset) {
   const q = $('.qadd.sheet'); if (!q || !evOn() || !preset?.due || q.querySelector('.qevbtn')) return;

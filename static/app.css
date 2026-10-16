@@ -7454,3 +7454,30 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .cevact.dvwact { display: flex; flex-wrap: wrap; gap: 6px; }
 .cevact.dvwact .btn.pri { margin-left: auto; }
 .dvwhint { margin: -2px 0 8px; }
+
+/* 2.52.0 A (#1016) the calendar like macOS: drag to move / resize events, the block "New event" in the grid, all-day and month ranges */
+.week .wcol,.week .wad,.cal .cell,.wcev{-webkit-touch-callout:none}
+@media (pointer:coarse){.week .wcol,.week .wad,.cal .cell,.wcev{-webkit-user-select:none;user-select:none}}
+.wcev.cgok::after{content:"";position:absolute;left:35%;right:35%;bottom:1px;height:2px;border-radius:1px;background:var(--ccb);opacity:0}
+.wcev.cgok:hover::after{opacity:1}
+@media (hover:hover){.wcev.cgok,.cev.cgok{cursor:grab}.wcev.cgok:active,.cev.cgok:active{cursor:grabbing}}
+.cev.cgsrc{opacity:.35}
+body.cgdrag,body.cgdrag *{user-select:none;-webkit-user-select:none}
+body.cgdrag #wbody{touch-action:none}
+body.cgdrag .week,body.cgdrag .cal{cursor:grabbing}
+.wcev.cgsrc{opacity:.35}
+.wcev.cgghost{z-index:3;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.25);border-color:var(--cc);background:color-mix(in srgb,var(--cc) 28%,var(--bg2))}
+.cgsaving{opacity:.6}
+.wad.cgsel,.cal .cell.cgsel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.week .wallday,.cal{position:relative}
+.cgnew{position:absolute;left:2px;right:2px;z-index:4;display:flex;flex-wrap:wrap;align-items:center;gap:.125rem .25rem;min-height:2.75rem;padding:2px .3125rem;
+  background:color-mix(in srgb,var(--accent) 22%,var(--bg2));border:1px solid var(--accent);border-radius:.3125rem;box-shadow:0 4px 14px rgba(0,0,0,.2);overflow:hidden;align-content:flex-start}
+.cgnew.cgday{right:auto;min-height:0;flex-wrap:nowrap}
+.cgnew .cgtm{font:var(--fs-xs) var(--mono);color:var(--muted);flex:1 1 100%}
+.cgnew.cgday .cgtm{flex:0 0 auto}
+.cgnew .cgin{flex:1 1 6rem;min-width:0;background:transparent;border:0;outline:0;padding:1px 0;font:inherit;font-size:var(--fs-s);font-weight:600;color:var(--text)}
+.cgnew .cgin::placeholder{color:var(--muted);font-weight:400}
+.cgnew .cgdet{flex:0 0 auto}
+@media (pointer:coarse){.cgnew .cgin{font-size:16px}.cgnew .cgdet{min-height:2.75rem}}
+@media (prefers-reduced-motion:no-preference){.cgnew{animation:cgin .16s ease-out}}
+@keyframes cgin{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
