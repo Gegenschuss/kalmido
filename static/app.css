@@ -7486,3 +7486,25 @@ body.cgdrag .week,body.cgdrag .cal{cursor:grabbing}
 @media (pointer:coarse){.cgnew .cgin{font-size:16px}.cgnew .cgdet{min-height:2.75rem}}
 @media (prefers-reduced-motion:no-preference){.cgnew{animation:cgin .16s ease-out}}
 @keyframes cgin{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+
+/* 2.53.0 D (#1449 #1440): reference cards in rendered text and the preview card at the pointer (refs.js) */
+.rfcard{display:inline-flex;align-items:center;gap:.25rem;max-width:min(18rem,100%);padding:0 .375rem;margin:0 .0625rem;border:1px solid var(--line2);border-radius:var(--r-s);background:var(--bg3);color:var(--text);font-size:.92em;line-height:1.5;vertical-align:baseline;text-decoration:none;white-space:nowrap}
+.rfcard .i{flex:none;color:var(--muted)}
+.rfcard .rfn{overflow:hidden;text-overflow:ellipsis}
+a.rfcard:hover{border-color:var(--muted);text-decoration:none}
+.rfcard.rfno,.rfcard.rfwait{color:var(--faint);background:transparent;border-style:dashed}
+.rfcard.rfno{cursor:default}
+.rfcard.rfdone .rfn{text-decoration:line-through;color:var(--muted)}
+.rfins.btn{margin-top:.375rem}
+.rfpv{position:fixed;z-index:9000;left:0;top:0;width:min(20rem,calc(100vw - 1rem));padding:.625rem .75rem;border-radius:var(--r-l);background:var(--bg2);box-shadow:var(--shadow);color:var(--text);font-size:var(--fs-m);line-height:1.4;cursor:pointer;opacity:0;transform:translateY(.25rem);transition:opacity .16s ease,transform .16s ease;pointer-events:auto}
+.rfpv.on{opacity:1;transform:none}
+.rfpvh{display:flex;align-items:flex-start;gap:.375rem;margin-bottom:.25rem}
+.rfpvh b{font-weight:600;overflow-wrap:anywhere}
+.rfpvh .i{flex:none;margin-top:.125rem;color:var(--muted)}
+.rfpvh.rfdone b{text-decoration:line-through;color:var(--muted)}
+.rfpvh.rfno b{color:var(--faint);font-weight:400}
+.rfpvr{display:flex;align-items:center;gap:.375rem;color:var(--text2);font-size:var(--fs-s);margin-top:.125rem}
+.rfpvr .i{flex:none;color:var(--faint)}
+.rfpvr span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rfpvd{margin-top:.375rem;color:var(--muted);font-size:var(--fs-s);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+@media (prefers-reduced-motion:reduce){.rfpv{transition:none;transform:none}}

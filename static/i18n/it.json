@@ -7944,5 +7944,9 @@
   "New event “{0}”": "Nuovo evento «{0}»",
   "Change a repeating event": "Modifica un evento ricorrente",
   "Change every date of this repeating event?": "Modificare tutte le date di questo evento ricorrente?",
-  "Single dates of a subscribed calendar cannot be changed here.": "Le singole date di un calendario in abbonamento non si possono modificare qui."
+  "Single dates of a subscribed calendar cannot be changed here.": "Le singole date di un calendario in abbonamento non si possono modificare qui.",
+  "No access": "Nessun accesso",
+  "Insert reference": "Inserisci riferimento",
+  "Nothing found": "Nessun risultato",
+  "{0} attachment": ["{0} allegato", "{0} allegati"]
 }
