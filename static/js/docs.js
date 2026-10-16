@@ -13,6 +13,7 @@ const DC_KINDS = [['any', N_('contains one of the words')], ['all', N_('contains
 const DC_STATE = {wait: N_('Waiting for recognition'), run: N_('Recognising…'), done: N_('Recognised'), failed: N_('Recognition failed')};
 const DC_BY = {rule: N_('set by a rule'), learn: N_('learnt from your documents'), agent: N_('set by an agent'), import: N_('imported'), code: N_('read from the code on the document')};
 
+// the module switch (Settings > Modules), off by default like the other areas
 // 2.65.0 (#1823): the module switch (FEATS, FEAT_DESC) and dc_shareOk are in lazyload.js (this file loads on demand)
 const dc_ws = () => (typeof wsCur === 'function' ? wsCur() : 'all');
 const dc_upWs = () => { const w = dc_ws(); return w.startsWith('org:') ? w : 'private'; };

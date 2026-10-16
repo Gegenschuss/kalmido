@@ -130,6 +130,7 @@ const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', menti
 const NM_PRIMARY = ['comment', 'mention', 'assign', 'complete', 'status', 'share', 'unblock'];
 const NM_NEWS_NEW = {newtask: 0, approval: 0, followup: 1, usage: 1, proposal: 1, errreport: 1};
 const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask: 0, complete: 1, status: 0, share: 0, unblock: 1, approval: 1, followup: 1, reminder: 1, usage: 1, proposal: 1, nag: 1, chat: 1, errreport: 1};
+const NM_SOCIAL = ['comment', 'reply', 'follow', 'mention', 'assign', 'newtask', 'complete', 'status', 'share', 'unblock', 'approval', 'proposal', 'chat', 'errreport'];
 const nmStored = s => { try { const o = JSON.parse(s.notify || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
 function notifMatrix(s) {
   const nk = new Set(String(s.news_kinds ?? 'mention,assign,comment,unblock,share,status').split(',')), o = nmStored(s), out = {};

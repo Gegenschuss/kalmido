@@ -49,7 +49,6 @@ function shareHtml(hint) {
 // (every push, News of reply / follow / new tasks / approvals / follow-ups) in the setting "notify" (json).
 const NEWS_KINDS = [['mention', N_('Mentions of me')], ['assign', N_('Tasks assigned to me (or taken away)')], ['comment', N_('Comments on my tasks')],
   ['unblock', N_('A task blocking mine was completed')], ['share', N_('Lists shared with me')], ['status', N_('Project status changes')], ['complete', N_('Others completed my tasks')]];
-const NM_SOCIAL = ['comment', 'reply', 'follow', 'mention', 'assign', 'newtask', 'complete', 'status', 'share', 'unblock', 'approval', 'proposal', 'chat', 'errreport'];
 // one checkbox -> the two stored values {notify, news_kinds}
 function notifPatch(s, row, ch, on) {
   const o = nmStored(s);
