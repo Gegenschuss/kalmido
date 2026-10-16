@@ -143,6 +143,7 @@ ORDER = (
     "team.workload",
     "hub.absence",  # 2.50.0 A (#1195): absences + German public holidays
     "hub.dispo",  # 2.50.0 A (#1194): resources and disposition (bookings of crew and equipment)
+    "hub.agentdispo",  # 2.51.0 C (#1355): shoot planning by agents (event drafts, options), the disposition in the REST API
     "office.packs",  # 2.36.1 (#1021): country packs (data), used by office.model
     "office.model",  # 2.36.1 (#1021): office & finance (B); C/D append office.calc, office.docs, office.pdf
     "office.web",
@@ -177,6 +178,8 @@ ORDER = (
     "admin.clientip",  # 2.33.0 (#834)
     "tasks.stale",  # 2.34.0 (#266)
     "personal.timegaps",  # 2.34.0 (#269)
+    "agents.agentpin",  # 2.51.0 C (#1352): agents on the pin board + the weekly status of a project
+    "agents.agenttime",  # 2.51.0 C (#1353): agents check time tracking + propose entries from events
     "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
     "admin.orgcrypt_cli",  # 2.42.0 (#828): the organisation keys' start-up pass + command line (no routes)
     "docs.extract",  # 2.48.0 (#1111): date / due date / amount from a text (no routes, standard library only)

@@ -1589,6 +1589,10 @@ MIGRATIONS = [
     ("office_docs", "agent_id", "ALTER TABLE office_docs ADD COLUMN agent_id BIGINT"),
     ("office_docs", "list_id", "ALTER TABLE office_docs ADD COLUMN list_id BIGINT REFERENCES lists(id) ON DELETE SET NULL"),
     ("office_doc_items", "agent_flag", "ALTER TABLE office_doc_items ADD COLUMN agent_flag TEXT NOT NULL DEFAULT ''"),
+    # 2.51.0 C (#1352): a notepad an agent wrote on the pin board (it may change / remove only its own); agent_key 'status'
+    # = its one weekly status block per list (upsert)
+    ("list_notepads", "agent_id", "ALTER TABLE list_notepads ADD COLUMN agent_id BIGINT REFERENCES users(id) ON DELETE SET NULL"),
+    ("list_notepads", "agent_key", "ALTER TABLE list_notepads ADD COLUMN agent_key TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

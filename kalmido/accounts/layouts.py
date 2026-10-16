@@ -193,7 +193,8 @@ def wg_std_put(key):
 # ---------------------------------------------------------------- 2.43.0 (#1346): the project page as a pin board
 # Colours per block for everyone in the project (lists.page_style, json {block: colour}) and notepads (table list_notepads:
 # Markdown, own title; block key "np<id>"). Everyone who sees the project page reads them, people with write access to the
-# list change them. Agents: not in this release (the routes refuse them, the overview of an agent has neither).
+# list change them. Agents: not through these routes (they refuse them, the overview of an agent has neither); 2.51.0
+# (#1352): agents write their own notepads through the REST API (agents/agentpin.py).
 
 WG_COLORS = ("yellow", "green", "blue", "red", "purple", "grey")
 WG_PADS_MAX = 20
@@ -202,7 +203,9 @@ WG_PAD_BODY_MAX = 20000
 
 
 def wg_pad_dict(r):
-    return {"id": r["id"], "title": r["title"], "body": r["body"], "updated_at": r["updated_at"], "updated_by": r["updated_by"]}
+    # 2.51.0 (#1352): agent_id = the agent that wrote it (marked on the page; agents/agentpin.py)
+    return {"id": r["id"], "title": r["title"], "body": r["body"], "updated_at": r["updated_at"], "updated_by": r["updated_by"],
+            "agent_id": r["agent_id"] if "agent_id" in r.keys() else None}
 
 
 def wg_pinboard(c, lid, role):

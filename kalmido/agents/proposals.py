@@ -50,6 +50,8 @@ from ..agents.chat import (
 # | all (every person of the instance) | off. The agent never gets general access: the job input is the only data it sees
 # (e.g. the selected inbox items, the lists the person ticked), stored with the job and deleted with it (PROP_KEEP_DAYS).
 PROP_KINDS = ("project", "subtasks", "triage", "extract", "dayplan", "cleanup")  # 2.10.0 (#440): dayplan; 2.39.0 (#1151): cleanup
+PROP_KINDS += ("time", "shoot")  # 2.51.0 C (#1353 #1355): time entries from events, shoot days (agents/agenttime.py, hub/agentdispo.py)
+PROP_KINDS_AGENT = ("time", "shoot")  # 2.51.0 C: the agent proposes these itself (POST /api/v1/agent/proposals/time|shoot), never on request
 PROP_STATES = ("requested", "ready", "applied", "discarded")
 PROP_MODES = ("off", "shared", "all")
 PROP_KINDS += ("inquiry", "setup")  # 2.51.0 B (#1351 #1358): an inquiry becomes a project, the setup assistant (agents/propkinds2.py)
@@ -337,6 +339,9 @@ def prop_validate(kind, b, inp):
         from ..agents.cleanup import cln_validate
         _p_keys(b, "", (*common, "items"))
         out.update(cln_validate(b, inp))
+    elif kind in PROP_KINDS_AGENT:  # 2.51.0 C (#1353 #1355)
+        from ..agents.agenttime import atm_prop_validate
+        out.update(atm_prop_validate(kind, b, inp))
     return out
 
 
@@ -439,6 +444,8 @@ def proposal_request():
     if kind == "cleanup":  # 2.39.0 (#1151): always the list's tidy agent, in packages (agents/cleanup.py)
         from ..agents.cleanup import cln_request
         return cln_request(c, uid, b)
+    if kind in PROP_KINDS_AGENT:  # 2.51.0 C: proposed by the agent itself, nothing to ask for
+        return err(tr("Invalid value: {0}", "kind"))
     try:
         aid = int(b.get("agent_id") or 0)
     except (TypeError, ValueError):
@@ -577,6 +584,10 @@ def prop_section(c, lid, name, made):
 def prop_run(c, j, sel, ed, extra):
     """Applies the selected (and edited) entries of the stored proposal as the current person. Returns the undo record."""
     kind, aid, uid = j["kind"], j["agent_id"], me()
+    if kind in PROP_KINDS_AGENT:  # 2.51.0 C (#1353 #1355): own edits (times, place), own records
+        from ..agents.agenttime import atm_prop_run
+        return atm_prop_run(c, j, sel, ed, {"at": iso(now_utc()), "sel": sel, "edits": ed, "extra": extra, "tasks": [], "sections": [],
+                                            "changes": {}, "list": None, "undone": False})
     prop, inp = json.loads(j["proposal"]), json.loads(j["input"] or "{}")
     edits = {k: prop_edit(kind, k, v, inp, prop) for k, v in ed.items()}
     ts = iso(now_utc())
@@ -770,6 +781,8 @@ def proposal_apply(jid):
     if j["kind"] == "cleanup":  # 2.39.0 (#1151): counts per kind of entry + the skipped tasks (why)
         from ..agents.cleanup import cln_result
         counts.update(cln_result(rec))
+    if j["kind"] in PROP_KINDS_AGENT:  # 2.51.0 C: entries / drafts / options made (rec["made"])
+        counts.update(created=len(rec.get("made") or []), warnings=rec.get("warnings", 0))
     prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] in ("project", "cleanup") else None})
     c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data->>'job' = ?",
               (ts, me(), str(jid)))
@@ -815,6 +828,9 @@ def proposal_undo(jid):
     elif j["kind"] == "cleanup":  # 2.39.0 (#1151): field changes back, closed tasks open again (one step)
         from ..agents.cleanup import cln_undo
         n, skipped = cln_undo(c, rec)
+    elif j["kind"] in PROP_KINDS_AGENT:  # 2.51.0 C: removes what it made (unchanged since)
+        from ..agents.agenttime import atm_prop_undo
+        n, skipped = atm_prop_undo(c, j, rec)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -885,6 +901,10 @@ def proposal_redo(jid):
     elif j["kind"] == "cleanup":  # 2.39.0 (#1151)
         from ..agents.cleanup import cln_undo
         n, skipped = cln_undo(c, rec, back=False)
+        rec.update(undone=False)
+    elif j["kind"] in PROP_KINDS_AGENT:  # 2.51.0 C: makes it again
+        from ..agents.agenttime import atm_prop_undo
+        n, skipped = atm_prop_undo(c, j, rec, back=False)
         rec.update(undone=False)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():

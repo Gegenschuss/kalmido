@@ -1576,6 +1576,45 @@ Every request of an agent is one line in the office's access log (agent, read / 
 the log has the filter *Agents*. The event `offer_accepted` reaches the agents of the area with the office switch on while
 the privacy switch is on.
 
+## Pin board, weekly status, time check, shoot planning (2.51.0)
+
+The agent proposes, a person confirms: these routes only read, write the agent's OWN notepads or create proposals and
+drafts. New rights are off for new agents: an admin (or, without an organisation, the person itself) turns on the scopes
+`pinboard`, `time` and `calendar` per agent. Health lists never; the token's list limit and the agent's organisation apply.
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| Notepads of a project page (`agent_id`, `mine`) | `GET /api/v1/lists/{id}/notepads` | `list_notepads` | read |
+| New notepad (marked as the agent's) | `POST /api/v1/lists/{id}/notepads` | `create_notepad` | pinboard |
+| Change / remove an own notepad (others: 403) | `PATCH` / `DELETE /api/v1/notepads/{id}` | `update_notepad`, `delete_notepad` | pinboard |
+| The agent's status block (one per agent and list, upsert) | `PUT /api/v1/lists/{id}/status-pad` | `write_status_pad` | pinboard |
+| A project's week: done, overdue, blocked, waiting, who waits on whom | `GET /api/v1/lists/{id}/weekly-status` | `get_weekly_status` | read |
+| Implausible entries, events / shoot days without time | `GET /api/v1/time/check` | `check_time_entries` | time |
+| Past events without a matching entry | `GET /api/v1/time/from-events` | `time_from_events` | time + calendar |
+| Propose time entries to a person (kind `time`) | `POST /api/v1/agent/proposals/time` | `propose_time_entries` | time |
+| Disposition of the agent's workspace (#1785) | `GET /api/v1/dispo`, `GET /api/v1/dispo/free` | `get_dispo`, `get_dispo_free` | calendar |
+| Propose shoot days + crew / equipment (kind `shoot`) | `POST /api/v1/agent/proposals/shoot` | `propose_shoot` | calendar |
+
+- **Weekly status.** A planned job (template *Status on the pin board*, event `scheduled_job` with the list) reads
+  `get_weekly_status` and writes the block with `write_status_pad`. People see it on the project page marked "From <agent>,
+  updated ..." and may edit or delete it as usual; the next run overwrites only the agent's own block.
+- **Time check.** `user_id` = a person who may chat with the agent (a personal agent: its owner by default). Only entries and
+  tasks of lists both see, events only of calendars shared with the agent, bookings only of the agent's workspace. Limits:
+  more than 12 h a day, an entry over 10 h, overlaps, weekend entries without an event or booking.
+- **Time proposals** (`items`: `date`, `start`, `end` as local HH:MM, `task_id` or `list_id`, `note`, `event_id`): a ready
+  proposal for the person (News + push per their settings); they change times and note and apply it, one undo step. Entries
+  never lie in the future; every list must track time.
+- **Shoot proposals** (`list_id` of a project the agent may write in and of its workspace; `days`: `date`, `start` / `end` or
+  all day, `title`, `location`, `note`, `alt_of`; `crew`: `kind` user | contact | equipment | set, `id` from `get_dispo`,
+  `day` = index into days). The server stores warnings per row (`double`: already booked, `away`, `other_projects`).
+  Applying creates per selected day a task in the project (due = the day) with a draft event (status `tentative`, shown
+  dashed with *Confirm* / *Discard* in the calendar; CalDAV keeps TENTATIVE) and per crew row a booking with status `option`.
+  Undo removes drafts that are still drafts, the tasks and the options.
+- The disposition: an agent of an organisation reads that organisation, a personal agent its owner's personal area
+  (freelancers without an organisation get the same); absences only as away, never the reason; booking notes are left out.
+- Both proposals are made by the agent itself (`POST /api/proposals` with these kinds answers 400) and answered with the
+  event `job` (approve / reject) like every proposal.
+
 ## Behaviour rules template (2.13.1)
 
 `mcp/CLAUDE.template.md` ("Kalmido agent behaviour rules", English with a German note) is the rule block every agent's

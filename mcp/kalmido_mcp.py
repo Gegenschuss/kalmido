@@ -1529,6 +1529,57 @@ TOOLS += [
      _obj({"state": {"type": "string", "enum": ["open", "accepted", "rejected", "all"]}, **_RB}),
      lambda api, a: api.call("GET", "/office/payment-suggestions", _pick(a, ("state", "requested_by")))),
 ]
+
+# 2.51.0 C (#1352 #1353 #1355): the pin board (own notepads, the weekly status), checking time, shoot planning
+_PAD = {"title": {"type": "string", "maxLength": 200}, "body": {"type": "string", "maxLength": 20000, "description": "Markdown"}}
+_PER = {"from": D, "to": D, "user_id": S_ID}
+TOOLS += [
+    ("list_notepads", "2.51.0: the notepads of a project page (agent_id marks those an agent wrote; mine = yours, you may change only those).",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/notepads")),
+    ("create_notepad", "2.51.0 (scope pinboard): a new notepad (Markdown) on a project page you may write in; it stays marked as yours.",
+     _obj({"list_id": S_ID, **_PAD}, ["list_id"]),
+     lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/notepads", body=_pick(a, ("title", "body")))),
+    ("update_notepad", "2.51.0 (scope pinboard): change one of YOUR notepads (people's notepads: 403).",
+     _obj({"notepad_id": S_ID, **_PAD}, ["notepad_id"]),
+     lambda api, a: api.call("PATCH", f"/notepads/{int(a['notepad_id'])}", body=_pick(a, ("title", "body")))),
+    ("delete_notepad", "2.51.0 (scope pinboard): remove one of YOUR notepads.", _obj({"notepad_id": S_ID}, ["notepad_id"]),
+     lambda api, a: api.call("DELETE", f"/notepads/{int(a['notepad_id'])}")),
+    ("write_status_pad", "2.51.0 (scope pinboard): write your status block of a project (one per agent and list, overwritten each time; "
+                         "default title Status). Recipe: get_weekly_status, write the words, then this.",
+     _obj({"list_id": S_ID, **_PAD}, ["list_id", "body"]),
+     lambda api, a: api.call("PUT", f"/lists/{int(a['list_id'])}/status-pad", body=_pick(a, ("title", "body")))),
+    ("get_weekly_status", "2.51.0: the numbers of a project's week for a status: done (last days), overdue, blocked (with blockers), waiting "
+                          "on external, who waits on whom, people (id -> name). days = 1-31 (default 7). Pure data: you write the words.",
+     _obj({"list_id": S_ID, "days": {"type": "integer", "minimum": 1, "maximum": 31}}, ["list_id"]),
+     lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/weekly-status", _pick(a, ("days",)))),
+    ("check_time_entries", "2.51.0 (scope time): implausible time entries of a person (day over 12 h, entry over 10 h, overlaps, weekend "
+                           "without event) and past events / firm shoot days without time. user_id = the person you work for; only what "
+                           "you both see; events only with the calendar scope (events_checked). Point it out, never fix it yourself.",
+     _obj(_PER), lambda api, a: api.call("GET", "/time/check", _pick(a, ("from", "to", "user_id")))),
+    ("time_from_events", "2.51.0 (scopes time + calendar): past events (default the last 7 days) without a matching time entry, as rows "
+                         "for propose_time_entries (start / end local HH:MM, null for all-day events).",
+     _obj(_PER), lambda api, a: api.call("GET", "/time/from-events", _pick(a, ("from", "to", "user_id")))),
+    ("propose_time_entries", "2.51.0 (scope time): ONE proposal of time entries for a person (items: date, start, end HH:MM, task_id or "
+                             "list_id, note, event_id). They review, change and apply it; you never track time for them. The answer "
+                             "comes as the event job.",
+     _obj({"user_id": S_ID, "title": {"type": "string"}, "summary": {"type": "string"},
+           "items": {"type": "array", "items": {"type": "object"}, "maxItems": 60}}, ["items"]),
+     lambda api, a: api.call("POST", "/agent/proposals/time", body=_pick(a, ("user_id", "title", "summary", "items")))),
+    ("get_dispo", "2.51.0 (scope calendar): the disposition of your workspace: bookings (option / firm) with double bookings, the "
+                  "resources (people, contacts, equipment, sets), who is away (never why), public holidays. start, days 1-62.",
+     _obj({"start": D, "days": {"type": "integer", "minimum": 1, "maximum": 62}, "org": {"type": "integer"}}),
+     lambda api, a: api.call("GET", "/dispo", _pick(a, ("start", "days", "org")))),
+    ("get_dispo_free", "2.51.0 (scope calendar): who and what of your workspace is free on a day.",
+     _obj({"date": D, "org": {"type": "integer"}}, ["date"]), lambda api, a: api.call("GET", "/dispo/free", _pick(a, ("date", "org")))),
+    ("propose_shoot", "2.51.0 (scope calendar): ONE proposal of shoot days for a project list (days: date, start / end HH:MM or all day, "
+                      "title, location, alt_of = a second variant of an earlier day) and crew / equipment (crew: kind, id from get_dispo, "
+                      "day = index into days). The server adds warnings per row (double bookings, absences, other projects). Applying "
+                      "makes event drafts (tentative) + tasks in the project + option bookings, never firm.",
+     _obj({"list_id": S_ID, "user_id": S_ID, "title": {"type": "string"}, "summary": {"type": "string"},
+           "days": {"type": "array", "items": {"type": "object"}, "maxItems": 31},
+           "crew": {"type": "array", "items": {"type": "object"}, "maxItems": 120}}, ["list_id", "days"]),
+     lambda api, a: api.call("POST", "/agent/proposals/shoot", body=_pick(a, ("list_id", "user_id", "title", "summary", "days", "crew")))),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -1565,10 +1616,13 @@ TOOL_SCOPES = {
     "files:write": ("write_file", "create_file_folder"),
     "office": ("get_office", "list_office_data", "list_office_documents", "get_office_document", "create_offer_draft", "update_offer_draft",
                "draft_invoice_from_offer", "draft_reminder", "suggest_payment", "list_payment_suggestions"),  # 2.51.0 (#1348, #1350)
+    "pinboard": ("create_notepad", "update_notepad", "delete_notepad", "write_status_pad"),  # 2.51.0 (#1352)
 }
+TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_entries")  # 2.51.0 (#1353)
+TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2.51.0 (#1355)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
-              "private", "files:read", "files:write", "office")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office
+              "private", "files:read", "files:write", "office", "pinboard")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard
 _ME = {"at": 0.0, "v": None}
 ME_TTL = 300  # s: a changed scope shows in tools/list within 5 minutes (a call is refused by the server at once anyway)
 
