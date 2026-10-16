@@ -287,7 +287,10 @@ def dsp_create():
             lid = int(lid)
         except (TypeError, ValueError):
             raise BadInput(tr("Invalid data")) from None
-        if not list_role(c, lid, uid):
+        from ..office.model import pb_cl_sql
+        # 2.50.0 (#1194 review): a project of this area only (a personal area: the owner's private lists), and visible
+        if not list_role(c, lid, uid) or not c.execute(f"SELECT 1 FROM lists WHERE id=? AND {pb_cl_sql(c, oid, 'org_id', 'owner_id')}",
+                                                         (lid,)).fetchone():
             raise Denied(404)
     else:
         lid = None

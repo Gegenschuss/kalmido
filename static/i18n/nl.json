@@ -7820,5 +7820,6 @@
   "Choose a project of this workspace": "Kies een project van deze werkruimte",
   "This suggestion was already decided": "Over dit voorstel is al beslist",
   "Only agents suggest; people set the receipt directly in the app": "Alleen agents doen voorstellen; mensen stellen de bon direct in de app in",
-  "The server key is missing: the API token cannot be stored safely": "De serversleutel ontbreekt: het API-token kan niet veilig worden opgeslagen"
+  "The server key is missing: the API token cannot be stored safely": "De serversleutel ontbreekt: het API-token kan niet veilig worden opgeslagen",
+  "The customer has signed this quotation; the record is kept": "De klant heeft deze offerte ondertekend; het protocol blijft bewaard"
 }

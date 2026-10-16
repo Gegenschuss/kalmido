@@ -7820,5 +7820,6 @@
   "Choose a project of this workspace": "Elige un proyecto de este espacio de trabajo",
   "This suggestion was already decided": "Esta sugerencia ya se decidió",
   "Only agents suggest; people set the receipt directly in the app": "Solo los agentes sugieren; las personas asignan el comprobante directamente en la app",
-  "The server key is missing: the API token cannot be stored safely": "Falta la clave del servidor: el token de API no se puede guardar de forma segura"
+  "The server key is missing: the API token cannot be stored safely": "Falta la clave del servidor: el token de API no se puede guardar de forma segura",
+  "The customer has signed this quotation; the record is kept": "El cliente ha firmado este presupuesto; el registro se conserva"
 }

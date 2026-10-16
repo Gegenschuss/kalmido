@@ -1051,6 +1051,8 @@ def odoc_delete(did):
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     ofx_need_editable(r)
+    if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (did, oid)).fetchone():
+        raise Denied(409, tr("The customer has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net")})
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
     bump(c)

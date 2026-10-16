@@ -26,6 +26,7 @@ from ..core.db import body, db, err, iso, local_now, now_utc, parse_iso, usettin
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_anon_bind, Denied, need_list
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
+from .model import office_role
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..api.v1 import hit_limit
@@ -101,14 +102,49 @@ def sig_list_tasks(c, r):
                                        "ORDER BY sort, id LIMIT 500", (r["list_id"], *args))]
 
 
-def sig_public(c, r):
-    d = oc_dec_fields(c, r["org_id"], "office_signoffs", r) if r["org_id"] else dict(r)
+def sig_crypt_org(c, r):
+    """2.50.0 (#1200 review): the organisation whose key protects the signer's data of approval r: its own, or for a
+    private list's sign-off the personal office of the list's owner (None without one: stored plain like other private data)."""
+    if r["org_id"] or not r["list_id"]:
+        return r["org_id"]
+    with system_ctx(c):  # the public page reads as "anon" without an organisation; only the key holder is resolved here
+        x = c.execute("SELECT o.id FROM lists l JOIN orgs o ON o.personal_of=l.owner_id WHERE l.id=?", (r["list_id"],)).fetchone()
+    return x[0] if x else None
+
+
+def sig_dec(c, r):
+    """r with the signer's data decrypted (see sig_crypt_org)."""
+    oid = sig_crypt_org(c, r)
+    if not oid:
+        return dict(r)
+    if r["org_id"]:
+        return oc_dec_fields(c, oid, "office_signoffs", r)
+    with system_ctx(c):  # the owner's personal key, outside the anon / member context of this request
+        return oc_dec_fields(c, oid, "office_signoffs", r)
+
+
+def sig_enc(c, r, vals):
+    """vals with the signer's data encrypted (see sig_crypt_org)."""
+    oid = sig_crypt_org(c, r)
+    if not oid:
+        return dict(vals)
+    if r["org_id"]:
+        return oc_enc_fields(c, oid, "office_signoffs", vals)
+    with system_ctx(c):  # as in sig_dec
+        return oc_enc_fields(c, oid, "office_signoffs", vals)
+
+
+def sig_public(c, r, full=True):
+    """full=False (members of the office who are not its admin): without the signer's e-mail, address and device
+    (2.50.0 #1200 review: personal data of the customer only for the admins / the list's owner)."""
+    d = sig_dec(c, r)
     live = d["state"] == "open" and not d["revoked_at"] and not (d["expires_at"] and parse_iso(d["expires_at"]) <= now_utc())
     return {"id": d["id"], "kind": d["kind"], "doc_id": d["doc_id"], "list_id": d["list_id"], "section_id": d["section_id"],
             "task_id": d["task_id"], "title": d["title"], "state": d["state"], "expires_at": d["expires_at"], "revoked_at": d["revoked_at"],
             "signer_name": d["signer_name"], "signer_email": d["signer_email"], "reason": d["reason"], "signed_at": d["signed_at"],
             "ip": d["ip"], "user_agent": d["user_agent"], "doc_hash": d["doc_hash"], "created_at": d["created_at"], "created_by": d["created_by"],
-            "live": live, "url": sig_url(c, d) if live else None}
+            "live": live, "url": sig_url(c, d) if live else None,
+            **({} if full else {"signer_email": None, "ip": None, "user_agent": None})}
 
 
 def sig_notify(c, r, st, name):
@@ -171,7 +207,7 @@ def sig_offer_new(did):
     row, tok = sig_create(c, oid, "offer", title, h, uid, exp, doc_id=did)
     ofx_log(c, oid, "signoff_link", doc_id=did, detail={"signoff": row["id"], "expires_at": exp, "doc_hash": h})
     c.commit()
-    return jsonify(sig_public(c, row))
+    return jsonify(sig_public(c, row, office_role(c, uid, oid) == "admin"))
 
 
 @app.get("/api/office/docs/<int:did>/signoffs")
@@ -181,7 +217,8 @@ def sig_offer_list(did):
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
     rows = c.execute("SELECT * FROM office_signoffs WHERE doc_id=? AND org_id=? ORDER BY id DESC LIMIT 50", (did, oid)).fetchall()
-    return jsonify(signoffs=[sig_public(c, r) for r in rows])
+    adm = office_role(c, uid, oid) == "admin"
+    return jsonify(signoffs=[sig_public(c, r, adm) for r in rows])
 
 
 @app.post("/api/office/signoffs/<int:sid>/revoke")
@@ -197,7 +234,7 @@ def sig_offer_revoke(sid):
         c.execute("UPDATE office_signoffs SET revoked_at=? WHERE id=?", (iso(now_utc()), sid))
         ofx_log(c, oid, "signoff_revoke", doc_id=r["doc_id"], detail={"signoff": sid})
         c.commit()
-    return jsonify(sig_public(c, c.execute("SELECT * FROM office_signoffs WHERE id=?", (sid,)).fetchone()))
+    return jsonify(sig_public(c, c.execute("SELECT * FROM office_signoffs WHERE id=?", (sid,)).fetchone(), office_role(c, uid, oid) == "admin"))
 
 
 # acceptance of a list (the owner of the list; from the list dialog > Public link)
@@ -364,7 +401,7 @@ def sig_page(c, r, token, lg, error=None, code=200):
     e = html.escape
     note = e(tr(SIG_NOTE, lg=lg))
     if r["state"] != "open":
-        d = oc_dec_fields(c, r["org_id"], "office_signoffs", r) if r["org_id"] else dict(r)
+        d = sig_dec(c, r)
         h = tr("Accepted", lg=lg) if d["state"] == "accepted" else tr("Declined", lg=lg)
         when = d["signed_at"] or ""
         main = (f'<div class="msg"><h1>{e(h)}</h1><p>{e(r["title"])}</p><p>{e(tr("By {0} on {1} (UTC).", d["signer_name"] or "", when[:16].replace("T", " "), lg=lg))}</p>'
@@ -461,9 +498,7 @@ def sig_decide(token):
     st = "accepted" if do == "accept" else "declined"
     ts = iso(now_utc())
     ua = (request.headers.get("User-Agent") or "")[:UA_MAX]
-    vals = oc_enc_fields(c, r["org_id"], "office_signoffs", {"signer_name": name, "signer_email": email or None, "reason": reason or None,
-                                                            "ip": ip, "user_agent": ua}) if r["org_id"] else \
-        {"signer_name": name, "signer_email": email or None, "reason": reason or None, "ip": ip, "user_agent": ua}
+    vals = sig_enc(c, r, {"signer_name": name, "signer_email": email or None, "reason": reason or None, "ip": ip, "user_agent": ua})
     c.execute("UPDATE office_signoffs SET state=?, signed_at=?, signer_name=?, signer_email=?, reason=?, ip=?, user_agent=? WHERE id=?",
               (st, ts, vals["signer_name"], vals["signer_email"], vals["reason"], vals["ip"], vals["user_agent"], r["id"]))
     proto = {"signoff": r["id"], "state": st, "name": name, "email": email, "reason": reason, "at": ts, "ip": ip, "user_agent": ua,
