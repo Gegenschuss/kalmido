@@ -373,8 +373,7 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     before = {r[0] for r in c.execute("SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id<?",
                                       (t["id"], cid))}
     ids |= before
-    ball = bell_all_users(c, t["list_id"], "comment")  # 2.62.0 (#1854): kept, a list bell "All" outranks "only replies"
-    ids |= ball  # 2.1.0 (#317): the bell "All" of a list: every comment (2.6.1: or "custom")
+    ids |= bell_all_users(c, t["list_id"], "comment")  # 2.1.0 (#317): the bell "All" of a list: every comment (2.6.1: or "custom")
     from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
     ids |= tbl_urgent_users(c, t["id"])  # 2.53.0 C (#1424): "Urgent" on the task: every comment
     if only is not None:
@@ -397,8 +396,9 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
             continue
         if "comments" not in (s.get("features") or "").split(","):  # 2.0.6: comments off -> no comment News / pushes
             continue
-        # 2.62.0 (#1854): an agent's comment with "only replies to me" (unless the list bell "All" / the task's "Urgent" wants it)
-        if not bl9_agent_comment_ok(s, uid, author, ag, prev, replied, uid in notify_mentions) and uid not in ball and \
+        # 2.62.0 (#1854): an agent's comment with "only replies to me" (also against a list bell "All": the person chose it for
+        # agents explicitly; only the task's "Urgent" still wants every comment)
+        if not bl9_agent_comment_ok(s, uid, author, ag, prev, replied, uid in notify_mentions) and \
                 tbl_level(c, uid, t["id"], s) != "urgent":
             continue
         mentioned = uid in notify_mentions or uid == replied
