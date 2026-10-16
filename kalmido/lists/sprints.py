@@ -135,9 +135,13 @@ def spr_burn(s, rows, unit="count"):
 
 def spr_dict(c, s, uid=None, rows=None):
     rows = spr_tasks(c, s, uid) if rows is None else rows
+    rv = spr_review(s)
+    if rv and uid and list_role(c, s["list_id"], uid) == "participant":  # a participant: only the ids of tasks they fully see
+        _, wr, _ = pvis(c, uid, s["list_id"])
+        rv = {**rv, **{k: [i for i in (rv.get(k) or []) if i in wr] for k in ("done", "moved", "added")}}
     return {"id": s["id"], "list_id": s["list_id"], "num": s["num"], "name": s["name"], "title": spr_title(s),
             "start": s["start"], "end": s["end_day"], "goal": s["goal"], "state": s["state"],
-            "closed_at": s["closed_at"], "created_at": s["created_at"], "review": spr_review(s), "progress": spr_progress(rows)}
+            "closed_at": s["closed_at"], "created_at": s["created_at"], "review": rv, "progress": spr_progress(rows)}
 
 
 def spr_brief(s):
