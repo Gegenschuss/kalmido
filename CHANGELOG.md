@@ -7,6 +7,18 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.48.1] - 2026-10-16
+
+**In short:** the checks of 2.48.0 green again; 2.48.0 and 2.48.1 go live together.
+
+### Fixed
+- Documents and Files use the app's own date picker instead of the browser's date fields.
+- The new views of 2.48 follow the text size setting (rem instead of px).
+- The folder queries of the file store keep their depth limit as a query parameter.
+- Closing a document sheet after its window is gone no longer raises a script error.
+- Tests follow the new behaviour of 2.48.0 (modules of new accounts, the areas, the route scan); two UI tests and the
+  setup test run more steadily.
+
 ## [2.48.0] - 2026-10-16
 
 **In short:** **Files** for you and your organisation with shares to people, groups and agents, **Documents** that read
