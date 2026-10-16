@@ -128,6 +128,10 @@ body = {"client_id": CL, "title": "Imagefilm 2027", "list_id": LID, "notify": Tr
         "items": [{"service_id": S1, "qty": 3}, {"service_id": S1, "qty": 1, "price": 900},
                   {"text": "Fahrtkosten", "qty": 1, "unit": "flat", "price": 120}, {"service_id": S2, "qty": 2, "discount": 10}]}
 check(ag("POST", "/offers", json={**body, "client_id": CL2}).status_code == 404, "#1348: a client of another organisation: 404")
+check(ag("POST", "/offers", json=body).status_code == 404, "#1348: a project list the agent does not see: 404")
+check(A.put(B + f"/api/lists/{LID}/members", json={"user_id": AG, "role": "edit"}).ok, "setup: the project list is shared with the agent")
+FL = Ca.post(B + "/api/lists", json={"name": "Fremdes Projekt"}).json()["id"]
+check(ag("POST", "/offers", json={**body, "list_id": FL}).status_code == 404, "#1348: a list of another organisation: 404")
 check(ag("POST", "/offers", json={**body, "status": "sent"}).status_code == 400, "#1348: no status field")
 r = ag("POST", "/offers", json=body)
 check(r.status_code == 201, "#1348: a quotation draft " + r.text[:300])
@@ -145,6 +149,10 @@ msgs = msgs.get("messages", msgs) if isinstance(msgs, dict) else msgs
 card = [m for m in msgs if m.get("id") == cm]
 check(card and [c.get("href") for c in card[0]["choices"]["choices"]] == [f"#office/offers/{QID}", f"/api/office/docs/{QID}/pdf?inline=1"],
       "#1348: the chat card with Open in the office + PDF preview")
+r = requests.post(B + f"/api/v1/agent/chats/{ALICE}", headers=AH, json={"body": "x", "choices": [{"id": "a", "label": "A", "href": "#settings/agents"}]})
+check(r.status_code == 400, "#1348: link buttons only to office documents, lists and the PDF preview " + str(r.status_code))
+r = requests.post(B + f"/api/v1/agent/chats/{ALICE}", headers=AH, json={"body": "x", "choices": [{"id": "a", "label": "A", "href": "https://example.com/x"}]})
+check(r.status_code == 400, "#1348: no outside address as a link button")
 r = ag("GET", f"/docs/{QID}/pdf")
 check(r.ok and r.content[:4] == b"%PDF", "#1348: the PDF preview of the draft")
 
@@ -243,6 +251,18 @@ check(A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": False}).ok and ag("
 A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": True})
 A.put(B + O + "/settings", json={"agents_read": 0})
 check(ag("GET", "/services").status_code == 403, "#1348: the privacy switch off = 403 at once")
+r = A.post(B + "/api/admin/agents", json={"username": "movebot", "display_name": "Move Bot", "scopes": ["read", "office"]})
+MB = r.json()["id"]
+A.patch(B + f"/api/admin/agents/{MB}", json={"org_id": ORG})
+check(A.patch(B + f"{O}/agents/{MB}", json={"office_drafts": True}).ok, "#1348: the switch of a team agent of the organisation")
+check(A.patch(B + f"/api/admin/agents/{MB}", json={"org_id": None}).ok and A.patch(B + f"/api/admin/agents/{MB}", json={"org_id": ORG}).ok
+      and A.get(B + f"{O}/agents/{MB}").json()["office_drafts"] is False, "#1348: another workspace switches the office switch off again")
+MH = {**H, "Authorization": "Bearer " + r.json()["token"]}
+A.patch(B + f"{O}/agents/{MB}", json={"office_drafts": True})
+A.put(B + O + "/settings", json={"agents_read": 1})
+check(requests.get(V, headers=MH).status_code == 400, "#1348: a team agent must name the person (requested_by)")
+check(requests.get(V, headers=MH, params={"requested_by": ALICE}).status_code == 404, "#1348: ... who shares a list with it")
+A.put(B + O + "/settings", json={"agents_read": 0})
 r = A.post(B + "/api/my/agents", json={"username": "plainbot", "display_name": "Plain Bot", "scopes": ["read"], "org_id": ORG})
 PH = {**H, "Authorization": "Bearer " + r.json()["token"]}
 r = requests.get(V, headers=PH)

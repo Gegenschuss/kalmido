@@ -259,9 +259,9 @@ function chatChoicesHtml(m) {
     send: `data-act="chat-choice-send" data-mid="${m.id}"`,
     pen: c => `<button type="button" class="cchpen" data-chpen="${m.id}" data-cid="${esc(c.id)}" title="${esc(tr('Edit before sending'))}" aria-label="${esc(tr('Edit before sending: {0}', c.label))}">${ic('edit', 's')}</button>`});
 }
-// 2.51.0 A (#1348): a choice with href (an office draft card: "Open in the office", "PDF preview") opens that view; only app
-// targets ("#...") and the PDF preview of a document (new tab) -- the server checks the same pattern
-const OA_HREF = /^(#[A-Za-z0-9/_=&.-]{1,160}|\/api\/office\/docs\/\d{1,12}\/pdf\?inline=1)$/;
+// 2.51.0 A (#1348): a choice with href (an office draft card: "Open in the office", "PDF preview") opens that view; only an
+// office document, a list and the PDF preview of a document (new tab) -- the server checks the same pattern
+const OA_HREF = /^(#office\/offers\/\d{1,12}|#l\/\d{1,12}|\/api\/office\/docs\/\d{1,12}\/pdf\?inline=1)$/;
 const oa_linkBtns = cs => `<div class="cchoices oa_links" role="group">${cs.filter(c => OA_HREF.test(c.href)).map(c => `<a class="cchb${c.style === 'primary' ? ' st-primary' : ''}" href="${esc(c.href)}"${c.href[0] === '/' ? ' target="_blank" rel="noopener"' : ''}>${ic(c.href[0] === '/' ? 'pdf' : 'arrow', 's')}<span>${esc(c.label)}</span></a>`).join('')}</div>`;
 async function chatChoice(mid, cid, send = false) {
   const m = S.chat.msgs.find(x => x.id === mid) || (S.chat.apv || []).find(x => x.id === mid); if (!m || m.choice || chatChoiceSt(m) !== 'open') return;

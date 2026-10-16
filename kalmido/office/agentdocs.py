@@ -39,7 +39,9 @@ OFA_DATA_KEYS = ("client_id", "title", "intro", "items", "list_id")
 OFA_CONF = ("high", "medium", "low")
 OFA_MASTER = ("services", "texts", "contracts")
 OFA_LOG_TARGETS = ("office", "services", "texts", "contracts", "clients", "docs", "doc", "pdf", "offer", "invoice", "reminder", "payment")
-NOTIFY_HREF_RE = re.compile(r"^(#[A-Za-z0-9/_=&.-]{1,160}|/api/office/docs/\d{1,12}/pdf\?inline=1)$")
+# link buttons in the chat (agents/chat.py): only the office document view, a list, and a document's PDF preview -- no other
+# app route (some do something when opened), no outside address
+NOTIFY_HREF_RE = re.compile(r"^(#office/offers/\d{1,12}|#l/\d{1,12}|/api/office/docs/\d{1,12}/pdf\?inline=1)$")
 OFA_RULES = N_("Drafts only: a person reserves the number, finalises, sends and books. Free positions, other prices and discounts are marked.")
 OFA_OFF = N_("This agent may not work in the office (its switch “May draft office documents” is off)")
 OFA_PRIVACY_OFF = N_("Agents may not read the office data of this area (switch in the office settings)")
@@ -147,13 +149,24 @@ def _iid(v, name):
         raise BadInput(tr("Invalid value: {0}", name)) from None
 
 
-def _list_ok(c, oid, uid, lid):
-    """A project list the person sees, in the office area's workspace (a personal office: a private list), never health."""
+def _agent_sees(c, aid, lid):
+    """The agent itself sees list lid (shared with it) and its list restriction (agents.list_ids) lets it in."""
+    from ..agents.core import agent_row
+    from ..agents.safety import ids_parse
+    a = agent_row(c, aid)
+    if not a or (a["list_ids"] and lid not in ids_parse(a["list_ids"])):
+        return False
+    return bool(list_role(c, lid, aid))
+
+
+def _list_ok(c, oid, uid, lid, agent_id=None):
+    """A project list the person sees, in the office area's workspace (a personal office: a private list), never health;
+    with agent_id also one the agent sees within its list restriction."""
     lid = _iid(lid, "list_id")
     if lid is None:
         return None
     r = c.execute("SELECT org_id, life FROM lists WHERE id=?", (lid,)).fetchone()
-    if not r or r["life"] == "health" or not list_role(c, lid, uid):
+    if not r or r["life"] == "health" or not list_role(c, lid, uid) or (agent_id and not _agent_sees(c, agent_id, lid)):
         raise Denied(404)
     personal = pb_owner(c, oid) is not None
     if (personal and r["org_id"] is not None) or (not personal and r["org_id"] != oid):
@@ -234,7 +247,7 @@ def ofa_draft_create(c, uid, oid, data, agent_id=None):
         raise PermissionError("office")
     if not isinstance(data, dict) or any(k not in OFA_DATA_KEYS for k in data):
         raise BadInput(tr("Invalid data"))
-    lid = _list_ok(c, oid, uid, data.get("list_id"))
+    lid = _list_ok(c, oid, uid, data.get("list_id"), agent_id)
     office_seed_texts(c, oid)
     b = {"project_title": _text(data.get("title"), "title", NAME_MAX)}
     if data.get("client_id") not in (None, "", 0):
@@ -470,7 +483,7 @@ def v1_office_offer_patch(did):
     if "client_id" in b:
         f.update(clean_doc(c, oid, {"client_id": b["client_id"]}, r, False))
     if "list_id" in b:
-        f["list_id"] = _list_ok(c, oid, uid, b.get("list_id"))
+        f["list_id"] = _list_ok(c, oid, uid, b.get("list_id"), aid)
     if f:
         f["updated_at"] = iso(now_utc())
         c.execute(f"UPDATE office_docs SET {','.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), did, oid])
