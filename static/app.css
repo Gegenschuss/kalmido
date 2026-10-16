@@ -7720,6 +7720,7 @@ button.jobtag b{font-weight:600}
 .spract{display:flex;gap:.5rem;margin-top:.25rem}
 .sprseg button,.sprunit button{white-space:nowrap}
 .sprtop .btn.sm{align-self:center}
-@media (max-width:40rem){.sprh{padding:.5rem .625rem}.sprtop{gap:.25rem .5rem}.sprsoon{display:none}.sprtop .sprp{order:5;flex:1 1 100%}.sprtop .sprp .pbar{flex:1;width:auto}
+@media (max-width:40rem){.sprh{padding:.5rem .625rem}.sprtop{gap:.25rem .5rem}.sprtop .spacer{display:none}
+  .sprtg{flex:1 1 0;min-width:0;flex-wrap:wrap;column-gap:.5rem;row-gap:0;text-align:left}.sprtg .muted{flex-basis:100%;padding-left:1.5rem;font-size:var(--fs-xs)}.sprsoon{display:none}.sprtop .sprp{order:5;flex:1 1 100%}.sprtop .sprp .pbar{flex:1;width:auto}
   .sprseg{display:flex}.sprtop .sprseg{flex:1 1 100%;order:6}.sprseg button{flex:1;padding:0 .5rem}}
 @media (prefers-reduced-motion:reduce){.sprp .pbar i{transition:none}}
