@@ -875,6 +875,8 @@ fresh; run p258_c_api "$PY" p258_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p258_b_api "$PY" p258_b_api_test.py "$KALMIDO_TEST_DATA"
 # 2.58.0 part F: a job's own name, one news item per list edit, sealed list pictures (#1803, #1804, #1805)
 fresh; run p258_f_api "$PY" p258_f_api_test.py "$KALMIDO_TEST_DATA"
+# 2.58.0 part D: Office search focus, pill morph, Esc in number field, privacy switch order, Back closes dialogs (touch)
+fresh; run p258_d_ui node p258_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

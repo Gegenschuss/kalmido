@@ -46,7 +46,7 @@ async function evPop(anchor, e) {
   const t = ev.task_id ? taskById(ev.task_id) : null;
   const desc = (e.description || '').slice(0, 2000);
   p.innerHTML = `<div class="cevpop evpop" style="--cc:${evCalColor(e)}">
-    <div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b>${e.status === 'cancelled' ? `<span class="evst">${tr('Cancelled')}</span>` : e.status === 'tentative' ? `<span class="evst evdraftb">${tr('Draft')}</span>` : ''}</div>
+    <div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b>${e.status === 'cancelled' ? `<span class="evst">${tr('Cancelled')}</span>` : (ev.status || e.status) === 'tentative' ? `<span class="evst evdraftb">${tr('Draft')}</span>` : ''}</div>
     <div class="cevm">${ic('clock', 's')}<span>${esc(evWhen(e))}</span></div>
     ${e.recurring ? `<div class="cevm">${ic('repeat', 's')}<span>${esc(repeatLabel(ev.rrule) || tr('Repeats'))}${e.changed ? ' · ' + esc(tr('this date changed')) : ''}</span></div>` : ''}
     ${e.location ? `<div class="cevm">${ic('mappin', 's')}<span>${esc(e.location)}</span></div>` : ''}

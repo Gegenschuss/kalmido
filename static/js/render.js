@@ -775,6 +775,7 @@ function fl_attrs(o, n) {
 }
 // nodes in the middle of an edit are left alone: the row with the inline title field, a table cell with its editor open
 function fl_hold(o) {
+  if (o.id === 'tc-new' || o.id === 'cm-new') return true;  // 2.46.3 (#1660): a shown "New message" pill stays shown on a redraw
   if (o.classList.contains('iedit') && S.ie && o.dataset.id === String(S.ie.id) && o.querySelector('.ttlin')) return true;
   return o.classList.contains('tcon') && o.contains(document.activeElement);
 }
@@ -830,8 +831,12 @@ function keepFocus(root, fn) {
   if (!root || ((!a || a === document.body || !root.contains(a) || editFocused()) && !same)) { try { return fn(); } finally { if (isView) FL.vsig = vs; } }
   let sig = null, i = 0;
   if (a && a !== document.body && root.contains(a) && !editFocused()) try { sig = focusSig(a); i = [...root.querySelectorAll(sig)].indexOf(a); } catch { sig = null; }
+  const ef = a && root.contains(a) && editFocused() ? a : null; let efs = null, efe = null; try { efs = ef?.selectionStart ?? null; efe = ef?.selectionEnd ?? null; } catch { /* no caret on this type */ }
   const prev = morphRoot; morphRoot = root;
   let r; try { r = fn(); } finally { morphRoot = prev; if (isView) FL.vsig = vs; }
+  if (ef && (!ef.isConnected || document.activeElement !== ef) && (!document.activeElement || document.activeElement === document.body)) {  // 2.58.0 (#1644): a text field that lost the focus in the redraw (Android keyboard) gets it back with its caret
+    try { const n = root.querySelector(focusSig(ef)); if (n && n !== ef && n.offsetParent !== null) { n.focus({preventScroll: true}); if (efs != null && n.setSelectionRange && n.value.length >= efs) n.setSelectionRange(efs, efe ?? efs); } } catch { /* odd selector / type without a caret */ }
+  }
   if (!sig || (a.isConnected && document.activeElement === a)) return r;
   const cur = document.activeElement;
   if (cur && cur !== document.body && cur !== a) return r;  // the render moved the focus on purpose

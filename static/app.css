@@ -6086,14 +6086,12 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .chedits time{font-size:var(--fs-xs)}
 @media (pointer:coarse){ .cmeta .cedited{min-height:2.75rem;margin:-.625rem 0} }
 /* 2.39.1 (#1181): bottom sheets on phones show a grip on top (drag it: taller / shorter, swipe down: close, static/js/sheetdrag.js);
-   on touch the X of a sheet that closes by swiping goes out of sight (it stays for screen readers and the keyboard) */
+   (2.58.0: its X stays visible, #1757) */
 @media (max-width:899px){
   #pop.sheet,.dpop.sheet,.qadd.sheet,.modal:not(.smodal):not(.authscreen):not(.shopmode):not(.palette)>.card,#pop.sheet .tch-sh{background-image:linear-gradient(var(--faint),var(--faint));background-repeat:no-repeat;background-position:center .3125rem;background-size:2.25rem .25rem}
   .sd-drag{user-select:none;-webkit-user-select:none}
 }
-@media (max-width:899px) and (pointer:coarse){
-  #pop.sheet .tch-shx:not(:focus-visible),.modal:not(.smodal):not(.authscreen):not(.shopmode):not(.palette)>.card .iconbtn[data-m="close"]:not(:focus-visible){position:absolute;width:1px;height:1px;min-width:0;min-height:0;padding:0;overflow:hidden;clip-path:inset(50%)}
-}
+/* 2.58.0 (#1757): the X of a sheet / dialog stays visible on touch (it was 1px; Back and the swipe close too, the X is the sure way) */
 @media (min-width:900px) and (pointer:coarse){ .qadd.sheet{background-image:linear-gradient(var(--faint),var(--faint));background-repeat:no-repeat;background-position:center .3125rem;background-size:2.25rem .25rem} }
 /* 2.39.1 (#1219): sorting the basket item by item; (#1221) where a group comes from + its own order; (#1185) fold all */
 .kbsortm>.card{max-width:34rem;width:100%}
@@ -7701,3 +7699,9 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 @media (pointer:coarse){#rsy-set .rsy-seg button{min-height:2.75rem}.rsy-g .chkl{min-height:2.75rem}}
 /* 2.58.0 A (#1724) "Join" in a list seen through the organisation: a full touch target on phones */
 @media (pointer:coarse){ .rohint.ovbar .btn{min-height:2.75rem} }
+/* 2.58.0 D (#1772) the person's colour mark in every menu / sheet (assign sheet on the phone), not only in the colour picker row */
+.menu-list button>.mswc{flex:none;width:1.125rem;height:1.125rem;border-radius:50%;display:inline-block}
+.menu-list .mcol>.mswc{width:1.25rem;height:1.25rem}
+@media (pointer:coarse){ .modal:not(.smodal):not(.authscreen):not(.shopmode):not(.palette)>.card .iconbtn[data-m="close"]{min-width:2.75rem;min-height:2.75rem} }
+/* 2.58.0 D (#1730) phones: a long press on a contact row selects the row, not a word of the name (also before the selection mode) */
+@media (pointer:coarse){ .ctrow{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none} }
