@@ -7,6 +7,14 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.51.1] - 2026-10-16
+
+**In short:** the checks of 2.51.0 green again; 2.51.0 and 2.51.1 go live together.
+
+### Fixed
+- Time and shoot proposals of agents pick times with the app's own time picker instead of the browser's field.
+- The marks of agent drafts and agent notes on the project page follow the font size.
+
 ## [2.51.0] - 2026-10-16
 
 **In short:** connected agents pitch in with business work - **quotation drafts** in the office, the way **from quotation

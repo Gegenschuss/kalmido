@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.51.1** (2026-10-16): CI fixes for 2.51.0, own time picker in agent proposals (both go live with this version).
 - **2.51.0** (2026-10-16): **agents pitch in with business work** - quotation drafts in the office, invoice and reminder
   drafts and payment suggestions, an inquiry becomes a project with one yes, a setup assistant, a weekly status on project
   pages, a time tracking check and shoot planning. The agent proposes, a person confirms; all new rights are off by default.
