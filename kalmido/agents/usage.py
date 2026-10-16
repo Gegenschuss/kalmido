@@ -747,7 +747,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
     job = {"type": "object", "properties": {k: {"type": "integer"} for k in ("id", "agent_id")} | {
         "task_id": nul("integer"), "user_id": nul("integer"), "title": {"type": "string"}, "state": {"type": "string", "enum": list(JOB_STATES)},
         "log": {"type": "string"}, "action": nul("string", enum=[*JOB_ACTIONS, None]), "created_at": {"type": "string"}, "updated_at": {"type": "string"},
-        "kind": nul("string", enum=[*PROP_KINDS, None]), "proposal_state": nul("string", enum=[*PROP_STATES, None])}}
+        "kind": nul("string", enum=[*PROP_KINDS, None]), "proposal_state": nul("string", enum=[*PROP_STATES, None]),
+        "name": nul("string", description="2.58.0 (#1803): the job's name (own field, else the \"Name: \" start of the title)")}}
     agent = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "status": {"type": "string", "enum": list(AGENT_STATUSES)},
                                               "status_text": {"type": "string"}, "status_task": nul("integer"),
                                               "job_tasks": {"type": "array", "items": {"type": "integer"}}, "running": {"type": "integer"}, "waiting": {"type": "integer"},
@@ -895,7 +896,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                         "post": op("Report a new job", AG, ok(ref("Job"), "Created", "201") | errs("400", "403", "404"), scope=W, body={
                             "type": "object", "required": ["title"], "properties": {"title": {"type": "string"}, "task_id": {"type": "integer"},
                                                                                     "state": {"type": "string", "enum": list(JOB_STATES)}, "log": {"type": "string"},
-                                                                                    "user_id": {"type": "integer"}}})},
+                                                                                    "user_id": {"type": "integer"},
+                                                                                    "name": {"type": "string", "description": "2.58.0 (#1803): short job name (letters, up to 24), shown on the job badge"}}})},
         "/agent/jobs/{id}": {"patch": op("Update a job (state, log)", AG, ok(ref("Job")) | errs("400", "403", "404"), [pid("id", "Job id")], scope=W, body={
             "type": "object", "properties": {"title": {"type": "string"}, "state": {"type": "string", "enum": list(JOB_STATES)},
                                              "log": {"type": "string"}, "append_log": {"type": "string"}}}),
