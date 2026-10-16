@@ -117,7 +117,8 @@ function fv2_change(arr, msg) {
 }
 // favorites.js favSet: a list's place follows its star at once (the server does the same)
 function fv2_listFollow(id, on) {
-  const key = 'l:' + +id, st = fv2_stored().filter(x => x !== key);
+  const key = 'l:' + +id; if (on && fv2_stored().includes(key)) return;  // a star set again keeps its place
+  const st = fv2_stored().filter(x => x !== key);
   S.settings.fav_items = JSON.stringify(on ? [...st, key] : st);
 }
 function fv2_set(key, on) {

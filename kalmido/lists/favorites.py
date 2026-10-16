@@ -70,7 +70,8 @@ def fv2_items_follow(c, uid, lid, on):
     except ValueError:
         items = []
     key = "l:%d" % lid
-    items = [x for x in items if x != key] + ([key] if on else [])
+    if not (on and key in items):  # a star set again keeps its place
+        items = [x for x in items if x != key] + ([key] if on else [])
     from ..accounts.settings import FV2_MAX
     out = json.dumps(items[-FV2_MAX:], ensure_ascii=False, separators=(",", ":"))
     uset(c, uid, "fav_items", out)
