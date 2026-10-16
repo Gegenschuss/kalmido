@@ -803,6 +803,7 @@ fresh; run p2473_a_ui node p2473_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.3 part E: DATEV booking batch (#1460), archive several lists (#1727)
 fresh; run p2473_e_api "$PY" p2473_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2473_e_ui node p2473_e_ui.js "$KALMIDO_TEST_DATA"
+shard 2  # 2.50.0: the 2.50 suites run in shard 2 (shard 3 took 23 min with the 2.47.3 suites, shard 2 18 min)
 # 2.50.0 part B: sales pipeline (#1196) + business figures (#1197)
 fresh; run p250_b_api "$PY" p250_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p250_b_ui node p250_b_ui.js "$KALMIDO_TEST_DATA"
