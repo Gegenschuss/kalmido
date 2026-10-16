@@ -266,6 +266,23 @@ check(r.ok and j.get("target") is None and j.get("restored") == [C1] and j.get("
 check(Bo.get(B + f"/api/contacts/{C1}").ok and links(C1) == [T1], "#1835: ... C1 is back with its own links " + str(links(C1)))
 check(Ev.post(B + f"/api/contacts/merges/{R3}/undo").status_code == 404, "#1835: a stranger still gets 404")
 
+# ---- a client's contact person whose new address book does not fit the client: the link goes (name stays), undo brings it back
+r = Ca.post(B + "/api/books", json={"name": "Carol's", "org_id": None})
+CBK = r.json()["id"]
+check(Ca.put(B + f"/api/books/{CBK}/members", json={"user_id": ids["bob"], "role": "edit"}).ok, "setup: carol shares her book with bob (edit)")
+CX = contact(Ca, CBK, "Erika", "Carol")
+r = Bo.post(B + "/api/clients", json={"name": "Beta Ltd", "org_id": None, "contacts": [{"name": "Erika M.", "contact_id": C1}]})
+CL2 = r.json().get("id")
+KP2 = dbx("SELECT id FROM office_client_contacts WHERE client_id=?", (CL2,))[0][0]
+r = merge(Bo, CX, [C1], dry=True)
+check(r.ok and any("does not fit" in x and x.endswith(": 1") for x in r.json()["lines"]), "#1835: the overview names the dropped client link " + r.text[:300])
+r = merge(Bo, CX, [C1])
+R4 = r.json().get("run_id")
+k = dbx("SELECT contact_id, name FROM office_client_contacts WHERE id=?", (KP2,))[0]
+check(r.ok and k[0] is None and k[1] == "Erika M.", "#1835: a link that does not fit the target's book is dropped, the name stays " + str(k))
+check(Bo.post(B + f"/api/contacts/merges/{R4}/undo").ok and dbx("SELECT contact_id FROM office_client_contacts WHERE id=?", (KP2,))[0][0] == C1,
+      "#1835: undo links the contact person again")
+
 # ---- CSRF: without the app's header the write is refused
 r = requests.post(B + "/api/contacts/merge", json={"target": C1, "ids": [C3]}, cookies=Bo.cookies)
 check(r.status_code in (400, 401, 403), f"#1835: without X-Requested-With: refused ({r.status_code})")

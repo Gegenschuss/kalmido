@@ -8265,5 +8265,6 @@
   "{0} contact merged": ["{0} contatto unito", "{0} contatti uniti"],
   "Contacts merged": "Contatti uniti",
   "Merged with {0}": "Unito con {0}",
-  "Merge undone": "Unione annullata"
+  "Merge undone": "Unione annullata",
+  "Contact person links dropped (the address book does not fit the client): {0}": "Collegamenti dei referenti rimossi (la rubrica non corrisponde al cliente): {0}"
 }

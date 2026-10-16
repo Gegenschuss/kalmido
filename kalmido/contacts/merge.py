@@ -140,7 +140,7 @@ def ctm_pick(pick, all_ids):
     return out
 
 
-def ctm_lines(rows, f, refs, occ_names):
+def ctm_lines(rows, f, refs, occ_names, unfit=0):
     """The overview of a merge (the dialog's step 2) in the person's language."""
     t = rows[0]
     n = {}
@@ -169,6 +169,8 @@ def ctm_lines(rows, f, refs, occ_names):
             d = len(_jl(f[k])) - len(_jl(t[k]))
             if d > 0:
                 lines.append(tr(label, d))
+    if unfit:
+        lines.append(tr("Contact person links dropped (the address book does not fit the client): {0}", unfit))
     for nm in occ_names:
         lines.append(tr("The birthday or anniversary task of {0} goes to the trash", nm))
     return lines
@@ -192,6 +194,7 @@ def ctm_merge(c, uid, target, ids, pick=None, dry=False):
             refs += [mg_repoint(c, tb_, col, others, t["id"], where) for tb_, col, where in CTM_SOFT]
             refs = [r for r in refs if r["moved"] or r["dropped"]]
             refs.append(ctm_dedupe_attendees(c, t["id"]))
+            unfit = ctm_unfit_clients(c, refs, tb)
             # the others' birthday / anniversary tasks go to the trash (like deleting them), their links come back on undo
             from ..contacts.bulk import bk_occ_drop
             occ = [dict(r) for r in c.execute(f"SELECT * FROM contact_occ WHERE contact_id IN ({','.join('?' * len(others))})",
@@ -203,7 +206,7 @@ def ctm_merge(c, uid, target, ids, pick=None, dry=False):
             occ_names = [r["fn"] for r in rows[1:] if any(o["contact_id"] == r["id"] and o["task_id"] in trashed for o in occ)]
             cascade = mg_cascade_rows(c, "contacts", others)
             if dry:
-                out = {"lines": ctm_lines(rows, f, refs, occ_names),
+                out = {"lines": ctm_lines(rows, f, refs, occ_names, unfit),
                        "fields": {k: (_jl(v) if k in CTM_LISTS else v) for k, v in f.items() if k not in CTM_NL and k != "photo"}}
                 raise _Dry()
             c.execute(f"DELETE FROM contacts WHERE id IN ({','.join('?' * len(others))})", others)
@@ -223,6 +226,22 @@ def ctm_merge(c, uid, target, ids, pick=None, dry=False):
     except _Dry:
         pass
     return out
+
+
+def ctm_unfit_clients(c, refs, tb):
+    """A client's contact person may only link to an address book that fits the client (contacts_cl.ckl_book_fits): a
+    moved link that does not fit the target's book is dropped (name, e-mail, phone stay; undo puts it back). Returns the count."""
+    from ..office.contacts_cl import ckl_book_fits
+    n = 0
+    for rec in refs:
+        if rec["t"] != "office_client_contacts":
+            continue
+        for k in rec["moved"]:
+            cl = c.execute("SELECT cl.* FROM office_client_contacts k JOIN clients cl ON cl.id=k.client_id WHERE k.id=?", (k["id"],)).fetchone()
+            if cl is not None and not ckl_book_fits(cl, tb):
+                c.execute("UPDATE office_client_contacts SET contact_id=NULL WHERE id=?", (k["id"],))
+                n += 1
+    return n
 
 
 def ctm_dedupe_attendees(c, tid):

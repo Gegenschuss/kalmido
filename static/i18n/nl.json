@@ -8265,5 +8265,6 @@
   "{0} contact merged": ["{0} contact samengevoegd", "{0} contacten samengevoegd"],
   "Contacts merged": "Contacten samengevoegd",
   "Merged with {0}": "Samengevoegd met {0}",
-  "Merge undone": "Samenvoegen ongedaan gemaakt"
+  "Merge undone": "Samenvoegen ongedaan gemaakt",
+  "Contact person links dropped (the address book does not fit the client): {0}": "Koppelingen van contactpersonen die vervallen (het adresboek past niet bij de klant): {0}"
 }
