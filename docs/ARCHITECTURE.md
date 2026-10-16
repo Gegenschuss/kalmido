@@ -395,6 +395,19 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
 - CI (`.github/workflows/ci.yml`): Python and JavaScript syntax of every file, `tools/check_layout.py`, translations,
   the MCP bridge, bandit (high severity), pip-audit, the browser demo, semgrep and the test shards.
 
+### Performance budget (2.65.0)
+
+`python tools/perf_budget.py` measures, statically from `static/index.html`, what the browser loads before the app shows
+anything: every script tag (raw and gzip size, count) and the stylesheets, and lists the files loaded on demand (`LAZY` /
+`LAZY_CSS` in `static/sw.js`) for comparison. The limits are in `tools/perf_budget.json` (`start_js_bytes`, `start_js_gzip`,
+`start_css_bytes`, `start_css_gzip`, `start_scripts`, and `start_ms`, the load time until the list shows, which
+`tests/perf_ui.js` checks in the browser). CI runs the tool in the lint job; a value over its limit prints
+`Budget exceeded: <key> <actual> > <limit>` and fails the build. `tests/perf_budget_test.py` proves that an oversized state fails.
+
+To raise a limit on purpose, change the value in `tools/perf_budget.json` in the same commit as the growth and say why;
+otherwise move the code into a module loaded on demand (see "Modules loaded on demand"). `--json` prints machine-readable
+output, `--budget FILE` and `--root DIR` are for tests.
+
 ## Organisations and who sees whom (2.22.0)
 
 People belong to one or more **organisations** (`accounts/orgs.py`; tables `orgs`, `org_members`). The instance setting
