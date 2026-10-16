@@ -2,7 +2,7 @@
 // - Contacts > More > Newsletter…: the sheet explains why Kalmido sends nothing itself, the form (service, address, access
 //   data); wrong access data show the reason in place; connected: service + address, never the access data
 // - a segment (new list at the service), "Sync now", the log line
-// - the contact card: the consent line; "Consented" asks for the source; Undo brings "Unknown" back (ONE step)
+// - the contact card: menu > Newsletter consent…; "Consented" asks for the source, the line shows it; Undo = Unknown (ONE step)
 // - phone width: the sheet is usable
 const {execFileSync} = require('child_process');
 const fs = require('fs');
@@ -84,9 +84,12 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_newsletter.py'])
   // ================= the consent in the contact card
   const c2 = await call('POST', '/api/contacts', {book_id: bk.id, fn: 'Ben Beta', emails: [{value: 'ben@example.com'}]});
   const v = await boot({user: 'alice', hash: `contacts/${c2.id}`}), e = v.document;
-  const row = await until(() => e.querySelector('.nwl-ctf'));
-  check(row && /Unknown/.test(row.textContent), 'the card shows the consent (Unknown)');
-  row?.querySelector('[data-nwlct]')?.click();
+  await until(() => e.querySelector('#view [data-ct="cmenu"]'));
+  check(!e.querySelector('.nwl-ctf'), 'no consent line while the consent is unknown');
+  e.querySelector('#view [data-ct="cmenu"]').click();
+  const ci = await until(() => menuItems(e).find(b => /Newsletter consent/.test(b.textContent)));
+  check(ci, 'the contact menu has "Newsletter consent…"');
+  ci?.click();
   const yes = await until(() => menuItems(e).find(b => /^Consented$/.test(b.textContent.trim())));
   yes?.click();
   const inp = await until(() => e.querySelector('#cdlg-in'));
@@ -98,6 +101,8 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_newsletter.py'])
   e.dispatchEvent(new v.KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true, cancelable: true}));
   await until(async () => (await call('GET', `/api/contacts/${c2.id}`)).newsletter?.status === '');
   check((await call('GET', `/api/contacts/${c2.id}`)).newsletter?.status === '', 'Undo: Unknown again (one step)');
+  await until(() => !e.querySelector('.nwl-ctf'));
+  check(!e.querySelector('.nwl-ctf'), 'Undo: the line is gone again');
   v.close();
 
   // ================= phone width

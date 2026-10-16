@@ -181,8 +181,9 @@ document.addEventListener('change', async e => {
 });
 
 // ---- the consent in the contact card (contacts.js ctCardHtml) ----------------------------------------------------------
+// shown once a consent is set (unknown = no line; it is set through the contact's menu, nwl_ctItem)
 function nwl_ctf(c, w) {
-  const n = c.newsletter; if (!n || !(c.emails || []).length) return '';
+  const n = c.newsletter; if (!n || !n.status || !(c.emails || []).length) return '';
   const blocked = ['unsub', 'bounce'].includes(n.status);
   const meta = [n.at ? fmtDayAbs(n.at.slice(0, 10)) : '', n.source === 'service' ? tr('reported by the newsletter service') : n.source].filter(Boolean).join(' · ');
   return `<div class="ctf nwl-ctf">${ic('mail', 's')}<span class="ctfl muted">${tr('Newsletter')}</span><span><span class="nwl-st nwl-st-${esc(n.status || 'none')}">${esc(tr(NWL_ST_TXT[n.status || '']))}</span>${meta ? ` <span class="muted">${esc(meta)}</span>` : ''}
@@ -191,9 +192,17 @@ function nwl_ctf(c, w) {
 async function nwl_consentSet(ids, status, source) {
   return api('PUT', '/api/newsletter/consent', {ids, status, source: source || ''});
 }
+// the entry in the contact's menu (contacts.js cmenu): only with an address, a writable book and no unsub / bounce
+function nwl_ctItem(c, w, anchor) {
+  if (!w || !c.newsletter || !(c.emails || []).length || ['unsub', 'bounce'].includes(c.newsletter.status)) return null;
+  return {label: tr('Newsletter consent…'), icon: 'mail', fn: () => nwl_ctPick(anchor, c)};
+}
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-nwlct]'); if (!b) return;
   const c = CT.card; if (!c || c.id !== +b.dataset.nwlct) return;
+  nwl_ctPick(b, c);
+});
+function nwl_ctPick(b, c) {
   const old = {...c.newsletter};
   const apply = async (status, source) => {
     try { await nwl_consentSet([c.id], status, source); } catch { return; }
@@ -208,4 +217,4 @@ document.addEventListener('click', e => {
     if (src && src.trim()) apply('yes', src.trim());
   }}, {label: tr(NWL_ST_TXT.pending), icon: 'clock', fn: () => apply('pending', '')},
   {label: tr(NWL_ST_TXT['']), icon: 'x', fn: () => apply('', '')}]);
-});
+}

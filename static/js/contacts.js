@@ -153,7 +153,8 @@ document.addEventListener('click', async e => {
       if (!await askConfirm(tr('Delete the contact “{0}”?', c.fn), tr('It is also removed from the phones that sync this address book.'), {ok: tr('Delete'), danger: true})) return;
       try { await api('DELETE', `/api/contacts/${c.id}`); } catch { return; }
       CT.sel = null; CT.card = null; toast(tr('Contact deleted')); await load().catch(() => {}); if (isMobile()) go('contacts'); ctLoad(); }},
-      feat('events') && {label: tr('Invite to a new event'), icon: 'cal', fn: () => evEditor({attendees: [{contact_id: c.id, name: c.fn, email: c.emails?.[0]?.value || '', partstat: 'needs-action'}]})}]);
+      feat('events') && {label: tr('Invite to a new event'), icon: 'cal', fn: () => evEditor({attendees: [{contact_id: c.id, name: c.fn, email: c.emails?.[0]?.value || '', partstat: 'needs-action'}]})},
+      typeof nwl_ctItem === 'function' && nwl_ctItem(c, w, b)]);  // 2.55.0 (#1455): the newsletter consent
   }
 });
 
