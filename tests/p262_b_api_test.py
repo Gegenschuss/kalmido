@@ -4,7 +4,7 @@
    (freelancer) has it the same way
  - with "replies" an agent's comment reaches me (News) only when it answers my comment (reply_to), follows right after my
    comment on that task, or mentions me; an unrelated agent comment stays quiet
- - comments by people always reach me as before; "all" brings every agent comment as before; a list bell "All" outranks it
+ - comments by people always reach me as before; "all" brings every agent comment as before; a list bell "All" does not outrank it (leader decision), the task's "Urgent" does
 usage: p262_b_api_test.py <datadir>"""
 import os
 import dbx as dbxm
@@ -128,11 +128,11 @@ mine2 = says(A, T, "soon gone")
 check(A.delete(B + f"/api/comments/{mine2}").ok, "delete my comment")
 c = agent_says(T, "after a deleted comment")
 check(not news_for(ALICE, c), "#1854: my deleted comment right before does not make it a reply")
-# the list bell "All" outranks "only replies"
+# 2.62.0 (#1854): "only replies" holds against the list bell "All" too
 check(A.put(B + f"/api/lists/{W['id']}/bell", json={"mode": "all"}).ok, "bell: all")
 says(Bo, T, "bob")
 c = agent_says(T, "unrelated, but the bell says all")
-check(news_for(ALICE, c), "#1854: a list bell 'All' brings every agent comment")
+check(not news_for(ALICE, c), "#1854: 'only replies' holds against a list bell 'All'")
 A.put(B + f"/api/lists/{W['id']}/bell", json={"mode": "default"})
 # bob kept "all": he hears the unrelated agent comments on a task he follows
 c = agent_says(T, "for the followers")
