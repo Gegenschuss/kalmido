@@ -210,6 +210,9 @@ TR = task(Bo, "Follow-up", LA, notes=f"see #{T4} and #{TB}")
 wait_for(lambda: TR in vec_ids(), "the new task gets its vector")
 got = ids_of(Bo.get(B + f"/api/tasks/{TR}/related").json())
 check(T4 in got and TB not in got, f"an explicit #reference is related, a foreign one never {got}")
+j = Bo.get(B + f"/api/tasks/{T4}/related").json()
+check(TR in ids_of(j) and not any(x["id"] == TR and x["dup"] for x in j["items"]), f"... also the other way round (a task naming T4), never as a duplicate {j}")
+check(TR not in ids_of(Ca.get(B + f"/api/tasks/{TB}/related").json()), "a task of another organisation naming TB stays hidden from carol")
 
 # ================================================================== similar while adding
 r = Bo.post(B + "/api/tasks/similar", json={"title": "Invoice template for clients", "list_id": LA})
