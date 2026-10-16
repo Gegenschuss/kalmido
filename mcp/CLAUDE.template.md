@@ -365,6 +365,8 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `file_shared`: a folder or file of the file store was shared with you (`node`, `role` view | edit)
 - `document_added`: a new document was recognised in a folder / file shared with you (`document`); a receipt? see *assign a receipt* below
 - `offer_accepted`: a quotation of your office area was accepted (`doc_id`, `client_id`, `list_id`, sums); only with your office switch on
+- `review_requested`: you are the reviewer of a task that went into review (`review` {state, list_id, url}); check it, then
+  `review_task` approve, or changes with a short note what should change. Never approve a task assigned to you
 
 Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get_document` (text, sender, amount) ->
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
@@ -399,9 +401,9 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,
 `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
-`request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`,
+`request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`, `review_task`,
 `search_contacts`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
-`set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
+`set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,
 `time_from_events`, `unlink_contact`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,

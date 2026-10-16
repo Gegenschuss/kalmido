@@ -201,6 +201,7 @@ APP_TO_API = {
     "GET /api/team/absences": ["GET /absences"],  # 2.50.0 (#1195): "away" only
     "POST /api/clients/bulk": ["POST /clients/bulk"],  # 2.47.3 (#1733)
     "POST /api/tasks/{}/approval": ["POST /tasks/{}/approval"], "GET /api/lists/{}/forms": ["GET /lists/{}/forms"],
+    "POST /api/tasks/{}/review": ["POST /tasks/{}/review"], "PUT /api/lists/{}/review": ["PUT /lists/{}/review"],  # 2.60.0 (#1512)
     "POST /api/lists/{}/forms": ["POST /lists/{}/forms"], "PATCH /api/forms/{}": ["PATCH /forms/{}"], "DELETE /api/forms/{}": ["DELETE /forms/{}"],
     # 2.48.0 (#1207): the file store -- list, read, add files / folders, new versions
     "GET /api/files": ["GET /files"], "GET /api/files/nodes/{}": ["GET /files/{}"], "GET /api/files/nodes/{}/content": ["GET /files/{}/content"],

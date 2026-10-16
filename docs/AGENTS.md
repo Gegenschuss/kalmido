@@ -690,6 +690,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `file_shared` | 2.48.0 (#1207): the owner shared a folder or file of the [file store](#file-store-2480) with the agent (only for a new share, not for a changed role) | `node` `{id, name, kind}`, `role`: `view` \| `edit` |
 | `document_added` | 2.48.0 (#1356): a new document was recognised (once, after its first recognition) in a folder or file of the file store the agent sees (a share or its own result folder); read it with `get_document`, e.g. to [suggest project and category of a receipt](#receipts-suggest-project-and-category-2480) | `document` `{id, name, state, date, url}` |
 | `offer_accepted` | 2.51.0 (#1348): a quotation of the agent's office area was accepted (by a person or the customer's approval); only agents with the switch *May draft office documents* (a personal agent in an organisation only while its owner works in the office), while the area lets agents read office data (see [Office](#office-drafts-only-2510)) | `doc_id`, `number`, `title`, `client_id`, `list_id`, `net`, `gross`, `currency` |
+| `review_requested` | 2.60.0 (#1512): the agent is the reviewer of a task that went into the [review step](#review-step-2600) (moved into the list's review section or *Send for review*); only when the agent has access to the list | `task`, `review` `{state: pending, reviewer_id, list_id, url, by}` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1067,6 +1068,25 @@ as the agent with its permissions and rights **at that moment** (paused meanwhil
 ends `done` or `failed` and the agent gets a `job` event with `action` and `result {status, body}`. *Reject* stops the
 job and changes nothing (`job` event, `action: reject`); a stored request runs at most once and the agent cannot
 change its job (title, state, log: `409`). At most 20 requests wait per agent.
+
+## Review step (2.60.0)
+
+#1512. A list can switch on a review step (list settings > *Review step*, or `set_list_review`): a default reviewer, the
+review section (default: the section named *Review*) and *Done only after approval*. Every task can have a reviewer
+(`reviewer_id`, a person or an agent with access to the list) and a review state (`review`: `pending`, `approved`,
+`changes`).
+
+- Moving a task into the review section (board, detail, API) or `review_task` action `request` asks for the review: the
+  default reviewer when the task has none, state `pending`. A person gets a News item + push (notification row *Reviews*,
+  switchable); an agent reviewer gets the event `review_requested`.
+- Only the reviewer or a list admin decides (`review_task` `approve` / `changes`); the assignee never approves their own
+  task unless they are a list admin, an agent only when it is the reviewer. `changes` returns the task to the section it
+  came from and tells the assignee.
+- With *Done only after approval* on, completing a task with a reviewer and without approval answers **409** "Waiting for
+  approval by ..." on every way: complete, batch, MCP `complete_task`, repeats and git keywords (a keyword completes it on
+  a later poll once approved).
+- A linked pull request counts as the approval when it is merged, or when its merge request comment got 👍 from someone
+  who may approve the review (`review_by` stays empty, the history names the pull request).
 
 ## Status, jobs and chat
 
@@ -2462,8 +2482,8 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
 `report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
 `request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
-`request_reward`, `restore_event`, `restore_task`, `search_contacts`, `search_messages`, `search_notes`, `search_tasks`,
-`send_chat`, `set_contact_care`, `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`,
+`request_reward`, `restore_event`, `restore_task`, `review_task`, `search_contacts`, `search_messages`, `search_notes`, `search_tasks`,
+`send_chat`, `set_contact_care`, `set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`, `set_status`,
 `set_waiting`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
 `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unshare_address_book`, `unshare_event_calendar`,

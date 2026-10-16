@@ -1384,6 +1384,19 @@ TOOLS += [
      _obj({"task_id": S_ID, "action": {"type": "string", "enum": ["request", "cancel"]}, "approver_id": {"type": "integer"},
            "note": {"type": "string"}}, ["task_id", "action"]),
      lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/approval", body=_pick(a, ("action", "approver_id", "note")))),
+    ("review_task", "2.60.0 (#1512): the review step of a task. reviewer (reviewer_id: a person or agent of the list, null = none), "
+                    "request (send for review: into the list's review section, the reviewer is told), approve / changes (only when YOU "
+                    "are the reviewer and not the assignee; changes = back to its previous section, note = what should change). With "
+                    "the list's 'done only after approval' on, completing a task whose review is not approved answers 409. The event "
+                    "review_requested tells you when you are asked to review.",
+     _obj({"task_id": S_ID, "action": {"type": "string", "enum": ["reviewer", "request", "approve", "changes"]},
+           "reviewer_id": {"type": ["integer", "null"]}, "note": {"type": "string", "maxLength": 2000}}, ["task_id", "action"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/review", body=_pick(a, ("action", "reviewer_id", "note")))),
+    ("set_list_review", "2.60.0 (#1512): switch the review step of a list on / off (editors): reviewer = default reviewer, section = "
+                        "the review section (default: the one named Review), gate = done only after approval.",
+     _obj({"list_id": S_ID, "on": {"type": "boolean"}, "reviewer": {"type": ["integer", "null"]}, "section": {"type": ["integer", "null"]},
+           "gate": {"type": "boolean"}}, ["list_id", "on"]),
+     lambda api, a: api.call("PUT", f"/lists/{int(a['list_id'])}/review", body=_pick(a, ("on", "reviewer", "section", "gate")))),
     ("list_forms", "2.23.0 (module forms): the forms of a list (owner / list admins) with their links.", _obj({"list_id": S_ID}, ["list_id"]),
      lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/forms")),
     ("create_form", "2.23.0: a form for a list: a link whose page creates a task (subject, description, name, e-mail); access org = "

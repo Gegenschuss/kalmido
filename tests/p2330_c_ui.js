@@ -60,7 +60,7 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     check(j.own?.tpl === 'work' && await ev(`document.querySelector('#sh-st-ntf').textContent`) === 'Collaborate', '#927: a tap saves Collaborate ' + JSON.stringify(j.own));
     await ev(`(() => { document.querySelector('#sh-sec-ntf input[value="custom"]').click(); return 1; })()`); await sleep(1000);
     const s2 = await ev(`(() => { const c = document.querySelector('#sh-sec-ntf .ntfcust'); return {hid: c.hidden, n: c.querySelectorAll('[data-ntfc]').length, on: [...c.querySelectorAll('[data-ntfc]:checked')].map(x => x.dataset.ntfc).join()}; })()`);
-    check(!s2.hid && s2.n === 14 && s2.on === 'mention,reply,assign,approval,comment,reminder', '#927: Custom shows the events, starting from Collaborate ' + JSON.stringify(s2));
+    check(!s2.hid && s2.n === 15 && s2.on === 'mention,reply,assign,approval,comment,reminder,review', /* 2.60.0 (#1512): + review */ '#927: Custom shows the events, starting from Collaborate ' + JSON.stringify(s2));
     await ev(`(() => { document.querySelector('#sh-sec-ntf [data-ntfc="comment"]').click(); return 1; })()`); await sleep(1000);
     j = await call('GET', `/api/lists/${L}/notify-template`);
     check(j.own?.tpl === 'custom' && j.own.custom.comment === 0 && j.own.custom.mention === 1, '#927: unticking an event saves it ' + JSON.stringify(j.own));
