@@ -298,6 +298,16 @@ logs = subprocess.run(["docker", "logs", CT], capture_output=True, text=True).st
 check(logs.count("embed: the service is not reachable") <= 3, "one log line per outage, no flood")
 check("Traceback" not in logs, "no traceback in the server log")
 
+# ================================================================== 2.59.0 (#1375): review - full visibility only
+# a participant sees the parent of an assigned subtask as context (title only): its related tasks = 404 like its notes
+check(Bo.put(B + f"/api/lists/{LP}/members", json={"user_id": DAVE, "role": "participant"}).ok, "setup: LP shared with dave (participant)")
+TQ = task(Bo, "Invoice parent with secret notes", LP, notes="secret parent notes")
+r = Bo.post(B + "/api/tasks", json={"title": "Invoice step for dave", "parent_id": TQ, "assignee_id": DAVE})
+check(r.ok, "setup: a subtask assigned to dave " + r.text[:120])
+TQa = r.json()["id"] if r.ok else 0
+check(Da.get(B + f"/api/tasks/{TQa}/related").status_code == 200, "participant: related of the own subtask")
+check(Da.get(B + f"/api/tasks/{TQ}/related").status_code == 404, "participant: related of the context parent = 404")
+
 # ================================================================== deleting the task deletes the vector (cascade)
 dbx("DELETE FROM tasks WHERE id=?", (T3,), write=True)
 check(T3 not in vec_ids(), "deleting a task deletes its vector (ON DELETE CASCADE)")
