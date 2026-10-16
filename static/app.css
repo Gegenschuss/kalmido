@@ -7450,3 +7450,7 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .apwarn .ic{color:var(--accent)}
 .apalt{border-style:dashed}
 @media (max-width:600px){.apf .aptime{flex:1 1 40%}}
+/* 2.52.0 B (#1128) events of writable CalDAV subscriptions: popover actions, hint under "Allow writing" */
+.cevact.dvwact { display: flex; flex-wrap: wrap; gap: 6px; }
+.cevact.dvwact .btn.pri { margin-left: auto; }
+.dvwhint { margin: -2px 0 8px; }

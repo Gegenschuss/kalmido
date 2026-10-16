@@ -152,6 +152,7 @@ function cevWhen(e) {
 function cevPop(anchor, id) {
   const e = S.cal.items.find(x => x.id === id); if (!e) return;
   if (e.own) { evPop(anchor, e); return; }  // 2.21.0 (#659): an own event (calevents.js)
+  if (e.dvw_write) { dvw_pop(anchor, e); return; }  // 2.52.0 (#1128): a writable CalDAV subscription (davwrite.js)
   const desc = (e.description || '').slice(0, 2000);
   const p = openPop(anchor, `<div class="cevpop" style="--cc:${cevColor(e)}">
     <div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b></div>
@@ -219,7 +220,7 @@ function tlCalRows(start, end, DW) {  // calendar timeline: one row per calendar
 function calsHtml(chk, hint) {
   if (!S.calendars?.enabled) return `<h4 id="s-cals-h">${tr('Calendars')}</h4>${hintK(tr('Calendar subscriptions are turned off on this server'))}`;
   return `<h4 id="s-cals-h">${tr('Calendars')}</h4>
-    ${hint(tr('Show events from Google Calendar, iCloud, Outlook or any CalDAV server next to your tasks: in the calendar, the timeline and on Today. Read-only, and only you see them.'))}
+    ${hint(tr('Show events from Google Calendar, iCloud, Outlook or any CalDAV server next to your tasks: in the calendar, the timeline and on Today. Only you see them. Read-only, unless you allow writing for a CalDAV calendar (Edit).'))}
     <div class="members" id="s-cals"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="row"><button class="btn sm pri" data-m="cal-add">${ic('plus', 's')} ${tr('Add calendar')}</button></div>
     ${feat('cal') ? `<div class="row"><label>${tr('Today')}</label>${chk('s-caltoday', S.settings.cal_today !== '0', tr('show today’s events at the top'))}</div>` : ''}
@@ -243,7 +244,7 @@ async function calsDraw(md, j) {
   calInvalidate();
   box.innerHTML = j.subs.length ? j.subs.map(x => `<div class="calsub ${x.visible ? '' : 'off'}" data-cal="${x.id}" style="--cc:${cssColor(x.color) || '#94a3b8'}">
       <button class="cswatch" data-calact="color" title="${tr('Color')}" aria-label="${tr('Color')}"></button>
-      <div class="calsub-main"><b>${esc(x.name)}</b><small class="muted">${esc(x.kind === 'caldav' ? `CalDAV · ${x.username}` : x.url_hint)} · ${calStatus(x)}</small></div>
+      <div class="calsub-main"><b>${esc(x.name)}</b><small class="muted">${esc(x.kind === 'caldav' ? `CalDAV · ${x.username}` : x.url_hint)} · ${calStatus(x)}${x.write && x.can_write ? ' · ' + esc(tr('writable')) : ''}</small></div>
       <label class="calvis" title="${tr('Show')}"><input type="checkbox" data-calact="vis" ${x.visible ? 'checked' : ''} aria-label="${tr('Show')}"></label>
       <button class="iconbtn" data-calact="refresh" title="${tr('Refresh now')}" aria-label="${tr('Refresh now')}">${ic('repeat', 's')}</button>
       <button class="iconbtn" data-calact="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
@@ -355,8 +356,10 @@ function calEditModal(x, colors, done) {
     ${x.kind === 'ics' ? `<div class="row"><label for="ce-url">${tr('Link')}</label><input id="ce-url" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${tr('saved ({0}), empty = keep', x.url_hint)}"></div>`
     : `<div class="row"><label for="ce-user">${tr('Username')}</label><input id="ce-user" autocomplete="off" autocapitalize="off" value="${esc(x.username)}"></div>
       <div class="row"><label for="ce-pw">${tr('Password')}</label><input id="ce-pw" type="password" autocomplete="new-password" placeholder="${x.password_saved ? tr('saved, empty = keep') : ''}"></div>`}
+    ${dvw_editRow(x)}
     <div class="calerr" role="alert" id="ce-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  dvw_editWire(md, x, done);  // 2.52.0 (#1128): "Allow writing"
   md.addEventListener('click', async e => {
     const cb = e.target.closest('[data-c]');
     if (cb) { color = cb.dataset.c; $$('.cpal [data-c]', md).forEach(b => b.classList.toggle('on', b === cb)); return; }

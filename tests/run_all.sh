@@ -819,6 +819,9 @@ fresh; run p251_a_ui node p251_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.51.0 part C: agents on the pin board + weekly status (#1352), time check + proposals (#1353), shoot planning (#1355)
 fresh; run p251_c_api "$PY" p251_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p251_c_ui node p251_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.52.0 part B: writing events into subscribed CalDAV calendars (#1128), fake CalDAV server inside the container
+fresh; run p252_b_api "$PY" p252_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p252_b_ui node p252_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

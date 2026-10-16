@@ -114,6 +114,29 @@ custom labels), birthday (also without the year), anniversary, notes, groups (`C
 Kalmido; every other property (social profiles, Apple's contact groups, …) is kept as it came. Each address book is one
 collection (`/dav/addressbooks/<user>/b<id>/`). An address book shared with you *view only* is read-only in the apps.
 
+## Writing into subscribed calendars
+
+Calendars of other services that you subscribed to under **Settings › Calendars** are read-only at first. For a
+calendar added as a **CalDAV account** (iCloud, Nextcloud, Fastmail, mailbox.org, Radicale, Baïkal …) you can switch on
+**Allow writing** in its edit window (pencil next to the calendar):
+
+- Kalmido first asks the server whether your account may write there (`current-user-privilege-set`). A shared calendar
+  you may only read cannot be switched on ("This calendar does not allow writing"). The check runs again on every sync.
+- Afterwards the event window offers the calendar under **Subscribed calendars** in the "Calendar" field, and its events
+  get **Edit** and **Delete** in their popover; in the week and day view they can be dragged like your own events.
+- Kalmido writes only what you change (title, place, notes, times). Everything else in the event stays as it was:
+  invitees, alarms and fields of other apps. A repeating event moves as a whole series; one single date of a series of
+  another service cannot be changed on its own.
+- **Changed elsewhere:** if the event was changed on another device in the meantime, Kalmido overwrites nothing. It shows
+  "This event was changed elsewhere", reloads the calendar, and you can make your change again.
+- Deleting can be undone for a few minutes (Undo puts the event back).
+- Calendar links (ICS / iCal, also Google's "secret address in iCal format") stay read-only and never show up in the
+  "Calendar" field. Google calendars cannot be written to.
+
+Your password for the calendar stays encrypted on the server, every request goes only to the server and the calendar
+you subscribed to (the same address checks as for reading), and only you can write into your subscriptions; agents
+have no access to them.
+
 ## For admins
 
 ### Settings
