@@ -32,6 +32,11 @@ MAX_TOKENS = int(os.environ.get("EMBED_MAX_TOKENS", "512"))
 MAX_BODY = 2 * 1024 * 1024
 THREADS = int(os.environ.get("EMBED_THREADS", "0"))  # 0 = onnxruntime decides
 STUB = os.environ.get("EMBED_STUB", "") == "1"
+LOCK_WAIT = float(os.environ.get("EMBED_LOCK_WAIT", "5"))  # seconds a request waits for the model, then 503 (no endless queue)
+
+
+class Busy(Exception):
+    """The model did not come free within LOCK_WAIT."""
 
 
 class Stub:
@@ -80,8 +85,12 @@ class Model:
         feed = {"input_ids": ids, "attention_mask": mask}
         if "token_type_ids" in self.inputs:
             feed["token_type_ids"] = np.zeros_like(ids)
-        with self.lock:
+        if not self.lock.acquire(timeout=LOCK_WAIT):
+            raise Busy
+        try:
             hidden = self.sess.run(None, feed)[0]  # (batch, tokens, dim)
+        finally:
+            self.lock.release()
         if POOLING == "cls":
             pooled = hidden[:, 0]
         else:
@@ -138,6 +147,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": "expected {texts: [1..%d strings], kind: passage|query}" % MAX_TEXTS})
         try:
             vecs = ENGINE.embed(texts, kind)
+        except Busy:
+            return self._send(503, {"error": "busy"})
         except Exception as e:  # noqa: BLE001 -- the reason in the log, never the texts
             print("embed: failed:", type(e).__name__, flush=True)
             return self._send(500, {"error": "embedding failed"})

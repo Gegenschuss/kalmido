@@ -226,6 +226,14 @@ check(T1 not in ids_of(r.json()), "similar: exclude leaves the task out")
 check(Bo.post(B + "/api/tasks/similar", json={"title": "ab"}).json()["items"] == [], "similar: too short = nothing")
 check(Bo.post(B + "/api/tasks/similar", json={"title": "x", "list_id": "a"}).status_code == 400, "similar: bad list_id = 400")
 
+# 2.59.0 (#1375): review - live queries per account are limited (6 per 10 s): the 7th answers empty, never a 500
+time.sleep(10.5)  # carol's earlier queries are out of the window
+res = [Ca.post(B + "/api/tasks/similar", json={"title": "Invoice template for clients", "list_id": LB}) for _ in range(7)]
+check(all(r.ok and r.json()["enabled"] is True for r in res), "rate limit: every answer ok + enabled " + str([r.status_code for r in res]))
+check(all(TB in ids_of(r.json()) for r in res[:6]) and res[6].json()["items"] == [], f"rate limit: 6 answered, the 7th empty {[len(r.json()['items']) for r in res]}")
+check(T1 in ids_of(Bo.post(B + "/api/tasks/similar", json={"title": "Invoice template for clients", "list_id": LA}).json()),
+      "rate limit: per account (bob still gets his hints)")
+
 # ================================================================== search semantic=1
 r = Bo.get(B + "/api/tasks", params={"scope": "search", "q": "clients invoice template", "semantic": "1"})
 ts = r.json()["tasks"]
