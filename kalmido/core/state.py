@@ -384,6 +384,9 @@ def task_query():
             extra = {"deletable": sum(1 for x in lids if x in ok), "kept": sum(1 for x in lids if x not in ok)}
     elif scope == "search":
         rows = search_tasks(c, uid, request.args.get('q', '').strip(), limit)
+        if request.args.get("semantic") == "1":  # 2.59.0 B (#1375): + tasks of similar meaning (only visible ones)
+            from ..tasks.related import rt9_search_extend
+            rows = rt9_search_extend(c, uid, request.args.get('q', '').strip(), rows, limit)
     else:
         rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND status!=0 AND {tvis(c, uid)} "
                              + ("AND (COALESCE(completed_at, ''), id) < (?, ?) " if cur else "")

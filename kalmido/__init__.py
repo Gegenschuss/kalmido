@@ -145,6 +145,7 @@ ORDER = (
     "life.v1",
     "team.clients",
     "team.clients_bulk",  # 2.47.3 (#1733): several clients at once
+    "office.clientlink",  # 2.59.0 A (#1735): the address book search of the client dialog
     "team.workload",
     "hub.absence",  # 2.50.0 A (#1195): absences + German public holidays
     "hub.dispo",  # 2.50.0 A (#1194): resources and disposition (bookings of crew and equipment)
@@ -203,6 +204,7 @@ ORDER = (
     "newsletter.web",  # 2.55.0 (#1455): the routes of the newsletter connection
     "receipts.suggest",  # 2.48.0 (#1356): receipts: project / category, agents suggest, people confirm
     "accounts.layouts_more",  # 2.55.0 (#1067): the new views' blocks for the agents' proposals (after agents.lyprop)
+    "tasks.related",  # 2.59.0 B (#1375): related tasks (text vectors from the optional embedding service, API v1, agent events)
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

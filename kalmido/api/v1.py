@@ -1333,14 +1333,19 @@ def v1_search():
     if request.args.get("scope") == "messages":  # 2.33.0 (#1080): comments, team chat, agent chats
         from ..collab.msgsearch import v1_search_messages
         return v1_search_messages()
-    a = v1_args(("q", "limit", "cursor", "scope"))
+    a = v1_args(("q", "limit", "cursor", "scope", "semantic"))  # 2.59.0 B (#1375): + semantic
     if a.get("scope") not in (None, "", "tasks"):
         raise BadInput(tr("Invalid value: {0}", "scope"))
+    if a.get("semantic") not in (None, "", "0", "1"):
+        raise BadInput(tr("Invalid value: {0}", "semantic"))
     q = (a.get("q") or "").strip()
     if not q or len(q) > 200:
         raise BadInput(tr("Invalid value: {0}", "q"))
     rows = search_tasks(db(), me(), q, 2000)
-    return v1_page([v1_task(d) for d in rows], cursor_dec("o", a.get("cursor")), v1_limit(a))
+    if a.get("semantic") == "1":  # 2.59.0 B (#1375): + tasks of similar meaning (only visible ones, flag similar)
+        from ..tasks.related import rt9_search_extend
+        rows = rt9_search_extend(db(), me(), q, rows, len(rows) + 20)
+    return v1_page([{**v1_task(d), **({"similar": True} if d.get("similar") else {})} for d in rows], cursor_dec("o", a.get("cursor")), v1_limit(a))
 
 
 @app.post("/api/v1/import/<source>")

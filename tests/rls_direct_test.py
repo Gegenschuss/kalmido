@@ -112,6 +112,8 @@ LB = Ca.post(B + "/api/lists", json={"name": "Beta list", "org_id": BETA}).json(
 for s, lid, uid, org in ((Bo, LA, BOB, ALPHA), (Ca, LB, CAROL, BETA)):
     tid = s.post(B + "/api/tasks", json={"title": "bell", "list_id": lid}).json()["id"]
     sql("INSERT INTO task_bell(task_id,user_id,org_id,level,created_at,updated_at) VALUES(?,?,?,'mute','2026-01-01','2026-01-01') ON CONFLICT DO NOTHING", (tid, uid, org))
+    # 2.59.0 (#1375): task_vectors points at a task the same way (task_id is its key): one vector row per organisation
+    sql("INSERT INTO task_vectors(task_id,org_id,list_id,model,dim,vec,text_hash,updated_at) VALUES(?,?,?,'t',0,'','','2026-01-01') ON CONFLICT DO NOTHING", (tid, org, lid))
 for s, nm in ((Bo, f"{MARK} cal"), (Ca, "Beta cal")):
     assert s.post(B + "/api/evcals", json={"name": nm}).ok
     assert s.post(B + "/api/books", json={"name": nm.replace("cal", "book")}).ok

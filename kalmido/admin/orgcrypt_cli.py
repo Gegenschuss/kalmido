@@ -293,6 +293,9 @@ def encrypt_org(c, oid, stop=None):
     if key is None:
         return {"fields": 0, "files": 0, "failed": 0}
     nf = fields_pass(c, oid, True, key, stop)
+    from ..tasks.related import emb_drop_org
+    emb_drop_org(c, oid, sealed=False)  # 2.59.0 B (#1375): plain task vectors go, the embedding worker computes them sealed
+    c.commit()
     ns, bad = files_encrypt(c, oid, key, org_files(c, oid), stop)
     if not (stop and stop()) and not bad:
         with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
@@ -328,6 +331,9 @@ def decrypt_all(c):
         if key is None:
             continue
         tot["fields"] += fields_pass(c, oid, False, key)
+    from ..tasks.related import emb_drop_sealed
+    emb_drop_sealed(c)  # 2.59.0 B (#1375): no sealed task vector stays behind (computed again, plain)
+    c.commit()
     n, bad = files_decrypt(c, all_files(c))
     tot["files"], tot["failed"] = n, bad
     return tot
