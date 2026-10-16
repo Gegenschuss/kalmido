@@ -150,6 +150,7 @@ function clkInit(md, c) {
   const ks = (c?.contacts || []).map(k => ({...k}));
   if (!ks.length && c?.contact) ks.push({name: c.contact, role: '', email: '', phone: '', is_default: true});
   md._clk = ks;
+  md._clId = c?.id || 0;  // 2.59.0 (#1735): the address book search needs a saved client (its organisation)
   clkDraw(md);
 }
 function clkRead(md) {
@@ -161,12 +162,13 @@ function clkDraw(md) {
   if (ks.length && !ks.some(k => k.is_default)) ks[0].is_default = true;
   const f = (i, k, label, v, mx, attrs = '') => `<label class="oimfl"><span>${esc(label)}</span><input data-clk="${k}" data-i="${i}" maxlength="${mx}" value="${esc(v || '')}" ${attrs}></label>`;
   box.innerHTML = ks.map((k, i) => `<div class="clkc"><div class="oimgrid">${f(i, 'name', tr('Name'), k.name, 120, 'autocomplete="off"')}${f(i, 'role', tr('Function or department'), k.role, 120)}${f(i, 'email', tr('E-mail'), k.email, 200, 'type="email" autocomplete="off"')}${f(i, 'phone', tr('Phone'), k.phone, 60, 'type="tel" autocomplete="off"')}</div>
-    <div class="lacts"><label class="chkl"><input type="radio" name="cl-kdef" data-clk="is_default" data-i="${i}" ${k.is_default ? 'checked' : ''}> ${tr('Default')}</label><span class="spacer"></span><button type="button" class="btn sm ghost" data-clk-rm="${i}" aria-label="${esc(tr('Remove {0}', k.name || tr('contact person')))}">${ic('trash', 's')} ${tr('Remove')}</button></div></div>`).join('')
+    <div class="lacts"><label class="chkl"><input type="radio" name="cl-kdef" data-clk="is_default" data-i="${i}" ${k.is_default ? 'checked' : ''}> ${tr('Default')}</label>${ckl_html(md, k, i)}<span class="spacer"></span><button type="button" class="btn sm ghost" data-clk-rm="${i}" aria-label="${esc(tr('Remove {0}', k.name || tr('contact person')))}">${ic('trash', 's')} ${tr('Remove')}</button></div></div>`).join('')
     + `<button type="button" class="btn sm" data-clk-add>${ic('plus', 's')} ${tr('Add contact person')}</button>`;
   if (!box._clkOn) {
     box._clkOn = true;
     box.addEventListener('click', e => {
       const add = e.target.closest('[data-clk-add]'), rm = e.target.closest('[data-clk-rm]');
+      if (ckl_click(md, e)) return;  // 2.59.0 (#1735): from the address book / unlink
       if (!add && !rm) return;
       clkRead(md);
       if (add) md._clk.push({name: '', role: '', email: '', phone: '', is_default: !md._clk.length});
@@ -179,7 +181,45 @@ function clkDraw(md) {
 }
 function clkValue(md) {
   clkRead(md);
-  return md._clk.filter(k => (k.name || '').trim()).map(k => ({...(k.id ? {id: k.id} : {}), name: k.name.trim(), role: (k.role || '').trim(), email: (k.email || '').trim(), phone: (k.phone || '').trim(), is_default: !!k.is_default}));
+  return md._clk.filter(k => (k.name || '').trim()).map(k => ({...(k.id ? {id: k.id} : {}), name: k.name.trim(), role: (k.role || '').trim(), email: (k.email || '').trim(), phone: (k.phone || '').trim(), is_default: !!k.is_default, contact_id: k.contact_id || null}));
+}
+// 2.59.0 (#1735): a contact person linked to a contact of the address book -- "From the address book" searches the address
+// books the server allows for this client (the organisation's, a freelancer's own) and copies name, function, e-mail and
+// phone into the fields; the link is saved with the client (Cancel drops it again). Later changes of the contact do not follow.
+function ckl_html(md, k, i) {
+  if (k.contact_id) return `<span class="cklk" title="${esc(tr('Linked to a contact of the address book'))}">${ic('link', 's')} ${esc(tr('Linked'))}</span><button type="button" class="linkbtn" data-clk-unlink="${i}">${tr('Unlink')}</button>`;
+  return md._clId && feat('contacts') ? `<button type="button" class="btn sm ghost" data-clk-pick="${i}">${ic('book', 's')} ${tr('From the address book')}</button>` : '';
+}
+function ckl_click(md, e) {
+  const pk = e.target.closest('[data-clk-pick]'), un = e.target.closest('[data-clk-unlink]');
+  if (un) { clkRead(md); const k = md._clk[+un.dataset.clkUnlink]; if (k) k.contact_id = null; clkDraw(md); return true; }
+  if (!pk) return false;
+  clkRead(md);
+  ckl_pick(md, pk, +pk.dataset.clkPick);
+  return true;
+}
+function ckl_pick(md, anchor, i) {
+  const p = openPop(anchor, `<div class="ctpick cklpick"><div class="row"><input id="cklp-q" type="search" placeholder="${esc(tr('Search contacts'))}" aria-label="${esc(tr('Search contacts'))}" autocomplete="off"></div>
+    <div class="ctpl" id="cklp-l" role="listbox" aria-label="${esc(tr('Contacts'))}"><div class="muted">${tr('Loading…')}</div></div></div>`);
+  let seq = 0, items = [];
+  const find = async q => {
+    const s = ++seq;
+    let j; try { j = await api('GET', `/api/clients/${md._clId}/book-contacts?q=${encodeURIComponent(q || '')}`); } catch { return; }
+    if (s !== seq || !$('#cklp-l')) return;
+    items = j.contacts;
+    $('#cklp-l').innerHTML = items.length ? items.map(c => `<button type="button" role="option" class="ctrow" data-cklp="${c.id}">${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org)}</b><small class="muted">${esc([c.title, c.email || c.phone, c.book].filter(Boolean).join(' · '))}</small></span></button>`).join('')
+      : `<div class="muted">${esc(q ? tr('No contacts found') : tr('No contacts to choose from: only the address books of the organisation of the client can be linked (without an organisation: your own).'))}</div>`;
+  };
+  find('');
+  p.oninput = e => { if (e.target.id === 'cklp-q') { clearTimeout(p._t); p._t = setTimeout(() => find(e.target.value.trim()), 180); } };
+  p.onclick = e => {
+    const b = e.target.closest('[data-cklp]'); if (!b) return;
+    const c = items.find(x => x.id === +b.dataset.cklp), k = md._clk[i]; if (!c || !k) return;
+    Object.assign(k, {contact_id: c.id, name: (c.fn || c.org || k.name).slice(0, 120), role: (c.title || k.role || '').slice(0, 120),
+      email: (c.email || k.email || '').slice(0, 200), phone: (c.phone || k.phone || '').slice(0, 60)});
+    closePop(); clkDraw(md);
+  };
+  setTimeout(() => { if (!isTouch()) $('#cklp-q')?.focus(); }, 30);
 }
 
 // ---- the list dialog: the client of the list, its forms

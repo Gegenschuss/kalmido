@@ -866,6 +866,9 @@ fresh; run p256_a_ui node p256_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.59.0 part C: #1827 job names and colours (job_name / job_parent / job_parent_name, agent_jobs.parent_id, tag + colour from the name)
 fresh; run p259_c_api "$PY" p259_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p259_c_ui node p259_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.59.0 part A: client contact persons linked to address book contacts (#1735)
+fresh; run p259_a_api "$PY" p259_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p259_a_ui node p259_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

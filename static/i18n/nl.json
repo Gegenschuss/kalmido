@@ -8206,5 +8206,13 @@
   "Back to the whole chat": "Terug naar de hele chat",
   "Job has ended": "Job is beëindigd",
   "The job reads it after its next step.": "De job leest het na zijn volgende stap.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)",
+  "Linked": "Gekoppeld",
+  "Linked to a contact of the address book": "Gekoppeld aan een contact uit het adresboek",
+  "Unlink": "Ontkoppelen",
+  "From the address book": "Uit adresboek kiezen",
+  "No contacts found": "Geen contacten gevonden",
+  "No contacts to choose from: only the address books of the organisation of the client can be linked (without an organisation: your own).": "Geen contacten om te kiezen: alleen de adresboeken van de organisatie van de klant kunnen worden gekoppeld (zonder organisatie: je eigen).",
+  "Open contact": "Contact openen",
+  "Contact person at": "Contactpersoon bij"
 }

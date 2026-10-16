@@ -874,6 +874,12 @@ first) and `contact` stays the default's name. `POST` / `PATCH` with `contacts` 
 kept / changed, without one added, a missing one deleted; `is_default` marks the default, else the first); writing only
 `contact` renames the default (empty removes it). Office documents choose one with `contact_id` (`null` = the default, `0` = none;
 the "attn." line of the address and the buyer contact BT-56 of the e-invoice follow it; `client_contacts` in the document).
+2.59.0 (#1735): a contact person may be linked to an address book contact (`contact_id`, `null` = not linked). Allowed are only
+contacts of an address book the client's organisation owns (a client without an organisation: its creator's own address books),
+never a private book; another contact `400`. In `PATCH` a missing `contact_id` keeps the link, `null` drops it; a new link
+needs the scope `contacts`. Name, e-mail and phone stay a copy (documents read it). Deleting the contact or its address book
+drops only the link; a client moved into another workspace loses its links. `GET /contacts/{id}` adds `clients`
+(`client_id`, `name`, `icon`, `role`, `contact_person_id`) for people who may open those clients.
 A list's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is the time report of its lists:
 `GET /time/entries?lists=1,2&from=&to=` (web) or `/api/time/export.csv`.
 

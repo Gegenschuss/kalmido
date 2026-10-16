@@ -8206,5 +8206,13 @@
   "Back to the whole chat": "Retour au chat complet",
   "Job has ended": "La tâche est terminée",
   "The job reads it after its next step.": "La tâche le lit après sa prochaine étape.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)",
+  "Linked": "Lié",
+  "Linked to a contact of the address book": "Lié à un contact du carnet d'adresses",
+  "Unlink": "Délier",
+  "From the address book": "Depuis le carnet d'adresses",
+  "No contacts found": "Aucun contact trouvé",
+  "No contacts to choose from: only the address books of the organisation of the client can be linked (without an organisation: your own).": "Aucun contact à choisir : seuls les carnets d'adresses de l'organisation du client peuvent être liés (sans organisation : les vôtres).",
+  "Open contact": "Ouvrir le contact",
+  "Contact person at": "Interlocuteur chez"
 }

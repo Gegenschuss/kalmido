@@ -7691,3 +7691,8 @@ button.jobtag b{font-weight:600}
    page background, so it turns lighter in the light theme and softer in the dark one */
 .cmsg.jobm.jpart .cbub{box-shadow:inset .25rem 0 0 color-mix(in srgb,var(--jcol) 70%,var(--bg))}
 .jpart .jobtag i,.jcbar.jpart .jcdot{background:color-mix(in srgb,var(--jcol) 70%,var(--bg))}
+/* 2.59.0 A (#1735) a client's contact person linked to an address book contact: the mark in the client dialog, the search */
+.clkc .lacts{flex-wrap:wrap}
+.clkc .cklk{display:inline-flex;align-items:center;gap:.25rem;color:var(--accent);font-size:.8125rem}
+.clkc [data-clk-unlink]{min-height:2.75rem;font-size:.8125rem}
+#pop .cklpick .ctpl{max-height:min(20rem,50dvh)}

@@ -1345,8 +1345,9 @@ _CLIENT = {"name": {"type": "string"}, "icon": {"type": "string"}, "color": {"ty
            "rate": {"type": "number"}, "budget_h": {"type": "number"}, "budget_amount": {"type": "number"}, "org_id": {"type": "integer"},
            "archived": {"type": "boolean"},
            # 2.40.0 (#1380): the contact persons (the whole list; "contact" stays the default's name)
-           "contacts": {"type": "array", "description": "2.40.0: the contact persons [{id?, name, role?, email?, phone?, is_default?}]: "
-                        "the whole list (with id = keep, without = new, missing = deleted)", "items": {"type": "object"}}}
+           "contacts": {"type": "array", "description": "2.40.0: the contact persons [{id?, name, role?, email?, phone?, is_default?, contact_id?}]: "
+                        "the whole list (with id = keep, without = new, missing = deleted); 2.59.0: contact_id = a contact of an address "
+                        "book of the client's organisation (null = unlink, missing = unchanged; needs the scope contacts)", "items": {"type": "object"}}}
 _FORM = {"title": {"type": "string"}, "intro": {"type": "string"}, "access": {"type": "string", "enum": ["org", "public"]},
          "section_id": {"type": "integer"}, "ask_email": {"type": "boolean"}}
 TOOLS += [

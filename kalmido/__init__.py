@@ -145,6 +145,7 @@ ORDER = (
     "life.v1",
     "team.clients",
     "team.clients_bulk",  # 2.47.3 (#1733): several clients at once
+    "office.clientlink",  # 2.59.0 A (#1735): the address book search of the client dialog
     "team.workload",
     "hub.absence",  # 2.50.0 A (#1195): absences + German public holidays
     "hub.dispo",  # 2.50.0 A (#1194): resources and disposition (bookings of crew and equipment)
