@@ -41,6 +41,8 @@ services:
       # Single sign-on via a trusted proxy header (see .env.example / README): map the proxy port
       # only to the address your proxy connects to, e.g. instead of the line above:
       # - "127.0.0.1:3040:3045"
+    # 2.59.0 (#1375): "default" + the internal network of the optional embedding service (below)
+    networks: [default, embed]
 
   db:
     # PostgreSQL 17 (2.37.0). Stay on 17 when updating; a new major version needs a dump + restore (docs/SELF-HOSTING.md).
@@ -69,3 +71,26 @@ services:
     volumes:
       # the database files; no port is published, only Kalmido reaches the database
       - ./pgdata:/var/lib/postgresql/data
+
+  # 2.59.0 (#1375): optional -- "Related tasks" (similar tasks in a task, a hint on likely duplicates while adding, "also similar
+  # meaning" in the search). A small local embedding model on your CPU turns task texts into numbers; it writes no text and
+  # sends nothing anywhere. Start it with: docker compose --profile embed up -d --build
+  # and set KALMIDO_EMBED_URL=http://embed:8090 in .env (then restart kalmido). About 0.6 GB image, ~0.5 GB RAM.
+  # Without it (the default) Kalmido works as before and hides the related tasks.
+  embed:
+    build: ./embed
+    image: kalmido-embed:local
+    container_name: kalmido-embed
+    profiles: ["embed"]
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+    # no published port: only Kalmido reaches it, over the internal network (no way out to the internet)
+    networks: [embed]
+
+networks:
+  embed:
+    internal: true
