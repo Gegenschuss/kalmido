@@ -27,7 +27,10 @@ function rt9_listHtml(c) {
   if (!c || (c.busy && !c.items)) return `<div class="muted rt9empty">${tr('Loading…')}</div>`;
   if (c.pending) return `<div class="muted rt9empty">${esc(tr('Being computed, please check again in a minute.'))}</div>`;
   if (!c.items?.length) return `<div class="muted rt9empty">${esc(tr('Nothing similar found.'))}</div>`;
-  return c.items.map(x => `<button type="button" class="rt9it ${x.done ? 'rt9done' : ''}" data-act="open-id" data-id="${x.id}"><span class="rt9n">#${x.id}</span><span class="rt9t">${esc(mdPlain(x.title))}</span>${x.dup ? `<span class="rt9dup">${esc(tr('probably a duplicate'))}</span>` : ''}</button>`).join('');
+  const row = x => `<button type="button" class="rt9it ${x.done ? 'rt9done' : ''}" data-act="open-id" data-id="${x.id}"><span class="rt9n">#${x.id}</span><span class="rt9t">${esc(mdPlain(x.title))}</span>${x.dup ? `<span class="rt9dup">${esc(tr('probably a duplicate'))}</span>` : ''}</button>`;
+  const sim = c.items.filter(x => !x.ref), refs = c.items.filter(x => x.ref);  // part M: tasks named by #number apart, not mixed in
+  return (sim.length ? sim.map(row).join('') : `<div class="muted rt9empty">${esc(tr('Nothing similar found.'))}</div>`)
+    + (refs.length ? `<div class="rt9refh">${esc(tr('Mentioned'))}</div>` + refs.map(row).join('') : '');
 }
 async function rt9_load(tid) {
   const old = RT9.cache.get(tid);

@@ -43,13 +43,16 @@ from ..api.v1 import v1_args, v1_view
 
 # ---- the one place for the model-dependent values (part M's measurement; environment overrides for other models) ----------
 EMBED_URL = (os.environ.get("KALMIDO_EMBED_URL") or "").strip().rstrip("/")
-EMB_DUP = float(os.environ.get("KALMIDO_RELATED_DUP") or 0.90)     # score from which two tasks are "probably duplicates"
-EMB_REL = float(os.environ.get("KALMIDO_RELATED_MIN") or 0.80)     # lowest score of a related task
-EMB_SEARCH = float(os.environ.get("KALMIDO_RELATED_SEARCH") or 0.80)  # lowest score of a "similar meaning" search hit (query vs task)
-EMB_MIX = os.environ.get("KALMIDO_RELATED_MIX") or "add"  # hybrid with the trigram similarity t of the titles:
+# 2.59.0 part M (measurement on the dev lists, 16.10.2026): multilingual-e5-small int8, cosine thresholds of that model
+EMB_DUP = float(os.environ.get("KALMIDO_RELATED_DUP") or 0.96)     # cosine from which two tasks are "probably duplicates"
+EMB_REL = float(os.environ.get("KALMIDO_RELATED_MIN") or 0.90)     # lowest cosine of a related task
+EMB_SEARCH = float(os.environ.get("KALMIDO_RELATED_SEARCH") or 0.82)  # lowest cosine of a "similar meaning" search hit (query vs task)
+EMB_MIX = os.environ.get("KALMIDO_RELATED_MIX") or "nsum"  # the order of the related tasks, t = trigram similarity of the titles:
+#   nsum: (1 - EMB_W_TXT) * clip((cosine - EMB_NORM) / (1 - EMB_NORM), 0, 1) + EMB_W_TXT * t   (M: e5 cosines sit above ~0.84)
 #   add: min(1, cosine + EMB_W_TXT * t) | max: max(cosine, 0.5 + t / 2) | sum: (1 - EMB_W_TXT) * cosine + EMB_W_TXT * t
-EMB_W_TXT = 0.15
-EMB_REF = 0.95          # an explicit reference (#123, either direction) is at least this related (never "probably a duplicate")
+EMB_NORM = float(os.environ.get("KALMIDO_RELATED_NORM") or 0.84)
+EMB_W_TXT = 0.25
+EMB_REFS = 5            # tasks named by #number (either direction) are shown apart from the similar ones ("ref"), at most this many
 EMB_TRGM_MIN = 0.45     # titles at least this similar (pg_trgm) are candidates even without a close vector
 EMB_TOP = 30            # vector candidates before mixing
 EMB_K = 5               # related tasks shown
@@ -408,10 +411,12 @@ def _cos_of(c, qv, tid, oid):
     return _sumprod(qv, v) if v is not None and len(v) == len(qv) else None
 
 
-def _combine(cos, trg):
-    """The hybrid score of a candidate: cosine (None = no vector) and trigram similarity of the titles (0 = none)."""
-    if cos is None:  # no vector (yet): only an (almost) equal title counts
-        return 0.5 + trg / 2 if EMB_MIX == "max" else EMB_REL if trg >= 0.9 else EMB_W_TXT * trg
+def _rank(cos, trg):
+    """The order of a candidate: cosine (None = no vector) mixed with the trigram similarity of the titles (0 = none)."""
+    if cos is None:
+        return EMB_W_TXT * trg
+    if EMB_MIX == "nsum":
+        return (1 - EMB_W_TXT) * min(1.0, max(0.0, (cos - EMB_NORM) / (1 - EMB_NORM))) + EMB_W_TXT * trg
     if EMB_MIX == "max":
         return max(cos, 0.5 + trg / 2)
     if EMB_MIX == "sum":
@@ -420,10 +425,11 @@ def _combine(cos, trg):
 
 
 def _mix(c, qv, title, text, cos, vis, k, own=None):
-    """Hybrid ranking: the vector candidates plus titles similar by trigrams plus explicit references (#123 in either
-    direction; own = the asked task's id), all only among vis. -> [(score, id, dup)] above EMB_REL, best first. A reference
-    alone is related, never "probably a duplicate"."""
-    sc = {tid: (_combine(s, 0.0), s) for s, tid in cos}
+    """Related = cosine >= EMB_REL (or an almost equal title without a vector), ordered by _rank, without the task's own
+    parent / subtasks; "probably a duplicate" = cosine >= EMB_DUP. Plus, apart, the tasks named by #number in either
+    direction (own = the asked task's id). All only among vis. -> [(score, id, dup, ref)]."""
+    cs = {tid: s for s, tid in cos}
+    trg = {}
     t = (title or "").strip()[:300]
     ids = sorted(vis)
     if t:
@@ -431,11 +437,21 @@ def _mix(c, qv, title, text, cos, vis, k, own=None):
             part = ids[i:i + 5000]
             for r in c.execute(f"SELECT id, similarity(title, ?) FROM tasks WHERE id IN ({','.join('?' * len(part))}) "
                                "AND similarity(title, ?) >= ?", (t, *part, t, EMB_TRGM_MIN)):
-                trg, tid = float(r[1]), r[0]
-                base = sc[tid][1] if tid in sc else _cos_of(c, qv, tid, vis[tid])
-                sc[tid] = (_combine(base, trg), base)
-    dup = {tid: v[0] >= EMB_DUP for tid, v in sc.items()}
-    score = {tid: v[0] for tid, v in sc.items()}
+                trg[r[0]] = float(r[1])
+                if r[0] not in cs:
+                    cs[r[0]] = _cos_of(c, qv, r[0], vis[r[0]])
+    near = set()
+    if own:  # the parent and the subtasks are shown by the task itself
+        near = {r[0] for r in c.execute("SELECT id FROM tasks WHERE parent_id=? OR id=(SELECT parent_id FROM tasks WHERE id=?)", (own, own))}
+    sim = []
+    for tid, cv in cs.items():
+        if tid == own or tid in near:
+            continue
+        g = trg.get(tid, 0.0)
+        if (cv is not None and cv >= EMB_REL) or (cv is None and g >= 0.9):
+            sim.append((round(_rank(cv, g), 4), tid, cv is not None and cv >= EMB_DUP, False))
+    sim.sort(key=lambda x: (x[0], -x[1]), reverse=True)
+    sim = sim[:k]
     refs = {int(x) for x in _REF.findall(text or "")} & set(vis)
     if own:  # the tasks that name this one (#own) in their title or description
         pat = f"%#{int(own)}%"
@@ -445,11 +461,9 @@ def _mix(c, qv, title, text, cos, vis, k, own=None):
                                "AND (title LIKE ? OR content LIKE ?)", (*part, pat, pat)):
                 if int(own) in {int(x) for x in _REF.findall((r[1] or "") + "\n" + (r[2] or ""))}:
                     refs.add(r[0])
-    for rid in refs - {own}:
-        score[rid] = max(score.get(rid, 0.0), EMB_REF, EMB_REL)
-        dup.setdefault(rid, False)
-    out = sorted(((round(s, 4), tid, dup[tid]) for tid, s in score.items() if s >= EMB_REL), reverse=True)
-    return out[:k]
+    shown = {x[1] for x in sim}
+    extra = sorted(refs - shown - {own})[:EMB_REFS]
+    return sim + [(round(_rank(cs.get(x), trg.get(x, 0.0)), 4), x, False, True) for x in extra]
 
 
 def _items(c, scored):
@@ -458,7 +472,7 @@ def _items(c, scored):
     ids = [x[1] for x in scored]
     rows = {r["id"]: r for r in c.execute(f"SELECT id, title, list_id, status FROM tasks WHERE id IN ({','.join('?' * len(ids))})", ids)}
     return [{"id": tid, "title": rows[tid]["title"], "list_id": rows[tid]["list_id"], "done": rows[tid]["status"] != 0,
-             "score": s, "dup": bool(d)} for s, tid, d in scored if tid in rows]
+             "score": s, "dup": bool(d), "ref": bool(rf)} for s, tid, d, rf in scored if tid in rows]
 
 
 def rt9_related(c, uid, tid, k=EMB_K):
@@ -485,7 +499,8 @@ def rt9_event(c, tid, aid, k=EMB_K):
         if qv is None:
             return None
         vis = _visible_agent(c, aid, exclude=(tid,))
-        scored = [(round(s, 4), x, s >= EMB_DUP) for s, x in _score_vec(c, qv, vis, k) if s >= EMB_REL]
+        near = {r[0] for r in c.execute("SELECT id FROM tasks WHERE parent_id=? OR id=(SELECT parent_id FROM tasks WHERE id=?)", (tid, tid))}
+        scored = [(round(s, 4), x, s >= EMB_DUP, False) for s, x in _score_vec(c, qv, vis, k + len(near)) if s >= EMB_REL and x not in near][:k]
         return [{"id": i["id"], "title": i["title"], "score": i["score"]} for i in _items(c, scored)]
     except Exception as e:  # noqa: BLE001 -- an event never fails because of its extra field
         print("embed: event", type(e).__name__, e, flush=True)

@@ -8219,5 +8219,6 @@
   "Service reachable": "Servicio accesible",
   "Service not reachable": "Servicio no accesible",
   "{0} tasks computed, {1} waiting": "{0} tareas calculadas, {1} pendientes",
-  "Show related tasks": "Mostrar tareas relacionadas"
+  "Show related tasks": "Mostrar tareas relacionadas",
+  "Mentioned": "Mencionadas"
 }

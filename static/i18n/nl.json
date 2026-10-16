@@ -8219,5 +8219,6 @@
   "Service reachable": "Dienst bereikbaar",
   "Service not reachable": "Dienst niet bereikbaar",
   "{0} tasks computed, {1} waiting": "{0} taken berekend, {1} wachtend",
-  "Show related tasks": "Verwante taken tonen"
+  "Show related tasks": "Verwante taken tonen",
+  "Mentioned": "Genoemd"
 }
