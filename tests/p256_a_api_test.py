@@ -144,6 +144,11 @@ check(act(A, JD, action="message", text="x").status_code == 409, "#1791: a done 
 JW = job("Plain waiting job", user_id=1)
 requests.patch(V + f"/agent/jobs/{JW}", headers=CLH, json={"state": "waiting"})
 check(act(A, JW, action="message", text="x").status_code == 200 and row(JW).get("state") == "waiting", "#1791: a waiting job takes a message, stays waiting")
+# 2.56.0 review: a paused agent gets nothing -> 409, never "sent"
+check(A.patch(B + f"/api/admin/agents/{CL}", json={"enabled": False}).ok, "setup: pause claude")
+r = act(A, JW, action="message", text="while paused")
+check(r.status_code == 409, "#1791: a paused agent -> 409 " + str(r.status_code))
+check(A.patch(B + f"/api/admin/agents/{CL}", json={"enabled": True}).ok, "setup: claude on again")
 check(row(JW).get("name") is None, "#1793: a title without a name -> name null")
 check(row(job("Clara B: Part A", user_id=1)).get("name") == "Clara B", "#1793: a part job's name")
 

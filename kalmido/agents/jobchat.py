@@ -24,8 +24,10 @@ def jc_job_message(c, j):
         return err(tr("The message is empty"))
     if len(text) > JOB_MESSAGE_MAX:
         return err(tr("The message is too long (max. {0} characters)", JOB_MESSAGE_MAX))
-    agent_emit(c, j["agent_id"], "job", {"job": job_dict(c, j), "action": "message", "text": text.strip(),
-                                         "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}})
+    seq = agent_emit(c, j["agent_id"], "job", {"job": job_dict(c, j), "action": "message", "text": text.strip(),
+                                               "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}})
+    if seq is None:  # review: a paused agent / one that does not hear the job's list gets nothing -- say so, never "sent"
+        return err(tr("The agent does not get this message now (paused, or the job's list is not shared with it)"), 409)
     c.commit()
     return jsonify(ok=True, job=job_dict(c, j))
 
@@ -48,9 +50,10 @@ def jc_chat_rows(c, aid, jid, before, limit, after=0):
     if not j or not job_visible(c, j, uid):
         raise Denied(404)
     pre = jc_prefixes(j)
-    q = ("SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND (job_id=? OR (sender='user' AND ("
+    # review: my addressed messages only from the job's start on (a reused first name must not pull in an older job's)
+    q = ("SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND (job_id=? OR (sender='user' AND created_at>=? AND ("
          + " OR ".join("LOWER(body) LIKE ?" for _p in pre) + ")))")
-    args = [aid, uid, jid, *[p + "%" for p in pre]]
+    args = [aid, uid, jid, j["created_at"] or "", *[p + "%" for p in pre]]
     if after:
         q += " AND id>?"
         args.append(after)

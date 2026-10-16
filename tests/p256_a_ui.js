@@ -2,7 +2,7 @@
 // - #1791 the Agents view: "Message" only on a running job's card; the dialog keeps Send off while empty; Send = the
 //   agent gets the 'job' event {action: message, text}; the job stays running
 // - #1793 the agent chat (phone page): a job's tag shows its name, a tap opens the job's own history (bar with name +
-//   title, only the job's messages), the box sends "Clara: …", Back leads to the whole chat; the name at the start of a
+//   title, only the job's messages), the box sends "Job N: …", Back leads to the whole chat; the name at the start of a
 //   job's message is the same link; an ended job: the bar says so, the box is off
 // - the agent menu of the top bar lists the running job with its name and title
 const {execFileSync} = require('child_process');
@@ -82,7 +82,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   ci.value = 'one more thing'; ci.dispatchEvent(new w.Event('input', {bubbles: true}));
   click(w, d.querySelector('[data-act="chat-send"]'));
   const sent = await until(async () => ((await call('GET', `/api/agents/${CL}/chat`)).messages || []).find(m => m.from === 'user' && /one more thing/.test(m.body)));
-  check(sent?.body === 'Clara: one more thing', '#1793: sent as "Clara: …" ' + (sent?.body || ''));
+  // 2.56.0 review: the box addresses the job by its number (a title like "Release: 2.56" is no name the service knows)
+  check(sent?.body === `Job ${JA}: one more thing`, '#1793: sent as "Job N: …" ' + (sent?.body || ''));
   await until(() => /one more thing/.test(d.querySelector('#chat-msgs')?.textContent || ''));
   check(/one more thing/.test(d.querySelector('#chat-msgs')?.textContent || ''), '#1793: the message shows in the job\'s history');
   click(w, d.querySelector('#jc-bar [data-act="jc-back"]'));

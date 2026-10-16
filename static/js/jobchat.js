@@ -61,11 +61,12 @@ function jc_barHtml() {
   return `<div class="jcbar" id="jc-bar" style="--jcol:${ux_jobColor(j.id)}"><button type="button" class="iconbtn jcback" data-act="jc-back" title="${esc(tr('Back to the whole chat'))}" aria-label="${esc(tr('Back to the whole chat'))}">${ic('back', 's')}</button><i class="jcdot" aria-hidden="true"></i><div class="jcn"><b>${esc(jc_label(j))}</b>${rest ? `<span>${esc(rest)}</span>` : ''}</div>${end ? `<span class="jcend">${esc(tr('Job has ended'))}</span>` : ''}</div>`;
 }
 const jc_ph = a => S.chat.job ? (jc_ended() ? tr('Job has ended') : tr('Message to {0}…', jc_label(jc_cur()))) : tr('Message to {0}…', a.name);
-// what the box sends: in a job's history "Clara: <text>" (unless it already starts so)
+// what the box sends: in a job's history "Job 220: <text>" (unless it already starts with that or the job's name) --
+// review: always the number, a title like "Release: 2.56" would otherwise address a job "Release" nobody knows
 function jc_send(body) {
   if (!S.chat.job || !body) return body;
-  const j = jc_cur(), pre = j.name ? j.name + ':' : `Job ${j.id}:`;
-  return body.toLowerCase().startsWith(pre.toLowerCase()) ? body : `${pre} ${body}`;
+  const j = jc_cur(), pre = `Job ${j.id}:`, low = body.toLowerCase();
+  return low.startsWith(pre.toLowerCase()) || (j.name && low.startsWith(j.name.toLowerCase() + ':')) ? body : `${pre} ${body}`;
 }
 // after every chat patch: the bar and the box follow the job's state (fetched at most every 15 s)
 function jc_patch() {
