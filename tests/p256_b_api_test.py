@@ -140,7 +140,9 @@ check(e and e[0]["detail"].get("name") == ["Bob Team", "\U0001F680 Team renamed"
       and e[0]["by"] == "Alice", f"#1795: the history has who and old -> new: {e[:1]}")
 r = A.patch(B + base, json={"color": "#f87171"})
 check(r.ok and row(TEAM)["color"] == "#f87171", "#1795: colour alone")
-check(any(d.get("action") == "restyle" for d in news(Bo)), "#1795: a colour change tells the owner (restyle)")
+# 2.58.0 (#1804): a colour change right after the rename joins the owner's unread rename item (one item, no second one)
+check(any(d.get("action") in ("restyle", "rename") for d in news(Bo)) and len([d for d in news(Bo) if d.get("action") in ("restyle", "rename")]) == 1,
+      "#1795: a colour change tells the owner (joined with the rename, #1804)")
 n0 = len(A.get(B + f"/api/orgs/{ORG}/lists").json()["log"])
 check(A.patch(B + base, json={"color": "#f87171"}).ok and len(A.get(B + f"/api/orgs/{ORG}/lists").json()["log"]) == n0,
       "#1795: the same value again: no history entry")

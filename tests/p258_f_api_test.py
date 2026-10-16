@@ -159,5 +159,28 @@ pa, _v = icon_file(TEAM)
 check(r.ok and head(pa) == b"KENC1\n", "#1805: the organisation admin's way seals as well " + r.text[:160])
 check(A.get(B + r.json().get("icon", "")).status_code == 200 if r.ok else False, "#1805: the admin sees it decrypted")
 
+# ================================================================== #1804 one news item for picture + name
+A.delete(B + base + "/icon")
+LIST2 = Bo.post(B + "/api/lists", json={"name": "\U0001F680 Rockets", "org_id": ORG}).json()["id"]
+b2 = f"/api/orgs/{ORG}/lists/{LIST2}"
+
+
+def news2():
+    return [x.get("data") or {} for x in Bo.get(B + "/api/news").json().get("items", []) if x["kind"] == "orglist" and x.get("list_id") == LIST2]
+
+
+check(A.post(B + b2 + "/icon", files={"file": ("i.png", png(), "image/png")}, headers=H).ok, "#1804: the admin sets a picture")
+check(A.patch(B + b2, json={"name": "Rockets"}).ok, "#1804: ... and the emoji leaves the name")
+n = news2()
+check(len(n) == 1 and n[0].get("action") == "rename" and n[0].get("old") == "\U0001F680 Rockets" and n[0].get("name") == "Rockets",
+      f"#1804: the owner gets one item (rename, old -> new): {n}")
+check(A.patch(B + b2, json={"color": "#f87171"}).ok and len(news2()) == 1, "#1804: a colour change right after joins it too")
+check(A.patch(B + b2, json={"name": "Rockets two"}).ok, "#1804: a second rename")
+n = news2()
+check(len(n) == 1 and n[0].get("old") == "\U0001F680 Rockets" and n[0].get("name") == "Rockets two", f"#1804: still one, from the first name: {n}")
+Bo.post(B + "/api/news/read", json={"all": True})
+check(A.patch(B + b2, json={"color": "#6d8cff"}).ok, "#1804: a change after the owner read it")
+check(len(news2()) == 2, "#1804: ... is a new item " + str(news2()))
+
 print(f"p258_f_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
