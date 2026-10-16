@@ -365,6 +365,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `file_shared`: a folder or file of the file store was shared with you (`node`, `role` view | edit)
 - `document_added`: a new document was recognised in a folder / file shared with you (`document`); a receipt? see *assign a receipt* below
 - `offer_accepted`: a quotation of your office area was accepted (`doc_id`, `client_id`, `list_id`, sums); only with your office switch on
+- `chat_pinned`: the person pinned (`pinned: true`) or unpinned a message of your chat (`message`); information only, nothing to answer
 
 Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get_document` (text, sender, amount) ->
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
@@ -394,7 +395,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
-`move_task`, `post_team_message`, `propose_layout`, `propose_playbook`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
+`move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_layout`, `propose_playbook`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
 `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,

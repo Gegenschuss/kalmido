@@ -113,3 +113,15 @@ task as a push at the highest priority, even if the list is quiet.
   News item ("For you", switched off together with the sharing News) with a preview and *Take over* / *Decline*; taken over,
   it is their own saved arrangement, named after the sender, with no link back.
 - Agents cannot use any of this (403); they propose arrangements their own way (2.55.0, #1066).
+
+## Pinned chat messages (2.62.0)
+
+Important messages stay in view: in the team chat and in the chat with an agent, *Pin* in the menu of a message (on a
+phone: press and hold the message) puts it into a bar at the top of the conversation. With several pins the bar shows
+the newest; a tap on the arrow goes through the others, a tap on the text jumps to the message, also when it is further
+up than the loaded part. *Unpin* in the same menu (or the x in the bar) takes it out again; Undo brings it back. At most
+five messages per conversation are pinned; a deleted message leaves the bar. Everyone in a team chat conversation can
+pin, in an agent chat the person and the agent. Others see the change right away.
+
+A message is sent once: it shows at once as *Sending…*, and Send / Enter wait until the server took it, so pressing
+Enter again (for example right after waking the laptop) does not send it twice.
