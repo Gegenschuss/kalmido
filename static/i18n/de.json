@@ -8226,5 +8226,17 @@
   "Virus scanner: active.": "Virenscanner: aktiv.",
   "Virus scanner: not reachable. Uploads are taken and marked “Unchecked”; the check follows once it runs again.": "Virenscanner: nicht erreichbar. Uploads werden angenommen und als „Ungeprüft“ markiert; die Prüfung folgt, sobald er wieder läuft.",
   "{0} file waits for the check": ["{0} Datei wartet auf die Prüfung", "{0} Dateien warten auf die Prüfung"],
-  "{0} locked file (malware found)": ["{0} gesperrte Datei (Schadsoftware gefunden)", "{0} gesperrte Dateien (Schadsoftware gefunden)"]
+  "{0} locked file (malware found)": ["{0} gesperrte Datei (Schadsoftware gefunden)", "{0} gesperrte Dateien (Schadsoftware gefunden)"],
+  "Text recognised": "Text erkannt",
+  "The text of this file was recognised: the search finds it.": "Der Text dieser Datei wurde erkannt: Die Suche findet sie.",
+  "No text found": "Kein Text gefunden",
+  "The text recognition found no text in this file.": "Die Texterkennung hat in dieser Datei keinen Text gefunden.",
+  "Recognising text…": "Text wird erkannt…",
+  "The text of this file is being recognised in the background.": "Der Text dieser Datei wird im Hintergrund erkannt.",
+  "Found in the file {0}": "Gefunden in der Datei {0}",
+  "Search files: name or text": "Dateien durchsuchen: Name oder Text",
+  "Found in the text": "Im Text gefunden",
+  "in {0}": "in {0}",
+  "Project {0}": "Projekt {0}",
+  "Search results": "Suchergebnisse"
 }

@@ -1233,8 +1233,14 @@ def _number_used(c, oid, num, aid=0):
 def fi_archive_add(c, oid, uid, raw, file_name, b):
     if len(raw) > FI_PDF_MAX:
         raise BadInput(tr("The file is too large (at most {0} MB)", FI_PDF_MAX // (1024 * 1024)))
-    if raw[:1024].find(b"%PDF-") < 0:
+    from ..files.scan import _sc_magic, sc_scan
+    from ..files.upsafe import UploadRefused
+    if _sc_magic(raw) != "application/pdf":  # 2.61.0 review (#1818): by the content (no "<html>...%PDF-" polyglot)
         raise BadInput(tr("Only PDF files can be archived"))
+    try:
+        sc_scan(file_name or "archive.pdf", raw)  # an unreachable scanner lets it through (decision 16.10.2026)
+    except UploadRefused as e:
+        raise BadInput(str(e))
     try:
         rid = int(b.get("run_id"))
     except (TypeError, ValueError):

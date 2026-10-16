@@ -30,7 +30,7 @@ SC_DOWN_S = 30            # after a failed connect: "unchecked" without trying, 
 SC_BATCH = 20             # files per watchdog run (sc_tick)
 SC_BUDGET_S = 20          # seconds per watchdog run at most
 SC_TICK_S = 60            # at most one run per minute (KALMIDO_CLAMD_TICK_S; the tests use 1)
-_SC = {"down_until": 0.0, "tick_at": 0.0, "last_ok": "", "last_err": ""}
+_SC = {"down_until": 0.0, "tick_at": 0.0, "last_ok": "", "last_err": "", "gc_at": 0.0, "gc_id": 0}
 
 
 def _env_int(name, default, lo, hi):
@@ -90,13 +90,21 @@ def _sc_reply(s):
 def _sc_instream(t, data):
     """clamd's answer to the bytes (e.g. "stream: OK", "stream: Eicar-Signature FOUND", "INSTREAM size limit exceeded. ERROR").
     Raises OSError when clamd cannot be reached / does not answer."""
+    end = time.monotonic() + _sc_scan_s()  # 2.61.0 review: one limit for the whole scan, not per socket step
+
+    def left():
+        r = end - time.monotonic()
+        if r <= 0:
+            raise socket.timeout("clamd scan time over")
+        return r
     with _sc_conn(t) as s:
-        s.settimeout(_sc_scan_s())
+        s.settimeout(left())
         s.sendall(b"zINSTREAM\0")
         mv = memoryview(data)
         try:
             for i in range(0, len(mv), SC_CHUNK):
                 ch = mv[i:i + SC_CHUNK]
+                s.settimeout(left())
                 s.sendall(struct.pack("!I", len(ch)) + bytes(ch))
             s.sendall(struct.pack("!I", 0))
         except OSError:  # clamd closes the stream when it is too long: its answer says so
@@ -104,6 +112,7 @@ def _sc_instream(t, data):
             if r:
                 return r
             raise
+        s.settimeout(left())
         return _sc_reply(s)
 
 
@@ -169,7 +178,8 @@ def _sc_magic(data):
         if brand == b"qt  ":
             return "video/quicktime"
         return "video/mp4"
-    if b"%PDF-" in h[:1024]:
+    i = h.find(b"%PDF-", 0, 1024)
+    if i >= 0 and b"<" not in h[:i]:  # 2.61.0 review: "<html>...%PDF-" is a polyglot and no PDF (it stays text/html below)
         return "application/pdf"
     if h[:2] == b"BM" and len(h) >= 26 and h[6:10] == b"\0\0\0\0":
         return "image/bmp"
@@ -393,12 +403,30 @@ def sc_news_live(c, data):
                               (kind, ref, ver)).fetchone())
 
 
+def _sc_gc(c):
+    """2.61.0 review: the rows of deleted files go (every state, also with the scanner off): 200 rows every 10 minutes,
+    walking through the table by id."""
+    from ..core.pg import system_ctx
+    if time.time() - _SC["gc_at"] < 600:
+        return
+    _SC["gc_at"] = time.time()
+    with system_ctx(c):
+        rows = c.execute("SELECT id, kind, ref_id, ver FROM upload_scan WHERE id>? ORDER BY id LIMIT 200",
+                         (_SC["gc_id"],)).fetchall()
+        for r in rows:
+            if not _sc_file(c, r["kind"], r["ref_id"], r["ver"]):
+                c.execute("DELETE FROM upload_scan WHERE id=?", (r["id"],))
+    _SC["gc_id"] = rows[-1]["id"] if len(rows) == 200 else 0
+    c.commit()
+
+
 def sc_tick(c, force=False):
     """Watchdog: scans up to SC_BATCH unchecked files (oldest first, at most SC_BUDGET_S seconds) while clamd answers.
     Returns the number of files checked."""
     from ..core.db import bump
     from ..core.orgcrypt import oc_read_file
     from ..core.pg import system_ctx
+    _sc_gc(c)
     t = sc_target()
     if not t or (not force and time.time() - _SC["tick_at"] < _env_int("KALMIDO_CLAMD_TICK_S", SC_TICK_S, 1, 3600)):
         return 0
@@ -440,6 +468,8 @@ def sc_tick(c, force=False):
                 elif st == "found":
                     c.execute("UPDATE upload_scan SET state='infected', sig=?, checked_at=? WHERE id=?", (sig, iso(now_utc()), r["id"]))
                     _sc_tell(c, r["kind"], r["ref_id"], r["ver"], f[0], sig)
+                    from .textscan import ts_forget  # the recognised text of a locked file is never searchable
+                    ts_forget(c, r["kind"], r["ref_id"])
                     changed = True
                     print(f"virus scan: {sig} found in a stored file ({r['kind']} {r['ref_id']}), locked", flush=True)
                 else:  # clamd could not scan it: again later, waiting longer each time (at most a day)

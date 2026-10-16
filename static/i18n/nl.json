@@ -8226,5 +8226,17 @@
   "Virus scanner: active.": "Virusscanner: actief.",
   "Virus scanner: not reachable. Uploads are taken and marked “Unchecked”; the check follows once it runs again.": "Virusscanner: niet bereikbaar. Uploads worden aangenomen en gemarkeerd als „Niet gecontroleerd”; de controle volgt zodra hij weer draait.",
   "{0} file waits for the check": ["{0} bestand wacht op de controle", "{0} bestanden wachten op de controle"],
-  "{0} locked file (malware found)": ["{0} geblokkeerd bestand (malware gevonden)", "{0} geblokkeerde bestanden (malware gevonden)"]
+  "{0} locked file (malware found)": ["{0} geblokkeerd bestand (malware gevonden)", "{0} geblokkeerde bestanden (malware gevonden)"],
+  "Text recognised": "Tekst herkend",
+  "The text of this file was recognised: the search finds it.": "De tekst van dit bestand is herkend: de zoekfunctie vindt het.",
+  "No text found": "Geen tekst gevonden",
+  "The text recognition found no text in this file.": "De tekstherkenning heeft in dit bestand geen tekst gevonden.",
+  "Recognising text…": "Tekst wordt herkend…",
+  "The text of this file is being recognised in the background.": "De tekst van dit bestand wordt op de achtergrond herkend.",
+  "Found in the file {0}": "Gevonden in het bestand {0}",
+  "Search files: name or text": "Bestanden zoeken: naam of tekst",
+  "Found in the text": "Gevonden in de tekst",
+  "in {0}": "in {0}",
+  "Project {0}": "Project {0}",
+  "Search results": "Zoekresultaten"
 }
