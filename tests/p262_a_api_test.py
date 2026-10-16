@@ -111,5 +111,78 @@ m1 = A.post(B + f"/api/agents/{CL}/chat", data={"body": "A file", "client_id": "
 m2 = A.post(B + f"/api/agents/{CL}/chat", data={"body": "A file", "client_id": "f-1"}, files={"file": ("n.txt", b"x", "text/plain")})
 check(m1.status_code == 201 and m2.status_code == 200 and m1.json()["id"] == m2.json()["id"], "#1530 chat: multipart with client_id once " + m2.text[:200])
 
+
+# ================================================================== #1848 pins: team chat
+tm = [A.post(B + f"/api/team/rooms/{RID}/messages", json={"body": f"Point {i}"}).json()["id"] for i in range(7)]
+r = A.post(B + f"/api/team/messages/{tm[0]}/pin", json={"pinned": True})
+check(r.ok and r.json()["message"]["pinned_at"] and r.json()["message"]["pinned_by"] == ALICE and [x["id"] for x in r.json()["pins"]] == [tm[0]],
+      "#1848 team: alice pins " + r.text[:200])
+pg = A.get(B + f"/api/team/rooms/{RID}/messages?limit=1").json()
+check([x["id"] for x in pg["pins"]] == [tm[0]] and tm[0] not in [x["id"] for x in pg["messages"]], "#1848 team: the page carries the pin, also when older than the page")
+r = A.post(B + f"/api/team/messages/{tm[0]}/pin", json={})
+check(r.ok and r.json()["message"]["pinned_at"] is None and r.json()["pins"] == [], "#1848 team: without pinned it toggles (unpinned)")
+v0 = Bo.get(B + "/api/version").json().get("t")
+r = Bo.post(B + f"/api/team/messages/{tm[1]}/pin", json={"pinned": True})
+check(r.ok and r.json()["message"]["pinned_by"] == BOB, "#1848 team: bob (member) pins alice's message")
+check(Bo.get(B + "/api/version").json().get("t") != v0, "#1848 team: the change marker t moves (others see it live)")
+check(Bo.post(B + f"/api/team/messages/{tm[1]}/pin", json={"pinned": True}).json()["pins"].__len__() == 1, "#1848 team: pinning twice keeps one pin")
+check(Ca.post(B + f"/api/team/messages/{tm[2]}/pin", json={"pinned": True}).status_code == 404, "#1848 team: carol (not in the conversation) 404")
+check(A.post(B + f"/api/team/messages/{tm[2]}/pin", json={"pinned": "yes"}).status_code == 400, "#1848 team: pinned must be a boolean")
+check(A.post(B + "/api/team/messages/99999999/pin", json={"pinned": True}).status_code == 404, "#1848 team: an unknown message 404")
+for i in (2, 3, 4, 5):
+    check(A.post(B + f"/api/team/messages/{tm[i]}/pin", json={"pinned": True}).ok, f"#1848 team: pin {i}")
+r = A.post(B + f"/api/team/messages/{tm[6]}/pin", json={"pinned": True})
+check(r.status_code == 409 and "5" in r.text, "#1848 team: the 6th pin 409 " + r.text[:200])
+assert A.delete(B + f"/api/team/messages/{tm[5]}").ok
+pins = A.get(B + f"/api/team/rooms/{RID}/messages").json()["pins"]
+check(tm[5] not in [x["id"] for x in pins] and len(pins) == 4, "#1848 team: a deleted message leaves the bar")
+check(A.post(B + f"/api/team/messages/{tm[5]}/pin", json={"pinned": True}).status_code == 409, "#1848 team: a deleted message cannot be pinned")
+r = requests.post(V + f"/team/messages/{tm[6]}/pin", headers=CLH, json={"pinned": True})
+check(r.ok and r.json()["message"]["pinned_by"] == CL, "#1848 v1 team: an agent of the channel pins " + r.text[:200])
+check(requests.post(V + f"/team/messages/{tm[6]}/pin", headers=OTH, json={"pinned": False}).status_code == 404, "#1848 v1 team: another agent 404")
+check(requests.post(V + f"/team/messages/{tm[6]}/pin", headers=CLH, json={"pinned": False, "x": 1}).status_code == 400, "#1848 v1 team: unknown fields 400")
+j = requests.get(V + f"/team/rooms/{RID}/messages", headers=CLH).json()
+check(len(j.get("pins", [])) == 5 and all("pinned_at" in x for x in j["data"]), "#1848 v1 team: the page carries pins + pinned_at")
+check(Ca.post(B + f"/api/team/messages/{tm[6]}/pin", json={"pinned": False}).status_code == 404 and
+      len(A.get(B + f"/api/team/rooms/{RID}/messages").json()["pins"]) == 5, "#1848 team: a stranger cannot unpin either")
+om = Bo.post(B + f"/api/team/rooms/{ROTHER}/messages", json={"body": "x"})
+check(om.status_code == 404, "setup: bob is not in the other channel")
+
+# ================================================================== #1848 pins: agent chat
+am = [requests.post(V + f"/agent/chats/{ALICE}", headers=CLH, json={"body": f"Answer {i}"}).json()["id"] for i in range(7)]
+cur = cursor()
+r = A.post(B + f"/api/agents/{CL}/chat/{am[0]}/pin", json={"pinned": True})
+check(r.ok and r.json()["message"]["pinned_by"] == ALICE and [x["id"] for x in r.json()["pins"]] == [am[0]], "#1848 chat: the person pins " + r.text[:200])
+ev = [e for e in events(cur) if e["event"] == "chat_pinned"]
+check(len(ev) == 1 and ev[0]["data"]["pinned"] is True and ev[0]["data"]["message"]["id"] == am[0] and ev[0]["data"]["user"]["id"] == ALICE,
+      "#1848 chat: the agent gets chat_pinned " + str(ev)[:300])
+oev = requests.get(V + "/agent/events?since=0&limit=500", headers=OTH).json()["data"]
+check(not [e for e in oev if e["event"] == "chat_pinned"], "#1848 chat: another agent gets nothing")
+j = A.get(B + f"/api/agents/{CL}/chat?limit=1").json()
+check([x["id"] for x in j["pins"]] == [am[0]], "#1848 chat: the conversation carries pins, also older than the page")
+cur = cursor()
+r = A.post(B + f"/api/agents/{CL}/chat/{am[0]}/pin", json={})
+ev = [e for e in events(cur) if e["event"] == "chat_pinned"]
+check(r.ok and r.json()["pins"] == [] and len(ev) == 1 and ev[0]["data"]["pinned"] is False, "#1848 chat: toggled off, event pinned false")
+cur = cursor()
+r = requests.post(V + f"/agent/chats/{ALICE}/messages/{am[1]}/pin", headers=CLH, json={"pinned": True})
+check(r.ok and r.json()["message"]["pinned_by"] == CL, "#1848 v1 chat: the agent pins in its own conversation " + r.text[:200])
+check(not [e for e in events(cur) if e["event"] == "chat_pinned"], "#1848 v1 chat: the agent's own pin sends no event")
+check(requests.post(V + f"/agent/chats/{ALICE}/messages/{am[2]}/pin", headers=OTH, json={"pinned": True}).status_code == 404, "#1848 v1 chat: another agent 404")
+check(requests.post(V + f"/agent/chats/{BOB}/messages/{am[2]}/pin", headers=CLH, json={"pinned": True}).status_code == 404, "#1848 v1 chat: the message of another person's conversation 404")
+check(requests.post(V + f"/agent/chats/{ALICE}/messages/{am[2]}/pin", headers=CLH, json={"pinned": True, "x": 1}).status_code == 400, "#1848 v1 chat: unknown fields 400")
+check(Bo.post(B + f"/api/agents/{CL}/chat/{am[2]}/pin", json={"pinned": True}).status_code == 404, "#1848 chat: bob cannot pin in alice's chat")
+check(Ca.post(B + f"/api/agents/{CL}/chat/{am[2]}/pin", json={"pinned": True}).status_code == 404, "#1848 chat: carol (no chat with the agent) 404")
+for i in (2, 3, 4, 5):
+    check(A.post(B + f"/api/agents/{CL}/chat/{am[i]}/pin", json={"pinned": True}).ok, f"#1848 chat: pin {i}")
+r = A.post(B + f"/api/agents/{CL}/chat/{am[6]}/pin", json={"pinned": True})
+check(r.status_code == 409, "#1848 chat: the 6th pin 409 " + r.text[:200])
+r = requests.post(V + f"/agent/chats/{ALICE}/messages/{am[6]}/pin", headers=CLH, json={"pinned": True})
+check(r.status_code == 409, "#1848 v1 chat: the agent hits the same limit")
+nt = requests.post(V + f"/agent/chats/{ALICE}", headers=CLH, json={"body": "New session", "kind": "notice"})
+check(nt.status_code == 201 and A.post(B + f"/api/agents/{CL}/chat/{nt.json()['id']}/pin", json={"pinned": False}).status_code == 400, "#1848 chat: a notice cannot be pinned")
+feed = requests.get(V + f"/agent/chats?since=0&user_id={ALICE}&limit=500", headers=CLH).json()["data"]
+check({x["id"] for x in feed if x.get("pinned_at")} == {am[1], am[2], am[3], am[4], am[5]}, "#1848 v1 chat: the feed carries pinned_at")
+
 print(f"p262_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

@@ -128,6 +128,7 @@ ROUTES = {
     "GET /api/agents/{}/bridges": "agent", "POST /api/v1/agent/chats/{}/messages/{}/withdraw": "agent",  # 2.30.0 (#919 / #1037)
     "GET /api/my/agents": "agent", "POST /api/my/agents": "agent", "PATCH /api/my/agents/{}": "agent",
     "PATCH /api/agents/{}/color": "agent",  # 2.47.1 (#1721): also p247c_b_api_test.py
+    "POST /api/agents/{}/chat/{}/pin": "agent", "POST /api/v1/agent/chats/{}/messages/{}/pin": "agent",  # 2.62.0 (#1848): also p262_a_api_test.py
     "POST /api/my/agents/{}/token": "agent", "DELETE /api/my/agents/{}": "agent", "GET /api/v1/agent": "agent",
     "PUT /api/v1/agent/status": "agent", "GET /api/v1/agent/events": "agent", "GET /api/v1/agent/jobs": "agent",
     "POST /api/v1/agent/jobs": "agent", "PATCH /api/v1/agent/jobs/{}": "agent", "GET /api/agents": "agent",
@@ -501,6 +502,7 @@ ROUTES = {
     "GET /api/v1/team/rooms/{}/messages": "team", "POST /api/v1/team/rooms/{}/messages": "team",
     "PATCH /api/v1/team/messages/{}": "team", "DELETE /api/v1/team/messages/{}": "team",
     "POST /api/v1/team/messages/{}/reactions": "team", "POST /api/v1/team/rooms/{}/read": "team",
+    "POST /api/team/messages/{}/pin": "team", "POST /api/v1/team/messages/{}/pin": "team",  # 2.62.0 (#1848): also p262_a_api_test.py
     # ---- template (10)
     "GET /api/v1/templates": "template", "POST /api/v1/templates": "template", "PATCH /api/v1/templates/{}": "template",
     "DELETE /api/v1/templates/{}": "template", "POST /api/v1/templates/{}/apply": "template",
