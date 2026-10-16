@@ -233,6 +233,9 @@ def adz_validate(b, inp):
             day = date.fromisoformat(d.get("date") or "")
         except (TypeError, ValueError):
             raise BadInput(tr("Invalid value: {0}", w + ".date")) from None
+        today = local_now().date()  # 2.51.0 (#1355): a shoot day between a year ago and three years ahead
+        if not today - timedelta(days=366) <= day <= today + timedelta(days=3 * 366):
+            raise BadInput(tr("Invalid value: {0}", w + ".date"))
         all_day = bool(d.get("all_day")) or not d.get("start")
         st = en = None
         if not all_day:
@@ -344,7 +347,15 @@ def adz_run(c, j, sel, ed, rec):
             conf = dsp_conflicts(c, oid, made, first, last)
             rec["warnings"] = sum(1 for r in made if conf.get(r["id"], {}).get("double") or conf.get(r["id"], {}).get("away"))
     rec["list"] = lid
+    # 2.51.0 (#1355): undo moves only tasks nobody changed since (their updated_at as the apply left it)
+    rec["tstamp"] = _adz_tstamp(c, [i for k, i in rec["made"] if k == "task"])
     return rec
+
+
+def _adz_tstamp(c, ids):
+    if not ids:
+        return {}
+    return {str(r[0]): r[1] for r in c.execute(f"SELECT id, updated_at FROM tasks WHERE id IN ({','.join('?' * len(ids))})", ids)}
 
 
 def adz_undo(c, rec, back=True):
@@ -366,11 +377,15 @@ def adz_undo(c, rec, back=True):
             elif back and not r["deleted_at"]:
                 skipped.append(r["title"][:40])
         elif kind == "task":
-            r = c.execute("SELECT deleted_at FROM tasks WHERE id=?", (i,)).fetchone()
+            r = c.execute("SELECT deleted_at, updated_at, title FROM tasks WHERE id=?", (i,)).fetchone()
             if r and back and not r["deleted_at"]:
-                do_delete(c, i)
+                if r["updated_at"] == (rec.get("tstamp") or {}).get(str(i)):
+                    do_delete(c, i)
+                else:
+                    skipped.append(r["title"][:40])  # 2.51.0 (#1355): changed since -- stays
             elif r and not back and r["deleted_at"] and r["deleted_at"] >= rec.get("undone_at", ""):
                 restore_task(c, i)
+                rec.setdefault("tstamp", {}).update(_adz_tstamp(c, [i]))
         elif kind == "booking":
             r = c.execute("SELECT status, deleted_at FROM hub_bookings WHERE id=?", (i,)).fetchone()
             if r and back and not r["deleted_at"] and r["status"] == "option":

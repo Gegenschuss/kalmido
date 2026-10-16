@@ -1613,7 +1613,9 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
   `day` = index into days). The server stores warnings per row (`double`: already booked, `away`, `other_projects`).
   Applying creates per selected day a task in the project (due = the day) with a draft event (status `tentative`, shown
   dashed with *Confirm* / *Discard* in the calendar; CalDAV keeps TENTATIVE) and per crew row a booking with status `option`.
-  Undo removes drafts that are still drafts, the tasks and the options.
+  Shoot days lie between one year ago and three years ahead. Undo removes drafts that are still drafts, the tasks nobody
+  changed since and the options. Replacing a proposal (`POST /api/v1/agent/jobs/{id}/proposal`) needs the scope of
+  creating it (`time` / `calendar`).
 - The disposition: an agent of an organisation reads that organisation, a personal agent its owner's personal area
   (freelancers without an organisation get the same); absences only as away, never the reason; booking notes are left out.
   It needs the module *Disposition* switched on at the owner (personal agent) or at an admin of the organisation (else 409).

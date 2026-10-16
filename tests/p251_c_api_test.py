@@ -382,5 +382,15 @@ r = AGS.put(V + f"/lists/{P}/status-pad", json={"body": "again"})
 check(r.ok and len(dbx("SELECT 1 FROM list_notepads WHERE list_id=? AND agent_id=? AND agent_key='status'", (P, AG))) == 1,
       "review 12: still one status block")
 
+# review 14 (#1355): shoot days only from a year ago to three years ahead; undo leaves changed tasks
+for bad in ("0001-01-01", str(today + timedelta(days=4 * 366)), str(today - timedelta(days=400))):
+    r = AGS.post(V + "/agent/proposals/shoot", json={"list_id": P, "days": [{"date": bad, "title": "x"}], "crew": []})
+    check(r.status_code == 400, f"review 14: shoot day {bad}: 400 ({r.status_code})")
+t1, t2 = [x[0] for x in dbx("SELECT task_id FROM events WHERE created_by=? AND deleted_at IS NULL AND title LIKE 'Shoot day%' ORDER BY id", (BOB,))]
+check(Bo.patch(B + f"/api/tasks/{t1}", json={"title": "Shoot day 1 moved"}).ok, "setup: bob changes the task of day 1")
+r = Bo.post(B + f"/api/proposals/{JS}/undo")
+dl = {x[0]: x[1] for x in dbx("SELECT id, deleted_at FROM tasks WHERE id IN (?, ?)", (t1, t2))}
+check(r.ok and dl[t1] is None and dl[t2] is not None, f"review 14: undo keeps the changed task, trashes the unchanged one ({dl} {r.text[:150]})")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
