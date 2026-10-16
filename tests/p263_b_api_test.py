@@ -315,6 +315,11 @@ ce = [e for e in evs if (e.get("comment") or {}).get("ext_name") == "Jane Exampl
 check(ce and ce[-1]["comment"].get("portal") is True and ce[-1]["comment"].get("author_id") is None, f"#1513: the customer's comment reaches the agent as an event {evs[-1:]}")
 check(Ca.get(B + f"/api/tasks/{T1}").status_code in (403, 404), "#1513: RLS: another organisation does not see the task")
 
+# ---------------------------------------------------------------- the team edits the description: the page shows the title only
+check(A.patch(B + f"/api/tasks/{T1}", json={"content": "Root cause: the internal module X." + SIG}).ok, "setup: the team edits the notes")
+pg = P.get(B + f"/p/{TK1}").text
+check("Root cause" not in pg and "Clicking Export" not in pg and "Export button does nothing" in pg, "#1513: after an edit only the title (never the team's notes)")
+
 # ---------------------------------------------------------------- the client's card
 CL = A.post(B + "/api/clients", json={"name": "Example Corp", "org_id": ORG, "contacts": [{"name": "Jane Example", "email": "jane@example.com"}]}).json()["id"]
 dbq("UPDATE portal_tickets SET client_id=NULL WHERE task_id=?", (T1,))
