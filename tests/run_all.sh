@@ -770,6 +770,7 @@ fresh; run p249_e_ui node p249_e_ui.js "$KALMIDO_TEST_DATA"
 run p249_d_mailtrim "$PY" p249_d_mailtrim_test.py
 fresh; run p249_d_api "$PY" p249_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p249_d_ui node p249_d_ui.js "$KALMIDO_TEST_DATA"
+shard 6  # 2.49.1: the 2.48 suites run in shard 6 (shard 5 reached the 30 min CI job limit, shard 6 took 17 min)
 # 2.48.0 part C: the PDF preview (#1367)
 fresh; run p248_c_pdf_ui node p248_c_pdf_ui.js "$KALMIDO_TEST_DATA"
 # 2.48.0 part C: lock a note with one's own password (#1642)
@@ -786,6 +787,7 @@ fresh; run p248_d_ui node p248_d_ui.js "$KALMIDO_TEST_DATA"
        run p248_b_unit "$PY" p248_b_unit_test.py
 fresh; run p248_b_api "$PY" p248_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p248_b_ui node p248_b_ui.js "$KALMIDO_TEST_DATA"
+shard 3  # 2.49.1: the 2.47.3 suites run in shard 3 (shard 5 reached the 30 min CI job limit, shard 3 took 19 min)
 # 2.47.3 part C: contacts / clients several at once, the clients page like the contacts (#1731, #1733, #1734)
 fresh; run p2473_c_api "$PY" p2473_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2473_c_ui node p2473_c_ui.js "$KALMIDO_TEST_DATA"
