@@ -294,7 +294,7 @@ Only when your host runs `mcp/agent_run.py` (the prompt then says so):
 - **Files for the person**: put them into the folder `$KALMIDO_OUTBOX`; they are attached to your chat answer. An image you
   look at with the Read tool is attached automatically (not in task runs, not the person's own uploads).
 - **Long work** (more than about ten minutes: release build, audit, full test run): do not do it in the chat run. Start a job
-  with `python3 <mcp>/agent_job.py start --title "..." [--worktree] -` (the complete brief on stdin: goal, rules, what to report),
+  with `python3 <mcp>/agent_job.py start --title "..." [--name NAME] [--worktree] -` (the complete brief on stdin: goal, rules, what to report),
   tell the person in one line what you started and end your answer. The job posts its result into the chat; then the launcher
   wakes you with one run that carries the outcome (2.46.6): go on from there, do not repeat the result, never restart a
   stopped job by yourself, and offer a new start of a lost one. Milestones: `agent_job.py progress ID "..."`. After a compaction, read the brief again and carry on.

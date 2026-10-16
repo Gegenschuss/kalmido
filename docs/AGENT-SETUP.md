@@ -506,7 +506,7 @@ chat messages of one person that arrive together: one run). It does what a hoste
   `chat-attachments`, are never attached, so the person's own uploads do not come back). The prompt tells the agent about the folder. Needs
   a server with chat files (2.13.1+); older servers get nothing.
 - **Long work as a job** (2.44.0, [`mcp/agent_job.py`](../mcp/agent_job.py)): work that takes more than about ten minutes (a release
-  build, an audit, a full test run) the agent starts with `python3 agent_job.py start --title "..." [--worktree] -` (the brief on
+  build, an audit, a full test run) the agent starts with `python3 agent_job.py start --title "..." [--name NAME] [--worktree] -` (the brief on
   stdin). The job is an own background run of the same command (it survives a restart of the runner), shows as a job in the Agents
   tab with its steps and progress lines (`agent_job.py progress ID "..."`), and posts its complete result, with the files in its own
   outbox, into the chat. 2.46.6: then it **wakes the chat agent** -- exactly one chat run for that person with the outcome and the
