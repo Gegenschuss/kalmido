@@ -249,8 +249,7 @@ views["agent"] = {"tasks": ag_tasks}
 for name, v in views.items():
     tl = v.get("tasks", [])
     print(f"PERF hash {name} tasks={hsh(sorted(tl, key=lambda t: t['id']))} n={len(tl)} sections={hsh(v.get('sections'))} "
-          f"counts={hsh(v.get('counts'))} lists={hsh([(x['id'], x['role'], x['progress']) for x in v.get('lists', [])])} "
-          f"rest={hsh({k: x for k, x in v.items() if k not in ('tasks', 'v', 'about', 'news', 'me', 'storage', 'evsig')})}", flush=True)
+          f"counts={hsh(v.get('counts'))} lists={hsh([(x['id'], x['role'], x['progress']) for x in v.get('lists', [])])}", flush=True)
 lid_of = lambda v: {t["list_id"] for t in v.get("tasks", [])}  # noqa: E731
 check(lid_of(views["bob"]) <= {SH}, "bob sees only the shared list's tasks")
 check(lid_of(views["vic"]) <= {SH}, "vic sees only the shared list's tasks")

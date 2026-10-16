@@ -110,6 +110,7 @@ The most used helpers:
 | `accounts/oidc.py` | Login with a generic OpenID Connect provider (authorization code flow with PKCE). |
 | `core/access.py` | Access control: who sees / changes which list and task, module switches, list roles. |
 | `core/serializers.py` | JSON shapes of database rows (tasks, lists, users ...) as the web client and the API see them. |
+| `core/compress.py` | 2.65.0 (#1505): JSON answers from 1 KB on go out gzip-compressed when the client accepts it (not files, streams, HEAD, 304 or answers that already carry a Content-Encoding). |
 | `core/pages.py` | HTML pages, security headers, /api/version, the share target, quick capture, /drop and the ntfy share inbox. |
 | `core/instance.py` | Version, update check and instance settings (admins). |
 | `core/state.py` | GET /api/state: everything the web client loads at start and after a change. |
