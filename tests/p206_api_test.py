@@ -165,8 +165,9 @@ dbx("INSERT INTO settings(key,value) VALUES('default_features','cal,kanban,colla
 dbx("DELETE FROM settings WHERE key='migr_feat9'")
 restart()
 Bo = sess("bob")
-check(feats(Bo) == ["cal", "collab", "time", "comments", "events", "contacts"], f"migration: comments added once (2.21: events + contacts too), the rest kept: {feats(Bo)}")
-check(dbx("SELECT value FROM user_settings WHERE user_id=? AND key='features_rev'", (bob,))[0][0] == "10", "features_rev 10")
+# 2.48.0 (#1207, #1111): features_rev 11 also turns on the file store and the documents
+check(feats(Bo) == ["cal", "collab", "time", "comments", "events", "contacts", "files", "docs"], f"migration: comments added once (2.21: events + contacts too, 2.48: files + docs), the rest kept: {feats(Bo)}")
+check(dbx("SELECT value FROM user_settings WHERE user_id=? AND key='features_rev'", (bob,))[0][0] == "11", "features_rev 11")
 check(dbx("SELECT value FROM settings WHERE key='default_features'")[0][0] == "cal,kanban,collab,time,comments", "setup default modules get comments too")
 Bo.patch(B + "/api/settings", json={"features": "cal,collab,time"})
 restart()
