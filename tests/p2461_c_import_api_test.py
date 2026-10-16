@@ -175,6 +175,13 @@ for ar in (["bogus"], "equipment"):
 r = A.post(B + L + "/import", json={"clients": [], "services": P1["services"]})
 check(r.status_code == 201, "#1557: without areas every area is taken as before (old clients)")
 A.post(B + L + f"/runs/{r.json()['run_id']}/undo")
+# 2.58.0 (#1557): a run without entries is not fully undone after its first partial undo
+r = A.post(B + L + "/import", json={"clients": [], "services": [], "equipment": [], "areas": ["clients", "services"]})
+check(r.status_code == 201, "#1557: an import without entries " + r.text[:200])
+RE = r.json().get("run_id")
+check(A.post(B + L + f"/runs/{RE}/undo", json={"kinds": ["services"]}).ok and not run(RE).get("undone_at"),
+      f"#1557: a run without entries stays open after one partial undo {run(RE)}")
+check(A.post(B + L + f"/runs/{RE}/undo").ok and run(RE).get("undone_at"), "#1557: the whole undo then closes it")
 
 # ---------------------------------------------------------------- undo per area
 r = A.post(B + L + f"/runs/{R1}/undo", json={"kinds": ["services"]})
