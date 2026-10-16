@@ -282,7 +282,8 @@ organisation and drops it.
 client that stays and, where the values differ, which value it keeps; the contact persons are joined (the kept client's
 default stays the default). The next step lists what moves: quotations and invoices, framework contracts, archive entries,
 projects, contact persons, trips and sales opportunities. A finalised document keeps its printed address, only its client
-changes; drafts and open quotations show the kept client's address afterwards. The other clients are gone then; the toast
+changes; drafts and open quotations show the kept client's address afterwards. The DATEV export takes the customer number from the client:
+issued invoices of a merged client go out under the kept client's number afterwards (the overview says so when the numbers differ). The other clients are gone then; the toast
 and the "History" of the kept client offer "Undo" for 30 days (a field or a link changed since stays as it is). Only the
 clients of one workspace can be merged, and only by people who may delete the others (their creator or an admin).
 `POST /api/clients/merge` `{target, ids, pick: {field: client id}, dry}` (dry: `{lines}` = the overview), then `{run_id,

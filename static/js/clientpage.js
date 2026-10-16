@@ -130,8 +130,8 @@ function clm_merge(ids) {
   if (sel.length < 2) { toast(tr('Choose at least two entries to merge')); return; }
   const cur = S.settings.time_currency || '€', num = (v, d, u) => v == null || v === '' ? '' : `${fmtNum(v, d)}${u ? ' ' + u : ''}`;
   const val = (k, fn) => Object.fromEntries(sel.map(c => [c.id, String(fn(c) ?? '')]));
-  const fields = [['name', tr('Name'), c => c.name], ['contact', tr('Contact person'), c => c.contact], ['email', tr('E-mail'), c => c.email],
-    ['phone', tr('Phone'), c => c.phone], ['address', tr('Address'), c => c.address], ['color', tr('Colour'), c => c.color],
+  const fields = [['name', tr('Name'), c => c.name], ['contact', tr('Default contact person'), c => c.contact], ['email', tr('E-mail'), c => c.email],
+    ['phone', tr('Phone'), c => c.phone], ['address', tr('Address'), c => c.address],
     ['rate', tr('Hourly rate'), c => num(c.rate, 2, cur)], ['budget_h', tr('Budget in hours'), c => num(c.budget_h, 1, 'h')],
     ['budget_amount', tr('Budget as an amount'), c => num(c.budget_amount, 2, cur)], ['note', tr('Note'), c => c.note],
     ...OFX_CL_FIELDS.map(([k, n]) => [k, tr(n), c => (c.billing || {})[k]])].map(([k, label, fn]) => ({k, label, vals: val(k, fn)}));

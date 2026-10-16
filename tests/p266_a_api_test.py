@@ -266,22 +266,22 @@ check(r.ok and j.get("target") is None and j.get("restored") == [C1] and j.get("
 check(Bo.get(B + f"/api/contacts/{C1}").ok and links(C1) == [T1], "#1835: ... C1 is back with its own links " + str(links(C1)))
 check(Ev.post(B + f"/api/contacts/merges/{R3}/undo").status_code == 404, "#1835: a stranger still gets 404")
 
-# ---- a client's contact person whose new address book does not fit the client: the link goes (name stays), undo brings it back
+# ---- 2.66.0 review (#1835): private address books of two people never merge (bob may edit carol's book: still 409) --
+# before, the contact went into the other person's book and a client contact person's link no longer fitted
 r = Ca.post(B + "/api/books", json={"name": "Carol's", "org_id": None})
 CBK = r.json()["id"]
 check(Ca.put(B + f"/api/books/{CBK}/members", json={"user_id": ids["bob"], "role": "edit"}).ok, "setup: carol shares her book with bob (edit)")
 CX = contact(Ca, CBK, "Erika", "Carol")
-r = Bo.post(B + "/api/clients", json={"name": "Beta Ltd", "org_id": None, "contacts": [{"name": "Erika M.", "contact_id": C1}]})
-CL2 = r.json().get("id")
-KP2 = dbx("SELECT id FROM office_client_contacts WHERE client_id=?", (CL2,))[0][0]
-r = merge(Bo, CX, [C1], dry=True)
-check(r.ok and any("does not fit" in x and x.endswith(": 1") for x in r.json()["lines"]), "#1835: the overview names the dropped client link " + r.text[:300])
-r = merge(Bo, CX, [C1])
-R4 = r.json().get("run_id")
-k = dbx("SELECT contact_id, name FROM office_client_contacts WHERE id=?", (KP2,))[0]
-check(r.ok and k[0] is None and k[1] == "Erika M.", "#1835: a link that does not fit the target's book is dropped, the name stays " + str(k))
-check(Bo.post(B + f"/api/contacts/merges/{R4}/undo").ok and dbx("SELECT contact_id FROM office_client_contacts WHERE id=?", (KP2,))[0][0] == C1,
-      "#1835: undo links the contact person again")
+for tgt, oth in ((CX, C1), (C1, CX)):
+    r = merge(Bo, tgt, [oth], dry=True)
+    check(r.status_code == 409, f"#1835: private books of two people: 409 ({r.status_code} {r.text[:120]})")
+check(Bo.get(B + f"/api/contacts/{C1}").ok and Ca.get(B + f"/api/contacts/{CX}").ok, "#1835: ... both contacts stay")
+
+# ---- 2.66.0 review: an agent token is refused on the merge routes (web only until #1357)
+ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write"], "username": "ctm-helper", "display_name": "Helper"}).json()
+r = requests.post(B + "/api/contacts/merge", headers={"Authorization": "Bearer " + ag["token"], "X-Requested-With": "kalmido"},
+                  json={"target": C1, "ids": [C3], "dry": True})
+check(r.status_code in (401, 403, 404), f"#1835: an agent token cannot merge contacts ({r.status_code})")
 
 # ---- CSRF: without the app's header the write is refused
 r = requests.post(B + "/api/contacts/merge", json={"target": C1, "ids": [C3]}, cookies=Bo.cookies)

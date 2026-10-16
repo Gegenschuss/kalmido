@@ -119,8 +119,10 @@ def mg_reinsert(c, table, row):
         return False
 
 
-def mg_undo_refs(c, recs):
-    """Reverses mg_repoint records (in reverse order): moved rows get their old value back, dropped rows come back."""
+def mg_undo_refs(c, recs, target_gone=False):
+    """Reverses mg_repoint records (in reverse order): moved rows get their old value back, dropped rows come back.
+    A moved row goes back only while it still points at the target; target_gone: also when it lost it (SET NULL) --
+    a reference someone took away on purpose since stays away (review)."""
     for rec in reversed(recs or []):
         t, col = rec["t"], rec["col"]
         for k in rec.get("moved") or []:
@@ -129,7 +131,7 @@ def mg_undo_refs(c, recs):
                 key[col] = rec["to"]
                 guard, ga = "", []
             else:  # 2.66.0 A (#1835): only while it still points at the target (or lost it with a deleted target: SET NULL)
-                guard, ga = f" AND ({col}=? OR {col} IS NULL)", [rec["to"]]
+                guard, ga = (f" AND ({col}=? OR {col} IS NULL)" if target_gone else f" AND {col}=?"), [rec["to"]]
             c.execute(f"UPDATE {t} SET {col}=? WHERE {' AND '.join(x + '=?' for x in key)}{guard}", [k["_from"], *key.values(), *ga])
         for r in rec.get("dropped") or []:
             mg_reinsert(c, t, r)
@@ -193,6 +195,17 @@ def mg_history(c, kind, target_id, limit=20):
     return out
 
 
-def mg_prune(c):
-    """Empties the snapshots older than MG_UNDO_DAYS (the deleted records' data does not stay forever)."""
+MG_PRUNE = {"at": 0.0}
+
+
+def mg_prune(c, force=True):
+    """Empties the snapshots older than MG_UNDO_DAYS (the deleted records' data does not stay forever). The watchdog calls
+    it with force=False (at most hourly, system context: every workspace); a merge calls it for what the person sees."""
+    import time
+    if not force:
+        if time.time() - MG_PRUNE["at"] < 3600:
+            return
+        MG_PRUNE["at"] = time.time()
     c.execute("UPDATE merge_runs SET snapshot='{}' WHERE snapshot!='{}' AND created_at<?", (iso(now_utc() - timedelta(days=MG_UNDO_DAYS)),))
+    if not force:
+        c.commit()

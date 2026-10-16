@@ -91,6 +91,8 @@ def op_book_edit(c, uid, bid, b):
 def op_book_delete(c, uid, bid):
     need_book(c, bid, manage=True)
     c.execute("DELETE FROM books WHERE id=?", (bid,))
+    # 2.66.0 (#1835): the undo data of merges into this book goes with it (the history line stays)
+    c.execute("UPDATE merge_runs SET snapshot='{}' WHERE kind='contact' AND book_id=?", (bid,))
     bump(c)
     c.commit()
 

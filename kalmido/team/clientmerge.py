@@ -137,12 +137,15 @@ def clm_lines(counts, target_name):
     if counts.get("docs_open"):
         lines.append(trn("{0} draft or open quotation shows the address of {1} afterwards", "{0} drafts or open quotations show the address of {1} afterwards",
                          counts["docs_open"], target_name))
+    if counts.get("datev"):
+        lines.append(trn("{0} issued invoice is exported to DATEV under the customer number of {1} afterwards",
+                         "{0} issued invoices are exported to DATEV under the customer number of {1} afterwards", counts["datev"], target_name))
     if counts.get("lists"):
         lines.append(trn("{0} project", "{0} projects", counts["lists"]))
     for t, (one, other) in CLM_LINES.items():
         if counts.get(t):
             lines.append(trn(one, other, counts[t]))
-    more = sum(n for k, n in counts.items() if k not in CLM_LINES and k not in ("docs_locked", "docs_open", "lists"))
+    more = sum(n for k, n in counts.items() if k not in CLM_LINES and k not in ("docs_locked", "docs_open", "lists", "datev"))
     if more:
         lines.append(trn("{0} more link", "{0} more links", more))
     if not lines:
@@ -179,6 +182,16 @@ def clm_merge(c, uid, target, ids, pick=None, dry=False):
     # client, see clients_bulk.ms_client_in_use); only numbers come out, no content
     with system_ctx(c):
         counts = clm_counts(c, others)
+        # review: DATEV reads the debtor (customer number) from the live client -- issued invoices of a client with another
+        # number are exported under the target's number afterwards; the overview says so
+        if "customer_no" in cols and counts.get("docs_locked"):
+            cn = (new.get("customer_no", t["customer_no"]) or "").strip()
+            dif = [i for i in others if (rows[i]["customer_no"] or "").strip() != cn]
+            if dif:
+                n = c.execute(f"SELECT COUNT(*) FROM office_docs WHERE locked_at IS NOT NULL AND client_id IN ({','.join('?' * len(dif))})",
+                              dif).fetchone()[0]
+                if n:
+                    counts["datev"] = int(n)
         nk = c.execute(f"SELECT COUNT(*) FROM office_client_contacts WHERE client_id IN ({','.join('?' * len(ids))})", ids).fetchone()[0]
     if nk > FK_LIMIT:
         raise BadInput(tr("Together these clients have more than {0} contact persons", FK_LIMIT))
@@ -186,6 +199,10 @@ def clm_merge(c, uid, target, ids, pick=None, dry=False):
         return {"lines": clm_lines(counts, t["name"]), "counts": counts, "fields": new}
     scope = clm_scope(t)
     write_lock(c, f"client_merge_{scope[0]}_{scope[1]}")
+    with system_ctx(c):  # review: a client deleted / merged meanwhile (between the check and the lock)
+        alive = c.execute(f"SELECT COUNT(*) FROM clients WHERE id IN ({','.join('?' * len(ids))})", ids).fetchone()[0]
+    if alive != len(ids):
+        raise Denied(409, tr("One of the clients was changed meanwhile, please try again"))
     before = {k: t[k] for k in t.keys()}
     with system_ctx(c):  # system: see above (moving every reference; the deleted rows go into the snapshot)
         kdef = [dict(r) for r in c.execute(f"SELECT id, client_id, is_default FROM office_client_contacts WHERE client_id IN "
@@ -256,10 +273,11 @@ def clm_undo(c, uid, rid):
     tid = d["target_id"]
     cl = s.get("clients") or []
     with system_ctx(c):  # system: the references go back in every workspace they came from (merge: see clm_merge)
+        tgone = not c.execute("SELECT 1 FROM clients WHERE id=?", (tid,)).fetchone()
         for r in cl:
             mg_reinsert(c, "clients", r)
         mg_undo_cascade(c, s.get("cascade"))
-        mg_undo_refs(c, s.get("refs"))
+        mg_undo_refs(c, s.get("refs"), target_gone=tgone)
         for k in s.get("kdef") or []:
             c.execute("UPDATE office_client_contacts SET is_default=? WHERE id=? AND client_id=?", (k["is_default"], k["id"], k["client_id"]))
         cur = c.execute("SELECT * FROM clients WHERE id=?", (tid,)).fetchone()

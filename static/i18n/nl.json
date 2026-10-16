@@ -8287,5 +8287,8 @@
   "Merge {0} contact": ["{0} contact samenvoegen", "{0} contacten samenvoegen"],
   "{0} contact merged": ["{0} contact samengevoegd", "{0} contacten samengevoegd"],
   "Contacts merged": "Contacten samengevoegd",
-  "Contact person links dropped (the address book does not fit the client): {0}": "Koppelingen van contactpersonen die vervallen (het adresboek past niet bij de klant): {0}"
+  "Contact person links dropped (the address book does not fit the client): {0}": "Koppelingen van contactpersonen die vervallen (het adresboek past niet bij de klant): {0}",
+  "Default contact person": "Standaardcontactpersoon",
+  "One of the clients was changed meanwhile, please try again": "Een van de klanten is intussen gewijzigd, probeer het opnieuw",
+  "{0} issued invoice is exported to DATEV under the customer number of {1} afterwards": ["{0} uitgegeven factuur gaat daarna met het klantnummer van {1} naar de DATEV-export", "{0} uitgegeven facturen gaan daarna met het klantnummer van {1} naar de DATEV-export"]
 }

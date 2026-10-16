@@ -122,7 +122,8 @@ event attendances, contact person at clients, bookings); the birthday task of a 
 other contacts are deleted, so the phone removes them on its next sync. The kept contact's card lists the merge under
 *History* with *Undo* for 30 days (also right after the merge in the message at the bottom or with Ctrl+Z): the contacts
 come back with their links. Contacts of a synced external account cannot be merged (they would come back), and contacts
-of an organisation's address book only merge with contacts of the same organisation.
+of an organisation's address book only merge with contacts of the same organisation; personal address books only
+with books of the same owner (not into a book someone shared with you).
 
 ## Writing into subscribed calendars
 

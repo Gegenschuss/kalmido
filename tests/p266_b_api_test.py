@@ -148,6 +148,14 @@ for want in ("1 issued quotation or invoice", "1 draft or open quotation shows t
     check(want in txt, f"dry: the overview names '{want}': {txt}")
 check(A.get(B + f"/api/clients/{M}").ok and one("SELECT client_id FROM office_docs WHERE id=?", (I1,)) == M
       and one("SELECT COUNT(*) FROM merge_runs") == 0, "dry: nothing changes")
+# 2.66.0 review: DATEV reads the debtor from the live client -- other customer numbers + issued invoices = a warning line
+dbx("UPDATE clients SET customer_no=? WHERE id=?", ("10001", M), write=True)
+dbx("UPDATE clients SET customer_no=? WHERE id=?", ("10002", T), write=True)
+r = A.post(M_URL, json={"target": T, "ids": [T, M], "dry": True})
+check(r.ok and any("DATEV" in x and "Acme Ltd" in x for x in r.json().get("lines") or []), f"dry: the DATEV line for other customer numbers ({r.text[:300]})")
+r = A.post(M_URL, json={"target": T, "ids": [T, M], "pick": {"customer_no": M}, "dry": True})
+check(r.ok and not any("DATEV" in x for x in r.json().get("lines") or []), "dry: no DATEV line when the target takes M's number")
+dbx("UPDATE clients SET customer_no='' WHERE id IN (?,?)", (M, T), write=True)
 
 # ================================================================== rights and input
 check(Ca.post(M_URL, json={"target": T, "ids": [M]}).status_code == 404, "tenant-matrix: client -- another organisation cannot merge (404)")
@@ -229,11 +237,14 @@ RID2 = r.json()["run_id"]
 check(A.patch(B + f"/api/clients/{T}", json={"rate": 100}).ok, "again: the rate edited afterwards")
 X = A.post(B + "/api/clients", json={"name": "Third client", "org_id": ORG}).json()["id"]
 dbx("UPDATE office_docs SET client_id=? WHERE id=?", (X, I2), write=True)
+dbx("UPDATE lists SET client_id=NULL WHERE id=?", (P,), write=True)  # 2.66.0 review: a reference taken away on purpose since
 r = A.post(undo_url(RID2))
 check(r.ok, "again: undone " + r.text[:200])
 check(A.get(B + f"/api/clients/{T}").json()["rate"] == 100, "undo: a field edited since the merge keeps the new value")
 check(one("SELECT client_id FROM office_docs WHERE id=?", (I2,)) == X, "undo: a document moved to another client since stays there")
 check(one("SELECT client_id FROM office_docs WHERE id=?", (I1,)) == M, "undo: ... the others go back")
+check(one("SELECT client_id FROM lists WHERE id=?", (P,)) is None, "undo: a project taken off the client since stays without one (target still there)")
+dbx("UPDATE lists SET client_id=? WHERE id=?", (M, P), write=True)
 dbx("UPDATE office_docs SET client_id=? WHERE id=?", (M, I2), write=True)
 
 # ---- undo after the target was deleted

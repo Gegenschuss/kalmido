@@ -11,7 +11,7 @@ agent can use them later (#1357); the routes are thin wrappers."""
 import json
 import re
 
-from flask import jsonify
+from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import N_, tr
@@ -97,7 +97,8 @@ def ctm_load(c, uid, all_ids):
         raise BadInput(tr("Contacts of a synced external address book cannot be merged (they would come back with the next sync)"))
     if any(r["kind"] == "group" for r in rows):
         raise BadInput(tr("Groups cannot be merged"))
-    if len({books[r["book_id"]]["org_id"] for r in rows}) > 1:
+    if len({books[r["book_id"]]["org_id"] for r in rows}) > 1 or (
+            books[rows[0]["book_id"]]["org_id"] is None and len({books[r["book_id"]]["owner_id"] for r in rows}) > 1):  # review: not into another person's own book
         raise Denied(409, tr("Only contacts of the same organisation (or all of your own address books) can be merged"))
     return rows, books
 
@@ -301,7 +302,7 @@ def ctm_undo(c, uid, rid):
     for r in rows:
         mg_reinsert(c, "contacts", r)
     mg_undo_cascade(c, snap.get("cascade"))
-    mg_undo_refs(c, snap.get("refs"))
+    mg_undo_refs(c, snap.get("refs"), target_gone=t is None)
     from ..tasks.lifecycle import restore_task, trash_task
     for o in snap.get("occ") or []:
         mg_reinsert(c, "contact_occ", o)
@@ -336,6 +337,8 @@ def ctm_history(c, cid):
 @app.post("/api/contacts/merge")
 def contacts_merge():
     need_feat("contacts")
+    if (g.user["kind"] or "user") == "agent":  # web only until #1357 (review)
+        raise Denied(403)
     from ..contacts.web import op_contact
     c, uid, b = db(), me(), body()
     res = ctm_merge(c, uid, b.get("target"), b.get("ids"), b.get("pick"), bool(b.get("dry")))
@@ -348,6 +351,8 @@ def contacts_merge():
 @app.post("/api/contacts/merges/<int:rid>/undo")
 def contacts_merge_undo(rid):
     need_feat("contacts")
+    if (g.user["kind"] or "user") == "agent":  # web only until #1357 (review)
+        raise Denied(403)
     from ..contacts.web import op_contact
     c, uid = db(), me()
     res = ctm_undo(c, uid, rid)

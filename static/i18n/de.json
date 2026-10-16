@@ -8287,5 +8287,8 @@
   "Merge {0} contact": ["{0} Kontakt zusammenführen", "{0} Kontakte zusammenführen"],
   "{0} contact merged": ["{0} Kontakt zusammengeführt", "{0} Kontakte zusammengeführt"],
   "Contacts merged": "Kontakte zusammengeführt",
-  "Contact person links dropped (the address book does not fit the client): {0}": "Ansprechpartner-Verknüpfungen, die gelöst werden (das Adressbuch passt nicht zum Kunden): {0}"
+  "Contact person links dropped (the address book does not fit the client): {0}": "Ansprechpartner-Verknüpfungen, die gelöst werden (das Adressbuch passt nicht zum Kunden): {0}",
+  "Default contact person": "Standard-Ansprechpartner",
+  "One of the clients was changed meanwhile, please try again": "Einer der Kunden wurde inzwischen geändert, bitte noch einmal versuchen",
+  "{0} issued invoice is exported to DATEV under the customer number of {1} afterwards": ["{0} ausgestellte Rechnung geht danach mit der Kundennummer von {1} in den DATEV-Export", "{0} ausgestellte Rechnungen gehen danach mit der Kundennummer von {1} in den DATEV-Export"]
 }
