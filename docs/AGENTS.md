@@ -1597,7 +1597,9 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
 
 - **Weekly status.** A planned job (template *Status on the pin board*, event `scheduled_job` with the list) reads
   `get_weekly_status` and writes the block with `write_status_pad`. People see it on the project page marked "From <agent>,
-  updated ..." and may edit or delete it as usual; the next run overwrites only the agent's own block.
+  updated ..." and may edit or delete it as usual; the next run overwrites only the agent's own block. An agent keeps at
+  most 3 notepads per project (its status block included); they do not count against the 20 of people. A blocker in a list
+  the agent does not see appears only as `hidden: true` (no title, id or assignee, not in `waits` / `people`).
 - **Time check.** `user_id` = a person who may chat with the agent (a personal agent: its owner by default). Only entries and
   tasks of lists both see, events only of calendars shared with the agent, bookings only of the agent's workspace. Limits:
   more than 12 h a day, an entry over 10 h, overlaps, weekend entries without an event or booking.

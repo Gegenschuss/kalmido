@@ -296,5 +296,16 @@ r = PAGS.post(V + "/agent/proposals/shoot", json={"list_id": PE, "days": [{"date
 check(r.status_code == 201 and r.json()["proposal"]["crew"][0]["warnings"][0]["kind"] == "double", f"freelancer: shoot proposal with warning ({r.status_code} {r.text[:150]})")
 check(PAGS.get(V + "/time/check").json().get("user_id") == ERIN, "a personal agent checks its owner's time by default")
 
+# =================================================================== 2.51.0 review fixes (part C), one negative test each
+# review 1 (#1352): a blocker in a list the agent does not see shows up only as hidden -- no title, id, assignee, waits
+TX = Bo.post(B + "/api/tasks", json={"list_id": PX, "title": "Hidden blocker", "assignee_id": BOB}).json()["id"]
+dbx("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)", (T1, TX, BOB, "2026-10-01T08:00:00+00:00"), write=True)
+r = AGS.get(V + f"/lists/{P}/weekly-status")
+w = r.json()
+bl = [x for x in w.get("blocked", []) if x["id"] == T1]
+check(r.ok and bl and bl[0]["blocked_by"] == [{"id": None, "title": None, "assignee_id": None, "same_list": False, "hidden": True}]
+      and "Hidden blocker" not in r.text and not [x for x in w["waits"] if x["who"] == CAROL],
+      f"review 1: a blocker of an unshared list stays hidden ({bl} {w.get('waits')})")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

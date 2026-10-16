@@ -190,10 +190,18 @@ def apin_weekly(c, lid, uid, days=APIN_DAYS):
     if ids:
         q = ",".join("?" * len(ids))
         for r in c.execute(f"""SELECT d.task_id, b.id, b.title, b.assignee_id, b.list_id FROM task_deps d JOIN tasks b ON b.id=d.blocker_id
-                               WHERE d.task_id IN ({q}) AND b.deleted_at IS NULL AND b.status=0 AND {tvis(c, uid, 'b.')}""", ids):
-            blockers.setdefault(r[0], []).append({"id": r[1], "title": r[2], "assignee_id": r[3], "same_list": r[4] == lid})
+                               WHERE d.task_id IN ({q}) AND b.deleted_at IS NULL AND b.status=0 ORDER BY b.id""", ids):
+            if bvis.task_ok(r[1], r[4]):
+                blockers.setdefault(r[0], []).append({"id": r[1], "title": r[2], "assignee_id": r[3], "same_list": r[4] == lid,
+                                                      "hidden": False})
+            else:
+                blockers.setdefault(r[0], []).append({"id": None, "title": None, "assignee_id": None, "same_list": False, "hidden": True})
     ppl = set()
     overdue, blocked, waiting, waits = [], [], [], {}
+        from ..personal.timetrack import vis_ids
+        # 2.51.0 (#1352): a blocker in a list the token does not see (not shared, outside the agent's list limit, health)
+        # shows up as in the app: hidden, without title, id or assignee -- and never in waits / people.
+        bvis = vis_ids(c, uid)
     for r in opn:
         if r["due"] and r["due"][:10] < today.isoformat():
             overdue.append({"id": r["id"], "title": r["title"], "due": r["due"][:10], "assignee_id": r["assignee_id"],
@@ -210,6 +218,8 @@ def apin_weekly(c, lid, uid, days=APIN_DAYS):
                     if r["id"] not in w:
                         w.append(r["id"])
         if r["waiting_at"]:
+                if x["hidden"]:
+                    continue
             waiting.append({"id": r["id"], "title": r["title"], "since": r["waiting_at"], "on": r["wait_note"] or "",
                             "assignee_id": r["assignee_id"]})
             ppl.add(r["assignee_id"])
