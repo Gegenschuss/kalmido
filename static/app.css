@@ -7732,3 +7732,7 @@ button.jobtag b{font-weight:600}
 /* 2.66.0 B (#1835): the merges in a client's card (Undo next to the line) */
 .clmhist .ctlinks li{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-height:2.75rem}
 .clmhist .ctlinks li>span{flex:1 1 12rem;overflow-wrap:anywhere}
+/* 2.66.0 A (#1835) contacts: the merge history on a contact's card (one line per merge, Undo while possible) */
+.ctmsec .ctmrow{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
+.ctmsec .ctmrow>span{min-width:0;overflow-wrap:anywhere}
+.ctmsec .ctmrow .btn{min-height:2.5rem}

@@ -6,7 +6,8 @@
 // the floating bar (like the tasks' selection bar): the count, then the buttons [key, icon, label, class?] with
 // data-<attr>="key" (disabled while nothing is ticked, except "all"), then the close button (Esc)
 function ms_barHtml(id, attr, n, hint, btns) {
-  const btn = ([k, i, lab, cls = '']) => `<button type="button" class="mbb ${cls}" data-${attr}="${k}" title="${esc(lab)}" aria-label="${esc(lab)}" ${n || k === 'all' ? '' : 'disabled'}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
+  // 2.66.0 A (#1835): min = the ticks a button needs (Merge: 2)
+  const btn = ([k, i, lab, cls = '', min = 1]) => `<button type="button" class="mbb ${cls}" data-${attr}="${k}" title="${esc(lab)}" aria-label="${esc(lab)}" ${n >= min || k === 'all' ? '' : 'disabled'}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
   return `<div id="${id}" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="mcount" role="status">${n ? tr('{0} selected', n) : hint}</span>
     ${btns.map(btn).join('')}
     <button type="button" class="iconbtn mbx" data-${attr}="close" title="${esc(tr('Clear selection') + ' (Esc)')}" aria-label="${esc(tr('Clear selection'))}">${ic('x')}</button></div>`;
@@ -73,7 +74,7 @@ function ms_merge(o) {
   const st = {target: ids[0], pick: {}, step: 1};
   const md = modal('<div class="mgbody"></div>');
   md.classList.add('msdlg', 'mgdlg');
-  const close = fgModal(md);
+  let close;  // 2.66.0 A (#1835): the form guard starts after the first drawing (else Cancel always asked to discard)
   const body = $('.mgbody', md);
   const diff = () => o.fields.filter(f => new Set(ids.map(i => (f.vals[i] ?? '').trim()).filter(Boolean)).size > 1);
   const dflt = f => (f.vals[st.target] ?? '').trim() ? st.target : (ids.find(i => (f.vals[i] ?? '').trim()) || st.target);
@@ -120,5 +121,6 @@ function ms_merge(o) {
     b.disabled = false;
   });
   draw1();
+  close = fgModal(md);
   return md;
 }
