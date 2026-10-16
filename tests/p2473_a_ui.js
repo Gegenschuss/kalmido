@@ -3,6 +3,7 @@
 //   19 UStG)" is saved, the instance admin sees "Move into an organisation"
 // - a member of one organisation in the workspace "Private": the empty personal office names the organisation's office with
 //   a button; the button switches the workspace and the office follows (the organisation's office), back to "Private" again
+// - 2.56.3 (#1842): in the organisation's office a document's client field offers the organisation's clients
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -55,6 +56,23 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   w.eval("wsSet('private')");
   check(await until(() => w.eval('OFC.info && OFC.info.personal') === 1, 60), 'back in Private: the office follows the switch (the personal office)');
   check(await until(() => d.querySelector('.office .pbhint'), 30), '... with the hint again');
+  w.close();
+
+  // ================= 2.56.3 (#1842): in the organisation's office a document's client field offers the organisation's
+  // clients (/api/state names their org_id), never the private ones
+  await call('PATCH', '/api/settings', {workspace: 'private'});
+  const pcl = await call('POST', '/api/clients', {name: 'Alice privat'});
+  await call('PATCH', '/api/settings', {workspace: 'org:' + org.id});
+  const ocl = await call('POST', '/api/clients', {name: 'Org-Kunde GmbH', org_id: org.id});
+  check([pcl.http, ocl.http].every(h => h === 200 || h === 201) && pcl.org_id == null && ocl.org_id === org.id, `a private and an organisation client ${pcl.http} ${ocl.http}`);
+  const odoc = await call('POST', '/api/office/docs', {project_title: 'Org-Beleg'});
+  check(odoc.http === 201, 'a quotation in the organisation\'s office ' + odoc.http + ' ' + (odoc.error || ''));
+  w = await boot({hash: `office/offers/${odoc.id}`}); d = w.document;
+  check(await until(() => w.eval(`(S.clients || []).some(c => c.id === ${ocl.id} && c.org_id === ${org.id})`), 60), 'state: the organisation client carries its org_id');
+  const sel = await until(() => d.querySelector('#ofd-client_id'), 60);
+  const opts = sel ? [...sel.options].map(o => o.textContent) : [];
+  check(opts.includes('Org-Kunde GmbH') && !opts.includes('Alice privat'), 'document: the client field offers the organisation\'s client, not the private one: ' + JSON.stringify(opts));
+  check(JSON.stringify(w.eval('ofdClientOpts()').map(x => x[1])) === '["Org-Kunde GmbH"]', 'new document dialog: only the organisation\'s client: ' + JSON.stringify(w.eval('ofdClientOpts()')));
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);
