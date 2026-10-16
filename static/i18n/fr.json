@@ -8230,5 +8230,6 @@
   "Attachment": "Pièce jointe",
   "Allow one file (at most 10 MB)": "Autoriser un fichier (10 Mo au maximum)",
   "The sender gets a link to the status": "L’expéditeur reçoit un lien de suivi",
-  "Without login, the sender sees a link after sending and gets it by mail (e-mail becomes required). It shows only their report: title, status and the answers you send to them, never internal comments or your team.": "Sans connexion, l’expéditeur voit un lien après l’envoi et le reçoit par e-mail (l’e-mail devient obligatoire). Il ne montre que son signalement : titre, état et les réponses que vous lui envoyez, jamais les commentaires internes ni votre équipe."
+  "Without login, the sender sees a link after sending and gets it by mail (e-mail becomes required). It shows only their report: title, status and the answers you send to them, never internal comments or your team.": "Sans connexion, l’expéditeur voit un lien après l’envoi et le reçoit par e-mail (l’e-mail devient obligatoire). Il ne montre que son signalement : titre, état et les réponses que vous lui envoyez, jamais les commentaires internes ni votre équipe.",
+  "Your time only": "Uniquement ton temps"
 }

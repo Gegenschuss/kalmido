@@ -384,8 +384,10 @@ check(is_err(a.post("/time/entries", {"task_id": ta2["id"], "start": now_l.isofo
 check(is_err(b.post("/time/entries", {"task_id": t1["id"], "start": now_l.isoformat(), "minutes": 5}), 404), "IDOR: time on an invisible task")
 el = a.get("/time/entries").json()
 check(len(el["data"]) == 1 and el["data"][0]["id"] == te["id"], "time entries list")
-check(b.get("/time/entries").json()["data"] == [] and b.get("/time/entries", params={"scope": "all"}).json()["data"][0]["id"] == te["id"],
-      "time entries: mine vs all (shared list)")
+# 2.63.0 (#1523): Bob is an editor of L3, not an admin: scope=all shows him only his own entries; the entries of one task stay
+check(b.get("/time/entries").json()["data"] == [] and b.get("/time/entries", params={"scope": "all"}).json()["data"] == []
+      and b.get("/time/entries", params={"scope": "all", "task_id": ta2["id"]}).json()["data"][0]["id"] == te["id"],
+      "time entries: mine vs all (editor: own only; one task: everyone's)")
 check(is_err(a.get("/time/entries", params={"from": "x"}), 400), "time entries: bad date")
 A.patch(B + "/api/admin/settings", json={"time_all": False})
 check(is_err(a.get("/time/entries"), 403) and is_err(a.post("/time/entries", {"task_id": ta2["id"], "start": now_l.isoformat(), "minutes": 5}), 403),

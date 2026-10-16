@@ -112,6 +112,17 @@ stamp in the page (sent sooner than 3 seconds after loading or more than 24 hour
 at most 5 reports per e-mail address, form and hour, at most 3 confirmation mails per address and hour (plus the server's
 mails per address and day) and at most 5 links in the text.
 
+## Tracked time of a project and templates (2.63.0)
+
+- **Who sees whose time.** In the window "Tracked time" of a project, the time reports and the CSV, the owner of the list,
+  its admins and the admins of its organisation see everyone's entries. Everyone else sees their own there, and the window
+  says "Your time only". The time list in a task's detail still shows everyone's entries of that task.
+- **Templates keep the project page.** "Save as template" on a project also saves its notepads, the standard arrangement of
+  the project page and the block colours. A project made from the template gets its own copies of the notepads, placed and
+  coloured as in the original. Notepads written by agents stay with their project.
+- **Undo after "Delete all times of this project"** brings the entries back exactly as they were, including the link to a
+  timer started on a phone, so a stop that arrives later from that phone still finds its entry.
+
 ## Saved arrangements and templates (2.55.0)
 
 - **Several arrangements per view.** The start page, Today, Time tracking, the overviews, the review and every project page

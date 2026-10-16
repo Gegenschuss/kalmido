@@ -8230,5 +8230,6 @@
   "Attachment": "Bijlage",
   "Allow one file (at most 10 MB)": "Eén bestand toestaan (maximaal 10 MB)",
   "The sender gets a link to the status": "Afzender krijgt een link naar de status",
-  "Without login, the sender sees a link after sending and gets it by mail (e-mail becomes required). It shows only their report: title, status and the answers you send to them, never internal comments or your team.": "Zonder inloggen ziet de afzender na het versturen een link en krijgt die per mail (e-mail wordt verplicht). Die toont alleen zijn melding: titel, status en de antwoorden die je naar hem stuurt, nooit interne opmerkingen of je team."
+  "Without login, the sender sees a link after sending and gets it by mail (e-mail becomes required). It shows only their report: title, status and the answers you send to them, never internal comments or your team.": "Zonder inloggen ziet de afzender na het versturen een link en krijgt die per mail (e-mail wordt verplicht). Die toont alleen zijn melding: titel, status en de antwoorden die je naar hem stuurt, nooit interne opmerkingen of je team.",
+  "Your time only": "Alleen jouw tijd"
 }

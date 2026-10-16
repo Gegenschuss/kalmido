@@ -8230,5 +8230,6 @@
   "Attachment": "Anhang",
   "Allow one file (at most 10 MB)": "Eine Datei erlauben (höchstens 10 MB)",
   "The sender gets a link to the status": "Melder bekommt einen Link zum Stand",
-  "Without login, the sender sees a link after sending and gets it by mail (e-mail becomes required). It shows only their report: title, status and the answers you send to them, never internal comments or your team.": "Ohne Anmeldung sieht der Melder nach dem Senden einen Link und bekommt ihn per Mail (E-Mail wird Pflicht). Er zeigt nur seine Meldung: Titel, Stand und die Antworten, die Sie an ihn senden, nie interne Kommentare oder Ihr Team."
+  "Without login, the sender sees a link after sending and gets it by mail (e-mail becomes required). It shows only their report: title, status and the answers you send to them, never internal comments or your team.": "Ohne Anmeldung sieht der Melder nach dem Senden einen Link und bekommt ihn per Mail (E-Mail wird Pflicht). Er zeigt nur seine Meldung: Titel, Stand und die Antworten, die Sie an ihn senden, nie interne Kommentare oder Ihr Team.",
+  "Your time only": "Nur deine Zeiten"
 }

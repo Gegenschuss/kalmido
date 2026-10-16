@@ -8230,5 +8230,6 @@
   "Attachment": "Adjunto",
   "Allow one file (at most 10 MB)": "Permitir un archivo (como máximo 10 MB)",
   "The sender gets a link to the status": "Quien envía recibe un enlace al estado",
-  "Without login, the sender sees a link after sending and gets it by mail (e-mail becomes required). It shows only their report: title, status and the answers you send to them, never internal comments or your team.": "Sin iniciar sesión, quien envía ve un enlace tras enviar y lo recibe por correo (el correo pasa a ser obligatorio). Solo muestra su aviso: título, estado y las respuestas que le envíes, nunca comentarios internos ni tu equipo."
+  "Without login, the sender sees a link after sending and gets it by mail (e-mail becomes required). It shows only their report: title, status and the answers you send to them, never internal comments or your team.": "Sin iniciar sesión, quien envía ve un enlace tras enviar y lo recibe por correo (el correo pasa a ser obligatorio). Solo muestra su aviso: título, estado y las respuestas que le envíes, nunca comentarios internos ni tu equipo.",
+  "Your time only": "Solo tu tiempo"
 }
