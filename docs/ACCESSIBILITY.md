@@ -15,6 +15,8 @@ the app has not yet been tested by people who use a screen reader every day (see
   one stop (↑ ↓ inside it); in a list one task is the stop and ↑ ↓ (or j k) move it, Enter opens the task, x completes
   it, Esc closes and puts the focus back on the row. Menus get the focus on their first item, ↑ ↓ move, Esc returns to
   the button that opened them. Dialogs keep Tab inside, close with Esc and give the focus back. `?` lists all shortcuts.
+  The favourite tiles on top of the sidebar are part of its stop; each has its name as label, and its menu (context menu
+  key, right-click or long press) moves it left or right, so the order can be arranged without dragging.
 - **Visible focus.** A 2 px ring in the accent colour on every control; text fields get a ring too.
 - **Nothing important behind the focus.** Lists keep the focused row clear of the sticky headers and the docked "Add
   task" box (WCAG 2.4.11).

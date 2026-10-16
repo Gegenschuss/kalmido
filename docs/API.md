@@ -1052,7 +1052,7 @@ without an owner sees `false` everywhere.
 
 | Call | What it does |
 |---|---|
-| `PUT /api/lists/{id}/favorite` | Web API (the signed-in person): `{on: true}` (default) stars list `{id}`, `{on: false}` removes the star; `404` for a list you cannot see. Answer `{ok, favorite, fav_lists}` |
+| `PUT /api/lists/{id}/favorite` | Web API (the signed-in person): `{on: true}` (default) stars list `{id}`, `{on: false}` removes the star; `404` for a list you cannot see. Answer `{ok, favorite, fav_lists, fav_items}` (2.57.0) |
 | `DELETE /api/lists/{id}/favorite` | Removes the star |
 
 The stars travel with the person's settings in `GET /api/state` (`settings.fav_lists`: comma list of list ids, in the
@@ -1071,6 +1071,15 @@ of favourites: `today`, `tomorrow`, `week`, `doable`, `assigned`). With and with
   without a star, not archived, not the Basket, that the person changed on at least 5 different days with at least 20
   changes during the last 14 days -- or `{list_id: null}`. Each list is offered only once (`fav_asked`, kept by the
   server); a star is never set by itself.
+
+2.57.0 (#1798): **favourites of every kind** as icon tiles in the sidebar's fixed head, in one order the person arranges.
+The setting `fav_items` (`PATCH /api/settings`, a json list, at most 200 keys) holds that order: `l:<list id>`,
+`folder:<path>`, `v:<view>` (`inbox`, `assigned`, `today`, `tomorrow`, `week`, `doable`, `pinned`, `waiting`, `stale`,
+`byme`, `all`, `done`, `trash`, `archived`), `m:<view or area>` (e.g. `cal`, `timeline`, `office`), `f:<filter id>`,
+`tag:<name>`, `p:<user id>`, `g:<group id>`, `a:<agent id>`. An unknown key is `400`, doubles are dropped. Lists keep their
+star in `fav_lists` (pushes, agents and *Only favourites* read only that); `PUT / DELETE /api/lists/{id}/favorite` puts the
+list's `l:` key at the end of `fav_items` / takes it out and answers `fav_items` too. A key whose target the person cannot
+see (any more) stays stored and is simply not shown. Agents do not see `fav_items`.
 
 ## My tasks in an own order (2.40.0)
 

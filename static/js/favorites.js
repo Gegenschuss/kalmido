@@ -1,4 +1,4 @@
-/* Kalmido web client: favourite lists and projects (2.40.0, #1361).
+/* Kalmido web client: favourite lists and projects (2.40.0, #1361); favourites of every kind as tiles: favtiles.js (2.57.0, #1798).
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md).
    The stars are personal (user setting fav_lists, set with PUT /api/lists/<id>/favorite); nobody else sees them.
    - the list menu (header "…", sidebar right-click / long press) and a star in the list header set / clear one
@@ -7,7 +7,7 @@
 'use strict';
 
 const FAV_VIEWS = ['today', 'tomorrow', 'week', 'doable', 'assigned'];
-const VW_FAV_HELP = N_('Star the lists and projects you really work on: the star next to the list title, or the list menu (…), a right-click or a long press in the sidebar > Add to favourites. Other members do not see your stars; only your own agents see which of their lists are your favourites. Your favourites stand on top of the sidebar; the filter button there (Only favourites) folds every other list under “More lists”. Today, Tomorrow, Next 7 days, Now doable and My tasks can show only the tasks of your favourites: … > Only favourites.');  // Settings > Help
+const VW_FAV_HELP = N_('Star what you really work with: lists and projects (the star next to the list title), but also folders, Plan views like Today, views and areas like the calendar, filters, tags, people and agents: right-click or long-press the row in the sidebar > Add to favourites. Your favourites stand as small tiles on top of the sidebar, which stays in place while the rest scrolls; drag a tile to move it, or right-click / long-press it > Move left / Move right. Your order is the same on all your devices. Other members do not see your stars; only your own agents see which of their lists are your favourites. The filter button there (Only favourites) folds every other list under “More lists”. Today, Tomorrow, Next 7 days, Now doable and My tasks can show only the tasks of your favourite lists: … > Only favourites.');  // Settings > Help
 const favIds = () => (S.settings?.fav_lists || '').split(',').filter(Boolean).map(Number);
 const favIs = id => favIds().includes(+id);
 const favAny = () => favIds().some(id => { const l = listById(id); return l && !l.archived && !l.is_inbox; });
@@ -20,9 +20,10 @@ async function favSet(id, on) {
   const ids = favIds().filter(x => x !== +id);
   if (on) ids.push(+id);
   S.settings.fav_lists = ids.join(',');
+  fv2_listFollow(id, on);  // 2.57.0 (#1798): its place among the favourite tiles
   render();
   toast(on ? tr('Added to favourites') : tr('Removed from favourites'));
-  try { const r = await api(on ? 'PUT' : 'DELETE', `/api/lists/${+id}/favorite`, on ? {on: true} : undefined); if (r && typeof r.fav_lists === 'string') S.settings.fav_lists = r.fav_lists; }
+  try { const r = await api(on ? 'PUT' : 'DELETE', `/api/lists/${+id}/favorite`, on ? {on: true} : undefined); if (r && typeof r.fav_lists === 'string') S.settings.fav_lists = r.fav_lists; if (r && typeof r.fav_items === 'string') S.settings.fav_items = r.fav_items; }
   catch { try { await load(); } catch { /* offline */ } render(); }
 }
 async function favSetting(key, val) {
@@ -40,13 +41,8 @@ function favTopBtn(l) {
   return `<button type="button" class="iconbtn hfav tf ${on ? 'on' : ''}" data-fav="${l.id}" aria-pressed="${on}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('star', 's')}</button>`;
 }
 // the sidebar's section on top (render.js renderSide; lists = the shown lists, listRow = its row)
-function favSideHtml(lists, listRow, head) {
-  const fl = lists.filter(l => favIs(l.id)); if (!fl.length) return '';
-  fl.sort((a, b) => favIds().indexOf(a.id) - favIds().indexOf(b.id));
-  const only = favOnly(), lab = tr('Only favourites');
-  const acts = `<button type="button" data-fav-only class="${only ? 'on' : ''}" aria-pressed="${only}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('filter', 's')}</button>`;
-  return `<div class="sgroup sg-favs">${head('favs', tr('Favourites'), acts, fl.length)}${sideOpen('favs') ? fl.map(listRow).join('') : ''}</div>`;
-}
+// 2.57.0 (#1798): favourites of every kind as icon tiles in the sidebar's fixed head (favtiles.js); listRow is no longer used
+const favSideHtml = (lists, listRow, head) => fv2_sideHtml(lists, head);
 // the lists of the group "Lists": with "Only favourites" every other list folds under "More lists (N)" (open for the session)
 function favListsHtml(lh, lists) {
   if (!favOnly() || S.listReorder) return lh;

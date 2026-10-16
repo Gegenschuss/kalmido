@@ -54,9 +54,27 @@ def vw_list_favorite(lid):
             ids = ids[1 - VW_FAV_MAX:]
         ids.append(lid)
     uset(c, me(), "fav_lists", ",".join(map(str, ids)))
+    items = fv2_items_follow(c, me(), lid, on)
     bump(c)
     c.commit()
-    return jsonify(ok=True, favorite=on, fav_lists=",".join(map(str, ids)))
+    return jsonify(ok=True, favorite=on, fav_lists=",".join(map(str, ids)), fav_items=items)
+
+
+def fv2_items_follow(c, uid, lid, on):
+    """2.57.0 (#1798): the list's place in the sidebar's favourites (fav_items) follows its star: a new star goes to the end,
+    an unstarred list leaves; returns the stored json. A star set by an older app / an agent without it is added by the
+    web app when it draws the favourites."""
+    import json
+    try:
+        items = [x for x in json.loads(usettings(c, uid).get("fav_items") or "[]") if isinstance(x, str)]
+    except ValueError:
+        items = []
+    key = "l:%d" % lid
+    items = [x for x in items if x != key] + ([key] if on else [])
+    from ..accounts.settings import FV2_MAX
+    out = json.dumps(items[-FV2_MAX:], ensure_ascii=False, separators=(",", ":"))
+    uset(c, uid, "fav_items", out)
+    return out
 
 
 # 2.46.1 (#1361 point 4): "Quieter pushes from lists without a star" (user setting fav_quiet, default off): while the person has
@@ -103,3 +121,20 @@ def lc_fav_suggestion():
         name = c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone()[0]
         return jsonify(list_id=r["list_id"], name=name)
     return jsonify(list_id=None)
+
+
+def fv2_folder_rename(c, uid, old, new):
+    """2.57.0 (#1798): a renamed / moved folder keeps its place among the favourites (fav_items), its subfolders too."""
+    import json
+    from .lists import FOLDER_SEP
+    raw = usettings(c, uid).get("fav_items") or "[]"
+    try:
+        items = [x for x in json.loads(raw) if isinstance(x, str)]
+    except ValueError:
+        return
+    def mv(x):
+        p = x[7:] if x.startswith("folder:") else None
+        return "folder:" + new + p[len(old):] if p is not None and (p == old or p.startswith(old + FOLDER_SEP)) else x
+    out = json.dumps(list(dict.fromkeys(mv(x) for x in items)), ensure_ascii=False, separators=(",", ":"))
+    if out != json.dumps(items, ensure_ascii=False, separators=(",", ":")):
+        uset(c, uid, "fav_items", out)
