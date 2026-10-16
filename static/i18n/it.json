@@ -8290,5 +8290,7 @@
   "Thank you, your answer has arrived.": "Grazie, la tua risposta è arrivata.",
   "We send a sign-in link to your e-mail address. No account needed.": "Inviamo un link di accesso al tuo indirizzo e-mail. Nessun account necessario.",
   "Your e-mail": "La tua e-mail",
-  "Your report": "La tua segnalazione"
+  "Your report": "La tua segnalazione",
+  "Turn mails off": "Disattiva le mail",
+  "No more mails about “{0}”? The status page stays available.": "Nessuna altra mail su «{0}»? La pagina di stato resta disponibile."
 }

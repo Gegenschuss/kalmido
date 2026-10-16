@@ -35,7 +35,7 @@ PT_EMAIL_MAX = 200
 def pt_email_norm(email):
     """The form of an address that identifies a reporter ('' when it is no address)."""
     e = (email or "").strip().lower()[:PT_EMAIL_MAX]
-    return e if re.fullmatch(r"[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+", e) else ""
+    return e if re.fullmatch(r"[^@\s<>,;\"()\[\]\\]+@[^@\s<>,;\"'()\[\]\\]+\.[^@\s<>,;\"'()\[\]\\]+", e) else ""  # review: one plain address
 
 
 def pt_email_hash(c, email):
@@ -86,7 +86,7 @@ def pt_token(c, row):
 PT_VIEW_RATE = 60          # status / portal pages per client address and minute
 PT_BAD_LIMIT = 30          # unknown tokens per address within FAIL_WINDOW
 PT_CMT_RATE, PT_CMT_HOUR, PT_CMT_MAX = 10, 30, 4000   # answers per address and minute / per ticket and hour / characters
-PT_LOGIN_IP, PT_LOGIN_ADDR, PT_LOGIN_SPACE = 5, 3, 30  # sign-in requests per address / per e-mail / per space (window below)
+PT_LOGIN_IP, PT_LOGIN_ADDR, PT_LOGIN_SPACE = 5, 3, 200  # sign-in requests per address / per e-mail / sign-in mails per space (window below)
 PT_LOGIN_WIN = 3600
 PT_LOGIN_TTL = 30 * 60     # s: a sign-in link is valid this long, once
 PT_COOKIE_DAYS = 7
@@ -346,8 +346,25 @@ def pt_team_news(c, t, cid, text, name):
                              f"{PUBLIC_URL}/#t/{t['id']}", TBL_PRIO if lv == "urgent" else push_prio(s)))
 
 
-# ---- mails off / on again (every mail has the off link; one click turns them off, the page offers the way back)
+# ---- mails off / on again (every mail has the off link; it opens a page with one button -- review: mail scanners and link
+# previews open every link of a mail, a plain GET must not turn the mails off -- and the page offers the way back)
 @app.get("/p/<token>/stop")
+def pt_stop_ask(token):
+    from ..core.i18n import tr
+    c = db()
+    p, bad = pt_open(c, token)
+    if bad:
+        return bad
+    lg = pt_lang(c, p)
+    e = html.escape
+    return _pt_rt().pub_html(tr("Turn mails off", lg=lg), f'<div class="msg"><h1>{e(tr("Turn mails off", lg=lg))}</h1>'
+                             f'<p>{e(tr("No more mails about “{0}”? The status page stays available.", p["title"], lg=lg))}</p>'
+                             f'<form method="post" action="/p/{e(token)}/stop" class="fform"><input type="hidden" name="f" value="{pt_key(c, p, "s")}">'
+                             f'<button type="submit">{e(tr("Turn mails off", lg=lg))}</button></form>'
+                             f'<a class="btn" href="/p/{e(token)}">{e(tr("To the status page", lg=lg))}</a></div>', lg)
+
+
+@app.post("/p/<token>/stop")
 def pt_stop(token):
     from ..core.i18n import tr
     c = db()
@@ -355,6 +372,8 @@ def pt_stop(token):
     if bad:
         return bad
     lg = pt_lang(c, p)
+    if not _pt_post_ok(c, p, "s"):
+        return _pt_denied(lg)
     c.execute("UPDATE portal_tickets SET notify=0 WHERE id=?", (p["id"],))
     c.commit()
     e = html.escape
@@ -418,14 +437,15 @@ def pt_login_ask(token):
     em = pt_email_norm(request.form.get("email"))
     eh = pt_email_hash(c, em) if em else ""
     space = f"{p['org_id'] or ''}:{p['owner_id'] or ''}"
-    if hit_limit("ptl:" + rate_ip(), PT_LOGIN_IP, PT_LOGIN_WIN) or hit_limit(f"ptls:{space}", PT_LOGIN_SPACE, PT_LOGIN_WIN):
+    if hit_limit("ptl:" + rate_ip(), PT_LOGIN_IP, PT_LOGIN_WIN):
         return _pt_rt().pub_limited(lg)
     mail = None
     if eh and MAIL_OUT_ON and not hit_limit(f"ptla:{eh}", PT_LOGIN_ADDR, PT_LOGIN_WIN):
         with_ticket = c.execute(f"""SELECT 1 FROM portal_tickets p JOIN tasks t ON t.id=p.task_id JOIN lists l ON l.id=t.list_id
                                     WHERE p.email_hash=? AND p.org_id IS NOT DISTINCT FROM ? AND p.owner_id IS NOT DISTINCT FROM ?
                                     AND t.deleted_at IS NULL AND {_pt_space_sql()} LIMIT 1""", (eh, p["org_id"], p["owner_id"])).fetchone()
-        if with_ticket and mail_budget(c, None, em):
+        # review: the space's limit counts only sign-in mails that really go out (others cannot lock a space's customers out)
+        if with_ticket and not hit_limit(f"ptls:{space}", PT_LOGIN_SPACE, PT_LOGIN_WIN) and mail_budget(c, None, em):
             tok = secrets.token_urlsafe(32)
             now = now_utc()
             c.execute("INSERT INTO portal_logins(email_hash,org_id,owner_id,token_hash,created_at,expires_at) VALUES(?,?,?,?,?,?)",
@@ -715,8 +735,10 @@ def pt_mail_tick(c):
                 c.execute("UPDATE portal_tickets SET mailed_status=? WHERE id=?", (p["status"], p["id"]))
                 continue
             em = pt_email(c, p)
+            if em and not mail_budget(c, None, em):  # review: the day's mails to this address are used up -> try again later
+                continue
             c.execute("UPDATE portal_tickets SET last_mail_at=?, mailed_status=? WHERE id=?", (iso(now), p["status"], p["id"]))
-            if not em or not mail_budget(c, None, em):
+            if not em:
                 continue
             lg = p["lang"] or lang(c, p["l_owner"])
             tok = pt_token(c, p)
@@ -725,7 +747,8 @@ def pt_mail_tick(c):
                 tr("There is a new answer to your report “{0}”.", p["title"], lg=lg)
             body_ = [(a["who"] or tr("Team", lg=lg)) + ":\n" + a["body"][:2000] for a in new[-3:]]
             foot = tr("You get this mail because you sent the report. No more mails about it: {0}", stop, lg=lg)
-            subj = (tr("Done: {0}", p["title"], lg=lg) if done else tr("New answer: {0}", p["title"], lg=lg))[:200]
+            ttl = " ".join(p["title"].split())  # review: no line breaks in the subject
+            subj = (tr("Done: {0}", ttl, lg=lg) if done else tr("New answer: {0}", ttl, lg=lg))[:200]
             text = "\n\n".join([head, *body_, tr("Status and answers: {0}", url, lg=lg), foot])
             hfoot = html.escape(tr("You get this mail because you sent the report.", lg=lg)) + \
                 f' <a href="{html.escape(stop)}">{html.escape(tr("No more mails about this report", lg=lg))}</a>'

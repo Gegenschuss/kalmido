@@ -240,8 +240,12 @@ dbq("UPDATE portal_tickets SET last_mail_at='2020-01-01T00:00:00+00:00' WHERE ta
 done = until(lambda: [m for m in mails("jane@example.com") if m[1].startswith("Done:")], 25)
 check(done and "Export button does nothing" in done[0][1], "#1513: a mail when the report is done")
 check('ptst-done' in P.get(B + f"/p/{TK1}").text, "#1513: the page says done")
+# 2.63.0 (#1513, review): the off link only asks (mail scanners open every link); its button turns the mails off
 r = P.get(B + f"/p/{TK1}/stop")
-check(r.status_code == 200 and dbq("SELECT notify FROM portal_tickets WHERE task_id=?", (T1,))[0][0] == 0, "#1513: the off link turns the mails off")
+check(r.status_code == 200 and dbq("SELECT notify FROM portal_tickets WHERE task_id=?", (T1,))[0][0] == 1, "#1513: opening the off link changes nothing")
+check(P.post(B + f"/p/{TK1}/stop", data={}).status_code == 403, "#1513: turning off needs the check value")
+r = P.post(B + f"/p/{TK1}/stop", data={"f": key(r.text, f"/p/{TK1}/stop")})
+check(r.status_code == 200 and dbq("SELECT notify FROM portal_tickets WHERE task_id=?", (T1,))[0][0] == 0, "#1513: the off button turns the mails off")
 n = len(mails("jane@example.com"))
 A.post(B + f"/api/tasks/{T1}/comments", json={"body": "After the stop.", "portal": True})
 dbq("UPDATE portal_tickets SET last_mail_at='2020-01-01T00:00:00+00:00' WHERE task_id=?", (T1,))

@@ -8290,5 +8290,7 @@
   "Thank you, your answer has arrived.": "Bedankt, je antwoord is aangekomen.",
   "We send a sign-in link to your e-mail address. No account needed.": "We sturen een inloglink naar je e-mailadres. Geen account nodig.",
   "Your e-mail": "Je e-mail",
-  "Your report": "Je melding"
+  "Your report": "Je melding",
+  "Turn mails off": "Mails uitschakelen",
+  "No more mails about “{0}”? The status page stays available.": "Geen mails meer over ‘{0}’? De statuspagina blijft beschikbaar."
 }
