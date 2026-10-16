@@ -31,6 +31,8 @@ TABLES = (
     "office_trips", "office_trip_items", "office_fixed_costs",  # 2.47.3 (#1022, #1652, part B)
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
+    "hub_absences",  # 2.50.0 A (#1195): absences (the area they were entered in; the app hides the kind)
+    "hub_bookings",  # 2.50.0 A (#1194): bookings of the disposition
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

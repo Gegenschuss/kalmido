@@ -51,6 +51,12 @@ CHECKS = {
     # 2.49.0 (#1106): a connection (accepted request) of an agent or a kid account -- requests are for people only
     "conn_agent": ("SELECT l.a_id, l.b_id FROM conn_links l JOIN users u ON u.id IN (l.a_id, l.b_id) "
                    "WHERE l.deleted_at IS NULL AND (u.kind!='user' OR u.kid!=0)"),
+    # 2.50.0 A (#1195): an absence in an organisation of a person who is not (any more) its member
+    "absence": ("SELECT a.id, a.user_id FROM hub_absences a JOIN orgs o ON o.id=a.org_id WHERE a.deleted_at IS NULL AND o.personal_of IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=a.org_id AND om.user_id=a.user_id)"),
+    # 2.50.0 A (#1194): a booking of a person in an organisation they are not (any more) a member of
+    "booking": ("SELECT b.id, b.resource_id FROM hub_bookings b JOIN orgs o ON o.id=b.org_id WHERE b.deleted_at IS NULL AND b.resource_kind='user' "
+                "AND o.personal_of IS NULL AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=b.org_id AND om.user_id=b.resource_id)"),
     # an agent of an organisation that is gone, or a personal agent working in an organisation its owner is not in
     "agent": ("SELECT a.user_id, a.owner_id FROM agents a WHERE a.org_id IS NOT NULL AND (NOT EXISTS (SELECT 1 FROM orgs o WHERE o.id=a.org_id) "
               "OR (a.owner_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=a.org_id AND om.user_id=a.owner_id)))"),

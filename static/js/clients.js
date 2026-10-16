@@ -11,7 +11,7 @@ const clientsOn = () => feat('clients');
 const workloadOn = () => feat('workload') && collab();
 const formsOn = () => feat('forms');
 const CLV = {data: null, id: null, loading: false, seq: 0, month: null};
-const WLV = {data: null, start: null, weeks: 4, org: null, loading: false, seq: 0};
+const WLV = {data: null, start: null, weeks: 4, org: null, loading: false, seq: 0, tab: 'wl'};  // 2.50.0 (#1195, #1194): tab wl | abs | dispo
 const clientById = id => (S.clients || []).find(c => c.id === id);
 const clientOfList = l => l && l.client_id ? clientById(l.client_id) : null;
 const clientIco = c => c.icon ? `<span class="sic semo" aria-hidden="true">${esc(c.icon)}</span>` : `<span class="sic" aria-hidden="true"><span class="sw" style="${cssColor(c.color) ? 'background:' + cssColor(c.color) : ''}"></span></span>`;
@@ -201,6 +201,8 @@ async function wlLoad() {
   if (S.route.mod === 'workload' && seq === WLV.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, viewWorkload())); }
 }
 function viewWorkload() {
+  if (WLV.tab === 'abs') return ab2_view();  // 2.50.0 (#1195): absences (absence.js)
+  if (WLV.tab === 'dispo' && dp_on()) return dp_view();  // 2.50.0 (#1194): disposition (dispo.js)
   if (!WLV.data && !WLV.loading) setTimeout(wlLoad, 0);
   const d = WLV.data;
   if (!d) return `<div class="dash wload"><p class="muted lempty">${tr('Loading…')}</p></div>`;
@@ -209,10 +211,10 @@ function viewWorkload() {
   const cell = (p, c, i) => {
     const h = c.minutes / 60, lv = c.level || 'none';
     const tip = tr('{0}: {1} of {2} h planned, {3}', p.display_name, fmtNum(h, 1), fmtNum(p.capacity_h, 1), trn('{0} task', '{0} tasks', c.tasks)) + (c.unestimated ? ' · ' + trn('{0} without an estimate', '{0} without an estimate', c.unestimated) : '');
-    return `<td class="wlc lv-${lv}"><button type="button" class="wlb" data-act="wl-cell" data-uid="${p.id}" data-w="${i}" ${c.tasks ? '' : 'disabled'} title="${esc(tip)}" aria-label="${esc(tip)}"><span class="wlbar"><i style="width:${Math.min(100, c.pct || 0)}%"></i></span><span class="wlt"><b>${fmtNum(h, 1)} h</b>${c.pct != null ? ` <small>${c.pct} %</small>` : ''}${c.unestimated ? ` <small class="muted">+${c.unestimated}</small>` : ''}</span></button></td>`;
+    return `<td class="wlc lv-${lv}${c.absent_days ? ' ab2wl' : ''}"><button type="button" class="wlb" data-act="wl-cell" data-uid="${p.id}" data-w="${i}" ${c.tasks ? '' : 'disabled'} title="${esc(tip)}" aria-label="${esc(tip)}"><span class="wlbar"><i style="width:${Math.min(100, c.pct || 0)}%"></i></span><span class="wlt"><b>${fmtNum(h, 1)} h</b>${c.pct != null ? ` <small>${c.pct} %</small>` : ''}${c.unestimated ? ` <small class="muted">+${c.unestimated}</small>` : ''}</span></button></td>`;
   };
   const rows = d.people.map(p => `<tr><th scope="row"><span class="wlp">${av(p.id, p.display_name)}<span class="wln"><b>${esc(p.display_name)}</b><button type="button" class="linkbtn wlcap" data-act="wl-cap" data-uid="${p.id}" ${p.own || S.me?.is_admin ? '' : 'disabled'} title="${esc(tr('Hours per week'))}">${esc(tr('{0} h / week', fmtNum(p.capacity_h, 1)))}</button></span></span></th>${p.weeks.map((c, i) => cell(p, c, i)).join('')}<td class="wlc wlnd">${p.nodate.tasks ? `<button type="button" class="wlb" data-act="wl-cell" data-uid="${p.id}" data-w="nd"><span class="wlt">${esc(trn('{0} task', '{0} tasks', p.nodate.tasks))}</span></button>` : ''}</td></tr>`).join('');
-  return `<div class="dash wload"><div class="clhead"><span class="spacer"></span>
+  return `<div class="dash wload">${ab2_tabs('wl')}<div class="clhead"><span class="spacer"></span>
       ${d.orgs.length > 1 ? `<select id="wl-org" aria-label="${esc(tr('Organisation'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       <button class="iconbtn" data-act="wl-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="wl-move" data-d="0">${tr('This week')}</button><button class="iconbtn" data-act="wl-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button></div>
     <p class="muted">${tr('Open tasks assigned to each person, by their planned start, else their due date (overdue ones count this week), with their duration as the estimate. Only what you can see.')}</p>
