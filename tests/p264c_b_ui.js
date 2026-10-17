@@ -123,6 +123,9 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
       return {c: r.created.length, s: r.skipped, paths: wk_pages(${JSON.stringify(SP)}).map(x => x.path), inf}; })().catch(e => ({err: e.message}))`);
     check(im.c === 2 && im.paths?.includes('Imp/One') && im.paths?.includes('Sub/Two x') && im.s?.includes('../evil/Three.md') && im.s?.includes('notes.txt') && im.s?.includes('notes/start.md'), 'import: .md files created encrypted, paths cleaned, others / taken names skipped ' + JSON.stringify(im).slice(0, 300));
     check(im.inf === `${M} deflated`, 'import: deflate entries open with DecompressionStream');
+    // 2.64.3 E (#1817, review 2 L2): inflating stops at the limit, the archive's size is not trusted
+    check(await ev(`(async () => { const cs = new Blob([new Uint8Array(5000)]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+      return wkeInflate(new Uint8Array(await new Response(cs).arrayBuffer()), 1000).then(() => 'opened', () => 'stopped'); })()`) === 'stopped', 'import: inflating stops at the size limit');
     idx = (await call('GET', '/api/wiki?space=' + SP + '&bodies=1')).j;
     check(!JSON.stringify(idx).includes(M) && !JSON.stringify(idx).includes('Sub/'), 'the imported pages are ciphers on the server');
 
@@ -137,6 +140,9 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
     await shot('dialog');
     await ev(`(document.querySelector('.cdlg [data-cd="yes"]')?.click(), 1)`);
     check(!(await sweep()), 'H1: no localStorage entry holds a plain text of the space ' + await sweep());
+    // 2.64.3 E (#1817, review 2 L1): locked meanwhile = "unlock first", not "cannot be decrypted"
+    const c1 = idx.pages[0].body;
+    check(await ev(`(e2eLock(), wkeDec(${JSON.stringify(SP)}, 'body', ${JSON.stringify(c1)}).then(() => 'opened', e => e.code))`) === 'wiki_e2e_locked', 'locked: decrypting stops with "unlock first"');
     check(await ev(`(e2eLock(), !WKE.memo.size && !Object.keys(WKE.keys).length && !(WK.idx[${JSON.stringify(SP)}]?.pages || []).some(p => p.path) && !JSON.stringify(HIST.undo).includes('Notes'))`), 'lock: the decrypted pages and keys leave the page');
   });
 
@@ -166,12 +172,17 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
     await unlock();
     const c = await ev(`(async () => { const sp = ${JSON.stringify(SP)}; await wk_load(sp, true); const p = await wkePage(await rawFetch('GET', '/api/wiki/pages/${START}')); return p.body; })().catch(e => 'ERR ' + e.message)`);
     check(String(c).startsWith(`${M} start page`), 'Carol reads after the release ' + String(c).slice(0, 80));
+    // ---------------------------------------------------------------- Carol leaves: key change, every page in generation 2
+    check((await call('DELETE', `/api/orgs/${ORG}/members/${CAROL}`)).status < 300, 'Carol leaves the organisation');
+    // 2.64.3 E (#1817, review 2 L5): the next load answers 404 -> the opened pages of the space leave her browser
+    const g = await ev(`(async () => { const sp = ${JSON.stringify(SP)}; await wk_load(sp, true);
+      return {n: (WK.idx[sp]?.pages || []).length, st: !!WKE.st[sp], hits: wkeSearch('${M}').length, memo: [...WKE.memo.values()].some(v => String(v).includes('${M}'))}; })().catch(e => ({err: e.message}))`);
+    check(g.n === 0 && !g.st && !g.hits && !g.memo, 'after leaving: index and opened pages of the space are gone ' + JSON.stringify(g).slice(0, 200));
   });
 
-  // ---------------------------------------------------------------- Carol leaves: key change, every page in generation 2
-  check((await call('DELETE', `/api/orgs/${ORG}/members/${CAROL}`)).status < 300, 'Carol leaves the organisation');
   check(((await call('GET', '/api/wiki/e2e?space=' + SP)).j.rotate || 0) > 0, 'the space shows "key change pending"');
-  await session('alice', async ({ev, unlock}) => {
+  let PB = '', OLDP = 0;  // 2.64.3 E (#1817): pages checked after switching off
+  await session('alice', async ({ev, waitFor, unlock}) => {
     await unlock();
     const k = await ev(`(async () => { const sp = ${JSON.stringify(SP)}; await wk_load(sp, true); const r = await wkeRotate(sp, true); const e = await wkeReenc(sp); return {r, e, gen: WKE.st[sp].gen}; })().catch(e => ({err: e.message}))`);
     check(k.r === true && k.e === true && k.gen === 2, 'the key changes and the pages are encrypted again ' + JSON.stringify(k));
@@ -179,6 +190,29 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
     check(g.length >= 12 && g.every(x => x === 2), 'every path and text in the new generation ' + JSON.stringify([...new Set(g)]));
     const i = (await call('GET', '/api/wiki/e2e?space=' + SP)).j;
     check(!(i.members || []).some(m => m.user_id === CAROL) && !i.rotate && !i.reenc, 'Carol is no member any more, nothing pending');
+
+    // 2.64.3 E (#1817, review 2 M1): names / texts that begin like a cipher
+    check(await ev(`wkeCreate(${JSON.stringify(SP)}, 'e2e1:x', 0, 'x').then(() => 'made', e => e.code)`) === 'bad', 'a page name "e2e1:…" is refused in the browser');
+    PB = await ev(`wkeCreate(${JSON.stringify(SP)}, 'Prefix body', 0, 'e2e1:typed').then(r => r.id + '|' + r.body, e => 'ERR ' + e.message)`);
+    check(String(PB).endsWith('| e2e1:typed'), 'a text "e2e1:…" is stored with a space in front ' + PB);
+    // a page of an older app: name and text begin with the prefix inside the cipher
+    OLDP = await ev(`(async () => { const sp = ${JSON.stringify(SP)}, s = WKE.st[sp], key = WKE.keys[sp][s.gen];
+      const seal = async (f, t) => { const b = await e2eSeal(key, le2ePad(e2eTEnc().encode(t)), wkeAad(s.space_id, s.gen, f)); return 'e2e1:' + JSON.stringify({v: 1, g: s.gen, iv: b.iv, ct: b.ct}); };
+      return (await rawFetch('POST', '/api/wiki/pages', {space: sp, path: await seal('path', 'e2e1:Old'), body: await seal('body', 'e2e1:old text')})).id; })().catch(e => 'ERR ' + e.message)`);
+    check(OLDP > 0, 'setup: a page whose plain name and text begin with "e2e1:" ' + OLDP);
+
+    // 2.64.3 E (#1817, review 2 M2): a cipher of an older generation that no key opens; the re-encryption takes it over as empty
+    const BADP = await ev(`(async () => { const sp = ${JSON.stringify(SP)}, s = WKE.st[sp];
+      const k = await crypto.subtle.generateKey({name: 'AES-GCM', length: 256}, false, ['encrypt', 'decrypt']);
+      const b = await e2eSeal(k, le2ePad(e2eTEnc().encode('lost')), wkeAad(s.space_id, 1, 'path'));
+      return (await rawFetch('POST', '/api/wiki/pages', {space: sp, path: 'e2e1:' + JSON.stringify({v: 1, g: 1, iv: b.iv, ct: b.ct}), body: ''})).id; })().catch(e => 'ERR ' + e.message)`);
+    check(BADP > 0 && ((await call('GET', '/api/wiki/e2e?space=' + SP)).j.reenc || 0) > 0, 'setup: an unreadable cipher of generation 1, re-encryption due ' + BADP);
+    await ev(`(window.wkeTA = wkeReenc(${JSON.stringify(SP)}, null, {ask: true}).then(r => ({r}), e => ({err: e.message})), 1)`);
+    check(await waitFor(`!!document.querySelector('.cdlg [data-cd="yes"]')`), 'the re-encryption asks before taking over unreadable texts');
+    await ev(`(document.querySelector('.cdlg [data-cd="yes"]')?.click(), 1)`);
+    const ta = await ev(`window.wkeTA.then(async x => { const sp = ${JSON.stringify(SP)}; await wk_load(sp, true); return {...x, path: wk_pages(sp).find(p => p.id === ${BADP})?.path}; })`);
+    const i2 = (await call('GET', '/api/wiki/e2e?space=' + SP)).j, g2 = gens((await call('GET', '/api/wiki?space=' + SP + '&bodies=1')).j);
+    check(ta.r === true && /^Unreadable page/.test(ta.path || '') && !i2.reenc && !(+i2.left?.pages) && g2.every(x => x === 2), 'the re-encryption takes the unreadable page over encrypted and ends ' + JSON.stringify([ta, i2.reenc, i2.left]).slice(0, 300));
 
     // switching off: plain texts on the server again
     const off = await ev(`wkeStop(${JSON.stringify(SP)}, 'password123', () => {}).then(r => ({r, on: wkeOn(${JSON.stringify(SP)})}), e => ({err: e.message}))`);
@@ -189,6 +223,9 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
   const pg = (await call('GET', '/api/wiki/pages/' + START)).j;
   check(pg.body?.startsWith(`${M} start page`) && (pg.backlinks || []).length >= 0, 'the text is plain on the server again');
   check(((await call('GET', '/api/wiki/search?q=' + M)).j.pages || []).length >= 3, 'the server search finds the pages again');
+  // 2.64.3 E (#1817, review 2 M1): the way back defuses the prefix, the space is open
+  const op = (await call('GET', '/api/wiki/pages/' + OLDP)).j, pb = (await call('GET', '/api/wiki/pages/' + PB.split('|')[0])).j;
+  check(op.path === '_e2e1:Old' && op.body === ' e2e1:old text' && pb.body === ' e2e1:typed', 'switching off: name and text "e2e1:…" get a character in front ' + JSON.stringify([op.path, op.body, pb.body]));
 
   console.log(`p264c_b_ui: ${ok} passed, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
