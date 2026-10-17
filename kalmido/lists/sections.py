@@ -211,13 +211,17 @@ def section_create():
     c = db()
     lid = as_int(b["list_id"], "list_id", 1)
     need_list(c, lid)
+    from ..collab.liste2e import le2a_clean_cipher, le2e_guard, le2e_is_cipher
+    if le2e_is_cipher(name):  # 2.64.1 (#1817): the encrypted name of a section in a list with the lock (never cut)
+        name = le2a_clean_cipher(name, "name")
+    le2e_guard(c, lid, {"section": name})
     srt = _sec_sort(b["sort"]) if b.get("sort") is not None else \
         c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM sections WHERE list_id=?", (lid,)).fetchone()[0]
     tids = b.get("tasks") or []
     if not isinstance(tids, list) or len(tids) > 5000 or any(isinstance(i, bool) or not isinstance(i, int) for i in tids):
         return err(tr("Invalid value: {0}", "tasks"))
     wip = wip_clean(b.get("wip_limit"))  # 2.60.0 (#1510): also the undo of a deleted section brings its limit back
-    cur_id = insert_id(c, "INSERT INTO sections(list_id,name,sort,wip_limit) VALUES(?,?,?,?)", (lid, name[:200], srt, wip))
+    cur_id = insert_id(c, "INSERT INTO sections(list_id,name,sort,wip_limit) VALUES(?,?,?,?)", (lid, name if le2e_is_cipher(name) else name[:200], srt, wip))
     sid, moved, skipped = cur_id, [], []
     for tid in tids:
         r = c.execute("SELECT list_id, section_id, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
@@ -244,9 +248,12 @@ def section_update(sid):
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else {}
     cur = c.execute("SELECT name, wip_limit FROM sections WHERE id=?", (sid,)).fetchone()
     if "name" in b:
-        name = str(b["name"] or "").strip()[:200]
+        from ..collab.liste2e import le2a_clean_cipher, le2e_guard, le2e_is_cipher
+        name = str(b["name"] or "").strip()
+        name = le2a_clean_cipher(name, "name") if le2e_is_cipher(name) else name[:200]  # 2.64.1 (#1817): a ciphertext is never cut
         if not name:
             return err(tr("Name missing"))
+        le2e_guard(c, c.execute("SELECT list_id FROM sections WHERE id=?", (sid,)).fetchone()[0], {"section": name}, cur={"section": cur["name"]})
         if "name" in prev and cur["name"] != str(prev["name"] or "") and cur["name"] != name:
             conflicts.append({"field": "name", "server": cur["name"], "mine": name})
         else:

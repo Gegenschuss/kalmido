@@ -516,6 +516,13 @@ ROUTES = {
     "DELETE /api/tasks/{}/enc-note": "task", "POST /api/tasks/{}/enc-attachments": "attachment",
     # 2.48.0 (#1642): the locked note of a task (need_task; only the person who locked it)
     "GET /api/tasks/{}/bell": "task", "PUT /api/tasks/{}/bell": "task", "POST /api/tasks/{}/bell/undo": "task",  # 2.53.0 C (#1424): need_task + people of the list (p253_c_api_test.py)
+    # 2.64.1 A (#1817): the lock per list -- need_list + people only (p264a_a_api_test.py: outside the list 404, agents / tokens 403)
+    "GET /api/lists/{}/e2e": "list", "POST /api/lists/{}/e2e/start": "list", "GET /api/lists/{}/e2e/todo": "list",
+    "POST /api/lists/{}/e2e/bulk": "list", "POST /api/lists/{}/e2e/finish": "list", "POST /api/lists/{}/e2e/stop": "list",
+    "POST /api/lists/{}/e2e/keys": "list",
+    "POST /api/lists/{}/e2e/rotate": "list",  # 2.64.2 A (#1817): key change of a list with the lock
+    # 2.64.2 B (#1817): list files -- need_task (+ own comment) / need_list, people in the app only (p264b_b_api_test.py)
+    "POST /api/tasks/{}/list-attachments": "attachment", "POST /api/lists/{}/e2e/files/{}": "list",
     "GET /api/tasks/{}/note-lock": "task", "PUT /api/tasks/{}/note-lock": "task", "DELETE /api/tasks/{}/note-lock": "task", "GET /api/v1/team/rooms": "team", "POST /api/v1/team/dm": "team",
     "GET /api/v1/team/rooms/{}/messages": "team", "POST /api/v1/team/rooms/{}/messages": "team",
     "PATCH /api/v1/team/messages/{}": "team", "DELETE /api/v1/team/messages/{}": "team",
@@ -571,6 +578,10 @@ ROUTES = {
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
+    # 2.64.3 A (#1817): the lock per knowledge space (wiki_space: a space of another organisation 404, p264c_a_api_test.py)
+    "GET /api/wiki/e2e": "wiki", "POST /api/wiki/e2e/start": "wiki", "GET /api/wiki/e2e/todo": "wiki",
+    "POST /api/wiki/e2e/bulk": "wiki", "POST /api/wiki/e2e/finish": "wiki", "POST /api/wiki/e2e/stop": "wiki",
+    "POST /api/wiki/e2e/keys": "wiki", "POST /api/wiki/e2e/rotate": "wiki",
     # 2.49.0 (#1106): find people by e-mail, connection requests, blocks
     "GET /api/disc": "discover", "PUT /api/disc": "discover", "POST /api/disc/confirm": "discover", "POST /api/disc/find": "discover",
     "POST /api/disc/check": "discover", "POST /api/disc/requests": "discover", "POST /api/disc/requests/{}/{}": "discover",

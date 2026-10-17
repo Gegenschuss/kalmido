@@ -41,7 +41,8 @@ NEWS_KINDS = ("mention", "comment", "assign", "unassign", "take", "complete", "s
               "lytpl")  # 2.55.0 (#1068): someone sent me an arrangement as a template (row "share", accounts/layoutsets.py)
 NEWS_KINDS += ("review",)  # 2.60.0 C (#1512): a review asked of me / my task sent back (row "review", tasks/review.py)
 NEWS_KINDS += ("upscan",)  # 2.61.0 (#1818): the virus scanner found malware in a file I uploaded earlier (files/scan.py, no push)
-NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal")  # about a list (2.21: an event / calendar / address book), not a task
+NEWS_KINDS += ("e2e_key",)  # 2.64.1 (#1817): someone handed me the key of a list encrypted in the browser (row "share", collab/liste2e.py)
+NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
 NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take"), "comment": ("comment",), "complete": ("complete",),
@@ -51,6 +52,7 @@ NEWS_TO_ME = ("mention", "assign", "unassign", "take")  # filter "Mentions & ass
 # approver's decision; everything agents do and every plain change is "Activity". The bell counts only "For you".
 NEWS_FOR_ME = ("mention", "assign", "take", "apdecide", "orglist", "connreq", "connok", "dispo", "lytpl")  # 2.55.0 (#1068): lytpl  # 2.50.0 (#1194): dispo; 2.35.0 (#1101): an organisation admin acted on my list
 NEWS_FOR_ME += ("review",)  # 2.60.0 C (#1512)
+NEWS_FOR_ME += ("e2e_key",)  # 2.64.1 (#1817)
 
 
 def news_to_me(kind, actor_id, data, agents):
@@ -354,7 +356,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             pass
         elif kind == "orglist":  # 2.35.0 (#1101): addressed to the list's people; a deleted list only lives on in data.name
             pass
-        elif kind in ("share", "role", "status", "owner", "agentjoin", "playbook_proposal"):
+        elif kind in ("share", "role", "status", "owner", "agentjoin", "playbook_proposal", "e2e_key"):  # 2.64.1 (#1817): e2e_key
             if not sees(r["list_id"]):
                 continue
         elif kind == "usage":  # 2.1.1 (#326): an agent's usage limit, for admins (no task, no list)
@@ -413,6 +415,14 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):
                 continue
+        elif kind == "wiki_e2e_key":  # 2.64.3 (#1817): the key of a knowledge space, while I am in its organisation
+            from ..accounts.orgs import user_orgs
+            try:
+                wo = int(json.loads(r["data"] or "{}").get("org_id") or 0)
+            except (ValueError, TypeError, AttributeError):
+                wo = 0
+            if wo not in user_orgs(c, uid):
+                continue
         elif kind != "unshare":
             if r["t_title"] is None or r["t_del"] or not sees(r["t_list"]) or not sees_task(r["task_id"], True):
                 continue
@@ -463,6 +473,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                     "read": read, "to_me": tome})
         if kind == "comment" and r["actor_id"] in agents:
             out[-1].update(agent=True, tasks=[{"id": r["task_id"], "title": r["t_title"]}])
+    from ..collab.liste2eguard import le2b_news
+    le2b_news(c, out)  # 2.64.1 B (#1817): items of lists with the lock: no title, no excerpt, enc + list_id (the app resolves)
     return out, user_names(c, uids)
 
 

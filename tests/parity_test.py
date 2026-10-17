@@ -318,6 +318,12 @@ APP_ONLY = [
     # 2.48.0 (#1642): a task's note locked with its owner's password, encrypted in the browser; agents see note_locked only
     ("2.48.0 (#1642): locking a task's note with one's own password happens in that person's browser (end-to-end); agents see only "
      "note_locked and get 409 when they write the notes", ("* /api/tasks/{}/note-lock",)),
+    # 2.64.1 (#1817): the lock per list, encrypted in the browser with a list key; agents are never members of such a list
+    ("2.64.1 (#1817): switching the lock of a list on / off, rewriting its texts and handing out the list key happen in a person's "
+     "browser (end-to-end); agents and API tokens get 403, lists with the lock are not for agents", ("* /api/lists/{}/e2e",)),
+    # 2.64.2 (#1817): files of a list with the lock, encrypted in the browser with the list key
+    ("2.64.2 (#1817): files of a list with the lock are encrypted with the list key in a person's browser; agents and API tokens get 403 "
+     "(they see such files only as encrypted)", ("=POST /api/tasks/{}/list-attachments",)),
     ("2.37.0 (#1159): a person saves a chat message as a task with a click; agents only offer it (send_chat offer_save), never save",
      ("=POST /api/chat-save",)),
     ("2.28.0 (#1005): a person answers an agent's question with a button: in the API as POST /agents/{id}/chat/{mid}/choice (a person's token); agents never answer",

@@ -113,6 +113,11 @@ CHECKS = {
     "task_reviewer": ("SELECT t.id, t.reviewer_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.reviewer_id IS NOT NULL "
                       "AND l.org_id IS NOT NULL AND t.reviewer_id<>l.owner_id AND NOT EXISTS (SELECT 1 FROM list_members m "
                       "WHERE m.list_id=t.list_id AND m.user_id=t.reviewer_id)"),
+    # 2.64.3 A (#1817): a wrapped key of an organisation's knowledge space with the lock held by an agent or by a person outside
+    # the organisation, or a key of a private space held by another person (the trigger wiki_e2e_members removes it when someone leaves; counted only)
+    "wiki_key": ("SELECT k.space_id, k.user_id FROM wiki_keys k JOIN wiki_spaces s ON s.id=k.space_id JOIN users u ON u.id=k.user_id "
+                 "WHERE (s.org_id IS NULL AND k.user_id<>s.owner_id) OR (s.org_id IS NOT NULL AND (u.kind='agent' OR "
+                 + _PERSON.format(o="s", m="k") + "))"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 

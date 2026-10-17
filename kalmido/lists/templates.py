@@ -307,12 +307,18 @@ def template_create():
         if b.get("task_id"):
             tid = int(b["task_id"])
             need_task(c, tid, write=False, full=True)
+            from ..collab.liste2eguard import le2b_task_locked, le2b_off
+            if le2b_task_locked(c, tid):  # 2.64.1 B (#1817): a template would be a plain-text copy on the server
+                return jsonify(error=le2b_off(), code="list_e2e"), 409
             t = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone()
             if not t:
                 raise Denied(404)
             kind, data, name = "task", {"task": tpl_node_from_task(c, t, base, uid)}, t["title"]
         elif b.get("list_id"):
             lid = int(b["list_id"])
+            from ..collab.liste2eguard import le2b_list_locked, le2b_off
+            if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): a template would be a plain-text copy on the server
+                return jsonify(error=le2b_off(), code="list_e2e"), 409
             if need_list(c, lid, write=False) == "participant":  # the whole list is not theirs to copy
                 raise Denied(403, tr("Participants cannot save the whole list as a template"))
             lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
@@ -473,6 +479,9 @@ def template_apply(tid):
     if r["kind"] == "task":
         lid = int(b.get("list_id") or 0) or my_inbox(c)
         need_list(c, lid)
+        from ..collab.liste2eguard import le2b_list_locked, le2b_off
+        if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): the server would write plain texts into a list with the lock
+            return jsonify(error=le2b_off(), code="list_e2e"), 409
         sec = b.get("section_id")
         if sec and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (sec, lid)).fetchone():
             sec = None

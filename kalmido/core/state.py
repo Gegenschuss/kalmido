@@ -126,9 +126,12 @@ def visible_lists(c, uid):
     if ids:
         for f in c.execute(f"SELECT id, list_id FROM list_fields WHERE list_id IN ({','.join('?' * len(ids))})", ids):
             lfids.setdefault(f["list_id"], set()).add(f["id"])
+    from ..collab.liste2e import le2a_state
+    le2s = le2a_state(c, rows, uid)  # 2.64.1 (#1817): the lock per list (waiting list, my key of the current generation)
     out = []
     for r in rows:
         d = {k: r[k] for k in r.keys() if not k.startswith("m_")}
+        d.update(le2s.get(r["id"], {"e2e_pending": 0, "e2e_mine": False}))
         d["progress"] = prog.get(r["id"], {"done": 0, "total": 0, "overdue": 0, "next_due": None})
         d["status_by_name"] = snames.get(r["status_by"], "")
         if r["owner_id"] != uid:
@@ -416,7 +419,9 @@ def search_tasks(c, uid, raw, limit):
     fhit = ts_task_hits(c, uid, raw)  # 2.61.0 (#1820): the recognised text of a task's files finds the task
     fids = sorted(set(fids) | set(sorted(fhit)[:2000]))
     # participants: only their own tasks match (a context parent's notes / link / fields are not theirs to search)
-    rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
+    # 2.64.1 B (#1817): lists with the lock are searched in the browser only (the server holds ciphertexts)
+    rows = load_tasks(c, f"list_id IN {vis_sql()} AND list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL) "
+                         f"AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
                          "AND (title ILIKE ? ESCAPE '\\' OR content ILIKE ? ESCAPE '\\' OR url ILIKE ? ESCAPE '\\' OR (snippets IS NOT NULL AND EXISTS (SELECT 1 FROM "
                          "jsonb_array_elements(CASE WHEN jsonb_typeof(snippets)='array' THEN snippets ELSE '[]'::jsonb END) j "
                          "WHERE (j->>'code') ILIKE ? ESCAPE '\\' OR (j->>'path') ILIKE ? ESCAPE '\\')) "

@@ -43,6 +43,9 @@ def snip_clean(v):
     from ..personal.timetrack import BadInput
     if v in (None, "", []):
         return None
+    from ..collab.liste2e import le2a_clean_cipher, le2e_is_cipher
+    if le2e_is_cipher(v):  # 2.64.1 (#1817): the encrypted snippets of a list with the lock, one JSON string (le2e_guard checks the list)
+        return json.dumps(le2a_clean_cipher(v, "snippets"))
     bad = lambda what: BadInput(tr("Invalid value: {0}", what))  # noqa: E731
     if not isinstance(v, list):
         raise bad("snippets")
@@ -89,7 +92,7 @@ def snip_clean(v):
 
 def snip_keep(new_raw, old_raw):
     """Unchanged snippets (same id, language, path, line and code) keep their author and time."""
-    if not new_raw or not old_raw:
+    if not new_raw or not old_raw or not new_raw.startswith("["):  # 2.64.1 (#1817): a ciphertext stays as it is
         return new_raw
     old = {s.get("id"): s for s in snip_parse(old_raw)}
     out = []
@@ -151,5 +154,8 @@ def snip_tpl(v):
 
 def snip_sig(v):
     """2.35.0: what a snippet list says (for the conflict check of undo / offline replays); None, '' and [] are the same."""
+    from ..collab.liste2e import le2a_snip_cipher, le2e_is_cipher
+    if le2e_is_cipher(v) or le2a_snip_cipher(v):  # 2.64.1 (#1817): ciphertexts compare as they are
+        return le2a_snip_cipher(v) or v
     lst = snip_parse(v) if isinstance(v, str) or v is None else [s for s in v if isinstance(s, dict)] if isinstance(v, list) else []
     return json.dumps([[s.get("id"), s.get("lang") or "", s.get("path") or None, s.get("line"), s.get("code")] for s in lst])

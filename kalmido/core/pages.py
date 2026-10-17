@@ -162,6 +162,10 @@ def save_attachment_bytes(c, tid, name, mime, data, owner=None):
     from ..core.orgcrypt import oc_task_org
     from ..files.upsafe import up_check, up_after_store, UploadRefused
     name = safe_name(name)
+    from ..collab.liste2efile import le2f_plain_skip
+    if le2f_plain_skip(c, tid):  # 2.64.2 B (#1817): no plain file in a list with the lock
+        print("share / mail file skipped: list encrypted in the browser", flush=True)
+        return
     who = c.execute("SELECT created_by FROM tasks WHERE id=?", (tid,)).fetchone()
     who = who[0] if who else None
     if owner is not None:  # 2.63.0 (#1513): a form's file without an account counts against the list owner's storage

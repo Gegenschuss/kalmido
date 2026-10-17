@@ -106,7 +106,9 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     e = ln_guard(c, tid, f)  # 2.48.0 (#1642): a note locked with a password is changed only through its own routes
     if e:
         return e
-    if f.get("ttype") and f["ttype"] != cur["ttype"] and "content" not in f and not (cur["content"] or "").strip():
+    from ..collab.liste2e import le2a_task_write, le2e_mode
+    if f.get("ttype") and f["ttype"] != cur["ttype"] and "content" not in f and not (cur["content"] or "").strip() \
+            and not le2e_mode(c, f.get("list_id") or cur["list_id"]):  # 2.64.1 (#1817): no plain template in a list with the lock
         tpl = ticket_template(c, f.get("list_id") or cur["list_id"], f["ttype"])  # 2.4.0 (#340): empty notes get the template
         if tpl:
             f["content"] = tpl
@@ -142,6 +144,7 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
             need_list(c, f["list_id"])  # moving out needs write on the source (caller), in on the target
             check_move(c, cur["list_id"], f["list_id"])
     lid = f.get("list_id", cur["list_id"])
+    le2_post = le2a_task_write(c, tid, cur, f, b, lid)  # 2.64.1 (#1817): the texts of a list with the lock (ciphertexts only, moves via the app)
     if f.get("section_id") and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (f["section_id"], lid)).fetchone():
         f["section_id"] = None
     # 2.18.0 (#430): a milestone stays top level without subtasks; a task's milestone is one of its own list
@@ -223,6 +226,8 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         c.execute(f"UPDATE tasks SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), tid])
         if "list_id" in f:  # subtasks follow their parent (all levels)
             move_subtree(c, tid, f["list_id"])
+            if le2_post:
+                le2_post()  # 2.64.1 (#1817): the re-encrypted texts of what moved along
             if "section_id" not in f:
                 c.execute("UPDATE tasks SET section_id=NULL WHERE id=?", (tid,))
         if ("list_id" in f and f["list_id"] != cur["list_id"]) or ("ms" in f and f["ms"] != cur["ms"]):

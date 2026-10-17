@@ -20,6 +20,13 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.64.3** (2026-10-17): **encrypted knowledge space**: a whole knowledge space (private or an organisation's) can be
+  encrypted in the browser; search, backlinks and export run in the browser, agents have no access.
+- **2.64.2** (2026-10-17): **lock per list, stage 2**: attachments and the team chat of a locked list are encrypted
+  too, and when a member leaves the key changes and older contents are encrypted again in the background.
+- **2.64.1** (2026-10-17): **lock per list**: a list's titles, descriptions, subtasks, comments, notes, section names,
+  text fields, links and snippets **encrypted in the browser** with a key per list for every member (waiting list, safety
+  numbers); agents, mail address, public link and templates stay out of such a list, search runs in the browser.
 - **2.64.0** (2026-10-17): **files in the private space are stored encrypted** on the server (a key per person, like the
   organisations' files since 2.42; server-side, not end-to-end). Security fix (files at rest).
 - **2.60.0** (2026-10-17): Software team - **sprints** with burndown and review, **WIP limits** per kanban column,
@@ -437,6 +444,14 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   accounts an admin created (or automatic accounts, if you want), optional group check and admin group
 - **Encryption** (2.42.0): an end-to-end encrypted note and files per task and encrypted direct messages (WebCrypto in
   the browser, the server only stores ciphertext), plus encryption at rest with a key per organisation for bank and tax
+  data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md)
+- **Lock per list** (2.64.1): a list can be *encrypted in the browser* (list dialog): titles, descriptions, subtasks,
+  comments, list notes, section names, text fields, links and code snippets are encrypted with a key per list that each
+  member gets wrapped with their own key; dates, status, assignees and the list name stay readable. Members without a key
+  wait until the owner releases it; agents, the mail address, public links and templates are not available there.
+  Since 2.64.2 attachments and the list's team chat are encrypted too, and the key changes when a member leaves;
+  since 2.64.3 a whole knowledge space can be encrypted the same way (see docs/ARCHITECTURE.md, *Lock per list*, and
+  docs/SELF-HOSTING.md, *Exporting encrypted content*)
   data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md). 2.64.0: the files
   of the private space are stored encrypted on the server as well, with a key per person (server-side, not end-to-end)
 - **Automatic backups** of the database and all attachments, daily with retention, optionally encrypted, downloadable,

@@ -51,6 +51,8 @@ def ntfy(title, msg, prio="4", click=None, topic=None, actions=None, admin=False
     from ..notify.alerts import aa_err, aa_fail, aa_ok
     if not topic or not NTFY_TOPIC_RE.fullmatch(topic):
         return False
+    from ..collab.liste2eguard import le2b_net
+    title, msg = le2b_net(title), le2b_net(msg)  # 2.64.1 B (#1817): never a ciphertext of a list with the lock in a push
     title, msg = md_plain(title), md_plain(msg)  # 2.40.0 (#1409): no Markdown marks in the push
     hdr = {"Title": title.encode("utf-8"), "Priority": prio}  # no Tags header: no emoji icon in the push
     if click:
@@ -408,6 +410,8 @@ def push_reachable(c, uid, s):
 def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None):
     """What the notification shows, nothing more: title, text, the in-app link (hash only), buttons."""
     hash_ = urllib.parse.urlsplit(click).fragment if click else ""
+    from ..collab.liste2eguard import le2b_net
+    title, msg = le2b_net(title), le2b_net(msg)  # 2.64.1 B (#1817): never a ciphertext of a list with the lock in a push
     title, msg = md_plain(title), md_plain(msg)  # 2.40.0 (#1409): no Markdown marks in the push
     p = {"title": (title or APP_NAME)[:200], "body": (msg or "")[:1000], "url": "/#" + hash_ if hash_ else "/",
          "prio": int(prio) if str(prio).isdigit() else 4, "ts": int(time.time() * 1000)}
@@ -440,6 +444,10 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
                 s = usettings(c, uid)
         finally:
             c.close()
+    from ..collab.liste2eguard import le2b_net
+    from ..core.i18n import LANGS
+    lg = s.get("lang") if s.get("lang") in LANGS else "en"
+    title, msg = le2b_net(title, lg), le2b_net(msg, lg)  # 2.64.2 D (#1817): the neutral word in the recipient's language
     ch = push_channel(s)
     sent = 0
     if WEBPUSH_ON and ch in ("webpush", "both"):

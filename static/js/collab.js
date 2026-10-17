@@ -189,6 +189,8 @@ function newsText(it, U) {
   const d = it.data || {}, who = `<b>${esc(viaName(d, it.actor_id, U))}</b>`, q = x => `<b>${esc(x)}</b>`;
   switch (it.kind) {
     case 'mention': return tr('{0} mentioned you', who);
+    case 'e2e_key': return le2u_newsText(it, who, q);  // 2.64.1 (#1817): the key of a locked list was released to me
+    case 'wiki_e2e_key': return typeof wkeNewsText === 'function' ? wkeNewsText(it, who, q) : '';  // 2.64.3 B (#1817): the key of an encrypted knowledge space
     case 'tbl_urgent': return tbl_newsText(it, who);  // 2.53.0 C (#1424)
     case 'comment': if ((it.tasks || []).length > 1) return trn('{1} left {0} comments on {2} tasks', '{1} left {0} comments on {2} tasks', it.count, who, it.tasks.length);  // 2.13.0 (#453 A5)
       return it.count > 1 ? trn('{1} left {0} comments', '{1} left {0} comments', it.count, (it.actors || [it.actor_id]).map(a => `<b>${esc(uname(a, U))}</b>`).join(', ')) : tr('{0} commented', who);
@@ -241,13 +243,13 @@ function newsText(it, U) {
   }
   return tr('{0} changed something', who);
 }
-const NEWS_ICON = {playbook_proposal: 'book', orglist: 'archive', mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot'};
+const NEWS_ICON = {playbook_proposal: 'book', orglist: 'archive', mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot', e2e_key: 'key', wiki_e2e_key: 'key'};  // 2.64.1 / 2.64.3 B (#1817)
 function newsItemHtml(it, i, pop) {
   const U = S.nf.users;
   const many = (it.tasks || []).length > 1;  // 2.13.0 (#453 A5): an agent's comments on several tasks
   const task = many ? `<div class="ntask"><span class="nt">${esc(it.tasks.slice(0, 2).map(x => x.title).join(' · '))}</span>${it.tasks.length > 2 ? `<span class="muted">+${it.tasks.length - 2}</span>` : ''}</div>`
-    : it.task_id ? `<div class="ntask"><span class="nt">${esc(it.task_title || '')}</span><span class="muted nl">${esc(newsListName(it))}</span></div>` : '';
-  const ex = it.excerpt ? `<div class="nexc">${newsExcerpt(it.excerpt, U)}</div>` : '';
+    : it.task_id ? `<div class="ntask"><span class="nt">${it.enc ? ic('lock', 's') + ' ' : ''}${esc(it.enc ? le2u_newsTitle(it) : it.task_title || '')}</span><span class="muted nl">${esc(newsListName(it))}</span></div>` : '';
+  const ex = it.excerpt && !it.enc ? `<div class="nexc">${newsExcerpt(it.excerpt, U)}</div>` : '';
   return `<div class="nitem ${it.read ? '' : 'unread'}${it.actor_id && isAgentUser(it.actor_id) ? ' agc' : ''} k-${esc(it.kind)} ${it.to_me ? 'tome' : ''}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
     ${it.actor_id ? `<button type="button" class="avb" data-mcard="${+it.actor_id}" data-mname="${esc(uname(it.actor_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(it.actor_id, U)))}" aria-label="${esc(tr('Show {0}', uname(it.actor_id, U)))}">` : ''}${av(it.actor_id, uname(it.actor_id, U), 'avatar', '', `<i class="nk">${ic(NEWS_ICON[it.kind] || 'bell', 's')}</i>`)}${it.actor_id ? '</button>' : ''}
     <div class="nmain"><div class="ntext">${newsText(it, U)}</div>${task}${ex}</div>
@@ -584,6 +586,7 @@ function encodeMentions(text, people) {
 }
 function cattHtml(a, cid, editing) {
   const del = editing ? `<button class="attdel" data-act="catt-del" data-att="${a.id}" title="${tr('Remove')}">${ic('x', 's')}</button>` : '';
+  if (a.enc === 2 && typeof le2eFileHtml === 'function') return le2eFileHtml(a, del, taskById(S.sel)?.list_id);  // 2.64.2 B (#1817)
   if (upLocked(a)) return scnLockedTile(a, del);  // 2.61.0 (#1818)
   if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="catt-view" data-att="${a.id}" data-cid="${cid}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${scnImgMark(a)}${del}</div>`;
   return `<div class="att file">${attFileA(a)}${del}</div>`;  // 2.30.0 (#1035): text files open in the viewer
@@ -709,7 +712,10 @@ async function sendComment() {
   const rto = replyTo('c:' + tid);  // 2.33.0 (#1076)
   const pub = typeof ptl_take === 'function' && ptl_take(tid);  // 2.63.0 B (#1513): "To the customer"
   let payload = {body: text, ...(rto ? {reply_to: rto} : {}), ...(pub ? {portal: true} : {})};
-  if (files.length) { payload = new FormData(); payload.append('body', text); if (rto) payload.append('reply_to', rto); if (pub) payload.append('portal', '1'); files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
+  // 2.64.2 B (#1817): in a list with the lock the files go encrypted with the list key (names as list ciphers)
+  let lf = null;
+  if (files.length && typeof le2eFileParts === 'function') { try { lf = await le2eFileParts(taskById(tid)?.list_id, files); } catch (x) { toast(x.message); return; } }
+  if (files.length) { payload = new FormData(); payload.append('body', text); if (rto) payload.append('reply_to', rto); if (pub) payload.append('portal', '1'); if (lf) lf.forEach(p => { payload.append('file', p.blob, 'encrypted.kenc'); payload.append('le2e_name', p.name); }); else files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
   const btn = $('[data-act="c-send"]'); if (btn) btn.disabled = true;
   try { await capi('POST', `/api/tasks/${tid}/comments`, payload); }
   catch { if (pub) { PTL.on[tid] = true; ptl_draw(); } return; }

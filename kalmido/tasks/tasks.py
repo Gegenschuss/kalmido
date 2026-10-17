@@ -161,11 +161,11 @@ def check_assignee(c, lid, aid):
 
 # 2.2.1 (#359): the fields the web API's task / list / comment endpoints know (others: warning, see web_fields)
 WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields", "people"}
-WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
+WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act", "le2e_move"}  # 2.64.1 (#1817): le2e_move
 WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family", "sections", "org_id", "time_tracking"})  # 2.28.0 (#935): org_id; 2.41.0 (#1471): time_tracking
 WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"col_sums", "kpis", "client_id", "rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "agent_members", "agent_peers", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype", "sort_mode", "org_id", "stale_days", "agent_followup", "done_in_section", "folder_adopt", "org_visibility", "org_edit"}  # 2.36.2 (#1136): done_in_section; 2.46.0 (#1603)
 WEB_LIST_EDIT |= {"tap_done"}  # 2.46.4 (#1751): "Tap does not open details" (owner / list admins)
-WEB_COMMENT = frozenset({"body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in"})  # 2.33.0 (#1076): reply_to; 2.41.0 (#1383): choices
+WEB_COMMENT = frozenset({"body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in", "mentions"})  # 2.64.1 (#1817): mentions  # 2.33.0 (#1076): reply_to; 2.41.0 (#1383): choices
 WEB_COMMENT |= {"portal"}  # 2.63.0 B (#1513): an answer the customer sees
 
 
@@ -205,6 +205,9 @@ def task_create():
     if f.get("section_id") and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?",
                                               (f["section_id"], f["list_id"])).fetchone():
         f["section_id"] = None
+    from ..collab.liste2e import le2a_task_create, le2e_mode
+    le2a_task_create(c, f["list_id"], f)  # 2.64.1 (#1817): texts of a list with the lock only as ciphertexts from the app
+    le2_on = bool(le2e_mode(c, f["list_id"]))
     shop = not f.get("parent_id") and is_shop(c, f["list_id"])  # 2.19.0 (#653): a new item goes to the area it had last time
     if shop and not f.get("section_id"):
         f["section_id"] = shop_area_of(c, f["list_id"], f["title"])
@@ -245,7 +248,7 @@ def task_create():
             # order they are typed
             f["sort"] = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM tasks WHERE list_id=? AND parent_id IS NULL",
                                   (f["list_id"],)).fetchone()[0]
-    if f.get("ttype") and not (f.get("content") or "").strip():  # 2.4.0 (#340): a new bug / feature gets its note template
+    if f.get("ttype") and not (f.get("content") or "").strip() and not le2_on:  # 2.4.0 (#340): a new bug / feature gets its note template
         tpl = ticket_template(c, f["list_id"], f["ttype"])
         if tpl:
             f["content"] = tpl
@@ -303,6 +306,8 @@ def set_waiting(c, tid, b):
     if note is not None and not isinstance(note, str):
         raise BadInput(tr("Invalid value: {0}", "note"))
     note = (note or "").strip()[:WAIT_NOTE_MAX]
+    from ..collab.liste2e import le2a_locked_text
+    le2a_locked_text(c, c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0], note)  # 2.64.1 (#1817): not encrypted
     until = b.get("until") or None
     if until is not None and not valid_date(until):
         raise BadInput(tr("Invalid value: {0}", "until"))

@@ -102,7 +102,7 @@ def dl_comment_message(c, cid):
         raise Denied(400, tr("Only comments of agents can be saved as a task"))
     t = c.execute("SELECT id, title FROM tasks WHERE id=?", (k["task_id"],)).fetchone()
     files = [(f["name"], f["mime"], f["size"], f["path"], ("att", f["id"])) for f in c.execute(
-        "SELECT id, name, mime, size, path FROM attachments WHERE comment_id=? ORDER BY id", (cid,))]
+        "SELECT id, name, mime, size, path FROM attachments WHERE comment_id=? AND enc=0 ORDER BY id", (cid,))]  # 2.64.2 B (#1817): no encrypted file
     who = user_names(c, [k["user_id"]]).get(k["user_id"], "?")
     return k["body"] or "", files, tr("Comment on {0}", t["title"]), who, k["created_at"], f"#t/{t['id']}"
 
@@ -114,6 +114,9 @@ def _copy_files(c, tid, uid, files):
     from ..files.upsafe import up_after_store
     from ..core.pg import insert_id
     skipped, ts = [], iso(now_utc())
+    from .liste2efile import le2f_plain_skip
+    if le2f_plain_skip(c, tid):  # 2.64.2 B (#1817): no plain file in a list with the lock
+        return [f[0] for f in files]
     for name, mime, size, path, (kind, fid) in files:
         src = os.path.join(ATT_DIR, path)
         # 2.61.0 review (#1818): a file found infected is never copied; an unchecked one stays marked for the later scan

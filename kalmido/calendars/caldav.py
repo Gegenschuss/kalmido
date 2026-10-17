@@ -431,6 +431,9 @@ def dav_vtodo(t, ctx):
     tid, meta = t["id"], ctx["meta"].get(t["id"])
     key = getattr(TZ, "key", "UTC")
     stamp = ics_utc(parse_iso(t["updated_at"]))
+    from ..collab.liste2e import le2e_is_cipher, le2e_neutral
+    if tid in ctx.get("e2e", ()) or le2e_is_cipher(t["title"]):  # 2.64.1 B (#1817): the neutral word, dates and alarms stay
+        t = {**dict(t), "title": le2e_neutral(), "content": "", "url": ""}
     L = ["BEGIN:VTODO", f"UID:{ics_text(dav_uid_of(tid, meta))}", f"DTSTAMP:{stamp}",
          f"CREATED:{ics_utc(parse_iso(t['created_at']))}", f"LAST-MODIFIED:{stamp}", f"SUMMARY:{ics_text(t['title'])}"]
     hide = tid in ctx["context"]  # a participant's context task: no notes / link
@@ -551,7 +554,9 @@ def dav_ctx(c, u, task_ids):
             extra_meta[pid] = c.execute("SELECT * FROM dav_meta WHERE task_id=?", (pid,)).fetchone()
         return dav_uid_of(pid, extra_meta[pid])
     s = usettings(c, u["id"])
-    return {"meta": meta, "tags": tags, "uid": uid, "allday": hm_minutes(s.get("allday_time") or "09:00"), "context": set()}
+    from ..collab.liste2eguard import le2b_task_lists
+    return {"meta": meta, "tags": tags, "uid": uid, "allday": hm_minutes(s.get("allday_time") or "09:00"), "context": set(),
+            "e2e": le2b_task_lists(c, task_ids)}  # 2.64.1 B (#1817): tasks of lists with the lock
 
 
 class DavColl:
@@ -1053,7 +1058,11 @@ def dav_patch(c, u, cur, v, caps, lid):
     tid, p = cur["id"], {}
     from ..collab.notelock import ln_is_locked
     locked = ln_is_locked(c, tid)  # 2.48.0 (#1642): a locked note is never overwritten (nor unlocked) by a calendar app
+    from ..collab.liste2eguard import le2b_list_locked
+    e2e = le2b_list_locked(c, lid)  # 2.64.1 B (#1817): texts of a list with the lock are ignored (dates, status, alarms stay)
     for k in ("title", "content", "priority", "due", "due_time", "url"):
+        if e2e and k in ("title", "content", "url"):
+            continue
         if (cur[k] or None) != (v[k] or None) and not (k == "content" and locked):
             p[k] = v[k]
     if cur["status"] == 0 or v["status"] == 0:  # completing moves a recurring task on: dates of a done task are kept
@@ -1147,6 +1156,9 @@ def dav_put(c, u, pw_row, lst, name):
         return Response(status=201)
     if _own_id(DAV_HREF_RE, name):  # names of this form belong to the tasks they name
         raise DavError(403, "This resource name is reserved", "<C:no-uid-conflict/>")
+    from ..collab.liste2eguard import le2b_list_locked
+    if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): no new task from a calendar app in a list with the lock
+        raise DavError(403, "This list is encrypted in the browser")
     b = {k: v[k] for k in ("title", "content", "priority", "due", "due_time", "start", "repeat", "url") if v[k] not in (None, "", 0)}
     b["list_id"] = lid
     if v["reminders"] and v["due"]:

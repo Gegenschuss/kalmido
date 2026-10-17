@@ -89,11 +89,16 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_deals": N_("Sales pipeline"),  # 2.50.0 (#1196)
                  "hub_absences": N_("Kind and note of absences")}  # 2.50.0 (#1195)
 PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))
+# 2.64.1 (#1817): what the browser encrypts in lists with a lock (collab/liste2e.py LE2E_FIELDS); the plain list holds them apart
+PM_CRYPT_BROWSER = (N_("Titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets of lists with a lock"),)
+PM_CRYPT_BROWSER += (N_("Names and texts of knowledge pages in spaces with a lock"),)  # 2.64.3 A (#1817): the lock per knowledge space
+PM_CRYPT_PLAIN_NOTE = N_("Tasks, descriptions, notes and comments: except in lists with a lock")
 
 
 def pm_crypt_scope():
     """{encrypted: [..], plain: [..]} in the user's language (no key material, the same for every organisation)."""
-    return {"encrypted": list(dict.fromkeys(tr(v) for v in PM_CRYPT_CATS.values())), "plain": [tr(x) for x in PM_CRYPT_PLAIN]}
+    return {"encrypted": list(dict.fromkeys(tr(v) for v in PM_CRYPT_CATS.values())), "plain": [tr(x) for x in PM_CRYPT_PLAIN],
+            "browser": [tr(x) for x in PM_CRYPT_BROWSER], "plain_note": tr(PM_CRYPT_PLAIN_NOTE)}  # 2.64.1 (#1817)
 
 
 class OrgCryptError(Exception):

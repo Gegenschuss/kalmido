@@ -7,6 +7,73 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.64.3] - 2026-10-17
+
+### Added
+- **Encrypted knowledge space** (lock per list, stage 3): an organisation admin (or the owner of the private space) can
+  encrypt a whole knowledge space in the browser (*Knowledge pages > … > Encryption…*). Page names and texts are then
+  encrypted with a key per space that every member of the organisation gets wrapped with their own key; the server
+  stores only ciphertext and no links. Search, backlinks, "mentioned in", link suggestions, templates, renaming with its
+  links and export / import as ZIP run in the browser. New members of the organisation wait until an admin releases the
+  key; when a member who held it leaves, the key changes and the pages are encrypted again in the background. Agents
+  have no access to an encrypted space; switching back needs the password (#1817).
+- Settings > Administration > Encryption lists the encrypted knowledge spaces; a help paragraph in Settings > Account
+  and new documentation explain how to export encrypted lists, chats and knowledge spaces and what is lost without the
+  keys (docs/SELF-HOSTING.md *Encryption in the browser*, *Exporting encrypted content*; docs/WIKI.md, AGENT-SETUP.md).
+
+### Security
+- Security fix (encryption in the browser: knowledge pages and lists).
+
+### Note
+- Before going back to an older version, switch the encryption of every knowledge space off again (and open the lock of
+  every list, as for 2.64.1 / 2.64.2): older versions show the encrypted names as page titles and do not guard such a
+  space, and a backup of 2.64.3 is refused by older versions.
+
+## [2.64.2] - 2026-10-17
+
+### Added
+- **Lock per list, stage 2**: when a member who held the key leaves a list with the lock (or the organisation), the
+  browser of the next owner or list admin changes the list key automatically and encrypts the older contents again in the
+  background (resumable, with progress; a button *Change the key now* for owners and list admins). The honest hint in the
+  member dialog stays until that run is done. New members get every key generation and read older contents too (#1817).
+- Attachments of tasks and comments in a list with the lock are encrypted in the browser with the list key; every member
+  opens them, agents and the API see only "encrypted". Switching the lock on, the key change and the way back convert
+  existing attachments in the browser. Project files and the other ways to add files (mail, API, sharing) are not
+  available in such a list; a task with encrypted files stays in its list.
+- The team chat of a list with the lock is encrypted with the list key; agents and the API read no text and cannot write
+  there, search and *Save as task* leave it out, a mention still notifies the person.
+- Safety numbers of all members of a list with the lock, reachable from its team chat and its attachments; a changed key
+  is shown there too.
+
+### Changed
+- Pushes about a list with the lock show the neutral word in the language of the person who gets them, and a comment
+  push names the list instead of quoting the comment.
+
+### Note
+- Before going back to an older version, open the lock of every list again (as for 2.64.1): older versions do not know
+  the lock, and 2.64.1 cannot open the encrypted attachments and team chat messages of 2.64.2.
+
+## [2.64.1] - 2026-10-17
+
+### Added
+- **Lock per list** (encrypted in the browser): the owner or a list admin can lock a list in the list dialog. Titles,
+  descriptions, subtasks, comments, list notes, section names, text fields, links and code snippets of that list are then
+  encrypted in the browser with a key per list that every member gets wrapped with their own key; the server stores only
+  ciphertext. Dates, status, priority, assignees and the list name stay readable. Members without a key wait on a list
+  until the owner releases it with one click; every member has a safety number, a changed key is shown. Agents, the mail
+  address, public links, templates, the participant role and "everyone in the organisation" are not available in such a
+  list, and lists of the Family and Household & Life modules cannot be locked (the server writes into them); in a locked
+  list CalDAV shows "🔒 Task" with dates, pushes and mails name only the list, search runs in the browser. The offline copy
+  in the browser keeps only ciphertext; texts that do not open with your key are reported (compare the safety numbers). The
+  way back decrypts everything again (owner, with the password). Not yet:
+  attachments, the list channel and a new key when a member leaves (the member dialog says so) (#1817).
+- Before going back to an older version, open the lock of every list again: older versions do not know the lock and
+  would show and accept texts of such a list unprotected.
+- Settings > Administration > Encryption lists a third kind: "Encrypted in the browser (lists with a lock)".
+
+### Fixed
+- Encrypted direct messages: the notice for your own switch says "You switched encryption on" (it read "You has ..." in
+  German), and the *Attach encrypted* button has an accessible name (#1518).
 ## [2.66.0] - 2026-10-17
 
 **In short:** duplicate contacts and duplicate clients can be merged by hand - pick the record that stays and, per field,

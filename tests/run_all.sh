@@ -947,6 +947,29 @@ fresh; run p266_b_ui node p266_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.66.0 part A: merging duplicate contacts (#1835): links, CardDAV, undo, rights
 fresh; run p266_a_api "$PY" p266_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p266_a_ui node p266_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.1 part C: #1817 lock per list - client data layer
+fresh; run p264a_c_ui node p264a_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.1 part D: #1817 lock per list - dialogs and display, #1518
+fresh; run p264a_d_ui node p264a_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.1 part A: #1817 lock per list - server core
+fresh; run p264a_a_api "$PY" p264a_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.64.1 part B: #1817 lock per list - other ways, neutral texts, copies
+fresh; run p264a_b_api "$PY" p264a_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.64.2 parts C + D: #1817 lock per list stage 2 - the list channel, pushes in the recipient's language
+fresh; run p264b_c_api "$PY" p264b_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.64.2 parts C + D: #1817 lock per list stage 2 - the list channel in the web app, safety numbers
+fresh; run p264b_c_ui node p264b_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.2 part A: #1817 lock per list stage 2 - key change and re-encryption
+fresh; run p264b_a_api "$PY" p264b_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p264b_a_ui node p264b_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.2 part B: #1817 lock per list stage 2 - list files (server)
+fresh; run p264b_b_api "$PY" p264b_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.64.2 part B: #1817 lock per list stage 2 - list files (web app)
+fresh; run p264b_b_ui node p264b_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.3 part A: #1817 lock per knowledge space - server routes, guard of the page routes, members, rotation
+fresh; run p264c_a_api "$PY" p264c_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.64.3 part B: #1817 lock per knowledge space - client (encrypted wiki space in the browser)
+fresh; run p264c_b_ui node p264c_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

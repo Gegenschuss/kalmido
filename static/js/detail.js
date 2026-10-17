@@ -406,6 +406,7 @@ function renderDetail0() {
   // 2.36.0 (#1118): a locked task: title, notes, date, priority, list, tags, repeat, assignee read-only (tlkR); the lock
   // button next to Pin switches it; comments, checkboxes, completing and subtasks stay free
   const tlkL = !ro && tlkIs(t), tlkR = ro || tlkL;
+  const le2uLk = typeof le2u_locked === 'function' && le2u_locked(t);  // 2.64.1 (#1817): a locked list, texts not decrypted
   // U07 (owner decision 3) applied to the checklist type; 2.7.2 (#414): the type is gone, every item is a full task
   const ck = false;
   // 2.0.6 (#315): comments everywhere (module "comments"), also in private lists and without collaboration (personal
@@ -439,8 +440,8 @@ function renderDetail0() {
     history: hist ? `<details class="dsec cmsec cmro" id="d-hist"><summary><span>${tr('History')}</span></summary><div class="cms" id="d-hist-items">${S.tl.id === t.id ? histItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div></details>` : '',
     deps: ck ? '' : `${t.id > 0 && dFor(t) && !t.context ? `<div class="dsec depsec" id="d-deps">${depsHtml(t)}</div>` : waitExtHtml(t, ro, true)}`,  // 2.22.0 (#686)
     tags: ck ? '' : `<div class="dsec"><h5>${tr('Tags')}${shared && collab() && t.tags.length ? ` <span class="muted h5note">${ic('user', 's')} ${tr('= only visible to you')}</span>` : ''}</h5>${tagEditHtml(t, tlkR)}</div>`,
-    attachments: ck ? '' : `<div class="dsec attsec"><h5>${tr('Attachments')}</h5><div class="atts">${(t.attachments || []).map(attHtml).join('')}
-        ${t.id > 0 && !ro ? `<label class="attadd" title="${esc(isTouch() ? tr('Images, PDFs, documents') : tr('Images, PDFs, documents') + ' · ' + tr('or drop files here / paste an image with Ctrl+V'))}">${ic('clip', 's')}<span>${tr('Add file')}</span><input type="file" id="d-file" multiple hidden></label>${e2eAttAddHtml(t)}` : ''}</div>
+    attachments: ck ? '' : `<div class="dsec attsec"><h5>${tr('Attachments')}</h5>${typeof le2uAttHead === 'function' ? le2uAttHead(t) : ''}<div class="atts">${(t.attachments || []).map(attHtml).join('')}
+        ${t.id > 0 && !ro ? `<label class="attadd" title="${esc(isTouch() ? tr('Images, PDFs, documents') : tr('Images, PDFs, documents') + ' · ' + tr('or drop files here / paste an image with Ctrl+V'))}">${ic('clip', 's')}<span>${tr('Add file')}</span><input type="file" id="d-file" multiple hidden></label>${typeof le2eOn === 'function' && le2eOn(t.list_id) ? '' : e2eAttAddHtml(t)}` : ''}</div>
 </div>`,
     fields: ck ? '' : `<div class="dsec fields">
         ${''/* 2.25.0 (UX-44): list and section are changed in the path on top (a tap on it), no fields here any more */}
@@ -477,7 +478,7 @@ function renderDetail0() {
     </div>
     <div class="dbody ${ck ? 'ckbody' : ''}">
       ${crumbsHtml(t, l, parent)}
-      <div class="dtitle"><textarea id="d-title" rows="1" placeholder="${tr('Title')}" aria-label="${tr('Title')}" ${tlkR ? 'readonly' : ''}>${esc(t.title)}</textarea></div>
+      ${le2uLk ? le2u_detailHtml(t) : ''}<div class="dtitle" ${le2uLk ? 'hidden' : ''}><textarea id="d-title" rows="1" placeholder="${tr('Title')}" aria-label="${tr('Title')}" ${tlkR ? 'readonly' : ''}>${esc(t.title)}</textarea></div>
       ${whoOn || jump ? `<div class="dmeta">${whoOn ? dWhoChip(t, tlkR) : ''}${whoOn && myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}${jump}</div>` : ''}
       ${!ck && t.due && (t.deadline || nagOf(t)) && t.status === 0 ? `<div class="ddl">${dlChip(t, 'big')}${nagOf(t) ? `<button type="button" class="dnag" data-act="date" data-id="${t.id}" title="${esc(tr('Change'))}">${ic('repeat', 's')}${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}</button>` : ''}</div>` : ''}
       ${!ck && planOf(t) ? `<div class="dplan">${ic('clock', 's')}<span class="dplt">${esc(tr('Planned: {0}', planLabel(t)))}</span>${ro ? '' : `<button type="button" class="linkbtn" data-act="unplan" data-id="${t.id}">${tr('Unplan')}</button>`}</div>` : ''}
@@ -485,7 +486,7 @@ function renderDetail0() {
       ${ck ? '' : approvalBar(t, ro)}
       ${ck ? '' : rvw_barHtml(t, ro)}${''/* 2.60.0 C (#1512): reviewer + review state (review.js) */}
       ${ck || ro ? '' : dupHintHtml(t)}
-      ${t.note_locked && typeof ln_html === 'function' ? ln_html(t, ro) : `${''/* 2.48.0 (#1642): a locked note replaces the description (notelock.js) */}
+      ${le2uLk ? '' : t.note_locked && typeof ln_html === 'function' ? ln_html(t, ro) : `${''/* 2.48.0 (#1642): a locked note replaces the description (notelock.js) */}
       ${mdMode && !ro && (isTouch() || td_mdPenOnly()) ? `<div class="mdbox"><button type="button" class="iconbtn mdpen" data-act="md-edit" title="${esc(tr('Edit description'))}" aria-label="${esc(tr('Edit description'))}">${ic('edit', 's')}</button>` : ''}
       <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tlkL ? esc(tr('Locked')) : td_mdPenOnly() ? '' : tr('Click to edit')}">${mdMode ? mdMentions(mdTaskRefs(renderMd(t.content, false, {lid: t.list_id}), true), t) : ''}</div>${mdMode && !ro && (isTouch() || td_mdPenOnly()) ? '</div>' : ''}
       ${mdLong ? `<button class="linkbtn mdmore" data-act="md-more" aria-expanded="${!mdClamp}">${mdClamp ? tr('Show more') : tr('Show less')}</button>` : ''}

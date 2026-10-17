@@ -310,6 +310,9 @@ Only when your host runs `mcp/agent_run.py` (the prompt then says so):
 End-to-end encrypted content (2.42.0) shows only as a placeholder: a task's `encrypted_note: true`, a file with
 `encrypted: true` (not readable for you). Leave it alone; do not ask for its content.
 Locked notes (2.48.0) are not readable: a task with `note_locked: true` has empty notes, and writing its notes answers 409.
+Lists encrypted in the browser (2.64.1) are not for agents: a task with `encrypted: true` has empty texts; writes there answer 403.
+Their files and team chat messages (2.64.2) come with `encrypted: true` and no text or name either; leave them alone.
+Knowledge spaces encrypted in the browser (2.64.3) are not reachable for agents either; do not ask for their content.
 
 ### Weekly status, time tracking, shoot planning (2.51.0)
 You propose, a person confirms. Never send, book firm, track time or delete for someone; these tools only write drafts and

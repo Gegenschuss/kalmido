@@ -307,7 +307,7 @@ function palAll() {
     add('s:' + k, 'setting', tr('Settings: {0}', tr(n)), icon, () => settingsModal(k), {keys: k === 'general' ? 'g s' : ''});
   }
   // tasks (open ones + the recently completed that are in the state)
-  for (const x of S.tasks.values()) if (x.status === 0 && x.id > 0 && !archivedTask(x)) add('t:' + x.id, 'tasks', x.title, 'check', () => { const r = $(`#view .trow[data-id="${x.id}"]`); if (!r && x.list_id) go(x.list_id === inbox()?.id ? 'inbox' : 'l/' + x.list_id); setTimeout(() => openDetail(x.id), 30); },
+  for (const x of S.tasks.values()) if (x.status === 0 && x.id > 0 && !archivedTask(x)) add('t:' + x.id, 'tasks', x.title, typeof le2eOn === 'function' && le2eOn(x.list_id) ? 'lock' : 'check', () => { const r = $(`#view .trow[data-id="${x.id}"]`); if (!r && x.list_id) go(x.list_id === inbox()?.id ? 'inbox' : 'l/' + x.list_id); setTimeout(() => openDetail(x.id), 30); },
     {sub: [lname(listById(x.list_id)), x.due ? dayLabel(x.due) : ''].filter(Boolean).join('  ·  ')});
   return it;
 }

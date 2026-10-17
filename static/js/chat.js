@@ -28,6 +28,7 @@ async function loadRoom(rid, older = false) {
   S.tc.pins = j.pins || [];  // 2.62.0 (#1848)
   S.tc.msgs = before ? [...j.messages, ...S.tc.msgs] : j.messages;
   e2eFromCache(S.tc.msgs); e2eRoomDecrypt(rid);  // 2.42.0 (#909): encrypted DMs (e2e.js)
+  le2eChanDecrypt(rid);  // 2.64.2 (#1817): the channel of a list with the lock (liste2echan.js)
   const last = S.tc.msgs[S.tc.msgs.length - 1];
   if (last && (!j.room.last_read || last.id > j.room.last_read) && !document.hidden) {
     try { const r = await rawFetch('POST', `/api/team/rooms/${rid}/read`, {last_id: last.id}); if (S.team) S.team.unread = r.unread; } catch { /* offline */ }
@@ -79,7 +80,7 @@ function tcRoomHtml() {
     ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind === 'list' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
     <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the list'))}" aria-label="${esc(tr('Open the list'))}">${ic('list')}</button>` : ''}
     ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${e2eRoomBtns(room)}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
-  return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${cpnBarHtml('t:' + rid)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
+  return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${le2eChanNotice(room)}${cpnBarHtml('t:' + rid)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
     <button type="button" class="chnew hidden" id="tc-new">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${replyBarHtml('t:' + rid)}<div class="chcomp tccomp"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > 18 ? name.slice(0, 17).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="send" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
     <button type="button" class="btn pri" data-act="tc-send"${csdBusy('t:' + rid) ? ' disabled' : ''}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
@@ -95,8 +96,9 @@ function tcMsgsHtml() {
     prev = m;
     const rxr = rxRow(m.reactions || [], {mid: m.id, act: 'tc-react', dis: !!m.deleted || S.tc.edit === m.id, own: mine, key: 't' + m.id});  // 2.18.0 (#651), 2.23.0 (#823)
     const eb = m.deleted ? null : e2eMsgBody(m);  // 2.42.0 (#909): a notice / an encrypted message not decrypted (yet)
+    const lb = eb && !m.enc.sys && le2eChanOn(S.tc.room) ? le2eChanMsgBody(m) : eb;  // 2.64.2 (#1817): unlock = the list's key
     if (eb && m.enc.sys) { h += `<div class="cmsg sys" data-k="m${m.id}" data-mid="t:${m.id}">${eb}</div>`; prev = null; continue; }
-    const body = m.deleted ? `<div class="cbub del"><span class="muted">${tr('Message deleted')}</span></div>` : eb ? eb
+    const body = m.deleted ? `<div class="cbub del"><span class="muted">${tr('Message deleted')}</span></div>` : lb ? lb
       : S.tc.edit === m.id ? `<div class="cbub tcedit"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea class="tc-edit" aria-label="${esc(tr('Edit message'))}" rows="2">${esc(m.body.replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, U)))}</textarea><div class="tcebtn"><button type="button" class="btn sm" data-act="tc-edit-cancel">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-act="tc-edit-save" data-mid="${m.id}">${tr('Save')}</button></div></div>`
         : `${replyQuoteHtml(m, 't')}<div class="cbub">${commentBody(m.body, U)}</div>`;  // 2.33.0 (#1076): the quote of the answered message
     h += `<div class="cmsg ${mine ? 'me' : 'ag'}${!mine && ags.has(m.user_id) ? ' agc' : ''} ${first ? 'first' : ''}${rxShow('t' + m.id)}" data-k="m${m.id}" data-mid="t:${m.id}">
@@ -142,10 +144,12 @@ async function tcSend() {
   const rto = replyTo('t:' + rid);  // 2.33.0 (#1076)
   try {
     // 2.42.0 (#909): an encrypted DM sends only the ciphertext (encrypted in this browser)
-    const enc = S.tc.room?.e2e ? await e2eDmEncrypt(rid, text) : null; if (S.tc.room?.e2e && !enc) throw null;
+    // 2.64.2 (#1817): the channel of a list with the lock: the text with its mention tokens, encrypted with the list key
+    const lk = le2eChanOn(S.tc.room), ltext = lk ? tcMentions(text) : null;
+    const enc = lk ? await le2eChanEnc(S.tc.room, ltext) : S.tc.room?.e2e ? await e2eDmEncrypt(rid, text) : null; if ((lk || S.tc.room?.e2e) && !enc) throw null;  // 2.62.0 (#1530): throw = the text goes back into the box
     if (!enc && !await e2eDownOk(rid)) throw null;  // 2.42.0 (#909): switched off by the server alone -> ask first
-    m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, {...(enc ? {enc} : {body: tcMentions(text)}), ...(rto ? {reply_to: rto} : {}), client_id: p.cid});
-    if (enc) { m.body = text; m._dec = true; E2E.dec[m.id + ':'] = text; }
+    m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, {...(enc ? {enc} : {body: tcMentions(text)}), ...(lk ? {mentions: le2eChanMentions(ltext)} : {}), ...(rto ? {reply_to: rto} : {}), client_id: p.cid});
+    if (enc) { m.body = lk ? ltext : text; m._dec = true; E2E.dec[m.id + ':'] = m.body; }
   }
   catch (e) {  // 2.62.0 (#1530): the text goes back into the box
     csdDone(ck, p); csdBack($('#tc-in'), text, 'team:' + rid); if (sb()) sb().disabled = false; tcPatch();
@@ -190,9 +194,10 @@ async function tcEditSave(mid) {
   if (!v) { if (await tcMsgDelete(mid)) $('#tc-in')?.focus(); else $('#tc-msgs .tc-edit')?.focus(); return; }
   let r;
   try {
-    const enc = m.enc ? await e2eDmEncrypt(S.tc.rid, v) : null; if (m.enc && !enc) return;  // 2.42.0 (#909): encrypted again
+    const lk = le2eChanOn(S.tc.room), lv = lk ? tcMentions(v) : null;  // 2.64.2 (#1817): the list key, the current generation
+    const enc = lk ? await le2eChanEnc(S.tc.room, lv) : m.enc ? await e2eDmEncrypt(S.tc.rid, v) : null; if ((lk || m.enc) && !enc) return;  // 2.42.0 (#909): encrypted again
     r = await rawFetch('PATCH', `/api/team/messages/${mid}`, enc ? {enc} : {body: tcMentions(v)});
-    if (enc) { r.body = v; r._dec = true; E2E.dec[r.id + ':' + (r.edited_at || '')] = v; }
+    if (enc) { r.body = lk ? lv : v; r._dec = true; E2E.dec[r.id + ':' + (r.edited_at || '')] = r.body; }
   } catch (e) { toast(e.message); return; }
   Object.assign(m, r); S.tc.edit = null; tcPatch();
 }

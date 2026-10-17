@@ -107,6 +107,9 @@ def ln_put(tid):
     locked note. Locking needs my keys and an own list that is not shared."""
     c = db()
     uid = _ln_task(c, tid)
+    from .liste2e import le2e_task_mode
+    if le2e_task_mode(c, tid):  # 2.64.1 (#1817): the whole list is encrypted in the browser already
+        return err(tr("Notes cannot be locked in a list that is encrypted in the browser: it is encrypted as a whole."), 409)
     if not e2e_has_keys(c, uid):
         return err(tr("Set up end-to-end encryption first (Settings > Account)."), 409)
     enc = e2e_blob(body().get("body"), E2E_NOTE_MAX)

@@ -48,6 +48,8 @@ def wiki_clean_path(v):
     if len(parts) > WIKI_DEPTH:
         raise BadInput(tr("Too many folder levels (at most {0})", WIKI_DEPTH))
     out = "/".join(parts)
+    if out.lower().startswith("e2e1:"):  # 2.64.3 (#1817, review M1): the prefix of browser ciphertexts is never a plain name
+        raise BadInput(tr("Invalid value: {0}", "path"))
     if len(out) > WIKI_PATH_MAX:
         raise BadInput(tr("The name is too long (at most {0} characters)", WIKI_PATH_MAX))
     return out
@@ -132,6 +134,8 @@ def wiki_dict(r, full=True, names=None):
     d = {"id": r["id"], "space": wiki_space_key(r["org_id"]), "org_id": r["org_id"], "path": r["path"], "attrs": attrs,
          "created_by": r["created_by"], "updated_by": r["updated_by"], "created_at": r["created_at"], "updated_at": r["updated_at"],
          "template": r["path"].lower().startswith(WIKI_TEMPLATES)}
+    if r["path"].startswith("e2e1:"):  # 2.64.3 A (#1817): a page of a locked space -- the browser reads both from the plain text
+        d["attrs"], d["template"] = {}, False
     if full:
         d["body"] = r["body"]
     if names is not None:
@@ -142,6 +146,8 @@ def wiki_dict(r, full=True, names=None):
 def wiki_set_links(c, pid, text):
     paths, tasks = wiki_links_of(text)
     c.execute("DELETE FROM wiki_links WHERE from_id=?", (pid,))
+    if (text or "").startswith("e2e1:"):  # 2.64.3 A (#1817): a locked space keeps no links on the server
+        return
     for p in paths[:500]:
         c.execute("INSERT INTO wiki_links(from_id,to_path) VALUES(?,?)", (pid, p))
     for t in tasks[:500]:
@@ -184,7 +190,14 @@ def wiki_index():
     rows = c.execute(f"SELECT id, org_id, owner_id, path, attrs, created_by, updated_by, created_at, updated_at FROM wiki_pages "
                      f"WHERE deleted_at IS NULL AND {w} ORDER BY lower(path) LIMIT 5000", a).fetchall()
     names = user_names(c, {r["updated_by"] for r in rows})
-    return jsonify(space=wiki_space_key(oid), may_write=True, pages=[wiki_dict(r, full=False, names=names) for r in rows])
+    from .wikie2e import wke_index_info  # 2.64.3 A (#1817): the lock of the space; bodies=1 = the ciphertexts for the local search
+    e2e = wke_index_info(c, oid, uid)
+    pages = [wiki_dict(r, full=False, names=names) for r in rows]
+    if e2e and request.args.get("bodies") == "1":
+        bodies = {r["id"]: r["body"] for r in c.execute(f"SELECT id, body FROM wiki_pages WHERE deleted_at IS NULL AND {w}", a)}
+        for d in pages:
+            d["body"] = bodies.get(d["id"], "")
+    return jsonify(space=wiki_space_key(oid), may_write=True, pages=pages, e2e=e2e)
 
 
 @app.get("/api/wiki/pages/<int:pid>")
@@ -198,7 +211,8 @@ def wiki_get(pid):
                      f"AND p.deleted_at IS NULL AND p.id!=? AND p.{w.replace(' AND ', ' AND p.')} ORDER BY p.path LIMIT 200",
                      [r["path"].lower(), pid, *a]).fetchall()
     d = wiki_dict(r, names=user_names(c, [r["updated_by"]]))
-    d["backlinks"] = [{"id": x["id"], "path": x["path"]} for x in back]
+    from .wikie2e import wke_page_mode  # 2.64.3 A (#1817): a locked space finds its backlinks in the browser
+    d["backlinks"] = [] if wke_page_mode(c, r) else [{"id": x["id"], "path": x["path"]} for x in back]
     return jsonify(d)
 
 
@@ -209,11 +223,17 @@ def wiki_create():
     uid = me()
     b = body()
     oid = wiki_space(c, uid, b.get("space"), write=True)
-    path = wiki_clean_path(b.get("path"))
-    text = wiki_body(b)
+    from .wikie2e import wke_guard  # 2.64.3 A (#1817): a locked space takes ciphertexts only (no template copy on the server)
+    if wke_guard(c, oid, uid, b.get("path"), b.get("body", ""), "create", template=bool(b.get("template_id"))):
+        path, text = b.get("path"), b.get("body", "")
+    else:
+        path = wiki_clean_path(b.get("path"))
+        text = wiki_body(b)
     if b.get("template_id") and not text:
         t = wiki_need(c, int(b["template_id"]))
         text = t["body"]
+        if text.startswith("e2e1:"):  # 2.64.3 (#1817, review M1): a template of an encrypted space opens only in the browser
+            raise BadInput(tr("Invalid value: {0}", "template_id"))
     pid = wiki_insert(c, oid, uid, path, text, iso_ms(now_utc()))
     if pid is None:
         return wiki_taken()
@@ -251,11 +271,13 @@ def wiki_update(pid):
         cur = wiki_dict(r, names=user_names(c, [r["updated_by"]]))
         return jsonify(error=tr("Changed in the meantime by {0}", cur.get("updated_by_name") or "?"), page=cur), 409
     f, ts, n = {}, iso_ms(now_utc()), 0
+    from .wikie2e import wke_guard  # 2.64.3 A (#1817): a locked space takes ciphertexts only, its links stay in the browser
+    locked = wke_guard(c, r["org_id"], r["owner_id"], b.get("path"), b.get("body"), "update")
     if "body" in b:
-        f["body"] = wiki_body(b)
-        f["attrs"] = json.dumps(wiki_frontmatter(f["body"]), ensure_ascii=False)
+        f["body"] = b["body"] if locked else wiki_body(b)
+        f["attrs"] = "{}" if locked else json.dumps(wiki_frontmatter(f["body"]), ensure_ascii=False)
     if "path" in b:
-        path = wiki_clean_path(b["path"])
+        path = b["path"] if locked else wiki_clean_path(b["path"])
         if path != r["path"]:
             f["path"] = path
     if f:
@@ -267,7 +289,7 @@ def wiki_update(pid):
             return wiki_taken()
         if "body" in f:
             wiki_set_links(c, pid, f["body"])
-        if "path" in f and b.get("relink", True) is not False:
+        if "path" in f and b.get("relink", True) is not False and not locked:
             n = wiki_relink(c, r, r["path"], f["path"], uid, ts)
         bump(c)
         c.commit()
@@ -284,6 +306,8 @@ def wiki_move():
     uid = me()
     b = body()
     oid = wiki_space(c, uid, b.get("space"), write=True)
+    from .wikie2e import wke_guard  # 2.64.3 A (#1817): in a locked space the browser renames page by page
+    wke_guard(c, oid, uid, kind="move")
     src, dst = wiki_clean_path(b.get("from")), wiki_clean_path(b.get("to"))
     if dst.lower() == src.lower() or dst.lower().startswith(src.lower() + "/"):
         raise BadInput(tr("Invalid value: {0}", "to"))
@@ -368,6 +392,8 @@ def wiki_search():
     q = (request.args.get("q") or "").strip()[:200]
     orgs = user_orgs(c, uid)
     w = "deleted_at IS NULL AND ((org_id IS NULL AND owner_id=?)" + (f" OR org_id IN ({','.join(str(int(x)) for x in orgs)})" if orgs else "") + ")"
+    from .wikie2e import wke_open_sql  # 2.64.3 A (#1817): locked spaces are searched in the browser
+    w += " AND " + wke_open_sql("wiki_pages")
     a = [uid]
     for word in q.split()[:6]:
         like = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
@@ -391,8 +417,9 @@ def wiki_mentions():
     if not tid or not task_visible(c, tid, uid):
         raise Denied(404)
     orgs = user_orgs(c, uid)
+    from .wikie2e import wke_open_sql  # 2.64.3 A (#1817): mentions in a locked space are found in the browser
     rows = c.execute("SELECT DISTINCT p.id, p.org_id, p.path FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.to_task=? "
-                     "AND p.deleted_at IS NULL AND ((p.org_id IS NULL AND p.owner_id=?)"
+                     f"AND {wke_open_sql('p')} AND p.deleted_at IS NULL AND ((p.org_id IS NULL AND p.owner_id=?)"
                      + (f" OR p.org_id IN ({','.join(str(int(x)) for x in orgs)})" if orgs else "") + ") ORDER BY p.path LIMIT 50",
                      (tid, uid)).fetchall()
     return jsonify(pages=[{"id": r["id"], "path": r["path"], "space": wiki_space_key(r["org_id"])} for r in rows])
@@ -404,6 +431,8 @@ def wiki_export():
     c = db()
     uid = me()
     oid = wiki_space(c, uid, request.args.get("space"))
+    from .wikie2e import wke_guard  # 2.64.3 A (#1817): a locked space exports in the browser (decrypted ZIP)
+    wke_guard(c, oid, uid, kind="export")
     w, a = wiki_space_sql(oid, uid)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -421,6 +450,8 @@ def wiki_import():
     c = db()
     uid = me()
     oid = wiki_space(c, uid, request.args.get("space"), write=True)
+    from .wikie2e import wke_guard  # 2.64.3 A (#1817): a locked space imports in the browser
+    wke_guard(c, oid, uid, kind="import")
     replace = request.args.get("replace") == "1"
     f = request.files.get("file")
     if not f:
@@ -444,6 +475,8 @@ def wiki_import():
         try:
             path = wiki_clean_path(name)
             text = z.read(i)[:WIKI_ZIP_FILE_MAX].decode("utf-8-sig", "replace")
+            if text.startswith("e2e1:"):  # 2.64.3 (#1817, review M1): no ciphertext-like text in an open space
+                raise BadInput(name)
         except (BadInput, zipfile.BadZipFile, OSError, RuntimeError, NotImplementedError):
             skipped.append(name[:200])
             continue
