@@ -655,6 +655,12 @@ once per workspace -- by an organisation's admin for the organisation, by a pers
   and custom fields, notes and the archive serial number as text below the document's text.
 - **Never twice:** a document already imported (Paperless-ngx id per instance address) or the same file already in the
   workspace (checksum) is left out, also when the import runs again.
+- **Rules and learning (2.69):** the matching of tags, correspondents and document types becomes document rules of the
+  workspace (*any*, *all*, *literal* -> *exact*, *regex*, *fuzzy*, case-sensitive kept), aimed at the names chosen in the
+  preview; a switch in the preview turns this off. *Auto* has no rule counterpart: Kalmido's own learning covers it. Patterns
+  Kalmido does not accept (too long, too complex for its safe regex check) are listed in the preview and the result. A rule
+  is taken over once: a later import does not double it, nor bring it back after it was changed or deleted in Kalmido. At
+  the end of every import the imported senders, types, tags and folders train the classifier once, as confirmed examples.
 - **In the background:** progress and *Stop* in the settings; optionally *Bring in new documents automatically* every
   15 minutes up to once a day (only Paperless-ngx -> Kalmido).
 - **Network:** http/https only, timeouts, no redirects, at most `TASKS_MAX_FILE_MB` per file. An instance in the local
