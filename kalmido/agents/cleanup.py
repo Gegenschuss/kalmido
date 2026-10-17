@@ -57,7 +57,7 @@ def cln_request(c, uid, b):
     lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
     if not lst or not list_role(c, lid, uid):
         raise Denied(404)
-    if (lst["life"] or "") == "health":
+    if (lst["life"] or "") in ("health", "budget"):  # 2.72.0 (#1333): budgets neither
         return err(tr("Health lists never reach an agent"), 403)
     if list_role(c, lid, uid) not in WRITE_ROLES:
         raise Denied(403)

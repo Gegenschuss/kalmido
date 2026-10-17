@@ -596,6 +596,7 @@ def list_row_purge(c, lid, gone):
     if not r:
         return 0
     paths = [x[0] for x in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))]
+    paths += [x[0] for x in c.execute("SELECT path FROM budget_files WHERE list_id=?", (lid,))]  # 2.72.0 (#1333): receipts
     from ..integrations.gitfolder import gf_before_list_delete
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository hanging on it moves to another list of its folder
     n = c.execute("DELETE FROM lists WHERE id=?", (lid,)).rowcount

@@ -78,7 +78,7 @@ def visible_lists(c, uid):
                         FROM lists l LEFT JOIN list_members m ON m.list_id=l.id AND m.user_id=?
                         WHERE l.id IN {acx_lists_sql(req=False)}""", (uid, uid, uid)).fetchall()  # 2.36.2 (#1142): the one list scope
     if health_hidden(c, uid):  # 2.22.0 (#663): health lists stay private (agents, tokens without the scope "private")
-        rows = [r for r in rows if r["life"] != "health"]
+        rows = [r for r in rows if r["life"] not in ("health", "budget")]  # 2.72.0 (#1333): budgets too
     if has_request_context() and getattr(g, "user", None) is not None and uid == g.user["id"]:
         from ..core.access import token_lists
         tl = token_lists()  # 2.30.0 (#919): a token limited to selected lists
