@@ -359,6 +359,10 @@ APP_ONLY = [
     # 2.55.0 (#1455): the newsletter connection holds access data of an outside service and decides who gets mail: people only
     ("2.55.0 (#1455): the newsletter connection, segments, sync and the consent of contacts are set by people (admins / the "
      "person); agents read the consent with the contact (field newsletter), no new agent rights", ("* /api/newsletter",)),
+    # 2.73.0 A (#661): several servers in one app -- the person's own accounts on other servers (their tokens); an agent only
+    # ever works on its own server
+    ("2.73.0 (#661): several Kalmido servers in one app: the person's accounts on other servers, their data through the other "
+     "server's own API; people only, never agents", ("* /api/servers",)),
 ]
 
 

@@ -44,6 +44,7 @@ MSV_ERR_BYTES = 64 * 1024          # of an error answer (only its message is use
 MSV_CACHE_S = 15                   # /data held in memory per account
 MSV_PAR = 4                        # requests to other servers per person at once
 MSV_TASKS_MAX = 3000               # open tasks per account in /data
+MSV_TRIES = 60                     # connection tries (a new account / token) per person and hour
 MSV_SCOPES = ("read", "tasks:write", "delete", "calendar", "comments")  # what a connection code's token gets
 MSV_CODE = "kalmido-link:"
 MSV_UA = f"{APP_NAME}/{APP_VERSION} (multi-server)"
@@ -444,6 +445,15 @@ def msv_bad(e):
     return err(str(e), 400)
 
 
+class MsvBusy(Exception):
+    pass
+
+
+@app.errorhandler(MsvBusy)
+def msv_busy(e):
+    return err(str(e), 429)
+
+
 def _unknown(b, allowed):
     if not isinstance(b, dict):
         raise MsvBad(tr("Invalid data"))
@@ -478,6 +488,9 @@ def _check_account(c, uid, base, tok, skip=None):
     """GET /api/v1/me over there -> (remote_me, effective scopes); refuses this server and a second link to the same account."""
     if msv_is_self(base):
         raise MsvBad(tr("That is this server. Connect another Kalmido server."))
+    from ..api.v1 import hit_limit
+    if hit_limit(f"msv-try:{uid}", MSV_TRIES, 3600):  # each try is a request to an address the person chose
+        raise MsvBusy(tr("Too many requests, please slow down"))
     try:
         j = msv_call(c, None, "/me", base=base, tok=tok)
     except MsvError as e:
