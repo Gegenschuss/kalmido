@@ -312,6 +312,18 @@ check(r.ok and d["lists"] == [{"id": 3, "name": "<img src=x onerror=alert(1)>", 
       f"odd values over there: type-checked, extra fields dropped {d}")
 log = open(os.path.join(DATA, "msv.log")).read()
 check("bearer=True" in log and "abk_" not in log, "the stub got the token as a bearer header (the log names no token)")
+# 2.73.0 (#661) review N3: the copy exists over there, its subtasks fail -> counted, the source still goes to the trash
+r = A.post(B + "/api/servers", json={"base_url": f"{STUB}/nosub", "token": "abk_" + "n" * 40})
+check(r.status_code == 201, f"N3: the stub that refuses subtasks is linked {r.text[:200]}")
+SIDN = r.json().get("id")
+tn = A.post(B + "/api/tasks", json={"title": "Move with subtasks", "list_id": la}).json()["id"]
+for x in ("Sub A", "Sub B"):
+    A.post(B + "/api/tasks", json={"title": x, "parent_id": tn})
+r = A.post(B + "/api/servers/move", json={"from": {"server": 0, "task": tn}, "to": {"server": SIDN, "list_id": None}})
+j = r.json() if r.ok else {}
+check(r.ok and j["task"] == {"server": SIDN, "id": 50} and j["lost"].get("subtasks") == 2 and not j.get("source_kept") and gone(tn),
+      f"N3: the move succeeds, two subtasks named as not created, the source in the trash {r.status_code} {r.text[:300]}")
+A.delete(B + f"/api/servers/{SIDN}")
 # the account goes offline / the token is revoked
 dbx("UPDATE msv_links SET base_url='http://127.0.0.1:3999' WHERE id=?", (SIDC,))
 r = A.get(B + f"/api/servers/{SIDC}/data")
@@ -394,6 +406,20 @@ check(A.get(B + f"/api/servers/{SIDE}/data").status_code == 404 and SIDE not in 
 r = A.post(B + f"/api/servers/{SIDE}/restore")
 check(r.ok and r.json()["id"] == SIDE, "restore (undo)")
 check(A.post(B + f"/api/servers/{SIDE}/restore").status_code == 404, "restoring a live account: 404")
+# 2.73.0 (#661) review N1: a removed account keeps its sealed token 30 days (undo), then the watchdog wipes it
+r = A.post(B + "/api/servers", json={"base_url": f"{STUB}/evil/n8", "token": "abk_" + "w" * 40})
+SIDW = r.json().get("id")
+check(r.status_code == 201 and A.delete(B + f"/api/servers/{SIDW}").ok, f"N1: an account added and removed {r.text[:150]}")
+time.sleep(2.5)
+check(dbx("SELECT token_enc FROM msv_links WHERE id=?", (SIDW,))[0][0] != "", "N1: a freshly removed account keeps its token (undo)")
+dbx("UPDATE msv_links SET deleted_at='2020-01-01T00:00:00Z' WHERE id=?", (SIDW,))
+for _ in range(20):
+    if dbx("SELECT token_enc FROM msv_links WHERE id=?", (SIDW,))[0][0] == "":
+        break
+    time.sleep(0.5)
+check(dbx("SELECT token_enc FROM msv_links WHERE id=?", (SIDW,))[0][0] == "", "N1: 30 days after removing the watchdog wiped the token")
+r = A.post(B + f"/api/servers/{SIDW}/restore")
+check(r.status_code == 409 and "token again" in r.json()["error"], f"N1: restoring it then asks for the token again {r.status_code} {r.text[:200]}")
 r = A.patch(B + f"/api/servers/{SIDE}", json={"default_inbox": True, "position": 5, "short": "ev"})
 check(r.ok and r.json()["default_inbox"] is True and r.json()["short"] == "EV", "quick add lands there by default")
 A.patch(B + f"/api/servers/{SIDC}", json={"default_inbox": True})

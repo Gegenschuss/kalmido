@@ -777,7 +777,8 @@ and no server needs to trust another one.
   creates a personal API token with exactly the scopes `read`, `tasks:write`, `delete`, `calendar` and `comments` and
   packs it with the server's `PUBLIC_URL` into a code that is shown once. Paste it on the home server. Instead of a code,
   the address and a token made by hand work too (any Kalmido server with the REST API, the code button needs 2.73).
-  The token stays visible under *API tokens* on the other server and can be revoked there at any time.
+  The token stays visible under *API tokens* on the other server and can be revoked there at any time. A removed account
+  can be restored for 30 days; then its stored token is wiped and the account has to be connected anew.
 - **Network.** Every request goes through the same guard as calendar subscriptions: public addresses only, no
   redirects, every resolved address is checked (no DNS rebinding). A **self-hosted** server reaches internal servers only
   when they are on the allow-list of internal hosts (*Settings > Administration > Advanced*, or
@@ -805,7 +806,9 @@ Nothing is copied or synced: every task stays on its server, and the app asks th
   with the badge; a slow or offline server never holds up your own results.
 - **Move to another server:** from the task menu (own tasks) or the panel (tasks of another server). The task is created anew on
   the target (title, notes, date, priority, open subtasks); comments, attachments and history stay in the trash of the source,
-  where it can still be restored. The app says this before it moves anything.
+  where it can still be restored. The app says this before it moves anything, and for a task of an organisation's list also
+  that it leaves the organisation. Should the other server refuse a subtask once the copy exists, the move still completes
+  and the app names how many subtasks are missing.
 - A server that does not answer shows one quiet line ("Work not reachable – last update 10:42") instead of error messages; a
   change on it is never queued offline, it is either done or reported.
 - Agents only ever see the server they are connected to.

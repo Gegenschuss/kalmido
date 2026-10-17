@@ -32,6 +32,9 @@ class H(BaseHTTPRequestHandler):
 
     def _any(self):
         auth = (self.headers.get('Authorization') or '').startswith('Bearer ')
+        n = int(self.headers.get('Content-Length') or 0)
+        if n:
+            self.rfile.read(n)  # read the body first: closing with unread data would reset the connection
         LOG.write(f"{self.command} {self.path} bearer={auth}\n")
         kind, _, rest = self.path.lstrip('/').partition('/')
         rest = re.sub(r'^/n\d+(?=/)', '', '/' + rest.split('?')[0])  # /evil/n3/... = another address of the same server

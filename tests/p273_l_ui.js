@@ -90,6 +90,20 @@ const bobTasks = async () => { const j = await call('GET', '/api/state', null, C
     const own = (await call('GET', '/api/state')).tasks.find(t => t.id === OWN);
     check(!own, '#661: ... and alice\'s copy left her open tasks (trash)');
     await shot('p273l-moved.png');
+    // 2.73.0 (#661) review question 1: a task of an organisation's list -> the question says that it leaves the organisation
+    const me = (await call('GET', '/api/state')).me.id;
+    const ORG = (await call('POST', '/api/admin/orgs', {name: 'Alpha', admin_id: me})).id;
+    const OL = await call('POST', '/api/lists', {name: 'Alpha team', org_id: ORG});
+    const OT = (await call('POST', '/api/tasks', {title: 'Org task', list_id: OL.id})).id;
+    await nav(B + '#inbox'); await ready(ev, '#view');
+    await ev(`(() => { taskMenu(document.querySelector('#view'), ${OT}); return 1; })()`); await sleep(500);
+    await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to another server/.test(b.textContent))?.click(); return 1; })()`); await sleep(800);
+    await ev(`(() => { const s = document.querySelector('#msvvmv-s'); s.value = '${SID}'; s.dispatchEvent(new Event('change')); return 1; })()`); await sleep(1200);
+    await ev(`(() => { document.querySelector('.msvvmv button[type="submit"]')?.click(); return 1; })()`); await sleep(800);
+    const oq = await ev(`document.querySelector('.cdlg #cdlg-b')?.textContent || ''`);
+    check(/leaves the organisation Alpha/.test(oq), '#661 review question 1: the move question names the organisation ' + JSON.stringify(oq));
+    await ev(`(() => { document.querySelector('.cdlg [data-cd="no"]')?.click(); return 1; })()`); await sleep(500);
+    check((await call('GET', '/api/state')).tasks.some(t => t.id === OT), '#661: cancelled: the organisation task stays');
   };
   await firefox(desk, false);
   console.log(`${ok} ok, ${F.length} failed`);
