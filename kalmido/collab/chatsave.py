@@ -122,7 +122,7 @@ def _copy_files(c, tid, uid, files):
             continue
         rel = os.path.join(str(tid), f"{uuid.uuid4().hex[:12]}-{name}")
         os.makedirs(os.path.join(ATT_DIR, str(tid)), exist_ok=True)
-        from ..core.orgcrypt import oc_copy_file, oc_task_space
+        from ..core.orgcrypt import oc_copy_file, oc_task_org, oc_task_space
         # 2.64.0 (#1864): opened with the chat's key, sealed for the task's space (organisation or the list owner's account)
         oc_copy_file(c, src, os.path.join(ATT_DIR, rel), oc_task_space(c, tid))
         g.chat_save_new = getattr(g, "chat_save_new", []) + [rel]

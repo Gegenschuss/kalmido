@@ -48,8 +48,8 @@ def mg_fk_refs(c, table):
     """[(table, column, on_delete)] of every single-column foreign key that points to table.id ('c' cascade, 'n' set null,
     'a' / 'r' no action / restrict)."""
     return [(r[0], r[1], r[2]) for r in c.execute(
-        "SELECT cl.relname, a.attname, con.confdeltype FROM pg_constraint con JOIN pg_class cl ON cl.oid=con.conrelid "
-        "JOIN pg_class rf ON rf.oid=con.confrelid JOIN pg_namespace n ON n.oid=rf.relnamespace "
+        "SELECT cl.relname, a.attname, con.confdeltype FROM pg_constraint con JOIN pg_class cl ON cl.oid=con.conrelid "  # pg-ok: pg_catalog oid (PostgreSQL system column)
+        "JOIN pg_class rf ON rf.oid=con.confrelid JOIN pg_namespace n ON n.oid=rf.relnamespace "  # pg-ok: pg_catalog oid (PostgreSQL system column)
         "JOIN pg_attribute a ON a.attrelid=con.conrelid AND a.attnum=con.conkey[1] "
         "WHERE con.contype='f' AND rf.relname=? AND n.nspname=current_schema() AND array_length(con.conkey,1)=1 "
         "ORDER BY cl.relname, a.attname", (table,)).fetchall()]
@@ -57,7 +57,7 @@ def mg_fk_refs(c, table):
 
 def _pk_cols(c, table):
     return [r[0] for r in c.execute(
-        "SELECT a.attname FROM pg_index i JOIN pg_class cl ON cl.oid=i.indrelid JOIN pg_namespace n ON n.oid=cl.relnamespace "
+        "SELECT a.attname FROM pg_index i JOIN pg_class cl ON cl.oid=i.indrelid JOIN pg_namespace n ON n.oid=cl.relnamespace "  # pg-ok: pg_catalog oid (PostgreSQL system column)
         "JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum = ANY(i.indkey) "
         "WHERE i.indisprimary AND cl.relname=? AND n.nspname=current_schema() ORDER BY a.attnum", (table,)).fetchall()]
 
