@@ -73,7 +73,7 @@ def _le2f_store(c, tid, f, gen, uid, saved):
     """Writes one uploaded list file (werkzeug FileStorage) next to the task's files, sealed like its neighbours.
     -> (rel path, size) or raises ValueError with the message."""
     from ..notify.alerts import aa_count, aa_oserr
-    from ..core.orgcrypt import oc_seal_path, oc_task_org
+    from ..core.orgcrypt import oc_seal_path, oc_task_space
     head = f.stream.read(LE2F_HEAD)
     f.stream.seek(0)
     if le2f_blob_gen(head) != gen:
@@ -92,7 +92,8 @@ def _le2f_store(c, tid, f, gen, uid, saved):
         raise ValueError(tr("{0}: larger than {1} MB", tr("Encrypted file"), MAX_FILE_MB) if size > LE2F_HEAD + 28
                          else tr("Invalid value: {0}", "file"))
     saved.append(rel)
-    oc_seal_path(c, oc_task_org(c, tid) or 0, full)  # #828: sealed with the organisation's key at rest, like every task file
+    # #828, 2.64.0 (#1864): sealed at rest with the key of its space (organisation, else the list owner's account), like every task file
+    oc_seal_path(c, oc_task_space(c, tid) or 0, full, fresh=True)
     return rel, size
 
 
@@ -225,7 +226,7 @@ def le2f_convert(lid, aid):
         import mimetypes
         mime = typ if LE2F_MIME.match(typ) else (mimetypes.guess_type(name)[0] or "application/octet-stream")
         try:
-            rel, size = _le2f_plain_store(c, a["task_id"], f, name, saved)
+            rel, size, mime, info = _le2f_plain_store(c, a["task_id"], f, name, saved, mime, uid)
         except ValueError as e:
             return err(str(e))
         n = c.execute("UPDATE attachments SET name=?, mime=?, size=?, path=?, enc=0, enc_by=NULL, e2e_gen=0 WHERE id=? AND path IS NOT DISTINCT FROM ? "
@@ -245,6 +246,13 @@ def le2f_convert(lid, aid):
         c.rollback()
         unlink_files([rel])
         return err(tr("Nothing to do"), 409)
+    if mode != "decrypting":  # 2.61.0 (#1820): the recognised text of the plain file goes (the server keeps only ciphertext)
+        from ..files.textscan import ts_forget
+        ts_forget(c, "att", aid)
+    else:  # 2.61.0 (#1818 #1820): an unchecked file is remembered for the later scan, text recognition queued
+        from ..core.orgcrypt import oc_task_org
+        from ..files.upsafe import up_after_store
+        up_after_store(c, "att", aid, oc_task_org(c, a["task_id"]) or None, info)
     bump(c)
     c.commit()
     if a["path"] and a["path"] != rel:
@@ -259,10 +267,12 @@ def _le2f_todo(a, mode, gen, uid):
     return a["enc"] == 0 or (a["enc"] == 2 and (a["e2e_gen"] or 0) < gen) or (a["enc"] == 1 and a["enc_by"] == uid)
 
 
-def _le2f_plain_store(c, tid, f, name, saved):
-    """The way back: the decrypted file, stored like a plain upload (size limit, sealed at rest). -> (rel, size)."""
+def _le2f_plain_store(c, tid, f, name, saved, mime, uid):
+    """The way back: the decrypted file, stored like a plain upload (size limit, upload checks of 2.61.0, sealed at rest).
+    -> (rel, size, mime, info of the upload checks for up_after_store)."""
     from ..notify.alerts import aa_count, aa_oserr
-    from ..core.orgcrypt import oc_seal_path, oc_task_org
+    from ..core.orgcrypt import oc_seal_path, oc_task_org, oc_task_space
+    from ..files.upsafe import up_check_path, UploadRefused
     try:
         os.makedirs(os.path.join(ATT_DIR, str(tid)), exist_ok=True)
         rel = os.path.join(str(tid), f"{uuid.uuid4().hex[:12]}-{name}")
@@ -277,8 +287,13 @@ def _le2f_plain_store(c, tid, f, name, saved):
         os.remove(full)
         saved.remove(rel)
         raise ValueError(tr("{0}: larger than {1} MB", name, MAX_FILE_MB) if size else tr("{0}: the file is empty and was not uploaded", name))
-    oc_seal_path(c, oc_task_org(c, tid) or 0, full)
-    return rel, size
+    try:  # 2.61.0 (#1818 #1819): the plain file is new content for the server: scan + metadata like an upload
+        size, mime, info = up_check_path(c, full, name, mime, uid, oc_task_org(c, tid) or None, "att")
+    except UploadRefused as e:  # up_check_path removed the file already
+        saved.remove(rel)
+        raise ValueError(str(e))
+    oc_seal_path(c, oc_task_space(c, tid) or 0, full, fresh=True)  # 2.64.0 (#1864): the key of its space, also private
+    return rel, size, mime, info
 
 
 # ---------------------------------------------------------------- guards used elsewhere
