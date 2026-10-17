@@ -551,11 +551,12 @@ ROUTES = {
     "PATCH /api/v1/team/messages/{}": "team", "DELETE /api/v1/team/messages/{}": "team",
     "POST /api/v1/team/messages/{}/reactions": "team", "POST /api/v1/team/rooms/{}/read": "team",
     "POST /api/team/messages/{}/pin": "team", "POST /api/v1/team/messages/{}/pin": "team",  # 2.62.0 (#1848): also p262_a_api_test.py
-    # ---- template (10)
+    # ---- template (12)
     "GET /api/v1/templates": "template", "POST /api/v1/templates": "template", "PATCH /api/v1/templates/{}": "template",
     "DELETE /api/v1/templates/{}": "template", "POST /api/v1/templates/{}/apply": "template",
     "GET /api/templates": "template", "POST /api/templates": "template", "PATCH /api/templates/{}": "template",
     "DELETE /api/templates/{}": "template", "POST /api/templates/{}/apply": "template",
+    "POST /api/lists/{}/duplicate": "template", "POST /api/v1/lists/{}/duplicate": "template",  # 2.78.0 (#1881): also p278_dup_api_test.py
     # ---- token (2)
     "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/git/{}": "token",
     # ---- 2.60.0 (#1514): environments of a project list (they belong to their list; the deploy hook is a secret token)

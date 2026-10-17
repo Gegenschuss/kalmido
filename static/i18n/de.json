@@ -690,7 +690,7 @@
   "Notifications (ntfy)": "Benachrichtigungen (ntfy)",
   "Topic": "Topic",
   "Subscribe in the ntfy app: server {0}, topic as above": "In der ntfy-App abonnieren: Server {0}, Topic wie oben",
-  ", with a user that has read access": ", mit einem Benutzer mit Leserecht",
+  ", logged in as user mo": ", angemeldet als Benutzer mo",
   "Web view": "Web-Ansicht",
   "Send test": "Test senden",
   "All-day reminder at": "Ganztägig erinnern um",
@@ -702,7 +702,7 @@
   "Default": "Standard",
   "Modules": "Module",
   "In the ntfy app, add server {0} once": "In der ntfy-App einmal Server {0}",
-  " and log in with a user that may write to the topic (Settings > Manage users).": " mit einem Benutzer anmelden, der auf das Topic schreiben darf (Einstellungen > Benutzer verwalten).",
+  " and log in as user <b>mo</b> (Settings > Manage users; password in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).": " mit Benutzer <b>mo</b> anmelden (Einstellungen > Benutzer verwalten; Passwort in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).",
   "Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.": "Dann: Bild oder Text teilen > ntfy > Server wie oben, Topic {0}. Nach ein paar Sekunden liegt es als Aufgabe im Korb, Dateien als Anhang.",
   "Color scheme": "Farbschema",
   "Automatic": "Automatisch",
@@ -9460,5 +9460,14 @@
   "Another version of this pack is installed": "Eine andere Version dieses Pakets ist installiert",
   "Update “{0}”?": "„{0}“ aktualisieren?",
   "The catalogue address is not allowed (https only)": "Die Katalog-Adresse ist nicht erlaubt (nur https)",
-  "{0} open documents will be calculated with the new rates and texts.": "{0} offene Belege werden mit den neuen Sätzen und Texten berechnet."
+  "{0} open documents will be calculated with the new rates and texts.": "{0} offene Belege werden mit den neuen Sätzen und Texten berechnet.",
+  "Participants cannot duplicate the whole list": "Teilnehmer können nicht die ganze Liste duplizieren",
+  "List too large to duplicate (at most {0} tasks)": "Liste zu groß zum Duplizieren (höchstens {0} Aufgaben)",
+  "{0} (copy)": "{0} (Kopie)",
+  "Duplicate “{0}”": "„{0}“ duplizieren",
+  "Copy completed tasks too": "Erledigte Aufgaben auch kopieren",
+  "Sections, tasks with subtasks and dates, fields, notepads and the page arrangement come along. Members, shares and assignees do not: the copy is yours alone.": "Abschnitte, Aufgaben mit Unteraufgaben und Terminen, Felder, Notizblöcke und die Anordnung der Seite kommen mit. Mitglieder, Freigaben und Zuständige nicht: Die Kopie gehört nur dir.",
+  "List duplicated": "Liste dupliziert",
+  "Duplicate list…": "Liste duplizieren…",
+  "A copy of this list with its sections, tasks and notepads": "Eine Kopie dieser Liste mit Abschnitten, Aufgaben und Notizblöcken"
 }

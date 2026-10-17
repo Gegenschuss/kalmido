@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.78.0** (2026-10-17): **Duplicate list** in the list menu and the list dialog: a copy with sections, tasks and their dates, notepads and the page arrangement (completed tasks optional; members and shares stay with the original).
 - **2.77.0** (2026-10-17): a **pack catalogue** in Office & finance: search, install, update and remove country and industry packs per office (verified / community, checked by SHA-256, data only).
 - **2.74.0** (2026-10-17): **several Kalmido servers in one app** (work + home side by side, with server badges) and **moving** between app.kalmido.com and your own server (export everything, import with people matched by e-mail).
 - **2.73.0** (2026-10-17): **household budget** at home (module *Budget*, off by default): income and expenses with
@@ -393,7 +394,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   (its “…” menu) or in the calendar (its bar)
 - **Own date and time pickers** in the app language: a small month grid (the week starts on your locale's first day)
   and hours / minutes you can also type (`930`, `9:30 pm`, `21 Uhr`); keyboard and touch friendly
-- **Templates**: save a task with its subtasks, or a whole list with sections, and reuse it with dates relative to today
+- **Templates**: save a task with its subtasks, or a whole list with sections, and reuse it with dates relative to today;
+  **Duplicate list…** (2.78.0) copies a list at once with its dates as they are (completed tasks optional, no members)
 - **List types**: *List* or *Project* (time tracking, dependencies with the Gantt timeline, custom fields, progress and
   status for that list only). Every list can **show completed at the bottom** (what you tick off stays there and comes
   back with one tap: shopping and packing lists). Set it in the list dialog or the list's menu; plain lists stay free of project controls (the repository

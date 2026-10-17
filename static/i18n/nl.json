@@ -690,7 +690,7 @@
   "Notifications (ntfy)": "Meldingen (ntfy)",
   "Topic": "Topic",
   "Subscribe in the ntfy app: server {0}, topic as above": "Abonneer je in de ntfy-app: server {0}, topic zoals hierboven",
-  ", with a user that has read access": ", met een gebruiker met leesrechten",
+  ", logged in as user mo": ", ingelogd als gebruiker mo",
   "Web view": "Webweergave",
   "Send test": "Test versturen",
   "All-day reminder at": "Herinnering voor hele dag om",
@@ -702,7 +702,7 @@
   "Default": "Standaard",
   "Modules": "Modules",
   "In the ntfy app, add server {0} once": "Voeg in de ntfy-app eenmalig server {0} toe",
-  " and log in with a user that may write to the topic (Settings > Manage users).": " en log in met een gebruiker die naar het topic mag schrijven (Instellingen > Gebruikers beheren).",
+  " and log in as user <b>mo</b> (Settings > Manage users; password in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).": " en log in als gebruiker <b>mo</b> (Instellingen > Gebruikers beheren; wachtwoord in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).",
   "Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.": "Daarna: deel een afbeelding of tekst > ntfy > server zoals hierboven, topic {0}. Een paar seconden later is het een taak in de mand, bestanden als bijlagen.",
   "Color scheme": "Kleurenschema",
   "Automatic": "Automatisch",
@@ -9460,5 +9460,14 @@
   "Another version of this pack is installed": "Er is een andere versie van dit pakket geïnstalleerd",
   "Update “{0}”?": "„{0}” bijwerken?",
   "The catalogue address is not allowed (https only)": "Het catalogusadres is niet toegestaan (alleen https)",
-  "{0} open documents will be calculated with the new rates and texts.": "{0} open documenten worden berekend met de nieuwe tarieven en teksten."
+  "{0} open documents will be calculated with the new rates and texts.": "{0} open documenten worden berekend met de nieuwe tarieven en teksten.",
+  "Participants cannot duplicate the whole list": "Deelnemers kunnen niet de hele lijst dupliceren",
+  "List too large to duplicate (at most {0} tasks)": "Lijst te groot om te dupliceren (hoogstens {0} taken)",
+  "{0} (copy)": "{0} (kopie)",
+  "Duplicate “{0}”": "„{0}” dupliceren",
+  "Copy completed tasks too": "Ook voltooide taken kopiëren",
+  "Sections, tasks with subtasks and dates, fields, notepads and the page arrangement come along. Members, shares and assignees do not: the copy is yours alone.": "Secties, taken met subtaken en datums, velden, notitieblokken en de indeling van de pagina gaan mee. Leden, delingen en toegewezen personen niet: de kopie is alleen van jou.",
+  "List duplicated": "Lijst gedupliceerd",
+  "Duplicate list…": "Lijst dupliceren…",
+  "A copy of this list with its sections, tasks and notepads": "Een kopie van deze lijst met secties, taken en notitieblokken"
 }

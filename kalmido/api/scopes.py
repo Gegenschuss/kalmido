@@ -34,7 +34,7 @@ from ..personal.timetrack import (
     BadInput, reject_unknown, time_delete, time_running, time_start, time_stop, time_update, UnknownFields,
 )
 from ..accounts.settings import export_json
-from ..lists.templates import template_apply, template_create, template_delete, template_update, templates_list
+from ..lists.templates import list_duplicate, template_apply, template_create, template_delete, template_update, templates_list
 from ..tasks.dependencies import dep_add, dep_remove, deps_get
 from ..lists.projects import list_status_set, LIST_STATUSES
 from ..lists.fields import field_create, field_delete, field_dict, field_update, need_field
@@ -757,6 +757,22 @@ def v1_template_apply(tid):
     return jsonify(v1_call(template_apply, tid, body=b)), 201
 
 
+@app.post("/api/v1/lists/<int:lid>/duplicate")
+@v1_view
+def v1_list_duplicate(lid):
+    """2.78.0 (#1881): a copy of the list ({name?, done?, folder?}): sections, tasks with their dates, fields, dependencies,
+    Playbook, notepads, page; without members, shares and assignees. done = the completed tasks too."""
+    v1_args(())
+    b = _v1_body(("name", "done", "folder"))
+    if "done" in b and not isinstance(b["done"], bool):
+        raise BadInput(tr("Invalid value: {0}", "done"))
+    j = v1_call(list_duplicate, lid, body=b)
+    from ..agents.safety import token_list_add
+    token_list_add(db(), j["list_id"])  # a token limited to selected lists keeps the list it created (like POST /lists)
+    db().commit()
+    return jsonify(j), 201
+
+
 # attachments + comments
 @app.post("/api/v1/tasks/<int:tid>/attachments")
 @v1_view
@@ -1243,6 +1259,14 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                                  "folder": {"type": "string"}, "start": {"type": "string"}, "end": {"type": "string"}}},
                                              desc="Task template: a task (+ subtasks) in list_id / section_id (default the inbox). "
                                                   "List template: a new list (name, folder, start / end move the dates).")},
+        "/lists/{id}/duplicate": {"post": op("Duplicate a list", S, ok(obj, "Created", "201") | errs("400", "403", "404"), [pid("id", "List id")],
+                                             scope="structure", body={"type": "object", "properties": {
+                                                 "name": {"type": "string", "description": "default: “<list> (copy)”"},
+                                                 "done": {"type": "boolean", "description": "also the completed tasks (default: open ones only)"},
+                                                 "folder": {"type": "string", "description": "default: your folder of the list"}}},
+                                             desc="2.78.0: a new list of yours with the sections, tasks (dates as they are), subtasks, "
+                                                  "fields, dependencies, milestones, Playbook, notepads and page arrangement; without "
+                                                  "members, shares or assignees. Answer {list_id}. Not for participants.")},
         "/tasks/{id}/attachments": {"post": {**op("Upload files to a task", T, ok(page("Attachment") if "Attachment" in schemas else obj, "Created", "201")
                                                   | errs("400", "403", "404", "413"), [pid()], scope="attachments:write"),
                                              "requestBody": {"required": True, "content": {"multipart/form-data": {"schema": {
