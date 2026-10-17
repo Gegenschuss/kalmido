@@ -217,6 +217,7 @@ run = import_all(A)
 le = run.get("learn") or {}
 check(run.get("new") == 2, f"import: 2 new ({run})")
 check(le.get("rules_new") == 5 and le.get("rules_dup") == 0 and le.get("trained") == 2, f"import result: 5 rules, 2 documents learnt ({le})")
+check("unsupported" not in le, "the stored summary keeps numbers only, no label names")
 check(le.get("auto") == 1 and le.get("unsupported_n") == 2, f"import result: auto + not taken over reported ({le})")
 rs = [strip(x) for x in rules(A)]
 want = [{"kind": "any", "match": "tax steuer", "tags": ["Taxes"]},

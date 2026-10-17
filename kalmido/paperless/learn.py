@@ -237,6 +237,14 @@ def pll_train(c, ws, nids):
     return len(docs)
 
 
+def pll_stored(res):
+    """2.69.0 review (N4): the summary as it is stored (plain, next to the run's counts): numbers only -- the names of the
+    labels not taken over are shown in the preview, never kept."""
+    if not res:
+        return ""
+    return json.dumps({k: v for k, v in res.items() if k != "unsupported" and isinstance(v, (int, bool))}, separators=(",", ":"))
+
+
 def pll_finish(c, ws, org_id, uid, src, since, labels, mapping):
     """Once at the end of an import run (also after a stop / a full storage): the rules (unless the mapping says no) and the
     learning from the documents this run brought. {rules_new, rules_dup, auto, unsupported, unsupported_n, trained}; {} on an

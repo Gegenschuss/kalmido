@@ -552,7 +552,8 @@ def pl_run(c, sid):
         from .learn import pll_finish
         res = pll_finish(c, r["ws"], r["org_id"], uid, pl_src(r["url"]), since, full, pl_mapping(c, r))
         if r["run_kind"] == "all":  # the app shows the summary of a full import; a follow-up run keeps it
-            _set(c, sid, run_learn=json.dumps(res, ensure_ascii=False, separators=(",", ":")) if res else "")
+            from .learn import pll_stored
+            _set(c, sid, run_learn=pll_stored(res))
     c.commit()
 
 

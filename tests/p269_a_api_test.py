@@ -347,6 +347,9 @@ check(tags["Tax"].get("match") == "tax office" and tags["Tax"].get("algo") == 1 
       "ZIP preview: the tags carry Paperless' matching (for the rules of part B)")
 check([x["name"] for x in p.get("senders", [])] == ["Example Utility"] and [x["name"] for x in p.get("types", [])] == ["Invoice"],
       f"ZIP preview: correspondents -> senders, types ({p.get('senders')}, {p.get('types')})")
+# 2.69.0 (#1847): the ZIP way takes over the matching rules too (Tax any, Example Utility literal + case-sensitive; auto counted)
+pr = p.get("rules") or {}
+check(pr.get("convert") == 2 and pr.get("auto") == 2 and pr.get("dup") == 0, f"ZIP preview: 2 rules to take over, 2 auto ({pr})")
 sz = p.get("size") or {}
 check(sz.get("exact") is True and sz.get("need") == len(PDF1) + len(PDF2), f"ZIP preview: the exact size of the originals ({sz}, {len(PDF1) + len(PDF2)})")
 mapping = {"tags": {"2": {"to": "folder", "name": "Archive 2025"}, "3": {"to": "skip", "name": ""}, "1": {"to": "tag", "name": "Taxes"}},
@@ -356,6 +359,11 @@ check(r.ok, f"ZIP import started ({r.status_code} {r.text[:200]})")
 j = zip_idle(Bo, OWS)
 run = ((j or {}).get("zip") or {}).get("run") or {}
 check(run.get("new") == 2 and run.get("failed") == 0 and run.get("total") == 2 and not run.get("error"), f"ZIP import: 2 new ({run})")
+le = run.get("learn") or {}
+check(le.get("rules_new") == 2 and le.get("trained") == 2 and "unsupported" not in le, f"ZIP import: 2 rules taken over, 2 documents learnt ({le})")
+zr = [{k: v for k, v in x.items() if k != "id"} for x in Bo.get(B + f"/api/docs/settings?ws=org:{ORG}").json().get("rules") or []]
+check({"kind": "exact", "match": "utility", "case": True, "sender": "Example Utility"} in zr
+      and {"kind": "any", "match": "tax office", "tags": ["Taxes"]} in zr, f"ZIP import: the rules with the mapped targets ({zr})")
 check(sh(f"test -e /data/paperless-zip/{zid} && echo yes") == "", "the upload is gone after the run")
 ds = until(lambda: (lambda x: x if len([d for d in x if d["name"] in ("Power bill May.pdf", "Tax notice.pdf")]) == 2 else None)(docs(Bo, OWS)), 30) or []
 by = {d["name"]: d for d in ds}

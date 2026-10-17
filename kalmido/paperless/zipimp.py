@@ -430,7 +430,8 @@ def plh_zip_run(c, rid):
         error = "failed"
     learn = _learn(c, r, uid, since, scan["labels"]) if scan else {}
     plh_drop_files(rid)
-    _zset(c, rid, run_state="", state="done", run_error=error, run_learn=json.dumps(learn, ensure_ascii=False)[:100_000] if learn else "",
+    from .learn import pll_stored
+    _zset(c, rid, run_state="", state="done", run_error=error, run_learn=pll_stored(learn),
           updated_at=_now())
     c.commit()
 
@@ -449,7 +450,7 @@ def plh_sweep(c, stale):
         _SWEPT[0] = time.time()
         keep = {str(x[0]) for x in c.execute("SELECT id FROM pl_uploads WHERE state IN ('upload','ready') OR run_state<>''")}
         for n in os.listdir(PLH_DIR):
-            if n not in keep:
+            if n.isdigit() and n not in keep:  # 2.69.0 review (N1): only the folders of uploads
                 p = os.path.join(PLH_DIR, n)
                 try:
                     if time.time() - os.path.getmtime(p) > 600:
@@ -514,7 +515,10 @@ def plh_zip_new():
     if q and q["limit"] and q["used"] >= q["limit"]:
         raise QuotaExceeded(q)
     try:  # the parts lie on the server's disk until the run: keep a margin for everything else
-        if shutil.disk_usage(os.path.dirname(PLH_DIR.rstrip(os.sep)) or "/").free < size + PLH_DISK_MARGIN:
+        from ..core.pg import system_ctx
+        with system_ctx(c):  # 2.69.0 review (M1): the parts still to come of every workspace's upload count against the margin
+            pending = int(c.execute("SELECT COALESCE(SUM(size - got), 0) FROM pl_uploads WHERE state='upload'").fetchone()[0] or 0)
+        if shutil.disk_usage(os.path.dirname(PLH_DIR.rstrip(os.sep)) or "/").free < size + pending + PLH_DISK_MARGIN:
             return err(tr("There is not enough space on the server for this upload right now"), 507)
     except OSError:
         pass
