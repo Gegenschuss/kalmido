@@ -126,6 +126,10 @@ CHECKS = {
     # pauses itself when it runs: lists/rules.py rul_target_ok)
     "list_rule": ("SELECT r.id, r.created_by FROM list_rules r JOIN lists l ON l.id=r.list_id LEFT JOIN lists t ON t.id=r.target_list_id "
                   "WHERE r.deleted_at IS NULL AND (r.org_id IS DISTINCT FROM l.org_id OR (t.id IS NOT NULL AND t.org_id IS DISTINCT FROM l.org_id))"),
+    # 2.75.0 A (#1411): a list of an organisation shared with the built-in assistant by a person outside it, or by an agent
+    # (the assistant reads only lists the person sees right now: assistant/web.py asst_lists; the row is taken out)
+    "assistant_person": ("SELECT a.list_id, a.user_id FROM assistant_access a JOIN lists l ON l.id=a.list_id JOIN users u ON u.id=a.user_id "
+                         "WHERE l.org_id IS NOT NULL AND (u.kind='agent' OR " + _PERSON.format(o="l", m="a") + ")"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
@@ -153,7 +157,8 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "cal_person": ("ev_cal_members", "cal_id"), "book_person": ("book_members", "book_id"),
           "file_person": ("fs_shares", "node_id"),  # 2.48.0 (#1207)
           "doc_mail_person": ("doc_mail", "org_id"),  # 2.48.0 (#1111)
-          "task_bell_person": ("task_bell", "task_id")}  # 2.53.0 C (#1424)
+          "task_bell_person": ("task_bell", "task_id"),  # 2.53.0 C (#1424)
+          "assistant_person": ("assistant_access", "list_id")}  # 2.75.0 A (#1411)
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Administration > Organisations")
 
 

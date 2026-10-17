@@ -5,6 +5,7 @@ An agent is a special kind of user. People mention it, assign tasks to it, chat 
 The agent works through the REST API, webhooks or the [MCP server](../mcp/README.md).
 
 **Kalmido never starts AI processes.** It only records events and delivers them. The agent runs somewhere you control and connects to Kalmido as a client.
+The one exception is the optional [built-in assistant](ASSISTANT.md) (2.75.0, off unless the operator configures it): see [Built-in assistant vs. your own agents](#built-in-assistant-vs-your-own-agents-2750).
 
 **New here?** [Set up an agent](#set-up-an-agent) below has a guide for admins (a team agent on a server) and one for users (a personal agent on their own computer), for Linux, macOS and Windows; [AGENT-SETUP.md](AGENT-SETUP.md) sets up an agent on Linux step by step (Claude Code in a sandbox, with a prompt that lets Claude Code do it for you); [AGENT-SECURITY.md](AGENT-SECURITY.md) explains the threat model behind it.
 
@@ -37,6 +38,7 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
 - [MCP server](#mcp-server)
 - [Use agents safely](#use-agents-safely-2300) (2.30.0)
 - [Security](#security)
+- [Built-in assistant vs. your own agents](#built-in-assistant-vs-your-own-agents-2750) (2.75.0)
 
 ## Concept
 
@@ -2845,3 +2847,18 @@ organisation or its list limit). The agent answers with ONE sentence; the person
   agent gets the event `job` (approve / reject). Open cards end with their deadline.
 - Nothing is ever cancelled, sent or deleted. Health lists and the journal never reach an agent (no event, no read, no
   scope `private` for agents), also when a person tries to share a health list with it.
+
+## Built-in assistant vs. your own agents (2.75.0)
+
+Since 2.75.0 an operator can configure a **built-in assistant** ([ASSISTANT.md](ASSISTANT.md)): Kalmido then calls one
+OpenAI-compatible model itself, for six small helps a person starts with a tap (summarize a task, draft a reply,
+extract tasks, suggest tags and a due date, sort the basket, plan the day). It is not an agent:
+
+- It is no user and no member of any list. Each person switches it on and ticks the lists it may read
+  (Settings > Assistant); it never sees anything else.
+- It has no events, no token, no API and no MCP tools; it never acts on its own or on a schedule.
+- Its results are proposals of the person who asked (they show as "Assistant" in the proposal dialog) and use the
+  same Apply / Discard / Undo as the [proposals](#proposals) of agents. Agents get no events about them.
+
+Everything longer or freer (code, research, long jobs, working tickets, chat) stays the job of your own agents.
+

@@ -77,6 +77,8 @@ KINDS = {
     "paperless": ("matrix", "p248_d_paperless_api_test.py: the connection of another workspace: 404; organisation admins only change it; agents never"),
     # 2.55.0 (#1455): the newsletter connection of one workspace (segments, log, sync) + the consent of a contact
     "newsletter": ("matrix", "p255_e_api_test.py: the connection, segments, log and sync of another workspace: 404 / 403; organisation admins only; agents never; consent only on writable contacts; address books of other workspaces refused in a segment"),
+    # 2.75.0 (#1411): the built-in assistant: a person's shares of visible lists, tasks only of shared lists / the own basket
+    "assistant": ("matrix", "p275_a_api_test.py: another person's task / basket item / list 404 or left out; shares of lists the person no longer sees dropped; the log only own rows; agents never"),
     "receipt": ("matrix", "p248_d_receipts_api_test.py: receipt data and suggestions only on a visible document; projects of another workspace refused; outsiders 404"),
     "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
@@ -691,6 +693,9 @@ ROUTES = {
     # (need_admin, the instance settings); no organisation data at all
     "GET /api/supporter": "own", "PUT /api/supporter/{}": "own", "DELETE /api/supporter/{}": "own", "POST /api/supporter/{}/swap": "own",
     "PATCH /api/supporter/nudge": "own",
+    # 2.75.0 (#1411): the built-in assistant (session only; p275_a_api_test.py)
+    "GET /api/assistant": "assistant", "PUT /api/assistant/lists": "assistant", "GET /api/assistant/log": "assistant",
+    "POST /api/assistant/run": "assistant", "GET /api/admin/assistant": "assistant",
 }
 
 # ---- 1. every route is classified, nothing stale

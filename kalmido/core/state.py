@@ -222,6 +222,7 @@ def state():
     from ..calendars.caldav import dav_info
     from ..notify.push import vapid_public, webpush_count, WEBPUSH_ON
     from ..calendars.subscriptions import CAL_ON
+    from ..assistant.web import asst_state  # 2.75.0 A (#1411)
     from ..api.v1 import API_ON, WH_ON
     from ..tasks.dayplan import dayplan_state
     from ..agents.core import agents_for
@@ -314,6 +315,7 @@ def state():
         team={"enabled": tchat_on(c, uid), "unread": tchat_unread(c, uid), "dm_unread": tchat_dm_unread(c, uid)},  # 2.17.0 (#419); 2.28.0 (#987): + DMs
         agents=agents_for(c, uid),
         proposers=prop_agents(c, uid),  # 2.3.0: agents I may ask for a proposal
+        **asst_state(c, uid),  # 2.75.0 A (#1411): "assistant" only when the server configured one (assistant/web.py)
         groups=groups_for(c, full=bool(u["is_admin"])) if collab_all() else [],  # 2.10.0 (#441)
         my_groups=grp_of_user(c, uid) if collab_all() else [],
         dayplan=dayplan_state(c, uid),  # 2.10.0 (#440): working hours, review card

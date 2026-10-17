@@ -1021,6 +1021,10 @@ fresh; run p274_a_ui node p274_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.74.0 part B (#1653): Office & finance in the browser demo (client, service, quotation, invoice, payments, sums / VAT like the
 # server, the print view instead of the PDF, no network) (no container)
 fresh; run p274_b_demo node p274_b_demo_test.js
+# 2.75.0 part A: built-in assistant (#1411)
+fresh; run p275_a_api "$PY" p275_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.75.0 part B: assistant UI (#1411)
+fresh; run p275_b_ui node p275_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -1318,7 +1318,11 @@ the kill switch only. *Add agent…* asks **team agent or personal agent** and e
 agent into a person's personal agent. Every agent works in **one workspace** (private or an organisation, see
 *Workspaces*) and joins only its lists. A small **robot badge** marks agents wherever people appear (#985). Kalmido
 itself never starts an AI or any other process; the agent runs wherever you like and talks to Kalmido through the REST
-API, webhooks or the MCP server.
+API, webhooks or the MCP server. The one exception is the optional **built-in assistant** (2.75.0, #1411, off by default):
+the operator points Kalmido at a single OpenAI-compatible chat model (a provider in the EU, or Ollama on the same
+server); every person switches it on for themselves and ticks the lists it may read, and gets summaries, extracted
+tasks, basket sorting, tag / due-date suggestions, short drafts and day plans as proposal cards with yes / no - never a
+direct change, every call in a log without texts. See [docs/ASSISTANT.md](docs/ASSISTANT.md).
 
 **Which agent?** A personal agent runs on your computer with your Claude access and only you give it orders; a team
 agent runs on a shared, always-on computer and colleagues give it orders. See [Which agent when?](docs/AGENTS.md#which-agent-when-2466).
@@ -1927,6 +1931,11 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_STORAGE_QUOTA_MB` | `0` | 2.24.0: storage per person in MB (0 = unlimited); admins can change it in *Administration > Server* |
 | `KALMIDO_SUPPORT_EMAIL` | *(empty)* | 2.24.0: where *Contact support* writes to when storage is full (else the admin setting, else the first admin's address) |
 | `KALMIDO_HOSTED` | `0` | 2.24.0: `1` = a server run as a service for others: integrations only reach public HTTPS addresses |
+| `KALMIDO_AI_BASE_URL` | *(empty)* | 2.75.0: base URL of an OpenAI-compatible chat API (`…/v1`) for the built-in assistant; empty = no assistant (no menu entry, routes 404) |
+| `KALMIDO_AI_MODEL` | *(empty)* | 2.75.0: model name sent to that API (required together with the URL) |
+| `KALMIDO_AI_KEY_FILE` | *(empty)* | 2.75.0: file with the API key (one line); `KALMIDO_AI_KEY` sets it directly; Ollama needs none. Never logged or shown |
+| `KALMIDO_AI_NAME` | *(host of the URL)* | 2.75.0: provider name people see when they share lists with the assistant |
+| `KALMIDO_AI_TIMEOUT_S` | `60` | 2.75.0: time limit of one model call; `KALMIDO_AI_MAX_CHARS` (`24000`) caps the input, `KALMIDO_AI_MAX_TOKENS` (`1500`) the answer |
 | `KALMIDO_ONBOARDING` | `1` | `0`: new accounts start empty (no "Getting started" list, no welcome tour) |
 | `KALMIDO_SEARCH_INDEX` | `0` | 2.29.0: search engines stay out by default (`X-Robots-Tag: noindex, nofollow` on every answer, `/robots.txt` with `Disallow: /`); `1` lets them index the sign-in page. Public list links, forms, feeds and the API stay noindex either way |
 | `KALMIDO_AGENT_EVENTS_STALE_H` | `48` | 2.29.0: agent events older than this many hours reach a poller as one `missed` summary instead of one by one (`0` = off; see docs/AGENTS.md) |

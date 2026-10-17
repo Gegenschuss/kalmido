@@ -305,6 +305,7 @@ function palAll() {
     if (k === 'users' && !S.me?.is_admin) continue;
     if (k === 'org' && !(S.me && lmOrgPaneOn())) continue;  // 2.39.1 (#1188)
     if (k === 'ai' && !aiPaneOn()) continue;  // 2.7.0 (#405 S2/S8: was a dead branch for a "time" tab)
+    if (k === 'assistant' && !asst_avail()) continue;  // 2.75.0 (#1411)
     add('s:' + k, 'setting', tr('Settings: {0}', tr(n)), icon, () => settingsModal(k), {keys: k === 'general' ? 'g s' : ''});
   }
   // tasks (open ones + the recently completed that are in the state)

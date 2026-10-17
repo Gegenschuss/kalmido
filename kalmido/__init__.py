@@ -240,6 +240,8 @@ ORDER = (
     "agents.contractprop",  # 2.70.0 C (#1359): contract_notice + the proposal kind notice (no routes of its own)
     "lists.rules",  # 2.71.0 A (#1457): rules of a list (When ... then ...), after api.v1
     "admin.supporter",  # 2.74.0 (#338): the supporter licence (self-hosted only, a badge, unlocks nothing)
+    "assistant.core",  # 2.75.0 (#1411): the built-in assistant -- configuration, model call, prompts (off unless configured)
+    "assistant.web",  # 2.75.0 (#1411): the routes of the built-in assistant
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

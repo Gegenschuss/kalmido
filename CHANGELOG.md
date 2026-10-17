@@ -7,6 +7,18 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.76.0] - 2026-10-17
+
+### Added
+- Built-in assistant (#1411), the one exception to "Kalmido never calls a language model": an operator points Kalmido at a
+  single OpenAI-compatible chat model (`KALMIDO_AI_BASE_URL`, `KALMIDO_AI_MODEL`, `KALMIDO_AI_KEY_FILE`; a provider in the
+  EU, or Ollama on the same server). Off by default: without the variables there is no menu entry and the routes answer
+  404. Every person switches it on for themselves (*Settings > Assistant*) and ticks the lists it may read; basket tasks go
+  only when you pick them. It summarises a task with its notes, comments or mail text, drafts a short reply, pulls tasks out
+  of a text, suggests tags and a due date, sorts the basket and proposes a day plan - always as a proposal card with
+  yes / no, never a direct change. Locked notes, health lists, attachments and office documents never go to the model;
+  every call leaves a log line with numbers only, the key appears nowhere. Admins see calls and errors per day. Your own
+  agents stay as they are (docs/ASSISTANT.md, docs/PRIVACY-ASSISTANT-DRAFT.md for the operator's privacy texts).
 ## [2.75.0] - 2026-10-17
 
 ### Added

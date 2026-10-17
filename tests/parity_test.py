@@ -420,6 +420,9 @@ APP_ONLY = [
     # 2.74.0 (#338): the supporter licence (self-hosted only) is entered by people; it unlocks nothing, agents have no use for it
     ("2.74.0 (#338): the supporter licence (server: admins, personal: the person) and its yearly hint: people only, session routes",
      ("* /api/supporter",)),
+    # 2.75.0 (#1411): the built-in assistant calls a language model for a person in the web app; agents are models themselves
+    ("2.75.0 (#1411): the built-in assistant (session only: a person's own switch, shared lists, log; the admin overview); agents "
+     "never use it and have their own proposals API", ("* /api/assistant", "* /api/admin/assistant")),
 ]
 
 

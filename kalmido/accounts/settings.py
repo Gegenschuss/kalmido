@@ -50,6 +50,7 @@ ROW_ICON_LEVELS = ("all", "key", "calm", "custom")
 ROW_ICON_KEYS = ("due", "repeat", "remind", "deadline", "occ", "note", "attach", "link", "sub", "cmt", "code", "tracked", "plan",
                  "ttype", "ms", "blocked", "wait", "stale", "pin", "list", "tags", "fields", "created", "num", "person", "turns")
 SETTINGS_FLAGS += ("photo_meta_strip",)  # 2.61.0 B (#1819): remove the metadata of my photos on upload
+SETTINGS_FLAGS += ("assistant_on",)  # 2.75.0 A (#1411): the built-in assistant for this person (assistant/web.py)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
@@ -644,6 +645,10 @@ def umz_export_queries(uid):
         "webhooks": ("SELECT id, name, url, events, enabled, created_at FROM webhooks WHERE user_id=?", (uid,)),
         "public_links": (f"SELECT list_id, mode, notes, password_hash IS NOT NULL AS has_password, expires_at, created_at FROM public_links "
                          f"WHERE list_id IN {own}", (uid,)),
+        # 2.75.0 A (#1411): the lists I shared with the built-in assistant and its log (numbers only, no texts)
+        "assistant_access": ("SELECT list_id, created_at FROM assistant_access WHERE user_id=?", (uid,)),
+        "assistant_log": ("SELECT id, kind, task_id, list_id, job_id, status, ms, chars_in, chars_out, model, at FROM assistant_log "
+                          "WHERE user_id=? ORDER BY id", (uid,)),
     }
     return q
 
