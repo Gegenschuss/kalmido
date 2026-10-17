@@ -57,6 +57,7 @@ const FEAT = 'cal,collab,comments,time,events,dispo';
   const ev = await call('POST', '/api/events', {title: 'Shoot day draft', start: `${t1}T09:00`, end: `${t1}T17:00`, status: 'tentative'});
   check(ev.http === 201 && ev.status === 'tentative', 'setup: a tentative event ' + ev.http);
   w = await boot({user: 'alice', hash: 'cal', ls: {'tasks.calMode': '"week"'}}); d = w.document;
+  w.eval(`S.calSel = '${t1}'; renderView()`);  // 2.56.4 (#1863): tomorrow's week -- on a Saturday tomorrow is the next week (en: Sunday first)
   const chip = await until(() => [...d.querySelectorAll('#view [data-cev]')].find(x => /Shoot day draft/.test(x.textContent)));
   check(chip && chip.classList.contains('evdraft'), '#1355: the draft is shown as a draft (evdraft) ' + chip?.className);
   click(w, chip);

@@ -23,6 +23,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **2.57.0** (2026-10-17): the sidebar's head (brand, workspace, search, favourites) **stays in place** while the rest
   scrolls, **anything in the sidebar can be a favourite** - icon tiles in your own order on all devices -, and **your own
   colour per workspace** tints the sidebar.
+- **2.56.4** (2026-10-17): connecting **Paperless-ngx 3.x** works again (API version negotiated, custom fields readable).
 - **2.56.3** (2026-10-16): the client field of a document in an organisation's office offers its clients again.
 - **2.56.1** (2026-10-16): CI fixes for 2.56.0 (both go live with this version).
 - **2.56.0** (2026-10-16): a **Message** button on job cards, a **chat history per job** (tap its name), running jobs in

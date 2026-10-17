@@ -7835,6 +7835,8 @@
   "Import started: it runs in the background": "Import gestart: hij loopt op de achtergrond",
   "Connected with Paperless-ngx": "Verbonden met Paperless-ngx",
   "Paperless-ngx could not be reached": "Paperless-ngx was niet bereikbaar",
+  "Yes": "Ja",
+  "This Paperless-ngx version speaks no API version Kalmido understands (5, 9 or 10)": "Deze Paperless-ngx-versie spreekt geen API-versie die Kalmido begrijpt (5, 9 of 10)",
   "Disconnect Paperless-ngx?": "Paperless-ngx loskoppelen?",
   "The token is removed. Documents already imported stay in Kalmido.": "Het token wordt verwijderd. Al geïmporteerde documenten blijven in Kalmido.",
   "No longer bring in new documents automatically": "Nieuwe documenten niet meer automatisch overnemen",
