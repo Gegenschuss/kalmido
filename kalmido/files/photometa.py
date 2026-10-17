@@ -17,13 +17,16 @@ handed on as meta["taken_at"] (documents keep it, files/store.py fs_put up=...).
 The setting: an organisation's file follows orgs.photo_meta_strip, any other the uploader's user setting photo_meta_strip
 (both default on). Anything unknown, broken or too big stays exactly as it came: the upload never fails here."""
 import io
+import os
 import re
 import struct
 import threading
 import zlib
 from datetime import datetime
 
-PM_MAX_PIXELS = 40_000_000          # the re-encode of a turned photo (memory); bigger: an orientation-only EXIF instead
+# the re-encode of a turned photo (memory); bigger: an orientation-only EXIF instead. 2.81.0 (#1856): KALMIDO_PHOTO_MAX_PIXELS
+_pm_px = os.environ.get("KALMIDO_PHOTO_MAX_PIXELS", "").strip()
+PM_MAX_PIXELS = max(1_000_000, int(_pm_px)) if _pm_px.isdigit() else 40_000_000
 PM_JPEG_QUALITY = 92
 _PM_ENC = threading.BoundedSemaphore(2)  # at most two re-encodes at once (memory)
 _PM_ENC_WAIT = 20                   # s; a busy server writes the orientation-only EXIF instead

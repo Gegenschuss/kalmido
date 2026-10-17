@@ -2055,6 +2055,8 @@ MIGRATIONS = [
     # 2.81.0 D (#1875): the source key of an uploaded Paperless export (zipimp.plh_src): one per Paperless-ngx instance;
     # '' = an upload of before, it keeps the old key shared by every export
     ("pl_uploads", "src", "ALTER TABLE pl_uploads ADD COLUMN src TEXT NOT NULL DEFAULT ''"),
+    # 2.81.0 C (#1866): a portal sign-in carries its cookie; signing out revokes it (NULL = still valid until it expires)
+    ("portal_logins", "revoked_at", "ALTER TABLE portal_logins ADD COLUMN revoked_at TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

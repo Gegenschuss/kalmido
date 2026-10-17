@@ -61,6 +61,12 @@ CHECKS = {
     # 2.63.0 B (#1513): a customer report in another workspace than its list, or bound to a client of another workspace
     "portal_ticket": ("SELECT p.id, p.list_id FROM portal_tickets p JOIN lists l ON l.id=p.list_id WHERE p.org_id IS DISTINCT FROM l.org_id "
                       "OR (p.org_id IS NULL AND p.owner_id IS DISTINCT FROM l.owner_id)"),
+    # 2.81.0 (#1856): a file's recognised text kept for another workspace than its file's (task / project file: the list's,
+    # Ablage file: the node's); the queue's workspace sweep (files/textscan.py) moves it within minutes
+    "file_text": ("SELECT f.id, f.ref_id FROM file_text f LEFT JOIN attachments a ON f.kind='att' AND a.id=f.att_id "
+                  "LEFT JOIN tasks t ON t.id=a.task_id LEFT JOIN list_files lf ON f.kind='list' AND lf.id=f.list_file_id "
+                  "LEFT JOIN lists l ON l.id=COALESCE(t.list_id, lf.list_id) LEFT JOIN fs_nodes n ON f.kind='fs' AND n.id=f.node_id "
+                  "WHERE (l.id IS NOT NULL AND f.org_id IS DISTINCT FROM l.org_id) OR (n.id IS NOT NULL AND f.org_id IS DISTINCT FROM n.org_id)"),
     "portal_client": ("SELECT p.id, p.client_id FROM portal_tickets p JOIN clients k ON k.id=p.client_id WHERE k.org_id IS DISTINCT FROM p.org_id"),
     # 2.49.0 (#1106): a connection (accepted request) of an agent or a kid account -- requests are for people only
     "conn_agent": ("SELECT l.a_id, l.b_id FROM conn_links l JOIN users u ON u.id IN (l.a_id, l.b_id) "

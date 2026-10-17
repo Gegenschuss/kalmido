@@ -9487,5 +9487,6 @@
   "Net {0} + VAT {1} = gross {2}": "Netto {0} + IVA {1} = lordo {2}",
   "{0}: {1} → {2}": "{0}: {1} → {2}",
   "No changes yet.": "Ancora nessuna modifica.",
-  "The linked contact no longer exists; link removed.": "Il contatto collegato non esiste più; collegamento rimosso."
+  "The linked contact no longer exists; link removed.": "Il contatto collegato non esiste più; collegamento rimosso.",
+  "Share: not every file was added (too large, empty or refused by the upload check)": "Condivisione: non tutti i file sono stati aggiunti (troppo grandi, vuoti o rifiutati dal controllo di caricamento)"
 }

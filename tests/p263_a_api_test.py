@@ -146,6 +146,8 @@ tokw = FW["url"].rsplit("/", 1)[1]
 anon = sess()
 p = anon.get(B + "/f/" + tok)
 st = stamp_of(p.text)
+# 2.81.0 (#1866): a stamp counts once -> every send below that passes the stamp check takes a page of its own
+sts = [stamp_of(anon.get(B + "/f/" + tok).text) for _ in range(12)]
 check(p.ok and st and 'enctype="multipart/form-data"' in p.text and 'name="file"' in p.text and re.search(r'name="email"[^>]*required', p.text)
       and "<script" not in p.text, "the page: a stamp, a file field (multipart), the e-mail required, no scripts")
 check('name="file"' not in anon.get(B + "/f/" + tokw).text, "a form without files: no file field")
@@ -158,7 +160,8 @@ time.sleep(3.3)
 p = anon.post(B + "/f/" + tok, data={"subject": "Forged", "email": "eve@example.com", "stamp": str(int(time.time()) - 60) + ".0123456789abcdef0123456789abcdef"})
 check(p.status_code == 400 and not task_by("Forged"), "a forged stamp: the form again")
 n0 = len(events(AG))
-p = anon.post(B + "/f/" + tok, data={"subject": "App crashes", "text": "On start.", "name": "Eve", "email": "Eve@Example.com", "stamp": st},
+st_used = sts.pop()
+p = anon.post(B + "/f/" + tok, data={"subject": "App crashes", "text": "On start.", "name": "Eve", "email": "Eve@Example.com", "stamp": st_used},
               files={"file": ("shot.png", png(), "text/html")})
 link = re.search(r'value="(https://kalmido\.example/p/[A-Za-z0-9_-]+)"', p.text)
 check(p.ok and link and "We have also sent the link to Eve@Example.com" in p.text, "sent: the status link on the thank-you page, the mail mentioned " + p.text[-600:])
@@ -188,19 +191,19 @@ m = mails("Example.com")
 mb = body_of(m[0]) if m else ("", "")
 check(len(m) == 1 and mb[1] == "Your report: App crashes" and link and link.group(1) in mb[0] and "anyone who has it" in mb[0],
       "one confirmation mail with the link " + str(mb)[:400])
-p = anon.post(B + "/f/" + tok, data={"subject": "Links", "text": " ".join(f"http://x{i}.example" for i in range(6)), "email": "eve@example.com", "stamp": st})
+p = anon.post(B + "/f/" + tok, data={"subject": "Links", "text": " ".join(f"http://x{i}.example" for i in range(6)), "email": "eve@example.com", "stamp": sts.pop()})
 check(p.status_code == 400 and "at most 5 links" in p.text and not task_by("Links"), "more than 5 links: refused with a hint")
-p = anon.post(B + "/f/" + tok, data={"subject": "Script file", "email": "eve@example.com", "stamp": st}, files={"file": ("run.sh", b"echo hi\n", "text/plain")})
+p = anon.post(B + "/f/" + tok, data={"subject": "Script file", "email": "eve@example.com", "stamp": sts.pop()}, files={"file": ("run.sh", b"echo hi\n", "text/plain")})
 t2 = task_by("Script file")
 att2 = dbx("SELECT name FROM attachments WHERE task_id=?", (t2[0],)) if t2 else []
 check(p.ok and att2 and att2[0][0] == "run.sh.txt", "an executable ending gets .txt " + str(att2))
 time.sleep(61)
 # batch 2
-p = anon.post(B + "/f/" + tok, data={"subject": "No address", "stamp": st})
+p = anon.post(B + "/f/" + tok, data={"subject": "No address", "stamp": sts.pop()})
 check(p.status_code == 400 and "e-mail address" in p.text and not task_by("No address"), "the status link needs an address")
-p = anon.post(B + "/f/" + tok, data={"subject": "Two addresses", "email": "a@x.example,b@y.example", "stamp": st})
+p = anon.post(B + "/f/" + tok, data={"subject": "Two addresses", "email": "a@x.example,b@y.example", "stamp": sts.pop()})
 check(p.status_code == 400 and not task_by("Two addresses"), "one address only")
-codes = [anon.post(B + "/f/" + tok, data={"subject": f"Again {i}", "email": "eve@example.com", "stamp": st}).status_code for i in range(4)]
+codes = [anon.post(B + "/f/" + tok, data={"subject": f"Again {i}", "email": "eve@example.com", "stamp": sts.pop()}).status_code for i in range(4)]
 check(codes == [200, 200, 200, 429], "5 reports per address, form and hour " + str(codes))
 for _ in range(20):
     if len(mails("xample.com")) >= 3:
@@ -212,7 +215,7 @@ pts = dbx("SELECT COUNT(*) FROM portal_tickets WHERE form_id=?", (F["id"],))[0][
 check(pts == 5, "every report a ticket " + str(pts))
 time.sleep(61)
 # batch 3
-p = anon.post(B + "/f/" + tok, data={"subject": "Big", "email": "big@example.com", "stamp": st}, files={"file": ("big.bin", b"0" * (10 * 1024 * 1024 + 10), "application/octet-stream")})
+p = anon.post(B + "/f/" + tok, data={"subject": "Big", "email": "big@example.com", "stamp": sts.pop()}, files={"file": ("big.bin", b"0" * (10 * 1024 * 1024 + 10), "application/octet-stream")})
 check(p.status_code in (400, 413) and not task_by("Big"), "a file over 10 MB: refused " + str(p.status_code))
 r = A.post(B + f"/api/lists/{PL}/forms", json={"title": "Private", "access": "public", "portal": True})
 tokp = r.json()["url"].rsplit("/", 1)[1]
@@ -239,6 +242,14 @@ t5 = task_by("A wish")
 check(p.ok and "/p/" not in p.text and t5 and t5[1] == "feature" and not dbx("SELECT 1 FROM attachments WHERE task_id=?", (t5[0],))
       and not dbx("SELECT 1 FROM portal_tickets WHERE task_id=?", (t5[0],)), "a form without status link / files: a feature task, no file, no ticket")
 check(Ca.get(B + "/f/" + tok).ok, "the public form also opens for another organisation")
+# 2.81.0 (#1866): batch 4: a used stamp is refused; at most 50 confirmation mails per form and day
+time.sleep(61)
+p = anon.post(B + "/f/" + tok, data={"subject": "Replayed", "email": "re@example.com", "stamp": st_used})
+check(p.status_code == 400 and "once more" in p.text and not task_by("Replayed"), "#1866: a stamp that was sent once is refused")
+day = time.strftime("%Y-%m-%d", time.gmtime())
+dbx("INSERT INTO mail_counts(k,day,n) VALUES(?,?,50) ON CONFLICT(k) DO UPDATE SET n=50, day=excluded.day RETURNING k", (f"fm:{F['id']}", day))
+p = anon.post(B + "/f/" + tok, data={"subject": "Day limit", "email": "day@example.com", "stamp": sts.pop()})
+check(p.ok and "/p/" in p.text and "We have also sent" not in p.text and task_by("Day limit"), "#1866: over the form's daily mails: the report is kept, no mail")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

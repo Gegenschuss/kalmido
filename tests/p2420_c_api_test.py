@@ -119,6 +119,13 @@ L = A.post(B + "/api/lists", json={"name": "Alpha Projekt", "org_id": ORG}).json
 T = A.post(B + "/api/tasks", json={"title": "Orgaufgabe Schnittplan", "list_id": L}).json()["id"]
 ST = A.post(B + "/api/tasks", json={"title": "Unteraufgabe Tonmischung", "list_id": L, "parent_id": T}).json()["id"]
 check(A.post(B + f"/api/tasks/{T}/comments", json={"body": "Kommentar Abnahme Freitag"}).ok, "comment on the organisation's task")
+# 2.81.0 (#1866): a customer report on the task (team/portal.py pt_create inside the container, as the form does)
+PT_CODE = ("import sys, app\nfrom kalmido.core.pg import system_ctx\nfrom kalmido.team.portal import pt_create\nc = app.connect()\n"
+           "with system_ctx(c):\n    l = c.execute('SELECT id, org_id, owner_id FROM lists WHERE id=?', (int(sys.argv[2]),)).fetchone()\n"
+           "    t = pt_create(c, int(sys.argv[1]), l, None, 'Kunde Beispiel', 'kunde@example.com')\nc.commit()\nprint(t[1])")
+PT = subprocess.run(["docker", "exec", CT, "python", "-c", PT_CODE, str(T), str(L)], capture_output=True, text=True)
+check(PT.returncode == 0, "setup: a customer report " + PT.stderr[-400:])
+PT_TOKEN = PT.stdout.strip().splitlines()[-1] if PT.returncode == 0 else "-"
 ATT = b"attachment of the organisation " + os.urandom(16).hex().encode()
 r = A.post(B + f"/api/tasks/{T}/attachments", files=[("file", ("plan.txt", ATT, "text/plain"))])
 check(r.ok, "attachment uploaded " + r.text[:120])
@@ -227,6 +234,9 @@ check([x["id"] for x in lists] == [L], f"only the organisation's list: {[x['name
 tasks = json.loads(z.read("tasks.json"))
 check({x["id"] for x in tasks} == {T, ST} and any(x["parent_id"] == T for x in tasks), "the task and its subtask")
 check("Kommentar Abnahme Freitag" in z.read("comments.json").decode(), "the comment")
+pts = json.loads(z.read("portal/tickets.json")) if "portal/tickets.json" in names else []
+check(len(pts) == 1 and pts[0]["task_id"] == T and pts[0]["email"] == "kunde@example.com" and pts[0]["name"] == "Kunde Beispiel"
+      and not {"token", "token_hash", "email_hash"} & set(pts[0]) and PT_TOKEN not in text, f"#1866: the customer report, address plain, never the status link {pts}")
 check("Privat Tagebuch" not in text and "Privataufgabe Zahnarzt" not in text, "the member's private list is not in it")
 check("Beta Liste" not in text and "Betaaufgabe Fremdorganisation" not in text and "Carol Other" not in text, "the other organisation is not in it")
 check(z.read(f"files/attachments/{ATT_ID}-plan.txt") == ATT, "the attachment, decrypted")

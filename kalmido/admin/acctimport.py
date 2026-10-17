@@ -320,6 +320,7 @@ UMZ_ORG_SKIP = (  # archive prefix -> what the preview names as not taken over
     ("lists/forms.json", N_("Forms")), ("lists/playbooks.json", N_("Playbooks")), ("lists/notes.json", N_("Project notes")),
     ("lists/notepads.json", N_("Notepads")), ("time_entries.json", N_("Time entries")),
     ("tasks/encrypted_notes.json", N_("Encrypted notes")), ("tasks/locked_notes.json", N_("Encrypted notes")),
+    ("portal/", N_("Customer reports")),  # 2.81.0 (#1866)
 )
 
 

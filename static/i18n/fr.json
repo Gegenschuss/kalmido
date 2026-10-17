@@ -9487,5 +9487,6 @@
   "Net {0} + VAT {1} = gross {2}": "HT {0} + TVA {1} = TTC {2}",
   "{0}: {1} → {2}": "{0} : {1} → {2}",
   "No changes yet.": "Aucune modification pour le moment.",
-  "The linked contact no longer exists; link removed.": "Le contact lié n'existe plus ; lien supprimé."
+  "The linked contact no longer exists; link removed.": "Le contact lié n'existe plus ; lien supprimé.",
+  "Share: not every file was added (too large, empty or refused by the upload check)": "Partage : tous les fichiers n’ont pas été ajoutés (trop volumineux, vides ou refusés par le contrôle d’envoi)"
 }

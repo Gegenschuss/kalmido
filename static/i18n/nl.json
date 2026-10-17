@@ -9487,5 +9487,6 @@
   "Net {0} + VAT {1} = gross {2}": "Netto {0} + btw {1} = bruto {2}",
   "{0}: {1} → {2}": "{0}: {1} → {2}",
   "No changes yet.": "Nog geen wijzigingen.",
-  "The linked contact no longer exists; link removed.": "Het gekoppelde contact bestaat niet meer; koppeling verwijderd."
+  "The linked contact no longer exists; link removed.": "Het gekoppelde contact bestaat niet meer; koppeling verwijderd.",
+  "Share: not every file was added (too large, empty or refused by the upload check)": "Delen: niet elk bestand is toegevoegd (te groot, leeg of geweigerd door de uploadcontrole)"
 }
