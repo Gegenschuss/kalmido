@@ -77,7 +77,9 @@ migrates itself.
 - Lists with the lock (2.64.1, "Encrypted in the browser") rely on trust on first use: each device trusts the first public
   key it sees for a member until the safety numbers are compared, and the ciphertexts are not bound to a task, so the server
   could swap texts of the same kind inside one list. Neither protects against a changed web app delivered by the server
-  itself. Details: *Lock per list* in docs/ARCHITECTURE.md.
+  itself. Since 2.64.2 files and the list channel are encrypted with the list key too, and when a member leaves the key
+  changes and older contents are encrypted again in the background; until that run is done a former member who kept a
+  copy of the database could still read older ciphertexts with the old key. Details: *Lock per list* in docs/ARCHITECTURE.md.
 - API tokens act as their user. Give scripts the smallest access they need (*read* unless they must change
   things), an expiry, and revoke tokens you no longer use. Behind a login proxy, only let `/api/v1/` requests that carry
   an `abk_` token bypass the login (see docs/API.md).
