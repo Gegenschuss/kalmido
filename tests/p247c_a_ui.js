@@ -142,6 +142,13 @@ const sec = (d, k) => d.querySelector(`#achat .cwin[data-cw="${k}"]`);
   // 2.47.3: wait for the state instead of a fixed 800 ms (the team reload after leaving is slower on a busy CI runner)
   await until(() => w.eval('S.tc.rid') === RID && !!sec(d, 't:' + RID)?.querySelector('#tc-in') && sec(d, 't:' + RID).textContent.includes('Hello studio'), 30);
   check(w.eval('S.tc.rid') === RID && !!sec(d, 't:' + RID).querySelector('#tc-in') && sec(d, 't:' + RID).textContent.includes('Hello studio'), '#1720: leaving the team view keeps the live panel window ' + JSON.stringify({rid: w.eval('S.tc.rid'), RID, DM, lt: w.eval('S.cw.lt'), inp: !!sec(d, 't:' + RID)?.querySelector('#tc-in'), n: d.querySelectorAll('#tc-in').length, txt: (sec(d, 't:' + RID)?.textContent || '').slice(0, 80), hash: w.location.hash}));
+  // 2.83.0 (#1774): the split button in the head of a team room (a phone has no long press)
+  check(w.eval("o3b_splitBtn({kind: 'list'}, 5)").includes('data-act="tc-split"') && w.eval("o3b_splitBtn({kind: 'dm'}, 5)") === '', '#1774: the head button for a list room, none for a direct message');
+  w.eval("cw_ren = 't:5'; 1"); check(w.eval("o3b_splitBtn({kind: 'list'}, 5)") === '', '#1774: none inside the panel window itself'); w.eval("cw_ren = ''; 1");
+  d.body.insertAdjacentHTML('beforeend', `<button id="t-split" data-act="tc-split" data-rid="${RID}">split</button>`);
+  d.getElementById('t-split').click();
+  await until(() => sec(d, 't:' + RID));
+  check(!!sec(d, 't:' + RID), '#1774: a click on the head button opens the room as a window');
   w.eval(`cw_close('t:${RID}')`);
   await sleep(100);
 
