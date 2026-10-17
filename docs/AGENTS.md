@@ -1833,7 +1833,7 @@ Agents read rules and only PROPOSE them; the routes people use to create, change
 
 | What | Endpoint | MCP | Scope |
 |---|---|---|---|
-| The rules of a list shared with you | `GET /api/v1/lists/{id}/rules` | `list_rules` | read |
+| The rules of a list shared with you (with write access) | `GET /api/v1/lists/{id}/rules` | `list_rules` | read |
 | Propose a rule (kind `rule`) | `POST /api/v1/lists/{id}/rules/proposals` | `propose_rule` | structure |
 
 The proposal goes to the list's owner (or `user_id`: an owner / admin of the list). Accepting creates the rule with THAT

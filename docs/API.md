@@ -1306,7 +1306,7 @@ groups, reason at most 300 characters; `{groups: []}` = none found). `GET /api/p
 (`key, target_id, reason, ok, contacts: [{id, fn, org, emails, phones, state: "" | changed | gone}]`, loaded fresh);
 `POST /api/proposals/{id}/apply {select: ["0", ...], edits: {"0": {target_id}}}` merges the ticked groups as the person
 (`merged`, `skipped`), `.../undo` and `.../redo` take all of them back / again.
-| `GET /lists/{id}/rules` | read | `trigger` {kind section / done / reopen / ltag / due, section_id, tag_id}, `action` {kind assign / due / comment / move, user_id, days, text, list_id, section_id}, `names`, `active`, `paused_reason`, `created_by` |
+| `GET /lists/{id}/rules` | read | people: owner / list admin (like the web), agents: write access to the list (else 403); `trigger` {kind section / done / reopen / ltag / due, section_id, tag_id}, `action` {kind assign / due / comment / move, user_id, days, text, list_id, section_id}, `names`, `active`, `paused_reason`, `created_by` |
 | `POST /lists/{id}/rules/proposals` | structure | agents only: `name`, `trigger`, `action`, `summary`, `title`, `user_id`; 201 = a ready proposal job (kind `rule`) |
 
 ## Pin board, time check and shoot planning for agents (2.51.0)
