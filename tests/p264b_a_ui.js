@@ -61,7 +61,13 @@ const gen = v => typeof v === 'string' && v.startsWith('e2e1:') ? JSON.parse(v.s
   check((await call('DELETE', `/api/lists/${L}/members/${U.carol}`)).status === 200, 'carol removed');
   check((await call('GET', `/api/lists/${L}/e2e`)).j.rotate === 1, 'rotation pending after carol left');
 
-  await session('alice', async ({ev, unlock}) => {
+  await session('alice', async ({ev, unlock, boot}) => {
+    // 2.64.2 review (M1): keys this device sees for the first time in this page are not wrapped automatically
+    await unlock();
+    await ev(`le2eUnlock(${L}).then(() => 1)`);
+    await sleep(1500);
+    check((await call('GET', `/api/lists/${L}/e2e`)).j.gen === 1, 'M1: no automatic key change for keys first seen in this page');
+    await boot('#l/' + L);  // the same device later: the keys are known from before
     await ev(`(window.__prog = [], document.addEventListener('le2e:progress', e => window.__prog.push(e.detail)), 1)`);
     await unlock();
     await ev(`le2eUnlock(${L}).then(() => 1)`);  // the automatic key change starts here (owner, unlocked)
@@ -86,6 +92,8 @@ const gen = v => typeof v === 'string' && v.startsWith('e2e1:') ? JSON.parse(v.s
   const G = (await call('GET', `/api/lists/${L}/e2e`)).j.gen;
   // an old text of generation 1 (as a backup or an unconverted row would hold it), written by Alice's session
   check((await call('PATCH', `/api/tasks/${TO}`, {title: OLD})).status === 200, 'an old cipher of generation 1 in the list');
+  // 2.64.2 review (M2): written after the re-encryption had finished: it is due again (the hint comes back)
+  check((await call('GET', `/api/lists/${L}/e2e`)).j.reenc === G, 'M2: an old generation after the key change makes the re-encryption due again');
 
   await session('bob', async ({ev, unlock, waitFor}) => {
     await unlock();

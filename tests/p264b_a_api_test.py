@@ -260,9 +260,11 @@ check(A.post(B + f"/api/lists/{L}/e2e/bulk", json={"comments": [{"id": C1, "body
 # an outdated tab writes a ciphertext of the old generation after the re-encryption: the next run picks it up
 assert Bo.patch(B + f"/api/tasks/{T1}", json={"content": ct(1)}).ok
 j = A.get(B + f"/api/lists/{L}/e2e").json()
-check(j["reenc"] == 0 and j["left"]["tasks"] == 1, "info: a late ciphertext of generation 1 is work again " + json.dumps(j["left"]))
+# 2.64.2 review (M2): it makes the re-encryption due again (reenc = the current generation, the hint comes back)
+check(j["reenc"] == 2 and j["left"]["tasks"] == 1, "info: a late ciphertext of generation 1 is work again " + json.dumps(j["left"]))
 check(A.post(B + f"/api/lists/{L}/e2e/bulk", json={"tasks": [{"id": T1, "content": ct(2)}]}).ok and gen_of(dbx("SELECT content FROM tasks WHERE id=?", (T1,))[0][0]) == 2,
-      "bulk: re-encrypted without a running key change")
+      "bulk: re-encrypted again")
+check(A.post(B + f"/api/lists/{L}/e2e/finish").ok and A.get(B + f"/api/lists/{L}/e2e").json()["reenc"] == 0, "finish: done again")
 
 # ================================================================== release of every generation
 r = A.post(B + f"/api/lists/{L}/e2e/keys", json={"keys": [{"user_id": CAROL, "gen": 1, "wrapped": wrapped()}, {"user_id": CAROL, "gen": 2, "wrapped": wrapped()}]})
