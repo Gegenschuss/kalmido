@@ -139,6 +139,17 @@ r = A.post(B + "/api/clients", json={"name": "Erins Kunde", "org_id": ORG})
 CLE = r.json()["id"]
 dbx("UPDATE clients SET created_by=? WHERE id=?", (ERIN, CLE))
 check(A.patch(B + f"/api/clients/{CLE}", json={"org_id": ORG, "note": "admin"}).ok, "N11: the org admin still edits a client")
+# 2.86.0 (N11, second way): a list moved into another workspace leaves a client of the old one behind
+LM = Bo.post(B + "/api/lists", json={"name": "Wander Projekt", "org_id": ORG}).json()["id"]
+check(Bo.patch(B + f"/api/lists/{LM}", json={"client_id": CLA}).ok, "setup: Alpha client on the Alpha list")
+r = Bo.patch(B + f"/api/lists/{LM}", json={"org_id": BETA})
+check(r.ok, f"N11: the owner moves the list into Beta ({r.status_code} {r.text[:120]})")
+check(tuple(dbx("SELECT org_id, client_id FROM lists WHERE id=?", (LM,))[0]) == (BETA, None), "N11: the moved list lost the Alpha client")
+check(Bo.patch(B + f"/api/lists/{LM}", json={"client_id": CLB}).ok, "setup: Beta client on the moved list")
+check(Bo.patch(B + f"/api/lists/{LM}", json={"org_id": BETA, "name": "Wander Projekt 2"}).ok, "N11: an unchanged workspace in a save")
+check(dbx("SELECT client_id FROM lists WHERE id=?", (LM,))[0][0] == CLB, "N11: a fitting client stays")
+r = Bo.patch(B + f"/api/lists/{LM}", json={"org_id": None})
+check(r.ok and dbx("SELECT client_id FROM lists WHERE id=?", (LM,))[0][0] is None, f"N11: private, the Beta client goes too ({r.status_code})")
 
 # ---------------------------------------------------------------- office settings with bank data (admin)
 r = A.put(B + O + "/settings", json={"company": {"name": "Studio Nordlicht GmbH", "bank_lines": ["Beispielbank", "IBAN DE02 1203 0000 0000 2020 51"]},
