@@ -170,6 +170,26 @@ row = dbx("SELECT body, mentions FROM comments WHERE task_id=? ORDER BY id DESC 
 body, ment = (row[0][0] or "", row[0][1] or "") if row else ("", "")
 check(f"<@{uid['erin']}>" not in body and str(uid["erin"]) not in ment.split(","), f"N20: a mention of someone outside the task stays plain text {body!r} {ment!r}")
 check(f"<@{uid['bob']}>" in body and str(uid["bob"]) in ment.split(","), f"N20: a mention of someone who shares the task stays {body!r} {ment!r}")
+# 2.86.0 (N20 review): the list's member list itself (state + v1) is cut the same way for a participant
+
+
+def st_members(s):
+    li = [x for x in s.get(B + "/api/state").json()["lists"] if x["id"] == L]
+    return {m["user_id"] for m in li[0]["members"]} if li else None
+
+
+cm = st_members(Ca)
+check(cm is not None and uid["bob"] in cm and uid["erin"] not in cm, f"N20: the participant's state members: not the other participant {cm}")
+check({uid["bob"], uid["carol"], uid["erin"]} <= (st_members(A) or set()), "N20: the owner's state members stay complete")
+r = Ca.post(B + "/api/me/tokens", json={"name": "carol read", "scopes": ["read"]})
+CTH = {"Authorization": "Bearer " + r.json().get("token", "")} if r.ok else {}
+r = requests.get(V + f"/lists/{L}/members", headers=CTH)
+vm = {m["user_id"] for m in r.json().get("data", [])} if r.ok else set()
+check(r.ok and {ALICE, uid["bob"]} <= vm and uid["erin"] not in vm, f"N20: v1 members of a participant: owner + who shares a task {r.status_code} {sorted(vm)}")
+TS = task(L, "Shared job", assignee_id=uid["carol"])
+dbx("INSERT INTO task_people(task_id, user_id) VALUES(?, ?) ON CONFLICT DO NOTHING", (TS, uid["erin"]))
+cm = st_members(Ca)
+check(cm is not None and uid["erin"] in cm, f"N20: a participant who shares a task with carol shows up {cm}")
 
 # ================================================================== N29: share requests name nobody the agent cannot see
 SH, SHH = agent("sharer", ["read", "tasks:write", "comments", "structure"])
