@@ -747,6 +747,17 @@ A short checklist for a new server:
   point your uptime monitor at it (let it pass a login proxy).
 - **Raspberry Pi and small boards:** run from an SSD, not an SD card; some USB-to-NVMe bridges drop out under load (pick
   one known to work, or one with a quirk setting); a busy USB 3 port can disturb 2.4 GHz Wi-Fi and Bluetooth nearby.
+- **Abuse limits (2.86).** Generous defaults that normal use never reaches; raise them in `.env` if a busy server needs
+  more (a value that is not a whole number keeps the default):
+
+  | Variable | Default | What it limits |
+  |---|---|---|
+  | `KALMIDO_FORM_FILES_MB_HOUR` | `200` | MB of files anonymous visitors may send through one public form per hour |
+  | `KALMIDO_AGENT_PUSH_DAY` | `500` | pushes per agent and person a day (past it the message still arrives, without a push) |
+  | `KALMIDO_OFFICE_MAILS_DAY_PERSON` | `150` | office document mails (invoices, quotations) one person sends a day |
+  | `KALMIDO_OFFICE_MAILS_DAY_ORG` | `300` | office document mails of one organisation a day |
+  | `KALMIDO_OFFICE_MAILS_DAY_ADDRESS` | `20` | office document mails one receiving address gets from an organisation a day |
+
 - **Changed `.env`? Recreate, do not restart.** `docker compose restart` keeps the old environment; run
   `docker compose up -d` so the container is recreated with the new values.
 
