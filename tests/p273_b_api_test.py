@@ -432,6 +432,21 @@ fr = dbx("SELECT id FROM users WHERE email='frank@example.com'")
 check(fr and dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (fl[0]["id"], fr[0]["id"])), "frank invited (instance admin) and shared")
 check(dbx("SELECT 1 FROM user_invites WHERE user_id=?", (fr[0]["id"] if fr else 0,)), "frank has an invitation link")
 
+# ---------------------------------------------------------------- 2.73.0 (#1473) review N4: a piece that broke off half-written
+r = Da.post(B + "/api/account/import", json={"size": len(EXP), "name": "alice.zip"})
+iid = r.json()["id"]
+check(Da.put(B + f"/api/account/import/{iid}?offset=0", data=EXP[:1 << 20], headers={"Content-Type": "application/octet-stream"}).ok, "N4: piece 1")
+with open(os.path.join(DATA, "exports", "account-import", str(DAVE), iid, "upload.bin"), "ab") as f:
+    f.write(os.urandom(70000))  # the rest of a write that stopped in the middle (the state still says 1 MiB)
+off = 1 << 20
+while off < len(EXP):
+    r = Da.put(B + f"/api/account/import/{iid}?offset={off}", data=EXP[off:off + (1 << 20)], headers={"Content-Type": "application/octet-stream"})
+    check(r.ok, f"N4: piece at {off} {r.status_code}")
+    off += 1 << 20
+j = wait(Da, iid)
+check(j.get("state") == "preview", f"N4: the leftover bytes were cut, the file checks fine ({j.get('state')}: {j.get('error')})")
+Da.delete(B + f"/api/account/import/{iid}")
+
 # ---------------------------------------------------------------- attacks
 bad(Da, b"this is not a zip" * 100, "no ZIP")
 bad(Da, mkzip({"lists": []}, extra=[("../evil.txt", b"x")]), "path traversal")
