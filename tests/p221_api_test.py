@@ -347,8 +347,9 @@ check(r.ok and r.headers.get("X-Kalmido-Unknown-Fields") == "text", "web comment
 CID = r.json()["id"]
 r = A.post(B + f"/api/tasks/{WT}/comments", data={"body": "with file", "extra": "1"}, files={"file": ("a.txt", b"hi", "text/plain")})
 check(r.ok and r.headers.get("X-Kalmido-Unknown-Fields") == "extra", f"web comment form: header ({r.status_code})")
-r = A.patch(B + f"/api/comments/{CID}", json={"body": "edited", "mentions": []})
-check(r.ok and r.json()["body"] == "edited" and r.headers.get("X-Kalmido-Unknown-Fields") == "mentions", "web comment update: header")
+# 2.64.1 (#1817): "mentions" is a known field of a comment now (lists with a lock send the mentions beside the ciphertext)
+r = A.patch(B + f"/api/comments/{CID}", json={"body": "edited", "mood": 1})
+check(r.ok and r.json()["body"] == "edited" and r.headers.get("X-Kalmido-Unknown-Fields") == "mood", "web comment update: header")
 check("X-Kalmido-Unknown-Fields" not in A.post(B + f"/api/tasks/{WT}/comments", json={"body": "plain"}).headers, "web comment: known -> no header")
 
 # ================================================================== retention + switched off
