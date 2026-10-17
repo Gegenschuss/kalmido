@@ -159,7 +159,7 @@ function fci_checkHtml() {
     <label class="chkl"><input type="checkbox" data-fcc="on" ${k.on ? 'checked' : ''} ${ppl.length ? '' : 'disabled'}><span>${tr('Monthly task: check the actual state of the cash flow')}</span></label>
     ${k.on || ppl.length ? `<div class="row"><label for="fcc-user">${tr('Responsible person')}</label><select id="fcc-user" data-fcc="user">${k.user_id && !ppl.some(p => p.id === k.user_id) ? `<option value="${k.user_id}" selected>${esc(tr('Person without access'))}</option>` : ''}${ppl.map(p => `<option value="${p.id}" ${p.id === (k.user_id || S.me?.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>` : ''}
     ${k.lost ? `<p class="aerr" role="alert">${tr('The person responsible no longer has access to the cash flow. Please choose someone else.')}</p>` : ''}
-    <p class="muted ofchint">${tr('Due on the 1st of every month in the basket of the person, with a link to the cash flow and no amounts. Off: the task is ended, not deleted.')}</p></div>`;
+    <p class="muted ofchint">${tr('Due on the 1st of every month in the Basket of the person, with a link to the cash flow and no amounts. Off: the task is ended, not deleted.')}</p></div>`;
 }
 document.addEventListener('change', async e => {
   const t = e.target.closest?.('[data-fcc]'); if (!t || !RKF.check) return;
