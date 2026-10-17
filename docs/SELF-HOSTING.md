@@ -504,7 +504,8 @@ and download is written to the office log (who, when, size).
   manifest.
 - **Without `KALMIDO_SECRET_KEY`** the organisation data is not encrypted and the export is refused: set the server key
   first (see the section on the encryption of the organisation data).
-- **Import** of such an archive into another Kalmido follows in a later version.
+- **Import** (2.73, stage 1): see [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom) -- an admin of an
+  organisation on the other server uploads the archive under *Settings > Data* and opens it with the recovery key.
 
 ## Moving from and to app.kalmido.com
 
@@ -548,6 +549,17 @@ organisation data that is not yours (use the organisation export for a whole org
   `server_links` without their access keys).
 - `files/attachments/`, `files/list_files/`: the files (decrypted).
 - `checksum.sha256`: check the file with `sha256sum -c checksum.sha256` after unpacking.
+
+**A whole organisation** (2.73, stage 1): upload its organisation export (see above) the same way, as an admin of an
+organisation on the new server, and enter the organisation's recovery key of the old server. The archive is opened on
+the server (a wrong key is refused, ten attempts per upload), checked and shown as a preview; it goes into an
+organisation you administer, never into a private space. Lists with sections, fields, tags, status updates, links,
+milestones and project files, tasks with subtasks, dependencies and field values, comments, attachments (sealed with the
+new organisation's key), the organisation's calendars with events and its address books with contacts move along; the
+lists belong to you as the importing admin. Members are matched by e-mail address: a ticked person joins the
+organisation and gets their lists shared again. Not yet taken over (the preview names them with their counts): the
+office, the file store, team chat, knowledge pages, documents, newsletter, clients, absences and bookings, forms,
+playbooks, project notes and notepads, time entries and browser-encrypted notes.
 
 **Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the storage quota of the
 person (hosting) is checked before the upload and for every file during the import -- when it is full, the import stops
