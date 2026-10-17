@@ -530,6 +530,12 @@ def list_duplicate(lid):
     uid = me()
     if need_list(c, lid, write=False) == "participant":
         raise Denied(403, tr("Participants cannot duplicate the whole list"))
+    from ..collab.liste2eguard import le2b_list_locked, le2b_off
+    if le2b_list_locked(c, lid):  # 2.78.0 N35 (#476): the copy would be an unlocked list (like a template, 2.64.1 B)
+        return jsonify(error=le2b_off(), code="list_e2e"), 409
+    if c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id=? AND deleted_at IS NULL{'' if b.get('done') else ' AND status=0'}",
+                 (lid,)).fetchone()[0] > DUP_MAX_NODES:  # N35: refuse before building the whole copy in memory
+        return err(tr("List too large to duplicate (at most {0} tasks)", DUP_MAX_NODES))
     base = local_now().date()
     d = tpl_list_data(c, lid, uid, base, dup={"done": bool(b.get("done"))})
     if tpl_count(d) > DUP_MAX_NODES:

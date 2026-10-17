@@ -163,6 +163,13 @@ dbx("UPDATE lists SET org_id=NULL WHERE id=?", (Q,))
 A.post(B + "/api/tasks", json={"title": "Milk", "list_id": Q})
 r = A.post(B + f"/api/lists/{Q}/duplicate", json={})
 check(r.ok and dbx("SELECT org_id FROM lists WHERE id=?", (r.json().get("list_id"),))[0][0] is None, "a private list's copy is private")
+# N35 (#476): a list locked in the browser is never duplicated into an unlocked copy
+dbx("UPDATE lists SET e2e='on' WHERE id=?", (Q,))
+n0 = dbx("SELECT COUNT(*) FROM lists")[0][0]
+r = A.post(B + f"/api/lists/{Q}/duplicate", json={})
+check(r.status_code == 409 and r.json().get("code") == "list_e2e", f"locked list: 409 list_e2e {r.status_code} {r.text[:200]}")
+check(dbx("SELECT COUNT(*) FROM lists")[0][0] == n0, "locked list: no copy was made")
+dbx("UPDATE lists SET e2e=NULL WHERE id=?", (Q,))
 
 # ============================================================ 4. REST API
 tok = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "structure"], "expires_days": 30}).json().get("token")
