@@ -276,3 +276,15 @@ workspace).
 - The history of the task and the comment show "Rule <name>".
 - Health lists, the basket and locked lists have no rules. Copying a list or making a template does not copy its rules.
 - Agents read rules and can only propose one; the owner or an admin accepts it with 👍.
+
+## An own picture as the organisation's symbol (2.87.9)
+
+An organisation's symbol was an emoji only. Its admins can now use an own picture instead, like a profile picture:
+*Settings > Workspaces*, the organisation, *Symbol > Upload a picture…*; the picture is cropped square in the app and
+stored re-encoded without metadata. It shows wherever the emoji showed (the workspace switch, *Settings > Workspaces*,
+the server's organisation list for its members).
+
+- Only admins of the organisation set or remove it (*Remove the picture*); setting an emoji later replaces the picture.
+- Only members of the organisation get the picture; with organisation encryption it is stored sealed with the
+  organisation's key, and it is part of backups like the list icons.
+- People without an organisation have nothing to set here: their private space shows its own symbol.

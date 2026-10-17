@@ -715,6 +715,8 @@ ROUTES = {
     "GET /api/feeds": "own", "POST /api/feeds": "own", "DELETE /api/feeds/{}": "own", "POST /api/feeds/{}/restore": "own",
     "GET /api/feeds/items": "own", "POST /api/feeds/read": "own", "POST /api/feeds/items/{}/later": "own",
     "GET /api/feeds/opml": "own", "POST /api/feeds/opml": "own",
+    # 2.87.9 (#1913): an organisation's own symbol picture (its admins set / remove it, only its members get it; p287b_a_api_test.py)
+    "POST /api/orgs/{}/icon": "org", "DELETE /api/orgs/{}/icon": "org", "GET /api/org-icon/{}/{}.png": "org",
 }
 
 # ---- 1. every route is classified, nothing stale

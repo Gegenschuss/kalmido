@@ -319,6 +319,7 @@ ROUTES = {
     "PUT /api/office/cashflow/check": "office", "PUT /api/office/docs/{}/items": "office",
     "PUT /api/office/docs/{}/parts/{}/items": "office", "PUT /api/office/settings": "office", "PUT /api/paperless": "office",
     # ---- orgadmin (23)
+    "GET /api/org-icon/{}/{}.png": "orgadmin", "POST /api/orgs/{}/icon": "orgadmin", "DELETE /api/orgs/{}/icon": "orgadmin",  # 2.87.9 (#1913)
     "DELETE /api/admin/orgs/{}": "orgadmin", "DELETE /api/orgs/{}/export": "orgadmin",
     "DELETE /api/orgs/{}/lists/{}": "orgadmin", "DELETE /api/orgs/{}/lists/{}/icon": "orgadmin",
     "DELETE /api/orgs/{}/members/{}": "orgadmin", "GET /api/admin/orgs": "orgadmin", "GET /api/orgs/{}/encryption": "orgadmin",
