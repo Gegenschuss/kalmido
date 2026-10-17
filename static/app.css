@@ -7687,3 +7687,7 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+
+/* 2.67.0 B (#1865) dependency chain: the bars that move along while a timeline bar is dragged */
+.tl-bar.dch-ghost{opacity:.6;outline:.0625rem dashed var(--accent);outline-offset:.0625rem;transition:transform .15s ease-out,opacity .15s ease-out}
+@media (prefers-reduced-motion:reduce){.tl-bar.dch-ghost{transition:none}}

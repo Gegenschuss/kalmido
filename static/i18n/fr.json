@@ -8208,5 +8208,15 @@
   "Back to the whole chat": "Retour au chat complet",
   "Job has ended": "La tâche est terminée",
   "The job reads it after its next step.": "La tâche le lit après sa prochaine étape.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)",
+  "milestone": "jalon",
+  "without a date": "sans date",
+  "limit of 500 reached": "limite de 500 atteinte",
+  "{0} not moved": ["{0} non déplacée", "{0} non déplacées"],
+  "Pull the chain in": "Rapprocher la chaîne",
+  "{0} task pulled in": ["{0} tâche avancée", "{0} tâches avancées"],
+  "Nothing to pull in: the waiting tasks already follow right after it": "Rien à rapprocher : les tâches en attente suivent déjà juste après",
+  "The waiting tasks stay where they are": "Les tâches en attente restent où elles sont",
+  "The tasks waiting on this one move up to the day after it is due (the gaps between them stay)": "Les tâches qui attendent celle-ci avancent jusqu’au lendemain de son échéance (les écarts entre elles restent)",
+  "This task has no date": "Cette tâche n’a pas de date"
 }
