@@ -17,14 +17,23 @@ _CODE_RE = re.compile(r"^[A-Z]{2}$")
 _cache = {}
 
 
+def _pkc(name, *a):
+    """2.76.0 (#1023): office/catalog.py's view of the installed packs of the bound office area (None without the app, e.g.
+    tools/packs_catalog.py or a pure test loading this file alone: then only the shipped packs exist)."""
+    try:
+        from . import catalog
+    except ImportError:
+        return None
+    return getattr(catalog, name)(*a)
+
+
 def office_pack_codes():
     """The codes of the packs shipped with the app (upper case, sorted)."""
     out = []
     for f in sorted(os.listdir(PACK_DIR)) if os.path.isdir(PACK_DIR) else []:
         if f.endswith(".json") and _CODE_RE.match(f[:-5].upper()):
             out.append(f[:-5].upper())
-    from .catalog import pkc_codes  # 2.76.0 (#1023): + the packs installed in the bound office area
-    return sorted(set(out) | pkc_codes("country"))
+    return sorted(set(out) | (_pkc("pkc_codes", "country") or set()))  # 2.76.0 (#1023): + the installed packs
 
 
 def office_pack(code, builtin=False):
@@ -34,8 +43,7 @@ def office_pack(code, builtin=False):
     if not _CODE_RE.match(code):
         return None
     if not builtin:
-        from .catalog import pkc_installed
-        inst = pkc_installed("country", code)
+        inst = _pkc("pkc_installed", "country", code)
         if inst:
             return inst
     if code in _cache:
