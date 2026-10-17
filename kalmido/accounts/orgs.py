@@ -218,9 +218,17 @@ def need_visible(c, other):
         raise Denied(404, tr("unknown user"))
 
 
+def org_icon_fields(r, member=True):
+    """2.87.9 (#1913): {icon: the emoji ('' with an own picture), icon_url: the own picture ('' without; only for members)}."""
+    from .pictures import org_icon_tok, org_icon_url
+    v = r["icon"] or ""
+    return {"icon": "" if org_icon_tok(v) else v, "icon_url": org_icon_url(r["id"], v) if member else ""}
+
+
 def org_public(c, r, roles=True):
-    d = {"id": r["id"], "name": r["name"], "icon": r["icon"], "domains": r["domains"],  # 2.23.0 (#711): e-mail domains
+    d = {"id": r["id"], "name": r["name"], "domains": r["domains"],  # 2.23.0 (#711): e-mail domains
          "members": [x[0] for x in c.execute("SELECT user_id FROM org_members WHERE org_id=? ORDER BY user_id", (r["id"],))]}
+    d.update(org_icon_fields(r, member=g.get("user") is not None and g.user["id"] in d["members"]))  # 2.87.9 (#1913)
     if roles:  # 2.28.0 (#935): the organisation's admins
         d["admins"] = [x[0] for x in c.execute("SELECT user_id FROM org_members WHERE org_id=? AND role='admin' ORDER BY user_id", (r["id"],))]
     return d
@@ -240,7 +248,7 @@ def workspaces_for(c, uid):
         return []
     q = ",".join("?" * len(oids))
     # 2.53.0 B (#1474): + color (the organisation's colour, '' = the default tone of its id)
-    return [{"id": r["id"], "name": r["name"], "icon": r["icon"], "color": r["color"] or "", "role": org_role(c, uid, r["id"]) or "member"}
+    return [{"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "role": org_role(c, uid, r["id"]) or "member"}
             for r in c.execute(f"SELECT id, name, icon, color FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
 
 
@@ -478,6 +486,8 @@ def _clean_name(v):
 
 def _clean_icon(v):
     v = str(v or "").strip()
+    if v.startswith("u:"):  # 2.87.9 (#1913): an own picture is set only by its upload (POST /api/orgs/{id}/icon)
+        return ""
     return v[:8]
 
 
@@ -622,7 +632,12 @@ def _org_patch(c, oid, b):
     if "name" in b:
         c.execute("UPDATE orgs SET name=? WHERE id=?", (_clean_name(b["name"]), oid))
     if "icon" in b:
-        c.execute("UPDATE orgs SET icon=? WHERE id=?", (_clean_icon(b["icon"]), oid))
+        from .pictures import org_icon_drop_file, org_icon_tok
+        v = _clean_icon(b["icon"])
+        old = (c.execute("SELECT icon FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0] or ""
+        if v or not org_icon_tok(old):  # 2.87.9 (#1913): an empty symbol keeps the own picture (removed by DELETE .../icon)
+            c.execute("UPDATE orgs SET icon=? WHERE id=?", (v, oid))
+            org_icon_drop_file(oid, old)  # an emoji replaces the own picture
     if "domains" in b:
         c.execute("UPDATE orgs SET domains=? WHERE id=?", (_clean_domains(b["domains"]), oid))
 
@@ -657,10 +672,13 @@ def org_delete(oid):
         if before_org_delete(c, oid)[1]:  # 2.64.0 (#1864): a file that lives on could not be resealed: keep the key
             raise Denied(409, tr("Some files could not be encrypted again for their new place. Nothing was deleted; see the server log."))
         oc_drop_key(c, oid)
+        icon = (c.execute("SELECT icon FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
         c.execute("DELETE FROM orgs WHERE id=?", (oid,))
         bump(c)
         c.commit()
         oc_drop_office_dir(oid)
+        from .pictures import org_icon_drop_file
+        org_icon_drop_file(oid, icon)  # 2.87.9 (#1913)
         from ..core.serializers import unlink_files
         unlink_files(fs_files)
         return jsonify(ok=True)
@@ -700,7 +718,7 @@ def org_mine_dict(c, r, uid):
     from ..collab.comments import user_names
     mem = c.execute("SELECT m.user_id, m.role, u.kind, u.disabled FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY lower(u.display_name), u.id", (r["id"],)).fetchall()
     names = user_names(c, [m["user_id"] for m in mem])
-    return {"id": r["id"], "name": r["name"], "icon": r["icon"], "color": r["color"] or "", "domains": r["domains"],
+    return {"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "domains": r["domains"],  # 2.87.9 (#1913)
             "photo_meta_strip": bool(r["photo_meta_strip"]),  # 2.61.0 B (#1819)
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "member",
@@ -744,6 +762,79 @@ def org_mine_update(oid):
     bump(c)
     c.commit()
     return jsonify(org_mine_dict(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone(), me()))
+
+
+# ---------------------------------------------------------------- 2.87.9 (#1913): an own picture as the organisation's symbol
+@app.post("/api/orgs/<int:oid>/icon")
+def org_icon_upload(oid):
+    """multipart "file": an organisation admin sets an own picture (JPEG / PNG / WebP, up to AVATAR_MAX_MB MB, cropped square
+    in the app) as its symbol instead of the emoji. Re-encoded like a list icon (square PNG, no metadata), sealed with the
+    organisation's key; the old picture file goes."""
+    from flask import request
+    from ..core.orgcrypt import oc_write_file
+    from ..personal.timetrack import BadInput
+    from .pictures import AVATAR_MAX_MB, LIST_ICON_DIR, list_icon_process, org_icon_drop_file, org_icon_path
+    import secrets
+    c = db()
+    _need_org_admin(c, oid)
+    if instance_mode(c) != "workspaces":
+        _no_change()
+    f = request.files.get("file")
+    if not f:
+        return err(tr("No file"))
+    raw = f.read(AVATAR_MAX_MB * 1024 * 1024 + 1)
+    if len(raw) > AVATAR_MAX_MB * 1024 * 1024:
+        return err(tr("The picture is too large (at most {0} MB)", AVATAR_MAX_MB), 413)
+    try:
+        png = list_icon_process(raw)
+    except BadInput as e:
+        return err(str(e))
+    tok = secrets.token_urlsafe(12)
+    os.makedirs(LIST_ICON_DIR, exist_ok=True)
+    oc_write_file(c, oid, org_icon_path(oid, tok), png)
+    old = (c.execute("SELECT icon FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0] or ""
+    c.execute("UPDATE orgs SET icon=? WHERE id=?", ("u:" + tok, oid))  # as the colour in org_mine_update (its admin, checked above)
+    bump(c)
+    c.commit()
+    org_icon_drop_file(oid, old)
+    print("organisation", oid, "symbol picture set by", g.user["username"], flush=True)
+    return jsonify(org_mine_dict(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone(), me()))
+
+
+@app.delete("/api/orgs/<int:oid>/icon")
+def org_icon_delete(oid):
+    """An organisation admin removes the own picture (the symbol is empty again: the app shows its default)."""
+    from .pictures import org_icon_drop_file, org_icon_tok
+    c = db()
+    _need_org_admin(c, oid)
+    if instance_mode(c) != "workspaces":
+        _no_change()
+    old = (c.execute("SELECT icon FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0] or ""
+    if org_icon_tok(old):
+        c.execute("UPDATE orgs SET icon='' WHERE id=?", (oid,))
+        bump(c)
+        c.commit()
+        org_icon_drop_file(oid, old)
+    return jsonify(org_mine_dict(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone(), me()))
+
+
+@app.get("/api/org-icon/<int:oid>/<tok>.png")
+def org_icon_get(oid, tok):
+    """An organisation's own picture: only for its members (404 for everybody else, also a wrong / old token)."""
+    from ..core.orgcrypt import oc_send_file
+    from .pictures import org_icon_path
+    if g.get("user") is None:
+        raise Denied(401)
+    c = db()
+    r = c.execute("SELECT icon FROM orgs WHERE id=? AND personal_of IS NULL", (oid,)).fetchone()
+    if not r or r["icon"] != "u:" + tok or not re.fullmatch(r"[A-Za-z0-9_-]{8,40}", tok) or oid not in user_orgs(c, me()):
+        raise Denied(404)
+    p = org_icon_path(oid, tok)
+    if not os.path.isfile(p):
+        raise Denied(404)
+    rs = oc_send_file(c, p, mimetype="image/png", max_age=31536000)  # sealed -> decrypted in memory
+    rs.headers["Cache-Control"] = "private, max-age=31536000, immutable"
+    return rs
 
 
 @app.put("/api/orgs/<int:oid>/members")

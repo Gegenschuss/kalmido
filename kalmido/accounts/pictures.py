@@ -117,6 +117,33 @@ def list_icon_drop_file(lid, a):
             os.remove(list_icon_path(lid, a[2:]))
 
 
+# ---- 2.87.9 (#1913): an organisation's own picture as its symbol (instead of the emoji): orgs.icon = "u:<token>", the file
+# ATT_DIR/listicons/o<id>-<token>.png (made like a list icon; in backups with the list icons), sealed with the organisation's
+# key, served only to its members (/api/org-icon/<id>/<token>.png)
+ORG_ICON_RE = re.compile(r"u:([A-Za-z0-9_-]{8,40})")
+
+
+def org_icon_tok(v):
+    m = ORG_ICON_RE.fullmatch(v or "")
+    return m.group(1) if m else None
+
+
+def org_icon_url(oid, v):
+    t = org_icon_tok(v)
+    return f"/api/org-icon/{int(oid)}/{t}.png" if t else ""
+
+
+def org_icon_path(oid, tok):
+    return os.path.join(LIST_ICON_DIR, f"o{int(oid)}-{tok}.png")
+
+
+def org_icon_drop_file(oid, v):
+    t = org_icon_tok(v)
+    if t:
+        with contextlib.suppress(OSError):
+            os.remove(org_icon_path(oid, t))
+
+
 def list_icon_process(raw):
     """Upload bytes -> square PNG bytes (LIST_ICON_PX, alpha kept, no metadata). BadInput for anything that is not a picture."""
     from ..personal.timetrack import BadInput
