@@ -46,7 +46,7 @@ function cpnText(m, art) {
 // 2.82.0 (#1862): the conversation of the open pin / unpin Undo toast is no longer on screen: close the toast (it would hit
 // that conversation unseen). Checked after the bars are drawn, so a side chat window keeps its Undo
 function cpnUndoDrop() {
-  if (!CPN.undoK || document.querySelector(`[data-cpn="${CSS.escape(CPN.undoK)}"]`)) return;
+  if (!CPN.undoK || document.querySelector(`[data-cpn="${cssEsc(CPN.undoK)}"]`)) return;
   if (HIST.toastE === CPN.undoE) { HIST.toastE = null; $('#toast')?.classList.add('hidden'); }
   CPN.undoK = CPN.undoE = null;
 }
