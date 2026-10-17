@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.84.0** (2026-10-17): e-mails filed at clients and projects - own addresses, matching by sender, search, original
+  mail and attachments in the file store.
 - **2.83.0** (2026-10-17): themes (Paper, Night, Contrast) and header strips for lists and folders, progress rings;
   the organisation view hides the private areas; assigned tasks of organisation-wide lists without joining; agent colour
   on the person card for organisation admins; team rooms open in a split window from their header.

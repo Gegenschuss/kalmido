@@ -7,6 +7,21 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.84.0] - 2026-10-17
+
+E-mail inbox for clients and projects.
+
+### Added
+- Clients and projects: file e-mails at them. Every client and project has its own address, every person one inbox
+  address per workspace; mails to the inbox are matched by the sender (client e-mail, contact persons, linked contacts),
+  forwarded mails by their original sender, anything unclear waits under *Not assigned*. Filed mails are searchable on
+  the client card and the project page; the original mail and its attachments land in the file store under
+  *E-mails / client / date subject* and go through the usual upload checks. No mail client: nothing is sent or answered.
+  Needs the mail import (IMAP) of *Tasks by e-mail* (#1198).
+
+### Fixed
+- Tests: a tags overview check took the UTC date as today and failed at night (#1868).
+
 ## [2.83.0] - 2026-10-17
 
 Organisation view, list themes, team room.
