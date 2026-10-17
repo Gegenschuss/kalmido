@@ -24,6 +24,7 @@ addresses and paths to your setup.
 - [Mail](#mail)
 - [Documents: text recognition](#documents-text-recognition)
   - [Import from Paperless-ngx (2.48)](#import-from-paperless-ngx-248)
+- [Several servers in one app (2.73)](#several-servers-in-one-app-273)
 - [Moving to a new server](#moving-to-a-new-server)
 - [Production updates](#production-updates)
 
@@ -695,6 +696,31 @@ Setting up listmonk (version 4 or newer) for Kalmido:
 3. In Kalmido: *Contacts > More > Newsletter…*, service *listmonk*, its address (e.g. `https://listmonk.example.com`),
    the API user's name and the token.
 4. Mark the consent of your contacts (contact card > *Newsletter*), create a segment and press *Sync now*.
+
+## Several servers in one app (2.73)
+
+A person with accounts on more than one Kalmido server (for example a company server and a private one) can see them
+together in one app: *Settings > Account > Servers*. The data stays on each server; nothing is copied or synchronised,
+and no server needs to trust another one.
+
+- **How it works.** The server the app runs on (the "home" server) talks to the other server's `/api/v1` on the person's
+  behalf, with a personal API token of the person's account there. The browser only ever talks to its own server: no
+  CORS, no change of the Content Security Policy, no token in the browser. The token is stored sealed with a key derived
+  from `KALMIDO_SECRET_KEY` (without a server key the feature refuses to store one) and never leaves the server: not in
+  answers, logs or the account export. Nothing of the other server is stored either; answers are held in memory for at
+  most 15 seconds, at most 4 requests per person run at once, each with an 8-second limit and at most 8 MB.
+- **Connecting.** On the other server: *Settings > Account > Servers > Create a connection code for another server*. That
+  creates a personal API token with exactly the scopes `read`, `tasks:write`, `delete`, `calendar` and `comments` and
+  packs it with the server's `PUBLIC_URL` into a code that is shown once. Paste it on the home server. Instead of a code,
+  the address and a token made by hand work too (any Kalmido server with the REST API, the code button needs 2.73).
+  The token stays visible under *API tokens* on the other server and can be revoked there at any time.
+- **Network.** Every request goes through the same guard as calendar subscriptions: public addresses only, no
+  redirects, every resolved address is checked (no DNS rebinding). A **self-hosted** server may use `http://` and
+  reaches internal servers only when they are on the allow-list of internal hosts (*Settings > Administration > Advanced*,
+  or `KALMIDO_CALENDAR_ALLOW_HOSTS`). A **hosted** server (`KALMIDO_HOSTED=1`) connects to `https://` addresses only and
+  never to an internal one.
+- **Agents** see nothing of it: there is no `/api/v1` route, no MCP tool and no event for it; an agent only ever works on
+  its own server.
 
 ## Moving to a new server
 
