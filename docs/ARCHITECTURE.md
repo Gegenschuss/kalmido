@@ -172,6 +172,7 @@ The most used helpers:
 | `wiki/outline.py` | 2.49.0 (#1201): parses an outline (Markdown list, OPML, FreeMind `.mm`; no DOCTYPE / entities) for the mind map import; stores nothing. |
 | `collab/teamchat.py` | Team chat (rooms and direct messages). |
 | `collab/msgsearch.py` | 2.33.0: search in comments, team chat and agent chats; since 2.37.0 a trigram index (`pg_trgm`) on `kalmido_fold(body)` (unaccent + umlaut folding) per message table, visibility, snippets. |
+| `collab/liste2e.py` | 2.64.1 (#1817): the lock per list -- texts of a list encrypted in the browser with a list key. Helpers (`le2e_mode`, `le2e_parse`, ...), the routes `/api/lists/<id>/e2e` (info, start, todo, bulk, finish, stop, keys), the one write guard `le2e_guard` (in every web write of a task, comment, note, section and text field), moves only with re-encrypted texts, memberships without agents / participants. See *Lock per list* below. |
 | `collab/notelock.py` | 2.48.0 (#1642): a task's note locked with its owner's password (`task_note_locks`, ciphertext only, `tasks.content` emptied; only own unshared lists); `ln_guard` keeps every other write (app, API, agents, proposals, CalDAV) off a locked note; flags `note_locked` / `note_locked_mine`. |
 | `collab/e2e.py` | 2.42.0 (#828, #909): end-to-end encryption in the browser: the person's public key + wrapped key bundle (`e2e_keys`), the encrypted note of a task (`task_enc_notes`), encrypted task files (`attachments.enc`), the switch of an encrypted DM (`tchat_rooms.e2e`, `tchat_msgs.enc`). Stores ciphertext only; see *End-to-end encryption* below. |
 | `collab/chatsave.py` | 2.37.0 (#1159): a chat message (agent chat, team chat) saved as a task by a person: text, file copies, link back (`#msg/...`); `chat_saves` per person, `saved_task_id` in the chat pages. 2.42.0 (#1383): also an agent's comment on a task (kind `comment`: a subtask of the task or a new task in its list). |
@@ -508,4 +509,30 @@ sent only after a confirmation. Replacing or removing one's keys asks for the ac
 **Limits.** This protects against the server operator, a reader of the database and the backups. A web app cannot
 protect against a changed script delivered by the server itself. Encrypted DMs have no forward secrecy (a static key
 pair per person): whoever gets the keys later can read older messages too. A task copy does not take the note along.
+
+### Lock per list (2.64.1, server side)
+
+A list with the lock (`lists.e2e` = `encrypting` | `on` | `decrypting`) keeps its texts as ciphertexts in the usual columns:
+`"e2e1:" + {"v": 1, "g": <generation>, "iv", "ct"}` in `tasks.title / content / url`, `tasks.snippets` (as one JSON string),
+`comments.body`, `notes.title / body`, `sections.name` and text values of custom fields (other field types stay readable).
+The browser encrypts with a random list key per generation (AES-256-GCM, AAD `kalmido-list:v1:<list>:<gen>:<field>`, texts
+padded to 64-byte steps) and wraps that key for every member with ECDH between the two people's key pairs
+(`list_keys`: wrapped key, who wrapped it, the wrapper's public key as the server knows it). The server checks shapes only.
+
+- **Switching on**: owner or list admin with their own keys; nothing may block (an agent in the list, a public link,
+  "Everyone in the organisation", the role participant directly / via a group / via a folder share, locked notes, notepads
+  with text). `start` stores one wrapped key per person with encryption set up; the others wait on `list_key_pending`.
+  `todo` / `bulk` (at most 200 values a call, no history, one live update) rewrite every text incl. the trash; `finish`
+  turns the lock on once nothing plain is left and removes copies of the texts elsewhere. The way back (`stop`) is the
+  owner's, with the account password, and runs the same way the other direction; at its end the keys are deleted.
+- **Writing**: `le2e_guard` lets only people in the web app write ciphertexts of a known generation into a list with the
+  lock (plain text: 409 `list_e2e`; agents and API tokens: 403); during a switch texts wait (409 `list_e2e_busy`);
+  ciphertexts never go into an open list (400). Moving a task (with its subtasks, comments and text fields) or a note into
+  or out of such a list needs the texts re-encrypted by the browser in the same request (`le2e_move`), else 409
+  `list_e2e_move`. Notepads and the note of "Waiting on external" are not encrypted and therefore not available there.
+- **Members**: the database trigger `list_e2e_members` puts every new member without a key on the waiting list (also from
+  groups and folder shares), drops the keys of a member who leaves and marks the rotation as pending (`e2e_rotate`; the
+  rotation itself comes later), and refuses agents and participants (the app answers before with a clear text). Owners and
+  list admins hand out keys from the waiting list (`/e2e/keys`, the server stores the wrapper's public key itself and tells
+  the recipient). A new owner must hold the key.
 
