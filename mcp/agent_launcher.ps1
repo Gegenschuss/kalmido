@@ -73,6 +73,7 @@ if ($env:KALMIDO_EVENTS -eq '1') { $Events = $true }
 # kalmido-capability: job_names (2.59.0: a name per job, part jobs name their leader; mcp/agent_job.py)
 # kalmido-capability: layout_answer (2.55.0: the answer to an arrangement proposal, in mcp/agent_run.py)
 # kalmido-capability: job_message (2.56.0: a message to a job from its card, in mcp/agent_run.py)
+# kalmido-capability: contract_notice (2.70.0: a contract's notice deadline -> ONE propose_contract_notice, in mcp/agent_run.py)
 # (2.44.0: agent_run.py; perm_relay and session_resume only when COMMAND is Claude Code)
 # (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)
 if ($Events) {

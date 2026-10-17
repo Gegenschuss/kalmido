@@ -1213,3 +1213,13 @@ agents get no pushes and never mark people urgent.
 - Setting `tbl_accept` (`"1"` default, `"0"` = urgency set by others counts as *As the list*; it stays visible on the task).
 - The task history gets a line `bell` for urgency set for others (`{level, until, n}`, a count, no names) and when a person
   switches off an urgency someone else set (`{level, self: 1}`).
+
+## Contracts: notice deadlines for agents (2.70.0)
+
+| Endpoint | Scope | Notes |
+|---|---|---|
+| `POST /agent/proposals` `{kind: "notice", task_id, text}` | write | agent tokens only; after the event `contract_notice` for that contract's current deadline (else `409`), a contract the agent cannot see `404`; `text` one sentence, at most 300 characters; 201 = a ready proposal job (kind `notice`) for the person whose contract it is |
+
+Accepting is a click of the person (`POST /api/proposals/{id}/apply`, optionally `remind: true` = also a reminder 3 days
+before the last day to cancel): a comment on the contract task as that person, one undo step (`POST /api/proposals/{id}/undo`).
+OpenAPI: the third body variant of `POST /agent/proposals` (`x-kalmido-scope` write). Nothing is cancelled or sent.
