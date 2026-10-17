@@ -337,14 +337,15 @@ def fci_task_new(c, person):
     return tid
 
 
-def fci_task_end(c, tid):
-    """Ends the task: the repeat removed and done (never deleted)."""
+def fci_task_end(c, tid, person):
+    """Ends the task: the repeat removed and done (never deleted). Only the task this setting made: the person's own and
+    assigned to them (a stored id never reaches another task)."""
     from ..tasks.validation import log_act
-    if not tid:
+    if not tid or not person:
         return
     ts = iso(now_utc())
-    if c.execute("UPDATE tasks SET repeat='', status=2, completed_at=?, updated_at=? WHERE id=? AND status=0 AND deleted_at IS NULL",
-                 (ts, ts, tid)).rowcount:
+    if c.execute("UPDATE tasks SET repeat='', status=2, completed_at=?, updated_at=? WHERE id=? AND created_by=? AND assignee_id=? AND status=0 "
+                 "AND deleted_at IS NULL", (ts, ts, tid, person, person)).rowcount:
         log_act(c, tid, "complete")
 
 
@@ -379,11 +380,11 @@ def fci_check_put():
         if isinstance(person, bool) or not isinstance(person, int) or person not in {p["id"] for p in fci_people(c, oid)}:
             raise BadInput(tr("This person does not see the cash flow of this office"))
         if not (s.get("cf_check") and s.get("cf_check_user") == person and s.get("cf_check_task")):
-            fci_task_end(c, s.get("cf_check_task"))
+            fci_task_end(c, s.get("cf_check_task"), s.get("cf_check_user"))
             s["cf_check_task"] = fci_task_new(c, person)
         s.update(cf_check=1, cf_check_user=person)
     else:
-        fci_task_end(c, s.get("cf_check_task"))
+        fci_task_end(c, s.get("cf_check_task"), s.get("cf_check_user"))
         s.update(cf_check=0, cf_check_task=None)
     office_settings_save(c, oid, s)
     ofx_log(c, oid, "update", target="settings", detail={"cf_check": int(on), "cf_check_user": s.get("cf_check_user")})
