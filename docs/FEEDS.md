@@ -3,6 +3,8 @@
 *Since 2.85.0.* A simple feed reader, part of the area **Home**: follow blogs and news sites and read their new articles
 in one list. Switch it on under *Settings > Modules > Home > Feeds* (off by default).
 
+![Feeds on the phone: one unread article with Open, Read later and Read, one saved article](feeds.png)
+
 ## Following a feed
 
 - Open **Feeds** (a tab of the area Home) and paste the address of a feed (RSS 2.0, Atom or RSS 1.0), e.g.
