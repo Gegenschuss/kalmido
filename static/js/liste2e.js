@@ -11,7 +11,7 @@
 // bad: ciphers that did not open; changed: user id -> the new key id of a person whose key differs from the remembered one;
 // objs: WeakRefs of every object that carries ciphers (_enc), to fill in after a decryption and to wipe on lock
 const LE2E = {on: new Set(), sig: {}, keys: {}, info: {}, infoP: {}, tried: {}, memo: new Map(), rev: new Map(), q: new Map(), bad: new Set(),
-  changed: {}, objs: new Set(), kickT: 0, draining: false, again: false, busy: {}, got: new Map(), badL: new Map(),
+  changed: {}, unread: {}, fresh: new Set(), objs: new Set(), kickT: 0, draining: false, again: false, busy: {}, got: new Map(), badL: new Map(),
   rot: {}, gens: {}, autoT: 0};  // 2.64.2 A (#1817): rot = list id -> the state the automatic key change last handled, gens = generation seen
 const LE2E_PRE = 'e2e1:';
 // the props that carry a cipher -> the field names of their AAD (tried in order: a task title and a note title share "title")
@@ -108,7 +108,7 @@ const le2eFp = pub => pub ? pub.x + '.' + pub.y : '';
 function le2eSeenOk(uid, pub) {
   if (!pub) return false;
   const k = `e2eSeen:${S.me.id}:${uid}`, fp = le2eFp(pub), seen = LS.get(k, '');
-  if (!seen) { LS.set(k, fp); return true; }
+  if (!seen) { LS.set(k, fp); LE2E.fresh.add(uid); return true; }  // 2.64.2 review (M1): first seen in this page
   if (seen === fp) { delete LE2E.changed[uid]; return true; }
   LE2E.changed[uid] = fp;
   return false;
@@ -219,7 +219,7 @@ async function le2eRelease(lid, userIds) {
 // A new list key of generation gen+1, wrapped for everyone holding the current one -- H4: only for people whose public key
 // matches the remembered one (the others wait for a release). The server accepts only gen+1 (409 list_e2e_gen: someone else
 // was faster -- reload, do not rotate again). Then the background re-encryption runs (le2eReenc).
-async function le2eRotate(lid) {
+async function le2eRotate(lid, byHand) {
   if (!await e2eEnsure()) return false;
   if (E2E.badPub) throw le2eErr(tr('Your public key on the server does not match your keys. Encrypted messages are blocked.'), 'list_e2e_badpub');
   const info = await le2eInfo(lid, true);
@@ -227,9 +227,12 @@ async function le2eRotate(lid) {
   const cur = info.gen, gen = cur + 1;
   if (!(info.keys || []).some(k => k.gen === cur)) throw le2eErr(tr('You do not have the key of this list yet.'), 'list_e2e_key');
   await le2eKeys(lid, true);  // every older generation stays needed for the texts not re-encrypted yet
+  const people = (info.members || []).filter(m => m.has_keys && m.kind !== 'agent' && (m.key_gens || []).includes(cur));
+  // 2.64.2 review (M1): the automatic change does not wrap for a key this device sees for the first time in this page (trust on
+  // first use without any look at it): it waits for the button "Change the key now" in the list dialog
+  if (!byHand && people.some(m => m.user_id !== S.me.id && LE2E.fresh.has(m.user_id))) return false;
   const raw = e2eRand(32), keys = [];
   try {
-    const people = (info.members || []).filter(m => m.has_keys && m.kind !== 'agent' && (m.key_gens || []).includes(cur));
     if (!people.some(m => m.user_id === S.me.id)) people.unshift({user_id: S.me.id});
     for (const m of people) {
       let pub;
@@ -270,7 +273,7 @@ function le2eRotAuto() {
         if (l.e2e_rotate > 0 && !await le2eRotate(l.id)) { LE2E.rot[l.id] = 'x' + tag; continue; }
         const info = await le2eInfo(l.id, true);
         if (info.mode === 'on' && info.can_manage && le2eLeft(info.left) > 0) await le2eReenc(l.id);
-      } catch (e) { console.warn('le2e: key change', e?.message); }
+      } catch (e) { console.warn('le2e: key change', e?.message); if (e?.code === 'list_e2e_unreadable') le2eChange(l.id); }
     }
   }, 0);
 }
@@ -757,7 +760,7 @@ async function le2eConv(lid, mode, gen, p, f, v) {
   if (mode === 'on' && le2eIs(v)) return le2eEnc(lid, f, await le2eDec(lid, f, v), true);
   return le2eEnc(lid, f, p === 'snippets' ? le2eSnipStr(v) : String(v), true);
 }
-async function le2eMigrate(lid, onProgress) {
+async function le2eMigrate(lid, onProgress, opts = {}) {
   if (LE2E.busy[lid]) return LE2E.busy[lid];
   const run = (async () => {
     let total = null, last = -1, blank = false, spins = 0, kind = null, reenc = 0;
@@ -791,7 +794,7 @@ async function le2eMigrate(lid, onProgress) {
             try { v = await le2eConv(lid, mode, gen, p, f, v); }
             catch (e) {
               if (e?.code === 'list_e2e_locked') throw e;
-              if (mode !== 'decrypting' || !blank) { bad.add(k); continue; }  // M4: kept back, or taken over as empty
+              if (mode === 'encrypting' || !blank) { bad.add(k); continue; }  // M4: kept back, or taken over as empty (2.64.2: also re-encrypting)
               v = p === 'snippets' ? [] : '';
             }
             o[p] = v; n++;
@@ -812,6 +815,12 @@ async function le2eMigrate(lid, onProgress) {
       }
       if (msgs.length) out.msgs = msgs;
       if (!Object.keys(out).length && !made) {
+        if (mode === 'on' && bad.size && !blank && opts.ask) {  // 2.64.2 review (M3): the same choice after a key change (by hand)
+          const yes = typeof askConfirm === 'function' && await askConfirm(tr('Texts that cannot be decrypted'),
+            tr('{0} texts of this list cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
+          if (yes) { blank = true; last = -1; continue; }
+        }
+        if (mode === 'on' && bad.size) { LE2E.unread[lid] = bad.size; le2eChange(lid); }  // shown in the key change hint (liste2eui.js)
         if (mode === 'decrypting' && bad.size && !blank) {
           // M4: only texts no key here opens are left (a broken or foreign cipher): the owner decides, else the way back stops here
           const yes = typeof askConfirm === 'function' && await askConfirm(tr('Texts that cannot be decrypted'),
@@ -828,7 +837,7 @@ async function le2eMigrate(lid, onProgress) {
     }
     if (kind !== 'reenc' || reenc) await rawFetch('POST', `/api/lists/${lid}/e2e/finish`);  // 2.64.2 A: only a key change has one
     delete LE2E.info[lid];
-    if (kind === 'reenc') { const l = listById(lid); if (l) l.e2e_reenc = 0; }  // the live update brings the new ciphers
+    if (kind === 'reenc') { const l = listById(lid); if (l) l.e2e_reenc = 0; delete LE2E.unread[lid]; }  // the live update brings the new ciphers
     else { await load(); render(); }
     le2eChange(lid);
     return true;
@@ -838,12 +847,12 @@ async function le2eMigrate(lid, onProgress) {
 }
 // 2.64.2 A (#1817): the background re-encryption of a list in 'on' (after a key change; files / messages of a list locked
 // before 2.64.2): resumable like switching on -- an open tab continues it, a closed one leaves it for the next start
-async function le2eReenc(lid, onProgress) {
+async function le2eReenc(lid, onProgress, opts) {
   if (le2eMode(lid) !== 'on') return false;
   if (!await e2eEnsure()) return false;
   await le2eKeys(lid, true);
   if (!le2eReady(lid)) throw le2eErrLocked();
-  return le2eMigrate(lid, onProgress);
+  return le2eMigrate(lid, onProgress, opts);  // opts.ask: by hand -- unreadable texts may be taken over as empty
 }
 async function le2eStart(lid, onProgress) {
   if (!await e2eEnsure()) return false;

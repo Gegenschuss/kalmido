@@ -228,8 +228,8 @@ def le2f_convert(lid, aid):
             rel, size = _le2f_plain_store(c, a["task_id"], f, name, saved)
         except ValueError as e:
             return err(str(e))
-        c.execute("UPDATE attachments SET name=?, mime=?, size=?, path=?, enc=0, enc_by=NULL, e2e_gen=0 WHERE id=?",
-                  (name, mime, size, rel, aid))
+        n = c.execute("UPDATE attachments SET name=?, mime=?, size=?, path=?, enc=0, enc_by=NULL, e2e_gen=0 WHERE id=? AND path IS NOT DISTINCT FROM ? "
+                      "AND enc=? AND e2e_gen=?", (name, mime, size, rel, aid, a["path"], a["enc"], a["e2e_gen"])).rowcount
     else:
         if not le2f_name_ok(name, gen):
             return err(tr("Invalid value: {0}", "name"))
@@ -238,8 +238,13 @@ def le2f_convert(lid, aid):
         except ValueError as e:
             unlink_files(saved)
             return err(str(e))
-        c.execute("UPDATE attachments SET name=?, mime='application/octet-stream', size=?, path=?, enc=2, enc_by=NULL, e2e_gen=? "
-                  "WHERE id=?", (name, size, rel, gen, aid))
+        n = c.execute("UPDATE attachments SET name=?, mime='application/octet-stream', size=?, path=?, enc=2, enc_by=NULL, e2e_gen=? "
+                      "WHERE id=? AND path IS NOT DISTINCT FROM ? AND enc=? AND e2e_gen=?",
+                      (name, size, rel, gen, aid, a["path"], a["enc"], a["e2e_gen"])).rowcount
+    if not n:  # 2.64.2 review (L1): another browser converted it meanwhile -- keep theirs, drop this copy
+        c.rollback()
+        unlink_files([rel])
+        return err(tr("Nothing to do"), 409)
     bump(c)
     c.commit()
     if a["path"] and a["path"] != rel:

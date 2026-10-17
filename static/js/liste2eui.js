@@ -160,13 +160,17 @@ const le2u_ruleHtml = () => `<p class="shint lhint keep le2uexp">${esc(tr('End-t
 // After a member left, the key changes (rotation) and the older contents are encrypted again in the background; until that is
 // done the honest hint stays, with the progress and, for the owner / a list admin, the button to change the key or to continue.
 const le2u_rotBusy = j => !!j && (j.rotate > 0 || j.reenc > 0);
+const le2u_unread = lid => (typeof LE2E === 'object' && LE2E.unread?.[lid]) || 0;
 function le2u_rotHint(j, lid) {
   if (!le2u_rotBusy(j)) return '';
   const r = LE2U.rot[lid], run = !!r;
   const btn = !j.can_manage || run ? '' : j.rotate > 0 ? (le2u_fn('le2eRotate') ? `<button type="button" class="btn sm" data-le2rot="rotate" data-lid="${lid}">${esc(tr('Change the key now'))}</button>` : '')
     : le2u_fn('le2eReenc') ? `<button type="button" class="btn sm" data-le2rot="reenc" data-lid="${lid}">${esc(tr('Continue'))}</button>` : '';
   return `<div class="shint lhint keep le2urot" data-lid="${lid}">${ic('alert', 's')} <span>${esc(tr('A member has left this list. The key is being changed; until everything is encrypted again, former members can still decrypt older contents with their old key.'))}</span>`
-    + (run ? `<span class="le2urotp">${le2u_pbar(r)}</span>` : '') + (btn ? `<span class="row">${btn}</span>` : '') + '</div>';
+    + (run ? `<span class="le2urotp">${le2u_pbar(r)}</span>` : '')
+    // 2.64.2 review (M3): texts no key here opens stop the run -- said here, the owner / an admin can take them over as empty
+    + (!run && le2u_unread(lid) ? `<span class="e2ewarn" role="alert">${esc(tr('{0} texts of this list cannot be decrypted with the keys you hold.', le2u_unread(lid)))}</span>` : '')
+    + (btn ? `<span class="row">${btn}</span>` : '') + '</div>';
 }
 document.addEventListener('le2e:progress', e => {
   const d = e.detail || {}; if (!d.lid || d.kind !== 'reenc') return;
@@ -182,7 +186,7 @@ document.addEventListener('click', async e => {
   b.disabled = true; LE2U.rot[lid] = {done: 0, total: 0};
   try {
     if (a === 'rotate') await le2eRotate(lid, true);
-    else await le2eReenc(lid, () => {});
+    else await le2eReenc(lid, () => {}, {ask: true});  // by hand: unreadable texts may be taken over as empty (review M3)
   } catch (x) { if (x?.message) toast(x.message); } finally { delete LE2U.rot[lid]; }
   try { await load(); } catch { /* next sync */ }
   render(); le2u_listRedraw(lid);

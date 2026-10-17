@@ -200,7 +200,15 @@ def le2e_guard(c, lid, values, source="app", cur=None):
         raise LE2EDenied("list_e2e", 403)
     if not all(le2a_value_ok(v, gen) for v in vals.values()):
         raise LE2EDenied("list_e2e")
+    if any((le2e_parse(v) or {}).get("g", gen) < gen for v in vals.values() if v):
+        le2a_reenc_again(c, lid)
     return None
+
+
+def le2a_reenc_again(c, lid):
+    """2.64.2 review (M2): a ciphertext of an older generation arrived after a key change (a tab that was not reloaded):
+    the re-encryption is due again -- the honest hint comes back and the next owner / list admin's browser cleans it up."""
+    c.execute("UPDATE lists SET e2e_reenc=e2e_gen WHERE id=? AND e2e='on' AND e2e_reenc=0 AND e2e_gen>1", (lid,))
 
 
 def le2a_snip_cipher(raw):

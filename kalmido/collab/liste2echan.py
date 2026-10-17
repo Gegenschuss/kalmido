@@ -10,7 +10,7 @@ import json
 from ..core.db import err
 from ..core.i18n import tr
 from .e2e import E2E_MSG_MAX, E2E_B64, e2e_msg_parse
-from .liste2e import le2a_gen, le2e_writer_ok
+from .liste2e import le2a_gen, le2a_reenc_again, le2e_writer_ok
 
 
 def le2c_blob(v, gen):
@@ -62,6 +62,8 @@ def le2c_check(c, r, b):
     if not le2e_writer_ok() or (isinstance(b.get("body"), str) and b["body"].strip()):
         return _le2c_refuse()
     enc = le2c_blob(b.get("enc"), gen)
+    if enc and json.loads(enc)["g"] < gen:  # 2.64.2 review (M2): an older generation after a key change: re-encrypt again
+        le2a_reenc_again(c, r["list_id"])
     return enc or err(tr("Invalid value: {0}", "enc"))
 
 
@@ -88,6 +90,8 @@ def le2c_edit(c, r, m, b):
     if (e2e_msg_parse(m["enc"]) or {}).get("sys") or not le2e_writer_ok() or (isinstance(b.get("body"), str) and b["body"].strip()):
         return None, _le2c_refuse()
     enc = le2c_blob(b.get("enc"), gen)
+    if enc and json.loads(enc)["g"] < gen:  # 2.64.2 review (M2)
+        le2a_reenc_again(c, r["list_id"])
     return (enc, None) if enc else (None, err(tr("Invalid value: {0}", "enc")))
 
 
@@ -130,17 +134,23 @@ def _le2c_todo(row, mode, gen):
 def le2c_left(c, lid, mode, gen, limit=None):
     """The channel messages of list lid not yet in the target format: ([{id, room_id, user_id, body, enc}], count).
     mode encrypting = plain messages; on = ciphertexts of an older generation than gen (and plain leftovers);
-    decrypting = every ciphertext of the list key. gen = lists.e2e_gen (the target generation)."""
+    decrypting = every ciphertext of the list key. gen = lists.e2e_gen (the target generation).
+    2.64.2 review (M4): chosen and counted in SQL (a long channel is not read into Python on every call)."""
     rooms = _le2c_rooms(c, lid)
     if not rooms:
         return [], 0
     q = ",".join("?" * len(rooms))
-    rows = c.execute(f"SELECT id, room_id, user_id, body, enc, deleted_at FROM tchat_msgs WHERE room_id IN ({q}) AND deleted_at IS NULL "
-                     "AND (enc IS NOT NULL OR body<>'') ORDER BY id", rooms).fetchall()
-    todo = [r for r in rows if _le2c_todo(r, mode, gen)]
-    out = [{"id": r["id"], "room_id": r["room_id"], "user_id": r["user_id"], "body": r["body"] if not r["enc"] else "",
-            "enc": e2e_msg_parse(r["enc"]) if r["enc"] else None} for r in todo[:limit if limit is not None else len(todo)]]
-    return out, len(todo)
+    plain = "(enc IS NULL AND body<>'')"
+    g = "(enc::jsonb->>'g')::bigint"  # NULL for a notice {sys} (enc is always JSON written by the server)
+    cond, args = {"encrypting": (plain, []), "decrypting": (f"(enc IS NOT NULL AND {g} IS NOT NULL)", []),
+                  "on": (f"({plain} OR (enc IS NOT NULL AND {g} < ?))", [gen])}[mode]
+    base = f"FROM tchat_msgs WHERE room_id IN ({q}) AND deleted_at IS NULL AND {cond}"
+    n = c.execute(f"SELECT COUNT(*) {base}", (*rooms, *args)).fetchone()[0]
+    if not limit or not n:
+        return [], n
+    rows = c.execute(f"SELECT id, room_id, user_id, body, enc {base} ORDER BY id LIMIT ?", (*rooms, *args, limit)).fetchall()
+    return [{"id": r["id"], "room_id": r["room_id"], "user_id": r["user_id"], "body": r["body"] if not r["enc"] else "",
+             "enc": e2e_msg_parse(r["enc"]) if r["enc"] else None} for r in rows], n
 
 
 def le2c_bulk(c, lid, mode, gen, rows):
