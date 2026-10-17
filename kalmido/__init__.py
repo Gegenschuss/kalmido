@@ -187,6 +187,8 @@ ORDER = (
     "agents.agenttime",  # 2.51.0 C (#1353): agents check time tracking + propose entries from events
     "agents.lyprop",  # 2.55.0 B (#1066): agents propose arrangements of views (the person accepts)
     "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
+    "admin.acctexport",  # 2.73.0 B (#1473): account export (moving between servers, GDPR copy)
+    "admin.acctimport",  # 2.73.0 B (#1473): account import with the mapping of people
     "admin.orgcrypt_cli",  # 2.42.0 (#828): the organisation keys' start-up pass + command line (no routes)
     "docs.extract",  # 2.48.0 (#1111): date / due date / amount from a text (no routes, standard library only)
     "docs.rules",  # 2.48.0 (#1111): sorting rules (no routes)

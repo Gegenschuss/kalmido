@@ -426,6 +426,12 @@ ROUTES = {
     "POST /api/calendars/{}/events": "own", "PATCH /api/calendars/{}/events": "own", "DELETE /api/calendars/{}/events": "own",
     "POST /api/calendars/{}/events/restore": "own", "POST /api/calendars/{}/write": "own", "POST /api/import/ticktick": "own", "POST /api/import/{}": "own",
     "POST /api/imports/{}/undo": "own", "GET /api/imports": "own", "GET /api/me/mail": "own",
+    # 2.73.0 B (#1473): the account export / import: the person's own files (a folder per person, another person's id = 404);
+    # the import's target organisation needs its admin (p273_b_api_test.py)
+    "GET /api/account/export": "own", "POST /api/account/export": "own", "DELETE /api/account/export": "own",
+    "GET /api/account/export/file": "own", "GET /api/account/import": "own", "POST /api/account/import": "own",
+    "GET /api/account/import/{}": "own", "PUT /api/account/import/{}": "own", "DELETE /api/account/import/{}": "own",
+    "POST /api/account/import/{}/run": "own",
     "POST /api/me/mail/token": "own", "DELETE /api/me/mail/token": "own", "POST /api/me/mail/test": "own",
     "GET /api/v1/life": "own", "GET /api/v1/life/upkeep-presets": "own",
     "POST /api/v1/life/contracts": "own", "POST /api/v1/life/devices": "own", "POST /api/v1/life/upkeep": "own",

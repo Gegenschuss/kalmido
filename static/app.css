@@ -7687,3 +7687,14 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+/* 2.73.0 B (#1473) move and export everything (Settings > Data, move.js) */
+.umzbar { display: grid; gap: .3rem; margin: .5rem 0; }
+.umzbar progress { width: 100%; height: .5rem; accent-color: var(--accent); }
+.umzcnt { margin: .35rem 0; line-height: 1.5; }
+.umzlists { max-height: 14rem; overflow: auto; margin: .35rem 0; }
+.umzp { align-items: center; gap: .5rem; }
+.umzck { display: inline-flex; align-items: center; gap: .4rem; min-height: 2.75rem; white-space: nowrap; }
+.umzhow { margin: .5rem 0 1rem; }
+.umzhow summary { cursor: pointer; min-height: 2.75rem; display: flex; align-items: center; }
+.umzsteps { margin: .25rem 0 0 1.25rem; padding: 0; line-height: 1.5; }
+@media (max-width: 40rem) { .umzp { flex-wrap: wrap; } }
