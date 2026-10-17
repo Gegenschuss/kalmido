@@ -207,6 +207,9 @@ APP_TO_API = {
     "POST /api/files/folders": ["POST /files"], "POST /api/files/upload": ["POST /files"], "POST /api/files/nodes/{}/versions": ["POST /files/{}/versions"],
     # 2.48.0 (#1111): documents (agents read / set the fields of documents shared with them)
     "GET /api/docs": ["GET /documents"], "GET /api/docs/{}": ["GET /documents/{}"], "PATCH /api/docs/{}": ["PATCH /documents/{}"],
+    # 2.71.0 (#1459): a task in several lists; the place in a further list = linking again with the section
+    "POST /api/tasks/{}/links": ["POST /tasks/{}/links"], "DELETE /api/tasks/{}/links/{}": ["DELETE /tasks/{}/links/{}"],
+    "PATCH /api/tasks/{}/links/{}": ["POST /tasks/{}/links"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [

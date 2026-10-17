@@ -105,6 +105,10 @@ KINDS = {
     # 2.50.0 A (#1195, #1194): absences and bookings of an organisation / a personal area (row-level security + the app)
     "hub": ("matrix", "p250_a_api_test.py: absences and bookings by id of another organisation 404 (read, change, delete, restore), "
                       "the kind of an absence only for the person and the admins, resources of another organisation cannot be booked"),
+    # 2.71.0 B (#1459): a task shown in further lists (task_links); rights stay with the task's own list
+    "tasklink": ("matrix", "p271_b_api_test.py: linking into a list of another organisation / private <-> organisation refused, "
+                           "a reader of only the further list gets the task nowhere (state, search, feed, public link, agent), "
+                           "\"also\" names only visible lists"),
 }
 
 ROUTES = {
@@ -593,6 +597,9 @@ ROUTES = {
     "GET /api/newsletter": "newsletter", "PUT /api/newsletter": "newsletter", "DELETE /api/newsletter": "newsletter",
     "GET /api/newsletter/lists": "newsletter", "POST /api/newsletter/segments": "newsletter", "PATCH /api/newsletter/segments/{}": "newsletter",
     "DELETE /api/newsletter/segments/{}": "newsletter", "POST /api/newsletter/sync": "newsletter", "PUT /api/newsletter/consent": "newsletter",
+    # 2.71.0 B (#1459)
+    "POST /api/tasks/{}/links": "tasklink", "DELETE /api/tasks/{}/links/{}": "tasklink", "PATCH /api/tasks/{}/links/{}": "tasklink",
+    "POST /api/v1/tasks/{}/links": "tasklink", "DELETE /api/v1/tasks/{}/links/{}": "tasklink",
 }
 
 # ---- 1. every route is classified, nothing stale
