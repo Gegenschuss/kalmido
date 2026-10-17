@@ -145,6 +145,7 @@ function renderKeepField(sel, fn) {
   if (f) { n.focus(); try { n.setSelectionRange(a, b); } catch { /* not a text field */ } }
 }
 async function submitQuick(input, extra = {}) {
+  if (!Object.keys(extra).length && await msvvQuick(input)) return;  // 2.73.0 C (#661): the target is another server
   const cap = input.id === 'qsheet' && S.quickPreset.capture;  // 2.4.0 (#187): a capture ignores the view (inbox unless ~list)
   const d = {...(cap ? {} : quickDefaults()), ...(input.id === 'qsheet' ? S.quickPreset : {}), ...extra};
   const pasted = S.qfiles?.[input.id] || [];  // 2.22.0 (#678): images pasted into the box
@@ -212,6 +213,7 @@ function openQuickSheet(prefill = '', preset = {}) {
     nf ? (nf === 1 ? tr('Attachment: {0}', preset.files[0].name) : tr('{0} attachments', nf)) : ''].filter(Boolean).join(' · ');
   const qh = $('.qhint', q); if (hint) qh.textContent = hint; else qh.innerHTML = qHelpChips('qsheet');
   const inp = $('#qsheet'); inp.value = prefill; updateChips(inp);
+  msvvSheetTarget(q);  // 2.73.0 C (#661)
   q.classList.toggle('capture', !!preset.capture);
   const i0 = $('.box > svg', q); if (i0) i0.outerHTML = ic(preset.capture ? 'zap' : 'plus');
   inp.placeholder = preset.capture ? tr('Capture to the basket…') : preset.section_name ? tr('Add a task to {0}', preset.section_name) : tr('Add task…');
