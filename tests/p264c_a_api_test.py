@@ -366,7 +366,7 @@ check(OWN not in [p["id"] for p in Bo.get(B + "/api/wiki/search", params={"q": "
 import io as _io, zipfile as _zf
 EP = Er.post(B + "/api/wiki/pages", json={"space": "private", "path": "Odd", "body": "x"}).json()["id"]
 dbx("UPDATE wiki_pages SET body=? WHERE id=?", (ct(1), EP))  # as if written before 2.64.3
-r = Er.post(B + "/api/wiki/pages", json={"space": SP, "path": "From odd", "template_id": EP})
+r = Er.post(B + "/api/wiki/pages", json={"space": "private", "path": "From odd", "template_id": EP})
 check(r.status_code == 400, "M1: a ciphertext template is never copied into an open space " + r.text[:200])
 r = Er.post(B + "/api/wiki/move", json={"space": "private", "from": "Odd", "to": "e2e1:x"})
 check(r.status_code == 400, "M1: no plain name with the ciphertext prefix (move) " + r.text[:200])
