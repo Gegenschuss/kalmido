@@ -708,7 +708,8 @@ def umz_write(c, run, uid, man, zf, files, data, people):
     and assignees (only people ticked for sharing)."""
     from ..admin.hosting import QuotaExceeded, quota_guard
     from ..core.access import my_inbox, my_max_sort
-    from ..core.orgcrypt import oc_write_file
+    from ..core.orgcrypt import oc_user_space, oc_write_file
+    from ..files.upsafe import up_check, UploadRefused
     from ..lists.lists import clean_folder, list_created, LIST_NAME_MAX
     from ..lists.projects import LIST_FILES_SUB
     from ..tasks.attachments import safe_name
@@ -877,13 +878,22 @@ def umz_write(c, run, uid, man, zf, files, data, people):
                 run.stopped = "quota"
                 raise UmzStop() from None
             name = safe_name(_txt(r.get("name"), 150))
+            if not enc:  # 2.61.0 (#1818 #1819): a taken-over file is new content for this server: virus scan + photo metadata
+                try:
+                    raw, _mime, _info = up_check(c, name, raw, _txt(r.get("mime"), 120) or "application/octet-stream", uid,
+                                                 run.list_org.get(run.task_list.get(parent) if kind == "tasks" else parent), "att")
+                except UploadRefused:
+                    run.warning(N_("A file could not be taken over: {0}"), name)
+                    continue
             sub = os.path.join(str(parent)) if kind == "tasks" else os.path.join(LIST_FILES_SUB, str(parent))
             os.makedirs(os.path.join(ATT_DIR, sub), exist_ok=True)
             rel = os.path.join(sub, f"{uuid.uuid4().hex[:12]}-{name}")
             full = os.path.join(ATT_DIR, rel)
             run.written.append(full)
             lorg = run.list_org.get(run.task_list.get(parent) if kind == "tasks" else parent)
-            oc_write_file(c, lorg, full, raw)  # 2.42.0 (#828): sealed with the key of the list's organisation (none: private)
+            # 2.42.0 (#828), 2.64.0 (#1864): sealed with the key of the list's space (organisation, else my account: I own the
+            # taken-over lists); bytes from outside
+            oc_write_file(c, lorg or oc_user_space(uid), full, raw, fresh=True)
             fixed = {"name": name, "size": len(raw), "path": rel, "user_id": uid, "created_at": _txt(r.get("created_at"), 40) or ts}
             if kind == "tasks":
                 fixed.update({"task_id": parent, "comment_id": run.m("comments", r.get("comment_id")), "enc": 1 if enc else 0,
