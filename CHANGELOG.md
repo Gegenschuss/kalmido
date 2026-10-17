@@ -18,7 +18,8 @@ minor one, anything that needs action on your side a major one.
   address, public links, templates, the participant role and "everyone in the organisation" are not available in such a
   list, and lists of the Family and Household & Life modules cannot be locked (the server writes into them); in a locked
   list CalDAV shows "🔒 Task" with dates, pushes and mails name only the list, search runs in the browser. The offline copy
-  in the browser keeps only ciphertext. The way back decrypts everything again (owner, with the password). Not yet:
+  in the browser keeps only ciphertext; texts that do not open with your key are reported (compare the safety numbers). The
+  way back decrypts everything again (owner, with the password). Not yet:
   attachments, the list channel and a new key when a member leaves (the member dialog says so) (#1817).
 - Before going back to an older version, open the lock of every list again: older versions do not know the lock and
   would show and accept texts of such a list unprotected.
