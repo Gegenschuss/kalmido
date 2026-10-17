@@ -195,7 +195,7 @@ def ctm_merge(c, uid, target, ids, pick=None, dry=False):
             refs += [mg_repoint(c, tb_, col, others, t["id"], where) for tb_, col, where in CTM_SOFT]
             refs = [r for r in refs if r["moved"] or r["dropped"]]
             refs.append(ctm_dedupe_attendees(c, t["id"]))
-            unfit = ctm_unfit_clients(c, refs, tb)
+            unfit, unfit_rows = ctm_unfit_clients(c, refs, tb)
             # the others' birthday / anniversary tasks go to the trash (like deleting them), their links come back on undo
             from ..contacts.bulk import bk_occ_drop
             occ = [dict(r) for r in c.execute(f"SELECT * FROM contact_occ WHERE contact_id IN ({','.join('?' * len(others))})",
@@ -205,7 +205,10 @@ def ctm_merge(c, uid, target, ids, pick=None, dry=False):
             bk_occ_drop(c, uid, others)
             trashed = [x for x in live if c.execute("SELECT 1 FROM tasks WHERE id=? AND deleted_at IS NOT NULL", (x,)).fetchone()]
             occ_names = [r["fn"] for r in rows[1:] if any(o["contact_id"] == r["id"] and o["task_id"] in trashed for o in occ)]
-            cascade = mg_cascade_rows(c, "contacts", others)
+            cascade, foreign = ctm_cascade(c, others)
+            unfit += foreign
+            if unfit_rows:  # 2.80.0 (#1885): undo links them again (mg_undo_refs only moves rows still at the target)
+                cascade.append({"t": "office_client_contacts", "col": "contact_id", "rule": "n", "rows": unfit_rows})
             if dry:
                 out = {"lines": ctm_lines(rows, f, refs, occ_names, unfit),
                        "fields": {k: (_jl(v) if k in CTM_LISTS else v) for k, v in f.items() if k not in CTM_NL and k != "photo"}}
@@ -229,11 +232,30 @@ def ctm_merge(c, uid, target, ids, pick=None, dry=False):
     return out
 
 
+def ctm_cascade(c, others):
+    """2.80.0 (#1885): what deleting the merged contacts removes or empties (mg_cascade_rows) for the undo snapshot, and how
+    many emptied contact person links of clients the person cannot see (another workspace: mg_repoint left them, the
+    database empties them on delete). Only numbers leave here; a set-null row keeps just its id and the old value."""
+    from ..core.pg import system_ctx
+    # system: read only -- the snapshot must know the rows of every workspace the foreign keys reach, else undo cannot
+    # put them back (the right to merge is checked in ctm_load; nothing of these rows goes to the person)
+    with system_ctx(c):
+        cascade = mg_cascade_rows(c, "contacts", others)
+    foreign = 0
+    for grp in cascade:
+        if grp["rule"] == "n":
+            grp["rows"] = [{"id": r["id"], grp["col"]: r[grp["col"]]} for r in grp["rows"] if "id" in r]
+            if grp["t"] == "office_client_contacts":  # every visible one moved (mg_repoint): what is left is foreign
+                foreign += len(grp["rows"])
+    return cascade, foreign
+
+
 def ctm_unfit_clients(c, refs, tb):
     """A client's contact person may only link to an address book that fits the client (contacts_cl.ckl_book_fits): a
-    moved link that does not fit the target's book is dropped (name, e-mail, phone stay; undo puts it back). Returns the count."""
+    moved link that does not fit the target's book is dropped (name, e-mail, phone stay; undo puts it back). Returns the count
+    and the dropped links [{id, contact_id: the old one}]."""
     from ..office.contacts_cl import ckl_book_fits
-    n = 0
+    n, back = 0, []
     for rec in refs:
         if rec["t"] != "office_client_contacts":
             continue
@@ -241,8 +263,9 @@ def ctm_unfit_clients(c, refs, tb):
             cl = c.execute("SELECT cl.* FROM office_client_contacts k JOIN clients cl ON cl.id=k.client_id WHERE k.id=?", (k["id"],)).fetchone()
             if cl is not None and not ckl_book_fits(cl, tb):
                 c.execute("UPDATE office_client_contacts SET contact_id=NULL WHERE id=?", (k["id"],))
+                back.append({"id": k["id"], "contact_id": k["_from"]})
                 n += 1
-    return n
+    return n, back
 
 
 def ctm_dedupe_attendees(c, tid):
@@ -301,8 +324,10 @@ def ctm_undo(c, uid, rid):
             raise Denied(409, tr("The address book has this contact already"))
     for r in rows:
         mg_reinsert(c, "contacts", r)
-    mg_undo_cascade(c, snap.get("cascade"))
-    mg_undo_refs(c, snap.get("refs"), target_gone=t is None)
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # system: 2.80.0 (#1885) exactly the rows of the snapshot go back, in every workspace they came from
+        mg_undo_cascade(c, snap.get("cascade"))
+        mg_undo_refs(c, snap.get("refs"), target_gone=t is None)
     from ..tasks.lifecycle import restore_task, trash_task
     for o in snap.get("occ") or []:
         mg_reinsert(c, "contact_occ", o)
