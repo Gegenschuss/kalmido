@@ -608,7 +608,9 @@ and download is written to the office log (who, when, size).
   contacts, its clients, the whole office (company data, services, equipment, packages, texts, framework contracts,
   quotations / invoices / credit notes with positions, payments, PDF and XML files, the archive, the office log), its
   file store (2.48: folders, files with every version, shares, the access history, the trash; `store/*.json`,
-  `files/store/`) and the members with their roles (name, user name, e-mail address).
+  `files/store/`), the customer reports of those lists (2.81: `portal/tickets.json` with the reporter's name and
+  address; never the status link, a new server would send new links) and the members with their roles (name, user
+  name, e-mail address).
 - **What is not in it.** Lists outside the organisation (the members' private space), other organisations, passwords,
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
   personal data (settings, own tags, filters, templates, direct messages, agent chats).
@@ -693,7 +695,7 @@ new organisation's key), the organisation's calendars with events and its addres
 lists belong to you as the importing admin. Members are matched by e-mail address: a ticked person joins the
 organisation and gets their lists shared again. Not yet taken over (the preview names them with their counts): the
 office, the file store, team chat, knowledge pages, documents, newsletter, clients, absences and bookings, forms,
-playbooks, project notes and notepads, time entries and browser-encrypted notes.
+playbooks, project notes and notepads, time entries, customer reports and browser-encrypted notes.
 
 **Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the data parts may hold at
 most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX_ROWS` (default 500000) rows per table
