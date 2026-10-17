@@ -1036,6 +1036,12 @@ fresh; run p278_dup_api "$PY" p278_dup_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p278_dup_ui node p278_dup_ui.js "$KALMIDO_TEST_DATA"
 # 2.79.0: security fixes of audit #476 part 1 (H1 ICS attendees, M1 app passwords, M2 admin scopes, M4 link lock, M5 child accounts, M6 health time, M8 backup folders, M9 proxy default)
 fresh; run p279_sec_api "$PY" p279_sec_api_test.py "$KALMIDO_TEST_DATA"
+# 2.81.0 part B: correct archived office documents (client, tax lines, paid, history, #1834), DATEV customer number of locked invoices (#1867)
+fresh; run p281_b_api "$PY" p281_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.81.0 part A: #1852 stale contact link, #1466 agent contact persons
+fresh; run p281_a_api "$PY" p281_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.81.0 part D: Paperless ZIP checked in the background (#1874), runs that lost their claim, one key per export (#1875)
+fresh; run p281_d_api "$PY" p281_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.83.0 part A: the organisation's view hides the private modules (#1845)
 fresh; run p283_a_ui node p283_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.83.0 part A: organisation-wide lists - assigned without joining: assignable with org_edit, Today, calendar feed, CalDAV (#1725)

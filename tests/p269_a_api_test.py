@@ -176,6 +176,14 @@ def upload(s, ws, data, name="export.zip", stop_after=None):
         if not r.ok:
             return r
         n += 1
+    return checked(s, ws, r)
+
+
+def checked(s, ws, r):
+    """2.81.0 (#1874): the last part only stores (state check); the worker checks in the background -> the state once it is done."""
+    if r.ok and (r.json().get("zip") or {}).get("state") == "check":
+        until(lambda: (state(s, ws).get("zip") or {}).get("state") != "check", 60)
+        r = s.get(B + f"/api/paperless?ws={ws}")
     return r
 
 
@@ -334,7 +342,10 @@ n = 1
 while n * chunk < len(ZGOOD):
     r = Bo.post(B + "/api/paperless/zip/part", data={"ws": OWS, "n": str(n)}, files={"part": ("part", ZGOOD[n * chunk:(n + 1) * chunk])})
     n += 1
+# 2.81.0 (#1874): the answer of the last part comes at once (the check runs in the worker), then the export is ready
 z = r.json().get("zip") or {}
+check(r.ok and z.get("state") == "check" and z.get("got") == len(ZGOOD), f"the last part answers at once: being checked ({z.get('state')})")
+z = checked(Bo, OWS, r).json().get("zip") or {}
 check(z.get("state") == "ready" and z.get("got") == len(ZGOOD), f"all parts in: ready ({z.get('state')} {z.get('error_text')})")
 check(Ca.get(B + f"/api/paperless/zip/preview?ws={OWS}").status_code == 403, "a member sees no preview of the upload")
 check((state(Ca, OWS).get("zip") or {}).get("mine") is False, "a member sees that there is one, not as theirs")

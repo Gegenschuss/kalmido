@@ -292,9 +292,12 @@ def share_post():
     title = (request.form.get("title") or "").strip() or re.sub(r"\s+", " ", text.replace(url, "") if url else text).strip(" -–—|:·") \
         or (url_title(url) if url else "") or (os.path.splitext(safe_name(files[0].filename))[0] if files else tr("Shared"))
     tid = new_inbox_task(c, me(), title, "", url=url or None)  # the link goes into the link field
-    save_attachments(c, tid, files)
+    e = save_attachments(c, tid, files)
     bump(c)
     c.commit()
+    if e:  # 2.81.0 (#1856): a refused file (too large, empty, the upload check) is named to the person, not only logged
+        print("share POST: file refused", e, flush=True)
+        return redirect(f"/?share=refused#t/{tid}", 303)
     return redirect(f"/#t/{tid}", 303)
 
 

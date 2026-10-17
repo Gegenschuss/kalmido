@@ -824,7 +824,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                     "EventPage": {"type": "object", "properties": {"data": {"type": "array", "items": ref("AgentEvent")}, "cursor": {"type": "integer"},
                                                                    "has_more": {"type": "boolean"}, "busy": {"type": "boolean"}, "waited": {"type": "number"}}},
                     "ChatPage": {"type": "object", "properties": {"data": {"type": "array", "items": ref("ChatMessage")}, "cursor": {"type": "integer"},
-                                                                  "has_more": {"type": "boolean"}}}})
+                                                                  "has_more": {"type": "boolean"},
+                                                                  "pins": {"type": "array", "items": ref("ChatMessage"), "description":
+                                                                           "2.82.0 (#1862): with ?user_id=, the pinned messages of that conversation (newest pin first)"}}}})
     schemas["Task"]["properties"]["list_tags"] = {"type": "array", "items": {"type": "string"}, "description": "Tags of the list, shared by its members"}
     schemas["TaskInput"]["properties"]["list_tags"] = {"type": "array", "items": {"type": "string"},
                                                        "description": "List tags by name; missing ones are created when you may change the list"}

@@ -14,8 +14,9 @@ over the API (ngx.plh_store), the same queue (ngx.pl_claim: one import per serve
 - The ZIP is never unpacked onto the disk: zipfile reads the members straight from the sealed parts, only manifest.json /
   <name>-manifest.json (--split-manifest) and the files the manifest names. Limits: entries, manifest bytes, the size of every
   file (MAX_FILE_MB), the compression ratio (zip bombs), JSON depth; encrypted ZIPs are refused, a ZIP inside is only a file.
-- Never twice: src = PLH_SRC (one key for every export) + the Paperless id, skipped only when the file is the same (sha256);
-  the checksum within the workspace catches the rest (another instance's document with the same id is still imported).
+- Never twice: src = the export's key (2.81.0 #1875: plh_src, one per Paperless-ngx instance; uploads of before keep PLH_SRC)
+  + the Paperless id, skipped only when the file is the same (sha256); the checksum within the workspace catches the rest
+  (another instance's document with the same id is still imported, its rules are its own).
 """
 import hashlib
 import io
@@ -23,6 +24,7 @@ import json
 import os
 import re
 import shutil
+import threading
 import time
 import zipfile
 from datetime import datetime, timedelta
@@ -49,15 +51,18 @@ PLH_DIR = os.environ.get("KALMIDO_PAPERLESS_ZIP_DIR", os.path.join(os.path.dirna
 PLH_ZIP_MAX = _env_mb("KALMIDO_PAPERLESS_ZIP_MAX_MB", 4096) * 1024 * 1024  # bytes of one uploaded ZIP
 PLH_CHUNK = max(64 * 1024, min(_env_mb("KALMIDO_PAPERLESS_ZIP_CHUNK_KB", 8192) * 1024,  # bytes per part (tests: small parts)
                                 MAX_FILE_MB * 4 * 1024 * 1024 - 256 * 1024))  # below MAX_CONTENT_LENGTH
-PLH_MANIFEST_MAX = 64 * 1024 * 1024  # bytes of all manifests together
-PLH_ENTRIES_MAX = 500_000            # members of the ZIP
-PLH_DOCS_MAX = 200_000               # documents in the manifest
+PLH_MANIFEST_MAX = 64 * 1024 * 1024  # bytes of all manifests together (the documents' text lies in them: kept)
+PLH_ENTRIES_MAX = 300_000            # members of the ZIP (2.81.0 #1874: was 500 000; original + archive + thumbnail per document)
+PLH_DOCS_MAX = 100_000               # documents in the manifest (2.81.0 #1874: was 200 000)
 PLH_RATIO = 200                      # uncompressed / compressed of a member above 1 MB: more = a zip bomb
 PLH_ORPHAN_H = 24                    # hours an upload without a run stays
 PLH_DISK_MARGIN = 1024 * 1024 * 1024  # bytes that stay free on the disk of PLH_DIR besides an upload
-PLH_SRC = P.pl_src("paperless-export")  # pl_imported.src of every ZIP import (not an address: no clash with pl_src(url))
+PLH_SRC = P.pl_src("paperless-export")  # pl_imported.src of every ZIP import up to 2.80 (not an address: no clash with pl_src(url))
 _CTX = b"pl_uploads.part|"
 _SWEPT = [0.0]
+_CK = {"thread": None, "again": False}
+_CK_LOCK = threading.Lock()
+_CK_RUN = threading.Lock()  # review: one check at a time per process (the kick thread and the worker before its claim)
 _MIME_RE = re.compile(r"[a-z0-9][a-z0-9.+-]{0,60}/[a-z0-9][a-z0-9.+-]{0,60}")
 
 P.PL_ERR.update({
@@ -225,9 +230,27 @@ def _label(rec, f):
     return {"id": rec["pk"], "name": str(f.get("name") or "")[:S.NAME_MAX], "count": 0, **P.pl_label_match(f)}
 
 
+def plh_src(users, labels):
+    """2.81.0 (#1875): the source key of an export: from its first user (pk, name, the time it joined -- set once when that
+    Paperless-ngx was set up, the same in every later export of it), without users from its labels (ids + names). Only the
+    hash is kept; never the shared PLH_SRC (rules of a second server with the same label ids are its own)."""
+    first = min(users, key=lambda u: [str(x) for x in u]) if users else None  # review: pk may be int or str
+    if first and first[2]:
+        fp = "user:" + json.dumps(first)
+    else:
+        fp = "labels:" + json.dumps(sorted(([k, str(x["id"]), x["name"]] for k, v in labels.items() for x in v.values()),
+                                           key=lambda t: [str(x) for x in t]))
+    return P.pl_src("paperless-export:" + fp)
+
+
+def _src(r):
+    """The key of upload r (an upload of before 2.81: the old shared one)."""
+    return r["src"] or PLH_SRC
+
+
 def plh_scan(zf):
     """Reads the manifest(s) of the export: {labels: {tags, correspondents, document_types: [label]}, fields: {id: {name, type,
-    options}}, docs: {pk: doc in the API's shape + member, mime}}. Raises PlhError."""
+    options}}, docs: {pk: doc in the API's shape + member, mime}, src: plh_src}. Raises PlhError."""
     infos = zf.infolist()
     if len(infos) > PLH_ENTRIES_MAX:
         raise PlhError("zip_large")
@@ -252,11 +275,13 @@ def plh_scan(zf):
         recs.extend(x for x in j if isinstance(x, dict) and isinstance(x.get("fields"), dict) and _int(x.get("pk")) is not None)
     labels = {"tags": {}, "correspondents": {}, "document_types": {}}
     kinds = {"documents.tag": "tags", "documents.correspondent": "correspondents", "documents.documenttype": "document_types"}
-    fields, docs, notes, values = {}, {}, {}, {}
+    fields, docs, notes, values, users = {}, {}, {}, {}, []
     for x in recs:
         m, f = str(x.get("model") or ""), x["fields"]
         if m in kinds:
             labels[kinds[m]][x["pk"]] = _label(x, f)
+        elif m == "auth.user":  # 2.81.0 (#1875): only for the export's key
+            users.append((x["pk"], str(f.get("username") or "")[:200], str(f.get("date_joined") or "")[:40]))
         elif m == "documents.customfield":
             ed = f.get("extra_data") if isinstance(f.get("extra_data"), dict) else {}
             opts = ed.get("select_options") if isinstance(ed.get("select_options"), list) else []
@@ -298,7 +323,7 @@ def plh_scan(zf):
             if t in labels["tags"]:
                 labels["tags"][t]["count"] += 1
     return {"labels": {k: sorted(v.values(), key=lambda x: (x["name"].lower(), x["id"])) for k, v in labels.items()},
-            "fields": fields, "docs": docs}
+            "fields": fields, "docs": docs, "src": plh_src(users, labels)}
 
 
 def _check(c, r):
@@ -307,11 +332,78 @@ def _check(c, r):
         with _open_zip(c, r) as zf:
             x = plh_scan(zf)
         info = {"labels": x["labels"], "docs": [[pk, d["size"], bool(d["member"])] for pk, d in sorted(x["docs"].items())]}
-        c.execute("UPDATE pl_uploads SET state='ready', info=?, error='', updated_at=? WHERE id=?",
-                  (S._jseal(c, r["ws"], "pl_uploads.info", info), _now(), r["id"]))
+        c.execute("UPDATE pl_uploads SET state='ready', info=?, src=?, error='', updated_at=? WHERE id=?",
+                  (S._jseal(c, r["ws"], "pl_uploads.info", info), x["src"], _now(), r["id"]))
     except PlhError as e:
         plh_drop_files(r["id"])
         c.execute("UPDATE pl_uploads SET state='bad', error=?, updated_at=? WHERE id=?", (e.code, _now(), r["id"]))
+
+
+def plh_check_one(c, wait=False):
+    """2.81.0 (#1874): checks one upload whose last part came in (state 'check') -- in the background, never in the web request
+    (a large export binds no web thread and its memory only here, one check at a time per process). FOR UPDATE SKIP LOCKED:
+    two processes never check the same upload, a discard waits for the check. Returns 1 when it checked one. Never raises.
+    wait=False: another check of this process is running -> 0 at once (the worker claims on, the kick thread checks the rest)."""
+    if not _CK_RUN.acquire(blocking=wait):
+        return 0
+    try:
+        return _check_one(c)
+    finally:
+        _CK_RUN.release()
+
+
+def _check_one(c):
+    try:
+        r = c.execute("SELECT * FROM pl_uploads WHERE state='check' ORDER BY updated_at, id LIMIT 1 FOR UPDATE SKIP LOCKED").fetchone()
+        if not r:
+            c.commit()
+            return 0
+        try:
+            _check(c, r)
+        except Exception as e:  # noqa: BLE001 -- an export that breaks the check fails it, never the worker (no endless retry)
+            print("paperless: zip check", r["id"], type(e).__name__, flush=True)
+            c.rollback()
+            plh_drop_files(r["id"])
+            c.execute("UPDATE pl_uploads SET state='bad', error='zip_bad', updated_at=? WHERE id=? AND state='check'", (_now(), r["id"]))
+        c.commit()
+        return 1
+    except Exception as e:  # noqa: BLE001
+        c.rollback()
+        print("paperless: zip check", type(e).__name__, e, flush=True)
+        return 0
+
+
+def _check_loop():
+    from ..accounts.session import GATE
+    from ..core.db import connect
+    from ..core.pg import system_ctx
+    try:
+        while True:
+            with _CK_LOCK:
+                _CK["again"] = False
+            with GATE.bg():
+                c = connect()
+                try:
+                    with system_ctx(c):  # paperless check: the uploads of every workspace (sealed with their own key)
+                        done = plh_check_one(c, wait=True)
+                finally:
+                    c.close()
+            if not done:
+                with _CK_LOCK:  # review: a kick between the empty look and here would find this thread alive -> look again
+                    if not _CK["again"]:
+                        _CK["thread"] = None
+                        return
+    except Exception as e:  # noqa: BLE001 -- the paperless worker checks what is left before its next claim
+        print("paperless: zip check worker", type(e).__name__, e, flush=True)
+
+
+def plh_check_kick():
+    """2.81.0 (#1874): checks the waiting uploads in a thread of its own (an import run of the paperless worker may last hours)."""
+    with _CK_LOCK:
+        _CK["again"] = True
+        if _CK["thread"] is None or not _CK["thread"].is_alive():
+            _CK["thread"] = threading.Thread(target=_check_loop, daemon=True, name="paperless-zipcheck")
+            _CK["thread"].start()
 
 
 def _info(c, r):
@@ -353,11 +445,6 @@ def plh_size_url(c, r, tok, left):
 
 
 # ---- the run ------------------------------------------------------------------------------------------------------------
-def _zset(c, rid, **kw):
-    kw["run_beat"] = _now()
-    c.execute("UPDATE pl_uploads SET " + ", ".join(f"{k}=?" for k in kw) + " WHERE id=?", (*kw.values(), rid))
-
-
 def _zstopped(c, rid):
     r = c.execute("SELECT run_state FROM pl_uploads WHERE id=?", (rid,)).fetchone()
     return not r or r[0] == "stop"
@@ -367,7 +454,7 @@ def _learn(c, r, uid, since, labels):
     """learn.py (#1847): rules + training from what came in (an empty dict on an error)."""
     from .learn import pll_finish
     try:
-        return pll_finish(c, r["ws"], r["org_id"], uid, PLH_SRC, since, labels, P.pl_mapping(c, r)) or {}
+        return pll_finish(c, r["ws"], r["org_id"], uid, _src(r), since, labels, P.pl_mapping(c, r)) or {}
     except Exception as e:  # noqa: BLE001 -- learning never fails the import
         print("paperless: zip learn", r["id"], type(e).__name__, flush=True)
         return {}
@@ -382,6 +469,8 @@ def plh_zip_run(c, rid):
     if not r:
         return
     uid, since = r["run_by"], _now()
+    own = [r["run_beat"]]  # 2.81.0 (#1875): the claim's beat (ngx.pl_beat): a run cut off ends instead of running twice
+    beat = lambda **kw: P.pl_beat(c, "pl_uploads", rid, own, **kw)  # noqa: E731
     counts = {"new": 0, "skip": 0, "dup": 0, "fail": 0, "done": 0}
     error, scan = "", None
     try:
@@ -391,7 +480,7 @@ def plh_zip_run(c, rid):
             scan = plh_scan(zf)
             labels = {k: {x["id"]: x["name"] for x in v} for k, v in scan["labels"].items()}
             docs = [scan["docs"][k] for k in sorted(scan["docs"])]
-            _zset(c, rid, run_total=len(docs))
+            beat(run_total=len(docs))
             c.commit()
             for d in docs:
                 if _zstopped(c, rid):
@@ -401,12 +490,15 @@ def plh_zip_run(c, rid):
                     if d["member"]:
                         data = _read(zf, zf.getinfo(d["member"]), MAX_FILE_MB * 1024 * 1024)
                         sha = hashlib.sha256(data).hexdigest()
-                        if c.execute("SELECT 1 FROM pl_imported WHERE ws=? AND src=? AND pl_id=? AND sha256=?",
-                                     (r["ws"], PLH_SRC, d["id"], sha)).fetchone():
+                        # 2.81.0 (#1875): the same file under the same id also from an import of before (the shared key)
+                        if c.execute("SELECT 1 FROM pl_imported WHERE ws=? AND src IN (?,?) AND pl_id=? AND sha256=?",
+                                     (r["ws"], _src(r), PLH_SRC, d["id"], sha)).fetchone():
                             res = "skip"
                         else:
+                            beat()  # 2.81.0 (#1875): right before the filing (committed: a rollback keeps this beat)
+                            c.commit()
                             with c.savepoint():
-                                res = P.plh_store(c, r, uid, PLH_SRC, d, data, d["mime"] or None, d["original_file_name"], labels,
+                                res = P.plh_store(c, r, uid, _src(r), d, data, d["mime"] or None, d["original_file_name"], labels,
                                                   lambda d=d: P._doc_text(d, d["notes"], scan["fields"]))
                 except PlhError as e:
                     if e.code == "zip_gone":  # the parts are gone: nothing more can come; a damaged member only fails its document
@@ -417,10 +509,14 @@ def plh_zip_run(c, rid):
                     print("paperless: zip document refused", d["id"], type(e).__name__, flush=True)
                 counts[res if res in counts else "fail"] += 1
                 counts["done"] += 1
-                _zset(c, rid, run_done=counts["done"], run_new=counts["new"], run_skip=counts["skip"] + counts["dup"], run_fail=counts["fail"])
+                beat(run_done=counts["done"], run_new=counts["new"], run_skip=counts["skip"] + counts["dup"], run_fail=counts["fail"])
                 c.commit()
                 if res == "new":
                     kick()
+    except P.PlLost:  # 2.81.0 (#1875): another run has it now (or it was discarded): its parts and its row are not ours
+        c.rollback()
+        print("paperless: zip run lost its claim", rid, flush=True)
+        return
     except PlhError as e:
         c.rollback()
         error = e.code
@@ -429,11 +525,14 @@ def plh_zip_run(c, rid):
         print("paperless: zip run", rid, type(e).__name__, e, flush=True)
         error = "failed"
     learn = _learn(c, r, uid, since, scan["labels"]) if scan else {}
-    plh_drop_files(rid)
     from .learn import pll_stored
-    _zset(c, rid, run_state="", state="done", run_error=error, run_learn=pll_stored(learn),
-          updated_at=_now())
+    try:
+        beat(run_state="", state="done", run_error=error, run_learn=pll_stored(learn), updated_at=_now())
+    except P.PlLost:
+        c.rollback()
+        return
     c.commit()
+    plh_drop_files(rid)
 
 
 def plh_sweep(c, stale):
@@ -442,13 +541,13 @@ def plh_sweep(c, stale):
     c.execute("UPDATE pl_uploads SET run_state='queued' WHERE run_state='busy' AND (run_beat IS NULL OR run_beat < ?)", (stale,))
     old = iso(now_utc() - timedelta(hours=PLH_ORPHAN_H))
     gone = [x[0] for x in c.execute("""SELECT id FROM pl_uploads WHERE (run_state='stop' AND (run_beat IS NULL OR run_beat < ?))
-                                       OR (run_state='' AND state IN ('upload','ready','bad') AND updated_at < ?)""", (stale, old))]
+                                       OR (run_state='' AND state IN ('upload','check','ready','bad') AND updated_at < ?)""", (stale, old))]
     for rid in gone:
         plh_drop_files(rid)
         c.execute("UPDATE pl_uploads SET run_state='', state='done', updated_at=? WHERE id=? AND run_state IN ('', 'stop')", (_now(), rid))
     if time.time() - _SWEPT[0] > 600 and os.path.isdir(PLH_DIR):
         _SWEPT[0] = time.time()
-        keep = {str(x[0]) for x in c.execute("SELECT id FROM pl_uploads WHERE state IN ('upload','ready') OR run_state<>''")}
+        keep = {str(x[0]) for x in c.execute("SELECT id FROM pl_uploads WHERE state IN ('upload','check','ready') OR run_state<>''")}
         for n in os.listdir(PLH_DIR):
             if n.isdigit() and n not in keep:  # 2.69.0 review (N1): only the folders of uploads
                 p = os.path.join(PLH_DIR, n)
@@ -527,7 +626,7 @@ def plh_zip_new():
     from ..core.pg import insert_id, write_lock
     write_lock(c, f"pl_uploads:{ws}")
     r = _row(c, ws)
-    if r and (_running(r) or (r["created_by"] != uid and r["state"] in ("upload", "ready") and r["updated_at"] > iso(now_utc() - timedelta(hours=PLH_ORPHAN_H)))):
+    if r and (_running(r) or (r["created_by"] != uid and r["state"] in ("upload", "check", "ready") and r["updated_at"] > iso(now_utc() - timedelta(hours=PLH_ORPHAN_H)))):
         return err(tr("Another import is under way in this area"), 409)
     for x in c.execute("SELECT id FROM pl_uploads WHERE ws=?", (ws,)).fetchall():
         plh_drop_files(x[0])
@@ -543,7 +642,7 @@ def plh_zip_new():
 @app.post("/api/paperless/zip/part")
 def plh_zip_part():
     """multipart: ws, n (the part's number: the next one, or the last one again), part (the bytes: PLH_CHUNK, the last one
-    less). After the last part the ZIP is checked (state ready | bad)."""
+    less). After the last part the ZIP is checked in the background (2.81.0 #1874: state check -> ready | bad; the app asks again)."""
     from ..core.pg import write_lock
     c = db()
     uid, org, ws, r = _mine(c, request.form.get("ws"), "upload")
@@ -573,9 +672,11 @@ def plh_zip_part():
     except OSError:
         return err(tr("The file could not be stored"), 507)
     c.execute("UPDATE pl_uploads SET got=?, parts=?, updated_at=? WHERE id=?", (got + len(data), n + 1, _now(), r["id"]))
-    if last:
-        _check(c, c.execute("SELECT * FROM pl_uploads WHERE id=?", (r["id"],)).fetchone())
+    if last:  # 2.81.0 (#1874): only stored here; plh_check_one checks it
+        c.execute("UPDATE pl_uploads SET state='check' WHERE id=?", (r["id"],))
     c.commit()
+    if last:
+        plh_check_kick()
     return _answer(c, ws, uid, org)
 
 
@@ -598,7 +699,7 @@ def _rows(mp, labels):
 def _left(c, r, info):
     """(documents, already imported, bytes of the rest) of an upload."""
     docs = info.get("docs") or []
-    done = {x[0] for x in c.execute("SELECT pl_id FROM pl_imported WHERE ws=? AND src=?", (r["ws"], PLH_SRC))}
+    done = {x[0] for x in c.execute("SELECT pl_id FROM pl_imported WHERE ws=? AND src=?", (r["ws"], _src(r)))}
     already = sum(1 for d in docs if d[0] in done)
     return len(docs), already, sum(int(d[1]) for d in docs if d[0] not in done and d[2])
 
@@ -614,7 +715,7 @@ def plh_zip_preview():
     out = {"count": count, "already": already, "zip": True, **_rows(mp, info.get("labels") or {}), "size": plh_space(c, uid, need, True)}
     from .learn import pll_rules_preview  # 2.69.0 (#1847): which matching rules come along
     try:
-        out["rules"] = pll_rules_preview(info.get("labels") or {}, mp, c=c, ws=ws, src=PLH_SRC)
+        out["rules"] = pll_rules_preview(info.get("labels") or {}, mp, c=c, ws=ws, src=_src(r))
     except Exception as e:  # noqa: BLE001 -- the preview never fails on the rules
         print("paperless: zip rules preview", type(e).__name__, flush=True)
     return jsonify(out)

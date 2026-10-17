@@ -270,7 +270,9 @@ def pt_page(token):
     if bad:
         return bad
     lg = pt_lang(c, p)
-    c.execute("UPDATE portal_tickets SET last_seen_at=?, lang=? WHERE id=?", (iso(now_utc()), lg, p["id"]))
+    # 2.81.0 (#1866): a page view writes only when the last one is older than 5 minutes (or the language changed)
+    c.execute("UPDATE portal_tickets SET last_seen_at=?, lang=? WHERE id=? AND (last_seen_at IS NULL OR last_seen_at<? OR lang<>?)",
+              (iso(now_utc()), lg, p["id"], iso(now_utc() - timedelta(minutes=5)), lg))
     if p["client_id"] is None:
         cl = pt_client_for(c, {"id": p["list_id"], "org_id": p["org_id"]}, pt_email(c, p))
         if cl:
@@ -457,7 +459,9 @@ def pt_login_ask(token):
                      tr("If you did not ask for it, you can ignore this mail.", lg=lg)]
             mail = (em, tr("Your reports: sign-in link", lg=lg), "\n\n".join(lines[:2]) + f"\n\n{url}\n\n" + lines[2],
                     _pt_mail_html(lines[:2], url, tr("Show my reports", lg=lg), html.escape(lines[2])))
-    c.execute("DELETE FROM portal_logins WHERE expires_at<?", (iso(now_utc() - timedelta(days=1)),))
+    # 2.81.0 (#1866): a used sign-in row is the cookie's (PT_COOKIE_DAYS); unused ones go a day after their link expired
+    c.execute("DELETE FROM portal_logins WHERE (used_at IS NULL AND expires_at<?) OR used_at<?",
+              (iso(now_utc() - timedelta(days=1)), iso(now_utc() - timedelta(days=PT_COOKIE_DAYS + 1))))
     c.commit()
     if mail:
         threading.Thread(target=_pt_mail_bg, args=mail, daemon=True).start()
@@ -502,21 +506,35 @@ def pt_login_page(tok):
                              f'<form method="post" action="/portal/login/{e(tok)}" class="fform"><button type="submit">{e(tr("Show my reports", lg=lg))}</button></form></div>', lg)
 
 
-def pt_cookie_make(c, eh, org_id, owner_id, exp):
-    raw = f"{eh}.{org_id or 0}.{owner_id or 0}.{exp}"
+def pt_cookie_make(c, eh, org_id, owner_id, exp, lid):
+    # 2.81.0 (#1866): the cookie names its sign-in (portal_logins.id), so signing out revokes it on the server
+    raw = f"{eh}.{org_id or 0}.{owner_id or 0}.{exp}.{lid}"
     return raw + "." + hmac.new(auth_key(c), b"kalmido-portal-cookie|" + raw.encode(), hashlib.sha256).hexdigest()
+
+
+def r81c_cookie_login(c):
+    """2.81.0 (#1866): the sign-in row of a valid, signed, unexpired portal cookie that was not revoked, else None.
+    Cookies from before 2.81.0 (without the sign-in id) no longer count: the customer signs in once more."""
+    from flask import request
+    from ..core.pg import system_ctx
+    v = request.cookies.get(PT_COOKIE, "")
+    m = re.fullmatch(r"([0-9a-f]{64})\.(\d+)\.(\d+)\.(\d+)\.(\d+)\.([0-9a-f]{64})", v)
+    if not m or int(m.group(4)) < time.time():
+        return None
+    if not hmac.compare_digest(pt_cookie_make(c, m.group(1), int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5))), v):
+        return None
+    with system_ctx(c):  # the signed id of one sign-in row; address and space are compared below
+        r = c.execute("SELECT * FROM portal_logins WHERE id=?", (int(m.group(5)),)).fetchone()
+    if (not r or r["revoked_at"] or not r["used_at"] or r["email_hash"] != m.group(1)
+            or (r["org_id"] or 0) != int(m.group(2)) or (r["owner_id"] or 0) != int(m.group(3))):
+        return None
+    return r
 
 
 def pt_cookie_read(c):
     """(email_hash, org_id, owner_id) of a valid portal cookie, else None."""
-    from flask import request
-    v = request.cookies.get(PT_COOKIE, "")
-    m = re.fullmatch(r"([0-9a-f]{64})\.(\d+)\.(\d+)\.(\d+)\.([0-9a-f]{64})", v)
-    if not m or int(m.group(4)) < time.time():
-        return None
-    if not hmac.compare_digest(pt_cookie_make(c, m.group(1), int(m.group(2)), int(m.group(3)), int(m.group(4))), v):
-        return None
-    return m.group(1), int(m.group(2)) or None, int(m.group(3)) or None
+    r = r81c_cookie_login(c)
+    return (r["email_hash"], r["org_id"], r["owner_id"]) if r else None
 
 
 @app.post("/portal/login/<tok>")
@@ -542,7 +560,7 @@ def pt_login(tok):
         return _pt_link_gone(lg)
     resp = redirect("/portal", 303)
     secure = request.is_secure or request.headers.get("X-Forwarded-Proto", "") == "https"
-    resp.set_cookie(PT_COOKIE, pt_cookie_make(c, r["email_hash"], r["org_id"], r["owner_id"], int(time.time()) + PT_COOKIE_DAYS * 86400),
+    resp.set_cookie(PT_COOKIE, pt_cookie_make(c, r["email_hash"], r["org_id"], r["owner_id"], int(time.time()) + PT_COOKIE_DAYS * 86400, r["id"]),
                     max_age=PT_COOKIE_DAYS * 86400, httponly=True, samesite="Lax", secure=secure, path="/portal")
     return _pt_rt().pub_headers(resp)
 
@@ -604,6 +622,12 @@ def pt_logout():
     if request.headers.get("Sec-Fetch-Site", "") == "cross-site" or not hmac.compare_digest(request.form.get("f") or "", pt_out_key(c)):
         from ..accounts.session import _accept_lang
         return _pt_denied(_accept_lang())
+    r = r81c_cookie_login(c)
+    if r:  # 2.81.0 (#1866): the cookie stops working everywhere, not only in this browser
+        from ..core.pg import system_ctx
+        with system_ctx(c):  # the one sign-in row the signed cookie names
+            c.execute("UPDATE portal_logins SET revoked_at=? WHERE id=?", (iso(now_utc()), r["id"]))
+        c.commit()
     resp = redirect("/portal", 303)
     resp.delete_cookie(PT_COOKIE, path="/portal")
     return _pt_rt().pub_headers(resp)

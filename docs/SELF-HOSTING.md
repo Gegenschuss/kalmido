@@ -608,7 +608,9 @@ and download is written to the office log (who, when, size).
   contacts, its clients, the whole office (company data, services, equipment, packages, texts, framework contracts,
   quotations / invoices / credit notes with positions, payments, PDF and XML files, the archive, the office log), its
   file store (2.48: folders, files with every version, shares, the access history, the trash; `store/*.json`,
-  `files/store/`) and the members with their roles (name, user name, e-mail address).
+  `files/store/`), the customer reports of those lists (2.81: `portal/tickets.json` with the reporter's name and
+  address; never the status link, a new server would send new links) and the members with their roles (name, user
+  name, e-mail address).
 - **What is not in it.** Lists outside the organisation (the members' private space), other organisations, passwords,
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
   personal data (settings, own tags, filters, templates, direct messages, agent chats).
@@ -693,7 +695,7 @@ new organisation's key), the organisation's calendars with events and its addres
 lists belong to you as the importing admin. Members are matched by e-mail address: a ticked person joins the
 organisation and gets their lists shared again. Not yet taken over (the preview names them with their counts): the
 office, the file store, team chat, knowledge pages, documents, newsletter, clients, absences and bookings, forms,
-playbooks, project notes and notepads, time entries and browser-encrypted notes.
+playbooks, project notes and notepads, time entries, customer reports and browser-encrypted notes.
 
 **Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the data parts may hold at
 most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX_ROWS` (default 500000) rows per table
@@ -853,6 +855,10 @@ published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the co
 `clamav:` block (and the `clamav-db` volume entry) from `docker-compose.yml`, then `docker compose up -d --remove-orphans`.
 Uploads are then taken without a scan and without a mark. An own ClamAV elsewhere: `KALMIDO_CLAMD=host:3310`.
 
+**Photos turned by the camera** are turned upright and saved again when their metadata are removed (see TEAM.md). The
+re-encode holds the whole picture in memory, so it is done only up to `KALMIDO_PHOTO_MAX_PIXELS` pixels (2.81; default
+`40000000`, at least `1000000`); larger photos keep a small orientation mark instead. Lower it on a host with little memory.
+
 ## Documents: text recognition
 
 The area *Documents* (2.48.0) reads the text of uploaded PDFs and images: the text layer of a PDF, and for scans the
@@ -944,9 +950,11 @@ follows (tags, correspondents, document types with their mapping), then the impo
 - The parts are stored sealed (the workspace's key) in `KALMIDO_PAPERLESS_ZIP_DIR` (default `paperless-zip` next to the
   database file in the data folder), not in the backups, and are deleted right after the run (done, stopped, failed) or
   when the upload is discarded; uploads without a run are removed after 24 hours.
-- The ZIP is never unpacked onto the disk: only the manifest and the files it names are read. Encrypted ZIPs, too many
-  entries, a manifest above 64 MB, a file above `TASKS_MAX_FILE_MB` and files that unpack to far more than their size
-  (zip bombs) are refused.
+- The ZIP is never unpacked onto the disk: only the manifest and the files it names are read. Encrypted ZIPs, more than
+  300 000 entries (2.81; before 500 000), a manifest above 64 MB, a file above `TASKS_MAX_FILE_MB` and files that unpack to
+  far more than their size (zip bombs) are refused.
+- The check of the uploaded ZIP runs in the background (2.81): after the last part the settings show *Checking the
+  export…* until it is ready (then the preview opens) or refused with the reason.
 - Never twice: a document of an earlier ZIP import with the same id and the same file, or the same file already in the
   workspace, is left out.
 

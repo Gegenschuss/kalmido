@@ -383,6 +383,8 @@ def v1_task(d):
         out["note_locked"] = True
     if d.get("also"):  # 2.71.0 B (#1459): the further lists the token's user sees (absent: none)
         out["also"] = d["also"]
+    if d.get("file_hit"):  # 2.81.0 (#1856): search -- only the recognised text of this file matched (absent otherwise)
+        out["file_hit"] = d["file_hit"]
     return out
 
 
