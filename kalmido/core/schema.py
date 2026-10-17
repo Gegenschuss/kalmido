@@ -1274,7 +1274,7 @@ CREATE OR REPLACE TRIGGER time_task_title AFTER UPDATE OF title ON tasks FOR EAC
   WHEN (NEW.title IS DISTINCT FROM OLD.title) EXECUTE FUNCTION kalmido_time_task_title();
 -- 2.64.1 B (#1817): a ciphertext of a list with the lock is never kept as a time entry snapshot (empty; the app shows the task)
 CREATE OR REPLACE FUNCTION kalmido_time_title_e2e() RETURNS trigger LANGUAGE plpgsql AS $fn$
-BEGIN IF NEW.task_title LIKE 'e2e1:%' THEN NEW.task_title := ''; END IF; RETURN NEW; END $fn$;
+BEGIN IF left(NEW.task_title, 5) = 'e2e1:' THEN NEW.task_title := ''; END IF; RETURN NEW; END $fn$;
 CREATE OR REPLACE TRIGGER time_title_e2e BEFORE INSERT OR UPDATE OF task_title ON time_entries FOR EACH ROW
   EXECUTE FUNCTION kalmido_time_title_e2e()"""  # 1.10.0: participants only while it is theirs
 # 2.64.1 (#1817): members of a list with the lock (lists.e2e not NULL). Every way a membership changes (share dialog, group

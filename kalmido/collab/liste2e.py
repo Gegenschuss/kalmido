@@ -641,8 +641,8 @@ def le2a_blockers(c, lr, agents):
 
 
 # what /e2e/todo hands out: (key, table, id columns, text column, field name)
-_LE2A_PLAIN = "(COALESCE({0}, '')<>'' AND {0} NOT LIKE 'e2e1:%')"
-_LE2A_CIPHER = "({0} LIKE 'e2e1:%')"
+_LE2A_PLAIN = "(COALESCE({0}, '')<>'' AND left({0}, 5)<>'e2e1:')"  # the prefix exactly (left(), not LIKE: pg_dialect)
+_LE2A_CIPHER = "(left({0}, 5)='e2e1:')"
 
 
 def _le2a_conds(enc):

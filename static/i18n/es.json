@@ -8309,7 +8309,7 @@
   "Remove the agent from the list first: agents cannot read encrypted lists.": "Quita primero el agente de la lista: los agentes no pueden leer listas cifradas.",
   "Remove the public link of the list first.": "Elimina primero el enlace público de la lista.",
   "Tasks and notes move into or out of a list encrypted in the browser only in the app (their texts are encrypted anew).": "Las tareas y notas solo se mueven a una lista cifrada en el navegador o desde ella en la aplicación (sus textos se vuelven a cifrar).",
-  "The basket cannot be encrypted.": "La bandeja de entrada no se puede cifrar.",
+  "The basket cannot be encrypted.": "La cesta no se puede cifrar.",
   "The list is already encrypted in the browser.": "La lista ya está cifrada en el navegador.",
   "The list is not encrypted in the browser.": "La lista no está cifrada en el navegador.",
   "This folder holds lists encrypted in the browser: they have no participants. Choose another role.": "Esta carpeta contiene listas cifradas en el navegador: no tienen participantes. Elige otro rol.",
