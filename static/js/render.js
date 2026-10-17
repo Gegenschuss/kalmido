@@ -1626,7 +1626,7 @@ async function doSearch(q) {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(async () => {
     if (S.msg.q !== q) msgSecRun(q);  // 2.33.0 (#1080): "Messages" below the tasks (chat.js)
-    if (S.msv.search.q !== q) msvvSearch(q);  // 2.73.0 C (#661): the other servers, in parallel
+    if (S.msvv.search.q !== q) msvvSearch(q);  // 2.73.0 C (#661): the other servers, in parallel
     if (!q.trim()) { S.searchRes = null; $('#sresults').innerHTML = ''; return; }
     const j = await api('GET', '/api/tasks?scope=search&q=' + encodeURIComponent(q));
     // 2.13.0: "#447" / "447" puts that task (one this person sees) first

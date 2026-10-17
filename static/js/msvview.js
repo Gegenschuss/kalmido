@@ -5,18 +5,18 @@
 // ---- 2.73.0 C (#661): the accounts on other Kalmido servers (Settings > Account > Servers, servers.js) shown next to the
 // own data: a sidebar group per server, their tasks in Today and the Basket, search, News, the calendar, the quick add
 // target and "Move to another server". The browser only talks to its own server (/api/servers…, it reaches the other
-// server with the stored token); nothing is synced. Their data lives in S.msv, NEVER in S.tasks (ids are per server;
+// server with the stored token); nothing is synced. Their data lives in S.msvv, NEVER in S.tasks (ids are per server;
 // undo, the offline outbox and the live updates hang on S.tasks); foreign rows carry data-msv="<sid>:<id>".
 // Without a linked server nothing changes: one GET /api/servers at the start (a 404 before part A is taken quietly).
-S.msv = {self: null, links: [], data: {}, news: {}, cal: {key: '', ev: {}}, search: {q: '', res: {}}, loaded: false, at: 0, busy: false};
-S.msvQ = null;  // the quick add target picked by hand: {key, sid, lid}
+S.msvv = {self: null, links: [], data: {}, news: {}, cal: {key: '', ev: {}}, search: {q: '', res: {}}, loaded: false, at: 0, busy: false};
+S.msvvQ = null;  // the quick add target picked by hand: {key, sid, lid}
 const MSVV_POLL = 60e3, MSVV_NEWS = 300e3;
 const MSVV_ERR = {offline: N_('not reachable'), auth: N_('sign-in no longer valid'), denied: N_('no access'), notfound: N_('not found'),
   rate: N_('too many requests, please wait a moment'), version: N_('needs a newer Kalmido version'), invalid: N_('unexpected answer')};
 const msvvErrText = code => tr(MSVV_ERR[code] || MSVV_ERR.offline);
-const msvvOn = () => !!S.msv.links.length;
-const msvvLink = sid => S.msv.links.find(l => l.id === +sid) || null;
-const msvvName = sid => +sid ? msvvLink(sid)?.name || '?' : S.msv.self?.name || tr('This server');
+const msvvOn = () => !!S.msvv.links.length;
+const msvvLink = sid => S.msvv.links.find(l => l.id === +sid) || null;
+const msvvName = sid => +sid ? msvvLink(sid)?.name || '?' : S.msvv.self?.name || tr('This server');
 const msvvArr = a => Array.isArray(a) ? a : [];
 const msvvPrio = p => [1, 3, 5].includes(+p) ? +p : 0;
 const msvvUrl = u => typeof u === 'string' && /^https?:\/\//i.test(u) ? u : '';
@@ -41,33 +41,33 @@ const msvvFail = (sid, e) => toast(tr('{0}: {1}', msvvName(sid), e?.message || m
 
 // ---- state
 async function msvvLoad() {
-  if (S.msv.busy) return; S.msv.busy = true;
+  if (S.msvv.busy) return; S.msvv.busy = true;
   try {
     let j;
-    try { j = await msvvFetch('GET', '/api/servers'); } catch { S.msv.loaded = true; return; }  // 404 before part A, offline: as it is
+    try { j = await msvvFetch('GET', '/api/servers'); } catch { S.msvv.loaded = true; return; }  // 404 before part A, offline: as it is
     const had = msvvOn();
-    S.msv.self = j.self && typeof j.self === 'object' ? j.self : null;
-    S.msv.links = msvvArr(j.links).filter(l => l && +l.id > 0).map(l => ({...l, id: +l.id}))
+    S.msvv.self = j.self && typeof j.self === 'object' ? j.self : null;
+    S.msvv.links = msvvArr(j.links).filter(l => l && +l.id > 0).map(l => ({...l, id: +l.id}))
       .sort((a, b) => (+a.position || 0) - (+b.position || 0) || a.id - b.id);
-    S.msv.loaded = true; S.msv.at = Date.now();
-    for (const k of Object.keys(S.msv.data)) if (!msvvLink(k)) delete S.msv.data[k];
-    if (!msvvOn()) { if (had) { S.msv.sig = ''; msvvDraw(); } return; }
-    await Promise.all(S.msv.links.map(l => msvvData(l.id)));
-    if (Date.now() - (S.msv.newsAt || 0) > MSVV_NEWS || S.route.mod === 'news') msvvNewsLoad();
+    S.msvv.loaded = true; S.msvv.at = Date.now();
+    for (const k of Object.keys(S.msvv.data)) if (!msvvLink(k)) delete S.msvv.data[k];
+    if (!msvvOn()) { if (had) { S.msvv.sig = ''; msvvDraw(); } return; }
+    await Promise.all(S.msvv.links.map(l => msvvData(l.id)));
+    if (Date.now() - (S.msvv.newsAt || 0) > MSVV_NEWS || S.route.mod === 'news') msvvNewsLoad();
     // the poll redraws only when something changed (the answer's time aside)
-    const sig = JSON.stringify([S.msv.self, S.msv.links.map(({at, ...l}) => l), S.msv.links.map(l => { const d = S.msv.data[l.id] || {}; return [d.lists, d.tasks, d.today, d.err]; })]);
-    if (sig !== S.msv.sig) { S.msv.sig = sig; msvvDraw(); }
-  } finally { S.msv.busy = false; }
+    const sig = JSON.stringify([S.msvv.self, S.msvv.links.map(({at, ...l}) => l), S.msvv.links.map(l => { const d = S.msvv.data[l.id] || {}; return [d.lists, d.tasks, d.today, d.err]; })]);
+    if (sig !== S.msvv.sig) { S.msvv.sig = sig; msvvDraw(); }
+  } finally { S.msvv.busy = false; }
 }
 async function msvvData(sid) {
-  const d0 = S.msv.data[sid] || {lists: [], tasks: [], today: '', at: '', err: null};
+  const d0 = S.msvv.data[sid] || {lists: [], tasks: [], today: '', at: '', err: null};
   try {
     const j = await msvvFetch('GET', `/api/servers/${sid}/data`);
-    S.msv.data[sid] = {lists: msvvArr(j.lists).map(l => ({...l, id: +l.id})), tasks: msvvArr(j.tasks).map(t => ({...t, id: +t.id, list_id: +t.list_id, parent_id: +t.parent_id || null, priority: msvvPrio(t.priority), status: +t.status || 0, tags: msvvArr(t.tags)})),
+    S.msvv.data[sid] = {lists: msvvArr(j.lists).map(l => ({...l, id: +l.id})), tasks: msvvArr(j.tasks).map(t => ({...t, id: +t.id, list_id: +t.list_id, parent_id: +t.parent_id || null, priority: msvvPrio(t.priority), status: +t.status || 0, tags: msvvArr(t.tags)})),
       today: /^\d{4}-\d{2}-\d{2}$/.test(j.today || '') ? j.today : today(), at: j.at || new Date().toISOString(), err: null};
-  } catch (e) { S.msv.data[sid] = {...d0, err: e.code || 'offline'}; }
+  } catch (e) { S.msvv.data[sid] = {...d0, err: e.code || 'offline'}; }
 }
-// what a change of S.msv redraws: the sidebar, and the view when it shows foreign data
+// what a change of S.msvv redraws: the sidebar, and the view when it shows foreign data
 function msvvDraw() {
   if (!S.booted) return;
   renderSide();
@@ -79,15 +79,15 @@ function msvvBoot() {
   if (msvvBoot.done || S.me?.kid) return; msvvBoot.done = true;
   msvvLoad();
   setInterval(() => { if (msvvOn() && !document.hidden) msvvLoad(); }, MSVV_POLL);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && msvvOn() && Date.now() - S.msv.at > 20e3) msvvLoad(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && msvvOn() && Date.now() - S.msvv.at > 20e3) msvvLoad(); });
   document.addEventListener('msv:changed', () => msvvLoad());  // servers.js: an account was added, changed or removed
 }
-const msvvTask = (sid, id) => S.msv.data[sid]?.tasks.find(t => t.id === +id) || S.msv.data[sid]?.extra?.[+id] || null;
-const msvvList = (sid, lid) => S.msv.data[sid]?.lists.find(l => l.id === +lid) || null;
+const msvvTask = (sid, id) => S.msvv.data[sid]?.tasks.find(t => t.id === +id) || S.msvv.data[sid]?.extra?.[+id] || null;
+const msvvList = (sid, lid) => S.msvv.data[sid]?.lists.find(l => l.id === +lid) || null;
 const msvvCanWrite = (sid, lid) => !!msvvList(sid, lid)?.can_write;
-const msvvKids = (sid, id) => (S.msv.data[sid]?.tasks || []).filter(t => t.parent_id === id && t.status === 0);
-function msvvPut(sid, t) {  // an answer of a write replaces the task in S.msv (an open one) or drops it (done / deleted)
-  const d = S.msv.data[sid]; if (!d || !t || !(+t.id > 0)) return;
+const msvvKids = (sid, id) => (S.msvv.data[sid]?.tasks || []).filter(t => t.parent_id === id && t.status === 0);
+function msvvPut(sid, t) {  // an answer of a write replaces the task in S.msvv (an open one) or drops it (done / deleted)
+  const d = S.msvv.data[sid]; if (!d || !t || !(+t.id > 0)) return;
   const n = {...t, id: +t.id, list_id: +t.list_id, parent_id: +t.parent_id || null, priority: msvvPrio(t.priority), status: +t.status || 0, tags: msvvArr(t.tags)};
   const i = d.tasks.findIndex(x => x.id === n.id);
   if (i >= 0) d.tasks[i] = {...d.tasks[i], ...n}; else d.tasks.push(n);
@@ -95,7 +95,7 @@ function msvvPut(sid, t) {  // an answer of a write replaces the task in S.msv (
 
 // ---- the badge: the server's short name in its colour (muted), its name for screen readers and as tooltip
 function msvvBadge(sid, cls = '') {
-  const l = +sid ? msvvLink(sid) : S.msv.self || {};
+  const l = +sid ? msvvLink(sid) : S.msvv.self || {};
   if (!l) return '';
   const nm = msvvName(sid), sh = String(l.short || initials(nm)).slice(0, 3), c = cssColor(l.color);
   return `<span class="msvb ${cls}"${c ? ` style="--msvc:${c}"` : ''} role="img" aria-label="${esc(tr('Server: {0}', nm))}" title="${esc(nm)}">${esc(sh)}</span>`;
@@ -106,14 +106,14 @@ function msvvSelfBadge(opts = {}) {
   return msvvBadge(0);
 }
 const msvvErrLine = sid => {
-  const d = S.msv.data[sid]; if (!d?.err) return '';
+  const d = S.msvv.data[sid]; if (!d?.err) return '';
   const tm = msvvTime(d.at);
   return `<div class="msvverr" role="status">${ic('cloudoff', 's')}<span>${esc(tm ? tr('{0} {1} – last update {2}', msvvName(sid), msvvErrText(d.err), tm) : tr('{0} {1}', msvvName(sid), msvvErrText(d.err)))}</span></div>`;
 };
 
 // ---- a foreign task row (the classes of taskRow, its own data-msv instead of data-id: the own handlers leave it alone)
 function msvvRow(sid, t, o = {}) {
-  const d = S.msv.data[sid], ro = !msvvCanWrite(sid, t.list_id), meta = [msvvBadge(sid)];
+  const d = S.msvv.data[sid], ro = !msvvCanWrite(sid, t.list_id), meta = [msvvBadge(sid)];
   const lst = o.showList ? msvvList(sid, t.list_id)?.name || '' : '';
   if (lst) meta.push(`<span class="lst" title="${esc(lst)}">${esc(lst)}</span>`);
   if (t.due) { const ov = !t.status && t.due < (d?.today || today()); meta.push(`<span class="dt ${ov ? 'over' : t.due === (d?.today || today()) && !t.status ? 'today' : ''}">${ov ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ic('cal', 's')}${esc(dueLabel(t, false))}</span>`); }
@@ -133,8 +133,8 @@ const msvvRoots = ts => { const ids = new Set(ts.map(t => t.id)); return ts.filt
 // ---- Today + Basket: the foreign tasks by the same rules (Today: due on or before the server's today; Basket: its inbox list)
 function msvvViewTasks(k) {
   const out = [];
-  for (const l of S.msv.links) {
-    const d = S.msv.data[l.id]; if (!d) continue;
+  for (const l of S.msvv.links) {
+    const d = S.msvv.data[l.id]; if (!d) continue;
     const inb = new Set(d.lists.filter(x => x.inbox).map(x => x.id));
     const m = d.tasks.filter(t => t.status === 0 && (k === 'today' ? t.due && t.due <= d.today : inb.has(t.list_id)));
     for (const t of msvvRoots(m)) out.push({id: `m${l.id}:${t.id}`, due: t.due, priority: t.priority, status: 0, list_id: 0, title: t.title, tags: [], _msv: {sid: l.id, t, today: d.today}});
@@ -169,20 +169,20 @@ function msvvCount(n, k) {
 // ---- the sidebar: one foldable group per server (badge + name, a quiet error line) with its lists
 function msvvSide() {
   if (!msvvOn()) return '';
-  return S.msv.links.map(l => {
-    const d = S.msv.data[l.id] || {lists: [], tasks: []}, key = 'msvside:' + l.id, closed = S.collapsed.has(key);
+  return S.msvv.links.map(l => {
+    const d = S.msvv.data[l.id] || {lists: [], tasks: []}, key = 'msvside:' + l.id, closed = S.collapsed.has(key);
     const on = S.route.mod === 'msv' && S.route.sid === l.id;
     const cnt = lid => d.tasks.filter(t => t.list_id === lid && t.status === 0 && !t.parent_id).length;
     const rows = d.lists.map(x => `<button class="srow msvsrow ${on && S.route.lid === x.id ? 'on' : ''}" data-go="srv/${l.id}/${x.id}"><span class="sic" aria-hidden="true">${ic(x.inbox ? 'inbox' : 'list', 's')}</span><span class="n">${esc(x.name || '')}</span><span class="c">${cnt(x.id) || ''}</span></button>`).join('');
-    return `<div class="sgroup sg-msv" data-msvside="${l.id}"><div class="shead sgh ${closed ? 'closed' : ''} ${on && closed ? 'sgon' : ''}"><button class="sgt" data-msvv-fold="${l.id}" aria-expanded="${!closed}">${ic('chev', 's fcar')}${msvvBadge(l.id)}<span>${esc(l.name || '?')}</span>${d.err ? `<span class="msvvoff" title="${esc(msvvErrText(d.err))}">${ic('cloudoff', 's')}<span class="sr">${esc(msvvErrText(d.err))}</span></span>` : ''}</button><span class="spacer"></span></div>${closed ? '' : (d.err ? msvvErrLine(l.id) : '') + (rows || `<div class="fempty">${esc(d.err ? '' : S.msv.data[l.id] ? tr('No lists') : tr('Loading…'))}</div>`)}</div>`;
+    return `<div class="sgroup sg-msv" data-msvside="${l.id}"><div class="shead sgh ${closed ? 'closed' : ''} ${on && closed ? 'sgon' : ''}"><button class="sgt" data-msvv-fold="${l.id}" aria-expanded="${!closed}">${ic('chev', 's fcar')}${msvvBadge(l.id)}<span>${esc(l.name || '?')}</span>${d.err ? `<span class="msvvoff" title="${esc(msvvErrText(d.err))}">${ic('cloudoff', 's')}<span class="sr">${esc(msvvErrText(d.err))}</span></span>` : ''}</button><span class="spacer"></span></div>${closed ? '' : (d.err ? msvvErrLine(l.id) : '') + (rows || `<div class="fempty">${esc(d.err ? '' : S.msvv.data[l.id] ? tr('No lists') : tr('Loading…'))}</div>`)}</div>`;
   }).join('');
 }
 
 // ---- a foreign list (#srv/<sid>/<lid>): its open tasks, ticking off, a quick add into it
 function msvvTitle() { const {sid, lid} = S.route; return msvvList(sid, lid)?.name || msvvName(sid); }
 function msvvViewList() {
-  const {sid, lid} = S.route, l = msvvLink(sid), d = S.msv.data[sid];
-  if (!l) return heronEmpty('empty', S.msv.loaded ? tr('This server is not connected (any more).') : tr('Loading…'));
+  const {sid, lid} = S.route, l = msvvLink(sid), d = S.msvv.data[sid];
+  if (!l) return heronEmpty('empty', S.msvv.loaded ? tr('This server is not connected (any more).') : tr('Loading…'));
   const lst = msvvList(sid, lid);
   const ts = d ? msvvRoots(d.tasks.filter(t => t.list_id === lid && t.status === 0)).sort(msvvRowKey) : [];
   const head = `<div class="msvvhead">${msvvBadge(sid)}<span>${esc(l.name || '')}${lst ? ' · ' + esc(lst.name || '') : ''}</span>${l.base_url && msvvUrl(l.base_url) ? `<a class="btn sm" href="${esc(msvvUrl(l.base_url))}" target="_blank" rel="noopener noreferrer">${ic('link', 's')}${esc(tr('Open on {0}', l.name || '?'))}</a>` : ''}</div>`;
@@ -268,7 +268,7 @@ function msvvDetailDraw(md, sid, t) {
     else if (a.dataset.msvd === 'move') msvvMoveDlg({server: sid, task: t.id, title: t.title || ''}, md);
     else if (a.dataset.msvd === 'delete') {
       if (!await askConfirm(tr('Delete on {0}?', l?.name || '?'), tr('“{0}” goes to the trash on {1} and can be restored there.', t.title || '', l?.name || '?'), {ok: tr('Delete'), danger: true})) return;
-      try { await msvvFetch('DELETE', `/api/servers/${sid}/tasks/${t.id}`); const d = S.msv.data[sid]; if (d) d.tasks = d.tasks.filter(x => x.id !== t.id); md.remove(); msvvDraw(); toast(tr('Moved to the trash on {0}', l?.name || '?')); }
+      try { await msvvFetch('DELETE', `/api/servers/${sid}/tasks/${t.id}`); const d = S.msvv.data[sid]; if (d) d.tasks = d.tasks.filter(x => x.id !== t.id); md.remove(); msvvDraw(); toast(tr('Moved to the trash on {0}', l?.name || '?')); }
       catch (er) { msvvFail(sid, er); }
     }
   });
@@ -279,10 +279,10 @@ function msvvMoveItem(t) {
   if (!msvvOn() || !t || !(t.id > 0) || t.context || !canEdit(t)) return [];
   return [{label: tr('Move to another server…'), icon: 'arrow', fn: () => msvvMoveDlg({server: 0, task: t.id, title: t.title || ''})}];
 }
-const msvvTargets = from => [...(from ? [0] : []), ...S.msv.links.map(l => l.id).filter(id => id !== from)];
+const msvvTargets = from => [...(from ? [0] : []), ...S.msvv.links.map(l => l.id).filter(id => id !== from)];
 function msvvTargetLists(sid) {
   if (!+sid) return [inbox(), ...S.lists.filter(l => !l.is_inbox && !l.archived && canAddTo(l.id))].filter(Boolean).map(l => ({id: l.id, name: l.is_inbox ? tr('Basket') : lname(l), inbox: !!l.is_inbox}));
-  return (S.msv.data[sid]?.lists || []).filter(l => l.can_write).map(l => ({id: l.id, name: l.name || '', inbox: !!l.inbox}));
+  return (S.msvv.data[sid]?.lists || []).filter(l => l.can_write).map(l => ({id: l.id, name: l.name || '', inbox: !!l.inbox}));
 }
 function msvvMoveDlg(src, parent) {
   const tg = msvvTargets(src.server); if (!tg.length) return;
@@ -321,10 +321,10 @@ function msvvQDefault() {
   const r = S.route;
   if (r.mod === 'msv' && msvvLink(r.sid)) return {sid: r.sid, lid: r.lid};
   if (r.mod === 'tasks' && (r.key === 'inbox' || r.key.startsWith('l:') || r.key.startsWith('folder:'))) return {sid: 0};
-  const dl = S.msv.links.find(l => l.default_inbox); return dl ? {sid: dl.id, lid: null} : {sid: 0};
+  const dl = S.msvv.links.find(l => l.default_inbox); return dl ? {sid: dl.id, lid: null} : {sid: 0};
 }
-const msvvQT = () => S.msvQ && S.msvQ.key === msvvQKey() && (!S.msvQ.sid || msvvLink(S.msvQ.sid)) ? S.msvQ : msvvQDefault();
-const msvvQLabel = q => { const nm = msvvName(q.sid); if (!q.sid) return nm; const lst = q.lid ? msvvList(q.sid, q.lid) : (S.msv.data[q.sid]?.lists || []).find(l => l.inbox); return nm + ' · ' + (lst?.name || tr('Basket')); };
+const msvvQT = () => S.msvvQ && S.msvvQ.key === msvvQKey() && (!S.msvvQ.sid || msvvLink(S.msvvQ.sid)) ? S.msvvQ : msvvQDefault();
+const msvvQLabel = q => { const nm = msvvName(q.sid); if (!q.sid) return nm; const lst = q.lid ? msvvList(q.sid, q.lid) : (S.msvv.data[q.sid]?.lists || []).find(l => l.inbox); return nm + ' · ' + (lst?.name || tr('Basket')); };
 const msvvQChip = () => { if (!msvvOn()) return ''; const q = msvvQT(); return `<button type="button" class="qdc set msvvqc ${q.sid ? 'far' : ''}" data-msvvq="1" aria-haspopup="menu" title="${esc(tr('Where the task goes'))}">${msvvBadge(q.sid)}<span>→ ${esc(msvvQLabel(q))}</span></button>`; };
 // the docked composer's chips (render.js qdockChips) and the phone sheet (events.js openQuickSheet) show the target
 function msvvQSync(box) {
@@ -340,8 +340,8 @@ function msvvSheetTarget(q) {
   $('.box', q)?.insertAdjacentHTML('afterend', `<div class="msvvqs qdchips">${msvvQChip()}</div>`);
 }
 function msvvQPick(a) {
-  const key = msvvQKey(), set = (sid, lid) => { S.msvQ = {key, sid, lid}; msvvQSync($('#qdchips')); const s = $('.qadd.sheet .msvvqs'); if (s) s.innerHTML = msvvQChip(); ($('#qinput') || $('#qsheet'))?.focus(); };
-  menu(a, [{label: msvvName(0), icon: 'home', fn: () => set(0, null)}, ...S.msv.links.map(l => ({label: l.name || '?', icon: 'globe', fn: () => setTimeout(() => {
+  const key = msvvQKey(), set = (sid, lid) => { S.msvvQ = {key, sid, lid}; msvvQSync($('#qdchips')); const s = $('.qadd.sheet .msvvqs'); if (s) s.innerHTML = msvvQChip(); ($('#qinput') || $('#qsheet'))?.focus(); };
+  menu(a, [{label: msvvName(0), icon: 'home', fn: () => set(0, null)}, ...S.msvv.links.map(l => ({label: l.name || '?', icon: 'globe', fn: () => setTimeout(() => {
     const ls = msvvTargetLists(l.id);
     if (!ls.length) { toast(tr('No list on {0} that you can add to', l.name || '?')); return; }
     menu(a, ls.map(x => ({label: x.name, icon: x.inbox ? 'inbox' : 'list', fn: () => set(l.id, x.id)})), null, null, l.name || '');
@@ -372,20 +372,20 @@ async function msvvQuick(input) {
 // ---- Search: the hits of the other servers below the own ones, one section per server, asked in parallel
 function msvvSearch(q) {
   if (!msvvOn()) return;
-  const s = S.msv.search = {q, res: {}};
+  const s = S.msvv.search = {q, res: {}};
   if (!q.trim()) { msvvSearchDraw(); return; }
-  for (const l of S.msv.links) {
+  for (const l of S.msvv.links) {
     s.res[l.id] = null;
     msvvFetch('GET', `/api/servers/${l.id}/search?q=${encodeURIComponent(q)}`)
       .then(j => { s.res[l.id] = {tasks: msvvArr(j.tasks).map(t => ({...t, id: +t.id, list_id: +t.list_id, priority: msvvPrio(t.priority), status: +t.status || 0, tags: msvvArr(t.tags)}))}; },
         e => { s.res[l.id] = {err: e.code || 'offline'}; })
-      .then(() => { if (S.msv.search === s) msvvSearchDraw(); });
+      .then(() => { if (S.msvv.search === s) msvvSearchDraw(); });
   }
   msvvSearchDraw();
 }
 function msvvSearchHtml() {
-  const s = S.msv.search; if (!msvvOn() || !s.q.trim()) return '';
-  return S.msv.links.map(l => {
+  const s = S.msvv.search; if (!msvvOn() || !s.q.trim()) return '';
+  return S.msvv.links.map(l => {
     const r = s.res[l.id];
     const body = r === null || r === undefined ? `<div class="muted msvvwait">${tr('Searching…')}</div>` : r.err ? `<div class="msvverr" role="status">${ic('cloudoff', 's')}<span>${esc(tr('{0} {1}', l.name || '?', msvvErrText(r.err)))}</span></div>`
       : r.tasks.length ? r.tasks.map(t => { msvvSeen(l.id, t); return msvvRow(l.id, t, {showList: true, tree: false}); }).join('') : `<div class="muted msvvwait">${tr('No results.')}</div>`;
@@ -394,25 +394,25 @@ function msvvSearchHtml() {
 }
 function msvvSearchDraw() { const el = $('#msvvsearch'); if (el) el.innerHTML = msvvSearchHtml(); }
 // a hit that is not among the open tasks of /data (done, other filters) is kept so its row can open it
-function msvvSeen(sid, t) { const d = S.msv.data[sid]; if (d && !d.tasks.some(x => x.id === t.id)) d.extra = {...(d.extra || {}), [t.id]: t}; }
+function msvvSeen(sid, t) { const d = S.msvv.data[sid]; if (d && !d.tasks.some(x => x.id === t.id)) d.extra = {...(d.extra || {}), [t.id]: t}; }
 
 // ---- News: the unread items of each server as a section of the News view (its number joins the bell's)
 async function msvvNewsLoad() {
   if (!msvvOn()) return;
-  S.msv.newsAt = Date.now();
-  await Promise.all(S.msv.links.map(async l => {
-    try { const j = await msvvFetch('GET', `/api/servers/${l.id}/news?limit=30`); S.msv.news[l.id] = {items: msvvArr(j.items), unread: +j.unread || 0, err: null}; }
-    catch (e) { S.msv.news[l.id] = {...(S.msv.news[l.id] || {items: [], unread: 0}), err: e.code || 'offline'}; }
+  S.msvv.newsAt = Date.now();
+  await Promise.all(S.msvv.links.map(async l => {
+    try { const j = await msvvFetch('GET', `/api/servers/${l.id}/news?limit=30`); S.msvv.news[l.id] = {items: msvvArr(j.items), unread: +j.unread || 0, err: null}; }
+    catch (e) { S.msvv.news[l.id] = {...(S.msvv.news[l.id] || {items: [], unread: 0}), err: e.code || 'offline'}; }
   }));
   renderSide(); renderTop();
   if (S.route.mod === 'news') viewSafeRender();
 }
-const msvvUnread = () => msvvOn() ? S.msv.links.reduce((n, l) => n + (S.msv.news[l.id]?.unread || 0), 0) : 0;
+const msvvUnread = () => msvvOn() ? S.msvv.links.reduce((n, l) => n + (S.msvv.news[l.id]?.unread || 0), 0) : 0;
 function msvvNewsHtml() {
   if (!msvvOn()) return '';
-  if (Date.now() - (S.msv.newsAt || 0) > MSVV_POLL) setTimeout(msvvNewsLoad, 0);
-  return S.msv.links.map(l => {
-    const n = S.msv.news[l.id];
+  if (Date.now() - (S.msvv.newsAt || 0) > MSVV_POLL) setTimeout(msvvNewsLoad, 0);
+  return S.msvv.links.map(l => {
+    const n = S.msvv.news[l.id];
     const items = (n?.items || []).filter(it => !S.nf?.unread || !it.read);
     const body = !n ? `<div class="muted msvvwait">${tr('Loading…')}</div>` : n.err && !n.items.length ? `<div class="msvverr" role="status">${ic('cloudoff', 's')}<span>${esc(tr('{0} {1}', l.name || '?', msvvErrText(n.err)))}</span></div>`
       : items.length ? items.map(it => `<button type="button" class="nitem msvvni ${it.read ? 'read' : 'unread'}" data-msvn="${l.id}:${esc(String(it.id))}">${msvvBadge(l.id)}<span class="msvvnt">${esc(String(it.text || ''))}</span><span class="muted">${esc(it.at ? fmtWhen(it.at) : '')}</span></button>`).join('') : `<div class="muted msvvwait">${tr('No news')}</div>`;
@@ -420,7 +420,7 @@ function msvvNewsHtml() {
   }).join('');
 }
 async function msvvNewsRead(sid, ids) {
-  const n = S.msv.news[sid]; if (!n || !ids.length) return;
+  const n = S.msvv.news[sid]; if (!n || !ids.length) return;
   try { await msvvFetch('POST', `/api/servers/${sid}/news/read`, {ids}); } catch (e) { msvvFail(sid, e); return; }
   for (const it of n.items) if (ids.includes(it.id) && !it.read) { it.read = true; n.unread = Math.max(0, n.unread - 1); }
   renderSide(); renderTop(); if (S.route.mod === 'news') viewSafeRender();
@@ -429,19 +429,19 @@ async function msvvNewsRead(sid, ids) {
 // ---- Calendar (month view): the foreign events and due tasks of the shown range, read-only, with the badge
 function msvvCalEnsure(from, to) {
   if (!msvvOn()) return;
-  const key = from + '|' + to + '|' + S.msv.links.map(l => l.id).join(',');
-  if (S.msv.cal.key === key && Date.now() - (S.msv.cal.at || 0) < 5 * MSVV_POLL) return;
-  S.msv.cal = {key, at: Date.now(), ev: {}};
-  const c = S.msv.cal;
-  Promise.all(S.msv.links.map(l => msvvFetch('GET', `/api/servers/${l.id}/events?from=${from}&to=${to}`).then(j => { c.ev[l.id] = msvvArr(j.events); }, () => { c.ev[l.id] = []; })))
-    .then(() => { if (S.msv.cal === c && S.route.mod === 'cal') viewSafeRender(); });
+  const key = from + '|' + to + '|' + S.msvv.links.map(l => l.id).join(',');
+  if (S.msvv.cal.key === key && Date.now() - (S.msvv.cal.at || 0) < 5 * MSVV_POLL) return;
+  S.msvv.cal = {key, at: Date.now(), ev: {}};
+  const c = S.msvv.cal;
+  Promise.all(S.msvv.links.map(l => msvvFetch('GET', `/api/servers/${l.id}/events?from=${from}&to=${to}`).then(j => { c.ev[l.id] = msvvArr(j.events); }, () => { c.ev[l.id] = []; })))
+    .then(() => { if (S.msvv.cal === c && S.route.mod === 'cal') viewSafeRender(); });
 }
 function msvvCalItems(d) {
   if (!msvvOn()) return [];
   const out = [];
-  for (const l of S.msv.links) {
-    (S.msv.cal.ev[l.id] || []).forEach((e, i) => { const a = String(e.start || '').slice(0, 10), b = String(e.end || e.start || '').slice(0, 10) || a; if (a && a <= d && d <= (b < a ? a : b)) out.push({sid: l.id, ev: e, i}); });
-    for (const t of S.msv.data[l.id]?.tasks || []) if (t.due === d && !t.parent_id) out.push({sid: l.id, t});
+  for (const l of S.msvv.links) {
+    (S.msvv.cal.ev[l.id] || []).forEach((e, i) => { const a = String(e.start || '').slice(0, 10), b = String(e.end || e.start || '').slice(0, 10) || a; if (a && a <= d && d <= (b < a ? a : b)) out.push({sid: l.id, ev: e, i}); });
+    for (const t of S.msvv.data[l.id]?.tasks || []) if (t.due === d && !t.parent_id) out.push({sid: l.id, t});
   }
   return out;
 }
@@ -461,18 +461,18 @@ document.addEventListener('click', e => {
   const qc = t.closest?.('[data-msvvq]');
   if (qc) { e.preventDefault(); e.stopPropagation(); msvvQPick(qc); return; }
   const nall = t.closest?.('[data-msvnall]');
-  if (nall) { e.preventDefault(); e.stopPropagation(); const sid = +nall.dataset.msvnall; msvvNewsRead(sid, (S.msv.news[sid]?.items || []).filter(x => !x.read).map(x => x.id)); return; }
+  if (nall) { e.preventDefault(); e.stopPropagation(); const sid = +nall.dataset.msvnall; msvvNewsRead(sid, (S.msvv.news[sid]?.items || []).filter(x => !x.read).map(x => x.id)); return; }
   const ni = t.closest?.('[data-msvn]');
   if (ni) {
     e.preventDefault(); e.stopPropagation();
-    const [sid, ...rest] = ni.dataset.msvn.split(':'), it = (S.msv.news[+sid]?.items || []).find(x => String(x.id) === rest.join(':'));
+    const [sid, ...rest] = ni.dataset.msvn.split(':'), it = (S.msvv.news[+sid]?.items || []).find(x => String(x.id) === rest.join(':'));
     if (!it) return;
     if (!it.read) msvvNewsRead(+sid, [it.id]);
     if (+it.task_id > 0) msvvOpen(+sid, +it.task_id);
     return;
   }
   const ce = t.closest?.('[data-msvev]');
-  if (ce) { e.preventDefault(); e.stopPropagation(); const [sid, i] = ce.dataset.msvev.split(':').map(Number), u = msvvUrl(S.msv.cal.ev[sid]?.[i]?.url); if (u) window.open(u, '_blank', 'noopener'); else toast(msvvName(sid)); return; }
+  if (ce) { e.preventDefault(); e.stopPropagation(); const [sid, i] = ce.dataset.msvev.split(':').map(Number), u = msvvUrl(S.msvv.cal.ev[sid]?.[i]?.url); if (u) window.open(u, '_blank', 'noopener'); else toast(msvvName(sid)); return; }
   const r = t.closest?.('[data-msv]');
   if (!r || r.classList.contains('modal') || t.closest('a[href]')) return;
   e.preventDefault(); e.stopPropagation();
