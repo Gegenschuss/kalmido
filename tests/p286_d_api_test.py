@@ -162,7 +162,8 @@ check(p.status_code == 413 and not task_titled("Huge"), f"N22/N24: a body above 
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"})
 CL, CLH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
 A.patch(B + f"/api/admin/agents/{CL}", json={"org_id": ORG})
-A.put(B + f"/api/lists/{W}/members", json={"user_id": CL, "role": "edit"})
+A.patch(B + f"/api/lists/{W}", json={"agent_members": True})
+check(A.put(B + f"/api/lists/{W}/members", json={"user_id": CL, "role": "edit"}).ok, "setup: the agent in the list")
 r = requests.post(V + "/agent/jobs", headers=CLH, json={"title": "Clara: weeding", "task_id": T})
 check(r.status_code in (200, 201), "setup: a job " + r.text[:200])
 JC = r.json().get("id") if r.ok else 0
