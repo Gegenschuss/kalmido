@@ -7,6 +7,24 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.70.0] - 2026-10-17
+
+### Added
+- Paperless-ngx import on hosted servers: only public HTTPS addresses there, the allow-list of internal hosts does not
+  apply (#1846).
+- Import from a Paperless-ngx export without a connection: upload the ZIP of `document_exporter` in the documents
+  settings, with the same preview and mapping as the import over the address (#1846).
+- Storage quota in the import: the preview shows what is needed and what is free; at a full storage the import stops
+  cleanly ("after X of Y documents") (#1846).
+- One import per server at a time; others wait in a queue and show their place (#1846).
+- The matching rules of Paperless-ngx tags, correspondents and document types become document rules (any, all, literal,
+  regex, fuzzy; case-sensitive kept; "auto" covered by Kalmido's learning), switchable in the preview, never twice (#1847).
+- After every import the classifier learns the imported senders, types, tags and folders once, as confirmed examples (#1847).
+- Document rules can be case-sensitive.
+
+### Security
+- Security fix: Paperless-ngx import (network boundary on hosted servers, upload handling).
+
 ## [2.69.0] - 2026-10-17
 
 ### Added
