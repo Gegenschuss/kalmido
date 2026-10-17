@@ -116,7 +116,7 @@ def op_event_new(c, uid, b):
     cid = as_int(cid, "cal_id", 1) if cid not in (None, "") else default_cal(c, uid)
     need_evcal(c, cid, write=True)
     f = ev_fields(c, uid, b)
-    att = att_clean(c, b["attendees"]) if "attendees" in b else None
+    att = att_clean(c, b["attendees"], cal_id=cid) if "attendees" in b else None
     eid = ev_store(c, uid, cid, f, attendees=att)
     c.commit()
     return ev_dict(c, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), uid)
@@ -142,7 +142,7 @@ def op_event_edit(c, uid, eid, b, occ=None):
     f = ev_fields(c, uid, {k: v for k, v in b.items() if k not in ("attendees", "cal_id", "expect")}, r)
     if "rrule" in f and not f["rrule"]:
         f["overrides"], f["exdates"] = "", ""
-    att = att_clean(c, b["attendees"], eid) if "attendees" in b else None
+    att = att_clean(c, b["attendees"], eid, r["cal_id"]) if "attendees" in b else None
     ev_store(c, uid, r["cal_id"], f, eid=eid, attendees=att)
     c.commit()
     return ev_dict(c, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), uid)

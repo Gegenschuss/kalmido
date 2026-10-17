@@ -17,7 +17,7 @@ from ..tasks.validation import REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm
 from ..calendars.icalfeed import ics_dur, ics_fold, ics_text, ics_utc, ics_vtimezone
 from ..personal.timetrack import BadInput
 from ..events.model import (
-    att_rows, ev_store, ev_zone, one_line, rule_local, EV_DESC_MAX, EV_LOC_MAX, EV_TITLE_MAX, need_evcal, ov_list, tz_ok, wall, wall_s,
+    att_rows, ev_att_ok, ev_store, ev_zone, one_line, rule_local, EV_DESC_MAX, EV_LOC_MAX, EV_TITLE_MAX, need_evcal, ov_list, tz_ok, wall, wall_s,
 )
 
 OV_KEYS = ("title", "location", "description", "all_day", "start", "end", "status", "delete")
@@ -455,7 +455,7 @@ def _cap(s):
     return s
 
 
-def atts_resolve(c, uid, raw, eid=None):
+def atts_resolve(c, uid, raw, eid=None, cal_id=None):
     """The ATTENDEE lines of a client -> attendee rows: a person of this server (by X-KALMIDO-USER / urn / e-mail),
     a contact the writer sees (by e-mail) or the address. A person only when the writer may see them (like att_clean,
     #476 H1): an ICS file or a CalDAV client never invites accounts of other organisations; already invited ones stay."""
@@ -464,6 +464,8 @@ def atts_resolve(c, uid, raw, eid=None):
     from ..agents.admin import personal_agent_foreign
     had_u = {r[0] for r in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL",
                                      (eid,))} if eid else set()
+    # 2.87.0 (#1983): in an organisation's calendar only its people (like att_clean); anyone else stays an address
+    cal_org = (c.execute("SELECT org_id FROM ev_cals WHERE id=?", (cal_id,)).fetchone() or [None])[0] if cal_id else None
     out, seen = [], set()
     for a in raw[:100]:
         addr = a["addr"]
@@ -472,7 +474,8 @@ def atts_resolve(c, uid, raw, eid=None):
         ku = int(a["kuser"]) if a.get("kuser") and str(a["kuser"]).isdigit() else (int(m.group(1)) if m else None)
         em = addr[7:].strip() if addr.lower().startswith("mailto:") else ""
         if collab_all() and ku and c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (ku,)).fetchone() \
-                and (ku == uid or ku in had_u or (may_see(c, uid, ku) and not personal_agent_foreign(c, ku, uid))):
+                and (ku == uid or ku in had_u or (may_see(c, uid, ku) and not personal_agent_foreign(c, ku, uid))) \
+                and (not cal_org or ev_att_ok(c, ku, cal_org)):
             row["user_id"] = ku  # by its Kalmido id only: an e-mail address never reveals or picks an account
             row["partstat"] = "needs-action"  # a person's reply is their own (att_set keeps it)
         if em and not row["user_id"] and c.execute("SELECT 1 FROM users WHERE id=? AND lower(email)=lower(?)", (uid, em)).fetchone():
@@ -502,7 +505,7 @@ def store_parsed(c, uid, cal_id, v, eid=None, href=None):
     if me_ and me_[0]:  # the writer's own address as organiser: Kalmido writes its own (no account e-mail reaches others)
         f["extra"] = "\n".join(x for x in f["extra"].split("\n")
                                if not (_prop_name(x) == "ORGANIZER" and x.split(":", 1)[-1].strip().lower() == "mailto:" + me_[0].lower()))
-    return ev_store(c, uid, cal_id, f, eid=eid, uid_=v["uid"], href=href, attendees=atts_resolve(c, uid, v["attendees_raw"], eid))
+    return ev_store(c, uid, cal_id, f, eid=eid, uid_=v["uid"], href=href, attendees=atts_resolve(c, uid, v["attendees_raw"], eid, cal_id))
 
 
 # ---- ICS import (a file, e.g. an export of another calendar) into one calendar

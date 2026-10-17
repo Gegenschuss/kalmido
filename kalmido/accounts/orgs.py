@@ -330,6 +330,12 @@ def obj_org_set(c, table, oid_col, members, obj_id, v, kind):
         p = ws_fit_problem(c, oid, uid, kind)
         if p:
             raise Denied(409, p)
+    if table == "ev_cals" and oid:  # 2.87.0 (#1983): people invited to its events must fit the organisation too
+        for (uid,) in c.execute("SELECT DISTINCT a.user_id FROM event_attendees a JOIN events e ON e.id=a.event_id WHERE e.cal_id=? "
+                                "AND e.deleted_at IS NULL AND a.user_id IS NOT NULL ORDER BY a.user_id", (obj_id,)).fetchall():
+            p = ws_fit_problem(c, oid, uid, kind)
+            if p:
+                raise Denied(409, p)
     c.execute(f"UPDATE {table} SET org_id=? WHERE id=?", (oid, obj_id))
     return True
 
@@ -830,6 +836,9 @@ def org_leave(c, oid, uid, heir):
         for table, mt, key in (("ev_cals", "ev_cal_members", "cal_id"), ("books", "book_members", "book_id")):
             c.execute(f"DELETE FROM {mt} WHERE user_id=? AND {key} IN (SELECT id FROM {table} WHERE org_id=?)", (aid, oid))
         c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, aid))
+    # 2.87.0 (#1983): the leaver and their agents are no longer invited to the events of the organisation's calendars
+    c.execute("DELETE FROM event_attendees WHERE user_id IN (%s) AND event_id IN (SELECT e.id FROM events e JOIN ev_cals k "
+              "ON k.id=e.cal_id WHERE k.org_id=?)" % ",".join("?" * (len(ags) + 1)), (uid, *ags, oid))
     c.execute("UPDATE agents SET org_id=NULL WHERE owner_id=? AND org_id=?", (uid, oid))
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
     # 2.53.0 (#1424, review): the leaver's task bells in the organisation go too (else the nightly boundary check alarms)
