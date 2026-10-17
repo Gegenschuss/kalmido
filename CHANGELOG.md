@@ -7,6 +7,21 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.77.0] - 2026-10-17
+
+### Added
+- **Pack catalogue** (Office & finance > Settings > Packs): search country and industry packs by name, code or author, see
+  version, author, licence and a badge **Verified** / **Community** (community packs ask with a warning first), install,
+  update and uninstall them per office (an organisation or a person's own office). Packs are data only (rates, formats,
+  labels, texts), never code; every file must match the catalogue's SHA-256, its schema and a size limit (#1023).
+- Updates are shown, never installed automatically; a pack still in use (the office's country pack, a switched-on industry
+  pack, open quotations) cannot be uninstalled and says why. Install, update and uninstall can be undone.
+- Finalised quotations and invoices keep the exact pack they were made with (version, SHA-256, source): updating or removing
+  a pack never changes them.
+- For operators: `KALMIDO_PACKS_CATALOG` (the catalogue's address; empty = only the built-in packs, no network call),
+  `KALMIDO_PACKS_ALLOW_HOSTS`, the tool `tools/packs_catalog.py` and [docs/PACKS.md](docs/PACKS.md) (index format,
+  checks, your own catalogue); contributing packs: [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## [2.76.0] - 2026-10-17
 
 ### Added

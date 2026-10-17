@@ -111,7 +111,7 @@ organisation.
 Tax rates, number and date formats, the labels of the documents and the default texts are not in the code but in a
 **country pack**: one JSON file per country under `kalmido/office/packs/<code>.json` (shipped: `DE`). A pack holds data
 only - no code - and is checked by a validator before it is used (`POST /api/office/packs/validate` runs the same check
-on a pack you paste, a dry run for community packs; installing foreign packs is a later stage).
+on a pack you paste, a dry run for community packs; packs from a catalogue: see *Packs* below).
 
 Shape (see `de.json`):
 
@@ -161,6 +161,38 @@ page. Three layers, no code plugin:
 Purchase, surplus, markup and internal / external are for the organisation's admins only: members edit the sheet but
 get none of these values (the price of a row with a markup is shown including it) and cannot set them; the server keeps
 the stored values. The printed page has no internal / external, purchase or markup column.
+
+## Packs (2.76)
+
+Office & finance > Settings > **Packs** lists the country and industry packs this office can use: the ones shipped with
+the app (*Built in*), the ones installed here, and the packs of a **catalogue**. The catalogue is an index file the
+operator of the server names in `KALMIDO_PACKS_CATALOG`; without it the list shows only the built-in packs and the note
+"No catalogue set up". Kalmido fetches nothing from the network unless a catalogue is set up.
+
+- **Search and filter**: the search field filters by code, name, description and author while you type; the buttons
+  *All / Countries / Industries* narrow the kind. Admins can fetch the catalogue again with *Refresh* (it is kept for an
+  hour otherwise).
+- **Badges**: *Verified* = checked by the Kalmido team (built-in packs always are); *Community* = made by someone else
+  and not checked. Installing a community pack asks first: check its tax rates and texts before you send documents
+  with it.
+- **Install, update, uninstall** (office admins; members see the list only): *Install* downloads the pack, checks its
+  checksum, size and shape (the same check as the built-in packs, no markup, data only, never program code) and makes
+  it available in this office only - a private office or one organisation, never others. An installed country pack
+  appears in the *Country pack* choice, an installed industry pack gets its box in the *Calculation rules*. *Update to
+  vN available* shows when the catalogue has a newer version, with its notes. A pack with the code of a built-in one
+  (for example a newer `DE`) replaces it in this office only; uninstalling it brings the built-in one back.
+- **Uninstalling** asks first. It is refused, with the reason, while the pack is still in use: the country pack chosen
+  in the settings, an industry pack switched on in the calculation rules, or used by open quotations. Change those
+  first.
+  Exception: a pack that replaces a built-in one (a newer `DE`) can be uninstalled while chosen - the office goes back
+  to the built-in version.
+- **Open documents follow the pack in effect**: quotations and invoices that are not finalised yet are calculated with
+  the pack the office uses now. Updating or uninstalling that pack therefore changes their rates and texts; the
+  confirmation says how many open documents are affected.
+- **Undo**: every install, update and uninstall is one step of the undo history (the arrow or Ctrl/Cmd+Z). Undoing an
+  update installs the version before again, as long as the catalogue still has it.
+- **Finalised documents keep their pack**: a finalised quotation or invoice stores the pack version, its checksum and
+  its source, and is always shown with that data - updating or uninstalling a pack never changes it.
 
 ## Import and export of master data
 

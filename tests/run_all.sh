@@ -1025,6 +1025,10 @@ fresh; run p274_b_demo node p274_b_demo_test.js
 fresh; run p275_a_api "$PY" p275_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.75.0 part B: assistant UI (#1411)
 fresh; run p275_b_ui node p275_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.76.0 part A: the pack catalogue (fake catalogue in the container, install / update / uninstall per office area)
+fresh; run p276_a_packs_api "$PY" p276_a_packs_api_test.py "$KALMIDO_TEST_DATA"
+# 2.76.0 part B: Office settings > Packs: catalogue search, badges, install / uninstall, undo (#1023)
+fresh; run p276_b_ui node p276_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

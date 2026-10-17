@@ -334,6 +334,8 @@ def ofx_finalize(c, oid, uid, did):
              "formats": pack.get("formats") or {}, "labels": {lang: (pack.get("labels") or {}).get(lang) or {}},
              # the pack's texts in the document's language (2.38.0: every plain text, the invoice words need them)
              "texts": {k: {lang: v.get(lang) or ""} for k, v in (pack.get("texts") or {}).items() if isinstance(v, dict) and isinstance(v.get(lang) or "", str)}}
+    from .catalog import pkc_origin  # 2.76.0 (#1023): which pack file exactly (built in or installed from a catalogue)
+    tsnap["pack_sha256"], tsnap["pack_source"] = pkc_origin("country", tsnap["pack"])
     ts = iso(now_utc())
     c.execute("UPDATE office_docs SET locked_at=?, locked_by=?, sender=?, recipient_snapshot=?, tax_snapshot=?, pack_version=?, totals=?, "
               "updated_at=? WHERE id=? AND org_id=?",
