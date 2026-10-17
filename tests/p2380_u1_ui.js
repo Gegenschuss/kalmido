@@ -140,7 +140,7 @@ const TOUCH = {'(hover: none)': true, '(hover:none)': true, '(pointer:coarse)': 
   w.close();
 
   // ================= CSS (static): the touch rule, the zoom lock, the sheet head
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   const tb = css.match(/@media \(hover: none\), \(pointer: coarse\)\{([^}]*\}[^}]*\})/);
   check(tb && /\.trow \.ttl/.test(tb[1]) && /-webkit-user-select:none/.test(tb[1]) && /-webkit-touch-callout:none/.test(tb[1]) && /#side/.test(tb[1]), '#1178 / #1155 one touch rule: titles and the sidebar not selectable, with the -webkit- prefix');
   check(/\.trow \.ttl\{-webkit-user-select:text;user-select:text\}/.test(css), '#1178 mouse: the title stays selectable');

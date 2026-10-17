@@ -54,7 +54,7 @@ const FEAT = 'comments,collab,agents';
   w.close();
 
   // ================= #1477: the hover dot is centred by the box (inset:0 + auto margins), no sub-pixel offset (jsdom has no layout: the rules)
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   const rule = sel => (css.split('}').reverse().find(b => b.includes(sel)) || '');
   check(/inset:0/.test(rule('.chk:hover:not(.on):not(.wont)::before')) && /margin:auto/.test(rule('.chk:hover:not(.on):not(.wont)::before')), '#1477: hover dot is centred with inset:0 + margin:auto');
   check(/inset:0/.test(rule('.chk.work::before')) && /margin:auto/.test(rule('.chk.work::before')), '#1477: the working dot too');

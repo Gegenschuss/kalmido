@@ -64,7 +64,7 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   check(JSON.stringify(sv) === JSON.stringify(fl), '#1664: the order is saved ' + JSON.stringify(sv));
 
   // ================= #1647
-  const css = require('fs').readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
+  const css = require('./boot').allCssSync(); // 2.65.0 (#1824): + the module stylesheets
   check(/\.oimfoot\{display:flex;[^}]*justify-content:flex-end/.test(css) && /\.oimfoot\{[^}]*margin:1rem -1\.75rem 0/.test(css) && /\.oimfoot\{[^}]*background:var\(--bg2\)/.test(css) && /\.oimfoot\{[^}]*border-top:1px solid var\(--line2\)/.test(css),
     '#1647: the import bar: flex row, full width, own background, line above');
 

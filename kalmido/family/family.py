@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from flask import g, has_request_context
 
 from ..core.config import PUBLIC_URL
-from ..core.pg import insert_id
+from ..core.pg import insert_id, st_ids
 from ..core.i18n import lang, LANGS, N_, tr
 from ..core.db import iso, local_now, now_utc, uset, usettings
 from ..accounts.session import me, user_public
@@ -341,11 +341,9 @@ def people_of(c, ids):
     out = {}
     if not ids:
         return out
-    ids = list(ids)
-    for i in range(0, len(ids), 900):
-        part = ids[i:i + 900]
-        for r in c.execute(f"SELECT task_id, user_id FROM task_people WHERE task_id IN ({','.join('?' * len(part))}) ORDER BY user_id", part):
-            out.setdefault(r[0], []).append(r[1])
+    # 2.65.0 (#1505): one array parameter instead of chunks of placeholders
+    for r in c.execute("SELECT task_id, user_id FROM task_people WHERE task_id = ANY(CAST(? AS BIGINT[])) ORDER BY user_id", (st_ids(ids),)):
+        out.setdefault(r[0], []).append(r[1])
     return out
 
 

@@ -88,6 +88,9 @@ the app has not yet been tested by people who use a screen reader every day (see
 - Some secondary dialogs (for example parts of the import, the time sheet print view and the roadmap's filters) are not
   covered by the automated test yet.
 - Lists with a lot of custom columns get dense on narrow screens; the columns that do not fit move into the second line.
+- Very long lists (more than 300 rows, 2.65.0) draw only the rows near the visible part. The browser's own search
+  (Ctrl+F) finds only those; the app's search (/) finds everything. Keyboard moving (↑ ↓, j k), Ctrl+A and Shift-click
+  work over all rows; the address book's rows say their place and the total (aria-posinset / aria-setsize).
 - Agents' messages are written by the agents; their Markdown is shown as headings, lists and code, but the content is up
   to them.
 

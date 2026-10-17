@@ -15,6 +15,8 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 const PY = process.env.PYTHON || 'python3';
 const REP = [];
+// 2.65.0 (#1822): the start budget (tools/perf_budget.json): sizes printed, load time checked against start_ms
+const BUDGET = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'tools', 'perf_budget.json'), 'utf8')); } catch (e) { return {}; } })();
 const rep = (k, v) => { REP.push([k, v]); console.log(`perf: ${k} = ${typeof v === 'number' ? Math.round(v) : v}`); };
 
 async function round(n) {
@@ -84,16 +86,18 @@ print(made)
     for (let i = 0; i < 300 && !(await ev(`!!document.querySelector('#view .trow')`).catch(() => false)); i++) await sleep(50);
     const start = Date.now() - s0; rep(`${tag} start ms`, start);
     check(start < (n > 10000 ? 15000 : 8000), `${tag}: start until the list shows in ${start} ms`);
+    if (BUDGET.start_ms) check(start < BUDGET.start_ms, `${tag}: start ${start} ms within the budget start_ms ${BUDGET.start_ms} (tools/perf_budget.json)`);
     const m = async (name, js, lim) => { const r = await ev(`(async () => { const t = performance.now(); ${js}; await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0))); return performance.now() - t; })()`); rep(`${tag} ${name} ms`, r); check(r < lim, `${tag}: ${name} in ${Math.round(r)} ms (limit ${lim})`); return r; };
     await m('switch list', `go('l/${L + 1}')`, 1500);
     await m('today', `go('today')`, 2000);
     await m('all', `go('all')`, n > 10000 ? 8000 : 4000);
     await m('re-render (live update)', `render()`, n > 10000 ? 8000 : 4000);
-    const rm = await ev(`(() => ({rows: document.querySelectorAll('#view .trow').length, more: !!document.querySelector('#view [data-act="rows-more"]')}))()`);
-    check(rm.rows <= 900 && rm.more, `${tag}: "All" shows the first rows and "Show more" ` + JSON.stringify(rm));
-    await ev(`(() => { document.querySelector('#view [data-act="rows-more"]').click(); return 1; })()`); await sleep(400);
+    // 2.65.0 (#1825): a long view draws only the rows near the visible part (vlist.js) instead of the first ROW_CAP + "Show more"
+    const rm = await ev(`(() => ({rows: document.querySelectorAll('#view .trow').length, pads: document.querySelectorAll('#view .vlpad').length, all: vl_ids().length}))()`);
+    check(rm.rows <= 900 && rm.pads && rm.all > rm.rows, `${tag}: "All" draws a window of its rows ` + JSON.stringify(rm));
+    await ev(`(() => { const v = document.getElementById('view'); v.scrollTop = v.scrollHeight; vl_sync(); return 1; })()`); await sleep(400);
     const rm2 = await ev(`document.querySelectorAll('#view .trow').length`);
-    check(rm2 > rm.rows, `${tag}: "Show more" adds rows (${rm.rows} -> ${rm2})`);
+    check(rm2 > 0 && rm2 <= 900, `${tag}: at the end of "All" the window stays small (${rm.rows} -> ${rm2})`);
     await ev(`(() => { go('l/${L}'); return 1; })()`); await sleep(500);
     await m('render list', `render()`, 1500);
     await m('palette open + type', `openPalette(); const i = document.querySelector('.palette .pqin'); i.value = 'review'; i.dispatchEvent(new Event('input', {bubbles: true}))`, 1500);
@@ -105,6 +109,10 @@ print(made)
 }
 
 (async () => {
+  try { // 2.65.0 (#1822): start size, static (same numbers as tools/perf_budget.py)
+    const sz = JSON.parse(execFileSync(PY, [path.join(__dirname, '..', 'tools', 'perf_budget.py'), '--json'], {encoding: 'utf8'})).measured;
+    for (const k of ['start_scripts', 'start_js_bytes', 'start_js_gzip', 'start_css_bytes', 'start_css_gzip']) rep(k, sz[k]);
+  } catch (e) { console.log('perf: start size not measured', String(e.message).split('\n')[0]); }
   await round(+(process.env.PERF_N || 5000));
   if (process.env.PERF_BIG) await round(20000);
   if (process.env.PERF_REPORT) fs.appendFileSync(process.env.PERF_REPORT, JSON.stringify(Object.fromEntries(REP)) + '\n');

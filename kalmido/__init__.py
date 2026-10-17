@@ -24,6 +24,7 @@ ORDER = (
     "accounts.oidc",
     "core.access",
     "core.serializers",
+    "core.compress",  # 2.65.0 (#1505): gzip for JSON answers; before core.pages = its after_request hook runs last
     "core.pages",
     "core.instance",
     "core.state",

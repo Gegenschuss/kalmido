@@ -45,12 +45,15 @@ def list_progress(c, ids, subtasks, uid=None):
     q = ",".join("?" * len(ids))
     sub = "" if subtasks else "AND t.parent_id IS NULL"
     out = {}
+    # 2.65.0 (#1505): a done copy (an older task of the list with the same created_at and title exists) is found with one
+    # window over the lists' tasks instead of a lookup per done task (the same rows: st_first = the oldest such task)
     for r in c.execute(f"""SELECT t.list_id, COUNT(*) FILTER (WHERE t.status=0) AS open, COUNT(*) FILTER (WHERE t.status=2) AS done,
                                   COUNT(*) FILTER (WHERE t.status=0 AND t.due IS NOT NULL AND t.due<?) AS overdue,
                                   MIN(CASE WHEN t.status=0 AND t.due>=? THEN t.due END) AS next_due
-                           FROM tasks t WHERE t.list_id IN ({q}) AND t.deleted_at IS NULL AND t.status IN (0, 2) {sub}
-                             AND {tvis(c, uid, "t.", write=True) if uid else "TRUE"} AND NOT (t.status=2 AND EXISTS (SELECT 1 FROM tasks o WHERE o.list_id=t.list_id AND o.id<t.id
-                                      AND o.created_at=t.created_at AND o.title=t.title))
+                           FROM (SELECT tasks.*, MIN(id) OVER (PARTITION BY list_id, created_at, title) AS st_first
+                                 FROM tasks WHERE list_id IN ({q})) t
+                           WHERE t.deleted_at IS NULL AND t.status IN (0, 2) {sub}
+                             AND {tvis(c, uid, "t.", write=True) if uid else "TRUE"} AND NOT (t.status=2 AND t.st_first<t.id)
                            GROUP BY t.list_id""", (t0, t0, *ids)):
         out[r["list_id"]] = {"done": r["done"] or 0, "total": (r["open"] or 0) + (r["done"] or 0),
                              "overdue": r["overdue"] or 0, "next_due": r["next_due"]}

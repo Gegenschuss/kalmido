@@ -28,6 +28,7 @@ from flask import g, jsonify
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
+from ..core.pg import st_ids
 from ..accounts.session import me
 from ..core.access import Denied, need_task, task_visible
 from ..agents.core import is_agent
@@ -197,11 +198,9 @@ def e2e_note_flags(c, ids, uid):
     out = {}
     if not ids:
         return out
-    ids = list(ids)
-    for i in range(0, len(ids), 5000):
-        part = ids[i:i + 5000]
-        for r in c.execute(f"SELECT task_id, user_id FROM task_enc_notes WHERE task_id IN ({','.join('?' * len(part))})", part):
-            out[r[0]] = out.get(r[0], False) or r[1] == uid
+    # 2.65.0 (#1505): one array parameter instead of thousands of placeholders
+    for r in c.execute("SELECT task_id, user_id FROM task_enc_notes WHERE task_id = ANY(CAST(? AS BIGINT[]))", (st_ids(ids),)):
+        out[r[0]] = out.get(r[0], False) or r[1] == uid
     return out
 
 

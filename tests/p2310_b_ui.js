@@ -169,7 +169,7 @@ const CHIP = `(() => { const a = [...document.querySelectorAll('#detail .attsec 
   w.close();
 
   // ================= CSS
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   check(/\.dfoot \.dfc\{font-family:var\(--sans\)\}/.test(css), '#1054: the footer in the normal font');
   check(/\.mdtbl th,\.mdtbl td\{word-break:normal;overflow-wrap:normal/.test(css) && /\.mdtbl\{overflow-x:auto/.test(css), '#1048: table cells never break inside a word, the frame scrolls (everywhere)');
   check(/\.att \.atxt\{[^}]*flex:1 1 auto;min-width:8ch/.test(css), '#1050: the name has priority in the tile');

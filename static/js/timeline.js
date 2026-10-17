@@ -267,11 +267,7 @@ function tlAfterRender(el) {  // renderView: a new timeline is in the DOM
 }
 
 // ---- linking: a task may wait on another one when I can change it; the server checks again (cycles, rights)
-function tlReaches(from, target) {  // does `from` (transitively) wait on `target`? (open blockers I can see)
-  const seen = new Set(), todo = [from];
-  while (todo.length) { const x = todo.pop(); if (x === target) return true; if (seen.has(x) || seen.size > 5000) continue; seen.add(x); todo.push(...(S.tasks.get(x)?.blockers || [])); }
-  return false;
-}
+// 2.65.0 (#1823): tlReaches is in lazyload.js (the list's drag asks it; this file loads on demand)
 function tlCanLink(b, w) {
   const wt = S.tasks.get(w);
   return b !== w && !!wt && canEdit(wt) && dFor(wt) && dFor(S.tasks.get(b)) && !(wt.blockers || []).includes(b) && !tlReaches(b, w);

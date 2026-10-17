@@ -3,7 +3,7 @@
 'use strict';
 
 // ------------------------------------------------------------------ package B: API tokens, webhooks, public links
-const API_DOCS = 'https://github.com/Gegenschuss/kalmido/blob/main/docs/API.md';
+// 2.65.0 (#1823): API_DOCS is in lazyload.js (this file loads on demand, module integrations)
 // a secret shown exactly once (new API token, webhook signing secret), with copy
 function secretModal(title, value, text) {
   const md = modal(`<h3>${esc(title)}</h3><div class="shint">${text}</div>

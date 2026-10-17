@@ -51,7 +51,7 @@ const CODE = LONG + '\nsecond line';
   const bobSays = () => call('POST', `/api/tasks/${TS}/comments`, {body: `New from Bob ${++nNew}`}, CB);
 
   // static: the rules are in the style sheet
-  const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
+  const css = require('./boot').allCssSync(); // 2.65.0 (#1824): + the module stylesheets
   check(/\.cbody pre\.mdpre,#d-md pre\.mdpre\{white-space:pre-wrap;overflow-wrap:anywhere/.test(css), '#1119: comment + description code blocks wrap (CSS)');
   check(/\.cm:hover \.cmrxq\{opacity:1/.test(css) && /\.cm:focus-within \.cmrxq/.test(css), '#1119: hover / keyboard focus still fade the quick reactions in (CSS)');
 

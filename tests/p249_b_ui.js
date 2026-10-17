@@ -60,7 +60,7 @@ const kidBoot = async log => {
   check(await until(() => d.querySelector(`#view [data-kd-list="${L3}"]`), 120), 'a newly shared list shows up without a reload');
   // Settings for a child: opens without errors; the areas a child cannot use are hidden by app.css (jsdom has no layout)
   w.eval('settingsModal()'); await sleep(200);
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   check(d.querySelector('.smodal #sp-account') && ['org', 'modules', 'integr', 'ai', 'data', 'users', 'help'].every(k => css.includes(`body.kidmode .smodal .snav [data-sec="${k}"]`))
     && !['account', 'general', 'look', 'notify'].some(k => css.includes(`.snav [data-sec="${k}"]`)), 'Settings of a child: account, general, appearance, notifications stay; the rest is hidden');
   w.close();

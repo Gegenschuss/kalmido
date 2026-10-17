@@ -329,7 +329,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await closeW(w);
 
   // ================= touch targets (U13): the rules in the stylesheet (layout itself: Firefox harness, see README)
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   const coarse = [...css.matchAll(/@media \(pointer:coarse\)\{([\s\S]*?)\n\}/g)].map(m => m[1]).join('\n');
   check(/#top \.iconbtn[^{]*\{[^}]*min-width:2\.75rem;min-height:2\.75rem/.test(coarse), 'header icons 44 px');
   check(/\.chk::after\{inset:-1\.0625rem\}/.test(coarse), 'status glyph hit area 14 + 2 x 17 >= 44 px (2.8.0)');

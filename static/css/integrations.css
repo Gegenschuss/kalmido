@@ -1,0 +1,17 @@
+/* Kalmido web client: the styles of the module "integrations" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
+   Moved unchanged from app.css (same order); later than app.css in the cascade. */
+.mrow.tokrow .n,.mrow.whrow .n,.whlog .mrow .n{white-space:normal}
+.mrow.tokrow small,.mrow.whrow small,.whlog small{display:block;font-size:var(--fs-s)}
+.whlog{max-height:60vh;overflow:auto}
+#wh-evs code{font-size:var(--fs-xs)}
+.stfoot .sfexp{display:flex;align-items:center;gap:.5rem;flex:1 1 auto;min-width:0}
+.stfoot .sfexp label{font-size:var(--fs-s);color:var(--muted);white-space:nowrap}
+.stfoot .sfexp select{width:auto;min-width:0;flex:0 1 auto}
+@media (max-width:899px) {
+  .stfoot .sfexp{flex-basis:100%}
+}
+.slink{display:inline-flex;align-items:center;font-size:var(--fs-s);color:var(--accent);margin:.125rem 0 .375rem;text-decoration:none}
+.slink:hover{text-decoration:underline}
+@media (pointer:coarse) {
+  .slink{min-height:2.75rem;margin:0}
+}
