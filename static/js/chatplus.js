@@ -43,14 +43,14 @@ function cpnText(m, art) {
   const t = mdBrief(decodeMentions(body, art === 't' ? S.tc.users || {} : {})) || (m.attachments || [])[0]?.name || '';
   return t.length > 140 ? t.slice(0, 140) + '…' : t;
 }
-// 2.82.0 (#1862): another conversation on screen closes the open pin / unpin Undo toast (it would hit the old conversation)
-function cpnUndoDrop(k) {
-  if (!CPN.undoK || CPN.undoK === k) return;
+// 2.82.0 (#1862): the conversation of the open pin / unpin Undo toast is no longer on screen: close the toast (it would hit
+// that conversation unseen). Checked after the bars are drawn, so a side chat window keeps its Undo
+function cpnUndoDrop() {
+  if (!CPN.undoK || document.querySelector(`[data-cpn="${CSS.escape(CPN.undoK)}"]`)) return;
   if (HIST.toastE === CPN.undoE) { HIST.toastE = null; $('#toast')?.classList.add('hidden'); }
   CPN.undoK = CPN.undoE = null;
 }
 function cpnBarHtml(k) {
-  cpnUndoDrop(k);
   const pins = cpnPins(k), art = k[0];
   if (!pins.length) return `<div class="cpnbar" data-cpn="${k}" hidden></div>`;
   const i = (CPN.idx[k] || 0) % pins.length, m = pins[i], n = pins.length;
@@ -59,6 +59,7 @@ function cpnBarHtml(k) {
 // the bars on the screen follow the state (called by tcPatch / chatPatch and after a pin)
 function cpnSync() {
   for (const el of document.querySelectorAll('[data-cpn]')) { const h = cpnBarHtml(el.dataset.cpn); if (el._h !== h) { const t = document.createElement('template'); t.innerHTML = h; const n = t.content.firstElementChild; n._h = h; el.replaceWith(n); } }
+  cpnUndoDrop();
 }
 // the small pin in a pinned message's line
 const cpnMark = m => m.pinned_at && !m.deleted ? `<span class="cpnmark" title="${esc(tr('Pinned'))}" aria-label="${esc(tr('Pinned'))}">${ic('pin', 's')}</span>` : '';

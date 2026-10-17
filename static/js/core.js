@@ -720,7 +720,7 @@ setInterval(async () => {
     if (sp !== undefined && sp !== S.stepsSig) { const first = S.stepsSig === undefined; S.stepsSig = sp; if (!first) stepsChanged(); }  // 2.32.0 (#1081)
     verCheck(app);  // 2.27.0 (#968)
     if (ty !== undefined) { const sig = JSON.stringify(ty); if (sig !== S.ctypingSig) { S.ctypingSig = sig; S.ctyping = ty; if (S.sel) agentLive(); } }  // 2.22.0 (#693)
-    if (t !== undefined && t !== S.teamSig) { const first = S.teamSig === undefined; S.teamSig = t; if (!first && (!editing() || editingTeam())) teamChanged(); }  // 2.17.0 (#419); 2.82.0 (#1862): typing in the team chat still takes live changes (tcPatch leaves the field alone)
+    if (t !== undefined && t !== S.teamSig) { const first = S.teamSig === undefined; S.teamSig = t; if (!first && (!editing() || ['tc-in', 'ms-q'].includes(document.activeElement?.id))) teamChanged(); }  // 2.17.0 (#419); 2.82.0 (#1862): typing a new message / search still takes live changes (tcPatch leaves those fields alone; an inline edit .tc-edit would be redrawn)
     if (c !== undefined && c !== S.calSig) {  // calendar subscriptions synced / changed: fetch the shown range again
       const first = S.calSig === undefined; S.calSig = c;
       if (!first && calEvOn() && !editing()) { calInvalidate(); if (S.route.mod === 'cal' || S.route.key === 'today') renderView(); }
