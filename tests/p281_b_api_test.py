@@ -173,7 +173,7 @@ A.patch(B + f"/api/clients/{C1}", json={"street": "Marktstraße 5", "zip": "5000
 
 
 def invoice(title, date):
-    r = A.post(B + D, json={"kind": "invoice", "client_id": C1, "items": [{"title": title, "qty": 1, "rate": 100}]})
+    r = A.post(B + D, json={"kind": "invoice", "client_id": C1, "service_from": "2026-03-01", "service_to": "2026-03-04", "items": [{"title": title, "qty": 1, "rate": 100}]})
     assert r.status_code == 201, r.text
     did = r.json()["id"]
     r = A.post(B + f"{D}/{did}/finalize")
@@ -195,7 +195,7 @@ I1, N1 = invoice("Schnitt", "2026-03-05")
 r = A.patch(B + f"/api/clients/{C1}", json={"customer_no": "10043"})
 check(r.ok, "the client's customer number changes to 10043 " + r.text[:200])
 I2, N2 = invoice("Ton", "2026-03-06")
-DRAFT = A.post(B + D, json={"kind": "invoice", "client_id": C1, "items": [{"title": "Entwurf", "qty": 1, "rate": 50}]}).json()["id"]
+DRAFT = A.post(B + D, json={"kind": "invoice", "client_id": C1, "service_from": "2026-03-01", "service_to": "2026-03-04", "items": [{"title": "Entwurf", "qty": 1, "rate": 50}]}).json()["id"]
 deb = debtors()
 check(deb.get(N1) == "10042", f"#1867: the invoice locked before keeps debtor 10042: {deb}")
 check(deb.get(N2) == "10043", f"#1867: the invoice locked afterwards takes 10043: {deb}")
