@@ -460,10 +460,6 @@ def list_update(lid):
     else:
         # 2.39.1 (#1188): a list admin archives / restores (deleting needs the archive); 2.40.0 (#1431): and renames / recolours it
         adm = ("archived", "name", "color") if role == "admin" else ()
-        if adm:
-            from ..agents.core import is_agent
-            if is_agent(getattr(g, "user", None)):  # 2.82.0 (#1467): agents never rename / recolour / archive a list
-                adm = ()
         from ..agents.core import is_agent
         if adm and is_agent(g.user):  # 2.82.0 (#1467): agents never rename / recolour / archive a list (#1431 is for people)
             adm = ()
