@@ -163,7 +163,8 @@ dbx("DELETE FROM budget_entries WHERE list_id=? AND amount<>'' AND id<>?", (L, E
 r = A.patch(B + f"/api/budget/entries/{E1}", json={"amount": 1200, "title": "Rent"})
 check(r.ok and r.json()["amount"] == 1200.0 and r.json()["title"] == "Rent" and r.json()["note"] == "incl. heating", "PATCH: the other fields stay")
 E2 = entry(A, L, title="Shoes", amount=60, cat_id=KIDS, day="2026-09-10").json()["id"]
-check(A.delete(B + f"/api/budget/cats/{KIDS}").json() == {"ok": True}, "a category deleted")
+r = A.delete(B + f"/api/budget/cats/{KIDS}").json()
+check(r["ok"] is True and r["cat"]["name"] == "Kids" and r["entry_ids"] == [E2] and r["recurring_ids"] == [], f"a category deleted, its rows named ({r})")
 check(A.get(B + f"/api/budget/{L}", params={"month": M}).json()["entries"][0]["cat_id"] is None, "its entry stays without a category")
 r = A.delete(B + f"/api/budget/entries/{E2}")
 check(r.ok and r.json()["entry"]["title"] == "Shoes" and r.json()["entry"]["amount"] == 60.0, "DELETE returns the entry (undo)")
