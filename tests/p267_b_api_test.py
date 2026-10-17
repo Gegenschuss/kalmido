@@ -99,6 +99,14 @@ PL = lst(A, "Errands")
 check(P["dep_shift"] == 1, f"a new project list: Move dependent tasks along on by default ({P['dep_shift']})")
 check(PL["dep_shift"] == 0, "a plain list: off by default")
 check(lst(A, "Quiet project", kind="project", dep_shift=False)["dep_shift"] == 0, "an explicit dep_shift false at creation is kept")
+for nm, kd in (("Tpl project", "project"), ("Tpl plain", "list")):
+    tp = A.post(B + "/api/templates", json={"kind": "list", "data": {"name": nm, "kind": kd}})
+    assert tp.ok, tp.text
+    ap = A.post(B + f"/api/templates/{tp.json()['id']}/apply", json={"name": nm + " list"})
+    assert ap.ok, ap.text
+with db() as cx:
+    tl = {r_["name"]: r_["dep_shift"] for r_ in cx.execute("SELECT name, dep_shift FROM lists WHERE name LIKE 'Tpl %'")}
+check(tl == {"Tpl project list": 1, "Tpl plain list": 0}, f"a list template without the setting: on for a project, off for a plain list: {tl}")
 P, PL = P["id"], PL["id"]
 
 # ================================================================== chain A -> B -> C, gaps kept
