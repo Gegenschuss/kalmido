@@ -54,6 +54,7 @@ TABLES = (
     "list_rules",  # 2.71.0 A (#1457): rules of a list (org_id follows the list, NULL = a private list)
     "office_pack_installs",  # 2.76.0 A (#1023): packs installed from the catalogue per office area
     "hub_tokens", "hub_mails",  # 2.84.0 A (#1198): hub mail addresses + filed mails (NULL = private, the app checks owner / client / list)
+    "office_archive_log",  # 2.81.0 B (#1834): the history of an archived document (org_id like the entry)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"
