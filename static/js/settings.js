@@ -736,6 +736,7 @@ function settingsModal(focus) {
     if (v === undefined) { settingsSync(); return; }  // not a valid value: back to what is saved
     if (d[2] === 'time' && el.id === 's-allday' && !v) return;
     await setApply({[d[0]]: v}, tr(d[1]));
+    if (d[0] === 'agent_comments') loadNews().then(render).catch(() => {});  // 2.66.1 (#1943): the bell's number depends on it
   };
   const saveName = async () => {
     const el = $('#a-name', md); if (!el || !S.me) return;

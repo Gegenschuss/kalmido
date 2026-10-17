@@ -10,7 +10,7 @@ import json
 import os
 import time
 
-from ..core.db import gsetting, gset, iso, now_utc
+from ..core.db import gsetting, gset
 
 FILL = os.environ.get("KALMIDO_DOCS_THUMB_FILL", "on").strip().lower() not in ("off", "0", "false", "no")
 FILL_S = max(1, int(os.environ.get("KALMIDO_DOCS_THUMB_FILL_S", "15") or 15))  # s between two portions
@@ -60,7 +60,6 @@ def p61a_thumb_fill(c):
                         c.execute("UPDATE doc_meta SET asn=?, auto=? WHERE node_id=?", (n, json.dumps(auto, separators=(",", ":")), nid))
                         m = S.meta_row(c, nid)
                         S.doc_index(c, nid, m["ws"], S.index_text(c, dict(m), node["name"], S.meta_text(c, m)))
-                c.execute("UPDATE doc_meta SET updated_at=? WHERE node_id=?", (iso(now_utc()), nid))
         except Exception as e:  # noqa: BLE001 -- a missing file, a key that does not open, a broken image: skip it
             print("docs: preview catch-up", nid, type(e).__name__, e, flush=True)
     gset(c, FILL_KEY, json.dumps({"below": rows[-1][0]}))
