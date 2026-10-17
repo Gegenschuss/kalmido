@@ -11,6 +11,7 @@ import hashlib
 import io
 import json
 import os
+import random
 import subprocess
 import sys
 import time
@@ -158,10 +159,11 @@ def user(pk, name, joined):
 
 
 # ---- #1874: the check in the background
+PAD = [b"%" + random.Random(1875 + i).randbytes(40_000) for i in range(3)]  # does not compress: the ZIP spans several parts
 X_TAG = rec("documents.tag", 1, name="Tax", match="tax office", matching_algorithm=1, is_insensitive=True)
 X_USER = user(1, "admin", "2023-01-05T10:00:00.123456Z")
 XDOCS = [drec(11 + i, f"Letter {i}", f"x{i}.pdf", tags=[1]) for i in range(3)]
-ZX = build_zip([X_USER, X_TAG] + XDOCS, {f"x{i}.pdf": tiny_pdf(f"Letter {i}") + bytes(range(256)) * 400 for i in range(3)})
+ZX = build_zip([X_USER, X_TAG] + XDOCS, {f"x{i}.pdf": tiny_pdf(f"Letter {i}") + PAD[i] for i in range(3)})
 check(len(ZX) > 64 * 1024, f"setup: the ZIP spans several parts ({len(ZX)})")
 last, z = upload(A, ZX)
 check(last.get("state") == "check" and last.get("got") == len(ZX), f"#1874: the last part answers at once, the ZIP is being checked ({last.get('state')})")
@@ -246,7 +248,7 @@ check("tax office" in rules and "policy number" in rules, f"#1875: the rules of 
 # the same server exported again later (one more document): the same key, nothing twice
 ZX2 = build_zip([X_USER, X_TAG, rec("documents.tag", 2, name="New", match="", matching_algorithm=0, is_insensitive=True)] + XDOCS
                 + [drec(20, "Letter later", "x9.pdf", tags=[1, 2])],
-                {**{f"x{i}.pdf": tiny_pdf(f"Letter {i}") + bytes(range(256)) * 400 for i in range(3)}, "x9.pdf": tiny_pdf("Letter later")})
+                {**{f"x{i}.pdf": tiny_pdf(f"Letter {i}") + PAD[i] for i in range(3)}, "x9.pdf": tiny_pdf("Letter later")})
 _last, z = upload(A, ZX2)
 SRC_X2 = (dbx("SELECT src FROM pl_uploads WHERE id=?", (z.get("id"),)) or [[""]])[0][0]
 check(SRC_X2 == SRC_X, f"#1875: a later export of the same server keeps its key ({SRC_X} {SRC_X2})")
