@@ -7736,3 +7736,13 @@ button.jobtag b{font-weight:600}
 .ctmsec .ctmrow{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
 .ctmsec .ctmrow>span{min-width:0;overflow-wrap:anywhere}
 .ctmsec .ctmrow .btn{min-height:2.5rem}
+/* 2.70.0 C (#1359) contracts: an agent's reminder of a notice deadline (proposal card, contractprop.js) */
+.ctr-head{font-size:.8125rem;margin:.125rem 0 .5rem;color:var(--muted)}
+.ctr-head b{color:var(--text)}
+.ctr-by{color:var(--accent)}
+.ctr-text{margin:0 0 .75rem;padding:.625rem .75rem;border-left:.1875rem solid var(--accent);background:var(--accent-soft);border-radius:.375rem;overflow-wrap:anywhere}
+.ctr-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.5rem;margin-bottom:.5rem}
+.ctr-f{display:flex;flex-direction:column;gap:.125rem;font-size:.875rem;min-width:0}
+.ctr-f .muted{font-size:.75rem}
+.ppm .card:has(.ctr-head) .foot{flex-wrap:wrap;gap:.5rem}
+.ppm .card:has(.ctr-head) .foot .btn{min-height:2.75rem}

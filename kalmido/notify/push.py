@@ -541,6 +541,8 @@ def watchdog_tick(c):
     _wd_section(c, "follow-ups", _wd_followups, users, S, LG, now)  # 2.1.0 (#335)
     from ..tasks.stale import _wd_stale
     _wd_section(c, "stale tasks", _wd_stale, now)  # 2.34.0 (#266): once a day, agents of lists with "Agent follows up"
+    from ..agents.contractprop import ctr_tick
+    _wd_section(c, "contract notices", ctr_tick, now)  # 2.70.0 C (#1359): contract_notice once per contract, deadline and agent
     _wd_section(c, "rotations", _wd_rotations, users, S, LG, now)  # 2.19.0 (#653)
     _wd_section(c, "events", _wd_events, users, S, LG, now)  # 2.21.0 (#659): event reminders, purge of deleted events
     _wd_section(c, "focus", _wd_focus, users, S, LG)

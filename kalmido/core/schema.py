@@ -1258,6 +1258,13 @@ CREATE TABLE IF NOT EXISTS merge_runs (
   org_id BIGINT REFERENCES orgs(id) ON DELETE CASCADE, book_id BIGINT, user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
   merged_ids TEXT NOT NULL DEFAULT '[]', snapshot TEXT NOT NULL DEFAULT '{}', summary TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL, undone_at TEXT, undone_by BIGINT);
+-- 2.70.0 C (#1359): the event contract_notice went out (agents/contractprop.py): once per contract task, its last day to
+-- cancel (due) and agent; user_id = the person whose contract it is, list_id = the contract's list then. A proposal of kind
+-- notice needs such a row. New table only
+CREATE TABLE IF NOT EXISTS ctr_notices (
+  task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, due TEXT NOT NULL,
+  agent_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  list_id BIGINT, sent_at TEXT NOT NULL, PRIMARY KEY (task_id, due, agent_id));
 """
 # Bumped when the database layout changes (stored in kalmido_meta.schema_version; SQLite: PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -1733,6 +1740,8 @@ CREATE INDEX IF NOT EXISTS office_client_contacts_contact ON office_client_conta
 CREATE INDEX IF NOT EXISTS task_vectors_org ON task_vectors(org_id);
 -- 2.66.0 (#1835): the merges into a contact / client (its history)
 CREATE INDEX IF NOT EXISTS merge_runs_target ON merge_runs(kind, target_id);
+-- 2.70.0 C (#1359): pruning the sent markers of contract_notice
+CREATE INDEX IF NOT EXISTS ctr_notices_sent ON ctr_notices(sent_at);
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 3  # task > subtask > sub-subtask

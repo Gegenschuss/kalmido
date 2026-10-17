@@ -8290,5 +8290,16 @@
   "Contact person links dropped (the address book does not fit the client): {0}": "Collegamenti dei referenti rimossi (la rubrica non corrisponde al cliente): {0}",
   "Default contact person": "Referente predefinito",
   "One of the clients was changed meanwhile, please try again": "Uno dei clienti è stato modificato nel frattempo, riprova",
-  "{0} issued invoice is exported to DATEV under the customer number of {1} afterwards": ["{0} fattura emessa viene poi esportata in DATEV con il numero cliente di {1}", "{0} fatture emesse vengono poi esportate in DATEV con il numero cliente di {1}"]
+  "{0} issued invoice is exported to DATEV under the customer number of {1} afterwards": ["{0} fattura emessa viene poi esportata in DATEV con il numero cliente di {1}", "{0} fatture emesse vengono poi esportate in DATEV con il numero cliente di {1}"],
+  "At most {0} contract reminders per day": "Al massimo {0} promemoria di contratti al giorno",
+  "Cancel by": "Disdire entro",
+  "Note added, reminder 3 days before": "Nota aggiunta, promemoria 3 giorni prima",
+  "Note added to the contract": "Nota aggiunta al contratto",
+  "Notice deadline: {0}": "Termine di disdetta: {0}",
+  "Take it as a note": "Salva come nota",
+  "Taking it adds the sentence as your note on the contract; nothing is cancelled or sent. One step, undo takes it back.": "La frase viene aggiunta come tua nota al contratto; non si disdice né si invia nulla. Un passo, annulla lo ritira.",
+  "Term ends": "Fine della durata",
+  "The contract is no longer available.": "Il contratto non è più disponibile.",
+  "This contract has no open notice deadline": "Questo contratto non ha un termine di disdetta aperto",
+  "You can only propose a reminder for a contract_notice you received": "Puoi proporre un promemoria solo per un contract_notice ricevuto"
 }

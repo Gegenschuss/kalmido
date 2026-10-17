@@ -56,6 +56,7 @@ PROP_STATES = ("requested", "ready", "applied", "discarded")
 PROP_MODES = ("off", "shared", "all")
 PROP_KINDS += ("inquiry", "setup")  # 2.51.0 B (#1351 #1358): an inquiry becomes a project, the setup assistant (agents/propkinds2.py)
 PROP_KINDS += ("layout",)  # 2.55.0 (#1066): the agent proposes how a view is arranged (agents/lyprop.py), never on request
+PROP_KINDS += ("notice",)  # 2.70.0 C (#1359): a contract's notice deadline as a note (agents/contractprop.py), never on request
 PROP_MAX_ITEMS = 200                    # entries one proposal may create / change (tasks + subtasks)
 PROP_MAX_BYTES = 256 * 1024             # JSON body of a proposal
 PROP_TITLE_MAX, PROP_NOTES_MAX, PROP_NAME_MAX, PROP_SUMMARY_MAX = 300, 5000, 120, 2000
@@ -346,6 +347,9 @@ def prop_validate(kind, b, inp):
     elif kind == "layout":  # 2.55.0 (#1066)
         from ..agents.lyprop import lyp_validate
         out.update(lyp_validate(b, inp))
+    elif kind == "notice":  # 2.70.0 C (#1359)
+        from ..agents.contractprop import ctr_validate
+        out.update(ctr_validate(b, inp))
     return out
 
 
@@ -450,6 +454,8 @@ def proposal_request():
         return cln_request(c, uid, b)
     if kind in PROP_KINDS_AGENT or kind == "layout":  # 2.51.0 C: proposed by the agent itself, nothing to ask for; 2.55.0 (#1066)
         return err(tr("Invalid value: {0}", "kind"))
+    if kind == "notice":  # 2.70.0 C (#1359): the agent proposes it after contract_notice, never on request
+        return err(tr("Invalid value: {0}", "kind"))
     try:
         aid = int(b.get("agent_id") or 0)
     except (TypeError, ValueError):
@@ -497,6 +503,9 @@ def prop_view(c, j):
     if j["kind"] == "layout":  # 2.55.0 (#1066): before / after for the card
         from ..agents.lyprop import lyp_view_extra
         out.update(lyp_view_extra(c, j))
+    if j["kind"] == "notice":  # 2.70.0 C (#1359): the contract as it is now
+        from ..agents.contractprop import ctr_view_extra
+        out.update(ctr_view_extra(c, j))
     return out
 
 
@@ -599,6 +608,10 @@ def prop_run(c, j, sel, ed, extra):
     if kind == "layout":  # 2.55.0 (#1066): a saved arrangement, used at once (agents/lyprop.py)
         from ..agents.lyprop import lyp_run
         return lyp_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": extra, "tasks": [], "sections": [],
+                                              "changes": {}, "list": None, "undone": False})
+    if kind == "notice":  # 2.70.0 C (#1359): a comment as the person (+ a reminder), agents/contractprop.py
+        from ..agents.contractprop import ctr_run
+        return ctr_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": extra, "tasks": [], "sections": [],
                                               "changes": {}, "list": None, "undone": False})
     prop, inp = json.loads(j["proposal"]), json.loads(j["input"] or "{}")
     edits = {k: prop_edit(kind, k, v, inp, prop) for k, v in ed.items()}
@@ -776,8 +789,11 @@ def proposal_apply(jid):
     if j["prop_state"] != "ready" or not j["proposal"]:
         return err(tr("There is no proposal to apply (anymore)"), 409)
     b = body()
+    rem = b.pop("remind", None) if j["kind"] == "notice" and isinstance(b, dict) else None  # 2.70.0 C (#1359): "Remind me"
     sel, ed = prop_sel(b)
     extra = {k: b[k] for k in ("name", "folder", "share_agent", "use") if k in b}  # 2.55.0 (#1066): use = a layout at once
+    if rem is not None:  # 2.70.0 C (#1359)
+        extra["remind"] = rem is True
     try:
         rec = prop_run(c, j, sel, ed, extra)
     except (BadInput, Denied):
@@ -798,6 +814,9 @@ def proposal_apply(jid):
     if j["kind"] == "layout":  # 2.55.0 (#1066): the saved arrangement, its view, used at once
         from ..agents.lyprop import lyp_result
         counts.update(lyp_result(rec))
+    if j["kind"] == "notice":  # 2.70.0 C (#1359): the comment, the reminder
+        from ..agents.contractprop import ctr_result
+        counts.update(ctr_result(rec))
     prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] in ("project", "cleanup") else None})
     c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data->>'job' = ?",
               (ts, me(), str(jid)))
@@ -849,6 +868,9 @@ def proposal_undo(jid):
     elif j["kind"] == "layout":  # 2.55.0 (#1066): back to the previous arrangement
         from ..agents.lyprop import lyp_undo
         n, skipped = lyp_undo(c, j, rec)
+    elif j["kind"] == "notice":  # 2.70.0 C (#1359): the comment goes, the reminder back
+        from ..agents.contractprop import ctr_undo
+        n, skipped = ctr_undo(c, j, rec)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -932,6 +954,10 @@ def proposal_redo(jid):
             c.rollback()
             raise
         rec.update(undone=False)
+    elif j["kind"] == "notice":  # 2.70.0 C (#1359)
+        from ..agents.contractprop import ctr_undo
+        n, skipped = ctr_undo(c, j, rec, back=False)
+        rec.update(undone=False)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -1012,6 +1038,9 @@ def v1_agent_job_proposal(jid):
     if j["kind"] == "layout":  # 2.55.0 (#1066)
         from ..api.scopes import need_scope
         need_scope("layouts")
+    if j["kind"] == "notice":  # 2.70.0 C (#1359): replacing checks the contract again
+        from ..agents.contractprop import _need_contract
+        _need_contract(c, aid, j["task_id"])
     if j["prop_state"] not in ("requested", "ready") or j["state"] not in ("running", "waiting"):
         raise Denied(409, tr("This proposal was already applied or discarded"))
     if len(request.data or b"") > PROP_MAX_BYTES:
@@ -1036,6 +1065,8 @@ def prop_cleanup(c, force=False):
     _PROP_CLEAN["at"] = time.time()
     from ..agents.lyprop import lyp_expire
     lyp_expire(c)  # 2.55.0 (#1066): open layout proposals expire after 14 days
+    from ..agents.contractprop import ctr_expire
+    ctr_expire(c)  # 2.70.0 C (#1359): open notice proposals end with their deadline
     n = c.execute("DELETE FROM agent_jobs WHERE kind IS NOT NULL AND (updated_at<? OR user_id IS NULL)",
                   (iso(now_utc() - timedelta(days=PROP_KEEP_DAYS)),)).rowcount
     c.commit()
@@ -1353,6 +1384,9 @@ def v1_agent_cross_proposal():
     if isinstance(b, dict) and b.get("kind") in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358): a project from an inquiry, the setup
         from ..agents.propkinds2 import pk2_agent_proposal
         return pk2_agent_proposal(aid, b)
+    if isinstance(b, dict) and b.get("kind") == "notice":  # 2.70.0 C (#1359): a reminder of a contract's notice deadline
+        from ..agents.contractprop import ctr_agent_proposal
+        return ctr_agent_proposal(aid, b)
     _p_keys(b, "", ("list_id", "title", "reason", "tasks", "summary"))
     lid = _p_int(b.get("list_id"), "list_id")
     title = _p_str(b.get("title"), "title", PROP_TITLE_MAX, True)

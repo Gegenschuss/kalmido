@@ -8290,5 +8290,16 @@
   "Contact person links dropped (the address book does not fit the client): {0}": "Liens d’interlocuteur retirés (le carnet ne correspond pas au client) : {0}",
   "Default contact person": "Contact par défaut",
   "One of the clients was changed meanwhile, please try again": "L'un des clients a été modifié entre-temps, réessaie",
-  "{0} issued invoice is exported to DATEV under the customer number of {1} afterwards": ["{0} facture émise est ensuite exportée vers DATEV avec le numéro client de {1}", "{0} factures émises sont ensuite exportées vers DATEV avec le numéro client de {1}"]
+  "{0} issued invoice is exported to DATEV under the customer number of {1} afterwards": ["{0} facture émise est ensuite exportée vers DATEV avec le numéro client de {1}", "{0} factures émises sont ensuite exportées vers DATEV avec le numéro client de {1}"],
+  "At most {0} contract reminders per day": "Au plus {0} rappels de contrat par jour",
+  "Cancel by": "Résilier avant le",
+  "Note added, reminder 3 days before": "Note ajoutée, rappel 3 jours avant",
+  "Note added to the contract": "Note ajoutée au contrat",
+  "Notice deadline: {0}": "Délai de résiliation : {0}",
+  "Take it as a note": "Garder comme note",
+  "Taking it adds the sentence as your note on the contract; nothing is cancelled or sent. One step, undo takes it back.": "La phrase est ajoutée comme ta note sur le contrat ; rien n’est résilié ni envoyé. Une étape, annuler la retire.",
+  "Term ends": "Fin de la durée",
+  "The contract is no longer available.": "Le contrat n’est plus disponible.",
+  "This contract has no open notice deadline": "Ce contrat n’a pas de délai de résiliation ouvert",
+  "You can only propose a reminder for a contract_notice you received": "Tu ne peux proposer un rappel que pour un contract_notice reçu"
 }

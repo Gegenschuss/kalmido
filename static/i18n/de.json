@@ -8290,5 +8290,16 @@
   "Contact person links dropped (the address book does not fit the client): {0}": "Ansprechpartner-Verknüpfungen, die gelöst werden (das Adressbuch passt nicht zum Kunden): {0}",
   "Default contact person": "Standard-Ansprechpartner",
   "One of the clients was changed meanwhile, please try again": "Einer der Kunden wurde inzwischen geändert, bitte noch einmal versuchen",
-  "{0} issued invoice is exported to DATEV under the customer number of {1} afterwards": ["{0} ausgestellte Rechnung geht danach mit der Kundennummer von {1} in den DATEV-Export", "{0} ausgestellte Rechnungen gehen danach mit der Kundennummer von {1} in den DATEV-Export"]
+  "{0} issued invoice is exported to DATEV under the customer number of {1} afterwards": ["{0} ausgestellte Rechnung geht danach mit der Kundennummer von {1} in den DATEV-Export", "{0} ausgestellte Rechnungen gehen danach mit der Kundennummer von {1} in den DATEV-Export"],
+  "At most {0} contract reminders per day": "Höchstens {0} Vertragserinnerungen pro Tag",
+  "Cancel by": "Kündigen bis",
+  "Note added, reminder 3 days before": "Notiz hinzugefügt, Erinnerung 3 Tage vorher",
+  "Note added to the contract": "Notiz am Vertrag hinzugefügt",
+  "Notice deadline: {0}": "Kündigungsfrist: {0}",
+  "Take it as a note": "Als Notiz übernehmen",
+  "Taking it adds the sentence as your note on the contract; nothing is cancelled or sent. One step, undo takes it back.": "Übernehmen fügt den Satz als deine Notiz am Vertrag hinzu; es wird nichts gekündigt oder versendet. Ein Schritt, Rückgängig nimmt ihn zurück.",
+  "Term ends": "Laufzeit endet",
+  "The contract is no longer available.": "Der Vertrag ist nicht mehr verfügbar.",
+  "This contract has no open notice deadline": "Dieser Vertrag hat keine offene Kündigungsfrist",
+  "You can only propose a reminder for a contract_notice you received": "Du kannst nur zu einem erhaltenen contract_notice eine Erinnerung vorschlagen"
 }

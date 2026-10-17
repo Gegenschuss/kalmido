@@ -675,6 +675,8 @@ def openapi_spec():
     rc_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1356)
     from ..tasks.related import rt9_spec
     rt9_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.59.0 B (#1375)
+    from ..agents.contractprop import ctr_spec
+    ctr_spec(paths)  # 2.70.0 C (#1359): the kind notice of POST /agent/proposals
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",
