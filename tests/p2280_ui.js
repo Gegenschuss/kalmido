@@ -62,7 +62,7 @@ const V = B + 'api/v1';
   await call('PATCH', `/api/tasks/${TW2}`, {assignee_id: 1}, BCK);
   // 2.66.1 (#1943): an agent's comments that reach me count at the bell now -> alice takes "only replies to me" (the plain
   // comments below stay away) and the agent's completion is the Activity
-  await call('PATCH', '/api/settings', {agent_comments: 'replies'});
+  await call('PATCH', '/api/settings', {agent_comments: 'replies', news_kinds: 'mention,assign,comment,unblock,share,status,complete'});
   await fetch(V + `/tasks/${TW}/comments`, {method: 'POST', headers: AGH, body: JSON.stringify({body: 'I looked at the build, all green.'})});
   await fetch(V + `/tasks/${TW2}/comments`, {method: 'POST', headers: AGH, body: JSON.stringify({body: 'Stock levels noted.'})});
   const TAC = (await call('POST', '/api/tasks', {title: 'Check the backups', list_id: W1})).id;

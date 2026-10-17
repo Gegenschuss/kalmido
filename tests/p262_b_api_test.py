@@ -181,6 +181,7 @@ it = next(x for x in A.get(B + "/api/news").json()["items"] if x.get("task_id") 
 check(it["count"] == 2 and it["to_me"] and unread_me(A) == 1, "#1943: the bundle with the agent's reply is 'For you' " + str(it))
 all_read(A)
 # other agent actions stay Activity: completing, assigning
+check(A.patch(B + "/api/settings", json={"news_kinds": "mention,assign,comment,unblock,share,status,complete"}).ok, "News about completions on")
 T4 = A.post(B + "/api/tasks", json={"title": "Agent completes", "list_id": W["id"]}).json()["id"]
 check(requests.patch(V + f"/tasks/{T4}", headers=CLH, json={"assignee_id": ALICE}).ok, "agent assigns the task to alice")
 check(requests.post(V + f"/tasks/{T4}/complete", headers=CLH).ok, "agent completes the task")

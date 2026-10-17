@@ -190,6 +190,7 @@ us = A.get(B + "/api/users").json()["users"]
 check(all("kind" in u for u in us) and sum(1 for u in us if u["kind"] == "agent") == 2, "#1011: the user list carries kind (the app shows people only)")
 
 # ================================================================== #987 News: For you / Activity
+A.patch(B + "/api/settings", json={"news_kinds": "mention,assign,comment,unblock,share,status,complete"})  # 2.66.1 (#1943): agent comments are "For you" now -> bob's completion is the Activity
 TB = Bo.post(B + "/api/tasks", json={"title": "Bob's task", "list_id": W["id"]}).json()["id"]
 Bo.post(B + f"/api/tasks/{TB}/comments", json={"body": "<@1> can you look?"})
 Bo.patch(B + f"/api/tasks/{TB}", json={"assignee_id": 1})
