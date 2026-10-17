@@ -1198,7 +1198,7 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
 | `POST /agent/proposals/import` | import | `area` (`fixed_costs`), `items` [{`label`, `amount`, `repeat`, `start`, `until`, `category`, `vat_rate`}] (1-500), `title`, `summary`, `note`, `user_id`; 201 = a ready proposal job (kind `import`) with `rows` and `expires_at` |
 
 Errors: 400 (the office module off for the person, another area, no rows, more than 500 rows), 403 (scope), 404 (not your
-person / not in your organisation), 409 (usage limit), 413 (body over 256 KB), 429 (5 open import proposals). People see
+person / not in your organisation), 409 (usage limit), 413 (body over 256 KB), 429 (5 open import proposals, 20 per person and day). People see
 the judged rows in `GET /api/proposals/{id}` (`import`: `office`, `problem`, `rows` with `status` new / dup / error,
 `counts`) and decide with `POST /api/proposals/{id}/apply` (`{"select": ["0", "2"], "edits": {"2": {"vat_rate": 7}}}`),
 `.../discard`, `.../undo`, `.../redo`.

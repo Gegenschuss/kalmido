@@ -1720,7 +1720,7 @@ owner, a team agent's person given as `user_id` (someone who may chat with it, i
   or decide it. Every row is checked again, all ticked rows are written in one step (at most 500 fixed costs per office),
   the office log names the agent; undo removes exactly these rows again (not those changed since), redo makes them again.
 - **The answer** comes as the event `job` with `action` approve / reject and only counts (`proposal`: `state`, `created`,
-  `skipped`). Limits: at most 5 open import proposals per agent (429), a card expires after 14 days, the proposal body up to
+  `skipped`). Limits: at most 5 open import proposals per agent and 20 per person and day (429), a card expires after 14 days, the proposal body up to
   256 KB, the agent's usage limit applies. A proposal job can be replaced with `POST /api/v1/agent/jobs/{id}/proposal`
   (scope `import`) while it is open.
 
