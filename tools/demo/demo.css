@@ -45,7 +45,7 @@
 .kp-sums .kp-g{border-top:.0625rem solid #1a1a1a;font-weight:700}
 .kp-note{color:#555;font-size:.75rem}
 .kp-foot{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.75rem;margin-top:2.5rem;padding-top:.75rem;border-top:.0625rem solid #ccc;color:#555;font-size:.6875rem}
-@media (max-width:40rem){.kp-page{padding:1.25rem 1rem}}
+@media (max-width:40rem){#kd-print .kd-ptxt{order:5;flex-basis:100%;font-size:.75rem}#kd-print .kd-sp{flex:1}.kp-page{padding:1.25rem .875rem;font-size:.75rem}.kp-items th,.kp-items td{padding:.3125rem .25rem}.kp-meta{justify-content:flex-start}.kp-head{margin-bottom:1rem}}
 @media print{
   :root.kd-printing body>*:not(#kd-print){display:none!important}
   :root.kd-printing #kd-print{position:static;background:#fff}
