@@ -792,9 +792,10 @@ def pm_purpose_on(purpose, all_mods=None):
 PM_EXTRA_ALL = tuple(dict.fromkeys(x for v in PURPOSE_EXTRA.values() for x in v))
 # 2.56.1 (#1808): every module of Settings > Modules (the keys of the client's FEATS, static/js/core.js); "Switch on all
 # modules" turns on all of them, PURPOSE_MODS stays what the purpose package and the switch-off touch
+# 2.84.0: + budget (2.72.0 #1333), in the order of the client's FEATS (p2461_b_api parses the tuple)
 PM_FULL = ("cal", "timeline", "matrix", "habits", "pomo", "kanban", "collab", "stats", "time", "progress", "deps", "fields",
            "agents", "comments", "family", "events", "contacts", "contracts", "home", "care", "health", "review", "travel",
-           "reading", "budget", "clients", "workload", "forms", "office", "wiki", "files", "dispo")  # 2.84.0: + budget (2.72.0 #1333), as FEATS
+           "reading", "budget", "clients", "workload", "forms", "office", "wiki", "files", "dispo")
 
 
 def pma_full():
