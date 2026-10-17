@@ -116,6 +116,10 @@ def check_url(f):
     if "url" not in f:
         return None
     u = (f["url"] or "").strip() if isinstance(f["url"], (str, type(None))) else ""
+    from ..collab.liste2e import le2e_is_cipher, le2e_parse
+    if le2e_is_cipher(u):  # 2.64.1 (#1817): the encrypted link of a list with the lock (le2e_guard checks the list)
+        f["url"] = u
+        return None if le2e_parse(u) else tr("Invalid value: {0}", "url")
     f["url"] = u or None
     return tr("The link must be a web address (https://…) or a file link (smb://…, file://…)") if u and not valid_link(u) else None  # 2.35.0 (#186): file links too
 
@@ -306,6 +310,7 @@ def clean_task(b):
     """Client values -> column values (validated; BadInput with a message otherwise)."""
     from ..personal.timetrack import BadInput
     from ..family.family import clean_fam, clean_rotation, STARS_MAX
+    from ..collab.liste2e import le2a_clean_cipher, le2e_is_cipher
     out = {}
     for k in TASK_FIELDS:
         if k in b:
@@ -317,11 +322,12 @@ def clean_task(b):
             if k == "title":
                 if v is not None and not isinstance(v, str):
                     raise BadInput(tr("Invalid value: {0}", tr("Title")))
-                v = (v or "").strip()[:TITLE_MAX]
+                # 2.64.1 (#1817): a ciphertext of a list with the lock is never stripped or cut (le2e_guard checks the list)
+                v = le2a_clean_cipher(v, tr("Title")) if le2e_is_cipher(v) else (v or "").strip()[:TITLE_MAX]
             if k == "content":
                 if v is not None and not isinstance(v, str):
                     raise BadInput(tr("Invalid value: {0}", tr("Description")))
-                v = (v or "")[:CONTENT_MAX]
+                v = le2a_clean_cipher(v, tr("Description")) if le2e_is_cipher(v) else (v or "")[:CONTENT_MAX]
             if k in ("list_id", "section_id", "parent_id", "assignee_id", "assignee_group_id") and v is not None:
                 v = as_int(v, k, 1)
             if k == "priority":

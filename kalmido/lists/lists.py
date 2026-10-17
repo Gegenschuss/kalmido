@@ -588,10 +588,15 @@ def list_purge(c, lid, inbox):
     owner's) so they stay restorable. Returns (icon, list file paths) to drop after the caller committed (list_icon_drop_file,
     list_files_drop). 2.35.0 (#1101): shared by the owner's delete and an organisation admin's."""
     ts = iso(now_utc())
+    from ..collab.liste2e import le2e_mode
+    tfiles = []
+    if le2e_mode(c, lid):  # 2.64.1 (#1817): ciphertexts go with the list and its keys (no trash: nobody could read them there)
+        from ..tasks.tasks import hard_delete
+        tfiles = hard_delete(c, [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))], lists={lid})
     c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at,?), list_id=?, section_id=NULL, assignee_id=NULL WHERE list_id=?",
               (ts, inbox, lid))
     icon = c.execute("SELECT icon FROM lists WHERE id=?", (lid,)).fetchone()[0]
-    lfiles = [r[0] for r in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))]  # 2.7.1 (#410)
+    lfiles = [r[0] for r in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))] + tfiles  # 2.7.1 (#410)
     from ..integrations.gitfolder import gf_before_list_delete
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository hanging on it moves to another list of its folder
     c.execute("DELETE FROM lists WHERE id=?", (lid,))
@@ -659,6 +664,10 @@ def member_set(lid):
         role = "participant"
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
     old = c.execute("SELECT role, grole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
+    from ..collab.liste2e import le2a_member_problem
+    p = le2a_member_problem(c, lid, uid, role_max(role, old["grole"]) if old else role)  # 2.64.1 (#1817): no agents / participants
+    if p:
+        return jsonify(error=p, code="list_e2e_member"), 409
     if old:  # 2.10.0 (#441): the personal role; the effective one is the higher of it and the role via groups
         eff = role_max(role, old["grole"])
         c.execute("UPDATE list_members SET role=?, own_role=? WHERE list_id=? AND user_id=?", (eff, role, lid, uid))
@@ -679,9 +688,10 @@ def member_set(lid):
         if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone():
             from ..admin.hosting import agent_joined_notice
             agent_joined_notice(c, lid, uid, me())  # 2.24.0 (#896)
+    pend = [r[0] for r in c.execute("SELECT user_id FROM list_key_pending WHERE list_id=? AND user_id=?", (lid, uid))]  # 2.64.1 (#1817)
     bump(c)
     c.commit()
-    return jsonify(ok=True, **({"by_email": True} if b.get("email") and not b.get("user_id") else {}))
+    return jsonify(ok=True, **({"by_email": True} if b.get("email") and not b.get("user_id") else {}), **({"e2e_pending": pend} if pend else {}))
 
 
 # ---- 2.22.0 (#740): a shared list lands with the other person in a folder of the same name as with its owner (created
@@ -725,6 +735,9 @@ def _folder_member_add(c, lid, uid, role, actor):
     role = "participant" if is_kid(c, uid) else role
     if role == "admin" and is_agent(u):  # 2.29.0: an agent is never a list admin (as in member_set)
         role = "edit"
+    from ..collab.liste2e import le2a_member_problem
+    if le2a_member_problem(c, lid, uid, role):  # 2.64.1 (#1817): a list with the lock is skipped (agents, participants)
+        return False
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
               (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc())))
     member_folder_adopt(c, lid, uid)
@@ -827,6 +840,10 @@ def folder_people_put():
     from ..agents.core import is_agent
     if role == "admin" and is_agent(c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()):
         return err(tr("An agent cannot be a list admin"))
+    from ..collab.liste2e import le2a_folder_problem
+    p = le2a_folder_problem(c, me(), f, role, uid)  # 2.64.1 (#1817): no participants in lists with the lock
+    if p:
+        return jsonify(error=p, code="list_e2e_member"), 409
     prev = c.execute("SELECT role FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid)).fetchone()
     c.execute("INSERT INTO folder_people(owner_id,folder,user_id,role,created_at) VALUES(?,?,?,?,?) ON CONFLICT(owner_id,folder,user_id) "
               "DO UPDATE SET role=excluded.role", (me(), f, uid, role, iso(now_utc())))
@@ -1108,7 +1125,9 @@ def member_remove(lid, uid):
     mr = c.execute("SELECT grole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
     if not mr:
         return err(tr("unknown"), 404)
-    if mr["grole"]:  # 2.10.0 (#441): access via a group stays; only the personal share goes
+    from ..collab.liste2e import le2e_mode
+    if mr["grole"] and not (mr["grole"] == "participant" and le2e_mode(c, lid)):  # 2.10.0 (#441): access via a group stays; only the personal share goes
+        # 2.64.1 (#1817): not as a participant in a list with the lock (the person leaves it)
         c.execute("UPDATE list_members SET own_role=NULL, role=grole WHERE list_id=? AND user_id=?", (lid, uid))
         bump(c)
         c.commit()

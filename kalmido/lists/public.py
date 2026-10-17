@@ -550,6 +550,9 @@ def pub_set(lid):
     need_pub_owner(c, lid)
     if not public_links_on(c):
         return err(tr("Public links are turned off on this server"), 409)
+    from ..collab.liste2e import le2e_mode
+    if le2e_mode(c, lid):  # 2.64.1 (#1817): its texts are encrypted in the browser
+        return jsonify(error=tr("A list encrypted in the browser cannot have a public link."), code="list_e2e_public"), 409
     b = body()
     old = c.execute("SELECT * FROM public_links WHERE list_id=?", (lid,)).fetchone()
     mode = b.get("mode", old["mode"] if old else "view")

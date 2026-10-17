@@ -20,7 +20,7 @@ async function useTemplate(tp) {
     let j; try { j = await api('POST', `/api/templates/${tp.id}/apply`, {name: name.trim()}); } catch { return; }
     await load(); go('l/' + j.list_id); toast(tr('List created from template')); return;
   }
-  const lid = quickDefaults().list_id;
+  const lid0 = quickDefaults().list_id, lid = listById(lid0)?.e2e ? null : lid0;  // 2.64.1 (#1817): a template never lands in a locked list (the basket instead)
   let j; try { j = await api('POST', `/api/templates/${tp.id}/apply`, {list_id: lid && canEditList(lid) ? lid : null}); } catch { return; }
   putTask(j.task); await load(); render();
   const id = j.task.id;
