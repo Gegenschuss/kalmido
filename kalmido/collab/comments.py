@@ -135,7 +135,8 @@ def timeline(tid):
     ids = {x["user_id"] for x in comments + acts} | {m for x in comments for m in x["mentions"]} \
         | {a["data"].get("to") for a in acts if a["kind"] == "assign"} | {a["data"].get("agent") for a in acts} | {a["data"].get("approver") for a in acts} \
         | {a["data"].get("by") for a in acts} | {u["id"] for x in comments for e in x["reactions"] for u in e["users"]} \
-        | {x["reply"]["user_id"] for x in comments if x.get("reply")}
+        | {x["reply"]["user_id"] for x in comments if x.get("reply")} \
+        | {a["data"].get("reviewer") for a in acts if a["kind"] == "review"}  # 2.82.0 (#1880): a reviewer has access to the list
     seen = c.execute("SELECT seen_id FROM task_seen WHERE user_id=? AND task_id=?", (me(), tid)).fetchone()
     ag = agent_ids(c)
     from .chatsave import chat_save_of  # 2.42.0 (#1383): an agent's comment I saved as a task

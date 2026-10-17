@@ -377,10 +377,13 @@ def rt9_forget(org_id=False):
             _CACHE.pop(org_id, None)
 
 
-def _org_vectors(c, org_id):
+def _org_vectors(c, org_id, ids=()):
     """{task id: vector} of one organisation (None: the private lists), decoded once and kept while nothing changed.
-    Only ever used after the caller's visibility filter decided which ids may be compared."""
+    Only ever used after the caller's visibility filter decided which ids may be compared. 2.82.0 (#1880): the private
+    lists of all people are no shared bucket in the cache: for org_id None only the given ids are read, nothing is kept."""
     from ..core.orgcrypt import OrgCryptError
+    if org_id is None:
+        return fr2a_private_vectors(c, ids)
     cond = "org_id=?" if org_id is not None else "org_id IS NULL"
     args = (org_id,) if org_id is not None else ()
     model = _W["model"]
@@ -410,12 +413,30 @@ def _org_vectors(c, org_id):
     return vecs
 
 
+def fr2a_private_vectors(c, ids):
+    """2.82.0 (#1880): {task id: vector} of the given tasks of private lists (no cache: a person's own vectors only)."""
+    from ..core.orgcrypt import OrgCryptError
+    ids, model, vecs = sorted({int(x) for x in ids}), _W["model"], {}
+    with system_ctx(c):  # derived numbers of tasks the caller already filtered by visibility
+        for i in range(0, len(ids), 1000):
+            part = ids[i:i + 1000]
+            for r in c.execute(f"SELECT task_id, dim, vec, model FROM task_vectors WHERE org_id IS NULL AND task_id IN ({','.join('?' * len(part))})",
+                               part):
+                if model and r["model"] != model:
+                    continue
+                try:
+                    vecs[r["task_id"]] = emb_load_val(c, None, r["vec"], r["dim"])
+                except (OrgCryptError, ValueError, struct.error):
+                    continue
+    return vecs
+
+
 def _own_vector(c, tid):
     with system_ctx(c):  # the asked task's own vector (the caller checked that the task is visible)
         r = c.execute("SELECT org_id FROM task_vectors WHERE task_id=?", (tid,)).fetchone()
     if not r:
         return None
-    return _org_vectors(c, r["org_id"]).get(tid)
+    return _org_vectors(c, r["org_id"], (tid,)).get(tid)
 
 
 def _visible(c, uid, exclude=()):
@@ -452,7 +473,7 @@ def _score_vec(c, qv, vis, top=EMB_TOP):
         by_org.setdefault(oid, []).append(tid)
     out = []
     for oid, ids in by_org.items():
-        vecs = _org_vectors(c, oid)
+        vecs = _org_vectors(c, oid, ids)
         for tid in ids:
             v = vecs.get(tid)
             if v is not None and len(v) == len(qv):
@@ -462,7 +483,7 @@ def _score_vec(c, qv, vis, top=EMB_TOP):
 
 
 def _cos_of(c, qv, tid, oid):
-    v = _org_vectors(c, oid).get(tid) if qv is not None else None
+    v = _org_vectors(c, oid, (tid,)).get(tid) if qv is not None else None
     return _sumprod(qv, v) if v is not None and len(v) == len(qv) else None
 
 
