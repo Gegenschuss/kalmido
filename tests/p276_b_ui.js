@@ -37,7 +37,8 @@ function writeCatalogue() {
   const ev = {...JSON.parse(fs.readFileSync(path.join(src, 'industry', 'film.json'), 'utf8')), code: 'event', name: {de: 'Veranstaltungen', en: 'Events'}, version: 1};
   const put = (rel, obj) => { const raw = Buffer.from(JSON.stringify(obj)); fs.writeFileSync(path.join(dir, rel), raw); return {sha256: crypto.createHash('sha256').update(raw).digest('hex'), size: raw.length}; };
   const a = put('country/at-1.json', at), e = put('industry/event-1.json', ev);
-  const ver = (rel, h) => [{version: 1, url: `${CAT}/${rel}`, ...h, released: '2026-10-17', min_app: '2.76.0', changes: {de: 'Erste Fassung', en: 'First version'}}];
+  // min_app below the running version: the test server still reports the base version until the release bump
+  const ver = (rel, h) => [{version: 1, url: `${CAT}/${rel}`, ...h, released: '2026-10-17', min_app: '2.0.0', changes: {de: 'Erste Fassung', en: 'First version'}}];
   fs.writeFileSync(path.join(dir, 'index.json'), JSON.stringify({format: 1, name: 'Test packs', updated: '2026-10-17', packs: [
     {kind: 'country', code: 'AT', name: {de: 'Österreich', en: 'Austria'}, description: {de: 'Steuersätze und Texte, *Beispiel*', en: 'Tax rates and texts, *example* <b>bold</b>'},
       author: 'Example group', license: 'CC0-1.0', verified: false, homepage: 'https://example.com/at', versions: ver('country/at-1.json', a)},
