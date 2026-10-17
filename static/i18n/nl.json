@@ -8351,5 +8351,9 @@
   "The key of {0} has changed.": "De sleutel van {0} is gewijzigd.",
   "The key of this list was changed meanwhile.": "De sleutel van deze lijst is inmiddels gewijzigd.",
   "The members of this list changed meanwhile. Try again.": "De leden van deze lijst zijn inmiddels gewijzigd. Probeer het opnieuw.",
-  "{0} texts of this list cannot be decrypted with the keys you hold.": "{0} teksten van deze lijst kunnen niet worden ontsleuteld met jouw sleutels."
+  "{0} texts of this list cannot be decrypted with the keys you hold.": "{0} teksten van deze lijst kunnen niet worden ontsleuteld met jouw sleutels.",
+  "This list is encrypted in the browser. Files can only be added in the app.": "Deze lijst is in de browser versleuteld. Bestanden kunnen alleen in de app worden toegevoegd.",
+  "Tasks with encrypted files cannot move to another list. Download the files and remove them from the task first.": "Taken met versleutelde bestanden kunnen niet naar een andere lijst worden verplaatst. Download de bestanden eerst en verwijder ze uit de taak.",
+  "Nothing to do": "Niets te doen",
+  "This list is encrypted in the browser. Add files to a task: project files would not be encrypted.": "Deze lijst is in de browser versleuteld. Voeg bestanden toe aan een taak: projectbestanden zouden niet versleuteld zijn."
 }

@@ -8351,5 +8351,9 @@
   "The key of {0} has changed.": "La chiave di {0} è cambiata.",
   "The key of this list was changed meanwhile.": "La chiave di questa lista è stata cambiata nel frattempo.",
   "The members of this list changed meanwhile. Try again.": "I membri di questa lista sono cambiati nel frattempo. Riprova.",
-  "{0} texts of this list cannot be decrypted with the keys you hold.": "{0} testi di questa lista non possono essere decifrati con le tue chiavi."
+  "{0} texts of this list cannot be decrypted with the keys you hold.": "{0} testi di questa lista non possono essere decifrati con le tue chiavi.",
+  "This list is encrypted in the browser. Files can only be added in the app.": "Questo elenco è cifrato nel browser. I file si possono aggiungere solo nell'app.",
+  "Tasks with encrypted files cannot move to another list. Download the files and remove them from the task first.": "Le attività con file cifrati non possono essere spostate in un altro elenco. Scarica prima i file e rimuovili dall'attività.",
+  "Nothing to do": "Niente da fare",
+  "This list is encrypted in the browser. Add files to a task: project files would not be encrypted.": "Questo elenco è cifrato nel browser. Aggiungi i file a un'attività: i file del progetto non sarebbero cifrati."
 }

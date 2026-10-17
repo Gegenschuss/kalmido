@@ -8351,5 +8351,9 @@
   "The key of {0} has changed.": "Der Schlüssel von {0} hat sich geändert.",
   "The key of this list was changed meanwhile.": "Der Schlüssel dieser Liste wurde inzwischen gewechselt.",
   "The members of this list changed meanwhile. Try again.": "Die Mitglieder dieser Liste haben sich inzwischen geändert. Bitte erneut versuchen.",
-  "{0} texts of this list cannot be decrypted with the keys you hold.": "{0} Texte dieser Liste lassen sich mit deinen Schlüsseln nicht entschlüsseln."
+  "{0} texts of this list cannot be decrypted with the keys you hold.": "{0} Texte dieser Liste lassen sich mit deinen Schlüsseln nicht entschlüsseln.",
+  "This list is encrypted in the browser. Files can only be added in the app.": "Diese Liste ist im Browser verschlüsselt. Dateien lassen sich nur in der App hinzufügen.",
+  "Tasks with encrypted files cannot move to another list. Download the files and remove them from the task first.": "Aufgaben mit verschlüsselten Dateien können nicht in eine andere Liste verschoben werden. Lade die Dateien zuerst herunter und entferne sie aus der Aufgabe.",
+  "Nothing to do": "Nichts zu tun",
+  "This list is encrypted in the browser. Add files to a task: project files would not be encrypted.": "Diese Liste ist im Browser verschlüsselt. Füge Dateien an einer Aufgabe hinzu: Projekt-Dateien wären nicht verschlüsselt."
 }
