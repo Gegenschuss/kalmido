@@ -267,9 +267,15 @@ check(any(x["id"] == NF and x["hit"] == "text" and x.get("url") for x in j.get("
 check(v1(Zo, "/files/search?q=zitronenbaum").json().get("data") == [], "#1820 API: another organisation finds nothing")
 check(v1(Bo, "/files/search").status_code == 400, "#1820 API: q is needed")
 # 2.81.0 (#1856): the API's task search names the file whose text matched, like the app
-j = v1(Bo, "/search?q=wolkenkratzer").json()
+j = v1(Bo, "/search?q=wolkenkratzer", ("read", "attachments:read")).json()
 hit = [x for x in j.get("data", []) if x["id"] == T1]
 check(hit and (hit[0].get("file_hit") or "").endswith(".pdf"), f"#1856 API: GET /search carries file_hit {str(hit)[:300]}")
+# audit G4: without attachments:read the recognised text of files finds nothing (no oracle on the content), a title still does
+for sc in (("read",), ("read", "files:read")):
+    j = v1(Bo, "/search?q=wolkenkratzer", sc).json()
+    check(not any(x["id"] == T1 or x.get("file_hit") for x in j.get("data", [])), f"G4: a token with {sc} does not find the task by its file's text {str(j)[:200]}")
+r = v1(Bo, "/search?q=Pay", ("read",))
+check(r.ok and any(x["id"] == T1 and not x.get("file_hit") for x in r.json().get("data", [])), f"G4: the title still finds the task with read only {r.text[:200]}")
 
 P = Bo.post(B + "/api/lists", json={"name": "Site", "kind": "project", "org_id": ORG}).json()["id"]
 r = Bo.post(B + f"/api/lists/{P}/files", files={"file": ("plan.pdf", text_pdf(["Kirschgarten Bauabschnitt"]), "application/pdf")})

@@ -435,13 +435,14 @@ def task_query():
     return jsonify(tasks=rows, **extra)
 
 
-def search_tasks(c, uid, raw, limit):
-    """Visible tasks whose title, notes, link or a custom field value contains raw (web search, REST API)."""
+def search_tasks(c, uid, raw, limit, files=True):
+    """Visible tasks whose title, notes, link or a custom field value contains raw (web search, REST API). files=False
+    (audit G4: an API token without attachments:read): the recognised text of files does not count."""
     from ..lists.fields import search_field_ids
     q = f"%{like_escape(raw)}%"  # 2.37.0 (#1150): the text literally (Postgres reads a backslash as an escape in LIKE)
     fids = sorted(search_field_ids(c, uid, raw))[:2000] if raw else []
     from ..files.textscan import ts_task_hits
-    fhit = ts_task_hits(c, uid, raw)  # 2.61.0 (#1820): the recognised text of a task's files finds the task
+    fhit = ts_task_hits(c, uid, raw) if files else {}  # 2.61.0 (#1820): the recognised text of a task's files finds the task
     fids = sorted(set(fids) | set(sorted(fhit)[:2000]))
     # participants: only their own tasks match (a context parent's notes / link / fields are not theirs to search)
     # 2.64.1 B (#1817): lists with the lock are searched in the browser only (the server holds ciphertexts)

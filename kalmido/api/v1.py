@@ -383,7 +383,7 @@ def v1_task(d):
         out["note_locked"] = True
     if d.get("also"):  # 2.71.0 B (#1459): the further lists the token's user sees (absent: none)
         out["also"] = d["also"]
-    if d.get("file_hit"):  # 2.81.0 (#1856): search -- only the recognised text of this file matched (absent otherwise)
+    if d.get("file_hit"):  # 2.81.0 (#1856): search -- only the recognised text of this file matched (absent otherwise; G4: needs attachments:read)
         out["file_hit"] = d["file_hit"]
     return out
 
@@ -1376,7 +1376,8 @@ def v1_search():
     q = (a.get("q") or "").strip()
     if not q or len(q) > 200:
         raise BadInput(tr("Invalid value: {0}", "q"))
-    rows = search_tasks(db(), me(), q, 2000)
+    # audit G4: the recognised text of files (and file_hit) only for a token that may read the files
+    rows = search_tasks(db(), me(), q, 2000, files=g.get("auth_via") != "token" or "attachments:read" in (g.get("scopes") or set()))
     if a.get("semantic") == "1":  # 2.59.0 B (#1375): + tasks of similar meaning (only visible ones, flag similar)
         from ..tasks.related import rt9_search_extend
         rows = rt9_search_extend(db(), me(), q, rows, len(rows) + 20)

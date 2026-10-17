@@ -58,7 +58,8 @@ from ..agents.api import job_notify
 #   comments           comments (write, edit, delete), reactions, News read state
 #   structure          lists, sections, custom fields, list tags, templates, saved filters, folders, project overview, import
 #   delete             tasks to the trash + restore + empty it, delete sections / lists / fields / templates / habits / filters
-#   attachments:read   download files of tasks, comments and projects (their names come with read)
+#   attachments:read   download files of tasks, comments and projects (their names come with read); the search over
+#                      their recognised text (audit G4)
 #   attachments:write  upload and remove them
 #   time               time tracking (timer, entries)
 #   export             the data export

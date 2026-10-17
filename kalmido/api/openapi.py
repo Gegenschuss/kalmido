@@ -180,7 +180,7 @@ def openapi_spec():
                                                               "subtasks, read-only, without notes, link, files and comments"},
                                                   "attachments": {"type": "array", "items": ref("Attachment")},
                                                   # 2.81.0 (#1856)
-                                                  "file_hit": {"type": "string", "description": "Search only: the name of the file whose recognised text matched (absent otherwise)"}}},
+                                                  "file_hit": {"type": "string", "description": "Search only: the name of the file whose recognised text matched (absent otherwise). The recognised text of files counts only for a token with attachments:read"}}},
         "TaskCompleted": {"allOf": [ref("Task"), {"type": "object", "properties": {"next_due": nul("string", format="date", description="Recurring: the next date the task moved to")}}]},
         "TaskInput": {"type": "object", "additionalProperties": False, "properties": task_in},
         # 2.67.0 B (#1865): a later due date moves the tasks waiting on it along (list setting); shift_chain false = not
