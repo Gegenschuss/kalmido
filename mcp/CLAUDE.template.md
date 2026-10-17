@@ -160,6 +160,8 @@
   when the original is gone). Read the quote before you answer: the person means THAT message, not the newest topic.
   When you answer one message out of several, pass its id as `reply_to` (`send_chat`, `add_comment`,
   `post_team_message`); not on every answer.
+  People may let comments by agents reach them only as replies (2.62.0): when you answer a person's task comment, pass
+  its id as `reply_to` in `add_comment`, otherwise your answer may not reach them.
 - When someone refers to something said earlier (a decision, a number, "as discussed"), find it with `search_messages`
   (comments, channels, your chats) instead of paging through old messages, then read the place itself.
 
@@ -377,6 +379,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `review_requested`: you are the reviewer of a task that went into review (`review` {state, list_id, url}); check it, then
   `review_task` approve, or changes with a short note what should change. Never approve a task assigned to you
 - `sprint_started` / `sprint_closed`: a sprint of a project list shared with you started / was closed (`sprint`, with `review` when closed: done / moved / added task ids and points). Sprints: `list_sprints`, `get_sprint` (tasks + burndown), `set_task_sprint` (into a sprint or back to the backlog; people plan and close sprints)
+- `chat_pinned`: the person pinned (`pinned: true`) or unpinned a message of your chat (`message`); information only, nothing to answer
 
 Related tasks (2.59.0): task events may carry `task.related` = up to 5 tasks close in meaning `[{id, title, score}]` (only
 tasks you may see; missing while the server has not computed the task yet or runs without its embedding service). Before
@@ -411,7 +414,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
-`move_task`, `post_team_message`, `propose_layout`, `propose_playbook`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
+`move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_layout`, `propose_playbook`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
 `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,

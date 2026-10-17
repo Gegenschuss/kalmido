@@ -1285,6 +1285,9 @@ class Runner:
                 continue
             if ev.get("event") == "reaction" and (ev.get("data") or {}).get("chat_message"):
                 continue  # a reaction in the chat: an approval by thumbs up / down also comes as chat_choice (2.35.0)
+            if ev.get("event") == "chat_pinned":  # kalmido-capability: chat_pinned (2.62.0, #1848): information only, no run
+                log("event chat_pinned: noted, no run")
+                continue
             uid = self.chat_uid(ev)
             if out and uid and ev.get("event") == "chat" and out[-1][0] == uid and out[-1][1][-1].get("event") == "chat":
                 out[-1][1].append(ev)

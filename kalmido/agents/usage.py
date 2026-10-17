@@ -766,6 +766,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                             "delivered_at": nul("string", description="2.7.2 (#422): when the agent fetched the person's message (event poll, MCP, webhook, chat read); null = not yet / an agent message"),
                                             "edited_at": nul("string", description="2.39.0 (#1179): when the person last edited their message (null = never); "
                                                              "body is the current text. Edited after you fetched or answered it: the event message_edited (old, new)"),
+                                            "pinned_at": nul("string", description="2.62.0 (#1848): pinned since (null = not pinned); the person's pins reach you as chat_pinned"),
+                                            "pinned_by": nul("integer", description="2.62.0 (#1848): who pinned it (the person or you)"),
                                             "asks": {"type": "boolean", "description": "2.13.0: an agent message that asks something (a question mark outside code and links); only there a 👍 / 👎 of the person is an approval / rejection"},
                                             "choices": nul("object", description="2.28.0 (#1005): answer buttons of an agent message: {choices: [{id, label, style?: primary | danger}], multi}; "
                                                           "2.30.0 permission, expires_at; 2.35.0 (#1103) approval {title, what} (an approval request, buttons yes / no)"),

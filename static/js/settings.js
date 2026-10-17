@@ -80,7 +80,11 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-favq': ['fav_quiet', N_('Quieter pushes from lists without a star'), 'chk'], 's-favs': ['fav_suggest', N_('Suggest favourites'), 'chk'],  // 2.46.1 (#1361)
   's-tblacc': ['tbl_accept', N_('Accept urgent markings from others'), 'chk'],  // 2.53.0 C (#1424)
   's-pmeta': ['photo_meta_strip', N_('Remove location data from photos'), 'chk'],  // 2.61.0 B (#1819)
+  's-bl9ac': ['agent_comments', N_('Comments by agents'), 'sel'],  // 2.62.0 (#1854)
 };
+// 2.62.0 (#1854): comments by agents: all | only replies to me (people's comments stay as the matrix says)
+const bl9SetHtml = (s, hint) => collab() && feat('agents') ? `<div class="row"><label for="s-bl9ac">${tr('Comments by agents')}</label><select id="s-bl9ac">${[['all', N_('All')], ['replies', N_('Only replies to me')]].map(([v, n]) => `<option value="${v}" ${(s.agent_comments || 'all') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+      ${hint(tr('Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.'))}` : '';
 const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
@@ -592,7 +596,7 @@ function settingsModal(focus) {
       <div class="row"><label>${tr('Topic')}</label><code class="topic">${esc(s.ntfy_topic)}</code><button class="btn sm" data-m="test">${ic('bell', 's')} ${tr('Send test')}</button></div>
       ${S.webpush?.enabled ? '' : prio}
       ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', with a user that has read access')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
-      ${notifMatrixHtml(s, hint)}${typeof tbl_setHtml === 'function' ? tbl_setHtml(chk, hint) : ''}
+      ${notifMatrixHtml(s, hint)}${bl9SetHtml(s, hint)}${typeof tbl_setHtml === 'function' ? tbl_setHtml(chk, hint) : ''}
       <h4>${tr('Reminders')}</h4>
       <div class="row"><label for="s-allday">${tr('All-day reminder at')}</label>${timeIn('s-allday', s.allday_time, {label: tr('All-day reminder at'), clear: false})}</div>
       <div class="row"><label for="s-defrem">${tr('Default reminder')}</label><select id="s-defrem"><option value="">${tr('none')}</option>${REM_OPTS.map(([v, n]) => `<option value="${v}" ${s.default_reminder === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}${s.default_reminder && !REM_OPTS.some(o => o[0] === s.default_reminder) ? `<option value="${esc(s.default_reminder)}" selected>${esc(s.default_reminder.split(',').map(fmtRem).join(', '))}</option>` : ''}</select></div>

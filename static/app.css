@@ -7869,3 +7869,20 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .ftxthit span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .scnmark.ftxtnone{opacity:.75}
 @media (pointer:coarse){.ftxtbar input{min-height:2.75rem}}
+
+/* 2.62.0 C (#1485): the head of the list and folder settings (name, "Saved · Undo", close) stays on top while the dialog scrolls */
+.lmodal .card>.lhdr,.fsmodal .card>.lhdr{position:sticky;top:0;z-index:3;background:var(--bg2);margin:-1.25rem -1.25rem .5rem;padding:1rem 1.25rem .5rem}
+/* 2.62.0 A (#1530) a message on its way: the bubble waits a little lighter until the server answered */
+.cmsg.csdpend .cbub{opacity:.6}
+.cmsg.csdpend .cmeta{opacity:.8}
+
+/* 2.62.0 A (#1848) pinned chat messages: one quiet bar above the messages (the newest pin, an arrow through the others) */
+.cpnbar{display:flex;align-items:center;gap:.375rem;padding:.125rem .5rem .125rem .75rem;border-bottom:.0625rem solid var(--line);background:color-mix(in srgb,var(--accent) 6%,var(--bg2));color:var(--accent);flex:0 0 auto}
+.cpnbar[hidden]{display:none}
+.cpngo{display:flex;flex-direction:column;align-items:flex-start;flex:1 1 auto;min-width:0;min-height:2.75rem;justify-content:center;padding:0 .25rem;border:0;border-left:.1875rem solid var(--accent);background:none;color:var(--text);font:inherit;font-size:.8125rem;line-height:1.3;text-align:left;cursor:pointer}
+.cpngo b{color:var(--accent);font-size:var(--fs-xs);white-space:nowrap}
+.cpngo span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpngo:hover span{text-decoration:underline}
+.cpnbar .iconbtn{flex:0 0 auto;min-width:2.75rem;min-height:2.75rem}
+.cpnmark{display:inline-flex;align-items:center;color:var(--accent)}
+.cpnmark .i{width:.75rem;height:.75rem}

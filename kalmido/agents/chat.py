@@ -179,6 +179,9 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
             **chat_reply(r),  # 2.33.0 (#1076): reply_to + reply (the quote of the answered message)
             # 2.39.0 (#1179): the person edited their message (null = never); edits = the earlier versions, only for the person
             "edited_at": r["edited_at"] if "edited_at" in r.keys() else None,
+            # 2.62.0 (#1848): pinned (collab/chatpins.py; null = not pinned)
+            "pinned_at": r["pinned_at"] if "pinned_at" in r.keys() else None,
+            "pinned_by": r["pinned_by"] if "pinned_by" in r.keys() and r["pinned_at"] else None,
             **({"edits": med_edits(r)} if edits else {}),
             "attachments": [{**f, "url": (f"/api/v1/chat-attachments/{f['id']}" if api else f"/api/chat-files/{f['id']}")}
                             for f in (files or {}).get(r["id"], [])]}
@@ -812,9 +815,11 @@ def agent_chat_get(aid):
     # 2.7.2 (#422): the server's clock, so the app can tell how long ago a message was delivered
     # 2.35.0 (#1103): the open approval requests (pinned at the top, also when older than this page)
     ap = chat_approvals_open(c, aid, me())[-APPROVAL_PIN_MAX:]
+    from ..collab.chatpins import cpin_agent_list
     return jsonify(agent=agent_public(c, a, me()), messages=msgs, now=iso_ms(now_utc()), has_more=more,
                    steps_live=steps_live(c, aid, me()),
-                   approvals_open=jn9_chat_jobs(c, [chat_dict(r, None, None, newest=nw) for r in ap], me()))
+                   approvals_open=jn9_chat_jobs(c, [chat_dict(r, None, None, newest=nw) for r in ap], me()),
+                   pins=cpin_agent_list(c, aid, me()))  # 2.62.0 (#1848): the pinned messages, also older than this page
 
 
 def chat_task(c, v, uid_a, uid_b):
@@ -854,8 +859,17 @@ def agent_chat_post(aid):
     if not agent_active(a):
         return err(tr("This agent is paused"), 409)
     try:
-        fb, files = chat_input(("body", "task_id", "reply_to"))
-        r = chat_post(c, aid, me(), "user", fb if fb is not None else body(), files)
+        fb, files = chat_input(("body", "task_id", "reply_to", "client_id"))  # 2.62.0 (#1530): client_id
+        b = fb if fb is not None else body()
+        from ..collab.teamchat import csd_client_id, csd_dup
+        cid = csd_client_id(b)
+        dup = cid and csd_dup(c, "agent_chat", "agent_id=? AND user_id=? AND sender='user'", (aid, me()), cid,
+                              b.get("body").strip() if isinstance(b.get("body"), str) else "")
+        if dup:  # the same message again within seconds: the stored one, no second event for the agent
+            return jsonify(chat_one(c, dup, edits=True)), 200
+        r = chat_post(c, aid, me(), "user", b, files)
+        if cid:
+            c.execute("UPDATE agent_chat SET client_id=? WHERE id=?", (cid, r["id"]))
     except UnknownFields as e:
         return err(str(e))
     except BadInput as e:

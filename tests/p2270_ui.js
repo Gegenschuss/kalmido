@@ -151,7 +151,9 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   await sleep(500);
   check(w.eval(`sideOrder().filter(l => l.folder === 'Work').map(l => l.id).join()`) === `${W2},${W1}`, '#991: Website now the last of Work');
   const sm = w.eval(`listMenuItems(${W1}, document.querySelector('#side .srow[data-list="${W1}"]')).map(x => x.label || x)`);
-  check(sm.includes('Move to the top') && sm.includes('Move to the bottom'), '#991: the sidebar menu has top / bottom ' + sm.join('|'));
+  // 2.62.0 (#1853): top / bottom (and up / down) sit in the second level of "Change position…"
+  const pm = w.eval(`listMenuItems(${W1}, document.querySelector('#side .srow[data-list="${W1}"]')).find(x => x.label === 'Change position…')?.more?.map(x => x.label)`) || [];
+  check(!sm.includes('Move to the top') && pm.includes('Move to the top') && pm.includes('Move to the bottom') && pm.length === 4, '#991 / #1853: the sidebar menu has "Change position…" with top / bottom ' + sm.join('|') + ' / ' + pm.join('|'));
   // #984 views above the lists, #1001 My tasks
   const grp = [...d.querySelectorAll('#side .sgroup')].map(x => [...x.classList].find(c => c.startsWith('sg-')));
   // 2.45.0 (#1503): the lists above Views again (right below Plan)

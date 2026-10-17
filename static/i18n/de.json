@@ -8452,5 +8452,16 @@
   "Found in the text": "Im Text gefunden",
   "in {0}": "in {0}",
   "Project {0}": "Projekt {0}",
-  "Search results": "Suchergebnisse"
+  "Search results": "Suchergebnisse",
+  "Change position…": "Position ändern…",
+  "Comments by agents": "Kommentare von Agenten",
+  "Only replies to me": "Nur Antworten an mich",
+  "Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.": "Nur Antworten an mich: Ein Kommentar eines Agenten erreicht dich (Neuigkeiten und Push) nur, wenn er auf deinen Kommentar antwortet, direkt nach deinem Kommentar folgt oder dich erwähnt. Kommentare von Menschen sind nicht betroffen.",
+  "Sending…": "Wird gesendet…",
+  "Pinned {0}/{1}": "Angeheftet {0}/{1}",
+  "Pinned messages": "Angeheftete Nachrichten",
+  "Next pinned message": "Nächste angeheftete Nachricht",
+  "Message pinned": "Nachricht angeheftet",
+  "Message unpinned": "Nachricht gelöst",
+  "At most {0} pinned messages. Unpin one first.": "Höchstens {0} angeheftete Nachrichten. Löse zuerst eine."
 }

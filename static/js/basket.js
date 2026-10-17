@@ -57,8 +57,9 @@ function kbGroupMove(id, to) {  // to: an index in the shown order
 }
 function kbGroupMenu(anchor, id) {
   const ids = kbShownGroups(), i = ids.indexOf(id);
-  menu(anchor, [{label: tr('Move up'), icon: 'up', dis: i <= 0, fn: () => kbGroupMove(id, i - 1)}, {label: tr('Move down'), icon: 'down', dis: i >= ids.length - 1, fn: () => kbGroupMove(id, i + 1)},
-    {label: tr('To the top'), icon: 'up', dis: i <= 0, fn: () => kbGroupMove(id, 0)}, {label: tr('To the bottom'), icon: 'down', dis: i >= ids.length - 1, fn: () => kbGroupMove(id, ids.length)},
+  // 2.62.0 (#1853): "Change position…" = one entry with the four moves in a second level
+  menu(anchor, [mpo_posItem([{label: tr('Move up'), icon: 'up', dis: i <= 0, fn: () => kbGroupMove(id, i - 1)}, {label: tr('Move down'), icon: 'down', dis: i >= ids.length - 1, fn: () => kbGroupMove(id, i + 1)},
+    {label: tr('To the top'), icon: 'up', dis: i <= 0, fn: () => kbGroupMove(id, 0)}, {label: tr('To the bottom'), icon: 'down', dis: i >= ids.length - 1, fn: () => kbGroupMove(id, ids.length)}]),
     ...(kbGroupPrefs()[S.route.key] ? ['-', kbGroupResetItem()] : [])], null, null, tr('Group order'));
 }
 const kbGroupResetItem = () => ({label: tr('Reset the order'), icon: 'sort', fn: () => { kbGroupSave(null); toast(tr('Groups in the sidebar’s order again')); }});

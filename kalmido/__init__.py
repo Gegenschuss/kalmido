@@ -116,6 +116,7 @@ ORDER = (
     "collab.teamchat",
     "collab.msgsearch",  # 2.33.0 (#1080)
     "collab.chatsave",  # 2.37.0 (#1159)
+    "collab.chatpins",  # 2.62.0 (#1848): pinned chat messages (after teamchat / agents.chat)
     "collab.cchoice",  # 2.41.0 (#1383): answer buttons / approval cards in comments
     "collab.e2e",  # 2.42.0 (#828, #909): end-to-end encryption (keys, encrypted notes / files / DMs)
     "integrations.mailtrim",  # 2.49.0 (#971)

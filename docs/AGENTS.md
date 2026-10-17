@@ -695,6 +695,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `review_requested` | 2.60.0 (#1512): the agent is the reviewer of a task that went into the [review step](#review-step-2600) (moved into the list's review section or *Send for review*); only when the agent has access to the list | `task`, `review` `{state: pending, reviewer_id, list_id, url, by}` |
 | `sprint_started` | 2.60.0 (#343): a sprint of a project list shared with the agent started (switched on, started by hand, or the next one after closing) | `list_id`, `list`, `sprint` (id, num, title, start, end, goal, state, progress) |
 | `sprint_closed` | 2.60.0 (#343): a sprint was closed (by a person or after its last day); `sprint.review` holds the done / moved / added task ids, counts and points | `list_id`, `list`, `sprint` (with `review`), `next_sprint_id` |
+| `chat_pinned` | 2.62.0 (#1848): the person pinned or unpinned a message of the agent's chat (see [Pinned chat messages](#pinned-chat-messages-2620)); information only, nothing to answer (the reference launcher starts no run) | `message` (the chat message, with `pinned_at` / `pinned_by`), `pinned` (true / false), `user` `{id, name}` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1370,6 +1371,10 @@ A `reply_to` of another place, an unknown id or a deleted message is refused wit
 - **Notifications**: the author of the original gets a push "... replied to your message" (it counts like an @mention in
   the notification settings); an agent whose comment or channel message is answered gets the event `mention` /
   `team_message`, like an @mention.
+- **Comments reach people only as replies, if they chose so (2.62.0)**: a person may set *Comments by agents: only replies
+  to me* (setting `agent_comments` = `replies`, default `all`). Then an agent's task comment reaches them (News and push)
+  only when it carries `reply_to` on their comment, comes right after their comment on that task, or @mentions them.
+  Answer a person's comment with `reply_to` so the answer arrives.
 
 ### Saving a chat message as a task (2.37.0)
 
@@ -1456,6 +1461,22 @@ the queued `chat` event. After that the agent gets the event `message_edited` (o
 Treat it as a correction: confirm it briefly in the chat, do not throw away running work and do not restart it, adjust
 only what the change affects. Edited task comments and team chat messages reach the agents that got them as an event
 the same way (`kind: comment` with `comment`, `task`, `list`; `kind: team` with `room`), never a new push to people.
+
+### Pinned chat messages (2.62.0)
+
+A message of the agent chat or of a team chat conversation can be pinned: it shows in a bar at the top of the
+conversation (newest pin first, a tap jumps to it). At most 5 per conversation (a 6th answers 409); a deleted message
+leaves the bar. Every message carries `pinned_at` (null = not pinned) and `pinned_by`; the conversation's page
+(`GET /api/v1/team/rooms/{id}/messages`, in the app also the agent chat) carries `pins`, also when they are older than
+the page.
+
+```
+POST /api/v1/agent/chats/{user_id}/messages/{message_id}/pin {"pinned": true}   (the agent, own conversations; MCP pin_chat_message)
+POST /api/v1/team/messages/{message_id}/pin                  {"pinned": false}  (members of the conversation; MCP pin_team_message)
+```
+
+Without `pinned` the pin toggles. When the **person** pins or unpins a message of the agent chat, the agent gets the event
+`chat_pinned` `{message, pinned, user}`; the agent's own pins and pins in team chats send no event.
 
 ## File store (2.48.0)
 
@@ -2467,7 +2488,7 @@ with the scope it needs). The tools:
 - waiting on someone: `set_waiting`, `clear_waiting`, `list_waiting`, `list_stale_tasks` (2.34.0: tasks lying idle)
 - agent channel (agent tokens only): `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`,
   `create_job`, `get_job`, `update_job`, `submit_proposal`, `propose_to_person` (2.51.0), `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
-  `chat_typing`, `react_to_chat`, `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`
+  `chat_typing`, `react_to_chat`, `pin_chat_message` (2.62.0), `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`
 
 Setup is in [mcp/README.md](../mcp/README.md).
 
@@ -2503,7 +2524,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `list_office_documents`, `list_packing_templates`, `list_payment_suggestions`, `list_project_files`,
 `list_receipt_suggestions`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,
 `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
-`list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `post_team_message`,
+`list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`,
 `propose_playbook`, `propose_to_other_topic`, `propose_to_person`, `react`, `react_team_message`, `react_to_chat`,
 `read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`,
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
@@ -2585,6 +2606,7 @@ own chat.
 | `POST /team/rooms/{id}/messages` `{body, task_id?, reply_to?}` (mentions as `<@user id>`; 2.33.0 `reply_to`: a message of the same conversation) | `post_team_message` | comments |
 | `PATCH /team/messages/{id}` · `DELETE …` (own messages) | `edit_team_message` · `delete_team_message` | comments |
 | `POST /team/messages/{id}/reactions` `{emoji, on?}` | `react_team_message` | comments |
+| `POST /team/messages/{id}/pin` `{pinned?}` (2.62.0: at most 5 per conversation; the page of a conversation carries `pins`) | `pin_team_message` | comments |
 | `POST /team/rooms/{id}/read` `{last_id?}` | `mark_team_chat_read` | comments |
 
 **Searching conversations (2.33.0)**: `GET /search?scope=messages&q=…` (MCP `search_messages`, scope read) finds words in

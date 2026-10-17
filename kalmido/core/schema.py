@@ -1751,6 +1751,14 @@ MIGRATIONS = [
     # photo document (EXIF, read before the metadata goes; ISO, maybe with its offset)
     ("orgs", "photo_meta_strip", "ALTER TABLE orgs ADD COLUMN photo_meta_strip BIGINT NOT NULL DEFAULT 1"),
     ("doc_meta", "taken_at", "ALTER TABLE doc_meta ADD COLUMN taken_at TEXT"),
+    # 2.62.0 A (#1530): the app's key of a sent message (the same on a retry): a second send within seconds returns the first
+    ("tchat_msgs", "client_id", "ALTER TABLE tchat_msgs ADD COLUMN client_id TEXT"),
+    ("agent_chat", "client_id", "ALTER TABLE agent_chat ADD COLUMN client_id TEXT"),
+    # 2.62.0 A (#1848): a pinned chat message (since when, by whom; NULL = not pinned)
+    ("tchat_msgs", "pinned_at", "ALTER TABLE tchat_msgs ADD COLUMN pinned_at TEXT"),
+    ("tchat_msgs", "pinned_by", "ALTER TABLE tchat_msgs ADD COLUMN pinned_by BIGINT"),
+    ("agent_chat", "pinned_at", "ALTER TABLE agent_chat ADD COLUMN pinned_at TEXT"),
+    ("agent_chat", "pinned_by", "ALTER TABLE agent_chat ADD COLUMN pinned_by BIGINT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -1804,6 +1812,9 @@ CREATE INDEX IF NOT EXISTS file_text_att ON file_text(att_id) WHERE att_id IS NO
 CREATE INDEX IF NOT EXISTS file_text_lf ON file_text(list_file_id) WHERE list_file_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS file_text_node ON file_text(node_id) WHERE node_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS file_words_h ON file_words(h);
+-- 2.62.0 A (#1848): the pinned messages of a conversation
+CREATE INDEX IF NOT EXISTS tchat_msgs_pinned ON tchat_msgs(room_id) WHERE pinned_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS agent_chat_pinned ON agent_chat(agent_id, user_id) WHERE pinned_at IS NOT NULL;
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 3  # task > subtask > sub-subtask
@@ -1946,6 +1957,9 @@ USER_DEFAULTS = {
     "fav_items": "[]",
     # 2.61.0 B (#1819): '0' = my own photos (not an organisation's) keep their metadata (GPS, camera, capture time) on upload
     "photo_meta_strip": "1",
+    # 2.62.0 (#1854): comments by agents in the bell and as push: all | replies (only replies to me: reply_to my comment,
+    # my comment right before, or an @mention of me)
+    "agent_comments": "all",
 }
 # global, server-internal (table settings); the legacy single-user rows stay there untouched
 GLOBAL_DEFAULTS = {

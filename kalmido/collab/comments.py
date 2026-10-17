@@ -368,7 +368,7 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     """Decides who gets a push for this comment (burst state updated in c, caller commits).
     Returns [(user id, title, message, click, priority)] to send after the commit.
     2.33.0 (#1076): replied = the author of the answered comment: "replied to your message", counted like a mention."""
-    from ..collab.news import agent_push_ok, bell_all_users, news_add, notif_ok
+    from ..collab.news import agent_push_ok, bell_all_users, bl9_agent_comment_ok, news_add, notif_ok
     from ..notify.push import push_prio, push_reachable
     from ..agents.core import agent_ids
     author = me()
@@ -393,11 +393,19 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     snippet = snippet[:280] + ("…" if len(snippet) > 280 else "")
     out = []
     ag = agent_ids(c)
+    # 2.62.0 (#1854): approval cards / questions with buttons / suggestions of an agent always arrive (they wait for the person)
+    asks = author in ag and bool(c.execute("SELECT choices IS NOT NULL OR suggestion IS NOT NULL FROM comments WHERE id=?",
+                                           (cid,)).fetchone()[0])
     for uid in sorted(ids):
         s = collab_user(c, uid, t["list_id"]) if uid not in ag else None  # 2.0.0: agents get events (agent_comment_events)
         if not s or not task_visible(c, t["id"], uid, full=True):  # 1.10.0: participants only about their tasks
             continue
         if "comments" not in (s.get("features") or "").split(","):  # 2.0.6: comments off -> no comment News / pushes
+            continue
+        # 2.62.0 (#1854): an agent's comment with "only replies to me" (also against a list bell "All": the person chose it for
+        # agents explicitly; only the task's "Urgent" still wants every comment)
+        if not asks and not bl9_agent_comment_ok(s, uid, author, ag, prev, replied, uid in notify_mentions) and \
+                tbl_level(c, uid, t["id"], s) != "urgent":
             continue
         mentioned = uid in notify_mentions or uid == replied
         # 2.1.0 (#317): which event of the notification settings this comment is for uid (first match)
@@ -419,8 +427,9 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
         if not notif_ok(c, uid, s, row, "push", t["list_id"]) or not push_reachable(c, uid, s) or \
                 not burst_gate(c, uid, t["id"], mentioned=mentioned):
             continue
-        if not mentioned and not agent_push_ok(c, uid, s, author):  # 2.28.0 (#987): an agent's comments push only when wanted
-            continue
+        if not mentioned and not agent_push_ok(c, uid, s, author) and \
+                not (s.get("agent_comments") == "replies" and uid == prev):  # 2.28.0 (#987): an agent's comments push only when wanted
+            continue  # 2.62.0 (#1854): with "only replies to me" a reply right after my comment pushes like one with reply_to
         lg = lang_of(s)
         what = snippet or trn("{0} file", "{0} files", nfiles, lg=lg)
         who = names.get(author, "?")

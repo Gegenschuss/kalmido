@@ -72,6 +72,15 @@ def agent_push_ok(c, uid, s, actor):
     return (s or {}).get("agent_push") == "1"
 
 
+def bl9_agent_comment_ok(s, uid, author, agents, prev, replied, mentioned):
+    """2.62.0 (#1854): a comment by an AGENT reaches uid (News and push) unless uid chose "only replies to me"
+    (setting agent_comments = replies); then only when it answers uid's comment (reply_to), follows right after uid's
+    comment on that task, or mentions uid. Comments by people are never filtered here."""
+    if not author or author not in agents or (s or {}).get("agent_comments") != "replies":
+        return True
+    return mentioned or uid == prev or uid == replied
+
+
 def news_wanted(s, kind):
     on = set((s.get("news_kinds") if s else USER_DEFAULTS["news_kinds"]).split(","))
     return any(kind in NEWS_GROUPS[g] for g in on if g in NEWS_GROUPS)

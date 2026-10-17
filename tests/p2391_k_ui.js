@@ -146,6 +146,8 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   const order0 = groups().filter(g => g.dataset.kbg).map(g => g.dataset.kbg);
   check(order0.at(-1) === 'l:' + SOLO && order0[0] === 'l:' + INBOX && order0.includes('l:' + HOME) && order0.includes('l:' + TEAM), '#1221: default in the sidebar order (basket, lists, then folders) ' + order0.join());
   click(w, gg.querySelector('[data-kb="grp-menu"]'));
+  // 2.62.0 (#1853): the four moves sit behind one "Change position…" entry (second level)
+  click(w, await until(() => [...d.querySelectorAll('.menu-list button')].find(b => /Change position/.test(b.textContent))));
   const top = await until(() => [...d.querySelectorAll('.menu-list button')].find(b => /To the top/.test(b.textContent)));
   click(w, top); await sleep(500);
   const order1 = groups().filter(g => g.dataset.kbg).map(g => g.dataset.kbg);
