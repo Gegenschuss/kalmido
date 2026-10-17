@@ -141,7 +141,7 @@ function reviewCard() {
     calReq('GET', '/api/dayplan/review').then(j => { S.review = {day: t0, data: j, busy: false}; if (S.route.key === 'today') viewSafeRender(); }).catch(() => { S.review.busy = false; });
     return '';
   }
-  const r = S.review.data; if (!r) return '';
+  const r = S.review.data; if (!r || !r.tomorrow) return '';  // 2.84.0: an answer without the day (the browser demo after work_end) shows no card
   const li = (arr, cls) => arr.slice(0, 5).map(x => `<li class="${cls}">${mdTitleNL(x.title)}</li>`).join('') + (arr.length > 5 ? `<li class="muted">${esc(trn('and {0} more', 'and {0} more', arr.length - 5))}</li>` : '');
   const tm = r.tomorrow;
   const plan = `<button class="btn sm" data-act="dayplan" data-mode="day" data-day="${esc(tm.date)}">${ic('cal', 's')} ${tm.date === addDays(today(), 1) ? tr('Plan tomorrow') : esc(tr('Plan {0}', fmtDayAbs(tm.date)))}</button>`;
