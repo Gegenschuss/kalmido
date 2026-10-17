@@ -17,11 +17,12 @@ const LE2E_PRE = 'e2e1:';
 const LE2E_CANDS = {title: ['title', 'note_title'], content: ['content'], url: ['url'], snippets: ['snippets'], body: ['comment', 'note_body'], name: ['section'], value: ['field']};
 const LE2E_PROPS = Object.keys(LE2E_CANDS);
 const LE2E_TASK = ['title', 'content', 'url', 'snippets'];
-const le2eIs = v => typeof v === 'string' && v.startsWith(LE2E_PRE);
-const le2eMode = lid => listById(lid)?.e2e || null;
-const le2eOn = lid => !!le2eMode(lid);
-const le2eReady = lid => { const l = listById(lid); return !!(l && l.e2e && LE2E.keys[lid]?.[l.e2e_gen]); };
-const le2eLocked = t => !!t && t._le2e === 'locked';
+// the names of the protocol are function declarations (window properties): other parts and tests can wrap or stub them
+function le2eIs(v) { return typeof v === 'string' && v.startsWith(LE2E_PRE); }
+function le2eMode(lid) { return listById(lid)?.e2e || null; }
+function le2eOn(lid) { return !!le2eMode(lid); }
+function le2eReady(lid) { const l = listById(lid); return !!(l && l.e2e && LE2E.keys[lid]?.[l.e2e_gen]); }
+function le2eLocked(t) { return !!t && t._le2e === 'locked'; }
 const le2eChange = lid => document.dispatchEvent(new CustomEvent('le2e:change', {detail: {lid}}));
 function le2eErr(msg, code) { const e = new Error(msg); e.code = code; return e; }
 const le2eErrLocked = () => le2eErr(tr('Unlock first: this list is encrypted in the browser.'), 'list_e2e_locked');
@@ -85,7 +86,7 @@ async function le2eDec(lid, field, cipher) {
   return s;
 }
 // the plain text of a cipher known on this page (render code: synchronous, no flicker); else ''
-const le2eShow = v => le2eIs(v) ? LE2E.memo.get(v) ?? '' : v ?? '';
+function le2eShow(v) { return le2eIs(v) ? LE2E.memo.get(v) ?? '' : v ?? ''; }
 
 // ------------------------------------------------------------------ list keys
 // wrapping for member R by W: ECDH(priv W, pub R) -> HKDF-SHA256(salt "<lid>:<gen>", info kalmido-listkey:v1) -> AES-GCM over the
@@ -111,7 +112,16 @@ function le2eSeenOk(uid, pub) {
   LE2E.changed[uid] = fp;
   return false;
 }
-const le2eKeyChanged = uid => !!LE2E.changed[uid];
+// true when the person's key known here (list infos, fetched public keys) differs from the remembered one
+function le2eKeyChanged(uid) {
+  if (LE2E.changed[uid]) return true;
+  const seen = S.me ? LS.get(`e2eSeen:${S.me.id}:${uid}`, '') : '';
+  if (!seen) return false;
+  const pubs = [E2E.peers[uid], ...Object.values(LE2E.info).map(j => (j?.members || []).find(m => m.user_id === uid)?.pub)].filter(Boolean);
+  const other = pubs.map(le2eFp).find(fp => fp !== seen);
+  if (other) LE2E.changed[uid] = other;
+  return !!other;
+}
 function le2eAcceptKey(uid) {
   const fp = LE2E.changed[uid]; if (!fp) return;
   LS.set(`e2eSeen:${S.me.id}:${uid}`, fp);
@@ -709,7 +719,7 @@ async function le2eResume(lid, onProgress) {
 
 // ------------------------------------------------------------------ texts the server gives neutral (history, time, news)
 // the title of a task of a locked list as far as this page can read it, else the fallback (the server's "🔒 Task")
-const le2eTitle = (tid, fallback) => { const t = S.tasks?.get(tid); return t && le2eOn(t.list_id) && !le2eLocked(t) && t.title ? t.title : fallback; };
+function le2eTitle(tid, fallback) { const t = S.tasks?.get(tid); return t && le2eOn(t.list_id) && !le2eLocked(t) && t.title ? t.title : fallback; }
 
 // ------------------------------------------------------------------ local search (M7): the server finds nothing in locked lists
 const le2eWords = q => String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
