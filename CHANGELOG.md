@@ -24,6 +24,10 @@ Small fixes: import, clients, contacts.
   wraps instead of scrolling sideways (#1897).
 - Agent chat usage ring: further quota windows are named (week incl. extra usage, Opus, Sonnet), unknown ones read
   *Other quota* instead of the raw English key, and an idle weekly window at 0 % is left out (#1841).
+- Bundle G3 + G4 + 2.78-2.80 (live in one step): the list name in the task rows (Today, matrix, folders) was gone after a
+  merge and is back; *Switch on all modules* includes the household budget; `DELETE /api/v1/tasks/{id}/links/{list_id}`
+  matches its OpenAPI entry; the cash flow's monthly check task text says *Basket* in every language; two case checks in
+  queries follow PostgreSQL (`ILIKE`). Tests: the newest suites are spread over five shards (shard 10 ran past the limit).
 
 ## [2.79.0] - 2026-10-17
 

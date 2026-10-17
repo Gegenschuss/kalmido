@@ -920,6 +920,7 @@ fresh; run p262_b_api "$PY" p262_b_api_test.py "$KALMIDO_TEST_DATA"
 # 2.62.0 part A: sending once in the chats (#1530), pinned chat messages (#1848)
 fresh; run p262_a_api "$PY" p262_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p262_a_ui node p262_a_ui.js "$KALMIDO_TEST_DATA"
+shard 2  # 2.80.0: the 2.63-2.66 suites run in shard 2 (shard 10 full)
 # 2.63.0 part D: one space list for knowledge pages, conversation on the job card (#1857 #1482)
 fresh; run p263_d_ui node p263_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.63.0 part A: the public report form - type, file, spam guard, status link (#1513)
@@ -947,6 +948,7 @@ fresh; run p266_b_ui node p266_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.66.0 part A: merging duplicate contacts (#1835): links, CardDAV, undo, rights
 fresh; run p266_a_api "$PY" p266_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p266_a_ui node p266_a_ui.js "$KALMIDO_TEST_DATA"
+shard 4  # 2.80.0: the 2.64.1-2.64.3 suites run in shard 4 (shard 10 full)
 # 2.64.1 part C: #1817 lock per list - client data layer
 fresh; run p264a_c_ui node p264a_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.64.1 part D: #1817 lock per list - dialogs and display, #1518
@@ -970,6 +972,7 @@ fresh; run p264b_b_ui node p264b_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p264c_a_api "$PY" p264c_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.64.3 part B: #1817 lock per knowledge space - client (encrypted wiki space in the browser)
 fresh; run p264c_b_ui node p264c_b_ui.js "$KALMIDO_TEST_DATA"
+shard 6  # 2.80.0: the 2.67-2.70 suites run in shard 6 (shard 10 full)
 # 2.67.0 part A: fixed costs from a spreadsheet in the cash flow, net / gross, the monthly check task (#1838)
 fresh; run p267_a_api "$PY" p267_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p267_a_ui node p267_a_ui.js "$KALMIDO_TEST_DATA"
@@ -994,6 +997,7 @@ fresh; run p270_b_ui node p270_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.70.0 part C: contracts in view (#1359): contract_notice, the proposal kind notice, health lists and the journal stay closed
 fresh; run p270_c_api "$PY" p270_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p270_c_ui node p270_c_ui.js "$KALMIDO_TEST_DATA"
+shard 1  # 2.80.0: the 2.71-2.73 suites run in shard 1 (shard 10 full)
 # 2.71.0 part B: a task in several lists without a copy (#1459)
 fresh; run p271_b_api "$PY" p271_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p271_b_ui node p271_b_ui.js "$KALMIDO_TEST_DATA"
@@ -1015,6 +1019,7 @@ fresh; run p273_l_ui node p273_l_ui.js "$KALMIDO_TEST_DATA"
 # 2.73.0 part B: moving an account -- account export + import with the mapping of people (#1473)
 fresh; run p273_b_api "$PY" p273_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p273_b_ui node p273_b_ui.js "$KALMIDO_TEST_DATA"
+shard 3  # 2.80.0: the 2.74-2.80 suites (and new ones after them) run in shard 3 (shard 10 ran past the 45 min Mac limit with the 2.6x/2.7x suites)
 # 2.74.0 part A: the supporter licence (#338; own key pair in a temp folder, a hosted restart)
 fresh; run p274_a_api "$PY" p274_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p274_a_ui node p274_a_ui.js "$KALMIDO_TEST_DATA"

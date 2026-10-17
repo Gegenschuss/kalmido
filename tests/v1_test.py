@@ -122,7 +122,9 @@ check(requests.get(B + "/api/about").status_code == 401, "about needs a login")
 check(about(A)["version"] == VERSION, f"about: version from the VERSION file ({VERSION})")
 check(A.get(B + "/api/state").json()["about"]["version"] == VERSION, "state carries the version")
 ab = about(Bo)
-check(set(ab) == {"version"}, f"non-admin: only the version, no update info: {ab}")
+# 2.74.0 (#338): the supporter licence fields are for everyone (p274_a_api), update info stays admin-only
+SUPP = {"support_url", "supporter", "supporter_me"}
+check(set(ab) - SUPP == {"version"}, f"non-admin: only the version, no update info: {ab}")
 check(A.get(B + "/api/state").json()["collab_all"] is True, "collab_all on by default")
 
 # ------------------------------------------------------------------ update check (fake GitHub API)
@@ -139,7 +141,7 @@ a = wait_checked(A, a0.get("checked_at"))
 check(a["available"] is True and a["latest"] == "99.0.1" and a["url"].endswith("/v99.0.1"), f"newer release found: {a}")
 calls = fake_calls()
 check(len(calls) == n0 + 1 and calls[-1]["ua"].startswith("Kalmido/" + VERSION), f"one request with a plain user agent: {calls[-1:]}")
-check(about(Bo) == {"version": VERSION}, "non-admin still sees no update info")
+check({k: v for k, v in about(Bo).items() if k not in SUPP} == {"version": VERSION}, "non-admin still sees no update info")
 # cached: another pass of the loop / a restart within the interval does not ask again (UPDATE_EVERY)
 n1 = len(fake_calls())
 subprocess.run(["docker", "exec", CT, "python", "-c",
