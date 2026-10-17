@@ -391,16 +391,22 @@ r = Da.post(B + "/api/account/import", json={"size": 2 * 1024 * 1024})
 check(r.status_code == 413 and r.json().get("code") == "quota_exceeded", f"quota before the upload {r.status_code}")
 big = b"Q" * 600_000  # (below the 1 MB per file of the tests)  # compresses well: the file is small, its attachments are not
 qz = mkzip({"lists": [{"id": 1, "name": "Kontingent Test", "created_at": ts}],
-            "tasks": [{"id": i, "list_id": 1, "title": f"Quota {i}", "created_at": ts, "updated_at": ts} for i in (1, 2, 3)],
+            "tasks": [{"id": i, "list_id": 1, "title": f"Quota {i}", "created_at": ts, "updated_at": ts, "assignee_id": 55} for i in (1, 2, 3)],
+            "comments": [{"id": 1, "task_id": 1, "user_id": 55, "body": "Bob im Kontingent", "created_at": ts}],
+            "people": [{"user_id": 55, "name": "Bob aus der Datei", "email": "bob@example.com", "lists": {"1": "edit"}}],
             "attachments": [{"id": i, "task_id": i, "name": f"q{i}.txt", "file": f"files/attachments/{i}-q{i}.txt", "created_at": ts} for i in (1, 2, 3)]},
            files={f"files/attachments/{i}-q{i}.txt": big for i in (1, 2, 3)})
 iid = upload(Da, qz)
 j = wait(Da, iid)
-j = run(Da, iid) if j.get("state") == "preview" else j
+j = run(Da, iid, people={"bob@example.com": {"share": True}}) if j.get("state") == "preview" else j
 check(j.get("state") == "stopped" and j["result"].get("stopped") and j["result"].get("import_id"), f"quota in the run: stopped {j.get('state')}")
 na = dbx("SELECT COUNT(*) AS n FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.name='Kontingent Test'",
          (DAVE,))[0]["n"]
 check(na == 1, f"one file fitted ({na})")
+qa = dbx("SELECT t.assignee_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.name='Kontingent Test'", (DAVE,))
+qc = dbx("SELECT c.user_id, c.ext_name FROM comments c WHERE c.body='Bob im Kontingent'")
+check(qa and all(x["assignee_id"] is None for x in qa) and qc and qc[0]["user_id"] is None and qc[0]["ext_name"] == "Bob aus der Datei",
+      "stopped before the sharing: bob is neither assignee nor author in a list he cannot see")
 check(Da.post(B + f"/api/imports/{j['result'].get('import_id')}/undo").ok and not dbx("SELECT 1 FROM lists WHERE owner_id=? AND name='Kontingent Test'", (DAVE,)),
       "undo after the stop")
 A.patch(B + f"/api/users/{DAVE}", json={"storage_quota_mb": None})

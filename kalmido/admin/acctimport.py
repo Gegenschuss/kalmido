@@ -806,6 +806,25 @@ def umz_share(c, run, uid, data, picks, can_invite):
     return out
 
 
+def umz_fix_people(c, run, uid, names):
+    """After the sharing: an assignment or a comment author that points at a person who did not become a member of the
+    list (sharing refused, not ticked, the run stopped) is undone -- the name stays as text, nobody gets attributed or
+    assigned in a list they cannot see."""
+    ids = run.created["tasks"]
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        q = ",".join("?" * len(part))
+        nm = f"""user_id!=? AND NOT EXISTS (SELECT 1 FROM list_members m JOIN tasks t ON t.list_id=m.list_id
+                 WHERE t.id=comments.task_id AND m.user_id=comments.user_id)"""
+        for r in c.execute(f"SELECT id, user_id FROM comments WHERE task_id IN ({q}) AND user_id IS NOT NULL AND {nm}", part + [uid]).fetchall():
+            c.execute("UPDATE comments SET user_id=NULL, ext_name=? WHERE id=?", (names.get(r["user_id"]) or tr("Unknown"), r["id"]))
+        n = c.execute(f"""UPDATE tasks SET assignee_id=NULL, assigned_by=NULL WHERE id IN ({q}) AND assignee_id IS NOT NULL AND assignee_id!=?
+                          AND NOT EXISTS (SELECT 1 FROM list_members m WHERE m.list_id=tasks.list_id AND m.user_id=tasks.assignee_id)""",
+                      part + [uid]).rowcount
+        if n:
+            run.warning(N_("Assignment not taken over (the person is not on this server or was not chosen)"))
+
+
 def umz_invite(c, run, uid, email, name):
     """A new account for a missing person (instance admin) and the invitation link by e-mail (#697)."""
     from ..accounts.invite import invite_new
@@ -869,6 +888,12 @@ def umz_run(uid, iid, opts):
                     c.heal() or c.rollback()
                     print(f"account import of user {uid}: sharing failed: {type(e).__name__}", flush=True)
                     run.warning(N_("Sharing with the chosen people failed. Share the lists by hand."))
+            names = {}
+            for p in data.get("people", []):  # the new account ids of the mapped people -> their names from the file
+                o = _oid(p.get("user_id"))
+                if o in people:
+                    names[people[o]] = _txt(p.get("name"), 100)
+            umz_fix_people(c, run, uid, names)
             report = {**run.stats, "export_id": eid, "tasks": run.stats.get("tasks", 0)}
             iid_db = None
             if any(run.created[k] for k in run.created):
