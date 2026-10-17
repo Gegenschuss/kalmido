@@ -19,7 +19,10 @@ E-mail inbox for clients and projects.
   *E-mails / client / date subject* and go through the usual upload checks. No mail client: nothing is sent or answered.
   Needs the mail import (IMAP) of *Tasks by e-mail* (#1198).
 
+- The account export includes your own private filed e-mails (#1903).
+
 ### Fixed
+- *Switch all modules on* also switches the household budget on, like every other module (#1808).
 - Tests: a tags overview check took the UTC date as today and failed at night (#1868).
 
 ## [2.83.0] - 2026-10-17
