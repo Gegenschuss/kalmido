@@ -61,7 +61,7 @@ const axe = async (ev, where) => {  // the rules of p2160_a11y over the list wit
   const btn = k => d.querySelector(`#view .lchead [data-colsort="${k}"]`);
   await until(() => d.querySelector('#view .lchead'));
   check(d.querySelector('#view .lchead[role="table"] [role="row"] [role="columnheader"]'), 'the title row: a table with one row of column headers');
-  check(btn('due') && btn('due').tagName === 'BUTTON' && btn('due').getAttribute('aria-label') === 'Date' && /Sort by Date/.test(btn('due').title), 'every title is a button named after its column');
+  check(btn('due') && btn('due').tagName === 'BUTTON' && btn('due').getAttribute('aria-label') === 'Due' && /Sort by Due/.test(btn('due').title), 'every title is a button named after its column');
   check(!head('due').hasAttribute('aria-sort') && head('prio').getAttribute('aria-sort') === 'descending', 'default sort: Priority (highest first) shows on the Priority title');
   click(w, btn('due'));
   await until(() => head('due')?.getAttribute('aria-sort') === 'ascending');
@@ -77,7 +77,7 @@ const axe = async (ev, where) => {  // the rules of p2160_a11y over the list wit
   // the sort menu mirrors it: "Date" is not ticked for the reversed order, the column line is
   w.eval(`sortMenu(document.querySelector('#top h1'))`); await sleep(200);
   const mi = [...d.querySelectorAll('#pop [role="menuitem"]')];
-  check(mi.some(b => b.classList.contains('sortcol') && b.classList.contains('on') && /Column: Date · descending/.test(b.textContent)), 'the sort menu shows the column sort: ' + mi.map(b => b.textContent.trim()).join('|'));
+  check(mi.some(b => b.classList.contains('sortcol') && b.classList.contains('on') && /Column: Due · descending/.test(b.textContent)), 'the sort menu shows the column sort: ' + mi.map(b => b.textContent.trim()).join('|'));
   w.eval('closePop()');
   w.close();
   // a reload keeps it (the list's sort on the server)

@@ -3,7 +3,7 @@
 //       or when I write; pressed ones stay "Answered"; a press on buttons that expired meanwhile (an old tab) is refused
 //       and the buttons go; the agent withdrawing them removes them
 // #1041 a permission question: the buttons Allow (accent) / Deny (calm), no "👍 = approval" hint; afterwards one line
-//       "Allowed HH:MM" / "Denied HH:MM", unanswered in time "Not answered, denied"; a 👍 answers it too
+//       "Allowed HH:MM" / "Denied HH:MM", unanswered in time "Not answered, denied"; (2.87.9: a thumb does not)
 // #1039 "working" without a task shows under the chat's last message, never in a task; with a task only in that task
 //       (with its text), not under the chat messages
 // #1034 the list dialog's switch "Agent listens in" (on in a software project, off elsewhere), the list's "…" menu says
@@ -98,9 +98,11 @@ const V = B + 'api/v1';
   check(ev1.some(e => e.event === 'chat_choice' && e.data.message_id === p1.id && e.data.approval === 'approved') && ev1.some(e => e.event === 'reaction' && e.data.chat_message?.id === p1.id && e.data.approval === 'approved'), '#1041: the agent got chat_choice and the reaction event');
   const p2 = await say('May I delete the cache?', {permission: true});
   await w.eval('chatLoad()'); await until(() => cm(d, p2.id)?.querySelector('.cperm'));
-  await call('POST', `/api/agents/${AG}/chat/${p2.id}/reactions`, {emoji: 'down'});
+  // 2.87.9 (#1963): a thumb no longer answers the question and is not even offered under it - the Deny button does
+  check(!cm(d, p2.id).querySelector('.rxrow [data-e="up"], .rxrow [data-e="down"]'), '#1963: no thumbs under the open permission question');
+  click(w, cm(d, p2.id).querySelector('.cperm .cchb:not(.st-primary)'));
   await w.eval('chatLoad()'); await until(() => cm(d, p2.id)?.querySelector('.cpermst'));
-  check(cm(d, p2.id).querySelector('.cpermst.no') && /^(\u{1F44E}\s*)?Denied \d{1,2}:\d\d/u.test(cm(d, p2.id).querySelector('.cpermst').textContent.trim()), '#1041: a 👎 answers it: "Denied HH:MM"');
+  check(cm(d, p2.id).querySelector('.cpermst.no') && /^(\u{1F44E}\s*)?Denied \d{1,2}:\d\d/u.test(cm(d, p2.id).querySelector('.cpermst').textContent.trim()), '#1041: Deny answers it: "Denied HH:MM"');
   const p3 = await say('May I restart the worker?', {permission: true, expires_in: 10});
   await w.eval('chatLoad()'); await until(() => cm(d, p3.id)?.querySelector('.cperm'));
   check(cm(d, p3.id)?.querySelector('.cperm'), '#1041: a question with a 10 s limit is open first');

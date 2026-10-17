@@ -84,7 +84,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(d.documentElement.style.getPropertyValue('--detW') === '27.5rem', '#639: the width comes back after a reload');
   // #634: column widths
   const lg = d.querySelector('.lchead .lcg[data-lcg="due"]');
-  check(lg && lg.getAttribute('role') === 'separator' && lg.tabIndex === 0 && lg.getAttribute('aria-label') === 'Width of the column Date', '#634: a grip in the column title ' + (lg && lg.getAttribute('aria-label')));
+  check(lg && lg.getAttribute('role') === 'separator' && lg.tabIndex === 0 && lg.getAttribute('aria-label') === 'Width of the column Due', '#634: a grip in the column title ' + (lg && lg.getAttribute('aria-label')));
   check(!d.querySelector('.lchead[aria-hidden="true"]') && d.querySelector('.lchead .lc .lcn[aria-hidden="true"]'), 'the titles stay hidden from screen readers, the grips are reachable');
   check(d.querySelector(`#view .trow .lc[data-k="due"]`), 'the cells carry their column key');
   key(w, lg, 'ArrowLeft', {shiftKey: true}); await sleep(50);  // 2.39.1 (#1217): the grip is the line left of the column, ← moves it = wider
