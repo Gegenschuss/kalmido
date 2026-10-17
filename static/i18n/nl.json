@@ -8293,5 +8293,6 @@
   "Encrypted notes": "Versleutelde notities",
   "The recovery key does not open this export. Attempts left: {0}": "De herstelsleutel opent deze export niet. Resterende pogingen: {0}",
   "An organisation export goes into an organisation: choose one you administer.": "Een organisatie-export gaat naar een organisatie: kies er een die je beheert.",
-  "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Dit is geen herstelsleutel (52 tekens A-Z en 2-7, in groepen van 4)."
+  "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Dit is geen herstelsleutel (52 tekens A-Z en 2-7, in groepen van 4).",
+  "Personal list kept in your private space: {0}": "Persoonlijke lijst blijft in je privéruimte: {0}"
 }

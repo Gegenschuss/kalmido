@@ -164,7 +164,7 @@ ALICE = A.get(B + "/api/state").json()["me"]["id"]
 A.patch(B + f"/api/users/{ALICE}", json={"email": "alice@example.com"})
 Bo, Ca, Da, Er = sess("bob"), sess("carol"), sess("dave"), sess("erin")
 for s in (A, Bo, Ca, Da, Er):
-    s.patch(B + "/api/settings", json={"lang": "en", "features": "cal,comments,collab,contacts,habits,deps,events,fields,time", "tour": "done"})
+    s.patch(B + "/api/settings", json={"lang": "en", "features": "cal,comments,collab,contacts,habits,deps,events,fields,time,health", "tour": "done"})
 r = A.post(B + "/api/admin/orgs", json={"name": "Alpha Umzug", "admin_id": ALICE})
 assert r.status_code == 201, r.text
 ORG = r.json()["id"]
@@ -198,6 +198,9 @@ OATT = b"Org-Datei " + os.urandom(8).hex().encode()
 check(A.post(B + f"/api/tasks/{TO}/attachments", files=[("file", ("org.txt", OATT, "text/plain"))]).ok, "org attachment")
 odir = os.path.join(DATA, "attachments", str(TO))
 check(open(os.path.join(odir, os.listdir(odir)[0]), "rb").read(6) == b"KENC1\n", "the org attachment is sealed on disk")
+r = A.post(B + "/api/life/health", json={"type": "appointment", "title": "Zahnarzt Umzug", "date": "2026-11-03"})
+check(r.status_code == 201, "a health appointment (Home & life) " + r.text[:120])
+LH = (dbx("SELECT id FROM lists WHERE owner_id=? AND life='health'", (ALICE,)) or [{"id": 0}])[0]["id"]
 KA = A.post(B + "/api/evcals", json={"name": "Umzugskalender"}).json()["id"]
 check(A.post(B + "/api/events", json={"title": "Schluesseluebergabe", "start": "2026-11-02T10:00", "end": "2026-11-02T11:00", "cal_id": KA}).ok, "event")
 BK = A.post(B + "/api/books", json={"name": "Umzugshelfer"}).json()["id"]
@@ -329,6 +332,8 @@ j = run(A, iid, target=ORG)
 check(j.get("state") == "done", f"import into the organisation {j.get('error')}")
 ol = dbx("SELECT id, org_id FROM lists WHERE owner_id=? AND name='Umzug Privatliste' AND id!=?", (ALICE, LP))
 check(ol and ol[0]["org_id"] == ORG, "the list belongs to the organisation")
+hl = dbx("SELECT org_id FROM lists WHERE owner_id=? AND life='health' AND id!=?", (ALICE, LH))
+check(hl and hl[0]["org_id"] is None, "a Home & life list stays private, also with an organisation as target")
 oa = dbx("SELECT a.path FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.list_id=? AND a.name='packliste.txt'", (ol[0]["id"] if ol else 0,))
 check(oa and open(os.path.join(DATA, "attachments", oa[0]["path"]), "rb").read(6) == b"KENC1\n", "the attachment is sealed (organisation key)")
 

@@ -558,7 +558,7 @@ class _Run:
         self.stats = {}
         self.warn = {}
         self.done, self.total, self.tick = 0, max(1, total), 0
-        self.task_list, self.field_list = {}, {}
+        self.task_list, self.field_list, self.list_org = {}, {}, {}
         self.written = []  # full paths of files written (removed again when the run fails)
         self.stopped = None
         self.kind = "account"  # or "org": an organisation export (part 4)
@@ -629,13 +629,18 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             folder = clean_folder(_txt(L.get("folder"), 1000), strict=False)
         except Exception:  # noqa: BLE001 -- a broken folder path: no folder
             folder = ""
-        d = umz_row(c, "lists", L, {"owner_id": uid, "org_id": org, "is_inbox": 0, "sort": sort, "folder": folder,
+        lorg = org
+        if org and man.get("kind") != "org" and _txt(L.get("life"), 20):  # Home & life lists (health, contracts ...) stay private
+            lorg = None
+            run.warning(N_("Personal list kept in your private space: {0}"), _txt(L.get("name"), 80))
+        d = umz_row(c, "lists", L, {"owner_id": uid, "org_id": lorg, "is_inbox": 0, "sort": sort, "folder": folder,
                                      "name": _txt(L.get("name"), LIST_NAME_MAX).strip() or tr("Import")}, ts)
         lid = umz_insert(c, "lists", d) if d else None
         if not lid:
             run.warning(N_("A list could not be taken over: {0}"), _txt(L.get("name"), 80))
             continue
         list_created(c, uid, lid, agents=False)  # 2.25.0 (#931); agents only when the person shares later
+        run.list_org[lid] = lorg
         run.put("lists", L.get("id"), lid)
         run.created["lists"].append(lid)
         run.count("lists")
@@ -768,7 +773,8 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             rel = os.path.join(sub, f"{uuid.uuid4().hex[:12]}-{name}")
             full = os.path.join(ATT_DIR, rel)
             run.written.append(full)
-            oc_write_file(c, org, full, raw)  # 2.42.0 (#828): sealed with the organisation's key when the target is one
+            lorg = run.list_org.get(run.task_list.get(parent) if kind == "tasks" else parent)
+            oc_write_file(c, lorg, full, raw)  # 2.42.0 (#828): sealed with the key of the list's organisation (none: private)
             fixed = {"name": name, "size": len(raw), "path": rel, "user_id": uid, "created_at": _txt(r.get("created_at"), 40) or ts}
             if kind == "tasks":
                 fixed.update({"task_id": parent, "comment_id": run.m("comments", r.get("comment_id")), "enc": 1 if enc else 0,
@@ -972,7 +978,7 @@ def umz_run(uid, iid, opts):
                 mine = (c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0] or ""
                 hit = [p for p in data.get("people", []) if mine and _email(p.get("email")) == mine.lower()]
                 man["user"]["id"] = _oid(hit[0].get("user_id")) if hit else None
-                if hit and hit[0].get("user_id") in people:
+                if hit and _oid(hit[0].get("user_id")) in people:
                     people.pop(_oid(hit[0].get("user_id")), None)
             total = sum(len(v) for v in data.values())
             eid = st.get("export_id") or secrets.token_hex(8)
@@ -983,10 +989,18 @@ def umz_run(uid, iid, opts):
                 umz_write(c, run, uid, man, zf, files, data, people)
             except UmzStop:
                 pass
+            report = {**run.stats, "export_id": eid, "tasks": run.stats.get("tasks", 0)}
+            iid_db = None
+            if any(run.created[k] for k in run.created):  # recorded with the rows: whatever happens next, undo works
+                from ..integrations.importers import IMPORT_KEEP
+                iid_db = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
+                                   (uid, UMZ_SOURCE, _txt(st.get("name"), 200), json.dumps(run.created), json.dumps(report), iso(now_utc())))
+                c.execute("""DELETE FROM imports WHERE user_id=? AND id NOT IN
+                             (SELECT id FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?)""", (uid, uid, IMPORT_KEEP))
+            c.commit()
+            run.written = []  # committed: the files belong to their rows now
             shared = []
             if not run.stopped:
-                c.commit()
-                run.written = []  # committed: the files belong to their rows now
                 try:
                     shared = umz_share(c, run, uid, data, opts["people"], opts["can_invite"])
                 except Exception as e:  # noqa: BLE001 -- the import stays (and can be undone); the sharing is reported
@@ -999,14 +1013,6 @@ def umz_run(uid, iid, opts):
                 if o in people:
                     names[people[o]] = _txt(p.get("name"), 100)
             umz_fix_people(c, run, uid, names)
-            report = {**run.stats, "export_id": eid, "tasks": run.stats.get("tasks", 0)}
-            iid_db = None
-            if any(run.created[k] for k in run.created):
-                from ..integrations.importers import IMPORT_KEEP
-                iid_db = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
-                                   (uid, UMZ_SOURCE, _txt(st.get("name"), 200), json.dumps(run.created), json.dumps(report), iso(now_utc())))
-                c.execute("""DELETE FROM imports WHERE user_id=? AND id NOT IN
-                             (SELECT id FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?)""", (uid, uid, IMPORT_KEEP))
             bump(c)
             c.commit()
         finally:

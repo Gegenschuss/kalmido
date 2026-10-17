@@ -8293,5 +8293,6 @@
   "Encrypted notes": "Verschlüsselte Notizen",
   "The recovery key does not open this export. Attempts left: {0}": "Der Wiederherstellungsschlüssel öffnet diesen Export nicht. Verbleibende Versuche: {0}",
   "An organisation export goes into an organisation: choose one you administer.": "Ein Organisations-Export kommt in eine Organisation: Wähle eine, deren Admin du bist.",
-  "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Das ist kein Wiederherstellungsschlüssel (52 Zeichen A-Z und 2-7, in Vierergruppen)."
+  "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Das ist kein Wiederherstellungsschlüssel (52 Zeichen A-Z und 2-7, in Vierergruppen).",
+  "Personal list kept in your private space: {0}": "Persönliche Liste bleibt in deinem privaten Bereich: {0}"
 }
