@@ -8261,5 +8261,18 @@
   "Nothing to pull in: the waiting tasks already follow right after it": "Nada que acercar: las tareas en espera ya siguen justo después",
   "The waiting tasks stay where they are": "Las tareas en espera se quedan donde están",
   "The tasks waiting on this one move up to the day after it is due (the gaps between them stay)": "Las tareas que esperan a esta se adelantan hasta el día siguiente a su vencimiento (las distancias entre ellas se mantienen)",
-  "This task has no date": "Esta tarea no tiene fecha"
+  "This task has no date": "Esta tarea no tiene fecha",
+  "Only fixed costs can be imported for now (area fixed_costs)": "Por ahora solo se pueden importar costes fijos (area fixed_costs)",
+  "This proposal can only be taken over into the office of “{0}”: switch your workspace there first": "Esta propuesta solo puede pasar a la oficina de «{0}»: cambia primero tu espacio de trabajo allí",
+  "Your personal office": "Tu oficina personal",
+  "Switch your workspace to the office of this import first": "Cambia primero al espacio de trabajo con la oficina de esta importación",
+  "{0} fixed costs changed since": "{0} costes fijos modificados desde entonces",
+  "This person does not use the office: an import proposal is not possible": "Esta persona no usa la oficina: no es posible una propuesta de importación",
+  "At most {0} open import proposals: wait until the person decided": "Como máximo {0} propuestas de importación abiertas: espera a que la persona decida",
+  "Import: {0} fixed costs": "Importación: {0} costes fijos",
+  "Propose imports": "Proponer importaciones",
+  "Read your old data (for example fixed costs) and send it as an import proposal you check and take over into the office; never sees the office itself": "Lee tus datos antiguos (por ejemplo, costes fijos) y los envía como propuesta de importación que revisas y pasas a la oficina; nunca ve la oficina",
+  "Into: {0}": "En: {0}",
+  "Taking over creates the ticked fixed costs as you in this office; nothing else changes. One step, undo takes it back.": "Al pasarlos se crean los costes fijos marcados a tu nombre en esta oficina; nada más cambia. Un paso, deshacer lo revierte.",
+  "At most {0} import proposals per person and day": "Como máximo {0} propuestas de importación por persona y día"
 }

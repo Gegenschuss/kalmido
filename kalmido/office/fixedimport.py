@@ -127,7 +127,7 @@ def fci_preview(c, oid, raw):
         body_rows.pop()
     if len(body_rows) > FCI_ROWS_MAX:
         raise BadInput(tr("Too many rows (at most {0})", FCI_ROWS_MAX))
-    seen = {fci_key(f["label"], f["amount"], f["repeat"], f["start"]) for f in rk_fixed(c, oid)}
+    seen = fci_seen(c, oid)
     out, group = [], ""
 
     def cell(r, f):
@@ -197,18 +197,14 @@ def fci_preview_post():
     return jsonify(fci_preview(c, oid, raw))
 
 
-@app.post("/api/office/fixed-costs/import")
-def fci_import_post():
-    """Office admin. {items: [{label, amount, repeat, start, until?, category?, vat_rate?}]} -> 201 {created, ids}. All or
-    nothing: one bad row = 400 with its number, too many in total (MAX_FIXED) = 400."""
-    from .ledger import ofx_log
-    c, uid, oid = _ctx()
-    b = body()
-    items = b.get("items") if isinstance(b, dict) else None
-    if not isinstance(items, list) or not items:
-        raise BadInput(tr("Invalid data"))
-    if len(items) > FCI_ROWS_MAX * 4:
-        raise BadInput(tr("Too many rows (at most {0})", FCI_ROWS_MAX * 4))
+def fci_seen(c, oid):
+    """2.68.0 (#1839): the keys (fci_key) of the fixed costs the area already has."""
+    return {fci_key(f["label"], f["amount"], f["repeat"], f["start"]) for f in rk_fixed(c, oid)}
+
+
+def fci_clean_rows(items):
+    """2.68.0 (#1839): [{label, amount, repeat, start, until?, category?, vat_rate?}] -> the rows rk_fixed_clean made of them
+    (only these fields; BadInput "Row N: ..." for the first bad one)."""
     rows = []
     for i, it in enumerate(items):
         if not isinstance(it, dict):
@@ -217,6 +213,15 @@ def fci_import_post():
             rows.append(rk_fixed_clean({k: it.get(k) for k in ("label", "amount", "repeat", "start", "until", "category", "vat_rate")}))
         except BadInput as x:
             raise BadInput(tr("Row {0}: {1}", i + 1, str(x.args[0] if x.args else x))) from None
+    return rows
+
+
+def fci_write(c, uid, oid, items, detail=None):
+    """2.68.0 (#1839): the writing part of the import (the spreadsheet and the agent's import proposal): every row checked
+    again (fci_clean_rows), all or nothing, MAX_FIXED counted under the area's lock, one office log line. No commit.
+    Returns the new ids."""
+    from .ledger import ofx_log
+    rows = fci_clean_rows(items)
     write_lock(c, f"office_fixed_{int(oid)}")
     have = c.execute("SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=?", (oid,)).fetchone()[0]
     if have + len(rows) > MAX_FIXED:
@@ -226,7 +231,22 @@ def fci_import_post():
         row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)
         row = oc_enc_fields(c, oid, "office_fixed_costs", row)
         ids.append(insert_id(c, f"INSERT INTO office_fixed_costs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())))
-    ofx_log(c, oid, "import", target="fixed_costs", detail={"count": len(ids)})
+    ofx_log(c, oid, "import", target="fixed_costs", detail={"count": len(ids), **(detail or {})})
+    return ids
+
+
+@app.post("/api/office/fixed-costs/import")
+def fci_import_post():
+    """Office admin. {items: [{label, amount, repeat, start, until?, category?, vat_rate?}]} -> 201 {created, ids}. All or
+    nothing: one bad row = 400 with its number, too many in total (MAX_FIXED) = 400."""
+    c, uid, oid = _ctx()
+    b = body()
+    items = b.get("items") if isinstance(b, dict) else None
+    if not isinstance(items, list) or not items:
+        raise BadInput(tr("Invalid data"))
+    if len(items) > FCI_ROWS_MAX * 4:
+        raise BadInput(tr("Too many rows (at most {0})", FCI_ROWS_MAX * 4))
+    ids = fci_write(c, uid, oid, items)  # 2.68.0 (#1839): shared with the agent's import proposal (agents/importprop.py)
     bump(c)
     c.commit()
     return jsonify(created=len(ids), ids=ids), 201

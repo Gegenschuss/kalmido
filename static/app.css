@@ -7711,3 +7711,10 @@ button.jobtag b{font-weight:600}
 /* 2.67.0 B (#1865) dependency chain: the bars that move along while a timeline bar is dragged */
 .tl-bar.dch-ghost{opacity:.6;outline:.0625rem dashed var(--accent);outline-offset:.0625rem;transition:transform .15s ease-out,opacity .15s ease-out}
 @media (prefers-reduced-motion:reduce){.tl-bar.dch-ghost{transition:none}}
+/* 2.68.0 A (#1839): the import card of an agent (importprop.js) -- the rows as in the spreadsheet import (.fcirow) */
+.ppm .aim-l{max-height:50vh}
+.aim-to{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;padding:.375rem .625rem;margin:.5rem 0;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);font-weight:600}
+.aim-to .i{color:var(--accent);flex:none}
+.aim-note{white-space:pre-wrap}
+.fcirow.aim-r .fciamt small{line-height:1.2}
+@media (max-width:40rem){.ppm .card:has(.aim-l)>.foot{flex-wrap:wrap;row-gap:.5rem}.ppm .card:has(.aim-l)>.foot [data-pp="apply"]{flex:1 1 100%;min-height:2.75rem}}

@@ -8261,5 +8261,18 @@
   "Nothing to pull in: the waiting tasks already follow right after it": "Rien à rapprocher : les tâches en attente suivent déjà juste après",
   "The waiting tasks stay where they are": "Les tâches en attente restent où elles sont",
   "The tasks waiting on this one move up to the day after it is due (the gaps between them stay)": "Les tâches qui attendent celle-ci avancent jusqu’au lendemain de son échéance (les écarts entre elles restent)",
-  "This task has no date": "Cette tâche n’a pas de date"
+  "This task has no date": "Cette tâche n’a pas de date",
+  "Only fixed costs can be imported for now (area fixed_costs)": "Pour l’instant, seuls les coûts fixes peuvent être importés (area fixed_costs)",
+  "This proposal can only be taken over into the office of “{0}”: switch your workspace there first": "Cette proposition ne peut être reprise que dans le bureau de « {0} » : passe d’abord ton espace de travail là-bas",
+  "Your personal office": "Ton bureau personnel",
+  "Switch your workspace to the office of this import first": "Passe d’abord dans l’espace de travail du bureau de cette importation",
+  "{0} fixed costs changed since": "{0} coûts fixes modifiés depuis",
+  "This person does not use the office: an import proposal is not possible": "Cette personne n’utilise pas le bureau : une proposition d’importation n’est pas possible",
+  "At most {0} open import proposals: wait until the person decided": "Au maximum {0} propositions d’importation ouvertes : attends que la personne ait décidé",
+  "Import: {0} fixed costs": "Importation : {0} coûts fixes",
+  "Propose imports": "Proposer des importations",
+  "Read your old data (for example fixed costs) and send it as an import proposal you check and take over into the office; never sees the office itself": "Lit tes anciennes données (par exemple les coûts fixes) et les envoie comme proposition d’importation que tu vérifies et reprends dans le bureau ; ne voit jamais le bureau lui-même",
+  "Into: {0}": "Vers : {0}",
+  "Taking over creates the ticked fixed costs as you in this office; nothing else changes. One step, undo takes it back.": "La reprise crée en ton nom les coûts fixes cochés dans ce bureau ; rien d’autre ne change. Une étape, annuler la reprend.",
+  "At most {0} import proposals per person and day": "Au maximum {0} propositions d’importation par personne et par jour"
 }
