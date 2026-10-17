@@ -165,6 +165,9 @@ const M = 'ZQXmark';  // every plain text of a locked list carries it: no storag
     check(mv.title === `${M} offline` && mv.move?.tasks?.[0]?.title === `${M} offline` && (mv.move?.comments || [])[0]?.body === `${M} hello <@${BOB}>`, 'M8: moving out carries the plain texts and comments ' + JSON.stringify(mv).slice(0, 300));
     const mi = await ev(`le2eOut('PATCH', '/api/tasks/${T2}', {list_id: ${L}}).then(b => ({title: b.title, m: b.le2e_move?.tasks?.[0]?.title}))`);
     check(mi.title?.startsWith('e2e1:') && mi.m === mi.title, 'M8: moving in encrypts the texts for the target list');
+    // 2.64.1 review 2 (M3): dragging several tasks onto a locked list (dragmulti: batch patch_each) carries the texts encrypted
+    const m3 = await ev(`le2eOut('POST', '/api/tasks/batch', {ids: [${T2}], action: 'patch_each', data: {items: {${T2}: {list_id: ${L}, section_id: null}}}}).then(b => b.data.items[${T2}].le2e_move?.tasks?.[0]?.title || '', e => 'ERR ' + e.message)`);
+    check(String(m3).startsWith('e2e1:'), 'review 2 (M3): drag of several tasks into a locked list carries ciphers ' + String(m3).slice(0, 80));
     // a subtask in the trash is not in the page: the server names it (need), le2eFix fetches and converts it
     const cS = await ev(`le2eEnc(${L}, 'title', '${M} trashed sub')`);
     const TS = (await call('POST', '/api/tasks', {title: cS, list_id: L, parent_id: T})).j.id;
