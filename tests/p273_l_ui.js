@@ -95,7 +95,7 @@ const bobTasks = async () => { const j = await call('GET', '/api/state', null, C
     const ORG = (await call('POST', '/api/admin/orgs', {name: 'Alpha', admin_id: me})).id;
     const OL = await call('POST', '/api/lists', {name: 'Alpha team', org_id: ORG});
     const OT = (await call('POST', '/api/tasks', {title: 'Org task', list_id: OL.id})).id;
-    await nav(B + '#inbox'); await ready(ev, '#view');
+    await nav(B + 'static/icon.svg'); await nav(B + '#inbox'); await ready(ev, '#view .trow');  // a real reload: the new organisation + list
     await ev(`(() => { taskMenu(document.querySelector('#view'), ${OT}); return 1; })()`); await sleep(500);
     await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to another server/.test(b.textContent))?.click(); return 1; })()`); await sleep(800);
     await ev(`(() => { const s = document.querySelector('#msvvmv-s'); s.value = '${SID}'; s.dispatchEvent(new Event('change')); return 1; })()`); await sleep(1200);

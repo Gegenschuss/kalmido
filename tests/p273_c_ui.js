@@ -183,8 +183,9 @@ const MOCK = `(() => {
     const q = await ev(`document.querySelector('.cdlg #cdlg-b')?.textContent || ''`);
     check(/created anew on Work/.test(q) && /stay on Base in the trash/.test(q), '#661: the move question in plain words ' + JSON.stringify(q));
     check(!/leaves the organisation/.test(q), '#661 review question 1: a private task says nothing about an organisation');
-    await ev(`(() => { document.querySelector('.cdlg [data-cd="yes"]').click(); return 1; })()`); await sleep(800);
-    check(/2 subtasks could not be created on Work/.test(await ev(`document.querySelector('#toast')?.textContent || ''`)), '#661 review N3: the toast names the subtasks the other server did not take');
+    await ev(`(() => { window.__toasts = []; const T0 = window.toast; window.toast = (...a) => { __toasts.push(String(a[0])); return T0(...a); }; document.querySelector('.cdlg [data-cd="yes"]').click(); return 1; })()`); await sleep(800);
+    const tsts = await ev(`window.__toasts`);
+    check(tsts.some(x => /2 subtasks could not be created on Work/.test(x)), '#661 review N3: the toast names the subtasks the other server did not take ' + JSON.stringify(tsts));
     c = await calls(ev);
     const mv = c.find(x => x.url === '/api/servers/move');
     check(mv && mv.body.from.server === 0 && mv.body.from.task === OWN && mv.body.to.server === 1 && mv.body.to.list_id === 11, '#661: the move call ' + JSON.stringify(mv));
