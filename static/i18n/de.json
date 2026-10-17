@@ -9479,5 +9479,6 @@
   "A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).": "Eine Anmeldung beim OIDC-Anbieter passte über {1} zu {0}, wurde aber nicht verknüpft (Admin, zweiter Faktor oder keine passende bestätigte E-Mail).",
   "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Noch nicht auf Schadsoftware geprüft: Die Datei lässt sich öffnen, sobald der Virenscanner sie geprüft hat",
   "No clients in this area yet": "Noch keine Kunden in diesem Bereich",
-  "Add client": "Kunde anlegen"
+  "Add client": "Kunde anlegen",
+  "Texts beginning with \"e2e1:\" got a space in front.": "Texte, die mit „e2e1:“ beginnen, haben ein Leerzeichen davor bekommen."
 }
