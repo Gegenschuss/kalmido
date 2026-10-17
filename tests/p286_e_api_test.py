@@ -225,6 +225,7 @@ CH, CHH = agent("chatter", ["read", "tasks:write", "comments"])
 if NOSTART:
     print("N31: skipped (the server was started without KALMIDO_AGENT_PUSH_DAY)")
 else:
+    check(A.post(B + f"/api/agents/{CH}/chat", json={"body": "Hello"}).status_code == 201, "setup: alice opens the chat")
     sent = []
     for i in range(PUSH_DAY + 2):
         r = requests.post(V + f"/agent/chats/{ALICE}", headers=CHH, json={"body": f"Pantry note {i}"})

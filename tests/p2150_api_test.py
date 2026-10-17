@@ -364,6 +364,11 @@ A.patch(B + f"/api/admin/agents/{AG}", json={"scopes": ["read", "tasks:write", "
                                                          "attachments:write", "time", "export"]})
 GL = cl.post("/lists", {"name": "Agent shares"}).json()["id"]
 r = cl.put(f"/lists/{GL}/groups/{GID}", {"role": "view"})
+# 2.86.0 (N29): a group the agent cannot see answers 404 before an approval names it (its replay would fail the same way)
+check(r.status_code == 404 and not dbx("SELECT 1 FROM agent_jobs WHERE agent_id=? AND title LIKE '%Office%'", (AG,)),
+      f"agent shares with a group it cannot see: 404, no job {r.status_code}")
+dbx("UPDATE groups SET created_by=? WHERE id=?", (AG, GID))  # a group the agent sees (its own)
+r = cl.put(f"/lists/{GL}/groups/{GID}", {"role": "view"})
 check(r.status_code == 202, f"agent shares with a group: approval {r.status_code}")
 r = cl.put(f"/lists/{GL}/members/{ids['carol']}", {"role": "view"})
 check(r.status_code == 202, f"agent shares with a person: approval {r.status_code}")
