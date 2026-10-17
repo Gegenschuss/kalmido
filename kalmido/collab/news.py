@@ -38,8 +38,9 @@ NEWS_KINDS = ("mention", "comment", "assign", "unassign", "take", "complete", "s
               "agentjoin",  # 2.24.0 (#896): an agent joined a list I am in (row "share"), with where it runs
               "playbook_proposal",  # 2.39.0 (#1168): an agent proposes a change of the Playbook of a list I decide on (row "proposal")
               "connreq", "connok",  # 2.49.0 (#1106): someone asks to connect / accepted my request (row "share", accounts/discover.py)
-              "lytpl")  # 2.55.0 (#1068): someone sent me an arrangement as a template (row "share", accounts/layoutsets.py)
-NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal")  # about a list (2.21: an event / calendar / address book), not a task
+              "lytpl",  # 2.55.0 (#1068): someone sent me an arrangement as a template (row "share", accounts/layoutsets.py)
+              "e2e_key")  # 2.64.1 (#1817): someone handed me the key of a list encrypted in the browser (row "share", collab/liste2e.py)
+NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
 NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take"), "comment": ("comment",), "complete": ("complete",),
@@ -47,7 +48,7 @@ NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take")
 NEWS_TO_ME = ("mention", "assign", "unassign", "take")  # filter "Mentions & assigned to me"
 # 2.28.0 (#987): "For you": messages from PEOPLE to me -- @mentions, assignments, replies to my comments (data.reply), an
 # approver's decision; everything agents do and every plain change is "Activity". The bell counts only "For you".
-NEWS_FOR_ME = ("mention", "assign", "take", "apdecide", "orglist", "connreq", "connok", "dispo", "lytpl")  # 2.55.0 (#1068): lytpl  # 2.50.0 (#1194): dispo; 2.35.0 (#1101): an organisation admin acted on my list
+NEWS_FOR_ME = ("mention", "assign", "take", "apdecide", "orglist", "connreq", "connok", "dispo", "lytpl", "e2e_key")  # 2.55.0 (#1068): lytpl  # 2.50.0 (#1194): dispo; 2.35.0 (#1101): an organisation admin acted on my list
 
 
 def news_to_me(kind, actor_id, data, agents):
@@ -336,7 +337,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             pass
         elif kind == "orglist":  # 2.35.0 (#1101): addressed to the list's people; a deleted list only lives on in data.name
             pass
-        elif kind in ("share", "role", "status", "owner", "agentjoin", "playbook_proposal"):
+        elif kind in ("share", "role", "status", "owner", "agentjoin", "playbook_proposal", "e2e_key"):  # 2.64.1 (#1817): e2e_key
             if not sees(r["list_id"]):
                 continue
         elif kind == "usage":  # 2.1.1 (#326): an agent's usage limit, for admins (no task, no list)

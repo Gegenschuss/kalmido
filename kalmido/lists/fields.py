@@ -106,8 +106,10 @@ def field_value(c, f, v, lid):
         raise BadInput(tr("{0}: invalid value", name))
     if t == "formula":  # 2.43.0 (#1328): computed by the server, never written
         raise BadInput(tr("{0} is calculated and cannot be set", name))
+    from ..collab.liste2e import le2a_field_value
+    v = le2a_field_value(c, f, v, lid)  # 2.64.1 (#1817): text values of a list with the lock are ciphertexts (others readable, E2)
     if t == "text":
-        return str(v).strip()[:1000] or None
+        return v if v.startswith("e2e1:") else str(v).strip()[:1000] or None
     if t == "url":
         s = str(v).strip()
         if not valid_link(s):  # 2.35.0 (#186): file links too

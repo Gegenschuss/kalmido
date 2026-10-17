@@ -184,8 +184,10 @@ def e2e_pub_get(uid):
     c = db()
     mine = e2e_person()
     a, b = sorted((mine, uid))
+    from .liste2e import le2a_shares_list
     if uid != mine and uid not in tchat_coworkers(c, mine) and not c.execute(
-            "SELECT 1 FROM tchat_rooms WHERE kind='dm' AND a=? AND b=?", (a, b)).fetchone():
+            "SELECT 1 FROM tchat_rooms WHERE kind='dm' AND a=? AND b=?", (a, b)).fetchone() \
+            and not le2a_shares_list(c, mine, uid):  # 2.64.1 (#1817, H4): also the people I share a list with
         raise Denied(404)
     r = e2e_keys_of(c, uid)
     return jsonify(user_id=uid, pub=json.loads(r["pub"]) if r else None)

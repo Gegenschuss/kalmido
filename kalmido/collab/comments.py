@@ -190,11 +190,15 @@ def comment_create(tid):
     if t["deleted_at"]:
         return err(tr("The task is in the trash"), 409)
     text, files = comment_input()
-    if len(text) > MAX_COMMENT:
+    from .liste2e import le2a_comment_in, le2a_text_max, le2e_mode
+    if len(text) > le2a_text_max(text, MAX_COMMENT):  # 2.64.1 (#1817): a ciphertext is longer than its text
         return err(tr("The comment is too long (max. {0} characters)", MAX_COMMENT))
     if not text and not files:
         return err(tr("The comment is empty"))
-    text, mentions = clean_mentions(c, t["list_id"], text) if collab_all() else (text, [])
+    if le2e_mode(c, t["list_id"]) or text.startswith("e2e1:"):  # 2.64.1 (#1817): ciphertext + mentions from the browser
+        text, mentions = le2a_comment_in(c, t["list_id"], text)
+    else:
+        text, mentions = clean_mentions(c, t["list_id"], text) if collab_all() else (text, [])
     try:  # 2.33.0 (#1076): a reply to a comment of the same task (else 400)
         orig = reply_check(c, "c", comment_reply_in(), task_id=tid)
     except BadInput as e:
@@ -278,13 +282,17 @@ def comment_update(cid):
     if r["user_id"] != me():
         return err(tr("Only the author can edit this comment"), 403)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (r["task_id"],)).fetchone()
-    text = (web_fields(body(), {"body"}, "PATCH /api/comments/{cid}").get("body") or "").strip()
-    if len(text) > MAX_COMMENT:
+    text = (web_fields(body(), {"body", "mentions"}, "PATCH /api/comments/{cid}").get("body") or "").strip()
+    from .liste2e import le2a_comment_in, le2a_text_max, le2e_mode
+    if len(text) > le2a_text_max(text, MAX_COMMENT):  # 2.64.1 (#1817)
         return err(tr("The comment is too long (max. {0} characters)", MAX_COMMENT))
     nfiles = c.execute("SELECT COUNT(*) FROM attachments WHERE comment_id=?", (cid,)).fetchone()[0]
     if not text and not nfiles:
         return err(tr("The comment is empty"))
-    text, mentions = clean_mentions(c, t["list_id"], text) if collab_all() else (text, [])
+    if le2e_mode(c, t["list_id"]) or text.startswith("e2e1:"):  # 2.64.1 (#1817): ciphertext + mentions from the browser
+        text, mentions = le2a_comment_in(c, t["list_id"], text)
+    else:
+        text, mentions = clean_mentions(c, t["list_id"], text) if collab_all() else (text, [])
     old = {int(x) for x in (r["mentions"] or "").split(",") if x}
     c.execute("UPDATE comments SET body=?, mentions=?, edited_at=? WHERE id=?",
               (text, ",".join(map(str, mentions)), iso(now_utc()), cid))

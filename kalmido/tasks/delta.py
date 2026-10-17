@@ -38,6 +38,7 @@ DL_TABLES = {
     "lists": "full", "list_members": "full", "sections": "full", "list_fields": "full", "list_tags": "full",
     "group_shares": "full", "group_members": "full", "folder_people": "full",
     "org_members": "full",  # 2.46.0 (#1603): lists seen by the whole organisation follow its members
+    "list_keys": "full", "list_key_pending": "full",  # 2.64.1 (#1817): a list key handed out / the waiting list of the lock
 }
 # one function for all of them; TG_ARGV = the id columns (to_jsonb reads a column by name from any row type)
 DL_FN = """CREATE OR REPLACE FUNCTION kalmido_dl_touch() RETURNS trigger LANGUAGE plpgsql AS $fn$

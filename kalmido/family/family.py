@@ -170,6 +170,8 @@ def kid_balance(c, kid):
 
 def kid_force_participant(c, kid):
     """A kid takes part in shared lists only as a participant (sees only what is assigned to it or where it comes along)."""
+    # 2.64.1 (#1817): lists encrypted in the browser have no participants: a kid leaves them (the members trigger drops its keys)
+    c.execute("DELETE FROM list_members WHERE user_id=? AND list_id IN (SELECT id FROM lists WHERE e2e IS NOT NULL)", (kid,))
     c.execute("""UPDATE list_members SET role='participant',
                  own_role=CASE WHEN own_role IS NULL THEN NULL ELSE 'participant' END,
                  grole=CASE WHEN grole IS NULL THEN NULL ELSE 'participant' END WHERE user_id=?""", (kid,))
