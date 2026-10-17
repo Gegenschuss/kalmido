@@ -56,6 +56,19 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(/svg/.test(th) && !/[\u{1F44D}\u{1F44E}]/u.test(th), '#1963: the approval thumbs are icons');
   w.close();
 
+  // 2.87.9 (#1933, P4): a person without an organisation keeps the button; it names the private space, its menu has only that
+  const fr = await call('POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com', orgs: []});
+  check(fr.http < 300, '#1933: a person without an organisation ' + fr.http);
+  const FCK = await login('frida');
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'}, FCK);
+  w = await boot({user: 'frida', hash: 'inbox'}); d = w.document;
+  const fbar = await until(() => d.querySelector('#side .sbsrch .wsbar'), 60);
+  check(fbar && /Private/.test(fbar.querySelector('.sr')?.textContent || ''), '#1933: without an organisation the button stays and shows the private space');
+  if (fbar) click(w, fbar);
+  const fitems = await until(() => { const x = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim()); return x.length && x; });
+  check(fitems && fitems.length === 1 && /Private/.test(fitems[0]), '#1933: its menu offers only the private space: ' + fitems);
+  w.close();
+
   console.log(`p287b_e_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
