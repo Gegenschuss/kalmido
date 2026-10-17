@@ -170,6 +170,7 @@ ORDER = (
     "hub.absence",  # 2.50.0 A (#1195): absences + German public holidays
     "hub.dispo",  # 2.50.0 A (#1194): resources and disposition (bookings of crew and equipment)
     "hub.agentdispo",  # 2.51.0 C (#1355): shoot planning by agents (event drafts, options), the disposition in the REST API
+    "hub.hubmail",  # 2.84.0 A (#1198): e-mail as an input of the hub (mails filed with clients / projects)
     "office.packs",  # 2.36.1 (#1021): country packs (data), used by office.model
     "office.model",  # 2.36.1 (#1021): office & finance (B); C/D append office.calc, office.docs, office.pdf
     "office.web",

@@ -74,6 +74,7 @@ FIELDS = {
     "budget_entries": ("amount", "title", "note", "counterpart"),
     "budget_recurring": ("title", "amount"),
     "budget_cats": ("lim",),
+    "hub_mails": ("from_addr", "from_name", "to_addrs", "subject", "body"),  # 2.84.0 A (#1198): filed e-mails
 }
 JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"): ("costs", "margin"),
              ("office_doc_parts", "totals"): ("costs", "margin")}  # 2.47.0 (#1215)
@@ -94,7 +95,8 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_deals": N_("Sales pipeline"),  # 2.50.0 (#1196)
                  "hub_absences": N_("Kind and note of absences"),  # 2.50.0 (#1195)
                  # 2.72.0 (#1333): amounts, texts and limits of the household budget, its receipts
-                 "budget_entries": N_("Household budget"), "budget_recurring": N_("Household budget"), "budget_cats": N_("Household budget")}
+                 "budget_entries": N_("Household budget"), "budget_recurring": N_("Household budget"), "budget_cats": N_("Household budget"),
+                 "hub_mails": N_("E-mails filed with clients and projects")}  # 2.84.0 A (#1198)
 PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))
 # 2.64.1 (#1817): what the browser encrypts in lists with a lock (collab/liste2e.py LE2E_FIELDS); the plain list holds them apart
 PM_CRYPT_BROWSER = (N_("Titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets of lists with a lock"),)

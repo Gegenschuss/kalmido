@@ -259,6 +259,7 @@ OX_AREAS = (
     ("documents/settings.json", "doc_cfg", "org_id=?"),
     ("hub/absences.json", "hub_absences", "org_id=?"),  # 2.50.0 (#1195): absences (kind + note decrypted like the others)
     ("hub/bookings.json", "hub_bookings", "org_id=?"),  # 2.50.0 (#1194): bookings of the disposition
+    ("hub/mails.json", "hub_mails", "org_id=?"),  # 2.84.0 A (#1198): filed e-mails (texts decrypted; not the addresses, not the word index)
 )
 OX_NOT_INCLUDED = (
     "private lists and private sharing of the members (lists without the organisation), other organisations",

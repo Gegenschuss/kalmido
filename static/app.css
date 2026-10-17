@@ -7272,3 +7272,37 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .empty svg.o3c-k{width:7.5rem;height:5.625rem;opacity:1;margin:0 auto .75rem;color:var(--text2);stroke-width:2.4}
 .o3c-k .o3c-kdot{fill:var(--accent);stroke:none}
 @media (max-width:899px){ .empty svg.o3c-k{width:6rem;height:4.5rem} }
+/* 2.84.0 A (#1198) e-mail as an input of the hub: the section "E-mails" (client card, project page), the reading view, the inbox */
+.hbmwrap{display:flex;flex-direction:column;gap:.5rem}
+.hbmq{display:flex;align-items:center;gap:.375rem;background:var(--bg3);border:1px solid var(--line2);border-radius:var(--radius);padding:0 .5rem}
+.hbmq:focus-within{border-color:var(--accent)}
+.hbmq input{border:0;background:transparent;flex:1;padding:.375rem 0;min-height:2.25rem;min-width:0}
+.hbmhl{display:flex;gap:.375rem;align-items:center;flex-wrap:wrap}
+.hbmhl:empty{display:none}
+.hbmlist,.hbmspaces,.hbmpicks,.hbmatt{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.hbmrow{display:flex;align-items:center;gap:.25rem;border-bottom:1px solid var(--line)}
+.hbmrow:last-child{border-bottom:0}
+.hbmopen{flex:1;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:.125rem;text-align:left;background:none;border:0;color:inherit;padding:.5rem .25rem;min-height:2.75rem;border-radius:var(--r-s);cursor:pointer}
+.hbmopen:hover,.hbmopen:focus-visible{background:var(--bg3)}
+.hbmtop{display:flex;align-items:center;gap:.375rem;min-width:0}
+.hbmfrom{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hbmtop time{font-size:var(--fs-xs);white-space:nowrap}
+.hbmclip{display:inline-flex;align-items:center;gap:.125rem;font-size:var(--fs-xs)}
+.hbmsubj{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)}
+.hbmproj{font-size:var(--fs-xs);display:inline-flex;align-items:center;gap:.25rem}
+.hbmacts{display:flex;align-items:center;gap:.25rem;flex:none}
+.hbmempty{margin:.25rem 0}
+.hbmhub{max-width:48rem;padding:0 1rem 2rem}
+.hbmhub h4{margin:1rem 0 .375rem;font-size:var(--fs-m);color:var(--muted)}
+.hbmsp{display:flex;align-items:center;gap:.5rem;padding:.375rem 0;border-bottom:1px solid var(--line)}
+.hbmspn{flex:1;min-width:0;display:flex;flex-direction:column}
+.hbmspn small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}
+.hbmhdr{display:flex;flex-direction:column;gap:.125rem;margin:.25rem 0 .75rem;font-size:var(--fs-s)}
+.hbmhf{display:flex;gap:.5rem;min-width:0}
+.hbmhf>span:first-child{flex:0 0 5.5rem}
+.hbmhf>span:last-child{min-width:0;overflow-wrap:anywhere}
+.hbmtext{white-space:pre-wrap;overflow-wrap:anywhere;max-height:50vh;overflow:auto;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r-s);padding:.75rem;font-size:var(--fs-s)}
+.hbmatt li{padding:.25rem 0}
+.hbmpick{display:flex;align-items:center;gap:.5rem;width:100%;text-align:left;background:none;border:0;color:inherit;padding:.5rem .25rem;min-height:2.75rem;border-radius:var(--r-s);cursor:pointer}
+.hbmpick:hover,.hbmpick:focus-visible{background:var(--bg3)}
+.hbmadlg .card{max-height:85vh;overflow:auto}

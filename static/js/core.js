@@ -901,6 +901,7 @@ function parseHash() {
   if (a === 'ev' && +b) return {mod: 'cal', key: 'cal', ev: +b};  // 2.21.0 (#659): a push / News about an event
   if (a === 'contacts') return {mod: 'contacts', key: 'contacts', contact: +b || null};  // 2.21.0 (#658)
   if (a === 'client' && +b) return {mod: 'clients', key: 'clients', client: +b};  // 2.23.0 (#463)
+  if (a === 'mailhub') return {mod: 'clients', key: 'clients', client: 'mailhub'};  // 2.84.0 A (#1198): the hub's e-mail inbox (hubmail.js)
   if (a === 'wiki') return {mod: 'wiki', key: 'wiki', wid: +b || null};  // 2.49.0 (#1199): wiki/<page id>
   if (a === 'ablage') return {mod: 'ablage', key: 'ablage', nid: +b || null};  // 2.48.0 (#1207): ablage/<folder or file id>
   if (a === 'docs') return {mod: 'docs', key: 'docs', id: +b || null};  // 2.48.0 (#1111): documents (docs.js)
