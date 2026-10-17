@@ -904,6 +904,8 @@ once per workspace -- by an organisation's admin for the organisation, by a pers
 - **Preview images (2.66.1):** imported PDFs and images get their preview image and the QR-code archive number check like an
   upload (also from a ZIP). Documents imported before get their missing previews once after the update, in small portions in
   the background while the documents queue is idle; nothing else of them changes. `KALMIDO_DOCS_THUMB_FILL=off` skips it.
+  The catch-up runs once (row `docs_thumb_fill` of the table `settings`); delete that row to run it again, e.g. after installing
+  the PDF tools later.
 - **Never twice:** a document already imported (Paperless-ngx id per instance address) or the same file already in the
   workspace (checksum) is left out, also when the import runs again.
 - **Rules and learning (2.69):** the matching of tags, correspondents and document types becomes document rules of the
