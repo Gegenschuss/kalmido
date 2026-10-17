@@ -8242,5 +8242,6 @@
   "This is not a ZIP file or it is damaged": "Non è un file ZIP oppure è danneggiato",
   "Uploaded: {0}": "Caricato: {0}",
   "Uploading: {0} of {1}": "Caricamento: {0} di {1}",
-  "Waiting, place {0} in the queue": "In attesa, posto {0} nella coda"
+  "Waiting, place {0} in the queue": "In attesa, posto {0} nella coda",
+  "There is not enough space on the server for this upload right now": "Al momento sul server non c’è abbastanza spazio per questo caricamento"
 }

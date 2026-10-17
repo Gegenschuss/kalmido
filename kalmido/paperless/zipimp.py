@@ -54,6 +54,7 @@ PLH_ENTRIES_MAX = 500_000            # members of the ZIP
 PLH_DOCS_MAX = 200_000               # documents in the manifest
 PLH_RATIO = 200                      # uncompressed / compressed of a member above 1 MB: more = a zip bomb
 PLH_ORPHAN_H = 24                    # hours an upload without a run stays
+PLH_DISK_MARGIN = 1024 * 1024 * 1024  # bytes that stay free on the disk of PLH_DIR besides an upload
 PLH_SRC = P.pl_src("paperless-export")  # pl_imported.src of every ZIP import (not an address: no clash with pl_src(url))
 _CTX = b"pl_uploads.part|"
 _SWEPT = [0.0]
@@ -419,7 +420,7 @@ def plh_zip_run(c, rid):
                                 res = P.plh_store(c, r, uid, PLH_SRC, d, data, d["mime"] or None, d["original_file_name"], labels,
                                                   lambda d=d: P._doc_text(d, d["notes"], scan["fields"]))
                 except PlhError as e:
-                    if e.code in ("zip_gone", "zip_bad"):
+                    if e.code == "zip_gone":  # the parts are gone: nothing more can come; a damaged member only fails its document
                         raise
                 except QuotaExceeded:
                     raise PlhError("quota") from None
@@ -523,6 +524,11 @@ def plh_zip_new():
     q = quota_info(c, uid)
     if q and q["limit"] and q["used"] >= q["limit"]:
         raise QuotaExceeded(q)
+    try:  # the parts lie on the server's disk until the run: keep a margin for everything else
+        if shutil.disk_usage(os.path.dirname(PLH_DIR.rstrip(os.sep)) or "/").free < size + PLH_DISK_MARGIN:
+            return err(tr("There is not enough space on the server for this upload right now"), 507)
+    except OSError:
+        pass
     name = d.get("name") if isinstance(d.get("name"), str) else ""
     name = re.sub(r"[\x00-\x1f\x7f/\\\\]", "", name).strip()[-120:]
     from ..core.pg import insert_id, write_lock
@@ -545,8 +551,13 @@ def plh_zip_new():
 def plh_zip_part():
     """multipart: ws, n (the part's number: the next one, or the last one again), part (the bytes: PLH_CHUNK, the last one
     less). After the last part the ZIP is checked (state ready | bad)."""
+    from ..core.pg import write_lock
     c = db()
     uid, org, ws, r = _mine(c, request.form.get("ws"), "upload")
+    write_lock(c, f"pl_uploads:{ws}")  # two sends of one part at once: one after the other
+    r = c.execute("SELECT * FROM pl_uploads WHERE id=?", (r["id"],)).fetchone()
+    if not r or r["state"] != "upload":
+        raise Denied(409, tr("The upload is not ready for this"))
     try:
         n = int(request.form.get("n", ""))
     except ValueError:
