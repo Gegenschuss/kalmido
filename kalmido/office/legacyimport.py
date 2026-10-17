@@ -1268,7 +1268,7 @@ def fi_archive_add(c, oid, uid, raw, file_name, b):
     fd = os.open(p + ".part", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o600)
     from ..core.orgcrypt import oc_seal
     with os.fdopen(fd, "wb") as fh:
-        fh.write(oc_seal(c, oid, raw))  # 2.42.0 (#828): sealed with the organisation's key at rest (sha256 = the original)
+        fh.write(oc_seal(c, oid, raw, fresh=True))  # 2.42.0 (#828): sealed with the organisation's key at rest (sha256 = the original)
     c.execute("UPDATE office_archive SET file=? WHERE id=? AND org_id=?", (name, aid, oid))
     _run_count(c, oid, rid)
     return aid, p

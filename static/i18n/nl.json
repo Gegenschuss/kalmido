@@ -6930,6 +6930,8 @@
   "Senders of finished documents": "Afzenders van afgeronde documenten",
   "The log of the documents": "Het logboek van de documenten",
   "Files of organisations": "Bestanden van organisaties",
+  "Files in the private space": "Bestanden in de privéruimte",
+  "Some files could not be encrypted again for their new place. Nothing was deleted; see the server log.": "Sommige bestanden konden niet opnieuw worden versleuteld voor hun nieuwe plek. Er is niets verwijderd; zie het serverlogboek.",
   "Stored access tokens (Git, client secret of the single sign-on)": "Opgeslagen toegangstokens (Git, clientgeheim van de single sign-on)",
   "Descriptions": "Beschrijvingen",
   "Chats": "Chats",

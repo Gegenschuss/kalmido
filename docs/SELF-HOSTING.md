@@ -18,6 +18,7 @@ addresses and paths to your setup.
 - [Upgrade to 2.37 (PostgreSQL required)](#upgrade-to-237-postgresql-required)
 - [Backup and encryption](#backup-and-encryption)
 - [Encryption of organisation data](#encryption-of-organisation-data)
+- [Encryption of private files](#encryption-of-private-files)
 - [Organisation export](#organisation-export)
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
@@ -429,6 +430,7 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
 | Senders of finished documents | Comments |
 | The log of the documents | Contacts |
 | Files of organisations | Chats |
+| Files in the private space (2.64) | |
 | Stored access tokens (Git, client secret of the single sign-on) | |
 
 - **What is encrypted:** the office's bank and tax data (IBAN, BIC, bank, tax number, VAT ID), the free company lines,
@@ -437,7 +439,7 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   of tasks in the organisation's lists (comments included), project files of its lists, stored invoices / credit notes
   (PDF/A-3 and e-invoice XML) and the archived PDFs of the legacy import. A stored PDF stays a PDF/A-3 without a
   password: it is sealed only on disk and served as the original (same checksum). Not encrypted: names, addresses,
-  task texts, logos, profile pictures, files in agent chats and private lists, the search index. The cache of texts read
+  task texts, logos, profile pictures, the search index. Files in the private space: see the next section (2.64). The cache of texts read
   from attachments (`textcache/`, at most 30 days) is sealed with a key derived from the master key.
 - **The keys.** `KALMIDO_SECRET_KEY` (32 random bytes, base64) is the master key. Each organisation gets a random key,
   stored in the database only wrapped with a key derived from the master key. Without `KALMIDO_SECRET_KEY` nothing is
@@ -467,6 +469,48 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
 - **Deleting an organisation** deletes its key and its office folder: whatever of it is left encrypted can no longer
   be read on this server. Files of lists that moved to another workspace are re-sealed first. Older backups still
   contain the wrapped key, so with the master key a restored old backup can read that organisation's data again.
+
+## Encryption of private files
+
+Since 2.64 the files of the **private space** are encrypted at rest as well, with a key per person (account key,
+AES-256-GCM, wrapped with the same master key `KALMIDO_SECRET_KEY` as the organisation keys). This is encryption **on the
+server**, not in the browser: the server opens a file for everyone who may see it, exactly as before (a private list
+shared with others, an agent the list is shared with); the database and the data folder hold ciphertext only.
+
+- **Which files:** attachments of tasks and comments in lists without an organisation, project files of those lists,
+  files shared or mailed into them, the own file store (documents included) and the files in chats with agents. A
+  file of a private list is sealed with the key of the list's owner. Not encrypted: task texts, comments, notes, profile
+  pictures (as for organisations).
+- **Moving.** A file follows its task: moved into an organisation's list it gets the organisation's key, moved into
+  another person's list that person's key, a list moved into or out of an organisation or handed to a new owner the
+  same (a short background pass after the change; until then the file stays readable with its old key).
+- **Existing files** are encrypted by the same background pass as the organisation data (five minutes after the start,
+  idempotent, in portions of 200 files with a short pause; `KALMIDO_ORGCRYPT_PAUSE` in seconds, default 0.2). The log
+  says `orgcrypt: encrypted at rest: ... files in ... organisations and the private spaces, ... files resealed`.
+- **Deleting an account** deletes its key: whatever is left encrypted with it can no longer be read. Files of lists the
+  person handed over earlier are re-sealed for their new owner first.
+- **Switch.** Private files follow *Encrypt organisation data* (`org_encrypt`) and have a switch of their own,
+  `private_encrypt` (default on), set by the commands below.
+- **The way back** (before a downgrade below 2.64, or to switch it off):
+
+  ```bash
+  docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli decrypt-private
+  ```
+
+  It sets `private_encrypt` to 0 first (new private files stay plain), then turns every file sealed with an account
+  key back into plain text and exits with 0 only when none is left. `encrypt-private` switches it on again and seals
+  them. `decrypt-all` (see above) also covers the private files. `status` shows `private_encrypt` and the counts.
+- **There is no recovery key for account keys.** Keep `KALMIDO_SECRET_KEY` safe (a password manager, apart from the
+  backups). If you change it on purpose, keep the earlier key and rewrap the account keys with it after the start:
+
+  ```bash
+  docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rewrap-accounts --old-key-file - < old-key.txt
+  ```
+
+  (the earlier key is read from a file or stdin, never from the command line; `status` counts account keys made with
+  another server key as `keys_other_server_key`). Without the master key the private files are lost.
+- **Your own data export** (*Settings > Data > Export*) is JSON and lists the files without their content, as before.
+  To take the files themselves out of the data folder in plain text, run `decrypt-private` first.
 
 ## Organisation export
 

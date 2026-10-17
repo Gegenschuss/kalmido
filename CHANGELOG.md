@@ -7,6 +7,19 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.64.0] - 2026-10-17
+
+### Security
+- Security fix (files at rest): the files of the private space (attachments of tasks and comments in lists without an
+  organisation, their project files, the own file store and documents, files in chats with agents) are now stored
+  encrypted on the server with a key per person, wrapped with `KALMIDO_SECRET_KEY` like the organisation keys (#1864).
+  Server-side encryption, not end-to-end: everyone who may see a file gets it as before.
+- Existing files are encrypted by the start-up pass (in portions); a file that moves into another space (task, list,
+  new list owner) is sealed again for it. Deleting an account deletes its key.
+- The way back: `python -m kalmido.admin.orgcrypt_cli decrypt-private` (before a downgrade below 2.64; `decrypt-all`
+  covers it too), `encrypt-private`, and `rewrap-accounts` after a planned change of the server key. See SELF-HOSTING.md,
+  *Encryption of private files*.
+- `decrypt-all` now also covers the versions of the file store and the files of agent chats.
 ## [2.56.4] - 2026-10-17
 
 ### Fixed

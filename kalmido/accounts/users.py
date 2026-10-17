@@ -405,6 +405,13 @@ def user_purge(c, uid):
     files += fs_user_purge(c, uid)  # 2.48.0 (#1207): the file store (organisation branches go to an admin, the own tree goes)
     from ..contacts.orgbooks import obk_user_purge
     obk_user_purge(c, uid)  # 2.52.0 C (#1438): the organisations' address books it manages get another manager and stay
+    # 2.64.0 (#1864): files sealed with the account key that lie elsewhere now are sealed for their space; then the key row
+    # goes with the account (foreign key): what is left sealed with it can no longer be read
+    from ..admin.orgcrypt_cli import before_user_delete
+    from ..core.orgcrypt import oc_drop_key
+    if before_user_delete(c, uid)[1]:  # a file that lives on could not be sealed for its new place: keep the key
+        raise Denied(409, tr("Some files could not be encrypted again for their new place. Nothing was deleted; see the server log."))
+    oc_drop_key(c, -int(uid))
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     return files
 

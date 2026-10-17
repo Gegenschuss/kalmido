@@ -102,8 +102,13 @@ def _cleanup(c):
     old = [r[0] for r in c.execute("""SELECT u.id FROM users u LEFT JOIN user_invites i ON i.user_id=u.id
                                       WHERE u.signup='confirm' AND (i.expires_at IS NULL OR i.expires_at<?)""", (iso(now_utc()),))]
     files = []
+    from ..core.access import Denied
     for uid in old:
-        files += user_purge(c, uid)
+        try:
+            with c.savepoint():  # nothing of this account goes when it is refused
+                files += user_purge(c, uid)
+        except Denied:  # 2.64.0 (#1864): a file that could not be resealed keeps the account (tried again next time)
+            continue
     unlink_files(files)
 
 
