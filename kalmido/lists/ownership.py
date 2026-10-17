@@ -141,7 +141,11 @@ def list_owner_set(lid):
     except (TypeError, ValueError):
         new = 0
     u = c.execute("SELECT * FROM users WHERE id=?", (new,)).fetchone()
-    if not u or u["disabled"]:
+    from ..accounts.orgs import may_see
+    # 2.87.0 (#1984): only to a person one may see or a member of the list (like owner_candidates) -- anyone else is an
+    # unknown user, the same answer as for an id that does not exist
+    if not u or u["disabled"] or not (may_see(c, me(), new)
+                                      or c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, new)).fetchone()):
         return err(tr("unknown user"), 404)
     if is_agent(u):
         return err(tr("An agent cannot own a list"))

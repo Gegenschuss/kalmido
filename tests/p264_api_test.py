@@ -378,6 +378,8 @@ r = requests.post(B + "/drop", headers={"Authorization": "Bearer " + edt}, data=
 EB = one("SELECT a.id FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id WHERE l.is_inbox=1 AND l.owner_id=?", (ERIN,))
 ebp = att_path(EB) if EB else ""
 check(space(ep) == -ERIN and ebp and space(ebp) == -ERIN, "(f) erin's files sealed with her account key")
+# 2.87.0 (#1984): a list goes only to a person one may see -- erin (outside the organisation) and bob are connected
+dbx("INSERT INTO conn_links(a_id, b_id, created_at) VALUES(?, ?, '2026-10-18T10:00:00.000Z') ON CONFLICT DO NOTHING", tuple(sorted((BOB, ERIN))))
 r = Er.post(B + f"/api/lists/{EL}/owner", json={"user_id": BOB})
 check(r.ok and space(ep) == -ERIN, f"(f) list handed to bob, the file still has erin's key (the kick waits) " + r.text[:100])
 r = A.delete(B + f"/api/users/{ERIN}")
