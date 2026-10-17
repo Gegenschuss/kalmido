@@ -7,6 +7,8 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.80.3] - 2026-10-18
+
 Live fix from the device test of 2.80.2.
 
 ### Fixed
@@ -5540,7 +5542,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.80.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.80.3...HEAD
+[2.80.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.80.3
 [2.80.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.80.1
 [2.41.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.2
 [2.41.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.1
