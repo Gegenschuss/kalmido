@@ -48,7 +48,9 @@ const ymd = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await signIn(ev, 'alice');
     await nav(B + '#cal');
     await ready(ev, `typeof dvw_commit === 'function' && typeof S !== 'undefined' && !!S.booted`, 80);
-    await ev(`(() => { S.calMode = 'week'; S.calSel = today(); renderView(); return 1; })()`);
+    // 2.56.4 (#1863): the week of the stub event's day (today + 2) -- the week of today misses it on Fridays / Saturdays
+    // (en: the week starts on Sunday)
+    await ev(`(() => { S.calMode = 'week'; S.calSel = '${ymd(2).replace(/(\d{4})(\d\d)(\d\d)/, '$1-$2-$3')}'; renderView(); return 1; })()`);
     check(await ready(ev, `S.cal.items.some(e => e.uid === 'rw-1@stub' && e.dvw_write)`, 80), 'the writable event is loaded and marked');
     // ---- the subscription's edit window: "Allow writing"
     await ev(`(async () => { const j = await api('GET', '/api/calendars'); calEditModal(j.subs.find(s => s.id === ${RW}), j.colors, () => {}); return 1; })()`);
