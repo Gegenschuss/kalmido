@@ -130,7 +130,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.close();
   w = await boot({user: 'bob', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('notify')`); await sleep(700);
-  check(!d.querySelector('[data-nm="usage"]') && [...d.querySelectorAll('#sp-notify .nmr')].filter(r => !r.querySelector('[data-nm="proposal"]')).length === 16, 'bob: no usage row (16 rows; 2.3.0: + the proposal row, 2.7.0: + repeated reminders, 2.17.0: + team chat, 2.18.0: + new error reports)');
+  check(!d.querySelector('[data-nm="usage"]') && [...d.querySelectorAll('#sp-notify .nmr')].filter(r => !r.querySelector('[data-nm="proposal"]')).length === 17, 'bob: no usage row (17 rows; 2.3.0: + the proposal row, 2.7.0: + repeated reminders, 2.17.0: + team chat, 2.18.0: + new error reports, 2.60.0 #1512: + reviews)');
   w.close();
 
   // ================= German

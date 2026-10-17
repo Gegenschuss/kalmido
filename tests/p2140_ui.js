@@ -306,6 +306,9 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
     check(dl && dl.fits && dl.over <= 1 && (dl.small === 0 || !phone), `${tag}: the Columns dialog fits` + (phone ? ', 44 px targets ' : ' ') + JSON.stringify(dl));
     await shot(`p2140-${tag}-dialog.png`);
     await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
+    // 2.58.0 (#1757): on touch a closed dialog takes its history entry away with an async history.back(); navigating
+    // before that Back has landed lets it undo the navigation (back to the list). Wait until the entry is gone.
+    for (let i = 0; i < 30 && !(await ev(`typeof f8d_bk === 'undefined' || (!f8d_bk.pushed && !f8d_bk.skip && !f8d_bk.queued && !history.state?.f8d)`)); i++) await sleep(100);
     await nav(B + '#l/' + EMPTY); await ready(ev);
     const qb = await ev(`(() => { if (document.querySelector('#fab') && getComputedStyle(document.querySelector('#fab')).display !== 'none' && !document.querySelector('#qinput')?.offsetParent) openQuickSheet(); const b = [...document.querySelectorAll('.qadd [data-act="q-open"], .qadd [data-act="q-clip"]')].filter(e => e.offsetParent); const r = b.map(e => e.getBoundingClientRect()); const out = {n: b.length, minW: Math.round(Math.min(...r.map(x => x.width))), minH: Math.round(Math.min(...r.map(x => x.height))), inside: r.every(x => x.right <= innerWidth + .5 && x.left >= 0)}; closePop?.(); return out; })()`);
     check(qb.n === 2 && qb.inside && (!phone || (qb.minW >= 43.5 && qb.minH >= 43.5)), `${tag}: quick add shows the paper clip + "Add and open"` + (phone ? ' with 44 px targets ' : ' ') + JSON.stringify(qb));

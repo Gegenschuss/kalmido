@@ -277,7 +277,9 @@ r = job("start", "--title", "Release build", "-", inp="WRITEFILE build the relea
 check(r.returncode == 0 and "Job #41" in r.stdout, f"job start: {r.stdout.strip()} {r.stderr[-200:]}")
 check(wait_for(lambda: job_state(41).get("state") == "done"), "the job ends as done")
 created = [json.loads(q["body"]) for q in REQS if q["p"] == "/api/v1/agent/jobs" and q["m"] == "POST"]
-check(created and created[0]["title"] == "Release build" and created[0]["user_id"] == 7, "the Kalmido job is created for the person")
+# 2.59.0 (#1827): the title starts with the job's name ("Name: Release build"), the name also goes along as {name}
+check(created and created[0]["title"].endswith(": Release build") and created[0]["title"].startswith(created[0].get("name", "-") + ": ")
+      and created[0]["user_id"] == 7, f"the Kalmido job is created for the person {created[:1]}")
 fp = [q for q in REQS if q["ct"].startswith("multipart/") and "/agent/chats/7" in q["p"]]
 check(fp and b'filename="report.txt"' in fp[0]["body"] and b"All done: first" in fp[0]["body"] and b'name="job_id"' in fp[0]["body"],
       "the result with the job's file is posted into the chat, linked to the job")

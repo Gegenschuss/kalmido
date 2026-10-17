@@ -176,6 +176,9 @@ const groupOf = row => row?.closest('.group');
     check(q && /For Bob in Team board/.test(q.t) && q.right <= 390, `${tag}: the sheet shows "For Bob in Team board" ` + JSON.stringify(q));
     await shot('p2362d-390-who-quickadd.png');
     await ev(`(() => { closePop(); return 1; })()`);
+    // 2.58.0 (#1757): closing the sheet on touch takes its history entry away with an async history.back(); navigating
+    // before that Back has landed lets it undo the navigation (back to "Tasks of Bob"). Wait until the entry is gone.
+    for (let i = 0; i < 30 && !(await ev(`typeof f8d_bk === 'undefined' || (!f8d_bk.pushed && !f8d_bk.skip && !f8d_bk.queued && !history.state?.f8d)`)); i++) await sleep(100);
     await o.nav(B + '#byme'); await sleep(1200);
     const g = await ev(`[...document.querySelectorAll('#view .ghead')].map(h => h.textContent.trim()).join('|')`);
     check(/Bob/.test(g) && /Carol/.test(g), `${tag}: "Assigned by me" grouped by person ` + g);

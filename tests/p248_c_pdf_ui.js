@@ -51,7 +51,8 @@ async function upload(tid, name, buf) {
   const L = (await call('POST', '/api/lists', {name: 'Papers'})).id;
   const T = (await call('POST', '/api/tasks', {title: 'Read the contract', list_id: L})).id;
   const a1 = await upload(T, 'contract.pdf', makePdf(3));
-  const a2 = await upload(T, 'broken.pdf', Buffer.from('this is no pdf at all'));
+  // 2.61.0 (#1818): the file type comes from the content - a damaged PDF needs the %PDF- header to stay a PDF
+  const a2 = await upload(T, 'broken.pdf', Buffer.from('%PDF-1.4\nthis is no pdf at all'));
   check(a1.attachments?.length === 1 && a2.attachments?.length === 2, 'two PDF attachments uploaded');
   const lib = await fetch(B + 'static/vendor/pdfjs/pdf.min.mjs');
   check(lib.ok && /javascript/.test(lib.headers.get('content-type') || ''), '#1367: pdf.js is served from the same origin as a JavaScript module ' + lib.headers.get('content-type'));

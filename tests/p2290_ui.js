@@ -221,7 +221,12 @@ const V = B + 'api/v1';
     await shot(`p2290-${th}-1440-agents-lists.png`);
     await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
     // #1002: an empty "Assigned" cell of the shared agency project opens the people picker (a real click)
-    await o.nav(B + '#l/' + AGY); await ready(ev); await sleep(600);
+    // 2.63.0: right after the settings dialog the address change can get lost (the run stayed on #today); go there
+    // until the agency project shows its rows
+    for (let i = 0; i < 3; i++) {
+      await o.nav(B + '#l/' + AGY); await ready(ev); await sleep(600);
+      if (await ev(`location.hash === '#l/${AGY}' && !!document.querySelector('#view .trow')`)) break;
+    }
     const cell = await ev(`(() => { const rows = [...document.querySelectorAll('#view .trow')]; for (const r of rows) { const c = r.querySelector('[data-act="assign"]'); if (c) { const b = c.getBoundingClientRect(); return {x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), w: b.width}; } } return null; })()`);
     if (cell && cell.w > 0) {
       await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: cell.x, y: cell.y}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]});

@@ -319,6 +319,9 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
     if (vw !== 829) await axe(ev, `${tag} event editor`);
     await shot(`p2210-${vw}x${vh}-${th}-editor.png`);
     await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
+    // 2.58.0 (#1757): on touch a closed dialog takes its history entry away with an async history.back(); navigating
+    // before that Back has landed lets it undo the navigation (back to the calendar). Wait until the entry is gone.
+    for (let i = 0; i < 30 && !(await ev(`typeof f8d_bk === 'undefined' || (!f8d_bk.pushed && !f8d_bk.skip && !f8d_bk.queued && !history.state?.f8d)`)); i++) await sleep(100);
     await o.nav(B + '#contacts'); await ready(ev, '#view .ctrow');
     check(await sideways(ev) <= 0, `${tag}: contacts: nothing sideways`);
     const sm2 = await ev(SMALL('#view .ctview button, #view .ctview input, #view .ctview select'));
@@ -366,6 +369,9 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
     await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); davGuide(); return 1; })()`); await sleep(400);
     await axe(ev, `${tag} phone guide`);
     await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
+    // 2.58.0 (#1757): on touch a closed dialog takes its history entry away with an async history.back(); navigating
+    // before that Back has landed lets it undo the navigation (back to the calendar). Wait until the entry is gone.
+    for (let i = 0; i < 30 && !(await ev(`typeof f8d_bk === 'undefined' || (!f8d_bk.pushed && !f8d_bk.skip && !f8d_bk.queued && !history.state?.f8d)`)); i++) await sleep(100);
     await o.nav(B + '#contacts'); await ready(ev, '#view .ctrow');
     await ev(`(() => { document.querySelector('#view .ctrow').click(); return 1; })()`); await sleep(700);
     check(await ev(`(() => { const l = document.querySelector('#view .ctlistw').getBoundingClientRect(), c = document.querySelector('#view .ctcard').getBoundingClientRect(); return c.left >= l.right - 1; })()`), `${tag}: list and card side by side`);
