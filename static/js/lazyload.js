@@ -9,7 +9,7 @@ const LD_MODS = {
   settings: ['settings'],
   contacts: ['contacts'],
   office: ['office', 'office_docs', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow',
-    'office_pipeline', 'office_kpi', 'office_datev', 'officeagents'],
+    'office_pipeline', 'office_kpi', 'office_datev', 'officeagents', 'office_packs'],
 };
 // functions of a module that code loaded at start calls: a stand-in loads the module and then calls the real one (the
 // module's own function declaration replaces the stand-in on window)
