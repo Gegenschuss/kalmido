@@ -211,6 +211,8 @@ def client_public(c, uid, r, stats=False, month=None):
              can_delete=bool(u and (u["is_admin"] or r["created_by"] == uid)))
     from ..office.contacts_cl import fk_contacts
     d["contacts"] = fk_contacts(c, r["id"])  # 2.40.0 (#1380): the contact persons, the default first ("contact" = its name)
+    if u and (u["kind"] or "user") == "agent":  # 2.81.0 (#1466): agents get name / role only per contact person, no mail / phone / link
+        d["contacts"] = [{k: x[k] for k in ("id", "name", "role", "is_default")} for x in d["contacts"]]
     if u and (u["kind"] or "user") != "agent":  # 2.36.2: billing fields for people only
         d["billing"] = {k: (r[k] if k in r.keys() else None) for k in CLIENT_BILLING}
     if stats:

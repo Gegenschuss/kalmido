@@ -1307,10 +1307,14 @@ def fi_archive_add(c, oid, uid, raw, file_name, b):
     # and removes it when the commit fails -- an archive-*.pdf never exists without its row
     fd = os.open(p + ".part", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o600)
     from ..core.orgcrypt import oc_seal
-    with os.fdopen(fd, "wb") as fh:
-        fh.write(oc_seal(c, oid, raw, fresh=True))  # 2.42.0 (#828): sealed with the organisation's key at rest (sha256 = the original)
-    c.execute("UPDATE office_archive SET file=? WHERE id=? AND org_id=?", (name, aid, oid))
-    _run_count(c, oid, rid)
+    try:  # 2.81.0 (#1462): any failure after the open leaves no orphan ".part" (the caller only cleans up after a return)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(oc_seal(c, oid, raw, fresh=True))  # 2.42.0 (#828): sealed with the organisation's key at rest (sha256 = the original)
+        c.execute("UPDATE office_archive SET file=? WHERE id=? AND org_id=?", (name, aid, oid))
+        _run_count(c, oid, rid)
+    except BaseException:
+        fk_archive_done(p, False)
+        raise
     return aid, p
 
 
@@ -1721,6 +1725,10 @@ def fk_archive_address_post():
     """2.40.0 (#1421) org admin. multipart 'file' (PDF) + client_id? (the file name's proposal) -> the recipient's address
     read from the text layer of page 1 and the proposals (new client / contact person / address differs); nothing stored."""
     c, uid, oid = _ctx()
+    from ..api.v1 import hit_limit
+    from ..tasks.attachtext import PDF_RATE
+    if hit_limit(f"pdftext:{uid}", PDF_RATE, 600):  # 2.81.0 (#1463): the same budget as POST /api/pdf-text
+        raise Denied(429, tr("Too many requests, please slow down"))
     f, raw = _upload("file", FI_PDF_MAX)
     if raw[:1024].find(b"%PDF-") < 0:
         raise BadInput(tr("Only PDF files can be archived"))

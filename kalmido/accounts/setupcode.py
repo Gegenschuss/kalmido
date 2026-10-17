@@ -16,7 +16,7 @@ SH_CODE_OFF = SH_CODE_ENV.lower() in ("off", "0", "false", "no")
 SH_CODE_RATE = 10  # wrong codes per address within the login window (FAIL_WINDOW)
 SH_CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"  # no 0/o, 1/l/i: read off a log, typed by hand
 _SH = {"hash": ""}
-_SH_LOCK = threading.Lock()
+_SH_LOCK = threading.RLock()  # 2.81.0 (#1627): re-entrant, sh_code_ensure holds it while it makes the code
 
 
 def sh_code_required():
@@ -39,10 +39,10 @@ def sh_code_ensure(c):
     """Start and first request: a code exists while the server has no user (nothing with a fixed or no code)."""
     if SH_CODE_OFF or SH_CODE_ENV or c.execute("SELECT 1 FROM users").fetchone():
         return
-    with _SH_LOCK:
+    with _SH_LOCK:  # 2.81.0 (#1627): check and make in one go, two first requests print one code
         if _SH["hash"]:
             return
-    sh_code_new()
+        sh_code_new()
 
 
 def sh_code_startup():
