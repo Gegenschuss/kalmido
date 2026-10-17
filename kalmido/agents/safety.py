@@ -74,7 +74,7 @@ def agent_cap(c, aid):
 
 def agent_reach(c, aid):
     """The lists agent aid can really use: owned or shared with it (no health list), within its list restriction."""
-    rows = [r[0] for r in c.execute("""SELECT id FROM lists WHERE COALESCE(life,'')!='health' AND (owner_id=? OR id IN
+    rows = [r[0] for r in c.execute("""SELECT id FROM lists WHERE COALESCE(life,'') NOT IN ('health', 'budget') AND (owner_id=? OR id IN
                                        (SELECT list_id FROM list_members WHERE user_id=?))""", (aid, aid))]
     cap = agent_cap(c, aid)
     return [x for x in rows if cap is None or x in cap]

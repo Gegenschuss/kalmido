@@ -197,6 +197,8 @@ The most used helpers:
 | `life/model.py` | Home & life (modules contracts, home, care, health, review, travel, reading): contracts, devices + upkeep, staying in touch, the private health list, review + journal, trips. |
 | `life/karakeep.py` | Home & life: "Read later" from Karakeep (a person's own connection, sealed API key, bookmarks -> tasks, archive back). |
 | `life/web.py` | Home & life: the web API (overview, contracts, devices, upkeep, health, trips, review + journal, staying in touch, Karakeep). |
+| `life/budget.py` | 2.72.0 (#1333) Home & life: the household budget (a list of kind `budget`): categories with monthly limits, entries, recurring items + taking them over from contracts, the month (planned / actual), the bank import (CSV), receipts; fields encrypted with the list's space key, `bud_settle` reseals after a move. |
+| `life/budget_web.py` | 2.72.0 (#1333): the web API of the household budget (`/api/budget...`; no REST v1 / MCP, never for agents). |
 | `life/v1.py` | Home & life: the REST API v1 (+ MCP) and its OpenAPI part (health + journal: scope "private"). |
 | `team/clients.py` | Clients (module "clients"): clients of an organisation above the lists, hours, budget, estimate vs. actual. |
 | `team/workload.py` | Workload (module "workload"): planned hours per person and week against their capacity. |

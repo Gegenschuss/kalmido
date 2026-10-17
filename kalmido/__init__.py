@@ -143,6 +143,8 @@ ORDER = (
     "life.karakeep",
     "life.web",
     "life.v1",
+    "life.budget",  # 2.72.0 (#1333): the household budget
+    "life.budget_web",
     "team.clients",
     "team.clients_bulk",  # 2.47.3 (#1733): several clients at once
     "team.workload",

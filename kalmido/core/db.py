@@ -776,6 +776,7 @@ LV_AREAS = (
     ("calendar", re.compile(r"^/api/(v1/)?(events|evcals|cal/|calendars)")),
     ("news", re.compile(r"^/api/(v1/)?news")),
     ("tasks", re.compile(r"^/api/(v1/)?(tasks|lists|sections|folders|batch|projects|tags)")),
+    ("budget", re.compile(r"^/api/budget")),  # 2.72.0 (#1333): the household budget (the open budget view reloads)
 )
 LV_AREA_KEYS = tuple(k for k, _ in LV_AREAS) + ("other",)
 

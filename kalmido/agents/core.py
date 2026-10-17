@@ -179,7 +179,7 @@ def agent_emit(c, aid, event, data, actor="auto"):
     if isinstance(data, dict):  # 2.22.0 (#663): nothing of a health list ever reaches an agent
         lid = data.get("list_id") or (data.get("task") or {}).get("list_id") or (data.get("list") or {}).get("id") \
             or (data.get("room") or {}).get("list_id")
-        if lid and c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone():
+        if lid and c.execute("SELECT 1 FROM lists WHERE id=? AND life IN ('health', 'budget')", (lid,)).fetchone():  # 2.72.0 (#1333)
             return None
         if lid and a["list_ids"]:  # 2.30.0 (#919): an agent limited to selected lists hears nothing of the others
             from ..agents.safety import ids_parse

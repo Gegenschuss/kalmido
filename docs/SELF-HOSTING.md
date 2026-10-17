@@ -431,6 +431,7 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
 | The log of the documents | Contacts |
 | Files of organisations | Chats |
 | Files in the private space (2.64) | |
+| Household budget (2.72) | |
 | Stored access tokens (Git, client secret of the single sign-on) | |
 
 - **What is encrypted:** the office's bank and tax data (IBAN, BIC, bank, tax number, VAT ID), the free company lines,
@@ -481,6 +482,10 @@ shared with others, an agent the list is shared with); the database and the data
   files shared or mailed into them, the own file store (documents included) and the files in chats with agents. A
   file of a private list is sealed with the key of the list's owner. Not encrypted: task texts, comments, notes, profile
   pictures (as for organisations).
+- **Household budget (2.72).** Amounts, titles, notes and counterparts of the entries, the recurring items and the
+  monthly limits of a budget are encrypted with the key of the budget list's owner, its receipts are sealed like
+  attachments. Category names and dates stay plain. The same background pass, `decrypt-all` and `decrypt-private`
+  cover them; a budget handed to another owner is resealed for that person.
 - **Moving.** A file follows its task: moved into an organisation's list it gets the organisation's key, moved into
   another person's list that person's key, a list moved into or out of an organisation or handed to a new owner the
   same (a short background pass after the change; until then the file stays readable with its old key).

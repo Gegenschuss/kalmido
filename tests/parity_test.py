@@ -359,6 +359,8 @@ APP_ONLY = [
     # 2.55.0 (#1455): the newsletter connection holds access data of an outside service and decides who gets mail: people only
     ("2.55.0 (#1455): the newsletter connection, segments, sync and the consent of contacts are set by people (admins / the "
      "person); agents read the consent with the contact (field newsletter), no new agent rights", ("* /api/newsletter",)),
+    ("2.72.0 (#1333): the household budget is private like health lists: people only, never an agent; no REST v1 / MCP in 2.72.0",
+     ("* /api/budget",)),
 ]
 
 

@@ -601,6 +601,8 @@ def export_json():
     for a in data["activity"]:  # 2.36.0 (#1116): old entries of the removed Paperless connection carry no document data
         if a["kind"] in ("paperless", "paperless_rm", "paperless_send"):
             a["data"] = "{}"
+    from ..life.budget import bud_export
+    data["budget"] = bud_export(c, uid)  # 2.72.0 (#1333): my budgets, decrypted (receipt files stay in data/attachments/)
     data["user"] = user_public(g.user)
     name = f"kalmido-export-{local_now():%Y-%m-%d}.json"
     return Response(json.dumps(data, ensure_ascii=False, indent=1), mimetype="application/json",

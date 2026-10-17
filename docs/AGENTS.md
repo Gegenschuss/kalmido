@@ -641,7 +641,7 @@ agent to the organisation's workspace (`PATCH /api/my/agents/{id} {"org_id": …
 **Everyone in the organisation (2.46.0).** An organisation's list can be opened to all members of its organisation
 (`org_visibility: "org"`, optionally `org_edit: true`): people who are not shared with it see it read-only (`org_reader:
 true`) and may join (`POST /api/v1/lists/{id}/join`). This never reaches agents: an agent sees a list only when it is
-shared with it, also in its own organisation, and health / Home & life / family lists stay private. Readers get no
+shared with it, also in its own organisation, and health / budget (2.72) / Home & life / family lists stay private. Readers get no
 events and notifications of the list until they join, so an agent's comments in such a list are read by more people
 than its members -- an agent opening a list (`PATCH /api/v1/lists/{id} {"org_visibility": "org"}`) waits for approval.
 
