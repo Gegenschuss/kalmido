@@ -146,7 +146,7 @@ r = A.post(B + f"/api/lists/{L}/e2e/bulk", json={"msgs": [{"id": M0, "enc": chan
 check(r.status_code == 400, "bulk: a message of another generation is refused")
 r = A.post(B + f"/api/lists/{L}/e2e/bulk", json={"msgs": [{"id": M0, "enc": chan(1)}]})
 check(r.ok, "bulk: the message encrypted " + r.text[:200])
-check(dbx("SELECT body, enc FROM tchat_msgs WHERE id=?", (M0,))[0][0] == "" and '"g":1' in dbx("SELECT enc FROM tchat_msgs WHERE id=?", (M0,))[0][1],
+check(dbx("SELECT body, enc FROM tchat_msgs WHERE id=?", (M0,))[0][0] == "" and '"g":1' in dbx("SELECT enc FROM tchat_msgs WHERE id=?", (M0,))[0][0],
       "bulk: the server keeps only the ciphertext")
 r = A.post(B + f"/api/lists/{L}/e2e/finish")
 check(r.ok, "finish: on " + r.text[:200])
