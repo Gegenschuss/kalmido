@@ -154,6 +154,13 @@ r = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "write"]}
 check(r.status_code == 201, f"API token {r.text[:200]}")
 TA = Api(r.json()["token"])
 AG = Api(ATOK) if ATOK else None
+# 2.64.1 review 2 (M5): an agent's chat answer about the task and its step texts (an agent that was a member before) quote texts
+if AID:
+    dbx("INSERT INTO agent_chat(agent_id,user_id,sender,body,task_id,created_at) VALUES(?,?,?,?,?,?)",
+        (AID, 1, "agent", MK + "AgentQuote", T, "2026-01-01T00:00:00Z"), write=True)
+    MID = dbx("SELECT id FROM agent_chat WHERE body=?", (MK + "AgentQuote",))[0][0]
+    dbx("INSERT INTO agent_steps(agent_id,user_id,message_id,state,text,created_at) VALUES(?,?,?,?,?,?)",
+        (AID, 1, MID, "done", MK + "AgentStep", "2026-01-01T00:00:00Z"), write=True)
 
 # ================================================================== the switch through part A's routes (start, todo / bulk, finish)
 def keys():
