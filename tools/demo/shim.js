@@ -877,6 +877,9 @@
   on('POST', '/api/clients', (q, b) => { const c = {id: nid('client'), name: '', org_id: null, created_by: 1, created_at: iso(), contacts: [], archived: 0}; clientSet(c, {...b, name: b.name ?? ''}); CL().push(c); return clientOut(c); });
   on('PATCH', '/api/clients/(\\d+)', (q, b, id) => { const c = CL().find(x => x.id === +id) || gone(); clientSet(c, b); return clientOut(c); });
   on('DELETE', '/api/clients/(\\d+)', (q, b, id) => { DB.clients = CL().filter(c => c.id !== +id); for (const l of DB.lists) if (l.client_id === +id) l.client_id = null; return {ok: true}; });
+  // 2.84.0 (#1198): filed e-mails - the demo has no mailbox, so the sections stay empty and offer no address
+  on('GET', '/api/hubmail/mails', () => ({enabled: false, address: '', can_address: false, total: 0, mails: []}));
+  on('GET', '/api/hubmail/inbox', () => ({enabled: false, spaces: [], total: 0, mails: []}));
   // ---- the office
   const ofInfo = () => ({settings: ofSettings(), company_fields: {...OF().company}, org_id: 1, role: 'admin', personal: 1, org_offices: [], can_move: false, industry: [],
     pack: {code: 'DE', name: 'Deutschland', tax: {...TAX}, currency: 'EUR', formats: {}}, number_preview: `KVA-${today().slice(0, 4)}-${String((OF().counters['offer:' + today().slice(0, 4)] || 0) + 1).padStart(3, '0')}`});
