@@ -13,6 +13,7 @@ Month 0 = monthly from 2026-01-01, 1..12 = yearly in that month (2026-MM-01); qu
 The spreadsheet is read by legacyimport.fi_xlsx_read (zip budget, entity guard, only the cells' text; formulas are never
 evaluated, their stored value is the text)."""
 import io
+import math
 import re
 import zipfile
 from datetime import date
@@ -92,6 +93,8 @@ def _vat(v):
     try:
         f = float(s)
     except ValueError:
+        return "bad"
+    if not math.isfinite(f):  # 2.67.0 (#1838, review): "inf" / "nan" / "1e400" are a row error, not a 500
         return "bad"
     if 0 < f < 1:  # 0.19 as a percentage cell
         f *= 100

@@ -166,6 +166,9 @@ check(up(A, b"not a zip").status_code == 400, "not a spreadsheet: 400")
 check(up(A, xlsx([["Foo", "Bar"], ["x", 1]])).status_code == 400, "no header with name and amount: 400")
 check(up(A, xlsx([["Name", "Betrag"]] + [[f"r{i}", 1, 0] for i in range(501)])).status_code == 400, "more than 500 rows: 400")
 check(up(A, b"PK" + b"\0" * (2 * 1024 * 1024 + 10)).status_code == 400, "a file over 2 MB: 400")
+# 2.67.0 (#1838, review): a VAT cell "inf" / "nan" / "1e400" is a row error, not a 500
+r = up(A, xlsx([["Name", "Betrag (netto)", "fällig Monat", "USt"], ["Inf-Abo", 5, 0, "inf"], ["Nan-Abo", 5, 0, "nan"], ["Big-Abo", 5, 0, "1e400"]]))
+check(r.status_code == 200 and [x["status"] for x in r.json()["rows"]] == ["error"] * 3, "VAT inf / nan / 1e400: row errors " + r.text[:300])
 f = up(A, xlsx([["Name", "Betrag", "Monat"], ['=HYPERLINK("http://example.com","x")', 10, 0], ["<script>alert(1)</script>", 10, 0]])).json()
 check([x["label"] for x in f["rows"]] == ['=HYPERLINK("http://example.com","x")', "<script>alert(1)</script>"], "formula / script text stays plain text (the client escapes it)")
 
