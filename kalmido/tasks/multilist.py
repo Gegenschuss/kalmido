@@ -230,10 +230,12 @@ def v1_ml_link(tid):
     return jsonify(v1_one(db(), tid))
 
 
-@app.delete("/api/v1/tasks/<int:tid>/links/<int:lid>")
+@app.delete("/api/v1/tasks/<int:tid>/links/<list_id>")  # second id as text like /contacts/<contact_id>: the spec says {list_id}
 @v1_view
-def v1_ml_unlink(tid, lid):
+def v1_ml_unlink(tid, list_id):
+    from .validation import as_int
     v1_args(())
+    lid = as_int(list_id, "list_id", 1)
     v1_call(ml_unlink, tid, lid)
     c = db()
     return jsonify(v1_one(c, tid)) if task_visible(c, tid, me()) else jsonify(ok=True)
