@@ -172,6 +172,7 @@ The most used helpers:
 | `wiki/outline.py` | 2.49.0 (#1201): parses an outline (Markdown list, OPML, FreeMind `.mm`; no DOCTYPE / entities) for the mind map import; stores nothing. |
 | `collab/teamchat.py` | Team chat (rooms and direct messages). |
 | `collab/msgsearch.py` | 2.33.0: search in comments, team chat and agent chats; since 2.37.0 a trigram index (`pg_trgm`) on `kalmido_fold(body)` (unaccent + umlaut folding) per message table, visibility, snippets. |
+| `wiki/wikie2e.py` | 2.64.3 (#1817): the lock per knowledge space -- path and text of the pages of a space encrypted in the browser; routes `/api/wiki/e2e...`, the write guard `wke_guard` of the page routes. See *Lock per list* below. |
 | `collab/liste2e.py` | 2.64.1 (#1817): the lock per list -- texts of a list encrypted in the browser with a list key. Helpers (`le2e_mode`, `le2e_parse`, ...), the routes `/api/lists/<id>/e2e` (info, start, todo, bulk, finish, stop, keys), the one write guard `le2e_guard` (in every web write of a task, comment, note, section and text field), moves only with re-encrypted texts, memberships without agents / participants. See *Lock per list* below. |
 | `collab/notelock.py` | 2.48.0 (#1642): a task's note locked with its owner's password (`task_note_locks`, ciphertext only, `tasks.content` emptied; only own unshared lists); `ln_guard` keeps every other write (app, API, agents, proposals, CalDAV) off a locked note; flags `note_locked` / `note_locked_mine`. |
 | `collab/e2e.py` | 2.42.0 (#828, #909): end-to-end encryption in the browser: the person's public key + wrapped key bundle (`e2e_keys`), the encrypted note of a task (`task_enc_notes`), encrypted task files (`attachments.enc`), the switch of an encrypted DM (`tchat_rooms.e2e`, `tchat_msgs.enc`). Stores ciphertext only; see *End-to-end encryption* below. |
@@ -611,3 +612,14 @@ lock opened first.
   search and "save as task" skip it. Re-encryption by an admin keeps the original sender in the AAD.
 - **Pushes** of such lists use the neutral word in the recipient's language; a comment push names the list, not the words.
 - **Safety numbers** of all members are reachable from the head of the list channel and of the attachments.
+- **Lock per knowledge space** (2.64.3, `wiki/wikie2e.py`). A whole space ("Private" or an organisation) can be encrypted:
+  `wiki_pages.path` and `.body` hold `e2e1:` ciphertexts with the space key (AAD `kalmido-wiki:v1:<space_id>:<g>:path|body`),
+  wrapped per member in `wiki_keys` (salt `wiki:<space_id>:<gen>`, info `kalmido-wikikey:v1`); `wiki_spaces` holds mode,
+  generation, rotation and re-encryption like the list columns. Managers: the owner of a private space, the admins of an
+  organisation. Routes `/api/wiki/e2e` (info), `/start` (`prepare: true` first creates the row: its id is in salt and AAD),
+  `/todo`, `/bulk`, `/finish`, `/stop` (password), `/keys` (release to members who joined; News `wiki_e2e_key`), `/rotate`.
+  The page routes call `wke_guard`: in such a space only ciphertexts from a person in the web app, no template copy, no
+  `wiki_links` / frontmatter on the server; move, export and import answer 409 `wiki_e2e` (the browser does them); search and
+  mentions leave such spaces out; `GET /api/wiki?bodies=1` hands the ciphertexts to the local search. Members who join the
+  organisation wait for their key (trigger `wiki_e2e_members`; the waiting list is also computed from the members); a key
+  holder who leaves marks the rotation. The organisation export keeps the ciphertexts (`client_encrypted.locked_wiki_pages`).
