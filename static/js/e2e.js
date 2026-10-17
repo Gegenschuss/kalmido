@@ -159,7 +159,7 @@ function e2eUnlockDlg() {
   return new Promise(done => {
     const md = modal(`<h3>${ic('lock', 's')} ${tr('Unlock encryption')}</h3><form class="e2eform" novalidate>
       <input type="password" id="e2e-pw" placeholder="${esc(tr('Passphrase'))}" aria-label="${esc(tr('Passphrase'))}" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore required>
-      <label class="chkl"><input type="checkbox" id="e2e-rem"> ${tr('Remember on this device')}</label>
+      <label class="chkl" title="${esc(tr('iPhone and iPad forget it after about a week without use; then the passphrase is asked again.'))}"><input type="checkbox" id="e2e-rem"> ${tr('Remember on this device')}</label>
       <div class="aerr" role="alert" id="e2e-err"></div>
       <button type="button" class="linkbtn" data-m="code">${tr('Forgot the passphrase? Use the recovery code')}</button>
       <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" type="submit">${tr('Unlock')}</button></div></form>`);

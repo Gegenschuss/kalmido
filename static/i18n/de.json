@@ -8338,5 +8338,6 @@
   "Texts that cannot be decrypted": "Texte, die sich nicht entschlüsseln lassen",
   "{0} texts of this list cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.": "{0} Texte dieser Liste lassen sich mit deinen Schlüsseln nicht entschlüsseln. Als leere Texte übernehmen? Sie lassen sich nicht wiederherstellen.",
   "Take over as empty": "Als leer übernehmen",
-  "{0} texts of this list cannot be decrypted. The list stays locked until they are taken over as empty.": "{0} Texte dieser Liste lassen sich nicht entschlüsseln. Die Liste bleibt gesperrt, bis sie als leer übernommen werden."
+  "{0} texts of this list cannot be decrypted. The list stays locked until they are taken over as empty.": "{0} Texte dieser Liste lassen sich nicht entschlüsseln. Die Liste bleibt gesperrt, bis sie als leer übernommen werden.",
+  "iPhone and iPad forget it after about a week without use; then the passphrase is asked again.": "iPhone und iPad vergessen das nach etwa einer Woche ohne Nutzung; dann wird die Passphrase wieder abgefragt."
 }

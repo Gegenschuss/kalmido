@@ -8338,5 +8338,6 @@
   "Texts that cannot be decrypted": "Teksten die niet te ontsleutelen zijn",
   "{0} texts of this list cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.": "{0} teksten van deze lijst kunnen niet worden ontsleuteld met jouw sleutels. Als lege teksten overnemen? Ze kunnen niet worden hersteld.",
   "Take over as empty": "Als leeg overnemen",
-  "{0} texts of this list cannot be decrypted. The list stays locked until they are taken over as empty.": "{0} teksten van deze lijst kunnen niet worden ontsleuteld. De lijst blijft vergrendeld tot ze als leeg zijn overgenomen."
+  "{0} texts of this list cannot be decrypted. The list stays locked until they are taken over as empty.": "{0} teksten van deze lijst kunnen niet worden ontsleuteld. De lijst blijft vergrendeld tot ze als leeg zijn overgenomen.",
+  "iPhone and iPad forget it after about a week without use; then the passphrase is asked again.": "iPhone en iPad vergeten dit na ongeveer een week zonder gebruik; dan wordt de wachtwoordzin opnieuw gevraagd."
 }
