@@ -109,6 +109,31 @@ answers one of your comments (reply), comes right after your comment on that tas
   address book (read-only when members may only view).
 - **Make personal again…** (an admin) turns it back into that admin's own address book; one undo step, like the hand-over.
 
+## Report forms (2.63.0)
+
+A list's form (list menu, Forms) can work as a report form for customers: **Type of report** gives every sent task a
+type (bug, feature, task), **Allow one file** adds a file field (at most 10 MB, stored like other attachments and counted
+against the list owner's storage; an executable ending gets `.txt`), and **The sender gets a link to the status** asks for
+the e-mail address (required then). After sending, a person without an account sees a status link on the thank-you page
+and gets it once by mail; the link shows only that report (see the customer portal). People of the organisation who
+send a form signed in get no status link: they see the task in the app.
+
+Against spam, without any outside service: the hidden honeypot field, limits per address and per form, a signed time
+stamp in the page (sent sooner than 3 seconds after loading or more than 24 hours later = "please send it once more"),
+at most 5 reports per e-mail address, form and hour, at most 3 confirmation mails per address and hour (plus the server's
+mails per address and day) and at most 5 links in the text.
+
+## Tracked time of a project and templates (2.63.0)
+
+- **Who sees whose time.** In the window "Tracked time" of a project, the time reports and the CSV, the owner of the list,
+  its admins and the admins of its organisation see everyone's entries. Everyone else sees their own there, and the window
+  says "Your time only". The time list in a task's detail still shows everyone's entries of that task.
+- **Templates keep the project page.** "Save as template" on a project also saves its notepads, the standard arrangement of
+  the project page and the block colours. A project made from the template gets its own copies of the notepads, placed and
+  coloured as in the original. Notepads written by agents stay with their project.
+- **Undo after "Delete all times of this project"** brings the entries back exactly as they were, including the link to a
+  timer started on a phone, so a stop that arrives later from that phone still finds its entry.
+
 ## Saved arrangements and templates (2.55.0)
 
 - **Several arrangements per view.** The start page, Today, Time tracking, the overviews, the review and every project page
@@ -203,3 +228,23 @@ pin, in an agent chat the person and the agent. Others see the change right away
 
 A message is sent once: it shows at once as *Sending…*, and Send / Enter wait until the server took it, so pressing
 Enter again (for example right after waking the laptop) does not send it twice.
+## The customer portal (2.63.0)
+
+A form with **status link** turns every report sent without an account into a customer report: the reporter gets a link to
+its status page (on the thank-you page and by mail). There they see the title, the state (received, in progress, done), the
+text they sent, the team's public answers and their own comments, and they can answer. **All my reports** sends a sign-in
+link (valid 30 minutes, once) to their address; it opens a page with all their reports in the same organisation (or the same
+private list owner) - never reports of another organisation, even with the same address. Nobody needs an account.
+
+- **Internal stays internal.** In the task panel, a customer report shows the box *Customer report* (who sent it; the
+  address, *Copy the status link* and *Mails to the customer* only for people who may change the task). The comment box
+  gets a switch *Internal* / *To the customer*: it starts on *Internal* every time. Only comments sent with *To the
+  customer* reach the customer; they are marked "to the customer", the customer's own ones "Customer". A public answer
+  cannot be made internal later (the customer may have it by mail already); delete it if needed.
+- **Mails.** The customer gets a mail for a public answer and when the report is done - at most one mail per report every
+  10 minutes, every mail with a link that turns them off. *Mails to the customer* in the box does the same for the team.
+- **Clients.** A report belongs to the list's client, else to the client of the organisation whose e-mail (or a contact
+  person's) is the reporter's address. The client's card lists its reports (block *Customer reports*).
+- **What the customer never sees:** internal comments, the notes once the team changed them, assignees, files, other tasks,
+  names of team members other than the name of an answer's author.
+- Agents answer customers the same way (`add_comment` with `portal: true`, see AGENTS.md).

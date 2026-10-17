@@ -25,7 +25,9 @@ from ..personal.habits import pomo_elapsed
 # Time entries per user on a task (or on a whole list). Decisions:
 # - Visibility: my own entries always; in a shared list every member sees everyone's entries on the list's
 #   tasks (task totals, reports "all members"), read-only: only the author edits or deletes an entry. Entries
-#   in lists I cannot see (someone else's private list) are never returned. Logging time needs read access
+#   in lists I cannot see (someone else's private list) are never returned. 2.63.0 (#1523): the entry list, the report and
+#   the CSV show other people's entries only to the list's owner, its admins and the admins of its organisation; everyone
+#   else sees their own there (agents: unchanged; the entries of one task in its detail view: unchanged). Totals per task / list (header "Tracked", status report) stay sums. Logging time needs read access
 #   to the task (a view-only member can track own time). time_entries.list_id follows the task (trigger).
 # - One running timer per user (unique index). Starting one stops the previous at the new start. Every
 #   start / stop carries the device time ("at", clamped to [now - 7 days, now]) and the device's client_id,
@@ -163,6 +165,28 @@ def evis(c, uid, a="e."):
         return "TRUE"
     return (f"({a}user_id={int(uid)} OR {a}list_id IS NULL OR {a}list_id NOT IN ({','.join(str(int(x)) for x in pl)}) "
             f"OR {a}task_id IN ({_pset_sql(uid, pl, write=True)}))")
+
+
+def n43_admin_lists(c, uid):
+    """2.63.0 (#1523): ids of the lists in which uid sees everyone's time entries: lists they own, lists where they are an
+    admin (MANAGE_ROLES) and the lists of organisations they administer. None = no limit (agents keep the time API's rules)."""
+    from ..agents.core import is_agent
+    from ..accounts.orgs import is_org_admin, user_orgs
+    if has_request_context() and is_agent(getattr(g, "user", None)):
+        return None
+    ids = {r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=?", (uid,))}
+    ids |= {r[0] for r in c.execute("SELECT list_id FROM list_members WHERE user_id=? AND role='admin'", (uid,))}
+    orgs = [o for o in user_orgs(c, uid) if is_org_admin(c, uid, o)]
+    if orgs:
+        ids |= {r[0] for r in c.execute(f"SELECT id FROM lists WHERE org_id IN ({','.join('?' * len(orgs))})", orgs)}
+    return ids
+
+
+def n43_own_sql(uid, ids, a="e."):
+    """2.63.0 (#1523): SQL restriction (no ? params): my own entries, and everyone's only in the lists of ids."""
+    if ids is None:
+        return "TRUE"
+    return f"({a}user_id={int(uid)}" + (f" OR {a}list_id IN ({','.join(str(int(x)) for x in sorted(ids))}))" if ids else ")")
 
 
 def rnd_up(sec, minutes):
@@ -525,11 +549,12 @@ def local_bounds(d1, d2):
     return (iso(datetime(d1.year, d1.month, d1.day, tzinfo=TZ)), iso(datetime(d3.year, d3.month, d3.day, tzinfo=TZ)))
 
 
-def time_rows(c, uid, a):
+def time_rows(c, uid, a, own=None):
     """Visible entries for the entry list / report. a: from, to (local dates, inclusive), scope (mine | all),
-    user, task_id, lists (csv of list ids; 0 = no list / a list I cannot see)."""
+    user, task_id, lists (csv of list ids; 0 = no list / a list I cannot see). own (2.63.0, #1523): n43_admin_lists() of uid
+    -> other people's entries only in those lists (the people's time views); None = as before (aggregates of the office)."""
     # 2.41.0 (#1471): every tracked entry counts, whatever the list's type or switch (before: project lists only)
-    where, args = [f"(e.user_id=? OR e.list_id IN {vis_sql()})", evis(c, uid)], [uid, uid, uid]
+    where, args = [f"(e.user_id=? OR e.list_id IN {vis_sql()})", evis(c, uid), n43_own_sql(uid, own)], [uid, uid, uid]
     try:
         f = date.fromisoformat(a["from"]) if a.get("from") else None
         t = date.fromisoformat(a["to"]) if a.get("to") else None
@@ -576,7 +601,8 @@ def time_list():
         except ValueError:
             raise Denied(404) from None
         a.setdefault("scope", "all")
-    rows, _, _, wanted = time_rows(c, uid, a)
+    # 2.63.0 (#1523): the entries of ONE task (task detail) stay as before; lists / periods follow the admin rule
+    rows, _, _, wanted = time_rows(c, uid, a, own=None if a.get("task_id") else n43_admin_lists(c, uid))
     vis, ref, rm = vis_ids(c, uid), now_utc(), time_rounding(usettings(c, uid))
     out = [entry_out(r, uid, vis, ref, rm) for r in rows]
     if wanted is not None:
@@ -586,12 +612,12 @@ def time_list():
                    mine=sum(e["seconds"] for e in out if e["mine"]))
 
 
-def time_report(c, uid, a):
+def time_report(c, uid, a, own=None):
     s = usettings(c, uid)
     rm, ref, vis = time_rounding(s), now_utc(), vis_ids(c, uid)
     lists = {l["id"]: l for l in visible_lists(c, uid)}
     crates = {r[0]: r[1] for r in c.execute("SELECT id, rate FROM clients WHERE rate IS NOT NULL")}  # 2.23.0 (#463)
-    rows, f, t, wanted = time_rows(c, uid, a)
+    rows, f, t, wanted = time_rows(c, uid, a, own)
     L, D, U, entries = {}, {}, {}, []
     tot = {"seconds": 0, "rounded": 0, "amount": 0.0, "count": 0}
 
@@ -647,7 +673,10 @@ def time_report(c, uid, a):
             "rounding": rm, "currency": s.get("time_currency") or "", "total": tot, "lists": out_lists,
             "days": sorted(D.values(), key=lambda x: x["date"]), "users": sorted(U.values(), key=lambda x: -x["seconds"]),
             "entries": entries, "now": iso(ref), "today": {"seconds": mine_today, "target_h": _num(s.get("time_target"))},
-            "me": user_public(g.user)}
+            "me": user_public(g.user),
+            # 2.63.0 (#1523): only my own entries of (some of) the wanted lists are in here -> the client says "Your time"
+            "own_only": own is not None and a.get("scope", "mine") != "mine" and bool(
+                ({x for x in wanted if x} if wanted is not None else {x for x in L if x}) - own)}
 
 
 def _num(v):
@@ -661,7 +690,7 @@ def _num(v):
 def time_report_api():
     need_time()
     c = db()
-    return jsonify(time_report(c, me(), dict(request.args)))
+    return jsonify(time_report(c, me(), dict(request.args), own=n43_admin_lists(c, me())))  # 2.63.0 (#1523)
 
 
 def _csv_cell(v):
@@ -675,7 +704,7 @@ def time_csv():
     need_time()
     c = db()
     uid = me()
-    rep = time_report(c, uid, dict(request.args))
+    rep = time_report(c, uid, dict(request.args), own=n43_admin_lists(c, uid))  # 2.63.0 (#1523)
     lg = lang()
     de = dec_comma(lg)  # 2.11.0: every decimal-comma language
     num = (lambda x: f"{x:.2f}".replace(".", ",")) if de else (lambda x: f"{x:.2f}")

@@ -160,7 +160,9 @@ check(A.get(B + f"/api/time/entries?task_id={TP}").status_code == 404, "entries 
 check(C.get(B + f"/api/time/entries?task_id={TS}").status_code == 404, "carol (no access): 404")
 check(C.delete(B + f"/api/time/entries/{bs['id']}").status_code == 404, "carol cannot delete (404, no existence leak)")
 rep = A.get(B + "/api/time/report?scope=all").json()
-check(all(e["id"] != bp["id"] for e in rep["entries"]) and any(e["id"] == bs["id"] for e in rep["entries"]), "report 'all': bob's shared entry yes, private no")
+# 2.63.0 (#1523): an editor (not owner / admin) sees only own entries in the report; the owner sees everyone's
+check(all(e["id"] not in (bp["id"], bs["id"]) for e in rep["entries"]), "report 'all' of an editor: bob's entries not in it")
+check(any(e["id"] == bs["id"] for e in Bb.get(B + "/api/time/report?scope=all").json()["entries"]), "report 'all' of the owner: his entry")
 check(all(e["mine"] for e in A.get(B + "/api/time/report?scope=mine").json()["entries"]), "report 'mine': only own entries")
 check(not any(e["id"] == bp["id"] for e in A.get(B + f"/api/time/report?scope=all&user={ids['bob']}").json()["entries"]), "filter by user cannot reach private entries")
 check(str(TS) in A.get(B + "/api/state").json()["time_totals"] and str(TP) not in A.get(B + "/api/state").json()["time_totals"], "alice's task totals: shared yes, private no")

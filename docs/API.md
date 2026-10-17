@@ -189,7 +189,7 @@ had been made in the app. Webhooks fire too.
 | `POST /tasks/{id}/subtasks` | tasks:write | Add a subtask |
 | `GET /tasks/{id}/comments` | read | Comments |
 | `GET /tasks/{id}/related` | read | 2.59.0 (#1375): up to 5 tasks close in meaning, only tasks you may see: `{enabled, pending, items: [{id, title, list_id, done, score, dup, ref}]}`: up to 5 similar ones (local text vectors, ordered together with the similarity of the titles; never the task's own parent / subtasks), `score` 0..1 = the order, `dup` = probably a duplicate; then, with `ref: true`, up to 5 tasks named by `#id` in either direction. `enabled: false` = the server runs without the optional embedding service or an admin switched it off; `pending: true` = this task is not computed yet. MCP `related_tasks` |
-| `POST /tasks/{id}/comments` | comments | Comment: `{body}`; mention someone with `<@user_id>`; agents may add a tidy `suggestion` (see [AGENTS.md](AGENTS.md)) |
+| `POST /tasks/{id}/comments` | comments | Comment: `{body}`; mention someone with `<@user_id>`; agents may add a tidy `suggestion` (see [AGENTS.md](AGENTS.md)); 2.63.0 (#1513): `portal: true` = a public answer the customer of a customer report sees (only on a task with a ticket and with write access; comments carry `portal`) |
 | `POST /comments/{id}/choice` · `POST /comments/{id}/withdraw` | comments | 2.41.0 (#1383): agents post comments with answer buttons (`choices`, `multi`) or an approval card (`approval: {title, what?, yes_label?, no_label?}`, `expires_in`); comments carry `choices`, `choice` (`{ids, at, user_id, user_name, via}`, written once) and `choice_state` (open, answered, expired, withdrawn). A person (own token, may edit the task and instruct the agent) answers `{choice_ids}` (a plain button is also posted as the person's comment: `answer_comment_id`); the agent withdraws its open buttons `{outcome?: denied \| expired}`. The app: `POST /api/comments/{id}/choice`, `GET /api/comments/{id}/choice` (the state); tasks carry `approvals_open` when an agent's approval card waits in their comments |
 | `GET /tasks/{id}/attachments` | read | 2.13.1: the files of a task and of its comments: `id`, `task_id`, `comment_id` (`null` = the task's own), `name`, `mime`, `size`, `created_at`, `url` |
 | `GET /attachments/{id}` | attachments:read | 2.13.1: the file itself (images, PDF and text inline, everything else as a download; `?dl=1` always a download; `410` = damaged on the server). Same rights as in the app |
@@ -232,7 +232,7 @@ had been made in the app. Webhooks fire too.
 | `POST /agent/usage` · `GET /agent/usage?from=&to=&group=` | agent | **Agent tokens only** (2.1.1): report model usage (numbers and ids only), read it grouped by day, task, list or model; over its hard limit an agent gets `429` on every other call, see [AGENTS.md](AGENTS.md#usage-and-limits) |
 | `GET /search?q=` | read | Search titles, notes, links and custom field values. 2.59.0 (#1375): `&semantic=1` adds, after the text hits, tasks of similar meaning (each with `"similar": true`; only on servers with the embedding service, otherwise nothing is added; at most 6 such queries per account in 10 seconds, more add nothing) |
 | `GET /search?scope=messages&q=&art=&sender=&room=&agent=&task=&limit=&cursor=` | read | 2.33.0 (#1080): search task comments, team chat (channels, direct messages) and agent chats -- only what you may read (comments of tasks you see, rooms you are in, your own agent chats; an agent: the lists shared with it, their channels, its own chats, never direct messages). Words match word beginnings; case, accents and ä / ae do not matter. Newest first, `{data, total, next_cursor}`; a hit `{art: c \| t \| a, chat_type: task \| list \| dm \| agent, id, task_id?, list_id?, room_id?, agent_id?, user_id?, chat_name, sender {id, name, agent}, created_at, snippet, marks}`: `snippet` is plain text (never HTML) around the hit, `marks` the `[start, end)` ranges of the hits in it (characters = Unicode code points). Filters: `art` (comma-separated), `sender` (user id), `room`, `agent` (an agent: the person), `task`; a foreign id simply finds nothing |
-| `GET /time/entries` | read | Time entries (time tracking), newest first: `from`, `to`, `scope=mine|all`, `list_id`, `task_id` |
+| `GET /time/entries` | read | Time entries (time tracking), newest first: `from`, `to`, `scope=mine|all`, `list_id`, `task_id`. 2.63.0: with `scope=all` a person's token gets other people's entries only in lists the person owns or administers (list admin, admin of the list's organisation); elsewhere only their own. With `task_id` everyone's entries of that task as before; agents unchanged |
 | `POST /time/entries` | time | Add one: `{task_id or list_id, start, end or minutes, note?}` |
 | `GET /habits` | read | The user's habits with today's count and the last 30 days |
 | `POST /habits/{id}/checkin` | tasks:write | `{date?, count?, note?}`: without `count` one more for the day |
@@ -916,9 +916,18 @@ section_id?}` (undo). Tasks carry `reviewer_id`, `review` (`pending | approved |
 `PUT /lists/{id}/review` (`structure`, editors): `{on, reviewer?, section?, gate?}`; lists carry `review_cfg` (json, empty
 = off). With `gate` on, completing a task that has a reviewer and is not approved answers **409** on every way (complete,
 batch, repeats, git keywords).
+2.63.0 (#1513) customer reports (web app only, no `/api/v1`): `GET /api/tasks/{id}/timeline` carries `ticket` for a task
+that came in through a form with a status link (`name`, `created_at`, `client_id` / `client_name`; for people who may change
+the task also `email`, `url` = the status link, `notify`, `last_seen_at`); `PATCH /api/tasks/{id}/ticket` `{notify}` turns
+the mails to the reporter on / off. `GET /clients/{id}` adds `tickets` (`task_id`, `title`, `done`, `created_at`; only tasks
+the person sees). The reporter's pages are server-rendered HTML without an account: `/p/{token}` (status, public answers,
+answer form, "All my reports"), `/p/{token}/stop` (mails off), `/portal/login/{token}` (one-time sign-in link by mail, 30 min)
+and `/portal` (the reporter's tickets of the same space, cookie for 7 days).
 
 `GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / list admins): a form's `url`, `access`
-(`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link.
+(`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link. 2.63.0: `ttype` (`''` | `bug` | `feature` |
+`task`, the type of a sent task), `files` (one file allowed), `portal` (a sender without an account gets a status link on
+the thank-you page and once by mail; turns `ask_email` on).
 
 ## Storage and the server's notice (2.24.0)
 

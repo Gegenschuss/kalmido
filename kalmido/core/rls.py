@@ -45,6 +45,7 @@ TABLES = (
     "task_vectors",  # 2.59.0 B (#1375): the text vectors of related tasks (NULL = a private list's task)
     "upload_scan",  # 2.61.0 A (#1818): unchecked / infected uploads (NULL = a private file; files/scan.py)
     "file_text",  # 2.61.0 C (#1820): recognised text of stored files (NULL = a private file, the app checks the file)
+    "portal_tickets", "portal_logins",  # 2.63.0 (#1513): customer reports + portal sign-ins (NULL = a private list, the app checks owner_id)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

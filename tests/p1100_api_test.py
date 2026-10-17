@@ -260,16 +260,21 @@ check(P.get(B + "/api/stats").ok, "stats work for a participant")
 # time tracking
 te = P.get(B + "/api/time/entries", params={"scope": "all", "from": (date.today() - timedelta(days=1)).isoformat()}).json()["entries"]
 notes = sorted(e["note"] for e in te)
-check(notes == ["carol on pete task", "pete own"], f"time entries: mine + on my tasks {notes}")
+# 2.63.0 (#1523): lists / reports / CSV show a participant only their own entries (the entries of one task stay)
+check(notes == ["pete own"], f"time entries: only mine {notes}")
+check(sorted(e["note"] for e in P.get(B + "/api/time/entries", params={"task_id": T1}).json()["entries"]) == ["carol on pete task", "pete own"],
+      "entries of my task: everyone's")
 check(P.get(B + "/api/time/entries", params={"task_id": T3}).status_code == 404, "time of hidden task 404")
 check(P.get(B + "/api/time/entries", params={"task_id": T2}).status_code == 404, "time of context task 404")
 rep = P.get(B + "/api/time/report", params={"scope": "all", "from": (date.today() - timedelta(days=1)).isoformat()}).json()
 check("hidden" not in json.dumps(rep).lower() and "list-level" not in json.dumps(rep), "report without hidden entries")
-check(rep["total"]["count"] == 2, f"report count {rep['total']}")
+check(rep["total"]["count"] == 1, f"report count {rep['total']}")  # 2.63.0 (#1523): own only
 csvt = P.get(B + "/api/time/export.csv", params={"scope": "all", "from": (date.today() - timedelta(days=1)).isoformat()}).text
-check("Hidden" not in csvt and "carol on hidden" not in csvt and len(list(csv.reader(io.StringIO(csvt.lstrip("﻿"))))) == 3, "CSV without hidden entries")
+check("Hidden" not in csvt and "carol on hidden" not in csvt and len(list(csv.reader(io.StringIO(csvt.lstrip("﻿"))))) == 2, "CSV without hidden entries")  # 2.63.0 (#1523): own only
 cte = C.get(B + "/api/time/entries", params={"scope": "all", "from": (date.today() - timedelta(days=1)).isoformat()}).json()["entries"]
-check(len(cte) == 4, f"member sees all 4 entries ({len(cte)})")
+# 2.63.0 (#1523): an editor sees own entries only (3), the list admin all 4
+check(len(cte) == 3, f"editor sees her 3 entries ({len(cte)})")
+check(len(Bo.get(B + "/api/time/entries", params={"scope": "all", "from": (date.today() - timedelta(days=1)).isoformat()}).json()["entries"]) == 4, "admin sees all 4 entries")
 check(P.post(B + "/api/time/entries", json={"task_id": T3, "minutes": 5}).status_code == 404, "no time on hidden task")
 hidden_entry = dbx("SELECT id FROM time_entries WHERE note='carol on hidden'")[0][0]
 check(P.patch(B + f"/api/time/entries/{hidden_entry}", json={"note": "x"}).status_code == 404, "hidden entry 404")
@@ -324,7 +329,7 @@ check(all(x["name"] != "stale" for x in v1("GET", "/tags").json()["data"]), "v1 
 vr = v1("GET", "/roadmap", params={"from": (date.today() - timedelta(days=3)).isoformat()}).json()
 check(not ({t["id"] for g in vr["groups"] for t in g["tasks"]} - PETE), "v1 roadmap")
 vte = v1("GET", "/time/entries", params={"scope": "all"}).json()["data"]
-check(sorted(e["note"] for e in vte) == ["carol on pete task", "pete own"], f"v1 time {[e['note'] for e in vte]}")
+check(sorted(e["note"] for e in vte) == ["pete own"], f"v1 time {[e['note'] for e in vte]}")  # 2.63.0 (#1523): own only
 check(v1("DELETE", f"/tasks/{T1}").status_code == 403, "v1: participants cannot delete")
 check(v1("PATCH", f"/tasks/{T2}", json={"title": "x"}).status_code == 403, "v1: context parent read-only")
 check(v1("PATCH", f"/tasks/{T3}", json={"title": "x"}).status_code == 404, "v1: hidden task 404")

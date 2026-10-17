@@ -319,7 +319,8 @@ LY.stats = {key: 'view_stats', title: () => tr('Customize statistics'), blocks: 
   ['bylist', N_('By list'), 'list', 'full'], ['overdue', N_('Overdue'), 'alert', 'full'], ['focus', N_('Focus time'), 'timer', 'full'], ['time', N_('Tracked time'), 'clock', 'full'],
   ['habits', N_('Habits'), 'repeat', 'full']]};
 LY.clients = {key: 'view_clients', title: () => tr('Customize the client card'), blocks: () => [['details', N_('Details'), 'brief', 'full'], ['persons', N_('Contact persons'), 'users', 'full'],
-  ['invoices', N_('Open invoices'), 'receipt', 'full'], ['month', N_('Month'), 'clock', 'full'], ['lists', N_('Lists and projects'), 'list', 'full'], ['note', N_('Note'), 'edit', 'full']]};
+  ['invoices', N_('Open invoices'), 'receipt', 'full'], ['month', N_('Month'), 'clock', 'full'], ['lists', N_('Lists and projects'), 'list', 'full'], ['note', N_('Note'), 'edit', 'full'],
+  ['tickets', N_('Customer reports'), 'megaphone', 'full']]};  // 2.63.0 B (#1513)
 LY.family = {key: 'view_family', grid: 'dgrid', title: () => tr('Customize Family'), blocks: () => [['occ', N_('Birthdays & anniversaries'), 'cake', 'half', false, 3], ['rot', N_('Whose turn'), 'turns', 'half', false, 3],
   ['meals', N_('Meal plan'), 'meal', 'half', false, 3], ['shop', N_('Shopping'), 'cart', 'half', false, 3], ['dl', N_('Deadlines'), 'hourglass', 'half', false, 3],
   ['kids', N_('Kids'), 'star', 'half', false, 3], ['pack', N_('Packing lists'), 'bag', 'half', false, 3]]};

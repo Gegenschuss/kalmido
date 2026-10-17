@@ -381,6 +381,9 @@ APP_ONLY = [
     # 2.59.0 (#1735): the search of the client dialog; the API sets contact_id with PATCH /clients/{id} and finds contacts with GET /contacts
     ("2.59.0 (#1735): the address book search of the client dialog (contacts a person may link to a client's contact persons); "
      "the API links with PATCH /clients/{id} contacts[].contact_id and searches with GET /contacts", ("=GET /api/clients/{}/book-contacts",)),
+    # 2.63.0 B (#1513): whether the reporter of a customer report gets mails is the team's (and the reporter's) decision
+    ("2.63.0 (#1513): the mails to the reporter of a customer report are switched by people (the task's box) or the reporter "
+     "(the link in every mail); agents answer customers with portal comments", ("=PATCH /api/tasks/{}/ticket",)),
 ]
 
 

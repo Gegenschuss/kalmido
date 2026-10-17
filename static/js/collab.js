@@ -602,7 +602,7 @@ function commentHtml(c, U, ro = false) {
     : `${ro ? '' : replyQuoteHtml(c, 'c')}${c.body ? `<div class="cbody">${commentBody(c.body, U, taskById(c.task_id || S.sel)?.list_id)}</div>` : ''}${files}${sugHtml(c, ro)}${ccCommentHtml(c, ro)}${reactHtml(c, ro)}`;
   // 2.5.1 (#395): the author's avatar opens the same card as an @mention (only in the comment list, not read-only copies)
   const cav = ro || c.ext_name ? av(c.user_id, cv_who(c, U)) : `<button type="button" class="cmav" data-mcard="${c.user_id}" data-mname="${esc(uname(c.user_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(c.user_id, U)))}">${av(c.user_id, uname(c.user_id, U))}</button>`;  // 2.50.0 (#329): a customer's comment: their name, no card
-  return `<div class="cm ${isNew ? 'new' : ''}${isAgentUser(c.user_id) ? ' agc' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;
+  return `<div class="cm ${isNew ? 'new' : ''}${isAgentUser(c.user_id) ? ' agc' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}${c.portal && typeof ptl_mark === 'function' ? ptl_mark(c) : '' /* 2.63.0 B (#1513) */}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;
 }
 function timelineItems(ro = false) {
   const T = S.tl, soc = cmSocial(taskById(T.id));
@@ -635,6 +635,7 @@ function timelineHtml(t) {
   // 2.31.0 (#1054): order and history sit in a small "…" menu (were two big switches); "Comments only" says so in the head.
   // (#344) the desktop split folds its area with the arrow at the end
   return `<h5 class="cmhead"><span>${tr('Comments')}</span><span class="c" id="d-tl-count">${n || ''}</span>${soc && !showAct() ? `<span class="cmmode">${tr('Comments only')}</span>` : ''}<span class="spacer"></span><button type="button" class="iconbtn cmmenu" data-act="tl-menu" aria-haspopup="menu" aria-label="${esc(tr('Comment options'))}" title="${esc(tr('Comment options'))}">${ic('dots', 's')}</button>${split ? `<button type="button" class="iconbtn dsfoldb" data-act="cm-fold" aria-controls="d-cpane" aria-expanded="${!dsFold()}" aria-label="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}" title="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}">${ic('chev', 's')}</button>` : ''}</h5>
+    <div id="d-ptl">${typeof ptl_boxHtml === 'function' ? ptl_boxHtml(t) : '' /* 2.63.0 B (#1513): a customer's report */}</div>
     ${top ? cmComposer(t, true) : ''}<div class="cms" id="d-tl-items">${S.tl.id === t.id ? timelineItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div><button type="button" class="chnew cmnew hidden" id="cm-new">${tr('New comment')} <span aria-hidden="true">↓</span></button>
     ${soc ? typingHtml(taskTypers(t), 'd-typing') : ''}`;
 }
@@ -645,13 +646,14 @@ function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the bo
   return `<div class="dcomp ${top ? 'dctop' : ''}">${replyBarHtml('c:' + t.id)}<div class="ccomp ${used ? 'used' : ''}"><textarea id="c-input" rows="1" name="kalmido-comment" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${soc ? tr('Write a comment… (@ mentions someone)') : tr('Write a comment…')}" aria-label="${tr('Comment')}">${esc(S.drafts[t.id] || '')}</textarea>
       <div class="mpick hidden"></div>
       <div class="cfiles" id="c-files">${composerFiles(t.id)}</div>
-      <div class="cbar"><label class="iconbtn" title="${tr('Attach files')}">${ic('clip', 's')}<input type="file" id="c-file" multiple hidden></label>${typeof rf_btnHtml === 'function' ? rf_btnHtml('c') : '' /* 2.53.0 (#1449) */}<span class="muted chint">${isMobile() ? '' : tr('Ctrl+Enter sends')}</span><span class="spacer"></span><button class="btn sm pri" data-act="c-send">${ic('send', 's')} ${tr('Send')}</button></div></div></div>`;
+      <div class="cbar"><label class="iconbtn" title="${tr('Attach files')}">${ic('clip', 's')}<input type="file" id="c-file" multiple hidden></label>${typeof rf_btnHtml === 'function' ? rf_btnHtml('c') : '' /* 2.53.0 (#1449) */}<span class="muted chint">${isMobile() ? '' : tr('Ctrl+Enter sends')}</span><span class="spacer"></span><span id="c-ptl">${typeof ptl_switchHtml === 'function' ? ptl_switchHtml(t) : '' /* 2.63.0 B (#1513) */}</span><button class="btn sm pri" data-act="c-send">${ic('send', 's')} ${tr('Send')}</button></div></div></div>`;
 }
 function drawTimeline() {
   if (S.tl.id !== S.sel) return;
   const sc = cmxScrollGet();  // 2.36.0 (#1120): who reads the newest comments at the end stays there when one arrives
   const box = $('#d-tl-items'), seen = !box?.lastElementChild || cf_visible(box.lastElementChild);
   if (box) { patchKids(box, timelineItems()); cf_comments(box, seen); }  // 2.46.2 (#1660)  // 2.12.2 (#451): only changed / new comments
+  if (typeof ptl_draw === 'function') ptl_draw();  // 2.63.0 B (#1513): the customer report's box + the switch
   const hb = $('#d-hist-items'); if (hb) hb.innerHTML = histItems();
   const n = $('#d-tl-count'); if (n) n.textContent = S.tl.comments?.length || '';
   const n2 = $('#d-jump-count'); if (n2) n2.textContent = S.tl.comments?.length || '';
@@ -705,11 +707,12 @@ async function sendComment() {
   if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
   const text = encodeMentions(raw, S.tl.id === tid ? S.tl.people : []);
   const rto = replyTo('c:' + tid);  // 2.33.0 (#1076)
-  let payload = {body: text, ...(rto ? {reply_to: rto} : {})};
-  if (files.length) { payload = new FormData(); payload.append('body', text); if (rto) payload.append('reply_to', rto); files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
+  const pub = typeof ptl_take === 'function' && ptl_take(tid);  // 2.63.0 B (#1513): "To the customer"
+  let payload = {body: text, ...(rto ? {reply_to: rto} : {}), ...(pub ? {portal: true} : {})};
+  if (files.length) { payload = new FormData(); payload.append('body', text); if (rto) payload.append('reply_to', rto); if (pub) payload.append('portal', '1'); files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
   const btn = $('[data-act="c-send"]'); if (btn) btn.disabled = true;
   try { await capi('POST', `/api/tasks/${tid}/comments`, payload); }
-  catch { return; }
+  catch { if (pub) { PTL.on[tid] = true; ptl_draw(); } return; }
   finally { if (btn) btn.disabled = false; }
   delete S.drafts[tid]; delete S.cfiles[tid]; replySent('c:' + tid);
   if (S.sel === tid) { const i = $('#c-input'); if (i) { i.value = ''; autosize(i); } const f = $('#c-files'); if (f) f.innerHTML = ''; }

@@ -58,6 +58,10 @@ CHECKS = {
     # tasks/related.py emb_cleanup; reported when the worker is off)
     "task_vector": ("SELECT v.task_id, v.org_id FROM task_vectors v JOIN tasks t ON t.id=v.task_id JOIN lists l ON l.id=t.list_id "
                     "WHERE v.org_id IS DISTINCT FROM l.org_id OR v.list_id IS DISTINCT FROM t.list_id"),
+    # 2.63.0 B (#1513): a customer report in another workspace than its list, or bound to a client of another workspace
+    "portal_ticket": ("SELECT p.id, p.list_id FROM portal_tickets p JOIN lists l ON l.id=p.list_id WHERE p.org_id IS DISTINCT FROM l.org_id "
+                      "OR (p.org_id IS NULL AND p.owner_id IS DISTINCT FROM l.owner_id)"),
+    "portal_client": ("SELECT p.id, p.client_id FROM portal_tickets p JOIN clients k ON k.id=p.client_id WHERE k.org_id IS DISTINCT FROM p.org_id"),
     # 2.49.0 (#1106): a connection (accepted request) of an agent or a kid account -- requests are for people only
     "conn_agent": ("SELECT l.a_id, l.b_id FROM conn_links l JOIN users u ON u.id IN (l.a_id, l.b_id) "
                    "WHERE l.deleted_at IS NULL AND (u.kind!='user' OR u.kid!=0)"),

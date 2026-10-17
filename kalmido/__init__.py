@@ -183,6 +183,7 @@ ORDER = (
     "team.approvals",
     "tasks.review",  # 2.60.0 C (#1512): review step (reviewer, gate, list setting, API v1)
     "team.forms",
+    "team.portal",  # 2.63.0 (#1513): customer reports (status link) and the customer portal
     "team.v1",
     "accounts.signup",
     "accounts.pwreset",  # 2.49.0 (#1531): "Forgot your password?"

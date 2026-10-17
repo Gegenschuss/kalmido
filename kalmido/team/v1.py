@@ -8,7 +8,7 @@ from ..team.clients import CLIENT_FIELDS, client_create, client_delete, client_g
 from ..team.clients_bulk import clients_bulk
 from ..team.workload import workload_get
 from ..team.approvals import APPROVAL_ACTIONS, APPROVAL_STATES, task_approval
-from ..team.forms import FORM_ACCESS, form_create, form_delete, form_update, forms_list
+from ..team.forms import FORM_ACCESS, FRM_TTYPES, form_create, form_delete, form_update, forms_list
 
 
 @app.get("/api/v1/clients")
@@ -85,7 +85,7 @@ def v1_forms(lid):
 def v1_form_create(lid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("title", "intro", "access", "section_id", "ask_email"))
+    reject_unknown(b, ("title", "intro", "access", "section_id", "ask_email", "ttype", "files", "portal"))  # 2.63.0 (#1513)
     return jsonify(v1_call(form_create, lid, body=b)), 201
 
 
@@ -94,7 +94,7 @@ def v1_form_create(lid):
 def v1_form_update(fid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("title", "intro", "access", "section_id", "ask_email", "enabled", "regenerate"))
+    reject_unknown(b, ("title", "intro", "access", "section_id", "ask_email", "enabled", "regenerate", "ttype", "files", "portal"))
     return jsonify(v1_call(form_update, fid, body=b))
 
 
@@ -103,6 +103,12 @@ def v1_form_update(fid):
 def v1_form_delete(fid):
     v1_args(())
     return jsonify(v1_call(form_delete, fid))
+
+
+# 2.63.0 (#1513): a form as a report form: the task type, one file, a status link for the sender
+FRM_V1 = {"ttype": {"type": "string", "enum": list(FRM_TTYPES), "description": "2.63.0: the type of the task a sent form makes ('' = none, bug = bug report)"},
+          "files": {"type": "boolean", "description": "2.63.0: the sender may add one file"},
+          "portal": {"type": "boolean", "description": "2.63.0: a sender without an account gets a status link (page and one mail); turns ask_email on"}}
 
 
 def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
@@ -188,10 +194,10 @@ def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "access": {"type": "string", "enum": list(FORM_ACCESS), "description": "org = signed-in people of the owner's organisations; public = anyone with the link"},
         "section_id": nul("integer"), "ask_email": {"type": "boolean"}, "enabled": {"type": "boolean"}, "count": {"type": "integer"},
         "last_at": nul("string"), "created_at": {"type": "string"}, "url": {"type": "string", "description": "The form's link"},
-        "live": {"type": "boolean", "description": "Enabled and allowed (public forms need the switch Public links)"}}}
+        "live": {"type": "boolean", "description": "Enabled and allowed (public forms need the switch Public links)"}, **FRM_V1}}
     fin = {"type": "object", "additionalProperties": False, "properties": {
         "title": {"type": "string"}, "intro": {"type": "string"}, "access": {"type": "string", "enum": list(FORM_ACCESS)},
-        "section_id": nul("integer"), "ask_email": {"type": "boolean"}}}
+        "section_id": nul("integer"), "ask_email": {"type": "boolean"}, **FRM_V1}}
     paths["/lists/{id}/forms"] = {
         "get": op("2.23.0 (module forms): the forms of a list (owner / list admins)", F,
                   ok({"type": "object", "properties": {"forms": {"type": "array", "items": ref("Form")}, "public_links": {"type": "boolean"}}})

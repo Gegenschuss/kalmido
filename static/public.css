@@ -106,3 +106,27 @@ a.sgreq:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 section.fb{margin-top:2rem;padding-top:1rem;border-top:1px solid var(--line)}
 section.fb .ok{color:var(--accent)}
 .fform select{background:var(--bg3);border:1px solid var(--line2);border-radius:.375rem;padding:.5rem .75rem;color:var(--text);font:inherit;width:100%;min-height:2.75rem}
+/* 2.63.0 A (#1513): the report form's file field and the status link on the thank-you page */
+.fform input[type=file]{padding:.5rem .75rem}
+.msg .frm-link{display:block;width:100%;max-width:32rem;margin:.75rem auto;background:var(--bg3);border:1px solid var(--line2);border-radius:.375rem;padding:.625rem .75rem;color:var(--text);font:inherit;min-height:2.75rem;text-align:center}
+.msg .frm-link:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* 2.63.0 B (#1513) the status page of a customer report (/p/<token>) and the portal (/portal) */
+.ptst{display:inline-block;margin:.375rem 0 0;padding:.125rem .625rem;border-radius:62.5rem;font-size:.8125rem;font-weight:600;border:1px solid var(--line2);color:var(--muted)}
+.ptst-progress{color:var(--accent);border-color:var(--accent)}
+.ptst-done{background:var(--accent);border-color:var(--accent);color:var(--ink)}
+section.ptd p,.ptlist p{margin:.25rem 0;overflow-wrap:anywhere}
+ol.ptlist{list-style:none;margin:0;padding:0}
+ol.ptlist li{padding:.625rem .75rem;margin:.5rem 0;border-radius:.75rem;background:var(--bg2);border:1px solid var(--line)}
+ol.ptlist li.me{background:transparent}
+.ptw{display:flex;gap:.5rem;align-items:baseline;font-size:.8125rem}
+.ptw span{color:var(--muted)}
+.ptstop{margin-top:1.5rem}
+.ptstop a,.ptall a{color:var(--accent)}
+ul.ptall{list-style:none;margin:0;padding:0}
+ul.ptall li{display:flex;align-items:center;gap:.75rem;padding:.625rem 0;border-bottom:1px solid var(--line)}
+ul.ptall a{flex:1;min-width:0;display:flex;flex-direction:column;text-decoration:none;min-height:2.75rem;justify-content:center}
+ul.ptall a b{color:var(--text);font-weight:500;overflow-wrap:anywhere}
+ul.ptall .ptst{margin:0;flex:0 0 auto}
+.ptout{margin-top:1.5rem}
+.ptout button{background:transparent;color:var(--text);border:1px solid var(--line2);border-radius:.5rem;padding:.5rem 1rem;font:inherit;min-height:2.75rem;cursor:pointer}
+main>.ok{color:var(--accent);margin:.5rem 0}

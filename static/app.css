@@ -7886,3 +7886,24 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .cpnbar .iconbtn{flex:0 0 auto;min-width:2.75rem;min-height:2.75rem}
 .cpnmark{display:inline-flex;align-items:center;color:var(--accent)}
 .cpnmark .i{width:.75rem;height:.75rem}
+/* 2.63.0 D (#1482) conversation on the job card */
+.jobth{margin-top:.5rem}
+.jobth>summary{cursor:pointer;min-height:2.75rem;display:flex;align-items:center;color:var(--muted);font-size:var(--fs-sm)}
+.jthbody{display:flex;flex-direction:column;gap:.5rem;padding:.25rem 0}
+.jthm{padding:.5rem .75rem;border-radius:.5rem;background:var(--bg3)}
+.jthm.me{background:var(--bg2)}
+.jthm p{margin:.125rem 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.jthm span{font-size:var(--fs-xs)}
+.jthbody .btn{align-self:flex-start;min-height:2.75rem}
+/* 2.63.0 B (#1513) customer reports: the box in the task panel, the composer's switch "To the customer", the marks */
+.ptlbox{border:1px solid var(--line2);border-radius:.75rem;padding:.625rem .75rem;margin:0 0 .75rem;background:var(--bg2)}
+.ptlh{display:flex;align-items:center;gap:.5rem;color:var(--accent)}
+.ptlh b{color:var(--text);font-weight:600}
+.ptlh .muted{margin-left:auto;font-size:var(--fs-xs)}
+.ptlwho{margin:.25rem 0 0;overflow-wrap:anywhere}
+.ptlacts{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin-top:.5rem}
+.ptlmail{min-height:2.75rem;display:inline-flex;align-items:center;gap:.375rem}
+.ptlsw{margin-right:.375rem}
+.ptlsw.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.ptltag.pub{color:var(--accent);white-space:nowrap}
+@media (max-width:40rem){.ptltag.pub .ptlt{position:absolute;width:.0625rem;height:.0625rem;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}  /* phone: the globe only (read aloud) */

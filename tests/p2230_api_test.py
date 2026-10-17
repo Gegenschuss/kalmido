@@ -339,7 +339,10 @@ F2 = r.json()
 tok2 = F2["url"].rsplit("/", 1)[1]
 p = anon.get(B + "/f/" + tok2)
 check(p.ok and 'name="email"' in p.text and 'name="name"' in p.text and 'name="website"' in p.text, "a public form: name, e-mail, the hidden honeypot")
-p = anon.post(B + "/f/" + tok2, data={"subject": "Crash", "text": "On start", "name": "Eve", "email": "eve@example.org"})
+# 2.63.0 (#1513): a visitor's page carries a signed time stamp; sending sooner than 3 s after loading is refused
+stamp = re.search(r'name="stamp" value="([^"]+)"', p.text).group(1)
+time.sleep(3.2)
+p = anon.post(B + "/f/" + tok2, data={"subject": "Crash", "text": "On start", "name": "Eve", "email": "eve@example.org", "stamp": stamp})
 t = dbx("SELECT content, created_by FROM tasks WHERE title='Crash'")
 check(p.ok and t and t[0][1] is None and "Eve <eve@example.org>" in t[0][0], "anonymous: a task without a creator, the sender in the notes " + str(t))
 act = dbx("SELECT data FROM activity WHERE task_id=(SELECT id FROM tasks WHERE title='Crash') AND kind='created'")

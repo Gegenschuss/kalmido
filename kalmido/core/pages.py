@@ -155,7 +155,7 @@ def split_link(title, content=""):
     return title, content, None
 
 
-def save_attachment_bytes(c, tid, name, mime, data):
+def save_attachment_bytes(c, tid, name, mime, data, owner=None):
     from ..tasks.attachments import safe_name
     from ..notify.alerts import aa_count, aa_oserr
     from ..admin.hosting import quota_fits
@@ -164,6 +164,8 @@ def save_attachment_bytes(c, tid, name, mime, data):
     name = safe_name(name)
     who = c.execute("SELECT created_by FROM tasks WHERE id=?", (tid,)).fetchone()
     who = who[0] if who else None
+    if owner is not None:  # 2.63.0 (#1513): a form's file without an account counts against the list owner's storage
+        who = owner
     org = oc_task_org(c, tid) or None
     mime = mime if mime and mime != "application/octet-stream" else (mimetypes.guess_type(name)[0] or "application/octet-stream")
     try:  # 2.61.0 (#1818 #1819 #1820): a virus find -> the task comes without the file (never an error), like a full quota

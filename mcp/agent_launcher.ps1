@@ -74,6 +74,7 @@ if ($env:KALMIDO_EVENTS -eq '1') { $Events = $true }
 # kalmido-capability: layout_answer (2.55.0: the answer to an arrangement proposal, in mcp/agent_run.py)
 # kalmido-capability: chat_pinned (2.62.0: a pinned / unpinned chat message is information only, no run; in mcp/agent_run.py)
 # kalmido-capability: job_message (2.56.0: a message to a job from its card, in mcp/agent_run.py)
+# kalmido-capability: customer_comment (2.63.0: a customer's comment / public answers of a customer report, in mcp/agent_run.py)
 # (2.44.0: agent_run.py; perm_relay and session_resume only when COMMAND is Claude Code)
 # (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)
 if ($Events) {

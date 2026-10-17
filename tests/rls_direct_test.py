@@ -114,6 +114,9 @@ for s, lid, uid, org in ((Bo, LA, BOB, ALPHA), (Ca, LB, CAROL, BETA)):
     sql("INSERT INTO task_bell(task_id,user_id,org_id,level,created_at,updated_at) VALUES(?,?,?,'mute','2026-01-01','2026-01-01') ON CONFLICT DO NOTHING", (tid, uid, org))
     # 2.59.0 (#1375): task_vectors points at a task the same way (task_id is its key): one vector row per organisation
     sql("INSERT INTO task_vectors(task_id,org_id,list_id,model,dim,vec,text_hash,updated_at) VALUES(?,?,?,'t',0,'','','2026-01-01') ON CONFLICT DO NOTHING", (tid, org, lid))
+    # 2.63.0 (#1513): portal_tickets.task_id is unique as well: one ticket per organisation on that task
+    sql("INSERT INTO portal_tickets(task_id,list_id,org_id,token,token_hash,created_at) VALUES(?,?,?,'x',?,'2026-01-01') ON CONFLICT DO NOTHING",
+        (tid, lid, org, f"rls-{org}"))
 for s, nm in ((Bo, f"{MARK} cal"), (Ca, "Beta cal")):
     assert s.post(B + "/api/evcals", json={"name": nm}).ok
     assert s.post(B + "/api/books", json={"name": nm.replace("cal", "book")}).ok
@@ -262,8 +265,9 @@ check(r.status_code == 303 and sql("SELECT status FROM tasks WHERE id=?", (TA,))
 r = Bo.post(B + f"/api/lists/{LA}/forms", json={"title": f"{MARK} form", "access": "public"})
 if r.status_code == 201:
     furl = r.json()["url"].replace("https://kalmido.example", "")
-    requests.get(B + furl)
-    r2 = requests.post(B + furl, data={"subject": "Form request", "text": "hello", "name": "Visitor"})
+    fpg = requests.get(B + furl)
+    time.sleep(3.2)  # 2.63.0 (#1513): the page's signed time stamp; sending sooner than 3 s after loading is refused
+    r2 = requests.post(B + furl, data={"subject": "Form request", "text": "hello", "name": "Visitor", "stamp": re.search(r'name="stamp" value="([^"]+)"', fpg.text).group(1)})
     check(r2.status_code == 200 and sql("SELECT COUNT(*) FROM tasks WHERE list_id=? AND title='Form request'", (LA,))[0][0] == 1,
           f"form: a visitor's request becomes a task of the Alpha list ({r2.status_code})")
 else:
@@ -283,7 +287,8 @@ if "furl" in globals():
     fp = Ca.get(B + furl)
     check(fp.status_code == 200 and f"{MARK} form" in fp.text and "Carol" not in fp.text and 'name="name"' in fp.text,
           f"K2-2: carol opens the public form of an Alpha list like a visitor ({fp.status_code})")
-    r2 = Ca.post(B + furl, data={"subject": "Carol request", "text": "hi", "name": "Visitor C"})
+    time.sleep(3.2)  # 2.63.0 (#1513): the signed time stamp of the page carol just opened
+    r2 = Ca.post(B + furl, data={"subject": "Carol request", "text": "hi", "name": "Visitor C", "stamp": re.search(r'name="stamp" value="([^"]+)"', fp.text).group(1)})
     row = sql("SELECT created_by, content FROM tasks WHERE list_id=? AND title='Carol request'", (LA,))
     check(r2.status_code == 200 and len(row) == 1 and row[0][0] is None and "Visitor C" in row[0][1],
           f"K2-2: carol's form request lands in the Alpha list as a visitor's ({r2.status_code} {row})")

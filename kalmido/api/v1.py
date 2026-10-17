@@ -1214,7 +1214,8 @@ def v1_comment(c, d, names):
             "edited_at": d["edited_at"], "attachments": [{k: a[k] for k in ("id", "name", "mime", "size")} for a in d["attachments"]],
             "reply_to": d.get("reply_to"), "reply": d.get("reply"),  # 2.33.0 (#1076)
             # 2.41.0 (#1383): answer buttons / approval card of an agent's comment, the answer and its state
-            "choices": d.get("choices"), "choice": d.get("choice"), "choice_state": d.get("choice_state")}
+            "choices": d.get("choices"), "choice": d.get("choice"), "choice_state": d.get("choice_state"),
+            "portal": bool(d.get("portal"))}  # 2.63.0 B (#1513): the customer sees it (public answer / their own comment)
 
 
 @app.get("/api/v1/tasks/<int:tid>/comments")
@@ -1239,13 +1240,13 @@ def v1_comment_create(tid):
     v1_args(())
     b = v1_json()
     # 2.2.1 (#359): 400 unknown_field; 2.33.0 (#1076): reply_to; 2.41.0 (#1383): choices / multi / approval / expires_in
-    reject_unknown(b, ("body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in"))
+    reject_unknown(b, ("body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in", "portal"))  # 2.63.0 B (#1513): + portal
     if not isinstance(b.get("body"), str):
         raise BadInput(tr("Expected {0}", '{"body": "..."}'))
     c = db()
     _v1_live(c, tid, write=False, full=True)  # view-only members may comment (as in the app)
     j = v1_call(comment_create, tid, body={"body": b["body"], **{k: b[k] for k in ("suggestion", "reply_to", "choices", "multi", "approval",
-                                                                                    "expires_in") if k in b}})
+                                                                                    "expires_in", "portal") if k in b}})
     return jsonify(v1_comment(c, {**j, "task_id": tid}, user_names(c, [me()]))), 201
 
 
@@ -1272,7 +1273,9 @@ def v1_time_entries():
          "scope": a.get("scope", "mine")}
     if a.get("task_id"):
         q["task_id"] = str(as_int(a["task_id"], "task_id", 1))
-    rows, _, _, _ = time_rows(c, uid, q)
+    from ..personal.timetrack import n43_admin_lists
+    # 2.63.0 (#1523): as /api/time/entries (agents and the entries of one task: unchanged)
+    rows, _, _, _ = time_rows(c, uid, q, own=None if q.get("task_id") else n43_admin_lists(c, uid))
     vis, ref, rm = vis_ids(c, uid), now_utc(), time_rounding(usettings(c, uid))
     out = [entry_out(r, uid, vis, ref, rm) for r in rows]
     if a.get("list_id"):
