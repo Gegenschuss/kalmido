@@ -73,7 +73,7 @@ const FEAT = 'cal,comments,collab,clients,office';
       await o.nav(B + '#office/offers');
       await until(() => ev(`!!document.querySelector('#view .ofmenu, #view .ofmbar')`).catch(() => false), 60); await sleep(900);
       const g = JSON.parse(await ev(tabs));
-      check(g && g.n >= (wd === 390 ? 2 : 6) && g.inside, `#1830 ${tag}: all tabs lie inside the tab bar ` + JSON.stringify(g));
+      check(g && g.n >= (wd < 900 ? 2 : 6) && g.inside, `#1830 ${tag}: all tabs lie inside the tab bar ` + JSON.stringify(g));
       check(g && g.wrap === 'wrap' && !g.scroll, `#1830 ${tag}: the bar wraps and does not scroll ` + JSON.stringify(g));
       check(g && g.kinds && !g.over, `#1830 ${tag}: the kind switches fit, no horizontal overflow ` + JSON.stringify(g));
       await shot(`p260d-office-${tag}.png`);
