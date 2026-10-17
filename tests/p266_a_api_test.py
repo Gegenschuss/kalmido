@@ -8,6 +8,8 @@
    (only to who may change it); undo puts everything back (same ids, uid, href, links, birthday task, CardDAV) once;
    a stranger gets 404, read-only 403, a mirrored address book / a group / too many / foreign ids 400, another scope 409;
    undo after the target was deleted brings the merged contacts back; the data export lists the merge without snapshot
+ - 2.80.0 (#1885): undo also links a client's contact person of another workspace (hidden by row-level security) and one
+   that did not fit the target's book again; no answer shows their content
 usage: p266_a_api_test.py <datadir>"""
 import os
 import re
@@ -276,6 +278,38 @@ for tgt, oth in ((CX, C1), (C1, CX)):
     r = merge(Bo, tgt, [oth], dry=True)
     check(r.status_code == 409, f"#1835: private books of two people: 409 ({r.status_code} {r.text[:120]})")
 check(Bo.get(B + f"/api/contacts/{C1}").ok and Ca.get(B + f"/api/contacts/{CX}").ok, "#1835: ... both contacts stay")
+
+# ---- 2.80.0 (#1885): links of another workspace (row-level security hides them from bob) and links that do not fit the
+# target's book: the merge empties them (the database: ON DELETE SET NULL), undo links them again; no answer shows their content
+r = A.post(B + "/api/admin/orgs", json={"name": "Beta"})
+BETA = r.json()["id"]
+A.patch(B + f"/api/admin/orgs/{BETA}", json={"members": [1], "admins": [1]})
+FX1, FX2 = contact(Bo, BK, "Zora", "Fox"), contact(Bo, BK, "Zora", "Foxx")
+r1 = A.post(B + "/api/clients", json={"name": "Beta Secret Client", "org_id": BETA, "contacts": [{"name": "Zeta Hidden", "email": "zeta@example.com"}]})
+r2 = A.post(B + "/api/clients", json={"name": "Alice Private Client", "org_id": None, "contacts": [{"name": "Yuri Unfit", "email": "yuri@example.com"}]})
+check(r1.status_code == 201 and r2.status_code == 201, "setup: a client of Beta and a private client of alice " + r1.text[:120] + r2.text[:120])
+KB = dbx("SELECT id FROM office_client_contacts WHERE client_id=?", (r1.json().get("id"),))[0][0]
+KA = dbx("SELECT id FROM office_client_contacts WHERE client_id=?", (r2.json().get("id"),))[0][0]
+# the links themselves cannot be made through the app any more (ckl_book_fits): as close as it gets, set directly (an older
+# version, a client that moved to another organisation since)
+dbx("UPDATE office_client_contacts SET contact_id=? WHERE id IN (?,?)", (FX2, KB, KA), write=True)
+SECRET = ("Zeta", "zeta@", "Beta Secret", "Yuri", "yuri@", "Alice Private")
+r = merge(Bo, FX1, [FX2], dry=True)
+L = r.json().get("lines", []) if r.ok else []
+check(r.ok and "Contact person links dropped (the address book does not fit the client): 2" in L, "#1885: the overview counts both links " + str(L))
+check(not any(x in r.text for x in SECRET), "#1885: the dry run shows nothing of the other workspace " + r.text[:300])
+r = merge(Bo, FX1, [FX2])
+RX = r.json().get("run_id") if r.ok else None
+check(r.ok and RX and not any(x in r.text for x in SECRET), "#1885: merged, nothing of the other workspace in the answer " + r.text[:200])
+check(dbx("SELECT contact_id FROM office_client_contacts WHERE id IN (?,?)", (KB, KA)) == [(None,), (None,)], "#1885: both links emptied")
+snap = dbx("SELECT snapshot FROM merge_runs WHERE id=?", (RX,))[0][0]
+check("Zeta" not in snap and "zeta@" not in snap, "#1885: the snapshot keeps only the id and the old link of a foreign row")
+hist = Bo.get(B + f"/api/contacts/{FX1}").text
+check(not any(x in hist for x in SECRET), "#1885: the card's history shows nothing of the other workspace")
+r = Bo.post(B + f"/api/contacts/merges/{RX}/undo")
+check(r.ok and r.json().get("restored") == [FX2] and not any(x in r.text for x in SECRET), "#1885: undone " + r.text[:200])
+got = dict(dbx("SELECT id, contact_id FROM office_client_contacts WHERE id IN (?,?)", (KB, KA)))
+check(got == {KB: FX2, KA: FX2}, "#1885: undo links the other workspace's and the unfitting contact person again " + str(got))
 
 # ---- 2.66.0 review: an agent token is refused on the merge routes (web only; 2.70.0 (#1357): agents propose, kind merge)
 ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write"], "username": "ctm-helper", "display_name": "Helper"}).json()
