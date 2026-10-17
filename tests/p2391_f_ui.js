@@ -81,6 +81,25 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntraile
   check(row && /663_MusterMedien/.test(row.textContent) && /Archive/.test(row.querySelector('.rotag')?.textContent || '') && /Paid/.test(row.textContent), 'archive: the archived invoice with the tag and the paid state');
   check(/\/api\/office\/legacy\/archive\/\d+\/pdf/.test(row?.getAttribute('href') || '') && row?.getAttribute('target') === '_blank', 'archive: the row opens the original PDF');
   check(/1,190\.00/.test(d.querySelector('.oimsum')?.textContent || ''), 'archive: the sums: ' + (d.querySelector('.oimsum')?.textContent || ''));
+  // 2.81.0 (#1834): the client filter above the list, the edit dialog: net + two tax rates (Kalmido adds the gross), paid off,
+  // save -> the server has the gross, the tax lines and the history; reopened, the history shows both changes
+  check(!!d.querySelector('#oim-cl option[value="' + CL + '"]'), '#1834: the client filter lists the client');
+  d.querySelector('[data-oim="arch-edit"]')?.click();
+  const dlg = await until(() => d.querySelector('.r81b-dlg'), 40);
+  check(!!dlg && /gross, tax unknown/.test(dlg.textContent) && !!dlg.querySelector('#r81b-paid')?.checked, '#1834: the dialog shows the old gross as "tax unknown" and paid');
+  const setNet = (i, v, tax) => { const ln = dlg.querySelectorAll('.r81b-ln')[i]; const n = ln.querySelector('[data-r81b="net"]'); n.value = v; n.dispatchEvent(new w.Event('input', {bubbles: true})); if (tax) { const t = ln.querySelector('[data-r81b="tax"]'); t.value = tax; t.dispatchEvent(new w.Event('change', {bubbles: true})); } };
+  if (dlg) {
+    setNet(0, '100', '19');
+    dlg.querySelector('[data-r81b="add"]').click();
+    setNet(1, '50', '7');
+    check(/172\.50/.test(dlg.querySelector('#r81b-sum')?.textContent || ''), '#1834: the sum 100 @ 19 % + 50 @ 7 % = gross 172.50: ' + (dlg.querySelector('#r81b-sum')?.textContent || ''));
+    dlg.querySelector('#r81b-paid').checked = false;
+    dlg.querySelector('[data-m="ok"]').click();
+  }
+  const one = await until(async () => { const x = await call('GET', '/api/office/legacy/archive'); const it = (x.items || [])[0]; return it && it.amount === 172.5 ? it : null; }, 40);
+  check(one && one.paid === 0 && (one.tax_lines || []).length === 2 && one.tax === 22.5, '#1834: saved: gross 172.50, tax 22.50, two lines, not paid: ' + JSON.stringify(one || {}).slice(0, 200));
+  const h = one ? await call('GET', `/api/office/legacy/archive/${one.id}`) : {};
+  check((h.history || []).map(x => x.field).sort().join() === 'amount,paid', '#1834: the history has amount and paid: ' + JSON.stringify(h.history || []).slice(0, 200));
   w.close();
 
   console.log(`p2391_f_ui: ${ok} ok, ${F.length} failed`);
