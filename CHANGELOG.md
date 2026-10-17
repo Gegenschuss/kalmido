@@ -7,6 +7,29 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.83.0] - 2026-10-17
+
+Organisation view, list themes, team room.
+
+### Added
+- Appearance: ready-made themes *Control room* (as before), *Paper* (warm, light), *Night* (deep blue) and *Contrast*,
+  per device; accent, density and font stay your own (#1427).
+- Lists and folders: a header strip - gradient from the list colour, dots, lines, grid or an own picture (JPEG / PNG /
+  WebP up to 2 MB, re-encoded without metadata, stored sealed like attachments; not for locked lists); low on the phone,
+  can be switched off per device. Progress rings at the lists in the sidebar, a short tick animation (none with reduced
+  motion) and a calm K drawing on empty pages (#1427).
+- Organisation admins change an agent's colour right on its person card (#1775).
+- Team rooms have a button *Open in split window* in their header, so it works on the iPhone too (#1774).
+
+### Changed
+- The organisation view shows only what belongs to the organisation: Home, Habits, Review and Notes are hidden there
+  (sidebar, phone tab bar, search); an old link to them switches quietly to the private space (#1845).
+- Organisation-wide lists that every member may edit: tasks can be assigned to members who have not joined; those tasks
+  show in their Today / All, the calendar link and CalDAV (read only). Other tasks of such lists still only after joining (#1725).
+
+### Fixed
+- The hint of the monthly cash flow task says *basket*, not *inbox*, in every language (#1838).
+
 ## [2.80.0] - 2026-10-17
 
 Small fixes: import, clients, contacts.
