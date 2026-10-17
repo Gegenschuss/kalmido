@@ -367,6 +367,10 @@ APP_ONLY = [
     # 2.59.0 (#1735): the search of the client dialog; the API sets contact_id with PATCH /clients/{id} and finds contacts with GET /contacts
     ("2.59.0 (#1735): the address book search of the client dialog (contacts a person may link to a client's contact persons); "
      "the API links with PATCH /clients/{id} contacts[].contact_id and searches with GET /contacts", ("=GET /api/clients/{}/book-contacts",)),
+    # 2.70.0 A (#1354): a person hands an agent a meeting (photos into their own chat, the cards of their own proposals)
+    ("2.70.0 (#1354): a person's photos of a meeting for a proposal request and the chat's cards of their ready proposals; "
+     "proposals come only from people, the agent reads the photos with GET /chat-attachments/{id} and answers with "
+     "POST /agent/jobs/{id}/proposal", ("=POST /api/agents/{}/meeting-images", "=GET /api/agents/{}/meeting-proposals")),
 ]
 
 
