@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.64.1** (2026-10-17): **lock per list**: a list's titles, descriptions, subtasks, comments, notes, section names,
+  text fields, links and snippets **encrypted in the browser** with a key per list for every member (waiting list, safety
+  numbers); agents, mail address, public link and templates stay out of such a list, search runs in the browser.
 - **2.56.4** (2026-10-17): connecting **Paperless-ngx 3.x** works again (API version negotiated, custom fields readable).
 - **2.56.3** (2026-10-16): the client field of a document in an organisation's office offers its clients again.
 - **2.56.1** (2026-10-16): CI fixes for 2.56.0 (both go live with this version).
@@ -425,6 +428,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Encryption** (2.42.0): an end-to-end encrypted note and files per task and encrypted direct messages (WebCrypto in
   the browser, the server only stores ciphertext), plus encryption at rest with a key per organisation for bank and tax
   data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md)
+- **Lock per list** (2.64.1): a list can be *encrypted in the browser* (list dialog): titles, descriptions, subtasks,
+  comments, list notes, section names, text fields, links and code snippets are encrypted with a key per list that each
+  member gets wrapped with their own key; dates, status, assignees and the list name stay readable. Members without a key
+  wait until the owner releases it; agents, the mail address, public links and templates are not available there
+  (see docs/ARCHITECTURE.md, *Lock per list*)
 - **Automatic backups** of the database and all attachments, daily with retention, optionally encrypted, downloadable,
   and a **restore** right in the app (checked, with a safety backup of the current state first)
 - **Admin alerts** over each admin's own channel (Web Push or ntfy): a new version, devices that stopped taking pushes, watchdog errors, failing integrations, repeated failed logins, low disk space or a failed database check reach the admins, never with task contents

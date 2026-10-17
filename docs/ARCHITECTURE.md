@@ -536,3 +536,38 @@ padded to 64-byte steps) and wraps that key for every member with ECDH between t
   list admins hand out keys from the waiting list (`/e2e/keys`, the server stores the wrapper's public key itself and tells
   the recipient). A new owner must hold the key.
 
+- **Other ways** (`collab/liste2eguard.py`): agents can never be members (share-all, automatic sharing, folder agents, tidy
+  and proposals skip such lists); the REST API / MCP refuse writes that touch such a list and answer with empty texts plus
+  `encrypted: true`; CalDAV / iCal show "🔒 Task" with dates and reminders and ignore text changes; the list's mail address
+  is switched off; templates from or into it, imports, forms and the shopping memory refuse or skip it; pushes, mail
+  digests, briefing, report, news and webhooks carry no texts of it; server search skips it. Switching on removes the
+  plain copies the server kept elsewhere (history texts, time entry title snapshots, news and queued webhook / agent
+  event payloads, shopping memory, proposals). Lists of the Family and Household & Life modules (and lists a contact sync
+  writes birthdays into) cannot be locked.
+
+### Lock per list (2.64.1, browser side)
+
+`static/js/liste2e.js` (data layer) and `liste2eui.js` (dialogs and display), built on `e2e.js`:
+- **Keys.** The list keys are unwrapped with the person's private key into non-extractable `CryptoKey`s that live only in
+  the tab. For a key the browser wrapped itself the own public key comes from the unlocked bundle, never from the server;
+  for keys wrapped by others, and before wrapping for a member, the member's public key is compared with the one this
+  browser saw before (trust on first use, as in encrypted DMs): a changed key is shown as a warning and not used until
+  the person confirms it. Every member has a safety number (SHA-256 over both public keys) to compare in person.
+- **In and out.** Every answer passes one hook: ciphertexts go to `o._enc`, the fields hold the plain text (or stay empty
+  with a lock placeholder until decrypted in the background). Every write of a text of such a list is encrypted in
+  `api()` before the offline outbox and the network; moving a task in or out carries its texts, subtasks, comments and
+  text fields in the target format (`le2e_move`, also for drag and drop and undo).
+- **Device storage.** What goes to `localStorage` (state cache, outbox, conflicts, other windows) holds only ciphertext;
+  plain text exists only in memory and is wiped (with the undo steps of such lists) when the encryption is locked or on
+  logout. The list keys are not stored on the device: offline, a locked list stays unreadable until the next unlock.
+- **Switching** runs in the browser of the owner / list admin with a progress bar (`le2eStart`, `le2eStop`, resumable).
+- **Search** for such lists runs over the decrypted texts in memory (search page, command palette, message search).
+
+**Limits.** No protection against a changed script delivered by the server itself (a web app loads its code from the
+server), against members who saw the texts, or against metadata (who writes when and how much, dates, assignees, text
+lengths in steps of 64 bytes). The AAD binds list, generation and field but no task id: the server can copy a ciphertext
+inside a list (repeating tasks) and could therefore swap two of the same field (integrity, not confidentiality). A member
+who leaves keeps what they saw and, until the rotation of a later version, could decrypt older ciphertexts of a backup
+with their old key; the member dialog says so. Exports keep the ciphertexts; they are readable again only in Kalmido with
+a member's passphrase (`tools/kalmido_export_decrypt.py` says so). Going back to a version before 2.64.1 needs every
+lock opened first.

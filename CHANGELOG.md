@@ -7,6 +7,27 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.64.1] - 2026-10-17
+
+### Added
+- **Lock per list** (encrypted in the browser): the owner or a list admin can lock a list in the list dialog. Titles,
+  descriptions, subtasks, comments, list notes, section names, text fields, links and code snippets of that list are then
+  encrypted in the browser with a key per list that every member gets wrapped with their own key; the server stores only
+  ciphertext. Dates, status, priority, assignees and the list name stay readable. Members without a key wait on a list
+  until the owner releases it with one click; every member has a safety number, a changed key is shown. Agents, the mail
+  address, public links, templates, the participant role and "everyone in the organisation" are not available in such a
+  list, and lists of the Family and Household & Life modules cannot be locked (the server writes into them); in a locked
+  list CalDAV shows "🔒 Task" with dates, pushes and mails name only the list, search runs in the browser. The offline copy
+  in the browser keeps only ciphertext. The way back decrypts everything again (owner, with the password). Not yet:
+  attachments, the list channel and a new key when a member leaves (the member dialog says so) (#1817).
+- Before going back to an older version, open the lock of every list again: older versions do not know the lock and
+  would show and accept texts of such a list unprotected.
+- Settings > Administration > Encryption lists a third kind: "Encrypted in the browser (lists with a lock)".
+
+### Fixed
+- Encrypted direct messages: the notice for your own switch says "You switched encryption on" (it read "You has ..." in
+  German), and the *Attach encrypted* button has an accessible name (#1518).
+
 ## [2.56.4] - 2026-10-17
 
 ### Fixed
