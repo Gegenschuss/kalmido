@@ -15,7 +15,10 @@ const inWs = (l, ws = wsCur()) => ws === 'all' || !l || !!l.is_inbox || wsOf(l) 
 const wsHidden = t => wsCur() !== 'all' && !!t && !inWs(listById(t.list_id));
 const wsOrg = id => (S.me?.workspaces || []).find(w => w.id === +id);
 const wsName = ws => ws === 'all' ? tr('All workspaces') : ws === 'private' ? tr('Private|workspace') : (wsOrg(ws.slice(4))?.name || tr('Organisation'));
-const wsIcon = ws => ws === 'private' ? ic('home', 's') : ws === 'all' ? ic('grid', 's') : (wsOrg(ws.slice(4))?.icon ? `<span class="wsemo" aria-hidden="true">${esc(wsOrg(ws.slice(4)).icon)}</span>` : ic('brief', 's'));
+// 2.87.9 (#1913): an organisation's symbol -- its own picture, else its emoji, else fb (the workspace switch, Settings, the admin list)
+const orgIconHtml = (o, fb = ic('brief', 's')) => o?.icon_url ? `<img class="orgic" src="${esc(o.icon_url)}" alt="" loading="lazy" decoding="async">`
+  : o?.icon ? `<span class="wsemo" aria-hidden="true">${esc(o.icon)}</span>` : fb;
+const wsIcon = ws => ws === 'private' ? ic('home', 's') : ws === 'all' ? ic('grid', 's') : orgIconHtml(wsOrg(ws.slice(4)));
 const wsOptions = () => ['private', ...(S.me?.workspaces || []).map(w => 'org:' + w.id), 'all'];
 const wsObjIn = (o, ws = wsCur()) => ws === 'all' || !o || wsOf(o) === ws;
 const wsAgentIn = (a, ws = wsCur()) => ws === 'all' || !a || (ws === 'private' ? !a.org_id : 'org:' + a.org_id === ws);

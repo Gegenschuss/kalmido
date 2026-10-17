@@ -432,6 +432,7 @@ shard 8  # ---------------------------------------------------------------- shar
 # (#1035 / #380), agent hardening (#919 bridges, list limits, access log, #920 Use safely) and the phone fixes
 # (#1033 #1042 #1043 #1044)
        run tenant_coverage "$PY" tenant_coverage_test.py
+       run freelancer_coverage "$PY" freelancer_coverage_test.py  # 2.87.9 (#1919): the freelancer parity guard (static)
 fresh; run p2300_tenant "$PY" p2300_tenant_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2300_chat_api "$PY" p2300_chat_api_test.py "$KALMIDO_TEST_DATA"
        run p2300_chat_ui node p2300_chat_ui.js "$KALMIDO_TEST_DATA"
@@ -1064,6 +1065,10 @@ fresh; run p286_c_api "$PY" p286_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_d_api "$PY" p286_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_e_api "$PY" p286_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p287b_d_ui node p287b_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.87.9 part A (#1919 / #1918): every area as a person without an organisation (the freelancer parity sweep)
+fresh; run p287b_a_freelancer_api "$PY" p287b_a_freelancer_api_test.py "$KALMIDO_TEST_DATA"
+# 2.87.9 part A (#1913): an organisation's own picture as its symbol (admins set it, members get it, sealed)
+fresh; run p287b_a_api "$PY" p287b_a_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

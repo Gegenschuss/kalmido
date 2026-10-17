@@ -4034,6 +4034,10 @@ a.frow:hover,.frow a:hover{background:var(--bg3)}
 .frow .ft b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .frow .ft .muted{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fem{font-size:1.25rem;line-height:1;width:1.5rem;text-align:center;flex:none}
+/* 2.87.9 (#1913): an organisation's own picture as its symbol (orgIconHtml): the size of the emoji it replaces */
+.orgic{width:1.125rem;height:1.125rem;border-radius:.25rem;object-fit:cover;flex:none;vertical-align:middle}
+.mrow .orgic,summary .orgic,.wsicprev .orgic{width:1.5rem;height:1.5rem}
+.wsicprev{display:inline-flex;align-items:center;min-width:1.5rem}
 .fwhen{font:var(--fs-s) var(--mono);color:var(--muted);white-space:nowrap;flex:none}
 .fwhen.soon{color:var(--accent)}.fwhen.over{color:var(--danger)}
 .fweek{display:flex;flex-direction:column;gap:.125rem}
