@@ -11,7 +11,10 @@
  - GET /api/users?all=1&limit=&offset=&q=&filter=: one page + total, search by name / user name / e-mail, the filters;
    300 accounts: a page of 50 under one second; without limit the whole list as before
  - POST /api/users/bulk: disable / enable / org_add per account through the single route (own account, invisible: failed)
+ - review B2: candidates cut with the admin's visibility (M1), a locked list whose key nobody else holds (M2), lists with
+   receipts only handed over (M3), an organisation admin never deletes a private space along (N1), no foreign org name (N2)
 usage: p288_b_api_test.py <datadir>      (a fresh container; P288B_NOSTART=1 = the server already runs)"""
+import base64
 import os
 import subprocess
 import sys
@@ -104,7 +107,9 @@ r = A.get(B + f"/api/users/{uid['frank']}/delete-info")
 check(r.ok and r.json()["can_delete"] and r.json()["by"] == "instance", "delete-info for the instance admin " + r.text[:300])
 info = {x["id"]: x for x in r.json().get("lists", [])}
 check(set(info) == {FA, FB, FP}, "delete-info: the three lists")
-check(info.get(FB, {}).get("name") is None and info.get(FB, {}).get("org") == "Beta", "a Beta list alice is not in: no name, the organisation " + str(info.get(FB)))
+# 2.88.0 (#1980) review N2: the name of an organisation alice is not in is not shown either (was: "Beta")
+check(info.get(FB, {}).get("name") is None and info.get(FB, {}).get("org") is None and info.get(FB, {}).get("org_id") == BETA,
+      "a Beta list alice is not in: neither its name nor the organisation's " + str(info.get(FB)))
 check(info.get(FP, {}).get("name") == "Frank private notes", "a private list shared with alice: named")
 check(info.get(FA, {}).get("shared") == 1, "the Alpha list: shared with one person " + str(info.get(FA)))
 cand = {x["id"] for x in r.json().get("candidates", [])}
@@ -159,6 +164,75 @@ r = deluser(A, "gina", lists="transfer", to=1)
 check(r.ok, "an account without organisation: its private list to the admin " + r.text[:200])
 check(owner(GP) == 1, "Alice owns Gina's list now")
 
+# ---- review M1: the candidates never name people the deleting admin may not see (dave: Beta only, a member of Olga's list)
+r = A.post(B + "/api/users", json={"orgs": [ORG, BETA], "username": "olga", "display_name": "Olga Example", "password": "password123"})
+uid["olga"] = r.json()["id"]
+Ol = sess("olga")
+OB = mklist(Ol, "Olga beta plan", BETA)
+check(Ol.put(B + f"/api/lists/{OB}/members", json={"user_id": uid["dave"], "role": "edit"}).ok, "setup: Olga shares her Beta list with Dave")
+r = A.get(B + f"/api/users/{uid['olga']}/delete-info")
+cand = {x["id"]: x["name"] for x in r.json().get("candidates", [])}
+check(r.ok and uid["dave"] not in cand and "Dave Example" not in cand.values(), "M1: a list member alice may not see is no candidate " + str(cand))
+check(uid["ivy"] in cand, "M1: people of Alpha and Beta stay candidates " + str(cand))
+check(r.json()["lists"][0]["org"] is None and r.json()["lists"][0]["members"] == [], "N2: no organisation name, no member names " + str(r.json()["lists"]))
+
+# ---- review M2: a list with the lock whose key nobody else holds is pointed out
+def b64(n):
+    return base64.b64encode(os.urandom(n)).decode()
+
+
+def b64u(n):
+    return base64.urlsafe_b64encode(os.urandom(n)).decode().rstrip("=")
+
+
+def ekeys():
+    u = b64u
+    return {"pub": {"kty": "EC", "crv": "P-256", "x": u(32), "y": u(32), "ext": True, "key_ops": []},
+            "bundle_pass": {"v": 1, "kdf": "pbkdf2-sha256", "iter": 600000, "salt": b64(16), "iv": b64(12), "ct": b64(200)},
+            "bundle_rec": {"v": 1, "kdf": "hkdf-sha256", "salt": b64(16), "iv": b64(12), "ct": b64(200)}}
+
+
+def wrapped():
+    return {"v": 1, "iv": b64(12), "ct": b64(48)}
+
+
+r = A.post(B + "/api/users", json={"orgs": [ORG], "username": "pia", "display_name": "Pia Example", "password": "password123"})
+uid["pia"] = r.json()["id"]
+Pi = sess("pia")
+for s_ in (Pi, Bo):
+    check(s_.put(B + "/api/e2e/keys", json=ekeys()).ok, "setup: a key pair")
+LK1 = mklist(Pi, "Pia diary")
+LK2 = mklist(Pi, "Pia and Bob")
+check(Pi.put(B + f"/api/lists/{LK2}/members", json={"user_id": uid["bob"], "role": "edit"}).ok, "setup: Pia shares a list with Bob")
+r = Pi.post(B + f"/api/lists/{LK1}/e2e/start", json={"keys": [{"user_id": uid["pia"], "wrapped": wrapped()}]})
+check(r.ok, "setup: the lock on Pia's own list " + r.text[:200])
+r = Pi.post(B + f"/api/lists/{LK2}/e2e/start", json={"keys": [{"user_id": uid["pia"], "wrapped": wrapped()}, {"user_id": uid["bob"], "wrapped": wrapped()}]})
+check(r.ok, "setup: the lock on the shared list " + r.text[:200])
+r = A.get(B + f"/api/users/{uid['pia']}/delete-info")
+info = {x["id"]: x for x in r.json().get("lists", [])}
+check(info.get(LK1, {}).get("locked") and info[LK1].get("key_alone") is True, "M2: nobody else holds the key of Pia's own list " + str(info.get(LK1)))
+check(info.get(LK2, {}).get("locked") and info[LK2].get("key_alone") is False, "M2: Bob holds the key of the shared list " + str(info.get(LK2)))
+check(deluser(A, "pia", lists="transfer", to=uid["bob"]).ok, "M2: the handover stays possible (the admin decides)")
+
+# ---- review M3: a list with budget receipts can only be handed over (#1969: receipts are kept)
+r = A.post(B + "/api/users", json={"orgs": [], "username": "rosa", "display_name": "Rosa Example", "password": "password123"})
+uid["rosa"] = r.json()["id"]
+Ro = sess("rosa")
+Ro.patch(B + "/api/settings", json={"lang": "en", "features": "comments,collab,budget"})
+r = Ro.post(B + "/api/budget/lists", json={})
+check(r.status_code == 201, "setup: a budget list " + r.text[:200])
+BL = r.json().get("list_id")
+r = Ro.post(B + f"/api/budget/{BL}/entries", json={"day": "2026-09-03", "amount": 10, "kind": "out", "title": "Paint"})
+r = Ro.post(B + f"/api/budget/entries/{r.json()['id']}/files", files=[("file", ("receipt.txt", b"paid", "text/plain"))])
+check(r.ok, "setup: a receipt " + r.text[:200])
+r = A.get(B + f"/api/users/{uid['rosa']}/delete-info")
+check(r.ok and r.json()["lists"][0]["receipts"] == 1, "M3: delete-info counts the receipts " + r.text[:300])
+r = deluser(A, "rosa", lists="delete", confirm="rosa")
+check(r.status_code == 409 and r.json().get("lists") == [BL], "M3: a list with receipts is not deleted along " + r.text[:200])
+check(Ro.get(B + "/api/me").ok, "M3: 409, Rosa's account is still there")
+r = deluser(A, "rosa", lists="transfer", to=1)
+check(r.ok and owner(BL) == 1, "M3: handing it over works " + r.text[:200])
+
 # ---- an organisation admin (erin, Alpha)
 CA = mklist(Ca, "Carol alpha", ORG)
 r = Er.get(B + f"/api/users/{uid['carol']}/delete-info")
@@ -182,6 +256,17 @@ check(deluser(Bo, "kim").status_code == 403, "a plain member -> 403")
 check(Bo.get(B + f"/api/users/{uid['kim']}/delete-info").status_code == 403, "a plain member: no delete-info")
 r = deluser(Er, "max")
 check(r.ok, "org admin: a member of Alpha alone without lists " + r.text[:200])
+# review N1: an organisation admin does not delete a private space along (here: a task in the basket)
+r = A.post(B + "/api/users", json={"orgs": [ORG], "username": "nora", "display_name": "Nora Example", "password": "password123"})
+uid["nora"] = r.json()["id"]
+No = sess("nora")
+check(No.post(B + "/api/tasks", json={"title": "Call the dentist"}).ok, "setup: a task in Nora's basket")
+r = Er.get(B + f"/api/users/{uid['nora']}/delete-info")
+check(r.ok and not r.json()["can_delete"] and "private space" in r.json().get("reason", "") and r.json()["org_id"] == ORG,
+      "N1: delete-info: no, only Remove from the organisation " + r.text[:300])
+check(deluser(Er, "nora").status_code == 403, "N1: org admin cannot delete an account with a basket task")
+check(No.get(B + "/api/me").ok, "N1: Nora's account is still there")
+check(A.get(B + f"/api/users/{uid['nora']}/delete-info").json().get("can_delete") is True, "N1: the server admin still may")
 # remove from the organisation with a chosen heir
 JA = mklist(Ja, "Jack alpha", ORG)
 check(Er.delete(B + f"/api/orgs/{ORG}/members/{uid['jack']}", params={"to": uid["dave"]}).status_code == 400, "remove: an heir outside the organisation 400")

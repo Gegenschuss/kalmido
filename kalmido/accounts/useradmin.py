@@ -16,6 +16,7 @@ from ..accounts.session import me, user_public
 UA8_FILTERS = ("people", "active", "disabled", "admin", "invited", "pending", "agents", "all")
 UA8_MAX_PAGE = 200
 UA8_MAX_BULK = 200
+UA8_PRIVATE = N_("The account still has things in its private space (lists, basket, calendars, files ...): only a server admin can delete it. You can remove it from your organisation.")
 
 
 def ua8_where(q, flt):
@@ -140,6 +141,8 @@ def ua8_may_delete(c, u, uid):
         raise Denied(404, tr("unknown user"))
     if len(theirs) != 1 or u["is_admin"] or is_agent(u):
         raise Denied(403, tr("Only a server admin can delete this account (it belongs to another organisation too or is a server admin). You can remove it from your organisation."))
+    if ua8_private_left(c, uid):  # review N1: deleting the account would delete its private space too
+        raise Denied(403, tr(UA8_PRIVATE))
     return shared[0]
 
 
@@ -150,8 +153,11 @@ def ua8_owned(c, uid):
 
 def ua8_candidates(c, lists, uid):
     """The people every one of the lists may go to (lists.ownership.owner_candidates per list: active people, never
-    agents, the caller may see them, an organisation's list stays in its organisation) -> [{id, name}]."""
+    agents, the caller may see them, an organisation's list stays in its organisation) -> [{id, name}]. Review M1: cut with
+    the caller's own visibility too (owner_candidates names every list member, under system_ctx also those of another
+    organisation)."""
     from ..lists.ownership import owner_candidates
+    from ..accounts.orgs import visible_people
     common, names = None, {}
     with system_ctx(c):  # the lists of organisations the instance admin is not in (the rule inside stays the caller's visibility)
         for lr in lists:
@@ -159,13 +165,18 @@ def ua8_candidates(c, lists, uid):
             names.update({x["id"]: x["name"] for x in cs})
             ids = {x["id"] for x in cs}
             common = ids if common is None else common & ids
+    vis = visible_people(c, me())
+    if vis is not None and common:
+        common &= vis
     return [{"id": i, "name": names[i]} for i in sorted(common or (), key=lambda i: names[i].lower())]
 
 
 def ua8_list_info(c, lists, by):
     """What the delete dialog shows of each list: the name only where the caller may see the list (a member / its owner, or
     an admin of its organisation) -- else "private list" / the organisation; the people it is shared with (only people the
-    caller may see by name, the rest as a number); whether it has the lock (#1817)."""
+    caller may see by name, the rest as a number); whether it has the lock (#1817) and whether nobody else holds its key
+    (review M2: then nobody can give the new owner the key); its project receipts (review M3: such a list is only handed
+    over); the organisation's name only for an organisation the caller is in (review N2)."""
     from ..accounts.orgs import org_role, visible_people
     from ..collab.liste2e import le2e_mode
     vis = visible_people(c, me())
@@ -175,13 +186,42 @@ def ua8_list_info(c, lists, by):
         with system_ctx(c):  # member ids and names of the organisation (structure); named below only when visible
             mem = c.execute("""SELECT u.id, COALESCE(u.display_name, u.username) FROM list_members m JOIN users u ON u.id=m.user_id
                                WHERE m.list_id=? AND m.user_id!=? ORDER BY u.id""", (lid, lr["owner_id"])).fetchall()
-            oname = (c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone() or [None])[0] if oid else None
+            foreign = ua8_foreign(c, lr)
+            oname = (c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone() or [None])[0] if oid and not foreign else None
             locked = bool(le2e_mode(c, lid))
+            key_alone = locked and not ua8_key_holders(c, lid, lr["owner_id"])
+            receipts = c.execute("SELECT COUNT(*) FROM budget_files WHERE list_id=?", (lid,)).fetchone()[0]
         seen = bool(list_role(c, lid)) or (oid and org_role(c, me(), oid) == "admin")
         named = [n for i, n in mem if vis is None or i in vis]
         out.append({"id": lid, "name": lr["name"] if seen else None, "org_id": oid, "org": oname, "shared": len(mem),
-                    "members": named[:8] if seen else [], "locked": locked, "foreign": ua8_foreign(c, lr)})
+                    "members": named[:8] if seen else [], "locked": locked, "key_alone": key_alone, "receipts": receipts,
+                    "foreign": foreign})
     return out
+
+
+def ua8_key_holders(c, lid, uid):
+    """Review M2: how many active members of the locked list lid besides uid hold its key of the current generation (one of
+    them can give the new owner the key; liste2e: list_keys per generation, lists.e2e_gen). The caller runs as system."""
+    return c.execute("""SELECT COUNT(*) FROM list_keys k JOIN lists l ON l.id=k.list_id AND k.gen=l.e2e_gen
+                        JOIN users u ON u.id=k.user_id JOIN list_members m ON m.list_id=k.list_id AND m.user_id=k.user_id
+                        WHERE k.list_id=? AND k.user_id!=? AND u.disabled=0""", (lid, uid)).fetchone()[0]
+
+
+def ua8_private_left(c, uid):
+    """Review N1: does account uid still have anything in its private space that user_purge would delete -- private lists, its
+    basket, private calendars / address books with entries, private files, knowledge pages, filed mails, habits, time of
+    private work? An organisation admin deletes only an account whose private space is empty (privat bleibt privat)."""
+    with system_ctx(c):  # existence only, nothing read; the private rows of a person the organisation admin must not see
+        return any(c.execute(sql, (uid,)).fetchone() for sql in (
+            "SELECT 1 FROM lists WHERE owner_id=? AND is_inbox=0 AND org_id IS NULL LIMIT 1",
+            "SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.is_inbox=1 LIMIT 1",
+            "SELECT 1 FROM ev_cals k JOIN events e ON e.cal_id=k.id WHERE k.owner_id=? AND k.org_id IS NULL LIMIT 1",
+            "SELECT 1 FROM books b JOIN contacts x ON x.book_id=b.id WHERE b.owner_id=? AND b.org_id IS NULL LIMIT 1",
+            "SELECT 1 FROM fs_nodes WHERE owner_id=? AND org_id IS NULL AND kind!='folder' LIMIT 1",
+            "SELECT 1 FROM wiki_pages WHERE owner_id=? AND org_id IS NULL LIMIT 1",
+            "SELECT 1 FROM hub_mails WHERE owner_id=? AND org_id IS NULL LIMIT 1",
+            "SELECT 1 FROM habits WHERE user_id=? LIMIT 1",
+            "SELECT 1 FROM time_entries t LEFT JOIN lists l ON l.id=t.list_id WHERE t.user_id=? AND l.org_id IS NULL LIMIT 1"))
 
 
 @app.get("/api/users/<int:uid>/delete-info")
@@ -202,10 +242,6 @@ def ua8_delete_info(uid):
             raise
         return jsonify(**base, can_delete=False, reason=e.text(), org_id=oid, heirs=ua8_heirs(c, oid, uid), lists=[], candidates=[])
     lists = ua8_owned(c, uid)
-    private = [lr for lr in lists if not lr["org_id"]]
-    if by != "instance" and private:
-        return jsonify(**base, can_delete=False, org_id=by, heirs=ua8_heirs(c, by, uid), lists=[], candidates=[],
-                       reason=tr("The account has private lists: only a server admin can delete it. You can remove it from your organisation."))
     return jsonify(**base, can_delete=True, by="instance" if by == "instance" else "org", org_id=None if by == "instance" else by,
                    username=u["username"], lists=ua8_list_info(c, lists, by), candidates=ua8_candidates(c, lists, uid) if lists else [])
 
@@ -244,8 +280,8 @@ def ua8_lists_settle(c, u, by):
     uid = u["id"]
     lists = ua8_owned(c, uid)
     mode = request.args.get("lists") or ""
-    if by != "instance" and any(not lr["org_id"] for lr in lists):  # private stays private: an organisation admin never moves / deletes them
-        raise Denied(403, tr("The account has private lists: only a server admin can delete it. You can remove it from your organisation."))
+    if by != "instance" and any(not lr["org_id"] for lr in lists):  # private stays private (ua8_may_delete refused already)
+        raise Denied(403, tr(UA8_PRIVATE))
     if mode == "transfer":
         try:
             to = int(request.args.get("to") or 0)
@@ -277,6 +313,11 @@ def ua8_lists_settle(c, u, by):
         bad = [lr["id"] for lr in lists if ua8_foreign(c, lr)]
         if bad:
             return (jsonify(error=tr("Lists of an organisation you do not belong to cannot be deleted along: hand them over instead."),
+                            lists=bad), 409), None
+        with system_ctx(c):  # review M3 (#1969: receipts are kept 10 years): a list with project receipts is only handed over
+            bad = [lr["id"] for lr in lists if c.execute("SELECT 1 FROM budget_files WHERE list_id=? LIMIT 1", (lr["id"],)).fetchone()]
+        if bad:
+            return (jsonify(error=tr("Lists with receipts cannot be deleted along (receipts are kept): hand them over instead."),
                             lists=bad), 409), None
         icons, files = [], []
         inbox = my_inbox(c, uid)
