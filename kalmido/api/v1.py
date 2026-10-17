@@ -346,6 +346,7 @@ def task_core(r, tags, fields):
             "approver_id": r["approver_id"] if "approval" in r.keys() and r["approval"] else None,
             # 2.36.0 (#1118): locked in the app (tasks created with an agent token start locked; the API is not bound by it)
             "locked": bool(r["locked"]) if "locked" in r.keys() else False,
+            "points": r["points"] if "points" in r.keys() else None,  # 2.60.0 (#1511): story points (null = none)
             # 2.35.0 (#1095): the code snippets: one task (GET / change / webhook row) all of them, lists only snippets_n
             **_snips(r)}
 
@@ -401,6 +402,7 @@ V1_TASK_IN = ("title", "notes", "list_id", "section_id", "parent_id", "priority"
               "reminders", "repeat", "repeat_from", "url", "tags", "assignee_id", "pinned", "fields", "list_tags", "type",
               "deadline", "deadline_in_today", "nag", "assignee_group_id", "plan_start", "milestone", "milestone_id",
               "family", "rotation", "stars", "people", "snippets", "locked")
+V1_TASK_IN += ("points",)  # 2.60.0 (#1511): story points 1, 2, 3, 5, 8, 13 (null = none)
 
 
 def v1_task_in(b, allowed=V1_TASK_IN):
@@ -499,6 +501,7 @@ def v1_list(d):
             "icon": d.get("icon") or "",
             "repos": d.get("repos") or [], "tickets": bool(d.get("tickets")),
             "time_tracking": bool(d.get("time_tracking")),  # 2.41.0 (#1471): time tracking on for this list
+            "points_on": bool(d.get("points_on")),  # 2.60.0 (#1511): story points shown in the app
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
             "columns": d.get("columns"),  # 2.14.0 (#425): the list's columns (null = default)
             "project_type": d.get("ptype") or None,  # 2.18.0 (#408): agency | software | private, null = none
@@ -740,9 +743,14 @@ def v1_list_create():
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "checklist", "done_at_bottom", "kind", "tickets", "project_type", "nag", "day_hours",
                                                "family", "sections", "org_id", "time_tracking"))  # 2.28.0 (#935): org_id; 2.41.0 (#1471)
+    unknown = [k for k in unknown if k != "points_on"]  # 2.60.0 (#1511): story points on (set right after, like time_tracking)
     if unknown:
         raise UnknownFields(unknown)
     later = {k: b.pop(k) for k in ("nag", "day_hours", "time_tracking") if k in b}  # 2.7.0: set right after the list exists
+    if "points_on" in b:  # 2.60.0 (#1511)
+        later["points_on"] = b.pop("points_on")
+        if not isinstance(later["points_on"], bool):
+            raise BadInput(tr("Invalid value: {0}", "points_on"))
     if "time_tracking" in later and not isinstance(later["time_tracking"], bool):  # 2.41.0 (#1471)
         raise BadInput(tr("Invalid value: {0}", "time_tracking"))
     if "nag" in later:
@@ -788,6 +796,9 @@ def v1_list_patch(lid):
                                                "client_id", "agent_members", "agent_peers", "org_id",
                                                "stale_days", "agent_followup", "folder_adopt", "time_tracking",
                                                "org_visibility", "org_edit"))  # 2.28.0 (#935); 2.34.0 (#266); 2.39.1 (#1188); 2.41.0 (#1471); 2.46.0 (#1603)
+    unknown = [k for k in unknown if k != "points_on"]  # 2.60.0 (#1511): story points on (the owner)
+    if "points_on" in b and not isinstance(b["points_on"], bool):
+        raise BadInput(tr("Invalid value: {0}", "points_on"))
     if unknown:
         raise UnknownFields(unknown)
     if "family" in b and b["family"] is None:  # 2.19.0 (#653): null = an ordinary list

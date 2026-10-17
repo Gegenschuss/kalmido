@@ -61,6 +61,7 @@ APP_TO_API = {
     "GET /api/tasks/{}/timeline": ["GET /tasks/{}/comments"],
     "GET /api/tasks/{}/deps": ["GET /tasks/{}/dependencies"],
     "GET /api/tasks/{}/milestone": ["GET /tasks/{}/milestone"],  # 2.18.0 (#430)
+    "GET /api/lists/{}/velocity": ["GET /lists/{}/velocity"],  # 2.60.0 (#1511)
     "POST /api/tasks/reorder": ["POST /tasks/{}/move"],
     "POST /api/tasks/batch": ["POST /tasks/batch"],
     "POST /api/tasks/purge-done": ["POST /tasks/batch"],
@@ -202,17 +203,25 @@ APP_TO_API = {
     "GET /api/team/absences": ["GET /absences"],  # 2.50.0 (#1195): "away" only
     "POST /api/clients/bulk": ["POST /clients/bulk"],  # 2.47.3 (#1733)
     "POST /api/tasks/{}/approval": ["POST /tasks/{}/approval"], "GET /api/lists/{}/forms": ["GET /lists/{}/forms"],
+    "POST /api/tasks/{}/review": ["POST /tasks/{}/review"], "PUT /api/lists/{}/review": ["PUT /lists/{}/review"],  # 2.60.0 (#1512)
     "POST /api/lists/{}/forms": ["POST /lists/{}/forms"], "PATCH /api/forms/{}": ["PATCH /forms/{}"], "DELETE /api/forms/{}": ["DELETE /forms/{}"],
     # 2.48.0 (#1207): the file store -- list, read, add files / folders, new versions
     "GET /api/files": ["GET /files"], "GET /api/files/nodes/{}": ["GET /files/{}"], "GET /api/files/nodes/{}/content": ["GET /files/{}/content"],
     "POST /api/files/folders": ["POST /files"], "POST /api/files/upload": ["POST /files"], "POST /api/files/nodes/{}/versions": ["POST /files/{}/versions"],
     # 2.48.0 (#1111): documents (agents read / set the fields of documents shared with them)
     "GET /api/docs": ["GET /documents"], "GET /api/docs/{}": ["GET /documents/{}"], "PATCH /api/docs/{}": ["PATCH /documents/{}"],
+    # 2.60.0 (#343): sprints -- agents read the sprints of a shared list and put tasks into one (or back to the backlog)
+    "GET /api/lists/{}/sprints": ["GET /lists/{}/sprints"], "GET /api/sprints/{}": ["GET /sprints/{}"],
+    "POST /api/lists/{}/sprints/assign": ["POST /lists/{}/sprints/assign"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
     ("2.59.0 (#1375): the hint while a person types a new task's title and the client's on / off of the related tasks; agents "
      "use related_tasks and search_tasks with semantic", ("=POST /api/tasks/similar", "=GET /api/related/config")),
+    ("2.60.0 (#343): planning sprints stays with the people of a list -- switching sprints on, planning, editing, starting, closing "
+     "and removing a sprint; agents read sprints (list_sprints / get_sprint), put tasks into one (set_task_sprint) and hear "
+     "sprint_started / sprint_closed", ("=PUT /api/lists/{}/sprint-settings", "=POST /api/lists/{}/sprints", "=PATCH /api/sprints/{}",
+                                        "=DELETE /api/sprints/{}", "=POST /api/sprints/{}/start", "=POST /api/sprints/{}/close")),
     ("2.48.0 (#1207): managing the file store stays with people -- rename, move, trash, restore a version, shares, organisation-wide "
      "access, links to task / project files, the move targets; agents list, read and write files where they may edit",
      ("=PATCH /api/files/nodes/{}", "=DELETE /api/files/nodes/{}", "=POST /api/files/nodes/{}/restore", "=POST /api/files/nodes/{}/versions/{}/restore",
@@ -267,6 +276,9 @@ APP_ONLY = [
         "* /api/folders/repos", "PUT /api/lists/{}/folder-repo")),  # 2.33.0 (#934): folder repositories, read through /lists/{id}/repos
     ("2.18.0: the error-report webhook of a list: its secret URL is shown once to people (owner / list admins); the inbound hook "
      "is called by the error service, not by a client", ("* /api/lists/{}/error-hook", "POST /api/hooks/issues/")),
+    ("2.60.0 (#1514): environments (Staging, Live) are created, renamed and removed by people in the app, their deploy-webhook token is "
+     "shown once to people; agents read them (list_environments) and record deployments (set_deployment)",
+     ("* /api/lists/{}/envs", "* /api/envs/", "POST /api/hooks/deploy/")),
     ("external calendar subscriptions and the calendar feed link: personal settings", ("* /api/calendars", "* /api/ical")),
     ("2.19.0: address books (CardDAV) for birthdays: their passwords are entered by people, like calendar subscriptions", ("* /api/family/contacts",)),
     ("2.49.0 (#1551): the parents' PIN of a child account: a secret people type in the app (the parent sets it, the child opens "

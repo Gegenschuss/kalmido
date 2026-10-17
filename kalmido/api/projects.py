@@ -192,6 +192,8 @@ def overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
         "MilestoneReport": {"type": "object", "properties": {  # 2.18.0 (#430)
             "milestone": {"type": "object", "properties": {"id": {"type": "integer"}, "title": {"type": "string"}, "list_id": {"type": "integer"},
                                                            "due": {"type": ["string", "null"], "format": "date"}, "status": {"type": "string"}}},
+            "envs": {"type": "array", "description": "2.60.0 (#1514): the environments this milestone runs in now",
+                     "items": {"type": "object", "properties": {"name": {"type": "string"}, "since": {"type": "string"}, "version": {"type": "string"}}}},
             "progress": {"type": "object", "properties": {"done": {"type": "integer"}, "total": {"type": "integer"}, "percent": {"type": "integer"}}},
             "tasks": {"type": "array", "items": {"type": "object", "properties": {
                 "id": {"type": "integer"}, "title": {"type": "string"}, "status": {"type": "string"}, "type": {"type": ["string", "null"]},

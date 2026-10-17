@@ -60,6 +60,7 @@ ORDER = (
     "lists.templates",
     "tasks.dependencies",
     "lists.projects",
+    "lists.envs",  # 2.60.0 D (#1514)
     "lists.formula",  # 2.43.0 (#1328): the formula parser (no routes; used by lists.fields)
     "lists.fields",
     "personal.stats",
@@ -105,6 +106,7 @@ ORDER = (
     "integrations.gitfolder",  # 2.33.0 (#934)
     "integrations.errorreports",
     "api.projects",
+    "lists.sprints",  # 2.60.0 (#343): sprints of project lists (after api.v1: it has token routes)
     "lists.kpis",  # 2.43.0 (#1328): sum row + key figures (web + token API)
     "lists.orgvis",  # 2.46.0 (#1603): organisation lists visible to the whole organisation
     "api.scopes",
@@ -175,6 +177,7 @@ ORDER = (
     "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
     "office.agentdocs",  # 2.51.0 A (#1348, #1350): agents in the office: drafts, payment suggestions, the switches (API v1 + routes)
     "team.approvals",
+    "tasks.review",  # 2.60.0 C (#1512): review step (reviewer, gate, list setting, API v1)
     "team.forms",
     "team.v1",
     "accounts.signup",
@@ -205,6 +208,7 @@ ORDER = (
     "receipts.suggest",  # 2.48.0 (#1356): receipts: project / category, agents suggest, people confirm
     "accounts.layouts_more",  # 2.55.0 (#1067): the new views' blocks for the agents' proposals (after agents.lyprop)
     "tasks.related",  # 2.59.0 B (#1375): related tasks (text vectors from the optional embedding service, API v1, agent events)
+    "lists.points",  # 2.60.0 B (#1511): story points velocity (after api.v1)
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

@@ -20,6 +20,7 @@ LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist
                "family",  # 2.19.0 (#653): '' | shopping | meals | birthdays | household | packing
                "life", "trip")  # 2.22.0 (#663): '' | contracts | home | health | travel | reading; {from, to, where} of a trip
 LIST_FIELDS += ("time_tracking",)  # 2.41.0 (#1471): time tracking on for this list (owner; any type, default off)
+LIST_FIELDS += ("points_on",)  # 2.60.0 (#1511): story points shown in the app (owner; default off)
 LIST_KINDS = ("list", "project")
 # 2.7.2 (#414): the type "checklist" (2.7.0 "Shopping & packing list") is gone. Every list has the display option "Show
 # completed at the bottom" instead (column lists.checklist, API field done_at_bottom); kind "checklist" is still accepted
@@ -195,6 +196,8 @@ def clean_list_value(k, v, member=False):
             raise BadInput(tr("Invalid value: {0}", "sort"))
         return v
     if k in ("archived", "checklist", "dep_shift", "tickets", "time_tracking"):
+        return 1 if v else 0
+    if k == "points_on":  # 2.60.0 (#1511)
         return 1 if v else 0
     if k == "kind":
         if v not in LIST_KINDS and v not in LIST_KIND_ALIASES:

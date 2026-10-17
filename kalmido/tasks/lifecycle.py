@@ -159,6 +159,15 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
             return e
     elif lid != cur["list_id"] and cur["milestone_id"]:
         f["milestone_id"] = None  # moved to another list: the milestone stays behind
+    if lid != cur["list_id"] and cur["status"] == 0:  # 2.60.0 (#1512, review): a task waiting for its approval keeps its list
+        from ..tasks.review import _gate_holds, rvw_gate, rvw_may
+        if _gate_holds(c, cur) and not rvw_may(c, cur, me()):
+            return rvw_gate(c, tid) or tr("Changed in the meantime, nothing to undo")
+    if "sprint_id" in f or (lid != cur["list_id"] and cur["sprint_id"]):  # 2.60.0 (#343): a sprint of the same list
+        from ..lists.sprints import spr_apply
+        e = spr_apply(c, f, cur, lid)
+        if e:
+            return e
     if "rotation" in f or (cur["rotation"] and lid != cur["list_id"]):  # 2.19.0 (#653): household rotation
         if "rotation" in f and has_request_context() and getattr(g, "user", None) and list_role(c, cur["list_id"]) == "participant":
             raise Denied(403, tr("Participants cannot change who a task is assigned to"))
@@ -247,6 +256,9 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         e = people_set(c, tid, lid, b["people"])
         if e:
             return e
+    if f and ("section_id" in f or "list_id" in f):  # 2.60.0 C (#1512): into the review section = review requested
+        from ..tasks.review import rvw_on_move
+        rvw_on_move(c, tid, cur)
     if f and "section_id" in f and not cur["parent_id"] and is_shop(c, lid):  # 2.19.0: the shop area of this item
         shop_remember(c, lid, f.get("title") or cur["title"], f["section_id"])
     return None
@@ -317,6 +329,11 @@ def do_complete(c, tid, status=2, undo=None):
     from ..collab.comments import assignment_events
     from ..family.family import _jparse, FAM_OCC, rot_next, stars_earn, stars_revoke
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+    if status == 2 and t["status"] != 2:  # 2.60.0 C (#1512): "done only after approval" -- every way of completing ends here
+        from ..tasks.review import rvw_gate
+        e = rvw_gate(c, tid)
+        if e:
+            raise Denied(409, e)
     ts = iso(now_utc())
     who = (me() or None) if status != 0 else None  # 0 = public link: nobody's completion (statistics)
     cnt = rr_count(t["repeat"])
@@ -365,6 +382,9 @@ def do_complete(c, tid, status=2, undo=None):
             c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL WHERE id=?", (d,))
         if undo is not None:
             undo.update(copy_id=cur_id, next=nxt)
+        if t["review"]:  # 2.60.0 C (#1512): the next occurrence needs its own approval
+            from ..tasks.review import rvw_after_repeat
+            rvw_after_repeat(c, tid)
     else:
         c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=?",
                   (status, ts, who, ts, tid))
@@ -416,6 +436,11 @@ def undo_status(c, tid, u):
         st = int(u.get("status") or 0)
         if t["status"] != 0 or st not in (2, -1):
             return tr("Changed in the meantime, nothing to undo")
+        if st == 2:  # 2.60.0 (#1512, review): undoing a reopen completes again -- only past an open review gate
+            from ..tasks.review import rvw_gate
+            e = rvw_gate(c, tid)
+            if e:
+                return e
         c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=?",
                   (st, when(u.get("completed_at")), who(u.get("completed_by")), ts, tid))
         if st == 2:  # 2.19.0 (#653): the kid's stars of that completion come back

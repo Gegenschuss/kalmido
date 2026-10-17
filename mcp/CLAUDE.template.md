@@ -323,6 +323,12 @@ proposals (or your own notepads).
   `alt_of`) and crew / equipment (ids from `get_dispo`). The server adds warnings per row (double bookings, absences, other
   projects); name the conflict and your solution in `summary`. Applying makes drafts (tentative events) and options, never firm.
 
+### Story points and WIP limits (2.60.0)
+In lists with story points on (`points_on`) a task can carry `points` (1, 2, 3, 5, 8, 13); set them with `update_task` only
+when the list's rules or a person ask, never overwrite a person's estimate. A section's `wip_limit` (`set_wip_limit`) is a hint
+for the kanban column, moving stays allowed. `get_velocity` gives the completed points of the last closed sprints and their
+average: a planning aid, never a measure of a person.
+
 ### Arrangements of views (2.55.0)
 With the right `layouts` (off until a person turns it on for you) you may PROPOSE how a view of the person you work for is
 arranged; you never change a view yourself. `list_layout_blocks` and `get_view_layout` show the blocks, their order, widths
@@ -361,11 +367,15 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `missed`: a summary of events that were too old to deliver one by one
 - `stale_tasks`: once a day: tasks lying idle in lists with Agent follows up
 - `scheduled_job`: a planned job of a person is due (answer in their chat); `list_check: true` = a scheduled check of a list
+- `deployed`: a version / milestone arrived in an environment (Staging, Live) of a list shared with you; information only (`list_environments` shows all, `set_deployment` records one)
 - `playbook_proposal`: people applied or discarded your proposed change of a list's Playbook
 - `message_edited`: a person changed a chat message, comment or team message you already had (a correction)
 - `file_shared`: a folder or file of the file store was shared with you (`node`, `role` view | edit)
 - `document_added`: a new document was recognised in a folder / file shared with you (`document`); a receipt? see *assign a receipt* below
 - `offer_accepted`: a quotation of your office area was accepted (`doc_id`, `client_id`, `list_id`, sums); only with your office switch on
+- `review_requested`: you are the reviewer of a task that went into review (`review` {state, list_id, url}); check it, then
+  `review_task` approve, or changes with a short note what should change. Never approve a task assigned to you
+- `sprint_started` / `sprint_closed`: a sprint of a project list shared with you started / was closed (`sprint`, with `review` when closed: done / moved / added task ids and points). Sprints: `list_sprints`, `get_sprint` (tasks + burndown), `set_task_sprint` (into a sprint or back to the backlog; people plan and close sprints)
 
 Related tasks (2.59.0): task events may carry `task.related` = up to 5 tasks close in meaning `[{id, title, score}]` (only
 tasks you may see; missing while the server has not computed the task yet or runs without its embedding service). Before
@@ -390,8 +400,8 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`, `get_dependencies`,
 `get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_key_figures`,
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`,
-`get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`,
-`get_time_gaps`, `get_timer`, `get_usage`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`,
+`get_playbook`, `get_project_overview`, `get_review`, `list_environments`, `set_deployment`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`,
+`get_time_gaps`, `get_timer`, `get_usage`, `get_velocity`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`,
 `import_vcards`, `ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`, `list_attachments`,
 `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,
 `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,
@@ -405,9 +415,9 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,
 `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
-`request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`,
+`request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`, `review_task`,
 `search_contacts`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
-`set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
+`set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,
 `time_from_events`, `unlink_contact`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,

@@ -45,6 +45,7 @@ function meFields(ts) {
     ...(msBulkList() ? [{k: 'milestone', lab: N_('Milestone'), icon: 'flag', get: t => t.milestone_id || 0, text: v => v ? S.tasks.get(v)?.title || '?' : tr('None'), perm: t => canEditList(t.list_id),
       open: a => menu(a, [...msOfList(lid).filter(m => m.status === 0).map(m => ({label: m.title + (m.due ? ' · ' + fmtDateLoc(m.due) : ''), icon: 'flag', fn: () => meApply('milestone', t => t.milestone_id !== m.id ? {milestone_id: m.id} : null, tr('Milestone: {0}', m.title))})),
         '-', {label: tr('No milestone'), icon: 'x', fn: () => meApply('milestone', t => t.milestone_id ? {milestone_id: null} : null, tr('Milestone removed'))}])}] : []),
+    ...spr_meField(lid),  // 2.60.0 (#343): Sprint (one list with sprints on)
     {k: 'repeat', lab: N_('Repeat'), icon: 'repeat', get: t => t.repeat || '', text: v => v ? repeatLabel(v) : tr('None'),
       open: a => menu(a, REP_PRE().map(([r, n]) => ({label: tr(n), icon: r ? 'repeat' : 'x', fn: () => meApply('repeat', t => (t.repeat || '') !== r ? {repeat: r} : null, tr('Repeat'))})))},
     ...(anyDue ? [{k: 'reminders', lab: N_('Reminder'), icon: 'bell', get: t => t.reminders || '', text: v => v ? String(v).split(',').map(remLabel).join(', ') : tr('None'),
@@ -53,6 +54,7 @@ function meFields(ts) {
       open: a => menu(a, [{label: tr('Waiting on someone…'), icon: 'hourglass', fn: () => meWaitDialog()}, {label: tr('No longer waiting'), icon: 'x', fn: () => meWait(null)}])},
     {k: 'pinned', lab: N_('Pinned'), icon: 'pin', get: t => t.pinned ? 1 : 0, text: v => v ? tr('Pinned') : tr('Not pinned'), toggle: true,
       open: () => { const on = meTasks().every(t => t.pinned) ? 0 : 1; meApply('pinned', t => (t.pinned ? 1 : 0) !== on ? {pinned: on} : null, on ? tr('Pinned') : tr('Unpin')); }},
+    ...spt_meField(ts),  // 2.60.0 (#1511)
     ...(lid ? fieldsOf(lid).map(f => meCustom(f, lid)) : [])];
   return F.map(f => ({perm: canEdit, ...f}));
 }

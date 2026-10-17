@@ -41,8 +41,9 @@ function listHead(l, o = {}) {
   // 2.31.0 (#1053): one slim line: bar left, overdue + next due right; "Set status" (no status yet) is not repeated here,
   // it lives on the project page and in the list's "…" menu (a status that is set still shows as its pill)
   const p = l.progress || {done: 0, total: 0, overdue: 0}, showP = progressFor(l) && p.total > 0 && !progHidden(l.id), pill = o.noPill ? '' : statusPill(l, true, false), ts = timeSumHtml([l]);
-  if (!showP && !pill && !ts) return vsegHtml(l) + famBar(l) + lifeBar(l) + agBandHtml();
-  return `${vsegHtml(l)}${famBar(l) + lifeBar(l)}<div class="lhead">${showP ? `<span class="lprow"><span class="lpg">${progBar(p)}</span>${progMeta(p)}</span>` : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
+  const sh = sprHead(l);  // 2.60.0 (#343): the sprint header (lists with sprints on)
+  if (!showP && !pill && !ts) return vsegHtml(l) + famBar(l) + lifeBar(l) + sh + agBandHtml();
+  return `${vsegHtml(l)}${famBar(l) + lifeBar(l)}<div class="lhead">${showP ? `<span class="lprow"><span class="lpg">${progBar(p)}</span>${progMeta(p)}</span>` : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${sh}${agBandHtml()}`;
 }
 // ---- 2.7.0 (#407): the tracked time of a project list (or of a folder's project lists) in its header, in hours and in
 // working days. Hours per day / shift: the list's own value (list dialog, owner; the same for every member), else the
@@ -248,7 +249,7 @@ function viewProjOv() {
       <button class="chk ms ${m.done ? 'on' : ''}" data-pov="ms-done" data-id="${m.id}" role="checkbox" aria-checked="${m.done}" aria-label="${esc(tr('Reached: {0}', m.name))}" ${can ? '' : 'disabled'}>${m.done ? ic('check') : ''}</button>
       <span class="pmn">${S.tasks.has(m.id) ? `<button type="button" class="linkbtn" data-pov="ms-open" data-id="${m.id}" title="${esc(tr('Open the milestone'))}"><span>${esc(m.name)}</span></button>` : `<span>${esc(m.name)}</span>`}</span><span class="pmd">${esc(m.day ? fmtDateLoc(m.day) : tr('No date'))}</span>
       ${can ? `<button class="iconbtn" data-pov="ms-edit" data-id="${m.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div>`).join('');
-  P.ms = x => povSec('ms', tr('Milestones'), ms, (can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '') + x, emp(!ms, tr('No milestones yet. They also show in the timeline.')));
+  P.ms = x => povSec('ms', tr('Milestones'), ms + (typeof env_ovHtml === 'function' ? env_ovHtml(l, can, !!ms) : ''), (can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '') + x, emp(!ms, tr('No milestones yet. They also show in the timeline.')));
   // files
   const files = j.files.map(f => povFile(f, povFileUrl, (typeof ab_linkBtn === 'function' ? ab_linkBtn('list_file', f.id, l.org_id, 'iconbtn povlk') : '') + (can ? povDel('file-del', f.id, tr('Remove')) : ''), 'pf')).join('');  // 2.48.0 (#1207): + "Show in the file store"
   const fAdd = can ? `<label class="btn sm povup" title="${esc(tr('Images, PDFs, documents'))}">${ic('upload', 's')}<span>${tr('Add file')}</span><input type="file" id="pov-file" multiple hidden></label>` : '';
@@ -272,6 +273,7 @@ function viewProjOv() {
   if (teamOn() && l.shared) P.chat = x => povSec('chat', tr('Team chat'), '', `<button type="button" class="btn sm" data-act="list-chat" data-id="${l.id}">${ic('comment', 's')}<span>${tr('Open the list chat')}</span></button>` + x);
   const ts = timeSumHtml([l]);
   P.kpis = fxKpiPart(l);  // 2.43.0 (#1328): key figures (undefined = not offered)
+  P.velocity = spt_povPart(l);  // 2.60.0 (#1511): completed points of the last sprints
   if (timeOn() && j.time) P.time = x => povSec('time', tr('Tracked time'), ts || '', x, emp(!ts, tr('No time tracked yet.')));
   for (const p of j.layout?.pads || []) P['np' + p.id] = () => wgPadHtml(l, p, can);  // 2.43.0 (#1346): the notepads
   const y = j.layout || {}, cust = S.ly.view === 'project';

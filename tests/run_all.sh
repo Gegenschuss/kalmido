@@ -892,6 +892,18 @@ fresh; run p259_b_api "$PY" p259_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p259_b_ui node p259_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.59.0 (#1375): the real embedding image (embed/Dockerfile, pinned model) builds and answers without network
 run p259_b_embed "$PY" p259_b_embed_test.py
+# 2.60.0 part D: environments of a project (Staging, Live), deploy webhook, deployed event (#1514), Office tabs that wrap (#1830)
+fresh; run p260_d_api "$PY" p260_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p260_d_ui node p260_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.60.0 part C: the review step - reviewer, done only after approval, git pull requests count (#1512)
+fresh; run p260_c_api "$PY" p260_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p260_c_ui node p260_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.60.0 part B: WIP limits per kanban column (#1510), story points and velocity (#1511)
+fresh; run p260_b_api "$PY" p260_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p260_b_ui node p260_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.60.0 part A: sprints of project lists with burndown and review (#343)
+fresh; run p260_a_api "$PY" p260_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p260_a_ui node p260_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

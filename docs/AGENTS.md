@@ -687,10 +687,14 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `stale_tasks` | 2.34.0 (#266): once a day (from 09:00 server time), the [tasks lying idle](#tasks-lying-idle-2340) of the lists shared with the agent that have *Agent follows up* on (off by default); one bundled event per agent and day, at most 30 tasks | `tasks` `[{id, title, list_id, list_name, idle_days, reason, since, due, assignee_id, wait_note}]`, `count`, `default_days`, `lists` `[{id, name}]`, `hint` |
 | `scheduled_job` | 2.34.0 (#272): a [planned job](#planned-jobs-2340) of a person is due (once per due time; after an outage only the one missed run, `late: true`), or the person pressed *Run now* (`manual: true`). Answer in your chat with `by.id` | `schedule_id`, `title`, `prompt` (the person's words: what to do), `list_id` + `list` (or `null`), `by` / `user` `{id, name}`, `chat_with` (= `by.id`), `rhythm` `{freq, days, time, tz}`, `due_at`, `late`, `manual`, `manual_by` (`{id, name}` when a manager of the agent pressed *Run now* on another person's plan, else `null`; you still answer `by.id`), `hint`; 2.39.0: a [scheduled check of a list](#playbook-2390) adds `list_check: true`, `open_task_ids`, `open_tasks_more` (and the `playbook`) |
 | `message_edited` | 2.39.0 (#1179): a person edited a message the agent already had: their chat message after the agent fetched (`delivered_at`) or answered it, a comment the agent got as `comment` / `mention` / `assigned`, a team chat message it got as `team_message`. Only to the agent(s) that had it, only while they still see the task / room (health lists never). A chat message not fetched yet is simply replaced (the queued `chat` event carries the new text, no `message_edited`). Comments and team messages count as had while the original event is still in your event history (30 days). Treat it as a correction: confirm briefly, keep your running work, adjust only what the change affects | `kind`: `chat` \| `comment` \| `team`, `old`, `new`, `user` `{id, name}`; chat: `message` `{id, user_id, task_id, created_at, edited_at}`, `answered` (you wrote after it); comment: `comment` `{id, task_id, created_at, edited_at}`, `task`, `list`, `list_id`; team: `room` `{id, kind, list_id}`, `message` |
+| `deployed` | 2.60.0 (#1514): a version / milestone arrived in an environment (Staging, Live) of a project list shared with you; information only, no run. Set by a person, by the token API (`set_deployment`) or by the environment's deploy webhook | `list_id`, `environment` `{id, name}`, `version`, `milestone` `{id, title}` or `null`, `source` (`manual` \| `api` \| `hook`), `at`, `closed_task_ids` (tasks completed on arrival, if the environment does that) |
 | `playbook_proposal` | 2.39.0 (#1168): a person applied or discarded the agent's proposed change of a list's [Playbook](#playbook-2390) | `list_id`, `proposal_id`, `state`: `applied` or `discarded`, `version` (applied: the new version of the list's part), `note` (yours), `by` `{id, name}`, `hint`; like every event of the list it carries the current `playbook` |
 | `file_shared` | 2.48.0 (#1207): the owner shared a folder or file of the [file store](#file-store-2480) with the agent (only for a new share, not for a changed role) | `node` `{id, name, kind}`, `role`: `view` \| `edit` |
 | `document_added` | 2.48.0 (#1356): a new document was recognised (once, after its first recognition) in a folder or file of the file store the agent sees (a share or its own result folder); read it with `get_document`, e.g. to [suggest project and category of a receipt](#receipts-suggest-project-and-category-2480) | `document` `{id, name, state, date, url}` |
 | `offer_accepted` | 2.51.0 (#1348): a quotation of the agent's office area was accepted (by a person or the customer's approval); only agents with the switch *May draft office documents* (a personal agent in an organisation only while its owner works in the office), while the area lets agents read office data (see [Office](#office-drafts-only-2510)) | `doc_id`, `number`, `title`, `client_id`, `list_id`, `net`, `gross`, `currency` |
+| `review_requested` | 2.60.0 (#1512): the agent is the reviewer of a task that went into the [review step](#review-step-2600) (moved into the list's review section or *Send for review*); only when the agent has access to the list | `task`, `review` `{state: pending, reviewer_id, list_id, url, by}` |
+| `sprint_started` | 2.60.0 (#343): a sprint of a project list shared with the agent started (switched on, started by hand, or the next one after closing) | `list_id`, `list`, `sprint` (id, num, title, start, end, goal, state, progress) |
+| `sprint_closed` | 2.60.0 (#343): a sprint was closed (by a person or after its last day); `sprint.review` holds the done / moved / added task ids, counts and points | `list_id`, `list`, `sprint` (with `review`), `next_sprint_id` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1068,6 +1072,25 @@ as the agent with its permissions and rights **at that moment** (paused meanwhil
 ends `done` or `failed` and the agent gets a `job` event with `action` and `result {status, body}`. *Reject* stops the
 job and changes nothing (`job` event, `action: reject`); a stored request runs at most once and the agent cannot
 change its job (title, state, log: `409`). At most 20 requests wait per agent.
+
+## Review step (2.60.0)
+
+#1512. A list can switch on a review step (list settings > *Review step*, or `set_list_review`): a default reviewer, the
+review section (default: the section named *Review*) and *Done only after approval*. Every task can have a reviewer
+(`reviewer_id`, a person or an agent with access to the list) and a review state (`review`: `pending`, `approved`,
+`changes`).
+
+- Moving a task into the review section (board, detail, API) or `review_task` action `request` asks for the review: the
+  default reviewer when the task has none, state `pending`. A person gets a News item + push (notification row *Reviews*,
+  switchable); an agent reviewer gets the event `review_requested`.
+- Only the reviewer or a list admin decides (`review_task` `approve` / `changes`); the assignee never approves their own
+  task unless they are a list admin, an agent only when it is the reviewer. `changes` returns the task to the section it
+  came from and tells the assignee.
+- With *Done only after approval* on, completing a task with a reviewer and without approval answers **409** "Waiting for
+  approval by ..." on every way: complete, batch, MCP `complete_task`, repeats and git keywords (a keyword completes it on
+  a later poll once approved).
+- A linked pull request counts as the approval when it is merged, or when its merge request comment got 👍 from someone
+  who may approve the review (`review_by` stays empty, the history names the pull request).
 
 ## Status, jobs and chat
 
@@ -2423,7 +2446,7 @@ with the scope it needs). The tools:
   `delete_chat_attachment`
 - projects: `get_project_overview`, `set_project_overview`, `set_project_status`, `add_project_link`,
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
-  `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`
+  `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`, `list_environments` (2.60.0), `set_deployment` (2.60.0)
 - time and habits: `get_timer`, `start_timer`, `stop_timer`, `list_time_entries`, `get_time_gaps` (2.34.0), `add_time_entry`, `update_time_entry`,
   `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`
 - News: `list_news`, `mark_news_read`
@@ -2477,8 +2500,8 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
 `report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
 `request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
-`request_reward`, `restore_event`, `restore_task`, `search_contacts`, `search_messages`, `search_notes`, `search_tasks`,
-`send_chat`, `set_contact_care`, `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`,
+`request_reward`, `restore_event`, `restore_task`, `review_task`, `search_contacts`, `search_messages`, `search_notes`, `search_tasks`,
+`send_chat`, `set_contact_care`, `set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`, `set_status`,
 `set_waiting`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
 `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unshare_address_book`, `unshare_event_calendar`,
@@ -2567,3 +2590,38 @@ something said earlier ("as we discussed about the invoice") instead of paging t
 curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" \
   "$KALMIDO_URL/api/v1/search?scope=messages&q=invoice%20dishwasher&art=c,t&limit=10"
 ```
+
+## Sprints (2.60.0)
+
+A project list can plan its work in sprints (list dialog > *Sprints*, off by default): time boxes of one or two weeks (or a
+free length) with a goal, a burndown and a review at the end. A task belongs to at most one open sprint of its own list
+(`sprint_id`; none = the backlog); moving it to another list clears it. People switch sprints on, plan, start and close them;
+agents with access to the list can:
+
+- read the sprints: `list_sprints` (`GET /api/v1/lists/{id}/sprints`: newest first, with progress, the review of closed
+  sprints and the list's settings) and `get_sprint` (`GET /api/v1/sprints/{id}?unit=count|points`: its tasks and a burndown
+  with an ideal line),
+- put tasks into a sprint or back to the backlog: `set_task_sprint` (`POST /api/v1/lists/{id}/sprints/assign`
+  `{ids, sprint_id | null}`, edit rights on the list; milestones and tasks of other lists are skipped),
+- hear `sprint_started` and `sprint_closed` (only for lists the agent may use; an agent limited to selected lists hears
+  nothing of the others).
+
+The review of a closed sprint (`sprint.review`): `done`, `moved` (open at closing), `added` (planned in after the start)
+as task ids, `count_done`, `count_total`, `points_done`, `points_total`, `points_added`, `target` (`next` | `backlog`),
+`next_id`. A good use: after `sprint_closed`, post a short summary in the list's team chat or comment on the moved tasks.
+
+### Story points, WIP limits and velocity (2.60.0)
+Software teams can estimate tasks in story points and limit the work in progress per kanban column. Both are off until
+someone switches them on: story points per list (`points_on`, the owner), a WIP limit per section.
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| Story points of a task (`1, 2, 3, 5, 8, 13`, `null` = none) | `PATCH /api/v1/tasks/{id}` `{points}` | `update_task` / `create_task` (`points`) | tasks:write |
+| Story points on in a list (the owner) | `PATCH /api/v1/lists/{id}` `{points_on}` | `update_list` (`points_on`) | structure |
+| The WIP limit of a kanban column (`null` / `0` = none) | `PATCH /api/v1/sections/{id}` `{wip_limit}` | `set_wip_limit` | structure |
+| Completed points of the last closed sprints and their average | `GET /api/v1/lists/{id}/velocity` | `get_velocity` | read |
+
+- A WIP limit is a hint: moving a task into a full column stays allowed. Do not hold back work because of it; mention it
+  when you plan ("In progress already holds 3 of 3").
+- Estimate only when the list's rules or a person ask for it; a person's estimate is never overwritten.
+- Use the velocity as a planning aid for the next sprint ("about 21 points"), never as a measure of a person.

@@ -104,6 +104,9 @@ def react(c, k, uid, emoji, on):
             c.execute("UPDATE comments SET suggestion=? WHERE id=?",
                       (json.dumps({**sug, "state": st, "by": uid, "at": iso(now_utc())}, ensure_ascii=False), k["id"]))
             res["merge"] = st
+            if st == "approved":  # 2.60.0 C (#1512): an approved pull request counts as the review (by someone who may approve it)
+                from ..tasks.review import rvw_approved_by_pr
+                rvw_approved_by_pr(c, t["id"], f"{sug.get('repo') or ''}#{sug.get('number') or ''}", sug.get("pr_url"), uid=uid)
     elif sug and sug.get("state") == "open" and emoji in ("up", "down") and not is_agent(g.user) \
             and task_visible(c, t["id"], uid, write=True) and not t["deleted_at"]:
         if emoji == "up":

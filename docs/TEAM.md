@@ -113,3 +113,53 @@ task as a push at the highest priority, even if the list is quiet.
   News item ("For you", switched off together with the sharing News) with a preview and *Take over* / *Decline*; taken over,
   it is their own saved arrangement, named after the sender, with no link back.
 - Agents cannot use any of this (403); they propose arrangements their own way (2.55.0, #1066).
+
+## Sprints (2.60.0)
+
+For teams that work through a shared backlog (software, agencies): a project list can plan in **sprints**, time boxes of one
+or two weeks with a goal. Off by default; switch it on in the list dialog (*Sprints > Plan in sprints*, people who may edit
+the list). *Settings…* sets the length (1 week, 2 weeks or free), the start weekday and whether open tasks move to the next
+sprint automatically.
+
+- **The sprint header** above the list and the Kanban: name, dates, goal, progress (tasks, or story points when the list
+  uses them) and a small burndown with an ideal line. On the phone it folds away with a tap on the name.
+- **Filter**: *All*, *Current sprint* or *Backlog* (tasks without a sprint), right in the header.
+- **Plan**: *Sprint…* in a task's menu, the *Sprint* field of the multi-selection, or drag tasks onto the sprint header. Each
+  step can be undone. *Sprint options > Show the sprint in the task row* shows the sprint in each task row.
+- **Close**: *Close sprint* shows the review (done, still open, added after the start) and asks where open tasks go: into the
+  next sprint or back to the backlog. The next sprint starts right away; a sprint whose last day is over closes by itself.
+  *Sprint options > All sprints* lists every sprint with its review; there you can also plan the next ones.
+- Agents of the list read sprints, put tasks into them and hear when a sprint starts or closes (see [AGENTS.md](AGENTS.md#sprints-2600)).
+
+## Review step (2.60.0)
+
+For software teams and anything that needs a second look. Off until a list switches it on: list settings > *Review
+step*, with an optional default reviewer, the review section (default: the section named *Review*) and *Done only after
+approval*.
+
+- A task shows its reviewer and the review state in the task panel (*Choose reviewer*, *Send for review*). The reviewer
+  is a person or an agent of the list.
+- Moving a task into the review section (dragging on the board or changing the section) asks its reviewer; they get a
+  News item and a push (Settings > Notifications, row *Reviews*).
+- The reviewer (or an owner / admin of the list) presses 👍 *Approve* or 👎 *Back* (with an optional note). *Back*
+  returns the task to the section it came from and tells the assignee. Nobody approves their own task unless they are a
+  list admin.
+- With *Done only after approval*, ticking off waits for the approval: the tick explains it and offers *Send for
+  review*. Without a reviewer ticking off stays free.
+- A linked pull request that is merged, or approved with 👍 in Kalmido, counts as the approval.
+- Every step can be undone.
+
+## Story points, WIP limits and velocity (2.60.0)
+
+For software teams working on a board. Everything is off until you switch it on.
+
+- **WIP limit per column**: in a kanban column's menu choose *WIP limit…* and enter how many open tasks the column should
+  hold (empty = no limit). The column head then shows "2/3"; above the limit the number and the head are marked in the
+  warning colour and a move into the column says so. Moving stays allowed. New projects of the type *Software / AI dev*
+  with the standard sections start with a limit of 3 for *In progress* and *Review* (change or remove it any time).
+- **Story points**: in the list dialog (lists with ticket types or sprints) turn on *Story points*. A task then gets the
+  field *Story points* (1, 2, 3, 5, 8, 13) in its panel; the number shows in the task row and on the card, the kanban
+  column heads add up their points, and the multi panel sets them for many tasks at once. Each change is one undo step.
+- **Velocity**: with sprints and story points on, the project page offers the block *Velocity*: the completed points of
+  the last (up to six) closed sprints as bars and their average as a planning aid for the next sprint.
+- Agents read and set the same through the API and MCP (`points`, `set_wip_limit`, `get_velocity`, see AGENTS.md).

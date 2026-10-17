@@ -204,10 +204,11 @@ def ms_compat(r):
 def milestones_of_lists(c, ids):
     """{list id: [milestones by day]} of the given (project) lists, for /api/state (timeline markers, offline). 2.18.0: from
     the milestone tasks; only dated ones (the markers and "next milestone" need a day)."""
-    out = {}
+    from .envs import env_for_lists  # 2.60.0 (#1514): where a milestone runs now
+    envs, out = env_for_lists(c, ids), {}
     for r in ms_rows(c, ids):
         if r["due"]:
-            out.setdefault(r["list_id"], []).append(ms_compat(r))
+            out.setdefault(r["list_id"], []).append({**ms_compat(r), **({"envs": envs[r["id"]]} if r["id"] in envs else {})})
     return out
 
 
@@ -217,7 +218,9 @@ def overview_build(c, lid, uid):
     role = list_role(c, lid, uid)
     lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
     links = [ov_link_dict(r) for r in c.execute("SELECT * FROM list_links WHERE list_id=? ORDER BY sort, id", (lid,))]
-    ms = [ms_compat(r) for r in ms_rows(c, [lid])]  # 2.18.0 (#430): milestone tasks (undated ones too, day null)
+    from .envs import env_for_lists
+    envs = env_for_lists(c, [lid])
+    ms = [{**ms_compat(r), **({"envs": envs[r["id"]]} if r["id"] in envs else {})} for r in ms_rows(c, [lid])]  # 2.18.0 (#430): milestone tasks (undated ones too, day null); 2.60.0 (#1514): envs
     frows = c.execute("SELECT * FROM list_files WHERE list_id=? ORDER BY id DESC", (lid,)).fetchall()
     names = user_names(c, [r["user_id"] for r in frows] + [lst["owner_id"]])
     # the files of the list's tasks (not in the trash; not files of comments): a participant only those of the tasks they
@@ -472,8 +475,10 @@ def ms_report(c, tid, uid, lg=None):
             part = [r for r in done if (r["ttype"] or "") in keys]
             if part:
                 lines += [f"### {tr(name, lg=lg)}", "", *[f"- #{r['id']} {r['title']}" for r in part], ""]
+    from .envs import env_for_milestones  # 2.60.0 (#1514): where this milestone runs now
     return {"milestone": {"id": m["id"], "title": m["title"], "list_id": m["list_id"], "due": m["due"],
                           "status": STATUS_NAMES.get(m["status"], "open")},
+            "envs": env_for_milestones(c, m["list_id"], {m["id"]}).get(m["id"], []),
             "progress": {"done": closed, "total": total, "percent": round(100 * closed / total) if total else 0},
             "tasks": [{"id": r["id"], "title": r["title"], "status": STATUS_NAMES.get(r["status"], "open"),
                        "type": r["ttype"] or None, "due": r["due"], "assignee_id": r["assignee_id"],

@@ -157,7 +157,7 @@ function rmMsHtml(G, l, r) {
   if (l.kind !== 'project') return '';
   const t0 = today();
   // 2.18.0: an open list shows its milestone tasks as diamonds in their rows: no second marker for them here
-  return (l.milestones || []).filter(m => m.day >= G.start && m.day <= G.end && !(r?.open && tlMsDrawn(m, r.ts))).map(m => `<i class="tl-ms rm-ms ${m.done ? 'done' : m.day < t0 ? 'over' : ''}" style="left:${rmX(G, m.day) + G.dw / 2}px" title="${esc(m.name + ' · ' + fmtDateLoc(m.day))}" role="img" aria-label="${esc(tr('Milestone') + ': ' + m.name + ', ' + fmtDateLoc(m.day))}"></i>`).join('');
+  return (l.milestones || []).filter(m => m.day >= G.start && m.day <= G.end && !(r?.open && tlMsDrawn(m, r.ts))).map(m => `<i class="tl-ms rm-ms ${m.done ? 'done' : m.day < t0 ? 'over' : ''}" style="left:${rmX(G, m.day) + G.dw / 2}px" title="${esc(m.name + ' · ' + fmtDateLoc(m.day) + (m.envs?.length ? ' · ' + m.envs.map(env_text).join(', ') : ''))}" role="img" aria-label="${esc(tr('Milestone') + ': ' + m.name + ', ' + fmtDateLoc(m.day) + (m.envs?.length ? ', ' + m.envs.map(env_text).join(', ') : ''))}"></i>${m.envs?.length ? `<span class="rm-env" style="left:${rmX(G, m.day) + G.dw / 2 + 10}px">${esc(env_text(m.envs[0]))}</span>` : ''}`).join('');  // 2.60.0 (#1514): where the milestone runs now
 }
 function rmRowHtml(G, M, r) {
   const y = G.hh + r.i * G.rh;

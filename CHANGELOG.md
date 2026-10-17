@@ -7,6 +7,34 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.60.0] - 2026-10-17
+
+**In short:** "Software team" - project lists can plan in **sprints** with a burndown and a review, kanban columns get
+**WIP limits**, tasks **story points** with a **velocity** chart, a real **review step** (reviewer, done only after
+approval) and **environments** (Staging, Live) that show where a milestone runs and since when. Everything is off until a
+list switches it on.
+
+### Added
+- **Sprints** per project list (list dialog > *Sprints*): one or two weeks or a free length, a start weekday, open tasks
+  move on automatically if wanted. A sprint header above the list and the Kanban shows goal, progress and a small burndown
+  with an ideal line; filter *Current sprint* / *Backlog*; plan by task menu, multi-selection or dragging onto the header;
+  *Close sprint* shows a review (done, moved, added later). API v1 + MCP `list_sprints`, `get_sprint`, `set_task_sprint`,
+  events `sprint_started` / `sprint_closed` (#343).
+- **WIP limit per kanban column** (column menu): the head shows "2/3" and is marked above the limit; moving stays allowed.
+  New *Software / AI dev* projects start with 3 for *In progress* and *Review*. MCP `set_wip_limit` (#1510).
+- **Story points** (1, 2, 3, 5, 8, 13) per list switch, in the task panel, rows, cards, column sums and the multi-selection;
+  the sprint burndown counts tasks or points; **velocity** of the last six sprints with the average as a planning aid.
+  API/MCP field `points`, `get_velocity` (#1511).
+- **Review step** per list: a reviewer per task (person or agent of the list), moving into the review section asks the
+  reviewer (News + push, row *Reviews* in the notification settings), 👍 *Approve* / 👎 *Back*; with *Done only after
+  approval* every way of completing waits for it. A merged or approved linked pull request counts. API v1 + MCP
+  `review_task`, `set_list_review`, event `review_requested` (#1512).
+- **Environments** per project (Staging, Live, ...): put a milestone there by hand, via API/MCP `set_deployment` or a
+  deploy webhook with a secret token; milestone, roadmap and task rows show "Live since 15.10.", optionally the
+  milestone's tasks complete on arrival. Event `deployed` (#1514).
+
+### Fixed
+- Office: the top tabs wrap instead of disappearing behind an open chat window (#1830).
 ## [2.59.0] - 2026-10-17
 
 **In short:** **related tasks** - every task can show up to five tasks with a similar meaning and flags probable

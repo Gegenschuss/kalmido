@@ -191,6 +191,14 @@ def _sec_sort(v):
     return v
 
 
+def wip_clean(v):
+    """2.60.0 (#1510): a section's WIP limit from a client value: None / '' / 0 = no limit, else 1..999."""
+    if v in (None, "", 0, "0"):
+        return None
+    from ..tasks.validation import as_int
+    return as_int(v, "wip_limit", 1, 999)
+
+
 @app.post("/api/sections")
 def section_create():
     """{list_id, name, sort?, tasks?}. D4 (undo of a deleted section): sort = its old place, tasks = the tasks that were
@@ -208,7 +216,8 @@ def section_create():
     tids = b.get("tasks") or []
     if not isinstance(tids, list) or len(tids) > 5000 or any(isinstance(i, bool) or not isinstance(i, int) for i in tids):
         return err(tr("Invalid value: {0}", "tasks"))
-    cur_id = insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, name[:200], srt))
+    wip = wip_clean(b.get("wip_limit"))  # 2.60.0 (#1510): also the undo of a deleted section brings its limit back
+    cur_id = insert_id(c, "INSERT INTO sections(list_id,name,sort,wip_limit) VALUES(?,?,?,?)", (lid, name[:200], srt, wip))
     sid, moved, skipped = cur_id, [], []
     for tid in tids:
         r = c.execute("SELECT list_id, section_id, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
@@ -226,13 +235,14 @@ def section_create():
 
 @app.patch("/api/sections/<int:sid>")
 def section_update(sid):
-    """{name?, sort?, _prev?: {name}}: with _prev (undo / redo) a name changed elsewhere meanwhile stays (conflicts)."""
+    """{name?, sort?, wip_limit?, _prev?: {name, wip_limit}}: with _prev (undo / redo) a name / limit changed elsewhere
+    meanwhile stays (conflicts). 2.60.0 (#1510): wip_limit null / 0 = no limit."""
     b = body()
     c = db()
     need_section(c, sid)
     conflicts = []
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else {}
-    cur = c.execute("SELECT name FROM sections WHERE id=?", (sid,)).fetchone()
+    cur = c.execute("SELECT name, wip_limit FROM sections WHERE id=?", (sid,)).fetchone()
     if "name" in b:
         name = str(b["name"] or "").strip()[:200]
         if not name:
@@ -243,6 +253,12 @@ def section_update(sid):
             c.execute("UPDATE sections SET name=? WHERE id=?", (name, sid))
     if "sort" in b:
         c.execute("UPDATE sections SET sort=? WHERE id=?", (_sec_sort(b["sort"]), sid))
+    if "wip_limit" in b:  # 2.60.0 (#1510)
+        wip = wip_clean(b["wip_limit"])
+        if "wip_limit" in prev and cur["wip_limit"] != wip_clean(prev["wip_limit"]) and cur["wip_limit"] != wip:
+            conflicts.append({"field": "wip_limit", "server": cur["wip_limit"], "mine": wip})
+        else:
+            c.execute("UPDATE sections SET wip_limit=? WHERE id=?", (wip, sid))
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts)
@@ -276,7 +292,7 @@ def section_delete(sid):
     name and exactly those tasks, else nothing happens and the answer carries a conflict."""
     c = db()
     need_section(c, sid)
-    sec = dict(c.execute("SELECT id, list_id, name, sort FROM sections WHERE id=?", (sid,)).fetchone())
+    sec = dict(c.execute("SELECT id, list_id, name, sort, wip_limit FROM sections WHERE id=?", (sid,)).fetchone())  # 2.60.0 (#1510): + limit
     tids = _sec_tasks(c, sid)
     prev = body().get("_prev")
     if isinstance(prev, dict):

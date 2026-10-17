@@ -498,6 +498,9 @@ def git_close(c, r, tid, kind, ref, title, url, lids=None):
     if not t or t["deleted_at"] or t["status"] != 0 or t["list_id"] not in (lids if lids is not None else {r["list_id"]}) or \
             c.execute("SELECT 1 FROM git_closes WHERE task_id=?", (tid,)).fetchone():
         return False
+    from ..tasks.review import rvw_gate
+    if rvw_gate(c, tid):  # 2.60.0 C (#1512): waits for its review approval; a later poll completes it once approved
+        return False
     undo = {}
     with app.app_context():
         g.user = {"id": None}
@@ -542,6 +545,10 @@ def git_take_prs(c, r, items, baseline):
                 changed = True
             elif old["state"] != p["state"] and p["state"] in ("merged", "closed"):
                 log_act(c, tid, "git_pr", {"repo": repo, "n": p["number"], "title": p["title"][:200], "url": p["url"], "state": p["state"]}, uid=None)
+        if p["state"] == "merged" and not baseline and (old is None or old["state"] != "merged"):  # 2.60.0 C (#1512): merged = approved
+            from ..tasks.review import rvw_approved_by_pr
+            for tid in sorted(tids):
+                changed |= rvw_approved_by_pr(c, tid, f"{repo}#{n} {p['title']}", p["url"])
         if p["state"] == "merged" and _git_after(p["merged_at"], r["created_at"]):
             for tid in sorted(git_task_ids(c, lid, git_keys(p["title"] + "\n" + p["body"]))):
                 changed |= git_close(c, r, tid, "pr", n, f"#{n} {p['title']}", p["url"], lid)

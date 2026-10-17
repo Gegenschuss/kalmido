@@ -152,6 +152,9 @@ TASK_FIELDS = {
     "people": {"type": "array", "items": {"type": "integer"}, "description": "2.19.0: who comes along (user ids sharing the list): they see the "
                "task and get its reminders"},
     "stars": {"type": ["integer", "null"], "minimum": 0, "maximum": 50, "description": "2.19.0: stars a kid account gets for completing it (null = 1)"},
+    # 2.60.0 (#1511): story points
+    "points": {"type": ["integer", "null"], "enum": [1, 2, 3, 5, 8, 13, None], "description": "2.60.0: story points (Fibonacci); null = none. "
+               "The app shows them where the list has story points on (points_on)"},
     "family": {"type": ["object", "null"], "description": "2.19.0: birthday / anniversary {kind, name, year?, lead?} or household deadline "
                "{kind: deadline, type, who, expires, notice, lead} data; easier: add_occasion / add_deadline"},
     # 2.35.0 (#1095): code snippets (plain code, no Markdown); the whole list is replaced
@@ -406,6 +409,17 @@ TOOLS = [
                       "(open tasks per day + the ideal line to the due date) and release notes (Markdown of its completed tasks by "
                       "ticket type). Milestones are tasks with milestone: true (list_tasks milestone=true).",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{int(a['task_id'])}/milestone")),
+    # 2.60.0 (#1514): environments of a project (Staging, Live): which milestone / version runs where since when
+    ("list_environments", "2.60.0: the environments of a project list (Staging, Live, ...) with the latest deployment of each "
+                          "{version, at, milestone_id, milestone, source}. People create and rename environments in the app.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/environments")),
+    ("set_deployment", "2.60.0: record that a version / milestone runs in an environment now (the time is now). environment = its id or "
+                       "name; give milestone_id, or a version (found by the milestone titles; a version without a milestone is kept as "
+                       "text). With \"complete tasks on arrival\" on for that environment the milestone's open tasks are completed. "
+                       "Needs write access to the list.",
+     _obj({"list_id": S_ID, "environment": {"type": ["integer", "string"], "description": "environment id or name"},
+           "version": {"type": "string", "maxLength": 100}, "milestone_id": S_ID}, ["list_id", "environment"]),
+     lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/deployments", body={k: a[k] for k in ("environment", "version", "milestone_id") if a.get(k) is not None})),
     # 2.10.0 (#441): groups (read) and the groups a list is shared with
     ("list_groups", "Groups of people (an admin creates them): id, name, members [{user_id, name}], synced (members follow a "
                     "sign-in group), mine. Lists and folders can be shared with a group; a task can be assigned to a group "
@@ -918,6 +932,7 @@ LIST_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "folder":
               "view": {"type": "string", "enum": ["list", "kanban", "timeline", "mindmap"]}, "kind": {"type": "string", "enum": ["list", "project"]},
               "done_at_bottom": {"type": "boolean"}, "nag": {"type": "string"}, "day_hours": {"type": ["number", "null"]},
               "time_tracking": {"type": "boolean", "description": "2.41.0: time tracking on for this list (any type, default off)"}}
+LIST_PROPS["points_on"] = {"type": "boolean", "description": "2.60.0: story points shown in the app (owner; default off)"}  # 2.60.0 (#1511)
 HABIT_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer", "minimum": 1},
                "days": {"type": "string", "description": "weekdays 1-7 (1 = Monday), e.g. 12345"}, "per_week": {"type": "integer", "minimum": 0},
                "remind_at": {"type": "string", "description": "HH:MM or empty"}}
@@ -988,8 +1003,10 @@ TOOLS += [
     # ---- sections
     ("list_sections", "Sections of a list in order.", _obj({"list_id": S_ID}, ["list_id"]),
      lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/sections")),
-    ("create_section", "Create a section in a list (at the end, or before section before_id).",
-     _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1, "maxLength": 200}, "before_id": S_ID}, ["list_id", "name"]),
+    ("create_section", "Create a section in a list (at the end, or before section before_id). 2.60.0: wip_limit = the most open tasks "
+                       "the kanban column should hold (a hint only; null / 0 = none).",
+     _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1, "maxLength": 200}, "before_id": S_ID,
+           "wip_limit": {"type": ["integer", "null"], "minimum": 0, "maximum": 999}}, ["list_id", "name"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/sections", body=_without(a, "list_id"))),
     ("rename_section", "Rename a section.", _obj({"section_id": S_ID, "name": {"type": "string", "minLength": 1, "maxLength": 200}},
                                                  ["section_id", "name"]),
@@ -1144,6 +1161,20 @@ TOOLS += [
      lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}/milestones/{_id(a, 'milestone_id')}", body=_without(a, "list_id", "milestone_id"))),
     ("delete_milestone", "Remove a milestone.", _obj({"list_id": S_ID, "milestone_id": S_ID}, ["list_id", "milestone_id"]),
      lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}/milestones/{_id(a, 'milestone_id')}")),
+    # 2.60.0 (#343): sprints of a project list (people switch them on, plan and close them; agents read and assign)
+    ("list_sprints", "2.60.0: the sprints of a project list (newest first): id, num, title, start, end, goal, state planned | active | "
+                     "closed, progress (done / total, points), the review of closed sprints (done / moved / added task ids, counts, "
+                     "points); plus the list's sprint settings and active_id. Empty when the list has no sprints.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/sprints")),
+    ("get_sprint", "2.60.0: one sprint with its tasks (open first) and a burndown (open work per day and an ideal line; unit count = "
+                   "tasks, points = story points).",
+     _obj({"sprint_id": S_ID, "unit": {"type": "string", "enum": ["count", "points"]}}, ["sprint_id"]),
+     lambda api, a: api.call("GET", f"/sprints/{_id(a, 'sprint_id')}", query={"unit": a["unit"]} if a.get("unit") else None)),
+    ("set_task_sprint", "2.60.0: put tasks of a list into one of its open sprints (sprint_id) or back to the backlog (sprint_id null). "
+                        "Needs edit rights on the list; milestones and tasks of other lists are skipped.",
+     _obj({"list_id": S_ID, "task_ids": {"type": "array", "items": {"type": "integer"}, "minItems": 1}, "sprint_id": {"type": ["integer", "null"]}},
+          ["list_id", "task_ids"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/sprints/assign", body={"ids": a["task_ids"], "sprint_id": a.get("sprint_id")})),
     ("set_project_status", "Post a status update of a project: status on_track | at_risk | off_track | on_hold | complete (empty = none) "
                            "and a short note; the members are told.",
      _obj({"list_id": S_ID, "status": {"type": "string", "enum": ["on_track", "at_risk", "off_track", "on_hold", "complete", ""]},
@@ -1393,6 +1424,19 @@ TOOLS += [
      _obj({"task_id": S_ID, "action": {"type": "string", "enum": ["request", "cancel"]}, "approver_id": {"type": "integer"},
            "note": {"type": "string"}}, ["task_id", "action"]),
      lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/approval", body=_pick(a, ("action", "approver_id", "note")))),
+    ("review_task", "2.60.0 (#1512): the review step of a task. reviewer (reviewer_id: a person or agent of the list, null = none), "
+                    "request (send for review: into the list's review section, the reviewer is told), approve / changes (only when YOU "
+                    "are the reviewer and not the assignee; changes = back to its previous section, note = what should change). With "
+                    "the list's 'done only after approval' on, completing a task whose review is not approved answers 409. The event "
+                    "review_requested tells you when you are asked to review.",
+     _obj({"task_id": S_ID, "action": {"type": "string", "enum": ["reviewer", "request", "approve", "changes"]},
+           "reviewer_id": {"type": ["integer", "null"]}, "note": {"type": "string", "maxLength": 2000}}, ["task_id", "action"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/review", body=_pick(a, ("action", "reviewer_id", "note")))),
+    ("set_list_review", "2.60.0 (#1512): switch the review step of a list on / off (editors): reviewer = default reviewer, section = "
+                        "the review section (default: the one named Review), gate = done only after approval.",
+     _obj({"list_id": S_ID, "on": {"type": "boolean"}, "reviewer": {"type": ["integer", "null"]}, "section": {"type": ["integer", "null"]},
+           "gate": {"type": "boolean"}}, ["list_id", "on"]),
+     lambda api, a: api.call("PUT", f"/lists/{int(a['list_id'])}/review", body=_pick(a, ("on", "reviewer", "section", "gate")))),
     ("list_forms", "2.23.0 (module forms): the forms of a list (owner / list admins) with their links.", _obj({"list_id": S_ID}, ["list_id"]),
      lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/forms")),
     ("create_form", "2.23.0: a form for a list: a link whose page creates a task (subject, description, name, e-mail); access org = "
@@ -1611,6 +1655,14 @@ TOOLS += [
      _obj({"view": _VIEW, "name": {"type": "string", "maxLength": 40}, "layout": _LAYOUT, "summary": {"type": "string"},
            "title": {"type": "string"}, "user_id": S_ID}, ["view", "name", "layout"]),
      lambda api, a: api.call("POST", "/layouts/proposals", body=_pick(a, ("view", "name", "layout", "summary", "title", "user_id")))),
+# 2.60.0 (#1510, #1511): WIP limits of kanban columns, the velocity of a list's sprints
+    ("set_wip_limit", "2.60.0: set the WIP limit of a section (kanban column): the most open tasks it should hold. A hint only: the app "
+                      "marks the column above it, moving stays allowed. wip_limit null or 0 = no limit.",
+     _obj({"section_id": S_ID, "wip_limit": {"type": ["integer", "null"], "minimum": 0, "maximum": 999}}, ["section_id", "wip_limit"]),
+     lambda api, a: api.call("PATCH", f"/sections/{_id(a, 'section_id')}", body={"wip_limit": a.get("wip_limit")})),
+    ("get_velocity", "2.60.0: the velocity of a list: completed story points (and tasks) of its last up to 6 closed sprints and their "
+                     "average, a planning aid for the next sprint.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/velocity")),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
@@ -1653,6 +1705,7 @@ TOOL_SCOPES = {
 TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_entries")  # 2.51.0 (#1353)
 TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2.51.0 (#1355)
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
+TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
               "private", "files:read", "files:write", "office", "pinboard", "layouts")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts

@@ -342,6 +342,11 @@ ROUTES = {
     "DELETE /api/v1/lists/{}/links/{}": "list", "PUT /api/v1/lists/{}/links/order": "list",
     "GET /api/v1/lists/{}/milestones": "list", "POST /api/v1/lists/{}/milestones": "list",
     "PATCH /api/v1/lists/{}/milestones/{}": "list", "DELETE /api/v1/lists/{}/milestones/{}": "list",
+    # 2.60.0 (#343): sprints belong to their list (need_list on the sprint's list: visibility to read, edit rights to change)
+    "GET /api/v1/lists/{}/sprints": "list", "GET /api/v1/sprints/{}": "list", "POST /api/v1/lists/{}/sprints/assign": "list",
+    "GET /api/lists/{}/sprints": "list", "POST /api/lists/{}/sprints": "list", "PUT /api/lists/{}/sprint-settings": "list",
+    "POST /api/lists/{}/sprints/assign": "list", "GET /api/sprints/{}": "list", "PATCH /api/sprints/{}": "list",
+    "DELETE /api/sprints/{}": "list", "POST /api/sprints/{}/start": "list", "POST /api/sprints/{}/close": "list",
     "GET /api/v1/lists/{}/sections": "list", "POST /api/v1/lists/{}/sections": "list", "PATCH /api/v1/sections/{}": "list",
     "PUT /api/v1/lists/{}/sections/order": "list", "DELETE /api/v1/sections/{}": "list",
     "GET /api/v1/lists/{}/fields": "list", "POST /api/v1/lists/{}/fields": "list", "PATCH /api/v1/fields/{}": "list",
@@ -512,6 +517,10 @@ ROUTES = {
     "DELETE /api/templates/{}": "template", "POST /api/templates/{}/apply": "template",
     # ---- token (2)
     "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/git/{}": "token",
+    # ---- 2.60.0 (#1514): environments of a project list (they belong to their list; the deploy hook is a secret token)
+    "POST /api/hooks/deploy/{}/{}": "token", "GET /api/lists/{}/envs": "list", "POST /api/lists/{}/envs": "list",
+    "PATCH /api/envs/{}": "list", "DELETE /api/envs/{}": "list", "POST /api/envs/{}/restore": "list", "POST /api/envs/{}/deploy": "list",
+    "DELETE /api/envs/{}/deploys/{}": "list", "GET /api/v1/lists/{}/environments": "list", "POST /api/v1/lists/{}/deployments": "list",
     # ---- webhook (7)
     "GET /api/me/webhooks": "webhook", "POST /api/me/webhooks": "webhook", "PATCH /api/me/webhooks/{}": "webhook",
     "DELETE /api/me/webhooks/{}": "webhook", "POST /api/me/webhooks/{}/secret": "webhook",
@@ -600,6 +609,11 @@ ROUTES = {
     # 2.59.0 B (#1375): related tasks (tasks/related.py)
     "GET /api/tasks/{}/related": "related", "GET /api/v1/tasks/{}/related": "related", "POST /api/tasks/similar": "related",
     "GET /api/related/config": "public", "GET /api/admin/related": "admin", "PUT /api/admin/related": "admin",
+    # 2.60.0 B (#1511): the velocity of a list (need_list read; p260_b_api_test.py: a stranger / another organisation's agent 404)
+    "GET /api/lists/{}/velocity": "list", "GET /api/v1/lists/{}/velocity": "list",
+    # 2.60.0 C (#1512): the review step (need_task / need_list of the task's list; p260_c_api_test.py: a stranger 404, a viewer 403)
+    "POST /api/tasks/{}/review": "task", "POST /api/v1/tasks/{}/review": "task",
+    "PUT /api/lists/{}/review": "list", "PUT /api/v1/lists/{}/review": "list",
 }
 
 # ---- 1. every route is classified, nothing stale

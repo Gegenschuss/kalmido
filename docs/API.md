@@ -214,6 +214,11 @@ had been made in the app. Webhooks fire too.
 | `PATCH` · `DELETE /lists/{id}/links/{link_id}`, `PUT /lists/{id}/links/order` | structure | Change · remove a link, reorder `{ids}` |
 | `GET` · `POST /lists/{id}/milestones`, `PATCH` · `DELETE /lists/{id}/milestones/{milestone_id}` | read · structure | Milestones `{name, day, done?}` (at most 100). 2.18.0: a compatibility layer on top of milestone tasks; the ids are task ids |
 | `GET /tasks/{id}/milestone` | read | 2.18.0: a milestone task's report: `progress` (closed / total / percent), its `tasks` (open first), `burndown` (open tasks per day + ideal line), `release_notes` (Markdown: Features / Fixes / Other). Tasks carry `milestone` (bool) and `milestone_id`; `GET /tasks?milestone=true` / `?milestone_id=` |
+| `GET /lists/{id}/environments` · `POST /lists/{id}/deployments` | read · write | 2.60.0 (#1514): the environments of a project list (Staging, Live, ...) with the latest deployment of each; `POST {environment: id or name, version?, milestone_id?}` records that a version / milestone runs there now (the milestone is found by `version` against the milestone titles: exact, with or without a leading `v`, or as a word of the title; a version without a milestone is kept as text). With "complete tasks on arrival" on for the environment the milestone's open tasks are completed. Agents with write access to the list may; the environment's deploy webhook and its token stay with people. Agents hear `deployed` |
+| Task field `points` | tasks:write | 2.60.0: story points `1, 2, 3, 5, 8, 13` or `null` (other values: 400) with `POST /tasks`, `PATCH /tasks/{id}` and `POST /tasks/batch`. Always stored; the app shows them in lists with `points_on: true` (`PATCH /lists/{id}`, owner) |
+| `GET /lists/{id}/sprints` | read | 2.60.0 (#343): the sprints of a project list (newest first): `id`, `num`, `title`, `start`, `end`, `goal`, `state` (planned \| active \| closed), `progress` (`done`, `total`, `points_done`, `points_total`), `review` of closed sprints; plus `settings` `{on, weeks, dow, carry}`, `points_on`, `active_id` |
+| `GET /sprints/{id}` | read | 2.60.0: one sprint with its `tasks` (open first) and `burndown` (`?unit=count\|points`: open work per day, `ideal` line from the start to 0 on the last day) |
+| `POST /lists/{id}/sprints/assign` | write | 2.60.0: `{ids, sprint_id \| null}` puts tasks of the list into one of its open sprints or back to the backlog (edit rights; milestones and other lists' tasks come back in `skipped`); answers `moved`, `skipped`, `prev` |
 | `GET` · `PATCH /lists/{id}/error-hook` | read · structure | 2.18.0: the error-report webhook of a project list `{state: on \| rotate \| off}`; `on` / `rotate` return the secret URL once. People only (agents: 403) |
 | `GET` · `POST /lists/{id}/files`, `GET` · `DELETE /lists/{id}/files/{file_id}` | read · attachments:write · attachments:read | Project files (multipart `file`, the attachment size limit; images / PDFs inline, everything else as a download) |
 | `GET /agents` | read | Agents you share a list with: status and job counts. 2.28.0: + `org_id` (the agent's workspace, null = private), `owner_id` (a personal agent's owner) |
@@ -238,6 +243,8 @@ had been made in the app. Webhooks fire too.
 | `GET /lists/{id}/sections` · `POST …` | read · structure | 2.15.0: sections in order; create `{name, before_id?}` (at the end or in front of a section) |
 | `PATCH /sections/{id}` · `DELETE …` | structure · delete | 2.15.0: rename `{name}`; delete (its tasks stay in the list without a section) |
 | `PUT /lists/{id}/sections/order` | structure | 2.15.0: `{ids}`: every section of the list exactly once, in the new order |
+| `PATCH /sections/{id}` `{wip_limit}` | structure | 2.60.0: the WIP limit of a kanban column (the most open tasks it should hold; `null` / `0` = none). A hint only: the app shows "2/3" in the column head and marks it above the limit, moving stays allowed. Sections carry `wip_limit`; `POST /lists/{id}/sections` takes it too |
+| `GET /lists/{id}/velocity` | read | 2.60.0: the completed story points (`points`) and tasks (`count`) of the list's last up to 6 closed sprints, oldest first, and their `average` (null = no closed sprint yet). Participants count only the tasks they see |
 | `POST /tasks/{id}/move` | tasks:write | 2.15.0: `{list_id?, section_id?, parent_id?, before_id? \| after_id? \| position?: top \| bottom}`: another list / section / parent and a place among the siblings; subtasks move along; the same rights as in the app (into a list you may edit, out of a shared list only as its owner) |
 | `POST /tasks/batch` | tasks:write (+ delete) | 2.15.0: `{ids (1-500), action: update \| complete \| reopen \| wont_do \| delete \| restore, changes? (update)}`: one transaction; tasks you may not change are skipped (`errors`). `delete` / `restore` also need `delete`. Agents: 10 or more tasks wait for approval (`202`) |
 | `POST /tasks/{id}/skip` | tasks:write | 2.15.0: skip this occurrence of a repeating task (next date, no completed copy) |
@@ -896,6 +903,17 @@ organisation's state. Never the kind (vacation, sick leave, day off) or the note
 `POST /tasks/{id}/approval` (`tasks:write`): `{action: request, approver_id, note?}` / `{action: cancel}`; the approver
 (a person in the app) decides with `approve`, `changes` or `reject`. Tasks carry `approval` (`pending | approved |
 changes | rejected | null`) and `approver_id`.
+
+`POST /tasks/{id}/review` (`tasks:write`, 2.60.0, #1512): the review step. `{action: reviewer, reviewer_id}` (a person or
+agent with access to the list, `null` = none), `{action: request, reviewer_id?, note?}` (send for review: into the list's
+review section, state `pending`, the reviewer gets a News item + push or the agent event `review_requested`),
+`{action: approve | changes, note?}` (only the reviewer or a list admin; never the assignee on their own task; an agent
+only as the reviewer; `changes` returns the task to the section it came from), `{action: restore, reviewer_id, review,
+section_id?}` (undo). Tasks carry `reviewer_id`, `review` (`pending | approved | changes`), `review_at`, `review_by`
+(`null` with `approved` = a linked pull request was merged or approved) and `review_sec` when set.
+`PUT /lists/{id}/review` (`structure`, editors): `{on, reviewer?, section?, gate?}`; lists carry `review_cfg` (json, empty
+= off). With `gate` on, completing a task that has a reviewer and is not approved answers **409** on every way (complete,
+batch, repeats, git keywords).
 
 `GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / list admins): a form's `url`, `access`
 (`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link.

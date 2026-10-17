@@ -7,14 +7,14 @@ function viewKanban() {
   const k = S.route.key;
   const lid = k === 'inbox' ? inbox().id : +k.slice(2);
   const secs = S.sections.filter(s => s.list_id === lid), ro = !canEditList(lid);
-  const tasks = sortTasks(openTasks().filter(t => t.list_id === lid && !t.parent_id));
+  const tasks = sortTasks(openTasks().filter(t => t.list_id === lid && !t.parent_id && sprKeep(t, k)));  // 2.60.0 (#343): the sprint filter
   const cols = [];
   const loose = tasks.filter(t => !t.section_id || !secs.some(s => s.id === t.section_id));
   if (loose.length || !secs.length) cols.push({id: null, name: secs.length ? tr('Unassigned') : tr('Tasks'), tasks: loose});
   for (const s of secs) cols.push({id: s.id, name: s.name, tasks: tasks.filter(t => t.section_id === s.id)});
   return `${listHead(listById(lid))}<div class="kanban">${cols.map(c => `
     <div class="kcol" data-kcol="${c.id ?? ''}">
-      <div class="khead" ${c.id ? `data-ksec="${c.id}"` : ''}>${c.id && !ro ? secHandle(c.id) : ''}${esc(c.name)} <span class="c">${c.tasks.length}</span>${c.id && !ro ? `<button class="iconbtn" data-act="section-menu" data-id="${c.id}" title="${esc(tr('More') + ': ' + c.name)}" aria-label="${esc(tr('More') + ': ' + c.name)}">${ic('dots', 's')}</button>` : ''}</div>
+      <div class="khead" ${c.id ? `data-ksec="${c.id}"` : ''}>${c.id && !ro ? secHandle(c.id) : ''}${esc(c.name)} ${wip_kHead(c)}${spt_kSum(c, lid)}${c.id && !ro ? `<button class="iconbtn" data-act="section-menu" data-id="${c.id}" title="${esc(tr('More') + ': ' + c.name)}" aria-label="${esc(tr('More') + ': ' + c.name)}">${ic('dots', 's')}</button>` : ''}</div>
       <div class="kcards">${c.tasks.map(t => taskRow(t, {compact: true})).join('')}</div>
       ${ro ? '' : `<div class="kadd"><input placeholder="${tr('+ Task')}" aria-label="${esc(tr('New task in {0}', c.name))}" data-kadd="${c.id ?? ''}" enterkeyhint="done"></div>`}
     </div>`).join('')}

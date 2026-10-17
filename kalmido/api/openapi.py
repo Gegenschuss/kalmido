@@ -160,6 +160,9 @@ def openapi_spec():
                    "and assignee are read-only there until a person with write access unlocks it (comments, checkboxes in the "
                    "notes, completing and subtasks stay free). Tasks created with an agent token start locked (send "
                    "locked: false to create an open one); the API itself is not bound by the lock and can set or clear it"}}
+    # 2.60.0 (#1511): story points
+    task_props["points"] = nul("integer", enum=[1, 2, 3, 5, 8, 13, None], description="2.60.0: story points (Fibonacci); "
+                               "null = none. Always stored; the app shows them where the list has story points on (points_on)")
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
@@ -646,6 +649,8 @@ def openapi_spec():
     from ..docs.v1 import docs_spec
     docs_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1111)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
+    from ..lists.envs import env_spec
+    env_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.60.0 D (#1514)
     from ..office.agentdocs import ofa_spec
     ofa_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 A (#1348, #1350)
     from ..hub.absence import abs_spec
@@ -675,6 +680,12 @@ def openapi_spec():
     rc_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1356)
     from ..tasks.related import rt9_spec
     rt9_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.59.0 B (#1375)
+    from ..tasks.review import rvw_spec
+    rvw_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.60.0 C (#1512)
+    from ..lists.points import spt_spec
+    spt_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.60.0 B (#1511)
+    from ..lists.sprints import spr_spec
+    spr_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.60.0 (#343)
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",

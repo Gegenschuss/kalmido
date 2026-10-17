@@ -105,6 +105,10 @@ CHECKS = {
                        "JOIN contacts ct ON ct.id=k.contact_id JOIN books b ON b.id=ct.book_id WHERE CASE WHEN cl.org_id IS NOT NULL "
                        "THEN b.owner_org_id IS DISTINCT FROM cl.org_id OR b.org_id IS DISTINCT FROM cl.org_id "
                        "ELSE b.owner_org_id IS NOT NULL OR b.org_id IS NOT NULL OR b.owner_id IS DISTINCT FROM cl.created_by END"),
+    # 2.60.0 C (#1512): the reviewer of an organisation's task who is neither its list's owner nor a member of the list
+    "task_reviewer": ("SELECT t.id, t.reviewer_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.reviewer_id IS NOT NULL "
+                      "AND l.org_id IS NOT NULL AND t.reviewer_id<>l.owner_id AND NOT EXISTS (SELECT 1 FROM list_members m "
+                      "WHERE m.list_id=t.list_id AND m.user_id=t.reviewer_id)"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 

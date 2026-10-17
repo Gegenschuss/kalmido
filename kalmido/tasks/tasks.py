@@ -38,6 +38,8 @@ def ms_cleanup(c):
     is in the trash the link is inert (clients only show milestones they can see, new links need an open milestone)."""
     c.execute("""UPDATE tasks SET milestone_id=NULL WHERE milestone_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM tasks m
                  WHERE m.id=tasks.milestone_id AND m.ms=1 AND m.list_id=tasks.list_id)""")
+    from ..lists.sprints import spr_cleanup
+    spr_cleanup(c)  # 2.60.0 (#343): sprint links follow the same rule (a sprint of the task's own list)
 
 
 def can_move(c, src, dst):
@@ -217,6 +219,11 @@ def task_create():
     e = ms_target(c, f.get("milestone_id"), f["list_id"])
     if e:
         return err(e)
+    if f.get("sprint_id"):  # 2.60.0 (#343): created right into a sprint of its list (edit rights)
+        from ..lists.sprints import spr_apply
+        e = spr_apply(c, f, {"sprint_id": None, "list_id": f["list_id"]}, f["list_id"])
+        if e:
+            return err(e)
     e = check_assignee(c, f["list_id"], f.get("assignee_id")) or check_group_assignee(c, f["list_id"], f.get("assignee_group_id")) \
         or check_url(f) or repeat_problem(f.get("repeat"), f.get("due"))
     if e:

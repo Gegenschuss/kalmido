@@ -577,6 +577,8 @@ def export_json():
         "lists": ("SELECT * FROM lists WHERE owner_id=?", (uid,)),
         "list_members": (f"SELECT * FROM list_members WHERE list_id IN {own}", (uid,)),
         "sections": (f"SELECT * FROM sections WHERE list_id IN {own}", (uid,)),
+        "list_envs": (f"SELECT id, list_id, name, sort, auto_close, created_at, deleted_at FROM list_envs WHERE list_id IN {own}", (uid,)),  # 2.60.0 (#1514): never the hook token
+        "env_deploys": (f"SELECT * FROM env_deploys WHERE env_id IN (SELECT id FROM list_envs WHERE list_id IN {own})", (uid,)),
         "tasks": (f"SELECT * FROM tasks WHERE list_id IN {own}", (uid,)),
         "task_tags": ("SELECT * FROM task_tags WHERE user_id=?", (uid,)),
         "habits": ("SELECT * FROM habits WHERE user_id=?", (uid,)),

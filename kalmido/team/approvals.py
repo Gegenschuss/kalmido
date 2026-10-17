@@ -109,6 +109,11 @@ def approval_apply(c, tid, b):
     need_task(c, tid, write=False, full=True)
     asker = t["assigned_by"] if t["assigned_by"] and t["assigned_by"] != uid else t["created_by"]
     state = {"approve": "approved", "changes": "changes", "reject": "rejected"}[act]
+    if state == "approved":  # 2.60.0 (#1512, review): a review gate of the list is checked before anything changes
+        from ..tasks.review import rvw_gate
+        e = rvw_gate(c, tid)
+        if e:
+            raise Denied(409, e)
     ts = iso(now_utc())
     c.execute("UPDATE tasks SET approval=?, updated_at=? WHERE id=?", (state, ts, tid))
     log_act(c, tid, "apstate", {"state": state, **({"note": note} if note else {})})
