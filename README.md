@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.76.0** (2026-10-17): a **pack catalogue** in Office & finance: search, install, update and remove country and industry packs per office (verified / community, checked by SHA-256, data only).
 - **2.56.4** (2026-10-17): connecting **Paperless-ngx 3.x** works again (API version negotiated, custom fields readable).
 - **2.56.3** (2026-10-16): the client field of a document in an organisation's office offers its clients again.
 - **2.56.1** (2026-10-16): CI fixes for 2.56.0 (both go live with this version).
