@@ -41,7 +41,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients';
   const cst = (await call(CC, 'GET', '/api/state')).me;
   check(!(cst.workspaces || []).length, 'P4: carol has no organisation');
   const os = await call(CC, 'GET', '/api/office/settings');
-  check(os.http === 200 && os.role === 'admin' && !os.org_id, 'P4: carol is the admin of her own office ' + JSON.stringify({http: os.http, role: os.role, org: os.org_id}));
+  check(os.http === 200 && os.role === 'admin' && os.personal, 'P4: carol is the admin of her own (personal) office ' + JSON.stringify({http: os.http, role: os.role, personal: os.personal}));
   const cl = await call(CC, 'POST', '/api/clients', {name: 'Example Ltd'});
   check(cl.id > 0, 'a client of carol');
 
