@@ -353,7 +353,7 @@ async function bg_contractsModal() {
 // ---- CSV import: file -> columns -> preview -> commit
 function bg_readFile(f) {
   const rd = enc => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => no(r.error); r.readAsText(f, enc); });
-  return rd('utf-8').then(t => t.includes('�') ? rd('windows-1252') : t);
+  return f.text().then(t => t.includes('�') ? rd('windows-1252') : t);  // UTF-8 via Blob.text(); FileReader only for the windows-1252 fallback
 }
 function bg_csvModal() {
   const lid = BG.lid, st = {text: '', p: null, rows: null, mapping: null};
