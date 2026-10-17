@@ -298,6 +298,10 @@ check(r.status_code == 303 and t and t[0]["url"] == "https://news.example.org/it
 r = Bb.post(B + "/share", data={"title": "", "text": "", "url": "https://only.example.org/p"}, allow_redirects=False)
 t = [x for x in Bb.get(B + "/api/state").json()["tasks"] if x.get("url") == "https://only.example.org/p"]
 check(t and t[0]["title"] == "only.example.org/p", "POST /share only url: title domain + path")
+# 2.81.0 (#1856): a refused file (here: empty) keeps the task and tells the person instead of disappearing silently
+r = Bb.post(B + "/share", data={"title": "Shared empty file"}, files={"file": ("empty.txt", b"", "text/plain")}, allow_redirects=False)
+check(r.status_code == 303 and "share=refused" in r.headers.get("Location", "") and "#t/" in r.headers.get("Location", ""),
+      "#1856: POST /share with a refused file: the app shows a hint " + r.headers.get("Location", ""))
 acts = Bb.get(B + f"/api/tasks/{t[0]['id']}/timeline").json()["activity"] if t else []
 check([a["kind"] for a in acts] == ["created"] and acts[0]["user_id"] == ids["bob"], "shared task has a 'created' entry by its user")
 
