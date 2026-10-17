@@ -11,7 +11,7 @@ from ..core.db import bump, db, err, insert_id, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, MANAGE_ROLES, need_task
 from ..core.serializers import unlink_files
-from ..core.orgcrypt import oc_plain_size, oc_seal_path, oc_send_file, oc_task_org
+from ..core.orgcrypt import oc_plain_size, oc_seal_path, oc_send_file, oc_task_org, oc_task_space
 from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
 
@@ -84,7 +84,7 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=N
         raise
     ts = iso(now_utc())
     agent = uploader_is_agent(c, uid)  # 2.30.0 (#380)
-    org = None
+    org = space = None
     for f in files:
         name = safe_name(f.filename)
         unexec = agent and unexec_name(name) != name
@@ -107,7 +107,8 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=N
         if saved is not None:
             saved.append(rel)
         if org is None:
-            org = oc_task_org(c, tid) or 0
+            org = oc_task_org(c, tid) or 0  # the organisation (upload checks 2.61.0: a real org id or None)
+            space = oc_task_space(c, tid) or 0  # 2.64.0 (#1864): the key's space: a private list's file with its owner's account key
         mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
         info = None
@@ -116,7 +117,7 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=N
                 size, mime, info = up_check_path(c, full, name, mime, uid, org or None, "att")
             except UploadRefused as e:
                 return str(e)
-        oc_seal_path(c, org, full)  # 2.42.0 (#828): a file of an organisation's list is sealed with its key at rest
+        oc_seal_path(c, space, full, fresh=True)  # 2.42.0 (#828), 2.64.0 (#1864): sealed with its space's key at rest, also private
         ins = ("INSERT INTO attachments(task_id,name,mime,size,path,created_at,comment_id,user_id) VALUES(?,?,?,?,?,?,?,?)",
                (tid, name, mime, size, rel, ts, comment_id, uid))
         if ids is not None or info:

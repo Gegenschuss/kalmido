@@ -6,7 +6,8 @@ sees them in plain as before. Invented companies and the test IBAN only.
    rates, purchase prices (cost 0 + cost_enc), the frozen sender of a finalised invoice, costs / margin of the totals and
    office log entries with such values; the API answers in plain (admin), a member still gets no purchase prices
  - files on disk start with the magic KENC1 (attachment of an organisation's list, stored invoice PDF / XML); the
-   downloads are byte for byte the originals; a private list's file stays plain; the storage check finds no problem
+   downloads are byte for byte the originals; the storage check finds no problem
+   2.64.0 (#1864): a private list's file is sealed too, with the owner's account key (header = -owner id)
  - Settings > Organisation > Encryption: state, recovery key only for the organisation's admins after the password
    (wrong 403, member 403, other organisation 404, agent 403), noted in the office log without the value
  - the instance switch org_encrypt (admin only): off -> new values stay plain, encrypted ones stay readable
@@ -14,7 +15,7 @@ sees them in plain as before. Invented companies and the test IBAN only.
  - a wrong server key: a clear error (code orgcrypt, names KALMIDO_SECRET_KEY) instead of garbage; rewrap with the
    recovery key from stdin makes the data readable with the new server key
  - deleting an organisation deletes its key row and its office folder; a file of a list that left the organisation is
-   resealed (here: plain in a private list) and stays readable
+   resealed (2.64.0 #1864: with the owner's account key in a private list) and stays readable
  - without KALMIDO_SECRET_KEY nothing is encrypted (database and files plain), the state says so, the recovery key 409
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY and the mode workspaces.
 usage: p2420_b_api_test.py <datadir>"""
@@ -22,6 +23,7 @@ import base64
 import glob
 import json
 import os
+import struct
 import subprocess
 import sys
 import time
@@ -82,6 +84,21 @@ def cli(*args, stdin=None):
 def head(path):
     with open(path, "rb") as f:
         return f.read(6)
+
+
+def space(path):
+    """2.64.0 (#1864): the space id in a sealed file's header (> 0 organisation, < 0 the account -id), None when plain."""
+    with open(path, "rb") as f:
+        h = f.read(14)
+    return struct.unpack(">q", h[6:14])[0] if h[:6] == b"KENC1\n" and len(h) == 14 else None
+
+
+def wait_space(path, sid, secs=30):
+    for _ in range(secs * 4):
+        if space(path) == sid:
+            return True
+        time.sleep(0.25)
+    return False
 
 
 def office_files(oid):
@@ -206,7 +223,10 @@ PL = A.post(B + "/api/lists", json={"name": "Privat", "org_id": None}).json()["i
 PT = A.post(B + "/api/tasks", json={"title": "privat", "list_id": PL}).json()["id"]
 A.post(B + f"/api/tasks/{PT}/attachments", files={"file": ("p.txt", b"private file", "text/plain")})
 pp = os.path.join(DATA, "attachments", one("SELECT path FROM attachments WHERE task_id=?", (PT,)))
-check(head(pp) == b"privat", "attachment of a private list stays plain")
+# 2.64.0 (#1864): a private list's file is sealed with the owner's account key now (was: stays plain)
+PA0 = one("SELECT id FROM attachments WHERE task_id=?", (PT,))
+check(space(pp) == -ALICE and A.get(B + f"/api/attachments/{PA0}").content == b"private file",
+      f"attachment of a private list sealed with the owner's account key ({space(pp)})")
 sc = A.get(B + "/api/admin/storage-check").json()
 check(not sc["problems"], f"storage check: sealed files count with their plain size {sc['problems']}")
 
@@ -274,14 +294,12 @@ if one("SELECT org_id FROM lists WHERE id=?", (PL,)) is not None:
 PT = A.post(B + "/api/tasks", json={"title": "p", "list_id": PL}).json()["id"]
 A.post(B + f"/api/tasks/{PT}/attachments", files={"file": ("p.txt", b"private file content", "text/plain")})
 pp = os.path.join(DATA, "attachments", one("SELECT path FROM attachments WHERE task_id=?", (PT,)))
-check(one("SELECT org_id FROM lists WHERE id=?", (PL,)) is None and head(pp) == b"privat", "private list: its file is plain")
+# 2.64.0 (#1864): private = sealed with the account key (was: plain)
+check(one("SELECT org_id FROM lists WHERE id=?", (PL,)) is None and space(pp) == -ALICE, "private list: its file is sealed with the account key")
 r = A.patch(B + f"/api/lists/{PL}", json={"org_id": ORG})
 check(r.ok and one("SELECT org_id FROM lists WHERE id=?", (PL,)) == ORG, "private list moved into the organisation " + r.text[:150])
-for _ in range(60):
-    if head(pp) == b"KENC1\n":
-        break
-    time.sleep(0.5)
-check(head(pp) == b"KENC1\n" and A.get(B + f"/api/attachments/{one('SELECT id FROM attachments WHERE task_id=?', (PT,))}").content == b"private file content",
+wait_space(pp, ORG)  # 2.64.0 (#1864): resealed from the account key to the organisation's key
+check(space(pp) == ORG and A.get(B + f"/api/attachments/{one('SELECT id FROM attachments WHERE task_id=?', (PT,))}").content == b"private file content",
       "moved into the organisation: the file is sealed without a restart and still readable")
 
 # ---------------------------------------------------------------- a wrong server key, then rewrap with the recovery key
@@ -306,6 +324,12 @@ check(row1[2] == row0[0] and row1[3] == row0[1] and row1[0] != row0[0],
       "rewrap: the replaced wrapped key is kept in wrapped_prev")
 check(A.get(B + O + "/settings").json().get("company_fields", {}).get("iban") == TEST_IBAN and A.get(B + f"/api/attachments/{AID}").content == BODY,
       "after rewrap: fields and files readable with the new server key")
+# 2.64.0 (#1864): the account keys are rewrapped with the earlier server key (they have no recovery key)
+rc, out, err_ = cli("rewrap-accounts", "--old-key-file", "-", stdin=KEY + "\n")
+check(rc == 0 and '"rewrapped": ' in out and KEY not in out and KEY not in err_, f"rewrap-accounts from stdin {out[-200:]} {err_[-200:]}")
+r = A.get(B + f"/api/attachments/{PA0}")
+check(r.status_code == 200 and r.content == b"private file",
+      "after rewrap-accounts: a file sealed with an account key readable again")
 
 # ---------------------------------------------------------------- deleting an organisation destroys its key
 OG = A.post(B + "/api/admin/orgs", json={"name": "Gamma", "admin_id": ALICE}).json()["id"]
@@ -326,7 +350,9 @@ r = A.delete(B + f"/api/admin/orgs/{OG}")
 check(r.ok, "organisation deleted " + r.text[:150])
 check(one("SELECT COUNT(*) FROM org_keys WHERE org_id=?", (OG,)) == 0, "deleted organisation: its key row is gone")
 check(not os.path.exists(os.path.join(DATA, "office", str(OG))), "deleted organisation: its office folder is gone")
-check(head(gp) == b"gamma " and A.get(B + f"/api/attachments/{GA}").content == b"gamma file content", "the moved list's file was resealed (plain, private list) before")
+# 2.64.0 (#1864): resealed with the owner's account key (was: plain)
+check(wait_space(gp, -ALICE, 10) and A.get(B + f"/api/attachments/{GA}").content == b"gamma file content",
+      f"the moved list's file was resealed (account key of the owner, private list) before ({space(gp)})")
 check(A.get(B + O + "/settings").json()["company_fields"]["iban"] == TEST_IBAN, "the other organisation is untouched")
 
 # ---------------------------------------------------------------- agents see what they saw before (no change of rights)
@@ -352,6 +378,14 @@ st = A.get(B + f"/api/orgs/{O3}/encryption").json()
 check(st["enabled"] is False and st["active"] is False and not st["has_key"], f"without a server key: the state says off {st}")
 check(A.post(B + f"/api/orgs/{O3}/encryption/recovery", json={"password": "password123"}).status_code == 409, "without a server key: no recovery key (409)")
 check(one("SELECT COUNT(*) FROM org_keys") == 0, "without a server key: no key rows")
+# 2.64.0 (#1864): without a server key a private list's file stays plain and no account key is made
+PL3 = A.post(B + "/api/lists", json={"name": "P", "org_id": None}).json()["id"]
+if one("SELECT org_id FROM lists WHERE id=?", (PL3,)) is not None:
+    A.patch(B + f"/api/lists/{PL3}", json={"org_id": None})
+PT3 = A.post(B + "/api/tasks", json={"title": "p", "list_id": PL3}).json()["id"]
+A.post(B + f"/api/tasks/{PT3}/attachments", files={"file": ("p.txt", b"plain private", "text/plain")})
+p3 = os.path.join(DATA, "attachments", one("SELECT path FROM attachments WHERE task_id=?", (PT3,)))
+check(head(p3) == b"plain " and one("SELECT COUNT(*) FROM user_keys") == 0, "without a server key: private files plain, no account keys")
 
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")
 if FAILS:

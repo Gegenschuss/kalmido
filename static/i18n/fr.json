@@ -6931,6 +6931,8 @@
   "Senders of finished documents": "Expéditeurs des documents finalisés",
   "The log of the documents": "Le journal des documents",
   "Files of organisations": "Fichiers des organisations",
+  "Files in the private space": "Fichiers de l'espace privé",
+  "Some files could not be encrypted again for their new place. Nothing was deleted; see the server log.": "Certains fichiers n'ont pas pu être chiffrés à nouveau pour leur nouvel emplacement. Rien n'a été supprimé ; voir le journal du serveur.",
   "Stored access tokens (Git, client secret of the single sign-on)": "Jetons d’accès enregistrés (Git, secret client de l’authentification unique)",
   "Descriptions": "Descriptions",
   "Chats": "Discussions",

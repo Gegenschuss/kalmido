@@ -540,7 +540,7 @@ def list_file_upload(lid):
             c.rollback()
             unlink_files(saved)
             return err(tr("{0}: the file is empty and was not uploaded", name))
-        from ..core.orgcrypt import oc_list_org, oc_seal_path
+        from ..core.orgcrypt import oc_list_org, oc_list_space, oc_seal_path
         from ..files.upsafe import up_check_path, up_after_store, UploadRefused
         mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
@@ -551,7 +551,7 @@ def list_file_upload(lid):
             c.rollback()
             unlink_files(saved)
             return err(str(e))
-        oc_seal_path(c, lorg, full)  # 2.42.0 (#828): a project file of an organisation's list is sealed at rest
+        oc_seal_path(c, oc_list_space(c, lid), full, fresh=True)  # 2.42.0 (#828), 2.64.0 (#1864): sealed at rest, also private
         fid = insert_id(c, "INSERT INTO list_files(list_id,name,mime,size,path,user_id,created_at) VALUES(?,?,?,?,?,?,?)",
                         (lid, name, mime, size, rel, me(), ts))
         up_after_store(c, "list", fid, lorg or None, info)

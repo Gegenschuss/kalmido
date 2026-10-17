@@ -7,9 +7,9 @@ models and the word index belong to exactly one workspace; nothing here ever mov
 
 Encryption at rest: documents are the most sensitive data. The recognised text, the amount, sender names, rules, models and
 suggestions are sealed (AES-256-GCM, "kenc1:") with the workspace key: the organisation's key (core/orgcrypt.py) or, for a
-person's own documents, a key derived from the server key per person (orgcrypt leaves private files plain; the text of a
-private document is sealed anyway, like the text cache of attachments). Without a server key / with org_encrypt=0 the values
-stay plain, as everywhere. The full-text search uses no plain index: doc_words holds HMAC-SHA256 hashes (keyed per workspace)
+person's own documents, a key derived from the server key per person (the text of a private document is sealed like
+the text cache of attachments; 2.64.0 (#1864): its file itself with the owner's account key, core/orgcrypt.py). Without
+a server key / with org_encrypt=0 the values stay plain, as everywhere. The full-text search uses no plain index: doc_words holds HMAC-SHA256 hashes (keyed per workspace)
 of the folded words plus prefix hashes of 4, 6 and 8 characters; a query word is looked up by its hash (or by its longest
 stored prefix and then checked against the opened text)."""
 import hashlib

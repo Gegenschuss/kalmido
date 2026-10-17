@@ -220,7 +220,8 @@ def choice_state(r, ch, ans, newest=None):
 
 
 # ---- 2.13.1 (#465): images / files in the chat between a person and an agent. Same limits and checks as task attachments
-# (MAX_FILE_MB per file, safe names, the sandbox CSP when shown); stored under ATT_DIR/chat/<agent>-<person>/. Only the
+# (MAX_FILE_MB per file, safe names, the sandbox CSP when shown); stored under ATT_DIR/chat/<agent>-<person>/ (2.64.0 #1864:
+# sealed with the person's account key, core/orgcrypt.py). Only the
 # two sides of the conversation can fetch them (the person in the app or with a token, the agent with its token); only
 # the sender removes them. Trimmed messages (CHAT_KEEP) and deleted conversations take their files along.
 CHAT_FILES_MAX = 10   # files per message
@@ -315,6 +316,8 @@ def chat_save_files(c, m, files, saved):
             size, mime, info = up_check_path(c, full, name, mime, m["user_id"], None, "chat")
         except UploadRefused as e:
             return str(e)
+        from ..core.orgcrypt import oc_seal_path, oc_user_space
+        oc_seal_path(c, oc_user_space(m["user_id"]), full, fresh=True)  # 2.64.0 (#1864): the person's account key at rest (after the checks)
         cid = insert_id(c, "INSERT INTO chat_files(message_id,name,mime,size,path,created_at) VALUES(?,?,?,?,?,?)",
                         (m["id"], name, mime, size, rel, ts))
         up_after_store(c, "chat", cid, None, info)

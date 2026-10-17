@@ -181,8 +181,8 @@ def save_attachment_bytes(c, tid, name, mime, data, owner=None):
         os.makedirs(os.path.join(ATT_DIR, str(tid)), exist_ok=True)
         with open(os.path.join(ATT_DIR, rel), "wb") as f:
             f.write(data)
-        from ..core.orgcrypt import oc_seal_path
-        oc_seal_path(c, org or 0, os.path.join(ATT_DIR, rel))  # 2.42.0 (#828): sealed in an organisation's list
+        from ..core.orgcrypt import oc_seal_path, oc_task_space
+        oc_seal_path(c, oc_task_space(c, tid), os.path.join(ATT_DIR, rel), fresh=True)  # 2.42.0 (#828), 2.64.0 (#1864): sealed, also private
     except OSError as e:
         aa_count("storage", "attachments", aa_oserr(e))
         raise

@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.64.0** (2026-10-17): **files in the private space are stored encrypted** on the server (a key per person, like the
+  organisations' files since 2.42; server-side, not end-to-end). Security fix (files at rest).
 - **2.60.0** (2026-10-17): Software team - **sprints** with burndown and review, **WIP limits** per kanban column,
   **story points** and velocity, a **review step** (done only after approval) and **environments** (Staging, Live:
   where a milestone runs since when). All off until a list switches it on.
@@ -435,7 +437,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   accounts an admin created (or automatic accounts, if you want), optional group check and admin group
 - **Encryption** (2.42.0): an end-to-end encrypted note and files per task and encrypted direct messages (WebCrypto in
   the browser, the server only stores ciphertext), plus encryption at rest with a key per organisation for bank and tax
-  data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md)
+  data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md). 2.64.0: the files
+  of the private space are stored encrypted on the server as well, with a key per person (server-side, not end-to-end)
 - **Automatic backups** of the database and all attachments, daily with retention, optionally encrypted, downloadable,
   and a **restore** right in the app (checked, with a safety backup of the current state first)
 - **Admin alerts** over each admin's own channel (Web Push or ntfy): a new version, devices that stopped taking pushes, watchdog errors, failing integrations, repeated failed logins, low disk space or a failed database check reach the admins, never with task contents
@@ -1876,7 +1879,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `NTFY_INBOX_URL`, `NTFY_INBOX_TOKEN`, `NTFY_INBOX_TOPIC` | | Optional share inbox: each message on this ntfy topic becomes an inbox task. The topic must be access-controlled (see *Share from your phone*) |
 | `NTFY_INBOX_USER` | first admin | Username whose inbox receives the share inbox |
 | `NTFY_INBOX_PUBLIC` | | Public ntfy URL, if attachment links use a different address than `NTFY_INBOX_URL` |
-| `KALMIDO_SECRET_KEY` | | 2.1.0: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts (2.2.0) repository tokens and webhook secrets; without it none can be stored. Keep a copy outside the server: losing it means everyone enters their tokens again. Never in the database or backups. 2.42.0: also wraps the per-organisation keys (encryption at rest); without it or an organisation's recovery key, encrypted office data and files are lost |
+| `KALMIDO_SECRET_KEY` | | 2.1.0: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts (2.2.0) repository tokens and webhook secrets; without it none can be stored. Keep a copy outside the server: losing it means everyone enters their tokens again. Never in the database or backups. 2.42.0: also wraps the per-organisation keys (encryption at rest); without it or an organisation's recovery key, encrypted office data and files are lost. 2.64.0: also the account keys of the private files (no recovery key: keep it safe; `orgcrypt_cli rewrap-accounts` after a planned change) |
 | `KALMIDO_SECRET_FILE` | `/secret/kalmido.key` (docker-compose.yml) | 2.45.0: without `KALMIDO_SECRET_KEY` the key is read from this file; a missing file is created once (32 random bytes, base64, mode 0600). Must not lie inside the data or backup folder (refused: a backup would carry the key). Keep a copy |
 | `KALMIDO_SETUP_CODE` | | 2.45.0: empty = while no account exists the server prints a one-time setup code into its log and the setup page asks for it. **Only for tests and automation:** a fixed code, or `off` (no code: whoever opens the page first becomes the admin) |
 | `TASKS_MAX_FILE_MB` | `50` | Maximum size per attachment (task and comment files) |
