@@ -634,7 +634,8 @@ def plh_zip_start():
     if sp["fits"] == "no":
         return err(tr("The documents need {0}, but only {1} of storage is free", fmt_bytes(need), fmt_bytes(sp["free"] or 0)), 413)
     if "mapping" in d:
-        c.execute("UPDATE pl_uploads SET mapping=? WHERE id=?", (S._jseal(c, ws, "pl_uploads.mapping", P.pl_clean_mapping(d["mapping"])), r["id"]))
+        # sealed in the context ngx.pl_mapping opens (the mapping has the same shape for both ways)
+        c.execute("UPDATE pl_uploads SET mapping=? WHERE id=?", (S._jseal(c, ws, "pl_sources.mapping", P.pl_clean_mapping(d["mapping"])), r["id"]))
     c.execute("UPDATE pl_uploads SET run_state='queued', run_by=?, run_total=0, run_done=0, run_new=0, run_skip=0, run_fail=0, "
               "run_error='', run_learn='', run_beat=?, updated_at=? WHERE id=?", (uid, _now(), _now(), r["id"]))
     c.commit()
