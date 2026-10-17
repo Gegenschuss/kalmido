@@ -93,6 +93,12 @@ const V = B + 'api/v1';
   w.eval(`chatOpen(${AG})`); await until(() => d.querySelector('.chring'));
   check(/Woche: 41 % · zurückgesetzt \d{2}\.\d{2}\.2031 \d{2}:\d{2}/.test(tip()) && d.querySelector('.chring')?.getAttribute('aria-label') === 'Verbrauch: 41 %',
     '#1045: German labels and date format (09.10.2026 14:00): ' + JSON.stringify(tip()));
+  // 2.80.0 (#1841): further windows read in German, an unknown key as "Weiteres Kontingent", a weekly window at 0 % with the week's reset is left out
+  await v1('PUT', '/agent/quota', {rate_limits: {seven_day: {used_percentage: 41.2, resets_at: wk}, seven_day_overage_included: {used_percentage: 3, resets_at: wk},
+    seven_day_sonnet: {used_percentage: 0, resets_at: wk}, extra_bucket: {used_percentage: 5}}});
+  await reload(w); await until(() => /Zusatzkontingent/.test(tip()));
+  check(/Woche \(inkl\. Zusatzkontingent\): 3 %/.test(tip()) && /Weiteres Kontingent: 5 %/.test(tip()) && !/Sonnet/.test(tip()) && !/[Oo]verage|[Ee]xtra bucket/.test(tip()),
+    '#1841: no raw English window names, the idle window left out: ' + JSON.stringify(tip()));
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
