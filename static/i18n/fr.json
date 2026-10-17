@@ -8838,7 +8838,7 @@
   "Responsible person": "Personne responsable",
   "Person without access": "Personne sans accès",
   "The person responsible no longer has access to the cash flow. Please choose someone else.": "La personne responsable n'a plus accès à la trésorerie. Veuillez choisir quelqu'un d'autre.",
-  "Due on the 1st of every month in the inbox of the person, with a link to the cash flow and no amounts. Off: the task is ended, not deleted.": "Échéance le 1er de chaque mois dans la boîte de réception de la personne, avec un lien vers la trésorerie et sans montants. Désactivé : la tâche est terminée, pas supprimée.",
+  "Due on the 1st of every month in the basket of the person, with a link to the cash flow and no amounts. Off: the task is ended, not deleted.": "Échéance le 1er de chaque mois dans le panier de la personne, avec un lien vers la trésorerie et sans montants. Désactivé : la tâche est terminée, pas supprimée.",
   "Monthly check on": "Contrôle mensuel activé",
   "Monthly check off": "Contrôle mensuel désactivé",
   "No name": "Pas de nom",
