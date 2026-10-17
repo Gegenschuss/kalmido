@@ -113,3 +113,15 @@ task as a push at the highest priority, even if the list is quiet.
   News item ("For you", switched off together with the sharing News) with a preview and *Take over* / *Decline*; taken over,
   it is their own saved arrangement, named after the sender, with no link back.
 - Agents cannot use any of this (403); they propose arrangements their own way (2.55.0, #1066).
+
+## A task in several lists (2.71.0)
+
+- **Show also in list…** in a task's menu (and in the task panel's list path) puts the task into a further list of the same
+  workspace without copying it: it is one task, every change shows everywhere. *Remove from <list>* takes it out of that
+  list again; the task stays. Both are one undo step, and the task's history notes them.
+- In the further list the row says **From <its list>**, in its own list **Also in <list>**. The further list has its own
+  place and column for it: dragging it there (also on the board) moves only that place, never the task into another list.
+- **Who sees it** is decided by the task's own list only. Someone who sees only the further list does not see the task
+  there (nor in search, the calendar feed, a public link or an export). Lists of another organisation, private lists of
+  an organisation's task (and the other way round), health lists and locked lists cannot be used.
+- It counts once: in statistics, Today, the calendar, search and exports. The sidebar counts it in each list it is in.

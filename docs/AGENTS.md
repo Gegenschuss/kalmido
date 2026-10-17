@@ -2393,7 +2393,8 @@ with the scope it needs). The tools:
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`
 - tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact),
   `search_tasks`, `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
-  `move_task` (list / section / parent + `before_id` / `after_id` / `position`), `batch_tasks`, `skip_occurrence`,
+  `move_task` (list / section / parent + `before_id` / `after_id` / `position`), `link_task_to_list` /
+  `unlink_task_from_list` (2.71.0: a task also in another list, see below), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
 - dependencies and fields: `get_dependencies`, `add_dependency`, `remove_dependency`, `list_fields`, `create_field`,
   `update_field`, `delete_field` (2.39.1, #1293: custom fields in every list, not only projects; creating a field or
@@ -2449,7 +2450,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
 `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`,
 `get_timer`, `get_usage`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,
-`link_contact`, `list_address_books`, `list_agents`, `list_attachments`, `list_calendar_events`, `list_chats`,
+`link_contact`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_calendar_events`, `list_chats`,
 `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`, `list_events`, `list_fields`,
 `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_jobs`, `list_kids`,
 `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,
@@ -2466,7 +2467,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `send_chat`, `set_contact_care`, `set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`,
 `set_waiting`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
-`sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unshare_address_book`, `unshare_event_calendar`,
+`sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`,
 `unshare_list`, `unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
 `update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
 `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_offer_draft`,
@@ -2474,6 +2475,18 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`,
 `write_journal`
 <!-- kalmido-tool-index:end -->
+
+## A task in several lists (2.71.0)
+
+A task can be shown in further lists without a copy (`POST /tasks/{id}/links` `{list_id, section_id?}`, `DELETE
+/tasks/{id}/links/{list_id}`, scope `tasks:write`; MCP `link_task_to_list` / `unlink_task_from_list`). It stays one task:
+every change is the same in all its lists. Rights come only from the task's own list (`list_id`): you see the task when you
+see that list, never through a further list alone. The task's JSON carries `also: [{list_id, section_id, sort}]` with the
+further lists **you** see (lists not shared with you, or outside your token's list limit, are left out; the field is absent
+when there are none). Linking needs edit rights on the task and on the list, both lists in the same workspace (an
+organisation, or private), no health or locked lists, top-level tasks only, at most 10 further lists. Rules and events
+belong to the task's own list; a column change in a further list is no change of the task. Moving the task into another
+workspace (or the list into another organisation) drops the links that would cross it.
 
 ## Use agents safely (2.30.0)
 
