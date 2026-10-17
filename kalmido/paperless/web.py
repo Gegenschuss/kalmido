@@ -1,6 +1,6 @@
 """2.48.0 (#1152): the routes of the Paperless-ngx connection (documents settings, static/js/paperless.js).
 
-Self-hosted servers only: on a hosted server every route answers 404. ?ws / {ws} = 'private' | 'org:<id>' like the
+2.69.0 A (#1846): also on a hosted server (public HTTPS only, ngx.plh_allow); the uploaded export ZIP: zipimp.py. ?ws / {ws} = 'private' | 'org:<id>' like the
 documents settings; setting up, importing and stopping need the right to manage that workspace (an organisation's admin,
 the person themself for their own space). Agents have no connection."""
 import json
@@ -18,10 +18,7 @@ from . import ngx as P
 
 
 def _gate():
-    from ..admin.hosting import hosted
-    if hosted():
-        raise Denied(404)
-    _no_agent()
+    _no_agent()  # 2.69.0 A (#1846): a hosted server has the connection too
 
 
 def _ws(c, raw, manage=True):
@@ -34,19 +31,33 @@ def _public(c, ws, uid, org):
     from ..accounts.orgs import is_org_admin
     r = P.pl_row(c, ws)
     can = bool(is_org_admin(c, uid, org)) if org else True
-    out = {"available": True, "can_manage": can, "ws": f"org:{org}" if org else "private", "every_choices": list(P.PL_EVERY)}
+    from ..admin.hosting import hosted
+    from .zipimp import PLH_ZIP_MAX, plh_public
+    out = {"available": True, "can_manage": can, "ws": f"org:{org}" if org else "private", "every_choices": list(P.PL_EVERY),
+           "hosted": hosted(), "zip": plh_public(c, ws, uid), "zip_max": PLH_ZIP_MAX}  # 2.69.0 A (#1846)
     if not r:
         out["conn"] = None
         return out
-    run = {"state": r["run_state"] or "idle", "kind": r["run_kind"], "total": r["run_total"], "done": r["run_done"], "new": r["run_new"],
-           "skipped": r["run_skip"], "failed": r["run_fail"], "error": r["run_error"], "error_text": P.pl_err_text(r["run_error"])}
-    try:  # 2.69.0 B (#1847): what the last run learnt (rules taken over, documents trained)
-        run["learn"] = json.loads(r["run_learn"]) if r["run_learn"] else None
-    except ValueError:
-        run["learn"] = None
+    run = _run_public(c, "pl_sources", r, r["run_kind"])
     out["conn"] = {"url": r["url"], "token_set": bool(r["token"]), "follow": bool(r["follow"]), "every_min": r["every_min"],
                    "synced_at": r["synced_at"], "error": r["error"], "error_text": P.pl_err_text(r["error"]), "run": run}
     return out
+
+
+def _run_public(c, table, r, kind):
+    """2.69.0 A (#1846): the state of a run (URL or ZIP): + its place in the server's queue, the storage-full stop with how far
+    it came, learn (part B's summary, {} without)."""
+    run = {"state": r["run_state"] or "idle", "kind": kind, "total": r["run_total"], "done": r["run_done"], "new": r["run_new"],
+           "skipped": r["run_skip"], "failed": r["run_fail"], "error": r["run_error"], "error_text": P.pl_err_text(r["run_error"]),
+           "place": P.plh_queue_place(c, table, r["id"]) if r["run_state"] == "queued" else None}
+    if str(r["run_error"]).partition(":")[0] == "quota" and r["run_total"]:
+        run["error_text"] = tr("The storage space is full: the import stopped after {0} of {1} documents", r["run_done"], r["run_total"])
+    try:
+        lv = json.loads(r.get("run_learn") or "{}")
+    except ValueError:
+        lv = {}
+    run["learn"] = lv if isinstance(lv, dict) else {}
+    return run
 
 
 @app.get("/api/paperless")
@@ -72,6 +83,9 @@ def pl_put_conn():
     r = P.pl_row(c, ws)
     url = P.pl_norm_url(d["url"]) if "url" in d else (r["url"] if r else None)
     if not url:
+        from ..admin.hosting import hosted
+        if hosted() and isinstance(d.get("url"), str) and d["url"].strip().lower().startswith("http://"):
+            return err(P.pl_err_text("public_https"))  # 2.69.0 A (#1846)
         return err(tr("Invalid value: {0}", tr("Address")))
     tok = P.pl_token(c, r) if r and url == r["url"] else ""
     if "token" in d:
@@ -138,7 +152,10 @@ def pl_preview_get():
     _uid, _org, ws = _ws(c, request.args.get("ws"))
     r = _need_conn(c, ws)
     try:
-        return jsonify(P.pl_preview(c, r))
+        p = P.pl_preview(c, r)
+        from .zipimp import plh_size_url, plh_space  # 2.69.0 A (#1846): about how much storage the rest needs
+        p["size"] = plh_space(c, _uid, plh_size_url(c, r, P.pl_token(c, r), max(0, p["count"] - p["already"])), False)
+        return jsonify(p)
     except P.PlError as e:
         return err(P.pl_err_text(e.stored()), 502)
 
@@ -153,6 +170,10 @@ def pl_import_start():
     r = _need_conn(c, ws)
     if r["run_state"] in ("queued", "busy", "stop"):
         return err(tr("An import is already running"), 409)
+    from ..admin.hosting import QuotaExceeded, quota_info
+    q = quota_info(c, uid)
+    if q and q["limit"] and q["used"] >= q["limit"]:  # 2.69.0 A (#1846): full = nothing could come in
+        raise QuotaExceeded(q)
     if "mapping" in d:
         c.execute("UPDATE pl_sources SET mapping=? WHERE id=?", (S._jseal(c, ws, "pl_sources.mapping", P.pl_clean_mapping(d["mapping"])), r["id"]))
     c.execute("UPDATE pl_sources SET run_state='queued', run_kind='all', run_by=?, run_total=0, run_done=0, run_new=0, run_skip=0, "

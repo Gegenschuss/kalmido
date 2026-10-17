@@ -6,8 +6,11 @@
 # Any other method answers 405 and is logged (the test checks that Kalmido never writes).
 # 2.56.4 (#1859): pl.json "versions" = the API versions the server allows (Paperless-ngx 3.x: ["9", "10"]); an Accept header
 # with another version= answers 406 like DRF's AcceptHeaderVersioning. Without "versions" every version is taken.
+# 2.69.0 A (#1846): /api/documents/<id>/metadata/ (original_size = the length of the file, like Paperless-ngx); pl.json "delay"
+# = seconds every download waits (a run that takes a while: the queue test).
 import json
 import re
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
@@ -75,7 +78,12 @@ class H(BaseHTTPRequestHandler):
             doc = next((x for x in d.get('documents', []) if x['id'] == int(parts[2])), None)
             if not doc:
                 return self._send(404, {'detail': 'Not found.'})
+            if parts[3] == 'metadata':
+                return self._send(200, {'original_size': len(doc.get('file', '').encode('latin-1')), 'original_mime_type': doc.get('mime', 'application/pdf'),
+                                        'has_archive_version': False})
             if parts[3] == 'download':
+                if d.get('delay'):
+                    time.sleep(float(d['delay']))
                 raw = doc.get('file', '').encode('latin-1')
                 return self._send(200, raw=raw, ctype=doc.get('mime', 'application/pdf'),
                                   extra={'Content-Disposition': f'attachment; filename="{doc.get("original_file_name", "x.pdf")}"'})

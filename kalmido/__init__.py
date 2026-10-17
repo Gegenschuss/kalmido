@@ -199,6 +199,7 @@ ORDER = (
     "paperless.ngx",  # 2.48.0 (#1152): Paperless-ngx connection + import into the documents (self-hosted only)
     "paperless.web",  # 2.48.0 (#1152): the routes of the Paperless-ngx connection (self-hosted only)
     "paperless.learn",  # 2.69.0 B (#1847): rules + learning from an import (URL and ZIP)
+    "paperless.zipimp",  # 2.69.0 A (#1846): the import of an uploaded Paperless-ngx export (ZIP)
     "newsletter.adapters",  # 2.55.0 (#1455): listmonk / Brevo / CleverReach (no routes)
     "newsletter.sync",  # 2.55.0 (#1455): connection, segments, consent, the sync runs (no routes)
     "newsletter.web",  # 2.55.0 (#1455): the routes of the newsletter connection

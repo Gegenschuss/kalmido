@@ -7692,3 +7692,8 @@ button.jobtag b{font-weight:600}
 .pll-rules{margin:.75rem 0 0}
 .pll-rules .muted{margin:.25rem 0 0}
 .pll-bad ul{margin:.25rem 0 0 1rem;padding:0}
+/* 2.69.0 A (#1846) Paperless-ngx: the two ways (address / export ZIP), the storage hint of the preview */
+.pl-slot .plh-way { margin: 1rem 0 .3rem; font-size: var(--fs-sm, .9rem); }
+.plh-zip { margin-top: .8rem; }
+.plh-zip code { font-family: var(--mono, monospace); font-size: .9em; overflow-wrap: anywhere; }
+.pl-warn { margin: .3rem 0; padding: .4rem .6rem; border-radius: .375rem; background: var(--bg3, rgba(127,127,127,.12)); }
