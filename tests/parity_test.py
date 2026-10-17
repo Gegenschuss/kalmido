@@ -359,6 +359,9 @@ APP_ONLY = [
     # 2.55.0 (#1455): the newsletter connection holds access data of an outside service and decides who gets mail: people only
     ("2.55.0 (#1455): the newsletter connection, segments, sync and the consent of contacts are set by people (admins / the "
      "person); agents read the consent with the contact (field newsletter), no new agent rights", ("* /api/newsletter",)),
+    # 2.74.0 (#338): the supporter licence (self-hosted only) is entered by people; it unlocks nothing, agents have no use for it
+    ("2.74.0 (#338): the supporter licence (server: admins, personal: the person) and its yearly hint: people only, session routes",
+     ("* /api/supporter",)),
 ]
 
 

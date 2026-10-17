@@ -68,6 +68,8 @@ def about_info(c, u):
         d.update(signup_admin(c))  # 2.23.0 (#711)
         from ..admin.hosting import hosting_admin
         d.update(hosting_admin(c))  # 2.24.0 (#905 #907 #910 #899)
+    from ..admin.supporter import sup_about
+    d.update(sup_about(c, u))  # 2.74.0 (#338): self-hosted only (hosted: no fields)
     return d
 
 

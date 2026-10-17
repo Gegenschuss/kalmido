@@ -208,6 +208,7 @@ The most used helpers:
 | `accounts/signup.py` | Self-registration on the login page and sign-in links (QR) for people without e-mail. |
 | `admin/hosting.py` | Running Kalmido for others (2.24.0): storage quota per person, the notice / maintenance banner, daily e-mail limits, the "agent joined" notice, `KALMIDO_HOSTED`. |
 | `admin/clientip.py` | 2.33.0 (#834): does the client's address arrive? Private sign-in addresses (14 days), the warning when many accounts sign in from one private address (log + Administration > Server), "Your IP". |
+| `admin/supporter.py` | 2.74.0 (#338): the supporter licence (self-hosted only): Ed25519 keys checked offline, server / personal licence, the badge and the yearly admin hint; unlocks nothing. |
 | `startup.py` | Start-up: init_db() and the background threads (watchdog, update check, calendars, backups, webhooks, mail, git). |
 
 ### Adding a route
