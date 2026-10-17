@@ -265,6 +265,10 @@ j = v1(Bo, "/files/search?q=zitronenbaum").json()
 check(any(x["id"] == NF and x["hit"] == "text" and x.get("url") for x in j.get("data", [])), f"#1820 API: GET /files/search finds the file by its text {str(j)[:200]}")
 check(v1(Zo, "/files/search?q=zitronenbaum").json().get("data") == [], "#1820 API: another organisation finds nothing")
 check(v1(Bo, "/files/search").status_code == 400, "#1820 API: q is needed")
+# 2.81.0 (#1856): the API's task search names the file whose text matched, like the app
+j = v1(Bo, "/search?q=wolkenkratzer").json()
+hit = [x for x in j.get("data", []) if x["id"] == T1]
+check(hit and (hit[0].get("file_hit") or "").endswith(".pdf"), f"#1856 API: GET /search carries file_hit {str(hit)[:300]}")
 
 P = Bo.post(B + "/api/lists", json={"name": "Site", "kind": "project", "org_id": ORG}).json()["id"]
 r = Bo.post(B + f"/api/lists/{P}/files", files={"file": ("plan.pdf", text_pdf(["Kirschgarten Bauabschnitt"]), "application/pdf")})
