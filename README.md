@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.82.0** (2026-10-17): **security release** - tighter permission boundaries (folder defaults, birthday tasks, the
+  *My tasks* order, agents as list admins), locked lists open with texts that begin with `e2e1:`, *Accept* / *Decline* on
+  layout proposals, pinning leftovers, 44 px review buttons on the phone and the reviewer's name in the history.
 - **2.80.0** (2026-10-17): small fixes - import amounts with thousands separators, new clients at once in the import and
   in quotations / invoices (with *Add client* when there is none), undo of a contact merge across workspaces, larger
   Undo button and a wrapping selection bar on the phone, all quota windows named in the agent chat.
