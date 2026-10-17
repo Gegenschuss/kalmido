@@ -323,7 +323,10 @@ check(A.post(B + f"/api/budget/{L}/import/commit", json={"rows": [dict(o3[0], am
 
 # ================================================================ receipts
 RC = b"%PDF-1.4 invented receipt " + os.urandom(8).hex().encode() + b"\n" * 50
+used0 = A.get(B + "/api/me/storage").json()["used"]
 r = A.post(B + f"/api/budget/entries/{E1}/files", files=[("file", ("receipt.pdf", RC, "application/pdf")), ("file", ("photo.txt", b"two", "text/plain"))])
+# 2.72.0 (#1333): review - receipts count towards the storage quota
+check(A.get(B + "/api/me/storage").json()["used"] == used0 + len(RC) + 3, "the receipts count towards the person's storage")
 check(r.ok and [f["name"] for f in r.json()["files"]] == ["receipt.pdf", "photo.txt"] and r.json()["files"][0]["size"] == len(RC),
       "two receipts uploaded " + r.text[:150])
 F1, F2 = r.json()["files"][0]["id"], r.json()["files"][1]["id"]
@@ -459,6 +462,14 @@ ex = A.get(B + "/api/export.json").json()
 eb = {x["list_id"]: x for x in ex.get("budget", [])}
 check(L in eb and any(e["title"] == "Bonus September" for e in eb[L]["entries"]) and "kenc1:" not in str(eb[L]), "the export has the budget decrypted")
 check(DL not in eb and L2 not in eb, "the export has only the person's own budgets")
+
+# ================================================================ 2.72.0 (#1333): review - a budget never gets a public link
+r = A.put(B + f"/api/lists/{L}/public-link", json={"mode": "view"})
+check(r.status_code == 409 and "public link" in r.json().get("error", ""), f"a budget list: no public link (409) {r.status_code} {r.text[:120]}")
+check(A.patch(B + f"/api/lists/{L}", json={"folder": "Home"}).ok, "the budget in a folder")
+r = A.put(B + "/api/folders/public-links", json={"folder": "Home", "on": True})
+check(r.ok and r.json().get("created") == 0 and one("SELECT COUNT(*) FROM public_links WHERE list_id=?", (L,)) == 0,
+      f"the folder's public links leave the budget out {r.text[:150]}")
 
 # ================================================================ deleting a budget list removes its receipts
 Bo.patch(B + f"/api/lists/{L2}", json={"archived": True})
