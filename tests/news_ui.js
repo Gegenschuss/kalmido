@@ -33,16 +33,18 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(!d.querySelector('#fab') || d.querySelector('#fab').classList.contains('gone'), 'no FAB on News');
   // click opens the task and marks it read
   const first = st.items[0];
+  const clicked = JSON.parse(w.eval(`JSON.stringify(S.nf.items[${+rows[0].dataset.i}] || null)`) || 'null');  // 2.80.1: the row's own item
   rows[0].dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(800);
-  check(w.eval('S.sel') === first.task_id, 'click opens the task');
+  check(w.eval('S.sel') === (clicked?.task_id ?? first.task_id), 'click opens the task');
+  // 2.80.1: by meaning instead of by count (CI saw 4 -> 1 and 4 -> 3, the Mac passes; items with the same time can come
+  // in another order in the client's list than in the test's request): the clicked row's own items are read, items of
+  // other tasks stay unread; the message lists the items that differ
   const st2 = await api(w, 'GET', '/api/news');
-  // 2.80.1: by meaning instead of by count (CI saw 4 -> 1 twice, the Mac passes): every item of the clicked task is read,
-  // every other unread item stays unread; the message lists the items that differ
-  const otherWas = st.items.filter(x => x.task_id !== first.task_id && !x.read).map(x => x.id);
-  const nowRead = otherWas.filter(i => st2.items.find(x => x.id === i)?.read);
-  const sameOpen = st2.items.filter(x => x.task_id === first.task_id && !x.read).map(x => x.id);
-  check(st2.items.find(x => x.id === first.id)?.read && !sameOpen.length && !nowRead.length && st2.unread < st.unread,
-    `click marks read (${st.unread} -> ${st2.unread}; other tasks read too: ${nowRead.join(',') || '-'}; same task still unread: ${sameOpen.join(',') || '-'}; `
+  const cids = clicked?.ids || [];
+  const stillOpen = cids.filter(i => !st2.items.find(x => x.id === i)?.read);
+  const nowRead = st.items.filter(x => x.task_id !== clicked?.task_id && !x.read && st2.items.find(y => y.id === x.id)?.read).map(x => x.id);
+  check(cids.length && !stillOpen.length && !nowRead.length && st2.unread <= st.unread - 1,
+    `click marks read (${st.unread} -> ${st2.unread}; clicked ${cids.join(',') || '?'}, still unread: ${stillOpen.join(',') || '-'}; other tasks read too: ${nowRead.join(',') || '-'}; `
     + `before: ${st.items.map(x => `${x.id}/${x.task_id}/${x.kind}/${x.read ? 'r' : 'u'}`).join(' ')})`);
   w.eval('closeDetail()'); await sleep(200);
   // filter
