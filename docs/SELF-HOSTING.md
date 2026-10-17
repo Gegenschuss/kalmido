@@ -570,7 +570,9 @@ organisation and gets their lists shared again. Not yet taken over (the preview 
 office, the file store, team chat, knowledge pages, documents, newsletter, clients, absences and bookings, forms,
 playbooks, project notes and notepads, time entries and browser-encrypted notes.
 
-**Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the storage quota of the
+**Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the data parts may hold at
+most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX_ROWS` (default 500000) rows per table
+(also for an organisation export); the storage quota of the
 person (hosting) is checked before the upload and for every file during the import -- when it is full, the import stops
 and what came over so far can be undone. The import refuses ZIP files with unsafe names, duplicate parts, encryption,
 extreme compression ratios or wrong checksums; ids, owners, organisations and authors in the file are never taken over

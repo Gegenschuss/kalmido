@@ -14,7 +14,7 @@
  - a crafted file: ids / owner / org / author from the file are ignored, wrong types fall back, cycles and lists that are not
    in the file are dropped; a missing person is invited only by an instance admin
  - attacks: no ZIP, path traversal, duplicate part, encrypted ZIP, ZIP bomb, deep JSON, wrong checksum, missing file, wrong
-   format, newer version, too large, storage quota before the upload and in the middle of the run (stops, undo possible)
+   format, newer version, too large, too many rows in one table, storage quota before the upload and in the middle of the run (stops, undo possible)
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY and the mode workspaces.
 usage: p273_b_api_test.py <datadir>"""
 import base64
@@ -151,7 +151,9 @@ def bad(s, data, what, code=None):
     s.delete(B + f"/api/account/import/{iid}")
 
 
-env = dict(os.environ, EXTRA=f"-e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_SECRET_KEY={KEY}")
+# 2.73.0 (#1473) review M2: a small row limit per table, so the test can go just above it
+MAX_ROWS = 5000
+env = dict(os.environ, EXTRA=f"-e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_SECRET_KEY={KEY} -e KALMIDO_ACCOUNT_IMPORT_MAX_ROWS={MAX_ROWS}")
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
 assert r.returncode == 0, r.stdout + r.stderr
 s0 = requests.Session()
@@ -449,6 +451,7 @@ bad(Da, mkzip({"lists": []}, files={"files/a.txt": b"abc"}, drop="files/a.txt"),
 bad(Da, mkzip({"lists": []}, man={"format": "kalmido-org-export"}), "wrong format")
 bad(Da, mkzip({"lists": []}, man={"v": 99}), "newer version")
 bad(Da, mkzip({"lists": {"not": "a list"}}), "broken JSON types")
+bad(Da, mkzip({"lists": [], "habits": [{"id": i} for i in range(MAX_ROWS + 1)]}), "one row above the limit per table (review M2)")
 check(Da.post(B + "/api/account/import", json={"size": 5 * 1024 ** 4}).status_code == 413, "too large 413")
 check(Da.post(B + "/api/account/import", json={"size": "big"}).status_code == 400, "size must be a number")
 # storage quota: before the upload, and in the middle of the run (stops, undo possible)
