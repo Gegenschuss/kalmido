@@ -525,7 +525,7 @@ def _contracts(c, uid):
     """{task id: (task, list org)} of the contracts the person sees (with a cost)."""
     from ..core.serializers import load_tasks
     out = {}
-    rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND fam!=''", (uid, uid))
+    rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND status=0 AND fam!=''", (uid, uid))  # as life_overview
     orgs = {}
     for t in rows:
         f = t.get("fam") or {}
