@@ -54,6 +54,9 @@ Kalmido 2.9.0 is a CalDAV server for tasks. Every list you can see appears as a 
 
 **Roles.**
 - Lists you can only view are read-only in the apps.
+- A list of your organisation that you see without having joined ("Everyone in the organisation") is no calendar; only
+  when tasks of it are assigned to you (2.83.0) it appears read-only with just those tasks, and they are in the calendar
+  link (ICS) too. Join the list to get all its tasks.
 - Participants see and change only the tasks assigned to them, and new tasks they create are assigned to them.
 - Deleting a task in an app moves it to the trash in Kalmido.
 - Lists are created, renamed and deleted in Kalmido (`MKCALENDAR`, `PROPPATCH` and deleting a collection are refused).

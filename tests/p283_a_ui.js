@@ -2,6 +2,8 @@
 // - #1845 an organisation's view shows only what belongs to the organisation: Home, habits, review (+ statistics) and
 //   notes are not in the sidebar, the phone's tab bar ("More" too) and the search; Time stays; Private shows them again;
 //   an old link (#review, #habits) in an organisation's view switches quietly to Private and opens the page
+// - #1725 a list everyone in the organisation may edit: the assign menu offers its members who have not joined ("Not
+//   joined"); the task assigned to such a member is in their Today, the list's other tasks are not
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -12,6 +14,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.KMT_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, EXTRA: (process.env.EXTRA || '') + ' -e KALMIDO_INSTANCE_MODE=workspaces'}});  // KMT_NOSTART=1: a running app
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 
 (async () => {
@@ -74,6 +77,33 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
     check(((await call('GET', '/api/state')).settings || {}).workspace === 'private', `#1845: #${h}: the server knows Private`);
     w.close();
   }
+
+  // ================= #1725: assigned without joining -> in Today
+  await call('PATCH', '/api/settings', {workspace: 'all'});
+  const carol = await call('POST', '/api/users', {username: 'carol', display_name: 'Carol', password: 'password123', email: 'carol@example.com'});
+  check((await call('PUT', `/api/orgs/${ORG}/members`, {email: 'carol@example.com'})).http === 200, '#1725: carol joins Alpha');
+  const CC = await login('carol');
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments'}, CC);
+  const T0 = ymd(new Date());
+  const L = (await call('POST', '/api/lists', {name: 'Team plan', org_id: ORG})).id;
+  check((await call('PATCH', `/api/lists/${L}`, {org_visibility: 'org', org_edit: true})).http === 200, '#1725: everyone in the organisation may edit');
+  const T1 = (await call('POST', '/api/tasks', {title: 'Carols part today', list_id: L, due: T0})).id;
+  await call('POST', '/api/tasks', {title: 'Someone elses part today', list_id: L, due: T0});
+  w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
+  await until(() => d.querySelector('#view .trow'), 40);
+  await w.eval(`assignMenu(document.querySelector('#view .trow'), ${T1})`); await until(() => d.querySelector('#pop [role="menuitem"]'), 20);
+  const mi = [...d.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim());
+  check(mi.some(x => /Carol/.test(x) && /Not joined/.test(x)), '#1725: the assign menu offers carol (not joined): ' + mi.join('|'));
+  [...d.querySelectorAll('#pop [role="menuitem"]')].find(x => /Carol/.test(x.textContent))?.click();
+  await until(async () => (await call('GET', `/api/tasks/${T1}`)).assignee_id === carol.id, 30);
+  check((await call('GET', `/api/tasks/${T1}`)).assignee_id === carol.id, '#1725: assigned to carol');
+  w.close();
+  w = await boot({user: 'carol', hash: 'today'}); d = w.document;
+  await until(() => /Carols part today/.test(d.querySelector('#view')?.textContent || ''), 40);
+  const vt = d.querySelector('#view')?.textContent || '';
+  check(/Carols part today/.test(vt), '#1725: the task assigned to carol is in her Today without joining');
+  check(!/Someone elses part today/.test(vt), '#1725: the other task of the list stays out of Today');
+  w.close();
 
   console.log(`p283_a_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

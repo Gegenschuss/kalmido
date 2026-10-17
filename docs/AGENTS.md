@@ -646,6 +646,9 @@ true`) and may join (`POST /api/v1/lists/{id}/join`). This never reaches agents:
 shared with it, also in its own organisation, and health / budget (2.72) / Home & life / family lists stay private. Readers get no
 events and notifications of the list until they join, so an agent's comments in such a list are read by more people
 than its members -- an agent opening a list (`PATCH /api/v1/lists/{id} {"org_visibility": "org"}`) waits for approval.
+Since 2.83.0 a member who has not joined can be assigned a task of such a list when everyone in the organisation may
+edit it (`org_edit`; in a read-only list only list people as before); the tasks assigned to them appear in their Today /
+All, calendar feed and CalDAV without joining, the list's other tasks only after joining. Agents are never assigned this way.
 
 Since 2.35.0 the admins of an organisation manage its lists in the app (2.39.1: Settings > Organisation > *Lists of the
 organisation*, grouped by owner, only lists shared with at least one more person): they see name, owner, folder and numbers
