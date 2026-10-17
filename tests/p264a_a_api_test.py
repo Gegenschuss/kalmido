@@ -446,7 +446,8 @@ check(r.ok and not dbx("SELECT 1 FROM tasks WHERE id=?", (T3,)) and not dbx("SEL
       "delete: tasks and keys go with the list (no unreadable ciphertexts in the trash) " + r.text[:200])
 
 # ================================================================== 2.64.1 review round 1 (part E)
-LK = A.post(B + "/api/lists", json={"name": "Review lock"}).json()["id"]
+LK = A.post(B + "/api/lists", json={"name": "Review lock", "kind": "project"}).json()["id"]
+assert A.patch(B + f"/api/lists/{LO}", json={"kind": "project"}).ok  # dependencies across lists need two projects
 assert A.put(B + f"/api/lists/{LK}/members", json={"user_id": BOB, "role": "edit"}).ok
 TK = A.post(B + "/api/tasks", json={"title": "Review task", "list_id": LK}).json()["id"]
 TW = A.post(B + "/api/tasks", json={"title": "Moving waiter", "list_id": LO}).json()["id"]
@@ -473,7 +474,7 @@ w0 = dbx("SELECT user_id, wrapped FROM list_keys WHERE list_id=? ORDER BY user_i
 r = A.post(B + f"/api/lists/{LK}/e2e/start", json={"keys": [{"user_id": 1, "wrapped": wrapped()}, {"user_id": BOB, "wrapped": wrapped()}]})
 check(r.status_code == 409 and dbx("SELECT user_id, wrapped FROM list_keys WHERE list_id=? ORDER BY user_id", (LK,)) == w0
       and dbx("SELECT e2e_gen FROM lists WHERE id=?", (LK,))[0][0] == 1, "review M1: second start 409, the first keys stay")
-assert A.post(B + f"/api/lists/{LK}/e2e/bulk", json={"tasks": [{"id": TK, "title": ct(1)}]}).ok
+assert A.post(B + f"/api/lists/{LK}/e2e/bulk", json=enc_all(A.get(B + f"/api/lists/{LK}/e2e/todo").json())).ok
 check(A.post(B + f"/api/lists/{LK}/e2e/finish").ok and A.post(B + f"/api/lists/{LK}/e2e/finish").status_code == 409, "review M1: finish once")
 # 2.64.1 review (M3): explicit targets and the purpose of a locked list
 r = A.patch(B + f"/api/lists/{LK}", json={"family": "shopping"})
