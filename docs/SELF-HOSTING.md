@@ -22,6 +22,7 @@ addresses and paths to your setup.
 - [Encryption in the browser (2.64)](#encryption-in-the-browser-264)
 - [Exporting encrypted content](#exporting-encrypted-content)
 - [Organisation export](#organisation-export)
+- [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom)
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
 - [Mail](#mail)
@@ -29,6 +30,7 @@ addresses and paths to your setup.
 - [Documents: text recognition](#documents-text-recognition)
   - [Import from Paperless-ngx (2.48)](#import-from-paperless-ngx-248)
 - [Related tasks: the embedding service (2.59)](#related-tasks-the-embedding-service-259)
+- [Several servers in one app (2.73)](#several-servers-in-one-app-273)
 - [Moving to a new server](#moving-to-a-new-server)
 - [Production updates](#production-updates)
 
@@ -621,7 +623,81 @@ and download is written to the office log (who, when, size).
   manifest.
 - **Without `KALMIDO_SECRET_KEY`** the organisation data is not encrypted and the export is refused: set the server key
   first (see the section on the encryption of the organisation data).
-- **Import** of such an archive into another Kalmido follows in a later version.
+- **Import** (2.73, stage 1): see [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom) -- an admin of an
+  organisation on the other server uploads the archive under *Settings > Data* and opens it with the recovery key.
+
+## Moving from and to app.kalmido.com
+
+Since 2.73 every person can take their own data from one Kalmido server to another -- from the hosted app.kalmido.com
+to an own server, back, or between two own servers -- and keep the same file as their copy of their data (GDPR Art. 15
+and 20). Agents and API tokens cannot do this; it is a person's step in the app.
+
+1. **Export.** *Settings > Data > Move and export everything > Export everything.* The server builds one ZIP file in the
+   background and keeps it for 24 hours (`exports/account/` in the data folder, not part of the backups, sealed with a
+   key derived from `KALMIDO_SECRET_KEY` and readable only by the server, mode 0600); *Download* gives you the plain ZIP,
+   *Delete now* removes it at once.
+2. **Set up the other server** (this guide) and sign in there (or ask its admin for an account).
+3. **Import.** *Settings > Data > Take over from a Kalmido export*: the file is uploaded in pieces (large exports work),
+   checked (every checksum, format and version) and shown as a preview: the counts, the lists with their folders, the
+   people of your lists and whether an account with the same e-mail address exists here. Choose the target -- your
+   private space or an organisation you administer -- and start. Everything is created anew; one *Undo* (24 hours)
+   removes everything the import created.
+4. **People.** Your lists are shared with a person found by e-mail only when you tick them in the preview (an address on
+   another server can belong to somebody else here). The file names other people only by a hash of their address, so
+   the preview shows their name and the account found here, never an address. A server admin can also invite people that
+   are missing (an account with an invitation link by e-mail): type their address in the preview -- it must match the
+   hash in the file, otherwise nobody is invited; everybody else invites them later as usual. Assignments to people that
+   are not taken over stay empty; comments of such people keep their name.
+
+**What moves:** your lists (sections, fields, tags, status updates, links, milestones, project files), their tasks with
+subtasks, dependencies, field values and your tags, comments, attachments, time entries, habits, filters, templates,
+your own calendars with events, your own address books with contacts, the journal and a few plain settings (language,
+work hours, display options, the folder order). Browser-encrypted content (locked notes, encrypted files) stays
+encrypted and opens with your passwords as before.
+
+**What does not move:** passwords, passkeys, two-factor settings, sessions, API tokens, webhooks, push subscriptions,
+access data of connections (calendar and address book subscriptions, Karakeep, newsletter, Git, other Kalmido servers:
+set them up again), lists of other people (the file names them and contains your own comments there), the trash, and
+organisation data that is not yours (use the organisation export for a whole organisation).
+
+**The file** (`kalmido-account-<date>.zip`, readable without Kalmido):
+
+- `manifest.json`: `format` (`kalmido-account`), `v` (1), Kalmido version, `created_at`, `source` (`url`, `hosted`),
+  `user` (id, name, e-mail), `tables` (rows per table), `files` (path, size, SHA-256 of every part), `client_encrypted`,
+  `export_id` (an import of the same file twice is pointed out), `not_included`.
+- `data/<table>.json`: one JSON array per table (the tables of *Download JSON*, plus `list_tags`, `task_list_tags`,
+  `people` -- the members of your lists with name and `email_hash` --, `shared_lists` (the owner as
+  `owner_email_hash`), `shared_comments`,
+  `server_links` without their access keys). Webhooks appear only with name, events and `url_hint` (scheme and
+  host; the address itself is the secret of many chat services), settings without the server-side ones (such as the
+  ntfy topic an admin set).
+- `files/attachments/`, `files/list_files/`: the files (decrypted).
+- `checksum.sha256`: check the file with `sha256sum -c checksum.sha256` after unpacking.
+
+Other people's addresses never leave the server in plain text: `email_hash` is the SHA-256 (hex) of
+`kalmido-people|` followed by the address in lower case without spaces around it; the import compares it with the accounts
+you may see on the new server. Your own address in `manifest.json` stays readable. Files of 2.73 test builds with a plain
+`email` field are still read.
+
+**A whole organisation** (2.73, stage 1): upload its organisation export (see above) the same way, as an admin of an
+organisation on the new server, and enter the organisation's recovery key of the old server. The archive is opened on
+the server (a wrong key is refused, ten attempts per upload), checked and shown as a preview; it goes into an
+organisation you administer, never into a private space. Lists with sections, fields, tags, status updates, links,
+milestones and project files, tasks with subtasks, dependencies and field values, comments, attachments (sealed with the
+new organisation's key), the organisation's calendars with events and its address books with contacts move along; the
+lists belong to you as the importing admin. Members are matched by e-mail address: a ticked person joins the
+organisation and gets their lists shared again. Not yet taken over (the preview names them with their counts): the
+office, the file store, team chat, knowledge pages, documents, newsletter, clients, absences and bookings, forms,
+playbooks, project notes and notepads, time entries and browser-encrypted notes.
+
+**Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the data parts may hold at
+most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX_ROWS` (default 500000) rows per table
+(also for an organisation export); the storage quota of the
+person (hosting) is checked before the upload and for every file during the import -- when it is full, the import stops
+and what came over so far can be undone. The import refuses ZIP files with unsafe names, duplicate parts, encryption,
+extreme compression ratios or wrong checksums; ids, owners, organisations and authors in the file are never taken over
+as they are. Values in a form the app never writes (a date like 2026-99-99, a time 25:99, an unknown priority, a colour
+that is no #rrggbb, a repeat rule the app refuses) are left out, so the default applies.
 
 ## Server hardening
 
@@ -914,6 +990,60 @@ stored in the table `task_vectors`: per organisation like its tasks (row-level s
 key when its data is encrypted, deleted with the task; they are not part of the organisation export (Kalmido computes them
 again). Thresholds for another model: `KALMIDO_RELATED_MIN`, `KALMIDO_RELATED_DUP`, `KALMIDO_RELATED_SEARCH`,
 `KALMIDO_RELATED_MIX`, `KALMIDO_RELATED_NORM` (see `.env.example`). A Raspberry Pi works too, only slower; leave the service out if the box is busy.
+
+## Several servers in one app (2.73)
+
+A person with accounts on more than one Kalmido server (for example a company server and a private one) can see them
+together in one app: *Settings > Account > Servers*. The data stays on each server; nothing is copied or synchronised,
+and no server needs to trust another one.
+
+- **How it works.** The server the app runs on (the "home" server) talks to the other server's `/api/v1` on the person's
+  behalf, with a personal API token of the person's account there. The browser only ever talks to its own server: no
+  CORS, no change of the Content Security Policy, no token in the browser. The token is stored sealed with a key derived
+  from `KALMIDO_SECRET_KEY` (without a server key the feature refuses to store one) and never leaves the server: not in
+  answers, logs or the account export. Nothing of the other server is stored either; answers are held in memory for at
+  most 15 seconds, at most 4 requests per person and 6 on the whole server run at once (a further one answers "busy"
+  at once instead of waiting), at most 120 reads per person and minute, each request with 3 seconds to connect, an
+  8-second limit and at most 8 MB.
+- **Connecting.** On the other server: *Settings > Account > Servers > Create a connection code for another server*. That
+  creates a personal API token with exactly the scopes `read`, `tasks:write`, `delete`, `calendar` and `comments` and
+  packs it with the server's `PUBLIC_URL` into a code that is shown once. Paste it on the home server. Instead of a code,
+  the address and a token made by hand work too (any Kalmido server with the REST API, the code button needs 2.73).
+  The token stays visible under *API tokens* on the other server and can be revoked there at any time. A removed account
+  can be restored for 30 days; then its stored token is wiped and the account has to be connected anew.
+- **Network.** Every request goes through the same guard as calendar subscriptions: public addresses only, no
+  redirects, every resolved address is checked (no DNS rebinding). A **self-hosted** server reaches internal servers only
+  when they are on the allow-list of internal hosts (*Settings > Administration > Advanced*, or
+  `KALMIDO_CALENDAR_ALLOW_HOSTS`), and uses `http://` only for those: the token never crosses the internet unencrypted. A **hosted** server (`KALMIDO_HOSTED=1`) connects to `https://` addresses only and
+  never to an internal one.
+- **Agents** see nothing of it: there is no `/api/v1` route, no MCP tool and no event for it; an agent only ever works on
+  its own server.
+
+### Several servers in one app: the merged view (2.73.0)
+
+Once an account on another Kalmido server is linked (Settings > Account > Servers), the app shows it next to your own data.
+Nothing is copied or synced: every task stays on its server, and the app asks that server whenever it shows or changes one.
+
+- **Badges:** every task, list and detail panel of another server carries that server's short name in its colour. In the merged
+  views (Today, Basket, Search, Calendar) your own tasks get your own badge too; in a normal list view there is none.
+- **Sidebar:** one group per server below your lists, with its lists. A list opens with its open tasks; you can tick them off and
+  add new ones there.
+- **Today and Basket:** the other servers' tasks join by the same rules (due today or overdue on that server's date; its basket).
+  The numbers in the sidebar count them.
+- **Details:** a tap on a task of another server opens a small panel: title, notes, date, priority, its subtasks, complete or
+  reopen, move it to the trash there, "Open on …" (the full task on its server; comments and attachments are only counted here).
+- **Quick add:** with a server linked, the composer shows where the task goes ("→ Work · Projects"); tap it to pick another
+  server and list. Date and priority words work; the rest stays in the title.
+- **Search, News, Calendar:** hits, unread news and the month's events and due tasks of each server appear in their own section
+  with the badge; a slow or offline server never holds up your own results.
+- **Move to another server:** from the task menu (own tasks) or the panel (tasks of another server). The task is created anew on
+  the target (title, notes, date, priority, open subtasks); comments, attachments and history stay in the trash of the source,
+  where it can still be restored. The app says this before it moves anything, and for a task of an organisation's list also
+  that it leaves the organisation. Should the other server refuse a subtask once the copy exists, the move still completes
+  and the app names how many subtasks are missing.
+- A server that does not answer shows one quiet line ("Work not reachable – last update 10:42") instead of error messages; a
+  change on it is never queued offline, it is either done or reported.
+- Agents only ever see the server they are connected to.
 
 ## Moving to a new server
 

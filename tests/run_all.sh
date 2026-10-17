@@ -1004,6 +1004,17 @@ fresh; run p271_a_ui node p271_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p272_a_budget_api "$PY" p272_a_budget_api_test.py "$KALMIDO_TEST_DATA"
 # 2.72.0 part B: the household budget in the app (#1333)
 fresh; run p272_b_budget_ui node p272_b_budget_ui.js "$KALMIDO_TEST_DATA"
+# 2.73.0 part A: several Kalmido servers in one app (#661): server accounts, connection code, the other server's API (the
+# test server connects to itself; a misbehaving stub server inside the container), SSRF guard, hosted = https only
+fresh; run p273_a_api "$PY" p273_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p273_a_ui node p273_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.73.0 part C: several servers in one app, the merged view (#661)
+fresh; run p273_c_ui node p273_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.73.0 release: part A's server routes with part C's merged view (#661), the test server as "the other server"
+fresh; run p273_l_ui node p273_l_ui.js "$KALMIDO_TEST_DATA"
+# 2.73.0 part B: moving an account -- account export + import with the mapping of people (#1473)
+fresh; run p273_b_api "$PY" p273_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p273_b_ui node p273_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

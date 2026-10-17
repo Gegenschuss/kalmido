@@ -317,6 +317,9 @@ APP_ONLY = [
      ("PUT /api/workload/capacity/", "POST /api/qr")),
     ("2.28.0 (#935): a person's organisations (workspaces) and their admins' member management: people only (agents 403)",
      ("* /api/orgs",)),
+    # 2.73.0 B (#1473): moving an account between servers: export and import of a person's own data, people only (agents 403)
+    ("2.73.0 B (#1473): the account export / import (moving to an own server and back): a person's own data, people only",
+     ("* /api/account/export", "* /api/account/import")),
     ("2.42.0 (#828, #909): end-to-end encryption happens in a person's browser (keys, encrypted note / files, the switch of an encrypted DM); "
      "agents see only placeholders (encrypted_note, encrypted files) and never take part in DMs", (
         "* /api/e2e/", "* /api/tasks/{}/enc-note", "=POST /api/tasks/{}/enc-attachments", "=POST /api/team/rooms/{}/e2e")),
@@ -410,6 +413,10 @@ APP_ONLY = [
      ("* /api/lists/{}/rules", "* /api/rules/")),
     ("2.72.0 (#1333): the household budget is private like health lists: people only, never an agent; no REST v1 / MCP in 2.72.0",
      ("* /api/budget",)),
+    # 2.73.0 A (#661): several servers in one app -- the person's own accounts on other servers (their tokens); an agent only
+    # ever works on its own server
+    ("2.73.0 (#661): several Kalmido servers in one app: the person's accounts on other servers, their data through the other "
+     "server's own API; people only, never agents", ("* /api/servers",)),
 ]
 
 

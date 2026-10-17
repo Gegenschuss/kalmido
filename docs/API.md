@@ -68,6 +68,13 @@ it: other lists and their tasks answer `404` as if they did not exist and are le
 shows it as `token.list_ids`. Agents get the same restriction in their dialog, see
 [Lists, people and agents](#lists-people-and-agents-2300).
 
+**A Kalmido app on another server (2.73.0).** *Settings > Account > Servers* shows the accounts of a person on several
+Kalmido servers in one app; the home server reads and changes the tasks over there through this API with a personal token
+of the person's account there. That token needs `read`, `tasks:write`, `delete`, `calendar` and `comments` (the
+connection code of 2.73 creates it with exactly these, named "Kalmido-App: …"); with fewer scopes the matching actions
+answer `403` with `error.required_scope`, and the app names the missing one. See
+[SELF-HOSTING.md](SELF-HOSTING.md#several-servers-in-one-app-273).
+
 Send it in every request:
 
 ```

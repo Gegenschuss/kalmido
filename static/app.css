@@ -7091,3 +7091,82 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .bgwarn{color:var(--danger)}
 .bgprev{max-height:50vh;overflow-y:auto}
 @media (max-width:30rem){.bgtiles{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.bg-saldo{grid-column:1/-1}.bgview{padding:.5rem .5rem 5rem}}
+/* 2.73.0 A (#661) Settings > Account > Servers: the short-name badge of a server (solid in the settings; the combined views use C's muted badge), the account rows */
+:is(.msvrow,.msvmodal) .msvb{display:inline-flex;align-items:center;justify-content:center;min-width:1.75rem;height:1.375rem;padding:0 .3125rem;border-radius:.375rem;background:var(--msvc,#6e56cf);color:#fff;font-size:var(--fs-xs);font-weight:700;letter-spacing:.02em;line-height:1;flex:0 0 auto;box-sizing:border-box}
+:is(.msvrow,.msvmodal) .msvb.dk{color:#131418}
+.msvrow{align-items:center;gap:.625rem}
+.msvrow .n{display:flex;flex-direction:column;min-width:0;gap:.125rem}
+.msvrow .n small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msvrow.off .msvb{opacity:.6}
+.msvst{font-size:var(--fs-xs)}
+.msvst.ok{color:var(--ok)}
+.msvst.bad{color:var(--danger);white-space:normal}
+.msvbtns{flex-wrap:wrap;gap:.5rem}
+.msvmodal textarea{width:100%;box-sizing:border-box;font-family:var(--mono,ui-monospace,monospace);font-size:var(--fs-s);word-break:break-all}
+.msvmodal .msvshort{width:4.5rem;text-transform:uppercase}
+.msvmodal .msvhead{align-items:center;gap:.625rem}
+.msvmodal .msvhead .msvb{min-width:2.5rem;height:2rem;font-size:var(--fs-s)}
+.msvmodal .msvman{margin:.5rem 0}
+.msvmodal .msvout{margin-top:.5rem}
+@media (pointer:coarse){ :is(.msvrow,.msvmodal) .msvb{min-width:2rem;height:1.625rem} }
+
+/* 2.73.0 C (#661) several servers in one app: the server badge, the sidebar group, foreign rows, details, quick add target */
+.msvb{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:1.375rem;height:1.125rem;padding:0 .25rem;margin-right:.25rem;border-radius:.3125rem;font-size:var(--fs-xs);font-weight:600;line-height:1;letter-spacing:.02em;text-transform:uppercase;color:color-mix(in srgb,var(--msvc,var(--muted)) 80%,var(--text));background:color-mix(in srgb,var(--msvc,var(--muted)) 16%,transparent);border:.0625rem solid color-mix(in srgb,var(--msvc,var(--muted)) 35%,transparent);box-sizing:border-box;white-space:nowrap}
+.meta .msvb{margin-right:0}
+.sg-msv .sgt .msvb{margin:0 .125rem 0 0}
+.msvvoff{display:inline-flex;margin-left:.25rem;color:var(--muted)}
+.msvverr{display:flex;align-items:center;gap:.375rem;padding:.375rem .5rem;margin:.25rem 0;color:var(--muted);font-size:var(--fs-xs);line-height:1.35}
+.msvverr svg{flex:0 0 auto}
+.msvvhead{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;padding:.25rem 0 .5rem;color:var(--muted)}
+.msvvhead .btn{margin-left:auto}
+.msvvqa{margin:0 0 .5rem}
+.msvvqa .box{display:flex;align-items:center;gap:.5rem}
+.msvvqa input{flex:1 1 auto;min-width:0;min-height:2.75rem}
+.trow.msvrow .meta{flex-wrap:wrap}
+.trow.msvrow .tmain{cursor:pointer}
+.msvvdlg .card{max-width:36rem}
+.msvvdh{display:flex;align-items:center;gap:.5rem}
+.msvvdsrv{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.msvvdf{display:flex;flex-direction:column;gap:.625rem}
+.msvvdt{font-size:1.0625rem;font-weight:600;min-height:2.75rem}
+.msvvdrow{display:flex;flex-wrap:wrap;gap:.75rem}
+.msvvdrow label{display:flex;align-items:center;gap:.375rem;color:var(--muted)}
+.msvvdrow input,.msvvdrow select{min-height:2.5rem}
+.msvvdf textarea{width:100%;box-sizing:border-box;resize:vertical;min-height:6rem}
+.msvvdf h4{margin:.25rem 0 0}
+.msvvsubs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.25rem}
+.msvvsubs li{display:flex;align-items:center;gap:.375rem}
+.msvvsubs li.done span{text-decoration:line-through;color:var(--muted)}
+.msvvcnt{margin:0;font-size:var(--fs-xs)}
+.msvvfoot{flex-wrap:wrap;gap:.5rem;justify-content:flex-start}
+.msvvfoot .btn{min-height:2.75rem}
+.msvvmv{display:flex;flex-direction:column;gap:.375rem}
+.msvvmv select{min-height:2.75rem}
+.qdc.msvvqc{gap:.25rem}
+.qdc.msvvqc.far{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.qdchips.msvvf [data-act="qd-list"]{display:none}
+.msvvqs{display:flex;flex-wrap:wrap;gap:.375rem;padding:.25rem .5rem 0}
+.msvvsec{margin-top:1rem}
+.msvvgh{display:flex;align-items:center;gap:.375rem;cursor:default}
+.msvvwait{padding:.375rem .5rem;font-size:var(--fs-xs)}
+.msvvni{display:flex;align-items:center;gap:.5rem;width:100%;text-align:left;min-height:2.75rem;padding:.375rem .5rem;background:none;border:0;border-radius:var(--radius);color:inherit;font:inherit;cursor:pointer}
+.msvvni.unread .msvvnt{font-weight:600}
+.msvvnt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ev.msvev{display:flex;align-items:center;gap:.125rem;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ev.msvev .msvb{min-width:auto;height:.875rem;padding:0 .1875rem;font-size:.625rem}
+.msvvcal{display:flex;flex-direction:column;gap:.125rem;margin-top:.5rem}
+.cevrow.msvcev{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+@media (max-width:37.5rem){.trow.msvrow .meta .lst{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+/* 2.73.0 B (#1473) move and export everything (Settings > Data, move.js) */
+.umzbar { display: grid; gap: .3rem; margin: .5rem 0; }
+.umzbar progress { width: 100%; height: .5rem; accent-color: var(--accent); }
+.umzcnt { margin: .35rem 0; line-height: 1.5; }
+.umzlists { max-height: 14rem; overflow: auto; margin: .35rem 0; }
+.umzp { align-items: center; gap: .5rem; }
+.umzck { display: inline-flex; align-items: center; gap: .4rem; min-height: 2.75rem; white-space: nowrap; }
+.umzhow { margin: .5rem 0 1rem; }
+.umzhow summary { cursor: pointer; padding: .75rem 0; font-weight: 600; }
+.umzsteps { margin: .25rem 0 0 1.25rem; padding: 0; line-height: 1.5; }
+.umzem { flex: 1 1 12rem; min-height: 2.75rem; }  /* review M1: the address an admin types for an invitation */
+.umzmis { flex-basis: 100%; color: var(--danger, inherit); }
+@media (max-width: 40rem) { .umzp { flex-wrap: wrap; } }

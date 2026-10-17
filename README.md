@@ -20,6 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.74.0** (2026-10-17): **several Kalmido servers in one app** (work + home side by side, with server badges) and **moving** between app.kalmido.com and your own server (export everything, import with people matched by e-mail).
 - **2.73.0** (2026-10-17): **household budget** at home (module *Budget*, off by default): income and expenses with
   categories and a monthly limit, planned / spent per month, recurring entries (also taken over from your contracts), CSV
   import of your bank's statement with column mapping and duplicate check, receipts on an entry; shared with your family

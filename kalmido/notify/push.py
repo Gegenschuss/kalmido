@@ -538,6 +538,10 @@ def watchdog_tick(c):
     _wd_section(c, "org export cleanup", ox_cleanup)  # 2.42.0 (#833): archives after 24 h
     from ..core.merges import mg_prune
     _wd_section(c, "merge snapshots", mg_prune, False)  # 2.66.0 (#1835): the undo data of merges after 30 days
+    from ..admin.acctexport import umz_cleanup
+    _wd_section(c, "account export cleanup", umz_cleanup)  # 2.73.0 B (#1473): account exports + import uploads after 24 h
+    from ..accounts.servers import msv_cleanup
+    _wd_section(c, "server link tokens", msv_cleanup)  # 2.73.0 A (#661) review N1: tokens of removed accounts after 30 days
     _wd_section(c, "tidy events", tidy_tick)  # 2.27.0 (#999)
     _wd_section(c, "agent bursts", burst_tick)  # 2.29.0 (#1031)
     from ..lists.sprints import spr_tick

@@ -130,6 +130,7 @@ TENANT_EXEMPT = {
     "conn_links": "2.49.0 (#1106): an accepted connection between two people, like a private shared list (no workspace)",
     "wiki_keys": "2.64.3 (#1817): a wrapped key of a knowledge space -> its wiki_spaces row (org_id or owner_id); only the person it is wrapped for reads it",
     "wiki_key_pending": "2.64.3 (#1817): an organisation member waiting for the key of a knowledge space -> its wiki_spaces row (org_id)",
+    "msv_links": "2.73.0 A (#661): the accounts of one person on other Kalmido servers (accounts/servers.py); only the person sees them",
 }
 schema_src = re.sub(r"--[^\n]*", "", read("kalmido", "core", "schema.py"))
 tables = {m.group(1): m.group(2) for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\);", schema_src, re.S)}

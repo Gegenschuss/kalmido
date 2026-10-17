@@ -570,12 +570,8 @@ def push_test():
     return jsonify(ok=ok, channel=push_channel(s), devices=webpush_count(c, me()))
 
 
-@app.get("/api/export.json")
-def export_json():
-    """My data: lists I own (also shared ones, with their tasks incl. link / sections / files / comments /
-    activity / custom fields + values / dependencies / status updates), my tags, habits, focus sessions, my time entries, filters and settings. Attachment files stay in data/attachments/."""
-    c = db()
-    uid = me()
+def umz_export_queries(uid):
+    """2.73.0 B (#1473): the tables of "my data" (GET /api/export.json and the account export) -> {name: (sql, args)}."""
     own = "(SELECT id FROM lists WHERE owner_id=?)"
     task_ids = f"(SELECT id FROM tasks WHERE list_id IN {own})"
     q = {
@@ -649,12 +645,25 @@ def export_json():
         "public_links": (f"SELECT list_id, mode, notes, password_hash IS NOT NULL AS has_password, expires_at, created_at FROM public_links "
                          f"WHERE list_id IN {own}", (uid,)),
     }
-    data = {t: [dict(r) for r in c.execute(sql, args)] for t, (sql, args) in q.items()}
-    for a in data["activity"]:  # 2.36.0 (#1116): old entries of the removed Paperless connection carry no document data
-        if a["kind"] in ("paperless", "paperless_rm", "paperless_send"):
-            a["data"] = "{}"
+    return q
+
+
+def umz_export_clean(table, row):
+    """2.73.0 B (#1473): a row of "my data" as exported (the same in export.json and the account export)."""
+    if table == "activity" and row.get("kind") in ("paperless", "paperless_rm", "paperless_send"):
+        row["data"] = "{}"  # 2.36.0 (#1116): old entries of the removed Paperless connection carry no document data
+    return row
+
+
+@app.get("/api/export.json")
+def export_json():
+    """My data: lists I own (also shared ones, with their tasks incl. link / sections / files / comments /
+    activity / custom fields + values / dependencies / status updates), my tags, habits, focus sessions, my time entries, filters and settings. Attachment files stay in data/attachments/."""
+    c = db()
+    q = umz_export_queries(me())  # 2.73.0 B (#1473): shared with the account export (admin/acctexport.py)
+    data = {t: [umz_export_clean(t, dict(r)) for r in c.execute(sql, args)] for t, (sql, args) in q.items()}
     from ..life.budget import bud_export
-    data["budget"] = bud_export(c, uid)  # 2.72.0 (#1333): my budgets, decrypted (receipt files stay in data/attachments/)
+    data["budget"] = bud_export(c, me())  # 2.72.0 (#1333): my budgets, decrypted (receipt files stay in data/attachments/)
     data["user"] = user_public(g.user)
     name = f"kalmido-export-{local_now():%Y-%m-%d}.json"
     return Response(json.dumps(data, ensure_ascii=False, indent=1), mimetype="application/json",

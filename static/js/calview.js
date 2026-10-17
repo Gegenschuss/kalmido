@@ -172,6 +172,7 @@ function viewCal() {
   const byDay = calByDay(start, addDays(start, 41));
   const evOn = calEvOn();
   if (evOn) ensureCalEv(start, addDays(start, 41));
+  msvvCalEnsure(start, addDays(start, 41));  // 2.73.0 C (#661): the other servers' events
   let cells = '';
   for (let i = 0; i < 42; i++) {
     const d = addDays(start, i);
@@ -179,7 +180,7 @@ function viewCal() {
     const ts = byDay.get(d) || [];
     const out = pd(d).getMonth() !== m - 1;
     const evs = evOn ? cevOn(d).sort(cevSort) : [];
-    const chips = [...evs.map(e => cevChip(e, d)), ...ts.map(t => `<div class="ev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}${lp_cls(t)}" data-id="${t.id}"${lp_attr(t) /* 2.53.0 (#1426) */} draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}">${msGlyph(t)}${t.due_time ? `<span class="muted">${t.due_time}</span> ` : ''}${mdTitleNL(t.title)}</div>`)];
+    const chips = [...evs.map(e => cevChip(e, d)), ...msvvCalChips(d), ...ts.map(t => `<div class="ev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}${lp_cls(t)}" data-id="${t.id}"${lp_attr(t) /* 2.53.0 (#1426) */} draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}">${msGlyph(t)}${t.due_time ? `<span class="muted">${t.due_time}</span> ` : ''}${mdTitleNL(t.title)}</div>`)];
     cells += `<div class="cell ${out ? 'out' : ''} ${d === t0 ? 'today' : ''} ${d === S.calSel ? 'sel' : ''}" data-day="${d}">
       <span class="dn">${pd(d).getDate()}</span>
       ${chips.slice(0, 3).join('')}
@@ -195,6 +196,7 @@ function viewCal() {
       ${selEv.length ? `<div class="cevlist">${selEv.map(e => cevRow(e, S.calSel)).join('')}</div>` : ''}
       ${qaddBox()}
       ${sel.length ? sel.map(t => taskRow(t, {showList: true, drag: false})).join('') : `<div class="muted" style="padding:.5rem .25rem">${tr('No tasks on this day.')}</div>`}
+      ${msvvCalDay(S.calSel)}
     </div>`;
 }
 

@@ -70,6 +70,7 @@ function bg_homeCard() {
 
 // ---- the view
 function viewBudget() {
+  if (typeof lifeModal !== 'function') { ld_later('life'); return `<div class="bgview"><p class="muted lempty">${tr('Loading…')}</p></div>`; }  // 2.65.0 (#1823): the dialogs use life.js (loaded on demand)
   const hl = bg_lidOfHash();
   if (hl && hl !== BG.lid) { BG.lid = hl; BG.data = null; BG.done = false; }
   if (BG.stale && !$('.modal.bgdlg')) { BG.stale = false; BG.done = false; }
