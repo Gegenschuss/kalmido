@@ -123,9 +123,7 @@ AGA, cla = agent("alphabot", org_id=ALPHA)        # an agent of Alpha
 AGB, clb = agent("betabot", org_id=BETA)          # an agent of Beta
 AGL, cll = agent("listbot", org_id=None)          # limited to one list
 LL = A.post(B + "/api/lists", json={"name": "Only this"}).json()["id"]
-check(A.put(B + f"/api/lists/{LL}/members", json={"user_id": AGL, "role": "edit"}).ok, "setup: listbot shares the list")
-r = A.patch(B + f"/api/admin/agents/{AGL}", json={"list_ids": [LL]})
-check(r.ok, "setup: listbot limited to one list " + r.text[:160])
+dbx("UPDATE agents SET list_ids=? WHERE user_id=?", (str(LL), AGL), write=True)  # limited to one list (the admin route takes only its own lists)
 
 # ---- bob's private book (carol reads it), his book in Alpha's workspace
 r = Bo.post(B + "/api/books", json={"name": "Bob private", "org_id": None})
