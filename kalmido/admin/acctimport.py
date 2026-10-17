@@ -6,7 +6,7 @@ Flow (Settings > Data, people only):
                                                sealed at rest like the export (0600, own folder of the person)
     GET    /api/account/import/<id>            state: upload | checking | preview (+ preview) | invalid (+ error) |
                                                running (+ progress) | done | stopped (+ result) | failed
-    POST   /api/account/import/<id>/run        {target: "private" | org id, people: {email: {share, invite}}} -> running
+    POST   /api/account/import/<id>/run        {target: "private" | org id, people: {key: {share, invite, email?}}} -> running
     DELETE /api/account/import/<id>            cancel: the upload is removed at once
 Undo: POST /api/imports/<import id>/undo (integrations/importers.py imp_undo hands source "Kalmido" to umz_undo).
 
@@ -30,7 +30,7 @@ import threading
 import time
 import uuid
 import zipfile
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from flask import g, jsonify, request
 
@@ -40,8 +40,11 @@ from ..core.pg import insert_id, system_ctx
 from ..core.i18n import lang, LANGS, N_, tr as _tr_base
 from ..core.access import Denied, ROLES
 from ..accounts.session import me
+from ..lists.lists import LIST_COLOR_RE
+from ..tasks.validation import (DATE_MAX_Y, DATE_MIN_Y, DURATION_MAX, PRIORITIES, REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm,
+                                rr_problem, valid_date, valid_hm, valid_plan_start)
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS
-from .acctexport import (UMZ_BLOCK, UMZ_FORMAT, UMZ_V, UmzReader, UmzWriter, umz_key, umz_person, umz_space_ok,
+from .acctexport import (UMZ_BLOCK, UMZ_FORMAT, UMZ_HEAD, UMZ_V, UmzReader, UmzWriter, umz_key, umz_person, umz_space_ok,
                          umz_user_conn, umz_write_state)
 
 UMZ_IN_DIR = os.path.join(EXPORT_DIR, "account-import")
@@ -61,13 +64,16 @@ UMZ_IMPORT_MAX_MB = _env_mb("KALMIDO_ACCOUNT_IMPORT_MAX_MB", 4096)
 # one piece per request: 8 MB, never above the request limit, a whole number of sealed blocks
 UMZ_CHUNK = max(UMZ_BLOCK, min(8 * UMZ_BLOCK, ((app.config.get("MAX_CONTENT_LENGTH") or 8 * UMZ_BLOCK) - 65536) // UMZ_BLOCK * UMZ_BLOCK))
 UMZ_MAX_ENTRIES = 200_000
-UMZ_JSON_MAX = 128 * 1024 * 1024  # one data/<table>.json
-UMZ_JSON_TOTAL = 512 * 1024 * 1024  # all data/*.json together (they are held in memory during the check and the run)
+# review M2: the parsed rows take 5-10 times the text in memory -- a real export of 50 000 tasks stays far below these
+UMZ_JSON_MAX = 32 * 1024 * 1024  # one data/<table>.json
+UMZ_JSON_TOTAL = 96 * 1024 * 1024  # all data/*.json together (they are held in memory during the check and the run)
+UMZ_MAX_ROWS = _env_mb("KALMIDO_ACCOUNT_IMPORT_MAX_ROWS", 500_000)  # rows of one table after parsing
 UMZ_MANIFEST_MAX = 32 * 1024 * 1024
 UMZ_RATIO = 200  # uncompressed / compressed of one entry above 1 MB
 UMZ_TEXT_MAX = 1_000_000  # characters of one text value
 UMZ_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._\-/]{0,250}")
 UMZ_EID_RE = re.compile(r"[0-9a-f]{8,64}")
+UMZ_UID_RE = re.compile(r"[A-Za-z0-9@._-]{1,200}")  # review N7: a contact uid taken from the file
 # settings that move along (nothing about security, sign-in, push or connections)
 UMZ_SETTINGS = ("lang", "allday_time", "default_reminder", "work_start", "work_end", "show_done_views", "show_done_new",
                 "show_done_default", "group_order", "comment_order", "time_rounding", "time_currency", "capacity_h",
@@ -283,6 +289,8 @@ def umz_open(path, key, size, full=True):
                 rows = _json(_read_entry(zf, zi, UMZ_JSON_MAX, sha), p)
                 if not isinstance(rows, list) or not all(isinstance(x, dict) for x in rows):
                     raise UmzBad(N_("The file contains a broken part: {0}"), p)
+                if len(rows) > UMZ_MAX_ROWS:
+                    raise UmzBad(N_("The file contains a part that is too large: {0}"), p)
                 data[p[5:-5]] = rows
             elif full:
                 _read_entry(zf, zi, MAX_FILE_MB * 1024 * 1024 * 4, sha)
@@ -338,6 +346,8 @@ def umz_org_open(zf, names, man, mraw, full):
             rows = _json(_read_entry(zf, zi, UMZ_JSON_MAX, f["sha256"]), p)
             if not isinstance(rows, list) or not all(isinstance(x, dict) for x in rows):
                 raise UmzBad(N_("The file contains a broken part: {0}"), p)
+            if len(rows) > UMZ_MAX_ROWS:  # review M2: the same limits as the account import
+                raise UmzBad(N_("The file contains a part that is too large: {0}"), p)
             data[UMZ_ORG_MAP[p]] = rows
         elif full or p.endswith(".json"):
             raw = _read_entry(zf, zi, UMZ_JSON_MAX if p.endswith(".json") else MAX_FILE_MB * 1024 * 1024 * 4, f["sha256"])
@@ -387,6 +397,29 @@ def _email(v):
     return v if "@" in v and " " not in v else ""
 
 
+def umz_phash(p):
+    """Review M1: the key of a person of the file -- email_hash (account export since the review), or the hash of the
+    plain address (older files, the organisation export)."""
+    from .acctexport import umz_email_hash
+    h = p.get("email_hash") if isinstance(p, dict) else None
+    if isinstance(h, str) and re.fullmatch(r"[0-9a-f]{64}", h):
+        return h
+    return umz_email_hash(_email(p.get("email"))) if isinstance(p, dict) else ""
+
+
+def umz_pkey(v):
+    """A key of the run's choice: the hash, or (older clients) a plain address."""
+    from .acctexport import umz_email_hash
+    if isinstance(v, str) and re.fullmatch(r"[0-9a-f]{64}", v):
+        return v
+    return umz_email_hash(_email(v))
+
+
+def umz_disk_size(received, sealed):
+    """The bytes on disk of an upload with `received` confirmed plaintext bytes (sealed: head + whole blocks with tag)."""
+    return UMZ_HEAD + (received // UMZ_BLOCK) * (UMZ_BLOCK + 16) if sealed else received
+
+
 def umz_targets(c, uid):
     """Where the import may go: the private space and every organisation the person administers."""
     from ..accounts.orgs import org_role, user_orgs
@@ -400,17 +433,25 @@ def umz_targets(c, uid):
     return out
 
 
-def umz_find(c, uid, email):
-    """The account with this address on this server that the person may see (else None: the answer must not reveal
-    accounts the person could not find in the app either)."""
-    from ..accounts.orgs import may_see
-    if not email:
+def umz_seen(c, uid):
+    """Review M1: {email hash: account} of the accounts the person may see on this server (never others: the preview must
+    not reveal accounts the person could not find in the app either)."""
+    from ..accounts.orgs import visible_people
+    from .acctexport import umz_email_hash
+    vis = visible_people(c, uid)
+    out = {}
+    for r in c.execute("SELECT id, display_name, username, email FROM users WHERE disabled=0 AND COALESCE(kind,'user')!='agent' "
+                       "AND email IS NOT NULL AND email!='' AND id!=?", (uid,)):
+        if vis is None or r["id"] in vis:
+            out.setdefault(umz_email_hash(r["email"]), r)
+    return out
+
+
+def umz_find(c, uid, h, seen=None):
+    """The account behind this hash that the person may see, else None."""
+    if not h:
         return None
-    r = c.execute("SELECT id, display_name, username FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'",
-                  (email,)).fetchone()
-    if not r or r["id"] == uid or not may_see(c, uid, r["id"]):
-        return None
-    return r
+    return (umz_seen(c, uid) if seen is None else seen).get(h)
 
 
 def umz_preview(c, uid, man, data, can_invite):
@@ -419,14 +460,18 @@ def umz_preview(c, uid, man, data, can_invite):
               "tasks": sum(1 for t in data.get("tasks", []) if t.get("list_id") == L.get("id") and not t.get("deleted_at"))}
              for L in data.get("lists", [])]
     people = []
-    mine = ((c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0] or "").lower()
+    from .acctexport import umz_email_hash
+    mine = umz_email_hash((c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0])
+    seen = umz_seen(c, uid)
     for p in data.get("people", []):
-        em = _email(p.get("email"))
-        if not em or p.get("agent") or em == mine:
+        h = umz_phash(p)
+        if not h or p.get("agent") or h == mine:
             continue
-        hit = umz_find(c, uid, em)
-        people.append({"email": em, "name": _txt(p.get("name"), 100), "lists": len(p.get("lists") or {}) if isinstance(p.get("lists"), dict) else 0,
-                       "found": bool(hit), "found_name": (hit["display_name"] or hit["username"]) if hit else ""})
+        hit = umz_find(c, uid, h, seen)
+        # review M1: never an address in the preview; key = hash, the admin types the address for an invitation
+        people.append({"key": h, "name": _txt(p.get("name"), 100), "lists": len(p.get("lists") or {}) if isinstance(p.get("lists"), dict) else 0,
+                       "found": bool(hit), "found_name": (hit["display_name"] or hit["username"]) if hit else "",
+                       "need_address": not _email(p.get("email"))})
     eid = man.get("export_id") if isinstance(man.get("export_id"), str) and UMZ_EID_RE.fullmatch(man.get("export_id")) else ""
     again = bool(eid) and bool(c.execute("SELECT 1 FROM imports WHERE user_id=? AND source=? AND undone_at IS NULL AND report LIKE ?",
                                          (uid, UMZ_SOURCE, f'%"export_id": "{eid}"%')).fetchone())
@@ -445,7 +490,7 @@ def umz_preview(c, uid, man, data, can_invite):
     return {
         "format": man.get("format"), "v": man.get("v"), "kalmido_version": _txt(man.get("kalmido_version"), 40),
         "created_at": _txt(man.get("created_at"), 40), "source": {"url": _txt(src.get("url"), 300), "hosted": bool(src.get("hosted"))},
-        "user": {"name": _txt(u.get("name"), 100), "email": _email(u.get("email"))},
+        "user": {"name": _txt(u.get("name"), 100), "email": _email(u.get("email"))},  # the own address (plain in the file)
         "counts": {k: tables.get(k, 0) for k in ("lists", "sections", "tasks", "comments", "attachments", "list_files", "habits",
                                                   "filters", "templates", "time_entries", "event_calendars", "events", "address_books",
                                                   "contacts", "journal")},
@@ -509,6 +554,58 @@ def _coerce(v, typ):
     return _BAD  # json, binary, time stamps: not taken over
 
 
+def _iso_ts(v):
+    """A time stamp as the app writes it (ISO 8601, date or date + time, optionally with zone)."""
+    if not isinstance(v, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:?\d{2})?)?", v):
+        return False
+    try:
+        datetime.fromisoformat(v.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return DATE_MIN_Y <= int(v[:4]) <= DATE_MAX_Y
+
+
+def _umz_rem(v):
+    """'0,15' (minutes before due, as the app writes them) -> normalized, else _BAD."""
+    if v == "":
+        return v
+    items = [x.strip() for x in v.split(",")] if isinstance(v, str) else []
+    if not items or len(items) > REM_COUNT or not all(re.fullmatch(r"-?\d{1,6}", x) and REM_MIN <= int(x) <= REM_MAX for x in items):
+        return _BAD
+    return ",".join(dict.fromkeys(str(int(x)) for x in items))
+
+
+# review N6: the format of known columns (the forms the app writes itself); a value that does not fit is left out, so the
+# column's default applies (or the row is dropped when the column is required)
+UMZ_CHECK = {
+    ("tasks", "due"): valid_date, ("tasks", "start"): valid_date, ("tasks", "due_time"): valid_hm,
+    ("tasks", "plan_start"): valid_plan_start, ("tasks", "priority"): lambda v: v in PRIORITIES,
+    ("tasks", "duration"): lambda v: isinstance(v, int) and 1 <= v <= DURATION_MAX,
+    ("tasks", "repeat_from"): lambda v: v in ("due", "done"), ("tasks", "reminders"): _umz_rem,
+    ("habits", "remind_at"): lambda v: v == "" or valid_hm(v), ("habits", "days"): lambda v: bool(re.fullmatch(r"[1-7]{1,7}", v or "")),
+    ("habits", "goal"): lambda v: isinstance(v, int) and 1 <= v <= 1000, ("habits", "per_week"): lambda v: isinstance(v, int) and 0 <= v <= 7,
+    ("habit_logs", "day"): valid_date, ("events", "start"): _iso_ts, ("events", "end"): _iso_ts,
+    ("time_entries", "start"): _iso_ts, ("time_entries", "end"): _iso_ts,
+}
+
+
+def umz_fmt(table, k, v):
+    """The value to store, or _BAD (left out)."""
+    f = UMZ_CHECK.get((table, k))
+    if f is None:
+        if v is None:
+            return v
+        if k == "color":
+            return v if v == "" or (isinstance(v, str) and LIST_COLOR_RE.fullmatch(v)) else _BAD
+        if k.endswith("_at") and isinstance(v, str):
+            return v if v == "" or _iso_ts(v) else _BAD
+        return v
+    if v is None:
+        return v
+    r = f(v)
+    return r if f is _umz_rem else v if r else _BAD
+
+
 def umz_row(c, table, src, fixed, ts):
     """The row to insert: the file's values of the columns this server has (coerced to their type), never ids or columns
     that point at rows, plus the fixed values. None when a required column has no value."""
@@ -520,9 +617,21 @@ def umz_row(c, table, src, fixed, ts):
                 or k.endswith("_id") or k.endswith("_by") or k in ("org_id", "reply_to"):
             continue
         v = _coerce(v, cols[k][0])
+        if v is not _BAD:
+            v = umz_fmt(table, k, v)
         if v is _BAD or (v is None and not cols[k][1]):
             continue
         d[k] = v
+    if table == "tasks":  # review N6: without a valid due date no time / reminders; a rule that never fits is dropped
+        if not d.get("due"):
+            for k in ("due_time", "reminders"):
+                d.pop(k, None)
+        if d.get("repeat"):
+            rule = rr_norm(d["repeat"])
+            if rr_problem(rule) or (d.get("due") and not rr_feasible(rule, d["due"])):
+                d.pop("repeat")
+            else:
+                d["repeat"] = rule
     d.update({k: v for k, v in fixed.items() if k in cols})
     for k, (typ, nullable, dflt) in cols.items():
         if k in d or nullable or dflt or k == "id":
@@ -825,8 +934,9 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         bid = run.m("books", r.get("book_id"))
         if not bid:
             continue
-        cuid = _txt(r.get("uid"), 200) or uuid.uuid4().hex
-        d = umz_row(c, "contacts", r, {"book_id": bid, "uid": cuid, "href": f"{cuid}.vcf", "updated_at": ts, "changed_at": ts}, ts)
+        cuid = r.get("uid") if isinstance(r.get("uid"), str) and UMZ_UID_RE.fullmatch(r["uid"]) else uuid.uuid4().hex
+        # review N7: the CardDAV path never comes from the file (a uid with / or spaces made it unreachable)
+        d = umz_row(c, "contacts", r, {"book_id": bid, "uid": cuid, "href": f"{uuid.uuid4().hex}.vcf", "updated_at": ts, "changed_at": ts}, ts)
         nid = umz_insert(c, "contacts", d) if d else None
         if nid:
             run.put("contacts", r.get("id"), nid)
@@ -878,17 +988,21 @@ def umz_write(c, run, uid, man, zf, files, data, people):
 
 
 def umz_share(c, run, uid, data, picks, can_invite):
-    """After the import: lists shared with the people ticked in the preview (found by e-mail), missing people invited
-    (instance admins only). Returns the people's results for the report."""
+    """After the import: lists shared with the people ticked in the preview (found by their e-mail hash), missing people
+    invited (instance admins only, the address typed by the admin must match the hash). Returns the people's results for
+    the report."""
     from ..lists.lists import _folder_member_add
+    from .acctexport import umz_email_hash
     out = []
+    seen = umz_seen(c, uid)
     for p in data.get("people", []):
-        em = _email(p.get("email"))
-        pick = picks.get(em) or {}
-        if not em or p.get("agent") or not (pick.get("share") or pick.get("invite")):
+        h = umz_phash(p)
+        pick = picks.get(h) or {}
+        if not h or p.get("agent") or not (pick.get("share") or pick.get("invite")):
             continue
         lists = p.get("lists") if isinstance(p.get("lists"), dict) else {}
-        hit = umz_find(c, uid, em)
+        hit = umz_find(c, uid, h, seen)
+        em = pick.get("email") or _email(p.get("email"))  # typed by the admin, or the plain address of an older file
         target, state = None, "skipped"
         if hit and pick.get("share"):
             target, state = hit["id"], "shared"
@@ -898,15 +1012,18 @@ def umz_share(c, run, uid, data, picks, can_invite):
                     with system_ctx(c):  # the organisation's admin adds the person they ticked (structure)
                         org_member_add(c, run.org, hit["id"], "member")
         elif not hit and pick.get("invite") and can_invite:
-            target = umz_invite(c, run, uid, em, _txt(p.get("name"), 60))
-            state = "invited" if target else "failed"
+            if not em or umz_email_hash(em) != h:
+                state = "mismatch"  # review M1: the typed address is not the one of the file -- nobody is invited
+            else:
+                target = umz_invite(c, run, uid, em, _txt(p.get("name"), 60))
+                state = "invited" if target else "failed"
         n = 0
         if target:
             for old, role in lists.items():
                 lid = run.m("lists", old)
                 if lid and lid in run.created["lists"] and _folder_member_add(c, lid, target, role if role in ROLES else "edit", uid):
                     n += 1
-        out.append({"email": em, "state": state, "lists": n})
+        out.append({"key": h, "name": _txt(p.get("name"), 100), "state": state, "lists": n})
     return out
 
 
@@ -968,15 +1085,17 @@ def umz_run(uid, iid, opts):
         zf, man, files, data = umz_open(os.path.join(_dir(uid, iid), "upload.bin"), key, st["size"], full=False)
         try:
             people = {}
+            seen = umz_seen(c, uid)
             for p in data.get("people", []):
-                em = _email(p.get("email"))
-                if em and (opts["people"].get(em) or {}).get("share"):
-                    hit = umz_find(c, uid, em)
+                h = umz_phash(p)
+                if h and (opts["people"].get(h) or {}).get("share"):
+                    hit = umz_find(c, uid, h, seen)
                     if hit and _oid(p.get("user_id")):
                         people[_oid(p.get("user_id"))] = hit["id"]
             if man.get("kind") == "org":  # an organisation export: my own account there has my e-mail address
-                mine = (c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0] or ""
-                hit = [p for p in data.get("people", []) if mine and _email(p.get("email")) == mine.lower()]
+                from .acctexport import umz_email_hash
+                mine = umz_email_hash((c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0])
+                hit = [p for p in data.get("people", []) if mine and umz_phash(p) == mine]
                 man["user"]["id"] = _oid(hit[0].get("user_id")) if hit else None
                 if hit and _oid(hit[0].get("user_id")) in people:
                     people.pop(_oid(hit[0].get("user_id")), None)
@@ -1320,6 +1439,9 @@ def umz_piece(iid):
         if (_st(uid, iid) or {}).get("received") != off:  # another request at the same offset was faster
             return jsonify(error=tr("Invalid value: {0}", "offset"), received=(_st(uid, iid) or {}).get("received")), 409
         with open(path, "ab") as f:
+            # review N4: a piece that broke off half-written left bytes behind the confirmed state -- cut them, so the next
+            # try neither appends to a broken file nor seals a block number (nonce) twice
+            f.truncate(umz_disk_size(off, bool(key)))
             w = UmzWriter.resume(f, path, key, off)
             w.write(data)
             w.finish()
@@ -1357,7 +1479,9 @@ def umz_current():
 
 @app.post("/api/account/import/<iid>/run")
 def umz_go(iid):
-    """{target: "private" | org id (I am its admin), people: {email: {share: bool, invite: bool}}} -> the run starts."""
+    """{target: "private" | org id (I am its admin), people: {key: {share: bool, invite: bool, email?: str}}} -> the run starts.
+    key = the preview's hash (review M1; a plain address of an older client works too); email = the address an instance
+    admin typed for an invitation (checked against the hash in the run)."""
     umz_person()
     uid = me()
     st = _need(uid, iid)
@@ -1377,9 +1501,10 @@ def umz_go(iid):
         org = tg
     picks = {}
     for em, v in (b.get("people") or {}).items() if isinstance(b.get("people"), dict) else ():
-        e = _email(em)
+        e = umz_pkey(em)
         if e and isinstance(v, dict):
-            picks[e] = {"share": v.get("share") is True, "invite": v.get("invite") is True}
+            picks[e] = {"share": v.get("share") is True, "invite": v.get("invite") is True, "email": _email(v.get("email"))
+                        or (_email(em) if "@" in str(em) else "")}
     c.rollback()
     _set(uid, iid, state="running", progress={"done": 0, "total": 1}, target=org)
     try:
