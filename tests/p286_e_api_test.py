@@ -222,6 +222,8 @@ check(r.ok and r.json().get("cursor", 0) >= max(x["seq"] for x in before), "N32:
 
 # ================================================================== N31: daily push budget per agent and person
 CH, CHH = agent("chatter", ["read", "tasks:write", "comments"])
+L5 = mklist("Pantry")
+check(A.put(B + f"/api/lists/{L5}/members", json={"user_id": CH, "role": "edit"}).ok, "setup: the agent shares a list with alice (the chat needs it)")
 if NOSTART:
     print("N31: skipped (the server was started without KALMIDO_AGENT_PUSH_DAY)")
 else:
