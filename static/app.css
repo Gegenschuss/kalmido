@@ -7221,3 +7221,14 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .pkc-home{font-size:var(--fs-xs);align-self:flex-start}
 .pkc-acts{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.25rem}
 .pkc-acts .btn{min-height:2.75rem}
+/* 2.80.0 C (#1897) phone: the toast's action button 44 px also where the device reports a fine pointer (emulators, styluses) -
+   same test as isTouch()/isMobile(); the contacts' selection bar never scrolls sideways: the count gets its own line, the
+   buttons share the width and long labels end with an ellipsis (the full name stays in title / aria-label) */
+@media (hover:none),(max-width:899px){ #toast button:not(.tx){min-height:2.75rem;min-width:2.75rem} }
+@media (max-width:899px){
+  #ct-sbar{flex-wrap:wrap;overflow-x:hidden;row-gap:.125rem}
+  #ct-sbar .mcount{flex:1 0 100%;padding:.25rem .375rem 0}
+  #ct-sbar .mbb{min-width:2.75rem;max-width:100%}
+  #ct-sbar .mbb .mbl{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .ctpicking .ctlistw{padding-bottom:6.5rem}
+}
