@@ -911,7 +911,10 @@ documents.
 
 An existing Paperless-ngx instance can be connected (2.69: also on a hosted server, see below)
 once per workspace -- by an organisation's admin for the organisation, by a person for their own space -- under
-*Documents > Settings > Paperless-ngx* with its address and an API token (Paperless-ngx: *My profile > API auth token*).
+*Settings > Integrations > Paperless-ngx* (2.87.9; before: *Documents > Settings*) with its address and an API token
+(Paperless-ngx: *My profile > API auth token*). The section names the workspace and switches between them; the documents
+settings keep only the progress of a running import and a jump there. The search (Ctrl/Cmd+K) finds *Import from
+Paperless-ngx…* and *Connect Paperless-ngx*.
 
 - **Read only:** Kalmido only sends GET requests. Nothing in Paperless-ngx is changed, moved or deleted.
 - **Preview first:** the number of documents and how tags, correspondents and document types are taken over: a tag
@@ -927,7 +930,13 @@ once per workspace -- by an organisation's admin for the organisation, by a pers
   Kalmido does not accept (too long, too complex for its safe regex check) are listed in the preview and the result. A rule
   is taken over once: a later import does not double it, nor bring it back after it was changed or deleted in Kalmido. At
   the end of every import the imported senders, types, tags and folders train the classifier once, as confirmed examples.
-- **In the background:** progress and *Stop* in the settings; optionally *Bring in new documents automatically* every
+- **Where it goes (2.87.9):** before the start Kalmido says in words where the documents go ("182 documents into the
+  organisation …" / "into your private space") and asks once more. With an organisation as the target, *Rather into
+  private* imports from the organisation's connection or export into the starter's own private space instead (an admin's
+  own space only, never someone else's). Every other importer (tasks, contacts, calendar files, budget, office, knowledge
+  pages, an account move, feeds) asks the same way.
+- **In the background:** progress, the target and *Stop* in the settings; the import runs on on the server (the window can be
+  closed), only the upload of an export ZIP needs the window open; optionally *Bring in new documents automatically* every
   15 minutes up to once a day (only Paperless-ngx -> Kalmido).
 - **Network:** http/https only, timeouts, no redirects, at most `TASKS_MAX_FILE_MB` per file. An instance in the local
   network is an internal address: allow its host under *Settings > Administration > Advanced* (or
@@ -952,7 +961,7 @@ server (in its Docker setup with `docker compose exec webserver ...`):
 document_exporter ../export --zip
 ```
 
-Then upload the ZIP under *Documents > Settings > Paperless-ngx > From a Paperless-ngx export (ZIP)*. The same preview
+Then upload the ZIP under *Settings > Integrations > Paperless-ngx > From a Paperless-ngx export (ZIP)*. The same preview
 follows (tags, correspondents, document types with their mapping), then the import in the background. Exports with
 `--split-manifest`, `--use-folder-prefix` and ZIPs with everything in one top folder work as well.
 

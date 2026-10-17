@@ -58,6 +58,9 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   d.querySelector('.oimpv [data-oim="area-skip"][data-area="equipment"]').click(); await sleep(50);
   check(/Import 3 entries/.test(btn()), '#1557: Take over all brings them back: ' + btn());
   d.querySelector('[data-oim="import"]').click();
+  // 2.87.9 (#1940): the import first names the office it goes into
+  check(await until(() => d.querySelector('.itc-dlg [data-cd="yes"]')), '#1940: the import names its target first');
+  d.querySelector('.itc-dlg [data-cd="yes"]')?.click();
   await until(async () => ((await call('GET', '/api/office/equipment')).items || []).length === 2, 40);
   const cl = await call('GET', '/api/clients');
   check(((await call('GET', '/api/office/equipment')).items || []).length === 2 && !(cl.clients || []).some(c => c.name === 'Bergtal Studios'), '#1557: the import wrote services + equipment, no client');

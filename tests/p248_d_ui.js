@@ -45,12 +45,16 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_paperless.py']);
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en'});
 
-  // ================= Paperless-ngx in the documents settings
+  // ================= Paperless-ngx (2.87.9 #1936: in Settings > Integrations; the documents settings keep a jump there)
   const w = await boot({user: 'alice', hash: 'docs'}), d = w.document;
   await until(() => d.querySelector('[data-dc="settings"]'));
   d.querySelector('[data-dc="settings"]').click();
-  await until(() => d.querySelector('.dc-smd .pl-slot #pl-url'));
-  const slot = () => d.querySelector('.dc-smd .pl-slot');
+  await until(() => d.querySelector('.dc-smd .pl-slot [data-pl="goset"]'));
+  check(!d.querySelector('.dc-smd #pl-url') && /Connect in the settings/.test(d.querySelector('.dc-smd [data-pl="goset"]')?.textContent || ''), '2.87.9 (#1936): the documents settings jump to the settings');
+  d.querySelector('.dc-smd [data-pl="goset"]')?.click();
+  await until(() => d.querySelector('.smodal .pl-slot #pl-url'));
+  check(!d.querySelector('.dc-smd') && d.querySelector('.smodal [data-pane="integr"] .pl-slot'), '2.87.9 (#1936): Settings > Integrations has the section');
+  const slot = () => d.querySelector('.smodal .pl-slot');
   check(/Paperless-ngx/.test(slot()?.textContent || '') && d.querySelector('#pl-url') && d.querySelector('#pl-tok'), 'settings: the section with address + token');
   d.querySelector('#pl-url').value = 'http://127.0.0.1:8098';
   d.querySelector('#pl-tok').value = 'wrong';
@@ -70,6 +74,10 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_paperless.py']);
   if (drop) { const s = drop.querySelector('select'); s.value = 'skip'; s.dispatchEvent(new w.Event('change', {bubbles: true})); }
   check(drop?.querySelector('input').disabled, 'leave out: the name field is off');
   pm?.querySelector('[data-plp="start"]').click();
+  // 2.87.9 (#1940): the import first names its target (no organisation: the private space)
+  await until(() => d.querySelector('.itc-dlg [data-cd="yes"]'));
+  check(/2 documents into your private space/.test(d.querySelector('.itc-dlg')?.textContent || ''), '2.87.9 (#1940): the target named before the start');
+  d.querySelector('.itc-dlg [data-cd="yes"]')?.click();
   await until(async () => (await call('GET', '/api/paperless?ws=private')).conn?.run?.state === 'idle' && (await call('GET', '/api/docs?ws=private')).docs?.length === 2, 150);
   const docs = (await call('GET', '/api/docs?ws=private')).docs || [];
   check(docs.length === 2, 'the import brought two documents');
