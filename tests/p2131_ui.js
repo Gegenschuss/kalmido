@@ -172,6 +172,7 @@ const form = (fields, files) => { const fd = new FormData(); for (const [k, v] o
         await c.put('/share-inbox/meta', new Response(JSON.stringify({title: '', text: 'Look at this ${vw}', url: '', files: [{name: 'shared.txt', type: 'text/plain', size: 6}]}), {headers: {'Content-Type': 'application/json'}})); return 1; })()`);
       await nav(B + '?share=1');
       for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('.shdest')`).catch(() => false)); i++) await sleep(300);
+      await sleep(300);  // 2.66.0: agentchat.js loads on demand since 2.65; the chooser focuses "New task" 30 ms after it shows
       const sd = await ev(`(() => { const bs = [...document.querySelectorAll('.shdest [data-sd]')]; return {labels: bs.map(b => b.textContent.trim()), h: bs.map(b => Math.round(b.getBoundingClientRect().height)), focus: document.activeElement?.dataset?.sd}; })()`);
       check(sd.labels.length === 2 && /New task/.test(sd.labels[0]) && /Send to agent Claude/.test(sd.labels[1]) && sd.focus === 'task', `${vw}px: share chooser: New task (focused) / Send to agent Claude ${JSON.stringify(sd)}`);
       check(sd.h.every(x => x >= 43.5), `${vw}px: share choices >= 44 px ${JSON.stringify(sd.h)}`);

@@ -269,7 +269,7 @@ function backdate(agentId, ids) {
     for (const [W, Hh, phone] of [[390, 844, true], [1280, 800, false]]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: W, height: Hh}});
       await nav(B + '#today'); await sleep(2500);
-      await ev(`localStorage.setItem('tasks.audPoll', '1'); S.aud.poll = true; settingsModal('ai')`); await sleep(400);
+      await ev(`localStorage.setItem('tasks.audPoll', '1'); if (S.aud) S.aud.poll = true; settingsModal('ai')`); await sleep(400);
       for (const k of ['agents', 'lists', 'usage', 'log']) {
         // 2.46.6 (#1710): the log is Settings > Administration > Agents
         await ev(k === 'log' ? `document.querySelector('.smodal .snav [data-sec="users"]').click(); document.querySelector('.smodal [data-admsub="agents"]').click()` : `document.querySelector('.smodal [data-aisub="${k}"]').click()`); await sleep(1800);
