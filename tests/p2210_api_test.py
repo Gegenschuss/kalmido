@@ -528,6 +528,17 @@ A.patch(B + f"/api/contacts/{C1['id']}", json={"bday": "--09-01", "anniversary":
 bt = sorted((t["title"], t["due"][5:], (t["fam"] or {}).get("year")) for t in A.get(B + "/api/state").json()["tasks"] if t["list_id"] == BL)
 check(bt == [("Anniversary: Erika Mustermann", "06-20", 2001), ("Birthday: Erika Mustermann", "09-01", None)], f"a new date + an anniversary {bt}")
 check(Bo.patch(B + f"/api/books/{BK}", json={"birthdays_list_id": BL}).status_code == 403, "only the owner chooses the list")
+# 2.82.0 (#1832): a birthday task moved into a list where the book's owner may only read is left alone
+OL = Bo.post(B + "/api/lists", json={"name": "Bob's dates"}).json()["id"]
+check(Bo.put(B + f"/api/lists/{OL}/members", json={"user_id": ids["alice"], "role": "view"}).ok, "#1832: setup: alice reads bob's list")
+BT = [t for t in A.get(B + "/api/state").json()["tasks"] if t["list_id"] == BL and t["title"].startswith("Birthday")][0]
+dbx("UPDATE tasks SET list_id=? WHERE id=?", (OL, BT["id"]))
+A.patch(B + f"/api/contacts/{C1['id']}", json={"bday": "--10-03"})
+check(dbx("SELECT due FROM tasks WHERE id=?", (BT["id"],))[0][0] == BT["due"], "#1832: the task in the read-only list keeps its date")
+dbx("UPDATE tasks SET list_id=? WHERE id=?", (BL, BT["id"]))
+A.patch(B + f"/api/contacts/{C1['id']}", json={"bday": "--09-02"})
+check(dbx("SELECT due FROM tasks WHERE id=?", (BT["id"],))[0][0][5:] == "09-02", "#1832: back in the owner's list it follows the contact again")
+A.patch(B + f"/api/contacts/{C1['id']}", json={"bday": "--09-01"})
 # vCard import / export
 VCF = ("BEGIN:VCARD\r\nVERSION:3.0\r\nN:Doe;Jane;;;\r\nFN:Jane Doe\r\nEMAIL;TYPE=INTERNET:jane@example.com\r\nUID:imp-1\r\nEND:VCARD\r\n"
        "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Max Power\r\nTEL;VALUE=uri;TYPE=cell:tel:+49-30-1234\r\nUID:imp-2\r\nEND:VCARD\r\n"
