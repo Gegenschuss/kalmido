@@ -456,6 +456,39 @@ def _num(v):
     return float(round(d, 4))
 
 
+# 2.80.0 (#1837): money amounts as people type them: German "2.436,53" / "1.500" (thousand dots), "2436,53", English
+# "2436.53" / "2,436.53", with "€" / "EUR" / spaces. A dot followed by exactly three digit groups is a thousand
+# separator ("1.500" = 1500); anything else that is not a plain number stays invalid (None).
+_AMT_DE = re.compile(r"\d{1,3}(\.\d{3})+(,\d+)?")
+_AMT_EN = re.compile(r"\d{1,3}(,\d{3})+(\.\d+)?")
+
+
+def _amount(v):
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float, Decimal)):
+        s = str(v)
+    else:
+        s = re.sub(r"\s", "", str(v or "")).replace("€", "")
+        s = re.sub(r"(?i)eur$|^eur", "", s)
+        neg = s.startswith("-")
+        s = s[1:] if neg else s
+        if _AMT_DE.fullmatch(s):
+            s = s.replace(".", "").replace(",", ".")
+        elif _AMT_EN.fullmatch(s) and ("." in s or s.count(",") > 1):
+            s = s.replace(",", "")
+        elif re.fullmatch(r"\d*[.,]?\d+", s):
+            s = s.replace(",", ".")
+        else:
+            return None
+        s = ("-" if neg else "") + s
+    try:
+        d = Decimal(s)
+    except InvalidOperation:
+        return None
+    return d if d.is_finite() and abs(d) <= Decimal("1e9") else None
+
+
 def _flag01(v):
     return 1 if str(v or "").strip().lower() in ("1", "x", "ja", "yes", "true", "wahr", "y", "j") else 0
 
@@ -1205,11 +1238,8 @@ def _archive_fields(c, oid, b, partial=False):
         if a in (None, ""):
             f["amount"] = None
         else:
-            try:
-                d = Decimal(str(a).replace(",", ".")) if not isinstance(a, bool) else None
-            except InvalidOperation:
-                d = None
-            if d is None or not d.is_finite() or abs(d) > Decimal("1e9"):
+            d = _amount(a)  # 2.80.0 (#1837): thousand separators ("2.436,53", "1.500")
+            if d is None:
                 raise BadInput(tr("Invalid value: {0}", "amount"))
             f["amount"] = str(round(d, 2))
     if not partial or "paid" in b:
