@@ -173,6 +173,12 @@ check(st and st[0] == "found" and st[2] == "pdf", f"#1820: the PDF's text layer 
 att = {x["name"]: x for x in Bo.get(B + f"/api/tasks/{T1}").json().get("attachments", [])}.get("bill.pdf") or {}
 check((att.get("up") or {}).get("text") == "found", f"#1820 (with #1818's marks): the task file carries up.text found ({att.get('up')})")
 n_words = dbx("SELECT COUNT(*) FROM file_words w JOIN file_text f ON f.id=w.ft_id WHERE f.kind='att' AND f.ref_id=?", (A1,))[0][0]
+# 2.81.0 (#1856): the nightly boundary check counts a recognised text kept for another workspace than its file's list
+dbx("UPDATE file_text SET org_id=? WHERE kind='att' AND ref_id=?", (ORG, A1), write=True)
+bd = A.get(B + "/api/admin/orgs").json().get("boundary", {})
+dbx("UPDATE file_text SET org_id=NULL WHERE kind='att' AND ref_id=?", (A1,), write=True)
+check(bd.get("kinds", {}).get("file_text") == 1, "#1856: the boundary check counts file_text across the boundary " + str(bd.get("kinds")))
+check(not A.get(B + "/api/admin/orgs").json().get("boundary", {}).get("kinds", {}).get("file_text"), "#1856: ... and nothing when it fits")
 check(n_words > 0, f"#1820: the words are in the keyed index ({n_words})")
 hits = tsearch(Bo, "wolkenkratzer")
 check(T1 in hits and hits[T1].get("file_hit") == "bill.pdf", f"#1820: the task search finds the task by its file's text, file_hit = the name ({hits.get(T1, {}).get('file_hit')})")
