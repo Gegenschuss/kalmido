@@ -362,5 +362,29 @@ check(A.get(B + "/api/wiki/e2e", params={"space": "private"}).json()["mode"] is 
 check(Bo.get(B + "/api/wiki/e2e/todo", params={"space": "private"}).json()["left"]["pages"] == 1, "private: todo of bob's page")
 check(OWN not in [p["id"] for p in Bo.get(B + "/api/wiki/search", params={"q": "diary"}).json()["pages"]], "private encrypting: search leaves it out")
 
+# ---------------------------------------------------------------- 2.64.3 review 1 M1: no ciphertext-like values in open spaces
+import io as _io, zipfile as _zf
+EP = Er.post(B + "/api/wiki/pages", json={"space": "private", "path": "Odd", "body": "x"}).json()["id"]
+dbx("UPDATE wiki_pages SET body=? WHERE id=?", (ct(1), EP))  # as if written before 2.64.3
+r = Er.post(B + "/api/wiki/pages", json={"space": SP, "path": "From odd", "template_id": EP})
+check(r.status_code == 400, "M1: a ciphertext template is never copied into an open space " + r.text[:200])
+r = Er.post(B + "/api/wiki/move", json={"space": "private", "from": "Odd", "to": "e2e1:x"})
+check(r.status_code == 400, "M1: no plain name with the ciphertext prefix (move) " + r.text[:200])
+r = Er.post(B + "/api/wiki/pages", json={"space": "private", "path": "e2e1:name", "body": ""})
+check(r.status_code == 400, "M1: no plain name with the ciphertext prefix (create)")
+buf = _io.BytesIO()
+with _zf.ZipFile(buf, "w") as z:
+    z.writestr("e2e1:named.md", "a")
+    z.writestr("Fine.md", "e2e1:{}")
+    z.writestr("Good.md", "good text")
+r = Er.post(B + "/api/wiki/import", params={"space": "private"}, files={"file": ("w.zip", buf.getvalue())})
+d = r.json() if r.ok else {}
+check(r.ok and len(d["created"]) == 1 and len(d["skipped"]) == 2, "M1: import skips ciphertext-like names and texts " + r.text[:200])
+r = Er.post(B + "/api/wiki/e2e/start", json={"space": "private", "keys": [{"user_id": ERIN, "wrapped": wrapped()}]})
+check(r.status_code == 409 and code(r) == "wiki_e2e_prefix" and r.json().get("pages") == [EP], "M1: switching on refuses such a page " + r.text[:200])
+check(Er.patch(B + f"/api/wiki/pages/{EP}", json={"body": "normal again"}).ok, "M1: the page can be changed")
+r = Er.post(B + "/api/wiki/e2e/start", json={"space": "private", "keys": [{"user_id": ERIN, "wrapped": wrapped()}]})
+check(r.ok and r.json()["mode"] == "encrypting", "M1: then switching on works " + r.text[:200])
+
 print(f"p264c_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
