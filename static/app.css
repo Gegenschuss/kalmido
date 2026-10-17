@@ -7687,3 +7687,9 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+
+/* 2.69.0 A (#1846) Paperless-ngx: the two ways (address / export ZIP), the storage hint of the preview */
+.pl-slot .plh-way { margin: 1rem 0 .3rem; font-size: var(--fs-sm, .9rem); }
+.plh-zip { margin-top: .8rem; }
+.plh-zip code { font-family: var(--mono, monospace); font-size: .9em; overflow-wrap: anywhere; }
+.pl-warn { margin: .3rem 0; padding: .4rem .6rem; border-radius: .375rem; background: var(--bg3, rgba(127,127,127,.12)); }
