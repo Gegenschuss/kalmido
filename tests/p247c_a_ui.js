@@ -151,6 +151,13 @@ const sec = (d, k) => d.querySelector(`#achat .cwin[data-cw="${k}"]`);
   check(!!sec(d, 't:' + RID), '#1774: a click on the head button opens the room as a window');
   w.eval(`cw_close('t:${RID}')`);
   await sleep(100);
+  // 2.83.0 (#1775): the colour row on an agent's person card for those who may change it (rights: p247c_b_api)
+  const mcCol = () => { w.eval(`personCard(document.querySelector('#top h1') || document.body, ${A1})`); return !!d.querySelector('.mcard .pfcol [data-accol]'); };
+  check(w.eval(`!!S.agents.find(a => a.id === ${A1}).can_color`) && mcCol(), '#1775: the admin sees the colour row on the agent\'s card');
+  w.eval(`(closePop(), S.agents.find(a => a.id === ${A1}).can_color = false, 1)`);
+  check(!mcCol(), '#1775: without can_color no colour row on the card');
+  w.eval(`(closePop(), S.agents.find(a => a.id === ${A1}).can_color = true, 1)`);
+  await sleep(100);
 
   // ================= more windows than fit fold (768 px: three open)
   for (const k of [`a:${A2}`, `a:${A3}`, `t:${RID}`]) w.eval(`cw_split('${k}')`);
