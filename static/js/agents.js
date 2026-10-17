@@ -714,6 +714,7 @@ function propItemsHtml() {
   const {v} = S.prop, p = v.proposal, inp = v.input;
   if (pk2_is(v.kind)) return pk2_itemsHtml();  // 2.51.0 B (#1351 #1358): propkinds2.js
   if (lyp_is(v)) return '';  // 2.55.0 (#1066): lyp_draw shows it
+  if (dup_is(v)) return '';  // 2.70.0 B (#1357): dup_draw shows it
   if (v.kind === 'dayplan') return propDayplanHtml();  // 2.10.0 (#440)
   if (v.kind === 'cleanup') return clnItemsHtml();  // 2.39.0 (#1151): cleanup.js
   if (AP_KINDS.includes(v.kind)) return ap_propItemsHtml();  // 2.51.0 C (#1353 #1355): agentplan.js

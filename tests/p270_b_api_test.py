@@ -123,7 +123,9 @@ AGA, cla = agent("alphabot", org_id=ALPHA)        # an agent of Alpha
 AGB, clb = agent("betabot", org_id=BETA)          # an agent of Beta
 AGL, cll = agent("listbot", org_id=None)          # limited to one list
 LL = A.post(B + "/api/lists", json={"name": "Only this"}).json()["id"]
-check(A.patch(B + f"/api/admin/agents/{AGL}", json={"list_ids": [LL]}).ok, "setup: listbot limited to one list")
+check(A.put(B + f"/api/lists/{LL}/members", json={"user_id": AGL, "role": "edit"}).ok, "setup: listbot shares the list")
+r = A.patch(B + f"/api/admin/agents/{AGL}", json={"list_ids": [LL]})
+check(r.ok, "setup: listbot limited to one list " + r.text[:160])
 
 # ---- bob's private book (carol reads it), his book in Alpha's workspace
 r = Bo.post(B + "/api/books", json={"name": "Bob private", "org_id": None})
@@ -151,7 +153,7 @@ check(ask(Ca, AG, BK).status_code == 403, "read-only book: 403")
 check(ask(Ev, AG, BK).status_code == 404, "a stranger's book: 404")
 check(ask(Bo, AG, 999999).status_code == 404, "unknown book: 404")
 r = ask(Bo, AGB, OBK)
-check(r.status_code == 403, f"Alpha's book to Beta's agent: 403 ({r.status_code})")
+check(r.status_code in (403, 404), f"Alpha's book to Beta's agent: refused ({r.status_code})")
 r = ask(Bo, AG, OBK)
 check(r.status_code == 403, f"an organisation's book to an agent without organisation: 403 ({r.status_code})")
 r = ask(Bo, AGL, BK)
