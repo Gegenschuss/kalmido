@@ -703,6 +703,10 @@ ROUTES = {
     # 2.83.0 (#1427): the header strip of a list (need_list like the list icon; p283_c_api_test.py) and of an owner's folder
     "PUT /api/lists/{}/header": "list", "POST /api/lists/{}/header": "list", "GET /api/list-header/{}/{}.jpg": "list",
     "GET /api/folder-heads": "folder", "PUT /api/folder-heads": "folder",
+    # 2.85.0 B (#1162): feeds, a person's own (no organisation, never an agent's; p285_b_api_test.py: another person gets 404)
+    "GET /api/feeds": "own", "POST /api/feeds": "own", "DELETE /api/feeds/{}": "own", "POST /api/feeds/{}/restore": "own",
+    "GET /api/feeds/items": "own", "POST /api/feeds/read": "own", "POST /api/feeds/items/{}/later": "own",
+    "GET /api/feeds/opml": "own", "POST /api/feeds/opml": "own",
 }
 
 # ---- 1. every route is classified, nothing stale
