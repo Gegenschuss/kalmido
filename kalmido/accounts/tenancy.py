@@ -46,9 +46,9 @@ CHECKS = {
     # layer ignores the invitation: events/model.py ev_att_ok; boundary_repair takes it out), an agent of another workspace
     # invited there (counted only, like cal_agent)
     "att_person": ("SELECT a.event_id, a.user_id FROM event_attendees a JOIN events e ON e.id=a.event_id JOIN ev_cals k ON k.id=e.cal_id "
-                   "JOIN users u ON u.id=a.user_id WHERE k.org_id IS NOT NULL AND " + _PERSON.format(o="k", m="a")),
+                   "JOIN users u ON u.id=a.user_id WHERE k.org_id IS NOT NULL AND e.deleted_at IS NULL AND " + _PERSON.format(o="k", m="a")),
     "att_agent": ("SELECT a.event_id, a.user_id FROM event_attendees a JOIN events e ON e.id=a.event_id JOIN ev_cals k ON k.id=e.cal_id "
-                  "JOIN agents g ON g.user_id=a.user_id WHERE k.org_id IS NOT NULL AND g.org_id IS DISTINCT FROM k.org_id"),
+                  "JOIN agents g ON g.user_id=a.user_id WHERE k.org_id IS NOT NULL AND e.deleted_at IS NULL AND g.org_id IS DISTINCT FROM k.org_id"),
     "book_person": ("SELECT m.book_id, m.user_id FROM book_members m JOIN books b ON b.id=m.book_id JOIN users u ON u.id=m.user_id "
                     "WHERE b.org_id IS NOT NULL AND " + _PERSON.format(o="b", m="m")),
     "book_agent": ("SELECT m.book_id, m.user_id FROM book_members m JOIN books b ON b.id=m.book_id JOIN agents a ON a.user_id=m.user_id "

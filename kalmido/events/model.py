@@ -747,8 +747,9 @@ def att_clean(c, items, eid=None, cal_id=None):
                     or (me_ and u not in had_u and not may_see(c, me_, u)):  # 2.22.0 (#752): only people one may see; 2.30.0 (#1036): also newly invited ones of an existing event
                 raise BadInput(tr("unknown user"))
             if cal_org and not ev_att_ok(c, u, cal_org):
-                if u not in had_u:
-                    raise BadInput(tr("unknown user"))
+                if u not in had_u:  # visible (checked above), but not of the calendar's organisation: say why (2.87.0, #1983)
+                    from ..accounts.orgs import ws_fit_problem
+                    raise Denied(409, ws_fit_problem(c, cal_org, u, "cal") or tr("unknown user"))
                 continue
             row["user_id"], key = u, ("u", u)
             if u != me_:

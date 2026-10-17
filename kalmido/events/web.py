@@ -133,7 +133,13 @@ def op_event_edit(c, uid, eid, b, occ=None):
         raise Denied(409, tr("The event was changed meanwhile"))
     if "cal_id" in b and b["cal_id"] not in (None, "") and as_int(b["cal_id"], "cal_id", 1) != r["cal_id"]:
         nc = as_int(b["cal_id"], "cal_id", 1)
-        need_evcal(c, nc, write=True)
+        nk, _ = need_evcal(c, nc, write=True)
+        if nk["org_id"] and "attendees" not in b:  # 2.87.0 (#1983): its invited people must fit the new calendar's organisation (as obj_org_set)
+            from ..accounts.orgs import ws_fit_problem
+            for (au,) in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL ORDER BY user_id", (eid,)).fetchall():
+                p = ws_fit_problem(c, nk["org_id"], au, "cal")
+                if p:
+                    raise Denied(409, p)
         if c.execute("SELECT 1 FROM events WHERE cal_id=? AND (uid=? OR href=?) AND deleted_at IS NULL", (nc, r["uid"], r["href"])).fetchone():
             raise Denied(409, tr("The calendar has this event already"))
         c.execute("UPDATE events SET cal_id=? WHERE id=?", (nc, eid))

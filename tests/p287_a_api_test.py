@@ -5,7 +5,8 @@
    events of its calendars: the event is gone from GET /api/events/<id> (404), the range, the RSVP (404) and the CalDAV
    invitations collection; an invitation to a private calendar's event stays; a stale invitation row of a former member is
    ignored by the read layer, counted by the boundary check (att_person) and taken out by "Clean up"; a new invitation of
-   someone outside the calendar's organisation is an unknown user; a calendar moves into an organisation only while every
+   someone outside the calendar's organisation is refused (409 naming the rule, an invisible one is an unknown user); an
+   event with such a person does not move into an organisation's calendar; a calendar moves into an organisation only while every
    invited person fits it (409)
  - #1984: a list goes only to a person the owner may see (or a member of the list): an id of another organisation answers
    exactly like an id that does not exist (web + API v1); a visible person still gets it; a freelancer without an
@@ -170,12 +171,19 @@ check(Er.post(B + f"/api/events/{E3}/rsvp", json={"partstat": "accepted"}).statu
 lo, hi = sorted((ALICE, uid["gina"]))
 dbx("INSERT INTO conn_links(a_id, b_id, created_at) VALUES(?, ?, '2026-10-18T10:00:00.000Z')", (lo, hi))
 r = A.post(B + "/api/events", json={"cal_id": TEAM, "title": "Lunch", "start": f"{DAY}T12:00", "attendees": [{"user_id": uid["gina"]}]})
-check(r.status_code == 400 and "unknown user" in r.text, f"#1983: an organisation's event invites nobody outside it {r.status_code} {r.text[:160]}")
+# 2.87.0 (#1983, review): a visible person outside the organisation gets the workspace rule (409), an invisible one stays unknown
+check(r.status_code == 409 and "Gina" in r.text and "not a member" in r.text, f"#1983: an organisation's event invites nobody outside it {r.status_code} {r.text[:160]}")
 r = A.patch(B + f"/api/events/{E1}", json={"attendees": [{"user_id": uid["carol"]}, {"user_id": uid["gina"]}]})
-check(r.status_code == 400 and "unknown user" in r.text, f"#1983: ... also when editing ({r.status_code})")
+check(r.status_code == 409 and "Gina" in r.text, f"#1983: ... also when editing ({r.status_code})")
+r = A.post(B + "/api/events", json={"cal_id": TEAM, "title": "Lunch", "start": f"{DAY}T12:00", "attendees": [{"user_id": uid["dave"]}]})
+check(r.status_code == 400 and "unknown user" in r.text, f"#1983: ... someone one may not see stays an unknown user {r.status_code} {r.text[:160]}")
 r = A.post(B + "/api/events", json={"cal_id": HOME, "title": "Tea", "start": f"{DAY}T17:00", "attendees": [{"user_id": uid["gina"]}]})
 check(r.status_code == 201 and S["gina"].get(B + f"/api/events/{r.json().get('id')}").ok if r.status_code == 201 else False,
       f"#1983: a private calendar still invites a contact outside the organisation {r.status_code} {r.text[:160]}")
+TEA = r.json().get("id") if r.status_code == 201 else 0
+r = A.patch(B + f"/api/events/{TEA}", json={"cal_id": TEAM})
+check(r.status_code == 409 and "Gina" in r.text, f"#1983 (review): an event with an outsider does not move into an organisation's calendar {r.status_code} {r.text[:160]}")
+check(dbx("SELECT cal_id FROM events WHERE id=?", (TEA,)) == [(HOME,)], "#1983 (review): ... it stays in the private calendar")
 r = A.patch(B + f"/api/events/{E1}", json={"title": "Quarterly review!", "attendees": [{"user_id": uid["carol"]}]})
 check(r.ok, f"#1983: editing with the organisation's people still works {r.status_code} {r.text[:160]}")
 # a calendar moves into the organisation only while its invited people fit (bob is invited to the garden party)
