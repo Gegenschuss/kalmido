@@ -403,6 +403,9 @@ def user_purge(c, uid):
         c.execute("DELETE FROM webhooks WHERE id=?", (a["webhook_id"],))
     from ..files.store import fs_user_purge
     files += fs_user_purge(c, uid)  # 2.48.0 (#1207): the file store (organisation branches go to an admin, the own tree goes)
+    # 2.84.0 A (#1198): the person's private filed mails and their mails nobody else sees (not assigned) go; an organisation's
+    # client / project mails stay with the client / project
+    c.execute("DELETE FROM hub_mails WHERE owner_id=? AND (org_id IS NULL OR (client_id IS NULL AND list_id IS NULL))", (uid,))
     from ..contacts.orgbooks import obk_user_purge
     obk_user_purge(c, uid)  # 2.52.0 C (#1438): the organisations' address books it manages get another manager and stay
     # 2.64.0 (#1864): files sealed with the account key that lie elsewhere now are sealed for their space; then the key row

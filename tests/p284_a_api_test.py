@@ -340,5 +340,10 @@ time.sleep(4)
 check(row(OLD) is None, "the old address files nothing")
 check(Bo.delete(B + "/api/hubmail/address", params={"client_id": ACME}).ok and not dbx("SELECT 1 FROM hub_tokens WHERE client_id=?", (ACME,)), "turn the address off")
 
+# ---- deleting an account: its private filed mails go, an organisation's client mails stay
+r = A.delete(B + f"/api/users/{ERIN}")
+check(r.ok and not dbx("SELECT 1 FROM hub_mails WHERE id=?", (R["m8"]["id"],)), f"erin deleted: her private mail is gone ({r.status_code})")
+check(dbx("SELECT 1 FROM hub_mails WHERE id=?", (R["m1"]["id"],)), "an organisation's client mail is untouched")
+
 print(f"p284_a_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
