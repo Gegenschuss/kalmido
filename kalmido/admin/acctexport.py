@@ -10,11 +10,13 @@ ZIP layout (format "kalmido-account", v 1; admin/acctimport.py reads it):
                         tables: {name: rows}, files: [{path, size, sha256}], client_encrypted: {...}, export_id, not_included}
     data/<table>.json  one JSON array per table: the tables of GET /api/export.json (accounts/settings.py
                         umz_export_queries) plus list tags, the lists shared with me (a reference only) with my own comments
-                        there, the people of my lists (for the mapping on import) and the server accounts (no token)
+                        there, the people of my lists (for the mapping on import; other people's e-mail addresses only as
+                        email_hash, see umz_email_hash) and the server accounts (no token)
     files/...          attachments of the tasks and project files of the lists (decrypted: oc_read_file)
     checksum.sha256    "sha256  path" lines (sha256sum -c): manifest.json and every file of the manifest
 
-Never in the file: passwords, sessions, token hashes, two-factor data, push subscriptions, webhook secrets, access data
+Never in the file: passwords, sessions, token hashes, two-factor data, push subscriptions, webhook secrets and addresses
+(url_hint only), server-side settings, access data
 (orgexport OX_SECRET_COLS is dropped from every row). Browser-encrypted content stays ciphertext (client_encrypted).
 
 At rest (export here and the uploads of acctimport.py): with a server key (KALMIDO_SECRET_KEY) the file is AES-256-GCM in
@@ -51,7 +53,8 @@ UMZ_V = 1
 UMZ_SUFFIX = ".zip"
 UMZ_SPACE_SPARE = 64 * 1024 * 1024  # free disk space kept on top of the expected size
 UMZ_NOT_INCLUDED = (
-    "passwords, sessions, API tokens (only their names), two-factor data, push subscriptions, webhook secrets",
+    "passwords, sessions, API tokens (only their names), two-factor data, push subscriptions, webhook secrets and addresses",
+    "server-side settings (such as the ntfy topic an admin set)",
     "access data of connections (calendar and address book subscriptions, Karakeep, newsletter, Git, server accounts)",
     "lists of other people that are shared with you (only a reference and your own comments there)",
     "organisation data that is not yours (use the organisation export for a whole organisation)",
@@ -216,26 +219,40 @@ def umz_space_ok(folder, need):
 
 # ---------------------------------------------------------------- what goes into the file
 def umz_clean(table, r):
-    from ..accounts.settings import umz_export_clean
-    return umz_export_clean(table, {k: v for k, v in dict(r).items() if k not in OX_SECRET_COLS})
+    """A row as it goes into the account export (None = left out)."""
+    from ..accounts.settings import SETTINGS_SERVER_ONLY, umz_export_clean
+    from ..calendars.subscriptions import cal_url_hint
+    d = {k: v for k, v in dict(r).items() if k not in OX_SECRET_COLS}
+    if table == "settings" and d.get("key") in SETTINGS_SERVER_ONLY:
+        return None  # review N5: server-side state (ntfy_topic is set by an admin only, digest marks, ...)
+    if table == "webhooks" and "url" in d:
+        d["url_hint"] = cal_url_hint(d.pop("url"))  # review N5: a Slack / Teams webhook address is itself the secret
+    return umz_export_clean(table, d)
+
+
+def umz_email_hash(email):
+    """Review M1: other people's addresses leave the server only as this hash (the import finds the accounts it may see)."""
+    e = (email or "").strip().lower() if isinstance(email, str) else ""
+    return hashlib.sha256(("kalmido-people|" + e).encode()).hexdigest() if e else ""
 
 
 def umz_people(c, uid):
-    """The people of my lists (members, comment authors, assignees) with name + e-mail: the mapping on import."""
+    """The people of my lists (members, comment authors, assignees) with name + e-mail hash: the mapping on import."""
     own = "(SELECT id FROM lists WHERE owner_id=?)"
     out = {}
     for r in c.execute(f"""SELECT m.user_id, m.list_id, m.role, u.display_name, u.username, u.email, COALESCE(u.kind,'user') AS kind
                            FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id IN {own}""", (uid,)):
         if r["kind"] == "agent":
             continue
-        p = out.setdefault(r["user_id"], {"user_id": r["user_id"], "name": r["display_name"] or r["username"], "email": r["email"] or "",
-                                           "lists": {}})
+        p = out.setdefault(r["user_id"], {"user_id": r["user_id"], "name": r["display_name"] or r["username"],
+                                           "email_hash": umz_email_hash(r["email"]), "lists": {}})
         p["lists"][str(r["list_id"])] = r["role"]
     for r in c.execute(f"""SELECT DISTINCT u.id, u.display_name, u.username, u.email, COALESCE(u.kind,'user') AS kind FROM users u
                            WHERE u.id IN (SELECT user_id FROM comments WHERE task_id IN (SELECT id FROM tasks WHERE list_id IN {own}))
                               OR u.id IN (SELECT assignee_id FROM tasks WHERE list_id IN {own})""", (uid, uid)):
         if r["id"] != uid and r["id"] not in out:
-            out[r["id"]] = {"user_id": r["id"], "name": r["display_name"] or r["username"], "email": "" if r["kind"] == "agent" else r["email"] or "",
+            out[r["id"]] = {"user_id": r["id"], "name": r["display_name"] or r["username"],
+                            "email_hash": "" if r["kind"] == "agent" else umz_email_hash(r["email"]),
                             "lists": {}, **({"agent": True} if r["kind"] == "agent" else {})}
     return list(out.values())
 
@@ -320,6 +337,10 @@ def umz_build(c, uid, stream, export_id):
             def rows(table=table, sql=sql, args=args):
                 for r in c.execute(sql, args):
                     d = umz_clean(table, r)
+                    if d is None:
+                        continue
+                    if table == "shared_lists":  # review M1: the owner's address only as a hash
+                        d["owner_email_hash"] = umz_email_hash(d.pop("owner_email", ""))
                     if (table, d.get("id")) in files:
                         d["file"] = files[(table, d["id"])]
                     yield d

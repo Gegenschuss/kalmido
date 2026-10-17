@@ -7763,4 +7763,6 @@ button.jobtag b{font-weight:600}
 .umzhow { margin: .5rem 0 1rem; }
 .umzhow summary { cursor: pointer; padding: .75rem 0; font-weight: 600; }
 .umzsteps { margin: .25rem 0 0 1.25rem; padding: 0; line-height: 1.5; }
+.umzem { flex: 1 1 12rem; min-height: 2.75rem; }  /* review M1: the address an admin types for an invitation */
+.umzmis { flex-basis: 100%; color: var(--danger, inherit); }
 @media (max-width: 40rem) { .umzp { flex-wrap: wrap; } }

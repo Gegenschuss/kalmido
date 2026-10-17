@@ -8379,5 +8379,10 @@
   "The recovery key does not open this export. Attempts left: {0}": "La chiave di ripristino non apre questa esportazione. Tentativi rimasti: {0}",
   "An organisation export goes into an organisation: choose one you administer.": "Un’esportazione di organizzazione va in un’organizzazione: scegline una che amministri.",
   "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Non è una chiave di ripristino (52 caratteri A-Z e 2-7, in gruppi di 4).",
-  "Personal list kept in your private space: {0}": "Elenco personale tenuto nel tuo spazio privato: {0}"
+  "Personal list kept in your private space: {0}": "Elenco personale tenuto nel tuo spazio privato: {0}",
+  "Their e-mail address": "Il suo indirizzo e-mail",
+  "E-mail address of {0}": "Indirizzo e-mail di {0}",
+  "This is not the address in the file: nobody is invited.": "Non è l'indirizzo del file: nessuno viene invitato.",
+  "Address does not match": "L'indirizzo non corrisponde",
+  "Type the e-mail address of {0} for the invitation.": "Inserisci l'indirizzo e-mail di {0} per l'invito."
 }

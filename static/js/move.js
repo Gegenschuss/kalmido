@@ -34,9 +34,9 @@ const umzCounts = o => Object.entries(o || {}).filter(([k, n]) => n && umzCount(
 function umzPreviewHtml(j) {
   const p = j.preview, org = p.kind === 'org', src = p.source.url ? esc(p.source.url) : tr('unknown');
   const people = p.people.length ? `<div class="muted mhint">${tr('People of your lists')}</div>` + p.people.map((x, i) => `<div class="mrow umzp">
-    <span class="n">${esc(x.name || x.email)} <span class="muted">${esc(x.email)}</span><br><span class="muted">${x.found ? esc(tr('found: {0}', x.found_name)) : esc(tr('not on this server'))}</span></span>
+    <span class="n">${esc(x.name || tr('Unknown'))}<br><span class="muted">${x.found ? esc(tr('found: {0}', x.found_name)) : esc(tr('not on this server'))}</span></span>
     ${x.found ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="share"> ${org ? tr('Add to the organisation and share the lists') : tr('Share my lists')}</label>`
-      : p.can_invite ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="invite"> ${tr('Invite by e-mail')}</label>` : `<span class="muted">${tr('Skipped')}</span>`}</div>`).join('')
+      : p.can_invite ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="invite"> ${tr('Invite by e-mail')}</label>${x.need_address === false ? '' : `<input type="email" class="umzem" data-umze="${i}" autocomplete="off" placeholder="${esc(tr('Their e-mail address'))}" aria-label="${esc(tr('E-mail address of {0}', x.name || ''))}"><span class="muted umzmis" data-umzm="${i}" hidden>${tr('This is not the address in the file: nobody is invited.')}</span>`}` : `<span class="muted">${tr('Skipped')}</span>`}</div>`).join('')
     + hintK(tr('Nothing is shared without a tick: an address on another server can belong to somebody else here.')) : '';
   const lists = p.lists.length ? `<div class="umzlists">${p.lists.slice(0, 12).map(l => `<div class="mrow"><span class="n">${esc(l.inbox ? tr('Basket') : l.name)}${l.folder ? ` <span class="muted">${esc(l.folder)}</span>` : ''}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}</span></div>`).join('')}${p.lists.length > 12 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', p.lists.length - 12))}</div>` : ''}</div>` : '';
   const notes = [p.again ? `<div class="shint warn" role="alert">${ic('alert', 's')} ${tr('You have imported this export already. Importing it again creates everything a second time.')}</div>` : '',
@@ -51,9 +51,20 @@ function umzPreviewHtml(j) {
     ${none ? hintK(tr('You are not the admin of an organisation on this server. Create one or ask its admin first.')) : ''}
     <div class="row"><button type="button" class="btn sm pri" data-umz="go" ${none ? 'disabled' : ''}>${ic('download', 's')} ${tr('Start the import')}</button><button type="button" class="btn sm" data-umz="cancel">${tr('Cancel')}</button></div></div>`;
 }
+// review M1: the file names other people only by a hash of their address; an address typed for an invitation is checked
+// against it here (the server checks again in the run)
+async function umzHash(em) {
+  if (!window.crypto?.subtle) return '';
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('kalmido-people|' + em.trim().toLowerCase()));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+async function umzEmailOk(p, i, em) {
+  const h = em.trim() ? await umzHash(em) : '';
+  return !h || h === p.people[i].key;
+}
 function umzResultHtml(j) {
   const r = j.result || {};
-  const ppl = (r.people || []).map(x => `<div class="mrow"><span class="n">${esc(x.email)}</span><span class="muted">${esc({shared: tr('Shared'), invited: tr('Invited'), skipped: tr('Skipped'), failed: tr('Not possible')}[x.state] || '')}${x.lists ? ' · ' + esc(trn('{0} list', '{0} lists', x.lists)) : ''}</span></div>`).join('');
+  const ppl = (r.people || []).map(x => `<div class="mrow"><span class="n">${esc(x.name || x.email || '')}</span><span class="muted">${esc({shared: tr('Shared'), invited: tr('Invited'), skipped: tr('Skipped'), failed: tr('Not possible'), mismatch: tr('Address does not match')}[x.state] || '')}${x.lists ? ' · ' + esc(trn('{0} list', '{0} lists', x.lists)) : ''}</span></div>`).join('');
   const w = (r.warnings || []).map(x => `<li>${esc(x.text)}${x.count > 1 ? ` (${x.count})` : ''}</li>`).join('');
   return `<div class="impbox umzbox" role="status"><div class="imphead"><b>${esc(r.stopped || tr('Import finished'))}</b></div>
     <div class="umzcnt">${umzCounts(r.created)}</div>${ppl}${w ? `<ul class="impwarn">${w}</ul>` : ''}
@@ -106,6 +117,10 @@ function umzInit(md) {
   umzExpLoad(md);
   api('GET', '/api/account/import').then(j => { if (j.current && j.current.state !== 'upload') umzImpDraw(md, j.current); }).catch(() => {});
   $('#s-umz-file', md)?.addEventListener('change', e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) umzUpload(md, f).catch(() => umzImpDraw(md, null)); });
+  md.addEventListener('change', async e => {  // review M1: a typed address that is not the one in the file -> hint at once
+    const x = e.target.closest?.('[data-umze]'); if (!x || !UMZ.cur?.preview) return;
+    const m = $(`[data-umzm="${x.dataset.umze}"]`, md); if (m) m.hidden = await umzEmailOk(UMZ.cur.preview, +x.dataset.umze, x.value);
+  });
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-umz]'); if (!b) return;
     const a = b.dataset.umz;
@@ -124,7 +139,15 @@ function umzInit(md) {
       }
       if (a === 'go') {
         const p = UMZ.cur.preview, people = {};
-        md.querySelectorAll('[data-umzp]').forEach(x => { if (x.checked) { const em = p.people[+x.dataset.umzp].email; people[em] = {...people[em], [x.dataset.k]: true}; } });
+        for (const x of md.querySelectorAll('[data-umzp]')) {
+          if (!x.checked) continue;
+          const i = +x.dataset.umzp, k = p.people[i].key, em = $(`[data-umze="${i}"]`, md)?.value.trim() || '';
+          if (x.dataset.k === 'invite' && p.people[i].need_address !== false) {
+            if (!em) { toast(tr('Type the e-mail address of {0} for the invitation.', p.people[i].name || '')); return; }
+            if (!await umzEmailOk(p, i, em)) { const m = $(`[data-umzm="${i}"]`, md); if (m) m.hidden = false; return; }
+          }
+          people[k] = {...people[k], [x.dataset.k]: true, ...(em ? {email: em} : {})};
+        }
         const t = $('#s-umz-tgt', md)?.value || 'private';
         b.disabled = true;
         return umzImpDraw(md, await api('POST', `/api/account/import/${UMZ.cur.id}/run`, {target: t === 'private' ? 'private' : +t, people}));

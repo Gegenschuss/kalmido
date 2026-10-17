@@ -8379,5 +8379,10 @@
   "The recovery key does not open this export. Attempts left: {0}": "De herstelsleutel opent deze export niet. Resterende pogingen: {0}",
   "An organisation export goes into an organisation: choose one you administer.": "Een organisatie-export gaat naar een organisatie: kies er een die je beheert.",
   "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Dit is geen herstelsleutel (52 tekens A-Z en 2-7, in groepen van 4).",
-  "Personal list kept in your private space: {0}": "Persoonlijke lijst blijft in je privéruimte: {0}"
+  "Personal list kept in your private space: {0}": "Persoonlijke lijst blijft in je privéruimte: {0}",
+  "Their e-mail address": "Hun e-mailadres",
+  "E-mail address of {0}": "E-mailadres van {0}",
+  "This is not the address in the file: nobody is invited.": "Dit is niet het adres uit het bestand: er wordt niemand uitgenodigd.",
+  "Address does not match": "Adres komt niet overeen",
+  "Type the e-mail address of {0} for the invitation.": "Typ voor de uitnodiging het e-mailadres van {0}."
 }

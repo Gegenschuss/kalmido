@@ -525,8 +525,10 @@ and 20). Agents and API tokens cannot do this; it is a person's step in the app.
    private space or an organisation you administer -- and start. Everything is created anew; one *Undo* (24 hours)
    removes everything the import created.
 4. **People.** Your lists are shared with a person found by e-mail only when you tick them in the preview (an address on
-   another server can belong to somebody else here). A server admin can also invite people that are missing (an
-   account with an invitation link by e-mail); everybody else invites them later as usual. Assignments to people that
+   another server can belong to somebody else here). The file names other people only by a hash of their address, so
+   the preview shows their name and the account found here, never an address. A server admin can also invite people that
+   are missing (an account with an invitation link by e-mail): type their address in the preview -- it must match the
+   hash in the file, otherwise nobody is invited; everybody else invites them later as usual. Assignments to people that
    are not taken over stay empty; comments of such people keep their name.
 
 **What moves:** your lists (sections, fields, tags, status updates, links, milestones, project files), their tasks with
@@ -546,10 +548,18 @@ organisation data that is not yours (use the organisation export for a whole org
   `user` (id, name, e-mail), `tables` (rows per table), `files` (path, size, SHA-256 of every part), `client_encrypted`,
   `export_id` (an import of the same file twice is pointed out), `not_included`.
 - `data/<table>.json`: one JSON array per table (the tables of *Download JSON*, plus `list_tags`, `task_list_tags`,
-  `people` -- the members of your lists with name and e-mail address --, `shared_lists`, `shared_comments`,
-  `server_links` without their access keys).
+  `people` -- the members of your lists with name and `email_hash` --, `shared_lists` (the owner as
+  `owner_email_hash`), `shared_comments`,
+  `server_links` without their access keys). Webhooks appear only with name, events and `url_hint` (scheme and
+  host; the address itself is the secret of many chat services), settings without the server-side ones (such as the
+  ntfy topic an admin set).
 - `files/attachments/`, `files/list_files/`: the files (decrypted).
 - `checksum.sha256`: check the file with `sha256sum -c checksum.sha256` after unpacking.
+
+Other people's addresses never leave the server in plain text: `email_hash` is the SHA-256 (hex) of
+`kalmido-people|` followed by the address in lower case without spaces around it; the import compares it with the accounts
+you may see on the new server. Your own address in `manifest.json` stays readable. Files of 2.73 test builds with a plain
+`email` field are still read.
 
 **A whole organisation** (2.73, stage 1): upload its organisation export (see above) the same way, as an admin of an
 organisation on the new server, and enter the organisation's recovery key of the old server. The archive is opened on
@@ -562,11 +572,14 @@ organisation and gets their lists shared again. Not yet taken over (the preview 
 office, the file store, team chat, knowledge pages, documents, newsletter, clients, absences and bookings, forms,
 playbooks, project notes and notepads, time entries and browser-encrypted notes.
 
-**Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the storage quota of the
+**Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the data parts may hold at
+most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX_ROWS` (default 500000) rows per table
+(also for an organisation export); the storage quota of the
 person (hosting) is checked before the upload and for every file during the import -- when it is full, the import stops
 and what came over so far can be undone. The import refuses ZIP files with unsafe names, duplicate parts, encryption,
 extreme compression ratios or wrong checksums; ids, owners, organisations and authors in the file are never taken over
-as they are.
+as they are. Values in a form the app never writes (a date like 2026-99-99, a time 25:99, an unknown priority, a colour
+that is no #rrggbb, a repeat rule the app refuses) are left out, so the default applies.
 
 ## Server hardening
 

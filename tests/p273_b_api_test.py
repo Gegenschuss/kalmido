@@ -6,7 +6,7 @@
    with me only as a reference with my own comment there; no list of others, no secrets (column names); sealed on disk (0600);
    another person 404, an agent token 401/403; GET /api/export.json unchanged
  - import into another person (private): the upload in pieces (wrong offset 409, another person's upload 404), the preview
-   (counts, people found by e-mail, again-warning), target checks (an organisation without admin rights 403, a foreign one
+   (counts, people found by the hash of their address -- review M1: no address of others in the file or the preview, again-warning), target checks (an organisation without admin rights 403, a foreign one
    404), everything created anew with new ids, subtask + dependency mapped, the comment authors mapped (me -> me, a ticked
    person -> that person), a found person shared only with a tick, the attachment readable; the upload is gone afterwards;
    undo removes everything (also the files)
@@ -14,7 +14,7 @@
  - a crafted file: ids / owner / org / author from the file are ignored, wrong types fall back, cycles and lists that are not
    in the file are dropped; a missing person is invited only by an instance admin
  - attacks: no ZIP, path traversal, duplicate part, encrypted ZIP, ZIP bomb, deep JSON, wrong checksum, missing file, wrong
-   format, newer version, too large, storage quota before the upload and in the middle of the run (stops, undo possible)
+   format, newer version, too large, too many rows in one table, storage quota before the upload and in the middle of the run (stops, undo possible)
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY and the mode workspaces.
 usage: p273_b_api_test.py <datadir>"""
 import base64
@@ -22,6 +22,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -41,12 +42,20 @@ SECRET = {"password_hash", "password", "token", "token_hash", "secret", "hook_se
           "api_key", "access_token", "refresh_token", "drop_token", "ical_token", "code_hash", "webauthn_handle", "oidc_subject", "token_enc"}
 
 
+def EH(email):  # review M1: other people's addresses only as this hash
+    return hashlib.sha256(("kalmido-people|" + email.strip().lower()).encode()).hexdigest()
+
+
 def check(cond, what):
     if cond:
         OKS[0] += 1
     else:
         FAILS.append(what)
         print("FAIL:", what, flush=True)
+        if len(FAILS) == 1:  # the server's side of the first failure (a traceback of the import thread)
+            ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+            print(subprocess.run(["docker", "logs", "--tail", "60", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 text=True).stdout[-6000:], flush=True)
 
 
 def sess(user, pw="password123"):
@@ -147,7 +156,9 @@ def bad(s, data, what, code=None):
     s.delete(B + f"/api/account/import/{iid}")
 
 
-env = dict(os.environ, EXTRA=f"-e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_SECRET_KEY={KEY}")
+# 2.73.0 (#1473) review M2: a small row limit per table, so the test can go just above it
+MAX_ROWS = 5000
+env = dict(os.environ, EXTRA=f"-e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_SECRET_KEY={KEY} -e KALMIDO_ACCOUNT_IMPORT_MAX_ROWS={MAX_ROWS}")
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
 assert r.returncode == 0, r.stdout + r.stderr
 s0 = requests.Session()
@@ -220,6 +231,10 @@ check(requests.post(B + P, headers=AGH).status_code in (401, 403) and requests.g
 check(requests.post(B + "/api/account/import", headers=AGH, json={"size": 100}).status_code in (401, 403), "agent token: no import")
 check(requests.get(B + "/api/v1/account/export", headers=AGH).status_code in (403, 404, 405), "nothing of it in the agent API")
 check(A.get(B + P).json().get("state") == "none", "no export yet")
+# 2.73.0 (#1473) review N5: a webhook address and a server-only setting
+WHU = "https://hooks.example.com/services/T000/Geheimpfad0815"
+check(A.post(B + "/api/me/webhooks", json={"name": "Umzug Hook", "url": WHU, "events": ["task.created"]}).status_code == 201, "N5: webhook")
+check(A.patch(B + f"/api/users/{ALICE}", json={"ntfy_topic": "umzugtopic4711"}).ok, "N5: ntfy topic (admin)")
 EXP = export_of(A)
 check(Bo.get(B + P + "/file").status_code == 404, "bob cannot download (he has none, alice's is not his)")
 ad = os.path.join(DATA, "exports", "account", str(ALICE))
@@ -241,10 +256,14 @@ titles = {t["title"] for t in D["tasks"]}
 check({"Umzugskartons packen", "Kartons beschriften", "Moebelwagen buchen", "Orgaufgabe Uebergabe"} <= titles, "own tasks in it")
 check("Bob Geheimaufgabe" not in titles and not any(L["name"] in ("Bob Geheimliste", "Carol Geheimliste", "Erin Privatsache") for L in D["lists"]),
       "no lists / tasks of other people")
-check(any(x["name"] == "Bob Geheimliste" and x["owner_email"] == "bob@example.com" for x in D["shared_lists"]), "bob's list as a reference")
+# 2.73.0 (#1473) review M1: the owner's address only as a hash
+check(any(x["name"] == "Bob Geheimliste" and x["owner_email_hash"] == EH("bob@example.com") and "owner_email" not in x for x in D["shared_lists"]),
+      "bob's list as a reference")
 check([x["body"] for x in D["shared_comments"]] == ["Alice schreibt bei Bob"], "my comment on bob's list (Art. 15)")
 check({"Kommentar von Alice", "Kommentar von Bob"} <= {x["body"] for x in D["comments"]}, "comments of my lists")
-check(any(p["email"] == "bob@example.com" and str(LP) in p["lists"] for p in D["people"]), "bob among the people (mapping)")
+check(any(p["email_hash"] == EH("Bob@Example.com ") and "email" not in p and str(LP) in p["lists"] for p in D["people"]), "bob among the people (mapping)")
+check(not any(b"bob@example.com" in z.read(n) or b"carol@example.com" in z.read(n) for n in names if not n.startswith("files/")),
+      "no address of another person anywhere in the file (review M1)")
 check(D["event_calendars"] and D["events"] and D["contacts"] and D["habits"], "calendar, event, contact, habit")
 att = {a["name"]: a for a in D["attachments"]}
 check(z.read(att["packliste.txt"]["file"]) == ATT and z.read(att["org.txt"]["file"]) == OATT, "attachments in it (the org one decrypted)")
@@ -252,9 +271,14 @@ check(not any(z.read(n)[:6] == b"KENC1\n" for n in names if n.startswith("files/
 leak = sorted({k for rows in D.values() for row in rows if isinstance(row, dict) for k in row if k in SECRET})
 check(not leak, f"no secret columns: {leak}")
 check(ag["token"].encode() not in EXP, "the agent token is not in the file")
+check(not any(x.get("key") in ("ntfy_topic", "onboard", "digest_sent") for x in D["settings"]) and b"umzugtopic4711" not in z.read("data/settings.json"),
+      "N5: no server-only settings")
+check(any(x.get("url_hint") == "https://hooks.example.com/…" and "url" not in x for x in D["webhooks"]) and
+      not any(b"Geheimpfad0815" in z.read(n) for n in names if not n.startswith("files/")), "N5: the webhook only as url_hint")
 EJ = A.get(B + "/api/export.json").json()
 check({"lists", "tasks", "comments", "attachments", "settings", "events", "contacts", "user"} <= set(EJ) and
-      len(EJ["tasks"]) == len(D["tasks"]) and "shared_lists" not in EJ, "GET /api/export.json unchanged")
+      len(EJ["tasks"]) == len(D["tasks"]) and "shared_lists" not in EJ and any(x.get("url") == WHU for x in EJ.get("webhooks", [])),
+      "GET /api/export.json unchanged")
 check(A.delete(B + P).ok and A.get(B + P).json()["state"] == "none" and not os.path.isdir(ad), "delete the export now")
 EXP = export_of(A)  # again for the imports
 
@@ -276,14 +300,14 @@ check(j.get("state") == "preview", f"preview {j.get('state')} {j.get('error')}")
 pv = j.get("preview") or {}
 check(pv.get("counts", {}).get("tasks") == len(D["tasks"]) and pv.get("user", {}).get("email") == "alice@example.com" and not pv.get("again"),
       f"preview counts + source {pv.get('counts')}")
-pb = [p for p in pv.get("people", []) if p["email"] == "bob@example.com"]
-check(pb and pb[0]["found"], f"bob found by e-mail {pb}")
+pb = [p for p in pv.get("people", []) if p["key"] == EH("bob@example.com")]
+check(pb and pb[0]["found"] and pb[0]["found_name"] and "email" not in pb[0], f"bob found by the hash, no address in the preview {pb}")
 check(not pv.get("can_invite"), "dave may not invite")
 check({t["id"] for t in pv.get("targets", [])} == {"private"}, f"dave: only private (member, not admin of Alpha) {pv.get('targets')}")
 check(Da.post(B + f"/api/account/import/{iid}/run", json={"target": ORG}).status_code == 403, "target: organisation without admin rights 403")
 check(Da.post(B + f"/api/account/import/{iid}/run", json={"target": ORG2}).status_code == 404, "target: foreign organisation 404")
 DAVE = ids["dave"]
-j = run(Da, iid, people={"bob@example.com": {"share": True}})
+j = run(Da, iid, people={EH("bob@example.com"): {"share": True}})
 check(j.get("state") == "done", f"import done {j.get('state')} {j.get('error')}")
 res = j.get("result") or {}
 check(res.get("import_id") and res.get("created", {}).get("tasks") == len([t for t in D["tasks"] if not t.get("deleted_at")]),
@@ -363,10 +387,11 @@ j = wait(A, iid)
 pv = j.get("preview") or {}
 check(j.get("state") == "preview" and pv.get("kind") == "org", f"opened: preview {j.get('state')} {j.get('error')}")
 check("private" not in [t["id"] for t in pv.get("targets", [])] and GAMMA in [t["id"] for t in pv.get("targets", [])], "targets: organisations only")
-check(any(x["email"] == "bob@example.com" and x["found"] for x in pv.get("people", [])) and
-      not any(x["email"] == "alice@example.com" for x in pv.get("people", [])), "the members: bob found, alice herself not listed")
+check(any(x["key"] == EH("bob@example.com") and x["found"] for x in pv.get("people", [])) and
+      not any(x["key"] == EH("alice@example.com") for x in pv.get("people", [])) and not any("email" in x for x in pv.get("people", [])),
+      "the members: bob found, alice herself not listed, no address in the preview")
 check(A.post(B + f"/api/account/import/{iid}/run", json={"target": "private"}).status_code == 400, "not into the private space")
-j = run(A, iid, target=GAMMA, people={"bob@example.com": {"share": True}})
+j = run(A, iid, target=GAMMA, people={"bob@example.com": {"share": True}})  # a plain address as key (older client) still works
 check(j.get("state") == "done", f"organisation import done {j.get('error')}")
 gl = dbx("SELECT id, owner_id FROM lists WHERE org_id=? AND name='Alpha Orgliste'", (GAMMA,))
 check(gl and gl[0]["owner_id"] == ALICE, "the list is in the target organisation")
@@ -388,12 +413,24 @@ crafted = mkzip({
               {"id": 11, "list_id": 999, "title": "Ohne Liste Test", "created_at": ts, "updated_at": ts},
               {"id": 12, "list_id": 5, "title": "x" * 100000, "created_at": ts, "updated_at": ts}],
     "comments": [{"id": 1, "task_id": 9, "user_id": CAROL, "body": "Fremder Kommentar Test", "created_at": ts}],
-    "people": [{"user_id": 77, "name": "Frank Neu", "email": "frank@example.com", "lists": {"5": "edit"}}],
+    "people": [{"user_id": 77, "name": "Frank Neu", "email": "frank@example.com", "lists": {"5": "edit"}},  # an older file: plain address
+               # review M1: only hashes -- the admin types the address; a wrong one invites nobody
+               {"user_id": 78, "name": "Gina Neu", "email_hash": EH("gina@example.com"), "lists": {"5": "edit"}},
+               {"user_id": 79, "name": "Hugo Neu", "email_hash": EH("hugo@example.com"), "lists": {"5": "view"}},
+               {"user_id": 80, "name": "Bob im Hash", "email_hash": EH("bob@example.com"), "lists": {}}],
 })
 iid = upload(A, crafted)
 j = wait(A, iid)
-check(j.get("state") == "preview" and any(p["email"] == "frank@example.com" and not p["found"] for p in j["preview"]["people"]), "frank: not here")
-j = run(A, iid, people={"frank@example.com": {"invite": True}})
+pp = {p["key"]: p for p in (j.get("preview") or {}).get("people", [])}
+check(j.get("state") == "preview" and not pp.get(EH("frank@example.com"), {}).get("found", True) and pp[EH("frank@example.com")]["need_address"] is False,
+      "frank: not here (address in the older file)")
+check(pp.get(EH("gina@example.com"), {}).get("need_address") is True and pp.get(EH("bob@example.com"), {}).get("found"), "gina: address needed; bob found by hash")
+j = run(A, iid, people={EH("frank@example.com"): {"invite": True}, EH("gina@example.com"): {"invite": True, "email": "Gina@Example.com"},
+                        EH("hugo@example.com"): {"invite": True, "email": "nothugo@example.com"}})
+st = {p.get("name"): p.get("state") for p in (j.get("result") or {}).get("people", [])}
+check(st.get("Gina Neu") == "invited" and st.get("Hugo Neu") == "mismatch" and not any("email" in p for p in j["result"]["people"]), f"invite states {st}")
+check(dbx("SELECT 1 FROM users WHERE lower(email)='gina@example.com'") and not dbx("SELECT 1 FROM users WHERE email IN ('nothugo@example.com', 'hugo@example.com')"),
+      "gina invited with the typed address, a wrong one invites nobody")
 check(j.get("state") == "done", f"crafted import done {j.get('error')}")
 fl = dbx("SELECT id, owner_id, org_id FROM lists WHERE name='Fremdliste Test'")
 check(len(fl) == 1 and fl[0]["owner_id"] == ALICE and fl[0]["org_id"] is None, f"owner / org from the file ignored {[dict(zip(x.keys(), x)) for x in fl]}")
@@ -408,6 +445,67 @@ check(fc and fc[0]["user_id"] is None and fc[0]["ext_name"], "a foreign author s
 fr = dbx("SELECT id FROM users WHERE email='frank@example.com'")
 check(fr and dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (fl[0]["id"], fr[0]["id"])), "frank invited (instance admin) and shared")
 check(dbx("SELECT 1 FROM user_invites WHERE user_id=?", (fr[0]["id"] if fr else 0,)), "frank has an invitation link")
+
+# ---------------------------------------------------------------- 2.73.0 (#1473) review N4: a piece that broke off half-written
+r = Da.post(B + "/api/account/import", json={"size": len(EXP), "name": "alice.zip"})
+iid = r.json()["id"]
+check(Da.put(B + f"/api/account/import/{iid}?offset=0", data=EXP[:1 << 20], headers={"Content-Type": "application/octet-stream"}).ok, "N4: piece 1")
+with open(os.path.join(DATA, "exports", "account-import", str(DAVE), iid, "upload.bin"), "ab") as f:
+    f.write(os.urandom(70000))  # the rest of a write that stopped in the middle (the state still says 1 MiB)
+off = 1 << 20
+while off < len(EXP):
+    r = Da.put(B + f"/api/account/import/{iid}?offset={off}", data=EXP[off:off + (1 << 20)], headers={"Content-Type": "application/octet-stream"})
+    check(r.ok, f"N4: piece at {off} {r.status_code}")
+    off += 1 << 20
+j = wait(Da, iid)
+check(j.get("state") == "preview", f"N4: the leftover bytes were cut, the file checks fine ({j.get('state')}: {j.get('error')})")
+Da.delete(B + f"/api/account/import/{iid}")
+
+# ---------------------------------------------------------------- 2.73.0 (#1473) review N6: values in a form the app never writes
+n6 = mkzip({
+    "lists": [{"id": 1, "name": "Formatpruefung Test", "color": "rot", "created_at": ts}],
+    "tasks": [{"id": 1, "list_id": 1, "title": "Kaputte Wiederholung", "due": "2026-99-99", "due_time": "25:99", "repeat": "FREQ=DAILY",
+               "priority": 999, "reminders": "abc", "duration": -5, "repeat_from": "irgendwann", "created_at": "gestern", "updated_at": ts},
+              {"id": 2, "list_id": 1, "title": "Gute Wiederholung", "due": "2026-10-20", "due_time": "09:30", "repeat": "RRULE:FREQ=WEEKLY",
+               "priority": 3, "reminders": "15,0", "created_at": ts, "updated_at": ts},
+              {"id": 3, "list_id": 1, "title": "Kaputte Regel", "due": "2026-10-20", "repeat": "FREQ=SECONDLY;INTERVAL=1", "created_at": ts,
+               "updated_at": ts}],
+    "habits": [{"id": 1, "name": "Formatgewohnheit", "color": "#12345", "remind_at": "abends", "days": "89", "goal": 0, "created_at": ts}],
+})
+iid = upload(Da, n6)
+j = wait(Da, iid)
+j = run(Da, iid) if j.get("state") == "preview" else j
+check(j.get("state") == "done", f"N6: import done {j.get('state')} {j.get('error')}")
+n6l = dbx("SELECT id, color FROM lists WHERE owner_id=? AND name='Formatpruefung Test'", (DAVE,))
+check(n6l and n6l[0]["color"] in ("", None), f"N6: a wrong colour is left out {n6l and n6l[0]['color']}")
+n6t = {r_["title"]: r_ for r_ in dbx("SELECT id, title, due, due_time, repeat, priority, reminders, duration, repeat_from, created_at FROM tasks "
+                                     "WHERE list_id=?", (n6l[0]["id"] if n6l else 0,))}
+kb, gu = n6t.get("Kaputte Wiederholung"), n6t.get("Gute Wiederholung")
+check(kb and kb["due"] is None and kb["due_time"] is None and kb["priority"] == 0 and kb["reminders"] in ("", None) and kb["duration"] is None
+      and kb["repeat_from"] == "due" and kb["created_at"] != "gestern", f"N6: broken values left out {kb and dict(zip(kb.keys(), kb))}")
+check(gu and gu["due"] == "2026-10-20" and gu["due_time"] == "09:30" and gu["repeat"] == "FREQ=WEEKLY" and gu["priority"] == 3 and gu["reminders"] == "15,0",
+      f"N6: valid values kept {gu and dict(zip(gu.keys(), gu))}")
+check(n6t.get("Kaputte Regel") and not n6t["Kaputte Regel"]["repeat"], "N6: a rule the app refuses is left out")
+for t_ in (kb, gu):
+    r = Da.post(B + f"/api/tasks/{t_['id'] if t_ else 0}/complete", json={})
+    check(r.ok, f"N6: {t_ and t_['title']} can be ticked off ({r.status_code} {r.text[:200]})")
+hb = dbx("SELECT color, remind_at, days, goal FROM habits WHERE user_id=? AND name='Formatgewohnheit'", (DAVE,))
+check(hb and hb[0]["color"] in ("", None) and hb[0]["remind_at"] == "" and hb[0]["days"] == "1234567" and hb[0]["goal"] == 1,
+      f"N6: habit defaults {hb and dict(zip(hb[0].keys(), hb[0]))}")
+
+# ---------------------------------------------------------------- 2.73.0 (#1473) review N7: the CardDAV path never from the file
+n7 = mkzip({"lists": [], "address_books": [{"id": 1, "name": "Pfadbuch Test", "created_at": ts}],
+            "contacts": [{"id": 1, "book_id": 1, "uid": "../boese uid/x", "fn": "Kontakt Pfad", "updated_at": ts},
+                         {"id": 2, "book_id": 1, "uid": "gute-uid_1@example.com", "fn": "Kontakt Gut", "updated_at": ts}]})
+iid = upload(Da, n7)
+j = wait(Da, iid)
+j = run(Da, iid) if j.get("state") == "preview" else j
+check(j.get("state") == "done", f"N7: import done {j.get('state')} {j.get('error')}")
+n7c = {r_["fn"]: dict(zip(r_.keys(), r_)) for r_ in dbx("SELECT c.fn, c.uid, c.href FROM contacts c JOIN books b ON b.id=c.book_id WHERE b.owner_id=? AND b.name='Pfadbuch Test'",
+                                  (DAVE,))}
+check(len(n7c) == 2 and all(re.fullmatch(r"[0-9a-f]{32}\.vcf", x["href"]) for x in n7c.values()), f"N7: href always new {n7c}")
+check(n7c.get("Kontakt Pfad", {}).get("uid") != "../boese uid/x" and re.fullmatch(r"[A-Za-z0-9@._-]+", n7c.get("Kontakt Pfad", {}).get("uid") or "")
+      and n7c.get("Kontakt Gut", {}).get("uid") == "gute-uid_1@example.com", "N7: a bad uid is replaced, a good one kept")
 
 # ---------------------------------------------------------------- attacks
 bad(Da, b"this is not a zip" * 100, "no ZIP")
@@ -428,6 +526,7 @@ bad(Da, mkzip({"lists": []}, files={"files/a.txt": b"abc"}, drop="files/a.txt"),
 bad(Da, mkzip({"lists": []}, man={"format": "kalmido-org-export"}), "wrong format")
 bad(Da, mkzip({"lists": []}, man={"v": 99}), "newer version")
 bad(Da, mkzip({"lists": {"not": "a list"}}), "broken JSON types")
+bad(Da, mkzip({"lists": [], "habits": [{"id": i} for i in range(MAX_ROWS + 1)]}), "one row above the limit per table (review M2)")
 check(Da.post(B + "/api/account/import", json={"size": 5 * 1024 ** 4}).status_code == 413, "too large 413")
 check(Da.post(B + "/api/account/import", json={"size": "big"}).status_code == 400, "size must be a number")
 # storage quota: before the upload, and in the middle of the run (stops, undo possible)
