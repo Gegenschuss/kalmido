@@ -62,16 +62,17 @@ function hbm_bodyHtml(key) {
   return `<div class="hbmwrap" data-hbm="${key}"><div class="hbmq">${ic('search', 's')}<input type="search" data-hbmq="${key}" value="${esc(s.q || '')}" placeholder="${esc(tr('Search e-mails'))}" aria-label="${esc(tr('Search e-mails'))}" autocomplete="off" enterkeyhint="search"></div>
     <div class="hbmhead hbmhl">${hbm_headHtml(key)}</div><div class="hbmbody">${hbm_listHtml(key)}</div></div>`;
 }
-// the client's card (clientpage.js) and the project page (projects.js); nothing while the mail input is off and nothing is filed
+// the client's card (clientpage.js) and the project page (projects.js); nothing before the first answer, nothing while the
+// mail input is off and nothing is filed
 function hbm_clientHtml(c) {
   const key = 'client:' + c.id, j = hbm_state(key).j;
-  if (j && !j.enabled && !j.total && !(HBM.s[key].q || '').trim()) return '';
+  if (!j || (!j.enabled && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded
   return `<div class="ctsec hbmsec"><h4>${ic('mail', 's')} ${tr('E-mails')}</h4>${hbm_bodyHtml(key)}</div>`;
 }
 function hbm_projHtml(l) {
   if (!l || l.kind !== 'project' || l.e2e) return '';
   const key = 'list:' + l.id, j = hbm_state(key).j;
-  if (j && !j.enabled && !j.total && !(HBM.s[key].q || '').trim()) return '';
+  if (!j || (!j.enabled && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded
   return `<section class="povs hbmsec hbmpov" id="pov-mails"><div class="povh"><h3>${tr('E-mails')}</h3></div>${hbm_bodyHtml(key)}</section>`;
 }
 // the entry in Office > Clients
