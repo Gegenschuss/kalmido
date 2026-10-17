@@ -103,7 +103,14 @@ function accountHtml() {
     ${apiHtml()}</details>
     ${m.auth === 'session' ? `<div class="row alogout"><button class="btn sm" data-acc="logout">${ic('logout', 's')} ${tr('Log out')}</button></div>` : ''}`;  // 2.24.0 (UX-21): at the very end, set apart
 }
-const usersHtml = () => `<h4>${tr('Users')}</h4><div class="members" id="a-users"><div class="muted mhint">${tr('Loading…')}</div></div>
+// 2.88.0 (#1980): search, filter and pages (hundreds of accounts), several accounts at once
+const UA8_FLT = [['people', N_('People')], ['active', N_('Active')], ['disabled', N_('Disabled')], ['admin', N_('Admins')], ['invited', N_('Invited')], ['pending', N_('Waiting for approval')], ['agents', N_('Agents')]];
+const UA8_PAGE = 50;
+const usersHtml = () => `<h4>${tr('Users')}</h4>
+  <div class="ua8bar"><input type="search" id="a-uq" placeholder="${esc(tr('Name, user name or e-mail'))}" aria-label="${esc(tr('Search users'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><select id="a-uflt" aria-label="${esc(tr('Filter'))}">${UA8_FLT.map(([k, n]) => `<option value="${k}">${esc(tr(n))}</option>`).join('')}</select></div>
+  <div class="ua8sel" id="a-usel" role="region" aria-label="${esc(tr('Selected users'))}" hidden></div>
+  <div class="members" id="a-users" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div>
+  <div class="ua8pg" id="a-upg"></div>
   <div class="row" style="margin-top:.5rem"><button class="btn sm" data-acc="user-new">${ic('plus', 's')} ${tr('New user')}</button></div>`;
 // ------------------------------------------------------------------ 2.10.0 (#441): groups
 // Settings > Administration > Groups (admins): name, members (people), optionally a sign-in group (OIDC) the members follow
@@ -206,17 +213,24 @@ function wsPaneHtml(hint) {
 }
 function accountWire(md) {
   let users = [];
+  const us = {q: '', flt: 'people', off: 0, total: 0, sel: new Set(), seq: 0};  // 2.88.0 (#1980): the page shown
   const drawUsers = async () => {
     const box = $('#a-users', md); if (!box) return;
-    let j; try { j = await api('GET', '/api/users?all=1'); users = j.users; S.mailOut = !!j.mail_out; } catch { return; }  // 2.46.0 (#1592): every account
-    // 2.28.0 (#1011): people only; the agents are managed under Agents (one row says how many)
-    const nAg = users.filter(u => u.kind === 'agent').length;
+    const n = ++us.seq, qs = new URLSearchParams({all: '1', limit: String(UA8_PAGE), offset: String(us.off), q: us.q, filter: us.flt});
+    let j; try { j = await api('GET', '/api/users?' + qs); } catch { return; }
+    if (n !== us.seq || !md.isConnected) return;  // a newer search answered first
+    users = j.users; S.mailOut = !!j.mail_out; us.total = j.total;
+    if (!users.length && us.off && j.total) { us.off = Math.max(0, Math.floor((j.total - 1) / UA8_PAGE) * UA8_PAGE); drawUsers(); return; }
+    // 2.28.0 (#1011): people only; the agents are managed under Agents (one row says how many; 2.88.0: the filter Agents lists them)
+    const nAg = us.flt === 'people' && !us.q ? j.agents : 0;
     box.innerHTML = (nAg ? `<div class="mrow agsum"><span class="avatar agent">${ic('bot', 's')}</span><span class="n">${esc(trn('{0} agent', '{0} agents', nAg))}</span><button class="linkbtn" data-act="agents-go">${tr('Manage under Agents')}</button></div>` : '')
-      + (j.others ? `<div class="shint keep">${esc(trn('{0} more person on this server you do not see (another organisation).', '{0} more people on this server you do not see (other organisations).', j.others))}</div>` : '')
-      + users.filter(u => u.kind !== 'agent').map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}">${u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}${u.signup === 'pending' ? ' · ' + tr('waits for approval') : u.signup === 'confirm' ? ' · ' + tr('registration not confirmed') : ''}</span></span>${u.signup === 'pending' ? `<button class="btn sm pri" data-acc="user-approve" data-uid="${u.id}">${ic('check', 's')} ${tr('Approve')}</button>` : ''}${u.kind === 'agent'
+      + (users.length ? '' : `<div class="muted mhint">${tr('Nothing found')}</div>`)
+      + users.map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}"><input type="checkbox" class="ua8chk" data-usel="${u.id}" aria-label="${esc(tr('Select {0}', u.display_name))}" ${us.sel.has(u.id) ? 'checked' : ''} ${u.id === S.me.id ? 'disabled' : ''}>${u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}${u.signup === 'pending' ? ' · ' + tr('waits for approval') : u.signup === 'confirm' ? ' · ' + tr('registration not confirmed') : ''}</span></span>${u.signup === 'pending' ? `<button class="btn sm pri" data-acc="user-approve" data-uid="${u.id}">${ic('check', 's')} ${tr('Approve')}</button>` : ''}${u.kind === 'agent'
       ? `<button class="linkbtn agmng" data-acc="agent-edit" data-uid="${u.id}" title="${esc(tr('Open the agent dialog'))}">${tr('Managed under Agents')}</button>`
       : `<button class="iconbtn" data-acc="user-edit" data-uid="${u.id}" title="${tr('Edit user')}">${ic('edit', 's')}</button>`}</div>`).join('');
+    ua8_pagerDraw(md, us); ua8_selDraw(md, us);
   };
+  ua8_wire(md, us, drawUsers);
   drawUsers();
   orgsDraw(md);
   if (wsPaneOn()) { wsPaneDraw(md); wsPaneWire(md); }  // 2.28.0 (#935)
@@ -318,8 +332,7 @@ function userModal(u, done) {
     let created = false;
     try {
       if (b.dataset.m === 'del') {
-        if (!await askConfirm(tr('Delete user “{0}”?', u.display_name), tr('Their basket, habits, filters and focus history are deleted. Lists they own must be deleted first.'), {ok: tr('Delete user'), danger: true})) return;
-        await api('DELETE', '/api/users/' + u.id);
+        if (!await ua8_delete(u)) return;  // 2.88.0 (#1980): the lists go to one person or are deleted along
       }
       if (b.dataset.m === 'save') {
         const body = {display_name: $('#u-name', md).value.trim(), proxy_login: $('#u-proxy', md).value.trim(), email: $('#u-email', md).value.trim(), ntfy_topic: $('#u-topic', md).value.trim(), is_admin: $('#u-admin', md).checked};
@@ -560,3 +573,119 @@ const sampleRowHtml = () => S.sample ? `<label>${tr('Sample')}</label><button cl
 const sampleHtml = hint => `<h4 id="s-sample-h">${tr('Sample project')}</h4>
       ${hint(tr('An example video production with sections, dates, dependencies and a packing checklist: a quick way to see how projects work. Private to you, without reminders.'))}
       <div class="row" id="s-sample">${sampleRowHtml()}</div>`;
+// ---- 2.88.0 (#1980): the user management for hundreds of accounts -- search (after a short pause in typing), filter,
+// pages of 50, several accounts at once (disable / enable / add to an organisation) and deleting an account that owns lists
+function ua8_wire(md, us, draw) {
+  let tq = 0;
+  md.addEventListener('input', e => {
+    if (e.target.id !== 'a-uq') return;
+    clearTimeout(tq); tq = setTimeout(() => { us.q = e.target.value.trim(); us.off = 0; draw(); }, 300);
+  });
+  md.addEventListener('change', async e => {
+    const t = e.target;
+    if (t.id === 'a-uflt') { us.flt = t.value; us.off = 0; draw(); return; }
+    if (t.dataset?.usel) { const id = +t.dataset.usel; t.checked ? us.sel.add(id) : us.sel.delete(id); ua8_selDraw(md, us); return; }
+    if (t.id === 'a-uborg' && +t.value) {
+      const o = (S.orgs || []).find(x => x.id === +t.value); t.value = '';
+      if (o && await askConfirm(trn('Add {0} person to “{1}”?', 'Add {0} people to “{1}”?', us.sel.size, o.name), tr('They become members of the organisation; their other organisations stay.'), {ok: tr('Add')})) await ua8_bulk(md, us, draw, 'org_add', o.id);
+    }
+  });
+  md.addEventListener('click', async e => {
+    const p = e.target.closest('[data-upg]');
+    if (p) { us.off = Math.max(0, us.off + (+p.dataset.upg) * UA8_PAGE); draw(); $('#a-uq', md)?.scrollIntoView({block: 'nearest'}); return; }
+    const b = e.target.closest('[data-ubulk]'); if (!b) return;
+    if (b.dataset.ubulk === 'clear') { us.sel.clear(); $$('[data-usel]', md).forEach(x => { x.checked = false; }); ua8_selDraw(md, us); return; }
+    if (b.dataset.ubulk === 'disable' && !await askConfirm(trn('Disable {0} account?', 'Disable {0} accounts?', us.sel.size), tr('They are logged out and cannot log in until enabled again. Nothing is deleted.'), {ok: tr('Disable'), danger: true})) return;
+    await ua8_bulk(md, us, draw, b.dataset.ubulk);
+  });
+}
+function ua8_pagerDraw(md, us) {
+  const box = $('#a-upg', md); if (!box) return;
+  const to = Math.min(us.total, us.off + UA8_PAGE);
+  box.innerHTML = us.total > UA8_PAGE ? `<button type="button" class="iconbtn" data-upg="-1" aria-label="${esc(tr('Previous page'))}" title="${esc(tr('Previous page'))}" ${us.off ? '' : 'disabled'}>${ic('left', 's')}</button><span class="muted">${esc(tr('{0}–{1} of {2}', us.off + 1, to, us.total))}</span><button type="button" class="iconbtn" data-upg="1" aria-label="${esc(tr('Next page'))}" title="${esc(tr('Next page'))}" ${to < us.total ? '' : 'disabled'}>${ic('right', 's')}</button>`
+    : us.total > 1 ? `<span class="muted">${esc(trn('{0} account', '{0} accounts', us.total))}</span>` : '';
+}
+function ua8_selDraw(md, us) {
+  const box = $('#a-usel', md); if (!box) return;
+  box.hidden = !us.sel.size;
+  if (!us.sel.size) { box.innerHTML = ''; return; }
+  const os = S.instanceMode === 'workspaces' ? (S.orgs || []) : [];
+  box.innerHTML = `<span class="n">${esc(tr('{0} selected', us.sel.size))}</span><button type="button" class="btn sm" data-ubulk="disable">${tr('Disable')}</button><button type="button" class="btn sm" data-ubulk="enable">${tr('Enable')}</button>`
+    + (os.length ? `<select id="a-uborg" aria-label="${esc(tr('Add to an organisation'))}"><option value="0">${tr('Add to an organisation …')}</option>${os.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select>` : '')
+    + `<button type="button" class="linkbtn" data-ubulk="clear">${tr('Clear selection')}</button>`;
+}
+async function ua8_bulk(md, us, draw, action, orgId) {
+  const ids = [...us.sel];
+  let j; try { j = await api('POST', '/api/users/bulk', {ids, action, ...(orgId ? {org_id: orgId} : {})}); } catch { return; }
+  us.sel.clear(); await draw();
+  const msg = j.failed.length ? tr('{0} changed, {1} not: {2}', j.ok.length, j.failed.length, j.failed[0].error) : tr('{0} changed', j.ok.length);
+  if (action === 'org_add' || !j.ok.length) { toast(msg); return; }
+  const back = action === 'disable' ? 'enable' : 'disable', ok = j.ok;  // one undo step: the same accounts back
+  offerUndo(msg, histAdd({label: tr('Users'),
+    undo: async () => { await api('POST', '/api/users/bulk', {ids: ok, action: back}); if (md.isConnected) draw(); return {skipped: []}; },
+    redo: async () => { await api('POST', '/api/users/bulk', {ids: ok, action}); if (md.isConnected) draw(); return {skipped: []}; }}));
+}
+// Deleting an account (instance admin, or an organisation admin for an account of their organisation alone): without lists
+// the short question as before; with lists the dialog names them (as far as the admin may see them) and asks: hand them all
+// to one person (the default) or delete them along (the user name typed to confirm). Resolves true when the account went
+// (or, for an organisation admin who may not delete it, left the organisation).
+async function ua8_delete(u) {
+  let j; try { j = await api('GET', `/api/users/${u.id}/delete-info`); } catch { return false; }
+  const name = u.display_name || u.name || '';
+  if (!j.can_delete) return ua8_orgRemove(u, name, j);
+  if (!j.lists.length) {
+    if (!await askConfirm(tr('Delete user “{0}”?', name), tr('Their basket, habits, filters and focus history are deleted.'), {ok: tr('Delete user'), danger: true})) return false;
+    try { await api('DELETE', '/api/users/' + u.id); } catch { return false; }
+    return true;
+  }
+  const shared = j.lists.filter(l => l.shared).length, locked = j.lists.some(l => l.locked), cand = j.candidates;
+  const lname = l => l.name != null ? esc(l.name) : esc(l.org ? tr('A list of {0}', l.org) : tr('A private list'));
+  const md = modal(`<h3>${esc(tr('Delete user “{0}”?', name))}</h3>
+    <div class="shint keep">${esc(trn('{1} still owns {0} list. Choose what happens to it.', '{1} still owns {0} lists. Choose what happens to them.', j.lists.length, name))}</div>
+    <div class="members ua8lists">${j.lists.map(l => `<div class="mrow"><span class="n">${l.locked ? ic('lock', 's') + ' ' : ''}${lname(l)} <span class="muted">${l.org && l.name != null ? esc(l.org) + ' · ' : ''}${l.shared ? esc(l.members.length ? tr('shared with {0}', l.members.join(', ') + (l.shared > l.members.length ? ' ' + tr('+{0}', l.shared - l.members.length) : '')) : trn('shared with {0} person', 'shared with {0} people', l.shared)) : esc(tr('not shared'))}</span></span></div>`).join('')}</div>
+    <fieldset class="ua8how"><legend>${tr('The lists')}</legend>
+      <label class="chkl"><input type="radio" name="ua8how" value="transfer" ${cand.length ? 'checked' : 'disabled'}> ${tr('Hand them over to')}</label>
+      <select id="ua8-to" aria-label="${esc(tr('New owner'))}" ${cand.length ? '' : 'disabled'}>${cand.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+      ${cand.length ? '' : `<div class="shint keep">${tr('Nobody can take over every one of these lists (an organisation’s list stays in its organisation). Hand single lists over first or delete them along.')}</div>`}
+      ${locked ? `<div class="shint keep">${ic('lock', 's')} ${tr('Lists with the lock: the new owner can read them once a member who holds the key opens them.')}</div>` : ''}
+      <label class="chkl"><input type="radio" name="ua8how" value="delete" ${cand.length ? '' : 'checked'}> ${tr('Delete them along')}</label>
+      <div id="ua8-del" ${cand.length ? 'hidden' : ''}>
+        ${shared ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('{0} of these lists is shared: the other people lose it too.', '{0} of these lists are shared: the other people lose them too.', shared))}</div>` : ''}
+        <div class="row"><label for="ua8-conf">${esc(tr('Type {0} to confirm', j.username))}</label><input id="ua8-conf" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      </div>
+    </fieldset>
+    <div class="shint">${tr('Invoices and filed documents do not belong to a list: they stay.')}</div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" data-m="go">${tr('Delete user')}</button></div>`);
+  const how = () => $('[name="ua8how"]:checked', md)?.value;
+  const sync = () => { $('#ua8-del', md).hidden = how() !== 'delete'; $('#ua8-to', md).disabled = how() !== 'transfer'; $('[data-m="go"]', md).disabled = how() === 'delete' ? $('#ua8-conf', md).value.trim() !== j.username : !how(); };
+  md.addEventListener('change', sync); md.addEventListener('input', sync); sync();
+  return new Promise(res => {
+    onRemove(md, () => res(false));
+    md.addEventListener('click', async e => {
+      const b = e.target.closest('button[data-m]'); if (!b) return;
+      if (b.dataset.m === 'close') { md.remove(); return; }
+      const q = how() === 'transfer' ? `lists=transfer&to=${+$('#ua8-to', md).value}` : `lists=delete&confirm=${encodeURIComponent($('#ua8-conf', md).value.trim())}`;
+      b.disabled = true;
+      try { await api('DELETE', `/api/users/${u.id}?${q}`); } catch { b.disabled = false; return; }
+      res(true); md.remove();
+    });
+  });
+}
+// an organisation admin and an account they may not delete (another organisation too, a server admin, private lists): only
+// "Remove from the organisation", its lists of the organisation going to the member chosen here
+async function ua8_orgRemove(u, name, j) {
+  if (!j.org_id) { toast(j.reason); return false; }
+  const md = modal(`<h3>${esc(tr('Delete user “{0}”?', name))}</h3><div class="shint keep">${esc(j.reason)}</div>
+    <div class="row"><label for="ua8-heir">${tr('Lists of the organisation go to')}</label><select id="ua8-heir">${[{id: S.me.id, name: tr('Me')}, ...j.heirs.filter(p => p.id !== S.me.id)].map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" data-m="go">${tr('Remove from the organisation')}</button></div>`);
+  return new Promise(res => {
+    onRemove(md, () => res(false));
+    md.addEventListener('click', async e => {
+      const b = e.target.closest('button[data-m]'); if (!b) return;
+      if (b.dataset.m === 'close') { md.remove(); return; }
+      const to = +$('#ua8-heir', md).value;
+      try { await api('DELETE', `/api/orgs/${j.org_id}/members/${u.id}${to !== S.me.id ? '?to=' + to : ''}`); } catch { return; }
+      toast(tr('Removed')); res('removed'); md.remove();
+    });
+  });
+}

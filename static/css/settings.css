@@ -148,3 +148,20 @@
 @media (pointer:coarse) {
   .ad-mark .ad-open{min-height:2.75rem;padding:0 .5rem}
 }
+/* 2.88.0 (#1980): the user management -- search + filter, selection bar, pages, the delete dialog's choice */
+.ua8bar{display:flex;gap:.5rem;margin:.25rem 0 .5rem}
+.ua8bar input{flex:1;min-width:0}
+.ua8bar select{flex:0 1 auto;max-width:42%}
+.ua8sel{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem;margin-bottom:.5rem;border-radius:.5rem;background:var(--accent-soft)}
+.ua8sel .n{font-weight:600;margin-right:auto}
+.ua8chk{width:1.125rem;height:1.125rem;flex:none;margin:0 .25rem 0 0;accent-color:var(--accent)}
+.ua8pg{display:flex;align-items:center;justify-content:center;gap:.75rem;margin-top:.5rem}
+.ua8pg:empty{display:none}
+.ua8lists{max-height:14rem;overflow:auto}
+.ua8how{border:0;padding:0;margin:.75rem 0 0;display:flex;flex-direction:column;gap:.5rem}
+.ua8how legend{font-weight:600;padding:0;margin-bottom:.25rem}
+.ua8how select{max-width:100%}
+@media (pointer:coarse) {
+  .ua8chk{width:1.5rem;height:1.5rem}
+  .ua8pg .iconbtn{min-width:2.75rem;min-height:2.75rem}
+}
