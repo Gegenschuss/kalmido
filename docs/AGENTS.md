@@ -1480,8 +1480,8 @@ the same way (`kind: comment` with `comment`, `task`, `list`; `kind: team` with 
 A message of the agent chat or of a team chat conversation can be pinned: it shows in a bar at the top of the
 conversation (newest pin first, a tap jumps to it). At most 5 per conversation (a 6th answers 409); a deleted message
 leaves the bar. Every message carries `pinned_at` (null = not pinned) and `pinned_by`; the conversation's page
-(`GET /api/v1/team/rooms/{id}/messages`, in the app also the agent chat) carries `pins`, also when they are older than
-the page.
+(`GET /api/v1/team/rooms/{id}/messages`, in the app also the agent chat; 2.82.0: `GET /api/v1/agent/chats?user_id=` too) carries
+`pins`, also when they are older than the page.
 
 ```
 POST /api/v1/agent/chats/{user_id}/messages/{message_id}/pin {"pinned": true}   (the agent, own conversations; MCP pin_chat_message)
