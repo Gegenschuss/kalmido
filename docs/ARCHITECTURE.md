@@ -592,7 +592,12 @@ lock opened first.
   `bulk` / `finish` steps as switching on re-encrypt texts, files and channel messages of older generations, resumable.
   Older generations stay with the members (backups, not yet re-encrypted rows); a person released later gets every
   generation. Until the re-encryption is done the member dialog keeps the honest hint. A waiting person without a key who
-  leaves changes nothing.
+  leaves changes nothing. The automatic change does not wrap for a member key this device sees for the first time in the
+  current page (trust on first use without a look at it); then the owner / admin uses *Change the key now*. A ciphertext of
+  an older generation written after the run (a tab that was not reloaded) makes the re-encryption due again. Texts that no
+  key held opens stop the run with a message; by hand they can be taken over as empty. Limits: the re-encryption by an
+  admin writes no history entry (an admin could replace texts unnoticed, as the server could); one call wraps for at most
+  200 people.
 - **Files** (`collab/liste2efile.py`). In a list with the lock attachments of tasks and comments are encrypted with the list
   key: `KENC\x02 | gen | iv | AES-GCM(list key, AAD kalmido-lfile:v1:<list>:<gen>, header {name, type, size} + bytes)`,
   `attachments.enc = 2`, the file name as a list ciphertext. Every other way to add a file there is refused; downloads go
