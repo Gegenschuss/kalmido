@@ -266,11 +266,13 @@ A.patch(B + f"/api/admin/agents/{CL}", json={"enabled": True})
 check(len(events()) == n0, "#272: nothing was queued while it was off")
 
 # ---- the list is no longer shared with the agent: the plan switches itself off
+nq0 = dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND event='scheduled_job'", (CL,))[0][0]
 A.delete(B + f"/api/lists/{W}/members/{CL}")
 dbx("UPDATE agent_schedules SET next_at=? WHERE id=?", (past, p1["id"]), write=True)
 q = wait_for(lambda: (lambda p: p if not p["enabled"] else None)(next(p for p in plans(Bo).json()["data"] if p["id"] == p1["id"])))
 check(q and q["last_state"] == "no_list" and q["next_at"] is None, "#272: list no longer shared -> switched off (no_list) " + str(q)[:200])
-check(len(events()) == n0, "#272: and no event")
+# 2.86.0 (N32): the agent no longer sees the earlier scheduled_job events of the unshared list - count the queue itself
+check(dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND event='scheduled_job'", (CL,))[0][0] == nq0, "#272: and no event")
 A.put(B + f"/api/lists/{W}/members", json={"user_id": CL, "role": "edit"})
 r = Bo.patch(B + f"/api/agent-schedules/{p1['id']}", json={"enabled": True})
 check(r.ok and r.json()["enabled"] and r.json()["last_state"] is None, "#272: switched on again, the reason is gone")

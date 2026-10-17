@@ -93,7 +93,9 @@ const day = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv', {t
     await ev(`(() => { setListView(listById(${P}), 'overview'); return 1; })()`); await sleep(1800);
     for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('[data-rpt="open"]')`)); i++) await sleep(200);  // 2.66.1: on-demand modules (2.65), slow CI
     const btn = await ev(`(() => { const b = document.querySelector('[data-rpt="open"]'); return b ? {t: b.textContent.trim(), h: b.getBoundingClientRect().height} : null; })()`);
-    check(btn && btn.t === 'Status report', '#265: the button on the project page ' + JSON.stringify(btn));
+    // 2.86.0 tests: what the page shows when the button is missing (red in the 2.86.0 full run, no app log)
+    const dbg = btn ? '' : await ev(`(() => { try { const l = listById(${P}); return JSON.stringify({hash: location.hash, key: S.route.key, l: !!l, pov: l ? povOn(l) : null, el: !!document.querySelector('.pov'), ly: S.ly && S.ly.view, hm: new Date().toTimeString().slice(0, 5), txt: (document.querySelector('main') || document.body).textContent.replace(/\\s+/g, ' ').slice(0, 300)}); } catch (e) { return 'dbg error ' + e; } })()`).catch(e => 'ev error ' + e);
+    check(btn && btn.t === 'Status report', '#265: the button on the project page ' + JSON.stringify(btn) + ' ' + dbg);
     await ev(`(() => { document.querySelector('[data-rpt="open"]').click(); return 1; })()`); await sleep(1800);
     const m = await ev(`(() => { const md = document.querySelector('.rptmodal'); if (!md) return null; const p = md.querySelector('#rpt-prev');
       return {h1: p.querySelector('h4')?.textContent, h2: [...p.querySelectorAll('h5')].map(x => x.textContent).join('|'), on: md.querySelector('[data-rpt="days"].on')?.textContent,
