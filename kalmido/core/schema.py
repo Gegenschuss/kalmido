@@ -844,6 +844,12 @@ CREATE INDEX IF NOT EXISTS office_client_contacts_client ON office_client_contac
 CREATE TABLE IF NOT EXISTS org_keys (
   org_id BIGINT PRIMARY KEY REFERENCES orgs(id) ON DELETE CASCADE, wrapped TEXT NOT NULL, kek_check TEXT NOT NULL,
   created_at TEXT NOT NULL, migrated_at TEXT, recovery_shown_at TEXT);
+-- 2.64.0 (#1864): the account key of a person (core/orgcrypt.py, space id -user_id): seals the files of the private space
+-- (lists without an organisation, the own file tree, the chats with agents). Wrapped like org_keys; deleted with the
+-- account (crypto-deletion on top of deleting the files). New table only: 2.56 ignores it
+CREATE TABLE IF NOT EXISTS user_keys (
+  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, wrapped TEXT NOT NULL, kek_check TEXT NOT NULL,
+  created_at TEXT NOT NULL, migrated_at TEXT, wrapped_prev TEXT, kek_check_prev TEXT);
 -- 2.40.0 (#1344): the own order of "My tasks", per person and task (pos 0 = on top); never touches tasks.sort. A task
 -- without a row (new, newly assigned) stands above the ordered ones. Personal like user_settings: no org_id
 CREATE TABLE IF NOT EXISTS user_task_order (

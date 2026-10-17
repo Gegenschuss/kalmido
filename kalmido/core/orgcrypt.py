@@ -15,6 +15,14 @@ repeated at any point. The org key itself is the recovery key (grouped base32, S
 master key can rewrap the org key (orgcrypt_cli rewrap). Deleting an organisation deletes its key row: what stays in
 the database or on disk of that organisation can no longer be read (older backups still hold the wrapped key).
 Never log, print or return a key, a recovery key or a decrypted protected value outside the routes that show it anyway.
+
+2.64.0 (#1864): account keys -- the files of a person's private space (lists without an organisation, the own file tree,
+the chats with agents) are sealed the same way with a key per person: 32 random bytes, wrapped with the same KEK (associated
+data binds the person), table user_keys (row deleted with the account: crypto-deletion on top of deleting the files).
+Everywhere in this module a "space" id names the key: > 0 = an organisation, < 0 = the account -id (0 = none). A sealed
+file's header carries the space id, so a file stays readable wherever it lies; the start-up pass (admin/orgcrypt_cli.py
+files_settle) reseals a file that lies in another space now. Switch for private files only: the instance setting
+private_encrypt (default "1"; orgcrypt_cli decrypt-private / encrypt-private), the org_encrypt switch covers both.
 """
 import base64
 import hashlib
@@ -71,7 +79,8 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  ("office_docs", "totals"): N_("Purchase prices and margins"), "office_contracts": N_("Framework contract rates"),
                  "office_docs": N_("Senders of finished documents"), "office_doc_log": N_("The log of the documents"),
                  "office_signoffs": N_("Signatures of customers (name, address, device)"),  # 2.50.0 (#1200)
-                 "files": N_("Files of organisations"), "tokens": N_("Stored access tokens (Git, client secret of the single sign-on)"),
+                 "files": N_("Files of organisations"), "private_files": N_("Files in the private space"),  # 2.64.0 (#1864)
+                 "tokens": N_("Stored access tokens (Git, client secret of the single sign-on)"),
                  # 2.47.0 (#1649, #1215, #1216): roles' purchase prices, purchases of accepted quotations, parts and shoot sheets
                  "office_roles": N_("Purchase prices and margins"), "office_purchases": N_("Purchase prices and margins"),
                  "office_doc_parts": N_("Purchase prices and margins"), ("office_doc_parts", "totals"): N_("Purchase prices and margins"),
@@ -121,12 +130,14 @@ def _kek(master=None):
 
 
 def _kek_check(kek, org_id):
+    if int(org_id) < 0:  # 2.64.0 (#1864): an account key
+        return hmac.new(kek, b"kalmido-userkey-check-v1|%d" % -int(org_id), hashlib.sha256).hexdigest()[:32]
     return hmac.new(kek, b"kalmido-orgkey-check-v1|%d" % int(org_id), hashlib.sha256).hexdigest()[:32]
 
 
 def _wrap(kek, org_id, key):
     n = os.urandom(12)
-    return "v1." + _b64u(n + AESGCM(kek).encrypt(n, key, b"kalmido-orgkey|%d" % int(org_id)))
+    return "v1." + _b64u(n + AESGCM(kek).encrypt(n, key, _wrap_ad(org_id)))
 
 
 def _unwrap(kek, org_id, wrapped):
@@ -134,9 +145,24 @@ def _unwrap(kek, org_id, wrapped):
         raise OrgCryptError("unknown key format")
     raw = _b64u_dec(wrapped[3:])
     try:
-        return AESGCM(kek).decrypt(raw[:12], raw[12:], b"kalmido-orgkey|%d" % int(org_id))
+        return AESGCM(kek).decrypt(raw[:12], raw[12:], _wrap_ad(org_id))
     except InvalidTag:
-        raise OrgCryptError("the organisation key cannot be unwrapped") from None
+        raise OrgCryptError(f"{_label(org_id)}: the key cannot be unwrapped") from None
+
+
+def _label(sid):
+    """'org N' / 'account N' for log lines (never a key)."""
+    return f"account {-int(sid)}" if int(sid) < 0 else f"org {int(sid)}"
+
+
+def _wrap_ad(sid):
+    # 2.64.0 (#1864): an account key is bound to its person, an org key to its organisation (the formats never mix)
+    return b"kalmido-userkey|%d" % -int(sid) if int(sid) < 0 else b"kalmido-orgkey|%d" % int(sid)
+
+
+def oc_user_space(uid):
+    """2.64.0 (#1864): the space id of a person's private space (None without a person)."""
+    return -int(uid) if uid else None
 
 
 def oc_enabled():
@@ -153,15 +179,31 @@ def oc_active(c):
     return (r[0] if r else "1") != "0"
 
 
+def oc_private_on(c):
+    """2.64.0 (#1864): the instance setting private_encrypt (default "1"): files of private spaces are sealed."""
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        r = c.execute("SELECT value FROM settings WHERE key='private_encrypt'").fetchone()
+    return (r[0] if r else "1") != "0"
+
+
+def oc_active_for(c, sid):
+    """True when NEW files of space sid are sealed: oc_active, and for a private space (sid < 0) also private_encrypt."""
+    if not sid or not oc_active(c):
+        return False
+    return int(sid) > 0 or oc_private_on(c)
+
+
 def _row(c, org_id):
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        if int(org_id) < 0:  # 2.64.0 (#1864): an account key
+            return c.execute("SELECT wrapped, kek_check FROM user_keys WHERE user_id=?", (-int(org_id),)).fetchone()
         return c.execute("SELECT wrapped, kek_check FROM org_keys WHERE org_id=?", (int(org_id),)).fetchone()
 
 
 def _open_row(org_id, r, kek=None):
     kek = kek or _kek()
     if not hmac.compare_digest(str(r["kek_check"]), _kek_check(kek, org_id)):
-        raise OrgCryptError(f"org {int(org_id)}: the server key (KALMIDO_SECRET_KEY) is not the one this organisation's key was made with")
+        raise OrgCryptError(f"{_label(org_id)}: the server key (KALMIDO_SECRET_KEY) is not the one this key was made with")
     ck = (int(org_id), r["wrapped"])
     with _LOCK:
         k = _CACHE.get(ck)
@@ -178,9 +220,14 @@ def _create(c, org_id):
     the row goes into the caller's transaction."""
     kek = _kek()
     key = os.urandom(32)
-    vals = (int(org_id), _wrap(kek, org_id, key), _kek_check(kek, org_id), _now())
-    sql = ("INSERT INTO org_keys(org_id, wrapped, kek_check, created_at) VALUES(?,?,?,?) "
-           "ON CONFLICT(org_id) DO NOTHING")
+    if int(org_id) < 0:  # 2.64.0 (#1864): an account key (the row holds the person's id)
+        vals = (-int(org_id), _wrap(kek, org_id, key), _kek_check(kek, org_id), _now())
+        sql = ("INSERT INTO user_keys(user_id, wrapped, kek_check, created_at) VALUES(?,?,?,?) "
+               "ON CONFLICT(user_id) DO NOTHING")
+    else:
+        vals = (int(org_id), _wrap(kek, org_id, key), _kek_check(kek, org_id), _now())
+        sql = ("INSERT INTO org_keys(org_id, wrapped, kek_check, created_at) VALUES(?,?,?,?) "
+               "ON CONFLICT(org_id) DO NOTHING")
     from ..core.db import connect
     c2 = None
     try:
@@ -211,7 +258,8 @@ def _now():
 
 def oc_key(c, org_id, create=True):
     """The organisation's key (32 bytes), made on first use; None without a master key or without an organisation
-    (create=False: None while it has none). OrgCryptError: the master key does not match."""
+    (create=False: None while it has none). OrgCryptError: the master key does not match. 2.64.0 (#1864): org_id < 0 =
+    the account key of person -org_id (same rules)."""
     if not SECRET_KEY or not org_id:
         return None
     r = _row(c, org_id)
@@ -219,7 +267,10 @@ def oc_key(c, org_id, create=True):
         if not create:
             return None
         with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
-            if not c.execute("SELECT 1 FROM orgs WHERE id=?", (int(org_id),)).fetchone():
+            if int(org_id) < 0:
+                if not c.execute("SELECT 1 FROM users WHERE id=?", (-int(org_id),)).fetchone():
+                    return None
+            elif not c.execute("SELECT 1 FROM orgs WHERE id=?", (int(org_id),)).fetchone():
                 return None
         r = _create(c, org_id)
         if r is None:
@@ -395,9 +446,17 @@ def oc_item_store(c, org_id, row):
 
 
 # ---- files ------------------------------------------------------------------------------------------------------------
-def oc_seal(c, org_id, data, ctx=FILE_CTX):
-    """MAGIC + org id + nonce + ciphertext; unchanged when off, without an organisation or already sealed."""
-    if not org_id or not oc_active(c) or data[:len(MAGIC)] == MAGIC:
+def oc_seal(c, org_id, data, ctx=FILE_CTX, fresh=False):
+    """MAGIC + org id + nonce + ciphertext; unchanged when off, without an organisation or already sealed.
+    2.64.0 (#1864): org_id = a space id (< 0: the person's account key). fresh = bytes from outside (an upload, a mail,
+    an import): when they already start with MAGIC they get an outer layer with this space's key (also while the
+    encryption is switched off); the download hands back exactly the uploaded bytes."""
+    if data[:len(MAGIC)] == MAGIC:
+        if fresh and org_id and SECRET_KEY:
+            key = oc_key(c, org_id)
+            return oc_seal_raw(key, org_id, data, ctx) if key is not None else data
+        return data
+    if not org_id or not oc_active_for(c, org_id):
         return data
     return oc_seal_k(oc_key(c, org_id), org_id, data, ctx)
 
@@ -405,13 +464,19 @@ def oc_seal(c, org_id, data, ctx=FILE_CTX):
 def oc_seal_k(key, org_id, data, ctx=FILE_CTX):
     if key is None or data[:len(MAGIC)] == MAGIC:
         return data
+    return oc_seal_raw(key, org_id, data, ctx)
+
+
+def oc_seal_raw(key, org_id, data, ctx=FILE_CTX):
+    """Seal data with key whatever it holds (also content that itself starts with MAGIC: an outer layer)."""
     head = MAGIC + struct.pack(">q", int(org_id))
     n = os.urandom(12)
     return head + n + AESGCM(key).encrypt(n, bytes(data), head + bytes(ctx))
 
 
 def oc_file_org(data):
-    """The organisation a sealed file belongs to (from its header), None for a plain file."""
+    """The organisation a sealed file belongs to (from its header), None for a plain file. 2.64.0 (#1864): < 0 = the
+    account key of that person (0 = a private document preview, docs/store.py thumb_seal)."""
     if data[:len(MAGIC)] != MAGIC or len(data) < _HEAD:
         return None
     return struct.unpack(">q", data[len(MAGIC):len(MAGIC) + 8])[0]
@@ -426,7 +491,7 @@ def oc_open(c, data, ctx=FILE_CTX):
     oid = oc_file_org(data)
     key = oc_key(c, oid, create=False)
     if key is None:
-        raise OrgCryptError(f"org {oid}: no key for a sealed file")
+        raise OrgCryptError(f"{_label(oid)}: no key for a sealed file")
     return oc_open_k(key, data, ctx)
 
 
@@ -437,7 +502,7 @@ def oc_open_k(key, data, ctx=FILE_CTX):
     try:
         return AESGCM(key).decrypt(data[len(head):_HEAD], data[_HEAD:], head + bytes(ctx))
     except InvalidTag:
-        raise OrgCryptError(f"org {oc_file_org(data)}: a sealed file cannot be decrypted") from None
+        raise OrgCryptError(f"{_label(oc_file_org(data))}: a sealed file cannot be decrypted") from None
 
 
 def oc_is_sealed_file(path):
@@ -468,9 +533,10 @@ def _write_atomic(path, data, mode=None):
             os.remove(tmp)
 
 
-def oc_write_file(c, org_id, path, data, ctx=FILE_CTX):
-    """Write data (sealed when active and the file belongs to an organisation), atomically (tmp + os.replace)."""
-    _write_atomic(path, oc_seal(c, org_id, data, ctx))
+def oc_write_file(c, org_id, path, data, ctx=FILE_CTX, fresh=False):
+    """Write data (sealed when active and the file belongs to an organisation), atomically (tmp + os.replace).
+    fresh: bytes from outside (oc_seal)."""
+    _write_atomic(path, oc_seal(c, org_id, data, ctx, fresh=fresh))
 
 
 def oc_reseal_file(path, new_data):
@@ -491,10 +557,19 @@ def oc_plain_size(path):
     return n - OVERHEAD if n >= OVERHEAD and oc_is_sealed_file(path) else n
 
 
-def oc_seal_path(c, org_id, path, ctx=FILE_CTX):
+def oc_seal_path(c, org_id, path, ctx=FILE_CTX, fresh=False):
     """Seal a file that was just written in plain (upload, copy) when it belongs to an organisation and the encryption is
-    active; a sealed file stays as it is. True when it was sealed."""
-    if not org_id or not oc_active(c) or oc_is_sealed_file(path):
+    active; a sealed file stays as it is. True when it was sealed. 2.64.0 (#1864): org_id = a space id (oc_task_space);
+    fresh = the bytes came from outside: one that already looks sealed gets an outer layer (oc_seal)."""
+    if fresh and org_id and SECRET_KEY and oc_is_sealed_file(path):
+        with open(path, "rb") as f:
+            data = f.read()
+        sealed = oc_seal(c, org_id, data, ctx, fresh=True)
+        if sealed is not data:
+            oc_reseal_file(path, sealed)
+            return True
+        return False
+    if not org_id or not oc_active_for(c, org_id) or oc_is_sealed_file(path):
         return False
     key = oc_key(c, org_id)
     if key is None:
@@ -516,6 +591,29 @@ def oc_list_org(c, lid):
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         r = c.execute("SELECT org_id FROM lists WHERE id=?", (int(lid),)).fetchone()
     return r[0] if r else None
+
+
+def _space(r):
+    return (int(r["org_id"]) if r["org_id"] else oc_user_space(r["owner_id"])) if r else None
+
+
+def oc_task_space(c, tid):
+    """2.64.0 (#1864): the space whose key seals a task's files: its list's organisation, else the list owner's account
+    (a private list shared with others: the owner's key; the server opens the file for everyone who may see it)."""
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        return _space(c.execute("SELECT l.org_id, l.owner_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?",
+                                (int(tid),)).fetchone())
+
+
+def oc_list_space(c, lid):
+    """2.64.0 (#1864): the space of a list (organisation, else the owner's account)."""
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        return _space(c.execute("SELECT org_id, owner_id FROM lists WHERE id=?", (int(lid),)).fetchone())
+
+
+def oc_copy_file(c, src, dst, sid):
+    """2.64.0 (#1864): copy a stored file into space sid (opened with the key in its header, sealed for the target)."""
+    _write_atomic(dst, oc_seal(c, sid, oc_read_file(c, src), fresh=True))  # the content may itself look sealed
 
 
 def oc_send_file(c, path, **kw):
@@ -604,10 +702,41 @@ def oc_rewrap(c, org_id, key, master=None):
     return True
 
 
-def oc_drop_key(c, org_id):
-    """Delete the organisation's key (Delete organisation): its encrypted values and sealed files become unreadable."""
+def oc_rewrap_accounts(c, old_master):
+    """2.64.0 (#1864): the account keys wrapped with an earlier server key (old_master, 32 bytes) are stored again with the
+    current one (the replaced row stays in wrapped_prev / kek_check_prev). Account keys have no recovery key: the earlier
+    server key is the way to keep private files after changing KALMIDO_SECRET_KEY. -> {"rewrapped", "current", "other"}."""
+    kek, old = _kek(), _kek(old_master)
+    if kek is None or old is None:
+        raise OrgCryptError("no server key (KALMIDO_SECRET_KEY) set")
+    out = {"rewrapped": 0, "current": 0, "other": 0}
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
-        c.execute("DELETE FROM org_keys WHERE org_id=?", (int(org_id),))
+        rows = c.execute("SELECT user_id, wrapped, kek_check FROM user_keys ORDER BY user_id").fetchall()
+    for r in rows:
+        sid = -int(r["user_id"])
+        if hmac.compare_digest(str(r["kek_check"]), _kek_check(kek, sid)):
+            out["current"] += 1
+            continue
+        if not hmac.compare_digest(str(r["kek_check"]), _kek_check(old, sid)):
+            out["other"] += 1
+            continue
+        key = _unwrap(old, sid, r["wrapped"])
+        with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+            c.execute("UPDATE user_keys SET wrapped_prev=wrapped, kek_check_prev=kek_check, wrapped=?, kek_check=? WHERE user_id=? AND wrapped=?",
+                      (_wrap(kek, sid, key), _kek_check(kek, sid), r["user_id"], r["wrapped"]))
+        oc_forget(sid)
+        out["rewrapped"] += 1
+    return out
+
+
+def oc_drop_key(c, org_id):
+    """Delete the organisation's key (Delete organisation): its encrypted values and sealed files become unreadable.
+    2.64.0 (#1864): org_id < 0 = the account key (the account's deletion also removes it by its foreign key)."""
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        if int(org_id) < 0:
+            c.execute("DELETE FROM user_keys WHERE user_id=?", (-int(org_id),))
+        else:
+            c.execute("DELETE FROM org_keys WHERE org_id=?", (int(org_id),))
     oc_forget(org_id)
 
 

@@ -11,7 +11,7 @@ from ..core.db import bump, db, err, insert_id, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, MANAGE_ROLES, need_task
 from ..core.serializers import unlink_files
-from ..core.orgcrypt import oc_plain_size, oc_seal_path, oc_send_file, oc_task_org
+from ..core.orgcrypt import oc_plain_size, oc_seal_path, oc_send_file, oc_task_space
 from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
 
@@ -105,8 +105,8 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=N
         if saved is not None:
             saved.append(rel)
         if org is None:
-            org = oc_task_org(c, tid) or 0
-        oc_seal_path(c, org, full)  # 2.42.0 (#828): a file of an organisation's list is sealed with its key at rest
+            org = oc_task_space(c, tid) or 0  # 2.64.0 (#1864): a private list's file with its owner's account key
+        oc_seal_path(c, org, full, fresh=True)  # 2.42.0 (#828): a file of an organisation's list is sealed with its key at rest
         mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
         ins = ("INSERT INTO attachments(task_id,name,mime,size,path,created_at,comment_id,user_id) VALUES(?,?,?,?,?,?,?,?)",
