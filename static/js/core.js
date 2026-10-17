@@ -259,7 +259,7 @@ function kidsIndex() {
   return ix;
 }
 const children = id => (kidsIndex().get(id) || []).slice();
-const bySort = (a, b) => a.sort - b.sort || a.id - b.id;
+const bySort = (a, b) => ((a.also || b.also) ? ml_sortOf(a, ml_viewList()) - ml_sortOf(b, ml_viewList()) : a.sort - b.sort) || a.id - b.id;  // 2.71.0 B (#1459): a linked task's place in a further list
 // 1.5.1: the tasks of an archived list are hidden everywhere except in that list itself (Today, Tomorrow, Next 7 days,
 // counts, Assigned, filters, tags, calendar, matrix, overview); unarchiving brings them back
 const archivedTask = t => !!t && !!listById(t.list_id)?.archived;

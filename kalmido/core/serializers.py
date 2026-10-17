@@ -155,6 +155,8 @@ def load_tasks(c, where, args=(), full_snips=False):
             d.pop("snippets", None)  # 2.35.0 (#1095)
             d.pop("snippets_n", None)
         out.append(d)
+    from ..tasks.multilist import ml_fill
+    ml_fill(c, out, viewer)  # 2.71.0 B (#1459): "also" = the further lists the viewer sees
     return out
 
 

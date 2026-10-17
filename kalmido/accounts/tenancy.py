@@ -94,6 +94,10 @@ CHECKS = {
     # bells; the read layer ignores rows of another workspace: notify/taskbell.py tbl_rows)
     "task_bell_person": ("SELECT b.task_id, b.user_id FROM task_bell b JOIN users u ON u.id=b.user_id WHERE b.org_id IS NOT NULL AND "
                          "(u.kind='agent' OR " + _PERSON.format(o="b", m="b") + ")"),
+    # 2.71.0 B (#1459): a task shown in a list of another workspace (the trigger kalmido_ml_prune drops such links on every
+    # move; the read layer ignores them: tasks/multilist.py ml_fill) -- (further list, who linked it)
+    "list_task_link": ("SELECT k.list_id, k.added_by FROM task_links k JOIN tasks t ON t.id=k.task_id JOIN lists o ON o.id=t.list_id "
+                       "JOIN lists x ON x.id=k.list_id WHERE o.org_id IS DISTINCT FROM x.org_id OR k.org_id IS DISTINCT FROM x.org_id"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 

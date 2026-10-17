@@ -7,11 +7,11 @@ function viewKanban() {
   const k = S.route.key;
   const lid = k === 'inbox' ? inbox().id : +k.slice(2);
   const secs = S.sections.filter(s => s.list_id === lid), ro = !canEditList(lid);
-  const tasks = sortTasks(openTasks().filter(t => t.list_id === lid && !t.parent_id));
-  const cols = [];
-  const loose = tasks.filter(t => !t.section_id || !secs.some(s => s.id === t.section_id));
+  const tasks = sortTasks(openTasks().filter(t => (t.list_id === lid || ml_in(t, lid)) && !t.parent_id));  // 2.71.0 B (#1459): + linked tasks
+  const cols = [], sc = t => ml_sec(t, lid);  // (a linked task in the column of its link)
+  const loose = tasks.filter(t => !sc(t) || !secs.some(s => s.id === sc(t)));
   if (loose.length || !secs.length) cols.push({id: null, name: secs.length ? tr('Unassigned') : tr('Tasks'), tasks: loose});
-  for (const s of secs) cols.push({id: s.id, name: s.name, tasks: tasks.filter(t => t.section_id === s.id)});
+  for (const s of secs) cols.push({id: s.id, name: s.name, tasks: tasks.filter(t => sc(t) === s.id)});
   return `${listHead(listById(lid))}<div class="kanban">${cols.map(c => `
     <div class="kcol" data-kcol="${c.id ?? ''}">
       <div class="khead" ${c.id ? `data-ksec="${c.id}"` : ''}>${c.id && !ro ? secHandle(c.id) : ''}${esc(c.name)} <span class="c">${c.tasks.length}</span>${c.id && !ro ? `<button class="iconbtn" data-act="section-menu" data-id="${c.id}" title="${esc(tr('More') + ': ' + c.name)}" aria-label="${esc(tr('More') + ': ' + c.name)}">${ic('dots', 's')}</button>` : ''}</div>

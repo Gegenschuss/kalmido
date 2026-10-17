@@ -7687,3 +7687,8 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+/* 2.71.0 B (#1459) a task in several lists: the row's "also in" / "from" mark, quiet like the other row details */
+.meta .mlm{display:inline-flex;align-items:center;gap:.25rem;min-width:0;max-width:11rem;color:var(--muted)}
+.meta .mlm .mll{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta .mlm svg.i{flex:0 0 auto;color:var(--accent)}
+@media (max-width:40rem){.meta .mlm{max-width:8rem}}

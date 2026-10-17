@@ -96,6 +96,7 @@ ORDER = (
     "lists.playbook",  # 2.39.0 (#1168)
     "tasks.attachtext",  # 2.34.0 (#368)
     "tasks.snippets",  # 2.35.0 (#1095)
+    "tasks.multilist",  # 2.71.0 B (#1459): a task in several lists without a copy (after api.v1)
     "agents.gates",  # 2.26.0 (#949)
     "agents.safety",  # 2.30.0 (#919)
     "agents.usage",

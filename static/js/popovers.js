@@ -709,6 +709,7 @@ function taskMenu(anchor, id, o = {}) {
     {head: tr('Organize')},
     // where it lives
     ...(open ? [moveListItem(anchor, id)] : []),
+    ...(open ? ml_menuItems(anchor, t) : []),  // 2.71.0 B (#1459): show also in another list / remove from it
     ...(open && !t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, id)}] : []),
     // 2.16.0 (#473, WCAG 2.5.7): what dragging does, as menu items (also Alt+↑ / ↓)
     ...(open && t.id > 0 && S.route.mod === 'tasks' && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []),

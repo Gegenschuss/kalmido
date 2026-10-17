@@ -35,6 +35,7 @@ DL_TABLES = {
     "task_people": ("task_id",), "events": ("task_id",), "contact_tasks": ("task_id",), "time_entries": ("task_id",),
     "task_enc_notes": ("task_id",),  # 2.42.0 (#828): the encrypted note marker of a task
     "task_note_locks": ("task_id",),  # 2.48.0 (#1642): the locked note marker of a task
+    "task_links": ("task_id",),  # 2.71.0 B (#1459): the further lists a task is shown in (its "also")
     "lists": "full", "list_members": "full", "sections": "full", "list_fields": "full", "list_tags": "full",
     "group_shares": "full", "group_members": "full", "folder_people": "full",
     "org_members": "full",  # 2.46.0 (#1603): lists seen by the whole organisation follow its members

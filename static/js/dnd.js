@@ -52,7 +52,7 @@ document.addEventListener('drop', async e => {
 function dropTask(id, el, clientY) { return histGroup(() => dropTask0(id, el, clientY)); }
 async function dropTask0(id, el, clientY) {
   const t = S.tasks.get(id); if (!t || !el) return;
-  if (!canEdit(t)) { roToast(); return; }
+  if (!canEdit(t) && !ml_in(t, ml_viewList())) { roToast(); return; }  // 2.71.0 B (#1459): a further list's writer moves the link
   const side = el.closest('.srow[data-drop]');
   const row = el.closest('.trow');
   const kcol = el.closest('.kcol');
@@ -63,6 +63,7 @@ async function dropTask0(id, el, clientY) {
   $$('.dragging,.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dragging', 'dropbefore', 'dropafter', 'drop'));
   document.body.classList.remove('tdrag');
   if (el.closest('#detail')) return;
+  if (await ml_drop(t, {sec, kcol, row, side, cell, wcol, wad, quad, y: clientY})) return;  // 2.71.0 B (#1459): in a further list only the link moves
   if (sec && sec.dataset.newsec) { taskToNewSection(id); return; }  // (sec is false over a row)
   if (sec) { taskToSection(id, sec.dataset.section ? +sec.dataset.section : null); return; }
   const item = {id};

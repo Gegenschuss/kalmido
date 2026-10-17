@@ -377,6 +377,8 @@ def v1_task(d):
         out["encrypted_note"] = True
     if d.get("note_locked"):  # 2.48.0 (#1642): the note is locked with its owner's password: notes stays empty
         out["note_locked"] = True
+    if d.get("also"):  # 2.71.0 B (#1459): the further lists the token's user sees (absent: none)
+        out["also"] = d["also"]
     return out
 
 

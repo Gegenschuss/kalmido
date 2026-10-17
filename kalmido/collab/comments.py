@@ -118,6 +118,8 @@ def timeline(tid):
             o = c.execute("SELECT list_id FROM tasks WHERE id=?", (a["data"]["id"],)).fetchone()
             if not o or o["list_id"] not in vis or not task_visible(c, a["data"]["id"], me()):
                 a["data"] = {"hidden": True}
+    from ..tasks.multilist import ml_acts
+    ml_acts(c, acts)  # 2.71.0 B (#1459): a further list's name only for who sees it
     comments = with_replies(c, "c", with_reactions(c, [comment_dict(r, atts) for r in rows]))
     from .cchoice import lv_with_choices
     lv_with_choices(c, tid, rows, comments)  # 2.41.0 (#1383): answer buttons / approval cards

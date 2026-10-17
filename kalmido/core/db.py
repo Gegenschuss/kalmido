@@ -329,6 +329,8 @@ def init_db(guard=True, load=None):
         c.executescript(TIME_TITLE_TRIGGER)
         from ..tasks.delta import dl_setup
         dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
+        from ..tasks.multilist import ml_setup
+        ml_setup(c)  # 2.71.0 B (#1459): links never cross a workspace boundary
         for stmt in INDEXES.strip().split(";"):
             if stmt.strip():
                 c.execute(stmt)

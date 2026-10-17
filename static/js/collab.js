@@ -455,6 +455,8 @@ function actText0(a, U) {
     case 'assign_group': return d.group ? tr('{0} assigned the task to the group {1}', who, q(d.group)) : tr('{0} removed the group', who);  // 2.10.0 (#441)
     case 'take': return tr('{0} took the task (group {1})', who, q(d.group || ''));
     case 'list': return tr('{0} moved the task to the list {1}', who, q(d.inbox && inboxDef(d.name) ? tr('Basket') : listName(d.name)));
+    case 'ml_add': return d.name ? tr('{0} also showed the task in the list {1}', who, q(d.name)) : tr('{0} also showed the task in another list', who);  // 2.71.0 B (#1459)
+    case 'ml_rm': return d.name ? tr('{0} removed the task from the list {1}', who, q(d.name)) : tr('{0} removed the task from another list', who);
     case 'section': return d.name ? tr('{0} moved the task to the section {1}', who, q(d.name)) : tr('{0} removed the task from its section', who);
     case 'parent': return d.title ? tr('{0} made the task a subtask of {1}', who, q(d.title)) : tr('{0} made the task a main task', who);
     case 'snippets': return d.n ? tr('{0} changed the code snippets ({1})', who, d.n) : tr('{0} removed the code snippets', who);  // 2.35.0 (#1095)
