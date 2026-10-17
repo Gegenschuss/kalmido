@@ -220,6 +220,10 @@ check(BO.post(B + "/api/feeds/read", json={"ids": [first["id"]], "read": True}).
 check(BO.post(B + "/api/feeds/read", json={"feed_id": F1, "read": True}).status_code == 404, "all read of alice's feed: 404")
 r = BO.post(B + "/api/feeds", json={"url": FS + "/rss.xml"})
 check(r.status_code == 201, "bob follows the same address: his own feed")
+# 2.85.0 (#1162 review): a trickling server ends at the deadline (20 s), not when it stops sending
+t0 = time.monotonic()
+r = BO.post(B + "/api/feeds", json={"url": FS + "/slow.xml"})
+check(r.status_code == 400 and time.monotonic() - t0 < 35, f"a trickling feed: refused at the deadline ({time.monotonic() - t0:.0f} s, {r.status_code} {r.text[:120]})")
 check(len(A.get(B + "/api/feeds").json()["feeds"]) == 3, "alice still has her three")
 r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude"})
 AGH = {"Authorization": "Bearer " + r.json()["token"]}

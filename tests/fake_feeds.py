@@ -5,6 +5,7 @@
 # Every request is logged to /data/feeds.log (method, path, If-None-Match).
 import json
 import os
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DIR = '/data/feeds'
@@ -26,6 +27,18 @@ class H(BaseHTTPRequestHandler):
             self.send_response(302)
             self.send_header('Location', REDIR[p])
             self.end_headers()
+            return
+        if p == '/slow.xml':  # 2.85.0 (#1162 review): headers at once, then one byte every 2 s for 60 s (a trickling server)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/rss+xml')
+            self.end_headers()
+            try:
+                for _ in range(30):
+                    self.wfile.write(b' ')
+                    self.wfile.flush()
+                    time.sleep(2)
+            except OSError:
+                pass
             return
         if p == '/big.xml':
             b = b'<?xml version="1.0"?><rss version="2.0"><channel><title>Big</title>' + b'<!-- padding -->' * 200000 + b'</channel></rss>'

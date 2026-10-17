@@ -1,5 +1,6 @@
 """Home & life: feeds (RSS 2.0, Atom 1.0, RSS 1.0 / RDF) of one person, fetched by the server, read in the view "Feeds"."""
 import re
+import threading
 import time
 import urllib.parse
 import xml.etree.ElementTree as ET
@@ -9,9 +10,9 @@ from html import unescape
 from html.parser import HTMLParser
 
 from ..core.i18n import N_, tr
-from ..core.db import iso, now_utc, parse_iso
+from ..core.db import connect, iso, now_utc, parse_iso
 from ..core.pg import insert_id
-from ..core.access import Denied
+from ..core.access import Denied, task_visible
 from ..tasks.validation import as_int, TITLE_MAX
 from ..personal.timetrack import BadInput
 from ..calendars.caldav import _DtdRefused, xml_no_dtd
@@ -258,25 +259,27 @@ def rss_fetch(c, f):
     """Fetches feed row f once and stores what came; the outcome (error code or '') is stored in the feed. -> (new, code)."""
     now = now_utc()
     try:
-        st, hdrs, raw, final = rss_get(c, f["url"], f["etag"], f["last_modified"])
-        new = 0
-        if st != 304:
-            try:
-                meta, items = rss_parse(raw, final)
-            except CalError:
-                raise
-            except Exception:  # noqa: BLE001  (whatever a hostile body does to the parser: never stall the other feeds)
-                raise CalError("parse") from None
-            new = rss_store(c, f, items, now)
-            c.execute("UPDATE rss_feeds SET title=CASE WHEN title='' THEN ? ELSE title END, site_url=? WHERE id=?",
-                      (meta["title"] or "", meta["site_url"] or "", f["id"]))
-        c.execute("UPDATE rss_feeds SET etag=?, last_modified=?, last_fetch=?, last_ok=?, last_error='', fails=0 WHERE id=?",
-                  (((hdrs.get("ETag") if hdrs else "") or f["etag"] or "")[:200],
-                   ((hdrs.get("Last-Modified") if hdrs else "") or f["last_modified"] or "")[:100], iso(now), iso(now), f["id"]))
-        return new, ""
-    except CalError as e:
-        c.execute("UPDATE rss_feeds SET last_fetch=?, last_error=?, fails=fails+1 WHERE id=?", (iso(now), e.stored()[:40], f["id"]))
-        return 0, e.stored()
+        with c.savepoint():  # 2.85.0 review: a database error inside rolls back only this fetch
+            st, hdrs, raw, final = rss_get(c, f["url"], f["etag"], f["last_modified"])
+            new = 0
+            if st != 304:
+                try:
+                    meta, items = rss_parse(raw, final)
+                except CalError:
+                    raise
+                except Exception:  # noqa: BLE001  (whatever a hostile body does to the parser: never stall the other feeds)
+                    raise CalError("parse") from None
+                new = rss_store(c, f, items, now)
+                c.execute("UPDATE rss_feeds SET title=CASE WHEN title='' THEN ? ELSE title END, site_url=? WHERE id=?",
+                          (meta["title"] or "", meta["site_url"] or "", f["id"]))
+            c.execute("UPDATE rss_feeds SET etag=?, last_modified=?, last_fetch=?, last_ok=?, last_error='', fails=0 WHERE id=?",
+                      (((hdrs.get("ETag") if hdrs else "") or f["etag"] or "")[:200],
+                       ((hdrs.get("Last-Modified") if hdrs else "") or f["last_modified"] or "")[:100], iso(now), iso(now), f["id"]))
+            return new, ""
+    except Exception as e:  # noqa: BLE001  (2.85.0 review: any error moves the feed into the back-off, the queue goes on)
+        code = e.stored() if isinstance(e, CalError) else "error"
+        c.execute("UPDATE rss_feeds SET last_fetch=?, last_error=?, fails=fails+1 WHERE id=?", (iso(now), code[:40], f["id"]))
+        return 0, code
 
 
 # ---- the feeds of a person
@@ -435,7 +438,7 @@ def rss_later(c, uid, iid):
         raise Denied(404, tr("Not found"))
     if it["saved_task_id"]:
         t = c.execute("SELECT id, list_id FROM tasks WHERE id=? AND deleted_at IS NULL", (it["saved_task_id"],)).fetchone()
-        if t:
+        if t and task_visible(c, t["id"], uid):  # 2.85.0 review: a task in a list the person lost access to counts as gone
             return {"task_id": t["id"], "list_id": t["list_id"], "created": False}
     lid = life_list(c, uid, "reading")
     tid = _insert(c, uid, lid, (it["title"] or it["url"] or tr("Article"))[:TITLE_MAX], url=it["url"] or None)
@@ -515,24 +518,45 @@ def rss_due(f, now):
     return (now - parse_iso(f["last_fetch"])).total_seconds() >= gap
 
 
+_RSS_RUN = threading.Lock()
+
+
 def _wd_feeds(c, users, S, LG, now):  # noqa: ARG001
-    """Watchdog: due feeds of people with the module on (a few per tick, the oldest first), the clean-up of old articles
-    and of deleted feeds."""
-    t0, done = time.monotonic(), 0
-    nu = now_utc()
+    """Watchdog: starts the fetch of due feeds of people with the module on in a thread of its own (2.85.0 review: a slow
+    feed server never holds up reminders and the other sections; at most one run at a time) and cleans up old articles
+    and deleted feeds."""
     on = [u for u in users if "feeds" in (S[u].get("features") or "").split(",")]
-    rows = []
-    if on:  # only due feeds of people with the module on (a feed nobody reads never holds up the others)
-        rows = c.execute(f"""SELECT * FROM rss_feeds WHERE deleted_at IS NULL AND user_id IN ({",".join("?" * len(on))}) AND
-                             (last_fetch IS NULL OR (fails<? AND last_fetch<?) OR last_fetch<?) ORDER BY COALESCE(last_fetch, '') LIMIT 20""",
-                         (*on, RSS_SLOW_AFTER, iso(nu - timedelta(seconds=RSS_EVERY)), iso(nu - timedelta(seconds=RSS_SLOW)))).fetchall()
-    for f in rows:
-        if done >= RSS_TICK_FEEDS or time.monotonic() - t0 > RSS_TICK_S:
-            break
-        if not rss_due(f, nu):
-            continue
-        rss_fetch(c, f)
-        c.commit()
+    if on and _RSS_RUN.acquire(blocking=False):
+        threading.Thread(target=_rss_run, args=(on,), daemon=True).start()
+    nu = now_utc()
+    c.execute("DELETE FROM rss_items WHERE published<?", (iso(nu - timedelta(days=RSS_KEEP_DAYS)),))
+    c.execute("DELETE FROM rss_feeds WHERE deleted_at IS NOT NULL AND deleted_at<?", (iso(nu - timedelta(days=RSS_TRASH_DAYS)),))
+    c.commit()
+
+
+def _rss_run(on):
+    """Due feeds of the people `on` (a few per run, the oldest first; a feed nobody reads never holds up the others)."""
+    try:
+        c = connect()
+        try:
+            t0, done, nu = time.monotonic(), 0, now_utc()
+            rows = c.execute(f"""SELECT * FROM rss_feeds WHERE deleted_at IS NULL AND user_id IN ({",".join("?" * len(on))}) AND
+                                 (last_fetch IS NULL OR (fails<? AND last_fetch<?) OR last_fetch<?) ORDER BY COALESCE(last_fetch, '') LIMIT 20""",
+                             (*on, RSS_SLOW_AFTER, iso(nu - timedelta(seconds=RSS_EVERY)), iso(nu - timedelta(seconds=RSS_SLOW)))).fetchall()
+            for f in rows:
+                if done >= RSS_TICK_FEEDS or time.monotonic() - t0 > RSS_TICK_S:
+                    break
+                if not rss_due(f, nu):
+                    continue
+                rss_fetch(c, f)
+                c.commit()
+                done += 1
+        finally:
+            c.close()
+    except Exception as e:  # noqa: BLE001
+        print("feeds run error:", type(e).__name__, flush=True)
+    finally:
+        _RSS_RUN.release()
         done += 1
     c.execute("DELETE FROM rss_items WHERE published<?", (iso(nu - timedelta(days=RSS_KEEP_DAYS)),))
     c.execute("DELETE FROM rss_feeds WHERE deleted_at IS NOT NULL AND deleted_at<?", (iso(nu - timedelta(days=RSS_TRASH_DAYS)),))
