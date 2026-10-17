@@ -527,6 +527,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 
 .md{line-height:1.6;cursor:text;min-height:1.5rem;word-break:break-word}
 /* 2.40.0 (#1409): inline Markdown in task titles (rows, calendar, timeline, roadmap, dashboard, briefing) */
+:is(.ttl,.tln,.dtt,.kbttl,.dpn,.ev,.wev,.tl-bar,.rm-tname) code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:0 .25em;border-radius:.25rem}
 .trow .ttl a[href]{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
 /* 2.40.0 (#1203): the pen that opens the description editor (touch screens / "only with the pen") */
 .mdpen{float:right;margin:-.25rem -.25rem .25rem .5rem;color:var(--muted);position:relative;z-index:1}  /* 2.40.2: above the masked (clamped) text, which is its own layer */
@@ -1020,6 +1021,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .ch-line{fill:none;stroke:var(--p5);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
 .ch-dot{fill:var(--p5);stroke:var(--bg2);stroke-width:2}
 .hm.l0{fill:var(--bg4)}
+.hm.l1{fill:color-mix(in srgb,var(--accent) 30%,var(--bg4))}
 .hm.l2{fill:color-mix(in srgb,var(--accent) 55%,var(--bg4))}
 .hm.l3{fill:color-mix(in srgb,var(--accent) 78%,var(--bg4))}
 .hm.l4{fill:var(--accent)}

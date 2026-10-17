@@ -287,7 +287,7 @@ function palAll() {
     if (modOn(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab
   for (const id of MG_IDS) if (mg_on(id)) add('v:a-' + id, 'view', tr(mg_area(id)[2]), mg_area(id)[1], () => go(mg_target(id)));  // 2.44.0 (#1187): the areas
   // 2.8.0 (#434): the command bar also opens the timeline, the agents and their chats ("ask an agent")
-  if (feat('timeline')) add('v:timeline', 'view', tr('Timeline'), 'timeline', () => { S.rmScrollReset = true; rmSet({v: 'timeline'}, 'none'); go('all'); });
+  if (feat('timeline')) add('v:timeline', 'view', tr('Timeline'), 'timeline', () => { S.rmScrollReset = true; Promise.resolve(rmSet({v: 'timeline'}, 'none')).then(() => go('all')); });  // 2.65.0 (#1823): rmSet may load the timeline first
   if (agentsTab()) {
     add('v:agents', 'view', tr('Agents'), 'bot', () => go('agents'));
     for (const a of (S.agents || []).filter(x => x.enabled)) add('a:chat-' + a.id, 'action', tr('Chat with {0}', a.name), 'comment', () => chatOpen(a.id));

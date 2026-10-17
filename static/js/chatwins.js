@@ -200,7 +200,7 @@ async function cw_aload(k) {
   st.busyL = true;
   try {
     const first = st.msgs.length ? st.msgs[0].id : 0;
-    const j = await api('GET', `/api/agents/${aid}/chat?` + (first ? `after=${first - 1}` : `limit=${CHAT_PAGE}`));
+    const j = await api('GET', `/api/agents/${aid}/chat?` + (first ? `after=${first - 1}` : `limit=${typeof CHAT_PAGE === 'number' ? CHAT_PAGE : 30}`));  // 2.65.0 (#1823): CHAT_PAGE lives in the agent chat module
     if (first) { const lo = j.messages.length ? j.messages[0].id : Infinity; st.msgs = [...st.msgs.filter(m => m.id < lo), ...j.messages]; }
     else { st.msgs = j.messages; st.more = !!j.has_more; }
     st.err = null; st.loaded = true; st.live = j.steps_live || []; st.apv = j.approvals_open || [];

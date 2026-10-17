@@ -501,7 +501,7 @@ document.addEventListener('click', async e => {
     case 'copy-id': copyTaskLink(+a.dataset.id); break;  // 2.13.0
     case 'ids-toggle': { const lid = +a.dataset.id; LS.set('ids.' + lid, !idsOn(lid)); render(); break; }
     case 'side-fold': sideFold(!LS.get('sideFold', false)); break;  // 2.13.0 (#453 A15)
-    case 'side-timeline': closeSide(); S.rmScrollReset = true; if (S.route.mod === 'tasks' && S.route.key === 'all') rmSet({v: 'timeline'}, 'all'); else { rmSet({v: 'timeline'}, 'none'); go('all'); } break;
+    case 'side-timeline': closeSide(); S.rmScrollReset = true; if (S.route.mod === 'tasks' && S.route.key === 'all') rmSet({v: 'timeline'}, 'all'); else Promise.resolve(rmSet({v: 'timeline'}, 'none')).then(() => go('all')); break;  // 2.65.0 (#1823): rmSet may load the timeline first
     case 'team-agent': { closeSide(); const ag = agentById(a.dataset.aid); if (ag && ag.enabled) chatOpen(ag.id); else go('agents'); break; }
     case 'lists-reorder': S.listReorder = !S.listReorder; renderSide(); break;
     case 'side-more': closeSide(); settingsModal('sidebar'); break;  // 2.25.0 (UX-03 / UX-26)

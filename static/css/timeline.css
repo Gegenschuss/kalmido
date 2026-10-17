@@ -1,6 +1,5 @@
 /* Kalmido web client: the styles of the module "timeline" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
    Moved unchanged from app.css (same order); later than app.css in the cascade. */
-:is(.ttl,.tln,.dtt,.kbttl,.dpn,.ev,.wev,.tl-bar,.rm-tname) code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:0 .25em;border-radius:.25rem}
 .tl-scroll{overflow-x:auto;position:relative}
 .tl-inner{position:relative;width:calc(var(--tl-name) + var(--days) * var(--dw))}
 .tl-headrow{height:3.25rem;position:sticky;top:0;z-index:4;background:var(--bg2)}
@@ -37,7 +36,6 @@
 .tl-bar.mode-l{box-shadow:inset .25rem 0 0 var(--text)}
 .tl-bar.mode-r{box-shadow:inset -.25rem 0 0 var(--text)}
 .tl-bar.mode-m{transform:translateY(-2px)}
-.hm.l1{fill:color-mix(in srgb,var(--accent) 30%,var(--bg4))}
 .rm-bar{flex-wrap:wrap}
 .rm-bar .spacer{flex:1}
 .rm-chips{align-items:center;margin:-.125rem 0 .625rem}
