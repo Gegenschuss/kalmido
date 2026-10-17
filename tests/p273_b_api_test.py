@@ -22,6 +22,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -487,6 +488,20 @@ for t_ in (kb, gu):
 hb = dbx("SELECT color, remind_at, days, goal FROM habits WHERE user_id=? AND name='Formatgewohnheit'", (DAVE,))
 check(hb and hb[0]["color"] in ("", None) and hb[0]["remind_at"] == "" and hb[0]["days"] == "1234567" and hb[0]["goal"] == 1,
       f"N6: habit defaults {hb and dict(zip(hb[0].keys(), hb[0]))}")
+
+# ---------------------------------------------------------------- 2.73.0 (#1473) review N7: the CardDAV path never from the file
+n7 = mkzip({"lists": [], "address_books": [{"id": 1, "name": "Pfadbuch Test", "created_at": ts}],
+            "contacts": [{"id": 1, "book_id": 1, "uid": "../boese uid/x", "fn": "Kontakt Pfad", "updated_at": ts},
+                         {"id": 2, "book_id": 1, "uid": "gute-uid_1@example.com", "fn": "Kontakt Gut", "updated_at": ts}]})
+iid = upload(Da, n7)
+j = wait(Da, iid)
+j = run(Da, iid) if j.get("state") == "preview" else j
+check(j.get("state") == "done", f"N7: import done {j.get('state')} {j.get('error')}")
+n7c = {r_["fn"]: dict(zip(r_.keys(), r_)) for r_ in dbx("SELECT c.fn, c.uid, c.href FROM contacts c JOIN books b ON b.id=c.book_id WHERE b.owner_id=? AND b.name='Pfadbuch Test'",
+                                  (DAVE,))}
+check(len(n7c) == 2 and all(re.fullmatch(r"[0-9a-f]{32}\.vcf", x["href"]) for x in n7c.values()), f"N7: href always new {n7c}")
+check(n7c.get("Kontakt Pfad", {}).get("uid") != "../boese uid/x" and re.fullmatch(r"[A-Za-z0-9@._-]+", n7c.get("Kontakt Pfad", {}).get("uid") or "")
+      and n7c.get("Kontakt Gut", {}).get("uid") == "gute-uid_1@example.com", "N7: a bad uid is replaced, a good one kept")
 
 # ---------------------------------------------------------------- attacks
 bad(Da, b"this is not a zip" * 100, "no ZIP")
