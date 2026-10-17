@@ -18,7 +18,7 @@ from ..core.config import app
 from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, usettings
-from ..core.access import Denied, list_people, my_inbox, need_task, vis_sql, WRITE_ROLES
+from ..core.access import Denied, list_people, list_role, my_inbox, need_task, vis_sql, WRITE_ROLES
 from ..accounts.session import me
 from ..personal.timetrack import BadInput
 from . import core as A
@@ -445,6 +445,8 @@ def asst_run():
                 raise BadInput(tr("Missing field: {0}", "list_id"))
             if lid not in shared:
                 raise Denied(403, tr(ASST_SHARE_MSG))
+            if list_role(c, lid) not in WRITE_ROLES:  # the tasks would be created there: no model call for a read-only list
+                raise Denied(403)
             src = text or (asst_task_text(c, task) if task is not None else "")
             if not src:
                 raise BadInput(tr("Missing field: {0}", "text"))

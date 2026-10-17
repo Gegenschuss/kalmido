@@ -141,6 +141,8 @@ dbx("UPDATE lists SET life='health' WHERE id=?", (HL,))
 AR = A.post(B + "/api/lists", json={"name": "Old"}).json()["id"]
 A.patch(B + f"/api/lists/{AR}", json={"archived": 1})
 BL = Bo.post(B + "/api/lists", json={"name": "Bobs list"}).json()["id"]
+BV = Bo.post(B + "/api/lists", json={"name": "Bob shows"}).json()["id"]
+Bo.put(B + f"/api/lists/{BV}/members", json={"user_id": 1, "role": "view"})
 A.put(B + f"/api/lists/{W}/members", json={"user_id": AG, "role": "edit"})
 A.put(B + f"/api/lists/{W}/members", json={"user_id": BOB, "role": "edit"})
 st = A.get(B + "/api/state").json()
@@ -190,8 +192,12 @@ check(r.status_code in (401, 403, 404), f"agent token: run refused ({r.status_co
 check(requests.get(V + "/assistant", headers=AGH).status_code in (401, 403, 404), "no v1 route")
 
 # lists: only what the person sees, never basket / health / archived / someone else's
-r = call(A, "put", "/api/assistant/lists", json={"list_ids": [W, HL, AR, BL, INBOX, 99999]})
-check(r.ok and [x["id"] for x in r.json()["lists"]] == [W], "share: only Work stays " + r.text)
+r = call(A, "put", "/api/assistant/lists", json={"list_ids": [W, HL, AR, BL, INBOX, 99999, BV]})
+check(r.ok and sorted(x["id"] for x in r.json()["lists"]) == sorted([W, BV]), "share: only Work + the visible list stay " + r.text)
+n0 = len(ai_log())
+r = run(A, kind="extract", text="x", list_id=BV)
+check(r.status_code == 403 and len(ai_log()) == n0, "extract into a read-only list: 403 before any call " + r.text)
+r = call(A, "put", "/api/assistant/lists", json={"list_ids": [W]})
 check(A.get(B + "/api/state").json()["assistant"]["list_ids"] == [W], "state: list_ids")
 check(call(A, "put", "/api/assistant/lists", json={"list_ids": "all"}).status_code == 400, "share: bad body 400")
 Bo.patch(B + "/api/settings", json={"assistant_on": "1"})
@@ -266,6 +272,17 @@ p = r.json().get("proposal", {}) if r.ok else {}
 check(r.ok and len(p.get("tasks", [])) == 1 and p["tasks"][0]["assignee_id"] is None and p["tasks"][0]["section"] is None
       and p["tasks"][0]["due"] is None, "extract: foreign assignee / section / bad date dropped " + r.text)
 A.post(B + f"/api/proposals/{r.json().get('job_id')}/discard")
+
+# too many open proposals: 429 before any call
+ts0 = "2026-01-01T00:00:00Z"
+for i in range(10):
+    dbx("INSERT INTO agent_jobs(agent_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state) "
+        "VALUES(1,1,'open','waiting','',?,?,'extract','{}','ready')", (ts0, ts0))
+n0 = len(ai_log())
+r = run(A, kind="extract", text="x", list_id=W)
+check(r.status_code == 429 and len(ai_log()) == n0, "open proposals at the limit: 429 " + r.text)
+check(run(A, kind="summary", text="still fine").ok, "text kinds are not limited by open proposals")
+dbx("DELETE FROM agent_jobs WHERE title='open' AND created_at=?", (ts0,))
 
 # ---- tags
 r = run(A, kind="tags", task_id=T1)
