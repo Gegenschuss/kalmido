@@ -696,6 +696,57 @@ Setting up listmonk (version 4 or newer) for Kalmido:
    the API user's name and the token.
 4. Mark the consent of your contacts (contact card > *Newsletter*), create a segment and press *Sync now*.
 
+### Built-in assistant (2.75.0)
+
+Kalmido calls no language model itself -- except the built-in assistant, and only when you configure it. It talks to any
+OpenAI-compatible chat-completions endpoint (`POST <base>/chat/completions`): a local model (Ollama, vLLM, LocalAI) or a
+provider of your choice. Nothing is wired in; without the two variables below the assistant does not exist (no menu, no
+routes, nothing in `/api/state`). Each person switches it on for themselves (*Settings > Assistant*) and shares single lists
+with it; only those lists, basket items they pick and texts they type are sent, as a summary, a draft or a proposal they
+apply or discard (nothing is changed directly). Locked notes, health lists, attachments, files and office documents are never
+sent. Every call leaves a log row with numbers only (no texts), kept `KALMIDO_AUDIT_DAYS` days; admins see the daily counts.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `KALMIDO_AI_BASE_URL` | (empty = off) | Base address of the endpoint, e.g. `http://ollama:11434/v1` |
+| `KALMIDO_AI_MODEL` | (empty = off) | Model name sent with every call |
+| `KALMIDO_AI_KEY_FILE` | | File holding the API key (one line); read once at start |
+| `KALMIDO_AI_KEY` | | The key directly (instead of the file); empty for a local model without a key |
+| `KALMIDO_AI_NAME` | host of the base address | Provider name shown to people ("texts are sent to ...") |
+| `KALMIDO_AI_TIMEOUT_S` | `60` | Time limit per call (seconds) |
+| `KALMIDO_AI_MAX_CHARS` | `24000` | Input characters per call; longer input is cut and the person is told |
+| `KALMIDO_AI_MAX_TOKENS` | `1500` | Answer tokens per call |
+
+The key is sent only as `Authorization: Bearer ...` to that address and never appears in logs, error texts, API answers or
+exports. The address is yours (an environment variable), so addresses in the local or Docker network are allowed; only
+http(s), no redirects to other hosts, one attempt per call, no streaming.
+
+Local model with Ollama in the same compose file (no key, nothing leaves your network):
+
+```yaml
+  kalmido:
+    environment:
+      KALMIDO_AI_BASE_URL: http://ollama:11434/v1
+      KALMIDO_AI_MODEL: llama3.1
+      KALMIDO_AI_NAME: Ollama (this server)
+  ollama:
+    image: ollama/ollama
+    volumes: ["ollama:/root/.ollama"]
+```
+
+An OpenAI-compatible provider in the EU (check its data processing terms and sign a processing agreement first; the
+people's texts go there):
+
+```yaml
+  kalmido:
+    environment:
+      KALMIDO_AI_BASE_URL: https://inference.provider.example/v1
+      KALMIDO_AI_MODEL: provider-model-name
+      KALMIDO_AI_KEY_FILE: /secret/ai.key
+      KALMIDO_AI_NAME: Example AI (EU)
+    volumes: ["./secret:/secret:ro"]
+```
+
 ## Moving to a new server
 
 1. **Before:** lower the DNS TTL of the name a day ahead; make a backup (*Back up now*).

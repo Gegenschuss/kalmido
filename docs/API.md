@@ -1206,3 +1206,38 @@ agents get no pushes and never mark people urgent.
 - Setting `tbl_accept` (`"1"` default, `"0"` = urgency set by others counts as *As the list*; it stays visible on the task).
 - The task history gets a line `bell` for urgency set for others (`{level, until, n}`, a count, no names) and when a person
   switches off an urgency someone else set (`{level, self: 1}`).
+
+## Built-in assistant (2.75.0)
+
+Kalmido calls no language model itself, with one exception: the built-in assistant, which exists only when the server
+operator configured an OpenAI-compatible endpoint (`KALMIDO_AI_BASE_URL` + `KALMIDO_AI_MODEL`, see SELF-HOSTING.md). Without
+that configuration every route below answers `404` and `/api/state` has no field `assistant`. Web API only (the signed-in
+person, session or sign-on proxy): no `/api/v1` route, no MCP tool, agents and API tokens never reach it (agents are models
+themselves and have their own proposals API); child accounts get `403`.
+
+- `/api/state` field `assistant`: `{enabled, provider, host, model, on, list_ids}` -- `on` is the person's setting
+  `assistant_on` (`"0"` default, `PATCH /api/settings`), `list_ids` the lists they shared with it. The key is never shown.
+- `GET /api/assistant` -> `{enabled, provider, host, model, on, lists: [{id, name}], limits: {max_chars, max_items, open_max}}`.
+- `PUT /api/assistant/lists` `{list_ids: [..]}` replaces the shared lists. Kept are only lists the person sees right now;
+  the basket, health lists, archived lists and unknown ids are left out without an error. Shares the person may no longer
+  use (left the list, list archived) are removed on the next `GET`.
+- `POST /api/assistant/run` `{kind, task_id?, task_ids?, text?, instruction?, list_id?, day?}` -- one synchronous call
+  (time limit `KALMIDO_AI_TIMEOUT_S`):
+  - `summary` (`task_id` and / or `text`), `draft` (`task_id` and / or `text`, `instruction`) -> `{kind, text, truncated, log_id}`
+  - `extract` (`text` or `task_id`, `list_id` = target, shared) -> a ready proposal of kind `extract`
+  - `tags` (`task_id`) -> a ready proposal of kind `triage` with one item (tags, due date, priority; never a move)
+  - `triage` (`task_ids`, at most 30; the person's own basket items or tasks of shared lists; targets = shared lists)
+  - `dayplan` (`day`, default today; only tasks of shared lists, events as busy times without titles)
+
+  Proposals answer `{kind, job_id, job, proposal, truncated}`: a proposal job of the person themself (`input.assistant` =
+  `true`, `input.provider`), shown, applied, discarded and undone with the existing `/api/proposals/{id}` routes; no agent
+  gets an event about it. A task must be visible to the person (`404` otherwise) and lie in a shared list or their own
+  basket (`403` "Share this list with the assistant first"). Never sent: locked notes, health lists, attachments, files,
+  office documents, other people's e-mail addresses. Errors: `403` while the person has it off, `400` input, `429` too many
+  open proposals, `502` provider unreachable or no usable answer, `504` time limit; the texts never carry the provider's
+  answer, its address or the key.
+- `GET /api/assistant/log?limit=50` (up to 500) -> `{items: [{id, kind, task_id, list_id, job_id, status, ms, chars_in,
+  chars_out, at}]}`: the person's own calls, numbers only (`status` ok | error | timeout | denied | truncated), never a prompt
+  or an answer; kept `KALMIDO_AUDIT_DAYS` days.
+- `GET /api/admin/assistant` (admins) -> `{provider, host, model, timeout_s, max_chars, today: {calls, errors}, days: [{day,
+  calls, errors, chars_in, chars_out}]}` for 30 days, without people.
