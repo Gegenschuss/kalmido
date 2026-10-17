@@ -139,6 +139,8 @@ PH.update(code="photo", name={"de": "Foto", "en": "Photo"}, version=1)
 PH1 = put("industry/photo-1.json", PH)
 FI2 = put("industry/film-x.json", dict(json.loads(json.dumps(FILM)), kind="country"))  # kind mismatch inside the file
 NO1 = put("country/no-1.json", country("NO", "Norwegen", "Norway", 25, 15))
+# 2.76.0 review (N3): nested deeper than the recursive checks go -> 422, never a 500
+XH1 = put("country/xh-1.json", ('{"code": "XH", "deep": ' + "[" * 950 + "]" * 950 + "}").encode())
 
 
 def entry(kind, code, name, versions, verified=True, min_app="2.0.0", **kw):
@@ -157,6 +159,7 @@ def index(at_versions):
         entry("country", "XB", "Checksum", [(1, dict(XB1, sha256="0" * 64))]),
         entry("country", "XC", "Code", [(1, XC1)]),
         entry("country", "XE", "Large", [(1, {"url": XE1["url"], "sha256": XE1["sha256"]})]),
+        entry("country", "XH", "Deep", [(1, XH1)]),
         entry("country", "NO", "Norway", [(1, dict(NO1, url="https://10.1.2.3/no-1.json"))]),
         entry("country", "SE", "Sweden", [(1, dict(NO1, url=FK + "/redirect-internal"))]),
         entry("industry", "photo", {"de": "Foto", "en": "Photo"}, [(1, PH1)], description="Shoot calculation for photo productions"),
@@ -256,6 +259,8 @@ check(r.status_code == 422 and any("sha256" in p for p in r.json().get("problems
       f"wrong checksum: 422 ({r.status_code} {r.text[:200]})")
 r = A.post(B + O + "/packs/install", json={"kind": "country", "code": "XE", "version": 1})
 check(r.status_code == 422 and any("size" in p for p in r.json().get("problems") or []), f"too large: 422 ({r.status_code} {r.text[:200]})")
+r = A.post(B + O + "/packs/install", json={"kind": "country", "code": "XH", "version": 1})
+check(r.status_code == 422, f"nested very deep: 422, not 500 ({r.status_code} {r.text[:200]})")  # 2.76.0 review (N3)
 r = A.post(B + O + "/packs/install", json={"kind": "country", "code": "XA", "version": 1})
 check(r.status_code == 422 and any("markup" in p for p in r.json().get("problems") or []), f"markup: 422 ({r.status_code} {r.text[:200]})")
 r = A.post(B + O + "/packs/install", json={"kind": "country", "code": "XC", "version": 1})
@@ -313,6 +318,10 @@ check(A.get(B + f"{D}/{DOC}/render").json() == R1, "finalised document: renderin
 DOC2 = A.post(B + D, json={"project_title": "Zweitfilm"}).json()["id"]
 r = A.put(B + f"{D}/{DOC2}/items", json={"items": [{"service_id": S1, "qty": 1}]})
 check(r.ok and r.json()["totals"]["gross"] == 1210, f"a new quotation uses v2 (21 %): {r.json().get('totals') if r.ok else r.text[:200]}")
+# 2.76.0 review (M1): the open documents an update / removal would recalculate (a hint, never blocking)
+at = items(A.get(B + O + "/catalog").json())[("country", "AT")]
+check(at["affects"] == 1 and at["affects_text"] == "1 open documents will be calculated with the new rates and texts.", f"catalogue: affects 1 ({at.get('affects')})")
+check(items(A.get(B + O + "/catalog").json())[("country", "LU")]["affects"] == 0, "a pack not in effect: affects 0")
 
 # ---- uninstall + restore
 r = A.delete(B + O + "/packs/installed/country/AT")
