@@ -18,7 +18,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
-const FEAT = 'cal,comments,collab';
+const FEAT = 'cal,comments,collab,kanban';
 
 (async () => {
   await sleep(600);
@@ -77,7 +77,7 @@ const FEAT = 'cal,comments,collab';
   check(rm.includes('Remove from Marketing'), '#1459: the menu offers "Remove from Marketing" ' + JSON.stringify(rm));
   await w.eval(`ml_remove(${T}, ${MKT})`); await sleep(300);
   srv = await call('GET', `/api/tasks/${T}`);
-  check(!srv.also && srv.status === 0 && !srv.deleted_at, '#1459: removed from Marketing, the task stays');
+  check(!srv.also && srv.list_id === SALES && !srv.deleted_at, '#1459: removed from Marketing, the task stays');
   w.eval('render()'); await sleep(100);
   check(!d.querySelector(`.trow[data-id="${T}"]`), '#1459: gone from the board');
   await w.eval(`histStep('undo')`); await sleep(600);

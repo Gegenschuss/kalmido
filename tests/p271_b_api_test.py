@@ -232,7 +232,9 @@ Bo.post(B + f"/api/tasks/{T}/restore")
 check(also_ids(task_in(Bo, T)) == [O2], "#1459: restored with its further list")
 OX = mk(Bo, "Short lived", ORG)
 link(Bo, T, OX)
-Bo.delete(B + f"/api/lists/{OX}")
+check(Bo.patch(B + f"/api/lists/{OX}", json={"archived": True}).ok, "setup: the further list archived (delete needs it)")
+r = Bo.delete(B + f"/api/lists/{OX}")
+check(r.ok, "setup: the further list deleted " + r.text[:120])
 check(links(T) == [O2] and task_in(Bo, T) is not None, "#1459: deleting the further list keeps the task")
 many = [mk(Bo, f"Extra {i}", ORG) for i in range(10)]
 codes = [link(Bo, T, x).status_code for x in many]
