@@ -91,6 +91,7 @@ check(not any(x.get("id") == OT for x in st.get("tasks", [])), "tasks: no task o
 ok(F.get(B + "/api/tasks", params={"q": "trailer"}), "tasks: search")
 ok(F.get(B + "/api/export.json"), "tasks: the export")
 ok(F.put(B + f"/api/lists/{IDS['list']}/public-link", json={}), "lists: a public link of the private list", (200, 201))
+ok(F.post(B + f"/api/lists/{IDS['list']}/signoffs", json={}), "lists: an approval link of the private list (its owner)", (200, 201))
 
 # ================================================================== the personal office (its own admin)
 # freelancer-matrix: office
@@ -112,6 +113,17 @@ IDS["service"], IDS["officekind"] = sv.get("id"), "services"
 inv = ok(F.post(B + f"/api/office/docs/{IDS['doc']}/invoice"), "office: an invoice from the quotation", (200, 201))
 ok(F.post(B + f"/api/office/docs/{inv.get('id')}/finalize"), "office: finalise the invoice")
 ok(F.get(B + f"/api/office/docs/{inv.get('id')}/pdf"), "office: the PDF")
+# #1918: what an organisation's office reserves to its admins, the freelancer does in the personal office
+ok(F.post(B + f"/api/office/docs/{inv.get('id')}/payments", json={"date": "2026-09-02", "amount": 100}), "office: record a payment (admin)", (200, 201))
+q2 = ok(F.post(B + "/api/office/docs", json={"project_title": "Imagefilm 2", "client_id": IDS["client"]}), "office: a second quotation", (200, 201))
+ok(F.put(B + f"/api/office/docs/{q2.get('id')}/items", json={"items": [{"service_id": IDS["service"], "qty": 1}]}), "office: its positions")
+ok(F.post(B + f"/api/office/docs/{q2.get('id')}/status", json={"status": "sent"}), "office: quotation sent")
+so = ok(F.post(B + f"/api/office/docs/{q2.get('id')}/signoff", json={}), "office: an approval link of the private quotation", (200, 201))
+check(bool(so.get("url")), "office: the approval link has its address")
+r = requests.get(B + "/s/q/" + (so.get("url") or "/s/q/x").split("/s/q/")[-1])
+check(r.status_code == 200, f"office: the customer opens the approval page {r.status_code}")
+ok(F.get(B + "/api/newsletter", params={"ws": "private"}), "office: the newsletter connection of the private space")
+ok(F.get(B + "/api/paperless", params={"ws": "private"}), "office: the Paperless connection of the private space")
 
 # ================================================================== knowledge pages
 # freelancer-matrix: wiki
@@ -130,6 +142,7 @@ IDS["node"] = ((fu.get("items") or [{}])[0]).get("id")
 du = ok(F.post(B + "/api/docs", data={"ws": "private"}, files=[("files", ("receipt.txt", b"Receipt 12,00 EUR", "text/plain"))]),
         "files: a document", (200, 201))
 IDS["docnode"] = (du.get("ids") or [None])[0]
+ok(F.put(B + "/api/docs/settings", json={"ws": "private", "inbox": True}), "files: document settings of the private space (its own admin)")
 
 # ================================================================== calendars, contacts, CalDAV / CardDAV
 # freelancer-matrix: pim
@@ -177,6 +190,9 @@ check("bob" not in names, f"team: nobody of the organisation in the freelancer's
 # freelancer-matrix: hub
 ab = ok(F.post(B + "/api/team/absences", json={"kind": "vacation", "start_date": D, "end_date": "2030-03-08"}), "hub: an own absence", (200, 201))
 IDS["absence"] = ab.get("id")
+# 409 = mail to tasks is not set up on the test server (the same answer for an organisation member); never 403 / 404
+ok(F.post(B + "/api/hubmail/address", json={"ws": "private"}), "hub: an own mail address of the private space", (200, 201, 409))
+ok(F.put(B + "/api/team/absences/holidays", json={"state": "HH"}), "hub: the public holidays of the personal area (its own admin)")
 # freelancer-matrix: personal
 bu = ok(F.post(B + "/api/budget/lists", json={"name": "Money"}), "personal: a budget", (200, 201))
 IDS["budget"] = bu.get("list_id")
@@ -184,6 +200,7 @@ ok(F.post(B + "/api/life/health", json={"type": "appointment", "title": "Checkup
    "personal: Home & life", (200, 201))
 # freelancer-matrix: own
 ok(F.patch(B + "/api/settings", json={"week_start": 1}), "own: settings")
+ok(F.post(B + "/api/account/export", json={}), "own: an account export", (200, 201, 202))
 tk = ok(F.post(B + "/api/me/tokens", json={"name": "all", "scopes": [x for x in ("read", "write", "comments", "structure", "delete",
                                                                                   "attachments:read", "attachments:write", "time", "export",
                                                                                   "calendar", "contacts", "private", "account", "files:read",
