@@ -162,8 +162,10 @@ def can_color(s, aid):
     return next((x.get("can_color") for x in (j.get("agents") if isinstance(j, dict) else j) if x["id"] == aid), None)
 
 
-check(can_color(Bo, AG[0]) in (True, None), "can_color: the organisation's admin (when the agent is listed for them at all)")
-check(can_color(A, AG[0]) is True, "can_color: the instance admin")
+_l = Bo.post(B + "/api/lists", json={"name": "Studio"}).json()["id"]  # a shared list makes the agent visible to them
+Bo.put(B + f"/api/lists/{_l}/members", json={"user_id": AG[0], "role": "edit"})
+check(can_color(Bo, AG[0]) is True, "can_color: the organisation's admin")
+check(can_color(A, AG[0]) in (True, None), "can_color: the instance admin")
 check(can_color(Ca, AG[0]) is not True, "can_color: a plain member does not get it")
 check(can_color(Da, AG[0]) is not True, "can_color: the admin of another organisation does not get it")
 # a personal agent: its owner
