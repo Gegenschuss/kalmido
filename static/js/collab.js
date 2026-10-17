@@ -229,7 +229,7 @@ function newsText(it, U) {
       : tr('{0} added the agent {1} to {2}. What it reads in the list goes to its AI provider.', who, q(d.agent || ''), q(newsListName(it)));  // 2.24.0 (#896)
     case 'followup': return d.note ? tr('Follow up today: waiting on {0}', q(d.note)) : tr('Follow up today: the task is waiting on someone');
     case 'usage': return aiuNewsText(d);  // 2.1.1 (#326)
-    case 'proposal': return tr('{0} has a proposal for you: {1}', who, q(d.title || ''));  // 2.3.0
+    case 'proposal': return tr('{0} has a proposal for you: {1}', d.assistant ? q(tr('Assistant')) : who, q(d.title || ''));  // 2.3.0; 2.75.0 (#1411): the built-in assistant has no person
     case 'playbook_proposal': return pbNewsText(it, who, q);  // 2.39.0 (#1168)
     case 'evinvite': case 'evshare': return evNewsText(it, who, q);  // 2.21.0 (#659)
     case 'abshare': return d.role === 'edit' ? tr('{0} shared the address book {1} with you', who, q(d.name || '')) : tr('{0} shared the address book {1} with you (view only)', who, q(d.name || ''));  // 2.21.0 (#658)

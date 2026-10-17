@@ -9,6 +9,7 @@ notes, health lists, attachments, files and office documents never are. The key 
 KALMIDO_AI_KEY), is read once at start and never appears in logs, error texts, API answers or exports. The model's answer
 is never trusted: JSON is parsed tolerantly, cleaned (unknown fields / ids dropped) and validated like an agent's proposal;
 the person decides with the usual proposal card (nothing is changed directly)."""
+import http.client
 import json
 import os
 import re
@@ -101,7 +102,7 @@ def asst_chat(system, user, max_tokens=None):
         raise AsstError("timeout" if isinstance(e.reason, (TimeoutError, socket.timeout)) else "network") from None
     except (TimeoutError, socket.timeout):
         raise AsstError("timeout") from None
-    except (OSError, ValueError):
+    except (OSError, ValueError, http.client.HTTPException):  # review 2.75.0: a torn / malformed answer is a network error, not a 500
         raise AsstError("network") from None
     if time.monotonic() - t0 > ASST_TIMEOUT_S:
         raise AsstError("timeout")

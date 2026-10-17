@@ -50,6 +50,7 @@ async function wpDraw(md) {
 // 2.25.0 (UX-17): what each area holds, shown in the overview a phone opens with
 const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('Members, roles, lists of the organisation'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
   modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), ai: N_('Agents and what they do'),
+  assistant: N_('The built-in assistant and the lists it may read'),  // 2.75.0 (#1411)
   data: N_('Import, export, templates, backups'), users: N_('People, sign-in, server'), help: N_('How things work, about Kalmido')};
 // ---- UX1 (U03, owner decision 2): settings save themselves. Every control applies at once, "Saved · Undo" shows in the
 // dialog header and each change is one step in the undo history ("Changed setting: …"). Text, number and time fields save
@@ -78,6 +79,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-sdd': ['show_done_default', N_('Completed tasks'), 'sel'],  // 2.39.1 (#1214)
   's-favq': ['fav_quiet', N_('Quieter pushes from lists without a star'), 'chk'], 's-favs': ['fav_suggest', N_('Suggest favourites'), 'chk'],  // 2.46.1 (#1361)
   's-tblacc': ['tbl_accept', N_('Accept urgent markings from others'), 'chk'],  // 2.53.0 C (#1424)
+  's-asst-on': ['assistant_on', N_('Use the assistant'), 'chk'],  // 2.75.0 (#1411)
 };
 const SET_RENDER = ['sidebar', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
@@ -115,6 +117,7 @@ async function setStep(to, from, label) {  // one way of a settings step; a valu
 async function setAfter(patch) {
   if ('lang' in patch) { await i18nLoad(patch.lang); LS.set('lang', patch.lang); document.documentElement.lang = patch.lang; }
   if ('features' in patch || 'nav_order' in patch) { try { await load(); } catch { /* offline: the local copy is right */ } await route(); return; }  // route: a view whose module went off
+  if ('assistant_on' in patch) asst_onSync(patch.assistant_on);  // 2.75.0 (#1411): the entry points follow the switch
   if (Object.keys(patch).some(k => SET_RENDER.includes(k))) render();
 }
 // local (per device) settings: appearance, tab bar
@@ -629,12 +632,13 @@ function settingsModal(focus) {
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${sampleHtml(hint)}`,
     ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage'}[focus]) : '',  // 2.7.0 (#405 S2)
+    assistant: asst_paneHtml(hint),  // 2.75.0 (#1411): only with a configured assistant
     users: S.me?.is_admin ? admSubsHtml({  // 2.24.0 (#826): Administration in sub-tabs like Agents
       users: usersHtml() + grpHtml() + orphHtml(),
       signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
       org: orgsHtml() + orgAgentsHtml(hint) + ocAdminHtml(hint),  // 2.42.0 (#828): + encryption of organisation data
       agents: ad_agentsHtml(hint),  // 2.46.6 (#1710)
-      server: instanceHtml(chk, hint) + ad_updHtml(hint) + hostHtml(hint) + bkHtml() + stoHtml(),  // 2.46.6 (#1710): + the update check result (was Help)
+      server: instanceHtml(chk, hint) + ad_updHtml(hint) + hostHtml(hint) + bkHtml() + stoHtml() + asst_admHtml(),  // 2.46.6 (#1710): + the update check result (was Help)
       log: aaHtml()}, ad_admFocus(focus)) : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
@@ -659,6 +663,7 @@ function settingsModal(focus) {
       <h4>${tr('Gestures (phone)')}</h4>
       <div class="shelp">${tr('Swipe right: complete · swipe left: snooze / delete · long-press: selects the task (a bar with Move, Date, Complete and More; tap more tasks to add them, drag them by the grip) · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the lists (dropping a subtask there = standalone task in that list).')}</div>`,
   };
+  pane.help += asst_helpHtml();  // 2.75.0 (#1411)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
   let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'users' : 'ai', agentpolicy: 'users', server: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
@@ -704,6 +709,7 @@ function settingsModal(focus) {
     if (k === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); ocAdminDraw(md); }
     if (k === 'ai') aiSubShow(md);  // 2.5.1 (#393): only the shown sub-tab loads
     if (k === 'users') admSubShow(md);
+    if (k === 'assistant' || k === 'users') asst_paneDraw(md);  // 2.75.0 (#1411)
     if (k === 'account') { tfaDraw(md); tokDraw(md); apwDraw(md); e2eDraw(md); }
     $(`.snav [data-sec="${k}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'});
   };
@@ -827,6 +833,7 @@ function settingsModal(focus) {
   if (cur === 'integr') { icalDraw(md); calsDraw(md); whDraw(md); }
   calsWire(md); whWire(md); if (S.me?.is_admin) { agWire(md); audWire(md); }
   agSetupWire(md);  // 2.7.2 (#420)
+  asst_setWire(md);  // 2.75.0 (#1411)
   if (cur === 'notify') wpDraw(md);
   ntfyShow(md);
   if (cur === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); ocAdminDraw(md); Promise.resolve(admSubShow(md, ad_admFocus(focus))).then(() => { if (focus === 'activity') $('#s-adlog-h', md)?.scrollIntoView({block: 'start'}); }); }  // 2.42.0 (#828): + ocAdminDraw  // 2.46.6 (#1710): + the shown sub-tab's data; 'activity' = its log, once the rules above it are drawn

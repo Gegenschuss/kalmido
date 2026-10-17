@@ -585,6 +585,7 @@ function applyState(j) {
   S.sample = j.sample || null;
   S.agents = j.agents || []; S.agentsAt = Date.now(); S.setupPending = !!j.setup_pending;  // 2.13.0 (#453 A16)
   S.proposers = j.proposers || [];  // 2.3.0: agents I may ask for a proposal
+  S.assistant = j.assistant || null;  // 2.75.0 (#1411): only with a configured assistant
   S.groups = j.groups || []; S.myGroups = j.my_groups || [];  // 2.10.0 (#441)
   S.dayplan = j.dayplan || {work_start: '09:00', work_end: '17:00', review_time: '', default_duration: 30};  // 2.10.0 (#440)
   S.kids = j.kids || []; S.kidIds = new Set(j.kid_ids || []);  // 2.19.0 (#653)

@@ -480,6 +480,7 @@ function renderTop0() {
   if (fk && feat('matrix') && !isMobile()) acts += `<div class="seg vseg fseg tf" role="group" aria-label="${esc(tr('View'))}"><button class="${m === 'tasks' ? 'on' : ''}" data-act="fview" data-k="list" data-ico="list" data-f="${esc(fk)}" title="${esc(tr('List'))}" aria-pressed="${m === 'tasks'}">${ic('list', 's')}</button><button class="${m === 'matrix' ? 'on' : ''}" data-act="fview" data-k="matrix" data-ico="grid" data-f="${esc(fk)}" title="${esc(tr('Matrix'))}" aria-pressed="${m === 'matrix'}">${ic('grid', 's')}</button></div>`;
   if (m === 'tasks' && k === 'all' && feat('timeline')) { const v = isRoadmap() ? 'timeline' : 'list'; acts += `<div class="seg tf" role="group" aria-label="${tr('View')}"><button class="${v === 'list' ? 'on' : ''}" data-act="rm-view" data-k="list" data-ico="list" title="${tr('List')}" aria-pressed="${v === 'list'}">${ic('list', 's')}</button><button class="${v === 'timeline' ? 'on' : ''}" data-act="rm-view" data-k="timeline" data-ico="timeline" title="${tr('Timeline')}" aria-pressed="${v === 'timeline'}">${ic('timeline', 's')}</button></div>`; }
   if (m === 'tasks' && k === 'inbox') acts += kbSortBtn();  // 2.39.1 (#1219)
+  if (m === 'tasks' && k === 'inbox') acts += asst_inboxBtn();  // 2.75.0 (#1411)
   if (m === 'tasks' && k.startsWith('lists:') && typeof dx_listsActs === 'function') acts += dx_listsActs(k);  // 2.47.3 (#1727)
   if (m === 'tasks' && k === 'trash' && (S.hist?.k === 'trash' && S.hist.deletable != null ? S.hist.deletable > 0 : (S.extra || []).some(t => !t.keep))) acts += `<button class="btn sm danger" data-act="trash-empty">${tr('Empty')}</button>`;
   if (m === 'tasks' && k === 'done' && (S.extra || []).length) acts += `<button class="btn sm" data-act="done-clean" title="${esc(tr('Move completed tasks to the trash'))}">${ic('trash', 's')}<span class="bl">${tr('Delete completed…')}</span></button>`;
@@ -607,6 +608,7 @@ function topMoreItems() {
   if (isMobile()) for (const dir of ['undo', 'redo']) { const b = histBtn(dir); if (b.off && !b.p) continue; out.push({label: b.lab, icon: dir, dis: b.off, cls: 'hmi' + (b.p ? ' pend' : ''), title: b.p ? tr('waiting for the connection') : '', fn: () => histStep(dir)}); }
   // 2.24.0 (UX-35): Today's planners live here now (the header keeps its room for the tasks)
   if (m === 'tasks' && k === 'today') out.push({label: tr('Plan my day'), icon: 'cal', fn: () => dayplanModal('day')}, {label: tr('Fill free time'), icon: 'clock', fn: () => dayplanModal('fill')});
+  if (m === 'tasks' && k === 'today' && asst_ready()) out.push({label: tr('Assistant plan'), icon: 'sparkle', fn: () => asst_go({kind: 'dayplan', day: today()})});  // 2.75.0 (#1411)
   if (m === 'tasks' && k === 'today') out.push({label: tr('Customize Today…'), icon: 'sliders', fn: () => lyOpen('today', true)});  // 2.32.0 (#1063)
   if (m === 'tasks' && k === 'today' && typeof lyv_viewMenu === 'function') out.push(...lyv_viewMenu('today'));  // 2.55.0 (#1069): Today has no header switch
   if (m === 'time') out.push({label: tr('Customize…'), icon: 'sliders', fn: () => lyOpen('time', true)});

@@ -483,6 +483,7 @@ document.addEventListener('scroll', e => {
 }, true);
 function jobHtml(j) {
   const mine = j.kind && S.me && j.user_id === S.me.id;  // 2.3.0: a proposal I asked for: reviewed in its dialog
+  // 2.75.0 (#1411): a proposal of the built-in assistant has the person as its "agent" (agent_id = user_id): named Assistant
   const acts = [mine && ['requested', 'ready'].includes(j.proposal_state) && `<button class="btn sm ${j.proposal_state === 'ready' ? 'pri' : ''}" data-act="prop-open" data-jid="${j.id}">${ic('bot', 's')} ${j.proposal_state === 'ready' ? tr('Review the proposal') : tr('Open')}</button>`,
     !j.kind && j.can_act && j.state === 'waiting' && `<button class="btn sm pri" data-act="job-do" data-jid="${j.id}" data-a="approve">${thumbIc(true)} ${tr('Approve')}</button>`,
     !j.kind && j.can_act && j.state === 'waiting' && `<button class="btn sm" data-act="job-do" data-jid="${j.id}" data-a="reject">${thumbIc(false)} ${tr('Reject')}</button>`,
@@ -490,7 +491,7 @@ function jobHtml(j) {
     j.can_stop && ['running', 'waiting'].includes(j.state) && `<button class="btn sm danger" data-act="job-do" data-jid="${j.id}" data-a="stop">${ic('stop', 's')} ${tr('Stop')}</button>`].filter(Boolean).join('');
   const last = String(j.log || '').trim().split('\n').pop();
   const fo = S.jobFocus === j.id;  // 2.36.2 (#1141): opened by a "Job #id" link: highlighted, log + history unfolded
-  return `<div class="job st-${esc(j.state)}${fo ? ' jfocus' : ''}" id="job-${j.id}"${fo ? ' tabindex="-1"' : ''}><div class="jobh"><span class="jst">${esc(tr(JOB_ST[j.state] || j.state))}</span><b>${esc(j.title)}</b><span class="spacer"></span><span class="muted">${ac_mk(j.agent_id) ? `<i class="acjob"${ac_mk(j.agent_id)} aria-hidden="true"></i>` : ''}${esc(j.agent_name)} · ${esc(relTime(j.updated_at))}</span></div>
+  return `<div class="job st-${esc(j.state)}${fo ? ' jfocus' : ''}" id="job-${j.id}"${fo ? ' tabindex="-1"' : ''}><div class="jobh"><span class="jst">${esc(tr(JOB_ST[j.state] || j.state))}</span><b>${esc(j.title)}</b><span class="spacer"></span><span class="muted">${ac_mk(j.agent_id) ? `<i class="acjob"${ac_mk(j.agent_id)} aria-hidden="true"></i>` : ''}${esc(j.kind && j.agent_id === j.user_id ? tr('Assistant') : j.agent_name)} · ${esc(relTime(j.updated_at))}</span></div>
     ${j.task_id ? `<button class="runtask" data-act="open-id" data-id="${j.task_id}">${ic('arrow', 's')}<span>${esc(j.task_title || '')}</span></button>` : ''}
     ${j.log ? `<details class="joblog" data-jid="${j.id}"${S.jobLogOpen[j.id] ?? fo ? ' open' : ''}><summary>${esc(last.slice(0, 140))}</summary><pre>${esc(j.log)}</pre></details>` : ''}
     ${j.steps ? jobStepsHtml(j.id, j.steps) : ''}
@@ -652,6 +653,7 @@ async function propOpen(jid) {
   try { v = await rawFetch('GET', `/api/proposals/${jid}`); } catch (e) {  // 2.5.2 (K19): a readable reason instead of "unknown"
     toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.status === 404 ? tr('This proposal is not available: only the person who asked for it can open it, or it was removed.') : e.message); return;
   }
+  if (v?.input?.assistant) v.agent = {...(v.agent || {}), name: tr('Assistant')};  // 2.75.0 (#1411): the built-in assistant, not an agent
   $('.ppm')?.remove();
   const md = modal('');
   md.classList.add('ppm');
