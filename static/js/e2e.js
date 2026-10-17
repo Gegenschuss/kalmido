@@ -314,7 +314,7 @@ async function e2eDraw(md) {
   if (!globalThis.crypto?.subtle) { box.innerHTML = `<div class="shint">${tr('This browser cannot encrypt here (it needs HTTPS and a current browser).')}</div>`; return; }
   const st = await e2eLoad(true);
   if (!st) { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
-  const limits = `<details class="e2einfo"><summary>${tr('What it protects, and what not')}</summary><p class="muted">${tr('Encrypted notes, files and direct messages are encrypted in your browser. The server, its database and its backups only hold unreadable data: neither the operator nor agents can read them. Titles, dates and reminders stay normal. A web app has a limit: whoever controls the server could deliver a changed script. Encrypted direct messages have no forward secrecy: whoever gets your keys later can read old messages too. Encrypted files have no preview and are not searched.')}</p></details>`;
+  const limits = `<details class="e2einfo"><summary>${tr('What it protects, and what not')}</summary><p class="muted">${tr('Encrypted notes, files and direct messages are encrypted in your browser. The server, its database and its backups only hold unreadable data: neither the operator nor agents can read them. Titles, dates and reminders stay normal. A web app has a limit: whoever controls the server could deliver a changed script. Encrypted direct messages have no forward secrecy: whoever gets your keys later can read old messages too. Encrypted files have no preview and are not searched.')}</p>${typeof le2u_helpHtml === 'function' ? le2u_helpHtml() : ''}</details>`;  // 2.64.1 (#1817): + lists with a lock
   if (!st.set) {
     box.innerHTML = `<div class="row"><label>${tr('State')}</label><span class="tfastate">${tr('Not set up')}</span><button class="btn sm pri" data-e2e="setup">${ic('lock', 's')} ${tr('Set up')}</button></div>
       <div class="shint">${tr('For an encrypted note on a task, encrypted files and encrypted direct messages. Only you hold the keys.')}</div>${limits}`;
@@ -444,7 +444,7 @@ async function e2eAttOpen(aid) {
 function e2eAttHtml(a, del) {
   return `<div class="att file e2eatt"><button type="button" class="attx" data-e2e="att-open" data-att="${a.id}" title="${esc(a.enc_mine ? tr('Decrypt and download') : tr('Only the person who attached it can open it'))}">${ic('lock')}<span class="atxt"><span class="an">${esc(tr('Encrypted file'))}</span><span class="as">${esc(fmtSize(a.size || 0))}${a.enc_mine ? '' : ' · ' + esc(tr('not yours'))}</span></span></button>${del}</div>`;
 }
-const e2eAttAddHtml = t => !globalThis.crypto?.subtle || !E2E.st?.set || !(t.id > 0) ? '' : `<label class="attadd e2eattadd" title="${esc(tr('Encrypted in your browser; no preview, not searched'))}">${ic('lock', 's')}<span>${tr('Attach encrypted')}</span><input type="file" id="d-efile" multiple hidden></label>`;
+const e2eAttAddHtml = t => !globalThis.crypto?.subtle || !E2E.st?.set || !(t.id > 0) ? '' : `<label class="attadd e2eattadd" title="${esc(tr('Encrypted in your browser; no preview, not searched'))}" aria-label="${esc(tr('Attach encrypted'))}">${ic('lock', 's')}<span>${tr('Attach encrypted')}</span><input type="file" id="d-efile" multiple hidden aria-label="${esc(tr('Attach encrypted'))}"></label>`;  // 2.64.1 (#1518): aria-label
 document.addEventListener('change', e => { if (e.target.id === 'd-efile' && S.sel) { const fs = [...e.target.files]; e.target.value = ''; e2eUpload(S.sel, fs); } });
 
 // ------------------------------------------------------------------ #909 encrypted direct messages
@@ -559,7 +559,9 @@ function e2eRoomNotice(room) {
 // the body of an encrypted message (or a notice) in the conversation; null = not encrypted
 function e2eMsgBody(m) {
   if (!m.enc) return null;
-  if (m.enc.sys) return `<div class="e2esys muted">${ic('lock', 's')}<span>${esc((w => m.enc.sys === 'on' ? tr('{0} switched encryption on', w) : tr('{0} switched encryption off', w))(m.user_id === S.me?.id ? tr('You') : uname(m.user_id, S.tc.users)))}</span></div>`;
+  // 2.64.1 (#1518): own texts for "you" (German "Du hast", not "Du hat")
+  if (m.enc.sys) return `<div class="e2esys muted">${ic('lock', 's')}<span>${esc(m.user_id === S.me?.id ? (m.enc.sys === 'on' ? tr('You switched encryption on') : tr('You switched encryption off'))
+    : (w => m.enc.sys === 'on' ? tr('{0} switched encryption on', w) : tr('{0} switched encryption off', w))(uname(m.user_id, S.tc.users)))}</span></div>`;
   if (m._dec) return null;
   if (m._fail) return `<div class="cbub e2emsg"><span class="muted">${ic('lock', 's')} ${tr('Cannot be decrypted')}</span></div>`;
   return `<div class="cbub e2emsg"><button type="button" class="linkbtn" data-e2e="dm-unlock">${ic('lock', 's')} ${tr('Encrypted message')}</button></div>`;

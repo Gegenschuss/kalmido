@@ -264,6 +264,10 @@ def ws_member_problem(c, lid, uid, org_id=None):
     """2.28.0 (#935): the reason (translated) why uid cannot be in list lid, or None. org_id: check against this workspace
     instead of the list's current one. A person: an organisation's list only for its members. An agent: only lists of its
     own workspace (agents.org_id == lists.org_id)."""
+    from ..collab.liste2eguard import le2b_agent_problem
+    p = le2b_agent_problem(c, lid, uid)  # 2.64.1 B (#1817): an agent never joins a list with the lock (every share path)
+    if p:
+        return p
     if not has_workspaces(c):
         return None
     return ws_fit_problem(c, list_org(c, lid) if org_id is None else (org_id or None), uid)

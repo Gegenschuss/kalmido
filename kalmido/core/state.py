@@ -405,7 +405,9 @@ def search_tasks(c, uid, raw, limit):
     q = f"%{like_escape(raw)}%"  # 2.37.0 (#1150): the text literally (Postgres reads a backslash as an escape in LIKE)
     fids = sorted(search_field_ids(c, uid, raw))[:2000] if raw else []
     # participants: only their own tasks match (a context parent's notes / link / fields are not theirs to search)
-    return load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
+    # 2.64.1 B (#1817): lists with the lock are searched in the browser only (the server holds ciphertexts)
+    return load_tasks(c, f"list_id IN {vis_sql()} AND list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL) "
+                         f"AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
                          "AND (title ILIKE ? ESCAPE '\\' OR content ILIKE ? ESCAPE '\\' OR url ILIKE ? ESCAPE '\\' OR (snippets IS NOT NULL AND EXISTS (SELECT 1 FROM "
                          "jsonb_array_elements(CASE WHEN jsonb_typeof(snippets)='array' THEN snippets ELSE '[]'::jsonb END) j "
                          "WHERE (j->>'code') ILIKE ? ESCAPE '\\' OR (j->>'path') ILIKE ? ESCAPE '\\')) "

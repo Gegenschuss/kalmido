@@ -271,6 +271,9 @@ def wh_queue(c, w, event, data, actor, via):
     if c.execute("SELECT COUNT(*) FROM webhook_queue WHERE webhook_id=?", (w["id"],)).fetchone()[0] >= WH_QUEUE_MAX:
         wh_log(c, w["id"], "", event, 0, False, None, "dropped", 0)
         return
+    from ..collab.liste2eguard import le2b_list_locked, le2b_mask
+    lid = (data.get("list") or {}).get("id") if isinstance(data, dict) else None
+    data = le2b_mask(c, data, force=le2b_list_locked(c, lid))  # 2.64.1 B (#1817): ids + encrypted: true, no text of a locked list
     delivery = str(uuid.uuid4())
     payload = {"id": delivery, "event": event, "created_at": iso(now_utc()), "webhook_id": w["id"], "actor": actor, "via": via,
                "data": data}
