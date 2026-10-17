@@ -324,7 +324,7 @@ a3 = att(F1)
 check(r.ok and a3["enc"] == 0 and a3["name"] == "contract.pdf" and a3["mime"] == "application/pdf" and a3["gen"] == 0,
       f"decrypting: a plain file again {r.text[:200]} {a3}")
 check(A.get(B + f"/api/attachments/{F1}?dl=1").content == b"%PDF-1.4 the contract", "decrypting: download in plain")
-r = conv(A, P2, b"\x89PNG fake", "photo.png", "bad type<>")
+r = conv(A, P2, b"\x89PNG\r\n\x1a\n fake", "photo.png", "bad type<>")  # vorint: the full PNG signature (2.61.0 takes the type from the content)
 check(r.ok and att(P2)["mime"] == "image/png", f"decrypting: a bad type falls back to the name's type {att(P2)}")
 for (aid,) in dbx("SELECT a.id FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.list_id=? AND a.enc=2", (L,)):
     check(conv(A, aid, b"plain bytes", f"file-{aid}.txt", "text/plain").ok, f"decrypting: {aid}")
