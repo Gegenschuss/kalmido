@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=10
+SHARDS_DEFINED=12
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -898,6 +898,7 @@ fresh; run p260_d_ui node p260_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.60.0 part C: the review step - reviewer, done only after approval, git pull requests count (#1512)
 fresh; run p260_c_api "$PY" p260_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p260_c_ui node p260_c_ui.js "$KALMIDO_TEST_DATA"
+shard 11  # 2.84.0: from the 2.60 B suites on in shard 11 (shard 10 had grown past the 30 min CI job limit)
 # 2.60.0 part B: WIP limits per kanban column (#1510), story points and velocity (#1511)
 fresh; run p260_b_api "$PY" p260_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p260_b_ui node p260_b_ui.js "$KALMIDO_TEST_DATA"
@@ -970,6 +971,7 @@ fresh; run p264b_b_ui node p264b_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p264c_a_api "$PY" p264c_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.64.3 part B: #1817 lock per knowledge space - client (encrypted wiki space in the browser)
 fresh; run p264c_b_ui node p264c_b_ui.js "$KALMIDO_TEST_DATA"
+shard 12  # 2.84.0: from the 2.67 suites on in shard 12 (shard 10 with every suite since 2.53 reached 45 min in a full run)
 # 2.67.0 part A: fixed costs from a spreadsheet in the cash flow, net / gross, the monthly check task (#1838)
 fresh; run p267_a_api "$PY" p267_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p267_a_ui node p267_a_ui.js "$KALMIDO_TEST_DATA"
