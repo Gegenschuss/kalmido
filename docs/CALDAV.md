@@ -61,6 +61,11 @@ Kalmido 2.9.0 is a CalDAV server for tasks. Every list you can see appears as a 
 
 Changes made over CalDAV show "via CalDAV" in the task history. Webhooks and agent events carry `"via": "caldav"`.
 
+**Lists encrypted in the browser** (2.64.1). The server cannot read their texts, so a calendar app sees each task as
+"🔒 Task" with its due date and reminders, without notes or link. Ticking it off and moving the date work; a changed title
+or note from the app is ignored, and new tasks cannot be created in such a list from the app. The same holds for the
+calendar feed (iCal link).
+
 ## Calendar and contacts on the phone
 
 One account brings everything: your task lists (Reminders), your event calendars (Calendar) and your address books
