@@ -852,6 +852,10 @@ published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the co
 `clamav:` block (and the `clamav-db` volume entry) from `docker-compose.yml`, then `docker compose up -d --remove-orphans`.
 Uploads are then taken without a scan and without a mark. An own ClamAV elsewhere: `KALMIDO_CLAMD=host:3310`.
 
+**Photos turned by the camera** are turned upright and saved again when their metadata are removed (see TEAM.md). The
+re-encode holds the whole picture in memory, so it is done only up to `KALMIDO_PHOTO_MAX_PIXELS` pixels (2.81; default
+`40000000`, at least `1000000`); larger photos keep a small orientation mark instead. Lower it on a host with little memory.
+
 ## Documents: text recognition
 
 The area *Documents* (2.48.0) reads the text of uploaded PDFs and images: the text layer of a PDF, and for scans the
