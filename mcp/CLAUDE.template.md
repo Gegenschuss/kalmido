@@ -104,6 +104,10 @@
   completing and subtasks stay free). The lock binds only the app: you can still change a locked task through the API
   (`update_task`; the field `locked` shows the state). Create a task with `locked: false` only when the person should
   edit it freely, and do not lift a lock a person set unless they ask you to.
+- **Dates move the chain (2.67.0).** Postponing a task's due date in a project list with *Move dependent tasks along* on
+  also moves every task waiting on it by the same days (the whole chain; the answer's `chain` / `chain_note` names them,
+  `chain.skipped` what stayed). Mention it when you report the change. Send `shift_chain: false` only when the person
+  wants the waiting tasks to stay.
 - Tick off what you delivered yourself and close the task with a short comment (what was done, where). Before you report
   "done", compare the open points of the task with what you delivered.
 - Write status texts, summaries and questions in plain words that a non-technical person understands.

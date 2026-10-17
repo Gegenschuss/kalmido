@@ -1008,14 +1008,22 @@ def v1_task_update(tid):
     v1_args(())
     c = db()
     _v1_live(c, tid)
-    b = v1_task_in(v1_json())
+    raw = dict(v1_json())
+    sc = raw.pop("shift_chain", True)  # 2.67.0 B (#1865): false = the tasks waiting on it stay where they are
+    if not isinstance(sc, bool):
+        raise BadInput(tr("Invalid value: {0}", "shift_chain"))
+    b = v1_task_in(raw)
     if not b:
         raise BadInput(tr("Nothing to change"))
     if b.get("list_id"):
         from ..agents.safety import move_gate
         move_gate(c, [(tid, b["list_id"])])  # 2.30.0 (#919): an agent moving it to other people waits for approval
-    v1_call(task_update, tid, body=b)
-    return jsonify(v1_one(c, tid))
+    r = v1_call(task_update, tid, body={**b, "shift_chain": sc})
+    out = v1_one(c, tid)
+    ch = (r or {}).get("chain") or {}
+    if ch.get("moved") or ch.get("skipped"):
+        out["chain"] = ch  # 2.67.0 B (#1865): the dependent tasks moved along / left in place
+    return jsonify(out)
 
 
 @app.delete("/api/v1/tasks/<int:tid>")

@@ -38,7 +38,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   const L = async (name, kind = 'project', folder = '') => (await call('POST', '/api/lists', {name, kind, ...(folder ? {folder} : {})})).id;
   const WEB = await L('🌐 Website', 'project', 'Clients'), BRAND = await L('Brand', 'project', 'Clients'), FILM = await L('Film'), SHOP = await L('Groceries', 'list');
   await call('PATCH', '/api/settings', {folders: '["Clients"]'});
-  await call('PATCH', `/api/lists/${WEB}`, {color: '#6d8cff'});
+  await call('PATCH', `/api/lists/${WEB}`, {color: '#6d8cff', dep_shift: false});  // 2.67.0 (#1865): a new project list has "Move dependent tasks along" on
   await call('PUT', `/api/lists/${WEB}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${WEB}/members`, {user_id: CAROL, role: 'view'});
   await call('PUT', `/api/lists/${FILM}/members`, {user_id: BOB, role: 'edit'});
@@ -157,7 +157,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(await until(async () => (await taskOf(w3)).due === ds(33)), 'drop: moved on the server');
   const a1 = await taskOf(w1), a2 = await taskOf(w2), aN = await taskOf(wN);
   check(a1.due === ds(4) && a2.start === ds(5) && a2.due === ds(13) && !aN.due, 'every open dated task +3 days, durations kept, undated untouched');
-  check((await taskOf(f1)).due === ds(20), 'Film has "Move dependent tasks along" off: not moved');
+  check((await taskOf(f1)).due === ds(20), 'Website (the moved list) has "Move dependent tasks along" off: Film not moved');  // 2.67.0 (#1865): the triggering list decides
   check(await until(() => /3 tasks moved/.test(toastText(d)) && d.querySelector('#toast button')), `toast "3 tasks moved" with Undo: ${toastText(d)}`);
   check(calls.filter(c => c[0] === 'POST' && /\/api\/lists\/\d+\/shift/.test(c[1])).length === 1, 'one request for the whole project');
   calls.length = 0;
@@ -165,11 +165,11 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(await until(async () => (await taskOf(w3)).due === before[w3].due && (await taskOf(w2)).start === before[w2].start && (await taskOf(w1)).due === before[w1].due), 'one undo: everything back');
   const wr = calls.filter(c => c[0] !== 'GET' && /\/api\/tasks/.test(c[1]));
   check(wr.length === 1 && /\/api\/tasks\/batch/.test(wr[0][1]), `the undo is one request too: ${JSON.stringify(wr)}`);
-  // with dependents in another list (Film: setting on)
+  // with dependents in other lists (Website: setting on)
   // the undo reloads and redraws after the server answered; on a busy CI runner that can take longer than 4 s, and a drag
   // that starts before it ends races its reload (2.12.1: the drag below then never reached the server)
   check(await until(() => !w.eval('HIST.busy'), 20000), 'the undo has finished (reload + redraw)');
-  await call('PATCH', `/api/lists/${FILM}`, {dep_shift: true});
+  await call('PATCH', `/api/lists/${WEB}`, {dep_shift: true});  // 2.67.0 (#1865): the setting of the moved list counts for the whole chain
   await w.eval('load().then(() => render())');
   await until(() => sum(WEB) && w.eval('!!S.rmV') && !w.eval('HIST.busy'), 8000); await sleep(300);
   calls.length = 0;
@@ -180,7 +180,8 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(await until(async () => (await taskOf(f1)).start === ds(22), 20000), 'dependent task in another list moved along (Shoot waits on Design)');
   await until(async () => (await taskOf(f2)).start === ds(31), 8000);
   const f2x = await taskOf(f2); check(f2x.start === ds(31), `and its own dependent (Cut waits on Shoot): ${f2x.start} ${f2x.due}`);
-  check(await until(() => /3 tasks moved · 2 dependent tasks moved/.test(toastText(d))), `toast names both: ${toastText(d)}`);
+  // 2.67.0 (#1865): the whole chain moves (Moodboard in Brand too, not only the tasks that would start too early)
+  check(await until(() => /3 tasks moved · 3 dependent tasks moved/.test(toastText(d))), `toast names both: ${toastText(d)}`);
   d.querySelector('#toast button').click();
   check(await until(async () => (await taskOf(f1)).start === ds(12) && (await taskOf(f2)).due === ds(28) && (await taskOf(w3)).due === ds(30)), 'one undo takes the dependents back too');
   // a click (no movement) = menu; keyboard

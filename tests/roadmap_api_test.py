@@ -173,8 +173,9 @@ with db() as c:
     check(c.execute("SELECT value FROM settings WHERE key='version'").fetchone()[0] != v0, "version bumped (clients reload)")
     check(c.execute("SELECT COUNT(*) FROM activity WHERE kind='due' AND task_id IN (?,?,?,?)", (w1, w2, w3, w3a)).fetchone()[0] >= 4,
           "an activity line per moved task")
-# dependents in other lists: BRAND waits on w3 (moved to +37). BRAND without dep_shift: stays
-check(row(b1)["due"] == D(40) and j["shifted"] == [], "dependent list without 'Move dependent tasks along': not moved")
+# dependents in other lists: BRAND waits on w3 (moved to +37). 2.67.0 (#1865): WEB (the triggering list, a project list:
+# on by default) decides; bob cannot change BRAND's tasks, so the Moodboard stays
+check(row(b1)["due"] == D(40) and j["shifted"] == [], "dependent task bob cannot change: not moved")
 A.patch(B + f"/api/lists/{BRAND}", json={"dep_shift": True})
 r = A.post(B + f"/api/lists/{WEB}/shift", json={"days": 7}).json()  # w3 due +44 -> Moodboard (starts +35) conflicts -> +7
 check([x["id"] for x in r["shifted"]] == [b1] and row(b1)["due"] == D(47) and row(b1)["start"] == D(42), f"dependent with the setting on: moved by the same delta: {r['shifted']}")
