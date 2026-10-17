@@ -578,7 +578,29 @@ Trust on first use: on every device the first public key seen for a member count
 are compared; a server that hands out a forged key (or a forged list key wrapped with it) before that comparison is not
 noticed by the key check. The browser then counts texts that do not open with the list key it holds and says so
 ("compare the safety numbers") instead of leaving silent placeholders. A member
-who leaves keeps what they saw and, until the rotation of a later version, could decrypt older ciphertexts of a backup
-with their old key; the member dialog says so. Exports keep the ciphertexts; they are readable again only in Kalmido with
+who leaves keeps what they saw; since 2.64.2 the list key changes and the older ciphertexts are encrypted again (below). Exports keep the ciphertexts; they are readable again only in Kalmido with
 a member's passphrase (`tools/kalmido_export_decrypt.py` says so). Going back to a version before 2.64.1 needs every
 lock opened first.
+
+### Lock per list, stage 2 (2.64.2): key change, files, list channel
+
+- **Key change (rotation).** A member who held a key and leaves (also by leaving the organisation) marks the list
+  (`e2e_rotate`). The next owner / list admin whose browser is unlocked creates a new list key, wraps it for every person
+  who still holds one and sends it (`POST /api/lists/<id>/e2e/rotate` `{gen, keys}`; the generation moves up atomically, a
+  second browser that was faster gets 409 `list_e2e_gen`; a person left out, e.g. because of an unconfirmed key change, goes
+  on the waiting list). New texts use the new generation at once; `e2e_reenc` marks the background work: the same `todo` /
+  `bulk` / `finish` steps as switching on re-encrypt texts, files and channel messages of older generations, resumable.
+  Older generations stay with the members (backups, not yet re-encrypted rows); a person released later gets every
+  generation. Until the re-encryption is done the member dialog keeps the honest hint. A waiting person without a key who
+  leaves changes nothing.
+- **Files** (`collab/liste2efile.py`). In a list with the lock attachments of tasks and comments are encrypted with the list
+  key: `KENC\x02 | gen | iv | AES-GCM(list key, AAD kalmido-lfile:v1:<list>:<gen>, header {name, type, size} + bytes)`,
+  `attachments.enc = 2`, the file name as a list ciphertext. Every other way to add a file there is refused; downloads go
+  to people in the web app only (agents and API tokens 404), no text extract, no preview. Switching on, the key change and
+  the way back convert existing files in the browser; files encrypted per person (2.42) stay readable for that person only.
+- **List channel** (`collab/liste2echan.py`). Messages in the team chat of such a list are `tchat_msgs.enc = {v, g, iv, ct}`
+  with the list key (AAD `kalmido-chan:v1:<room>:<gen>:<sender>`, padded like the texts); plain text is refused, the browser
+  names @mentioned members for their push. Agents and API tokens read no text (`encrypted: true`) and cannot write;
+  search and "save as task" skip it. Re-encryption by an admin keeps the original sender in the AAD.
+- **Pushes** of such lists use the neutral word in the recipient's language; a comment push names the list, not the words.
+- **Safety numbers** of all members are reachable from the head of the list channel and of the attachments.

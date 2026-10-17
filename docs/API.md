@@ -334,7 +334,10 @@ dates and status with `"encrypted": true`, never a text; CalDAV and the calendar
 the due date and the reminders (a calendar app cannot change the texts or create tasks there, `403`); pushes, the daily mail,
 the status report and News name the list instead of a task; the server search and the message search leave it out (the app
 searches it on the device). Exports keep the ciphertexts as they are (values starting with `e2e1:`); they can only be read in
-Kalmido with a member's own passphrase. Templates (private copies of a person) made before the switch are kept.
+Kalmido with a member's own passphrase. Templates (private copies of a person) made before the switch are kept. Since 2.64.2 the
+files of such a list and the messages of its team chat are encrypted too: the API lists those files with `"encrypted": true`
+and no name (download `404`), team chat messages come with an empty `body`, `"enc": null` and `"encrypted": true`, and
+posting, editing or reacting there answers `403` with `"code": "list_e2e"`.
 
 **Locked tasks** (2.36.0): `locked: true` makes a task read-only **in the app**: title, notes, date and time,
 priority, list, tags, repeat and assignee stay as they are until someone who may change the task unlocks it there
