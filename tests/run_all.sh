@@ -1064,13 +1064,17 @@ fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_c_api "$PY" p286_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_d_api "$PY" p286_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_e_api "$PY" p286_e_api_test.py "$KALMIDO_TEST_DATA"
+# 2.87.9 part D (#1965): drags run once per frame, stored on release
 fresh; run p287b_d_ui node p287b_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.87.9 part A (#1919 / #1918): every area as a person without an organisation (the freelancer parity sweep)
 fresh; run p287b_a_freelancer_api "$PY" p287b_a_freelancer_api_test.py "$KALMIDO_TEST_DATA"
 # 2.87.9 part A (#1913): an organisation's own picture as its symbol (admins set it, members get it, sealed)
 fresh; run p287b_a_api "$PY" p287b_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.87.9 part B (#1940 #1938 #1936 #1935 #1934): import target confirmation, Paperless in the settings, search
 fresh; run p287b_b_api "$PY" p287b_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p287b_b_ui node p287b_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.87.9 part E (#1914 #1920 #1909 #1933 #1937 #1952 #1963): polish
+fresh; run p287b_e_ui node p287b_e_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
