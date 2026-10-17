@@ -164,7 +164,9 @@ def pl_token(c, r):
 
 def pl_mapping(c, r):
     m = S._jopen(c, r["ws"], "pl_sources.mapping", r["mapping"], {}) if r and r["mapping"] else {}
-    return {k: (m.get(k) if isinstance(m.get(k), dict) else {}) for k in ("tags", "senders", "types")}
+    out = {k: (m.get(k) if isinstance(m.get(k), dict) else {}) for k in ("tags", "senders", "types")}
+    out["rules"] = m.get("rules", True) is not False  # 2.69.0 B (#1847): take over Paperless' matching rules
+    return out
 
 
 # ---- HTTP ---------------------------------------------------------------------------------------------------------------
@@ -235,7 +237,8 @@ def pl_check(c, url, token):
 
 
 def pl_labels(c, url, token, kind):
-    """All tags / correspondents / document_types: [{id, name, count}]."""
+    """All tags / correspondents / document_types: [{id, name, count, match, algo, insens}] (2.69.0 B (#1847): + the matching:
+    pattern, matching_algorithm, is_insensitive -- see learn.py)."""
     out, page = [], 1
     while page <= PL_LABEL_PAGES:
         j = pl_get(c, url, token, f"/api/{kind}/?page_size=100&page={page}")
@@ -244,11 +247,19 @@ def pl_labels(c, url, token, kind):
         for x in j["results"]:
             if isinstance(x, dict) and isinstance(x.get("id"), int):
                 out.append({"id": x["id"], "name": str(x.get("name") or "")[:S.NAME_MAX],
-                            "count": int(x.get("document_count") or 0) if str(x.get("document_count") or "0").isdigit() else 0})
+                            "count": int(x.get("document_count") or 0) if str(x.get("document_count") or "0").isdigit() else 0,
+                            **pl_label_match(x)})
         if not j.get("next"):
             break
         page += 1
     return out
+
+
+def pl_label_match(x):
+    """2.69.0 B (#1847): {match, algo, insens} of a Paperless-ngx label (API answer or export record)."""
+    algo = x.get("matching_algorithm")
+    return {"match": str(x.get("match") or "")[:1000], "algo": algo if isinstance(algo, int) and not isinstance(algo, bool) else 0,
+            "insens": x.get("is_insensitive") is not False}
 
 
 def pl_fields(c, url, token):
@@ -311,14 +322,18 @@ def pl_preview(c, r):
             else:
                 rows.append({**x, "to": "skip" if m == "" else "keep", "target": (m if isinstance(m, str) and m else x["name"])[:S.NAME_MAX]})
         out[key] = rows
+    from .learn import pll_rules_preview  # 2.69.0 B (#1847): which matching rules come along
+    out["rules"] = pll_rules_preview({k: out[key] for k, key in (("tags", "tags"), ("correspondents", "senders"), ("document_types", "types"))},
+                                     mp, c, r["ws"], pl_src(url))
     return out
 
 
 def pl_clean_mapping(d):
     """{tags: {id: {to, name}}, senders: {id: name|''}, types: {id: name|''}} from the app (unknown parts dropped)."""
-    out = {"tags": {}, "senders": {}, "types": {}}
+    out = {"tags": {}, "senders": {}, "types": {}, "rules": True}
     if not isinstance(d, dict):
         return out
+    out["rules"] = d.get("rules") is not False  # 2.69.0 B (#1847)
     for k, v in (d.get("tags") or {}).items() if isinstance(d.get("tags"), dict) else ():
         if str(k).isdigit() and isinstance(v, dict) and v.get("to") in ("tag", "folder", "skip"):
             out["tags"][str(k)] = {"to": v["to"], "name": str(v.get("name") or "").strip()[:S.NAME_MAX]}
@@ -454,8 +469,10 @@ def pl_run(c, sid):
         return
     tok = pl_token(c, r)
     counts = {"new": 0, "skip": 0, "dup": 0, "fail": 0, "done": 0}
+    since, full = _now(), None  # 2.69.0 B (#1847): learn.py takes the documents of this run at its end
     try:
-        labels = {k: {x["id"]: x["name"] for x in pl_labels(c, r["url"], tok, k)} for k in ("tags", "correspondents", "document_types")}
+        full = {k: pl_labels(c, r["url"], tok, k) for k in ("tags", "correspondents", "document_types")}
+        labels = {k: {x["id"]: x["name"] for x in full[k]} for k in full}
         fields = pl_fields(c, r["url"], tok)
         order = "id" if r["run_kind"] == "all" else "-id"
         page, stop = 1, False
@@ -500,6 +517,11 @@ def pl_run(c, sid):
     except PlError as e:
         c.rollback()
         _set(c, sid, run_state="", run_error=e.stored(), error=e.stored(), synced_at=_now())
+    if full is not None:  # 2.69.0 B (#1847): rules + learning once per run, also after a stop / a full storage
+        from .learn import pll_finish
+        res = pll_finish(c, r["ws"], r["org_id"], uid, pl_src(r["url"]), since, full, pl_mapping(c, r))
+        if r["run_kind"] == "all":  # the app shows the summary of a full import; a follow-up run keeps it
+            _set(c, sid, run_learn=json.dumps(res, ensure_ascii=False, separators=(",", ":")) if res else "")
     c.commit()
 
 

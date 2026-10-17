@@ -45,6 +45,7 @@ function pl_html() {
       ${can && r.state !== 'stop' ? `<button type="button" class="btn sm" data-pl="stop">${tr('Stop')}</button>` : ''}</div>`;
   } else if (r.kind === 'all' && r.done) {
     h += `<p class="muted">${tr('Last import: {0} new, {1} already there, {2} failed', r.new, r.skipped, r.failed)}</p>`;
+    h += pll_line(r.learn);  // 2.69.0 B (#1847)
   }
   if (can) {
     h += `<label class="chkl"><input type="checkbox" data-pl="follow" ${c.follow ? 'checked' : ''}> ${tr('Bring in new documents automatically')}</label>
@@ -73,7 +74,7 @@ async function pl_preview() {
   const left = Math.max(0, p.count - p.already);
   $('.pl-pbody', md).innerHTML = `<p>${tr('{0} documents in Paperless-ngx', p.count)}${p.already ? ` · ${tr('{0} already imported', p.already)}` : ''}</p>
     <p class="muted">${tr('Each document comes with its file, text, date and notes. Documents that are already here are left out.')}</p>
-    ${sec(tr('Tags'), p.tags.map(tagRow))}${sec(tr('Correspondents → senders'), p.senders.map(t => labRow('senders', t)))}${sec(tr('Document types'), p.types.map(t => labRow('types', t)))}
+    ${sec(tr('Tags'), p.tags.map(tagRow))}${sec(tr('Correspondents → senders'), p.senders.map(t => labRow('senders', t)))}${sec(tr('Document types'), p.types.map(t => labRow('types', t)))}${pll_preview_html(p)}
     <div class="foot"><button type="button" class="btn" data-plp="close">${tr('Cancel')}</button><span class="spacer"></span><button type="button" class="btn pri" data-plp="start" ${left ? '' : 'disabled'}>${tr('Import {0} documents', left)}</button></div>`;
   md.addEventListener('change', e => {
     const s = e.target.closest('select[data-plk]'); if (!s) return;
@@ -82,7 +83,7 @@ async function pl_preview() {
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-plp]'); if (!b) return;
     if (b.dataset.plp === 'close') { md.remove(); return; }
-    const mapping = {tags: {}, senders: {}, types: {}};
+    const mapping = {tags: {}, senders: {}, types: {}, rules: $('#pll-rules', md) ? $('#pll-rules', md).checked : true};  // 2.69.0 B (#1847)
     $$('.pl-map', md).forEach(li => {
       const s = $('select', li), name = $('[data-pln]', li).value.trim(), k = s.dataset.plk, id = li.dataset.id;
       if (k === 'tags') mapping.tags[id] = {to: s.value, name};
@@ -125,3 +126,27 @@ document.addEventListener('change', async e => {
     histToast(tr('Changed setting: {0}', tr('How often')), histAdd({label: tr('Changed setting: {0}', tr('How often')), sett: true, undo: set(from), redo: set(to)}));
   }
 });
+
+// 2.69.0 B (#1847): the matching rules of Paperless-ngx in the preview (a switch, on by default) and what the last import learnt
+function pll_preview_html(p) {
+  const r = p && p.rules; if (!r) return '';
+  const n = r.convert || 0, bad = r.unsupported || [];
+  if (!n && !r.dup && !r.auto && !bad.length) return '';
+  const WHY = {long: N_('pattern too long'), pattern: N_('pattern too complex'), unknown: N_('unknown kind'), limit: N_('rule limit reached')};
+  let h = `<div class="pll-rules">`;
+  if (n) h += `<label class="chkl"><input type="checkbox" id="pll-rules" ${r.on === false ? '' : 'checked'}> ${tr('Take over the matching rules from Paperless-ngx ({0})', n)}</label>`;
+  const notes = [];
+  if (r.dup) notes.push(tr('{0} rules are already here', r.dup));
+  if (r.auto) notes.push(tr('{0} use “Auto” in Paperless-ngx: Kalmido learns them from the imported documents', r.auto));
+  if (notes.length) h += `<p class="muted">${esc(notes.join(' · '))}</p>`;
+  if (bad.length) h += `<details class="pll-bad"><summary class="muted">${tr('{0} rules cannot be taken over', r.unsupported_n || bad.length)}</summary><ul>${bad.map(b => `<li>${esc(b.name)} <span class="muted">${esc(tr(WHY[b.why] || b.why))}</span></li>`).join('')}</ul></details>`;
+  return h + '</div>';
+}
+function pll_line(l) {
+  if (!l) return '';
+  const parts = [];
+  if (l.trained) parts.push(tr('learnt from {0} documents', l.trained));
+  if (l.rules_new) parts.push(tr('{0} rules taken over', l.rules_new));
+  if (l.unsupported_n) parts.push(tr('{0} rules not taken over', l.unsupported_n));
+  return parts.length ? `<p class="muted pll-line">${esc(parts.join(' · '))}</p>` : '';
+}

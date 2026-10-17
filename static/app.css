@@ -7687,3 +7687,8 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+
+/* 2.69.0 B (#1847) Paperless-ngx: matching rules in the import preview */
+.pll-rules{margin:.75rem 0 0}
+.pll-rules .muted{margin:.25rem 0 0}
+.pll-bad ul{margin:.25rem 0 0 1rem;padding:0}

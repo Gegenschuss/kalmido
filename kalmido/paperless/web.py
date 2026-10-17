@@ -3,6 +3,8 @@
 Self-hosted servers only: on a hosted server every route answers 404. ?ws / {ws} = 'private' | 'org:<id>' like the
 documents settings; setting up, importing and stopping need the right to manage that workspace (an organisation's admin,
 the person themself for their own space). Agents have no connection."""
+import json
+
 from flask import jsonify, request
 
 from ..core.config import app
@@ -38,6 +40,10 @@ def _public(c, ws, uid, org):
         return out
     run = {"state": r["run_state"] or "idle", "kind": r["run_kind"], "total": r["run_total"], "done": r["run_done"], "new": r["run_new"],
            "skipped": r["run_skip"], "failed": r["run_fail"], "error": r["run_error"], "error_text": P.pl_err_text(r["run_error"])}
+    try:  # 2.69.0 B (#1847): what the last run learnt (rules taken over, documents trained)
+        run["learn"] = json.loads(r["run_learn"]) if r["run_learn"] else None
+    except ValueError:
+        run["learn"] = None
     out["conn"] = {"url": r["url"], "token_set": bool(r["token"]), "follow": bool(r["follow"]), "every_min": r["every_min"],
                    "synced_at": r["synced_at"], "error": r["error"], "error_text": P.pl_err_text(r["error"]), "run": run}
     return out

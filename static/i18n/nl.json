@@ -8208,5 +8208,17 @@
   "Back to the whole chat": "Terug naar de hele chat",
   "Job has ended": "Job is beëindigd",
   "The job reads it after its next step.": "De job leest het na zijn volgende stap.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)",
+  "case-sensitive": "hoofdlettergevoelig",
+  "Take over the matching rules from Paperless-ngx ({0})": "Toewijzingsregels uit Paperless-ngx overnemen ({0})",
+  "{0} rules are already here": "{0} regels zijn er al",
+  "{0} use “Auto” in Paperless-ngx: Kalmido learns them from the imported documents": "{0} gebruiken „Automatisch” in Paperless-ngx: Kalmido leert ze uit de geïmporteerde documenten",
+  "{0} rules cannot be taken over": "{0} regels kunnen niet worden overgenomen",
+  "pattern too long": "patroon te lang",
+  "pattern too complex": "patroon te complex",
+  "unknown kind": "onbekend soort",
+  "rule limit reached": "maximum aantal regels bereikt",
+  "learnt from {0} documents": "geleerd van {0} documenten",
+  "{0} rules taken over": "{0} regels overgenomen",
+  "{0} rules not taken over": "{0} regels niet overgenomen"
 }

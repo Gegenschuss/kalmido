@@ -8208,5 +8208,17 @@
   "Back to the whole chat": "Zurück zum ganzen Chat",
   "Job has ended": "Job ist beendet",
   "The job reads it after its next step.": "Der Job liest sie nach seinem nächsten Schritt.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "Der Agent bekommt diese Nachricht gerade nicht (pausiert, oder die Liste des Jobs ist nicht mit ihm geteilt)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "Der Agent bekommt diese Nachricht gerade nicht (pausiert, oder die Liste des Jobs ist nicht mit ihm geteilt)",
+  "case-sensitive": "Groß-/Kleinschreibung beachten",
+  "Take over the matching rules from Paperless-ngx ({0})": "Zuordnungsregeln aus Paperless-ngx übernehmen ({0})",
+  "{0} rules are already here": "{0} Regeln sind schon da",
+  "{0} use “Auto” in Paperless-ngx: Kalmido learns them from the imported documents": "{0} nutzen in Paperless-ngx „Automatisch“: Kalmido lernt sie aus den importierten Dokumenten",
+  "{0} rules cannot be taken over": "{0} Regeln lassen sich nicht übernehmen",
+  "pattern too long": "Muster zu lang",
+  "pattern too complex": "Muster zu komplex",
+  "unknown kind": "unbekannte Art",
+  "rule limit reached": "Höchstzahl an Regeln erreicht",
+  "learnt from {0} documents": "aus {0} Dokumenten gelernt",
+  "{0} rules taken over": "{0} Regeln übernommen",
+  "{0} rules not taken over": "{0} Regeln nicht übernommen"
 }
