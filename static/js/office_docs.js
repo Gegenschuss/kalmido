@@ -44,11 +44,16 @@ async function ofdLoadDoc(id, force) {
   catch (x) { OFD.doc = null; OFD.err = x.message || tr('unknown'); }
   OFD.docLoading = false;
   ofdDraw();
-  fx8a_clientsFresh();
+  fx8a_clientsFresh(force);
 }
 // 2.80.0 (#1842): the client list of the state is read again when a document opens; only a changed list redraws
-async function fx8a_clientsFresh() {
+// (review: the list with its statistics is heavy -- asked only when forced, when the office has no client yet or after a minute)
+let fx8a_clAt = 0;
+async function fx8a_clientsFresh(force) {
   if (typeof clientsOn !== 'function' || !clientsOn()) return;
+  const none = !(S.clients || []).some(c => !c.archived && (c.org_id || null) === pb_clOrg());
+  if (!force && !none && Date.now() - fx8a_clAt < 6e4) return;
+  fx8a_clAt = Date.now();
   try {
     const j = await api('GET', '/api/clients'), sig = a => a.filter(c => !c.archived).map(c => `${c.id}:${c.name}:${c.org_id || ''}`).sort().join('|');
     if (sig(j.clients || []) !== sig(S.clients || [])) { await load(); ofdDraw(); }

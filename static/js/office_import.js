@@ -16,8 +16,11 @@ async function oimLoad() {
 }
 // 2.80.0 (#1836): the client choice is read again on every visit of the import page and whenever the clients change
 // (core.js), not only once per page load -- a client created meanwhile was missing until a reload
-async function fx8a_oimClients() {
-  try { const j = await api('GET', '/api/clients'); OIM.clients = (j.clients || []).filter(c => !c.archived && (c.org_id || null) === pb_clOrg()); } catch { OIM.clients = []; }
+// (review: a state refresh takes the clients of the state, no extra request; a visit of the page asks the server)
+async function fx8a_oimClients(fromState) {
+  const mine = a => (a || []).filter(c => !c.archived && (c.org_id || null) === pb_clOrg());
+  if (fromState) OIM.clients = mine(S.clients);
+  else try { const j = await api('GET', '/api/clients'); OIM.clients = mine(j.clients); } catch { OIM.clients = []; }
   ofcDraw();
 }
 window.addEventListener('hashchange', () => { if (/^#office\/import\b/.test(location.hash) && OIM.runs !== null) fx8a_oimClients(); });
