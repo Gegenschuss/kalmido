@@ -9,7 +9,7 @@ Invented names only, generated file contents.
  - following: new documents come in by themselves; Kalmido only ever sends GET
  - rights: organisation admins only (members see, cannot change), no agents, not across workspaces; a person without an
    organisation for their own space
- - a hosted server: every route 404
+ - a hosted server: 2.69.0 (#1846) the connection is there, public HTTPS only (more in p269_a_api_test.py)
  - 2.56.4 (#1859): the API version is negotiated (Paperless-ngx 3.x: only 9 / 10, 406 on 5; an old server: only up to 5;
    none in common: a readable reason), custom fields of API 7+ (select option ids, amounts, yes / no, document links) and of
    before (select option index) as text
@@ -323,13 +323,13 @@ ag.headers.update({**H, "Authorization": "Bearer " + AGT})
 check(ag.get(B + "/api/paperless?ws=private").status_code in (401, 403, 404), "an agent has no connection")
 check(Er.delete(B + "/api/paperless?ws=private").json().get("conn") is None, "disconnect")
 
-# ---- a hosted server: nothing
+# ---- a hosted server: 2.69.0 (#1846): the connection is there too, but only for public HTTPS addresses (p269_a_api_test.py)
 subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL,
                env={**env, "KEEP": "1", "EXTRA": env["EXTRA"] + " -e KALMIDO_HOSTED=1 -e KALMIDO_SECRET_KEY=" + "A" * 43 + "="})
 A = sess("alice")
-check(A.get(B + "/api/paperless?ws=private").status_code == 404, "hosted: GET 404")
-check(A.put(B + "/api/paperless", json={"ws": "private", "url": PL, "token": "pl-secret"}).status_code == 404, "hosted: PUT 404")
-check(A.post(B + "/api/paperless/import", json={"ws": "private"}).status_code == 404, "hosted: import 404")
+check(A.get(B + "/api/paperless?ws=private").json().get("available") is True, "hosted: available (2.69.0)")
+r = A.put(B + "/api/paperless", json={"ws": "private", "url": PL, "token": "pl-secret"})
+check(r.status_code == 400 and "public HTTPS" in r.json().get("error", ""), f"hosted: an http:// address refused (2.69.0) ({r.status_code} {r.text[:200]})")
 
 # ---- 2.48.0 review (S2): without a server key the token is not stored at all
 subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL, env={**env, "KEEP": "1", "EXTRA": BASE_EXTRA})

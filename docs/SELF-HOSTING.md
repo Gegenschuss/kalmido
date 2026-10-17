@@ -643,7 +643,7 @@ documents.
 
 ### Import from Paperless-ngx (2.48)
 
-Only on a self-hosted server (a hosted server shows nothing of it): an existing Paperless-ngx instance can be connected
+An existing Paperless-ngx instance can be connected (2.69: also on a hosted server, see below)
 once per workspace -- by an organisation's admin for the organisation, by a person for their own space -- under
 *Documents > Settings > Paperless-ngx* with its address and an API token (Paperless-ngx: *My profile > API auth token*).
 
@@ -662,6 +662,38 @@ once per workspace -- by an organisation's admin for the organisation, by a pers
   `KALMIDO_CALENDAR_ALLOW_HOSTS=paperless.example.com:8000`), the same allow-list as for calendar subscriptions.
 - The token is always stored sealed with a key derived from `KALMIDO_SECRET_KEY` (also when the encryption of
   organisation data is off) and never shown again. Without a server key the connection cannot be set up.
+- **Hosted servers (2.69, `KALMIDO_HOSTED=1`):** only public HTTPS addresses; the list of allowed internal hosts does not
+  apply there (http://, loopback, private, link-local and similar addresses are refused, also after a DNS lookup).
+- **Storage quota (2.69):** the preview shows how much storage the documents need (over the address an estimate from a
+  sample of up to 10 documents, from a ZIP the exact size) and how much is free. A full storage refuses the start; when it
+  fills up during the run, the import stops after the last document that fitted and says how far it came.
+- **One import at a time (2.69):** a server runs one Paperless-ngx import at a time (over all processes); further ones wait
+  in a queue and the settings show their place. A run that was cut off (restart) goes back to the queue after 10 minutes.
+
+#### From an export ZIP (2.69)
+
+For a Paperless-ngx that Kalmido cannot reach (a VPN, a Tailnet, a login in front of it) the documents can come from an
+export instead -- on hosted and self-hosted servers, without a connection or token. Create the export on the Paperless-ngx
+server (in its Docker setup with `docker compose exec webserver ...`):
+
+```bash
+document_exporter ../export --zip
+```
+
+Then upload the ZIP under *Documents > Settings > Paperless-ngx > From a Paperless-ngx export (ZIP)*. The same preview
+follows (tags, correspondents, document types with their mapping), then the import in the background. Exports with
+`--split-manifest`, `--use-folder-prefix` and ZIPs with everything in one top folder work as well.
+
+- The upload goes in parts of 8 MB (an interrupted upload continues when the same file is chosen again), at most
+  `KALMIDO_PAPERLESS_ZIP_MAX_MB` (default 4096) per ZIP. It belongs to the workspace and the person who uploaded it.
+- The parts are stored sealed (the workspace's key) in `KALMIDO_PAPERLESS_ZIP_DIR` (default `paperless-zip` next to the
+  database file in the data folder), not in the backups, and are deleted right after the run (done, stopped, failed) or
+  when the upload is discarded; uploads without a run are removed after 24 hours.
+- The ZIP is never unpacked onto the disk: only the manifest and the files it names are read. Encrypted ZIPs, too many
+  entries, a manifest above 64 MB, a file above `TASKS_MAX_FILE_MB` and files that unpack to far more than their size
+  (zip bombs) are refused.
+- Never twice: a document of an earlier ZIP import with the same id and the same file, or the same file already in the
+  workspace, is left out.
 
 ### Newsletter: listmonk, Brevo, CleverReach (2.55)
 
