@@ -550,7 +550,9 @@ organisation data that is not yours (use the organisation export for a whole org
 - `data/<table>.json`: one JSON array per table (the tables of *Download JSON*, plus `list_tags`, `task_list_tags`,
   `people` -- the members of your lists with name and `email_hash` --, `shared_lists` (the owner as
   `owner_email_hash`), `shared_comments`,
-  `server_links` without their access keys).
+  `server_links` without their access keys). Webhooks appear only with name, events and `url_hint` (scheme and
+  host; the address itself is the secret of many chat services), settings without the server-side ones (such as the
+  ntfy topic an admin set).
 - `files/attachments/`, `files/list_files/`: the files (decrypted).
 - `checksum.sha256`: check the file with `sha256sum -c checksum.sha256` after unpacking.
 

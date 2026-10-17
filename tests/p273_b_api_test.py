@@ -226,6 +226,10 @@ check(requests.post(B + P, headers=AGH).status_code in (401, 403) and requests.g
 check(requests.post(B + "/api/account/import", headers=AGH, json={"size": 100}).status_code in (401, 403), "agent token: no import")
 check(requests.get(B + "/api/v1/account/export", headers=AGH).status_code in (403, 404, 405), "nothing of it in the agent API")
 check(A.get(B + P).json().get("state") == "none", "no export yet")
+# 2.73.0 (#1473) review N5: a webhook address and a server-only setting
+WHU = "https://hooks.example.com/services/T000/Geheimpfad0815"
+check(A.post(B + "/api/me/webhooks", json={"name": "Umzug Hook", "url": WHU, "events": ["task.created"]}).status_code == 201, "N5: webhook")
+check(A.patch(B + f"/api/users/{ALICE}", json={"ntfy_topic": "umzugtopic4711"}).ok, "N5: ntfy topic (admin)")
 EXP = export_of(A)
 check(Bo.get(B + P + "/file").status_code == 404, "bob cannot download (he has none, alice's is not his)")
 ad = os.path.join(DATA, "exports", "account", str(ALICE))
@@ -262,9 +266,14 @@ check(not any(z.read(n)[:6] == b"KENC1\n" for n in names if n.startswith("files/
 leak = sorted({k for rows in D.values() for row in rows if isinstance(row, dict) for k in row if k in SECRET})
 check(not leak, f"no secret columns: {leak}")
 check(ag["token"].encode() not in EXP, "the agent token is not in the file")
+check(not any(x.get("key") in ("ntfy_topic", "onboard", "digest_sent") for x in D["settings"]) and b"umzugtopic4711" not in z.read("data/settings.json"),
+      "N5: no server-only settings")
+check(any(x.get("url_hint") == "https://hooks.example.com/…" and "url" not in x for x in D["webhooks"]) and
+      not any(b"Geheimpfad0815" in z.read(n) for n in names if not n.startswith("files/")), "N5: the webhook only as url_hint")
 EJ = A.get(B + "/api/export.json").json()
 check({"lists", "tasks", "comments", "attachments", "settings", "events", "contacts", "user"} <= set(EJ) and
-      len(EJ["tasks"]) == len(D["tasks"]) and "shared_lists" not in EJ, "GET /api/export.json unchanged")
+      len(EJ["tasks"]) == len(D["tasks"]) and "shared_lists" not in EJ and any(x.get("url") == WHU for x in EJ.get("webhooks", [])),
+      "GET /api/export.json unchanged")
 check(A.delete(B + P).ok and A.get(B + P).json()["state"] == "none" and not os.path.isdir(ad), "delete the export now")
 EXP = export_of(A)  # again for the imports
 
