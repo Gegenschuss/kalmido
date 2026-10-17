@@ -1071,6 +1071,8 @@ fresh; run p286_d_api "$PY" p286_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_e_api "$PY" p286_e_api_test.py "$KALMIDO_TEST_DATA"
 # 2.66.1 part B: the workspace switch reloads every open view with a workspace link (#1945), the guard list of those views
 fresh; run p2661_b_ui node p2661_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.87.0 (#1983 #1984): organisation boundary of event invitations and list hand-overs (audit T3 H1 + H2)
+fresh; run p287_a_api "$PY" p287_a_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
