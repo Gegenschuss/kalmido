@@ -105,6 +105,9 @@ KINDS = {
     # 2.50.0 A (#1195, #1194): absences and bookings of an organisation / a personal area (row-level security + the app)
     "hub": ("matrix", "p250_a_api_test.py: absences and bookings by id of another organisation 404 (read, change, delete, restore), "
                       "the kind of an absence only for the person and the admins, resources of another organisation cannot be booked"),
+    # 2.72.0 (#1333): the household budget
+    "budget": ("matrix", "p272_a_budget_api_test.py: categories, entries, templates, contracts, import and receipts by id of another "
+                         "person's budget 404, read-only shared = no change, agents / tokens without the scope private never"),
 }
 
 ROUTES = {
@@ -593,6 +596,15 @@ ROUTES = {
     "GET /api/newsletter": "newsletter", "PUT /api/newsletter": "newsletter", "DELETE /api/newsletter": "newsletter",
     "GET /api/newsletter/lists": "newsletter", "POST /api/newsletter/segments": "newsletter", "PATCH /api/newsletter/segments/{}": "newsletter",
     "DELETE /api/newsletter/segments/{}": "newsletter", "POST /api/newsletter/sync": "newsletter", "PUT /api/newsletter/consent": "newsletter",
+    # 2.72.0 (#1333): the household budget (a list of kind budget; p272_a_budget_api_test.py)
+    "GET /api/budget": "budget", "POST /api/budget/lists": "budget", "GET /api/budget/{}": "budget",
+    "POST /api/budget/{}/cats": "budget", "PATCH /api/budget/cats/{}": "budget", "DELETE /api/budget/cats/{}": "budget",
+    "POST /api/budget/{}/entries": "budget", "PATCH /api/budget/entries/{}": "budget", "DELETE /api/budget/entries/{}": "budget",
+    "GET /api/budget/{}/recurring": "budget", "POST /api/budget/{}/recurring": "budget", "PATCH /api/budget/recurring/{}": "budget",
+    "DELETE /api/budget/recurring/{}": "budget", "POST /api/budget/recurring/{}/book": "budget",
+    "GET /api/budget/{}/contracts": "budget", "POST /api/budget/{}/contracts": "budget",
+    "POST /api/budget/{}/import/parse": "budget", "POST /api/budget/{}/import/commit": "budget",
+    "POST /api/budget/entries/{}/files": "budget", "GET /api/budget/files/{}": "budget", "DELETE /api/budget/files/{}": "budget",
 }
 
 # ---- 1. every route is classified, nothing stale

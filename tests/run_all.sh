@@ -865,6 +865,8 @@ fresh; run p256_a_api "$PY" p256_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p256_a_ui node p256_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.64.0: #1864 private files encrypted at rest (account keys), own container with KALMIDO_SECRET_KEY
 fresh; run p264_api "$PY" p264_api_test.py "$KALMIDO_TEST_DATA"
+# 2.72.0 part A: #1333 the household budget (server), own container with KALMIDO_SECRET_KEY
+fresh; run p272_a_budget_api "$PY" p272_a_budget_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
