@@ -624,6 +624,7 @@ function settingsModal(focus) {
       <div class="members" id="s-imp-hist"></div>
       <h4>${tr('Export')}</h4>
       <div class="row"><label>${tr('Export')}</label><a class="btn sm" href="/api/export.json" download>${ic('download', 's')} ${tr('Download JSON')}</a></div>
+      ${typeof umzHtml === 'function' ? umzHtml(hint) : ''}
       <h4 id="s-tpl-h">${tr('Templates')}</h4>
       ${hint(tr('Private to you. Save a task (with subtasks) from its menu (…) or a list from the list dialog; use them from the template button in the add bar or under Lists > +. Dates are kept as “days after use”.'))}
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
@@ -964,6 +965,7 @@ function settingsModal(focus) {
     }
   });
   impInit(md);
+  if (typeof umzInit === 'function') umzInit(md);  // 2.73.0 B (#1473): move / export everything (move.js)
   return md;
 }
 // ---- Settings > Data > Import (package C): pick the source, choose a file, preview (dry run on the server), import, undo

@@ -1512,6 +1512,9 @@ def imp_undo(c, uid, iid):
         raise Denied(409, tr("This import was already undone"))
     if (now_utc() - parse_iso(r["created_at"])).total_seconds() > IMPORT_UNDO_HOURS * 3600:
         raise Denied(409, tr("An import can only be undone within {0} hours", IMPORT_UNDO_HOURS))
+    if r["source"] == "Kalmido":  # 2.73.0 B (#1473): an account import undoes everything it created
+        from ..admin.acctimport import umz_undo
+        return umz_undo(c, uid, r)
     cr = json.loads(r["created"] or "{}")
     ids = [int(x) for x in cr.get("tasks") or []]
     mine = []

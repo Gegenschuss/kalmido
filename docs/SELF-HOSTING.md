@@ -19,6 +19,7 @@ addresses and paths to your setup.
 - [Backup and encryption](#backup-and-encryption)
 - [Encryption of organisation data](#encryption-of-organisation-data)
 - [Organisation export](#organisation-export)
+- [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom)
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
 - [Mail](#mail)
@@ -504,7 +505,68 @@ and download is written to the office log (who, when, size).
   manifest.
 - **Without `KALMIDO_SECRET_KEY`** the organisation data is not encrypted and the export is refused: set the server key
   first (see the section on the encryption of the organisation data).
-- **Import** of such an archive into another Kalmido follows in a later version.
+- **Import** (2.73, stage 1): see [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom) -- an admin of an
+  organisation on the other server uploads the archive under *Settings > Data* and opens it with the recovery key.
+
+## Moving from and to app.kalmido.com
+
+Since 2.73 every person can take their own data from one Kalmido server to another -- from the hosted app.kalmido.com
+to an own server, back, or between two own servers -- and keep the same file as their copy of their data (GDPR Art. 15
+and 20). Agents and API tokens cannot do this; it is a person's step in the app.
+
+1. **Export.** *Settings > Data > Move and export everything > Export everything.* The server builds one ZIP file in the
+   background and keeps it for 24 hours (`exports/account/` in the data folder, not part of the backups, sealed with a
+   key derived from `KALMIDO_SECRET_KEY` and readable only by the server, mode 0600); *Download* gives you the plain ZIP,
+   *Delete now* removes it at once.
+2. **Set up the other server** (this guide) and sign in there (or ask its admin for an account).
+3. **Import.** *Settings > Data > Take over from a Kalmido export*: the file is uploaded in pieces (large exports work),
+   checked (every checksum, format and version) and shown as a preview: the counts, the lists with their folders, the
+   people of your lists and whether an account with the same e-mail address exists here. Choose the target -- your
+   private space or an organisation you administer -- and start. Everything is created anew; one *Undo* (24 hours)
+   removes everything the import created.
+4. **People.** Your lists are shared with a person found by e-mail only when you tick them in the preview (an address on
+   another server can belong to somebody else here). A server admin can also invite people that are missing (an
+   account with an invitation link by e-mail); everybody else invites them later as usual. Assignments to people that
+   are not taken over stay empty; comments of such people keep their name.
+
+**What moves:** your lists (sections, fields, tags, status updates, links, milestones, project files), their tasks with
+subtasks, dependencies, field values and your tags, comments, attachments, time entries, habits, filters, templates,
+your own calendars with events, your own address books with contacts, the journal and a few plain settings (language,
+work hours, display options, the folder order). Browser-encrypted content (locked notes, encrypted files) stays
+encrypted and opens with your passwords as before.
+
+**What does not move:** passwords, passkeys, two-factor settings, sessions, API tokens, webhooks, push subscriptions,
+access data of connections (calendar and address book subscriptions, Karakeep, newsletter, Git, other Kalmido servers:
+set them up again), lists of other people (the file names them and contains your own comments there), the trash, and
+organisation data that is not yours (use the organisation export for a whole organisation).
+
+**The file** (`kalmido-account-<date>.zip`, readable without Kalmido):
+
+- `manifest.json`: `format` (`kalmido-account`), `v` (1), Kalmido version, `created_at`, `source` (`url`, `hosted`),
+  `user` (id, name, e-mail), `tables` (rows per table), `files` (path, size, SHA-256 of every part), `client_encrypted`,
+  `export_id` (an import of the same file twice is pointed out), `not_included`.
+- `data/<table>.json`: one JSON array per table (the tables of *Download JSON*, plus `list_tags`, `task_list_tags`,
+  `people` -- the members of your lists with name and e-mail address --, `shared_lists`, `shared_comments`,
+  `server_links` without their access keys).
+- `files/attachments/`, `files/list_files/`: the files (decrypted).
+- `checksum.sha256`: check the file with `sha256sum -c checksum.sha256` after unpacking.
+
+**A whole organisation** (2.73, stage 1): upload its organisation export (see above) the same way, as an admin of an
+organisation on the new server, and enter the organisation's recovery key of the old server. The archive is opened on
+the server (a wrong key is refused, ten attempts per upload), checked and shown as a preview; it goes into an
+organisation you administer, never into a private space. Lists with sections, fields, tags, status updates, links,
+milestones and project files, tasks with subtasks, dependencies and field values, comments, attachments (sealed with the
+new organisation's key), the organisation's calendars with events and its address books with contacts move along; the
+lists belong to you as the importing admin. Members are matched by e-mail address: a ticked person joins the
+organisation and gets their lists shared again. Not yet taken over (the preview names them with their counts): the
+office, the file store, team chat, knowledge pages, documents, newsletter, clients, absences and bookings, forms,
+playbooks, project notes and notepads, time entries and browser-encrypted notes.
+
+**Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the storage quota of the
+person (hosting) is checked before the upload and for every file during the import -- when it is full, the import stops
+and what came over so far can be undone. The import refuses ZIP files with unsafe names, duplicate parts, encryption,
+extreme compression ratios or wrong checksums; ids, owners, organisations and authors in the file are never taken over
+as they are.
 
 ## Server hardening
 

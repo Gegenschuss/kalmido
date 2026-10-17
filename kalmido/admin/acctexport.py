@@ -1,0 +1,534 @@
+"""2.73.0 B (#1473): account export -- everything of one person as ONE file (moving between a hosted server such as
+app.kalmido.com and an own server, both ways; usable as the GDPR copy of Art. 15 / 20).
+
+The person (cookie session only: agents and tokens never) starts it in Settings > Data; a background thread writes a ZIP
+(below the data folder, exports/account/<user id>/, not in the backups; sealed at rest, see below, mode 0600), the file
+waits UMZ_KEEP_H hours and the watchdog removes it after that. The download is the plain ZIP (the person's own data).
+
+ZIP layout (format "kalmido-account", v 1; admin/acctimport.py reads it):
+    manifest.json      {format, v, kalmido_version, created_at, source: {url, hosted}, user: {id, name, email},
+                        tables: {name: rows}, files: [{path, size, sha256}], client_encrypted: {...}, export_id, not_included}
+    data/<table>.json  one JSON array per table: the tables of GET /api/export.json (accounts/settings.py
+                        umz_export_queries) plus list tags, the lists shared with me (a reference only) with my own comments
+                        there, the people of my lists (for the mapping on import) and the server accounts (no token)
+    files/...          attachments of the tasks and project files of the lists (decrypted: oc_read_file)
+    checksum.sha256    "sha256  path" lines (sha256sum -c): manifest.json and every file of the manifest
+
+Never in the file: passwords, sessions, token hashes, two-factor data, push subscriptions, webhook secrets, access data
+(orgexport OX_SECRET_COLS is dropped from every row). Browser-encrypted content stays ciphertext (client_encrypted).
+
+At rest (export here and the uploads of acctimport.py): with a server key (KALMIDO_SECRET_KEY) the file is AES-256-GCM in
+UMZ_BLOCK blocks with a key derived per person and purpose (HKDF), so it is readable with random access (zipfile seeks);
+without a server key it is plain with mode 0600 like the attachments next to it."""
+import hashlib
+import io
+import json
+import os
+import secrets
+import shutil
+import struct
+import threading
+import time
+import zipfile
+from datetime import timedelta
+
+from flask import g, jsonify, Response
+
+from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL, SECRET_KEY
+from ..core.db import connect, db, err, iso, now_utc
+from ..core.pg import system_ctx
+from ..core.i18n import tr
+from ..core.access import Denied
+from ..accounts.session import me
+from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _jdef, _safe_part, _under
+
+UMZ_DIR = os.path.join(EXPORT_DIR, "account")
+UMZ_KEEP_H = 24
+UMZ_BLOCK = 1 << 20  # 1 MiB of plaintext per sealed block
+UMZ_MAGIC = b"KALMIDO-UMZ1\n"
+UMZ_FORMAT = "kalmido-account"
+UMZ_V = 1
+UMZ_SUFFIX = ".zip"
+UMZ_SPACE_SPARE = 64 * 1024 * 1024  # free disk space kept on top of the expected size
+UMZ_NOT_INCLUDED = (
+    "passwords, sessions, API tokens (only their names), two-factor data, push subscriptions, webhook secrets",
+    "access data of connections (calendar and address book subscriptions, Karakeep, newsletter, Git, server accounts)",
+    "lists of other people that are shared with you (only a reference and your own comments there)",
+    "organisation data that is not yours (use the organisation export for a whole organisation)",
+)
+
+_UMZ = {}  # user id -> the running export thread
+_UMZ_LOCK = threading.Lock()
+
+
+# ---------------------------------------------------------------- sealing at rest (shared with acctimport.py)
+def umz_key(uid, purpose):
+    """32 bytes for the person's files of this purpose ("export" / "upload"); None without a server key (then plain)."""
+    if not SECRET_KEY:
+        return None
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=None,
+                info=b"kalmido-umz-v1|" + purpose.encode() + b"|" + str(int(uid)).encode()).derive(SECRET_KEY)
+
+
+UMZ_HEAD = len(UMZ_MAGIC) + 8  # magic + nonce prefix
+
+
+class UmzWriter:
+    """Write-only stream into the open binary file f: sealed blocks (key) or plain (key None). No tell()/seek(), so
+    zipfile streams with data descriptors. size = plaintext bytes written. resume(): go on appending (the upload)."""
+
+    def __init__(self, f, key, size=0, prefix=None):
+        self.f, self.key, self.size = f, key, size
+        self.buf = bytearray()
+        self.aes = None
+        if key:
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+            self.aes = AESGCM(key)
+            if prefix is None:
+                prefix = os.urandom(8)
+                f.write(UMZ_MAGIC + prefix)
+            self.prefix = prefix
+            self.n = size // UMZ_BLOCK
+
+    @classmethod
+    def resume(cls, f, path, key, size):
+        """Appending to a file with `size` plaintext bytes (a whole number of blocks when sealed)."""
+        prefix = None
+        if key:
+            with open(path, "rb") as r:
+                head = r.read(UMZ_HEAD)
+            if head[:len(UMZ_MAGIC)] != UMZ_MAGIC or size % UMZ_BLOCK:
+                raise ValueError("not resumable")
+            prefix = head[len(UMZ_MAGIC):]
+        return cls(f, key, size, prefix)
+
+    def write(self, b):
+        if not self.aes:
+            self.f.write(b)
+            self.size += len(b)
+            return len(b)
+        self.buf += b
+        self.size += len(b)
+        while len(self.buf) >= UMZ_BLOCK:
+            self._emit(bytes(self.buf[:UMZ_BLOCK]))
+            del self.buf[:UMZ_BLOCK]
+        return len(b)
+
+    def flush(self):
+        pass
+
+    def finish(self):
+        if self.aes and self.buf:
+            self._emit(bytes(self.buf))
+            self.buf = bytearray()
+        self.f.flush()
+
+    def _emit(self, chunk):
+        nonce = self.prefix + struct.pack(">I", self.n)
+        self.f.write(self.aes.encrypt(nonce, chunk, UMZ_MAGIC + struct.pack(">Q", self.n)))
+        self.n += 1
+
+
+class UmzReader(io.RawIOBase):
+    """Random-access reading of a file written by UmzWriter (size = its plaintext bytes); zipfile can seek in it."""
+
+    def __init__(self, path, key, size):
+        super().__init__()
+        self.f, self.size, self.pos = open(path, "rb"), int(size), 0
+        self.aes, self.cache = None, (None, b"")
+        if key:
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+            head = self.f.read(UMZ_HEAD)
+            if head[:len(UMZ_MAGIC)] != UMZ_MAGIC:
+                raise ValueError("not a sealed file")
+            self.aes, self.prefix = AESGCM(key), head[len(UMZ_MAGIC):]
+
+    def readable(self):
+        return True
+
+    def seekable(self):
+        return True
+
+    def tell(self):
+        return self.pos
+
+    def seek(self, off, whence=0):
+        self.pos = max(0, off if whence == 0 else self.pos + off if whence == 1 else self.size + off)
+        return self.pos
+
+    def _block(self, i):
+        if self.cache[0] != i:
+            self.f.seek(UMZ_HEAD + i * (UMZ_BLOCK + 16))
+            ct = self.f.read(UMZ_BLOCK + 16)
+            self.cache = (i, self.aes.decrypt(self.prefix + struct.pack(">I", i), ct, UMZ_MAGIC + struct.pack(">Q", i)))
+        return self.cache[1]
+
+    def readinto(self, b):
+        n = min(len(b), max(0, self.size - self.pos))
+        if n <= 0:
+            return 0
+        if not self.aes:
+            self.f.seek(self.pos)
+            data = self.f.read(n)
+        else:
+            i, o = divmod(self.pos, UMZ_BLOCK)
+            data = self._block(i)[o:o + n]
+        b[:len(data)] = data
+        self.pos += len(data)
+        return len(data)
+
+    def close(self):
+        try:
+            self.f.close()
+        finally:
+            super().close()
+
+
+def umz_stream(path, key, size):
+    """The plaintext of a stored file in pieces (a download)."""
+    r = UmzReader(path, key, size)
+    try:
+        while True:
+            b = r.read(UMZ_BLOCK)
+            if not b:
+                return
+            yield b
+    finally:
+        r.close()
+
+
+def umz_person():
+    """People only: an agent or a request with a token gets 403 (the routes are no part of /api/v1 either)."""
+    from ..agents.core import is_agent
+    if g.get("token") or is_agent(g.user):
+        raise Denied(403, tr("Agents cannot use this endpoint"))
+
+
+def umz_space_ok(folder, need):
+    try:
+        os.makedirs(folder, mode=0o700, exist_ok=True)
+        return shutil.disk_usage(folder).free >= int(need) + UMZ_SPACE_SPARE
+    except OSError:
+        return False
+
+
+# ---------------------------------------------------------------- what goes into the file
+def umz_clean(table, r):
+    from ..accounts.settings import umz_export_clean
+    return umz_export_clean(table, {k: v for k, v in dict(r).items() if k not in OX_SECRET_COLS})
+
+
+def umz_people(c, uid):
+    """The people of my lists (members, comment authors, assignees) with name + e-mail: the mapping on import."""
+    own = "(SELECT id FROM lists WHERE owner_id=?)"
+    out = {}
+    for r in c.execute(f"""SELECT m.user_id, m.list_id, m.role, u.display_name, u.username, u.email, COALESCE(u.kind,'user') AS kind
+                           FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id IN {own}""", (uid,)):
+        if r["kind"] == "agent":
+            continue
+        p = out.setdefault(r["user_id"], {"user_id": r["user_id"], "name": r["display_name"] or r["username"], "email": r["email"] or "",
+                                           "lists": {}})
+        p["lists"][str(r["list_id"])] = r["role"]
+    for r in c.execute(f"""SELECT DISTINCT u.id, u.display_name, u.username, u.email, COALESCE(u.kind,'user') AS kind FROM users u
+                           WHERE u.id IN (SELECT user_id FROM comments WHERE task_id IN (SELECT id FROM tasks WHERE list_id IN {own}))
+                              OR u.id IN (SELECT assignee_id FROM tasks WHERE list_id IN {own})""", (uid, uid)):
+        if r["id"] != uid and r["id"] not in out:
+            out[r["id"]] = {"user_id": r["id"], "name": r["display_name"] or r["username"], "email": "" if r["kind"] == "agent" else r["email"] or "",
+                            "lists": {}, **({"agent": True} if r["kind"] == "agent" else {})}
+    return list(out.values())
+
+
+def umz_extra_queries(uid):
+    own = "(SELECT id FROM lists WHERE owner_id=?)"
+    shared = "(SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.owner_id!=?)"
+    return {
+        "list_tags": (f"SELECT * FROM list_tags WHERE list_id IN {own}", (uid,)),
+        "task_list_tags": (f"SELECT * FROM task_list_tags WHERE task_id IN (SELECT id FROM tasks WHERE list_id IN {own})", (uid,)),
+        # Art. 15: the lists other people share with me (a reference) and what I wrote there
+        "shared_lists": (f"""SELECT l.id, l.name, m.role, u.display_name AS owner_name, u.email AS owner_email FROM lists l
+                             JOIN list_members m ON m.list_id=l.id AND m.user_id=? JOIN users u ON u.id=l.owner_id
+                             WHERE l.id IN {shared}""", (uid, uid, uid)),
+        "shared_comments": (f"""SELECT c.id, c.task_id, t.title AS task_title, t.list_id, c.body, c.created_at, c.edited_at FROM comments c
+                                JOIN tasks t ON t.id=c.task_id WHERE c.user_id=? AND c.deleted_at IS NULL AND t.list_id IN {shared}""",
+                            (uid, uid, uid)),
+    }
+
+
+class _Out:
+    def __init__(self):
+        self.files, self.tables = [], {}
+
+
+def _put(zf, out, name, data):
+    zi = zipfile.ZipInfo(name, date_time=time.localtime()[:6])
+    zi.compress_type = zipfile.ZIP_DEFLATED
+    zf.writestr(zi, data)
+    out.files.append({"path": name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+
+
+def _put_rows(zf, out, table, rows):
+    """data/<table>.json streamed into the ZIP (one row per line)."""
+    name = f"data/{table}.json"
+    h, size, n = hashlib.sha256(), 0, 0
+    with zf.open(zipfile.ZipInfo(name, date_time=time.localtime()[:6]), "w", force_zip64=True) as w:
+        def put(s):
+            nonlocal size
+            b = s.encode()
+            h.update(b)
+            size += len(b)
+            w.write(b)
+        put("[")
+        for r in rows:
+            put(("," if n else "") + "\n" + json.dumps(r, ensure_ascii=False, default=_jdef, sort_keys=True))
+            n += 1
+        put("\n]\n")
+    out.files.append({"path": name, "size": size, "sha256": h.hexdigest()})
+    out.tables[table] = n
+
+
+def umz_att_name(kind, rid, name):
+    return f"files/{kind}/{int(rid)}-{_safe_part(name)}"
+
+
+def umz_build(c, uid, stream, export_id):
+    """Writes the ZIP of person uid into stream; returns the manifest."""
+    from ..accounts.settings import umz_export_queries
+    from ..admin.hosting import hosted
+    from ..core.orgcrypt import oc_read_file
+    out = _Out()
+    have = {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
+    u = c.execute("SELECT id, username, display_name, email FROM users WHERE id=?", (uid,)).fetchone()
+    q = umz_export_queries(uid)
+    q.update(umz_extra_queries(uid))
+    client_enc = {"attachments": [], "locked_notes": 0}
+    with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        files = {}  # (kind, row id) -> path in the ZIP
+        for kind, table in (("attachments", "attachments"), ("list_files", "list_files")):
+            sql, args = q[table]
+            for r in c.execute(sql, args).fetchall():
+                full = _under(ATT_DIR, r["path"])
+                if not full:
+                    continue
+                name = umz_att_name(kind, r["id"], r["name"])
+                _put(zf, out, name, oc_read_file(c, full))
+                files[(table, r["id"])] = name
+                if table == "attachments" and "enc" in r.keys() and r["enc"]:
+                    client_enc["attachments"].append(name)
+        for table, (sql, args) in q.items():
+            def rows(table=table, sql=sql, args=args):
+                for r in c.execute(sql, args):
+                    d = umz_clean(table, r)
+                    if (table, d.get("id")) in files:
+                        d["file"] = files[(table, d["id"])]
+                    yield d
+            _put_rows(zf, out, table, rows())
+        _put_rows(zf, out, "people", umz_people(c, uid))
+        if "msv_links" in have:  # 2.73.0: msv_links comes with part A -- the server accounts, never their token
+            try:
+                with c.savepoint():
+                    links = [dict(r) for r in c.execute("SELECT id, name, short, color, base_url, created_at FROM msv_links "
+                                                        "WHERE user_id=? AND deleted_at IS NULL ORDER BY id", (uid,))]
+            except Exception:  # noqa: BLE001 -- another shape of the table: no server accounts in the file
+                links = []
+            _put_rows(zf, out, "server_links", links)
+        client_enc["locked_notes"] = out.tables.get("task_note_locks", 0)
+        manifest = {
+            "format": UMZ_FORMAT, "v": UMZ_V, "kalmido_version": APP_VERSION, "created_at": iso(now_utc()),
+            "source": {"url": PUBLIC_URL, "hosted": bool(hosted())},
+            "user": {"id": u["id"], "name": u["display_name"] or u["username"], "email": u["email"] or ""},
+            "tables": out.tables, "files": out.files,
+            "client_encrypted": {**client_enc, "note": "Encrypted in the browser: stored here as ciphertext, only with your password readable."},
+            "export_id": export_id, "not_included": list(UMZ_NOT_INCLUDED),
+        }
+        mb = json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode()
+        zi = zipfile.ZipInfo("manifest.json", date_time=time.localtime()[:6])
+        zi.compress_type = zipfile.ZIP_DEFLATED
+        zf.writestr(zi, mb)
+        lines = [f"{hashlib.sha256(mb).hexdigest()}  manifest.json"] + [f"{f['sha256']}  {f['path']}" for f in out.files]
+        zi = zipfile.ZipInfo("checksum.sha256", date_time=time.localtime()[:6])
+        zf.writestr(zi, ("\n".join(lines) + "\n").encode())
+    return manifest
+
+
+# ---------------------------------------------------------------- state, thread, clean-up
+def _udir(uid):
+    return os.path.join(UMZ_DIR, str(int(uid)))
+
+
+def _state(uid):
+    try:
+        with open(os.path.join(_udir(uid), "state.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def umz_write_state(folder, d):
+    os.makedirs(folder, mode=0o700, exist_ok=True)
+    p = os.path.join(folder, "state.json")
+    tmp = p + ".tmp"
+    with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f:
+        json.dump(d, f)
+    os.replace(tmp, p)
+
+
+def _running(uid):
+    t = _UMZ.get(int(uid))
+    return bool(t and t.is_alive())
+
+
+def umz_user_conn(c, uid):
+    """The background thread works in the person's own access context (row-level security as in their requests)."""
+    from ..core.access import acx_of
+    with system_ctx(c):  # the person's memberships (structure) for their context
+        ax = acx_of(c, uid)
+    c.set_ctx(uid, ax.org_ids, "user")
+
+
+def umz_run(uid, export_id):
+    c = connect()
+    part = None
+    try:
+        umz_user_conn(c, uid)
+        key = umz_key(uid, "export")
+        part = os.path.join(_udir(uid), secrets.token_hex(8) + ".part")
+        with os.fdopen(os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as f:
+            w = UmzWriter(f, key)
+            man = umz_build(c, uid, w, export_id)
+            w.finish()
+            os.fsync(f.fileno())
+        name = f"kalmido-account-{now_utc():%Y-%m-%d}{UMZ_SUFFIX}"
+        for old in os.listdir(_udir(uid)):
+            if old.endswith(UMZ_SUFFIX):
+                os.remove(os.path.join(_udir(uid), old))
+        os.replace(part, os.path.join(_udir(uid), name))
+        part = None
+        done = now_utc()
+        st = _state(uid) or {}
+        umz_write_state(_udir(uid), {"state": "done", "started_at": st.get("started_at"), "done_at": iso(done),
+                                     "expires_at": iso(done + timedelta(hours=UMZ_KEEP_H)), "file": name, "bytes": w.size,
+                                     "sealed": bool(key), "export_id": export_id, "rows": sum(man["tables"].values()),
+                                     "files": sum(1 for x in man["files"] if x["path"].startswith("files/"))})
+        c.rollback()
+        print(f"account export of user {uid}: {w.size} bytes", flush=True)
+    except Exception as e:  # noqa: BLE001 -- the state says it failed; never content in the message
+        try:
+            c.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        print(f"account export of user {uid} failed: {type(e).__name__}", flush=True)
+        st = _state(uid) or {}
+        umz_write_state(_udir(uid), {"state": "failed", "started_at": st.get("started_at"), "error": type(e).__name__, "done_at": iso(now_utc())})
+    finally:
+        if part and os.path.exists(part):
+            os.remove(part)
+        c.close()
+        with _UMZ_LOCK:
+            _UMZ.pop(int(uid), None)
+
+
+def umz_status(uid):
+    st = _state(uid) or {"state": "none"}
+    if st.get("state") == "running" and not _running(uid):
+        st = {**st, "state": "failed", "error": "interrupted"}
+    if st.get("state") == "done":
+        p = os.path.join(_udir(uid), st.get("file") or "-")
+        if not os.path.isfile(p) or st.get("expires_at", "") <= iso(now_utc()):
+            st = {"state": "none"}
+    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files", "rows") if st.get(k) is not None}
+    if st.get("state") == "failed":
+        out["error"] = tr("The export was interrupted. Please start it again.") if st.get("error") == "interrupted" else \
+            tr("The export failed. Please try again later or ask the server admin (server log).")
+    return out
+
+
+UMZ_CLEAN = {"at": 0.0}
+
+
+def umz_cleanup(c=None, force=False):
+    """Watchdog (at most every 10 minutes): account exports after UMZ_KEEP_H hours, leftovers of interrupted runs, and
+    the uploads of account imports (acctimport.py) that are finished, cancelled or older than a day."""
+    if not force and time.time() - UMZ_CLEAN["at"] < 600:
+        return 0
+    UMZ_CLEAN["at"] = time.time()
+    n = 0
+    if os.path.isdir(UMZ_DIR):
+        now = iso(now_utc())
+        for d in os.listdir(UMZ_DIR):
+            p = os.path.join(UMZ_DIR, d)
+            if not d.isdigit() or not os.path.isdir(p) or _running(int(d)):
+                continue
+            st = _state(int(d)) or {}
+            for fn in os.listdir(p):
+                fp = os.path.join(p, fn)
+                old = time.time() - os.path.getmtime(fp) > UMZ_KEEP_H * 3600
+                if fn.endswith(".part") or (fn.endswith(UMZ_SUFFIX) and (fn != st.get("file") or st.get("expires_at", "") <= now or old)):
+                    os.remove(fp)
+                    n += 1
+            if not any(f.endswith(UMZ_SUFFIX) for f in os.listdir(p)):
+                shutil.rmtree(p, ignore_errors=True)
+    from .acctimport import umz_import_cleanup
+    return n + umz_import_cleanup()
+
+
+# ---------------------------------------------------------------- routes (people only)
+@app.get("/api/account/export")
+def umz_get():
+    """The state of my account export: none | running | done (file, bytes, expires_at) | failed (error)."""
+    umz_person()
+    return jsonify(keep_hours=UMZ_KEEP_H, **umz_status(me()))
+
+
+@app.post("/api/account/export")
+def umz_start():
+    """Starts my account export in the background (one at a time; 409 while one runs, 507 without the disk space)."""
+    umz_person()
+    c = db()
+    uid = me()
+    from ..accounts.settings import umz_export_queries
+    q = umz_export_queries(uid)
+    need = 0
+    for t in ("attachments", "list_files"):
+        sql, args = q[t]
+        need += c.execute(f"SELECT COALESCE(SUM(size),0) FROM ({sql}) x", args).fetchone()[0] or 0
+    if not umz_space_ok(UMZ_DIR, need * 1.1):
+        return err(tr("There is not enough space on the server for the export. Please ask the server admin."), 507)
+    with _UMZ_LOCK:
+        if _running(uid):
+            return err(tr("Your export is already running"), 409)
+        os.makedirs(_udir(uid), mode=0o700, exist_ok=True)
+        umz_write_state(_udir(uid), {"state": "running", "started_at": iso(now_utc())})
+        t = threading.Thread(target=umz_run, args=(uid, secrets.token_hex(16)), daemon=True)
+        _UMZ[uid] = t
+        t.start()
+    c.rollback()
+    return jsonify(umz_status(uid)), 202
+
+
+@app.get("/api/account/export/file")
+def umz_download():
+    umz_person()
+    uid = me()
+    st = umz_status(uid)
+    if st.get("state") != "done":
+        raise Denied(404)
+    raw = _state(uid) or {}
+    path = os.path.join(_udir(uid), st["file"])
+    key = umz_key(uid, "export") if raw.get("sealed") else None
+    return Response(umz_stream(path, key, raw["bytes"]), mimetype="application/zip", direct_passthrough=True,
+                    headers={"Content-Disposition": f'attachment; filename="{st["file"]}"', "Content-Length": str(raw["bytes"]),
+                             "Cache-Control": "no-store"})
+
+
+@app.delete("/api/account/export")
+def umz_delete():
+    """Removes my finished export now (instead of after UMZ_KEEP_H hours)."""
+    umz_person()
+    uid = me()
+    if _running(uid):
+        return err(tr("Your export is already running"), 409)
+    shutil.rmtree(_udir(uid), ignore_errors=True)
+    return jsonify(ok=True)
+

@@ -871,6 +871,9 @@ fresh; run p273_a_ui node p273_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p273_c_ui node p273_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.73.0 release: part A's server routes with part C's merged view (#661), the test server as "the other server"
 fresh; run p273_l_ui node p273_l_ui.js "$KALMIDO_TEST_DATA"
+# 2.73.0 part B: moving an account -- account export + import with the mapping of people (#1473)
+fresh; run p273_b_api "$PY" p273_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p273_b_ui node p273_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
