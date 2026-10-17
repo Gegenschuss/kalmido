@@ -110,7 +110,8 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
     const note = await waitFor(`document.querySelector('.cdlg .le2unote') ? document.querySelector('.cdlg #cdlg-b').textContent : ''`);
     check(note && /not even the operator/.test(note) && /manipulated server/.test(note) && /no agents, no tasks by e-mail/.test(note) && /needs encryption set up/.test(note), '#1817: the notice before switching on (points 1-4) ' + (note || '').slice(0, 200));
     check(/Carol: not set up yet/.test(note || '') && /waiting list/.test(note || ''), '#1817 E7: members without encryption go on the waiting list, by name');
-    check(/Attachments of this list are not yet encrypted in the browser/.test(note || '') && /recovery code is enough/.test(note || '') && /End-to-end in the browser/.test(note || '') && /Limit/.test(note || ''), '#1817 E9 / E5 / E10: attachments, recovery code, the limit');
+    // 2.64.2 D (#1817): attachments are encrypted with the list key now (the E9 hint is gone)
+    check(/Attachments and the messages of the list chat are encrypted with it/.test(note || '') && /recovery code is enough/.test(note || '') && /End-to-end in the browser/.test(note || '') && /Limit/.test(note || ''), '#1817 2.64.2 / E5 / E10: attachments, recovery code, the limit');
     check(await ev(`document.querySelectorAll('.cdlg .le2umem li.ok').length === 2 && document.querySelectorAll('.cdlg .le2umem li.no').length === 1`), '#1817: the members with yes / no "Encryption set up"');
     check(await ev(`document.querySelector('.cdlg [data-cd="yes"]').disabled`), '#1817: OK only after "I have read this"');
     check(!(await unnamed('.cdlg button, .cdlg input')).length, '#1817: every button of the notice has a name');
@@ -133,7 +134,8 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
     check(sh && /Key present/.test(sh) && /Key pending/.test(sh) && /Has not set up encryption yet/.test(sh), '#1817: member states key present / pending / not set up');
     check(await ev(`!!document.querySelector('.shmodal .mrow[data-uid="${BOB}"] [data-le2us="release"]') && !document.querySelector('.shmodal .mrow[data-uid="${CAROL}"] [data-le2us="release"]')`), '#1817: "Release" only for a waiting person with encryption set up');
     check(await ev(`!!document.querySelector('.shmodal .mrow[data-uid="${BOB}"] [data-le2us="safety"]')`), '#1817: a safety number per person');
-    check(/Former members can still decrypt old contents with their old key/.test(sh || ''), '#1817 E8: the honest hint while a rotation is pending');
+    // 2.64.2 D (#1817): the hint now says the key is being changed (rotation in 2.64.2)
+    check(/former members can still decrypt older contents with their old key/.test(sh || ''), '#1817 E8: the honest hint while a rotation is pending');
     check(await ev(`![...document.querySelectorAll('.shmodal select option')].some(o => o.value === 'participant')`), '#1817 E4: no participant role in a locked list');
     check(await ev(`!document.querySelector('.shmodal #sh-agwrap') || /Not available in encrypted lists/.test(document.querySelector('.shmodal #sh-agwrap').textContent)`), '#1817: agents greyed out with the reason');
     check(!(await unnamed('.shmodal button, .shmodal select')).length, '#1817: every button of the share dialog has a name ' + JSON.stringify(await unnamed('.shmodal button, .shmodal select')));
