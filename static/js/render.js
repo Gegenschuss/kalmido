@@ -494,7 +494,7 @@ function renderTop0() {
   const off = !OUT.online || OUT.q.length ? `<span class="offline" role="status" title="${esc([oflab, ofn, tr('Changes are sent as soon as the server is reachable')].filter(Boolean).join(' · '))}" aria-label="${esc([oflab, ofn].filter(Boolean).join(' · '))}">${ic(OUT.online ? 'sync' : 'cloudoff', 's')}<span class="ofl">${oflab}</span>${OUT.q.length ? `<span class="ofn">${OUT.q.length}</span>` : ''}</span>` : '';
   const cf = S.conflicts?.length ? `<button class="cfpill" data-act="conflicts" title="${tr('Review conflicts')}">${ic('alert', 's')}${S.conflicts.length}</button>` : '';
   // open tasks of the view next to the title (Geist Mono), task views only
-  const nOpen = m === 'tasks' && !NOLIST_KEYS.includes(k) ? viewTasks().open.length : 0;
+  const nOpen = m === 'tasks' && !NOLIST_KEYS.includes(k) ? msvvCount(viewTasks().open.length, k) : 0;  // 2.73.0 C (#661): + other servers in Today / Basket
   // 2.8.0 (#434): the command bar (search + commands + the agents' chat) and "New task" (mouse screens; touch has the + button)
   // 2.18.0 (#651, owner decision: the magnifier is always visible): Search never folds into "…" (no .tf4); the title gets cut instead (fitTop)
   const pal = `<button class="kbtn cmdbar" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span>${kb('Mod+K')}</button>`;
@@ -685,7 +685,7 @@ let refreshing = false;
 async function refreshNow() {
   if (refreshing) return;
   refreshing = true; $$('[data-act="refresh"]').forEach(b => b.classList.add('spin'));
-  try { await flushSaves(); await load(); render(); if (S.sel && (cmtOn() || collab())) loadTimeline(S.sel); S.syncOk = Date.now(); toast(tr('Up to date')); }
+  try { await flushSaves(); await load(); render(); msvvLoad();  /* 2.73.0 C (#661) */ if (S.sel && (cmtOn() || collab())) loadTimeline(S.sel); S.syncOk = Date.now(); toast(tr('Up to date')); }
   catch (e) { if (e instanceof Offline) toast(tr('You are offline')); }
   finally { refreshing = false; $$('[data-act="refresh"]').forEach(b => b.classList.remove('spin')); }
 }

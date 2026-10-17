@@ -7716,7 +7716,7 @@ button.jobtag b{font-weight:600}
 .msvvsubs li{display:flex;align-items:center;gap:.375rem}
 .msvvsubs li.done span{text-decoration:line-through;color:var(--muted)}
 .msvvcnt{margin:0;font-size:var(--fs-xs)}
-.msvvfoot{flex-wrap:wrap;gap:.5rem}
+.msvvfoot{flex-wrap:wrap;gap:.5rem;justify-content:flex-start}
 .msvvfoot .btn{min-height:2.75rem}
 .msvvmv{display:flex;flex-direction:column;gap:.375rem}
 .msvvmv select{min-height:2.75rem}

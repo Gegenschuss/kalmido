@@ -105,6 +105,8 @@ const MOCK = `(() => {
     const td = await ev(`(() => { const r = document.querySelector('#view .trow[data-msv="1:100"]'), o = document.querySelector('#view .trow[data-msv="1:102"]');
       return {txt: r?.querySelector('.ttl')?.textContent || '', img: !!r?.querySelector('img'), xss: !!window.__xss, over: !!o?.closest('.group')?.querySelector('.ghead.over'), sub: !!document.querySelector('#view .trow.sub[data-msv="1:103"]'), own: !!document.querySelector('#view .trow[data-id] .msvb')}; })()`);
     check(td.txt.includes('<img') && !td.img && !td.xss, '#661: an HTML title is shown as text ' + JSON.stringify(td));
+    const hn = await ev(`[document.querySelector('#top .hn')?.textContent, parseInt(document.querySelector('#side .srow[data-go="today"] .c')?.textContent)]`);
+    check(+hn[0] === hn[1] && hn[1] >= 3, '#661: the header count and the sidebar count of Today include the foreign tasks ' + JSON.stringify(hn));
     check(td.over && td.sub && td.own, '#661: Today merged (overdue group, subtask below, own badge) ' + JSON.stringify(td));
     await shot('p273c-today-1280.png');
     // a normal own list: no own badge
@@ -168,6 +170,10 @@ const MOCK = `(() => {
     await sleep(800);
     const cl = await ev(`(() => ({ev: [...document.querySelectorAll('#view .cal .ev.msvev')].map(e => e.textContent), day: !!document.querySelector('#view .agenda .msvvcal')}))()`);
     check(cl.ev.some(t => /Meeting W/.test(t)) && cl.ev.some(t => /Report/.test(t)), '#661: calendar shows foreign events + tasks ' + JSON.stringify(cl));
+    await ev(`(() => { S.calMode = 'week'; S.calSel = today(); renderView(); return 1; })()`); await sleep(600);
+    const wk = await ev(`[...document.querySelectorAll('#view .week .ev.msvev')].map(e => e.textContent)`);
+    check(wk.some(t => /Meeting W/.test(t)) && wk.some(t => /Report/.test(t)), '#661: the week view too (all-day row) ' + JSON.stringify(wk));
+    await ev(`(() => { S.calMode = 'month'; LS.set('calMode', 'month'); return 1; })()`);
     // ---- Move an own task to another server: the menu entry, the plain question, the call
     await go(ev, 'inbox', `#view .trow[data-id="${OWN}"]`);
     await ev(`(() => { taskMenu(document.querySelector('#view .trow[data-id="${OWN}"] .ttl'), ${OWN}); return 1; })()`); await sleep(400);
@@ -199,6 +205,9 @@ const MOCK = `(() => {
     const t = await ev(`(() => { const bs = [...document.querySelectorAll('.msvvdlg .foot .btn')].map(x => x.getBoundingClientRect().height); return bs.length ? Math.min(...bs) : 0; })()`);
     check(t >= 40, '#661: phone: the buttons of the details are big targets ' + t);
     await shot('p273c-detail-390.png');
+    await ev(`(() => { document.querySelector('.msvvdlg')?.remove(); openQuickSheet(); return 1; })()`); await sleep(500);
+    check(/Base/.test(await ev(`document.querySelector('.qadd.sheet .msvvqc')?.textContent || ''`)), '#661: phone: the quick add sheet shows the target');
+    await shot('p273c-sheet-390.png');
   };
   await firefox(desk, false);
   await firefox(phone, true);

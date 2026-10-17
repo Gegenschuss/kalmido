@@ -36,7 +36,8 @@ async function msvvFetch(method, url, body) {
   return j;
 }
 // a failed foreign write: one quiet toast that names the server
-const msvvFail = (sid, e) => toast(tr('{0}: {1}', msvvName(sid), e?.status === 424 || !e?.message ? msvvErrText(e?.code) : e.message), null, 5000);
+// (a 424 carries the other server's reason as translated plain text, part A)
+const msvvFail = (sid, e) => toast(tr('{0}: {1}', msvvName(sid), e?.message || msvvErrText(e?.code)), null, 5000);
 
 // ---- state
 async function msvvLoad() {
@@ -50,10 +51,12 @@ async function msvvLoad() {
       .sort((a, b) => (+a.position || 0) - (+b.position || 0) || a.id - b.id);
     S.msv.loaded = true; S.msv.at = Date.now();
     for (const k of Object.keys(S.msv.data)) if (!msvvLink(k)) delete S.msv.data[k];
-    if (!msvvOn()) { if (had) msvvDraw(); return; }
+    if (!msvvOn()) { if (had) { S.msv.sig = ''; msvvDraw(); } return; }
     await Promise.all(S.msv.links.map(l => msvvData(l.id)));
     if (Date.now() - (S.msv.newsAt || 0) > MSVV_NEWS || S.route.mod === 'news') msvvNewsLoad();
-    msvvDraw();
+    // the poll redraws only when something changed (the answer's time aside)
+    const sig = JSON.stringify([S.msv.self, S.msv.links.map(({at, ...l}) => l), S.msv.links.map(l => { const d = S.msv.data[l.id] || {}; return [d.lists, d.tasks, d.today, d.err]; })]);
+    if (sig !== S.msv.sig) { S.msv.sig = sig; msvvDraw(); }
   } finally { S.msv.busy = false; }
 }
 async function msvvData(sid) {
@@ -158,7 +161,7 @@ function msvvMerge(groups, v) {
 }
 // the sidebar numbers of Today / the Basket with the foreign open tasks
 function msvvCount(n, k) {
-  if (!msvvOn()) return n;
+  if (!msvvOn() || (k !== 'today' && k !== 'inbox')) return n;
   const add = msvvViewTasks(k).length;
   return add ? (+n || 0) + add : n;
 }
