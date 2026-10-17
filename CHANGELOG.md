@@ -7,6 +7,28 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.64.3] - 2026-10-17
+
+### Added
+- **Encrypted knowledge space** (lock per list, stage 3): an organisation admin (or the owner of the private space) can
+  encrypt a whole knowledge space in the browser (*Knowledge pages > … > Encryption…*). Page names and texts are then
+  encrypted with a key per space that every member of the organisation gets wrapped with their own key; the server
+  stores only ciphertext and no links. Search, backlinks, "mentioned in", link suggestions, templates, renaming with its
+  links and export / import as ZIP run in the browser. New members of the organisation wait until an admin releases the
+  key; when a member who held it leaves, the key changes and the pages are encrypted again in the background. Agents
+  have no access to an encrypted space; switching back needs the password (#1817).
+- Settings > Administration > Encryption lists the encrypted knowledge spaces; a help paragraph in Settings > Account
+  and new documentation explain how to export encrypted lists, chats and knowledge spaces and what is lost without the
+  keys (docs/SELF-HOSTING.md *Encryption in the browser*, *Exporting encrypted content*; docs/WIKI.md, AGENT-SETUP.md).
+
+### Security
+- Security fix (encryption in the browser: knowledge pages and lists).
+
+### Note
+- Before going back to an older version, switch the encryption of every knowledge space off again (and open the lock of
+  every list, as for 2.64.1 / 2.64.2): older versions show the encrypted names as page titles and do not guard such a
+  space, and a backup of 2.64.3 is refused by older versions.
+
 ## [2.64.2] - 2026-10-17
 
 ### Added

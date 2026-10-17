@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.64.3** (2026-10-17): **encrypted knowledge space**: a whole knowledge space (private or an organisation's) can be
+  encrypted in the browser; search, backlinks and export run in the browser, agents have no access.
 - **2.64.2** (2026-10-17): **lock per list, stage 2**: attachments and the team chat of a locked list are encrypted
   too, and when a member leaves the key changes and older contents are encrypted again in the background.
 - **2.64.1** (2026-10-17): **lock per list**: a list's titles, descriptions, subtasks, comments, notes, section names,
@@ -434,8 +436,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   comments, list notes, section names, text fields, links and code snippets are encrypted with a key per list that each
   member gets wrapped with their own key; dates, status, assignees and the list name stay readable. Members without a key
   wait until the owner releases it; agents, the mail address, public links and templates are not available there.
-  Since 2.64.2 attachments and the list's team chat are encrypted too, and the key changes when a member leaves
-  (see docs/ARCHITECTURE.md, *Lock per list*)
+  Since 2.64.2 attachments and the list's team chat are encrypted too, and the key changes when a member leaves;
+  since 2.64.3 a whole knowledge space can be encrypted the same way (see docs/ARCHITECTURE.md, *Lock per list*, and
+  docs/SELF-HOSTING.md, *Exporting encrypted content*)
 - **Automatic backups** of the database and all attachments, daily with retention, optionally encrypted, downloadable,
   and a **restore** right in the app (checked, with a safety backup of the current state first)
 - **Admin alerts** over each admin's own channel (Web Push or ntfy): a new version, devices that stopped taking pushes, watchdog errors, failing integrations, repeated failed logins, low disk space or a failed database check reach the admins, never with task contents
