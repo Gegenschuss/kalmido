@@ -50,12 +50,13 @@ const M = 'ZQXchan';  // every plain text of the channel carries it: no storage 
   await session('bob', async ({ev}) => {
     check(await ev(`e2eCreate(${JSON.stringify(PASS_B)}).then(c => !!c)`), 'Bob sets up encryption');
   });
-  await session('alice', async ({ev, waitFor, boot, sweep}) => {
+  await session('alice', async ({ev, waitFor, boot, sweep, unlock}) => {
     check(await ev(`e2eCreate(${JSON.stringify(PASS)}).then(c => !!c && e2eUnlocked())`), 'Alice sets up encryption');
     check(await ev(`le2eStart(${L}, () => {}).then(r => !!r && listById(${L})?.e2e === 'on')`), 'le2eStart: the list is locked');
     await boot('#team/' + RID);
     check(await waitFor(`S.tc.room?.id === ${RID} && le2eChanOn(S.tc.room)`), 'the channel knows the lock of its list');
     check(await waitFor(`!!document.querySelector('.tcroom .le2uhd [data-le2uhd="safety"]')`), 'part D: the head line with Safety numbers');
+    await unlock(PASS);  // the keys are not remembered on this device: unlocked again after the reload
     await ev(`(async () => { await le2eKeys(${L}, true); return 1; })()`);
     await ev(`(() => { const ta = document.querySelector('#tc-in'); ta.value = '${M} hello @Bob'; return 1; })()`);
     await ev(`tcSend().then(() => 1)`);
