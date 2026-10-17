@@ -722,6 +722,30 @@ and no server needs to trust another one.
 - **Agents** see nothing of it: there is no `/api/v1` route, no MCP tool and no event for it; an agent only ever works on
   its own server.
 
+### Several servers in one app: the merged view (2.73.0)
+
+Once an account on another Kalmido server is linked (Settings > Account > Servers), the app shows it next to your own data.
+Nothing is copied or synced: every task stays on its server, and the app asks that server whenever it shows or changes one.
+
+- **Badges:** every task, list and detail panel of another server carries that server's short name in its colour. In the merged
+  views (Today, Basket, Search, Calendar) your own tasks get your own badge too; in a normal list view there is none.
+- **Sidebar:** one group per server below your lists, with its lists. A list opens with its open tasks; you can tick them off and
+  add new ones there.
+- **Today and Basket:** the other servers' tasks join by the same rules (due today or overdue on that server's date; its basket).
+  The numbers in the sidebar count them.
+- **Details:** a tap on a task of another server opens a small panel: title, notes, date, priority, its subtasks, complete or
+  reopen, move it to the trash there, "Open on …" (the full task on its server; comments and attachments are only counted here).
+- **Quick add:** with a server linked, the composer shows where the task goes ("→ Work · Projects"); tap it to pick another
+  server and list. Date and priority words work; the rest stays in the title.
+- **Search, News, Calendar:** hits, unread news and the month's events and due tasks of each server appear in their own section
+  with the badge; a slow or offline server never holds up your own results.
+- **Move to another server:** from the task menu (own tasks) or the panel (tasks of another server). The task is created anew on
+  the target (title, notes, date, priority, open subtasks); comments, attachments and history stay in the trash of the source,
+  where it can still be restored. The app says this before it moves anything.
+- A server that does not answer shows one quiet line ("Work not reachable – last update 10:42") instead of error messages; a
+  change on it is never queued offline, it is either done or reported.
+- Agents only ever see the server they are connected to.
+
 ## Moving to a new server
 
 1. **Before:** lower the DNS TTL of the name a day ahead; make a backup (*Back up now*).

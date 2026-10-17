@@ -867,6 +867,8 @@ fresh; run p256_a_ui node p256_a_ui.js "$KALMIDO_TEST_DATA"
 # test server connects to itself; a misbehaving stub server inside the container), SSRF guard, hosted = https only
 fresh; run p273_a_api "$PY" p273_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p273_a_ui node p273_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.73.0 part C: several servers in one app, the merged view (#661)
+fresh; run p273_c_ui node p273_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
