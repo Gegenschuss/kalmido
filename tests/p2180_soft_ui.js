@@ -290,6 +290,7 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
     await shot(`p2180-soft-${th}-${vw}-dialog.png`);
     await ev(`(() => { [...document.querySelectorAll('.modal')].forEach(m => m.remove()); return 1; })()`);
     await o.nav(B + '#t/' + T1); await ready(ev); await sleep(400);
+    for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#d-md')`)); i++) await sleep(200);  // 2.66.1: slow CI, the panel draws later
     await ev(`(() => { listById(${L}).repos = [{id: 1, full_name: 'acme/app', provider: 'github', web_url: 'https://github.com/acme/app', default_branch: 'main'}]; renderDetail(); return 1; })()`); await sleep(300);
     const c = await ev(CONTRAST);
     check(c && Object.keys(c).length >= 5 && Object.values(c).every(v => v >= 4.5), `${tag}: code colours AA on the code background ` + JSON.stringify(c));

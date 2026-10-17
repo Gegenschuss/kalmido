@@ -136,7 +136,7 @@ window.__secs = lid => secIds(lid).map(i => S.sections.find(s => s.id === i).nam
       await ev(`(() => { location.hash = '#l/${SEC[k]}'; return 1; })()`); await ready(ev, k === 'list' ? '#view .ghead[data-section]' : '#view .kcol[data-kcol]');
       const go = async (name, where) => ev(`(async () => { const LID = ${SEC[k]}, kan = ${k === 'board'}, where = '${where}', sid = S.sections.find(s => s.list_id === LID && s.name === '${name}').id;
         const dt = new DataTransfer(), h = document.querySelector('[data-sdrag="' + sid + '"]'); __fire('dragstart', h, 0, 0, dt); await new Promise(r => setTimeout(r, 120));
-        for (let i = 0; !kan && i < 30 && !document.querySelector('#view .sb-secfold'); i++) await new Promise(r => setTimeout(r, 50));  // 2.56.1: the fold comes in a frame (slow CI runner)
+        for (let i = 0; !kan && i < 80 && !document.querySelector('#view .sb-secfold'); i++) await new Promise(r => setTimeout(r, 50));  // 2.56.1: the fold comes in a frame (slow CI runner)
         const els = sb_secEls().filter(e => kan ? e.dataset.kcol : e.querySelector('.ghead').dataset.section), r = (where === 'end' ? els[els.length - 1] : els[0]).getBoundingClientRect();
         const x = kan ? (where === 'end' ? r.right + 8 : r.left + 6) : r.left + 60, y = kan ? r.top + 30 : (where === 'end' ? r.bottom + 8 : r.top + 3), t = document.elementFromPoint(x, y) || document.body;
         const ok = __fire('dragover', t, x, y, dt), mark = (document.querySelector('#view .dropafter, #view .dropbefore') || {}).className || '', fold = !!document.querySelector('#view .sb-secfold');

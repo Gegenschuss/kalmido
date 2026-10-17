@@ -36,7 +36,7 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   rows[0].dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(800);
   check(w.eval('S.sel') === first.task_id, 'click opens the task');
   const st2 = await api(w, 'GET', '/api/news');
-  check(st2.items[0].read && st2.unread === st.unread - 1 - (st.items.filter(x => x.task_id === first.task_id && !x.read).length - 1), `click marks read (${st.unread} -> ${st2.unread})`);
+  check(st2.items.find(x => x.id === first.id)?.read && st2.unread === st.unread - 1 - (st.items.filter(x => x.task_id === first.task_id && !x.read).length - 1), `click marks read (${st.unread} -> ${st2.unread})`);
   w.eval('closeDetail()'); await sleep(200);
   // filter
   // 1.9.0: "Mentions & assigned to me" (mentions + assignments) replaced "Only mentions"
