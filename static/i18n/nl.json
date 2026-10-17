@@ -9482,5 +9482,6 @@
   "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Nog niet op malware gecontroleerd: het bestand kan worden geopend zodra de virusscanner het heeft gecontroleerd",
   "No clients in this area yet": "Nog geen klanten in deze omgeving",
   "Add client": "Klant toevoegen",
-  "Sent as {0}": "Verzonden als {0}"
+  "Sent as {0}": "Verzonden als {0}",
+  "Texts beginning with \"e2e1:\" got a space in front.": "Teksten die met \"e2e1:\" beginnen, hebben een spatie ervoor gekregen."
 }

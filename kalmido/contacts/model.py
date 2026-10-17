@@ -935,6 +935,10 @@ def occ_sync(c, cid):
         if t:
             if ln["digest"] == dig:
                 continue
+            # 2.82.0 (#1832): the task may live in another list by now (moved): only changed where the owner may write
+            if t["list_id"] != r["occ_list_id"] and (list_role(c, t["list_id"], r["owner_id"]) not in WRITE_ROLES
+                                                    or le2a_gen_locked(c, t["list_id"])):
+                continue
             f = _jparse(t["fam"]) or {}
             old_title = tr("Birthday: {0}", f.get("name", ""), lg=lg) if kind == "birthday" else tr("Anniversary: {0}", f.get("name", ""), lg=lg)
             f.update(name=name)

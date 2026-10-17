@@ -9482,5 +9482,6 @@
   "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Noch nicht auf Schadsoftware geprüft: Die Datei lässt sich öffnen, sobald der Virenscanner sie geprüft hat",
   "No clients in this area yet": "Noch keine Kunden in diesem Bereich",
   "Add client": "Kunde anlegen",
-  "Sent as {0}": "Gesendet als {0}"
+  "Sent as {0}": "Gesendet als {0}",
+  "Texts beginning with \"e2e1:\" got a space in front.": "Texte, die mit „e2e1:“ beginnen, haben ein Leerzeichen davor bekommen."
 }

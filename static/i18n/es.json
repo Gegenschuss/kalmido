@@ -9482,5 +9482,6 @@
   "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Aún no se ha comprobado si tiene malware: el archivo se podrá abrir cuando el antivirus lo haya comprobado",
   "No clients in this area yet": "Todavía no hay clientes en esta área",
   "Add client": "Añadir cliente",
-  "Sent as {0}": "Enviado como {0}"
+  "Sent as {0}": "Enviado como {0}",
+  "Texts beginning with \"e2e1:\" got a space in front.": "Los textos que empiezan por \"e2e1:\" llevan ahora un espacio delante."
 }

@@ -148,10 +148,14 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     continue
                 if not dry:
                     g.folder_applying = True  # list_agent_set must not mark it as the list's own
+                    prev = g.user  # 2.82.0 (#1831): the inner call runs as the person uid too (the list's owner), not the caller
+                    if prev is None or prev["id"] != uid:
+                        g.user = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
                     try:
                         v1_call(list_agent_set, lid, body={"agent_id": v})
                     finally:
                         g.folder_applying = False
+                        g.user = prev
                 changed += 1
             elif k in ("agent_members", "agent_peers", "agent_followup", "time_tracking"):  # 2.41.0 (#1423): + agent_followup, (#1471) time_tracking
                 cur = c.execute(f"SELECT {k} FROM lists WHERE id=?", (lid,)).fetchone()[0]

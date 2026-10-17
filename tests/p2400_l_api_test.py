@@ -235,5 +235,12 @@ for body in ({"name": "App", "folder": "Dev", "kind": "project", "ptype": "softw
     lid = A.post(B + "/api/lists", json=body).json()["id"]
     check(dbx("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (lid, HL)) == [("edit",)], f"#1414: {body['name']}: Helper is a member at once")
 
+# 2.82.0 (#1831): applying the folder's agent to the lists already in it (the inner agent call runs as the lists' owner)
+OLD = A.post(B + "/api/lists", json={"name": "Old one"}).json()["id"]
+check(A.patch(B + f"/api/lists/{OLD}", json={"folder": "Ops"}).ok, "#1831: setup: a list in the folder Ops")
+r = A.put(B + "/api/folders/props", json={"folder": "Ops", "props": {"agent_id": HL}, "apply": "all"})
+check(r.ok, "#1831: the folder's agent applied to all its lists " + r.text[:200])
+check(dbx("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (OLD, HL)) == [("edit",)], "#1831: Helper joined the existing list")
+
 print(f"{OKS[0]} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
