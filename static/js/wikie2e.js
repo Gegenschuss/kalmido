@@ -46,8 +46,9 @@ function wkeSetInfo(sp, j) {
 // AES-256-GCM with the space key of generation g; AAD binds space, generation and field ("path" | "body"), no page id (M1:
 // templates and copies in the same space stay readable); padded to 64 bytes like the lists (le2ePad, L1)
 const wkeAad = (sid, g, f) => `kalmido-wiki:v1:${sid}:${g}:${f}`;
-async function wkeEnc(sp, field, text) {
-  if (text == null || text === '') return '';
+async function wkeEnc(sp, field, text, keepEmpty) {
+  if (text == null || (text === '' && !keepEmpty)) return '';
+  if (field === 'body' && String(text).startsWith(WKE_PRE)) text = ' ' + text;  // 2.64.3 E (#1817, review 2 M1): a typed "e2e1:" stays a text on the way back
   const s = WKE.st[sp], g = s?.gen, sid = s?.space_id;
   let key = WKE.keys[sp]?.[g];
   if (!key && s?.mode) key = (await wkeKeys(sp))[g];
@@ -70,6 +71,7 @@ async function wkeTry(sp, c, field, ks) {
 }
 async function wkeDec(sp, field, c) {
   if (!wkeIs(c)) return c ?? '';
+  if (typeof e2eUnlocked === 'function' && !e2eUnlocked()) throw wkeErrLocked();  // 2.64.3 E (#1817, review 2 L1): locked meanwhile, not "unreadable"
   const s = await wkeTry(sp, c, field, await wkeKeys(sp));
   if (s == null) throw wkeErr(s === undefined ? tr('You do not have the key of this space yet.') : tr('The space key could not be opened.'), 'wiki_e2e_key');
   return s;
@@ -210,7 +212,7 @@ function wkeFront(text) {
 }
 // the cleaned path (wiki/pages.py wiki_clean_path): the server cannot clean a cipher, so the browser does it with the same rules
 const WKE_BAD = /[\x00-\x1f\x7f\[\]|#^\\]/g;
-function wkeClean(v) {
+function wkeClean(v, loose) {
   v = String(v ?? '').normalize('NFC').trim();
   if (v.toLowerCase().endsWith('.md')) v = v.slice(0, -3);
   const parts = v.replace(/\\/g, '/').split('/').map(p => p.replace(WKE_BAD, '').replace(/\s+/g, ' ').trim()).filter(Boolean);
@@ -218,7 +220,14 @@ function wkeClean(v) {
   if (parts.length > 12) throw wkeErr(tr('Too many folder levels (at most {0})', 12), 'bad');
   const out = parts.join('/');
   if (out.length > 200) throw wkeErr(tr('The name is too long (at most {0} characters)', 200), 'bad');
+  if (!loose && out.toLowerCase().startsWith(WKE_PRE)) throw wkeErr(tr('Invalid value: {0}', 'path'), 'bad');  // 2.64.3 E (#1817, review 2 M1): like wiki_clean_path
   return out;
+}
+// 2.64.3 E (#1817, review 2 M1): a plain value the server refuses on the way back (it begins like a cipher) gets a character in front
+function wkeDefuse(f, v) {
+  if (f === 'path') { const c = wkeClean(v, true); if (!c.toLowerCase().startsWith(WKE_PRE)) return c; WKE.defused = (WKE.defused || 0) + 1; return ('_' + c).slice(0, 200); }
+  if (!String(v).startsWith(WKE_PRE)) return v;
+  WKE.defused = (WKE.defused || 0) + 1; return ' ' + v;
 }
 const wkeKey = p => { try { return wkeClean(p).toLowerCase(); } catch { return ''; } };
 const WKE_LINK = /\[\[([^\[\]|#\n]{1,250})(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?\]\]/g;
@@ -280,7 +289,7 @@ function wkeSearch(q) {
   const ws = le2eWords(q), out = [];
   if (!ws.length) return out;
   for (const sp in WKE.st) {
-    if (!wkeReady(sp)) continue;
+    if (!wkeReady(sp) || !wk_spaces().includes(sp)) continue;  // 2.64.3 E (#1817, review 2 L5)
     for (const p of wk_pages(sp)) if (le2eHit(ws, p.path, p.body)) out.push({id: p.id, space: sp, org_id: p.org_id, path: p.path, attrs: p.attrs || {}, template: !!p.template, updated_at: p.updated_at, e2e: true});
   }
   return out.slice(0, 30);
@@ -289,7 +298,7 @@ function wkeSearch(q) {
 async function wkeMentions(tid) {
   const out = [];
   for (const sp in WKE.st) {
-    if (!wkeReady(sp)) continue;
+    if (!wkeReady(sp) || !wk_spaces().includes(sp)) continue;  // 2.64.3 E (#1817, review 2 L5)
     for (const p of wk_pages(sp)) if (wkeTasks(p.body).has(tid)) out.push({id: p.id, path: p.path, space: sp});
   }
   return out.sort((a, b) => a.path.localeCompare(b.path, LOCALE())).slice(0, 50);
@@ -394,9 +403,19 @@ function wkeZip(files) {
   [[0, 0x06054b50, 4], [4, 0, 2], [6, 0, 2], [8, files.length, 2], [10, files.length, 2], [12, cs, 4], [16, off, 4], [20, 0, 2]].forEach(([o, v, n]) => n === 4 ? end.setUint32(o, v, true) : end.setUint16(o, v, true));
   return new Blob([...parts, ...cen, new Uint8Array(end.buffer)], {type: 'application/zip'});
 }
-async function wkeInflate(u) {
-  const s = new Blob([u]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-  return new Uint8Array(await new Response(s).arrayBuffer());
+// 2.64.3 E (#1817, review 2 L2): stops at max + 1 bytes (the size in the archive is not trusted)
+async function wkeInflate(u, max = Infinity) {
+  const rd = new Blob([u]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader(), parts = [];
+  let n = 0;
+  for (;;) {
+    const {done, value} = await rd.read();
+    if (done) break;
+    n += value.length; parts.push(value);
+    if (n > max) { rd.cancel().catch(() => {}); throw new Error('zip'); }
+  }
+  const out = new Uint8Array(n); let o = 0;
+  for (const x of parts) { out.set(x, o); o += x.length; }
+  return out;
 }
 // the entries of a ZIP: [{name, method, flags, csize, usize, data()}]; null when it is not one
 function wkeUnzip(buf) {
@@ -447,11 +466,11 @@ async function wkeImport(sp, file) {
   const created = [], skipped = [], seen = new Set(), td = new TextDecoder('utf-8');
   for (const x of files) {
     const nm = x.name.slice(0, 200);
-    if (!x.name.toLowerCase().endsWith('.md') || x.usize > WKE_ZIP.file || x.name.includes('__MACOSX') || (x.flags & 1) || ![0, 8].includes(x.method)) { skipped.push(nm); continue; }
+    if (!x.name.toLowerCase().endsWith('.md') || x.usize > WKE_ZIP.file || x.csize > WKE_ZIP.file + 4096 || x.name.includes('__MACOSX') || (x.flags & 1) || ![0, 8].includes(x.method)) { skipped.push(nm); continue; }
     let path, text;
     try {
       path = wkeClean(x.name);
-      const raw = x.method === 8 ? await wkeInflate(x.data()) : x.data();
+      const raw = x.method === 8 ? await wkeInflate(x.data(), WKE_ZIP.file) : x.data();
       text = td.decode(raw.subarray(0, WKE_ZIP.file)).replace(/^﻿/, '');
     } catch { skipped.push(nm); continue; }
     if (seen.has(path.toLowerCase()) || wk_byPath(sp, path)) { skipped.push(nm); continue; }
@@ -474,7 +493,7 @@ async function wkeImport(sp, file) {
 // one value in the target format of mode: encrypting = a cipher of the current generation, decrypting = the plain text, on
 // (re-encryption after a key change) = an older cipher opened with its generation and encrypted with the current one
 async function wkeConv(sp, mode, gen, f, v) {
-  if (mode === 'decrypting') return wkeIs(v) ? wkeDec(sp, f, v) : v;
+  if (mode === 'decrypting') return wkeIs(v) ? wkeDefuse(f, await wkeDec(sp, f, v)) : v;
   if (le2eParse(v)?.g === gen) return v;
   if (wkeIs(v) && mode === 'on') return wkeEnc(sp, f, await wkeDec(sp, f, v));
   return wkeEnc(sp, f, f === 'path' ? wkeClean(v) : String(v));
@@ -500,6 +519,7 @@ async function wkeMigrate(sp, onProgress, opts = {}) {
         prog(total - left, total);
         if (!left) break;
         if (left === last && ++spins > 2) throw wkeErr(tr('Encryption of this space stopped without progress. Try again later.'), 'wiki_e2e_stuck');
+        if (typeof e2eUnlocked !== 'function' || !e2eUnlocked() || !S.me) throw wkeErrLocked();  // 2.64.3 E (#1817, review 2 L1)
         if (mode !== 'decrypting') await wkeKeys(sp, !wkeReady(sp));
         const rows = [];
         for (const r of todo.pages || []) {
@@ -512,6 +532,7 @@ async function wkeMigrate(sp, onProgress, opts = {}) {
               if (e?.code === 'wiki_e2e_locked') throw e;
               if (mode === 'encrypting' || !blank) { bad.add(r.id + ':' + f); continue; }
               v = f === 'path' ? tr('Unreadable page {0}', r.id) : '';  // taken over as empty (a path is never empty)
+              if (mode === 'on') v = await wkeEnc(sp, f, v, true);  // 2.64.3 E (#1817, review 2 M2): re-encryption takes ciphers only
             }
             o[f] = v; n++;
           }
@@ -639,6 +660,19 @@ function wkeWipe() {
   if (typeof HIST !== 'undefined') for (const k of ['undo', 'redo']) HIST[k] = (HIST[k] || []).filter(e => !(e.wsp && sps.includes(e.wsp)));
   for (const sp of sps) wkeChange(sp);
 }
+// 2.64.3 E (#1817, review 2 L5): the space cannot be read any more (403 / 404): its opened pages, keys and undo steps go
+function wkeForget(sp) {
+  if (typeof WK === 'object') {
+    for (const p of WK.idx[sp]?.pages || []) for (const c of Object.values(p._enc || {})) WKE.memo.delete(c);
+    if (WK.idx[sp]) WK.idx[sp].pages = null;
+    if (WK.pg?.space === sp) { WK.pg = null; WK.edit = false; WK.dirty = false; }
+    WK.men = {};
+  }
+  if (typeof HIST !== 'undefined') for (const k of ['undo', 'redo']) HIST[k] = (HIST[k] || []).filter(e => e.wsp !== sp);
+  const had = !!WKE.st[sp];
+  wkeSet(sp, null);
+  if (had) wkeChange(sp);
+}
 
 // ------------------------------------------------------------------ the view: lock box, bars, marks (wiki.js viewWiki)
 const wkePbar = r => typeof le2u_pbar === 'function' ? le2u_pbar(r) : '';
@@ -721,6 +755,7 @@ async function wkeRun(sp, kind, password) {
     ok = true;
     toast(kind === 'stop' || (kind === 'resume' && !wkeOn(sp)) ? tr('The knowledge pages of this space are readable on the server again') : tr('The knowledge pages of this space are encrypted in the browser'));
     if (WKE.renamed) { toast(trn('{0} page got a new name (the name was taken)', '{0} pages got a new name (the names were taken)', WKE.renamed)); WKE.renamed = 0; }
+    if (WKE.defused) { toast(trn('{0} name or text began like an encrypted value and got a character in front', '{0} names or texts began like an encrypted value and got a character in front', WKE.defused)); WKE.defused = 0; }  // 2.64.3 E (#1817)
   } catch (x) { if (x?.message) toast(x.message); }
   finally { delete WKE.prog[sp]; wkeAfter(sp); }
   return ok;
@@ -813,7 +848,7 @@ async function wkeDlg(sp) {
 }
 // the way back: only who manages the space, with the account password (like the lists)
 async function wkeStopDlg(sp) {
-  if (!await askConfirm(tr('Switch off the encryption of the knowledge pages?'), tr('Your browser decrypts every page and stores it readable again. Then the search, backlinks on the server and agents work again. Old backups keep the encrypted pages.'), {ok: tr('Switch off')})) return false;
+  if (!await askConfirm(tr('Switch off the encryption of the knowledge pages?'), tr('Your browser decrypts every page and stores it readable again. Then the search and backlinks on the server work again. Old backups keep the encrypted pages.'), {ok: tr('Switch off')})) return false;
   if (!await e2eEnsure()) return false;
   let password = '';
   if (E2E.st?.password !== false) {

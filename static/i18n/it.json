@@ -8403,10 +8403,11 @@
   "Encryption…": "Cifratura…",
   "Encryption of the knowledge pages · {0}": "Cifratura delle pagine di conoscenza · {0}",
   "Switch off the encryption of the knowledge pages?": "Disattivare la cifratura delle pagine di conoscenza?",
-  "Your browser decrypts every page and stores it readable again. Then the search, backlinks on the server and agents work again. Old backups keep the encrypted pages.": "Il tuo browser decifra ogni pagina e la salva di nuovo leggibile. Poi ricerca, backlink sul server e agenti funzionano di nuovo. I vecchi backup conservano le pagine cifrate.",
   "Switching off the encryption of the knowledge pages needs your account password.": "Per disattivare la cifratura delle pagine di conoscenza serve la password del tuo account.",
   "Encrypted in the browser (knowledge pages)": "Cifrato nel browser (pagine di conoscenza)",
   "Agents have no access to these knowledge pages.": "Gli agenti non hanno accesso a queste pagine di conoscenza.",
   "{0} released the key for the knowledge pages of {1} to you": "{0} ti ha rilasciato la chiave delle pagine di conoscenza di {1}",
-  "These pages start with \"e2e1:\" and cannot be encrypted. Change them first: {0}": "Queste pagine iniziano con «e2e1:» e non si possono cifrare. Modificale prima: {0}"
+  "These pages start with \"e2e1:\" and cannot be encrypted. Change them first: {0}": "Queste pagine iniziano con «e2e1:» e non si possono cifrare. Modificale prima: {0}",
+  "{0} name or text began like an encrypted value and got a character in front": ["{0} nome o testo iniziava come un valore cifrato e ha ricevuto un carattere davanti", "{0} nomi o testi iniziavano come un valore cifrato e hanno ricevuto un carattere davanti"],
+  "Your browser decrypts every page and stores it readable again. Then the search and backlinks on the server work again. Old backups keep the encrypted pages.": "Il tuo browser decifra ogni pagina e la salva di nuovo leggibile. Poi la ricerca e i collegamenti inversi sul server funzionano di nuovo. I vecchi backup conservano le pagine cifrate."
 }

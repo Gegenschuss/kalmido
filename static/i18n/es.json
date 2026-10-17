@@ -8403,10 +8403,11 @@
   "Encryption…": "Cifrado…",
   "Encryption of the knowledge pages · {0}": "Cifrado de las páginas de conocimiento · {0}",
   "Switch off the encryption of the knowledge pages?": "¿Desactivar el cifrado de las páginas de conocimiento?",
-  "Your browser decrypts every page and stores it readable again. Then the search, backlinks on the server and agents work again. Old backups keep the encrypted pages.": "Tu navegador descifra cada página y la guarda de nuevo legible. Después vuelven a funcionar la búsqueda, los vínculos inversos en el servidor y los agentes. Las copias de seguridad antiguas conservan las páginas cifradas.",
   "Switching off the encryption of the knowledge pages needs your account password.": "Para desactivar el cifrado de las páginas de conocimiento necesitas la contraseña de tu cuenta.",
   "Encrypted in the browser (knowledge pages)": "Cifrado en el navegador (páginas de conocimiento)",
   "Agents have no access to these knowledge pages.": "Los agentes no tienen acceso a estas páginas de conocimiento.",
   "{0} released the key for the knowledge pages of {1} to you": "{0} te ha liberado la clave de las páginas de conocimiento de {1}",
-  "These pages start with \"e2e1:\" and cannot be encrypted. Change them first: {0}": "Estas páginas empiezan por «e2e1:» y no se pueden cifrar. Cámbialas primero: {0}"
+  "These pages start with \"e2e1:\" and cannot be encrypted. Change them first: {0}": "Estas páginas empiezan por «e2e1:» y no se pueden cifrar. Cámbialas primero: {0}",
+  "{0} name or text began like an encrypted value and got a character in front": ["{0} nombre o texto empezaba como un valor cifrado y recibió un carácter delante", "{0} nombres o textos empezaban como un valor cifrado y recibieron un carácter delante"],
+  "Your browser decrypts every page and stores it readable again. Then the search and backlinks on the server work again. Old backups keep the encrypted pages.": "Tu navegador descifra cada página y la guarda de nuevo legible. Después, la búsqueda y los vínculos inversos en el servidor vuelven a funcionar. Las copias de seguridad antiguas conservan las páginas cifradas."
 }

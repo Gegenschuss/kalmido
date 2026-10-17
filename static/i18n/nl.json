@@ -8403,10 +8403,11 @@
   "Encryption…": "Versleuteling…",
   "Encryption of the knowledge pages · {0}": "Versleuteling van de kennispagina’s · {0}",
   "Switch off the encryption of the knowledge pages?": "Versleuteling van de kennispagina’s uitschakelen?",
-  "Your browser decrypts every page and stores it readable again. Then the search, backlinks on the server and agents work again. Old backups keep the encrypted pages.": "Je browser ontsleutelt elke pagina en slaat die weer leesbaar op. Daarna werken zoeken, terugverwijzingen op de server en agenten weer. Oude back-ups behouden de versleutelde pagina’s.",
   "Switching off the encryption of the knowledge pages needs your account password.": "Voor het uitschakelen van de versleuteling van de kennispagina’s heb je je accountwachtwoord nodig.",
   "Encrypted in the browser (knowledge pages)": "In de browser versleuteld (kennispagina’s)",
   "Agents have no access to these knowledge pages.": "Agenten hebben geen toegang tot deze kennispagina’s.",
   "{0} released the key for the knowledge pages of {1} to you": "{0} heeft je de sleutel voor de kennispagina’s van {1} vrijgegeven",
-  "These pages start with \"e2e1:\" and cannot be encrypted. Change them first: {0}": "Deze pagina's beginnen met „e2e1:” en kunnen niet worden versleuteld. Pas ze eerst aan: {0}"
+  "These pages start with \"e2e1:\" and cannot be encrypted. Change them first: {0}": "Deze pagina's beginnen met „e2e1:” en kunnen niet worden versleuteld. Pas ze eerst aan: {0}",
+  "{0} name or text began like an encrypted value and got a character in front": ["{0} naam of tekst begon als een versleutelde waarde en kreeg een teken ervoor", "{0} namen of teksten begonnen als een versleutelde waarde en kregen een teken ervoor"],
+  "Your browser decrypts every page and stores it readable again. Then the search and backlinks on the server work again. Old backups keep the encrypted pages.": "Je browser ontsleutelt elke pagina en slaat die weer leesbaar op. Daarna werken het zoeken en de terugverwijzingen op de server weer. Oude back-ups houden de versleutelde pagina's."
 }
