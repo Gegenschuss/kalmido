@@ -115,7 +115,8 @@ const CASES = {
     }});
   await sleep(2500);
   const w = dom.window;
-  check(w.eval('S.tasks.size') > 0, 'app booted');
+  // 2.74.0 (#1653): the demo starts like a new account (no sample data): booted = the Basket is there
+  check(w.eval('S.lists.some(l => l.is_inbox)'), 'app booted');
   for (const [lang, cases] of Object.entries(CASES)) {
     check(await w.eval(`i18nLoad('${lang}')`), `${lang}: language loaded`);
     let n = 0;
