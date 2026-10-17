@@ -252,7 +252,10 @@ check(A.post(B + f"/api/proposals/{J2}/discard").ok and cards(A, CL) == [], "dis
 check(not dbx("SELECT 1 FROM tasks WHERE title='Call the venue'"), "discard creates nothing")
 
 # ================================================================== a freelancer without an organisation
-FA, fa = agent("fredbot")
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})  # people may connect their own agents
+r = Fr.post(B + "/api/my/agents", json={"username": "fredbot", "scopes": ["read", "tasks:write", "comments"]})
+check(r.status_code == 201, "freelancer: his own personal agent " + r.text[:200])
+FA, fa = r.json()["id"], Api(r.json()["token"])
 FL = Fr.post(B + "/api/lists", json={"name": "My shoots"}).json()["id"]
 share(Fr, FL, FA)
 check(FA in [a["id"] for a in Fr.get(B + "/api/proposals/agents").json()["agents"]], "freelancer: his own agent takes his requests")

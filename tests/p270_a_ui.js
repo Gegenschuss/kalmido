@@ -38,7 +38,8 @@ const dbx = (sql, args = []) => JSON.parse(execFileSync('python3', [path.join(__
   await call('PUT', `/api/lists/${W}/members`, {user_id: CL, role: 'edit'});
   const r2 = await call('PUT', `/api/lists/${W2}/members`, {user_id: OT, role: 'edit'});
   if (r2.status >= 400) dbx("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')", [W2, OT, 'edit', 'edit']);
-  check((await call('PATCH', `/api/admin/agents/${OT}`, {proposals: 'off'})).status === 200, 'setup: otto takes no proposal requests');
+  await call('PATCH', `/api/admin/agents/${OT}`, {proposals: 'off'});
+  check(!((await call('GET', '/api/proposals/agents')).agents || []).some(a => a.id === OT), 'setup: otto takes no proposal requests');
   await call('POST', `/api/agents/${OT}/chat`, {body: 'hello otto'});
 
   // ================= the entry in the chat
@@ -100,7 +101,7 @@ const dbx = (sql, args = []) => JSON.parse(execFileSync('python3', [path.join(__
   await until(() => !d.querySelector(`#chat-mtg .mtgcard[data-jid="${job.id}"]`));
   check(!d.querySelector(`#chat-mtg .mtgcard[data-jid="${job.id}"]`), 'the card goes after apply');
   const made = dbx('SELECT title, created_by, assignee_id FROM tasks WHERE list_id=? AND deleted_at IS NULL ORDER BY id', [W]);
-  check(made.length === 1 && made[0][0] === 'Book the studio' && made[0][1] === me.id && made[0][2] === me.id, 'only the ticked task, created as me ' + JSON.stringify(made));
+  check(made.length === 1 && made[0].title === 'Book the studio' && made[0].created_by === me.id && made[0].assignee_id === me.id, 'only the ticked task, created as me ' + JSON.stringify(made));
   w.close();
 
   // ================= discard
