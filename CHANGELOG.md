@@ -35,6 +35,11 @@ Hardening from the security audit, part 1 (low findings, #1896). No new features
   arrives); events of lists the agent no longer sees are left out; the workload shows an agent only people who share a list
   with it; a token limited to certain lists cannot create lists on import; participants see only the people of the task
   in the mention picker.
+- Audit part 2, before the merge of 2.81-2.86: archived documents of the legacy import - members only assign the client,
+  amount, tax lines and *Paid* only an office admin, no negative amounts, the history marks a member's change (#1968);
+  hub mail - a mail from the person's own address counts as forwarded (the original sender picks the client) only when the
+  receiving mail server confirmed that domain (DKIM / DMARC / SPF pass, `KALMIDO_MAIL_AUTHSERV_ID`), else it stays *Not
+  assigned*; the API task search finds tasks by the recognised text of their files only with `attachments:read`.
 
 ## [2.85.0] - 2026-10-17
 
