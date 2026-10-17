@@ -12,13 +12,14 @@ import json
 import os
 import subprocess
 import sys
-from datetime import date, timedelta
+from datetime import timedelta
 
 import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import testclock  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -47,7 +48,7 @@ def dbx(sql, args=()):
 
 
 def D(n):
-    return (date.today() + timedelta(days=n)).isoformat()
+    return (testclock.today() + timedelta(days=n)).isoformat()
 
 
 if not os.environ.get("P278_NOSTART"):

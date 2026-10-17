@@ -8,8 +8,9 @@ task after a time; my own changes do not count), the server time; sections: crea
 section and its tasks; lists: PATCH with _prev (owner and member fields), reorder with _prev (order, folders); and the
 rights: view-only members change nothing, nobody moves tasks of another list into a section."""
 import os, dbx, sys, time
-from datetime import date, timedelta
+from datetime import timedelta
 import requests
+import testclock
 
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1]
@@ -54,7 +55,7 @@ def tags(s, tid):
     return next(t for t in s.get(B + "/api/state").json()["tasks"] if t["id"] == tid)["tags"]
 
 
-D = lambda n: (date.today() + timedelta(days=n)).isoformat()  # noqa: E731
+D = lambda n: (testclock.today() + timedelta(days=n)).isoformat()  # noqa: E731
 
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")

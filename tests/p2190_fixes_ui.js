@@ -13,6 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const {boot, sleep, B, login, errs} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2190_fixes_ui', check, shots: 'P2190X_SHOTS'});
@@ -82,7 +83,7 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   Object.defineProperty(w.navigator, 'serviceWorker', {configurable: true, value: {getRegistration: async () => reg, register: () => Promise.resolve(), addEventListener() {}, controller: null}});
   const badge = [];
   w.navigator.setAppBadge = async n => { badge.push(n); }; w.navigator.clearAppBadge = async () => { badge.push(0); };
-  const DUE = (await call('POST', '/api/tasks', {title: 'Pay rent', list_id: L, due: new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10)})).id;
+  const DUE = (await call('POST', '/api/tasks', {title: 'Pay rent', list_id: L, due: TC.today()})).id;
   const LATER = (await call('POST', '/api/tasks', {title: 'Some day', list_id: L, due: '2099-01-01'})).id;
   await call('POST', `/api/tasks/${T3}/complete`, {});
   await w.eval('load()');

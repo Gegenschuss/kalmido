@@ -21,6 +21,7 @@ import time
 
 import dbx as dbxm
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -116,7 +117,7 @@ check(r.ok, "office settings with company data " + r.text[:160])
 r = A.post(B + "/api/clients", json={"name": "Beispielkunde AG", "street": "Marktstraße 5", "zip": "50667", "city": "Köln", "country": "DE"})
 assert r.status_code == 201, r.text
 CL = r.json()["id"]
-Y = datetime.date.today().year
+Y = testclock.today().year
 
 
 def draft(s=A):

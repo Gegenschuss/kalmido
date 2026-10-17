@@ -18,11 +18,12 @@ import os
 import subprocess
 import sys
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 
 import requests
 
 import dbx as dbxm
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -86,7 +87,7 @@ Bo = sess("bob")
 Bo.patch(B + "/api/settings", json={"tour": "done", "lang": "de", "features": LIFE})
 ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).json()["id"]
 ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": ALICE}).json()["id"]
-T0 = date.today()
+T0 = testclock.today()
 D = lambda n: (T0 + timedelta(days=n)).isoformat()  # noqa: E731
 
 

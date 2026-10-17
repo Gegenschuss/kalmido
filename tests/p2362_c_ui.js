@@ -9,6 +9,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2362_c_ui', check, shots: 'P2362C_SHOTS'});
@@ -38,7 +39,7 @@ const FEAT = 'cal,events,comments,collab,office,agents';
   await call('PUT', `/api/lists/${L_AG}/members`, {user_id: AG, role: 'edit'});
   await call('PUT', `/api/lists/${L_BOTH}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${L_BOTH}/members`, {user_id: AG, role: 'edit'});
-  const today = new Date().toISOString().slice(0, 10);
+  const today = TC.today();
   await call('POST', '/api/tasks', {title: 'Water the plants', list_id: L_HOME, due: today});
   await call('POST', '/api/evcals', {name: 'Mine', color: '#60a5fa'});
 

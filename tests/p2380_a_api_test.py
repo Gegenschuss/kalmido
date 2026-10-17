@@ -24,6 +24,7 @@ import subprocess
 import sys
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -383,7 +384,7 @@ check(A.post(B + f"{D}/from-time", json={"client_id": CL, "from": "2026-05-31", 
 # ---------------------------------------------------------------- review fixes 2.38.0: back-dating, reminders, credits, payments, sending
 import ast
 import datetime as _dt
-TODAY = _dt.date.today()
+TODAY = testclock.today()
 r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": "2026-05-01", "date": f"{TODAY.year}-01-01", "items": [{"title": "Beratung", "qty": 1, "rate": 100}]})
 BD = r.json()["id"]
 if TODAY.month > 1 or TODAY.day > 1:

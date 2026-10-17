@@ -6,6 +6,7 @@
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p273_l_ui', check, shots: 'P273L_SHOTS'});
@@ -16,7 +17,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore',
 let CK, CB;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return Array.isArray(j) ? j : {...j, _status: r.status}; };
 const recode = (code, u) => { const j = JSON.parse(Buffer.from(code.slice('kalmido-link:'.length), 'base64url').toString()); return {t: j.t, code: 'kalmido-link:' + Buffer.from(JSON.stringify({u, t: j.t})).toString('base64url')}; };
-const day = (n = 0) => { const d = new Date(Date.now() + n * 864e5); return d.toISOString().slice(0, 10); };
+const day = (n = 0) => TC.day(n);
 const bobTasks = async () => { const j = await call('GET', '/api/state', null, CB); return j.tasks || []; };
 
 (async () => {

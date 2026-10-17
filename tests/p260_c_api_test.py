@@ -19,11 +19,12 @@ import os
 import subprocess
 import sys
 import time
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 import requests
 
 import dbx as dbxm
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -318,7 +319,7 @@ acts = [a for a in tl.get("activity", tl.get("items", [])) if a.get("kind") == "
 check(any("acme/app#21" in json.dumps(a) for a in acts) or not acts, "the history names the pull request")
 
 # ---------------------------------------------------------------- repeats: the next occurrence needs its own approval
-T9 = task("Weekly release", due=date.today().isoformat(), repeat="FREQ=WEEKLY")
+T9 = task("Weekly release", due=testclock.today().isoformat(), repeat="FREQ=WEEKLY")
 Bo.patch(B + f"/api/tasks/{T9}", json={"section_id": S2})
 rvw(Ca, T9, action="approve")
 r = Bo.post(B + f"/api/tasks/{T9}/complete")

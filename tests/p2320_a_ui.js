@@ -11,6 +11,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2320_a_ui', check, shots: 'P2320A_SHOTS'});
@@ -42,7 +43,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   const fd = new FormData(); fd.append('file', new Blob([PNG], {type: 'image/png'}), 'moodboard.png');
   r = await fetch(B + `api/lists/${P}/files`, {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: CK}, body: fd});
   check(r.ok, 'an image uploaded to the project ' + r.status);
-  const T0 = (await call('POST', '/api/tasks', {title: 'Call the printer', due: new Date().toISOString().slice(0, 10)})).id;
+  const T0 = (await call('POST', '/api/tasks', {title: 'Call the printer', due: TC.today()})).id;
   const lay = async (ck = CK) => call('GET', `/api/lists/${P}/layout`, null, ck);
   const pov = {'tasks.pov': JSON.stringify([P])};
 

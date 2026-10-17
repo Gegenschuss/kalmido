@@ -19,6 +19,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -90,13 +91,13 @@ def task(title, lid=W, **kw):
 
 
 T_OLD, T_NEW, T_WAIT, T_WAITF = task("Old offer"), task("Fresh task"), task("Waits on Mueller"), task("Waits with a day")
-T_FUT, T_CMT, T_TIME, T_DAVE = task("Due later", due=(date.today() + timedelta(days=20)).isoformat()), task("Commented yesterday"), \
+T_FUT, T_CMT, T_TIME, T_DAVE = task("Due later", due=(testclock.today() + timedelta(days=20)).isoformat()), task("Commented yesterday"), \
     task("Time yesterday"), task("Dave's task", assignee_id=DAVE)
-T_REP, T_PRIV, T_DONE = task("Weekly report", due=date.today().isoformat(), repeat="FREQ=WEEKLY"), task("Private old", PRIV), task("Done long ago")
+T_REP, T_PRIV, T_DONE = task("Weekly report", due=testclock.today().isoformat(), repeat="FREQ=WEEKLY"), task("Private old", PRIV), task("Done long ago")
 T_SUB = A.post(B + "/api/tasks", json={"title": "Old subtask", "list_id": W, "parent_id": T_OLD}).json()["id"]
 T_CAROL = Ca.post(B + "/api/tasks", json={"title": "Carol old", "list_id": CLIST}).json()["id"]
 check(A.put(B + f"/api/tasks/{T_WAIT}/waiting", json={"note": "Mr Mueller"}).ok, "setup: waiting without a follow-up day")
-check(A.put(B + f"/api/tasks/{T_WAITF}/waiting", json={"note": "the office", "until": (date.today() + timedelta(days=5)).isoformat()}).ok,
+check(A.put(B + f"/api/tasks/{T_WAITF}/waiting", json={"note": "the office", "until": (testclock.today() + timedelta(days=5)).isoformat()}).ok,
       "setup: waiting with a follow-up day ahead")
 A.post(B + f"/api/tasks/{T_DONE}/complete")
 OLD = ago(10)

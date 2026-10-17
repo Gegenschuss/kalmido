@@ -25,6 +25,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import testclock  # noqa: E402
 
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -171,7 +172,7 @@ T2 = Bo.post(B + "/api/tasks", json={"list_id": P, "title": "Shot list", "assign
 T3 = Bo.post(B + "/api/tasks", json={"list_id": P, "title": "Script", "assignee_id": BOB}).json()["id"]
 T4 = Bo.post(B + "/api/tasks", json={"list_id": P, "title": "Permit"}).json()["id"]
 check(Bo.post(B + "/api/deps", json={"task_id": T2, "blocker_id": T1}).ok, "setup: shot list waits on the studio")
-dbx("UPDATE tasks SET status=2, completed_at=?, completed_by=? WHERE id=?", (date.today().isoformat() + "T08:00:00+00:00", BOB, T3), write=True)
+dbx("UPDATE tasks SET status=2, completed_at=?, completed_by=? WHERE id=?", (testclock.today().isoformat() + "T08:00:00+00:00", BOB, T3), write=True)
 dbx("UPDATE tasks SET waiting_at=?, wait_note='city office' WHERE id=?", ("2026-10-01T08:00:00+00:00", T4), write=True)
 w = AGS.get(V + f"/lists/{P}/weekly-status").json()
 check(w["counts"]["done"] == 1 and [x["id"] for x in w["done"]] == [T3], f"weekly: done ({w.get('counts')})")
@@ -183,7 +184,7 @@ check(AGS.get(V + f"/lists/{PX}/weekly-status").status_code == 404, "weekly: a l
 
 # =================================================================== #1353 time check + time proposals
 check(Bo.patch(B + f"/api/lists/{P}", json={"time_tracking": True}).ok, "setup: time tracking on in P")
-today = date.today()
+today = testclock.today()
 D1 = today - timedelta(days=3)
 while D1.weekday() > 4:
     D1 -= timedelta(days=1)

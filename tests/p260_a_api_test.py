@@ -16,11 +16,12 @@ import os
 import subprocess
 import sys
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 
 import requests
 
 import dbx as dbxm
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -113,7 +114,7 @@ r = A.put(B + f"/api/lists/{P}/sprint-settings", json={"on": True})
 check(r.ok and r.json()["started_id"], "switching on starts sprint 1 " + r.text[:200])
 S1 = r.json()["started_id"]
 sp = sprints(P)
-td = date.today()
+td = testclock.today()
 first = td + timedelta(days=(0 - td.weekday()) % 7)
 check(len(sp) == 1 and sp[0]["num"] == 1 and sp[0]["state"] == "active", f"one active sprint: {sp}")
 check(sp[0]["start"] == first.isoformat() and sp[0]["end_day"] == (first + timedelta(days=13)).isoformat(),

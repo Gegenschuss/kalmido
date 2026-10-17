@@ -18,6 +18,7 @@ import time
 from datetime import date, datetime, timedelta
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -85,7 +86,7 @@ shutil.copy(os.path.join(N, "fake_carddav.py"), DATA)
 subprocess.run(["docker", "exec", "-d", CT, "python", "/data/fake_carddav.py"])
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-today = date.today()
+today = testclock.today()
 
 # ================================================================== the setup: "What do you use Kalmido for?" = Family (German)
 r = A.post(B + "/api/admin/setup", json={"lang": "de", "collab_all": True, "time_all": True,

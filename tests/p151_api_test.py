@@ -6,6 +6,7 @@ unarchiving brings them back); the statistics weeks start on the viewer's first 
 import json, os, sys, time
 from datetime import date, timedelta
 import requests
+import testclock
 
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1]
@@ -81,7 +82,7 @@ r = A.patch(B + "/api/settings", json={"show_done_views": ""})
 check(r.ok and st()["settings"]["show_done_views"] == "{}", "empty -> {}")
 
 # ---- archived lists
-today = date.today()
+today = testclock.today()
 T0 = today.isoformat()
 L = A.post(B + "/api/lists", json={"name": "Old project"}).json()["id"]
 K = A.post(B + "/api/lists", json={"name": "Keep"}).json()["id"]

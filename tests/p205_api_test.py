@@ -15,12 +15,13 @@ import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
-from datetime import date
+
 
 import http_ece
 import requests
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -255,7 +256,7 @@ clear()
 Bo.post(B + f"/api/tasks/{W}/comments", json={"body": "W"})
 wait_for(lambda: wp_log(), 3)
 clear()
-dbx("UPDATE push_subs SET dismiss_n=30, dismiss_day=?", (date.today().isoformat(),))
+dbx("UPDATE push_subs SET dismiss_n=30, dismiss_day=?", (testclock.today().isoformat(),))
 A.post(B + "/api/push/handled", json={"tasks": [W]})
 time.sleep(5)
 check(not phone.dismisses() and not desk.dismisses(), "daily cap reached: no dismiss push")

@@ -19,6 +19,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -28,7 +29,7 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 TZ = ZoneInfo("Europe/Berlin")
 STUB = "http://127.0.0.1:8095"
 FAILS, OKS = [], [0]
-T = date.today()
+T = testclock.today()
 
 
 def check(cond, what):

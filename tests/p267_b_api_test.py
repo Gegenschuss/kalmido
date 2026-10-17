@@ -12,11 +12,12 @@ usage: p267_b_api_test.py <datadir>      (a fresh container; P267B_NOSTART=1 = t
 import os
 import subprocess
 import sys
-from datetime import date, timedelta
+from datetime import timedelta
 
 import requests
 
 import dbx
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
@@ -24,7 +25,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 FAILS, OKS = [], [0]
-D = lambda n: (date.today() + timedelta(days=n)).isoformat()  # noqa: E731
+D = lambda n: (testclock.today() + timedelta(days=n)).isoformat()  # noqa: E731
 
 
 def check(cond, what):

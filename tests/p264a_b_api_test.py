@@ -21,11 +21,12 @@ import re
 import subprocess
 import sys
 import time
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 import requests
 
 import dbx as dbxm
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -120,7 +121,7 @@ check(r.ok, f"bob joins the list {r.status_code} {r.text[:200]}")
 wh = A.post(B + "/api/me/webhooks", json={"name": "hook", "url": "http://127.0.0.1:8099/hook",
                                            "events": ["task.created", "task.updated", "comment.created"]})
 check(wh.status_code in (200, 201), f"webhook created {wh.status_code} {wh.text[:200]}")
-due = date.today().isoformat()
+due = testclock.today().isoformat()
 r = A.post(B + "/api/tasks", json={"list_id": L, "title": MK + "Title1", "content": MK + "Note1", "url": "https://example.com/" + MK + "Url1",
                                    "due": due, "reminders": "0"})
 assert r.ok, r.text

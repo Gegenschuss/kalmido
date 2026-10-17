@@ -22,6 +22,7 @@ from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -186,7 +187,7 @@ cals = A.get(B + "/api/state").json()["evcals"]
 check([c["name"] for c in cals] == ["Work stuff", "Private"], f"in the state, in their order {[c['name'] for c in cals]}")
 
 # ================================================================== events: validation, time zones, repeat rules
-today = date.today()
+today = testclock.today()
 D = today + timedelta(days=3)
 r = A.post(B + "/api/events", json={"title": "Dentist", "cal_id": P["id"], "start": f"{D}T15:00", "end": f"{D}T14:00"})
 check(r.status_code == 400 and "after the start" in r.json()["error"], "end before start: 400")

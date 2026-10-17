@@ -15,9 +15,10 @@ import os
 import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -99,7 +100,7 @@ check(sb["cal_tasks"] == "1" and sb["cal_lists_hidden"] == "[]", "another person
 check(A.patch(B + "/api/settings", json={"cal_tasks": "1", "cal_lists_hidden": []}).ok, "back to the defaults")
 
 # ================================================================== the day planner: subscriptions + own calendars
-D = date.today() + timedelta(days=7)
+D = testclock.today() + timedelta(days=7)
 while D.weekday() != 2:  # a Wednesday in the future: the window is the whole working day
     D += timedelta(days=1)
 DS = D.isoformat()
@@ -197,7 +198,7 @@ check(inp["builtin"]["plan"] and {x["task_id"] for x in inp["builtin"]["plan"]} 
 A.patch(B + "/api/settings", json={"plan_cals_off": []})
 
 # ================================================================== "Events today" data
-T0 = date.today()
+T0 = testclock.today()
 sub_event(S_WORK, "Standup today", 9, 10, day=T0)
 sub_event(S_OFF, "Hidden today", 9, 10, day=T0)
 A.post(B + "/api/events", json={"title": "Lunch today", "cal_id": C_OWN, "start": f"{T0.isoformat()}T12:00", "end": f"{T0.isoformat()}T13:00"})

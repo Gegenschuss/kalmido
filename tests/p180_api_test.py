@@ -10,6 +10,7 @@ The setup's {sample} flag creates it / stops the tour from asking."""
 import json, os, sys, threading, time
 from datetime import date, timedelta
 import requests
+import testclock
 
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1]
@@ -58,7 +59,7 @@ Bb = sess("bob")
 A.patch(B + "/api/settings", json={"features": ALL, "push_channel": "ntfy"})
 Bb.patch(B + "/api/settings", json={"features": ALL, "lang": "de"})
 st = lambda s=A: s.get(B + "/api/state").json()  # noqa: E731
-T0 = date.today()
+T0 = testclock.today()
 D = lambda n: (T0 + timedelta(days=n)).isoformat()  # noqa: E731
 
 # ---- guards

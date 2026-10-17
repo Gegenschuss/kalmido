@@ -6,8 +6,9 @@ cascade by the same delta, only conflicting tasks, only when postponed, lists wi
 size caps, activity line, the reverse PATCHes of the client's undo, the reorder endpoint), then the migration of
 existing users (features_rev 8, and 9 = "comments" since 2.0.6) after a restart of the container on the same data."""
 import json, os, dbx, subprocess, sys, time
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 import requests
+import testclock
 
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1]
@@ -57,7 +58,7 @@ def feats(s):
     return state(s)["settings"]["features"].split(",")
 
 
-D = lambda n: (date.today() + timedelta(days=n)).isoformat()  # noqa: E731
+D = lambda n: (testclock.today() + timedelta(days=n)).isoformat()  # noqa: E731
 
 # ---- setup presets: the client sends the modules of the chosen card; new users follow them
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok

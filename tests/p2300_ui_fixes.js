@@ -9,6 +9,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2300_ui_fixes', check, shots: 'P2300_SHOTS'});
@@ -45,7 +46,7 @@ const NOOVER = sel => `(() => { const box = document.querySelector('${sel}'); if
   const share = await call('PUT', '/api/folders/people', {folder: 'Clients', user_id: BOB, role: 'edit'});
   check(share.status === 200, '#1044 setup: the folder is shared with Bob ' + share.status);
   // tasks in today's view: the area next to the drawer is full of task rows
-  for (let i = 0; i < 12; i++) await call('POST', '/api/tasks', {title: 'Row behind the drawer ' + (i + 1), list_id: C1, due: new Date().toISOString().slice(0, 10)});
+  for (let i = 0; i < 12; i++) await call('POST', '/api/tasks', {title: 'Row behind the drawer ' + (i + 1), list_id: C1, due: TC.today()});
   const TD = (await call('POST', '/api/tasks', {title: 'Task with code', list_id: C1, content: 'Run this:\n\n```\n' + LONG + '\n```\n\nThen go on.'})).id;
   const AGL = (await call('POST', '/api/lists', {name: 'With the agent'})).id;  // the agent is reachable for Alice through a shared list
   await call('PUT', `/api/lists/${AGL}/members`, {user_id: AG, role: 'edit'});

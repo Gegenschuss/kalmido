@@ -6,6 +6,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -33,7 +34,7 @@ const opts = async key => { const s = (await call('GET', '/api/state')).settings
   const TB = (await call('POST', '/api/tasks', {title: 'Beta work', list_id: BL})).id;
   await call('POST', '/api/time/entries', {task_id: TA, start: new Date(Date.now() - 3 * 36e5).toISOString(), minutes: 30});
   await call('POST', '/api/time/entries', {task_id: TB, start: new Date(Date.now() - 2 * 36e5).toISOString(), minutes: 50});
-  const today = new Date().toISOString().slice(0, 10);
+  const today = TC.today();
   for (let i = 0; i < 12; i++) await call('POST', '/api/tasks', {title: 'Today ' + i, list_id: BL, due: today});
 
   // ---- time tracking: the gear only in Customize, a block with one client only

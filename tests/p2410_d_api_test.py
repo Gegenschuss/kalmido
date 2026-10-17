@@ -11,11 +11,12 @@ usage: p2410_d_api_test.py <datadir>"""
 import os
 import subprocess
 import sys
-from datetime import date, timedelta
+from datetime import timedelta
 
 import requests
 
 import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -69,7 +70,7 @@ for s_ in (Bo, Ca):
     s_.patch(B + "/api/settings", json={"lang": "en", "features": "collab,time,comments"})
 st = lambda s: s.get(B + "/api/state").json()  # noqa: E731
 lst = lambda s, i: next((x for x in st(s)["lists"] if x["id"] == i), None)  # noqa: E731
-D = lambda n: (date.today() + timedelta(days=n)).isoformat()  # noqa: E731
+D = lambda n: (testclock.today() + timedelta(days=n)).isoformat()  # noqa: E731
 
 TEAM = A.post(B + "/api/lists", json={"name": "Team"}).json()["id"]
 A.put(B + f"/api/lists/{TEAM}/members", json={"user_id": BOB, "role": "edit"})
