@@ -1,0 +1,23 @@
+/* Kalmido web client: the styles of the module "stats" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
+   Moved unchanged from app.css (same order); later than app.css in the cascade. */
+.ch-track{fill:var(--bg4)}
+.hmleg{display:flex;align-items:center;gap:.25rem;font-size:.6875rem;margin-top:.375rem}
+.hmleg i{display:inline-block;width:.6875rem;height:.6875rem;border-radius:.1875rem}
+.hmleg i.l0{background:var(--bg4)}
+.hmleg i.l1{background:color-mix(in srgb,var(--accent) 30%,var(--bg4))}
+.hmleg i.l2{background:color-mix(in srgb,var(--accent) 55%,var(--bg4))}
+.hmleg i.l3{background:color-mix(in srgb,var(--accent) 78%,var(--bg4))}
+.hmleg i.l4{background:var(--accent)}
+.sthabits{display:flex;flex-direction:column}
+.sthabits .shh,.sthabits .shr{display:grid;grid-template-columns:minmax(0,1fr) 7rem 5.5rem 2.75rem;gap:.625rem;align-items:center;padding:.375rem 2px;font-size:.8125rem}
+.sthabits .shh{font-size:var(--fs-s);color:var(--muted)}
+.sthabits .shr{border-top:1px solid var(--line);cursor:pointer}
+.sthabits .shr:hover{background:var(--bg3)}
+.sthabits .n{display:flex;align-items:center;gap:.5rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sthabits .n .sw{width:.5625rem;height:.5625rem;border-radius:50%;flex:none}
+.sthabits .rate{display:flex;align-items:center;gap:.5rem}
+.sthabits .rate b{font-variant-numeric:tabular-nums;font-weight:600}
+@media (max-width:899px) {
+  .sthabits .shh,.sthabits .shr{grid-template-columns:minmax(0,1fr) 6rem 4rem 1.875rem;gap:.375rem}
+  .sthabits .rate svg{width:2.5rem}
+}

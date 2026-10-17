@@ -27,10 +27,11 @@ const CAL_KEYS = {1: 'month', 2: 'week', 3: 'day', 4: 'timeline'};
 function kbSelect(ids) { for (const i of ids) S.multi.add(i); if (ids.length) S.multiLast = ids[ids.length - 1]; $$('#view .trow').forEach(r => r.classList.toggle('msel', S.multi.has(+r.dataset.id))); renderMultiBar(); }
 const GO_KEYS = {t: () => go('today'), m: () => go('tomorrow'), w: () => go('week'), d: () => go('doable'), i: () => go('inbox'), c: () => feat('cal') && go('cal'), h: () => feat('habits') && go('habits'), f: () => feat('pomo') && go('pomo'), s: () => settingsModal(), a: () => go('all'), n: () => teamOn() && go('team')};
 S.kf = null;  // keyboard-focused task row (j / k)
-const rowIds = () => $$('#view .trow').map(r => +r.dataset.id).filter(Boolean);
+const rowIds = () => vl_ids().filter(Boolean);  // 2.65.0 (#1825): vl_ids = all rows of the view, also the ones a long list does not draw
 function kfocus(id) {
   S.kf = id;
   $$('#view .trow.kfocus').forEach(r => r.classList.remove('kfocus'));
+  if (id) vl_reveal(id);  // 2.65.0 (#1825): a row a long list does not draw yet is scrolled into its window
   const r = id && $(`#view .trow[data-id="${id}"]`);
   if (r) { r.classList.add('kfocus'); r.scrollIntoView({block: 'nearest'}); }
   // 2.16.0 (#473): the keyboard focus is the real focus (screen readers follow it): the row's title gets it while the
@@ -89,7 +90,7 @@ window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === 'a' && !typing(e.target) && !$('.modal') && !$('.palette') && $('#view .trow')) {
     e.preventDefault(); e.stopPropagation();
     if (isTouch()) S.multiMode = true;  // 2.26.0 (#936): with a mouse a plain click still opens a task (and ends the selection)
-    kbSelect($$('#view .trow').map(r => +r.dataset.id).filter(Boolean)); render(); return;
+    kbSelect(vl_ids().filter(Boolean)); render(); return;  // 2.65.0 (#1825): vl_ids = all rows of the view, also the ones a long list does not draw
   }
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === 'k') {  // anywhere, also while typing
     if ($('.authscreen')) return;
@@ -286,7 +287,7 @@ function palAll() {
     if (modOn(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab
   for (const id of MG_IDS) if (mg_on(id)) add('v:a-' + id, 'view', tr(mg_area(id)[2]), mg_area(id)[1], () => go(mg_target(id)));  // 2.44.0 (#1187): the areas
   // 2.8.0 (#434): the command bar also opens the timeline, the agents and their chats ("ask an agent")
-  if (feat('timeline')) add('v:timeline', 'view', tr('Timeline'), 'timeline', () => { S.rmScrollReset = true; rmSet({v: 'timeline'}, 'none'); go('all'); });
+  if (feat('timeline')) add('v:timeline', 'view', tr('Timeline'), 'timeline', () => { S.rmScrollReset = true; Promise.resolve(rmSet({v: 'timeline'}, 'none')).then(() => go('all')); });  // 2.65.0 (#1823): rmSet may load the timeline first
   if (agentsTab()) {
     add('v:agents', 'view', tr('Agents'), 'bot', () => go('agents'));
     for (const a of (S.agents || []).filter(x => x.enabled)) add('a:chat-' + a.id, 'action', tr('Chat with {0}', a.name), 'comment', () => chatOpen(a.id));

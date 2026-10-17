@@ -108,7 +108,7 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
   await until(() => d.querySelector('#view .ab2tabs'));
   w.eval(`WLV.tab = 'dispo'; DPV.start = '${NMON}'; DPV.data = null; render()`);
   check(await until(() => d.querySelector('#view .dpdays .dpjob')), 'phone: the day list with the jobs');
-  const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
+  const css = require('./boot').allCssSync(); // 2.65.0 (#1824): + the module stylesheets
   check(/@media \(max-width:599px\)\{\.dpgrid\{display:none\}\.dpdays\{display:block\}\}/.test(css) && /\.dpjob\{[^}]*min-height:2\.75rem/.test(css), 'CSS: the grid gives way to the day list, large targets');
   check(/@media \(max-width:599px\)\{\.ab2grid\{display:none\}/.test(css), 'CSS: the absence grid gives way to the list');
   w.close();

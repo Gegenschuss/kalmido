@@ -117,9 +117,10 @@ for s, lid, uid, org in ((Bo, LA, BOB, ALPHA), (Ca, LB, CAROL, BETA)):
     # 2.63.0 (#1513): portal_tickets.task_id is unique as well: one ticket per organisation on that task
     sql("INSERT INTO portal_tickets(task_id,list_id,org_id,token,token_hash,created_at) VALUES(?,?,?,'x',?,'2026-01-01') ON CONFLICT DO NOTHING",
         (tid, lid, org, f"rls-{org}"))
-    # 2.61.0 (#1820): file_text without its file is deleted by the text scan worker while it waits ('wait'): a finished row
-    sql("INSERT INTO file_text(kind,ref_id,org_id,ws,state,created_at,updated_at) VALUES('att',?,?,?,'skip','2026-01-01','2026-01-01') "
-        "ON CONFLICT DO NOTHING", (-org, org, f"o{org}"))
+    # 2.61.0 (#1820): file_text is unique per (kind, ref_id): one recognised text row per organisation (fill_row would repeat the pair)
+    # (state skip: the recognition worker would drop a waiting row whose file does not exist)
+    sql("INSERT INTO file_text(kind,ref_id,org_id,ws,state,created_at,updated_at) VALUES('att',?,?,?,'skip','2026-01-01','2026-01-01') ON CONFLICT DO NOTHING",
+        (900000 + org, org, f"org:{org}"))
 for s, nm in ((Bo, f"{MARK} cal"), (Ca, "Beta cal")):
     assert s.post(B + "/api/evcals", json={"name": nm}).ok
     assert s.post(B + "/api/books", json={"name": nm.replace("cal", "book")}).ok

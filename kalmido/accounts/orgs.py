@@ -361,9 +361,10 @@ def list_org_set(c, lid, v):
     for (uid,) in c.execute("SELECT user_id FROM list_members WHERE list_id=? ORDER BY user_id", (lid,)).fetchall():
         ws_check_member(c, lid, uid, org_id=oid or 0)
     c.execute("UPDATE lists SET org_id=? WHERE id=?", (oid, lid))
-    if oid:
-        from ..admin.orgcrypt_cli import oc_migrate_kick
-        oc_migrate_kick()  # 2.42.0 (#828): the list's files get the organisation's key now
+    from ..admin.orgcrypt_cli import oc_settle_kick
+    # 2.42.0 (#828): the list's files get the organisation's key now; 2.64.0 (#1864): out of it the owner's account key
+    # (only this list's files, after the request)
+    oc_settle_kick([lid])
     return True
 
 
@@ -400,6 +401,8 @@ def ws_private_for(c, lid):
     if ag:
         raise Denied(409, tr("{0} works in another workspace ({1}): an agent joins only lists of its own workspace", ag["display_name"] or ag["username"], _org_name(c, oid)))
     c.execute("UPDATE lists SET org_id=NULL WHERE id=?", (lid,))
+    from ..admin.orgcrypt_cli import oc_settle_kick
+    oc_settle_kick([lid])  # 2.64.0 (#1864): its files get the owner's account key
 
 
 def ws_migrate(c):
@@ -642,7 +645,8 @@ def org_delete(oid):
         # folder (stored invoices, archive) removed
         from ..admin.orgcrypt_cli import before_org_delete
         from ..core.orgcrypt import oc_drop_key
-        before_org_delete(c, oid)
+        if before_org_delete(c, oid)[1]:  # 2.64.0 (#1864): a file that lives on could not be resealed: keep the key
+            raise Denied(409, tr("Some files could not be encrypted again for their new place. Nothing was deleted; see the server log."))
         oc_drop_key(c, oid)
         c.execute("DELETE FROM orgs WHERE id=?", (oid,))
         bump(c)
@@ -789,6 +793,8 @@ def org_leave(c, oid, uid, heir):
             n += 1
         else:
             c.execute("UPDATE lists SET org_id=NULL WHERE id=?", (lr["id"],))
+            from ..admin.orgcrypt_cli import oc_settle_kick
+            oc_settle_kick([lr["id"]])  # 2.64.0 (#1864): its files get the owner's account key
     for (lid,) in c.execute("SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.org_id=?", (uid, oid)).fetchall():
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))

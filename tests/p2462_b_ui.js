@@ -159,7 +159,7 @@ const shift = card => card.style.transform;
   const msg = await until(() => [...d.querySelectorAll('#tc-msgs .cbub')].some(x => /Hello studio/.test(x.textContent)));
   check(msg && !!d.querySelector('#tc-in'), '#1719: the team window shows the conversation and its box');
   // jsdom applies no style sheet: the rule that hides the list of conversations, Back and the top bar in a chat window
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   check(d.documentElement.classList.contains('mini-chat') && /html\.mini-chat #top,html\.mini-chat \.chback,html\.mini-chat \.tcback,html\.mini-chat \.tclist\{display:none!important\}/.test(css), '#1719: no list of conversations, Back or top bar in the window');
   // a new message comes live (the box without focus: the poll holds team updates back while someone types, as in any tab)
   d.activeElement?.blur?.();

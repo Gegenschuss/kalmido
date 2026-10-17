@@ -218,6 +218,8 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.66.0 (#1835): merging duplicate contacts / clients and its undo stay with people for now; the agent tool follows with #1357",
+     ("=POST /api/contacts/merge", "=POST /api/contacts/merges/{}/undo", "=POST /api/clients/merge", "=POST /api/clients/merges/{}/undo")),
     ("2.59.0 (#1375): the hint while a person types a new task's title and the client's on / off of the related tasks; agents "
      "use related_tasks and search_tasks with semantic", ("=POST /api/tasks/similar", "=GET /api/related/config")),
     ("2.60.0 (#343): planning sprints stays with the people of a list -- switching sprints on, planning, editing, starting, closing "

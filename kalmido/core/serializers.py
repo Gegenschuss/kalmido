@@ -6,13 +6,14 @@ from ..core.config import ATT_DIR
 from ..core.i18n import tr
 from ..accounts.session import me
 from ..core.access import plists, PROJ_SQL, pvis
+from ..core.pg import st_ids
 
 
 # ---------------------------------------------------------------- serializers
 
 def task_dict(r, tags, full_snips=False):
     from ..family.family import fam_task_out
-    d = dict(r)
+    d = dict(zip(r.keys(), r)) if isinstance(r, tuple) else dict(r)  # 2.65.0 (#1505): a row at once, not key by key
     d.pop("reminded", None)
     d.pop("nag_at", None)
     # 2.18.0 (#430): ms only on milestones, milestone_id only when set (keeps every other task's dict as it was)
@@ -46,6 +47,12 @@ def task_dict(r, tags, full_snips=False):
 def tags_for(c, ids=None, uid=None):
     out = {}
     uid = uid or me()
+    if ids is not None:  # 2.65.0 (#1505): only the rows of these tasks (one array parameter)
+        ids = set(ids)
+        for r in c.execute("SELECT task_id, tag FROM task_tags WHERE user_id=? AND task_id = ANY(CAST(? AS BIGINT[])) ORDER BY tag",
+                           (uid, st_ids(ids))):
+            out.setdefault(r["task_id"], []).append(r["tag"])
+        return out
     for r in c.execute("SELECT task_id, tag FROM task_tags WHERE user_id=? ORDER BY tag", (uid,)):
         if ids is None or r["task_id"] in ids:
             out.setdefault(r["task_id"], []).append(r["tag"])
@@ -68,12 +75,17 @@ def load_tasks(c, where, args=(), full_snips=False):
             pv, _, ctx = pvis(c, viewer)
             rows = [r for r in rows if r["list_id"] not in pl or r["id"] in pv]
     ids = {r["id"] for r in rows}
+    # 2.65.0 (#1505): files, comments, field values and AI usage read only the rows of these tasks (one array parameter, the
+    # tables' task_id indexes) instead of every row of the instance; the Python filters on ids stay (same result). The
+    # dependency queries stay as they were (with the array the planner picks a far slower plan)
+    idl = st_ids(sorted(ids))
     tags = tags_for(c, ids)
     ltags = ltags_for(c, ids) if ids else {}
     atts = {}  # the task's own files; files of comments are shown inside their comment (timeline)
     # 2.30.0 (#380): agent = the name of the agent that stored the file ("Created by agent" in the app), else absent
     for a in c.execute("""SELECT a.id, a.task_id, a.name, a.mime, a.size, a.created_at, u.kind, u.display_name, u.username, a.enc, a.enc_by
-                          FROM attachments a LEFT JOIN users u ON u.id=a.user_id WHERE a.comment_id IS NULL ORDER BY a.id"""):
+                          FROM attachments a LEFT JOIN users u ON u.id=a.user_id WHERE a.comment_id IS NULL
+                          AND a.task_id = ANY(CAST(? AS BIGINT[])) ORDER BY a.id""", (idl,)):
         if a["task_id"] in ids:
             d = {k: a[k] for k in ("id", "name", "mime", "size", "created_at")}
             if a["enc"]:  # 2.42.0 (#828): encrypted in the browser; mine = I uploaded it (only I can open it)
@@ -95,7 +107,8 @@ def load_tasks(c, where, args=(), full_snips=False):
                                               AND k.choices->>'withdrawn_at' IS NULL AND COALESCE(k.choices->>'expires_at', '9') > ?
                                               THEN 1 ELSE 0 END) AS a
                               FROM comments k LEFT JOIN task_seen s ON s.task_id=k.task_id AND s.user_id=?
-                              WHERE k.deleted_at IS NULL GROUP BY k.task_id""", (uid, iso_ms(now_utc()), uid)):
+                              WHERE k.deleted_at IS NULL AND k.task_id = ANY(CAST(? AS BIGINT[])) GROUP BY k.task_id""",
+                           (uid, iso_ms(now_utc()), uid, idl)):
             if r["task_id"] in ids:
                 cms[r["task_id"]] = (r["n"], r["u"] or 0, r["a"] or 0)
     # custom field values (fields of the task's current list) and dependencies: blocked = open blockers
@@ -103,7 +116,7 @@ def load_tasks(c, where, args=(), full_snips=False):
     fvs, blk, bing = {}, {}, {}
     if ids:
         for r in c.execute("""SELECT v.task_id, v.field_id, v.value FROM task_field_values v JOIN list_fields f ON f.id=v.field_id
-                              JOIN tasks t ON t.id=v.task_id WHERE f.list_id=t.list_id"""):
+                              JOIN tasks t ON t.id=v.task_id WHERE f.list_id=t.list_id AND v.task_id = ANY(CAST(? AS BIGINT[]))""", (idl,)):
             if r["task_id"] in ids:
                 fvs.setdefault(r["task_id"], {})[str(r["field_id"])] = r["value"]
         from ..lists.formula import fx_fill
@@ -123,7 +136,8 @@ def load_tasks(c, where, args=(), full_snips=False):
     aiu = {}  # 2.1.1 (#326): model usage agents reported for the task ("AI usage" in the task panel)
     if ids and uid and c.execute("SELECT 1 FROM agent_usage WHERE task_id IS NOT NULL LIMIT 1").fetchone():
         for r in c.execute("""SELECT task_id, COUNT(*) AS n, SUM(input_tokens+output_tokens+cache_write_tokens) AS tok,
-                                     SUM(cost_usd) AS cost FROM agent_usage WHERE task_id IS NOT NULL GROUP BY task_id"""):
+                                     SUM(cost_usd) AS cost FROM agent_usage WHERE task_id = ANY(CAST(? AS BIGINT[])) GROUP BY task_id""",
+                           (idl,)):
             if r["task_id"] in ids:
                 aiu[r["task_id"]] = {"tokens": r["tok"] or 0, "cost": round(r["cost"], 4) if r["cost"] is not None else None,
                                      "calls": r["n"]}

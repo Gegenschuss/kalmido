@@ -42,6 +42,16 @@ if len(set(lazy)) != len(lazy):
     ERR.append("sw.js LAZY names a module twice")
 if sorted(tags + lazy) != files:
     ERR.append(f"index.html script tags + LAZY vs static/js/: missing {sorted(set(files) - set(tags) - set(lazy))}, unknown {sorted(set(tags + lazy) - set(files))}")
+# 2.65.0 (#1824): the stylesheets loaded with a module: LAZY_CSS in sw.js = the files of LD_CSS in lazyload.js (same order) =
+# static/css/*.css, each once
+lazy_css = re.findall(r"'/static/css/([\w-]+\.css)'", (re.search(r"LAZY_CSS = \[(.*?)\];", sw, re.S) or [None, ""])[1])
+_lc = re.search(r"const LD_CSS = \{(.*?)\};", read("static", "js", "lazyload.js"), re.S)
+ld_css = [f + ".css" for f in re.findall(r"'([\w-]+)'", re.sub(r"^\s*\w+:", "", _lc.group(1), flags=re.M))] if _lc else []
+css_files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "static", "css", "*.css")))
+if lazy_css != ld_css:
+    ERR.append(f"sw.js LAZY_CSS differs from LD_CSS in static/js/lazyload.js (same files, same order): {lazy_css} vs {ld_css}")
+if sorted(lazy_css) != css_files or len(set(lazy_css)) != len(lazy_css):
+    ERR.append(f"sw.js LAZY_CSS vs static/css/: missing {sorted(set(css_files) - set(lazy_css))}, unknown {sorted(set(lazy_css) - set(css_files))}")
 if len(set(tags)) != len(tags):
     ERR.append("index.html loads a module twice")
 if tags and tags[-1] != "main.js":
@@ -80,6 +90,7 @@ TENANT_EXEMPT = {
     "habits": _OWN, "pl_conns": _OWN + " (Paperless connection, unused since 2.36.0, kept)",
     "pl_conn_users": "who could use a shared Paperless connection (unused since 2.36.0, kept)", "pl_tokens": _OWN,
     "user_task_order": _OWN + " (2.40.0 #1344: the own order of My tasks; rows only for tasks the person sees)",
+    "user_keys": _OWN + " (2.64.0 #1864: the wrapped account key; read and written only by core/orgcrypt.py as system, never served)",
     "wait_hidden": _OWN + " (2.41.0 #1205: Waiting-on texts the person took out of their own suggestions)",
     "view_layouts": _OWN + " (2.55.0 #1069: saved arrangements of a view; layout json only, no content)",
     "e2e_keys": _OWN + " (2.42.0 #828: the person's public key + wrapped key bundle; others only get the public key of a DM partner)",

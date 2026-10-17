@@ -196,7 +196,7 @@ const feats = st => st.settings.features.split(',');
   w.close();
   // 1.8.1: the sign-in / setup screens are centered on every width (tablets in portrait got a bottom sheet under 900 px)
   // and opaque in every theme; a tour card without a target sits in the middle of the screen
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   const rule = (css.match(/\.modal\.authscreen,:root\[data-theme\] \.modal\.authscreen\{([^}]*)\}/) || [])[1] || '';
   check(/align-items:center/.test(rule) && /background:var\(--bg\)/.test(rule), 'CSS: auth screen centered + opaque, after the phone bottom-sheet rule: ' + rule);
   check(css.lastIndexOf('.modal{align-items:end') < css.indexOf('.modal.authscreen,'), 'CSS: the centering rule comes after the bottom-sheet rule');

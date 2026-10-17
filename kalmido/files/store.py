@@ -12,7 +12,7 @@ Rules (the same as lists, see core/access.py):
 - kind 'link' points to a task file (ref_kind 'att') or a project file ('list_file'): reading it needs the rights on the
   original as well (no move, no copy). 'page' (#1199) is reserved: a node need not have a stored file.
 - Contents are versions (fs_versions, ATT_DIR/files/<node>/<uuid>), sealed with the organisation's key at rest (orgcrypt,
-  like task files: a private file stays plain). Deleting moves into the trash (deleted_at, the subtree with it);
+  like task files; 2.64.0 (#1864): a private file with its owner's account key). Deleting moves into the trash (deleted_at, the subtree with it);
   fs_purge removes for good and calls the hooks in fs_on_delete (other packages clean their own rows).
 
 Functions of the interface (kalmido/docs and the import use them; signatures are fixed): fs_role, need_node, fs_put,
@@ -275,14 +275,21 @@ def _check_data(name, data):
         raise ValueError(tr("{0}: larger than {1} MB", name, MAX_FILE_MB))
 
 
+def fs_space(org_id, owner_id):
+    """2.64.0 (#1864): the key space of a node's files: its organisation, else its owner's account."""
+    from ..core.orgcrypt import oc_user_space
+    return int(org_id) if org_id else oc_user_space(owner_id)
+
+
 def _store_version(c, nid, org_id, data, mime, uid):
-    """Write data as the next version of node nid (sealed for an organisation) and point the node at it. Returns the no."""
+    """Write data as the next version of node nid (sealed for an organisation) and point the node at it. Returns the no.
+    2.64.0 (#1864): org_id = the space id (fs_space: the organisation, else the owner's account key)."""
     from ..notify.alerts import aa_count, aa_oserr
     d = os.path.join(ATT_DIR, FS_DIR, str(int(nid)))
     rel = os.path.join(FS_DIR, str(int(nid)), uuid.uuid4().hex[:16])
     try:
         os.makedirs(d, exist_ok=True)
-        oc_write_file(c, org_id or 0, os.path.join(ATT_DIR, rel), bytes(data))
+        oc_write_file(c, org_id or 0, os.path.join(ATT_DIR, rel), bytes(data), fresh=True)
     except OSError as e:
         aa_count("storage", "files", aa_oserr(e))
         raise
@@ -325,7 +332,7 @@ def fs_put(c, uid, parent_id, name, data, mime=None, org_id=None, agent_id=None,
                           VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                     (parent_id or None, "file", _free_name(c, parent_id, owner, org, name), owner, org, agent_id,
                      mime, len(data), uid, ts, ts))  # 2.61.0 (#1818): the type of the upload checks (octet-stream from the content stays)
-    _store_version(c, nid, org, data, mime, uid)
+    _store_version(c, nid, fs_space(org, owner), data, mime, uid)  # 2.64.0 (#1864): sealed with the space's key, also private
     up_after_store(c, "fs", nid, org, info)
     if up is not None:
         up.update(info)
@@ -351,7 +358,7 @@ def fs_new_version(c, nid, data, mime=None):
     data, mime, info = up_check(c, n["name"], data, _mime_of(n["name"], mime or n["mime"]), uid, n["org_id"], "fs")
     if uid:
         quota_guard(c, uid, len(data))
-    no = _store_version(c, nid, n["org_id"], data, mime, uid)
+    no = _store_version(c, nid, fs_space(n["org_id"], n["owner_id"]), data, mime, uid)  # 2.64.0 (#1864)
     up_after_store(c, "fs", nid, n["org_id"], info)
     return no
 

@@ -74,6 +74,13 @@ def main(argv):
     os.makedirs(os.path.join(st, "js"), exist_ok=True)
     for m in lazy:
         write(os.path.join(st, "js", m), read(os.path.join(STATIC, "js", m)))
+    # 2.65.0 (#1824): their stylesheets (LAZY_CSS in sw.js, static/css/) stay own files as well: loadModule loads them
+    # beside the module, and a missing one would stop the module from loading in the demo
+    lcss = re.search(r"const LAZY_CSS = \[([^\]]*)\]", read(os.path.join(STATIC, "sw.js")))
+    if lcss:
+        os.makedirs(os.path.join(st, "css"), exist_ok=True)
+        for f in re.findall(r"'/static/css/([\w-]+\.css)'", lcss.group(1)):
+            write(os.path.join(st, "css", f), read(os.path.join(STATIC, "css", f)))
     i18n = read(os.path.join(STATIC, "i18n.js"))
     write(os.path.join(st, "i18n.js"), replace(i18n, "/static/i18n/", "static/i18n/", "i18n.js"))
     css = read(os.path.join(STATIC, "app.css"))

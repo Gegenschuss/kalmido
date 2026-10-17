@@ -12,7 +12,7 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
   const CK = await login('alice');
   const call = async (method, url, body) => (await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined})).json();
   const T = (await call('POST', '/api/tasks', {title: 'Water plants'})).id;
-  const css = await (await fetch(B + 'static/app.css')).text();
+  const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   const m = css.match(/@media \(min-width:900px\) and \(hover:none\),\(min-width:900px\) and \(pointer:coarse\)\{([\s\S]*?)\n\}/);
   check(m && /#fab\{display:grid;[^}]*position:fixed;right:1\.25rem;bottom:calc\(var\(--safe-b\) \+ 1\.25rem\)/.test(m[1]), 'stylesheet: the "+" button on touch screens >= 900 px, bottom right with the safe area, no tab bar offset');
   check(m && /#fab\.gone\{display:none\}/.test(m[1]) && /#app\.detail-open #fab\{right:calc\((?:var\(--detW,25\.5rem\)|25\.5rem) \+ 1\.25rem\)\}/.test(m[1]), 'stylesheet: hidden where it does not belong, left of the open detail pane');

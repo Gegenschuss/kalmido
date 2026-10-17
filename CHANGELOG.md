@@ -7,6 +7,55 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.66.0] - 2026-10-17
+
+**In short:** duplicate contacts and duplicate clients can be merged by hand - pick the record that stays and, per field,
+the value it keeps; everything linked moves along, and the merge can be undone for 30 days.
+
+### Added
+- **Merge contacts:** tick two or more contacts, *Merge*: choose the contact that stays and, where the entries differ, which
+  value each field keeps; phone numbers, e-mail addresses, addresses, web links and groups are joined. Linked tasks, event
+  attendances, client contact persons and "stay in touch" move to the kept contact; the others disappear from the address
+  book and, over CardDAV, from your devices (#1835).
+- **Merge clients:** the same in the clients list; offers, invoices, contracts, archive entries, projects, trips, deals and
+  contact persons move to the kept client. Issued invoices keep the address they were printed with, only the client
+  changes (#1835).
+- **Undo and history:** an overview of what moves where before the merge, *Undo* right after it and in the history of the
+  kept contact / client for 30 days (#1835).
+
+## [2.65.0] - 2026-10-17
+
+**In short:** Kalmido **starts faster** and **long lists stay smooth**: a smaller start, compressed answers, and only the
+rows you see are drawn.
+
+### Changed
+- Faster start with many tasks: `GET /api/state` with 5,000 tasks takes about 160 ms instead of 333 ms; a single task loads
+  only its own rows (#1505).
+- JSON answers go out gzip-compressed when the browser accepts it: the start state with 5,000 tasks shrinks from 3.6 MB to
+  158 KB (#1505).
+- Less at start: agent chat, calendar, statistics, knowledge pages, mind maps, PDF preview, documents, Home & life,
+  timeline / roadmap, playbooks, integrations and parts of the settings load when first opened and ahead of time while
+  idle (not in data saver mode); still available offline (#1823).
+- The styles of these areas live in their own files and arrive with the area, without a flash (#1824).
+- Long lists stay smooth: from 300 rows Kalmido draws only the rows around the visible part (lists, Today, All,
+  Completed, Trash, contacts); redrawing 5,000 tasks takes 21 ms instead of 331 ms; selection, keyboard, dragging and the
+  scroll position work across the whole list (#1825).
+- Performance budget in CI: start size and load time are measured, a too large state turns CI red
+  (`tools/perf_budget.py`, `tools/perf_budget.json`) (#1822).
+
+## [2.64.0] - 2026-10-17
+
+### Security
+- Security fix (files at rest): the files of the private space (attachments of tasks and comments in lists without an
+  organisation, their project files, the own file store and documents, files in chats with agents) are now stored
+  encrypted on the server with a key per person, wrapped with `KALMIDO_SECRET_KEY` like the organisation keys (#1864).
+  Server-side encryption, not end-to-end: everyone who may see a file gets it as before.
+- Existing files are encrypted by the start-up pass (in portions); a file that moves into another space (task, list,
+  new list owner) is sealed again for it. Deleting an account deletes its key.
+- The way back: `python -m kalmido.admin.orgcrypt_cli decrypt-private` (before a downgrade below 2.64; `decrypt-all`
+  covers it too), `encrypt-private`, and `rewrap-accounts` after a planned change of the server key. See SELF-HOSTING.md,
+  *Encryption of private files*.
+- `decrypt-all` now also covers the versions of the file store and the files of agent chats.
 ## [2.63.0] - 2026-10-17
 
 **In short:** a list's form becomes a **report form for customers** - a type for every report, one file, and a **link to

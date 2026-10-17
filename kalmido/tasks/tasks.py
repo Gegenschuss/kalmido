@@ -52,6 +52,11 @@ def can_move(c, src, dst):
 def check_move(c, src, dst):
     if not can_move(c, src, dst):
         raise Denied(403, tr("Only the list owner can move tasks out of this shared list"))
+    if src != dst:  # 2.64.0 (#1864): into another space -> the moved tasks' files get its key (after the commit)
+        from ..core.orgcrypt import oc_enabled, oc_list_space
+        if oc_enabled() and oc_list_space(c, src) != oc_list_space(c, dst):
+            from ..admin.orgcrypt_cli import oc_settle_kick
+            oc_settle_kick([dst])
 
 
 def move_subtree(c, tid, lid):

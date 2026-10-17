@@ -931,6 +931,22 @@ fresh; run p263_c_ui node p263_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.63.0 part B: #1513 the customer portal (status page, answers, sign-in, mails, agents) and the task panel's customer report
 fresh; run p263_b_api "$PY" p263_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p263_b_ui node p263_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.0: #1864 private files encrypted at rest (account keys), own container with KALMIDO_SECRET_KEY
+fresh; run p264_api "$PY" p264_api_test.py "$KALMIDO_TEST_DATA"
+# 2.65.0 part C: start-up performance budget (static tool, deliberately oversized state turns it red) + start time in the browser
+       run perf_budget "$PY" perf_budget_test.py
+# 2.65.0 part A: GET /api/state with 5000 tasks: time, size, gzip, the same state for every viewer (#1505)
+fresh; run p265_a_api "$PY" p265_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.65.0 part D: long lists draw only the rows near the visible part (#1825)
+fresh; run p265_d_ui node p265_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.65.0 part B: more areas load on demand (agent chat, calendar, statistics, knowledge pages, mind maps, PDF, documents) + their stylesheets
+fresh; run p265_b_ui node p265_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.66.0 part B: merging duplicate clients (#1835): dry overview, move + undo, locked invoices, billed time, rights
+fresh; run p266_b_api "$PY" p266_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p266_b_ui node p266_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.66.0 part A: merging duplicate contacts (#1835): links, CardDAV, undo, rights
+fresh; run p266_a_api "$PY" p266_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p266_a_ui node p266_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

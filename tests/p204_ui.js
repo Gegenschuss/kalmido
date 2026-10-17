@@ -93,7 +93,7 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   check(JSON.stringify(opts.map(o => o.dataset.st)) === JSON.stringify(want), 'picker offers every status + none');
   check(opts.every(o => o.classList.contains('st-' + (o.dataset.st || 'none')) && o.querySelector('i')), 'every option carries its st-* class and a dot');
   w.close();
-  const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
+  const css = require('./boot').allCssSync(); // 2.65.0 (#1824): + the module stylesheets
   const stopt = (css.match(/(^|\n)\.stopt\{[^}]*\}/) || [''])[0];
   check(stopt && !/--sc\s*:/.test(stopt), '.stopt no longer resets --sc (the st-* colour wins)');
   check(/\.stopt i\{[^}]*background:var\(--sc/.test(css), 'the dot uses --sc');

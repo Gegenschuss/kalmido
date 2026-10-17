@@ -51,7 +51,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(wa && wa.classList.contains('acol') && wa.classList.contains('agent') && wa.querySelector('.abot-b'), 'the agent: its colour + the robot badge');
   const wm = who('me');
   check(wm && wm.classList.contains('me'), '"me" keeps the accent class');
-  const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
+  const css = require('./boot').allCssSync(); // 2.65.0 (#1824): + the module stylesheets
   check(/\.acol:not\(\.pic\):not\(\.me\)\{background:var\(--acol\)/.test(css) && /\.acol\.pic:not\(\.me\)\{box-shadow:0 0 0 1\.5px var\(--acol\)/.test(css),
     'CSS: fill without a photo, thin ring with one, never on "me" (the accent goes first)');
   check(w.eval(`AC_COLORS.every(c => { const x = ac_darkInk(c); const l = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255).map(v => v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4); const L = .2126 * l[0] + .7152 * l[1] + .0722 * l[2]; return (x ? (L + .05) / (.0098 + .05) : 1.05 / (L + .05)) >= 4.5; })`),

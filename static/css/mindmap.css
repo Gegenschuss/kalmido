@@ -1,0 +1,42 @@
+/* Kalmido web client: the styles of the module "mindmap" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
+   Moved unchanged from app.css (same order); later than app.css in the cascade. */
+.mmwrap{display:flex;flex-direction:column;gap:.5rem;min-height:0}
+.mmbar{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
+.mmstage{position:relative;overflow:hidden;height:calc(100vh - 15rem);min-height:18rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg);touch-action:none;outline:none;cursor:grab}
+.mmstage:focus-visible{box-shadow:0 0 0 2px var(--accent)}
+.mmstage.mmdragging{cursor:grabbing}
+.mmcanvas{position:absolute;left:0;top:0;transform-origin:0 0}
+.mmsvg{display:block;overflow:visible}
+.mmline{fill:none;stroke:var(--accent);stroke-width:1.6;opacity:.7}
+.mmline.done{opacity:.3}
+.mmnode{cursor:pointer}
+.mmnode rect{fill:var(--bg2);stroke:var(--line2);stroke-width:1}
+.mmnode .mmt{fill:var(--text);font:.875rem system-ui,-apple-system,"Segoe UI",sans-serif}
+.mmnode .mmm{fill:var(--muted);font-size:.6875rem}
+.mmnode.root rect{fill:var(--accent);stroke:var(--accent)}
+.mmnode.root .mmt{fill:#fff;font-weight:700}
+.mmnode.sec .mmt{font-weight:700}
+.mmnode.done{opacity:.5}
+.mmnode.done .mmt{text-decoration:line-through}
+.mmnode.sel rect{stroke:var(--accent);stroke-width:2.5}
+.mmnode.drop rect{stroke:var(--accent);stroke-dasharray:4 3;stroke-width:2.5}
+.mmnode.lift rect{stroke:var(--accent);stroke-width:3;fill:var(--accent-soft)}
+.mmfold circle{fill:var(--accent)}
+.mmfold text{fill:#fff;font-size:.625rem}
+.mmedit{position:absolute;z-index:3;padding:0 .5rem;border:2px solid var(--accent);border-radius:.5625rem;background:var(--bg);color:var(--text)}
+.mmhint{font-size:var(--fs-xs);margin:0}
+.mmoutline,.mmoutline ul{list-style:none;margin:0;padding:0}
+.mmoutline ul{padding-left:1.25rem;border-left:1px solid var(--line);margin-left:.875rem}
+.mmot{flex:0 1 auto;min-width:0;overflow-wrap:anywhere}
+.mmtog{width:1.75rem;flex:none}
+.mmblock{overflow:auto;max-width:100%;padding:.5rem 0}
+@media (max-width:899px) {
+  .mmstage{height:calc(100vh - 17rem)}
+  .mmbar .btn span{display:none}
+}
+@media (prefers-reduced-motion:no-preference) {
+  .mmnode rect{transition:stroke .15s}
+}
+@media (pointer:coarse) {
+  .mmbar .btn,.mmbar .iconbtn,.mmbar .seg button{min-height:2.75rem;min-width:2.75rem}
+}

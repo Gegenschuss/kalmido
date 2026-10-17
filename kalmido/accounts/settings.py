@@ -635,6 +635,8 @@ def export_json():
         # 2.22.0 (#663): my journal, whom I stay in touch with, my Karakeep connection (without the API key)
         "journal": ("SELECT day, text, mood, updated_at FROM journal WHERE user_id=? ORDER BY day", (uid,)),
         "contact_care": ("SELECT contact_id, every_days, last, note, updated_at FROM contact_care WHERE user_id=?", (uid,)),
+        # 2.66.0 A (#1835): my merges of contacts / clients (the history lines, without the undo snapshot)
+        "merge_runs": ("SELECT id, kind, target_id, merged_ids, summary, created_at, undone_at FROM merge_runs WHERE user_id=?", (uid,)),
         "karakeep": ("SELECT url, list_id, source, archive, synced_at, created_at FROM kk_conns WHERE user_id=?", (uid,)),
         # calendar subscriptions without the (encrypted) link / password
         "calendar_subscriptions": ("SELECT id, kind, name, color, visible, interval, url_hint, username, created_at FROM cal_subs "

@@ -107,6 +107,9 @@ def owner_transfer(c, lr, new):
         c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,folder,sort,view,added_at) VALUES(?,?,?,?,?,?,?,?)",
                   (lid, old, "edit" if old in ag else "admin", "edit" if old in ag else "admin", lr["folder"] or "", lr["sort"], lr["view"], ts))
     c.execute("UPDATE lists SET owner_id=?, folder=?, sort=?, view=? WHERE id=?", (new, folder, sort, view, lid))
+    if not lr["org_id"]:  # 2.64.0 (#1864): a private list's files get the new owner's account key (after the commit)
+        from ..admin.orgcrypt_cli import oc_settle_kick
+        oc_settle_kick([lid])
     grp_sync(c, [lid])  # 2.10.0 (#441): the old owner's folder shares no longer reach it, the new owner's may
     names = user_names(c, [old, new, me()])
     c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",

@@ -15,15 +15,7 @@
 // into one arrow with a count. Prefs (view, zoom, filters, collapse state) are the user setting "roadmap" (json).
 const RM_Z = {week: {px: 36, step: 14, days: 84, lead: 7}, month: {px: 12, step: 28, days: 196, lead: 14}, quarter: {px: 4, step: 91, days: 546, lead: 28}};
 const RM_SHIFT_MAX = 500;  // = SHIFT_MAX_TASKS on the server
-const rmEsc = v => String(v).replace(/["\\]/g, '\\$&');  // inside a quoted attribute selector
-function rmP() {
-  const src = S.rmLocal ?? S.settings.roadmap ?? '';
-  if (!S.rmPc || S.rmPc.src !== src) {
-    let v = {}; try { v = JSON.parse(src || '{}'); } catch { v = {}; }
-    S.rmPc = {src, v: v && typeof v === 'object' && !Array.isArray(v) ? v : {}};
-  }
-  return S.rmPc.v;
-}
+// 2.65.0 (#1823): rmEsc, rmP and isRoadmap are in lazyload.js (this file loads on demand, module timeline)
 let rmSaveT = 0;
 // merge into the prefs, redraw, save (debounced; kept locally until the server has it, so a poll cannot undo it)
 function rmSet(patch, how = 'view') {
@@ -38,7 +30,6 @@ function rmSet(patch, how = 'view') {
     if (S.rmLocal === val) S.rmLocal = null;
   }, 350);
 }
-const isRoadmap = () => S.route.mod === 'tasks' && S.route.key === 'all' && feat('timeline') && rmP().v === 'timeline';
 const rmZoom = () => RM_Z[rmP().z] ? rmP().z : 'month';
 const rmDW = () => RM_Z[rmZoom()].px * uiZ() * (isMobile() ? 5 / 6 : 1);
 const rmProjects = () => S.lists.filter(l => !l.archived && !l.is_inbox && l.kind === 'project');

@@ -159,7 +159,7 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   w = await boot({user: 'alice', hash: 'l/' + L, mobile: true}); d = w.document;
   check(await until(() => d.querySelector('#view .mmstage')), 'phone: the map');
   check(d.querySelector('#view .mmbar') && !d.querySelector('#view .mmbar .btn span:not(.sr)')?.offsetWidth, 'phone: compact tool bar');
-  const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
+  const css = require('./boot').allCssSync(); // 2.65.0 (#1824): + the module stylesheets
   check(/\.mmstage\{[^}]*touch-action:none/.test(css) && /\.mmbar\{[^}]*flex-wrap:wrap/.test(css), 'CSS: the stage takes the fingers, the bar wraps');
   w.location.hash = 'wiki/' + OTHER;
   await until(() => d.querySelector('#view .wkpage h2'));
