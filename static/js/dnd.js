@@ -124,10 +124,11 @@ async function dropTask0(id, el, clientY) {
   if (item.list_id && !canEditList(item.list_id)) { roToast(); return; }
   if (tlkHits(t, item)) { tlkToast(t); render(); return; }  // 2.36.0 (#1118): a locked task keeps its list / day / priority
   const before = snapTask(t);
-  Object.assign(t, item);
-  render();
+  // 2.64.1 (#1817): into / out of a list with the lock: a PATCH, so the browser re-encrypts the texts on the way (reorder cannot)
+  const xe2e = item.list_id && item.list_id !== t.list_id && typeof le2eOn === 'function' && (le2eOn(item.list_id) || le2eOn(t.list_id));
+  if (!xe2e) { Object.assign(t, item); render(); }
   let res;
-  try { res = await api('POST', '/api/tasks/reorder', {items: [item]}); } catch { /* api() showed it */ return; }
+  try { res = xe2e ? await api('PATCH', `/api/tasks/${id}`, Object.fromEntries(Object.entries(item).filter(([k]) => k !== 'id'))) : await api('POST', '/api/tasks/reorder', {items: [item]}); } catch { /* api() showed it */ return; }
   await load(); render();
   // a move to another list or day can be undone (plain reordering not)
   const after = snapTask(S.tasks.get(id)), rev = after && (before.list_id !== after.list_id || before.due !== after.due || (before.due_time || null) !== (after.due_time || null) || (before.section_id || null) !== (after.section_id || null) || before.priority !== after.priority) && reverseOf(before, after);

@@ -131,8 +131,9 @@ async function le2u_release(lid) {
   let j; try { j = await le2u_info(lid, true); } catch (x) { toast(x?.message || tr('Not possible right now')); return; }
   const ids = (j.pending || []).filter(p => p.has_keys).map(p => p.user_id);
   if (!ids.length) { toast(tr('Nobody waiting has set up encryption yet')); return; }
-  try { await le2eRelease(lid, ids); } catch (x) { if (x?.message) toast(x.message); return; }
-  toast(trn('Key released for {0} person', 'Key released for {0} people', ids.length));
+  let r; try { r = await le2eRelease(lid, ids); } catch (x) { if (x?.message) toast(x.message); return; }
+  const n = ids.length - (r?.skipped?.length || 0);  // 2.64.1 review: a copy the server kept (skipped) is no new release
+  toast(trn('Key released for {0} person', 'Key released for {0} people', n));
   try { await load(); } catch { /* next sync */ }
   render(); le2u_listRedraw(lid);
   $$('.shmodal').forEach(md => { if (md._le2uLid === lid) { md._le2u = null; md._le2uDraw?.(); } });
@@ -322,7 +323,7 @@ function le2u_share(md, lid) {
         const ids = a === 'release' ? [uid] : (md._le2u?.pending || []).filter(p => p.has_keys && !(md._le2uChg || []).some(c => c[0] === p.user_id)).map(p => p.user_id);
         if (!ids.length) return;
         b.disabled = true;
-        try { await le2eRelease(lid, ids); toast(trn('Key released for {0} person', 'Key released for {0} people', ids.length)); } catch (x) { if (x?.message) toast(x.message); b.disabled = false; return; }
+        try { const r = await le2eRelease(lid, ids); toast(trn('Key released for {0} person', 'Key released for {0} people', ids.length - (r?.skipped?.length || 0))); } catch (x) { if (x?.message) toast(x.message); b.disabled = false; return; }
         md._le2u = null; try { await load(); } catch { /* next sync */ } render(); le2u_share(md, lid);
       }
     });

@@ -6545,7 +6545,6 @@
   "Send unencrypted": "Enviar sin cifrar",
   "Encrypt again": "Cifrar de nuevo",
   "Encrypted content stays with you": "Lo cifrado se queda contigo",
-  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "Las notas, archivos y mensajes directos cifrados de extremo a extremo nunca llegan a un agente: solo ve que una tarea tiene una nota cifrada. No pongas ahí nada con lo que deba trabajar el agente.",
   "All time": "Todo el tiempo",
   "By person": "Por persona",
   "By task": "Por tarea",
@@ -8329,5 +8328,6 @@
   "Birthdays from an address book land in this list: choose another list for them first.": "Los cumpleaños de una libreta de direcciones llegan a esta lista: elige primero otra lista para ellos.",
   "Change the participant role of the folder first": "Cambia primero el rol de participante de la carpeta",
   "The owner sets it up in Settings > Account": "El propietario la configura en Ajustes > Cuenta",
-  "The new owner needs the key of the list “{0}” first.": "El nuevo propietario necesita primero la clave de la lista «{0}»."
+  "The new owner needs the key of the list “{0}” first.": "El nuevo propietario necesita primero la clave de la lista «{0}».",
+  "End-to-end encrypted task notes, files, direct messages and lists with a lock never reach an agent: it only sees that a task has an encrypted note, and an agent cannot be a member of a list with a lock. Put nothing there that the agent should work with.": "Las notas de tareas, archivos, mensajes directos cifrados de extremo a extremo y las listas con candado nunca llegan a un agente: solo ve que una tarea tiene una nota cifrada, y un agente no puede ser miembro de una lista con candado. No pongas allí nada con lo que el agente deba trabajar."
 }

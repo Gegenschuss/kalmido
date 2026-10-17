@@ -6545,7 +6545,6 @@
   "Send unencrypted": "Onversleuteld versturen",
   "Encrypt again": "Opnieuw versleutelen",
   "Encrypted content stays with you": "Versleutelde inhoud blijft bij jou",
-  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "End-to-end versleutelde notities, bestanden en directe berichten bereiken nooit een agent: die ziet alleen dat een taak een versleutelde notitie heeft. Zet er niets in waarmee de agent moet werken.",
   "All time": "Alle tijd",
   "By person": "Per persoon",
   "By task": "Per taak",
@@ -8329,5 +8328,6 @@
   "Birthdays from an address book land in this list: choose another list for them first.": "Verjaardagen uit een adresboek komen in deze lijst: kies daar eerst een andere lijst voor.",
   "Change the participant role of the folder first": "Wijzig eerst de deelnemersrol van de map",
   "The owner sets it up in Settings > Account": "De eigenaar stelt dit in via Instellingen > Account",
-  "The new owner needs the key of the list “{0}” first.": "De nieuwe eigenaar heeft eerst de sleutel van de lijst „{0}” nodig."
+  "The new owner needs the key of the list “{0}” first.": "De nieuwe eigenaar heeft eerst de sleutel van de lijst „{0}” nodig.",
+  "End-to-end encrypted task notes, files, direct messages and lists with a lock never reach an agent: it only sees that a task has an encrypted note, and an agent cannot be a member of a list with a lock. Put nothing there that the agent should work with.": "End-to-end versleutelde taaknotities, bestanden, directe berichten en lijsten met slot bereiken nooit een agent: hij ziet alleen dat een taak een versleutelde notitie heeft, en een agent kan geen lid zijn van een lijst met slot. Zet daar niets waarmee de agent moet werken."
 }

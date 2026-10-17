@@ -6545,7 +6545,6 @@
   "Send unencrypted": "Envoyer non chiffré",
   "Encrypt again": "Chiffrer à nouveau",
   "Encrypted content stays with you": "Le contenu chiffré reste chez toi",
-  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "Les notes, fichiers et messages directs chiffrés de bout en bout n’atteignent jamais un agent : il voit seulement qu’une tâche a une note chiffrée. N’y mets rien sur quoi l’agent doit travailler.",
   "All time": "Tout le temps",
   "By person": "Par personne",
   "By task": "Par tâche",
@@ -8329,5 +8328,6 @@
   "Birthdays from an address book land in this list: choose another list for them first.": "Les anniversaires d'un carnet d'adresses arrivent dans cette liste : choisissez d'abord une autre liste pour eux.",
   "Change the participant role of the folder first": "Modifiez d'abord le rôle participant du dossier",
   "The owner sets it up in Settings > Account": "Le propriétaire la configure dans Réglages > Compte",
-  "The new owner needs the key of the list “{0}” first.": "Le nouveau propriétaire a d'abord besoin de la clé de la liste « {0} »."
+  "The new owner needs the key of the list “{0}” first.": "Le nouveau propriétaire a d'abord besoin de la clé de la liste « {0} ».",
+  "End-to-end encrypted task notes, files, direct messages and lists with a lock never reach an agent: it only sees that a task has an encrypted note, and an agent cannot be a member of a list with a lock. Put nothing there that the agent should work with.": "Les notes de tâche, fichiers, messages directs chiffrés de bout en bout et les listes verrouillées n'atteignent jamais un agent : il voit seulement qu'une tâche a une note chiffrée, et un agent ne peut pas être membre d'une liste verrouillée. N'y mettez rien sur quoi l'agent doit travailler."
 }

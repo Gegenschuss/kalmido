@@ -6545,7 +6545,6 @@
   "Send unencrypted": "Unverschlüsselt senden",
   "Encrypt again": "Wieder verschlüsseln",
   "Encrypted content stays with you": "Verschlüsseltes bleibt bei dir",
-  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "Ende-zu-Ende-verschlüsselte Notizen, Dateien und Direktnachrichten erreichen nie einen Agenten: Er sieht nur, dass eine Aufgabe eine verschlüsselte Notiz hat. Schreib dort nichts hinein, womit der Agent arbeiten soll.",
   "All time": "Gesamte Zeit",
   "By person": "Nach Person",
   "By task": "Nach Aufgabe",
@@ -8329,5 +8328,6 @@
   "Birthdays from an address book land in this list: choose another list for them first.": "Geburtstage aus einem Adressbuch landen in dieser Liste: wähle dafür zuerst eine andere Liste.",
   "Change the participant role of the folder first": "Teilnehmer-Rolle des Ordners zuerst ändern",
   "The owner sets it up in Settings > Account": "Der Besitzer richtet sie unter Einstellungen > Konto ein",
-  "The new owner needs the key of the list “{0}” first.": "Der neue Besitzer braucht zuerst den Schlüssel der Liste „{0}“."
+  "The new owner needs the key of the list “{0}” first.": "Der neue Besitzer braucht zuerst den Schlüssel der Liste „{0}“.",
+  "End-to-end encrypted task notes, files, direct messages and lists with a lock never reach an agent: it only sees that a task has an encrypted note, and an agent cannot be a member of a list with a lock. Put nothing there that the agent should work with.": "Ende-zu-Ende verschlüsselte Aufgabennotizen, Dateien, Direktnachrichten und Listen mit Schloss erreichen nie einen Agenten: Er sieht nur, dass eine Aufgabe eine verschlüsselte Notiz hat, und ein Agent kann nicht Mitglied einer Liste mit Schloss sein. Lege dort nichts ab, womit der Agent arbeiten soll."
 }
