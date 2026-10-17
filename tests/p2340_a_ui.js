@@ -91,9 +91,14 @@ const day = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv', {t
     // ================= #265 the status report on the project page
     await nav(B + '#l/' + P); await ready(ev);
     await ev(`(() => { setListView(listById(${P}), 'overview'); return 1; })()`); await sleep(1800);
-    for (let i = 0; i < 75 && !(await ev(`!!document.querySelector('[data-rpt="open"]')`)); i++) await sleep(200);  // 2.66.1: on-demand modules (2.65), slow CI (2.80.1: up to 15 s)
+    for (let i = 0; i < 75 && !(await ev(`!!document.querySelector('[data-rpt="open"]')`)); i++) {
+      await sleep(200);
+      if (i % 20 === 19) await ev(`(() => { if (location.hash !== '#l/${P}') go('l/${P}'); setListView(listById(${P}), 'overview'); return 1; })()`).catch(() => 0);  // 2.80.2: ask for the overview again (CI)
+    }  // 2.66.1: on-demand modules (2.65), slow CI (2.80.1: up to 15 s)
     const btn = await ev(`(() => { const b = document.querySelector('[data-rpt="open"]'); return b ? {t: b.textContent.trim(), h: b.getBoundingClientRect().height} : null; })()`);
-    check(btn && btn.t === 'Status report', '#265: the button on the project page ' + JSON.stringify(btn));
+    check(btn && btn.t === 'Status report', '#265: the button on the project page ' + JSON.stringify(btn) + (btn ? '' : ' ' + JSON.stringify(await ev(`(async () => ({route: location.hash, ly: S.ly?.view,
+      pov: S.povD?.[${P}] && {err: S.povD[${P}].err, busy: S.povD[${P}].busy, has: !!S.povD[${P}].j}, api: (await fetch('/api/lists/${P}/overview')).status,
+      txt: (document.querySelector('#view')?.textContent || '').replace(/\\s+/g, ' ').slice(0, 300)}))()`).catch(e => String(e)))));
     await ev(`(() => { document.querySelector('[data-rpt="open"]').click(); return 1; })()`); await sleep(1800);
     const m = await ev(`(() => { const md = document.querySelector('.rptmodal'); if (!md) return null; const p = md.querySelector('#rpt-prev');
       return {h1: p.querySelector('h4')?.textContent, h2: [...p.querySelectorAll('h5')].map(x => x.textContent).join('|'), on: md.querySelector('[data-rpt="days"].on')?.textContent,

@@ -12,7 +12,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   const ck = await login('alice');
   const post = async (u, b) => (await fetch(B + u.replace(/^\//, ''), {method: 'POST', headers: {...H, Cookie: ck}, body: JSON.stringify(b)})).json().catch(() => ({}));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('sv', {timeZone: 'Europe/Berlin'});  // the app's day (TZ of the container), also between 0 and 2 o'clock
   const t1 = await post('/api/tasks', {title: 'Paint the fence', tags: ['garden', 'weekend'], due: today});
   const t2 = await post('/api/tasks', {title: 'Buy seeds', tags: ['garden']});
   const t3 = await post('/api/tasks', {title: 'Old job', tags: ['garden']});

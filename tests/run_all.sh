@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=10
+SHARDS_DEFINED=11
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -842,6 +842,7 @@ fresh; run p253_a_ui node p253_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.52.0 part C: #1438 address books an organisation owns (hand-over, roles, leaving / account deletion, CardDAV, way back)
 fresh; run p252_c_api "$PY" p252_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p252_c_ui node p252_c_ui.js "$KALMIDO_TEST_DATA"
+shard 11  # 2.80.2: the 2.55-2.62 suites run in shard 11 (shard 10 took 42 min on CI, over the 45 min limit with the rerun)
 # 2.55.0 part E: the newsletter connection (#1455): fake listmonk / Brevo / CleverReach inside the container
 fresh; run p255_e_api "$PY" p255_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p255_e_ui node p255_e_ui.js "$KALMIDO_TEST_DATA"

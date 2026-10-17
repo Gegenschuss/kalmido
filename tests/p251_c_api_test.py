@@ -189,6 +189,8 @@ while D1.weekday() > 4:
     D1 -= timedelta(days=1)
 SAT = today - timedelta(days=(today.weekday() - 5) % 7 or 7)
 D2 = today - timedelta(days=1)
+if SAT == D2:  # on a Sunday: the weekend entry would cover yesterday's event
+    SAT -= timedelta(days=7)
 for d, a, b in ((D1, "06:00", "17:30"), (D1, "17:00", "20:00"), (SAT, "10:00", "12:00")):
     r = Bo.post(B + "/api/time/entries", json={"task_id": T1, "start": f"{d}T{a}", "end": f"{d}T{b}"})
     check(r.ok, f"setup: entry {d} {a} ({r.status_code} {r.text[:100]})")
