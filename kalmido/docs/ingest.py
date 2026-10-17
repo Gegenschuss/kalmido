@@ -148,6 +148,14 @@ def docs_run_once():
                                FOR UPDATE OF d SKIP LOCKED) RETURNING node_id""", (_now(),)).fetchone()
         c.commit()
         if not r:
+            from .thumbfill import p61a_thumb_fill  # 2.66.1 (#1944): previews of imports from before, while nothing waits
+            try:
+                with system_ctx(c):  # docs queue: server-side catch-up of every workspace's previews, nothing handed to a person
+                    p61a_thumb_fill(c)
+                c.commit()
+            except Exception as e:  # noqa: BLE001 -- the queue never dies
+                c.rollback()
+                print("docs: preview catch-up", type(e).__name__, e, flush=True)
             return 0
         nid = r[0]
         try:
