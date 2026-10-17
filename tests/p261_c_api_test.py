@@ -20,6 +20,7 @@ import os
 import subprocess
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -179,6 +180,13 @@ bd = A.get(B + "/api/admin/orgs").json().get("boundary", {})
 dbx("UPDATE file_text SET org_id=NULL WHERE kind='att' AND ref_id=?", (A1,), write=True)
 check(bd.get("kinds", {}).get("file_text") == 1, "#1856: the boundary check counts file_text across the boundary " + str(bd.get("kinds")))
 check(not A.get(B + "/api/admin/orgs").json().get("boundary", {}).get("kinds", {}).get("file_text"), "#1856: ... and nothing when it fits")
+# 2.81.0 (#1856): a run of 35 minutes is not taken up again (the longest recognition, 30 pages x 60 s, is still going on)
+old = (datetime.now(timezone.utc) - timedelta(minutes=35)).isoformat()
+dbx("UPDATE file_text SET state='run', updated_at=? WHERE kind='att' AND ref_id=?", (old, A1), write=True)
+time.sleep(12)
+st35 = ft("att", A1)
+dbx("UPDATE file_text SET state='found' WHERE kind='att' AND ref_id=?", (A1,), write=True)
+check(st35 and st35[0] == "run", f"#1856: a long run stays with its worker ({st35})")
 check(n_words > 0, f"#1820: the words are in the keyed index ({n_words})")
 hits = tsearch(Bo, "wolkenkratzer")
 check(T1 in hits and hits[T1].get("file_hit") == "bill.pdf", f"#1820: the task search finds the task by its file's text, file_hit = the name ({hits.get(T1, {}).get('file_hit')})")
