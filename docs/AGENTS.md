@@ -1515,6 +1515,10 @@ Scopes: `files:read` (list, read) and `files:write` (add files and folders, new 
 | A new file / folder (`{parent_id?, name, content \| content_base64, mime?, kind?}`; without `parent_id`: your own folder) | `POST /api/v1/files` | `write_file`, `create_file_folder` |
 | A new version of a file (`{content \| content_base64}`, role edit; the older versions stay) | `POST /api/v1/files/{id}/versions` | `write_file` with `file_id` |
 
+2.84.0 (#1198): mails filed with clients and projects keep their `.eml` and attachments in the folder *E-Mails* of the file
+store; an agent reaches them only when a person shares such a folder with it. The filed mails themselves (headers, text,
+assigning) have no agent route yet.
+
 A name that is taken gets " (2)"; an agent's executable ending gets ".txt" (#380). Renaming, moving, the trash and shares
 stay with people. Without a share the answer is 404 (the file does not exist for you); a view share answers 403 on writes.
 

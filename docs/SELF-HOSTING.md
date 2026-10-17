@@ -805,6 +805,9 @@ Trigger every alert once on purpose after setting it up, the dead man's switch t
   attached as `.eml`. Off by default.
 - **Deliver directly, do not forward.** Many forwarding rules drop the plus part of an address (`tasks+token@…`), and
   then Kalmido cannot tell whose task it is.
+- **E-mails at clients and projects (2.84):** the same mailbox also takes the addresses of clients, projects and the
+  personal e-mail inboxes (docs/OFFICE.md); nothing else to set up. The mails go into the database (table `hub_mails`), their
+  `.eml` and attachments into the file store, so they count against the storage limit and go through the virus scan.
 - **Sender domain:** for the daily summary over SMTP, set up SPF, DKIM and DMARC for the sender domain, or the mails land
   in spam.
 - **Forgot your password? (2.49):** the login page shows the link only when outgoing mail (SMTP) is set up. A person

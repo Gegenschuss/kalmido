@@ -321,6 +321,32 @@ clients of one workspace can be merged, and only by people who may delete the ot
 `POST /api/clients/merge` `{target, ids, pick: {field: client id}, dry}` (dry: `{lines}` = the overview), then `{run_id,
 target}`; `POST /api/clients/merges/{run_id}/undo`; the client's answer carries `merges` (the history). Not in the agent API yet.
 
+## E-mails at clients and projects (2.84)
+
+Mails can be filed with a client or a project: filed, assigned and searchable. Kalmido is no mail client: it never sends or
+answers these mails, does not sync a mailbox and shows the text as plain text. It needs the mail input of *Tasks by
+e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addresses are not offered.
+
+- **Addresses** (plus addresses of the server's mailbox, made on the first tap of *Copy address*): one per client (everybody
+  who sees the client gets the same one), one per project (people who may change the project), and an **e-mail inbox** per
+  person and workspace (Office > Clients > *E-mail inbox*, one for the private space and one per organisation). The menu
+  next to an address makes a new one (the old one stops at once) or turns it off.
+- **Matching in the inbox**: the sender is compared with the client's e-mail, its contact persons and the address book
+  contacts linked to them - only clients of the same workspace that the recipient sees. A mail the person forwards (or
+  sends a copy of) counts with the original sender of the forwarding header, else with To / Cc. No match or several
+  clients: the mail waits under *Not assigned* (only its recipient sees it) until it is assigned by hand. A client's or
+  project's address files without matching; a project's mail names the project's client as well.
+- **Where it goes**: the headers and the text are stored with the mail (sealed with the organisation's key when encryption
+  is on); the original `.eml` and the attachments go into the file store, folder *E-Mails / client / date subject* of the
+  workspace (the virus scan and the storage limit apply; a find leaves the attachment out, a full storage all of them -
+  the mail says so). Assigning moves the folder along when the person may change it.
+- **Who sees a mail**: a client's mail everybody who sees the client, a project's mail everybody who sees the project, a mail
+  that is not assigned only its recipient - never across workspaces. Assigning and deleting need the right to change the
+  project / see the client (taking a mail back to *Not assigned*: its recipient). Both are one undo step each; a deleted
+  mail can be restored with Undo. The attachments of a mail can be opened by everybody who sees the mail.
+- **Search**: subject, sender and text (a hashed word index, no plain index).
+- **Agents** have no access to filed mails in 2.84 (no API route, no MCP tool).
+
 ## Sales pipeline and figures (2.50)
 
 Two tabs for the admins of the office area (a personal office: its owner; members get `403`).
