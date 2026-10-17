@@ -94,7 +94,7 @@ def _contracts(c):
     today = local_now().date()
     rows = c.execute("""SELECT t.* FROM tasks t JOIN lists l ON l.id=t.list_id
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND t.due>=? AND t.due<=?
-                          AND t.fam LIKE '%contract%' AND l.archived=0 AND l.life!='health'""",
+                          AND t.fam ILIKE '%contract%' AND l.archived=0 AND l.life!='health'""",
                      (today.isoformat(), (today + timedelta(days=366)).isoformat())).fetchall()
     out = []
     for t in rows:

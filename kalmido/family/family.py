@@ -794,7 +794,7 @@ PM_EXTRA_ALL = tuple(dict.fromkeys(x for v in PURPOSE_EXTRA.values() for x in v)
 # modules" turns on all of them, PURPOSE_MODS stays what the purpose package and the switch-off touch
 PM_FULL = ("cal", "timeline", "matrix", "habits", "pomo", "kanban", "collab", "stats", "time", "progress", "deps", "fields",
            "agents", "comments", "family", "events", "contacts", "contracts", "home", "care", "health", "review", "travel",
-           "reading", "clients", "workload", "forms", "office", "wiki", "files", "dispo")
+           "reading", "budget", "clients", "workload", "forms", "office", "wiki", "files", "dispo")
 
 
 def pma_full():

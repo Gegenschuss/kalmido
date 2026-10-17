@@ -4401,6 +4401,8 @@
   "Accept": "Accepter",
   "Maybe": "Peut-être",
   "Decline": "Refuser",
+  "Accept|proposal": "Accepter",
+  "Decline|proposal": "Refuser",
   "Accepted": "Accepté",
   "No answer yet": "Pas encore de réponse",
   "On the day at 9:00": "Le jour même à 9:00",
@@ -8838,7 +8840,7 @@
   "Responsible person": "Personne responsable",
   "Person without access": "Personne sans accès",
   "The person responsible no longer has access to the cash flow. Please choose someone else.": "La personne responsable n'a plus accès à la trésorerie. Veuillez choisir quelqu'un d'autre.",
-  "Due on the 1st of every month in the inbox of the person, with a link to the cash flow and no amounts. Off: the task is ended, not deleted.": "Échéance le 1er de chaque mois dans la boîte de réception de la personne, avec un lien vers la trésorerie et sans montants. Désactivé : la tâche est terminée, pas supprimée.",
+  "Due on the 1st of every month in the Basket of the person, with a link to the cash flow and no amounts. Off: the task is ended, not deleted.": "Échéance le 1er de chaque mois dans le Panier de la personne, avec un lien vers la trésorerie et sans montants. Désactivé : la tâche est terminée, pas supprimée.",
   "Monthly check on": "Contrôle mensuel activé",
   "Monthly check off": "Contrôle mensuel désactivé",
   "No name": "Pas de nom",
@@ -9488,5 +9490,7 @@
   "{0}: {1} → {2}": "{0} : {1} → {2}",
   "No changes yet.": "Aucune modification pour le moment.",
   "The linked contact no longer exists; link removed.": "Le contact lié n'existe plus ; lien supprimé.",
-  "Share: not every file was added (too large, empty or refused by the upload check)": "Partage : tous les fichiers n’ont pas été ajoutés (trop volumineux, vides ou refusés par le contrôle d’envoi)"
+  "Share: not every file was added (too large, empty or refused by the upload check)": "Partage : tous les fichiers n’ont pas été ajoutés (trop volumineux, vides ou refusés par le contrôle d’envoi)",
+  "Sent as {0}": "Envoyé en tant que {0}",
+  "Texts beginning with \"e2e1:\" got a space in front.": "Les textes commençant par « e2e1: » ont reçu une espace devant."
 }

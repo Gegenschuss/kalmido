@@ -16,7 +16,10 @@ VW_MINE_MAX = 5000  # tasks in one order (more are cut: the oldest placed ones f
 
 def vw_mine_order(c, uid):
     """{task id (str): pos} of the person's own order of "My tasks" (for /api/state)."""
-    return {str(r[0]): r[1] for r in c.execute("SELECT task_id, pos FROM user_task_order WHERE user_id=?", (uid,))}
+    # 2.82.0 (#1464): only tasks the person still sees (a row of a list they left / were removed from stays hidden)
+    return {str(r[0]): r[1] for r in c.execute(
+        f"SELECT o.task_id, o.pos FROM user_task_order o JOIN tasks t ON t.id=o.task_id WHERE o.user_id=? "
+        f"AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.')}", (uid, uid, uid))}
 
 
 @app.put("/api/tasks/mine-order")

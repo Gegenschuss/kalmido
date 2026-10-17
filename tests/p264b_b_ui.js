@@ -6,6 +6,7 @@
 //   decrypted name; the per-person button of 2.42 is not offered; the head line (le2uAttHead) is there
 // - a second member opens the file with his own key
 // - the way back turns the list files into plain files with their names and types again
+// - 2.82.0 (#1878): a text beginning with "e2e1:" goes back with a space in front (the open list refuses the prefix)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -106,6 +107,10 @@ const M = 'ZQXfile';  // every plain file text carries it: the server and localS
   await session('alice', async ({ev, unlock}) => {
     await unlock(PASS);
     await ev(`le2eUnlock(${L})`);
+    // 2.82.0 (#1878): a text that itself begins with "e2e1:" (only possible inside the lock) must not stop the way back
+    const TX = await ev(`le2eEnc(${L}, 'title', 'e2e1:hello').then(c => rawFetch('POST', '/api/tasks', {title: c, list_id: ${L}})).then(t => t.id, e => 'ERR ' + e.message)`);
+    check(TX > 0, '#1878: a task titled "e2e1:hello" in the locked list ' + TX);
+    check(await ev(`le2eEnc(${L}, 'title', 'e2e1:x', true).then(c => le2eDec(${L}, 'title', c))`) === ' e2e1:x', '#1878: encrypted as a text it gets a space in front');
     // the way back: stop, the files (le2eFileConvert 'decrypting'; with part A also inside le2eResume), then the texts
     check(await ev(`rawFetch('POST', '/api/lists/${L}/e2e/stop', {password: 'password123'}).then(() => load()).then(() => listById(${L})?.e2e)`) === 'decrypting', 'stop: decrypting');
     const rows = (await stateAtts()).filter(x => x.enc === 2);
@@ -116,6 +121,8 @@ const M = 'ZQXfile';  // every plain file text carries it: the server and localS
     for (const c of ((await call('GET', `/api/tasks/${T}/timeline`)).j.comments || [])) for (const x of c.attachments || []) if (x.enc === 2)
       await ev(`le2eFileConvert(${L}, {id: ${x.id}, task_id: ${T}, comment_id: ${c.id}, enc: 2, gen: 1, size: ${x.size}}, 'decrypting').then(j => j.enc)`);
     check(await ev(`le2eResume(${L}, () => {}).then(r => !!r, e => 'ERR ' + e.message)`) === true, 'the way back finishes');
+    const tx = ((await call('GET', '/api/state')).j.tasks || []).find(t => t.id === TX);
+    check(tx?.title === ' e2e1:hello' && await ev(`fr2a_prefixSaid.has(${L})`), '#1878: back with a space in front, said once ' + JSON.stringify(tx?.title));
     const as = await stateAtts();
     check(as.length === 2 && as.every(x => !x.enc) && as.map(x => x.name).sort().join() === 'before.txt,notes.txt' && as.every(x => x.mime === 'text/plain'),
       'the files are plain again with their names and types ' + JSON.stringify(as));

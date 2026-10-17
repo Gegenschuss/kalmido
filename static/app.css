@@ -7245,3 +7245,5 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .r81b-dlg .r81b-hist ul{list-style:none;margin:0;padding:0}
 .r81b-dlg .r81b-hist li{display:flex;flex-direction:column;padding:.375rem 0;border-top:1px solid var(--line, rgba(127,127,127,.2))}
 .r81b-clf select{min-height:2.75rem;max-width:100%}
+/* 2.82.0 B (#1880) review bar: 44 px targets for Approve / Back on phones */
+@media (pointer:coarse){.apbar.rvwbar .apacts .btn{min-height:2.75rem}}

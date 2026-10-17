@@ -183,6 +183,10 @@ nt = requests.post(V + f"/agent/chats/{ALICE}", headers=CLH, json={"body": "New 
 check(nt.status_code == 201 and A.post(B + f"/api/agents/{CL}/chat/{nt.json()['id']}/pin", json={"pinned": False}).status_code == 400, "#1848 chat: a notice cannot be pinned")
 feed = requests.get(V + f"/agent/chats?since=0&user_id={ALICE}&limit=500", headers=CLH).json()["data"]
 check({x["id"] for x in feed if x.get("pinned_at")} == {am[1], am[2], am[3], am[4], am[5]}, "#1848 v1 chat: the feed carries pinned_at")
+# 2.82.0 (#1862): one person's feed (?user_id=) also carries `pins` (same list as the app); without user_id there is none
+fj = requests.get(V + f"/agent/chats?since=0&user_id={ALICE}&limit=5", headers=CLH).json()
+check({x["id"] for x in fj.get("pins", [])} == {am[1], am[2], am[3], am[4], am[5]}, "#1862 v1 chat: pins in the feed of one person")
+check("pins" not in requests.get(V + "/agent/chats?since=0&limit=5", headers=CLH).json(), "#1862 v1 chat: no pins without user_id")
 
 print(f"p262_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

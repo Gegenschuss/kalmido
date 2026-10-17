@@ -336,6 +336,11 @@ check(Bo.put(B + f"/api/lists/{P}/review", json={"on": True, "reviewer": CAROL, 
 check(Bo.post(B + f"/api/tasks/{T5}/complete").ok, "without the gate a waiting task completes")
 check(q("SELECT review FROM tasks WHERE id=?", (T5,))[0][0] == "pending", "the review state stays as it was")
 
+# 2.82.0 (#1880): the history names the reviewer (the timeline's users carry them), not "Deleted user"
+tl = Bo.get(B + f"/api/tasks/{T3}/timeline").json()
+rv = [a["data"].get("reviewer") for a in tl.get("activity", []) if a.get("kind") == "review" and a["data"].get("reviewer")]
+check(CAROL in rv and tl["users"].get(str(CAROL)), f"#1880: the reviewer's name is in the timeline {rv} {sorted(tl.get('users', {}))}")
+
 print(f"{OKS[0]} checks ok, {len(FAILS)} failed")
 if FAILS:
     sys.exit(1)

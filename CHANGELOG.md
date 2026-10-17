@@ -7,6 +7,25 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.82.0] - 2026-10-17
+
+Leftover fixes: tasks, agents, chat.
+
+### Security
+- Security fix (permission boundaries): folder defaults, birthday tasks of moved contacts, the personal *My tasks*
+  order and the related-tasks cache keep to the person's rights and visibility (#1464, #1831, #1832, #1880).
+- Security fix (agent permissions): an agent that is a list admin no longer renames, recolours or archives the list (#1467).
+
+### Fixed
+- Locked lists: a title or text beginning with `e2e1:` no longer blocks opening the lock; it gets a leading space and a
+  short hint (#1878).
+- Agents page: *Load more* stops at the scan limit also after a full page (#1465).
+- Layout proposals of an agent: the buttons read *Accept* / *Decline* (#1821).
+- Pinning: *Undo* closes when you switch to another conversation; the team chat takes live changes while you type; the
+  agent API chat feed with `user_id` also returns the conversation's `pins` (#1862).
+- Reviews: *Approve* / *Back* are 44 px high on the phone, the history names the reviewer instead of *Deleted user*,
+  and the public form page translates *Sent as* (#1880).
+
 ## [2.81.0] - 2026-10-17
 
 Remaining fixes: office, import, clients, uploads. Contains security fixes.

@@ -4401,6 +4401,8 @@
   "Accept": "Zusagen",
   "Maybe": "Vielleicht",
   "Decline": "Absagen",
+  "Accept|proposal": "Annehmen",
+  "Decline|proposal": "Ablehnen",
   "Accepted": "Zugesagt",
   "No answer yet": "Noch keine Antwort",
   "On the day at 9:00": "Am Tag um 9:00",
@@ -8838,7 +8840,7 @@
   "Responsible person": "Zuständige Person",
   "Person without access": "Person ohne Zugriff",
   "The person responsible no longer has access to the cash flow. Please choose someone else.": "Die zuständige Person hat keinen Zugriff mehr auf den Cashflow. Bitte jemand anderen wählen.",
-  "Due on the 1st of every month in the inbox of the person, with a link to the cash flow and no amounts. Off: the task is ended, not deleted.": "Fällig am 1. jedes Monats im Eingang der Person, mit einem Link auf den Cashflow und ohne Beträge. Aus: Die Aufgabe wird beendet, nicht gelöscht.",
+  "Due on the 1st of every month in the Basket of the person, with a link to the cash flow and no amounts. Off: the task is ended, not deleted.": "Fällig am 1. jedes Monats im Korb der Person, mit einem Link auf den Cashflow und ohne Beträge. Aus: Die Aufgabe wird beendet, nicht gelöscht.",
   "Monthly check on": "Monatliche Prüfung an",
   "Monthly check off": "Monatliche Prüfung aus",
   "No name": "Kein Name",
@@ -9488,5 +9490,7 @@
   "{0}: {1} → {2}": "{0}: {1} → {2}",
   "No changes yet.": "Noch keine Änderungen.",
   "The linked contact no longer exists; link removed.": "Der verknüpfte Kontakt existiert nicht mehr; Verknüpfung gelöst.",
-  "Share: not every file was added (too large, empty or refused by the upload check)": "Teilen: Nicht jede Datei wurde hinzugefügt (zu groß, leer oder von der Upload-Prüfung abgelehnt)"
+  "Share: not every file was added (too large, empty or refused by the upload check)": "Teilen: Nicht jede Datei wurde hinzugefügt (zu groß, leer oder von der Upload-Prüfung abgelehnt)",
+  "Sent as {0}": "Gesendet als {0}",
+  "Texts beginning with \"e2e1:\" got a space in front.": "Texte, die mit „e2e1:“ beginnen, haben ein Leerzeichen davor bekommen."
 }

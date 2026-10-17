@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.82.0** (2026-10-17): **security release** - tighter permission boundaries (folder defaults, birthday tasks, the
+  *My tasks* order, agents as list admins), locked lists open with texts that begin with `e2e1:`, *Accept* / *Decline* on
+  layout proposals, pinning leftovers, 44 px review buttons on the phone and the reviewer's name in the history.
 - **2.81.0** (2026-10-17): security fixes (customer portal sign-out, single-use form pages, rate limits, agent data -
   **portal users sign in once again**); office archive entries can be corrected after the import (client, net amounts
   per tax rate, paid, with history); DATEV keeps the customer number of locked invoices; the Paperless ZIP check runs in

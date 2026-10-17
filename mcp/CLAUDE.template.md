@@ -433,6 +433,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
   `review_task` approve, or changes with a short note what should change. Never approve a task assigned to you
 - `sprint_started` / `sprint_closed`: a sprint of a project list shared with you started / was closed (`sprint`, with `review` when closed: done / moved / added task ids and points). Sprints: `list_sprints`, `get_sprint` (tasks + burndown), `set_task_sprint` (into a sprint or back to the backlog; people plan and close sprints)
 - `chat_pinned`: the person pinned (`pinned: true`) or unpinned a message of your chat (`message`); information only, nothing to answer
+  (the current pins of a conversation: `pins` in `GET /agent/chats?user_id=`)
 - `contract_notice`: a shared contract's last day to cancel is near (once per deadline): answer with ONE `propose_contract_notice`
 
 Related tasks (2.59.0): task events may carry `task.related` = up to 5 tasks close in meaning `[{id, title, score}]` (only

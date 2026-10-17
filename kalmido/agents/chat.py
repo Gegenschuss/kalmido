@@ -99,7 +99,7 @@ def ag_jobs_page(c, where, args):
                     break
                 page.append(j)
             cur = (j["updated_at"], j["id"])
-            if seen >= AG_JOBS_SCAN and len(page) < lim:  # long run of rows I may not see: continue next time
+            if seen >= AG_JOBS_SCAN:  # 2.82.0 (#1465): also on a full page, else a run of hidden rows scans to the table end
                 nxt = ag_cursor(*cur)
                 break
         if nxt or len(batch) < 200:
