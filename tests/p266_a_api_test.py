@@ -277,7 +277,7 @@ for tgt, oth in ((CX, C1), (C1, CX)):
     check(r.status_code == 409, f"#1835: private books of two people: 409 ({r.status_code} {r.text[:120]})")
 check(Bo.get(B + f"/api/contacts/{C1}").ok and Ca.get(B + f"/api/contacts/{CX}").ok, "#1835: ... both contacts stay")
 
-# ---- 2.66.0 review: an agent token is refused on the merge routes (web only until #1357)
+# ---- 2.66.0 review: an agent token is refused on the merge routes (web only; 2.70.0 (#1357): agents propose, kind merge)
 ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write"], "username": "ctm-helper", "display_name": "Helper"}).json()
 r = requests.post(B + "/api/contacts/merge", headers={"Authorization": "Bearer " + ag["token"], "X-Requested-With": "kalmido"},
                   json={"target": C1, "ids": [C3], "dry": True})

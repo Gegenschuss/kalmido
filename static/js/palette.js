@@ -229,6 +229,7 @@ function palAll() {
     add('a:propinbox', 'action', propWith(N_('Sort the basket with {0}…'), N_('Sort the basket with an agent…')), 'bot', () => propRequest('triage', {}));
     const rl = routeList();
     if (rl && !rl.is_inbox && canEditList(rl.id)) add('a:propnotes', 'action', tr('Tasks from notes…'), 'bot', () => propRequest('extract', {lid: rl.id}));
+    if (feat('contacts') && typeof dup_open === 'function' && dup_books().length) add('a:propdup', 'action', tr('Find duplicates with an agent…'), 'bot', () => dup_open());  // 2.70.0 B (#1357)
   }
   if (ct) {
     const n = `“${t.title.length > 40 ? t.title.slice(0, 39) + '…' : t.title}”`;

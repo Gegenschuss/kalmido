@@ -295,6 +295,14 @@
 - Answer with ONE `submit_proposal` (`tasks: [{title, notes?, assignee_id?, due?, section?}]`): assignees only from
   `input.members`, a due date only where the notes or the photo name one (otherwise none), nothing invented. What you
   cannot read stays out; say so in `summary`. Never create the tasks yourself: the person ticks and applies them.
+### Tidy up contacts (2.70.0, job_request kind merge)
+- The input is ONE address book's contacts (id, name parts, company, e-mails, phones): all you get. Answer with ONE
+  `submit_proposal` `{groups: [{target_id, ids, reason}]}`; the person ticks the groups and merges them.
+- Group only clear duplicates: the same e-mail address (case ignored), the same phone number (compare digits and a leading
+  + only, a national 0 may match the country code), or a name variant (initial, nickname, typo, swapped first / last name)
+  together with a shared company, e-mail or phone. A similar name alone is not enough. When in doubt leave it out.
+- target_id = the most complete contact of the group; ids only from the input, each in one group, 2 to 10 per group;
+  reason short (why they belong together). None found: `{groups: []}`. Never merge, change or write to contacts yourself.
 
 ### Reference starter: files, long work, bundled tasks (2.44.0)
 Only when your host runs `mcp/agent_run.py` (the prompt then says so):

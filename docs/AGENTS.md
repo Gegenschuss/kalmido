@@ -1876,8 +1876,9 @@ lists and a first project. Nothing is sent or booked; you tick what you want and
 1. A person starts it in the app: *New project from briefing…* (Lists > +, command palette), *Break down with
    <agent>…* (task menu, palette), *Sort the basket with <agent>…* (the inbox's menu - in the app the inbox is called “Basket” since 2.39.1 -, palette,
    or the bot button when inbox items are selected), *Tasks from notes…* (a list's menu, palette), *Tidy up the list…* (2.39.0: a list's menu, or
-   *Tidy up…* for selected tasks; always the list's tidy agent). With several agents they pick one.
-2. Kalmido creates a job (kind `project`, `subtasks`, `triage`, `extract`, `dayplan`, `cleanup`, `inquiry` or `setup`; state `running`, `proposal_state`
+   *Tidy up…* for selected tasks; always the list's tidy agent), *Find duplicates with an agent…* (2.70.0: the contacts view's
+   menu, palette; one address book). With several agents they pick one.
+2. Kalmido creates a job (kind `project`, `subtasks`, `triage`, `extract`, `dayplan`, `cleanup`, `inquiry`, `setup` or `merge`; state `running`, `proposal_state`
    `requested`) and sends the agent the event `job_request` with the input.
 3. The agent reads the input, sets its status to `working`, and submits ONE proposal:
    `POST /api/v1/agent/jobs/{id}/proposal` (MCP `submit_proposal`). Kalmido validates it (400 with the reason,
@@ -1907,6 +1908,8 @@ the proposal in the app.
 | `extract` | `{list: {id, name, sections: [names]}, members: [{id, name}], text, images?}`: the people of the list (no agents) so the agent can suggest assignees; 2.70.0: `text` may be empty when `images` (photos of the meeting: `[{id, name, mime, size, url}]`, see [A meeting becomes tasks](#a-meeting-becomes-tasks-2700)) are there |
 | `dayplan` | `{date, mode, now, work: {start, end}, from, default_duration, events, fixed, tasks, builtin}` (2.10.0, see [Day plans](#day-plans-2100)) |
 | `cleanup` | `{list: {id, name, sections: [{id, name}]}, package: {n, of, group}, snapshot_at, hint, items: [{task_id, title, notes, section_id, sort, due, priority, list_tags, assignee_id, created_at, updated_at, comments_count}]}` (2.39.0, see [Tidy up a list](#tidy-up-a-list-2390)) |
+(2.39.0, see [Tidy up a list](#tidy-up-a-list-2390)) |
+| `merge` | `{book: {id, name}, contacts: [{id, fn, given, family, org, emails: [values], phones: [values]}], limits}` (2.70.0): the contacts of ONE address book the person may change (at most 2,000), only these fields - no notes, addresses, birthdays, groups |
 
 **Proposals** (the body of `POST /api/v1/agent/jobs/{id}/proposal`). Every kind may carry `summary` (a short
 explanation, Markdown, at most 2,000 characters) and `kind` (must match the job). Dates are `YYYY-MM-DD`, priority
@@ -1937,7 +1940,20 @@ explanation, Markdown, at most 2,000 characters) and `kind` (must match the job)
            {"op": "rename", "task_id": 82, "title": "Call the printer about the paper", "reason": "clearer"},
            {"op": "move", "task_id": 83, "section_id": 40, "position": 1},     // section (null = none) and / or place in it
            {"op": "close", "task_id": 84, "reason": "the fair was in 2025"}]}  // closed as won't do; reason required
+// merge (2.70.0): only ids from input.contacts, 2-10 per group (target included), each id in one group at most, at most 200 groups
+{"summary": "Two people are in the book twice.",
+ "groups": [{"target_id": 12, "ids": [12, 31], "reason": "same e-mail address"},   // 12 stays, 31 is merged into it
+            {"target_id": 40, "ids": [40, 41, 57], "reason": "same phone, name variants"}]}   // none found: {"groups": []}
 ```
+
+**Tidy up contacts (2.70.0, kind `merge`).** The person picks one address book they may change (a synced external book
+cannot be merged) and an agent; an organisation's book only goes to an agent of that organisation, an agent limited to
+selected lists gets no contacts. The agent proposes groups of duplicates; the review shows each group with the contacts as
+they are now, the reason and the main contact (switchable), each with its own tick. Applying merges the ticked groups
+as the person, exactly like merging by hand (links, attendances, contact persons move; the history of the contact names the
+agent's proposal); a group with a contact that was deleted or changed since the request is skipped. One undo step takes
+every merge of the proposal back. The agent still cannot read or merge contacts through the API: the job input is all
+it gets. `job` event on apply: `proposal: {state: "applied", merged, skipped}`.
 
 A section name in `extract` that the list does not have yet is created on apply. In `triage`, `tags` are the person's
 own (personal) tags; leave `list_id` out to keep an item in the inbox.
@@ -1975,6 +1991,8 @@ organisation have the same flow with their own lists and agents.
   meeting's photos, with get_attachment source chat; due dates only where named), dayplan {items[{task_id, start,
   duration?}], nofit[{task_id}]} with task ids from input.tasks only (a plan never changes due dates), cleanup
   {items[{op: merge|rename|move|close, ...}]} with task ids from input.items only, each once (follow the list's playbook).
+  merge {groups[{target_id, ids, reason}]} with contact ids from input.contacts only, each in one group (2.70.0: only clear
+  duplicates - same e-mail / phone, a name variant with a shared detail; when in doubt leave it out; none = groups []).
   Add a short summary.
 - submit_proposal(job_id, proposal). On a 400, fix what the message names and submit again.
 - NEVER create the lists, sections or tasks yourself (no create_task / create_job for this): the person applies them.
