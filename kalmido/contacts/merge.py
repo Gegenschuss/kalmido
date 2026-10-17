@@ -337,7 +337,7 @@ def ctm_history(c, cid):
 @app.post("/api/contacts/merge")
 def contacts_merge():
     need_feat("contacts")
-    if (g.user["kind"] or "user") == "agent":  # web only until #1357 (review)
+    if (g.user["kind"] or "user") == "agent":  # web only (review); 2.70.0 (#1357): agents propose merges (agents/dupprop.py)
         raise Denied(403)
     from ..contacts.web import op_contact
     c, uid, b = db(), me(), body()
@@ -351,7 +351,7 @@ def contacts_merge():
 @app.post("/api/contacts/merges/<int:rid>/undo")
 def contacts_merge_undo(rid):
     need_feat("contacts")
-    if (g.user["kind"] or "user") == "agent":  # web only until #1357 (review)
+    if (g.user["kind"] or "user") == "agent":  # web only (review); 2.70.0 (#1357): agents propose merges (agents/dupprop.py)
         raise Denied(403)
     from ..contacts.web import op_contact
     c, uid = db(), me()

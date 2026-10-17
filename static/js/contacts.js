@@ -146,7 +146,8 @@ document.addEventListener('click', async e => {
       {label: tr('Import a vCard file…'), icon: 'upload', fn: () => ctImport()},
       ...(S.books || []).map(x => ({label: tr('Export {0} (vCard)', x.name), icon: 'download', fn: () => { location.href = `/api/books/${x.id}/export.vcf`; }})),
       {label: tr('On the phone…'), icon: 'phone', fn: davGuide},
-      typeof nwl_open === 'function' && {label: tr('Newsletter…'), icon: 'mail', fn: nwl_open}]);  // 2.55.0 (#1455)
+      typeof nwl_open === 'function' && {label: tr('Newsletter…'), icon: 'mail', fn: nwl_open},  // 2.55.0 (#1455)
+      typeof dup_open === 'function' && propOn() && dup_books().length && {label: tr('Find duplicates with an agent…'), icon: 'bot', fn: () => dup_open()}]);  // 2.70.0 B (#1357)
   } else if (k === 'cmenu' && CT.card) {
     const c = CT.card, w = ctWrite(ctBook(c.book_id));
     menu(b, [w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
@@ -595,7 +596,7 @@ async function ctm_merge(ids) {
     }});
 }
 function ctm_histHtml(c) {
-  return `<div class="ctsec ctmsec"><h4>${tr('History')}</h4><ul class="ctlinks">${c.merges.map(m => `<li class="ctmrow"><span>${esc(tr('Merged with {0}', (m.summary?.merged || []).map(x => x.fn).join(', ') || '?'))}<small class="muted"> · ${esc([fmtWhen(m.at), m.by_name].filter(Boolean).join(' · '))}${m.undone_at ? ' · ' + esc(tr('undone')) : ''}</small></span>${m.undo === '' ? `<button type="button" class="btn sm" data-ctmundo="${m.id}">${ic('undo', 's')} ${tr('Undo')}</button>` : ''}</li>`).join('')}</ul></div>`;
+  return `<div class="ctsec ctmsec"><h4>${tr('History')}</h4><ul class="ctlinks">${c.merges.map(m => `<li class="ctmrow"><span>${esc(tr('Merged with {0}', (m.summary?.merged || []).map(x => x.fn).join(', ') || '?'))}<small class="muted"> · ${esc([fmtWhen(m.at), m.by_name, m.summary?.proposal?.agent && tr('from a proposal by {0}', m.summary.proposal.agent)].filter(Boolean).join(' · '))}${m.undone_at ? ' · ' + esc(tr('undone')) : ''}</small></span>${m.undo === '' ? `<button type="button" class="btn sm" data-ctmundo="${m.id}">${ic('undo', 's')} ${tr('Undo')}</button>` : ''}</li>`).join('')}</ul></div>`;
 }
 async function ctm_undoCard(rid, el) {
   el.disabled = true;

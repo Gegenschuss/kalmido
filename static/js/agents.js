@@ -643,6 +643,7 @@ function propKeys(v) {
   const p = v.proposal; if (!p) return [];
   if (pk2_is(v.kind)) return pk2_keys(v);  // 2.51.0 (#1351 #1358): propkinds2.js
   if (lyp_is(v)) return ['0'];  // 2.55.0 (#1066): one arrangement (lyprop.js)
+  if (dup_is(v)) return dup_keys(v);  // 2.70.0 B (#1357): the groups still mergeable (dupprop.js)
   if (v.kind === 'project') return p.tasks.flatMap((t, i) => [String(i), ...t.subtasks.map((s, k) => `${i}.${k}`)]);
   if (v.kind === 'dayplan') return p.items.map((x, i) => String(i));  // 2.10.0 (#440); 2.11.0: "does not fit" entries change nothing
   return (v.kind === 'extract' ? p.tasks : p.items).map((x, i) => String(i));
@@ -682,6 +683,7 @@ async function propOpen(jid) {
 }
 function propEdit(el) {
   if (ap_propEdit(el)) return;  // 2.51.0 C (#1353 #1355): times / place of time and shoot proposals (agentplan.js)
+  if (dup_edit(el)) return;  // 2.70.0 B (#1357): the main contact of a group (dupprop.js)
   const f = el.dataset?.f, row = el.closest?.('.ppi'); if (!f || !row || !S.prop) return;
   const k = row.dataset.k, v = el.value, e = S.prop.ed[k] ||= {};
   if (f === 'title') e.title = v.trim();
@@ -743,6 +745,7 @@ function propItemsHtml() {
 function propCount() {
   const P = S.prop, n = P.sel.size, all = propKeys(P.v).length, b = $('[data-pp="apply"]', P.md);
   if (lyp_is(P.v)) return;  // 2.55.0 (#1066): its own buttons
+  if (dup_is(P.v)) return dup_count(P);  // 2.70.0 B (#1357): groups to merge
   $$('.ppcount', P.md).forEach(c => { c.textContent = tr('{0} of {1} selected', n, all); });
   if (b) { b.disabled = !n; b.innerHTML = `${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', n))}`; }
 }
@@ -763,6 +766,7 @@ function propDraw() {
     // 2.5.2 (K03): the footer stays visible below the entries (sticky), with the count next to Apply
     foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
     if (lyp_is(v)) ({main, foot} = lyp_draw(v));  // 2.55.0 (#1066): before / after, 👍 / 👎 (lyprop.js)
+    if (dup_is(v)) ({main, foot} = dup_draw(v));  // 2.70.0 B (#1357): one row per group (dupprop.js)
   } else {
     main = `<div class="ppwait">${ic(st === 'applied' ? 'check' : 'x')}<p>${st === 'applied' ? (v.applied?.undone ? tr('Applied, then undone.') : tr('Applied.')) : tr('Discarded. {0} was told.', agent)}</p></div>`;
   }
@@ -785,7 +789,8 @@ async function propApply(b) {
   const e = histAdd({label: tr('Applied the proposal of {0}', name), snaps: [], after: [], ids: [], lids: r.list_id ? [r.list_id] : [],
     undo: async () => { const x = await api('POST', `/api/proposals/${jid}/undo`); ly(); return {skipped: x.skipped || [], none: !!x.none}; },
     redo: async () => { const x = await api('POST', `/api/proposals/${jid}/redo`); ly(); return {skipped: x.skipped || [], none: !!x.none}; }});
-  histToast(lyp_is(v) ? lyp_toast(v, r) : pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e);
+  if (dup_is(v)) dup_hist(e);  // 2.70.0 B (#1357): the contacts view follows undo / redo
+  histToast(dup_is(v) ? dup_toast(r) : lyp_is(v) ? lyp_toast(v, r) : pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e);
   if ((v.kind === 'project' || v.kind === 'inquiry') && r.list_id && listById(r.list_id)) go('l/' + r.list_id);
   if (S.route.mod === 'agents') loadJobs();
 }

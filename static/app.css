@@ -7736,3 +7736,17 @@ button.jobtag b{font-weight:600}
 .ctmsec .ctmrow{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
 .ctmsec .ctmrow>span{min-width:0;overflow-wrap:anywhere}
 .ctmsec .ctmrow .btn{min-height:2.5rem}
+
+/* 2.70.0 B (#1357) tidy up contacts: one row per group of the merge proposal, the contacts side by side (stacked on a phone) */
+.dupg .ppn{white-space:normal}
+.dupcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.375rem}
+.dupc{display:flex;flex-direction:column;gap:.125rem;min-width:0;padding:.375rem .5rem;border:1px solid var(--line2);border-radius:var(--radius);overflow-wrap:anywhere}
+.dupc small{display:flex;align-items:center;gap:.25rem}
+.dupc.tgt{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.dupc.dupx{opacity:.55}
+.dupst{color:var(--muted);font-style:italic}
+.dupg.dupx{opacity:.6}
+.duprow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.duprow select{min-height:2.5rem;flex:1;min-width:10rem}
+.dupbook{margin:.25rem 0}
+.dupskip{font-size:var(--fs-s)}

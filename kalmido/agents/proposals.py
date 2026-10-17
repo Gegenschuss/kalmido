@@ -56,6 +56,7 @@ PROP_STATES = ("requested", "ready", "applied", "discarded")
 PROP_MODES = ("off", "shared", "all")
 PROP_KINDS += ("inquiry", "setup")  # 2.51.0 B (#1351 #1358): an inquiry becomes a project, the setup assistant (agents/propkinds2.py)
 PROP_KINDS += ("layout",)  # 2.55.0 (#1066): the agent proposes how a view is arranged (agents/lyprop.py), never on request
+PROP_KINDS += ("merge",)  # 2.70.0 B (#1357): duplicate contacts merged (agents/dupprop.py), on request
 PROP_MAX_ITEMS = 200                    # entries one proposal may create / change (tasks + subtasks)
 PROP_MAX_BYTES = 256 * 1024             # JSON body of a proposal
 PROP_TITLE_MAX, PROP_NOTES_MAX, PROP_NAME_MAX, PROP_SUMMARY_MAX = 300, 5000, 120, 2000
@@ -346,6 +347,9 @@ def prop_validate(kind, b, inp):
     elif kind == "layout":  # 2.55.0 (#1066)
         from ..agents.lyprop import lyp_validate
         out.update(lyp_validate(b, inp))
+    elif kind == "merge":  # 2.70.0 B (#1357)
+        from ..agents.dupprop import dup_validate
+        out.update(dup_validate(b, inp))
     return out
 
 
@@ -355,6 +359,9 @@ def prop_input(c, uid, kind, b):
     if kind in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358)
         from ..agents.propkinds2 import pk2_input
         return pk2_input(c, uid, kind, b)
+    if kind == "merge":  # 2.70.0 B (#1357): one address book, only names / company / e-mails / phones
+        from ..agents.dupprop import dup_input
+        return dup_input(c, uid, b)
     if kind == "project":
         _p_keys(b, "", ("agent_id", "kind", "text", "file_name", "folder"))
         inp = {"text": _p_str(b.get("text"), "text", PROP_TEXT_MAX, True, line=False),
@@ -497,6 +504,9 @@ def prop_view(c, j):
     if j["kind"] == "layout":  # 2.55.0 (#1066): before / after for the card
         from ..agents.lyprop import lyp_view_extra
         out.update(lyp_view_extra(c, j))
+    if j["kind"] == "merge":  # 2.70.0 B (#1357): the groups with their contacts as they are now
+        from ..agents.dupprop import dup_view_extra
+        out.update(dup_view_extra(c, j))
     return out
 
 
@@ -599,6 +609,10 @@ def prop_run(c, j, sel, ed, extra):
     if kind == "layout":  # 2.55.0 (#1066): a saved arrangement, used at once (agents/lyprop.py)
         from ..agents.lyprop import lyp_run
         return lyp_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": extra, "tasks": [], "sections": [],
+                                              "changes": {}, "list": None, "undone": False})
+    if kind == "merge":  # 2.70.0 B (#1357): ctm_merge per ticked group as the person (agents/dupprop.py)
+        from ..agents.dupprop import dup_run
+        return dup_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": ed, "extra": extra, "tasks": [], "sections": [],
                                               "changes": {}, "list": None, "undone": False})
     prop, inp = json.loads(j["proposal"]), json.loads(j["input"] or "{}")
     edits = {k: prop_edit(kind, k, v, inp, prop) for k, v in ed.items()}
@@ -798,6 +812,9 @@ def proposal_apply(jid):
     if j["kind"] == "layout":  # 2.55.0 (#1066): the saved arrangement, its view, used at once
         from ..agents.lyprop import lyp_result
         counts.update(lyp_result(rec))
+    if j["kind"] == "merge":  # 2.70.0 B (#1357): merged / skipped groups
+        from ..agents.dupprop import dup_result
+        counts.update(dup_result(rec))
     prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] in ("project", "cleanup") else None})
     c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data->>'job' = ?",
               (ts, me(), str(jid)))
@@ -849,6 +866,9 @@ def proposal_undo(jid):
     elif j["kind"] == "layout":  # 2.55.0 (#1066): back to the previous arrangement
         from ..agents.lyprop import lyp_undo
         n, skipped = lyp_undo(c, j, rec)
+    elif j["kind"] == "merge":  # 2.70.0 B (#1357): every merge back (ctm_undo)
+        from ..agents.dupprop import dup_undo
+        n, skipped = dup_undo(c, j, rec)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -928,6 +948,14 @@ def proposal_redo(jid):
         from ..agents.lyprop import lyp_undo
         try:
             n, skipped = lyp_undo(c, j, rec, back=False)
+        except (BadInput, Denied):
+            c.rollback()
+            raise
+        rec.update(undone=False)
+    elif j["kind"] == "merge":  # 2.70.0 B (#1357): merged again
+        from ..agents.dupprop import dup_undo
+        try:
+            n, skipped = dup_undo(c, j, rec, back=False)
         except (BadInput, Denied):
             c.rollback()
             raise
