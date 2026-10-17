@@ -7,6 +7,8 @@ Invented names only, generated file contents.
  - import in the background: file, Paperless' text, date, tags, correspondent -> sender, type, a tag as folder, a skipped
    tag, custom fields + notes + archive serial number in the text; the same file twice = once; again = nothing new
  - following: new documents come in by themselves; Kalmido only ever sends GET
+ - 2.66.1 (#1944): an import with Paperless' text gets its preview (private: sealed with the space's key, an organisation:
+   with its key); the one-time catch-up makes missing previews of earlier imports and changes nothing else
  - rights: organisation admins only (members see, cannot change), no agents, not across workspaces; a person without an
    organisation for their own space
  - a hosted server: 2.69.0 (#1846) the connection is there, public HTTPS only (more in p269_a_api_test.py)
@@ -257,6 +259,26 @@ if pb and tn:
     check("Check the objection period" in t2, "notes fetched when the list only counts them")
     f = A.get(B + f"/api/docs/{pb['id']}/file")
     check(f.ok and f.content.startswith(b"%PDF"), "the original file is stored")
+    # 2.66.1 (#1944): an import with Paperless' text gets its preview all the same; alice has no organisation -> her
+    # private preview is sealed on disk with the space's key, the route opens it (P4)
+    th = dbx("SELECT thumb FROM doc_meta WHERE node_id=?", (pb["id"],))[0][0]
+    check(pb.get("thumb") and th, f"#1944: the imported document has a preview ({pb.get('thumb')}, {th!r})")
+    if th:
+        raw = open(os.path.join(DATA, "attachments", th), "rb").read()
+        tr_ = A.get(B + f"/api/docs/{pb['id']}/thumb")
+        check(raw.startswith(b"KENC1\n") and tr_.ok and tr_.content[:2] == b"\xff\xd8", "#1944: private preview sealed on disk, a JPEG from the route")
+    # the catch-up for documents imported before: preview gone, the merker reset -> the queue makes it again, nothing else changes
+    before = A.get(B + f"/api/docs/{pb['id']}").json()
+    dbx("UPDATE doc_meta SET thumb='' WHERE node_id=?", (pb["id"],), write=True)
+    dbx("DELETE FROM settings WHERE key='docs_thumb_fill'", write=True)
+    th2 = until(lambda: dbx("SELECT thumb FROM doc_meta WHERE node_id=?", (pb["id"],))[0][0], 90)
+    tr_ = A.get(B + f"/api/docs/{pb['id']}/thumb")
+    check(th2 and tr_.ok and tr_.content[:2] == b"\xff\xd8", f"#1944: the catch-up made the preview again ({th2!r}, {tr_.status_code})")
+    after = A.get(B + f"/api/docs/{pb['id']}").json()
+    check(all(after.get(k) == before.get(k) for k in ("text", "sender", "type", "tags", "folder", "review", "asn", "date")),
+          "#1944: the catch-up changes nothing but the preview")
+    check(until(lambda: '"done"' in (dbx("SELECT value FROM settings WHERE key='docs_thumb_fill'") or [[""]])[0][0], 90),
+          "#1944: the catch-up notes that it is done")
 check(dbx("SELECT COUNT(*) FROM pl_imported WHERE dup=1")[0][0] == 1, "the duplicate is remembered")
 
 # again: nothing new
@@ -314,6 +336,9 @@ check(r.ok, "the admin imports into the organisation")
 run_idle(Bo, f"org:{ORG}")
 od = docs(Bo, f"org:{ORG}")
 check(len(od) == 3 and all(d["org_id"] == ORG for d in od), f"organisation import: in the organisation's documents ({len(od)})")
+od = until(lambda: (lambda x: x if len(x) == 3 and all(d["state"] in ("done", "failed") for d in x) else None)(docs(Bo, f"org:{ORG}")), 60) or od
+check(all(d.get("thumb") for d in od) and Bo.get(B + f"/api/docs/{od[0]['id']}/thumb").content[:2] == b"\xff\xd8",
+      "#1944: the organisation's imports have their previews (sealed with the organisation's key, the route opens them)")
 check(not any(d["org_id"] == ORG for d in docs(A, "all")), "alice (no member) sees none of them")
 check(len(docs(A)) == 3, "the private import is untouched")
 r = Er.put(B + "/api/paperless", json={"ws": "private", "url": PL, "token": "pl-secret"})
