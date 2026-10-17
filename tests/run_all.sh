@@ -863,6 +863,8 @@ fresh; run p256_b_ui node p256_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.56.0 part A: a message to a job from its card, a job's own chat history (#1791 #1793)
 fresh; run p256_a_api "$PY" p256_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p256_a_ui node p256_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.1 part C: #1817 lock per list - client data layer
+fresh; run p264a_c_ui node p264a_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.64.1 part D: #1817 lock per list - dialogs and display, #1518
 fresh; run p264a_d_ui node p264a_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.64.1 part A: #1817 lock per list - server core
