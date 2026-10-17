@@ -1601,6 +1601,8 @@ _OITEM = {"type": "object", "additionalProperties": False, "properties": {
     "discount": {"type": "number", "minimum": 0, "maximum": 100, "description": "Percent off (marked)"}}}
 _ODRAFT = {"client_id": S_ID, "title": {"type": "string"}, "intro": {"type": "string"}, "items": {"type": "array", "items": _OITEM},
            "list_id": {**S_ID, "description": "The project list"}, "notify": {"type": "boolean", "description": "A card in the person's chat: sum, PDF preview, Open in the office"}, **_RB}
+# 2.88.0 (#1915): a draft's share in the cash flow plan (counts once it is sent)
+_OCF = {"cashflow": {"type": "string", "enum": ["auto", "yes", "no"], "description": "In the cash flow plan once sent: auto = the newest version of the chain, yes, no"}}
 TOOLS += [
     ("get_office", "2.51.0: the office area you work in (your workspace; a personal agent without one: your owner's personal office), the "
                    "person you act for and the rules. Drafts only: a person reserves the number, finalises, sends and books.",
@@ -1619,9 +1621,9 @@ TOOLS += [
                            "from the catalogue or the client's framework contract; free positions, other prices and discounts are allowed but marked "
                            "for the person). notify = a card in the person's chat with the sum, the PDF preview and \"Open in the office\".",
      _obj(_ODRAFT, ["title"]), lambda api, a: api.call("POST", "/office/offers", body=_pick(a, tuple(_ODRAFT)))),
-    ("update_offer_draft", "2.51.0: change your own quotation draft while it is a draft (items replaces the whole list). Never status, number or sending.",
-     _obj({"doc_id": S_ID, **_ODRAFT}, ["doc_id"]),
-     lambda api, a: api.call("PATCH", f"/office/offers/{int(a['doc_id'])}", body=_pick(a, tuple(_ODRAFT)))),
+    ("update_offer_draft", "2.51.0: change your own quotation draft while it is a draft (items replaces the whole list; 2.88.0: cashflow). Never status, number or sending.",
+     _obj({"doc_id": S_ID, **_ODRAFT, **_OCF}, ["doc_id"]),
+     lambda api, a: api.call("PATCH", f"/office/offers/{int(a['doc_id'])}", body=_pick(a, tuple(_ODRAFT) + tuple(_OCF)))),
     ("draft_invoice_from_offer", "2.51.0: an invoice DRAFT from an accepted quotation (like a person's \"Create invoice\"; parts_mode for a quotation "
                                  "with parts). A person finalises and sends it. The event offer_accepted tells you when a quotation was accepted.",
      _obj({"offer_id": S_ID, "parts_mode": {"type": "string", "enum": ["full", "title", "summary"]}, "notify": {"type": "boolean"}, **_RB}, ["offer_id"]),

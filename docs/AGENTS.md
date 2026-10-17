@@ -1676,7 +1676,7 @@ area's clients, documents or lists answer `404`.
 | One document with its positions | `GET /api/v1/office/docs/{id}` | `get_office_document` |
 | The PDF preview of a draft (marked as a draft) | `GET /api/v1/office/docs/{id}/pdf` | -- (binary; the chat card links it) |
 | A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`) | `POST /api/v1/office/offers` | `create_offer_draft` |
-| Change your own draft (only while it is a draft) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
+| Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
 | An invoice draft from an accepted quotation | `POST /api/v1/office/offers/{id}/invoice` | `draft_invoice_from_offer` |
 | A reminder draft over open invoices of one client | `POST /api/v1/office/reminders` | `draft_reminder` |
 | Suggest an incoming payment / your suggestions | `POST` / `GET /api/v1/office/payment-suggestions` | `suggest_payment` / `list_payment_suggestions` |
