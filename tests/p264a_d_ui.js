@@ -27,7 +27,8 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const I18N = path.join(__dirname, '..', 'static', 'i18n');
 const de = JSON.parse(fs.readFileSync(path.join(I18N, 'de.json'), 'utf8'));
 check(de['You switched encryption on'] === 'Du hast die Verschlüsselung eingeschaltet' && de['You switched encryption off'] === 'Du hast die Verschlüsselung ausgeschaltet', '#1518: own German texts "Du hast …"');
-check(de['Former members can still decrypt old contents with their old key; the key change follows in a later update.'] === 'Ehemalige Mitglieder können alte Inhalte mit ihrem alten Schlüssel noch entschlüsseln; der Schlüsselwechsel folgt in einem späteren Update.', '#1817 E8: the honest leave text in German');
+// 2.64.2 D (#1817): the key changes now (rotation); the honest text says so while it runs
+check(/Der Schlüssel wird gewechselt/.test(de['A member has left this list. The key is being changed; until everything is encrypted again, former members can still decrypt older contents with their old key.'] || ''), '#1817 E8: the honest leave text in German');
 for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
   const j = JSON.parse(fs.readFileSync(path.join(I18N, f), 'utf8'));
   check(j['Encrypted in the browser'] && j['Not available in encrypted lists'] && j['You switched encryption on'], `#1817: the new texts are in ${f}`);
