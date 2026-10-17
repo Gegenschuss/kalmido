@@ -201,7 +201,8 @@ check(r.ok, f"connected ({r.status_code} {r.text[:200]})")
 # ---- preview: what comes along
 p = A.get(B + "/api/paperless/preview?ws=private").json()
 pr = p.get("rules") or {}
-check(pr.get("convert") == 5 and pr.get("dup") == 0 and pr.get("on") is True, f"preview: 5 rules to take over ({pr})")
+# before the first import nothing is left out yet: "Ignore me" counts too (the mapping comes with the start)
+check(pr.get("convert") == 6 and pr.get("dup") == 0 and pr.get("on") is True, f"preview: 6 rules to take over ({pr})")
 check(pr.get("auto") == 1, f"preview: 1 auto counted apart ({pr.get('auto')})")
 bad = {(b["name"], b["why"]) for b in pr.get("unsupported") or []}
 check(bad == {("Bad regex", "pattern"), ("Long", "long")} and pr.get("unsupported_n") == 2, f"preview: too complex / too long reported ({bad})")
