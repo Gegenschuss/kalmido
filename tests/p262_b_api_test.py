@@ -189,6 +189,11 @@ nj = A.get(B + "/api/news").json()
 kinds = sorted(x["kind"] for x in nj["items"] if x.get("task_id") == T4 and not x["read"])
 check("complete" in kinds and nj["unread_me"] == 0, "#1943: an agent's completion / assignment has no number " + str(kinds) + " " + str(nj["unread_me"]))
 all_read(A)
+# 2.66.1 (#1943): an agent's approval card reaches "only replies" (it waits for me) - so it counts at the bell too
+says(Bo, T2, "bob before the card")
+r = requests.post(V + f"/tasks/{T2}/comments", headers=CLH, json={"body": "May I ship?", "approval": {"title": "Ship it"}})
+check(r.status_code == 201 and unread_me(A) == 1, "#1943: an agent's approval card counts at the bell with 'replies' " + str(unread_me(A)))
+all_read(A)
 # "all": every agent comment that reaches me counts
 check(A.patch(B + "/api/settings", json={"agent_comments": "all"}).ok, "back to 'all'")
 says(Bo, T2, "bob")
