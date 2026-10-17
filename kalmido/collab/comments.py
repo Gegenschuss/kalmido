@@ -72,8 +72,11 @@ def comment_plain(c, text, names=None):
 
 def att_dicts(c, where, args):
     out = {}
-    for a in c.execute(f"SELECT id, comment_id, name, mime, size, created_at FROM attachments WHERE {where} ORDER BY id", args):
-        out.setdefault(a["comment_id"], []).append({k: a[k] for k in ("id", "name", "mime", "size", "created_at")})
+    for a in c.execute(f"SELECT id, comment_id, name, mime, size, created_at, enc, e2e_gen FROM attachments WHERE {where} ORDER BY id", args):
+        d = {k: a[k] for k in ("id", "name", "mime", "size", "created_at")}
+        if a["enc"] == 2:  # 2.64.2 B (#1817): a list file (name = list ciphertext)
+            d.update(enc=2, e2e_gen=a["e2e_gen"])
+        out.setdefault(a["comment_id"], []).append(d)
     if out:  # 2.61.0 (#1818): + up (virus scan marks)
         from ..files.scan import sc_up
         sc_up(c, "att", [d for v in out.values() for d in v])
@@ -86,7 +89,8 @@ def comment_dict(r, atts):
             "attachments": atts.get(r["id"], []), "suggestion": json.loads(r["suggestion"]) if r["suggestion"] else None,
             "reply_to": r["reply_to"] if "reply_to" in r.keys() else None,  # 2.33.0 (#1076): + reply (with_replies)
             "ext_name": r["ext_name"] if "ext_name" in r.keys() else None,  # 2.50.0 (#329): written by a customer through the public link
-            "portal": bool(r["portal"]) if "portal" in r.keys() else False}  # 2.63.0 B (#1513): the customer sees it (answer / their own)
+            "portal": bool(r["portal"]) if "portal" in r.keys() else False,  # 2.63.0 B (#1513): the customer sees it (answer / their own)
+            "rule_name": r["rule_name"] if "rule_name" in r.keys() else None}  # 2.71.0 A (#1457): written by a list rule
 
 
 def need_live_comment(c, cid):
@@ -123,6 +127,8 @@ def timeline(tid):
             o = c.execute("SELECT list_id FROM tasks WHERE id=?", (a["data"]["id"],)).fetchone()
             if not o or o["list_id"] not in vis or not task_visible(c, a["data"]["id"], me()):
                 a["data"] = {"hidden": True}
+    from ..tasks.multilist import ml_acts
+    ml_acts(c, acts)  # 2.71.0 B (#1459): a further list's name only for who sees it
     comments = with_replies(c, "c", with_reactions(c, [comment_dict(r, atts) for r in rows]))
     from .cchoice import lv_with_choices
     lv_with_choices(c, tid, rows, comments)  # 2.41.0 (#1383): answer buttons / approval cards
@@ -196,11 +202,15 @@ def comment_create(tid):
     if t["deleted_at"]:
         return err(tr("The task is in the trash"), 409)
     text, files = comment_input()
-    if len(text) > MAX_COMMENT:
+    from .liste2e import le2a_comment_in, le2a_text_max, le2e_mode
+    if len(text) > le2a_text_max(text, MAX_COMMENT):  # 2.64.1 (#1817): a ciphertext is longer than its text
         return err(tr("The comment is too long (max. {0} characters)", MAX_COMMENT))
     if not text and not files:
         return err(tr("The comment is empty"))
-    text, mentions = clean_mentions(c, t["list_id"], text) if collab_all() else (text, [])
+    if le2e_mode(c, t["list_id"]) or text.startswith("e2e1:"):  # 2.64.1 (#1817): ciphertext + mentions from the browser
+        text, mentions = le2a_comment_in(c, t["list_id"], text)
+    else:
+        text, mentions = clean_mentions(c, t["list_id"], text) if collab_all() else (text, [])
     try:  # 2.33.0 (#1076): a reply to a comment of the same task (else 400)
         orig = reply_check(c, "c", comment_reply_in(), task_id=tid)
     except BadInput as e:
@@ -257,7 +267,11 @@ def comment_create(tid):
     if sug and sug.get("kind") == "merge_request":
         git_merge_link(c, t, sug)
     saved = []
-    e = save_attachments(c, tid, files, comment_id=cid, saved=saved) if files else None
+    if files and le2e_mode(c, t["list_id"]):  # 2.64.2 B (#1817): list files, encrypted in the browser (names: list ciphertexts)
+        from .liste2efile import le2f_save
+        e = le2f_save(c, tid, files, request.form.getlist("le2e_name"), comment_id=cid, saved=saved)
+    else:
+        e = save_attachments(c, tid, files, comment_id=cid, saved=saved) if files else None
     if e:
         c.rollback()
         unlink_files(saved)
@@ -291,13 +305,17 @@ def comment_update(cid):
     if r["user_id"] != me():
         return err(tr("Only the author can edit this comment"), 403)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (r["task_id"],)).fetchone()
-    text = (web_fields(body(), {"body"}, "PATCH /api/comments/{cid}").get("body") or "").strip()
-    if len(text) > MAX_COMMENT:
+    text = (web_fields(body(), {"body", "mentions"}, "PATCH /api/comments/{cid}").get("body") or "").strip()
+    from .liste2e import le2a_comment_in, le2a_text_max, le2e_mode
+    if len(text) > le2a_text_max(text, MAX_COMMENT):  # 2.64.1 (#1817)
         return err(tr("The comment is too long (max. {0} characters)", MAX_COMMENT))
     nfiles = c.execute("SELECT COUNT(*) FROM attachments WHERE comment_id=?", (cid,)).fetchone()[0]
     if not text and not nfiles:
         return err(tr("The comment is empty"))
-    text, mentions = clean_mentions(c, t["list_id"], text) if collab_all() else (text, [])
+    if le2e_mode(c, t["list_id"]) or text.startswith("e2e1:"):  # 2.64.1 (#1817): ciphertext + mentions from the browser
+        text, mentions = le2a_comment_in(c, t["list_id"], text)
+    else:
+        text, mentions = clean_mentions(c, t["list_id"], text) if collab_all() else (text, [])
     old = {int(x) for x in (r["mentions"] or "").split(",") if x}
     c.execute("UPDATE comments SET body=?, mentions=?, edited_at=? WHERE id=?",
               (text, ",".join(map(str, mentions)), iso(now_utc()), cid))
@@ -401,6 +419,9 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     names = user_names(c, [author] + [int(x) for x in MENTION_RE.findall(text)])
     snippet = comment_plain(c, text, names)
     snippet = snippet[:280] + ("…" if len(snippet) > 280 else "")
+    from .liste2e import le2e_mode, le2e_neutral
+    lk = le2e_mode(c, t["list_id"])  # 2.64.2 D (#1817): a list with the lock: no words of the comment, the list's name instead
+    lname = (c.execute("SELECT name FROM lists WHERE id=?", (t["list_id"],)).fetchone() or [""])[0] if lk else ""
     out = []
     ag = agent_ids(c)
     # 2.62.0 (#1854): approval cards / questions with buttons / suggestions of an agent always arrive (they wait for the person)
@@ -431,6 +452,11 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
         if lv == "urgent":
             if push_reachable(c, uid, s) and not tbl_sent(uid, t["id"]):
                 lg = lang_of(s)
+                if lk:
+                    out.append((uid, tr("Urgent: {0}", le2e_neutral(lg), lg=lg), tr("{0} commented in {1}", names.get(author, "?"), lname, lg=lg),
+                                f"{PUBLIC_URL}/#t/{t['id']}", TBL_PRIO, comment_push_extra(t, lg)))
+                    continue
+                lg = lang_of(s)
                 out.append((uid, tr("Urgent: {0}", t["title"], lg=lg), tr("{0} commented: {1}", names.get(author, "?"), snippet or
                             trn("{0} file", "{0} files", nfiles, lg=lg), lg=lg), f"{PUBLIC_URL}/#t/{t['id']}", TBL_PRIO, comment_push_extra(t, lg)))
             continue
@@ -443,6 +469,11 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
         lg = lang_of(s)
         what = snippet or trn("{0} file", "{0} files", nfiles, lg=lg)
         who = names.get(author, "?")
+        if lk:
+            msg = tr("{0} mentioned you in {1}", who, lname, lg=lg) if uid in notify_mentions else \
+                tr("{0} replied to your message in {1}", who, lname, lg=lg) if uid == replied else tr("{0} commented in {1}", who, lname, lg=lg)
+            out.append((uid, le2e_neutral(lg), msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), comment_push_extra(t, lg)))
+            continue
         msg = tr("{0} mentioned you: {1}", who, what, lg=lg) if uid in notify_mentions else \
             tr("{0} replied to your message: {1}", who, what, lg=lg) if uid == replied else tr("{0} commented: {1}", who, what, lg=lg)
         out.append((uid, t["title"], msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), comment_push_extra(t, lg)))

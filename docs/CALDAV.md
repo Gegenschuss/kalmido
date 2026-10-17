@@ -61,6 +61,11 @@ Kalmido 2.9.0 is a CalDAV server for tasks. Every list you can see appears as a 
 
 Changes made over CalDAV show "via CalDAV" in the task history. Webhooks and agent events carry `"via": "caldav"`.
 
+**Lists encrypted in the browser** (2.64.1). The server cannot read their texts, so a calendar app sees each task as
+"🔒 Task" with its due date and reminders, without notes or link. Ticking it off and moving the date work; a changed title
+or note from the app is ignored, and new tasks cannot be created in such a list from the app. The same holds for the
+calendar feed (iCal link).
+
 ## Calendar and contacts on the phone
 
 One account brings everything: your task lists (Reminders), your event calendars (Calendar) and your address books
@@ -124,6 +129,14 @@ other contacts are deleted, so the phone removes them on its next sync. The kept
 come back with their links. Contacts of a synced external account cannot be merged (they would come back), and contacts
 of an organisation's address book only merge with contacts of the same organisation; personal address books only
 with books of the same owner (not into a book someone shared with you).
+
+**Finding duplicates with an agent** (2.70.0): in *Contacts › More › Find duplicates with an agent…* (or the command
+palette) pick an address book you may change and an agent. The dialog says exactly what the agent gets: name, company,
+e-mail addresses and phone numbers of that book's contacts, nothing else (no notes, addresses, birthdays). The agent
+proposes groups that belong together; you get a notification and review each group: the contacts side by side as they
+are now, the agent's reason, the contact that stays (switchable), each group with its own tick. *Merge* merges the ticked
+groups exactly like merging by hand; a group with a contact that was deleted or changed in the meantime is skipped. One
+undo step takes all merges of the proposal back. The agent never merges or deletes anything itself.
 
 ## Writing into subscribed calendars
 
@@ -250,7 +263,8 @@ This should answer `207 Multi-Status` with `current-user-principal`. A `302` to 
 App passwords can also be managed with a personal access token (`read` to list them, `write` to create or revoke). See [API.md](API.md):
 
 - `GET /api/v1/me/app-passwords`
-- `POST /api/v1/me/app-passwords` with `{"name": "..."}`
+- `POST /api/v1/me/app-passwords` with `{"name": "..."}` (2.79.0: only a token for all lists with `calendar` and `contacts`;
+  an app password opens CalDAV / CardDAV without the token's limits)
 - `DELETE /api/v1/me/app-passwords/{id}`
 
 Agents' tokens get 403.

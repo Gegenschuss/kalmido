@@ -125,6 +125,7 @@ APP_TO_API = {
     "PATCH /api/templates/{}": ["PATCH /templates/{}"],
     "DELETE /api/templates/{}": ["DELETE /templates/{}"],
     "POST /api/templates/{}/apply": ["POST /templates/{}/apply"],
+    "POST /api/lists/{}/duplicate": ["POST /lists/{}/duplicate"],  # 2.78.0 (#1881)
     "POST /api/habits": ["POST /habits"],
     "PATCH /api/habits/{}": ["PATCH /habits/{}"],
     "DELETE /api/habits/{}": ["DELETE /habits/{}"],
@@ -215,10 +216,15 @@ APP_TO_API = {
     # 2.60.0 (#343): sprints -- agents read the sprints of a shared list and put tasks into one (or back to the backlog)
     "GET /api/lists/{}/sprints": ["GET /lists/{}/sprints"], "GET /api/sprints/{}": ["GET /sprints/{}"],
     "POST /api/lists/{}/sprints/assign": ["POST /lists/{}/sprints/assign"],
+    # 2.71.0 (#1459): a task in several lists; the place in a further list = linking again with the section
+    "POST /api/tasks/{}/links": ["POST /tasks/{}/links"], "DELETE /api/tasks/{}/links/{}": ["DELETE /tasks/{}/links/{}"],
+    "PATCH /api/tasks/{}/links/{}": ["POST /tasks/{}/links"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
-    ("2.66.0 (#1835): merging duplicate contacts / clients and its undo stay with people for now; the agent tool follows with #1357",
+    # 2.70.0 (#1357): agents propose contact merges as a proposal (kind merge); the person applies them, the routes stay with people
+    ("2.66.0 (#1835): merging duplicate contacts / clients and its undo stay with people; agents propose contact merges "
+     "(proposal kind merge, #1357), the person applies them",
      ("=POST /api/contacts/merge", "=POST /api/contacts/merges/{}/undo", "=POST /api/clients/merge", "=POST /api/clients/merges/{}/undo")),
     ("2.59.0 (#1375): the hint while a person types a new task's title and the client's on / off of the related tasks; agents "
      "use related_tasks and search_tasks with semantic", ("=POST /api/tasks/similar", "=GET /api/related/config")),
@@ -312,12 +318,21 @@ APP_ONLY = [
      ("PUT /api/workload/capacity/", "POST /api/qr")),
     ("2.28.0 (#935): a person's organisations (workspaces) and their admins' member management: people only (agents 403)",
      ("* /api/orgs",)),
+    # 2.73.0 B (#1473): moving an account between servers: export and import of a person's own data, people only (agents 403)
+    ("2.73.0 B (#1473): the account export / import (moving to an own server and back): a person's own data, people only",
+     ("* /api/account/export", "* /api/account/import")),
     ("2.42.0 (#828, #909): end-to-end encryption happens in a person's browser (keys, encrypted note / files, the switch of an encrypted DM); "
      "agents see only placeholders (encrypted_note, encrypted files) and never take part in DMs", (
         "* /api/e2e/", "* /api/tasks/{}/enc-note", "=POST /api/tasks/{}/enc-attachments", "=POST /api/team/rooms/{}/e2e")),
     # 2.48.0 (#1642): a task's note locked with its owner's password, encrypted in the browser; agents see note_locked only
     ("2.48.0 (#1642): locking a task's note with one's own password happens in that person's browser (end-to-end); agents see only "
      "note_locked and get 409 when they write the notes", ("* /api/tasks/{}/note-lock",)),
+    # 2.64.1 (#1817): the lock per list, encrypted in the browser with a list key; agents are never members of such a list
+    ("2.64.1 (#1817): switching the lock of a list on / off, rewriting its texts and handing out the list key happen in a person's "
+     "browser (end-to-end); agents and API tokens get 403, lists with the lock are not for agents", ("* /api/lists/{}/e2e",)),
+    # 2.64.2 (#1817): files of a list with the lock, encrypted in the browser with the list key
+    ("2.64.2 (#1817): files of a list with the lock are encrypted with the list key in a person's browser; agents and API tokens get 403 "
+     "(they see such files only as encrypted)", ("=POST /api/tasks/{}/list-attachments",)),
     ("2.37.0 (#1159): a person saves a chat message as a task with a click; agents only offer it (send_chat offer_save), never save",
      ("=POST /api/chat-save",)),
     ("2.28.0 (#1005): a person answers an agent's question with a button: in the API as POST /agents/{id}/chat/{mid}/choice (a person's token); agents never answer",
@@ -386,6 +401,29 @@ APP_ONLY = [
     # 2.63.0 B (#1513): whether the reporter of a customer report gets mails is the team's (and the reporter's) decision
     ("2.63.0 (#1513): the mails to the reporter of a customer report are switched by people (the task's box) or the reporter "
      "(the link in every mail); agents answer customers with portal comments", ("=PATCH /api/tasks/{}/ticket",)),
+    ("2.67.0 (#1865): \"Pull the chain in\" is a person's button in the timeline / task panel; agents move the waiting tasks "
+     "with update_task (a later due date moves the chain along by itself)", ("=POST /api/tasks/{}/chain/pull",)),
+    # 2.70.0 A (#1354): a person hands an agent a meeting (photos into their own chat, the cards of their own proposals)
+    ("2.70.0 (#1354): a person's photos of a meeting for a proposal request and the chat's cards of their ready proposals; "
+     "proposals come only from people, the agent reads the photos with GET /chat-attachments/{id} and answers with "
+     "POST /agent/jobs/{id}/proposal", ("=POST /api/agents/{}/meeting-images", "=GET /api/agents/{}/meeting-proposals")),
+    # 2.71.0 A (#1457): rules of a list are set by its owner / admins; agents read (GET /lists/{id}/rules, MCP list_rules) and
+    # only propose (POST /lists/{id}/rules/proposals, MCP propose_rule)
+    ("2.71.0 (#1457): the rules of a list are managed by its owner / list admins in the app; agents read them and only propose "
+     "one (the person accepts it, it runs with their rights)",
+     ("* /api/lists/{}/rules", "* /api/rules/")),
+    ("2.72.0 (#1333): the household budget is private like health lists: people only, never an agent; no REST v1 / MCP in 2.72.0",
+     ("* /api/budget",)),
+    # 2.73.0 A (#661): several servers in one app -- the person's own accounts on other servers (their tokens); an agent only
+    # ever works on its own server
+    ("2.73.0 (#661): several Kalmido servers in one app: the person's accounts on other servers, their data through the other "
+     "server's own API; people only, never agents", ("* /api/servers",)),
+    # 2.74.0 (#338): the supporter licence (self-hosted only) is entered by people; it unlocks nothing, agents have no use for it
+    ("2.74.0 (#338): the supporter licence (server: admins, personal: the person) and its yearly hint: people only, session routes",
+     ("* /api/supporter",)),
+    # 2.75.0 (#1411): the built-in assistant calls a language model for a person in the web app; agents are models themselves
+    ("2.75.0 (#1411): the built-in assistant (session only: a person's own switch, shared lists, log; the admin overview); agents "
+     "never use it and have their own proposals API", ("* /api/assistant", "* /api/admin/assistant")),
 ]
 
 

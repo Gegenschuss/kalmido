@@ -64,11 +64,16 @@ def note_fields(b, partial=False):
         t = b.get("title")
         if not isinstance(t, str) or not t.strip():
             raise BadInput(tr("Please give the note a title"))
-        out["title"] = re.sub(r"\s+", " ", t).strip()[:NOTE_TITLE_MAX]
+        from .liste2e import le2a_clean_cipher, le2e_is_cipher
+        # 2.64.1 (#1817): a ciphertext of a list with the lock stays as it is (le2e_guard checks the list)
+        out["title"] = le2a_clean_cipher(t, "title") if le2e_is_cipher(t) else re.sub(r"\s+", " ", t).strip()[:NOTE_TITLE_MAX]
     if "body" in b:
+        from .liste2e import le2a_clean_cipher, le2e_is_cipher
         if not isinstance(b["body"], str):
             raise BadInput(tr("Invalid value: {0}", "body"))
-        if len(b["body"]) > NOTE_BODY_MAX:
+        if le2e_is_cipher(b["body"]):
+            le2a_clean_cipher(b["body"], "body")
+        elif len(b["body"]) > NOTE_BODY_MAX:
             raise BadInput(tr("The note is too long (at most {0} characters)", NOTE_BODY_MAX))
         out["body"] = b["body"]
     if "tags" in b:
@@ -87,7 +92,8 @@ def note_dict(r, full=True, names=None):
     if full:
         d["body"] = r["body"]
     else:
-        d["excerpt"] = re.sub(r"\s+", " ", re.sub(r"[#*_`>\[\]]", "", r["body"] or "")).strip()[:160]
+        d["excerpt"] = "" if (r["body"] or "").startswith("e2e1:") else \
+            re.sub(r"\s+", " ", re.sub(r"[#*_`>\[\]]", "", r["body"] or "")).strip()[:160]  # 2.64.1 (#1817): never a cut ciphertext
     if names is not None:
         d["updated_by_name"] = names.get(r["updated_by"], "")
     return d
@@ -124,6 +130,8 @@ def note_create(lid):
     c = db()
     note_role(c, lid, write=True)
     f = note_fields(body())
+    from .liste2e import le2e_guard
+    le2e_guard(c, lid, {"note_title": f["title"], "note_body": f.get("body", "")})  # 2.64.1 (#1817)
     ts, uid = iso(now_utc()), me()
     nid = insert_id(c, "INSERT INTO notes(list_id,title,body,tags,pinned,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
                     (lid, f["title"], f.get("body", ""), f.get("tags", ""), f.get("pinned", 0), uid, uid, ts, ts))
@@ -154,6 +162,8 @@ def note_update(nid):
             raise BadInput(tr("Invalid value: {0}", "list_id"))
         note_role(c, lid, write=True)
         f["list_id"] = lid
+    from .liste2e import le2a_note_write
+    le2a_note_write(c, r, f)  # 2.64.1 (#1817): texts of a list with the lock; a move into / out of one only with both texts
     exp = b.get("expect_updated_at")
     if exp and exp != r["updated_at"] and ("body" in f or "title" in f):
         cur = note_dict(r, names=user_names(c, [r["updated_by"]] if r["updated_by"] else []))
@@ -184,6 +194,7 @@ def notes_search(c, uid, q, lid=None, limit=50):
         w += " AND list_id=?"
         a.append(lid)
     if q:
+        w += " AND list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL)"  # 2.64.1 (#1817, M7): ciphertexts are not searched
         for word in q.split()[:6]:
             like = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
             w += " AND (title ILIKE ? ESCAPE '\\' OR body ILIKE ? ESCAPE '\\' OR tags ILIKE ? ESCAPE '\\')"
@@ -210,6 +221,8 @@ def v1_list_notes(lid):
     a = request.args
     c = db()
     note_role(c, lid)
+    from .liste2e import le2a_api_refuse
+    le2a_api_refuse(c, lid)  # 2.64.1 (#1817)
     after, limit = cursor_dec("n", a.get("cursor")), v1_limit(a)
     rows = c.execute("SELECT * FROM notes WHERE list_id=? AND id>? ORDER BY id LIMIT ?", (lid, after, limit + 1)).fetchall()
     more = len(rows) > limit
@@ -223,6 +236,8 @@ def v1_note_create(lid):
     v1_args(())
     b = v1_json()
     reject_unknown(b, ("title", "body", "tags", "pinned"))
+    from .liste2e import le2a_api_refuse
+    le2a_api_refuse(db(), lid)  # 2.64.1 (#1817)
     j = v1_call(note_create, lid, body=b)
     return jsonify({k: v for k, v in j.items() if k != "updated_by_name"}), 201
 
@@ -234,14 +249,20 @@ def v1_notes_search():
     c = db()
     lid = as_int(a["list_id"], "list_id", 1) if a.get("list_id") else None
     rows = notes_search(c, me(), (a.get("q") or "").strip()[:200], lid, v1_limit(a))
-    return jsonify(data=[note_dict(r, full=False) for r in rows], next_cursor=None)
+    from .liste2e import le2e_modes
+    lk = le2e_modes(c, [r["list_id"] for r in rows])  # 2.64.1 (#1817): notes of lists with the lock are not for the API
+    return jsonify(data=[note_dict(r, full=False) for r in rows if r["list_id"] not in lk], next_cursor=None)
 
 
 @app.get("/api/v1/notes/<int:nid>")
 @v1_view
 def v1_note_get(nid):
     v1_args(())
-    return jsonify(note_dict(need_note(db(), nid)))
+    c = db()
+    r = need_note(c, nid)
+    from .liste2e import le2a_api_refuse
+    le2a_api_refuse(c, r["list_id"])  # 2.64.1 (#1817)
+    return jsonify(note_dict(r))
 
 
 @app.patch("/api/v1/notes/<int:nid>")
@@ -250,6 +271,8 @@ def v1_note_update(nid):
     v1_args(())
     b = v1_json()
     reject_unknown(b, ("title", "body", "tags", "pinned", "list_id", "expect_updated_at"))
+    from .liste2e import le2a_api_refuse
+    le2a_api_refuse(db(), need_note(db(), nid)["list_id"], b.get("list_id"))  # 2.64.1 (#1817)
     j = v1_call(note_update, nid, body=b)
     return jsonify({k: v for k, v in j.items() if k != "updated_by_name"})
 
@@ -258,6 +281,8 @@ def v1_note_update(nid):
 @v1_view
 def v1_note_delete(nid):
     v1_args(())
+    from .liste2e import le2a_api_refuse
+    le2a_api_refuse(db(), need_note(db(), nid)["list_id"])  # 2.64.1 (#1817)
     v1_call(note_delete, nid, body={})
     return Response(status=204)
 

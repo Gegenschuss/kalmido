@@ -13,7 +13,7 @@ from ..core.i18n import dec_comma, lang, LANGS, tr
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import me, user_public
 from ..core.access import (
-    _pset_sql, Denied, list_role, need_feat, need_list, need_task, need_time, plists,
+    _pset_sql, Denied, health_hidden, list_role, need_feat, need_list, need_task, need_time, plists,
     pvis, task_visible, time_all, vis_sql,
 )
 from ..core.state import visible_lists
@@ -211,19 +211,34 @@ def time_on(s):
     return time_all() and "time" in (s.get("features") or "").split(",")
 
 
-TIME_Q = """SELECT e.*, t.title AS t_title, u.display_name AS u_name, u.username AS u_login
-            FROM time_entries e LEFT JOIN tasks t ON t.id=e.task_id LEFT JOIN users u ON u.id=e.user_id"""
+TIME_Q = """SELECT e.*, t.title AS t_title, u.display_name AS u_name, u.username AS u_login, tl.life AS l_life
+            FROM time_entries e LEFT JOIN tasks t ON t.id=e.task_id LEFT JOIN users u ON u.id=e.user_id
+            LEFT JOIN lists tl ON tl.id=e.list_id"""
+HIDDEN_LIFE = ("health", "budget")
+
+
+def th_sql(a="e."):
+    """2.79.0 (#476 M6): SQL restriction (no ? params) for time entries: a request that must not see health / budget lists
+    (agents, tokens without "private") gets no entries of them, also not its own (their title copies are that data)."""
+    if not health_hidden():
+        return "TRUE"
+    return f"({a}list_id IS NULL OR {a}list_id NOT IN (SELECT id FROM lists WHERE COALESCE(life, '') IN ('health', 'budget')))"
 
 
 def entry_out(r, uid, vis, ref, rm):
     sec, seen = entry_secs(r, ref), r["list_id"] in vis
+    hid = "l_life" in r.keys() and r["l_life"] in HIDDEN_LIFE and health_hidden()  # #476 M6 (e.g. my running timer)
     if seen and r["task_id"] and isinstance(vis, VisIds):  # 1.10.0: a task a participant no longer sees
         seen = vis.task_ok(r["task_id"], r["list_id"], full=True)
-    title = r["t_title"] if seen and r["t_title"] is not None else r["task_title"]
-    return {"id": r["id"], "user_id": r["user_id"], "user_name": r["u_name"] or r["u_login"] or "",
+    title = "" if hid else r["t_title"] if seen and r["t_title"] is not None else r["task_title"]
+    from ..collab.liste2e import le2e_is_cipher, le2e_neutral
+    e2e = le2e_is_cipher(title)  # 2.64.1 B (#1817): a title of a list with the lock: the neutral word, the app resolves it
+    if e2e:
+        title = le2e_neutral()
+    return {**({"e2e": True} if e2e else {}), "id": r["id"], "user_id": r["user_id"], "user_name": r["u_name"] or r["u_login"] or "",
             "task_id": r["task_id"] if seen else None, "list_id": r["list_id"] if seen else None,
             "title": title or "", "start": r["start"], "end": r["end"], "seconds": sec, "rounded": rnd_up(sec, rm),
-            "note": r["note"], "source": r["source"], "running": r["end"] is None, "mine": r["user_id"] == uid,
+            "note": "" if hid else r["note"], "source": r["source"], "running": r["end"] is None, "mine": r["user_id"] == uid,
             "auto_stopped": bool(r["auto_stopped"]), "client_id": r["client_id"] if r["user_id"] == uid else None}
 
 
@@ -294,7 +309,7 @@ def time_totals(c, uid):
     out = {}
     for r in c.execute(f"""SELECT task_id, SUM(seconds) AS s, SUM(CASE WHEN user_id=? THEN seconds ELSE 0 END) AS m
                            FROM time_entries WHERE task_id IS NOT NULL AND "end" IS NOT NULL
-                             AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} GROUP BY task_id""", (uid, uid, uid, uid)):
+                             AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} AND {th_sql("")} GROUP BY task_id""", (uid, uid, uid, uid)):
         if r["s"]:
             out[r["task_id"]] = [r["s"], r["m"]]
     return out
@@ -326,7 +341,7 @@ def time_list_totals(c, uid):
     called "Budget h" (the agency project type's field, any language) over the list's tasks."""
     out = {}
     for r in c.execute(f"""SELECT list_id, SUM(seconds) AS s FROM time_entries WHERE "end" IS NOT NULL
-                           AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} GROUP BY list_id""", (uid, uid, uid)):
+                           AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} AND {th_sql("")} GROUP BY list_id""", (uid, uid, uid)):
         if r["s"]:
             out[r["list_id"]] = {"s": r["s"], "b": None}
     names = set(BUDGET_FIELD_NAMES) | {tr("Budget h", lg=x).lower() for x in LANGS}
@@ -554,7 +569,7 @@ def time_rows(c, uid, a, own=None):
     user, task_id, lists (csv of list ids; 0 = no list / a list I cannot see). own (2.63.0, #1523): n43_admin_lists() of uid
     -> other people's entries only in those lists (the people's time views); None = as before (aggregates of the office)."""
     # 2.41.0 (#1471): every tracked entry counts, whatever the list's type or switch (before: project lists only)
-    where, args = [f"(e.user_id=? OR e.list_id IN {vis_sql()})", evis(c, uid), n43_own_sql(uid, own)], [uid, uid, uid]
+    where, args = [f"(e.user_id=? OR e.list_id IN {vis_sql()})", evis(c, uid), n43_own_sql(uid, own), th_sql()], [uid, uid, uid]
     try:
         f = date.fromisoformat(a["from"]) if a.get("from") else None
         t = date.fromisoformat(a["to"]) if a.get("to") else None
@@ -757,6 +772,8 @@ def _time_watch_one(c, r, users, S, LG, ref):
     seen = r["list_id"] is not None and list_role(c, r["list_id"], uid) and \
         (not r["task_id"] or task_visible(c, r["task_id"], uid, full=True))
     label = (r["t_title"] if seen else None) or r["task_title"] or tr("No task", lg=lg)
+    from ..collab.liste2e import le2e_show
+    label = le2e_show(label, lg)  # 2.64.1 B (#1817): never a ciphertext in a push (2.64.2 D: in the recipient's language)
     fnum = (lambda x: f"{x:.1f}".rstrip("0").rstrip(".").replace(".", "," if dec_comma(lg) else "."))
     if stop_h > 0 and hrs >= stop_h:
         end = start + timedelta(hours=stop_h)

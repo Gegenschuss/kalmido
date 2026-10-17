@@ -233,8 +233,8 @@ def overview_build(c, lid, uid):
         _, wr, _ = pvis(c, uid, lid)
         cond = f" AND t.id IN ({','.join(str(int(x)) for x in wr) or '0'})"
     tfiles = [{"id": r["id"], "name": r["name"], "mime": r["mime"], "size": r["size"], "created_at": r["created_at"],
-               "task_id": r["task_id"], "task_title": r["title"]}
-              for r in c.execute(f"""SELECT a.id, a.name, a.mime, a.size, a.created_at, a.task_id, t.title FROM attachments a
+               "task_id": r["task_id"], "task_title": r["title"], **({"enc": 2, "e2e_gen": r["e2e_gen"]} if r["enc"] == 2 else {})}  # 2.64.2 B (#1817)
+              for r in c.execute(f"""SELECT a.id, a.name, a.mime, a.size, a.created_at, a.task_id, t.title, a.enc, a.e2e_gen FROM attachments a
                                      JOIN tasks t ON t.id=a.task_id WHERE t.list_id=? AND t.deleted_at IS NULL
                                      AND a.comment_id IS NULL{cond} ORDER BY a.id DESC LIMIT {OV_TASK_FILES_MAX}""", args)]
     members = []
@@ -504,6 +504,10 @@ def list_file_upload(lid):
     from ..notify.alerts import aa_count, aa_oserr
     c = db()
     need_overview(c, lid, write=True)
+    from ..collab.liste2e import le2e_mode
+    if le2e_mode(c, lid):  # 2.64.2 B (#1817): project files are not encrypted with the list key: none new in a list with the lock
+        from ..collab.liste2efile import LE2F_MSG
+        return jsonify(error=tr(LE2F_MSG["project"]), code="list_e2e"), 409
     files = request.files.getlist("file")
     if not files:
         return err(tr("File missing"))
@@ -617,6 +621,7 @@ def list_row_purge(c, lid, gone):
     if not r:
         return 0
     paths = [x[0] for x in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))]
+    paths += [x[0] for x in c.execute("SELECT path FROM budget_files WHERE list_id=?", (lid,))]  # 2.72.0 (#1333): receipts
     from ..integrations.gitfolder import gf_before_list_delete
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository hanging on it moves to another list of its folder
     n = c.execute("DELETE FROM lists WHERE id=?", (lid,)).rowcount

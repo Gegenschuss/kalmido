@@ -2,7 +2,7 @@
 import json
 import re
 from datetime import date, timedelta
-from flask import jsonify
+from flask import g, jsonify
 
 from ..core.config import app
 from ..core.pg import insert_id
@@ -31,20 +31,23 @@ TPL_MAX_PER_USER = 200
 HHMM_RE = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
 
 
-def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None):
+def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None, dup=None):
     """fidx (list templates): ({field id: index}, {field id: type}) -> the node keeps its custom field values
     as fv {index: value} (dates as days after use, people are not kept). order (2.4.0, list templates): collects
-    (task id, node key) so the dependencies between the tasks can be kept (deps: [[waiting key, blocker key], ...])."""
+    (task id, node key) so the dependencies between the tasks can be kept (deps: [[waiting key, blocker key], ...]).
+    dup (2.78.0, #1881, tpl_list_data): past dates stay, the state comes along (st / done_at), completed subtasks only with done."""
     def off(d):
-        return max(0, (date.fromisoformat(d) - base).days) if d else None
+        return ((date.fromisoformat(d) - base).days if dup is not None else max(0, (date.fromisoformat(d) - base).days)) if d else None
     tags = [r[0] for r in c.execute("SELECT tag FROM task_tags WHERE task_id=? AND user_id=? ORDER BY tag", (t["id"], uid))]
-    kids = c.execute("SELECT * FROM tasks WHERE parent_id=? AND deleted_at IS NULL ORDER BY sort, id",
-                     (t["id"],)).fetchall() if depth < MAX_DEPTH - 1 else []
+    kids = c.execute(f"""SELECT * FROM tasks WHERE parent_id=? AND deleted_at IS NULL{' AND status=0' if dup is not None and not dup.get('done') else ''}
+                         ORDER BY sort, id""", (t["id"],)).fetchall() if depth < MAX_DEPTH - 1 else []
     n = {"title": t["title"], "content": t["content"] or "", "priority": t["priority"] or 0, "tags": tags,
          "url": t["url"], "due_offset": off(t["due"]), "start_offset": off(t["start"]) if t["due"] else None,
          "due_time": t["due_time"] if t["due"] else None, "duration": t["duration"] if t["due_time"] else None,
          "reminders": t["reminders"] or "", "repeat": t["repeat"] or "", "repeat_from": t["repeat_from"] or "due",
          **({"ttype": t["ttype"]} if t["ttype"] else {}), **({"ms": 1} if t["ms"] and depth == 0 else {}), "children": []}
+    if dup is not None and t["status"]:  # 2.78.0 (#1881): a completed / won't-do task stays one in the copy
+        n["st"], n["done_at"] = t["status"], t["completed_at"]
     if t["points"]:  # 2.60.0 (#1511): the story points come along
         n["points"] = t["points"]
     if t["snippets"]:  # 2.35.0 (#1095): the code snippets come along
@@ -55,7 +58,7 @@ def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None):
         order.append((t["id"], n["k"]))
         if t["milestone_id"]:  # 2.18.0 (#430): resolved to the milestone's node key once the whole list is read
             n["mid"] = t["milestone_id"]
-    n["children"] = [tpl_node_from_task(c, k, base, uid, depth + 1, fidx, order) for k in kids]
+    n["children"] = [tpl_node_from_task(c, k, base, uid, depth + 1, fidx, order, dup) for k in kids]
     if fidx:
         fv = {}
         for r in c.execute("SELECT field_id, value FROM task_field_values WHERE task_id=?", (t["id"],)):
@@ -189,7 +192,9 @@ def tpl_clean(kind, d):
             # 2.4.0 (#328 / #340): dates relative to the project start (rel), its length in days (span), the dependencies,
             # the list's ticket types + templates and "Move dependent tasks along"
             "rel": bool(d.get("rel")), "span": span(tasks), "deps": deps, "tickets": 1 if d.get("tickets") else 0,
-            "ticket_tpl": tt, "dep_shift": 1 if d.get("dep_shift") else 0,
+            # 2.67.0 B (#1865): a template without the setting: on for a project (like a new project list)
+            "ticket_tpl": tt, "dep_shift": (1 if d["dep_shift"] else 0) if "dep_shift" in d else
+            1 if (d.get("kind") if d.get("kind") in LIST_KINDS else "project" if d.get("fields") else "list") == "project" else 0,
             # 2.39.0 (#1168): the list's own Playbook (its text; the new list gets it as its first version, source template)
             "playbook": _tpl_playbook(d.get("playbook")),
             # 2.63.0 (#1523): the project page - its notepads, the standard arrangement and the block colours
@@ -292,11 +297,56 @@ def templates_list():
         "SELECT * FROM templates WHERE user_id=? ORDER BY kind DESC, lower(name), id", (me(),))])
 
 
+def tpl_list_data(c, lid, uid, base, rel=False, dup=None):
+    """The list template of list lid as uid sees it (sections, open tasks with subtasks, fields, dependencies, Playbook, page).
+    rel (2.4.0, #328): the dates relative to the project start instead of base. dup (2.78.0, #1881, "Duplicate list"):
+    {"done": bool} = exact dates (also past ones), the task states kept, completed tasks only with done (else not even as
+    subtasks); the caller uses the data at once without tpl_clean."""
+    from ..lists.fields import tpl_fields_of
+    lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
+    secs = c.execute("SELECT id, name FROM sections WHERE list_id=? ORDER BY sort, id", (lid,)).fetchall()
+    sidx = {s["id"]: i for i, s in enumerate(secs)}
+    fdefs, fidx, ftypes = tpl_fields_of(c, lid)
+    if rel:  # 2.4.0 (#328): the project start = the earliest start / due of its open tasks ("Start + 3 days")
+        t0 = c.execute("""SELECT MIN(COALESCE(start, due)) FROM tasks WHERE list_id=? AND status=0 AND deleted_at IS NULL
+                          AND due IS NOT NULL""", (lid,)).fetchone()[0]
+        base = date.fromisoformat(t0) if t0 and valid_date(t0) else base
+    tasks, order = [], []
+    for t in c.execute(f"""SELECT * FROM tasks WHERE list_id=? AND parent_id IS NULL{'' if dup and dup.get('done') else ' AND status=0'}
+                           AND deleted_at IS NULL ORDER BY sort, id""", (lid,)).fetchall():
+        n = tpl_node_from_task(c, t, base, uid, fidx=(fidx, ftypes), order=order, dup=dup)
+        n["section"] = sidx.get(t["section_id"])
+        tasks.append(n)
+    keys = dict(order)
+
+    def mkeys(nodes):  # 2.18.0 (#430): milestone task ids -> node keys (a milestone not in the template: dropped)
+        for x in nodes:
+            mid = x.pop("mid", None)
+            if mid in keys:
+                x["mk"] = keys[mid]
+            mkeys(x.get("children") or [])
+    mkeys(tasks)
+    deps = [[keys[r[0]], keys[r[1]]] for r in c.execute("""SELECT d.task_id, d.blocker_id FROM task_deps d JOIN tasks t ON t.id=d.task_id
+                                                                   WHERE t.list_id=? ORDER BY d.created_at, d.task_id, d.blocker_id""", (lid,)).fetchall()
+            if r[0] in keys and r[1] in keys] if keys else []
+    role = list_role(c, lid)
+    name = tr("Basket") if lst["is_inbox"] and inbox_default(lst["name"]) else lst["name"]
+    return {"name": name, "color": lst["color"], "kind": lst["kind"],
+            "view": lst["view"] if role == "owner" else (c.execute(
+                "SELECT COALESCE(view, ?) FROM list_members WHERE list_id=? AND user_id=?",
+                (lst["view"], lid, uid)).fetchone() or ["list"])[0],
+            "sections": [s["name"] for s in secs], "tasks": tasks, "fields": fdefs,
+            "rel": rel, "deps": deps, "tickets": lst["tickets"], "dep_shift": lst["dep_shift"],
+            "done_at_bottom": lst["checklist"],
+            "playbook": _tpl_list_playbook(c, lid),  # 2.39.0 (#1168)
+            **n43_page_of(c, lid),  # 2.63.0 (#1523): notepads, page arrangement, block colours
+            "ticket_tpl": json.loads(lst["ticket_tpl"] or "{}") if role == "owner" else {}}
+
+
 @app.post("/api/templates")
 def template_create():
     """{task_id} = this task with its subtasks, {list_id} = the list's sections and open tasks (with subtasks),
     or {kind, data} as sent by the template editor. name optional (default: the task title / list name)."""
-    from ..lists.fields import tpl_fields_of
     b = body()
     c = db()
     uid = me()
@@ -307,53 +357,22 @@ def template_create():
         if b.get("task_id"):
             tid = int(b["task_id"])
             need_task(c, tid, write=False, full=True)
+            from ..collab.liste2eguard import le2b_task_locked, le2b_off
+            if le2b_task_locked(c, tid):  # 2.64.1 B (#1817): a template would be a plain-text copy on the server
+                return jsonify(error=le2b_off(), code="list_e2e"), 409
             t = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone()
             if not t:
                 raise Denied(404)
             kind, data, name = "task", {"task": tpl_node_from_task(c, t, base, uid)}, t["title"]
         elif b.get("list_id"):
             lid = int(b["list_id"])
+            from ..collab.liste2eguard import le2b_list_locked, le2b_off
+            if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): a template would be a plain-text copy on the server
+                return jsonify(error=le2b_off(), code="list_e2e"), 409
             if need_list(c, lid, write=False) == "participant":  # the whole list is not theirs to copy
                 raise Denied(403, tr("Participants cannot save the whole list as a template"))
-            lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
-            secs = c.execute("SELECT id, name FROM sections WHERE list_id=? ORDER BY sort, id", (lid,)).fetchall()
-            sidx = {s["id"]: i for i, s in enumerate(secs)}
-            fdefs, fidx, ftypes = tpl_fields_of(c, lid)
-            rel = bool(b.get("relative"))
-            if rel:  # 2.4.0 (#328): the project start = the earliest start / due of its open tasks ("Start + 3 days")
-                t0 = c.execute("""SELECT MIN(COALESCE(start, due)) FROM tasks WHERE list_id=? AND status=0 AND deleted_at IS NULL
-                                  AND due IS NOT NULL""", (lid,)).fetchone()[0]
-                base = date.fromisoformat(t0) if t0 and valid_date(t0) else base
-            tasks, order = [], []
-            for t in c.execute("""SELECT * FROM tasks WHERE list_id=? AND parent_id IS NULL AND status=0 AND deleted_at IS NULL
-                                  ORDER BY sort, id""", (lid,)).fetchall():
-                n = tpl_node_from_task(c, t, base, uid, fidx=(fidx, ftypes), order=order)
-                n["section"] = sidx.get(t["section_id"])
-                tasks.append(n)
-            keys = dict(order)
-
-            def mkeys(nodes):  # 2.18.0 (#430): milestone task ids -> node keys (a milestone not in the template: dropped)
-                for x in nodes:
-                    mid = x.pop("mid", None)
-                    if mid in keys:
-                        x["mk"] = keys[mid]
-                    mkeys(x.get("children") or [])
-            mkeys(tasks)
-            deps = [[keys[r[0]], keys[r[1]]] for r in c.execute("""SELECT d.task_id, d.blocker_id FROM task_deps d JOIN tasks t ON t.id=d.task_id
-                                                                           WHERE t.list_id=? ORDER BY d.created_at, d.task_id, d.blocker_id""", (lid,)).fetchall()
-                    if r[0] in keys and r[1] in keys] if keys else []
-            role = list_role(c, lid)
-            name = tr("Basket") if lst["is_inbox"] and inbox_default(lst["name"]) else lst["name"]
-            kind, data = "list", {"name": name, "color": lst["color"], "kind": lst["kind"],
-                                  "view": lst["view"] if role == "owner" else (c.execute(
-                                      "SELECT COALESCE(view, ?) FROM list_members WHERE list_id=? AND user_id=?",
-                                      (lst["view"], lid, uid)).fetchone() or ["list"])[0],
-                                  "sections": [s["name"] for s in secs], "tasks": tasks, "fields": fdefs,
-                                  "rel": rel, "deps": deps, "tickets": lst["tickets"], "dep_shift": lst["dep_shift"],
-                                  "done_at_bottom": lst["checklist"],
-                                  "playbook": _tpl_list_playbook(c, lid),  # 2.39.0 (#1168)
-                                  **n43_page_of(c, lid),  # 2.63.0 (#1523): notepads, page arrangement, block colours
-                                  "ticket_tpl": json.loads(lst["ticket_tpl"] or "{}") if role == "owner" else {}}
+            kind, data = "list", tpl_list_data(c, lid, uid, base, rel=bool(b.get("relative")))
+            name = data["name"]
         else:
             kind = b.get("kind") if b.get("kind") in ("task", "list") else None
             if not kind:
@@ -426,6 +445,9 @@ def tpl_insert(c, n, lid, sec, parent, base, sort, uid, fmap=None, scale=1.0, ma
          "ms": 1 if n.get("ms") and parent is None else 0}
     if n.get("points") in POINTS and not isinstance(n.get("points"), bool):  # 2.60.0 (#1511)
         f["points"] = n["points"]
+    if n.get("st") in (2, -1):  # 2.78.0 (#1881): only a duplicated list carries states (tpl_clean drops st)
+        f["status"], f["completed_at"] = n["st"], n.get("done_at") or iso(now_utc())
+        f["repeat"] = ""  # the repeating task itself stays open in the original; a done copy does not repeat
     if n.get("snippets"):  # 2.35.0 (#1095)
         from ..tasks.snippets import snip_clean
         try:
@@ -473,6 +495,9 @@ def template_apply(tid):
     if r["kind"] == "task":
         lid = int(b.get("list_id") or 0) or my_inbox(c)
         need_list(c, lid)
+        from ..collab.liste2eguard import le2b_list_locked, le2b_off
+        if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): the server would write plain texts into a list with the lock
+            return jsonify(error=le2b_off(), code="list_e2e"), 409
         sec = b.get("section_id")
         if sec and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (sec, lid)).fetchone():
             sec = None
@@ -488,6 +513,53 @@ def template_apply(tid):
     bump(c)
     c.commit()
     return jsonify(list_id=lid)
+
+
+# 2.78.0 (#1881): "Duplicate list" = a list template used at once, with the exact dates and (optionally) the completed tasks.
+# Sections, tasks with subtasks, fields, dependencies, milestones, Playbook, notepads, page arrangement and colours like a
+# template (2.63.0); the copy is mine, in my folder of the list, without members, shares, assignees or public link.
+DUP_MAX_NODES = 2000
+
+
+@app.post("/api/lists/<int:lid>/duplicate")
+def list_duplicate(lid):
+    """{name?, done?: bool, folder?} -> {list_id}. Who may save the list as a template may duplicate it (not participants)."""
+    from ..lists.fields import tpl_clean_fields
+    b = body()
+    c = db()
+    uid = me()
+    if need_list(c, lid, write=False) == "participant":
+        raise Denied(403, tr("Participants cannot duplicate the whole list"))
+    from ..collab.liste2eguard import le2b_list_locked, le2b_off
+    if le2b_list_locked(c, lid):  # 2.78.0 N35 (#476): the copy would be an unlocked list (like a template, 2.64.1 B)
+        return jsonify(error=le2b_off(), code="list_e2e"), 409
+    if c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id=? AND deleted_at IS NULL{'' if b.get('done') else ' AND status=0'}",
+                 (lid,)).fetchone()[0] > DUP_MAX_NODES:  # N35: refuse before building the whole copy in memory
+        return err(tr("List too large to duplicate (at most {0} tasks)", DUP_MAX_NODES))
+    base = local_now().date()
+    d = tpl_list_data(c, lid, uid, base, dup={"done": bool(b.get("done"))})
+    if tpl_count(d) > DUP_MAX_NODES:
+        return err(tr("List too large to duplicate (at most {0} tasks)", DUP_MAX_NODES))
+    try:
+        d["fields"] = tpl_clean_fields(d["fields"])
+    except ValueError as e:
+        return err(str(e))
+    name = str(b.get("name") or "").strip()[:200] or tr("{0} (copy)", d["name"])[:200]
+    src = c.execute("SELECT owner_id, folder, org_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if "folder" in b:
+        folder = clean_folder(b.get("folder") or "")
+    else:
+        folder = src["folder"] if src["owner_id"] == uid else (c.execute(
+            "SELECT folder FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone() or [""])[0]
+    from ..accounts.orgs import user_orgs
+    # the workspace of the original when I belong to it (a private list stays private), else the default of a new list
+    org = src["org_id"] if src["org_id"] is None or src["org_id"] in user_orgs(c, uid) else "auto"
+    if org != "auto":
+        g.list_keep = ("org_id",)  # list_created: the original's workspace beats the folder's default (like an explicit org_id)
+    new = tpl_apply_list(c, uid, d, name, folder, base, org_id=org)
+    bump(c)
+    c.commit()
+    return jsonify(list_id=new)
 
 
 def tpl_dates(b, today_):
@@ -523,7 +595,8 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=
                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (name, d.get("color") or "" if color is None else color, folder, my_max_sort(c, uid) + 1, d.get("view") or "list",
                      iso(now_utc()), uid, lk, 1 if d.get("done_at_bottom") or d.get("kind") == "checklist" else 0, 1 if d.get("tickets") else 0,
-                     json.dumps(tt, ensure_ascii=False) if tt else "", 1 if d.get("dep_shift") else 0,
+                     json.dumps(tt, ensure_ascii=False) if tt else "",
+                     (1 if d["dep_shift"] else 0) if "dep_shift" in d else 1 if lk == "project" else 0,  # 2.67.0 B (#1865)
                      ws_default_org(c, uid, folder) if org_id == "auto" else org_id))  # 2.28.0 (#935): the workspace, before anyone joins
     secs = [insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, s, i))
             for i, s in enumerate(d.get("sections") or [])]

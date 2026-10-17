@@ -37,11 +37,15 @@ from ..family.family import PACKING
 #   travel     = a trip is a list (lists.life 'travel', lists.trip {from, to, where}) with bookings, things to do before
 #                leaving and a packing list from the Family templates; optionally an all-day event
 #   reading    = "Read later": a list (lists.life 'reading') filled from Karakeep (kalmido/life/karakeep.py)
-LIFE_MODS = ("contracts", "home", "care", "health", "review", "travel", "reading")
-LIFE_LIST_KINDS = ("", "contracts", "home", "health", "travel", "reading")
+#   budget     = 2.72.0 (#1333): the household budget, a list (lists.life 'budget') without tasks (kalmido/life/budget.py);
+#                private like health (never an agent, an API token needs the scope "private")
+LIFE_MODS = ("contracts", "home", "care", "health", "review", "travel", "reading", "budget")
+LIFE_LIST_KINDS = ("", "contracts", "home", "health", "travel", "reading", "budget")
+LIFE_PRIVATE = ("health", "budget")  # 2.72.0 (#1333): the list kinds an agent never sees
 LIFE_FAM = ("contract", "device", "upkeep", "health", "bookmark")
-LIFE_LIST_NAMES = {"contracts": N_("Contracts"), "home": N_("Home & devices"), "health": N_("Health"), "reading": N_("Read later")}
-LIFE_LIST_COLORS = {"contracts": "#0ea5e9", "home": "#f59e0b", "health": "#ef4444", "travel": "#14b8a6", "reading": "#8b5cf6"}
+LIFE_LIST_NAMES = {"contracts": N_("Contracts"), "home": N_("Home & devices"), "health": N_("Health"), "reading": N_("Read later"),
+                   "budget": N_("Household budget")}
+LIFE_LIST_COLORS = {"contracts": "#0ea5e9", "home": "#f59e0b", "health": "#ef4444", "travel": "#14b8a6", "reading": "#8b5cf6", "budget": "#10b981"}
 LIFE_FEAT = {"contracts": "contracts", "home": "home", "health": "health", "travel": "travel", "reading": "reading"}
 NAME_MAX, NOTE_MAX = 100, 500
 COST_MAX = 10_000_000
@@ -187,8 +191,8 @@ def _reminders(lead):
 # ---- the lists of the package
 def life_list(c, uid, kind, create=True):
     """The first not archived list of life kind `kind` the user may write (own first), created when missing (create)."""
-    r = c.execute(f"""SELECT id FROM lists WHERE life=? AND archived=0 AND id IN {wr_sql()}
-                      ORDER BY owner_id!=?, id LIMIT 1""", (kind, uid, uid, uid)).fetchone()
+    r = c.execute(f"""SELECT id FROM lists WHERE life=? AND archived=0 AND e2e IS NULL AND id IN {wr_sql()}
+                      ORDER BY owner_id!=?, id LIMIT 1""", (kind, uid, uid, uid)).fetchone()  # 2.64.1 review (M3): never a list with the lock
     if r:
         return r[0]
     return life_list_create(c, uid, kind) if create else None
@@ -202,7 +206,7 @@ def life_list_create(c, uid, kind, name=None, folder="", trip=None):
                      my_max_sort(c, uid) + 1, "list", iso(now_utc()), uid, 1 if kind == "travel" else 0, "list", kind,
                      _dump(trip) if trip else ""))
     # health lists never go to an agent automatically; the people of a shared folder get them like any list (#931)
-    list_created(c, uid, lid, agents=kind != "health")
+    list_created(c, uid, lid, agents=kind not in LIFE_PRIVATE)  # 2.72.0 (#1333): budgets neither
     return lid
 
 
@@ -211,6 +215,8 @@ def _target_list(c, uid, b, kind):
     if lid not in (None, ""):
         lid = as_int(lid, "list_id", 1)
         need_list(c, lid)
+        from ..collab.liste2e import le2a_gen_refuse
+        le2a_gen_refuse(c, lid)  # 2.64.1 review (M3)
         return lid
     return life_list(c, uid, kind)
 

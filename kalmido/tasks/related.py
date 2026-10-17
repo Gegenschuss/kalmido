@@ -12,7 +12,8 @@ as before and the new parts are hidden (enabled: false, empty lists, never an er
   encrypts without an organisation). Vectors are derived data: not in the organisation export, recomputed when missing.
 - The worker (one thread per process; one batch at a time per database through an advisory lock) embeds the tasks whose
   vector is missing, of another model, older than the task or of another list / organisation. Text = "folder > list >
-  parent" + title + description. Trash and health lists: no vectors (a trashed task's vector is dropped).
+  parent" + title + description. Trash and health lists: no vectors (a trashed task's vector is dropped); 2.64.1 (#1817): lists
+  with the lock neither (the server holds only ciphertexts; the vectors of a list that gets the lock are dropped).
 - Finding (rt9_related): cosine over the vectors of the tasks the asker may SEE (the candidates come from the same
   visibility filter as the search: vis_sql + tvis, agents only what is shared with them), mixed with the text similarity of
   the titles (pg_trgm) and explicit references (#123). Pure Python (math.sumprod), the vectors of an organisation cached
@@ -190,7 +191,7 @@ _BADORG = {}  # org id -> monotonic time until which its tasks are left out (its
 _STALE_SQL = """SELECT t.id, t.title, t.content, t.list_id, t.updated_at, l.org_id, l.name AS lname, l.folder, p.title AS ptitle,
        v.task_id AS vid, v.text_hash, v.model AS vmodel, v.vec, v.org_id AS vorg
   FROM tasks t JOIN lists l ON l.id=t.list_id LEFT JOIN tasks p ON p.id=t.parent_id LEFT JOIN task_vectors v ON v.task_id=t.id
- WHERE t.deleted_at IS NULL AND COALESCE(l.life, '')!='health'{skip}
+ WHERE t.deleted_at IS NULL AND COALESCE(l.life, '')!='health' AND l.e2e IS NULL{skip}
    AND (v.task_id IS NULL OR v.model!=? OR v.updated_at < t.updated_at OR v.list_id IS DISTINCT FROM t.list_id
         OR v.org_id IS DISTINCT FROM l.org_id{enc})
  ORDER BY (v.task_id IS NULL) DESC, t.updated_at DESC LIMIT ?"""
@@ -278,7 +279,7 @@ def emb_cleanup(c):
     to another list (computed again, sealed with the right key): a vector never stays readable outside its task's workspace."""
     with system_ctx(c):  # housekeeping of derived data over every organisation, nothing handed to a person
         c.execute("DELETE FROM task_vectors v USING tasks t, lists l WHERE t.id=v.task_id AND l.id=t.list_id "
-                  "AND (t.deleted_at IS NOT NULL OR COALESCE(l.life, '')='health' OR v.org_id IS DISTINCT FROM l.org_id "
+                  "AND (t.deleted_at IS NOT NULL OR COALESCE(l.life, '')='health' OR l.e2e IS NOT NULL OR v.org_id IS DISTINCT FROM l.org_id "
                   "OR v.list_id IS DISTINCT FROM t.list_id)")
 
 
@@ -436,7 +437,7 @@ def _visible_agent(c, aid, exclude=()):
     if not a:
         return {}
     rows = c.execute(f"SELECT t.id, l.org_id, l.id AS lid FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.list_id IN "
-                     f"{acx_lists_sql(req=False)} AND t.deleted_at IS NULL AND COALESCE(l.life, '')!='health' "
+                     f"{acx_lists_sql(req=False)} AND t.deleted_at IS NULL AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND l.e2e IS NULL "
                      f"AND {tvis(c, aid, 't.', write=True)}", (aid, aid)).fetchall()
     only = set(ids_parse(a["list_ids"])) if a["list_ids"] else None
     ex = set(exclude)
@@ -668,6 +669,9 @@ def rt9_route_similar():
         ex = int(b.get("exclude")) if b.get("exclude") not in (None, "") else None
     except (TypeError, ValueError):
         return err(tr("Invalid value: {0}", "list_id"))
+    from ..collab.liste2e import le2e_mode
+    if lid and le2e_mode(c, lid):  # 2.64.1 (#1817): a list with the lock gets no hints (its titles stay in the browser)
+        return jsonify(enabled=True, items=[])
     return jsonify(rt9_similar(c, g.user["id"], str(b.get("title") or ""), str(b.get("notes") or ""), lid, ex))
 
 
@@ -682,7 +686,7 @@ def rt9_admin_get():
         on = (r[0] if r else "1") != "0"
         done = c.execute("SELECT COUNT(*) FROM task_vectors").fetchone()[0]
         total = c.execute("SELECT COUNT(*) FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.deleted_at IS NULL "
-                          "AND COALESCE(l.life, '')!='health'").fetchone()[0]
+                          "AND COALESCE(l.life, '')!='health' AND l.e2e IS NULL").fetchone()[0]
     h = emb_health(2) if EMBED_URL else None
     return jsonify(configured=bool(EMBED_URL), on=on, reachable=bool(h and h["ok"]), model=(h or {}).get("model") or None,
                    dim=(h or {}).get("dim") or None, done=done, open=max(0, total - done))

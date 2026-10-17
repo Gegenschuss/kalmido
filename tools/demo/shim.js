@@ -4,12 +4,15 @@
    connect-src 'none').
    Implemented: lists, sections, tasks (subtasks, tags, fields, dependencies, repeats, trash), Today / Upcoming / kanban /
    timeline / calendar data, comments (local), time tracking, habits, filters, milestones and project status, day plan,
-   settings (appearance, language, modules) and a simulated agent with one approval. Everything that needs a server
+   settings (appearance, language, modules) and a simulated agent with one approval.
+   2.74.0 (#1653): the demo starts like a new account (empty Basket, "Getting started" list, welcome tour); the sample
+   project comes on request (tour, Settings > Data) and the office (clients, services, quotations, invoices, payments,
+   print view instead of the server's PDF) runs here too, see demo-office below. Everything that needs a server
    (push, CalDAV, calendar subscriptions, real agents, Git, webhooks, OIDC, more users, imports, backups) answers
    with a calm "not available in the demo" notice and a link to the install page. */
 'use strict';
 (() => {
-  const KEY = 'kalmido-demo.db', VER = 1;
+  const KEY = 'kalmido-demo.db', VER = 2;  // 2.74.0 (#1653): 2 = starts as a new account, + office (1 is migrated)
   const TX = window.KDEMO_TEXTS, LANGS = ['en', 'de', 'fr', 'es', 'it', 'nl'];
   const SITE = window.KDEMO_SITE || '../';
   const browserLang = () => {
@@ -29,8 +32,15 @@
   // ---------------------------------------------------------------- storage
   function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch { /* full / private mode: stays in memory */ } }
   function loadDb() {
-    try { const j = JSON.parse(localStorage.getItem(KEY)); if (j && j.ver === VER && j.tasks) return j; } catch { /* broken: new seed */ }
+    try { const j = JSON.parse(localStorage.getItem(KEY)); if (j && j.ver === VER && j.tasks) return j; if (j && j.ver === 1 && j.tasks) return migrate1(j); } catch { /* broken: new seed */ }
     return null;
+  }
+  // 2.74.0 (#1653): a visitor of the old demo (version 1: the sample data from the start) keeps the data; the tour and the
+  // "Getting started" list are behind them, the sample counts as their own (no "Remove sample project")
+  function migrate1(j) {
+    j.ver = VER; j.settings = {...j.settings, onboard: 'done', tour: 'done', sample_ask: '0'};
+    j.sample = null; j.office = null;
+    return j;
   }
   const bump = () => { DB.v++; save(); };
   const nid = k => { DB.seq[k] = (DB.seq[k] || 0) + 1; return DB.seq[k]; };
@@ -47,32 +57,43 @@
     tidy_agent_id: null, view: 'list', family: ''};
   const SETTINGS_DEF = {agent_share: '{}', agents_hidden: '', allday_time: '09:00', cal_today: '1', celebrate: '1', comment_order: 'old',
     date_confirm: '0', default_reminder: '0', digest_time: '', features: 'cal,timeline,matrix,habits,kanban,collab,stats,time,progress,deps,fields,comments,agents',
-    features_rev: '9', folders: '[]', folders_closed: '[]', hide_blocked_today: '0', hide_progress: '', ical_alarms: '1', ical_scope: 'all',
+    features_rev: '11', show_done_default: '0', folders: '[]', folders_closed: '[]', hide_blocked_today: '0', hide_progress: '', ical_alarms: '1', ical_scope: 'all',
     lang: 'en', nav_order: 'tasks,cal,matrix,habits', news_kinds: 'mention,assign,comment,unblock,share,status', notify: '', ntfy_topic: '',
-    onboard: 'done', pomo_focus: '25', pomo_long: '15', pomo_long_every: '4', pomo_short: '5', progress_subtasks: '0',
-    push_channel: 'webpush', push_priority: '4', quiet_from: '22:00', quiet_to: '07:00', review_time: '', roadmap: '', sample_ask: '0',
+    onboard: 'pending', pomo_focus: '25', pomo_long: '15', pomo_long_every: '4', pomo_short: '5', progress_subtasks: '0',
+    push_channel: 'webpush', push_priority: '4', quiet_from: '22:00', quiet_to: '07:00', review_time: '', roadmap: '', sample_ask: '1',
     show_done_views: '{}', time_autostop_h: '12', time_currency: '€', time_focus: '1', time_remind_h: '4', time_rounding: '0', time_target: '0',
-    tour: 'done', work_end: '17:00', work_start: '09:00'};
+    tour: 'pending', work_end: '17:00', work_start: '09:00'};
   const AGENT = 2;
 
+  // 2.74.0 (#1653): a new account: the Basket (named in the visitor's language), the simulated agent with its hello; the
+  // "Getting started" list follows on the first start (POST /api/onboarding), the sample on request (POST /api/sample)
   function seed(lang) {
-    const x = TX[lang] || TX.en, t = x.t, now = iso();
+    const x = TX[lang] || TX.en;
     DB = {ver: VER, v: 1, seq: {}, settings: {...SETTINGS_DEF, lang}, me: {id: 1, username: 'demo', display_name: 'Demo', avatar: ''},
       lists: [], sections: [], tasks: [], fields: [], deps: [], comments: [], activity: [], time: [], timer: null, habits: [], filters: [],
-      status: [], chat: [], jobs: [], agent: {status: 'working', status_text: x.agentTexts[0], status_task: null, step: 0}};
-    const list = o => { const l = {...clone(LIST_DEF), id: nid('list'), created_at: now, ...o}; DB.lists.push(l); return l; };
-    const sec = (lid, name, sort) => { const s = {id: nid('section'), list_id: lid, name, sort}; DB.sections.push(s); return s.id; };
-    const task = o => { const k = {...clone(TASK_DEF), id: nid('task'), created_at: now, updated_at: now, ...o}; if (k.status && !k.completed_at) { k.completed_at = now; k.completed_by = 1; } DB.tasks.push(k); return k; };
-    list({name: 'Eingang', is_inbox: 1, sort: -1});
-    const p = list({name: x.project, kind: 'project', time_tracking: 1, color: '#7c5cff', sort: 1, tickets: 1,  // 2.41.0 (#1471): time_tracking status: 'on_track', status_at: now, status_by: 1, status_note: x.status,
+      status: [], chat: [], jobs: [], agent: {status: 'idle', status_text: '', status_task: null, step: 0}, sample: null, office: null};
+    DB.lists.push({...clone(LIST_DEF), id: nid('list'), created_at: iso(), name: x.inbox, is_inbox: 1, sort: -1});
+    DB.chat.push({id: nid('chat'), agent_id: AGENT, user_id: 1, from: 'agent', body: x.agentChatHello, task_id: null, created_at: iso(), delivered_at: null, reactions: [], read: 0});
+    save();
+  }
+
+  // the sample (Café Aurora) in the visitor's language; every row it creates is recorded in DB.sample (removal takes exactly that)
+  function sampleMake() {
+    const x = T(), t = x.t, now = iso(), inbox = DB.lists.find(l => l.is_inbox) || DB.lists[0];
+    const rec = DB.sample = {lists: [], tasks: [], sections: [], fields: [], time: [], jobs: []};
+    const list = o => { const l = {...clone(LIST_DEF), id: nid('list'), created_at: now, ...o}; DB.lists.push(l); rec.lists.push(l.id); return l; };
+    const sec = (lid, name, sort) => { const s = {id: nid('section'), list_id: lid, name, sort}; DB.sections.push(s); rec.sections.push(s.id); return s.id; };
+    const task = o => { const k = {...clone(TASK_DEF), id: nid('task'), created_at: now, updated_at: now, ...o}; if (k.status && !k.completed_at) { k.completed_at = now; k.completed_by = 1; } DB.tasks.push(k); rec.tasks.push(k.id); return k; };
+    const base = Math.max(0, ...DB.lists.map(l => l.sort));
+    const p = list({name: x.project, kind: 'project', time_tracking: 1, color: '#7c5cff', sort: base + 1, tickets: 1, status: 'on_track', status_at: now, status_by: 1, status_note: x.status,  // 2.41.0 (#1471): time_tracking; 2.74.0 (#1653): the status was inside this comment
       description: '', milestones: [{id: 1, name: x.ms1, day: day(4), done: 0}, {id: 2, name: x.ms2, day: day(20), done: 0}]});
-    DB.seq.ms = 2;
-    const priv = list({name: x.personal, color: '#22c55e', sort: 2});
+    DB.seq.ms = Math.max(DB.seq.ms || 0, 2);
+    const priv = list({name: x.personal, color: '#22c55e', sort: base + 2});
     const S = x.secs.map((n, i) => sec(p.id, n, i + 1));
     const fb = {id: nid('field'), list_id: p.id, name: x.budget, type: 'number', options: {unit: '€'}, pinned: 1, sort: 1};
     const fe = {id: nid('field'), list_id: p.id, name: x.effort, type: 'select', pinned: 1, sort: 2,
       options: {options: [{id: 's', name: x.small, color: '#22c55e'}, {id: 'm', name: x.medium, color: '#f59e0b'}, {id: 'l', name: x.large, color: '#ef4444'}]}};
-    DB.fields.push(fb, fe);
+    DB.fields.push(fb, fe); rec.fields.push(fb.id, fe.id);
     const cl = x.tags.client, web = x.tags.web;
     const tk = (o, type) => task({list_id: p.id, ...o, ...(type ? {ttype: type} : {})});
     const kick = tk({section_id: S[0], title: t.kickoff, priority: 3, status: 2, due: day(-9), completed_at: atLocal(-9, 16), completed_by: 1, tags: [cl], sort: 1}, 'task');
@@ -95,10 +116,10 @@
     task({list_id: p.id, title: t.call, due: day(tue), due_time: '10:00', duration: 30, repeat: 'FREQ=WEEKLY;BYDAY=TU', sort: 14});
     DB.deps.push([appr.id, lay.id], [cms.id, appr.id], [live.id, cms.id]);
     DB.comments.push({id: nid('comment'), task_id: appr.id, user_id: 1, body: t.comment, created_at: atLocal(0, 9, 12), edited_at: null, mentions: [], reactions: [], attachments: [], suggestion: null});
-    DB.status.push({id: 1, list_id: p.id, user_id: 1, status: 'on_track', note: x.status, created_at: now});
+    DB.status.push({id: nid('status'), list_id: p.id, user_id: 1, status: 'on_track', note: x.status, created_at: now});
     // time entries (the last days)
     const te = (n, h, mins, tid, note) => { const st = new Date(); st.setDate(st.getDate() + n); st.setHours(h, 0, 0, 0); const en = new Date(st.getTime() + mins * 60000);
-      DB.time.push({id: nid('time'), user_id: 1, task_id: tid, list_id: p.id, start: iso(st), end: iso(en), seconds: mins * 60, note, source: 'manual', created_at: now, updated_at: now}); };
+      const e = {id: nid('time'), user_id: 1, task_id: tid, list_id: p.id, start: iso(st), end: iso(en), seconds: mins * 60, note, source: 'manual', created_at: now, updated_at: now}; DB.time.push(e); rec.time.push(e.id); };
     te(-9, 10, 120, kick.id, t.time1); te(-6, 14, 90, site.id, ''); te(-2, 9, 150, lay.id, t.time2); te(-1, 13, 105, lay.id, ''); te(-1, 16, 45, cms.id, t.time3);
     // personal list + inbox
     const home = x.tags.home;
@@ -107,17 +128,75 @@
     task({list_id: priv.id, title: t.plants, due: day(0), repeat: 'FREQ=WEEKLY', sort: 3, tags: [home]});
     task({list_id: priv.id, title: t.book, sort: 4});
     task({list_id: priv.id, title: t.grandma, due: day(0), due_time: '18:30', sort: 5});
-    task({list_id: 1, title: t.groceries, sort: 1, tags: [home]});
-    task({list_id: 1, title: t.idea, sort: 2});
+    task({list_id: inbox.id, title: t.groceries, sort: 1, tags: [home]});
+    task({list_id: inbox.id, title: t.idea, sort: 2});
     // the simulated agent works in the project: status on the form bug, one job waiting for approval
-    DB.agent.status_task = form.id;
+    DB.agent.status_task = form.id; DB.agent.status = 'working'; DB.agent.status_text = x.agentTexts[0];
     p.members = [{user_id: AGENT, name: x.agentName, role: 'editor', username: 'demo-agent', via_group: false, group_role: null}];
     p.shared = true;
-    DB.jobs.push({id: 1, agent_id: AGENT, task_id: cms.id, user_id: 1, title: x.jobTitle, state: 'waiting', log: x.jobLog, action: null, action_by: null,
+    const jid = nid('job'); rec.jobs.push(jid);
+    DB.jobs.push({id: jid, agent_id: AGENT, task_id: cms.id, user_id: 1, title: x.jobTitle, state: 'waiting', log: x.jobLog, action: null, action_by: null,
       action_at: null, created_at: atLocal(0, 8, 40), updated_at: atLocal(0, 8, 40), kind: null, prop_state: null});
-    DB.chat.push({id: 1, agent_id: AGENT, user_id: 1, from: 'agent', body: x.agentChatHello, task_id: null, created_at: atLocal(0, 8, 30), delivered_at: null, reactions: [], read: 0});
-    DB.seq.job = 1; DB.seq.chat = 1;
-    save();
+    return p.id;
+  }
+  function sampleState() {
+    const r = DB.sample; if (!r) return null;
+    const own = new Set(r.tasks), tasks = DB.tasks.filter(t => own.has(t.id)).length;
+    const lists = DB.lists.filter(l => r.lists.includes(l.id)).map(l => ({id: l.id, name: l.name, extra: DB.tasks.filter(t => t.list_id === l.id && !own.has(t.id)).length}));
+    return tasks || lists.length ? {tasks, lists} : null;
+  }
+  function sampleRemove() {
+    const r = DB.sample, own = new Set(r.tasks);
+    const gone = DB.tasks.filter(t => own.has(t.id)).length; let lists = 0, kept = 0;
+    DB.tasks = DB.tasks.filter(t => !own.has(t.id)); DB.deps = DB.deps.filter(d => taskById(d[0]) && taskById(d[1]));
+    DB.comments = DB.comments.filter(c => taskById(c.task_id));
+    DB.time = DB.time.filter(e => !r.time.includes(e.id)); if (DB.timer && !DB.time.some(e => e.id === DB.timer)) DB.timer = null;
+    DB.fields = DB.fields.filter(f => !r.fields.includes(f.id));
+    DB.jobs = DB.jobs.filter(j => !r.jobs.includes(j.id)); DB.agent = {...DB.agent, status: 'idle', status_text: '', status_task: null};
+    for (const lid of r.lists) {
+      const l = listById(lid); if (!l) continue;
+      if (DB.tasks.some(t => t.list_id === lid)) { kept++; continue; }
+      DB.lists = DB.lists.filter(x => x !== l); DB.sections = DB.sections.filter(x => x.list_id !== lid); DB.status = DB.status.filter(x => x.list_id !== lid); lists++;
+    }
+    DB.sample = null;
+    return {ok: true, tasks: gone, lists, kept_lists: kept, kept_tasks: DB.tasks.filter(t => r.lists.includes(t.list_id)).length};
+  }
+
+  // the "Getting started" list of a new account (kalmido/accounts/onboarding.py onboarding_tasks, same texts via the app's translations)
+  function onboardTasks(feats, touch, mac) {
+    const tt = [
+      [touch ? 'Tap the square on the left, or swipe the task to the right.' : 'Click the square on the left to complete a task.', 'Tick me off', 5, true, []],
+      ['Everything about a task lives in this panel:\n\n- a description with **Markdown**\n- [ ] checklists like this one\n- files, links, dates and reminders',
+        touch ? 'Tap me for details, notes and subtasks' : 'Click me for details, notes and subtasks', 3, true, ['Subtasks work like tasks', 'Tick this one off, too']],
+      ['Type it into the add bar (the + button on a phone): dates, times, !priority, #tags and ~list are recognized while you type.', 'Try quick add: Dentist tomorrow 3pm !high #private', 3, true, []],
+      [touch ? 'Swipe left for snooze, other dates and delete; long-press for the task’s menu, long-press and drag to reorder.'
+        : 'Drag tasks onto a day, a list or another place in the list. Right-click is not needed: the … menu has the rest.', touch ? 'Swipe me left to reschedule' : 'Drag me onto Tomorrow in the sidebar', 1, true, []],
+    ];
+    if (!touch) tt.push(['Lists, tasks, views and actions in one box. Press ? for all keyboard shortcuts.', 'Press {0} to search and run commands', 0, false, []]);
+    const mods = [['habits', 'Create a habit under Habits', 'Daily or a few times a week, with streaks.'],
+      ['pomo', 'Start a focus timer on a task', 'Task menu (…) > Start focus, or the Focus timer module.'],
+      ['collab', 'Share this list with someone', 'List menu (…) > Sharing. Tasks in shared lists can be assigned and commented.'],
+      ['time', 'Start a timer on a task', 'Task menu (…) > Start timer; reports under Time tracking.'],
+      ['timeline+deps', 'Plan a project in the timeline', touch ? 'Edit list > Type: Project, View: Timeline. Long-press a bar and choose “Connect to…”, then tap the task it blocks.'
+        : 'Edit list > Type: Project, View: Timeline. Drag the dot at the end of one bar onto another: the second task is then blocked by the first.']];
+    for (const [k, title, d] of mods) if (k.split('+').every(f => feats.includes(f))) tt.push([d, title, 0, false, []]);
+    tt.push(['List menu (…) > Delete. Nothing else is affected.', 'Delete this list when you are done', 0, false, []]);
+    return tt;
+  }
+  function onboard(b) {
+    if (DB.settings.onboard !== 'pending') return {ok: true, created: false};
+    const feats = DB.settings.features.split(',').filter(Boolean), touch = b.touch === true, mac = b.mac === true;
+    const kind = ['time', 'deps', 'fields'].some(f => feats.includes(f)) ? 'project' : 'list';
+    const l = {...clone(LIST_DEF), id: nid('list'), created_at: iso(), name: tx('Getting started'), color: '#2dd4bf', kind, sort: Math.max(0, ...DB.lists.map(x => x.sort)) + 1};
+    DB.lists.push(l);
+    onboardTasks(feats, touch, mac).forEach(([content, title, priority, due, subs], i) => {
+      const t = {...clone(TASK_DEF), id: nid('task'), created_at: iso(), updated_at: iso(), list_id: l.id, title: tx(title).replace('{0}', mac ? '⌘K' : 'Ctrl+K'),
+        content: tx(content), priority, due: due ? today() : null, sort: i};
+      DB.tasks.push(t);
+      subs.forEach((st, j) => DB.tasks.push({...clone(TASK_DEF), id: nid('task'), created_at: iso(), updated_at: iso(), list_id: l.id, parent_id: t.id, title: tx(st), sort: j}));
+    });
+    DB.settings.onboard = 'done';
+    return {ok: true, created: true, list_id: l.id};
   }
 
   // ---------------------------------------------------------------- views of the data (shapes of the server's JSON)
@@ -182,9 +261,10 @@
       timer: DB.timer ? entryOut(DB.time.find(e => e.id === DB.timer)) : null, time_totals: tt, time_lists: tl, time_day_h: 8, collab_all: true, time_all: true,
       about: {available: false, latest: '', checked_at: '', error: '', collab_all: true, cal_on: false, oidc: {configured: false}},
       calendars: {enabled: false, subs: 0}, api: {enabled: false}, webhooks: {enabled: false}, caldav: {enabled: false}, public_links: false,
-      share: {drop_url: '', ios_shortcut: ''}, sample: null, agents: [agentOut()], proposers: [], groups: [], my_groups: [],
+      share: {drop_url: '', ios_shortcut: ''}, sample: sampleState(), agents: [agentOut()], proposers: [], groups: [], my_groups: [],
       dayplan: {default_duration: 30, review_time: '', work_end: DB.settings.work_end, work_start: DB.settings.work_start},
       kids: [], kid_ids: [],  // 2.19.0 (#653): no other accounts in the demo
+      clients: DB.settings.features.split(',').includes('clients') ? (DB.clients || []).map(clientBrief) : [], workspaces: false,  // 2.74.0 (#1653)
     };
   }
 
@@ -317,20 +397,28 @@
   }
 
   // ---------------------------------------------------------------- routes
-  const GATED = /^\/api\/(push|ical|calendars(?!\/events)|admin|import|imports|repos|me\/(webhooks|tokens|app-passwords|2fa|passkeys|drop-token)|my\/agents|users$|users\/|backups|public|oidc|attachments|list-files|templates|news\/|pomo|ntfy|sample|onboarding|proposals|folders\/groups|agents\/usage|family\/contacts)|\/(members|groups|owner|public-link|repos|paperless|files|icon|git-undo|attachments|take|wake|waiting)(\/|$|\?)/;
+  const GATED = /^\/api\/(push|ical|calendars(?!\/events)|admin|import|imports|repos|me\/(webhooks|tokens|app-passwords|2fa|passkeys|drop-token)|my\/agents|users$|users\/|backups|public|oidc|attachments|list-files|templates|news\/|pomo|ntfy|proposals|folders\/groups|agents\/usage|family\/contacts)|\/(members|groups|owner|public-link|repos|paperless|files|icon|git-undo|attachments|take|wake|waiting|duplicate)(\/|$|\?)/;
   // automatic background calls of the app: answered quietly (no notice)
   const QUIET = {
     'GET /api/push/subs': () => ({subs: []}), 'GET /api/push/vapid': () => ({key: ''}), 'GET /api/my/agents': () => ({allowed: false, max: 0, count: 0, agents: [], api: false}),
     'GET /api/imports': () => ({imports: []}), 'GET /api/templates': () => ({templates: []}), 'GET /api/calendars': () => ({subs: [], enabled: false}),
     'GET /api/me/tokens': () => ({tokens: []}), 'GET /api/me/webhooks': () => ({webhooks: []}), 'GET /api/me/app-passwords': () => ({passwords: []}),
     'GET /api/me/2fa': () => ({totp: false, passkeys: [], recovery_left: 0}),
-    'GET /api/agents/usage': () => ({days: [], agents: []}), 'POST /api/onboarding': () => ({ok: true, created: false}), 'POST /api/news/read': () => ({ok: true}),
-    'GET /api/pomo/stats': () => ({days: [], total: 0}), 'GET /api/ical': () => ({enabled: false}),
+    'GET /api/agents/usage': () => ({days: [], agents: []}), 'POST /api/news/read': () => ({ok: true}),
+    'GET /api/pomo/stats': () => ({days: [], total: 0}), 'GET /api/stale': () => ({tasks: [], count: 0, default_days: 7}),
+    'GET /api/briefing': () => ({}), 'GET /api/layouts/saved': () => ({saved: []}), 'GET /api/layouts/std': () => ({layouts: {}, can: false}),
+    'POST /api/favorites/suggestion': () => ({list_id: null}),  // 2.74.0 (#1653): was a write -> the notice popped up 8 s after the start 'GET /api/ical': () => ({enabled: false}),
   };
-  const R = [], MISS = [];  // MISS: calls answered by the fallback (tests list them)
+  const R = [], MISS = [], GATE = [];  // MISS: calls answered by the fallback (tests list them); GATE (2.74.0): office reads gated on purpose
   const on = (m, re, fn) => R.push([m, new RegExp('^' + re + '$'), fn]);
   on('GET', '/api/state', () => state());
+  // 2.74.0 (#1653): the first start of a new account and the sample project on request
+  on('POST', '/api/onboarding', (q, b) => onboard(b));
+  on('POST', '/api/sample', () => { const st = sampleState(); if (st) return {ok: true, created: false, exists: true, list_id: st.lists[0]?.id ?? null, sample: st};
+    const lid = sampleMake(); return {ok: true, created: true, list_id: lid, sample: sampleState()}; });
+  on('DELETE', '/api/sample', () => { if (!sampleState()) { DB.sample = null; throw new Http(404, {error: tx('There is no sample project')}); } return sampleRemove(); });
   on('GET', '/api/version', () => ({v: DB.v, n: '0', c: '0'}));
+  on('GET', '/api/servers', () => ({links: [], self: {name: 'Kalmido', short: 'K', color: '#6e56cf'}}));  // 2.73.0 (#661): no other servers in the demo
   on('GET', '/api/me', () => ({auth: 'session', avatar: DB.me.avatar, display_name: DB.me.display_name, has_password: true, id: 1, is_admin: false, username: DB.me.username, twofa: [], via: 'password', drop_token: '', proxy_login: '', ntfy_topic: ''}));
   on('PATCH', '/api/me', (q, b) => { for (const k of ['display_name', 'avatar']) if (k in b) DB.me[k] = b[k]; return {ok: true}; });
   on('PATCH', '/api/settings', (q, b) => { for (const [k, v] of Object.entries(b)) DB.settings[k] = typeof v === 'string' ? v : typeof v === 'boolean' ? (v ? '1' : '0') : typeof v === 'object' ? JSON.stringify(v) : String(v); return {ok: true}; });
@@ -584,17 +672,333 @@
   });
   on('POST', '/api/lists/(\\d+)/shop-areas', (q, b, id) => { const l = listById(id) || gone(); l.family = 'shopping'; return {ok: true, added: shopAreas(l)}; });
   on('GET', '/api/family/kids', () => ({kids: []}));
-  const PURPOSE = {me: ['cal'], family: ['cal', 'habits', 'comments', 'collab', 'family'], team: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields'],
-    software: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields']};
+  // 2.74.0 (#1653): "What do you use Kalmido for?" like kalmido/family/family.py purpose_apply (+ office, all_modules); the
+  // modules that need a server (files, documents, contacts, events, life areas ...) stay off in the demo
+  const LIFE = ['contracts', 'home', 'care', 'health', 'review', 'travel', 'reading'];
+  const PURPOSE_MODS = ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'family', 'events', 'contacts', ...LIFE];
+  const TEAM = ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts'];
+  const PURPOSE = {me: ['cal', 'events', 'contacts'], home: ['cal', 'events', 'contacts', 'habits', ...LIFE],
+    family: ['cal', 'habits', 'comments', 'collab', 'family', 'events', 'contacts', 'contracts', 'home', 'travel'], team: TEAM, software: TEAM, office: TEAM};
+  const PURPOSE_EXTRA = {office: ['clients', 'workload', 'forms', 'office']};
+  const DEMO_OFF = new Set(['events', 'contacts', 'files', 'docs', 'workload', 'forms', ...LIFE]);
   on('POST', '/api/me/purpose', (q, b) => {
-    const on = PURPOSE[b.purpose] || bad('Invalid purpose'), all = Object.values(PURPOSE).flat(), fs = DB.settings.features.split(',').filter(Boolean);
-    DB.settings.features = [...fs.filter(x => !all.includes(x) || on.includes(x)), ...on.filter(x => !fs.includes(x))].join(',');
-    DB.settings.purpose = b.purpose;
+    const p = b.purpose, am = b.all_modules; if (!PURPOSE[p]) bad('Invalid purpose');
+    const extra = PURPOSE_EXTRA[p] || [], onS = new Set(am == null ? [...PURPOSE[p], ...extra] : am ? [...PURPOSE_MODS, ...extra] : []);
+    const sw = [...PURPOSE_MODS, ...(am === false ? Object.values(PURPOSE_EXTRA).flat() : [])];
+    let fs = DB.settings.features.split(',').filter(Boolean);
+    fs = [...fs.filter(x => !sw.includes(x) || onS.has(x)), ...PURPOSE_MODS.filter(x => onS.has(x) && !fs.includes(x))];
+    fs = [...fs, ...extra.filter(x => onS.has(x) && !fs.includes(x))].filter(x => !DEMO_OFF.has(x));
+    if (am != null) DB.settings.mods_all = am ? '1' : '0';
+    DB.settings.features = fs.join(','); DB.settings.purpose = p;
     const created = [];
-    if (b.purpose === 'family' && b.examples !== false) for (const [k, n] of [['shopping', 'Shopping list'], ['household', 'Household'], ['birthdays', 'Birthdays'], ['meals', 'Meal plan']])
-      if (!DB.lists.some(l => l.family === k)) { created.push(famList(k, n).id); }
+    if (p === 'family') { for (const [k, n] of [['shopping', 'Shopping list'], ['household', 'Household']]) if (!DB.lists.some(l => l.family === k)) created.push(famList(k, n).id); }
+    else if (b.examples === true && ['team', 'office', 'software'].includes(p) && !sampleState()) created.push(sampleMake());
     return {features: DB.settings.features, created};
   });
+
+  // ---------------------------------------------------------------- demo-office (2.74.0, #1653)
+  // Office & finance of a person without an organisation (the personal office, the person is its admin): clients,
+  // services, quotations, invoices, payments. Sums and VAT like kalmido/office/calc.py (office_calc / inv_calc): every
+  // position money(qty x rate), the tax per rate on the sum of that rate, half up to cents (BigInt cents here). Numbers
+  // KVA-/RE-/GS-{yyyy}-{seq:03} like the German country pack. The PDF of the server becomes a print view (printView).
+  // Everything else of the office (DATEV, e-invoice XML, mail, agents, imports, cash flow, KPI, travel ...) is gated.
+  const OF = () => DB.office || (DB.office = {settings: {}, company: {}, services: [], docs: [], counters: {}});
+  const CL = () => DB.clients || (DB.clients = []);
+  const TAX = {standard: 19, reduced: 7, exempt: 0};
+  const SCHEME = {offer: 'KVA', invoice: 'RE', credit: 'GS', reminder: 'MA'};
+  const OF_DEF = {currency: 'EUR', lang: 'de', fx_usd: 1.09, offer_scheme: 'KVA-{yyyy}-{seq:03}', invoice_scheme: 'RE-{yyyy}-{seq:03}', credit_scheme: 'GS-{yyyy}-{seq:03}',
+    reminder_scheme: 'MA-{yyyy}-{seq:03}', offer_number_at: 'create', offer_valid_days: 30, payment_days: 14, reminder_fee: 0, reminder_deadline_days: 10, small_business: 0,
+    producing_on: 0, raw_on: 0, prod_quotient: 3, raw_factor: 0.25, producing_rate: 600, producing_service_id: null, logo: '', color: '', einvoice_format: 'zugferd',
+    datev_email: '', datev_auto: 0, intro_text_id: {de: null, en: null}, closing_text_id: {de: null, en: null}, rights_default: {time_id: null, territory_id: null, media_id: null},
+    industry_packs: [], invoice_closing_de: '', invoice_closing_en: '', reminder_text_de: '', reminder_text_en: '', agents_read: 0, datev_extf: 0, parts_invoice_mode: ''};
+  const CO_KEYS = ['name', 'street', 'zip', 'city', 'country', 'email', 'phone', 'tax_number', 'vat_id', 'iban', 'bic', 'bank_name', 'register_court', 'register_no', 'managing_directors', 'md_label'];
+  // an example sender, so a quotation can be finalised right away (Settings of the office: change it)
+  const coDefault = () => ({name: T().coName || 'Demo Studio', street: 'Musterstraße 1', zip: '10115', city: 'Berlin', country: 'DE', email: 'office@example.com', phone: '',
+    tax_number: '12/345/67890', vat_id: '', iban: 'DE02120300000000202051', bic: 'BYLADEM1001', bank_name: 'Demo Bank', register_court: '', register_no: '', managing_directors: '', md_label: ''});
+  const ofSettings = () => { const o = OF(); if (!o.company.name) o.company = coDefault(); const co = o.company;
+    return {...OF_DEF, ...o.settings, company: {name: co.name, lines: [co.street, [co.zip, co.city].filter(Boolean).join(' ')].filter(Boolean), contact_lines: [co.email, co.phone].filter(Boolean),
+      register_lines: [co.tax_number ? 'St.-Nr. ' + co.tax_number : '', co.vat_id ? 'USt-IdNr. ' + co.vat_id : ''].filter(Boolean), bank_lines: [co.bank_name, co.iban ? 'IBAN ' + co.iban : '', co.bic ? 'BIC ' + co.bic : ''].filter(Boolean), ...(o.settings.company || {})}}; };
+  // money in cents (BigInt), half up like Decimal ROUND_HALF_UP
+  const C = v => BigInt(Math.round((+v || 0) * 100));
+  const divR = (a, b) => { const neg = (a < 0n) !== (b < 0n), x = a < 0n ? -a : a, y = b < 0n ? -b : b, q = (2n * x + y) / (2n * y); return neg ? -q : q; };
+  const mulQ = (qty, cents) => divR(BigInt(Math.round((+qty || 0) * 10000)) * cents, 10000n);  // money(qty x rate)
+  const pctOf = (cents, pct) => divR(cents * BigInt(Math.round(pct * 100)), 10000n);
+  const cs = c => { const n = c < 0n ? -c : c, s = (c < 0n ? '-' : '') + (n / 100n) + '.' + String(n % 100n).padStart(2, '0'); return s; };  // "1428.00"
+  const cn = c => Number(cs(c));
+  const fmtM = (c, lang, cur) => { const en = lang === 'en', neg = c < 0n, [w, f] = cs(neg ? -c : c).split('.'), g = w.replace(/\B(?=(\d{3})+(?!\d))/g, en ? ',' : '.'), sym = cur === 'USD' ? '$' : '€';
+    return en ? `${neg ? '-' : ''}${sym}${g}.${f}` : `${neg ? '-' : ''}${g},${f} ${sym}`; };
+  const fmtQ = (q, lang) => { const s = String(+(+q || 0).toFixed(4)); return lang === 'en' ? s : s.replace('.', ','); };
+  const LBL = {de: {net: 'Summe Netto', gross: 'Gesamt Brutto', discount: 'Rabatt', producing: 'Producing', net_incl_raw: 'inklusive Rohdaten', net_excl_raw: 'ohne Rohdaten',
+    tax: p => `MwSt. ${p} %`, exempt: 'steuerfrei', vat_note: 'Alle Preise zuzüglich 7 % bzw. 19 % MwSt.', novat_note: 'Nicht im Inland steuerbar / Reverse-Charge-Verfahren.',
+    units: {day: 'Tage', hour: 'Std.', piece: 'Stk.', minute: 'Min.', flat: 'pauschal'}, producing_detail: (d, q, k) => `${d} Tage = ${q} Produktionstage / ${k}, auf halbe Tage gerundet`,
+    raw_optional: 'Optional: Bereitstellung der Rohdaten', raw_included: 'Bereitstellung der Rohdaten', raw_detail: p => `${p} % der Positionen mit Rohdaten`, discount_detail: p => `${p} % auf die markierten Positionen`},
+  en: {net: 'Net Total', gross: 'Gross Total', discount: 'Discount', producing: 'Producing', net_incl_raw: 'including raw data', net_excl_raw: 'excluding raw data',
+    tax: p => `VAT ${p} %`, exempt: 'tax exempt', vat_note: 'All prices plus 7 % or 19 % VAT.', novat_note: 'Not taxable domestically / reverse charge.',
+    units: {day: 'days', hour: 'h', piece: 'pcs', minute: 'min', flat: 'flat'}, producing_detail: (d, q, k) => `${d} days = ${q} production days / ${k}, rounded to half days`,
+    raw_optional: 'Optional: Delivery of raw data', raw_included: 'Delivery of raw data', raw_detail: p => `${p} % of the positions with raw data`, discount_detail: p => `${p} % on the marked positions`}};
+  const flag = v => ![null, undefined, 0, '0', '', false, 'false', 'off'].includes(v);
+  // the calculator of quotations (office_calc) and of invoices / credit notes (inv_calc)
+  function ofCalc(d, inv) {
+    const lang = d.lang === 'en' ? 'en' : 'de', L = LBL[lang], cur = d.currency === 'USD' ? 'USD' : 'EUR', fx = cur === 'USD' ? (+d.fx_rate || 1.09) : 1;
+    const novat = d.vat_mode === 'novat', rates = Object.fromEntries(Object.entries(TAX).map(([k, v]) => [k, novat ? 0 : v]));
+    const conv = r => C(cur === 'USD' ? +((+r || 0) * fx).toFixed(2) : r);
+    const its = d.items || [];
+    let ext = 0n; for (const it of its) if ((it.kind || 'service') === 'service' && it.unit !== 'percent' && it.intext === 'extern') ext += mulQ(it.qty ?? 1, conv(it.rate));
+    const base = {standard: 0n, reduced: 0n, exempt: 0n}, disc = {standard: 0n, reduced: 0n, exempt: 0n}, lines = [];
+    let pos = 0, net = 0n, raw = 0n, prodQ = 0, costs = 0n;
+    for (const it of its) {
+      const kind = it.kind || 'service';
+      if (kind === 'heading') { lines.push({kind, title: it.title || ''}); continue; }
+      if (kind === 'text') { lines.push({kind, text: it.detail || it.title || ''}); continue; }
+      if (kind === 'discount' && !inv) continue;
+      const pct = kind === 'service' && it.unit === 'percent' ? +it.rate || 0 : null, qty = pct == null ? (it.qty ?? 1) : 1;
+      let total = pct == null ? mulQ(qty, conv(it.rate)) : pctOf(ext, pct);
+      if (kind === 'discount') total = total < 0n ? total : -total;
+      const tax = TAX[it.tax] != null ? it.tax : 'standard';
+      pos++; net += total; base[tax] += total;
+      if (!inv && flag(it.raw_fee)) raw += total;
+      if (!inv && flag(it.producing) && pct == null) prodQ += +qty || 0;
+      if (!inv && flag(it.discountable ?? 1)) disc[tax] += total;
+      if (kind !== 'discount') costs += mulQ(qty, C(it.cost));
+      const rate = pct == null ? conv(it.rate) : total, unit = it.unit || 'day';
+      lines.push({kind: kind === 'discount' ? 'discount' : 'item', pos, id: it.id, service_id: it.service_id || null, title: it.title || (kind === 'discount' ? L.discount : ''), detail: it.detail || '',
+        qty: +qty, qty_text: pct == null ? fmtQ(qty, lang) : fmtQ(pct, lang) + ' %', unit, unit_text: pct == null ? (L.units[unit] || unit) : '', ...(pct != null ? {pct, base: cn(ext)} : {}),
+        rate: cn(rate), rate_text: fmtM(rate, lang, cur), tax, tax_pct: rates[tax], total: cn(total), total_text: fmtM(total, lang, cur), net: cs(total), intext: it.intext || 'intern'});
+    }
+    let prodTotal = 0n, rawAmt = 0n, discount = 0n;
+    const rawMode = inv ? 'none' : (['optional', 'included', 'none'].includes(d.raw_mode) ? d.raw_mode : 'optional');
+    if (!inv) {
+      const quot = +(d.prod_quotient ?? 3) || 0, days = d.producing_on !== 0 && quot > 0 && prodQ > 0 ? Math.round((prodQ / quot / 5) * 10 + 1e-9) / 10 * 5 : 0;
+      if (days > 0) { const pr = conv(d.producing_rate ?? 600); prodTotal = mulQ(days, pr); base.standard += prodTotal; net += prodTotal;
+        lines.push({kind: 'producing', title: L.producing, qty: days, qty_text: fmtQ(days, lang), unit: 'day', unit_text: L.units.day, rate: cn(pr), tax: 'standard', tax_pct: rates.standard, total: cn(prodTotal), total_text: fmtM(prodTotal, lang, cur), detail: L.producing_detail(fmtQ(days, lang), fmtQ(prodQ, lang), fmtQ(quot, lang))}); }
+      if (rawMode !== 'none') rawAmt = mulQ(+(d.raw_factor ?? 0.25), raw);
+      if (rawMode !== 'none' && raw > 0n) { const incl = rawMode === 'included'; if (incl) { base.standard += rawAmt; net += rawAmt; }
+        lines.push({kind: 'raw', optional: !incl, title: incl ? L.raw_included : L.raw_optional, qty: incl ? 1 : null, qty_text: incl ? '1' : '', unit: 'flat', unit_text: '', rate: cn(rawAmt), tax: 'standard', tax_pct: rates.standard, total: cn(rawAmt), total_text: fmtM(rawAmt, lang, cur), detail: L.raw_detail(fmtQ((+(d.raw_factor ?? 0.25)) * 100, lang))}); }
+      const dp = +d.discount_pct || 0;
+      if (dp > 0) { for (const k of Object.keys(base)) { const x = pctOf(disc[k], dp); base[k] -= x; discount += x; } net -= discount;
+        if (discount > 0n) lines.push({kind: 'discount', title: L.discount, pct: dp, total: cn(-discount), total_text: fmtM(-discount, lang, cur), detail: L.discount_detail(fmtQ(dp, lang))}); }
+    }
+    const taxLines = []; let taxSum = 0n;
+    if (!novat) for (const k of Object.keys(base)) { if (base[k] === 0n) continue; const amt = pctOf(base[k], rates[k]); taxSum += amt;
+      taxLines.push({rate_key: k, pct: inv ? String(rates[k]) : rates[k], base: inv ? cs(base[k]) : cn(base[k]), amount: inv ? cs(amt) : cn(amt), base_text: fmtM(base[k], lang, cur), amount_text: fmtM(amt, lang, cur), label: k === 'exempt' ? L.exempt : L.tax(rates[k])}); }
+    const gross = net + taxSum, N = inv ? cs : cn;
+    const out = {lang, currency: cur, fx_rate: cur === 'USD' ? fx : null, fx_note: cur === 'USD' ? (lang === 'en' ? `Exchange rate €1: $${fmtQ(fx, lang)}` : `Wechselkurs 1 €: ${fmtQ(fx, lang)} $`) : '',
+      vat_mode: novat ? 'novat' : 'vat', raw_mode: rawMode, net: N(net), net_text: fmtM(net, lang, cur), tax_lines: taxLines, tax: cs(taxSum), tax_total: N(taxSum), tax_text: fmtM(taxSum, lang, cur),
+      gross: N(gross), gross_text: fmtM(gross, lang, cur), costs: N(costs), margin: N(net - costs), items_net: N(net - prodTotal - (rawMode === 'included' ? rawAmt : 0n) + discount),
+      discount: N(discount), raw_amount: N(rawAmt), producing_total: N(prodTotal), lines,
+      net_incl_raw: !inv && rawMode === 'optional' && raw > 0n ? cn(net + rawAmt) : null, net_excl_raw: !inv && rawMode === 'included' && raw > 0n ? cn(net - rawAmt) : null,
+      vat_note: novat ? L.novat_note : inv ? '' : L.vat_note, labels: {net: L.net, gross: L.gross, discount: L.discount, producing: L.producing, net_incl_raw: L.net_incl_raw, net_excl_raw: L.net_excl_raw}};
+    return out;
+  }
+  const isInv = d => d.kind !== 'offer';
+  const OFD_STATE = {done: 'Settled', draft: 'Draft', issued: 'Finalised', sent: 'Sent', paid: 'Paid', partial: 'Partly paid', overdue: 'Overdue', cancelled: 'Cancelled', accepted: 'Accepted', declined: 'Declined'};
+  const totalsOf = d => d.locked && d.frozen ? d.frozen : ofCalc(d, isInv(d));
+  const paidC = d => (d.payments || []).reduce((a, p) => a + C(p.amount), 0n);
+  function stateOf(d) {
+    if (!isInv(d)) return d.status;
+    if (['draft', 'paid', 'cancelled'].includes(d.status)) return d.status;
+    if (d.kind === 'invoice' && paidC(d) > 0n) return 'partial';
+    if (d.due_date && d.due_date < today()) return 'overdue';
+    return d.status;
+  }
+  const docLine = d => { const t = totalsOf(d), st = stateOf(d), open = isInv(d) ? C(t.gross) - paidC(d) : 0n, o = open > 0n && d.status !== 'cancelled' ? open : 0n;
+    return {id: d.id, kind: d.kind, number: d.number, status: d.status, state: st, status_text: tx(OFD_STATE[st] || st), date: d.date, due_date: d.due_date || null, valid_until: d.valid_until,
+      recipient_name: d.recipient?.name || '', project_title: d.project_title, project_ref: d.project_ref, client_id: d.client_id, locked: !!d.locked,
+      net: t.net, gross: t.gross, net_text: t.net_text, gross_text: t.gross_text, open: cs(o), open_text: fmtM(o, t.lang, t.currency), paid: cs(paidC(d)), credits: '0.00'}; };
+  function docOut(d) {
+    const t = totalsOf(d), ln = docLine(d), editable = !d.locked && d.status !== 'sent';
+    const items = (d.items || []).map(it => ({...clone(it), margin: it.kind === 'service' || !it.kind ? cn(mulQ(it.qty ?? 1, C(it.rate)) - mulQ(it.qty ?? 1, C(it.cost))) : null}));
+    const out = {...clone(d), frozen: undefined, totals: t, state: ln.state, status_text: ln.status_text, net_text: t.net_text, gross_text: t.gross_text,
+      statuses: d.kind === 'offer' ? ['draft', 'sent', 'accepted', 'declined'] : d.kind === 'invoice' ? ['draft', 'issued', 'sent', 'paid', 'cancelled'] : ['draft', 'issued', 'sent', 'paid'],
+      items, items_margin: items.reduce((a, it) => a + (it.margin || 0), 0), parts: [], parts_shoot: null, client_contacts: [], contract: null, locked: !!d.locked,
+      locked_by_name: d.locked ? DB.me.display_name : '', can_edit: editable, can_delete: editable, number_at_finalize: isInv(d) && !d.number, agent_name: '', list_name: ''};
+    delete out.frozen;
+    if (isInv(d)) Object.assign(out, {paid: ln.paid, credits: '0.00', open: ln.open, open_text: ln.open_text, credits_of: [], fee_reminders: [], fee_open: '0.00',
+      payments: (d.payments || []).map(p => ({...p, created_by_name: DB.me.display_name}))});
+    return out;
+  }
+  const needDoc = id => OF().docs.find(x => x.id === +id) || gone();
+  const conflict = msg => { throw new Http(409, {error: tx(msg)}); };
+  function nextNumber(kind, date) {
+    const y = String(date || today()).slice(0, 4), k = kind + ':' + y, o = OF(); o.counters[k] = (o.counters[k] || 0) + 1;
+    return `${SCHEME[kind]}-${y}-${String(o.counters[k]).padStart(3, '0')}`;
+  }
+  const addDays = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return ds(x); };
+  function newDoc(kind, extra = {}) {
+    const s = ofSettings(), t0 = today();
+    const d = {id: nid('ofdoc'), org_id: 1, kind, number: '', status: 'draft', lang: s.lang, currency: s.currency, fx_rate: s.fx_usd, vat_mode: s.small_business ? 'novat' : 'vat',
+      vat_note: s.small_business ? 'small' : '', client_id: null, recipient: {name: '', lines: []}, project_title: '', project_ref: '', date: t0, valid_until: kind === 'offer' ? addDays(t0, +s.offer_valid_days || 30) : '',
+      contract_id: null, raw_mode: s.raw_on ? 'optional' : 'none', raw_factor: s.raw_factor, prod_quotient: s.prod_quotient, producing_rate: s.producing_rate, producing_on: s.producing_on ? 1 : 0,
+      discount_pct: 0, intro: '', closing: '', rights: {time: {id: null, text: ''}, territory: {id: null, text: ''}, media: {id: null, text: ''}, exceptions: '', exclusive: 0, note: ''}, fields: [],
+      created_by: 1, created_at: iso(), updated_at: iso(), sent_at: null, locked_at: null, locked_by: null, service_from: '', service_to: '', order_ref: '', due_date: null,
+      payment_days: kind === 'invoice' ? +s.payment_days || 14 : null, source_doc_id: null, paid_at: null, einvoice_format: s.einvoice_format, contact_id: null, items: [], payments: [], ...extra};
+    if (kind === 'offer' && s.offer_number_at !== 'finalize') d.number = nextNumber('offer', d.date);
+    OF().docs.push(d); return d;
+  }
+  const recipientOf = cl => ({name: cl.name, lines: [cl.name, ...(cl.contacts || []).filter(k => k.is_default).map(k => k.name), cl.street || '', [cl.zip, cl.city].filter(Boolean).join(' '), ...String(cl.address || '').split('\n')].map(x => String(x || '').trim()).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i)});
+  const DOC_FIELDS = ['lang', 'currency', 'fx_rate', 'vat_mode', 'vat_note', 'project_title', 'project_ref', 'date', 'valid_until', 'contract_id', 'raw_mode', 'raw_factor', 'prod_quotient', 'producing_rate',
+    'producing_on', 'discount_pct', 'intro', 'closing', 'rights', 'fields', 'service_from', 'service_to', 'order_ref', 'due_date', 'payment_days', 'einvoice_format', 'contact_id'];
+  function patchDoc(d, b) {
+    if (d.locked || d.status === 'sent') conflict('Sent documents cannot be changed; duplicate it for a new version.');
+    for (const k of DOC_FIELDS) if (k in b) d[k] = b[k];
+    if ('recipient' in b) d.recipient = {name: String(b.recipient?.name || ''), lines: (b.recipient?.lines || []).map(String)};
+    if ('client_id' in b) { d.client_id = b.client_id ? +b.client_id : null; const cl = CL().find(c => c.id === d.client_id);
+      if (cl && b.recipient_from_client) d.recipient = recipientOf(cl); if (cl && d.kind === 'invoice' && cl.payment_terms_days != null) d.payment_days = +cl.payment_terms_days; }
+    d.updated_at = iso();
+  }
+  const svcRate = (s, unit) => unit === 'hour' ? s.hourly_rate : s.daily_rate ?? s.hourly_rate;
+  function putItems(d, items) {
+    if (d.locked || d.status === 'sent') conflict('Sent documents cannot be changed; duplicate it for a new version.');
+    d.items = (items || []).map(it => {
+      const s = it.service_id ? OF().services.find(x => x.id === +it.service_id) : null, kind = ['service', 'text', 'heading', 'discount'].includes(it.kind) ? it.kind : 'service';
+      const unit = it.unit || s?.unit || 'day';
+      return {id: it.id || nid('ofitem'), kind, service_id: s ? s.id : null, title: String(it.title ?? '') || (s ? (d.lang === 'en' ? s.name_en || s.name_de : s.name_de) : ''), detail: String(it.detail ?? ''),
+        qty: it.qty == null || it.qty === '' ? 1 : +it.qty, unit, rate: it.rate == null || it.rate === '' ? (s ? +(svcRate(s, unit) || 0) : 0) : +it.rate, tax: it.tax || s?.tax || 'standard',
+        raw_fee: flag(it.raw_fee) ? 1 : 0, producing: flag(it.producing) ? 1 : 0, intext: it.intext || s?.intext || 'intern', cost: it.cost == null || it.cost === '' ? 0 : +it.cost,
+        discountable: flag(it.discountable ?? 1) ? 1 : 0, ref_part_id: null};
+    });
+    d.updated_at = iso();
+  }
+  // ---- clients (module clients)
+  const CL_BILL = ['street', 'zip', 'city', 'country', 'vat_id', 'customer_no', 'buyer_reference', 'email_invoice', 'payment_terms_days'];
+  const clientOut = c => ({...clone(c), archived: !!c.archived, org_name: '', lists: DB.lists.filter(l => l.client_id === c.id).map(l => l.id), can_delete: true,
+    billing: Object.fromEntries(CL_BILL.map(k => [k, c[k] ?? null])),
+    stats: {seconds: 0, rounded: 0, amount: 0, month: today().slice(0, 7), month_seconds: 0, month_amount: 0, estimate_min: 0, estimated: 0, open: 0, done: 0}, budget: {pct_h: null, pct_amount: null, level: 'none'}});
+  const clientBrief = c => ({id: c.id, name: c.name, icon: c.icon || '', color: c.color || '', org_id: null, archived: !!c.archived, lists: DB.lists.filter(l => l.client_id === c.id).map(l => l.id)});
+  function clientSet(c, b) {
+    if ('name' in b) { if (!String(b.name || '').trim()) bad(tx('Name missing')); c.name = String(b.name).trim(); }
+    for (const k of ['icon', 'color', 'email', 'phone', 'address', 'note', 'rate', 'budget_h', 'budget_amount', ...CL_BILL]) if (k in b) c[k] = b[k];
+    if ('archived' in b) c.archived = b.archived ? 1 : 0;
+    if (Array.isArray(b.contacts)) c.contacts = b.contacts.filter(k => String(k.name || '').trim()).map((k, i) => ({id: k.id || nid('clcontact'), name: String(k.name).trim(), role: k.role || '', email: k.email || '', phone: k.phone || '', is_default: !!k.is_default || (i === 0 && !b.contacts.some(x => x.is_default))}));
+    c.contact = (c.contacts || []).find(k => k.is_default)?.name || ''; c.updated_at = iso();
+  }
+  on('GET', '/api/clients', () => ({clients: CL().map(clientOut)}));
+  on('GET', '/api/clients/(\\d+)', (q, b, id) => ({...clientOut(CL().find(c => c.id === +id) || gone()), per_list: []}));
+  on('POST', '/api/clients', (q, b) => { const c = {id: nid('client'), name: '', org_id: null, created_by: 1, created_at: iso(), contacts: [], archived: 0}; clientSet(c, {...b, name: b.name ?? ''}); CL().push(c); return clientOut(c); });
+  on('PATCH', '/api/clients/(\\d+)', (q, b, id) => { const c = CL().find(x => x.id === +id) || gone(); clientSet(c, b); return clientOut(c); });
+  on('DELETE', '/api/clients/(\\d+)', (q, b, id) => { DB.clients = CL().filter(c => c.id !== +id); for (const l of DB.lists) if (l.client_id === +id) l.client_id = null; return {ok: true}; });
+  // ---- the office
+  const ofInfo = () => ({settings: ofSettings(), company_fields: {...OF().company}, org_id: 1, role: 'admin', personal: 1, org_offices: [], can_move: false, industry: [],
+    pack: {code: 'DE', name: 'Deutschland', tax: {...TAX}, currency: 'EUR', formats: {}}, number_preview: `KVA-${today().slice(0, 4)}-${String((OF().counters['offer:' + today().slice(0, 4)] || 0) + 1).padStart(3, '0')}`});
+  on('GET', '/api/office/settings', () => ofInfo());
+  on('PUT', '/api/office/settings', (q, b) => { const o = OF();
+    if (b.company_fields) for (const k of CO_KEYS) if (k in b.company_fields) o.company[k] = String(b.company_fields[k] ?? '');
+    const {company_fields, pack, ...rest} = b; o.settings = {...o.settings, ...rest}; return ofInfo(); });
+  on('GET', '/api/office/number-preview', q => { const k = q.get('kind') || 'offer'; return {preview: `${SCHEME[k] || 'KVA'}-${today().slice(0, 4)}-001`, valid: true, yearly: true}; });
+  for (const k of ['roles', 'crew', 'equipment', 'sets', 'texts', 'contracts']) on('GET', `/api/office/${k}`, () => ({items: []}));
+  on('GET', '/api/office/services', () => ({items: clone(OF().services)}));
+  const SVC = ['name_de', 'name_en', 'category', 'sort', 'unit', 'daily_rate', 'hourly_rate', 'raw_fee', 'producing', 'intext', 'role', 'role_id', 'tax', 'archived'];
+  const svcSet = (s, b) => { for (const k of SVC) if (k in b) s[k] = b[k]; if (!String(s.name_de || '').trim()) bad(tx('Name missing')); s.updated_at = iso(); };
+  on('POST', '/api/office/services', (q, b) => { const s = {id: nid('ofsvc'), org_id: 1, name_de: '', name_en: '', category: '', sort: 0, unit: 'day', daily_rate: null, hourly_rate: null, raw_fee: 0, producing: 0,
+    intext: 'extern', role: '', role_id: null, tax: 'standard', archived: 0, created_at: iso(), import_run_id: null}; svcSet(s, b); OF().services.push(s); return clone(s); });
+  on('PATCH', '/api/office/services/(\\d+)', (q, b, id) => { const s = OF().services.find(x => x.id === +id) || gone(); svcSet(s, b); return clone(s); });
+  on('DELETE', '/api/office/services/(\\d+)', (q, b, id) => { OF().services = OF().services.filter(x => x.id !== +id); return {ok: true}; });
+  on('GET', '/api/office/pay-props', () => ({items: [], admin: true}));
+  on('GET', '/api/office/mail-status', () => ({smtp: false, datev_email: '', datev_auto: 0}));
+  on('GET', '/api/office/log', () => ({log: []}));
+  on('GET', '/api/office/docs', q => { const k = q.get('kind') || 'offer', st = q.get('status');
+    return {docs: OF().docs.filter(d => d.kind === k).map(docLine).filter(r => !st || r.status === st || r.state === st).sort((a, b) => b.id - a.id)}; });
+  on('POST', '/api/office/docs', (q, b) => { const k = ['offer', 'invoice'].includes(b.kind) ? b.kind : 'offer', d = newDoc(k); if (b.client_id) patchDoc(d, {client_id: b.client_id, recipient_from_client: true}); return docOut(d); });
+  on('GET', '/api/office/docs/(\\d+)', (q, b, id) => docOut(needDoc(id)));
+  on('PATCH', '/api/office/docs/(\\d+)', (q, b, id) => { const d = needDoc(id); patchDoc(d, b); return docOut(d); });
+  on('PUT', '/api/office/docs/(\\d+)/items', (q, b, id) => { const d = needDoc(id); putItems(d, b.items); return docOut(d); });
+  on('DELETE', '/api/office/docs/(\\d+)', (q, b, id) => { const d = needDoc(id); if (d.locked || d.status === 'sent') conflict('Sent documents cannot be changed; duplicate it for a new version.'); OF().docs = OF().docs.filter(x => x !== d); return {ok: true}; });
+  on('GET', '/api/office/docs/(\\d+)/signoffs', () => ({signoffs: []}));
+  on('GET', '/api/office/docs/(\\d+)/log', () => ({log: []}));
+  on('POST', '/api/office/docs/(\\d+)/number', (q, b, id) => { const d = needDoc(id); if (!d.number && !isInv(d)) d.number = nextNumber(d.kind, d.date); return {id: d.id, number: d.number}; });
+  on('POST', '/api/office/docs/(\\d+)/status', (q, b, id) => { const d = needDoc(id), s = b.status;
+    if (!docOut(d).statuses.includes(s)) bad(tx('Invalid value: {0}').replace('{0}', 'status'));
+    if (isInv(d) && !d.locked && s !== 'draft') conflict('Finalise the document first');
+    if (d.kind === 'offer' && s === 'draft' && d.status !== 'draft') conflict('Sent documents cannot be changed; duplicate it for a new version.');
+    d.status = s; if (s === 'sent' && !d.sent_at) d.sent_at = iso(); if (s === 'paid') d.paid_at = d.paid_at || iso(); d.updated_at = iso();
+    const o = docOut(d); delete o.items; return o; });
+  on('POST', '/api/office/docs/(\\d+)/finalize', (q, b, id) => { const d = needDoc(id); if (d.locked) conflict('Already finalised');
+    const miss = [];
+    if (!String(d.recipient?.name || '').trim()) miss.push(tx('Recipient'));
+    if (!d.date) miss.push(tx('Date'));
+    if (isInv(d) && !(d.items || []).some(it => (it.kind || 'service') === 'service')) miss.push(tx('Service'));
+    if (miss.length) bad(tx('Missing before finalising: {0}').replace('{0}', miss.join(', ')));
+    if (d.date > today()) bad(tx('Invalid value: {0}').replace('{0}', tx('Date')));
+    if (!d.number) d.number = nextNumber(d.kind, d.date);
+    if (isInv(d)) { if (!d.service_from && !d.service_to) d.service_from = d.service_to = d.date; if (!d.due_date && d.kind === 'invoice') d.due_date = addDays(d.date, +d.payment_days || 14); d.status = 'issued'; }
+    d.frozen = ofCalc(d, isInv(d)); d.locked = 1; d.locked_at = iso(); d.locked_by = 1; d.updated_at = iso();
+    return docOut(d); });
+  on('POST', '/api/office/docs/(\\d+)/invoice', (q, b, id) => { const o = needDoc(id); if (o.kind !== 'offer') bad(tx('Invalid value: {0}').replace('{0}', 'kind'));
+    const cl = CL().find(c => c.id === o.client_id), t = ofCalc(o, false);
+    const d = newDoc('invoice', {lang: o.lang, currency: o.currency, fx_rate: o.fx_rate, vat_mode: o.vat_mode, vat_note: o.vat_note, client_id: o.client_id, recipient: clone(o.recipient),
+      project_title: o.project_title, project_ref: o.project_ref, order_ref: o.project_ref, rights: clone(o.rights), fields: clone(o.fields), service_from: o.service_from, service_to: o.service_to,
+      contact_id: o.contact_id, source_doc_id: o.id, payment_days: cl && cl.payment_terms_days != null ? +cl.payment_terms_days : +ofSettings().payment_days || 14});
+    const its = o.items.filter(it => it.kind !== 'discount').map(it => ({...clone(it), id: undefined, raw_fee: 0, producing: 0}));
+    for (const l of t.lines) {
+      if (l.kind === 'producing') its.push({kind: 'service', title: l.title, detail: l.detail, qty: l.qty, unit: 'day', rate: l.rate, tax: 'standard', intext: 'intern', cost: 0});
+      if (l.kind === 'raw' && !l.optional) its.push({kind: 'service', title: l.title, detail: l.detail, qty: 1, unit: 'flat', rate: l.total, tax: 'standard', intext: 'intern', cost: 0});
+      if (l.kind === 'discount') its.push({kind: 'discount', title: l.title, detail: l.detail, qty: 1, unit: 'flat', rate: -l.total, tax: 'standard', intext: 'intern', cost: 0});
+    }
+    putItems(d, its); return docOut(d); });
+  on('POST', '/api/office/docs/(\\d+)/duplicate', (q, b, id) => { const o = needDoc(id);
+    const {id: _i, number: _n, status: _s, locked: _l, locked_at: _la, locked_by: _lb, frozen: _f, payments: _p, sent_at: _sa, paid_at: _pa, due_date: _dd, ...rest} = clone(o);
+    const d = newDoc(o.kind, {...rest, date: today(), items: []}); putItems(d, o.items.map(it => ({...clone(it), id: undefined}))); return docOut(d); });
+  on('POST', '/api/office/docs/(\\d+)/payments', (q, b, id) => { const d = needDoc(id);
+    if (d.kind !== 'invoice' || !d.locked || ['cancelled', 'paid'].includes(d.status)) conflict('Finalise the document first');
+    const amt = C(b.amount), open = C(totalsOf(d).gross) - paidC(d);
+    if (!(amt > 0n) || amt > open) bad(tx('Invalid value: {0}').replace('{0}', tx('Amount')));
+    if (!b.date || b.date > today()) bad(tx('Invalid value: {0}').replace('{0}', tx('Date')));
+    d.payments.push({id: nid('ofpay'), date: b.date, amount: cs(amt), method: b.method || 'transfer', note: String(b.note || ''), created_by: 1, created_at: iso()});
+    if (paidC(d) >= C(totalsOf(d).gross)) { d.status = 'paid'; d.paid_at = iso(); }
+    return docOut(d); });
+  on('DELETE', '/api/office/docs/(\\d+)/payments/(\\d+)', (q, b, id, pid) => { const d = needDoc(id); d.payments = d.payments.filter(p => p.id !== +pid);
+    if (d.status === 'paid' && paidC(d) < C(totalsOf(d).gross)) { d.status = 'issued'; d.paid_at = null; } return docOut(d); });
+
+  // ---- the print view (instead of the server's PDF): the document as HTML in an overlay, the browser prints it
+  const PL = {de: {offer: 'Angebot', invoice: 'Rechnung', credit: 'Gutschrift', reminder: 'Mahnung', date: 'Datum', valid: 'Gültig bis', due: 'Fällig am', period: 'Leistungszeitraum',
+    pos: 'Pos.', desc: 'Leistung', qty: 'Menge', rate: 'Einzelpreis', total: 'Gesamt', paid: 'Bezahlt', open: 'Offen', ref: 'Ihr Zeichen', draft: 'Entwurf'},
+  en: {offer: 'Quotation', invoice: 'Invoice', credit: 'Credit note', reminder: 'Reminder', date: 'Date', valid: 'Valid until', due: 'Due on', period: 'Service period',
+    pos: 'Pos.', desc: 'Description', qty: 'Qty', rate: 'Unit price', total: 'Amount', paid: 'Paid', open: 'Open', ref: 'Your reference', draft: 'Draft'}};
+  const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+  const dfmt = (s, lang) => { if (!s) return ''; const [y, m, d] = String(s).slice(0, 10).split('-'); return lang === 'en' ? `${y}-${m}-${d}` : `${d}.${m}.${y}`; };
+  function printHtml(d) {
+    const o = docOut(d), t = o.totals, lg = t.lang, P = PL[lg], s = ofSettings(), co = s.company;
+    const rows = t.lines.map(l => l.kind === 'heading' ? `<tr class="kp-hd"><td></td><td colspan="4"><b>${h(l.title)}</b></td></tr>`
+      : l.kind === 'text' ? `<tr><td></td><td colspan="4" class="kp-tx">${h(l.text)}</td></tr>`
+      : `<tr><td>${h(l.pos || '')}</td><td><b>${h(l.title)}</b>${l.detail ? `<br><small>${h(l.detail)}</small>` : ''}</td><td class="kp-n">${h(l.qty_text || '')} ${h(l.unit_text || '')}</td><td class="kp-n">${l.rate != null && l.kind !== 'discount' ? h(fmtM(C(l.rate), lg, t.currency)) : ''}</td><td class="kp-n">${h(l.total_text || fmtM(C(l.total), lg, t.currency))}</td></tr>`).join('');
+    const sums = [[t.labels.net, t.net_text || fmtM(C(t.net), lg, t.currency)], ...t.tax_lines.map(x => [x.label, x.amount_text]), ...(t.vat_mode === 'novat' ? [] : [[t.labels.gross, t.gross_text]])];
+    if (o.kind === 'invoice' && +o.paid) sums.push([P.paid, fmtM(C(o.paid), lg, t.currency)], [P.open, o.open_text]);
+    const meta = [[P.date, dfmt(o.date, lg)], o.kind === 'offer' ? [P.valid, dfmt(o.valid_until, lg)] : null, o.kind === 'invoice' && o.due_date ? [P.due, dfmt(o.due_date, lg)] : null,
+      isInv(o) && (o.service_from || o.service_to) ? [P.period, [dfmt(o.service_from, lg), dfmt(o.service_to, lg)].filter(Boolean).join(' – ')] : null, o.project_ref || o.order_ref ? [P.ref, o.project_ref || o.order_ref] : null].filter(Boolean);
+    return `<div class="kp-page" lang="${lg}">
+      <header class="kp-head"><div class="kp-from"><b>${h(co.name)}</b><br>${co.lines.map(h).join(' · ')}</div></header>
+      <div class="kp-addr"><small>${h([co.name, ...co.lines].join(' · '))}</small><br>${(o.recipient.lines.length ? o.recipient.lines : [o.recipient.name]).map(h).join('<br>')}</div>
+      <dl class="kp-meta">${meta.map(([k, v]) => `<div><dt>${h(k)}</dt><dd>${h(v)}</dd></div>`).join('')}</dl>
+      <h1>${h(P[o.kind] || o.kind)} ${h(o.number || P.draft)}</h1>${o.project_title ? `<h2>${h(o.project_title)}</h2>` : ''}
+      ${o.intro ? `<p class="kp-tx">${h(o.intro)}</p>` : ''}
+      <table class="kp-items"><thead><tr><th>${P.pos}</th><th>${P.desc}</th><th class="kp-n">${P.qty}</th><th class="kp-n">${P.rate}</th><th class="kp-n">${P.total}</th></tr></thead><tbody>${rows}</tbody></table>
+      <dl class="kp-sums">${sums.map(([k, v], i) => `<div class="${i === sums.length - 1 || k === t.labels.gross ? 'kp-g' : ''}"><dt>${h(k)}</dt><dd>${h(v)}</dd></div>`).join('')}</dl>
+      ${t.vat_note ? `<p class="kp-note">${h(t.vat_note)}</p>` : ''}${o.closing ? `<p class="kp-tx">${h(o.closing)}</p>` : ''}
+      <footer class="kp-foot"><div>${[co.name, ...co.lines].map(h).join('<br>')}</div><div>${co.contact_lines.map(h).join('<br>')}</div><div>${co.register_lines.map(h).join('<br>')}</div><div>${co.bank_lines.map(h).join('<br>')}</div></footer></div>`;
+  }
+  function printView(id) {
+    const d = OF().docs.find(x => x.id === +id); if (!d) { notice(); return; }
+    const x = T(); document.getElementById('kd-print')?.remove();
+    const el = document.createElement('div'); el.id = 'kd-print'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', x.printTitle);
+    el.innerHTML = `<div class="kd-pbar"><b></b><span class="kd-ptxt"></span><span class="kd-sp"></span><button type="button" class="kd-btn kd-pri" data-kp="print"></button><button type="button" class="kd-btn" data-kp="close"></button></div><div class="kd-pscroll">${printHtml(d)}</div>`;
+    el.querySelector('.kd-pbar b').textContent = x.printTitle; el.querySelector('.kd-ptxt').textContent = x.printNote;
+    el.querySelector('[data-kp="print"]').textContent = x.print; el.querySelector('[data-kp="close"]').textContent = x.close;
+    const back = document.activeElement, close = () => { el.remove(); document.documentElement.classList.remove('kd-printing'); back?.focus?.(); };
+    el.addEventListener('click', e => { const b = e.target.closest('[data-kp]'); if (!b) return; if (b.dataset.kp === 'print') window.print(); else close(); });
+    el.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+    document.body.appendChild(el); document.documentElement.classList.add('kd-printing');
+    el.querySelector('[data-kp="print"]').focus();
+  }
+  const PDF_RE = /^\/api\/office\/docs\/(\d+)\/pdf$/;
+  const pdfId = url => { try { const m = new URL(url, 'https://demo.invalid/').pathname.match(PDF_RE); return m ? +m[1] : null; } catch { return null; } };
+  // the app opens a PDF with its viewer (pdfView), window.open or a download link: all of them become the print view
+  window.addEventListener('load', () => {
+    const pv = window.pdfView;
+    if (typeof pv === 'function') window.pdfView = o => { const id = pdfId(o?.url || ''); return id ? printView(id) : pv(o); };
+  });
+  const wopen = window.open;
+  window.open = (url, ...rest) => { const id = pdfId(String(url || '')); if (id) { printView(id); return null; }
+    if (/^\/api\//.test(String(url || ''))) { notice(); return null; } return wopen.call(window, url, ...rest); };
 
   // ---------------------------------------------------------------- the notice for server features
   function notice() {
@@ -641,6 +1045,9 @@
         return [200, out];
       }
     }
+    // 2.74.0 (#1653): the office's server-only parts (KPI, cash flow, travel, pipeline, DATEV, imports ...) answer a read with
+    // the calm "not available" text (the tab shows it), without the notice popping up while browsing
+    if (/^\/api\/office\//.test(path)) { GATE.push(key); if (method !== 'GET') notice(); return [409, {error: T().gated, demo: 'gated'}]; }
     MISS.push(key);
     if (GATED.test(path) || method !== 'GET') { notice(); return [409, {error: T().gated, demo: 'gated'}]; }
     return [200, {}];  // an unknown read: empty
@@ -659,7 +1066,7 @@
   // download links of the app (JSON export, CSV, backups) point at the server: the notice instead
   document.addEventListener('click', e => {
     const a = e.target.closest && e.target.closest('a[href]');
-    if (a && /^\/api\//.test(a.getAttribute('href') || '')) { e.preventDefault(); e.stopPropagation(); notice(); }
+    if (a && /^\/api\//.test(a.getAttribute('href') || '')) { e.preventDefault(); e.stopImmediatePropagation(); const id = pdfId(a.getAttribute('href')); if (id) printView(id); else notice(); }  // 2.74.0 (#1653): a PDF = the print view
   }, true);
 
   // ---------------------------------------------------------------- banner + reset
@@ -685,9 +1092,10 @@
   }
   const CSPV = [];  // blocked by the page's CSP (tests: must stay empty)
   document.addEventListener('securitypolicyviolation', e => CSPV.push(e.violatedDirective + ' ' + e.blockedURI));
-  window.KDEMO = {reset, db: () => DB, miss: MISS, csp: CSPV};
+  window.KDEMO = {reset, db: () => DB, miss: MISS, gated: GATE, csp: CSPV, printView};
 
   DB = loadDb();
+  if (DB && DB.ver === VER) save();  // 2.74.0 (#1653): a migrated storage is written back once
   if (!DB) {
     seed(browserLang());
     try { localStorage.setItem('tasks.lang', JSON.stringify(DB.settings.lang)); localStorage.removeItem('tasks.cache'); localStorage.removeItem('tasks.uid'); } catch { /* private mode */ }

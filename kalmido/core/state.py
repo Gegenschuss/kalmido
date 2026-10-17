@@ -78,7 +78,7 @@ def visible_lists(c, uid):
                         FROM lists l LEFT JOIN list_members m ON m.list_id=l.id AND m.user_id=?
                         WHERE l.id IN {acx_lists_sql(req=False)}""", (uid, uid, uid)).fetchall()  # 2.36.2 (#1142): the one list scope
     if health_hidden(c, uid):  # 2.22.0 (#663): health lists stay private (agents, tokens without the scope "private")
-        rows = [r for r in rows if r["life"] != "health"]
+        rows = [r for r in rows if r["life"] not in ("health", "budget")]  # 2.72.0 (#1333): budgets too
     if has_request_context() and getattr(g, "user", None) is not None and uid == g.user["id"]:
         from ..core.access import token_lists
         tl = token_lists()  # 2.30.0 (#919): a token limited to selected lists
@@ -126,9 +126,12 @@ def visible_lists(c, uid):
     if ids:
         for f in c.execute(f"SELECT id, list_id FROM list_fields WHERE list_id IN ({','.join('?' * len(ids))})", ids):
             lfids.setdefault(f["list_id"], set()).add(f["id"])
+    from ..collab.liste2e import le2a_state
+    le2s = le2a_state(c, rows, uid)  # 2.64.1 (#1817): the lock per list (waiting list, my key of the current generation)
     out = []
     for r in rows:
         d = {k: r[k] for k in r.keys() if not k.startswith("m_")}
+        d.update(le2s.get(r["id"], {"e2e_pending": 0, "e2e_mine": False}))
         d["progress"] = prog.get(r["id"], {"done": 0, "total": 0, "overdue": 0, "next_due": None})
         d["status_by_name"] = snames.get(r["status_by"], "")
         if r["owner_id"] != uid:
@@ -219,6 +222,7 @@ def state():
     from ..calendars.caldav import dav_info
     from ..notify.push import vapid_public, webpush_count, WEBPUSH_ON
     from ..calendars.subscriptions import CAL_ON
+    from ..assistant.web import asst_state  # 2.75.0 A (#1411)
     from ..api.v1 import API_ON, WH_ON
     from ..tasks.dayplan import dayplan_state
     from ..agents.core import agents_for
@@ -283,7 +287,7 @@ def state():
                            f"AND {tvis(c, uid)}", (uid, uid)).fetchone()[0],
             trash=c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN {wr_sql()} AND deleted_at IS NOT NULL",
                             (uid, uid)).fetchone()[0]),
-        settings={k: v for k, v in s.items() if k not in ("digest_sent", "digest_mail_sent", "review_sent")},
+        settings={k: v for k, v in s.items() if k not in ("digest_sent", "digest_mail_sent", "review_sent") and not k.startswith("sup_key")},  # 2.74.0 (#338): never the licence key
         mine_order=vw_mine_order(c, uid),  # 2.40.0 (#1344): the own order of "My tasks" {task id: pos}
         mine_hidden=mt_mine_hidden(c, uid),  # 2.41.0 (#1365): ids of the lists I switched off for "My tasks"
         notify=notif_matrix(s),  # 2.1.0 (#317)
@@ -311,6 +315,7 @@ def state():
         team={"enabled": tchat_on(c, uid), "unread": tchat_unread(c, uid), "dm_unread": tchat_dm_unread(c, uid)},  # 2.17.0 (#419); 2.28.0 (#987): + DMs
         agents=agents_for(c, uid),
         proposers=prop_agents(c, uid),  # 2.3.0: agents I may ask for a proposal
+        **asst_state(c, uid),  # 2.75.0 A (#1411): "assistant" only when the server configured one (assistant/web.py)
         groups=groups_for(c, full=bool(u["is_admin"])) if collab_all() else [],  # 2.10.0 (#441)
         my_groups=grp_of_user(c, uid) if collab_all() else [],
         dayplan=dayplan_state(c, uid),  # 2.10.0 (#440): working hours, review card
@@ -416,7 +421,9 @@ def search_tasks(c, uid, raw, limit):
     fhit = ts_task_hits(c, uid, raw)  # 2.61.0 (#1820): the recognised text of a task's files finds the task
     fids = sorted(set(fids) | set(sorted(fhit)[:2000]))
     # participants: only their own tasks match (a context parent's notes / link / fields are not theirs to search)
-    rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
+    # 2.64.1 B (#1817): lists with the lock are searched in the browser only (the server holds ciphertexts)
+    rows = load_tasks(c, f"list_id IN {vis_sql()} AND list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL) "
+                         f"AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
                          "AND (title ILIKE ? ESCAPE '\\' OR content ILIKE ? ESCAPE '\\' OR url ILIKE ? ESCAPE '\\' OR (snippets IS NOT NULL AND EXISTS (SELECT 1 FROM "
                          "jsonb_array_elements(CASE WHEN jsonb_typeof(snippets)='array' THEN snippets ELSE '[]'::jsonb END) j "
                          "WHERE (j->>'code') ILIKE ? ESCAPE '\\' OR (j->>'path') ILIKE ? ESCAPE '\\')) "

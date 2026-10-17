@@ -947,6 +947,93 @@ fresh; run p266_b_ui node p266_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.66.0 part A: merging duplicate contacts (#1835): links, CardDAV, undo, rights
 fresh; run p266_a_api "$PY" p266_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p266_a_ui node p266_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.1 part C: #1817 lock per list - client data layer
+fresh; run p264a_c_ui node p264a_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.1 part D: #1817 lock per list - dialogs and display, #1518
+fresh; run p264a_d_ui node p264a_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.1 part A: #1817 lock per list - server core
+fresh; run p264a_a_api "$PY" p264a_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.64.1 part B: #1817 lock per list - other ways, neutral texts, copies
+fresh; run p264a_b_api "$PY" p264a_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.64.2 parts C + D: #1817 lock per list stage 2 - the list channel, pushes in the recipient's language
+fresh; run p264b_c_api "$PY" p264b_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.64.2 parts C + D: #1817 lock per list stage 2 - the list channel in the web app, safety numbers
+fresh; run p264b_c_ui node p264b_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.2 part A: #1817 lock per list stage 2 - key change and re-encryption
+fresh; run p264b_a_api "$PY" p264b_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p264b_a_ui node p264b_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.2 part B: #1817 lock per list stage 2 - list files (server)
+fresh; run p264b_b_api "$PY" p264b_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.64.2 part B: #1817 lock per list stage 2 - list files (web app)
+fresh; run p264b_b_ui node p264b_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.3 part A: #1817 lock per knowledge space - server routes, guard of the page routes, members, rotation
+fresh; run p264c_a_api "$PY" p264c_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.64.3 part B: #1817 lock per knowledge space - client (encrypted wiki space in the browser)
+fresh; run p264c_b_ui node p264c_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.67.0 part A: fixed costs from a spreadsheet in the cash flow, net / gross, the monthly check task (#1838)
+fresh; run p267_a_api "$PY" p267_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p267_a_ui node p267_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.67.0 part B: the dependency chain moves along, Pull the chain in (#1865)
+fresh; run p267_b_api "$PY" p267_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p267_b_ui node p267_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.68.0 part A: old data into the office with the person's own agent (import proposals, fixed costs; #1839)
+fresh; run p268_a_api "$PY" p268_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p268_a_ui node p268_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.69.0 part B: a Paperless-ngx import takes over the matching rules (any / all / literal / regex / fuzzy, auto reported) and
+# trains the classifier once per run (#1847)
+fresh; run p269_b_api "$PY" p269_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.69.0 part A: Paperless-ngx import on a hosted server (public HTTPS), quota, queue, export ZIP upload + import
+fresh; run p269_a_api "$PY" p269_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p269_a_ui node p269_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.70.0 part A: a meeting becomes tasks (#1354): photos, list choice, the chat's card, part apply, freelancer
+fresh; run p270_a_api "$PY" p270_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p270_a_ui node p270_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.70.0 part B: tidy up contacts - an agent proposes duplicates, the person merges them (#1357)
+fresh; run p270_b_api "$PY" p270_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p270_b_ui node p270_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.70.0 part C: contracts in view (#1359): contract_notice, the proposal kind notice, health lists and the journal stay closed
+fresh; run p270_c_api "$PY" p270_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p270_c_ui node p270_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.71.0 part B: a task in several lists without a copy (#1459)
+fresh; run p271_b_api "$PY" p271_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p271_b_ui node p271_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.71.0 part A: rules of a list (When ... then ...), run as their creator, agents propose (#1457)
+fresh; run p271_a_api "$PY" p271_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p271_a_ui node p271_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.72.0 part A: #1333 the household budget (server), own container with KALMIDO_SECRET_KEY
+fresh; run p272_a_budget_api "$PY" p272_a_budget_api_test.py "$KALMIDO_TEST_DATA"
+# 2.72.0 part B: the household budget in the app (#1333)
+fresh; run p272_b_budget_ui node p272_b_budget_ui.js "$KALMIDO_TEST_DATA"
+# 2.73.0 part A: several Kalmido servers in one app (#661): server accounts, connection code, the other server's API (the
+# test server connects to itself; a misbehaving stub server inside the container), SSRF guard, hosted = https only
+fresh; run p273_a_api "$PY" p273_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p273_a_ui node p273_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.73.0 part C: several servers in one app, the merged view (#661)
+fresh; run p273_c_ui node p273_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.73.0 release: part A's server routes with part C's merged view (#661), the test server as "the other server"
+fresh; run p273_l_ui node p273_l_ui.js "$KALMIDO_TEST_DATA"
+# 2.73.0 part B: moving an account -- account export + import with the mapping of people (#1473)
+fresh; run p273_b_api "$PY" p273_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p273_b_ui node p273_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.74.0 part A: the supporter licence (#338; own key pair in a temp folder, a hosted restart)
+fresh; run p274_a_api "$PY" p274_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p274_a_ui node p274_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.74.0 part B (#1653): Office & finance in the browser demo (client, service, quotation, invoice, payments, sums / VAT like the
+# server, the print view instead of the PDF, no network) (no container)
+fresh; run p274_b_demo node p274_b_demo_test.js
+# 2.75.0 part A: built-in assistant (#1411)
+fresh; run p275_a_api "$PY" p275_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.75.0 part B: assistant UI (#1411)
+fresh; run p275_b_ui node p275_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.76.0 part A: the pack catalogue (fake catalogue in the container, install / update / uninstall per office area)
+fresh; run p276_a_packs_api "$PY" p276_a_packs_api_test.py "$KALMIDO_TEST_DATA"
+# 2.76.0 part B: Office settings > Packs: catalogue search, badges, install / uninstall, undo (#1023)
+fresh; run p276_b_ui node p276_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.78.0: "Duplicate list" - the copy with sections, tasks, dates, notepads; done optional; who may; REST API (#1881)
+fresh; run p278_dup_api "$PY" p278_dup_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p278_dup_ui node p278_dup_ui.js "$KALMIDO_TEST_DATA"
+# 2.79.0: security fixes of audit #476 part 1 (H1 ICS attendees, M1 app passwords, M2 admin scopes, M4 link lock, M5 child accounts, M6 health time, M8 backup folders, M9 proxy default)
+fresh; run p279_sec_api "$PY" p279_sec_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

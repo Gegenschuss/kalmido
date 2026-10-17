@@ -5,7 +5,7 @@ const OX = {timer: 0};
 function oxBoxHtml(o) {
   return `<div class="oxbox" data-oxorg="${o.id}"><h5>${tr('Export the organisation')}</h5>
     <div class="shint">${tr('An encrypted archive with the organisation’s lists, tasks, comments, files, calendars, address books, office documents and members with their roles. Not in it: the members’ private lists, other organisations, passwords and access keys.')}</div>
-    <div class="shint">${tr('To open it you need the organisation’s recovery key (section Encryption) and the tool kalmido_export_decrypt.py, see SELF-HOSTING.md. The file is kept for 24 hours. Importing comes later.')}</div>
+    <div class="shint">${tr('To open it you need the organisation’s recovery key (section Encryption) and the tool kalmido_export_decrypt.py, see SELF-HOSTING.md. The file is kept for 24 hours. On another Kalmido server an admin of an organisation takes it over under Settings > Data.')}</div>
     <div class="oxst" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div></div>`;
 }
 function oxStateHtml(j) {

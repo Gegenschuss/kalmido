@@ -1,6 +1,9 @@
 """2.48.0 (#1152): the Paperless-ngx connection of a workspace and the import of its documents into the Kalmido documents.
 
-Self-hosted servers only (a hosted server answers 404 and the app shows nothing). One connection per workspace: an
+2.69.0 A (#1846): also on a hosted server (KALMIDO_HOSTED=1): there only public HTTPS addresses (the admin's list of allowed
+internal hosts does not apply), the storage quota is checked before and during the import, and one import runs per server at
+a time (the others wait in a queue, URL and ZIP runs alike; zipimp.py = the import of an uploaded document_exporter ZIP).
+One connection per workspace: an
 organisation's admins set it up for the organisation, a person for their own space (a freelancer without an organisation
 is their own admin, #1348). The documents go into the documents area of exactly that workspace (docs_ingest), never into
 another one. Only Paperless-ngx -> Kalmido: Kalmido only reads (GET), it never writes or deletes anything in Paperless-ngx.
@@ -57,6 +60,7 @@ PL_ERR = {"key": N_("The API token is not set (or the server key changed): enter
           "too_large": N_("The file is larger than {0} MB"),
           "owner": N_("The person who set up the connection can no longer import here"),
           "quota": N_("The storage space is full: the import stopped"),
+          "public_https": N_("In hosted operation only public HTTPS addresses work"),  # 2.69.0 A (#1846)
           "failed": N_("The import stopped because of an error")}
 
 
@@ -95,8 +99,9 @@ def pl_norm_url(u):
     if not isinstance(u, str):  # 2.48.0 review (L6): null / a number -> 400, not 500
         return None
     try:
+        from ..admin.hosting import hosted
         u = cal_norm_url(u)
-        if not u or not u.lower().startswith(("http://", "https://")):
+        if not u or not u.lower().startswith(("https://",) if hosted() else ("http://", "https://")):  # 2.69.0 A (#1846): hosted = HTTPS only
             return None
         p = urllib.parse.urlsplit(u)
         p.port  # noqa: B018 -- raises ValueError on a bad port
@@ -164,7 +169,9 @@ def pl_token(c, r):
 
 def pl_mapping(c, r):
     m = S._jopen(c, r["ws"], "pl_sources.mapping", r["mapping"], {}) if r and r["mapping"] else {}
-    return {k: (m.get(k) if isinstance(m.get(k), dict) else {}) for k in ("tags", "senders", "types")}
+    out = {k: (m.get(k) if isinstance(m.get(k), dict) else {}) for k in ("tags", "senders", "types")}
+    out["rules"] = m.get("rules", True) is not False  # 2.69.0 B (#1847): take over Paperless' matching rules
+    return out
 
 
 # ---- HTTP ---------------------------------------------------------------------------------------------------------------
@@ -194,11 +201,14 @@ def pl_get(c, url, token, path, raw=False, limit=PL_JSON_MAX):
 
 
 def _pl_get1(c, url, token, path, ver, raw, limit):
-    from ..calendars.subscriptions import _cal_opener, cal_allow, CalError
+    from ..calendars.subscriptions import _cal_opener, CalError
+    allow = plh_allow(c, url)
+    if allow is None:  # 2.69.0 A (#1846): a stored http:// address on a server that is hosted now
+        raise PlError("public_https")
     hdr = {"Authorization": f"Token {token}", "Accept": "*/*" if raw else f"application/json; version={ver}"}
     req = urllib.request.Request(url + path, headers=hdr, method="GET")
     try:
-        with _cal_opener(cal_allow(c)).open(req, timeout=PL_TIMEOUT) as resp:
+        with _cal_opener(allow).open(req, timeout=PL_TIMEOUT) as resp:
             if not raw and resp.headers.get("Content-Length", "").isdigit() and int(resp.headers["Content-Length"]) > limit:
                 raise PlError("answer")
             data = resp.read(limit + 1)
@@ -217,13 +227,29 @@ def _pl_get1(c, url, token, path, ver, raw, limit):
         e.close()
         raise PlError("auth" if e.code in (401, 403) else "redirect" if 300 <= e.code < 400 else "http", e.code) from None
     except urllib.error.URLError as e:
-        raise PlError(e.reason.code if isinstance(e.reason, CalError) else "network") from None
+        raise PlError(plh_code(e.reason.code) if isinstance(e.reason, CalError) else "network") from None
     except CalError as e:
-        raise PlError(e.code) from None
+        raise PlError(plh_code(e.code)) from None
     except PlError:
         raise
     except (OSError, ValueError):
         raise PlError("network") from None
+
+
+def plh_allow(c, url=None):
+    """2.69.0 A (#1846): the internal hosts Paperless-ngx may be on: the admin's list on a self-hosted server, none on a hosted
+    one (public addresses only, like the integrations of #905). None = this address may not be used at all (hosted + http)."""
+    from ..admin.hosting import hosted
+    from ..calendars.subscriptions import cal_allow
+    if not hosted():
+        return cal_allow(c)
+    return frozenset() if url is None or str(url).lower().startswith("https://") else None
+
+
+def plh_code(code):
+    """A blocked (internal) address on a hosted server: the hint names public HTTPS, not the admin's list (which does not apply)."""
+    from ..admin.hosting import hosted
+    return "public_https" if code == "blocked" and hosted() else code
 
 
 def pl_check(c, url, token):
@@ -235,7 +261,8 @@ def pl_check(c, url, token):
 
 
 def pl_labels(c, url, token, kind):
-    """All tags / correspondents / document_types: [{id, name, count}]."""
+    """All tags / correspondents / document_types: [{id, name, count, match, algo, insens}] (2.69.0 B (#1847): + the matching:
+    pattern, matching_algorithm, is_insensitive -- see learn.py)."""
     out, page = [], 1
     while page <= PL_LABEL_PAGES:
         j = pl_get(c, url, token, f"/api/{kind}/?page_size=100&page={page}")
@@ -244,11 +271,19 @@ def pl_labels(c, url, token, kind):
         for x in j["results"]:
             if isinstance(x, dict) and isinstance(x.get("id"), int):
                 out.append({"id": x["id"], "name": str(x.get("name") or "")[:S.NAME_MAX],
-                            "count": int(x.get("document_count") or 0) if str(x.get("document_count") or "0").isdigit() else 0})
+                            "count": int(x.get("document_count") or 0) if str(x.get("document_count") or "0").isdigit() else 0,
+                            **pl_label_match(x)})
         if not j.get("next"):
             break
         page += 1
     return out
+
+
+def pl_label_match(x):
+    """2.69.0 B (#1847): {match, algo, insens} of a Paperless-ngx label (API answer or export record)."""
+    algo = x.get("matching_algorithm")
+    return {"match": str(x.get("match") or "")[:1000], "algo": algo if isinstance(algo, int) and not isinstance(algo, bool) else 0,
+            "insens": x.get("is_insensitive") is not False}
 
 
 def pl_fields(c, url, token):
@@ -311,14 +346,18 @@ def pl_preview(c, r):
             else:
                 rows.append({**x, "to": "skip" if m == "" else "keep", "target": (m if isinstance(m, str) and m else x["name"])[:S.NAME_MAX]})
         out[key] = rows
+    from .learn import pll_rules_preview  # 2.69.0 B (#1847): which matching rules come along
+    out["rules"] = pll_rules_preview({k: out[key] for k, key in (("tags", "tags"), ("correspondents", "senders"), ("document_types", "types"))},
+                                     mp, c, r["ws"], pl_src(url))
     return out
 
 
 def pl_clean_mapping(d):
     """{tags: {id: {to, name}}, senders: {id: name|''}, types: {id: name|''}} from the app (unknown parts dropped)."""
-    out = {"tags": {}, "senders": {}, "types": {}}
+    out = {"tags": {}, "senders": {}, "types": {}, "rules": True}
     if not isinstance(d, dict):
         return out
+    out["rules"] = d.get("rules") is not False  # 2.69.0 B (#1847)
     for k, v in (d.get("tags") or {}).items() if isinstance(d.get("tags"), dict) else ():
         if str(k).isdigit() and isinstance(v, dict) and v.get("to") in ("tag", "folder", "skip"):
             out["tags"][str(k)] = {"to": v["to"], "name": str(v.get("name") or "").strip()[:S.NAME_MAX]}
@@ -365,12 +404,20 @@ def _day(v):
 
 def pl_import_doc(c, r, uid, tok, doc, labels, fields):
     """One Paperless document into the documents of r's workspace. Returns 'new' | 'skip' | 'dup'. Raises PlError."""
-    from ..docs.ingest import docs_ingest
     ws, src, pid = r["ws"], pl_src(r["url"]), int(doc["id"])
     if c.execute("SELECT 1 FROM pl_imported WHERE ws=? AND src=? AND pl_id=?", (ws, src, pid)).fetchone():
         return "skip"
     data, mime, fname = pl_get(c, r["url"], tok, f"/api/documents/{pid}/download/?original=true", raw=True,
                                limit=MAX_FILE_MB * 1024 * 1024)
+    return plh_store(c, r, uid, src, doc, data, mime, fname, labels, lambda: _doc_text(doc, _notes(c, r, tok, doc), fields))
+
+
+def plh_store(c, r, uid, src, doc, data, mime, fname, labels, text):
+    """2.69.0 A (#1846): file the bytes of one Paperless document (fetched over the API or read from an export ZIP) into r's
+    workspace: the same file already there = 'dup', else the mapping of r (tags / folder / sender / type) and docs_ingest =
+    'new'; either way one pl_imported row (ws, src, pl_id). text() = the document's text (only asked for a new one)."""
+    from ..docs.ingest import docs_ingest
+    ws, pid = r["ws"], int(doc["id"])
     sha = hashlib.sha256(data).hexdigest()
     asn = doc.get("archive_serial_number") if isinstance(doc.get("archive_serial_number"), int) else None
     same = c.execute("SELECT node_id FROM pl_imported WHERE ws=? AND sha256=? AND node_id IS NOT NULL LIMIT 1", (ws, sha)).fetchone() or \
@@ -391,8 +438,7 @@ def pl_import_doc(c, r, uid, tok, doc, labels, fields):
             folder = folder or name
         elif name not in tags:
             tags.append(name)
-    meta = {"ext_id": f"pl:{src}:{pid}", "date": _day(doc.get("created") or doc.get("created_date")), "tags": tags,
-            "text": _doc_text(doc, _notes(c, r, tok, doc), fields)}
+    meta = {"ext_id": f"pl:{src}:{pid}", "date": _day(doc.get("created") or doc.get("created_date")), "tags": tags, "text": text()}
     for key, kind, field in (("senders", "correspondents", "correspondent"), ("types", "document_types", "document_type")):
         lid = doc.get(field)
         if isinstance(lid, int):
@@ -454,8 +500,10 @@ def pl_run(c, sid):
         return
     tok = pl_token(c, r)
     counts = {"new": 0, "skip": 0, "dup": 0, "fail": 0, "done": 0}
+    since, full = _now(), None  # 2.69.0 B (#1847): learn.py takes the documents of this run at its end
     try:
-        labels = {k: {x["id"]: x["name"] for x in pl_labels(c, r["url"], tok, k)} for k in ("tags", "correspondents", "document_types")}
+        full = {k: pl_labels(c, r["url"], tok, k) for k in ("tags", "correspondents", "document_types")}
+        labels = {k: {x["id"]: x["name"] for x in full[k]} for k in full}
         fields = pl_fields(c, r["url"], tok)
         order = "id" if r["run_kind"] == "all" else "-id"
         page, stop = 1, False
@@ -500,11 +548,22 @@ def pl_run(c, sid):
     except PlError as e:
         c.rollback()
         _set(c, sid, run_state="", run_error=e.stored(), error=e.stored(), synced_at=_now())
+    if full is not None:  # 2.69.0 B (#1847): rules + learning once per run, also after a stop / a full storage
+        from .learn import pll_finish
+        res = pll_finish(c, r["ws"], r["org_id"], uid, pl_src(r["url"]), since, full, pl_mapping(c, r))
+        if r["run_kind"] == "all":  # the app shows the summary of a full import; a follow-up run keeps it
+            from .learn import pll_stored
+            _set(c, sid, run_learn=pll_stored(res))
     c.commit()
 
 
 def pl_claim(c):
-    """The id of a connection whose run this process takes now (queued, a run cut off, a follow that is due), or None."""
+    """The run this process takes now (queued, a run cut off, a follow that is due): ('url', pl_sources.id) | ('zip',
+    pl_uploads.id), or None. 2.69.0 A (#1846): one import per server at a time -- across all processes (the advisory lock
+    serializes the claim, a fresh busy / stop run of either table blocks it); the others wait in the order they were queued
+    (run_beat), a run cut off (no heartbeat for PL_STALE minutes) goes back to the queue and never blocks it for good."""
+    from ..core.pg import write_lock
+    from .zipimp import plh_sweep
     stale = iso(now_utc() - timedelta(minutes=PL_STALE))
     c.execute("UPDATE pl_sources SET run_state='queued' WHERE run_state='busy' AND (run_beat IS NULL OR run_beat < ?)", (stale,))
     c.execute("UPDATE pl_sources SET run_state='' WHERE run_state='stop' AND (run_beat IS NULL OR run_beat < ?)", (stale,))
@@ -513,19 +572,47 @@ def pl_claim(c):
         if not last or now_utc() - last >= timedelta(minutes=int(r["every_min"] or 15)):
             c.execute("UPDATE pl_sources SET run_state='queued', run_kind='new', run_by=?, run_total=0, run_done=0, run_new=0, run_skip=0, "
                       "run_fail=0, run_error='', run_beat=? WHERE id=? AND run_state=''", (r["created_by"], _now(), r["id"]))
-    x = c.execute("""UPDATE pl_sources SET run_state='busy', run_beat=? WHERE id=(SELECT id FROM pl_sources WHERE run_state='queued'
-                     ORDER BY run_beat, id LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING id""", (_now(),)).fetchone()
+    plh_sweep(c, stale)
     c.commit()
-    return x[0] if x else None
+    write_lock(c, "paperless-queue")
+    if c.execute("SELECT 1 FROM pl_sources WHERE run_state IN ('busy','stop') UNION ALL "
+                 "SELECT 1 FROM pl_uploads WHERE run_state IN ('busy','stop') LIMIT 1").fetchone():
+        c.commit()
+        return None
+    x = c.execute("""SELECT 'url' AS k, id, run_beat FROM pl_sources WHERE run_state='queued' UNION ALL
+                     SELECT 'zip' AS k, id, run_beat FROM pl_uploads WHERE run_state='queued' ORDER BY run_beat, k, id LIMIT 1""").fetchone()
+    if x:
+        c.execute(f"UPDATE {'pl_sources' if x['k'] == 'url' else 'pl_uploads'} SET run_state='busy', run_beat=? WHERE id=?", (_now(), x["id"]))
+    c.commit()
+    return (x["k"], x["id"]) if x else None
+
+
+def plh_queue_place(c, table, rid):
+    """2.69.0 A (#1846): the place of a waiting run in the server's queue (1 = next), None when it does not wait."""
+    from ..core.pg import system_ctx
+    r = c.execute(f"SELECT run_state, run_beat FROM {table} WHERE id=?", (rid,)).fetchone()
+    if not r or r["run_state"] != "queued":
+        return None
+    with system_ctx(c):  # the queue spans every workspace of the server: only a count of the runs ahead, nothing of them
+        b = r["run_beat"] or ""
+        ahead = sum(c.execute(f"SELECT COUNT(*) FROM {t} WHERE run_state='queued' AND COALESCE(run_beat,'') < ?", (b,)).fetchone()[0]
+                    for t in ("pl_sources", "pl_uploads"))
+        ahead += c.execute(f"SELECT COUNT(*) FROM {table} WHERE run_state='queued' AND COALESCE(run_beat,'') = ? AND id < ?", (b, rid)).fetchone()[0]
+    return int(ahead or 0) + 1
 
 
 def pl_run_once():
     c = connect()
     try:
         with system_ctx(c):  # paperless worker: the import of every workspace's connection; the right of run_by is checked in pl_run
-            sid = pl_claim(c)
-            if not sid:
+            x = pl_claim(c)
+            if not x:
                 return 0
+            kind, sid = x
+            if kind == "zip":  # 2.69.0 A (#1846): an uploaded export (it never raises)
+                from .zipimp import plh_zip_run
+                plh_zip_run(c, sid)
+                return 1
             try:
                 pl_run(c, sid)
             except Exception as e:  # noqa: BLE001 -- the worker never dies on one run
@@ -564,6 +651,5 @@ def pl_kick():
 
 @app.before_request
 def _pl_start():
-    from ..admin.hosting import hosted
-    if _W["thread"] is None and not hosted():
+    if _W["thread"] is None:  # 2.69.0 A (#1846): also on a hosted server
         pl_kick()

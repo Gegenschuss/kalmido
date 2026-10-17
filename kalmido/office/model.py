@@ -60,7 +60,10 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "datev_extf": {},
                      # 2.51.0 A (#1348): agents may read office data (clients, prices) -- they go to the agent's AI model; off by
                      # default, needed together with the agent's own switch "may draft office documents" (office/agentdocs.py)
-                     "agents_read": 0}
+                     "agents_read": 0,
+                     # 2.67.0 A (#1838): the monthly task "Cash flow: check the actual state" (set only by its own route,
+                     # office/fixedimport.py): on, the person it goes to, the id of the task
+                     "cf_check": 0, "cf_check_user": None, "cf_check_task": None}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -205,6 +208,8 @@ def office_settings(c, oid):
                 out[k].update(d[k])
             else:
                 out[k] = d[k]
+    from .catalog import pkc_bind
+    pkc_bind(c, oid)  # 2.76.0 (#1023): office_pack / dk_pack resolve the packs installed in this office area from here on
     pack = office_pack(out["pack"]) or office_pack("DE")
     if pack:
         out["currency"] = out["currency"] or pack["currency"]

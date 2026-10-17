@@ -275,7 +275,8 @@ def list_create():
     # 2.2.1 (#359): dep_shift ("Move dependent tasks along") is taken at creation too (before, only PATCH set it)
     cur_id = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets,org_id,time_tracking) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
-                     clean_list_value("dep_shift", b.get("dep_shift")), clean_list_value("tickets", b.get("tickets")), oid,
+                     # 2.67.0 B (#1865): "Move dependent tasks along" is on by default in a new project list
+                     clean_list_value("dep_shift", b["dep_shift"] if "dep_shift" in b else kind == "project"), clean_list_value("tickets", b.get("tickets")), oid,
                      clean_list_value("time_tracking", b.get("time_tracking"))))
     list_created(c, uid, cur_id)  # 2.4.2 (#391) agents, 2.10.0 (#441) groups, 2.22.0 (#740) / 2.25.0 (#931) folder people
     bump(c)
@@ -415,6 +416,9 @@ def list_update(lid):
     vals = {k: clean_list_value(k, b[k], member=role != "owner") for k in LIST_FIELDS if k in b}  # BadInput: 400
     if b.get("kind") == "checklist" and "checklist" not in vals:  # deprecated alias: a plain list with the option on
         vals["checklist"] = 1
+    if vals.get("family") or vals.get("life"):  # 2.64.1 review (M3): their generators write plain texts -> not with the lock
+        from ..collab.liste2e import le2a_gen_refuse
+        le2a_gen_refuse(c, lid)
     if role == "owner":
         if vals.get("family") or vals.get("life"):  # 2.28.0 (#935): "Used for" / Home & life make the list private (409 with an organisation agent in it)
             from ..accounts.orgs import ws_private_for
@@ -427,7 +431,7 @@ def list_update(lid):
                 c.execute(f"UPDATE lists SET {k}=? WHERE id=?", (vals[k], lid))
         if "time_tracking" in vals:  # 2.41.0 (#1471): set on its own: differs from its folder's default from now on
             list_own_mark(c, lid, "time_tracking")
-        if vals.get("life") == "health":  # 2.22.0 (#663): a health list is never shared with an agent
+        if vals.get("life") in ("health", "budget"):  # 2.22.0 (#663): a health list is never shared with an agent (2.72.0: a budget)
             c.execute("DELETE FROM list_members WHERE list_id=? AND user_id IN (SELECT id FROM users WHERE kind='agent')", (lid,))
         # 2.22.0 (#747): a list that becomes a shopping list gets no shop areas by itself any more ("Add shop areas")
         if "rate" in b:  # hourly rate for the time reports (None / '' = none)
@@ -591,10 +595,16 @@ def list_purge(c, lid, inbox):
     owner's) so they stay restorable. Returns (icon, list file paths) to drop after the caller committed (list_icon_drop_file,
     list_files_drop). 2.35.0 (#1101): shared by the owner's delete and an organisation admin's."""
     ts = iso(now_utc())
+    from ..collab.liste2e import le2e_mode
+    tfiles = []
+    if le2e_mode(c, lid):  # 2.64.1 (#1817): ciphertexts go with the list and its keys (no trash: nobody could read them there)
+        from ..tasks.tasks import hard_delete
+        tfiles = hard_delete(c, [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))], lists={lid})
     c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at,?), list_id=?, section_id=NULL, assignee_id=NULL WHERE list_id=?",
               (ts, inbox, lid))
     icon = c.execute("SELECT icon FROM lists WHERE id=?", (lid,)).fetchone()[0]
-    lfiles = [r[0] for r in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))]  # 2.7.1 (#410)
+    lfiles = [r[0] for r in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))] + tfiles  # 2.7.1 (#410)
+    lfiles += [r[0] for r in c.execute("SELECT path FROM budget_files WHERE list_id=?", (lid,))]  # 2.72.0 (#1333): receipts
     from ..integrations.gitfolder import gf_before_list_delete
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository hanging on it moves to another list of its folder
     c.execute("DELETE FROM lists WHERE id=?", (lid,))
@@ -630,6 +640,9 @@ def member_set(lid):
     if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone() and \
             c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone():  # 2.22.0 (#663)
         return err(tr("A health list is private: it cannot be shared with an agent"), 409)
+    if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone() and \
+            c.execute("SELECT 1 FROM lists WHERE id=? AND life='budget'", (lid,)).fetchone():  # 2.72.0 (#1333)
+        return err(tr("A budget is private: it cannot be shared with an agent"), 409)
     try:
         uid = int(b.get("user_id") or 0)
     except (TypeError, ValueError):
@@ -653,6 +666,10 @@ def member_set(lid):
         return err(tr("unknown user"), 404)
     if uid == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The owner's role cannot be changed"), 403)
+    from ..collab.liste2eguard import le2b_agent_problem
+    p = le2b_agent_problem(c, lid, uid)  # 2.64.1 review: the lock's own code first (ws_check_member below says the same without it)
+    if p:
+        return jsonify(error=p, code="list_e2e_member"), 409
     from ..accounts.orgs import ws_check_member
     ws_check_member(c, lid, uid)  # 2.28.0 (#935): an organisation's list only inside it, agents only in their workspace (409)
     if not (b.get("email") and not b.get("user_id")):  # 2.30.0 (#919): no agent bridge between lists with different people
@@ -662,6 +679,10 @@ def member_set(lid):
         role = "participant"
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
     old = c.execute("SELECT role, grole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
+    from ..collab.liste2e import le2a_member_problem
+    p = le2a_member_problem(c, lid, uid, role_max(role, old["grole"]) if old else role)  # 2.64.1 (#1817): no agents / participants
+    if p:
+        return jsonify(error=p, code="list_e2e_member"), 409
     if old:  # 2.10.0 (#441): the personal role; the effective one is the higher of it and the role via groups
         eff = role_max(role, old["grole"])
         c.execute("UPDATE list_members SET role=?, own_role=? WHERE list_id=? AND user_id=?", (eff, role, lid, uid))
@@ -682,9 +703,10 @@ def member_set(lid):
         if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone():
             from ..admin.hosting import agent_joined_notice
             agent_joined_notice(c, lid, uid, me())  # 2.24.0 (#896)
+    pend = [r[0] for r in c.execute("SELECT user_id FROM list_key_pending WHERE list_id=? AND user_id=?", (lid, uid))]  # 2.64.1 (#1817)
     bump(c)
     c.commit()
-    return jsonify(ok=True, **({"by_email": True} if b.get("email") and not b.get("user_id") else {}))
+    return jsonify(ok=True, **({"by_email": True} if b.get("email") and not b.get("user_id") else {}), **({"e2e_pending": pend} if pend else {}))
 
 
 # ---- 2.22.0 (#740): a shared list lands with the other person in a folder of the same name as with its owner (created
@@ -712,7 +734,7 @@ def _folder_member_add(c, lid, uid, role, actor):
     from ..agents.core import is_agent
     u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
     l = c.execute("SELECT name, life, is_inbox, owner_id FROM lists WHERE id=?", (lid,)).fetchone()
-    if not u or not l or l["is_inbox"] or l["owner_id"] == uid or (is_agent(u) and l["life"] == "health"):
+    if not u or not l or l["is_inbox"] or l["owner_id"] == uid or (is_agent(u) and l["life"] in ("health", "budget")):
         return False
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone():
         return False
@@ -728,6 +750,9 @@ def _folder_member_add(c, lid, uid, role, actor):
     role = "participant" if is_kid(c, uid) else role
     if role == "admin" and is_agent(u):  # 2.29.0: an agent is never a list admin (as in member_set)
         role = "edit"
+    from ..collab.liste2e import le2a_member_problem
+    if le2a_member_problem(c, lid, uid, role):  # 2.64.1 (#1817): a list with the lock is skipped (agents, participants)
+        return False
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
               (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc())))
     member_folder_adopt(c, lid, uid)
@@ -830,6 +855,10 @@ def folder_people_put():
     from ..agents.core import is_agent
     if role == "admin" and is_agent(c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()):
         return err(tr("An agent cannot be a list admin"))
+    from ..collab.liste2e import le2a_folder_problem
+    p = le2a_folder_problem(c, me(), f, role, uid)  # 2.64.1 (#1817): no participants in lists with the lock
+    if p:
+        return jsonify(error=p, code="list_e2e_member"), 409
     prev = c.execute("SELECT role FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid)).fetchone()
     c.execute("INSERT INTO folder_people(owner_id,folder,user_id,role,created_at) VALUES(?,?,?,?,?) ON CONFLICT(owner_id,folder,user_id) "
               "DO UPDATE SET role=excluded.role", (me(), f, uid, role, iso(now_utc())))
@@ -929,7 +958,7 @@ def agent_share_add(c, lid, aid, actor):
     from ..core.access import list_other_agent
     from ..accounts.orgs import ws_member_problem
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone() or \
-            c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone() or \
+            c.execute("SELECT 1 FROM lists WHERE id=? AND life IN ('health', 'budget')", (lid,)).fetchone() or \
             list_other_agent(c, lid, aid) or ws_member_problem(c, lid, aid):  # 2.22.0 (#663) health; 2.26.0: one agent per list; 2.28.0: workspace
         return False
     from ..agents.safety import bridge_blocks
@@ -1004,6 +1033,9 @@ def list_agent_set(lid):
     new = b.get("agent_id")
     if new is not None and (isinstance(new, bool) or not isinstance(new, int) or new not in agent_ids(c)):
         return err(tr("Invalid value: {0}", "agent_id"))
+    from ..collab.liste2eguard import le2b_agent_problem
+    if new is not None and le2b_agent_problem(c, lid, new):  # 2.64.1 B (#1817): no agent in a list with the lock
+        return err(le2b_agent_problem(c, lid, new), 409)
     lr = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
     if lr["owner_id"] in agent_ids(c):
         return err(tr("The list belongs to an agent"), 409)
@@ -1111,7 +1143,9 @@ def member_remove(lid, uid):
     mr = c.execute("SELECT grole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
     if not mr:
         return err(tr("unknown"), 404)
-    if mr["grole"]:  # 2.10.0 (#441): access via a group stays; only the personal share goes
+    from ..collab.liste2e import le2e_mode
+    if mr["grole"] and not (mr["grole"] == "participant" and le2e_mode(c, lid)):  # 2.10.0 (#441): access via a group stays; only the personal share goes
+        # 2.64.1 (#1817): not as a participant in a list with the lock (the person leaves it)
         c.execute("UPDATE list_members SET own_role=NULL, role=grole WHERE list_id=? AND user_id=?", (lid, uid))
         bump(c)
         c.commit()

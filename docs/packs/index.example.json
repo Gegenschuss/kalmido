@@ -1,0 +1,57 @@
+{
+ "format": 1,
+ "name": "Kalmido packs",
+ "updated": "2026-10-17",
+ "packs": [
+  {
+   "kind": "country",
+   "code": "DE",
+   "name": {
+    "de": "Deutschland",
+    "en": "Germany"
+   },
+   "description": {
+    "de": "Umsatzsteuer 19 % / 7 %, deutsche Formate und Textbausteine für Angebote und Rechnungen.",
+    "en": "VAT 19 % / 7 %, German formats and text blocks for quotations and invoices."
+   },
+   "author": "Kalmido",
+   "license": "CC0-1.0",
+   "verified": true,
+   "versions": [
+    {
+     "version": 1,
+     "url": "https://example.com/kalmido-packs/country/de.json",
+     "sha256": "11aa38adbf87835e38a050a79019f90b378774eae95325f8a8191c9484f704d2",
+     "size": 12969,
+     "released": "2026-10-17",
+     "min_app": "2.76.0"
+    }
+   ]
+  },
+  {
+   "kind": "industry",
+   "code": "film",
+   "name": {
+    "de": "Film & Video",
+    "en": "Film & Video"
+   },
+   "description": {
+    "de": "Drehkalkulation für Film und Video: Team, Technik, Reise, Produktion.",
+    "en": "Shoot calculation for film and video: crew, equipment, travel, producing."
+   },
+   "author": "Kalmido",
+   "license": "CC0-1.0",
+   "verified": true,
+   "versions": [
+    {
+     "version": 1,
+     "url": "https://example.com/kalmido-packs/industry/film.json",
+     "sha256": "15c96c60062254469d611f0ad75d29077905c54e4764ba65c57899990b55ff9f",
+     "size": 3534,
+     "released": "2026-10-17",
+     "min_app": "2.76.0"
+    }
+   ]
+  }
+ ]
+}

@@ -455,10 +455,15 @@ def _cap(s):
     return s
 
 
-def atts_resolve(c, uid, raw):
+def atts_resolve(c, uid, raw, eid=None):
     """The ATTENDEE lines of a client -> attendee rows: a person of this server (by X-KALMIDO-USER / urn / e-mail),
-    a contact the writer sees (by e-mail) or the address."""
+    a contact the writer sees (by e-mail) or the address. A person only when the writer may see them (like att_clean,
+    #476 H1): an ICS file or a CalDAV client never invites accounts of other organisations; already invited ones stay."""
     from ..contacts.model import contact_by_email
+    from ..accounts.orgs import may_see
+    from ..agents.admin import personal_agent_foreign
+    had_u = {r[0] for r in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL",
+                                     (eid,))} if eid else set()
     out, seen = [], set()
     for a in raw[:100]:
         addr = a["addr"]
@@ -466,7 +471,8 @@ def atts_resolve(c, uid, raw):
         m = re.fullmatch(r"(?i)urn:kalmido:user:(\d{1,9})", addr)
         ku = int(a["kuser"]) if a.get("kuser") and str(a["kuser"]).isdigit() else (int(m.group(1)) if m else None)
         em = addr[7:].strip() if addr.lower().startswith("mailto:") else ""
-        if collab_all() and ku and c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (ku,)).fetchone():
+        if collab_all() and ku and c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (ku,)).fetchone() \
+                and (ku == uid or ku in had_u or (may_see(c, uid, ku) and not personal_agent_foreign(c, ku, uid))):
             row["user_id"] = ku  # by its Kalmido id only: an e-mail address never reveals or picks an account
             row["partstat"] = "needs-action"  # a person's reply is their own (att_set keeps it)
         if em and not row["user_id"] and c.execute("SELECT 1 FROM users WHERE id=? AND lower(email)=lower(?)", (uid, em)).fetchone():
@@ -496,7 +502,7 @@ def store_parsed(c, uid, cal_id, v, eid=None, href=None):
     if me_ and me_[0]:  # the writer's own address as organiser: Kalmido writes its own (no account e-mail reaches others)
         f["extra"] = "\n".join(x for x in f["extra"].split("\n")
                                if not (_prop_name(x) == "ORGANIZER" and x.split(":", 1)[-1].strip().lower() == "mailto:" + me_[0].lower()))
-    return ev_store(c, uid, cal_id, f, eid=eid, uid_=v["uid"], href=href, attendees=atts_resolve(c, uid, v["attendees_raw"]))
+    return ev_store(c, uid, cal_id, f, eid=eid, uid_=v["uid"], href=href, attendees=atts_resolve(c, uid, v["attendees_raw"], eid))
 
 
 # ---- ICS import (a file, e.g. an export of another calendar) into one calendar

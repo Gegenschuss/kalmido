@@ -142,6 +142,8 @@ def tchat_rooms(c, uid):
         else:
             l = c.execute("SELECT name, is_inbox, owner_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()
             d.update(list_id=r["list_id"], name=l["name"], members=len(tchat_list_members(c, r["list_id"])))
+            from ..collab.liste2echan import le2c_room
+            d.update(le2c_room(c, r))  # 2.64.2 C (#1817): list_e2e, gen
         out.append(d)
     out.sort(key=lambda d: (d["last_at"] or ""), reverse=True)
     return out
@@ -300,10 +302,11 @@ def tchat_messages(rid):
     from ..collab.chatsave import chat_save_of
     from ..collab.chatpins import cpin_team_list
     saved = chat_save_of(c, me(), "team", [m["id"] for m in rows])  # 2.37.0 (#1159): saved as a task by me
+    from ..collab.liste2echan import le2c_out, le2c_room  # 2.64.2 C (#1817): the lock of the list (agents / API: no ciphertext)
     return jsonify(room={"id": r["id"], "kind": r["kind"], "list_id": r["list_id"], "muted": muted, "last_read": lr, "e2e": bool(r["e2e"]),
-                         "members": [{"id": u, "name": names.get(u, "?"), "agent": u in agent_ids(c)} for u in sorted(mem)]},
-                   messages=[{**tchat_msg_dict(c, m, rx, qs), "saved_task_id": saved.get(m["id"])} for m in rows], has_more=more,
-                   users={str(k): v for k, v in names.items()}, pins=cpin_team_list(c, rid))  # 2.62.0 (#1848): also older than the page
+                         "members": [{"id": u, "name": names.get(u, "?"), "agent": u in agent_ids(c)} for u in sorted(mem)], **le2c_room(c, r)},
+                   messages=le2c_out(c, r, [{**tchat_msg_dict(c, m, rx, qs), "saved_task_id": saved.get(m["id"])} for m in rows]), has_more=more,
+                   users={str(k): v for k, v in names.items()}, pins=le2c_out(c, r, cpin_team_list(c, rid)))  # 2.62.0 (#1848): also older than the page; 2.64.2 C: the lock
 
 
 @app.post("/api/team/rooms/<int:rid>/messages")
@@ -316,7 +319,11 @@ def tchat_post(rid):
     r = need_room(c, rid)
     b = body()
     text = b.get("body")
-    enc = tchat_e2e_check(r, b)  # 2.42.0 (#909): an encrypted DM takes only ciphertext (and only it takes one)
+    if r["kind"] == "list":  # 2.64.2 C (#1817): the channel of a list with the lock takes only a ciphertext of the list key
+        from ..collab.liste2echan import le2c_check
+        enc = le2c_check(c, r, b)
+    else:
+        enc = tchat_e2e_check(r, b)  # 2.42.0 (#909): an encrypted DM takes only ciphertext (and only it takes one)
     if isinstance(enc, tuple):
         return enc
     if enc:
@@ -329,6 +336,9 @@ def tchat_post(rid):
     if tid is not None and (isinstance(tid, bool) or not isinstance(tid, int) or not task_visible(c, tid, me())):
         return err(tr("Invalid value: {0}", "task_id"))
     text, mentions = tchat_clean_mentions(c, r, text.strip()) if not enc else ("", [])
+    if enc and r["kind"] == "list":  # 2.64.2 C (#1817): the browser names the @mentioned members of an encrypted message
+        from ..collab.liste2echan import le2c_mentions
+        mentions = le2c_mentions(c, r, b)
     try:
         orig = reply_check(c, "t", b.get("reply_to"), room_id=rid)
     except BadInput as e:
@@ -459,6 +469,16 @@ def tchat_edit(mid):
         return err(tr("The message was deleted"), 409)
     b = body()
     text = b.get("body")
+    if r["kind"] == "list":  # 2.64.2 C (#1817): a channel of a list with the lock: changed by encrypting it again
+        from ..collab.liste2echan import le2c_edit
+        enc, bad = le2c_edit(c, r, m, b)
+        if bad:
+            return bad
+        if enc:
+            c.execute("UPDATE tchat_msgs SET body='', enc=?, edited_at=? WHERE id=?", (enc, iso_ms(now_utc()), mid))
+            c.commit()
+            m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
+            return jsonify(tchat_msg_dict(c, m, tchat_rx(c, [mid])))
     if m["enc"] or r["e2e"]:  # 2.42.0 (#909): an encrypted message is changed by encrypting it again (the notices never)
         from ..collab.e2e import E2E_MSG_MAX, e2e_blob, e2e_msg_parse
         if (e2e_msg_parse(m["enc"]) or {}).get("sys") or not m["enc"]:

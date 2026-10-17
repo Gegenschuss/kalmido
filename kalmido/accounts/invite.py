@@ -166,7 +166,10 @@ def _lookup(c, tok, kinds=("invite", "reset", "signup")):
 
 
 def _limited():
-    keys = _rate_keys("invite", pre="inv:")
+    # 2.79.0 (#476 M4): per address only. The ceiling "uall:" (meant for one user name hit from many addresses) would be one
+    # key for every link of the server here: ~100 wrong tokens from a few addresses locked everybody out of invitations,
+    # password links, sign-ups and sign-in links. The tokens themselves (256 bits) cannot be guessed anyway.
+    keys = [k for k in _rate_keys("invite", pre="inv:") if not k[0].startswith("inv:uall:")]
     if _rate_blocked(keys):
         return keys, err(tr("Too many attempts, please wait a few minutes"), 429)
     return keys, None

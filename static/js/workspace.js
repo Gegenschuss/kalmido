@@ -102,6 +102,6 @@ function wsMoveMenu(anchor, cur, fn) {
 // 2.28.0 (#985): a small robot on an agent's picture wherever people appear; a tooltip for everyone, the text for screen readers
 const botBadge = () => `<i class="abot-b" title="${esc(tr('Agent'))}" role="img" aria-label="${esc(tr('Agent'))}">${ic('bot', 's')}</i>`;
 // 2.28.0 (#987): the bell counts only what PEOPLE send me: mentions, assignments, replies, decisions + unread direct messages
-const bellCount = () => (S.news?.unread_me || 0) + (S.team?.dm_unread || 0);
+const bellCount = () => (S.news?.unread_me || 0) + (S.team?.dm_unread || 0) + (typeof msvvUnread === 'function' ? msvvUnread() : 0);  // 2.73.0 C (#661): + other servers
 const newsForMe = it => !!it.to_me;
 const newsInWs = it => wsCur() === 'all' || !it.list_id || inWs(listById(it.list_id));

@@ -70,6 +70,7 @@ function rt9_qaHint(input) {
     const seq = ++RT9.qseq;
     let lid = r.list_id || null;
     try { lid = lid || quickDefaults().list_id || null; } catch { /* no defaults here */ }
+    if (lid && typeof le2eMode === 'function' && le2eMode(lid)) return;  // 2.64.1 (#1817): a title for a list with the lock never goes to the server
     let j; try { j = await rawFetch('POST', '/api/tasks/similar', {title, list_id: lid}); } catch { return; }
     if (seq !== RT9.qseq || !input.isConnected || !input.value.trim()) return;
     rt9_qaShow(box, (j.items || []).slice(0, 2));

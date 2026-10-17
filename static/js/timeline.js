@@ -306,6 +306,7 @@ function tlBarMenu(el) {
     const rm = [...(canEdit(t) ? (t.blockers || []).map(b => S.tasks.get(b)).filter(Boolean).map(b => ({label: tr('No longer blocked by “{0}”', nm(b.title)), icon: 'x', fn: () => tlUnlink(id, b.id)})) : []),
       ...openTasks().filter(x => (x.blockers || []).includes(id) && canEdit(x)).map(x => ({label: tr('“{0}” is no longer blocked', nm(x.title)), icon: 'x', fn: () => tlUnlink(x.id, id)}))];
     if (rm.length) items.push('-', ...rm);
+    if (dch_canPull(t)) items.push('-', {label: tr('Pull the chain in'), icon: 'deps', fn: () => dch_pull(id)});  // 2.67.0 B (#1865)
   }
   menu(el, items);
 }
@@ -580,10 +581,12 @@ function tlApply(d, clientX) {
   const k = b.nextElementSibling;
   if (k && k.classList.contains('tl-knob')) k.style.left = (parseFloat(b.style.left) + parseFloat(b.style.width) + 11) + 'px';
   tlArrowsSoon();  // the arrows follow the bar while it is dragged
+  dch_preview(d);  // 2.67.0 B (#1865): the tasks that will move along slide with it
 }
 async function tlCommit(d) {
   const {t, mode, days, b} = d;
   b.classList.remove('drag', 'mode-l', 'mode-r', 'mode-m');
+  dch_clear(d);
   if (!days) return;
   tlDragged = true; setTimeout(() => { tlDragged = false; }, 400);
   const s0 = tlStart0(t);
@@ -594,7 +597,10 @@ async function tlCommit(d) {
   const before = snapTask(t);
   let r;
   try { r = await patchTask(t.id, {start, due}, true); } catch { render(); return; }
-  shiftUndo(before, r, tr('Date: {0}', start && start < due ? `${fmtDayAbs(start)} – ${fmtDayAbs(due)}` : dayLabel(due)));
+  const msg = tr('Date: {0}', start && start < due ? `${fmtDayAbs(start)} – ${fmtDayAbs(due)}` : dayLabel(due));
+  // 2.67.0 B (#1865): earlier: the chain stays (said in the one toast; a second toast would replace its Undo - review),
+  // "Pull the chain in" stays in the bar menu and the task panel
+  shiftUndo(before, r, dch_afterEarlier(t, t.due, due) ? [msg, tr('The waiting tasks stay where they are')].join(' · ') : msg);
 }
 // touch: hold a bar ~0.3 s, then drag. Grabbed near an end = change start / due, middle = move.
 // Held and let go without moving: the bar menu (connect, remove dependencies, open).
@@ -638,7 +644,7 @@ function tlTouchEnd(e) {
   if (!d.active) return;
   tlDragged = true; setTimeout(() => { tlDragged = false; }, 400);
   if (e && e.cancelable) e.preventDefault();  // no click after the hold (it would land on the menu's backdrop)
-  if (!d.moved || !d.days) { d.b.classList.remove('drag', 'mode-l', 'mode-r', 'mode-m'); if (!d.moved && e?.type === 'touchend') tlBarMenu(d.b); else render(); return; }
+  if (!d.moved || !d.days) { d.b.classList.remove('drag', 'mode-l', 'mode-r', 'mode-m'); dch_clear(d); if (!d.moved && e?.type === 'touchend') tlBarMenu(d.b); else render(); return; }
   tlCommit(d);
 }
 document.addEventListener('touchend', tlTouchEnd);
@@ -657,7 +663,7 @@ document.addEventListener('pointerup', e => {
   if (tlLink) { tlLinkEnd(e); return; }
   if (!tlDrag) return; const d = tlDrag; tlDrag = null;
   const nd = document.elementFromPoint?.(e.clientX, e.clientY)?.closest?.('.tl-ndhead, .tl-nd');
-  if (nd && d.t.due) { d.b.classList.remove('drag', 'mode-l', 'mode-r', 'mode-m'); tlDragged = true; setTimeout(() => { tlDragged = false; }, 400); tlUndate(d.t.id); return; }
+  if (nd && d.t.due) { d.b.classList.remove('drag', 'mode-l', 'mode-r', 'mode-m'); dch_clear(d); tlDragged = true; setTimeout(() => { tlDragged = false; }, 400); tlUndate(d.t.id); return; }
   tlCommit(d);
 });
 document.addEventListener('pointercancel', () => { if (tlLink) tlLinkEnd(null, true); });

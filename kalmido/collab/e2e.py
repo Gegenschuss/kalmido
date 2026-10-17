@@ -185,8 +185,12 @@ def e2e_pub_get(uid):
     c = db()
     mine = e2e_person()
     a, b = sorted((mine, uid))
+    from .liste2e import le2a_shares_list
+    from ..wiki.wikie2e import wke_shares_space
     if uid != mine and uid not in tchat_coworkers(c, mine) and not c.execute(
-            "SELECT 1 FROM tchat_rooms WHERE kind='dm' AND a=? AND b=?", (a, b)).fetchone():
+            "SELECT 1 FROM tchat_rooms WHERE kind='dm' AND a=? AND b=?", (a, b)).fetchone() \
+            and not le2a_shares_list(c, mine, uid) \
+            and not wke_shares_space(c, mine, uid):  # 2.64.1 (#1817, H4): also the people I share a list with; 2.64.3: or a locked knowledge space
         raise Denied(404)
     r = e2e_keys_of(c, uid)
     return jsonify(user_id=uid, pub=json.loads(r["pub"]) if r else None)
@@ -294,6 +298,9 @@ def e2e_attachment_upload(tid):
 
 def e2e_att_guard(a):
     """need_attachment(read): an encrypted file only for its uploader (people; agents never)."""
+    if "enc" in a.keys() and a["enc"] == 2:  # 2.64.2 B (#1817): a list file: every person with the list key (read right checked by the caller)
+        from .liste2efile import le2f_att_guard
+        return le2f_att_guard(a)
     if "enc" in a.keys() and a["enc"]:
         if not g.get("user") or is_agent(g.user) or a["enc_by"] != me():
             raise Denied(404)

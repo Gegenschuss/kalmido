@@ -3,6 +3,9 @@
 // in the user's language, so nothing is kept twice here.
 function pm_cryptScopeHtml(sc) {
   if (!sc || !Array.isArray(sc.encrypted)) return '';
-  const ul = (h, xs, cls) => `<div class="pmcs ${cls}"><b>${esc(h)}</b><ul>${xs.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
-  return `<div class="pmcsw">${ul(tr('Encrypted'), sc.encrypted, 'on')}${ul(tr('Not encrypted'), sc.plain || [], 'off')}</div>`;
+  const ul = (h, xs, cls, note = '') => `<div class="pmcs ${cls}"><b>${esc(h)}</b><ul>${xs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>${note ? `<small class="muted pmcsn">${esc(note)}</small>` : ''}</div>`;
+  // 2.64.1 (#1817): a third list, what the browser encrypts in lists with a lock; the plain list says it holds those apart
+  const br = typeof le2u_scopeHtml === 'function' ? le2u_scopeHtml(sc) : '';
+  const wb = typeof wkeScopeHtml === 'function' ? wkeScopeHtml() : '';  // 2.64.3 B (#1817): the encrypted knowledge spaces by name
+  return `<div class="pmcsw">${ul(tr('Encrypted'), sc.encrypted, 'on')}${br}${wb}${ul(tr('Not encrypted'), sc.plain || [], 'off', br ? sc.plain_note : '')}</div>`;
 }

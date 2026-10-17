@@ -143,7 +143,7 @@ start()
 setup()
 A = sess("alice")
 A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123"})
-# the test container's peer is the Docker bridge gateway: trusted by default (and via AUTH_TRUSTED_PROXIES of start.sh)
+# the test container's peer is the Docker bridge gateway: trusted via AUTH_TRUSTED_PROXIES of start.sh (2.79.0: no longer by default)
 for _ in range(5):
     check(login("bob", "wrong-pass", "203.0.113.7").status_code == 401, "wrong password: 401")
 check(login("bob", "password123", "203.0.113.7").status_code == 429, "5 failures of bob from 203.0.113.7: locked there")
@@ -196,6 +196,14 @@ check(login("alice", "password123", "198.51.100.99").status_code == 429, "untrus
 check("from 203.0.113.9" not in logs(), "untrusted peer: the spoofed address is not logged")
 r = login("bob", "x", None, **{"X-Forwarded-Proto": "https"})
 check("Secure" not in r.headers.get("Set-Cookie", ""), "untrusted peer: X-Forwarded-Proto ignored")
+# 2.79.0 (#476 M9): KALMIDO_TRUSTED_PROXIES not set = loopback only; the Docker bridge gateway is no longer believed by default
+start("-e AUTH_TRUSTED_PROXIES=")
+setup()
+for _ in range(5):
+    login("alice", "wrong-pass", "203.0.113.19")
+check(login("alice", "password123", "198.51.100.199").status_code == 429, "M9 default: the gateway's X-Forwarded-For is ignored (same peer = locked)")
+r = login("bob", "x", None, **{"X-Forwarded-Proto": "https"})
+check("Secure" not in r.headers.get("Set-Cookie", ""), "M9 default: X-Forwarded-Proto of the gateway ignored")
 
 # ================================================================== #441 groups
 start()

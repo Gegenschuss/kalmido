@@ -291,12 +291,14 @@ AUTH_HEADER = os.environ.get("AUTH_PROXY_HEADER", "").strip()
 AUTH_TRUSTED = _nets(os.environ.get("AUTH_TRUSTED_PROXIES", ""))
 AUTH_PROXY_PORT = os.environ.get("AUTH_PROXY_PORT", "").strip()
 # ---- 2.10.0 (#445): reverse proxies whose X-Forwarded-For / -Proto / -Host are believed (KALMIDO_TRUSTED_PROXIES:
-# comma-separated addresses or networks; default loopback + the docker bridge gateway 172.17.0.1, "none" = trust nobody).
+# comma-separated addresses or networks; default loopback only, "none" = trust nobody). 2.79.0 (#476 M9): the
+# docker bridge gateway 172.17.0.1 is no longer in the default: with a published port every client arrives from it and could
+# set X-Forwarded-For freely. A proxy in a docker network (or cloudflared on the host) is named explicitly.
 # The AUTH_TRUSTED_PROXIES peers (proxy login) are trusted proxies too. waitress' own trusted_proxy takes ONE address,
 # so the app wraps itself in waitress' proxy-header parser per peer (proxy_mw below; waitress itself clears nothing).
 # KALMIDO_TRUSTED_PROXY_COUNT: proxies in a row in front of the app (default 1: the rightmost X-Forwarded-For entry,
 # the one the proxy appended, is the client; earlier ones were sent by the client and are ignored).
-_TP_RAW = os.environ.get("KALMIDO_TRUSTED_PROXIES", "127.0.0.1,::1,172.17.0.1").strip()
+_TP_RAW = os.environ.get("KALMIDO_TRUSTED_PROXIES", "127.0.0.1,::1").strip()
 TRUSTED_PROXIES = ([] if _TP_RAW.lower() in ("none", "off", "0") else _nets(_TP_RAW)) + AUTH_TRUSTED
 try:
     TRUSTED_PROXY_COUNT = max(1, min(5, int(os.environ.get("KALMIDO_TRUSTED_PROXY_COUNT", "1"))))

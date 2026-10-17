@@ -5,6 +5,7 @@ An agent is a special kind of user. People mention it, assign tasks to it, chat 
 The agent works through the REST API, webhooks or the [MCP server](../mcp/README.md).
 
 **Kalmido never starts AI processes.** It only records events and delivers them. The agent runs somewhere you control and connects to Kalmido as a client.
+The one exception is the optional [built-in assistant](ASSISTANT.md) (2.75.0, off unless the operator configures it): see [Built-in assistant vs. your own agents](#built-in-assistant-vs-your-own-agents-2750).
 
 **New here?** [Set up an agent](#set-up-an-agent) below has a guide for admins (a team agent on a server) and one for users (a personal agent on their own computer), for Linux, macOS and Windows; [AGENT-SETUP.md](AGENT-SETUP.md) sets up an agent on Linux step by step (Claude Code in a sandbox, with a prompt that lets Claude Code do it for you); [AGENT-SECURITY.md](AGENT-SECURITY.md) explains the threat model behind it.
 
@@ -37,6 +38,7 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
 - [MCP server](#mcp-server)
 - [Use agents safely](#use-agents-safely-2300) (2.30.0)
 - [Security](#security)
+- [Built-in assistant vs. your own agents](#built-in-assistant-vs-your-own-agents-2750) (2.75.0)
 
 ## Concept
 
@@ -641,7 +643,7 @@ agent to the organisation's workspace (`PATCH /api/my/agents/{id} {"org_id": …
 **Everyone in the organisation (2.46.0).** An organisation's list can be opened to all members of its organisation
 (`org_visibility: "org"`, optionally `org_edit: true`): people who are not shared with it see it read-only (`org_reader:
 true`) and may join (`POST /api/v1/lists/{id}/join`). This never reaches agents: an agent sees a list only when it is
-shared with it, also in its own organisation, and health / Home & life / family lists stay private. Readers get no
+shared with it, also in its own organisation, and health / budget (2.72) / Home & life / family lists stay private. Readers get no
 events and notifications of the list until they join, so an agent's comments in such a list are read by more people
 than its members -- an agent opening a list (`PATCH /api/v1/lists/{id} {"org_visibility": "org"}`) waits for approval.
 
@@ -680,7 +682,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
 | `ping` | the "Send test" button in the admin settings | `message` |
 | `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it); 2.46.1: in a list where the agent listens in, every message of a person in its channel, without an @mention (`mentioned` false; never a message of an agent) | `room` `{id, kind, list_id}`, `mentioned`, `listening` (2.46.1), `message` `{id, text, user_id, task_id, created_at, reply_to, reply}`, `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message-2330)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
-| `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}`; 2.39.0 kind `cleanup` ([Tidy up a list](#tidy-up-a-list-2390)): + `list_id` (and the list's `playbook`) |
+| `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}`; 2.39.0 kind `cleanup` ([Tidy up a list](#tidy-up-a-list-2390)): + `list_id` (and the list's `playbook`); 2.70.0 kind `extract`: `input.images` = photos of the meeting ([A meeting becomes tasks](#a-meeting-becomes-tasks-2700)) |
 | `task_added` | 2.23.0 (#795): a top-level task was created in, or moved into, a list shared with the agent (not for its own tasks); 2.30.0: only when the agent [listens in](#agent-listens-in-2300) there | `task`, `list`, `how`: `created` or `moved`, `moved_from` `{id, name}` (only when the agent sees that list), `source`: `form`, `mail`, `errors`, `proposal` (when not made in the app); 2.63.0: a form's report also carries `ttype` (when the form sets one) and `portal: true` (the sender has a status link and sees only the answers meant for them, never internal comments) |
 | `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction`; 2.35.0 approval requests (`request_chat_approval`): `approval`, `approval_request` `{title, what}`, `via` |
 | `followup_due` | 2.1.0: the follow-up day of a task *waiting on someone* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
@@ -696,6 +698,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `sprint_started` | 2.60.0 (#343): a sprint of a project list shared with the agent started (switched on, started by hand, or the next one after closing) | `list_id`, `list`, `sprint` (id, num, title, start, end, goal, state, progress) |
 | `sprint_closed` | 2.60.0 (#343): a sprint was closed (by a person or after its last day); `sprint.review` holds the done / moved / added task ids, counts and points | `list_id`, `list`, `sprint` (with `review`), `next_sprint_id` |
 | `chat_pinned` | 2.62.0 (#1848): the person pinned or unpinned a message of the agent's chat (see [Pinned chat messages](#pinned-chat-messages-2620)); information only, nothing to answer (the reference launcher starts no run) | `message` (the chat message, with `pinned_at` / `pinned_by`), `pinned` (true / false), `user` `{id, name}` |
+| `contract_notice` | 2.70.0 (#1359): the last day to cancel a contract (Home & life) in a list shared with the agent is near: from the contract's own lead (else 30 days) before it; once per contract, deadline and agent; never from a health list; only while the person has the module *Contracts* on. Answer with ONE `propose_contract_notice` (see [Contracts and notice deadlines](#contracts-and-notice-deadlines-2700)) | `task_id`, `list_id`, `name`, `provider`, `cost`, `per`, `monthly`, `yearly`, `notice`, `notice_unit`, `due` (cancel by), `ends`, `renew_months`, `days`, `user` `{id, name}`, `lang`, `hint` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -792,6 +795,16 @@ free. Every task in events and in the API has `"locked": true | false`.
   MCP `update_task`) and can set or clear it with `{"locked": true | false}`. Do not lift a lock a person set unless
   they ask you to.
 - Locking and unlocking show in the task's history; existing tasks were not locked by the update.
+
+### Dates move the dependency chain (2.67.0)
+
+In a project list with *Move dependent tasks along* on (the default for new project lists), postponing a task's due
+date (`PATCH /api/v1/tasks/{id}`, MCP `update_task`) moves every task waiting on it by the same number of days, down the
+whole chain (gaps stay, each task once, at most 500). Completed tasks, milestones, tasks without a date and tasks the
+agent may not change (lists not shared with it included) stay, and so does the chain behind them. The answer carries
+`chain` (`moved` with old and new dates, `skipped` with a reason; a task the agent cannot see comes without id and
+title, MCP adds `chain_note`). An earlier date never moves the chain back. `"shift_chain": false` leaves the waiting
+tasks where they are; use it only when the person asks for that.
 
 ### Waiting on someone (2.1.0)
 
@@ -1548,6 +1561,18 @@ never reach agents (agents take no part in DMs). Do not ask anyone to paste encr
 task then has empty `notes` and `note_locked: true`; locked notes are not readable for agents, and writing `notes` on such a
 task answers `409` (other fields can still change). Work with the title, dates and comments; do not ask for the note's text.
 
+**Lists encrypted in the browser (2.64.1).** A list whose members encrypt it in their browsers is not readable for agents
+and the API: an agent is never a member (adding one answers `409`), it gets no events of it, and with a person's token the
+list's tasks and comments come with empty texts and `encrypted: true`; every write there answers `403` (`list_e2e`). Leave
+such tasks alone and do not ask anyone to paste their texts. Since 2.64.2 the files of such a list are encrypted with the
+list key as well: `GET /api/v1/tasks/{id}/attachments` lists them with `"encrypted": true` and an empty name, and their
+download and `/text` answer `404`; a task with such files cannot be moved to another list (`409`, `list_e2e_files`).
+The list's team chat is encrypted too: messages come with an empty `body` and `"encrypted": true`, and posting there
+answers `403`.
+
+**Knowledge spaces encrypted in the browser (2.64.3).** Agents have no tools for knowledge pages, and an encrypted space (private or
+of an organisation) is out of reach for them in any case: no texts, no access.
+
 **Reading a file as text (2.34.0).** `GET /api/v1/attachments/{id}/text` (MCP `read_attachment`, scope
 `attachments:read`, same rights as the file itself, else `404`) answers `{id, task_id, comment_id, name, mime, size, url,
 kind, text, chars, truncated, message}`:
@@ -1742,6 +1767,76 @@ shared with the agent (within its list limit) that is a project and that the per
 - Both proposals are made by the agent itself (`POST /api/proposals` with these kinds answers 400) and answered with the
   event `job` (approve / reject) like every proposal.
 
+## Importing old data into the office (2.68.0)
+
+An agent may read a person's old data (today: **fixed costs**; a spreadsheet, a PDF, a list in a mail, in any format)
+and PROPOSE it as ONE import in a fixed JSON shape; Kalmido never runs a model and never reads the old data itself. The
+agent writes nothing: the office routes stay closed to agent tokens (403) and the agent never sees the office (no rows, no
+duplicates, no totals). The scope `import` is off for new agents (and not part of the legacy `write`): an admin, or without
+an organisation the person itself, turns it on per agent (permission *Propose imports*). Whose office: a personal agent's
+owner, a team agent's person given as `user_id` (someone who may chat with it, in the agent's organisation); everyone else
+404. The office module must be on for that person (else 400).
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| Propose an import (kind `import`) | `POST /api/v1/agent/proposals/import` | `propose_import` | import |
+
+- **The format**: `{area, items, title?, summary?, note?, user_id?}`. `area` is `fixed_costs` (the only area so far,
+  the default; others answer 400). `items` = 1 to 500 rows, each
+  `{label, amount, repeat?, start, until?, category?, vat_rate?}` - the fields of the spreadsheet import (2.67):
+  - `label`: the name (up to 200 characters).
+  - `amount`: the **net** amount in euros, more than 0: best a JSON number (`1200.5`); a text is read like a spreadsheet
+    cell (`"1.200,50"`, `"1200.50"`, `"29,90"`, `"12.500"` = 12500).
+  - `repeat`: `monthly` (default), `quarterly`, `yearly` or `once`.
+  - `start`: `YYYY-MM-DD`, the first due date (yearly and once: its month is the due month); `until`: `YYYY-MM-DD` or
+    left out (no end).
+  - `category`: a free group such as "Insurances" (up to 100 characters).
+  - `vat_rate`: `0`, `7` or `19`; left out = 19, insurances, levies and contributions 0 (as the spreadsheet import).
+  Other fields of a row (an `id`, an `org_id`, `created_by`) are ignored. `note`: what you could not read or assumed.
+- **The card**: a ready proposal job (kind `import`): News + push "Proposal ready" per the person's settings and a card with
+  the preview of the spreadsheet import, judged against the office when the card is OPENED: every row new, already there
+  (same name, amount and repeat as an existing cost or an earlier row; not ticked) or with an error (greyed out with the
+  reason; never taken over). The person ticks rows, may change the VAT per row (net and gross shown) and takes them over
+  into the office they work in (their organisation or, without one, their personal office), shown on the card. An agent of
+  an organisation imports only into that organisation (another workspace: the card asks to switch, nothing is written).
+  Only an admin of that office can take it over (403 otherwise, nothing written); only the person the card is for can open
+  or decide it. Every row is checked again, all ticked rows are written in one step (at most 500 fixed costs per office),
+  the office log names the agent; undo removes exactly these rows again (not those changed since), redo makes them again.
+- **The answer** comes as the event `job` with `action` approve / reject and only counts (`proposal`: `state`, `created`,
+  `skipped`). Limits: at most 5 open import proposals per agent and 20 per person and day (429), a card expires after 14 days, the proposal body up to
+  256 KB, the agent's usage limit applies. A proposal job can be replaced with `POST /api/v1/agent/jobs/{id}/proposal`
+  (scope `import`) while it is open.
+
+```json
+{"area": "fixed_costs", "user_id": 3, "summary": "From the old spreadsheet 'Kosten 2025'",
+       "note": "Row 14 (phone) had no amount, left out",
+       "items": [{"label": "Office rent", "amount": 950, "repeat": "monthly", "start": "2026-01-01", "category": "Rooms"},
+                 {"label": "Liability insurance", "amount": "240,00", "repeat": "yearly", "start": "2026-03-01", "category": "Insurances", "vat_rate": 0},
+                 {"label": "Software subscription", "amount": 29.9, "start": "2026-01-01", "vat_rate": 19}]}
+```
+
+## Rules of a list (2.71.0)
+
+The owner or an admin of a list sets rules there: one trigger (a task comes into a column, is completed, is opened again,
+gets a list tag, its due day is today) and one action (assign it to a person of the list, set or clear the due date
+relative to today, write a fixed comment, move it to a list and / or column). A rule runs with the rights of the person who
+set it up, checked every time; when a right is missing (that person left the list, lost the admin role, the target list
+became unreachable) the rule pauses itself (`paused_reason`). A change made by a rule never triggers another rule (also
+not in the target list of a move); at most 20 rules run for one change, at most 50 rules per list. Health lists, the
+basket and locked lists have no rules; a rule never moves a task into a health list, a locked list or a list of another
+workspace. The history and the comment show "Rule <name>" (activity `data.rule` = `{id, name}`, comment `rule_name`).
+
+Agents read rules and only PROPOSE them; the routes people use to create, change or delete rules answer 403 to agents.
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| The rules of a list shared with you | `GET /api/v1/lists/{id}/rules` | `list_rules` | read |
+| Propose a rule (kind `rule`) | `POST /api/v1/lists/{id}/rules/proposals` | `propose_rule` | structure |
+
+The proposal goes to the list's owner (or `user_id`: an owner / admin of the list). Accepting creates the rule with THAT
+person's rights; it belongs to them, never to the agent. The answer comes as the event `job` (approve / reject). At most 20
+rule proposals per agent and day.
+
 ## Behaviour rules template (2.13.1)
 
 `mcp/CLAUDE.template.md` ("Kalmido agent behaviour rules", English with a German note) is the rule block every agent's
@@ -1934,8 +2029,9 @@ lists and a first project. Nothing is sent or booked; you tick what you want and
 1. A person starts it in the app: *New project from briefing…* (Lists > +, command palette), *Break down with
    <agent>…* (task menu, palette), *Sort the basket with <agent>…* (the inbox's menu - in the app the inbox is called “Basket” since 2.39.1 -, palette,
    or the bot button when inbox items are selected), *Tasks from notes…* (a list's menu, palette), *Tidy up the list…* (2.39.0: a list's menu, or
-   *Tidy up…* for selected tasks; always the list's tidy agent). With several agents they pick one.
-2. Kalmido creates a job (kind `project`, `subtasks`, `triage`, `extract`, `dayplan`, `cleanup`, `inquiry` or `setup`; state `running`, `proposal_state`
+   *Tidy up…* for selected tasks; always the list's tidy agent), *Find duplicates with an agent…* (2.70.0: the contacts view's
+   menu, palette; one address book). With several agents they pick one.
+2. Kalmido creates a job (kind `project`, `subtasks`, `triage`, `extract`, `dayplan`, `cleanup`, `inquiry`, `setup` or `merge`; state `running`, `proposal_state`
    `requested`) and sends the agent the event `job_request` with the input.
 3. The agent reads the input, sets its status to `working`, and submits ONE proposal:
    `POST /api/v1/agent/jobs/{id}/proposal` (MCP `submit_proposal`). Kalmido validates it (400 with the reason,
@@ -1962,9 +2058,11 @@ the proposal in the app.
 | `project` | `{text, file_name, folder}`: the pasted briefing (or a loaded .txt / .md file), at most 50,000 characters |
 | `subtasks` | `{task: {id, title, notes, due, subtasks: [titles]}, hint}` |
 | `triage` | `{items: [{task_id, title, notes}], lists: [{id, name, folder, sections: [{id, name}]}]}`: the selected open inbox items (or all, at most 100) and the lists the person ticked (default: every list they may change) |
-| `extract` | `{list: {id, name, sections: [names]}, members: [{id, name}], text}`: the people of the list (no agents) so the agent can suggest assignees |
+| `extract` | `{list: {id, name, sections: [names]}, members: [{id, name}], text, images?}`: the people of the list (no agents) so the agent can suggest assignees; 2.70.0: `text` may be empty when `images` (photos of the meeting: `[{id, name, mime, size, url}]`, see [A meeting becomes tasks](#a-meeting-becomes-tasks-2700)) are there |
 | `dayplan` | `{date, mode, now, work: {start, end}, from, default_duration, events, fixed, tasks, builtin}` (2.10.0, see [Day plans](#day-plans-2100)) |
 | `cleanup` | `{list: {id, name, sections: [{id, name}]}, package: {n, of, group}, snapshot_at, hint, items: [{task_id, title, notes, section_id, sort, due, priority, list_tags, assignee_id, created_at, updated_at, comments_count}]}` (2.39.0, see [Tidy up a list](#tidy-up-a-list-2390)) |
+(2.39.0, see [Tidy up a list](#tidy-up-a-list-2390)) |
+| `merge` | `{book: {id, name}, contacts: [{id, fn, given, family, org, emails: [values], phones: [values]}], limits}` (2.70.0): the contacts of ONE address book the person may change (at most 2,000), only these fields - no notes, addresses, birthdays, groups |
 
 **Proposals** (the body of `POST /api/v1/agent/jobs/{id}/proposal`). Every kind may carry `summary` (a short
 explanation, Markdown, at most 2,000 characters) and `kind` (must match the job). Dates are `YYYY-MM-DD`, priority
@@ -1995,10 +2093,44 @@ explanation, Markdown, at most 2,000 characters) and `kind` (must match the job)
            {"op": "rename", "task_id": 82, "title": "Call the printer about the paper", "reason": "clearer"},
            {"op": "move", "task_id": 83, "section_id": 40, "position": 1},     // section (null = none) and / or place in it
            {"op": "close", "task_id": 84, "reason": "the fair was in 2025"}]}  // closed as won't do; reason required
+// merge (2.70.0): only ids from input.contacts, 2-10 per group (target included), each id in one group at most, at most 200 groups
+{"summary": "Two people are in the book twice.",
+ "groups": [{"target_id": 12, "ids": [12, 31], "reason": "same e-mail address"},   // 12 stays, 31 is merged into it
+            {"target_id": 40, "ids": [40, 41, 57], "reason": "same phone, name variants"}]}   // none found: {"groups": []}
 ```
+
+**Tidy up contacts (2.70.0, kind `merge`).** The person picks one address book they may change (a synced external book
+cannot be merged) and an agent; an organisation's book only goes to an agent of that organisation, an agent limited to
+selected lists gets no contacts. The agent proposes groups of duplicates; the review shows each group with the contacts as
+they are now, the reason and the main contact (switchable), each with its own tick. Applying merges the ticked groups
+as the person, exactly like merging by hand (links, attendances, contact persons move; the history of the contact names the
+agent's proposal); a group with a contact that was deleted or changed since the request is skipped. One undo step takes
+every merge of the proposal back. The agent still cannot read or merge contacts through the API: the job input is all
+it gets. `job` event on apply: `proposal: {state: "applied", merged, skipped}`.
 
 A section name in `extract` that the list does not have yet is created on apply. In `triage`, `tags` are the person's
 own (personal) tags; leave `list_id` out to keep an item in the inbox.
+
+### A meeting becomes tasks (2.70.0)
+
+The guided way to *Tasks from notes*: in the chat with an agent that takes proposal requests from the person, the button
+*Turn a meeting into tasks* (next to the clip) opens the request with this agent chosen. The person picks a list (one
+they may write in; health lists are never offered and answer 400), pastes the notes and / or adds up to 4 photos (a
+whiteboard, handwritten minutes; on the phone the camera). Text or an image is required. The photos are stored as the
+person's files in their chat with that agent (same limits as any chat file) and the job input carries them:
+
+```jsonc
+{"list": {"id": 12, "name": "Shoot", "sections": ["Prep"]}, "members": [{"id": 7, "name": "Sam"}], "text": "",
+ "images": [{"id": 301, "name": "whiteboard.jpg", "mime": "image/jpeg", "size": 812345, "url": "/api/v1/chat-attachments/301"}]}
+```
+
+Read each image with `GET /api/v1/chat-attachments/{id}` (MCP `get_attachment`, `source: "chat"`); an agent reads only
+files of its own chats. Propose as usual (`submit_proposal`, kind `extract`): assignees only from `members`, a due date
+only where the notes or the photo name one (else leave it out), nothing invented; what you cannot read stays out (say so
+in `summary`). When the proposal is ready, the person's chat with the agent shows ONE card: each task with its assignee
+and date and a tick, *Create N tasks* (the selected ones, as the person, one undo step) and *Discard*; *Edit* opens the
+usual review. The same dialog (with the list fixed) opens from a list's menu *Tasks from notes…*. Freelancers without an
+organisation have the same flow with their own lists and agents.
 
 **Snippet for your agent's CLAUDE.md** (or system prompt):
 
@@ -2008,9 +2140,12 @@ own (personal) tags; leave `list_id` out to keep an item in the inbox.
   and all you may use. Never ask for or fetch more of their inbox or lists.
 - set_status working (task_id if there is one), then build ONE proposal of that kind (docs/AGENTS.md "Proposals"):
   project {name, sections, tasks[..]}, subtasks {items[..]}, triage {items[{task_id, list_id?, ...}]} with ids from
-  the input only, extract {tasks[..]} with assignee_id only from input.members, dayplan {items[{task_id, start,
+  the input only, extract {tasks[..]} with assignee_id only from input.members (2.70.0: look at input.images, the
+  meeting's photos, with get_attachment source chat; due dates only where named), dayplan {items[{task_id, start,
   duration?}], nofit[{task_id}]} with task ids from input.tasks only (a plan never changes due dates), cleanup
   {items[{op: merge|rename|move|close, ...}]} with task ids from input.items only, each once (follow the list's playbook).
+  merge {groups[{target_id, ids, reason}]} with contact ids from input.contacts only, each in one group (2.70.0: only clear
+  duplicates - same e-mail / phone, a name variant with a shared detail; when in doubt leave it out; none = groups []).
   Add a short summary.
 - submit_proposal(job_id, proposal). On a 400, fix what the message names and submit again.
 - NEVER create the lists, sections or tasks yourself (no create_task / create_job for this): the person applies them.
@@ -2461,7 +2596,8 @@ with the scope it needs). The tools:
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`
 - tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact),
   `search_tasks` (2.59.0: `semantic: true` = also tasks of similar meaning), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
-  `move_task` (list / section / parent + `before_id` / `after_id` / `position`), `batch_tasks`, `skip_occurrence`,
+  `move_task` (list / section / parent + `before_id` / `after_id` / `position`), `link_task_to_list` /
+  `unlink_task_from_list` (2.71.0: a task also in another list, see below), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
 - dependencies and fields: `get_dependencies`, `add_dependency`, `related_tasks`, `remove_dependency`, `list_fields`, `create_field`,
   `update_field`, `delete_field` (2.39.1, #1293: custom fields in every list, not only projects; creating a field or
@@ -2470,6 +2606,7 @@ with the scope it needs). The tools:
   tasks), `get_key_figures` (2.43.0: the key figures of a list, `GET /api/v1/lists/{id}/kpis`, read-only, never of a health list)
 - list tags: `list_list_tags`, `create_list_tag`, `update_list_tag`, `delete_list_tag`
 - templates and filters: `list_templates`, `create_template`, `update_template`, `delete_template`, `apply_template`,
+  `duplicate_list` (2.78.0: a copy of a list with its tasks, dates and notepads, without members),
   `list_filters`, `create_filter`, `update_filter`, `delete_filter`
 - comments and reactions: `add_comment`, `update_comment`, `delete_comment`, `react`
 - files: `list_attachments`, `get_attachment` (task, chat or project files), `read_attachment` (2.34.0: PDF / text as text), `upload_attachment`, `create_text_file` (2.30.0), `delete_attachment`,
@@ -2511,13 +2648,13 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `delete_field`, `delete_filter`, `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`,
 `delete_milestone`, `delete_note`, `delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`,
 `delete_task`, `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`,
-`draft_reminder`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
+`draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
 `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
 `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_life`, `get_list`, `get_me`,
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
 `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`,
 `get_timer`, `get_usage`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,
-`link_contact`, `list_address_books`, `list_agents`, `list_attachments`, `list_calendar_events`, `list_chats`,
+`link_contact`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_calendar_events`, `list_chats`,
 `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`, `list_events`, `list_fields`,
 `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_jobs`, `list_kids`,
 `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,
@@ -2535,7 +2672,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `set_status`,
 `set_waiting`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
-`sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unshare_address_book`, `unshare_event_calendar`,
+`sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`,
 `unshare_list`, `unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
 `update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
 `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_offer_draft`,
@@ -2543,6 +2680,18 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`,
 `write_journal`
 <!-- kalmido-tool-index:end -->
+
+## A task in several lists (2.71.0)
+
+A task can be shown in further lists without a copy (`POST /tasks/{id}/links` `{list_id, section_id?}`, `DELETE
+/tasks/{id}/links/{list_id}`, scope `tasks:write`; MCP `link_task_to_list` / `unlink_task_from_list`). It stays one task:
+every change is the same in all its lists. Rights come only from the task's own list (`list_id`): you see the task when you
+see that list, never through a further list alone. The task's JSON carries `also: [{list_id, section_id, sort}]` with the
+further lists **you** see (lists not shared with you, or outside your token's list limit, are left out; the field is absent
+when there are none). Linking needs edit rights on the task and on the list, both lists in the same workspace (an
+organisation, or private), no health or locked lists, top-level tasks only, at most 10 further lists. Rules and events
+belong to the task's own list; a column change in a further list is no change of the task. Moving the task into another
+workspace (or the list into another organisation) drops the links that would cross it.
 
 ## Use agents safely (2.30.0)
 
@@ -2675,3 +2824,42 @@ page without an account and may answer there. For agents:
   user names or e-mail addresses. The ticket's space (organisation, or the owner of a list without organisation) is its
   boundary: the portal never shows tickets of another space.
 - The reference starter adds one line to such events (capability `customer_comment`).
+## Contracts and notice deadlines (2.70.0)
+
+Home & life keeps a contract as a task (the last day to cancel is its due date, the renewal its repeat). Kalmido itself never
+phrases anything: once per contract and deadline the agents that see the contract's list get the event `contract_notice`
+(the contract's own lead before the last day to cancel, else 30 days; never from a health list, never across the agent's
+organisation or its list limit). The agent answers with ONE sentence; the person decides.
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| Remind of a notice deadline (kind `notice`) | `POST /api/v1/agent/proposals` `{kind: "notice", task_id, text}` | `propose_contract_notice` | write |
+
+- **The sentence** (`text`, at most 300 characters, one line): in the person's language (`lang`), what cancelling saves or
+  what staying costs and until when they can decide; no pressure, never "cancelled".
+- **Allowed**: only for a contract the agent got a `contract_notice` for its current deadline (else 409); a contract it
+  cannot see is 404. A new proposal for the same contract replaces the agent's open one; at most 50 a day; the usage limit
+  applies. `POST /api/proposals` with kind `notice` answers 400 (a person cannot ask for it).
+- **The card** (News + push "Proposal ready" per the person's settings; the title names the contract, never its cost): the
+  contract (cancel by, end of the term, notice period, cost), the sentence, and *Take it as a note* (a comment on the contract
+  task as the person, history "applied a proposal by <agent>"; a quiet note: no comment push, news or `comment` event
+  for the list's members and agents), *Remind me* (the same plus a reminder 3 days before the last
+  day to cancel, shown while that is still ahead) or *Discard*. One undo step takes the note (and the reminder) back. The
+  agent gets the event `job` (approve / reject). Open cards end with their deadline.
+- Nothing is ever cancelled, sent or deleted. Health lists and the journal never reach an agent (no event, no read, no
+  scope `private` for agents), also when a person tries to share a health list with it.
+
+## Built-in assistant vs. your own agents (2.75.0)
+
+Since 2.75.0 an operator can configure a **built-in assistant** ([ASSISTANT.md](ASSISTANT.md)): Kalmido then calls one
+OpenAI-compatible model itself, for six small helps a person starts with a tap (summarize a task, draft a reply,
+extract tasks, suggest tags and a due date, sort the basket, plan the day). It is not an agent:
+
+- It is no user and no member of any list. Each person switches it on and ticks the lists it may read
+  (Settings > Assistant); it never sees anything else.
+- It has no events, no token, no API and no MCP tools; it never acts on its own or on a schedule.
+- Its results are proposals of the person who asked (they show as "Assistant" in the proposal dialog) and use the
+  same Apply / Discard / Undo as the [proposals](#proposals) of agents. Agents get no events about them.
+
+Everything longer or freer (code, research, long jobs, working tickets, chat) stays the job of your own agents.
+

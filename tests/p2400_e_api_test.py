@@ -71,6 +71,7 @@ def fetch_calls(src):
 # fetch() calls whose options come from a variable: reviewed by hand
 FETCH_VAR_OK = {
     ("core.js", "url, opt"),  # rawFetch0: opt is built with the header right above
+    ("msvview.js", "url, opt"),  # 2.73.0 (#661): msvvFetch, opt is built with the header right above
 }
 JS = os.path.join(N, "..", "static", "js")
 bad = []

@@ -20,10 +20,28 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.79.0** (2026-10-17): **security release** (audit part 1): calendar imports invite only people you may see, tighter
+  token permissions (app passwords, admin routes, child accounts, health time entries), safer first OIDC login, uploads
+  held back until the virus scan, complete backups. **Check your proxy setting** if a reverse proxy on the host reaches a
+  published Docker port (see CHANGELOG).
+- **2.78.0** (2026-10-17): **Duplicate list** in the list menu and the list dialog: a copy with sections, tasks and their dates, notepads and the page arrangement (completed tasks optional; members and shares stay with the original).
+- **2.77.0** (2026-10-17): a **pack catalogue** in Office & finance: search, install, update and remove country and industry packs per office (verified / community, checked by SHA-256, data only).
+- **2.74.0** (2026-10-17): **several Kalmido servers in one app** (work + home side by side, with server badges) and **moving** between app.kalmido.com and your own server (export everything, import with people matched by e-mail).
+- **2.73.0** (2026-10-17): **household budget** at home (module *Budget*, off by default): income and expenses with
+  categories and a monthly limit, planned / spent per month, recurring entries (also taken over from your contracts), CSV
+  import of your bank's statement with column mapping and duplicate check, receipts on an entry; shared with your family
+  like any list, never visible to agents, amounts and texts stored encrypted.
 - **2.66.0** (2026-10-17): **merge duplicate contacts and clients** - pick the record that stays and the value per field,
   everything linked moves along, undo for 30 days.
 - **2.65.0** (2026-10-17): **faster start** (compressed answers, areas load when first opened) and **smooth long lists**
   (only the visible rows are drawn).
+- **2.64.3** (2026-10-17): **encrypted knowledge space**: a whole knowledge space (private or an organisation's) can be
+  encrypted in the browser; search, backlinks and export run in the browser, agents have no access.
+- **2.64.2** (2026-10-17): **lock per list, stage 2**: attachments and the team chat of a locked list are encrypted
+  too, and when a member leaves the key changes and older contents are encrypted again in the background.
+- **2.64.1** (2026-10-17): **lock per list**: a list's titles, descriptions, subtasks, comments, notes, section names,
+  text fields, links and snippets **encrypted in the browser** with a key per list for every member (waiting list, safety
+  numbers); agents, mail address, public link and templates stay out of such a list, search runs in the browser.
 - **2.64.0** (2026-10-17): **files in the private space are stored encrypted** on the server (a key per person, like the
   organisations' files since 2.42; server-side, not end-to-end). Security fix (files at rest).
 - **2.63.0** (2026-10-17): **report forms** with a type, one file and a **status link** for the sender, the **customer
@@ -380,7 +398,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   (its “…” menu) or in the calendar (its bar)
 - **Own date and time pickers** in the app language: a small month grid (the week starts on your locale's first day)
   and hours / minutes you can also type (`930`, `9:30 pm`, `21 Uhr`); keyboard and touch friendly
-- **Templates**: save a task with its subtasks, or a whole list with sections, and reuse it with dates relative to today
+- **Templates**: save a task with its subtasks, or a whole list with sections, and reuse it with dates relative to today;
+  **Duplicate list…** (2.78.0) copies a list at once with its dates as they are (completed tasks optional, no members)
 - **List types**: *List* or *Project* (time tracking, dependencies with the Gantt timeline, custom fields, progress and
   status for that list only). Every list can **show completed at the bottom** (what you tick off stays there and comes
   back with one tap: shopping and packing lists). Set it in the list dialog or the list's menu; plain lists stay free of project controls (the repository
@@ -451,6 +470,14 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   accounts an admin created (or automatic accounts, if you want), optional group check and admin group
 - **Encryption** (2.42.0): an end-to-end encrypted note and files per task and encrypted direct messages (WebCrypto in
   the browser, the server only stores ciphertext), plus encryption at rest with a key per organisation for bank and tax
+  data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md)
+- **Lock per list** (2.64.1): a list can be *encrypted in the browser* (list dialog): titles, descriptions, subtasks,
+  comments, list notes, section names, text fields, links and code snippets are encrypted with a key per list that each
+  member gets wrapped with their own key; dates, status, assignees and the list name stay readable. Members without a key
+  wait until the owner releases it; agents, the mail address, public links and templates are not available there.
+  Since 2.64.2 attachments and the list's team chat are encrypted too, and the key changes when a member leaves;
+  since 2.64.3 a whole knowledge space can be encrypted the same way (see docs/ARCHITECTURE.md, *Lock per list*, and
+  docs/SELF-HOSTING.md, *Exporting encrypted content*)
   data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md). 2.64.0: the files
   of the private space are stored encrypted on the server as well, with a key per person (server-side, not end-to-end)
 - **Automatic backups** of the database and all attachments, daily with retention, optionally encrypted, downloadable,
@@ -1073,6 +1100,14 @@ calendar, CalDAV, sharing and the API work as everywhere.
   bookmarks into tasks with their link and archives the ticked ones in Karakeep.
 - API v1 and MCP: `/life`, `/life/contracts`, `/life/devices`, `/life/upkeep`, `/life/health` (permission `private`),
   `/life/trips`, `/life/review`, `/life/journal/{day}` (`private`), `/contacts/{id}/care`, `/life/karakeep/sync`.
+- **Budget** (2.72.0; its own part of *At home*): a budget is a list of its own that opens the budget view. Entries
+  (income or expense, amount, day, title, category, counterpart, note, receipts), categories with a monthly limit, a
+  month view with planned / spent / left and the last six months as bars. **Recurring entries** (monthly, quarterly,
+  yearly) are templates: *Open this month* books them with one tap; *Take over from contracts* turns your contracts into
+  recurring entries. **CSV import**: the file you download from your bank (no bank access), columns mapped once and
+  remembered, duplicates and errors left out, categories suggested from earlier entries. Share it with your family like
+  any list (read-only or writing); agents never see it, there is no API v1 / MCP for it. Amounts, texts and receipts are
+  encrypted at rest with the key of the list's space (needs `KALMIDO_SECRET_KEY`).
 
 ## Events
 
@@ -1304,7 +1339,11 @@ the kill switch only. *Add agent…* asks **team agent or personal agent** and e
 agent into a person's personal agent. Every agent works in **one workspace** (private or an organisation, see
 *Workspaces*) and joins only its lists. A small **robot badge** marks agents wherever people appear (#985). Kalmido
 itself never starts an AI or any other process; the agent runs wherever you like and talks to Kalmido through the REST
-API, webhooks or the MCP server.
+API, webhooks or the MCP server. The one exception is the optional **built-in assistant** (2.75.0, #1411, off by default):
+the operator points Kalmido at a single OpenAI-compatible chat model (a provider in the EU, or Ollama on the same
+server); every person switches it on for themselves and ticks the lists it may read, and gets summaries, extracted
+tasks, basket sorting, tag / due-date suggestions, short drafts and day plans as proposal cards with yes / no - never a
+direct change, every call in a log without texts. See [docs/ASSISTANT.md](docs/ASSISTANT.md).
 
 **Which agent?** A personal agent runs on your computer with your Claude access and only you give it orders; a team
 agent runs on a shared, always-on computer and colleagues give it orders. See [Which agent when?](docs/AGENTS.md#which-agent-when-2466).
@@ -1805,7 +1844,9 @@ Register Kalmido at the provider as a confidential client with the redirect URI 
 
 **Accounts:** by default only users an admin created can log in. The first OIDC login links a user whose user name
 equals the username claim, or whose e-mail (optional field in *Settings > Administration*) equals the provider's **verified**
-e-mail; from then on the provider's subject (issuer + `sub`) decides, even if the name changes. Without a match the
+e-mail; from then on the provider's subject (issuer + `sub`) decides, even if the name changes. 2.79.0: a user name match
+needs the same verified e-mail as well (accounts made for SSO, without password and e-mail, link as before), and admins, accounts with a second factor and child accounts are linked only from
+their own open session (log in with the password, then use the provider's button once in the same browser). Without a match the
 login page says "no account, ask the admin". *Create accounts on the first OIDC login* (admin switch) creates them
 instead (no admin rights unless the admin group says so, no password). An admin can unlink a user again.
 
@@ -1883,7 +1924,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `AUTH_PROXY_HEADER` | | Header with the user name from an authenticating proxy (e.g. `Remote-User`); empty = built-in login only |
 | `AUTH_TRUSTED_PROXIES` | | Comma list of IPs / CIDRs whose header is trusted (direct peer) |
 | `AUTH_PROXY_PORT` | | Extra container port; if set, the header is only trusted on it (see *Login*) |
-| `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1,172.17.0.1` | Reverse proxies (IPs / CIDRs of the direct peer) whose `X-Forwarded-For` / `-Proto` / `-Host` are believed: the real client address for login lockouts, logs and alerts, https for cookies and CalDAV. The `AUTH_TRUSTED_PROXIES` peers count too; `none` = trust nobody. A proxy in another container on its own Docker network arrives from that network's gateway (e.g. `172.18.0.1`): add it |
+| `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1` | Reverse proxies (IPs / CIDRs of the direct peer) whose `X-Forwarded-For` / `-Proto` / `-Host` are believed: the real client address for login lockouts, logs and alerts, https for cookies and CalDAV. The `AUTH_TRUSTED_PROXIES` peers count too; `none` = trust nobody. A proxy in another container on its own Docker network arrives from that network's gateway (e.g. `172.18.0.1`): add it. 2.79.0: the docker bridge gateway `172.17.0.1` is no longer in the default; a proxy on the host in front of a port published on Docker's default bridge needs `127.0.0.1,::1,172.17.0.1` |
 | `KALMIDO_IP_WARN_ACCOUNTS` | `3` | 2.33.0 (#834): warn in the log and under *Administration > Server* when at least this many accounts sign in from one private address within 7 days (the client addresses do not arrive: check the reverse proxy, see docs/SELF-HOSTING.md); only private addresses are kept, 14 days |
 | `KALMIDO_NOTIF_TEMPLATE` | `read` | 2.33.0 (#927): the notification template a newly shared list or folder starts with: `read` (mentions, assignments, direct replies), `work`, `all` |
 | `KALMIDO_TRUSTED_PROXY_COUNT` | `1` | Proxies in a row in front of Kalmido; the client is the entry that many places from the right in `X-Forwarded-For` |
@@ -1913,6 +1954,11 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_STORAGE_QUOTA_MB` | `0` | 2.24.0: storage per person in MB (0 = unlimited); admins can change it in *Administration > Server* |
 | `KALMIDO_SUPPORT_EMAIL` | *(empty)* | 2.24.0: where *Contact support* writes to when storage is full (else the admin setting, else the first admin's address) |
 | `KALMIDO_HOSTED` | `0` | 2.24.0: `1` = a server run as a service for others: integrations only reach public HTTPS addresses |
+| `KALMIDO_AI_BASE_URL` | *(empty)* | 2.75.0: base URL of an OpenAI-compatible chat API (`…/v1`) for the built-in assistant; empty = no assistant (no menu entry, routes 404) |
+| `KALMIDO_AI_MODEL` | *(empty)* | 2.75.0: model name sent to that API (required together with the URL) |
+| `KALMIDO_AI_KEY_FILE` | *(empty)* | 2.75.0: file with the API key (one line); `KALMIDO_AI_KEY` sets it directly; Ollama needs none. Never logged or shown |
+| `KALMIDO_AI_NAME` | *(host of the URL)* | 2.75.0: provider name people see when they share lists with the assistant |
+| `KALMIDO_AI_TIMEOUT_S` | `60` | 2.75.0: time limit of one model call; `KALMIDO_AI_MAX_CHARS` (`24000`) caps the input, `KALMIDO_AI_MAX_TOKENS` (`1500`) the answer |
 | `KALMIDO_ONBOARDING` | `1` | `0`: new accounts start empty (no "Getting started" list, no welcome tour) |
 | `KALMIDO_SEARCH_INDEX` | `0` | 2.29.0: search engines stay out by default (`X-Robots-Tag: noindex, nofollow` on every answer, `/robots.txt` with `Disallow: /`); `1` lets them index the sign-in page. Public list links, forms, feeds and the API stay noindex either way |
 | `KALMIDO_AGENT_EVENTS_STALE_H` | `48` | 2.29.0: agent events older than this many hours reach a poller as one `missed` summary instead of one by one (`0` = off; see docs/AGENTS.md) |
@@ -2130,7 +2176,7 @@ setup); an existing server keeps its setting. *Back up now* makes one at any tim
 **Restore** a listed backup or an uploaded file (larger files: copy them into the backup folder, they show up in the
 list). You type `RESTORE` to confirm. Kalmido then:
 
-1. checks the archive completely: only the expected members (`manifest.json`, `kalmido.dump`, `attachments/<task>/<file>`, 2.46.0: `attachments/avatars|listicons/<file>` - a 2.45 server refuses such an archive;
+1. checks the archive completely: only the expected members (`manifest.json`, `kalmido.dump`, `attachments/<task>/<file>`, 2.46.0: `attachments/avatars|listicons/<file>` - a 2.45 server refuses such an archive; 2.79.0: `attachments/chat|budget|docthumbs/...` - a 2.78 server refuses such an archive;
    no paths outside, no links, no folders), size and member limits (`KALMIDO_BACKUP_MAX_MB`), compression ratio (zip
    bombs), free disk space, every SHA-256 while extracting, the dump's table of contents and statements (only tables,
    data, sequences, indexes, constraints and plain defaults are taken; functions, triggers and access rules are always

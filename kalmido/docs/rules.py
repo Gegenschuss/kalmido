@@ -96,6 +96,8 @@ def clean_rule(r):
         if why:
             raise RuleError(why)
     out = {"kind": kind, "match": match}
+    if r.get("case") is True and kind != "fuzzy":  # 2.69.0 B (#1847): case-sensitive (Paperless-ngx "is_insensitive" off)
+        out["case"] = True
     for k in ("sender", "type", "folder"):
         v = str(r.get(k) or "").strip()[:120]
         if v:
@@ -138,12 +140,13 @@ for k, v in ((resource.RLIMIT_AS, 256 << 20), (resource.RLIMIT_CPU, int(sys.argv
     except (ValueError, OSError):
         pass
 d = json.loads(sys.stdin.read())
-print(json.dumps([bool(re.search(p, d["t"], re.I)) for p in d["p"]]))
+print(json.dumps([bool(re.search(p[0], d["t"], 0 if p[1] else re.I)) if isinstance(p, list) else bool(re.search(p, d["t"], re.I))
+                  for p in d["p"]]))
 """
 
 
 def regex_hits(patterns, text):
-    """[bool] per pattern, run in a limited child process; a timeout = no hit for any of them."""
+    """[bool] per pattern (a text, or [text, case-sensitive]), run in a limited child process; a timeout = no hit for any of them."""
     if not patterns:
         return []
     try:
@@ -160,19 +163,25 @@ def matches(rules, text):
     """The rules (in their order) whose condition holds for text."""
     ftext = fold(text)
     fwords = None
-    wset = None
+    wset = cset = None
     regex = [r for r in rules if r.get("kind") == "regex" and not check_pattern(r.get("match"))]
-    rhits = dict(zip((id(r) for r in regex), regex_hits([r["match"] for r in regex], text)))
+    rhits = dict(zip((id(r) for r in regex), regex_hits([[r["match"], True] if r.get("case") else r["match"] for r in regex], text)))
     out = []
     for r in rules:
         kind, m = r.get("kind"), r.get("match") or ""
         if kind == "regex":
             ok = rhits.get(id(r), False)
+        elif kind == "exact" and r.get("case"):  # 2.69.0 B (#1847)
+            ok = bool(m.strip()) and re.search(r"(?<!\w)" + re.escape(m.strip()) + r"(?!\w)", text or "") is not None
         elif kind == "exact":
             ok = bool(fold(m).strip()) and re.search(r"(?<!\w)" + re.escape(fold(m).strip()) + r"(?!\w)", ftext) is not None
         elif kind == "fuzzy":
             fwords = fwords if fwords is not None else words(text)
             ok = _fuzzy_in(m, fwords)
+        elif r.get("case"):  # 2.69.0 B (#1847): any / all with the words as written
+            cset = cset if cset is not None else set(re.findall(r"\w+", text or ""))
+            want = re.findall(r"\w+", m)
+            ok = bool(want) and (all(w in cset for w in want) if kind == "all" else any(w in cset for w in want))
         else:
             if wset is None:
                 wset = set(words(text))

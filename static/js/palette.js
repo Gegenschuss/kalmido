@@ -230,6 +230,7 @@ function palAll() {
     add('a:propinbox', 'action', propWith(N_('Sort the basket with {0}…'), N_('Sort the basket with an agent…')), 'bot', () => propRequest('triage', {}));
     const rl = routeList();
     if (rl && !rl.is_inbox && canEditList(rl.id)) add('a:propnotes', 'action', tr('Tasks from notes…'), 'bot', () => propRequest('extract', {lid: rl.id}));
+    if (feat('contacts') && typeof dup_open === 'function' && dup_books().length) add('a:propdup', 'action', tr('Find duplicates with an agent…'), 'bot', () => dup_open());  // 2.70.0 B (#1357)
   }
   if (ct) {
     const n = `“${t.title.length > 40 ? t.title.slice(0, 39) + '…' : t.title}”`;
@@ -304,10 +305,11 @@ function palAll() {
     if (k === 'users' && !S.me?.is_admin) continue;
     if (k === 'org' && !(S.me && lmOrgPaneOn())) continue;  // 2.39.1 (#1188)
     if (k === 'ai' && !aiPaneOn()) continue;  // 2.7.0 (#405 S2/S8: was a dead branch for a "time" tab)
+    if (k === 'assistant' && !asst_avail()) continue;  // 2.75.0 (#1411)
     add('s:' + k, 'setting', tr('Settings: {0}', tr(n)), icon, () => settingsModal(k), {keys: k === 'general' ? 'g s' : ''});
   }
   // tasks (open ones + the recently completed that are in the state)
-  for (const x of S.tasks.values()) if (x.status === 0 && x.id > 0 && !archivedTask(x)) add('t:' + x.id, 'tasks', x.title, 'check', () => { const r = $(`#view .trow[data-id="${x.id}"]`); if (!r && x.list_id) go(x.list_id === inbox()?.id ? 'inbox' : 'l/' + x.list_id); setTimeout(() => openDetail(x.id), 30); },
+  for (const x of S.tasks.values()) if (x.status === 0 && x.id > 0 && !archivedTask(x)) add('t:' + x.id, 'tasks', x.title, typeof le2eOn === 'function' && le2eOn(x.list_id) ? 'lock' : 'check', () => { const r = $(`#view .trow[data-id="${x.id}"]`); if (!r && x.list_id) go(x.list_id === inbox()?.id ? 'inbox' : 'l/' + x.list_id); setTimeout(() => openDetail(x.id), 30); },
     {sub: [lname(listById(x.list_id)), x.due ? dayLabel(x.due) : ''].filter(Boolean).join('  ·  ')});
   return it;
 }

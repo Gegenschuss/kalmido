@@ -33,7 +33,8 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   const CAROL = (await call('POST', '/api/users', {username: 'carol', display_name: 'Carol', password: 'password123'})).id;
   const BK = await login('bob'), CKc = await login('carol');
   await call('PATCH', '/api/settings', {lang: 'de'}, BK);
-  const PRJ = (await call('POST', '/api/lists', {name: 'Relaunch', view: 'timeline', kind: 'project', time_tracking: true})).id;  // 2.41.0 (#1471): time tracking is a switch of the list
+  // 2.67.0 (#1865): "Move dependent tasks along" is on by default in a new project list - off here, the dialog turns it on below
+  const PRJ = (await call('POST', '/api/lists', {name: 'Relaunch', view: 'timeline', kind: 'project', time_tracking: true, dep_shift: false})).id;  // 2.41.0 (#1471): time tracking is a switch of the list
   const HOME = (await call('POST', '/api/lists', {name: 'Home', kind: 'project'})).id;
   await call('PUT', `/api/lists/${PRJ}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${PRJ}/members`, {user_id: CAROL, role: 'view'});
@@ -158,7 +159,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   w = await boot({user: 'alice', hash: 'l/' + PRJ}); d = w.document;
   w.eval(`listModal(${PRJ})`); await sleep(200);
   let md = lastModal(d);
-  check(md.querySelector('#l-depshift') && !md.querySelector('#l-depshift').checked && /Move dependent tasks along/.test(md.textContent), 'list dialog: setting, off by default');
+  check(md.querySelector('#l-depshift') && !md.querySelector('#l-depshift').checked && /Move dependent tasks along/.test(md.textContent), 'list dialog: setting, off (created so, 2.67.0)');
   md.querySelector('#l-depshift').checked = true; md.querySelector('#l-depshift').dispatchEvent(new w.Event('change', {bubbles: true}));  // 1.5.1: saves itself
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === PRJ).dep_shift === 1), 'setting saved');
   await until(() => bar(A));

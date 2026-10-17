@@ -234,6 +234,9 @@ with db() as c:
 check((datetime.fromisoformat(r3["end"]) - datetime.fromisoformat(r3["start"])).total_seconds() <= 25 * 60 + 1, "a late finish ends at the planned end, not hours later")
 
 # ---- "Move dependent tasks along" (list setting dep_shift)
+# 2.67.0 (#1865): on by default in a new project list; the whole chain moves by the same delta (gaps kept, not only
+# conflicts), the triggering task's list decides, no depth cap (500 tasks), stay-put tasks are reported in chain.skipped
+check(next(l for l in state(A)["lists"] if l["id"] == W)["dep_shift"] == 1, "dep_shift: on by default in a new project list (2.67.0)")
 r = Bb.patch(B + f"/api/lists/{W}", json={"dep_shift": True})
 check(r.status_code == 403, f"dep_shift: only the owner sets it (member: {r.status_code})")
 r = A.patch(B + f"/api/lists/{W}", json={"dep_shift": True})
@@ -250,10 +253,13 @@ A.post(B + f"/api/tasks/{te}/complete")
 A.delete(B + f"/api/tasks/{tf}")
 r = A.patch(B + f"/api/tasks/{ta}", json={"due": D(5)}).json()
 sh = {x["id"]: x for x in r.get("shifted", [])}
-check(set(sh) == {tb, td}, f"cascade: B (conflict) and D (conflict after B moved) move, C (starts after B) not: {list(sh)}")
+check(set(sh) == {tb, tc, td}, f"cascade: the whole chain moves (2.67.0: C too, gaps kept): {list(sh)}")
 check(tb in sh and sh[tb]["start"] == D(6) and sh[tb]["due"] == D(8) and sh[tb]["prev_start"] == D(3) and sh[tb]["prev_due"] == D(5), f"cascade: same delta, duration kept: {sh.get(tb)}")
 check(td in sh and sh[td]["due"] == D(10) and sh[td]["start"] is None, f"cascade: second level by the same delta: {sh.get(td)}")
-check(task(A, tc)["due"] == D(10) and task(A, tc)["start"] == D(9), "cascade: a task that still starts after its blocker stays")
+check(task(A, tc)["due"] == D(13) and task(A, tc)["start"] == D(12), "cascade (2.67.0): a task that starts later moves by the same delta too")
+check(r["chain"]["days"] == 3 and {x["id"] for x in r["chain"]["moved"]} == {tb, tc, td} and r["chain"]["moved"][0]["old_due"] == D(5),
+      f"2.67.0: the chain field: {r.get('chain')}")
+check([(x["id"], x["reason"]) for x in r["chain"]["skipped"]] == [(te, "done")], f"2.67.0: the completed task is reported, the trashed one not: {r['chain']['skipped']}")
 with db() as c:
     check(c.execute("SELECT due FROM tasks WHERE id=?", (te,)).fetchone()[0] == D(4) and c.execute("SELECT due FROM tasks WHERE id=?", (tf,)).fetchone()[0] == D(4),
           "cascade: completed and trashed tasks stay")
@@ -263,26 +269,32 @@ with db() as c:
 A.patch(B + f"/api/tasks/{ta}", json={"due": D(2), "_prev": {"due": D(5)}})
 for x in r["shifted"]:
     A.patch(B + f"/api/tasks/{x['id']}", json={"start": x["prev_start"], "due": x["prev_due"], "_prev": {"start": x["start"], "due": x["due"]}})
-check(task(A, tb)["start"] == D(3) and task(A, tb)["due"] == D(5) and task(A, td)["due"] == D(7) and task(A, ta)["due"] == D(2), "undo: the whole chain is back")
+check(task(A, tb)["start"] == D(3) and task(A, tb)["due"] == D(5) and task(A, td)["due"] == D(7) and task(A, tc)["due"] == D(10) and task(A, ta)["due"] == D(2),
+      "undo: the whole chain is back")
 r = A.patch(B + f"/api/tasks/{ta}", json={"due": D(1)}).json()
 check(r.get("shifted") == [] and task(A, tb)["start"] == D(3), "moving a task earlier moves nothing")
 r = A.patch(B + f"/api/tasks/{ta}", json={"title": "Design v2"}).json()
 check(r.get("shifted") == [], "no date change: nothing moves")
 # reorder (drag onto a day in the calendar / list) cascades too
 r = A.post(B + "/api/tasks/reorder", json={"items": [{"id": ta, "due": D(4)}]}).json()
-check([x["id"] for x in r.get("shifted", [])] == [tb, td] and task(A, tb)["start"] == D(6), f"reorder: dependent tasks moved along: {r}")
-# list without the setting: nothing moves
-X = A.post(B + "/api/lists", json={"name": "Other", "kind": "project"}).json()["id"]
+check([x["id"] for x in r.get("shifted", [])] == [tb, tc, td] and task(A, tb)["start"] == D(6), f"reorder: dependent tasks moved along: {r}")
+# list without the setting: nothing moves (2.67.0: switched off explicitly, a new project list has it on)
+X = A.post(B + "/api/lists", json={"name": "Other", "kind": "project", "dep_shift": False}).json()["id"]
 xa = A.post(B + "/api/tasks", json={"list_id": X, "title": "X1", "due": D(1)}).json()["id"]
 xb = A.post(B + "/api/tasks", json={"list_id": X, "title": "X2", "start": D(2), "due": D(3)}).json()["id"]
 A.post(B + "/api/deps", json={"task_id": xb, "blocker_id": xa})
 r = A.patch(B + f"/api/tasks/{xa}", json={"due": D(6)}).json()
 check(r.get("shifted") == [] and task(A, xb)["start"] == D(2), "list without the setting: nothing moves")
-# the waiting task's list decides: a task in W waiting on X's task moves
+# 2.67.0 (#1865): the TRIGGERING task's list decides, for the whole chain
 wx = mk(A, title="Follows X", start=D(7), due=D(8))
 A.post(B + "/api/deps", json={"task_id": wx, "blocker_id": xa})
 r = A.patch(B + f"/api/tasks/{xa}", json={"due": D(9)}).json()
-check([x["id"] for x in r["shifted"]] == [wx], f"the waiting task's list setting counts: {r['shifted']}")
+check(r["shifted"] == [] and task(A, wx)["due"] == D(8), f"trigger in a list with the setting off: its waiting task in W stays: {r['shifted']}")
+wy = mk(A, title="W first", due=D(1))
+xw = A.post(B + "/api/tasks", json={"list_id": X, "title": "X follows W", "start": D(3), "due": D(4)}).json()["id"]
+A.post(B + "/api/deps", json={"task_id": xw, "blocker_id": wy})
+r = A.patch(B + f"/api/tasks/{wy}", json={"due": D(3)}).json()
+check([x["id"] for x in r["shifted"]] == [xw] and task(A, xw)["due"] == D(6), f"trigger in W (on): the waiting task in X (off) moves: {r['shifted']}")
 # edit rights: a task in a list I may only view is never moved
 V = Bb.post(B + "/api/lists", json={"name": "Bob view", "kind": "project"}).json()["id"]
 Bb.patch(B + f"/api/lists/{V}", json={"dep_shift": True})
@@ -291,23 +303,30 @@ vt = Bb.post(B + "/api/tasks", json={"list_id": V, "title": "Bob waits", "start"
 A.put(B + f"/api/lists/{W}/members", json={"user_id": BOB, "role": "edit"})
 vb = mk(A, title="Alice first", due=D(1))
 check(Bb.post(B + "/api/deps", json={"task_id": vt, "blocker_id": vb}).ok, "bob links his task to alice's")
+HB = Bb.post(B + "/api/lists", json={"name": "Bob hidden", "kind": "project"}).json()["id"]
+ht = Bb.post(B + "/api/tasks", json={"list_id": HB, "title": "Bob secret", "start": D(1), "due": D(2)}).json()["id"]
+check(Bb.post(B + "/api/deps", json={"task_id": ht, "blocker_id": vb}).ok, "bob links a task of his private list to alice's")
 r = A.patch(B + f"/api/tasks/{vb}", json={"due": D(4)}).json()
 check(r.get("shifted") == [] and task(Bb, vt)["due"] == D(2), "no edit rights on the waiting task: not moved")
+sk = sorted(r["chain"]["skipped"], key=lambda x: x["hidden"])
+check(len(sk) == 2 and sk[0] == {"id": vt, "title": "Bob waits", "reason": "no_access", "hidden": False}
+      and sk[1] == {"id": None, "title": None, "reason": "no_access", "hidden": True} and "Bob secret" not in json.dumps(r),
+      f"2.67.0: skipped names the visible task, the invisible one without id / title: {sk}")
 r = Bb.patch(B + f"/api/tasks/{vb}", json={"due": D(6)}).json()
-check([x["id"] for x in r["shifted"]] == [vt], "the same move by bob (owner of the waiting task) moves it")
-# caps: depth 10, 50 tasks
+check(sorted(x["id"] for x in r["shifted"]) == sorted([vt, ht]), "the same move by bob (owner of the waiting tasks) moves them")
+# 2.67.0 (#1865): no depth cap any more (12 levels move), a fan of 55 moves (cap 500)
 chain = [mk(A, title="C0", due=D(1))]
 for i in range(1, 13):
     chain.append(mk(A, title=f"C{i}", start=D(i), due=D(i)))
     A.post(B + "/api/deps", json={"task_id": chain[i], "blocker_id": chain[i - 1]})
 r = A.patch(B + f"/api/tasks/{chain[0]}", json={"due": D(3)}).json()
-check(len(r["shifted"]) == 10 and task(A, chain[11])["due"] == D(11), f"cascade depth capped at 10 levels: {len(r['shifted'])}")
+check(len(r["shifted"]) == 12 and task(A, chain[12])["due"] == D(14), f"cascade: the whole 12-level chain moves: {len(r['shifted'])}")
 root = mk(A, title="Hub", due=D(1))
 fan = [mk(A, title=f"F{i}", due=D(1)) for i in range(55)]
 with db() as c:  # 55 dependencies at once (the API allows 50 blockers per task, not per blocker)
     c.executemany("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,1,?)", [(f, root, f"2026-01-01T00:00:{i:02d}.000Z") for i, f in enumerate(fan)])
 r = A.patch(B + f"/api/tasks/{root}", json={"due": D(2)}).json()
-check(len(r["shifted"]) == 50, f"cascade capped at 50 tasks: {len(r['shifted'])}")
+check(len(r["shifted"]) == 55, f"cascade: all 55 move (cap 500): {len(r['shifted'])}")
 r = A.patch(B + f"/api/lists/{W}", json={"dep_shift": False})
 check(r.ok and next(l for l in state(A)["lists"] if l["id"] == W)["dep_shift"] == 0, "dep_shift: off again")
 

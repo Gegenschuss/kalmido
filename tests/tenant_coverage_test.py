@@ -77,6 +77,8 @@ KINDS = {
     "paperless": ("matrix", "p248_d_paperless_api_test.py: the connection of another workspace: 404; organisation admins only change it; agents never"),
     # 2.55.0 (#1455): the newsletter connection of one workspace (segments, log, sync) + the consent of a contact
     "newsletter": ("matrix", "p255_e_api_test.py: the connection, segments, log and sync of another workspace: 404 / 403; organisation admins only; agents never; consent only on writable contacts; address books of other workspaces refused in a segment"),
+    # 2.75.0 (#1411): the built-in assistant: a person's shares of visible lists, tasks only of shared lists / the own basket
+    "assistant": ("matrix", "p275_a_api_test.py: another person's task / basket item / list 404 or left out; shares of lists the person no longer sees dropped; the log only own rows; agents never"),
     "receipt": ("matrix", "p248_d_receipts_api_test.py: receipt data and suggestions only on a visible document; projects of another workspace refused; outsiders 404"),
     "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
@@ -110,6 +112,15 @@ KINDS = {
     # 2.59.0 B (#1375): related tasks -- candidates only among the tasks the asker sees
     "related": ("matrix", "p259_b_api_test.py: related tasks, the hint while adding, search semantic=1, API v1 and agent events never "
                           "name a task of another organisation, an unshared list or a private list; another organisation's task 404"),
+    # 2.71.0 B (#1459): a task shown in further lists (task_links); rights stay with the task's own list
+    "tasklink": ("matrix", "p271_b_api_test.py: linking into a list of another organisation / private <-> organisation refused, "
+                           "a reader of only the further list gets the task nowhere (state, search, feed, public link, agent), "
+                           "\"also\" names only visible lists"),
+    # 2.72.0 (#1333): the household budget
+    "budget": ("matrix", "p272_a_budget_api_test.py: categories, entries, templates, contracts, import and receipts by id of another "
+                         "person's budget 404, read-only shared = no change, agents / tokens without the scope private never"),
+    # 2.73.0 A (#661): the accounts of one person on other Kalmido servers (accounts/servers.py) -- private per person
+    "servers": ("matrix", "p273_a_api_test.py: the server accounts of another person 404 (read, change, delete, restore, data, tasks, move); agents 403; nothing of another person's tasks moves"),
 }
 
 ROUTES = {
@@ -216,6 +227,9 @@ ROUTES = {
     # ---- office (B: settings, packs, master data, import / export)
     "GET /api/office/settings": "office", "PUT /api/office/settings": "office", "GET /api/office/number-preview": "office",
     "GET /api/office/packs": "office", "GET /api/office/packs/{}": "office", "POST /api/office/packs/validate": "office",
+    # 2.76.0 (#1023): the pack catalogue (p276_a_packs_api_test.py carries the office marker)
+    "GET /api/office/catalog": "office", "POST /api/office/catalog/refresh": "office", "POST /api/office/packs/install": "office",
+    "DELETE /api/office/packs/installed/{}/{}": "office", "POST /api/office/packs/installed/{}/{}/restore": "office",
     "GET /api/office/{}": "office", "POST /api/office/{}": "office", "GET /api/office/{}/{}": "office", "PATCH /api/office/{}/{}": "office",
     "DELETE /api/office/{}/{}": "office", "GET /api/office/export": "office", "POST /api/office/import": "office",
     "POST /api/office/move": "office",  # 2.47.3 (#1360): the personal office becomes an organisation (p2473_a_api_test.py)
@@ -225,6 +239,9 @@ ROUTES = {
     "GET /api/office/trips/report": "office", "GET /api/office/trips/bill-docs": "office", "POST /api/office/trips/bill": "office",
     "POST /api/office/trips/unbill": "office", "GET /api/office/cashflow": "office", "GET /api/office/fixed-costs": "office",
     "POST /api/office/fixed-costs": "office", "PATCH /api/office/fixed-costs/{}": "office", "DELETE /api/office/fixed-costs/{}": "office",
+    # 2.67.0 (#1838): the import of fixed costs, its template, the undo of an import, the monthly check task (office admins)
+    "POST /api/office/fixed-costs/import/preview": "office", "POST /api/office/fixed-costs/import": "office", "GET /api/office/fixed-costs/import/template": "office",
+    "POST /api/office/fixed-costs/delete": "office", "GET /api/office/cashflow/check": "office", "PUT /api/office/cashflow/check": "office",
     # 2.50.0 (#1196, #1197): the sales pipeline and the business figures, admins of the office area only (p250_b_api_test.py: other org 404, member 403)
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
@@ -445,6 +462,12 @@ ROUTES = {
     "POST /api/calendars/{}/events": "own", "PATCH /api/calendars/{}/events": "own", "DELETE /api/calendars/{}/events": "own",
     "POST /api/calendars/{}/events/restore": "own", "POST /api/calendars/{}/write": "own", "POST /api/import/ticktick": "own", "POST /api/import/{}": "own",
     "POST /api/imports/{}/undo": "own", "GET /api/imports": "own", "GET /api/me/mail": "own",
+    # 2.73.0 B (#1473): the account export / import: the person's own files (a folder per person, another person's id = 404);
+    # the import's target organisation needs its admin (p273_b_api_test.py)
+    "GET /api/account/export": "own", "POST /api/account/export": "own", "DELETE /api/account/export": "own",
+    "GET /api/account/export/file": "own", "GET /api/account/import": "own", "POST /api/account/import": "own",
+    "GET /api/account/import/{}": "own", "PUT /api/account/import/{}": "own", "DELETE /api/account/import/{}": "own",
+    "POST /api/account/import/{}/run": "own", "POST /api/account/import/{}/key": "own",
     "POST /api/me/mail/token": "own", "DELETE /api/me/mail/token": "own", "POST /api/me/mail/test": "own",
     "GET /api/v1/life": "own", "GET /api/v1/life/upkeep-presets": "own",
     "POST /api/v1/life/contracts": "own", "POST /api/v1/life/devices": "own", "POST /api/v1/life/upkeep": "own",
@@ -516,16 +539,24 @@ ROUTES = {
     "DELETE /api/tasks/{}/enc-note": "task", "POST /api/tasks/{}/enc-attachments": "attachment",
     # 2.48.0 (#1642): the locked note of a task (need_task; only the person who locked it)
     "GET /api/tasks/{}/bell": "task", "PUT /api/tasks/{}/bell": "task", "POST /api/tasks/{}/bell/undo": "task",  # 2.53.0 C (#1424): need_task + people of the list (p253_c_api_test.py)
+    # 2.64.1 A (#1817): the lock per list -- need_list + people only (p264a_a_api_test.py: outside the list 404, agents / tokens 403)
+    "GET /api/lists/{}/e2e": "list", "POST /api/lists/{}/e2e/start": "list", "GET /api/lists/{}/e2e/todo": "list",
+    "POST /api/lists/{}/e2e/bulk": "list", "POST /api/lists/{}/e2e/finish": "list", "POST /api/lists/{}/e2e/stop": "list",
+    "POST /api/lists/{}/e2e/keys": "list",
+    "POST /api/lists/{}/e2e/rotate": "list",  # 2.64.2 A (#1817): key change of a list with the lock
+    # 2.64.2 B (#1817): list files -- need_task (+ own comment) / need_list, people in the app only (p264b_b_api_test.py)
+    "POST /api/tasks/{}/list-attachments": "attachment", "POST /api/lists/{}/e2e/files/{}": "list",
     "GET /api/tasks/{}/note-lock": "task", "PUT /api/tasks/{}/note-lock": "task", "DELETE /api/tasks/{}/note-lock": "task", "GET /api/v1/team/rooms": "team", "POST /api/v1/team/dm": "team",
     "GET /api/v1/team/rooms/{}/messages": "team", "POST /api/v1/team/rooms/{}/messages": "team",
     "PATCH /api/v1/team/messages/{}": "team", "DELETE /api/v1/team/messages/{}": "team",
     "POST /api/v1/team/messages/{}/reactions": "team", "POST /api/v1/team/rooms/{}/read": "team",
     "POST /api/team/messages/{}/pin": "team", "POST /api/v1/team/messages/{}/pin": "team",  # 2.62.0 (#1848): also p262_a_api_test.py
-    # ---- template (10)
+    # ---- template (12)
     "GET /api/v1/templates": "template", "POST /api/v1/templates": "template", "PATCH /api/v1/templates/{}": "template",
     "DELETE /api/v1/templates/{}": "template", "POST /api/v1/templates/{}/apply": "template",
     "GET /api/templates": "template", "POST /api/templates": "template", "PATCH /api/templates/{}": "template",
     "DELETE /api/templates/{}": "template", "POST /api/templates/{}/apply": "template",
+    "POST /api/lists/{}/duplicate": "template", "POST /api/v1/lists/{}/duplicate": "template",  # 2.78.0 (#1881): also p278_dup_api_test.py
     # ---- token (2)
     "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/git/{}": "token",
     # ---- 2.60.0 (#1514): environments of a project list (they belong to their list; the deploy hook is a secret token)
@@ -571,6 +602,10 @@ ROUTES = {
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
+    # 2.64.3 A (#1817): the lock per knowledge space (wiki_space: a space of another organisation 404, p264c_a_api_test.py)
+    "GET /api/wiki/e2e": "wiki", "POST /api/wiki/e2e/start": "wiki", "GET /api/wiki/e2e/todo": "wiki",
+    "POST /api/wiki/e2e/bulk": "wiki", "POST /api/wiki/e2e/finish": "wiki", "POST /api/wiki/e2e/stop": "wiki",
+    "POST /api/wiki/e2e/keys": "wiki", "POST /api/wiki/e2e/rotate": "wiki",
     # 2.49.0 (#1106): find people by e-mail, connection requests, blocks
     "GET /api/disc": "discover", "PUT /api/disc": "discover", "POST /api/disc/confirm": "discover", "POST /api/disc/find": "discover",
     "POST /api/disc/check": "discover", "POST /api/disc/requests": "discover", "POST /api/disc/requests/{}/{}": "discover",
@@ -628,6 +663,43 @@ ROUTES = {
     "PUT /api/lists/{}/review": "list", "PUT /api/v1/lists/{}/review": "list",
     # 2.61.0 (#1818): the virus scanner's state + counts for the server admin (no file, no content; p261_a_api_test.py: 403 for others)
     "GET /api/admin/upload-scan": "admin",
+    # 2.67.0 (#1865): Pull the chain in: the task must be visible, each waiting task that moves needs write access
+    "POST /api/tasks/{}/chain/pull": "task",
+    # 2.68.0 (#1839): an agent proposes old data for its person's office (only a card; p268_a_api_test.py: other person / org 404)
+    "POST /api/v1/agent/proposals/import": "agent",
+    # 2.69.0 A (#1846): the uploaded Paperless-ngx export of one workspace (p269_a_api_test.py: member 403, outsider 404, agent refused)
+    "POST /api/paperless/zip": "paperless", "POST /api/paperless/zip/part": "paperless", "GET /api/paperless/zip/preview": "paperless",
+    "POST /api/paperless/zip/import": "paperless", "POST /api/paperless/zip/stop": "paperless", "DELETE /api/paperless/zip": "paperless",
+    # 2.70.0 A (#1354): meeting photos into my own chat with an agent I may ask, the chat's cards = my own proposals (p270_a_api_test.py)
+    "POST /api/agents/{}/meeting-images": "agent", "GET /api/agents/{}/meeting-proposals": "agent",
+    # 2.71.0 B (#1459)
+    "POST /api/tasks/{}/links": "tasklink", "DELETE /api/tasks/{}/links/{}": "tasklink", "PATCH /api/tasks/{}/links/{}": "tasklink",
+    "POST /api/v1/tasks/{}/links": "tasklink", "DELETE /api/v1/tasks/{}/links/{}": "tasklink",
+    # 2.71.0 A (#1457): rules of a list (owner / list admins; agents read + propose) -- p271_a_api_test.py: other org 404
+    "GET /api/lists/{}/rules": "list", "POST /api/lists/{}/rules": "list", "PATCH /api/rules/{}": "list", "DELETE /api/rules/{}": "list",
+    "POST /api/rules/{}/restore": "list", "GET /api/v1/lists/{}/rules": "list", "POST /api/v1/lists/{}/rules/proposals": "list",
+    # 2.72.0 (#1333): the household budget (a list of kind budget; p272_a_budget_api_test.py)
+    "GET /api/budget": "budget", "POST /api/budget/lists": "budget", "GET /api/budget/{}": "budget",
+    "POST /api/budget/{}/cats": "budget", "PATCH /api/budget/cats/{}": "budget", "DELETE /api/budget/cats/{}": "budget",
+    "POST /api/budget/{}/entries": "budget", "PATCH /api/budget/entries/{}": "budget", "DELETE /api/budget/entries/{}": "budget",
+    "GET /api/budget/{}/recurring": "budget", "POST /api/budget/{}/recurring": "budget", "PATCH /api/budget/recurring/{}": "budget",
+    "DELETE /api/budget/recurring/{}": "budget", "POST /api/budget/recurring/{}/book": "budget",
+    "GET /api/budget/{}/contracts": "budget", "POST /api/budget/{}/contracts": "budget",
+    "POST /api/budget/{}/import/parse": "budget", "POST /api/budget/{}/import/commit": "budget",
+    "POST /api/budget/entries/{}/files": "budget", "GET /api/budget/files/{}": "budget", "DELETE /api/budget/files/{}": "budget",
+    # 2.73.0 A (#661): several servers in one app (the person's own server accounts; p273_a_api_test.py)
+    "GET /api/servers": "servers", "POST /api/servers": "servers", "PATCH /api/servers/{}": "servers", "DELETE /api/servers/{}": "servers",
+    "POST /api/servers/{}/restore": "servers", "PATCH /api/servers/self": "servers", "POST /api/servers/code": "servers", "GET /api/servers/{}/data": "servers",
+    "GET /api/servers/{}/tasks/{}": "servers", "POST /api/servers/{}/tasks": "servers", "PATCH /api/servers/{}/tasks/{}": "servers", "POST /api/servers/{}/tasks/{}/{}": "servers",
+    "DELETE /api/servers/{}/tasks/{}": "servers", "GET /api/servers/{}/search": "servers", "GET /api/servers/{}/events": "servers", "GET /api/servers/{}/news": "servers",
+    "POST /api/servers/{}/news/read": "servers", "POST /api/servers/move": "servers",
+    # 2.74.0 (#338): the supporter licence -- the person's own licence + the yearly hint (user_id = me), the server licence
+    # (need_admin, the instance settings); no organisation data at all
+    "GET /api/supporter": "own", "PUT /api/supporter/{}": "own", "DELETE /api/supporter/{}": "own", "POST /api/supporter/{}/swap": "own",
+    "PATCH /api/supporter/nudge": "own",
+    # 2.75.0 (#1411): the built-in assistant (session only; p275_a_api_test.py)
+    "GET /api/assistant": "assistant", "PUT /api/assistant/lists": "assistant", "GET /api/assistant/log": "assistant",
+    "POST /api/assistant/run": "assistant", "GET /api/admin/assistant": "assistant",
 }
 
 # ---- 1. every route is classified, nothing stale

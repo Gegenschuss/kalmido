@@ -83,7 +83,10 @@ BK_PG_TIMEOUT = _env_int("KALMIDO_BACKUP_PG_TIMEOUT", 6 * 3600)   # s for one pg
 # 2.46.0 (#1605): + attachments/avatars/<file> and attachments/listicons/<file> (pictures of people, groups and lists)
 # 2.48.0 (#1207): + attachments/files/<node>/<file> (the file store) and attachments/lists/<list>/<file> (project files, #410:
 # they were left out of the archive before)
-BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|avatars|listicons|(?:files|lists)/\d{1,12})/([^/\\\x00-\x1f]{1,255})")
+# 2.79.0 (#476 M8): + attachments/chat/<agent>-<person>/<file> (agent chat files), attachments/budget/<list>/<file> (household
+# budget receipts) and attachments/docthumbs/<file> (document previews): their rows were in the dump, the files were not
+BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|avatars|listicons|docthumbs|(?:files|lists|budget)/\d{1,12}|chat/\d{1,12}-\d{1,12})"
+                          r"/([^/\\\x00-\x1f]{1,255})")
 BK_ERR = {"busy": N_("Another backup or restore is running, please try again in a moment."),
           "disk": N_("Not enough free disk space for the backup."),
           "io": N_("The backup could not be written ({0})."),
@@ -356,6 +359,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
         with zipfile.ZipFile(zp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6, allowZip64=True) as z:
             z.write(dbp, BK_DUMP, compress_type=zipfile.ZIP_STORED)  # pg_dump -Fc compresses itself
             files.append([BK_DUMP, os.path.getsize(dbp), _sha256_file(dbp)])
+            skipped = {}  # top folder -> files not matching BK_MEMBER_RE
             for base, prefix in ((ATT_DIR, "attachments/"), (OFFICE_DIR, "office/")):
                 if not os.path.isdir(base):
                     continue
@@ -364,9 +368,12 @@ def bk_create(kind="manual", c=None, keep_dump=None):
                     for fn in sorted(fns):
                         full = os.path.join(root, fn)
                         rel = prefix + os.path.relpath(full, base).replace(os.sep, "/")
-                        if os.path.islink(full) or not os.path.isfile(full) or not BK_MEMBER_RE.fullmatch(rel):
-                            continue
                         if prefix == "office/" and fn.endswith((".tmp", ".part")):  # 2.36.2 E (#1146): unfinished uploads
+                            continue
+                        if os.path.islink(full) or not os.path.isfile(full) or not BK_MEMBER_RE.fullmatch(rel):
+                            if not os.path.islink(full) and os.path.isfile(full):  # 2.79.0 (#476 M8): never silently
+                                top = prefix + (rel[len(prefix):].split("/", 1)[0] if "/" in rel[len(prefix):] else ".")
+                                skipped[top] = skipped.get(top, 0) + 1
                             continue
                         try:
                             digest, size = _sha256_file(full), os.path.getsize(full)
@@ -379,7 +386,10 @@ def bk_create(kind="manual", c=None, keep_dump=None):
                         att_bytes += size
             meta = {"format": "kalmido-backup", "format_version": 2, "app_version": APP_VERSION, "schema_version": schema,
                     "created_at": iso(now_utc()), "kind": kind, "counts": counts, "db_bytes": files[0][1],
-                    "attachment_files": len(files) - 1, "attachment_bytes": att_bytes}
+                    "attachment_files": len(files) - 1, "attachment_bytes": att_bytes,
+                    "skipped_files": sum(skipped.values())}  # 2.79.0 (#476 M8)
+            if skipped:  # folder names only (never file names): a new kind of stored file the archive does not know yet
+                print("backup: files outside the known folders were not saved:", json.dumps(skipped, sort_keys=True), flush=True)
             z.writestr("manifest.json", json.dumps({**meta, "files": files}, ensure_ascii=False))
         name = bk_name(kind, encrypt)
         final = os.path.join(BK_DIR, name)
@@ -1191,7 +1201,10 @@ def storage_check():
                                     "LEFT JOIN lists l ON l.id=f.list_id"),
                       # 2.13.1 (#465): files in the agent chats (where = the agent's name)
                       ("chat_file", "SELECT f.id, m.agent_id AS owner, f.name, f.size, f.path, u.display_name AS where_ FROM chat_files f "
-                                    "JOIN agent_chat m ON m.id=f.message_id LEFT JOIN users u ON u.id=m.agent_id")):
+                                    "JOIN agent_chat m ON m.id=f.message_id LEFT JOIN users u ON u.id=m.agent_id"),
+                      # 2.72.0 (#1333): receipts of the household budget (where = the budget list's name)
+                      ("budget_file", "SELECT f.id, f.list_id AS owner, f.name, f.size, f.path, l.name AS where_ FROM budget_files f "
+                                      "LEFT JOIN lists l ON l.id=f.list_id")):
         for r in c.execute(sql):
             n += 1
             full = os.path.join(ATT_DIR, r["path"] or "")

@@ -333,28 +333,53 @@ def sc_up(c, kind, items, key="id"):
     return items
 
 
-def sc_locked(c, kind, ref_id, ver=None):
-    """The signature when the file (fs: version ver, default the current one) was found infected, else None."""
+def sc_strict():
+    """2.79.0 (#476 M7): strict mode = a file the scanner could not check yet (scanner down, error) is locked like an
+    infected one until the later scan finds it clean (a file too large for the scanner keeps its mark only). KALMIDO_CLAMD_STRICT=1 / 0; not set = on whenever a
+    scanner is configured (KALMIDO_CLAMD). Off = the behaviour of 2.61-2.78: unchecked files stay readable, with their mark."""
+    v = (os.environ.get("KALMIDO_CLAMD_STRICT") or "").strip().lower()
+    if v in ("0", "off", "no", "false"):
+        return False
+    return sc_target() is not None
+
+
+def _sc_state_row(c, kind, ref_id, ver, state, more=""):
     from ..core.pg import system_ctx
-    if not ref_id:
-        return None
     if kind == "fs":
         cur, args = ("?", (int(ver),)) if ver else ("COALESCE((SELECT cur_version FROM fs_nodes WHERE id=?), 0)", (int(ref_id),))
     else:
         cur, args = "0", ()
     with system_ctx(c):  # a public link / an agent sees the lock like everyone (the caller checked the read right)
-        r = c.execute(f"SELECT sig FROM upload_scan WHERE kind=? AND ref_id=? AND state='infected' AND ver={cur}",
-                      (kind, int(ref_id), *args)).fetchone()
+        return c.execute(f"SELECT sig FROM upload_scan WHERE kind=? AND ref_id=? AND state=? AND ver={cur} {more}",
+                         (kind, int(ref_id), state, *args)).fetchone()
+
+
+def sc_locked(c, kind, ref_id, ver=None):
+    """The signature when the file (fs: version ver, default the current one) was found infected, else None."""
+    if not ref_id:
+        return None
+    r = _sc_state_row(c, kind, ref_id, ver, "infected")
     return (r[0] or "?") if r else None
 
 
+def sc_waiting(c, kind, ref_id, ver=None):
+    """2.79.0 (#476 M7): True when strict mode holds this file back because it is not checked yet. A file too large for
+    the scanner (why 'size') is never scanned later, so it stays readable with its mark (else it would be locked for good)."""
+    if not ref_id or not sc_strict():
+        return False
+    r = _sc_state_row(c, kind, ref_id, ver, "unchecked", "AND why=''")
+    return bool(r)
+
+
 def sc_guard(c, kind, ref_id, ver=None):
-    """Raises Denied(403) when the file was found infected: no download, no preview, no text. Deleting it stays possible
-    (write paths do not call this)."""
+    """Raises Denied(403) when the file was found infected (or, strict mode, is not checked yet): no download, no preview,
+    no text. Deleting it stays possible (write paths do not call this)."""
     from ..core.access import Denied
     sig = sc_locked(c, kind, ref_id, ver)
     if sig:
         raise Denied(403, tr("Locked: malware was found in this file ({0})", sig))
+    if sc_waiting(c, kind, ref_id, ver):
+        raise Denied(403, tr("Not checked for malware yet: the file can be opened once the virus scanner has checked it"))
 
 
 # ---------------------------------------------------------------- the later scan (watchdog)
@@ -498,4 +523,5 @@ def sc_admin_state():
         cnt = {r[0]: r[1] for r in c.execute("SELECT state, COUNT(*) FROM upload_scan GROUP BY state")}
     state = "off" if not t else ("ok" if sc_ping() else "down")
     return jsonify(state=state, unchecked=cnt.get("unchecked", 0) if t else 0, infected=cnt.get("infected", 0),
+                   strict=bool(t) and sc_strict(),  # 2.79.0 (#476 M7)
                    max_mb=sc_max_bytes() // (1024 * 1024), last_ok=_SC["last_ok"], last_error=_SC["last_err"] if state == "down" else "")

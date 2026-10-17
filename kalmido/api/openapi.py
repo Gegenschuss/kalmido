@@ -181,6 +181,18 @@ def openapi_spec():
                                                   "attachments": {"type": "array", "items": ref("Attachment")}}},
         "TaskCompleted": {"allOf": [ref("Task"), {"type": "object", "properties": {"next_due": nul("string", format="date", description="Recurring: the next date the task moved to")}}]},
         "TaskInput": {"type": "object", "additionalProperties": False, "properties": task_in},
+        # 2.67.0 B (#1865): a later due date moves the tasks waiting on it along (list setting); shift_chain false = not
+        "TaskUpdate": {"type": "object", "additionalProperties": False, "properties": {**task_in, "shift_chain": {
+            "type": "boolean", "default": True, "description": "false: the tasks waiting on this one stay where they are"}}},
+        "TaskChanged": {"allOf": [ref("Task"), {"type": "object", "properties": {"chain": ref("Chain")}}]},
+        "Chain": {"type": "object", "description": "Only when the change moved dependent tasks along (or left some in place)", "properties": {
+            "days": {"type": "integer", "description": "Days the chain moved (negative = earlier)"},
+            "moved": {"type": "array", "items": {"type": "object", "properties": {
+                "id": {"type": "integer"}, "title": {"type": "string"}, "start": nul("string", format="date"), "due": {"type": "string", "format": "date"},
+                "old_start": nul("string", format="date"), "old_due": {"type": "string", "format": "date"}}}},
+            "skipped": {"type": "array", "description": "Left in place; the chain behind them did not move either", "items": {"type": "object", "properties": {
+                "id": nul("integer", description="null for a task you cannot see"), "title": nul("string"), "hidden": {"type": "boolean"},
+                "reason": {"type": "string", "enum": ["done", "milestone", "no_date", "no_access", "limit", "error"]}}}}}},
         "Snippet": {"type": "object", "required": ["code"], "properties": {  # 2.35.0 (#1095)
             "id": {"type": "string", "description": "Set by the server (keep it when you send the list back)"},
             "lang": {"type": "string", "maxLength": 20, "description": "Language (py, js, ts, sh, sql, diff, json, …); empty = recognised by the app"},
@@ -240,7 +252,7 @@ def openapi_spec():
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
                           "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),
-            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", None], description="2.22.0: what the list is for in "
+            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", "budget", None], description="2.22.0: what the list is for in "
                         "Home & life (health lists are private: never visible to agents, tokens need the scope private); null = none"),
             "trip": {"type": ["object", "null"], "description": "2.22.0: a trip list's {from, to, where?}", "properties": {
                 "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}},
@@ -270,7 +282,7 @@ def openapi_spec():
         "ListPatch": {"type": "object", "additionalProperties": False, "properties": {
             "org_id": nul("integer", description="2.28.0: the list's workspace (the owner; 409 while people / agents in it do not fit, for family / Home & life lists and the inbox)"),
             "client_id": nul("integer", description="2.23.0: the client of the list (owner / list admins; a client you see); null = none"),
-            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", None], description="2.22.0: what the list is for in "
+            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", "budget", None], description="2.22.0: what the list is for in "
                         "Home & life (health lists are private: never visible to agents, tokens need the scope private); null = none"),
             "trip": {"type": ["object", "null"], "description": "2.22.0: a trip list's {from, to, where?}", "properties": {
                 "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}},
@@ -540,8 +552,8 @@ def openapi_spec():
                    "post": op("Create a task (default list: your inbox)", T, ok(ref("Task"), "Created", "201") | errs("400", "403", "404"),
                               body=ref("TaskCreate"), scope="write")},
         "/tasks/{id}": {"get": op("One task", T, ok(ref("Task")) | errs("404"), [pid()]),
-                        "patch": op("Change a task (only the fields you send)", T, ok(ref("Task")) | errs("400", "403", "404"), [pid()],
-                                    body=ref("TaskInput"), scope="write"),
+                        "patch": op("Change a task (only the fields you send)", T, ok(ref("TaskChanged")) | errs("400", "403", "404"), [pid()],
+                                    body=ref("TaskUpdate"), scope="write"),
                         "delete": op("Move a task (with its subtasks) to the trash", T,
                                      {"204": {"description": "In the trash (restorable in the app)"}} | errs("403", "404"), [pid()], scope="write")},
         "/tasks/{id}/complete": {"post": op("Complete a task", T, ok(ref("TaskCompleted")) | errs("403", "404"), [pid()], scope="write",
@@ -680,6 +692,8 @@ def openapi_spec():
     atm_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 C (#1353)
     from ..agents.lyprop import lyp_spec
     lyp_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.55.0 B (#1066)
+    from ..agents.importprop import aim_spec
+    aim_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.68.0 A (#1839)
     from ..hub.agentdispo import adz_spec
     adz_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 C (#1355)
     from ..files.v1 import files_spec
@@ -694,6 +708,12 @@ def openapi_spec():
     spt_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.60.0 B (#1511)
     from ..lists.sprints import spr_spec
     spr_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.60.0 (#343)
+    from ..agents.contractprop import ctr_spec
+    ctr_spec(paths)  # 2.70.0 C (#1359): the kind notice of POST /agent/proposals
+    from ..tasks.multilist import ml_spec
+    ml_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.71.0 B (#1459)
+    from ..lists.rules import rul_spec
+    rul_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.71.0 A (#1457)
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",

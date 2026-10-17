@@ -124,7 +124,7 @@ def err_of(r):
 start()
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-for u, extra in (("frank", {}), ("gina", {"email": "Gina@Example.test"}), ("hank", {"email": "hank@example.test"}), ("ivy", {})):
+for u, extra in (("frank", {"email": "frank@example.test"}), ("gina", {"email": "Gina@Example.test"}), ("hank", {"email": "hank@example.test"}), ("ivy", {})):
     assert A.post(B + "/api/users", json={"username": u, **extra}).ok, u
 IDS = {u["username"]: u["id"] for u in A.get(B + "/api/users").json()["users"]}
 A.patch(B + f"/api/users/{IDS['ivy']}", json={"disabled": True})
@@ -153,7 +153,7 @@ check(r.status_code == 302 and q.get("response_type") == "code" and q.get("clien
       and q.get("redirect_uri") == "https://kalmido.example/api/auth/oidc/callback" and q.get("code_challenge_method") == "S256"
       and len(q.get("state", "")) >= 40 and len(q.get("nonce", "")) >= 40 and len(q.get("code_challenge", "")) == 43, f"authorization request: {q}")
 check("kalmido_oidc=" in sc and "HttpOnly" in sc and "Path=/api/auth/oidc" in sc and "SameSite=Lax" in sc, f"binding cookie: {sc}")
-code = give_code(q, {"sub": "sub-frank", "preferred_username": "frank"})
+code = give_code(q, {"sub": "sub-frank", "preferred_username": "frank", "email": "frank@example.test", "email_verified": True})  # 2.79.0 (#476 M3): name + the same verified e-mail
 r = s.get(B + "/api/auth/oidc/callback", params={"code": code, "state": q["state"]}, allow_redirects=False)
 check(r.status_code == 303 and r.headers["Location"] == "/" and "kalmido_session" in r.cookies, f"login ok -> '/', session cookie: {r.headers.get('Location')}")
 me = s.get(B + "/api/me").json()
@@ -185,6 +185,18 @@ s, r = oidc_login({"sub": "sub-ivy", "preferred_username": "ivy"})
 check(err_of(r) == "disabled" and "kalmido_session" not in r.cookies, "disabled user -> disabled")
 s, r = oidc_login({"sub": "sub-other", "preferred_username": "frank"})
 check(err_of(r) == "no_account", "a second subject cannot take over an already linked user by name")
+# 2.79.0 (#476 M3): a first link by the user name claim alone takes no local account over
+assert A.post(B + "/api/users", json={"username": "kai", "password": "password123"}).ok
+s, r = oidc_login({"sub": "sub-kai", "preferred_username": "kai"})
+check(err_of(r) == "link" and dbx("SELECT oidc_subject FROM users WHERE username='kai'")[0][0] is None, "M3: a local account (password) by user name alone -> link, not linked")
+assert A.post(B + "/api/users", json={"username": "ssoonly"}).ok
+s, r = oidc_login({"sub": "sub-ssoonly", "preferred_username": "ssoonly"})
+check(err_of(r) == "ok" and dbx("SELECT oidc_subject FROM users WHERE username='ssoonly'")[0][0] == ISS + "|sub-ssoonly", "M3: an account made for SSO (no password, no e-mail) still links by user name")
+s, r = oidc_login({"sub": "sub-hank3", "preferred_username": "hank", "email": "mallory@example.test", "email_verified": True})
+check(err_of(r) == "link" and dbx("SELECT oidc_subject FROM users WHERE username='hank'")[0][0] is None, "M3: user name with another verified e-mail -> link")
+s, r = oidc_login({"sub": "sub-alice-x", "preferred_username": "alice"})
+check(err_of(r) == "link" and dbx("SELECT oidc_subject FROM users WHERE username='alice'")[0][0] is None, "M3: an admin is never linked by the user name claim")
+check("link" in requests.get(B + "/api/auth/info").json()["login_errors"], "M3: the login screen knows the error text")
 
 # ---- broken tokens
 for mode in ("bad_sig", "wrong_aud", "aud_list_no_azp", "azp_bad", "expired", "no_exp", "wrong_nonce", "wrong_iss", "alg_none", "hs256", "tampered"):
@@ -196,12 +208,12 @@ check("token" in ab["error"], f"admin sees the token problem: {ab['error']}")
 # ---- state problems
 s = sess()
 r, loc, q = begin(s)
-code = give_code(q, {"sub": "sub-frank", "preferred_username": "frank"})
+code = give_code(q, {"sub": "sub-frank", "preferred_username": "frank", "email": "frank@example.test", "email_verified": True})  # 2.79.0 (#476 M3): name + the same verified e-mail
 r = s.get(B + "/api/auth/oidc/callback", params={"code": code, "state": "not-the-state"}, allow_redirects=False)
 check(err_of(r) == "state", "unknown state -> state")
 s = sess()
 r, loc, q = begin(s)
-code = give_code(q, {"sub": "sub-frank", "preferred_username": "frank"})
+code = give_code(q, {"sub": "sub-frank", "preferred_username": "frank", "email": "frank@example.test", "email_verified": True})  # 2.79.0 (#476 M3): name + the same verified e-mail
 other = sess()
 r = other.get(B + "/api/auth/oidc/callback", params={"code": code, "state": q["state"]}, allow_redirects=False)
 check(err_of(r) == "state" and "kalmido_session" not in r.cookies, "callback in another browser (no binding cookie) -> state (login CSRF)")
@@ -209,7 +221,7 @@ r = s.get(B + "/api/auth/oidc/callback", params={"code": code, "state": q["state
 check(err_of(r) == "state", "the state is one-time: the first (failed) use consumed it")
 s = sess()
 r, loc, q = begin(s)
-code = give_code(q, {"sub": "sub-frank", "preferred_username": "frank"})
+code = give_code(q, {"sub": "sub-frank", "preferred_username": "frank", "email": "frank@example.test", "email_verified": True})  # 2.79.0 (#476 M3): name + the same verified e-mail
 r = s.get(B + "/api/auth/oidc/callback", params={"code": code, "state": q["state"]}, allow_redirects=False)
 r2 = s.get(B + "/api/auth/oidc/callback", params={"code": code, "state": q["state"]}, allow_redirects=False)
 check(err_of(r) == "ok" and err_of(r2) == "state", "replayed callback refused")
@@ -245,8 +257,13 @@ check(err_of(r) == "no_account", "auto-create off again -> no_account")
 # ---- unlink
 r = A.patch(B + f"/api/users/{IDS['frank']}", json={"oidc_unlink": True})
 check(r.ok and r.json()["oidc_linked"] is False and dbx("SELECT oidc_subject FROM users WHERE username='frank'")[0][0] is None, "admin unlinks")
-s, r = oidc_login({"sub": "sub-frank-new", "preferred_username": "frank"})
+s, r = oidc_login({"sub": "sub-frank-new", "preferred_username": "frank", "email": "frank@example.test", "email_verified": True})
 check(err_of(r) == "ok" and dbx("SELECT oidc_subject FROM users WHERE username='frank'")[0][0] == ISS + "|sub-frank-new", "next login links again")
+
+# 2.79.0 (#476 M3): the account's own open session links it (also an admin): log in with the password, then the provider
+s, r = oidc_login({"sub": "sub-alice", "preferred_username": "alice"}, s=A)
+check(err_of(r) == "ok" and dbx("SELECT oidc_subject FROM users WHERE username='alice'")[0][0] == ISS + "|sub-alice", "M3: own session links the admin")
+check(A.get(B + "/api/me").json().get("username") == "alice", "M3: still alice afterwards")
 
 # ---- rate limit on start (60 / 15 min / IP) + secrets not logged
 logs = subprocess.run(["docker", "logs", CT], capture_output=True, text=True)
@@ -265,13 +282,14 @@ start(["-e KALMIDO_OIDC_ALLOW_HOSTS=127.0.0.1:9990", "-e KALMIDO_OIDC_REQUIRED_G
        "-e KALMIDO_OIDC_SCOPES=openid,profile,email,groups"])
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-assert A.post(B + "/api/users", json={"username": "max"}).ok
+assert A.post(B + "/api/users", json={"username": "max", "email": "max@example.test"}).ok
 s = sess()
 r, loc, q = begin(s)
 check(r.status_code == 302 and q["scope"] == "openid profile email groups", f"env allow-list works; scopes from the env: {q.get('scope')}")
 s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": ["other"]})
 check(err_of(r) == "group" and "kalmido_session" not in r.cookies, "not in the required group -> group")
-s, r = oidc_login({"sub": "sub-max", "preferred_username": "max"}, userinfo={"sub": "sub-max", "groups": ["kalmido"]})
+s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "email": "max@example.test", "email_verified": True},  # #476 M3
+                  userinfo={"sub": "sub-max", "groups": ["kalmido"]})
 check(err_of(r) == "ok" and s.get(B + "/api/me").json()["is_admin"] is False, "group from userinfo -> in, not admin")
 s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": ["kalmido", "kalmido-admins"]})
 check(err_of(r) == "ok" and s.get(B + "/api/me").json()["is_admin"] is True, "admin group -> admin")

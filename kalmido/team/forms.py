@@ -382,6 +382,9 @@ def form_send(token):
         meta += " · " + tr("the sender has a status link", lg=olg)
     content = (vals["text"][:FORM_TEXT_MAX] + "\n\n" if vals["text"] else "") + "— " + meta
     lid = f["list_id"]
+    from ..collab.liste2eguard import LE2B_OFF_MSG, le2b_list_locked
+    if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): a form cannot write plain texts into a list with the lock
+        return _page(c, f, token, lg, vals, tr(LE2B_OFF_MSG, lg=lg))
     srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
     ts = iso(now_utc())
     sec = f["section_id"] if f["section_id"] and c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (f["section_id"], lid)).fetchone() else None

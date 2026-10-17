@@ -64,7 +64,8 @@ def _user_bytes(c, uids):
                       WHERE m.sender='user' AND m.user_id IN ({q})""", uids).fetchone()[0]
     from ..files.store import fs_bytes_of
     e = fs_bytes_of(c, uids)  # 2.48.0 (#1207): every version in the file store counts for its uploader
-    return int(a + b + d + e)
+    g = c.execute(f"SELECT COALESCE(SUM(size),0) FROM budget_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.72.0 (#1333): receipts
+    return int(a + b + d + e + g)
 
 
 def quota_info(c, uid):
@@ -408,7 +409,7 @@ def hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     paths["/announcement"] = {"get": op("2.24.0: the server's current notice (maintenance / announcement), {} when there is none",
                                         "Account", ok(ref("Announcement")))}
     paths["/admin/announcement"] = {"put": op(
-        "2.24.0: set the notice every app shows above its content (admins); {\"text\": \"\"} clears it", "Admin",
+        "2.24.0: set the notice every app shows above its content (admins; 2.79.0: scopes admin-read + account); {\"text\": \"\"} clears it", "Admin",
         ok(ref("Announcement")) | errs("400", "403"), body={"type": "object", "additionalProperties": False, "properties": {
             "text": {"type": "string", "maxLength": ANN_TEXT_MAX}, "level": {"type": "string", "enum": ["info", "maintenance"]},
             "starts_at": {"type": "string", "description": "ISO 8601 (UTC)"}, "ends_at": {"type": "string"},

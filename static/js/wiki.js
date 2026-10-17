@@ -22,19 +22,20 @@ function wk_cur() {
 const wk_spaceName = sp => sp === 'private' ? tr('Private|workspace') : (wsOrg(sp.slice(4))?.name || tr('Organisation'));
 const wk_base = p => p.split('/').pop();
 const wk_isTpl = p => /^(templates|vorlagen)\//i.test(p);
+const wk_e2e = sp => typeof wkeOn === 'function' && wkeOn(sp);  // 2.64.3 B (#1817): the space is encrypted in the browser (wikie2e.js)
 async function wk_load(sp, force) {
   const d = WK.idx[sp] || (WK.idx[sp] = {});
   if (WK.busy['i' + sp] || (!force && d.pages && d.v === S.v)) return;
   WK.busy['i' + sp] = true;
-  try { const j = await rawFetch('GET', '/api/wiki?space=' + encodeURIComponent(sp)); d.pages = j.pages; d.mayWrite = j.may_write; d.err = ''; }
-  catch (e) { if (e.message === 'auth') return; d.err = e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; d.pages = d.pages || null; }
+  try { let j = await rawFetch('GET', '/api/wiki?space=' + encodeURIComponent(sp) + '&bodies=1'); if (typeof wkeIndex === 'function') j = await wkeIndex(sp, j); d.pages = j.pages; d.mayWrite = j.may_write; d.err = ''; }  // 2.64.3 B (#1817): texts of an encrypted space open here
+  catch (e) { if (e.message === 'auth') return; d.err = e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; d.pages = d.pages || null; if ([403, 404].includes(e.status) && typeof wkeForget === 'function') wkeForget(sp); }  // 2.64.3 E (#1817): no access any more
   finally { d.v = S.v; WK.busy['i' + sp] = false; }
   if (S.route.mod === 'wiki') viewSafeRender();
 }
 async function wk_loadPage(id, force) {
   if (WK.busy['p' + id] || (!force && WK.pg && WK.pg.id === id && (WK.pg._v === S.v || WK.dirty || WK.edit))) return;
   WK.busy['p' + id] = true;
-  try { const p = await rawFetch('GET', '/api/wiki/pages/' + id); p._v = S.v; WK.pgErrFor = null; if (WK.pg?.id !== id) { WK.edit = !!WK.editNext && WK.editNext === id; WK.editNext = null; } WK.pg = p; WK.pgErr = ''; WK.space = p.space; }
+  try { const p = await rawFetch('GET', '/api/wiki/pages/' + id); if (typeof wkePage === 'function') await wkePage(p); p._v = S.v; WK.pgErrFor = null; if (WK.pg?.id !== id) { WK.edit = !!WK.editNext && WK.editNext === id; WK.editNext = null; } WK.pg = p; WK.pgErr = ''; WK.space = p.space; }  // 2.64.3 B (#1817)
   catch (e) { if (e.message === 'auth') return; WK.pgErrFor = id + ':' + S.v; WK.pgErr = e.status === 404 ? tr('This page does not exist or you cannot see it.') : e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; if (WK.pg?.id === id) WK.pg = null; }
   finally { WK.busy['p' + id] = false; }
   if (S.route.mod === 'wiki') viewSafeRender();
@@ -75,15 +76,15 @@ function viewWiki() {
   const pages = d?.pages || [], q = WK.q.trim().toLowerCase();
   const vis = q ? pages.filter(p => p.path.toLowerCase().includes(q)) : pages;
   const sel = wk_spaces().length > 1 && (!wsCur?.() || wsCur() === 'all') ?  // 2.63.0 (#1857): the switch above picks the space, this list only with "All"
-     `<label class="wkspace"><span class="sr">${tr('Space')}</span><select data-wk="space" aria-label="${esc(tr('Space'))}">${wk_spaces().map(s => `<option value="${esc(s)}" ${s === sp ? 'selected' : ''}>${esc(wk_spaceName(s))}</option>`).join('')}</select></label>` : '';
+     `<label class="wkspace"><span class="sr">${tr('Space')}</span><select data-wk="space" aria-label="${esc(tr('Space'))}">${wk_spaces().map(s => `<option value="${esc(s)}" ${s === sp ? 'selected' : ''}>${esc(wk_spaceName(s))}</option>`).join('')}</select>${typeof wkeMark === 'function' ? wkeMark(sp) : ''}</label>` : (typeof wkeMark === 'function' ? wkeMark(sp) : '');  // 2.64.3 (#1817): the lock mark
   const side = `<div class="ntlist wkside">
     <div class="ntbar">${sel}<button type="button" class="iconbtn" data-wk="menu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button></div>
     <div class="ntbar"><div class="ssearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
       <button type="button" class="btn sm pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button></div>
-    <nav id="wk-res" aria-label="${esc(tr('Pages'))}">${!d?.pages ? `<div class="muted mhint">${d?.err ? esc(d.err) : tr('Loading…')}</div>`
+    ${typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp) ? wkeLockHtml(sp) : !d?.pages ? `<div class="muted mhint">${d?.err ? esc(d.err) : tr('Loading…')}</div>`
       : vis.length ? (q ? `<ul class="wktree">${vis.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span></a></li>`).join('')}</ul>` : wk_treeHtml(wk_tree(vis), cur, vis.length > 30))
       : q ? `<div class="empty">${tr('No page matches.')}</div>` : heronEmpty('empty', tr('No pages yet.'), tr('Processes, checklists, how-tos: write down what the team needs to know.'))}</nav></div>`;
-  const main = id ? `<article class="ntedit wkpage" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? wk_pageHtml(cur) : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`}</article>` : '';
+  const main = id ? `<article class="ntedit wkpage" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`}</article>` : '';
   return `<div class="ntwrap wkwrap"><div class="ntview ${id ? 'open' : ''}">${mob && id ? '' : side}${main}</div></div>`;
 }
 function wk_crumbs(p) {
@@ -135,7 +136,7 @@ async function wk_flush() {
   if (!b || b.value === p.body) return;
   const patch = {body: b.value, expect_updated_at: p.updated_at};
   try {
-    const r = await rawFetch('PATCH', '/api/wiki/pages/' + p.id, patch);
+    const r = typeof wkeApi === 'function' ? await wkeApi('PATCH', '/api/wiki/pages/' + p.id, patch, p.space) : await rawFetch('PATCH', '/api/wiki/pages/' + p.id, patch);  // 2.64.3 B (#1817)
     Object.assign(p, r, {backlinks: p.backlinks, _v: S.v});
     const s = $('#wk-saved'); if (s) { s.textContent = tr('Saved'); setTimeout(() => { if (s.isConnected) s.textContent = ''; }, 1500); }
   } catch (e) {
@@ -145,7 +146,7 @@ async function wk_flush() {
 }
 async function wk_conflict(mine, theirs, patch) {
   const keep = await askDialog({title: tr('Changed in the meantime by {0}', theirs.updated_by_name || '?'), html: `<p>${tr('Keep your version or take theirs?')}</p><div class="ntdiff"><div><b>${tr('Yours')}</b><pre>${esc(patch.body)}</pre></div><div><b>${tr('Theirs')}</b><pre>${esc(theirs.body)}</pre></div></div>`, ok: tr('Keep mine'), cancel: tr('Take theirs')});
-  if (keep) { try { Object.assign(mine, await rawFetch('PATCH', '/api/wiki/pages/' + mine.id, {...patch, expect_updated_at: theirs.updated_at})); } catch (e) { toast(e.message); } }
+  if (keep) { try { Object.assign(mine, typeof wkeApi === 'function' ? await wkeApi('PATCH', '/api/wiki/pages/' + mine.id, {...patch, expect_updated_at: theirs.updated_at}, mine.space) : await rawFetch('PATCH', '/api/wiki/pages/' + mine.id, {...patch, expect_updated_at: theirs.updated_at})); } catch (e) { toast(e.message); } }
   else Object.assign(mine, theirs);
   renderView();
 }
@@ -158,9 +159,9 @@ async function wk_new(path0 = '') {
   const path = path0 || await askDialog({title: tr('New page'), html: tsel, input: {value: pre, placeholder: tr('Name, folders with / (e.g. Processes/Checklist)'), max: 200}, ok: tr('Create')});
   if (!path || !path.trim()) return;
   const tpl = +WK.tplPick || 0;
-  let r; try { r = await rawFetch('POST', '/api/wiki/pages', {space: sp, path: path.trim(), ...(tpl ? {template_id: tpl} : {})}); } catch (e) { toast(e.message); return; }
+  let r; try { r = wk_e2e(sp) ? await wkeCreate(sp, path.trim(), tpl) : await rawFetch('POST', '/api/wiki/pages', {space: sp, path: path.trim(), ...(tpl ? {template_id: tpl} : {})}); } catch (e) { toast(e.message); return; }  // 2.64.3 B (#1817): name check + template here
   wk_after(sp); WK.editNext = r.id; go('wiki/' + r.id);
-  const e = histAdd({label: tr('Created {0}', qn(wk_base(r.path))), ids: [], snaps: [], lids: [],
+  const e = histAdd({label: tr('Created {0}', qn(wk_base(r.path))), ids: [], snaps: [], lids: [], wsp: sp,
     undo: async () => { await rawFetch('POST', '/api/wiki/trash', {ids: [r.id]}); wk_after(sp); return {skipped: []}; },
     redo: async () => { await rawFetch('POST', '/api/wiki/restore', {ids: [r.id]}); wk_after(sp); return {skipped: []}; }});
   histToast(tr('Page {0} created', qn(wk_base(r.path))), e);
@@ -171,9 +172,9 @@ async function wk_rename(p) {
   const np = await askPrompt(tr('Rename page'), p.path, {input: {max: 200}, ok: tr('Rename')});
   if (!np || np.trim() === p.path) return;
   const old = p.path;
-  const ren = async (path) => { const r = await rawFetch('PATCH', '/api/wiki/pages/' + p.id, {path}); if (WK.pg?.id === p.id) Object.assign(WK.pg, r); wk_after(p.space); return r; };
+  const ren = async (path) => { const r = wk_e2e(p.space) ? await wkeRename(p, path) : await rawFetch('PATCH', '/api/wiki/pages/' + p.id, {path}); if (WK.pg?.id === p.id) Object.assign(WK.pg, r); wk_after(p.space); return r; };  // 2.64.3 B (#1817): links renamed here
   let r; try { r = await ren(np.trim()); } catch (e) { toast(e.message); return; }
-  const e = histAdd({label: tr('Renamed {0}', qn(wk_base(r.path))), ids: [], snaps: [], lids: [],
+  const e = histAdd({label: tr('Renamed {0}', qn(wk_base(r.path))), ids: [], snaps: [], lids: [], wsp: p.space,
     undo: async () => { await ren(old); return {skipped: []}; }, redo: async () => { await ren(r.path); return {skipped: []}; }});
   histToast(r.relinked ? trn('Renamed, {0} link changed', 'Renamed, {0} links changed', r.relinked) : tr('Renamed'), e);
 }
@@ -182,10 +183,10 @@ async function wk_moveFolder(p) {  // the folder of the page (and everything und
   const from = p.path.split('/').slice(0, -1).join('/'); if (!from) return;
   const to = await askPrompt(tr('Rename folder'), from, {input: {max: 200}, ok: tr('Rename')});
   if (!to || !to.trim() || to.trim() === from) return;
-  const mv = async (a, b) => { const r = await rawFetch('POST', '/api/wiki/move', {space: p.space, from: a, to: b}); wk_after(p.space); return r; };
+  const mv = async (a, b) => { const r = wk_e2e(p.space) ? await wkeMove(p.space, a, b) : await rawFetch('POST', '/api/wiki/move', {space: p.space, from: a, to: b}); wk_after(p.space); return r; };  // 2.64.3 B (#1817): one PATCH per page
   let r; try { r = await mv(from, to.trim()); } catch (e) { toast(e.message); return; }
   const nf = to.trim().split('/').filter(Boolean).join('/');
-  const e = histAdd({label: tr('Renamed {0}', qn(from)), ids: [], snaps: [], lids: [],
+  const e = histAdd({label: tr('Renamed {0}', qn(from)), ids: [], snaps: [], lids: [], wsp: p.space,
     undo: async () => { await mv(nf, from); return {skipped: []}; }, redo: async () => { await mv(from, nf); return {skipped: []}; }});
   histToast(trn('{0} page moved', '{0} pages moved', r.moved.length), e);
 }
@@ -193,24 +194,25 @@ async function wk_delete(p) {
   await wk_flush();
   try { await rawFetch('DELETE', '/api/wiki/pages/' + p.id); } catch (e) { toast(e.message); return; }
   WK.pg = null; wk_after(p.space); go('wiki');
-  const e = histAdd({label: tr('Deleted {0}', qn(wk_base(p.path))), ids: [], snaps: [], lids: [],
+  const e = histAdd({label: tr('Deleted {0}', qn(wk_base(p.path))), ids: [], snaps: [], lids: [], wsp: p.space,
     undo: async () => { const r = await rawFetch('POST', '/api/wiki/restore', {ids: [p.id]}); wk_after(p.space); return {skipped: r.skipped?.length ? [p.path] : []}; },
     redo: async () => { await rawFetch('POST', '/api/wiki/trash', {ids: [p.id]}); wk_after(p.space); return {skipped: []}; }});
   histToast(tr('Page {0} deleted', qn(wk_base(p.path))), e);
 }
-function wk_export() { const a = document.createElement('a'); a.href = '/api/wiki/export?space=' + encodeURIComponent(wk_cur()); a.download = 'wiki.zip'; document.body.append(a); a.click(); a.remove(); }
+function wk_export() { if (wk_e2e(wk_cur())) { wkeExport(wk_cur()).catch(e => toast(e.message)); return; }  // 2.64.3 B (#1817): the ZIP is made in the browser
+  const a = document.createElement('a'); a.href = '/api/wiki/export?space=' + encodeURIComponent(wk_cur()); a.download = 'wiki.zip'; document.body.append(a); a.click(); a.remove(); }
 function wk_import() {
   const sp = wk_cur(), inp = document.createElement('input');
   inp.type = 'file'; inp.accept = '.zip,application/zip';
   inp.onchange = async () => {
     const f = inp.files?.[0]; if (!f) return;
     const fd = new FormData(); fd.append('file', f);
-    let r; try { r = await rawFetch('POST', '/api/wiki/import?space=' + encodeURIComponent(sp), fd); } catch (e) { toast(e.message); return; }
+    let r; try { r = wk_e2e(sp) ? await wkeImport(sp, f) : await rawFetch('POST', '/api/wiki/import?space=' + encodeURIComponent(sp), fd); } catch (e) { toast(e.message); return; }  // 2.64.3 B (#1817): read and encrypted in the browser
     wk_after(sp);
     const ids = r.created || [];
     const msg = tr('{0} pages imported', ids.length) + (r.skipped?.length ? ' · ' + tr('{0} skipped', r.skipped.length) : '');
     if (!ids.length) { toast(msg); return; }
-    const e = histAdd({label: tr('Import of {0} pages', ids.length), ids: [], snaps: [], lids: [],
+    const e = histAdd({label: tr('Import of {0} pages', ids.length), ids: [], snaps: [], lids: [], wsp: sp,
       undo: async () => { await rawFetch('POST', '/api/wiki/trash', {ids}); wk_after(sp); return {skipped: []}; },
       redo: async () => { await rawFetch('POST', '/api/wiki/restore', {ids}); wk_after(sp); return {skipped: []}; }});
     histToast(msg, e);
@@ -248,7 +250,8 @@ document.addEventListener('click', async e => {
   else if (k === 'close' || k === 'home') { e.preventDefault(); await wk_flush(); WK.edit = false; go('wiki'); }
   else if (k === 'mode') { if (a.dataset.m === 'read') await wk_flush(); WK.edit = a.dataset.m === 'edit'; renderView(); if (WK.edit) setTimeout(() => $('#wk-body')?.focus(), 30); }
   else if (k === 'ac') { e.preventDefault(); wk_acPick(+a.dataset.i); }
-  else if (k === 'menu') menu(a, [{label: tr('Export as ZIP'), icon: 'download', fn: wk_export}, ...(WK.idx[wk_cur()]?.mayWrite !== false ? [{label: tr('Import ZIP…'), icon: 'upload', fn: wk_import}] : [])]);
+  else if (k === 'menu') menu(a, [{label: tr('Export as ZIP'), icon: 'download', fn: wk_export}, ...(WK.idx[wk_cur()]?.mayWrite !== false ? [{label: tr('Import ZIP…'), icon: 'upload', fn: wk_import}] : []),
+    ...(typeof wkeDlg === 'function' && S.me?.kind !== 'agent' && globalThis.crypto?.subtle ? ['-', {label: tr('Encryption…'), icon: 'lock', fn: () => wkeDlg(wk_cur())}] : [])]);  // 2.64.3 B (#1817)
   else if (k === 'pmenu' && p) menu(a, [{label: tr('Rename…'), icon: 'edit', fn: () => wk_rename(p)},
     ...(p.path.includes('/') ? [{label: tr('Rename folder…'), icon: 'folder', fn: () => wk_moveFolder(p)}] : []),
     {label: tr('Copy link'), icon: 'link', fn: () => { navigator.clipboard?.writeText(`${location.origin}${location.pathname}#wiki/${p.id}`).then(() => toast(tr('Link copied'))); }},
@@ -294,10 +297,14 @@ function wk_mentionHtml(t) {
 // ---- search / command field: pages of every space ("Knowledge page")
 async function wk_search(q) {
   if (!feat('wiki') || !q || q.length < 2) return [];
-  try { return (await rawFetch('GET', '/api/wiki/search?q=' + encodeURIComponent(q))).pages || []; } catch { return []; }
+  let ps; try { ps = (await rawFetch('GET', '/api/wiki/search?q=' + encodeURIComponent(q))).pages || []; } catch { ps = []; }
+  return typeof wkeSearch === 'function' ? [...ps, ...wkeSearch(q)] : ps;  // 2.64.3 B (#1817): + the unlocked encrypted spaces, searched here
 }
 // ---- a task's "Mentioned in" (the detail asks once per opening)
 async function wk_mentions(tid) {
   if (!feat('wiki') || !(tid > 0)) return [];
-  try { return (await rawFetch('GET', '/api/wiki/mentions?task=' + tid)).pages || []; } catch { return []; }
+  let ps; try { ps = (await rawFetch('GET', '/api/wiki/mentions?task=' + tid)).pages || []; } catch { ps = []; }
+  if (typeof wkeMentions !== 'function') return ps;
+  await Promise.all(wk_spaces().filter(sp => !WK.idx[sp]).map(sp => wk_load(sp)));  // 2.64.3 B (#1817): + the unlocked encrypted spaces
+  return [...ps, ...await wkeMentions(tid)];
 }

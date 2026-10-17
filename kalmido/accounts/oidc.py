@@ -62,7 +62,9 @@ OIDC_ERRORS = {"no_account": N_("There is no account for this login yet. Please 
                "state": N_("The login took too long or was started in another browser. Please try again."),
                "denied": N_("The login was cancelled at the login provider."),
                "taken": N_("The user name from the login provider is already used by another account."),
-               "failed": N_("The login with the provider failed. Please try again or ask the admin.")}
+               "failed": N_("The login with the provider failed. Please try again or ask the admin."),
+               # 2.79.0 (#476 M3)
+               "link": N_("This account is not linked to the login provider yet. Log in with your password first, then use the provider's button once in the same browser.")}
 
 
 def oidc_seal(secret):
@@ -314,14 +316,33 @@ def _truthy(v):
     return v is True or (isinstance(v, str) and v.lower() == "true")
 
 
-def oidc_account(c, claims):
-    """The user for these claims (links / creates as configured) or OidcError(no_account|disabled|group|taken)."""
+def oidc_account(c, claims, sess_uid=None):
+    """The user for these claims (links / creates as configured) or OidcError(no_account|disabled|group|taken|link).
+    sess_uid: the person already signed in in this browser (a first link of their own account needs no other proof)."""
     from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): before the login nobody is signed in: linking / creating the account and syncing its
-        return _oidc_account(c, claims)  # groups (memberships of their lists) is account structure across organisations
+        return _oidc_account(c, claims, sess_uid)  # groups (memberships of their lists) is account structure across organisations
 
 
-def _oidc_account(c, claims):
+def oidc_link_ok(c, u, how, email, sess_uid):
+    """2.79.0 (#476 M3): may this login link the existing local account u for the first time (how = username | email)?
+    The account's own open session always may. Otherwise never an agent, a child account, an admin or an account with a
+    second factor (the provider's login would skip it), and a match by user name only with the same verified e-mail too
+    (a provider where people choose their user name must not take over a local account) or for an account made for single
+    sign-on (no password, no e-mail). Linked accounts stay as they are."""
+    if sess_uid is not None and sess_uid == u["id"]:
+        return True
+    from .login import twofa_methods
+    if u["kind"] != "user" or u["kid"] or u["is_admin"] or twofa_methods(c, u):
+        return False
+    if how == "email" or bool(email and (u["email"] or "").strip().lower() == email):
+        return True
+    # an account an admin made for single sign-on (no password, no e-mail: README "New user (SSO login = ...)") is linked
+    # by its user name as before; it cannot log in any other way, so there is no session to link it from
+    return not u["password_hash"] and not (u["email"] or "").strip()
+
+
+def _oidc_account(c, claims, sess_uid=None):
     from ..lists.groups import grp_oidc_sync
     from ..accounts.users import _active_admins
     from ..notify.alerts import aa_now
@@ -367,6 +388,10 @@ def _oidc_account(c, claims):
         return _user(c, uid)
     if u["disabled"]:
         raise OidcError("disabled", u["username"])
+    if how != "subject" and not oidc_link_ok(c, u, how, email, sess_uid):
+        msg = N_("A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).")
+        aa_now("security", f"oidc:nolink:{u['username']}", msg, [u["username"], {"t": N_("user name") if how == "username" else N_("e-mail")}])
+        raise OidcError("link", u["username"])
     if how != "subject":
         c.execute("UPDATE users SET oidc_subject=? WHERE id=?", (subject, u["id"]))
         aa_now("security", f"oidc:link:{u['username']}", N_("{0} was linked to the OIDC provider (matched by {1})."),
@@ -462,10 +487,10 @@ def oidc_callback():
                     claims = {**{k: v for k, v in ui.items() if k not in ("iss", "aud", "exp", "iat", "nbf", "nonce", "azp")}, **claims}
             except OidcError as e:
                 print("OIDC userinfo skipped:", e.code, e.detail, flush=True)
-        u = oidc_account(c, claims)
+        u = oidc_account(c, claims, g.user["id"] if g.get("auth_via") == "session" and g.get("user") is not None else None)
     except OidcError as e:
         c.rollback()
-        if e.code in ("no_account", "disabled", "group", "taken"):
+        if e.code in ("no_account", "disabled", "group", "taken", "link"):
             print("OIDC login refused:", e.code, e.detail, flush=True)
             aa_count("security", "logins", client_ip(), user="oidc:" + e.code)
             return _oidc_fail_redirect(e.code)
