@@ -7,6 +7,14 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.80.1] - 2026-10-17
+
+CI fixes for the 2.80 bundle.
+
+- Browser demo: the evening review card in Today no longer stops the demo after the end of the working day (the demo's
+  review answer had no *tomorrow* part).
+- Office catalog: the control character filter is written with escapes instead of raw bidirectional characters (bandit B613).
+
 ## [2.80.0] - 2026-10-17
 
 Small fixes: import, clients, contacts.
@@ -5511,7 +5519,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.41.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.80.1...HEAD
+[2.80.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.80.1
 [2.41.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.2
 [2.41.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.1
 [2.41.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.0

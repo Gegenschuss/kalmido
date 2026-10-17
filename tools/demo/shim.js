@@ -605,7 +605,8 @@
   on('GET', '/api/dayplan', q => dayplan(q));
   on('GET', '/api/dayplan/review', () => { const t0 = today();
     return {date: t0, done: live().filter(t => t.completed_at && ds(new Date(t.completed_at)) === t0).map(t => ({task_id: t.id, title: t.title})), moved: [],
-      open: live().filter(t => t.status === 0 && t.due && t.due <= t0).map(t => ({due: t.due, overdue: t.due < t0, task_id: t.id, title: t.title}))}; });
+      open: live().filter(t => t.status === 0 && t.due && t.due <= t0).map(t => ({due: t.due, overdue: t.due < t0, task_id: t.id, title: t.title})),
+      tomorrow: {date: addDays(t0, 1), plan: [], events: 0, count: 0}}; });  // 2.80.1: the review card needs tomorrow (CI after 17:00)
   // the simulated agent
   on('GET', '/api/agents', () => ({agents: [agentOut()]}));
   on('GET', '/api/agents/jobs', q => ({jobs: DB.jobs.filter(j => q.get('state') !== 'open' || ['running', 'waiting'].includes(j.state)).map(jobOut).reverse()}));
