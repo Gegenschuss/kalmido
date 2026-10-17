@@ -21,6 +21,10 @@ minor one, anything that needs action on your side a major one.
 - REST API `POST /api/v1/lists/{id}/duplicate` (`structure`; `{name?, done?, folder?}` -> `{list_id}`) and the MCP tool
   `duplicate_list`.
 
+### Security
+- A list locked in the browser (end-to-end) cannot be duplicated (`409 list_e2e`, like saving it as a template): the copy
+  would have been an unlocked list. Very large lists are refused before the copy is built (audit #476 N35).
+
 ## [2.77.0] - 2026-10-17
 
 ### Added
