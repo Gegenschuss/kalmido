@@ -130,7 +130,8 @@ def ctr_expire(c):
     """Open notice proposals whose last day to cancel passed are discarded (the agent is not told); old markers go."""
     ts, today = iso(now_utc()), local_now().date().isoformat()
     c.execute("""UPDATE agent_jobs SET prop_state='discarded', state='stopped', updated_at=? WHERE kind=? AND prop_state='ready'
-                 AND COALESCE(input::jsonb->>'due', '')<?""", (ts, CTR_KIND, today))
+                 AND (CASE WHEN kind=? THEN COALESCE(input::jsonb->>'due', '') END)<?""", (ts, CTR_KIND, CTR_KIND, today))
+    # (the CASE: only notice rows are read as JSON, whatever order the planner picks)
     c.execute("DELETE FROM ctr_notices WHERE sent_at<?", (iso(now_utc() - timedelta(days=CTR_KEEP_DAYS)),))
 
 
