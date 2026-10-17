@@ -96,6 +96,7 @@ const M = 'ZQXmark';  // every plain text of a locked list carries it: no storag
     check(wr.after, 'H4: after le2eAcceptKey the key is used');
     check(wr.own, 'H4: my own wrap opens with my own key (the server copy of wrapper_pub is ignored)');
 
+    await ev(`(histFields('t', [[{id: 1, list_id: ${L}, title: '${M} undo'}, {id: 1, list_id: ${L}, title: 'x'}]], {fields: ['title']}), 1)`);  // an undo step of the locked list
     // incoming: a cipher in the state becomes the plain text in memory, the cipher stays in _enc
     const cT = await ev(`le2eEnc(${L}, 'title', '${M} task title')`);
     const cC = await ev(`le2eEnc(${L}, 'content', '${M} task notes')`);
@@ -151,11 +152,17 @@ const M = 'ZQXmark';  // every plain text of a locked list carries it: no storag
     check(mv.title === `${M} offline` && mv.move?.tasks?.[0]?.title === `${M} offline` && (mv.move?.comments || [])[0]?.body === `${M} hello <@${BOB}>`, 'M8: moving out carries the plain texts and comments ' + JSON.stringify(mv).slice(0, 300));
     const mi = await ev(`le2eOut('PATCH', '/api/tasks/${T2}', {list_id: ${L}}).then(b => ({title: b.title, m: b.le2e_move?.tasks?.[0]?.title}))`);
     check(mi.title?.startsWith('e2e1:') && mi.m === mi.title, 'M8: moving in encrypts the texts for the target list');
+    // a subtask in the trash is not in the page: the server names it (need), le2eFix fetches and converts it
+    const cS = await ev(`le2eEnc(${L}, 'title', '${M} trashed sub')`);
+    const TS = (await call('POST', '/api/tasks', {title: cS, list_id: L, parent_id: T})).j.id;
+    await call('DELETE', `/api/tasks/${TS}`);
+    const fx = await ev(`le2eFix('/api/tasks/${T}', {list_id: ${L2}, le2e_move: {tasks: [], comments: [], fields: []}}, {tasks: [${TS}], comments: [], fields: []}).then(b => b && b.le2e_move.tasks.find(x => x.id === ${TS})?.title, e => 'ERR ' + e.message)`);
+    check(fx === `${M} trashed sub`, 'M8: a missing subtask (trash) is fetched and sent in the target format ' + fx);
     // no key: no text leaves
     const lk = await ev(`(async () => { const k = LE2E.keys[${L}]; LE2E.keys[${L}] = {}; LE2E.tried[${L}] = '1'; try { await le2eOut('PATCH', '/api/tasks/${T}', {title: 'x'}); return 'sent'; } catch (e) { return e.code; } finally { LE2E.keys[${L}] = k; } })()`);
     check(lk === 'list_e2e_locked', 'without the list key a text is refused ("unlock first") ' + lk);
     // lock: nothing readable stays in the page
-    check(await ev(`(e2eLock(), (() => { const t = S.tasks.get(${T}); return t.title === '' && t._le2e === 'locked' && !LE2E.memo.size && !Object.keys(LE2E.keys).length; })())`), 'lock: plain texts and keys wiped');
+    check(await ev(`(e2eLock(), (() => { const t = S.tasks.get(${T}); return t.title === '' && t._le2e === 'locked' && !LE2E.memo.size && !Object.keys(LE2E.keys).length && !JSON.stringify(HIST.undo).includes('${M}') && !JSON.stringify(HIST.redo).includes('${M}'); })())`), 'lock: plain texts, keys and undo steps of the list wiped');
   });
 
   if (!hasA) { console.log('p264a_c_ui: part A routes missing, end-to-end cases skipped'); }
