@@ -162,6 +162,8 @@ ORDER = (
     "life.v1",
     "life.budget",  # 2.72.0 (#1333): the household budget
     "life.budget_web",
+    "life.rss",  # 2.85.0 B (#1162): feeds
+    "life.rss_web",
     "team.clients",
     "team.clients_bulk",  # 2.47.3 (#1733): several clients at once
     "team.clientmerge",  # 2.66.0 B (#1835): merging duplicate clients (reversible)
