@@ -68,7 +68,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // 2.18.0 (#651, intended change): the quick reactions are visible in the meta line of every message (no hidden bar)
   check(r1 && r1.querySelectorAll('.cmeta .rxrow .rx.add').length === 3 && !r1.querySelector('.rxhint') && !/counts as/.test(r1.querySelector('[data-e="up"]').getAttribute('aria-label')), 'A2 / #651: a status message: 👍 👎 ❤️ visible, plain reactions');
   check(r2 && !r2.querySelector('.rxhint'), 'A2: an older question has no "👍 = approval" hint (only the newest message)');
-  check(d.querySelector('#achat .chath .ib[data-ii="chat-info"]') && !d.querySelector('#achat .chnote'), 'helper texts: the chat note is behind (i) in the header, not under the input');
+  // 2.87.0 (#1982): no (i) in the chat header any more (it covered the usage ring); the note lives in the agent settings
+  check(!d.querySelector('#achat .chath .ib[data-ii="chat-info"]') && !d.querySelector('#achat .chath #chat-info') && !d.querySelector('#achat .chnote'), 'helper texts: no (i) in the chat header, no note under the input (#1982)');
   check(!d.querySelector('#chat-st .atdots'), 'P11: no typing dots in the header (only the line under the messages)');
   const rp1 = await call('POST', `/api/agents/${AG}/chat/${q1.id}/reactions`, {emoji: 'up'});
   check(rp1.status === 200 && rp1.approval === null, 'A2: 👍 on a status message is a plain reaction, no approval');
