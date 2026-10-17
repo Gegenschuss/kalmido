@@ -7,6 +7,30 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.64.2] - 2026-10-17
+
+### Added
+- **Lock per list, stage 2**: when a member who held the key leaves a list with the lock (or the organisation), the
+  browser of the next owner or list admin changes the list key automatically and encrypts the older contents again in the
+  background (resumable, with progress; a button *Change the key now* for owners and list admins). The honest hint in the
+  member dialog stays until that run is done. New members get every key generation and read older contents too (#1817).
+- Attachments of tasks and comments in a list with the lock are encrypted in the browser with the list key; every member
+  opens them, agents and the API see only "encrypted". Switching the lock on, the key change and the way back convert
+  existing attachments in the browser. Project files and the other ways to add files (mail, API, sharing) are not
+  available in such a list; a task with encrypted files stays in its list.
+- The team chat of a list with the lock is encrypted with the list key; agents and the API read no text and cannot write
+  there, search and *Save as task* leave it out, a mention still notifies the person.
+- Safety numbers of all members of a list with the lock, reachable from its team chat and its attachments; a changed key
+  is shown there too.
+
+### Changed
+- Pushes about a list with the lock show the neutral word in the language of the person who gets them, and a comment
+  push names the list instead of quoting the comment.
+
+### Note
+- Before going back to an older version, open the lock of every list again (as for 2.64.1): older versions do not know
+  the lock, and 2.64.1 cannot open the encrypted attachments and team chat messages of 2.64.2.
+
 ## [2.64.1] - 2026-10-17
 
 ### Added

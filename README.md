@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.64.2** (2026-10-17): **lock per list, stage 2**: attachments and the team chat of a locked list are encrypted
+  too, and when a member leaves the key changes and older contents are encrypted again in the background.
 - **2.64.1** (2026-10-17): **lock per list**: a list's titles, descriptions, subtasks, comments, notes, section names,
   text fields, links and snippets **encrypted in the browser** with a key per list for every member (waiting list, safety
   numbers); agents, mail address, public link and templates stay out of such a list, search runs in the browser.
@@ -431,7 +433,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Lock per list** (2.64.1): a list can be *encrypted in the browser* (list dialog): titles, descriptions, subtasks,
   comments, list notes, section names, text fields, links and code snippets are encrypted with a key per list that each
   member gets wrapped with their own key; dates, status, assignees and the list name stay readable. Members without a key
-  wait until the owner releases it; agents, the mail address, public links and templates are not available there
+  wait until the owner releases it; agents, the mail address, public links and templates are not available there.
+  Since 2.64.2 attachments and the list's team chat are encrypted too, and the key changes when a member leaves
   (see docs/ARCHITECTURE.md, *Lock per list*)
 - **Automatic backups** of the database and all attachments, daily with retention, optionally encrypted, downloadable,
   and a **restore** right in the app (checked, with a safety backup of the current state first)
