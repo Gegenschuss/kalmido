@@ -180,7 +180,7 @@ def ua8_list_info(c, lists, by):
         seen = bool(list_role(c, lid)) or (oid and org_role(c, me(), oid) == "admin")
         named = [n for i, n in mem if vis is None or i in vis]
         out.append({"id": lid, "name": lr["name"] if seen else None, "org_id": oid, "org": oname, "shared": len(mem),
-                    "members": named[:8] if seen else [], "locked": locked})
+                    "members": named[:8] if seen else [], "locked": locked, "foreign": ua8_foreign(c, lr)})
     return out
 
 
@@ -208,6 +208,13 @@ def ua8_delete_info(uid):
                        reason=tr("The account has private lists: only a server admin can delete it. You can remove it from your organisation."))
     return jsonify(**base, can_delete=True, by="instance" if by == "instance" else "org", org_id=None if by == "instance" else by,
                    username=u["username"], lists=ua8_list_info(c, lists, by), candidates=ua8_candidates(c, lists, uid) if lists else [])
+
+
+def ua8_foreign(c, lr):
+    """A list of an organisation the caller does not belong to: it may change hands inside that organisation, but only the
+    organisation's own people delete it (the instance admin never deletes another organisation's lists along)."""
+    from ..accounts.orgs import user_orgs
+    return bool(lr["org_id"]) and lr["org_id"] not in user_orgs(c, me())
 
 
 def ua8_org_of(c, uid):
@@ -267,6 +274,10 @@ def ua8_lists_settle(c, u, by):
     if mode == "delete":
         if (request.args.get("confirm") or "") != u["username"]:
             return err(tr("Type the user name to confirm")), None
+        bad = [lr["id"] for lr in lists if ua8_foreign(c, lr)]
+        if bad:
+            return (jsonify(error=tr("Lists of an organisation you do not belong to cannot be deleted along: hand them over instead."),
+                            lists=bad), 409), None
         icons, files = [], []
         inbox = my_inbox(c, uid)
         with system_ctx(c):  # the account's lists in every organisation go with it (invoices / documents do not hang on lists)
