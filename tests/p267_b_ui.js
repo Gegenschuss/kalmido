@@ -1,6 +1,6 @@
 // 2.67.0 UI tests, part B (#1865): the dependency chain moves along in the timeline (jsdom, fresh DB). Dragging a bar
 // later: the waiting bars slide along as a preview (transform, class dch-ghost), the server moves the chain, the toast
-// "2 dependent tasks moved" with one Undo for all; dragging earlier: the chain stays, the toast offers "Pull the chain in";
+// "2 dependent tasks moved" with one Undo for all; dragging earlier: the chain stays, the toast says so (with Undo);
 // the bar menu and the task panel offer it too (one undo step); the list setting (on by default in a new project list,
 // off in a plain list; off = no preview, nothing moves). Invented names only.
 const {boot, errs, sleep, B, login} = require('./boot');
@@ -51,16 +51,17 @@ const span = (s, e) => `${ds(s)}..${ds(e)}`;
   check(await until(async () => await dates(A) === span(0, 2) && await dates(Bt) === span(3, 4) && await dates(Cc) === span(6, 7)), 'one undo takes the whole chain back');
   await until(() => bar(A) && !bar(A).classList.contains('dch-ghost'));
 
-  // ================= drag earlier: nothing slides back, the toast offers "Pull the chain in"
+  // ================= drag earlier: nothing slides back, the toast says so; pull in
   await sleep(300);
   ptr(w, bar(A), 'pointerdown', 0); ptr(w, d, 'pointermove', -DW);
   check(!bar(Bt).classList.contains('dch-ghost'), 'earlier: no preview (the chain stays)');
   ptr(w, d, 'pointerup', -DW);
   check(await until(async () => (await taskOf(A)).due === ds(1)), 'drop: the task is one day earlier');
   check(await dates(Bt) === span(3, 4), 'earlier: the waiting task stays');
-  check(await until(() => /The waiting tasks stay where they are/.test(toastText(d)) && /Pull the chain in/.test(d.querySelector('#toast button')?.textContent || '')),
-        `toast offers Pull the chain in: ${toastText(d)}`);
-  d.querySelector('#toast button').click();
+  // 2.67.0 (#1865, review): one toast keeps its Undo; "Pull the chain in" lives in the bar menu / task panel
+  check(await until(() => /The waiting tasks stay where they are/.test(toastText(d)) && /Undo/.test(d.querySelector('#toast button')?.textContent || '')),
+        `toast says the chain stays, with Undo: ${toastText(d)}`);
+  w.dch_pull(A);
   check(await until(async () => await dates(Bt) === span(2, 3) && await dates(Cc) === span(5, 6)), 'pulled in: the chain follows right after (gaps kept)');
   check(await until(() => /2 tasks pulled in/.test(toastText(d)) && /Undo/.test(d.querySelector('#toast button')?.textContent || '')), `toast "2 tasks pulled in" with Undo: ${toastText(d)}`);
   d.querySelector('#toast button').click();

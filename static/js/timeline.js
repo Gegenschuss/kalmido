@@ -602,8 +602,9 @@ async function tlCommit(d) {
   let r;
   try { r = await patchTask(t.id, {start, due}, true); } catch { render(); return; }
   const msg = tr('Date: {0}', start && start < due ? `${fmtDayAbs(start)} – ${fmtDayAbs(due)}` : dayLabel(due));
-  shiftUndo(before, r, msg);
-  dch_afterEarlier(t, t.due, due, msg);  // 2.67.0 B (#1865): earlier: the chain stays, the message offers to pull it in
+  // 2.67.0 B (#1865): earlier: the chain stays (said in the one toast; a second toast would replace its Undo - review),
+  // "Pull the chain in" stays in the bar menu and the task panel
+  shiftUndo(before, r, dch_afterEarlier(t, t.due, due) ? [msg, tr('The waiting tasks stay where they are')].join(' · ') : msg);
 }
 // touch: hold a bar ~0.3 s, then drag. Grabbed near an end = change start / due, middle = move.
 // Held and let go without moving: the bar menu (connect, remove dependencies, open).

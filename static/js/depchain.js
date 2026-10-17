@@ -57,10 +57,8 @@ async function dch_pull(id) {
   histToast(msg, e);
 }
 // after a drag made t EARLIER: the waiting tasks stay (no automatic sliding back) - the message offers to pull them in
-function dch_afterEarlier(t, oldDue, newDue, msg) {
-  if (!oldDue || !newDue || newDue >= oldDue || !dch_canPull({...t, due: newDue})) return false;
-  toast([msg, tr('The waiting tasks stay where they are')].filter(Boolean).join(' · '), () => dch_pull(t.id), 8000, tr('Pull the chain in'));
-  return true;
+function dch_afterEarlier(t, oldDue, newDue) {  // true: moved earlier while tasks wait on it (they stay)
+  return !!(oldDue && newDue && newDue < oldDue && dch_canPull({...t, due: newDue}));
 }
 // the task panel (Dependencies): a button under "Blocking" while there are waiting tasks to pull in
 function dch_pullBtn(t, D) {

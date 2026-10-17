@@ -16,7 +16,7 @@ from flask import jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err
+from ..core.db import body, bump, db, err, write_lock
 from ..accounts.session import me
 from ..core.access import need_project, need_task, task_visible
 
@@ -97,6 +97,7 @@ def dch_shift(c, uid, tid, old_due, new_due, seen=None, moved=None, skipped=None
     delta = dch_days(old_due, new_due)
     if delta <= 0 or not dch_switch(c, tid):
         return moved
+    write_lock(c, "depchain")  # 2.67.0 (#1865, review): two moves at once must not both shift the same waiting tasks
     seen = {tid} if seen is None else seen
     seen.add(tid)
     plan, sk = dch_plan(c, uid, [tid], delta, seen, DCH_MAX - len(moved))
@@ -127,6 +128,8 @@ def dch_pull(tid):
     if not t["due"]:
         return err(tr("This task has no date"))
     dry = bool(body().get("dry"))
+    if not dry:
+        write_lock(c, "depchain")
     first = []
     for w in c.execute("""SELECT t.id, t.start, t.due FROM task_deps d JOIN tasks t ON t.id=d.task_id JOIN lists l ON l.id=t.list_id
                           WHERE d.blocker_id=? AND t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL
