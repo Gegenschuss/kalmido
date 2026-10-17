@@ -1614,6 +1614,14 @@ TOOLS += [
      _obj({"view": _VIEW, "name": {"type": "string", "maxLength": 40}, "layout": _LAYOUT, "summary": {"type": "string"},
            "title": {"type": "string"}, "user_id": S_ID}, ["view", "name", "layout"]),
      lambda api, a: api.call("POST", "/layouts/proposals", body=_pick(a, ("view", "name", "layout", "summary", "title", "user_id")))),
+    # 2.70.0 C (#1359): after the event contract_notice
+    ("propose_contract_notice", "2.70.0: after the event contract_notice: ONE sentence for the person (in data.lang, at most 300 characters) "
+                                "when the notice period of the contract ends and what it costs, so they can decide (cancel, renew, compare); "
+                                "no pressure, never say it was cancelled. The person takes it as a note on the contract (optionally with a "
+                                "reminder 3 days before) or discards it (job event). Only for a contract_notice you got; a new one replaces "
+                                "your open one. You never cancel, send or change anything.",
+     _obj({"task_id": S_ID, "text": {"type": "string", "minLength": 1, "maxLength": 300}}, ["task_id", "text"]),
+     lambda api, a: api.call("POST", "/agent/proposals", body={"kind": "notice", **_pick(a, ("task_id", "text"))})),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
@@ -1656,6 +1664,7 @@ TOOL_SCOPES = {
 TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_entries")  # 2.51.0 (#1353)
 TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2.51.0 (#1355)
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
+TOOL_SCOPES["agent"] += ("propose_contract_notice",)  # 2.70.0 C (#1359)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
               "private", "files:read", "files:write", "office", "pinboard", "layouts")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts

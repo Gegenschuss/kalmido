@@ -691,6 +691,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `file_shared` | 2.48.0 (#1207): the owner shared a folder or file of the [file store](#file-store-2480) with the agent (only for a new share, not for a changed role) | `node` `{id, name, kind}`, `role`: `view` \| `edit` |
 | `document_added` | 2.48.0 (#1356): a new document was recognised (once, after its first recognition) in a folder or file of the file store the agent sees (a share or its own result folder); read it with `get_document`, e.g. to [suggest project and category of a receipt](#receipts-suggest-project-and-category-2480) | `document` `{id, name, state, date, url}` |
 | `offer_accepted` | 2.51.0 (#1348): a quotation of the agent's office area was accepted (by a person or the customer's approval); only agents with the switch *May draft office documents* (a personal agent in an organisation only while its owner works in the office), while the area lets agents read office data (see [Office](#office-drafts-only-2510)) | `doc_id`, `number`, `title`, `client_id`, `list_id`, `net`, `gross`, `currency` |
+| `contract_notice` | 2.70.0 (#1359): the last day to cancel a contract (Home & life) in a list shared with the agent is near: from the contract's own lead (else 30 days) before it; once per contract, deadline and agent; never from a health list; only while the person has the module *Contracts* on. Answer with ONE `propose_contract_notice` (see [Contracts and notice deadlines](#contracts-and-notice-deadlines-2700)) | `task_id`, `list_id`, `name`, `provider`, `cost`, `per`, `monthly`, `yearly`, `notice`, `notice_unit`, `due` (cancel by), `ends`, `renew_months`, `days`, `user` `{id, name}`, `lang`, `hint` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -2602,3 +2603,27 @@ something said earlier ("as we discussed about the invoice") instead of paging t
 curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" \
   "$KALMIDO_URL/api/v1/search?scope=messages&q=invoice%20dishwasher&art=c,t&limit=10"
 ```
+
+## Contracts and notice deadlines (2.70.0)
+
+Home & life keeps a contract as a task (the last day to cancel is its due date, the renewal its repeat). Kalmido itself never
+phrases anything: once per contract and deadline the agents that see the contract's list get the event `contract_notice`
+(the contract's own lead before the last day to cancel, else 30 days; never from a health list, never across the agent's
+organisation or its list limit). The agent answers with ONE sentence; the person decides.
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| Remind of a notice deadline (kind `notice`) | `POST /api/v1/agent/proposals` `{kind: "notice", task_id, text}` | `propose_contract_notice` | write |
+
+- **The sentence** (`text`, at most 300 characters, one line): in the person's language (`lang`), what cancelling saves or
+  what staying costs and until when they can decide; no pressure, never "cancelled".
+- **Allowed**: only for a contract the agent got a `contract_notice` for its current deadline (else 409); a contract it
+  cannot see is 404. A new proposal for the same contract replaces the agent's open one; at most 50 a day; the usage limit
+  applies. `POST /api/proposals` with kind `notice` answers 400 (a person cannot ask for it).
+- **The card** (News + push "Proposal ready" per the person's settings; the title names the contract, never its cost): the
+  contract (cancel by, end of the term, notice period, cost), the sentence, and *Take it as a note* (a comment on the contract
+  task as the person, history "applied a proposal by <agent>"), *Remind me* (the same plus a reminder 3 days before the last
+  day to cancel, shown while that is still ahead) or *Discard*. One undo step takes the note (and the reminder) back. The
+  agent gets the event `job` (approve / reject). Open cards end with their deadline.
+- Nothing is ever cancelled, sent or deleted. Health lists and the journal never reach an agent (no event, no read, no
+  scope `private` for agents), also when a person tries to share a health list with it.

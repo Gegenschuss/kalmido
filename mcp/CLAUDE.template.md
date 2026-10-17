@@ -347,6 +347,14 @@ the start page, or when they ask. One open proposal per view (a new one replaces
 `job` (approve / reject): after a decline never propose the same again unasked. The project page (`list:<id>`) only for a
 list shared with you.
 
+### Contracts and notice deadlines (2.70.0)
+The event `contract_notice` comes once per contract and deadline when the last day to cancel a contract in a list shared
+with you is near (the contract's own lead, else 30 days): `name`, `provider`, `cost` / `per`, `monthly`, `due` (cancel by),
+`ends`, `renew_months`, `user` and `lang` (the person whose contract it is). Answer with ONE `propose_contract_notice`: one
+sentence in their language that says what cancelling saves or what staying costs and until when they can decide, without
+pressure; never write that something was cancelled. The person takes it as a note on the contract (optionally with a reminder)
+or discards it (event `job`). You never cancel, send or change a contract yourself; health lists and the journal never reach you.
+
 <!-- kalmido-tool-index:start -->
 ## Events and tools (index)
 
@@ -381,6 +389,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `file_shared`: a folder or file of the file store was shared with you (`node`, `role` view | edit)
 - `document_added`: a new document was recognised in a folder / file shared with you (`document`); a receipt? see *assign a receipt* below
 - `offer_accepted`: a quotation of your office area was accepted (`doc_id`, `client_id`, `list_id`, sums); only with your office switch on
+- `contract_notice`: a shared contract's last day to cancel is near (once per deadline): answer with ONE `propose_contract_notice`
 
 Related tasks (2.59.0): task events may carry `task.related` = up to 5 tasks close in meaning `[{id, title, score}]` (only
 tasks you may see; missing while the server has not computed the task yet or runs without its embedding service). Before
@@ -415,7 +424,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
-`move_task`, `post_team_message`, `propose_layout`, `propose_playbook`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
+`move_task`, `post_team_message`, `propose_contract_notice`, `propose_layout`, `propose_playbook`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
 `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,
