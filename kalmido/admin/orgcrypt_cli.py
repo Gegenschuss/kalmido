@@ -320,6 +320,9 @@ SPACE_SQL = (
     # 2.72.0 (#1333): the receipts of the household budget
     ("budget_files", "f.id", "SELECT f.id AS rid, f.path, l.org_id, l.owner_id FROM budget_files f JOIN lists l ON l.id=f.list_id "
                              "WHERE f.path<>''", "f.list_id"),
+    # 2.83.0 (#1427): the lists' own header pictures (lists/listhead.py o3c_head_rel) move with their list
+    ("lists", "l.id", "SELECT l.id AS rid, 'listheads/l' || l.id || '-' || l.header_file || '.jpg' AS path, l.org_id, l.owner_id "
+                      "FROM lists l WHERE l.header_file<>''", "l.id"),
 )
 
 

@@ -103,6 +103,7 @@ up = lambda s, data, name="head.png", mime="image/png": s.post(B + f"/api/lists/
 check(up(A, GIF, "head.gif", "image/gif").status_code == 400, "a GIF: 400")
 check(up(A, b"not a picture at all", "head.png").status_code == 400, "text named .png: 400 (the content decides)")
 check(up(A, os.urandom(2 * 1024 * 1024 + 10), "big.png").status_code == 413, "more than 2 MB: 413")
+check(up(A, png(5000, 4100)).status_code == 400, "2.83.0 review: a small file of more than 20 megapixels: 400")
 check(up(Bo, png()).status_code == 403 and up(Ca, png()).status_code == 403, "upload: an editing member / a reader 403")
 check(up(Da, png()).status_code == 404, "upload: someone who cannot see the list 404")
 r = up(A, png())

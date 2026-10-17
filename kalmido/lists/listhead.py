@@ -59,7 +59,7 @@ def o3c_head_process(raw):
         im = Image.open(io.BytesIO(raw))  # reads the header only
         if im.format not in ("JPEG", "PNG", "WEBP"):
             raise BadInput(tr("Please choose a JPEG, PNG or WebP picture"))
-        if im.width * im.height > 60_000_000:
+        if im.width * im.height > 20_000_000:  # 2.83.0 review: a 1600 x 800 strip needs no more (PNG / WebP decode in full)
             raise BadInput(tr("This picture cannot be read"))
         if im.format == "JPEG":
             im.draft("RGB", (HEAD_W, HEAD_H))
@@ -106,6 +106,10 @@ def o3c_head_put(lid):
         return err(tr("Invalid value: {0}", "style"))
     if st == "image" and not c.execute("SELECT header_file FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("Invalid value: {0}", "style"))
+    if st == "image":  # 2.83.0 review: a list locked after the upload shows no own picture
+        from ..collab.liste2e import le2e_mode
+        if le2e_mode(c, lid):
+            return err(tr("A locked list has no own header picture"), 409)
     c.execute("UPDATE lists SET header_style=? WHERE id=?", (st, lid))
     bump(c)
     c.commit()
@@ -155,6 +159,9 @@ def o3c_head_get(lid, tok):
         from ..accounts.orglists import ole_org_admin
         if not r or r["header_file"] != tok or not _TOK.fullmatch(tok) or not ole_org_admin(c, lid):
             raise Denied(404)
+    from ..collab.liste2e import le2e_mode
+    if le2e_mode(c, lid):  # 2.83.0 review: locked after the upload = no own picture any more
+        raise Denied(404)
     p = os.path.join(ATT_DIR, o3c_head_rel(lid, tok))
     if not os.path.isfile(p):
         raise Denied(404)
