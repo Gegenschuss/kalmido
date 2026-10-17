@@ -499,6 +499,7 @@ def asst_run():
             data = json.dumps({k: inp[k] for k in ("date", "now", "work", "from", "default_duration", "events", "fixed", "tasks")},
                               ensure_ascii=False)
         msg, rec["chars_in"], cut = A.asst_frame(data, instr if kind == "draft" else None)
+        c.commit()  # no open transaction while the model works (up to KALMIDO_AI_TIMEOUT_S); nothing is written before
         answer = A.asst_chat(system, msg)
         if kind in ("summary", "draft"):
             out = A.asst_cap(answer)
