@@ -331,6 +331,12 @@ the start page, or when they ask. One open proposal per view (a new one replaces
 `job` (approve / reject): after a decline never propose the same again unasked. The project page (`list:<id>`) only for a
 list shared with you.
 
+### Rules of a list (2.71.0)
+`list_rules` shows the rules of a list shared with you ("When a task comes into column X, assign it to Y"). You never create
+or change rules; with the right `structure` you may PROPOSE one (`propose_rule`: name, trigger, action, `summary` = why),
+only when it clearly saves the people work or when they ask. The owner or an admin accepts it and the rule then runs with
+their rights. A change made by a rule never triggers another rule. After a decline never propose the same again unasked.
+
 <!-- kalmido-tool-index:start -->
 ## Events and tools (index)
 
@@ -391,10 +397,10 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,
 `list_jobs`, `list_kids`, `list_layout_blocks`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
 `list_notepads`, `list_notes`, `list_office_data`, `list_office_documents`, `list_packing_templates`,
-`list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
+`list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_rules`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
-`move_task`, `post_team_message`, `propose_layout`, `propose_playbook`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
+`move_task`, `post_team_message`, `propose_layout`, `propose_playbook`, `propose_rule`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
 `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,

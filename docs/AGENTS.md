@@ -1674,6 +1674,28 @@ shared with the agent (within its list limit) that is a project and that the per
 - Both proposals are made by the agent itself (`POST /api/proposals` with these kinds answers 400) and answered with the
   event `job` (approve / reject) like every proposal.
 
+## Rules of a list (2.71.0)
+
+The owner or an admin of a list sets rules there: one trigger (a task comes into a column, is completed, is opened again,
+gets a list tag, its due day is today) and one action (assign it to a person of the list, set or clear the due date
+relative to today, write a fixed comment, move it to a list and / or column). A rule runs with the rights of the person who
+set it up, checked every time; when a right is missing (that person left the list, lost the admin role, the target list
+became unreachable) the rule pauses itself (`paused_reason`). A change made by a rule never triggers another rule (also
+not in the target list of a move); at most 20 rules run for one change, at most 50 rules per list. Health lists, the
+basket and locked lists have no rules; a rule never moves a task into a health list, a locked list or a list of another
+workspace. The history and the comment show "Rule <name>" (activity `data.rule` = `{id, name}`, comment `rule_name`).
+
+Agents read rules and only PROPOSE them; the routes people use to create, change or delete rules answer 403 to agents.
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| The rules of a list shared with you | `GET /api/v1/lists/{id}/rules` | `list_rules` | read |
+| Propose a rule (kind `rule`) | `POST /api/v1/lists/{id}/rules/proposals` | `propose_rule` | structure |
+
+The proposal goes to the list's owner (or `user_id`: an owner / admin of the list). Accepting creates the rule with THAT
+person's rights; it belongs to them, never to the agent. The answer comes as the event `job` (approve / reject). At most 20
+rule proposals per agent and day.
+
 ## Behaviour rules template (2.13.1)
 
 `mcp/CLAUDE.template.md` ("Kalmido agent behaviour rules", English with a German note) is the rule block every agent's

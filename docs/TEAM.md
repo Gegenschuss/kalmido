@@ -113,3 +113,19 @@ task as a push at the highest priority, even if the list is quiet.
   News item ("For you", switched off together with the sharing News) with a preview and *Take over* / *Decline*; taken over,
   it is their own saved arrangement, named after the sender, with no link back.
 - Agents cannot use any of this (403); they propose arrangements their own way (2.55.0, #1066).
+
+## Rules in lists (2.71.0)
+
+In the list settings the owner and the list admins find *Rules*: "When a task comes into the column Review, assign it to
+the reviewer" in one sentence per rule, a switch, edit and delete (undo brings it back). *Add rule* asks for a name, *When* (a
+task comes into a column, is completed, is opened again, gets a list tag, its due date is reached) and *Then* (assign to
+a person of the list, set or remove the due date, write a comment, move to a column or another list of the same
+workspace).
+
+- A rule runs with the rights of the person who set it up. Loses that person the access or the admin role, or the target
+  list becomes unreachable, the rule pauses and the settings say why; switching it on again makes the person who does it
+  its owner.
+- A change made by a rule never starts another rule, so two rules cannot play ping-pong.
+- The history of the task and the comment show "Rule <name>".
+- Health lists, the basket and locked lists have no rules. Copying a list or making a template does not copy its rules.
+- Agents read rules and can only propose one; the owner or an admin accepts it with 👍.
