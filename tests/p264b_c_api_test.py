@@ -227,7 +227,8 @@ r = A.post(B + f"/api/tasks/{T}/comments", json={"body": ct(1), "mentions": [BOB
 check(r.status_code in (200, 201), "comment: a ciphertext " + r.text[:200])
 p = until(lambda: [x for x in pushes() if x.get("topic") == "t-bob"])
 s = json.dumps(p, ensure_ascii=False)
-check(p and "e2e1:" not in s and "Alice hat dich in Roses erwähnt" in s, "comment push: names the list, not the words, in German " + s[:300])
+# the burst gate may fold it into "1 more comment" after the assignment push: then it carries no words either
+check(p and "e2e1:" not in s and ("Alice hat dich in Roses erwähnt" in s or "weiterer Kommentar" in s), "comment push: names the list, not the words, in German " + s[:300])
 check(p and "🔒 Aufgabe" in s, "comment push: the neutral title in the recipient's language " + s[:300])
 
 print(f"p264b_c_api: {OKS[0]} ok, {len(FAILS)} failed")
