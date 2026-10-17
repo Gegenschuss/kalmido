@@ -190,9 +190,3 @@ document.addEventListener('click', async e => {
   }
 });
 document.addEventListener('change', e => { if (e.target.id === 'dp-org') { DPV.org = +e.target.value; DPV.data = null; DPV.free = null; dp_load(); } });
-// 2.66.1 (#1945): the area follows the workspace switch like the absences (absence.js)
-p61b_wsOn('dispo', after => {
-  if (!after) { DPV.seq++; Object.assign(DPV, {data: null, org: null, free: null, mine: null, loading: true}); return; }
-  DPV.loading = false;
-  if (S.route.mod === 'workload' && WLV.tab === 'dispo') dp_load();
-});

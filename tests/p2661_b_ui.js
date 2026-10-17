@@ -29,15 +29,13 @@ const WS_VIEWS = {
   'static/js/wiki.js': 'check:wiki',          // wiki: the space's pages; an open page of the old space closes (p61b_wsOn)
   'static/js/office.js': 'check:office',      // office: pb_wsChanged (its tabs compare OFC.info.org_id)
   'static/js/clientpage.js': 'check:office',  // clients: MSC.ws, part of the office check (same area)
-  'static/js/absence.js': 'check:absences',   // absences: the server's area of the saved setting (p61b_wsOn)
-  'static/js/dispo.js': 'check:dispo',        // disposition: the same (p61b_wsOn)
   'static/js/calendar.js': 'check:calendar',  // appointments: own calendars filtered by wsObjIn while drawing
   'static/js/calevents.js': 'draw',           // the calendars one may write into (dialogs)
   'static/js/contacts.js': 'check:contacts',  // contacts: address books filtered by wsObjIn while drawing
   'static/js/render.js': 'draw',              // lists, tasks, News (checked in p2280_ui)
   'static/js/sidebar.js': 'draw',             // the sidebar's lists and folders (p2280_ui)
   'static/js/sbnav.js': 'draw',
-  'static/js/core.js': 'draw',
+  'static/js/core.js': 'draw',                // also: the new state reloads the workload tabs (absences, disposition)
   'static/js/chat.js': 'draw',                // team chats of the workspace
   'static/js/agents.js': 'draw',              // agents of the workspace (p2280_ui)
   'static/js/agentchat.js': 'helper',         // the default workspace of a new agent
@@ -48,7 +46,8 @@ const WS_VIEWS = {
   'static/js/newsletter.js': 'helper',        // a dialog with its own workspace choice
   'static/js/workspace.js': 'helper',         // the switch itself
   'static/js/wscolor.js': 'helper',
-  'kalmido/hub/absence.py': 'check:absences', // abs_org: the saved setting (also the disposition)
+  'kalmido/hub/absence.py': 'check:absences', // abs_org: the area of the saved setting; absences and disposition load again
+                                              // with the state that follows the saved setting (core.js)
   'kalmido/office/model.py': 'check:office',  // office_org: the saved setting
 };
 const ROOT = path.join(__dirname, '..');
@@ -203,7 +202,7 @@ function scan() {
   check(await until(() => w.eval('DPV.data && DPV.data.org_id') === Bo, 60), 'dispo: Alpha -> Bravo loads Bravo\'s area without opening again');
   await sw(WA);
   check(await until(() => w.eval('DPV.data && DPV.data.org_id') === A, 60), 'dispo: Bravo -> Alpha loads Alpha\'s area');
-  CHECKED.add('dispo');
+  CHECKED.add('absences');  // the disposition: the same area (abs_org)
 
   // ================= the guard, part 2: every listed check ran, every switch hook of the client is listed
   const want = [...new Set(Object.values(WS_VIEWS).filter(v => v.startsWith('check:')).map(v => v.slice(6)))];

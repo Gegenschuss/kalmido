@@ -22,7 +22,8 @@ const wsAgentIn = (a, ws = wsCur()) => ws === 'all' || !a || (ws === 'private' ?
 const wsLabel = (org_id) => org_id ? (wsOrg(org_id)?.name || tr('Organisation')) : tr('Private|workspace');
 // 2.66.1 (#1945): views that keep data of ONE workspace which they cannot check themselves when drawing (the server picks the
 // area from the saved setting) register here: wsSet() calls fn(false) before it draws again and fn(true) once the server
-// knows the new workspace. Views that compare their own workspace when drawing (docs, files, office, clients) need no entry.
+// knows the new workspace. Views that compare their own workspace when drawing (docs, files, office, clients) or load again
+// with the new state (absences, disposition: core.js) need no entry.
 // The guard test p2661_b_ui lists every view with a workspace link.
 const p61b_WS = {};
 const p61b_wsOn = (name, fn) => { p61b_WS[name] = fn; };

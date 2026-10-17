@@ -158,10 +158,3 @@ document.addEventListener('change', async e => {
     try { await put(to)(); histAdd({label: tr('Changed setting: {0}', tr('Public holidays')), sett: true, undo: put(from), redo: put(to)}); toast(tr('Saved')); } catch { /* api() said it */ }
   }
 });
-// 2.66.1 (#1945): without a picked organisation the server shows the area of the saved workspace: on a switch the absences of
-// the old area go at once and the new ones load once the setting is saved (loading = true holds ab2_view until then)
-p61b_wsOn('absences', after => {
-  if (!after) { AB2.seq++; Object.assign(AB2, {data: null, org: null, loading: true}); return; }
-  AB2.loading = false;
-  if (S.route.mod === 'workload' && WLV.tab === 'abs') ab2_load();
-});
