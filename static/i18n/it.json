@@ -9477,5 +9477,7 @@
   "Only a token for all lists with the permissions “Calendar” and “Contacts” may create an app password": "Solo un token per tutte le liste con i permessi «Calendario» e «Contatti» può creare una password per app",
   "This account is not linked to the login provider yet. Log in with your password first, then use the provider's button once in the same browser.": "Questo account non è ancora collegato al provider di accesso. Accedi prima con la tua password, poi usa una volta il pulsante del provider nello stesso browser.",
   "A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).": "Un accesso con il provider OIDC corrispondeva a {0} tramite {1}, ma non è stato collegato (admin, secondo fattore o nessuna e-mail verificata corrispondente).",
-  "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Non ancora controllato per malware: il file si potrà aprire non appena l’antivirus lo avrà controllato"
+  "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Non ancora controllato per malware: il file si potrà aprire non appena l’antivirus lo avrà controllato",
+  "No clients in this area yet": "Ancora nessun cliente in quest'area",
+  "Add client": "Aggiungi cliente"
 }

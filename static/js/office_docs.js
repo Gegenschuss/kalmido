@@ -44,6 +44,15 @@ async function ofdLoadDoc(id, force) {
   catch (x) { OFD.doc = null; OFD.err = x.message || tr('unknown'); }
   OFD.docLoading = false;
   ofdDraw();
+  fx8a_clientsFresh();
+}
+// 2.80.0 (#1842): the client list of the state is read again when a document opens; only a changed list redraws
+async function fx8a_clientsFresh() {
+  if (typeof clientsOn !== 'function' || !clientsOn()) return;
+  try {
+    const j = await api('GET', '/api/clients'), sig = a => a.filter(c => !c.archived).map(c => `${c.id}:${c.name}:${c.org_id || ''}`).sort().join('|');
+    if (sig(j.clients || []) !== sig(S.clients || [])) { await load(); ofdDraw(); }
+  } catch { /* the open document stays as it is */ }
 }
 function ofdDraw() {
   if (S.route.mod !== 'office' || ofcTab() !== 'offers') return;
@@ -140,7 +149,7 @@ function ofdEditorHtml() {
     ${d.currency === 'USD' ? ofdF('fx_rate', tr('Exchange rate'), ofdIn('fx_rate', ofdNumIn(d.fx_rate), {num: true, max: 12}), tr('1 € in USD; rates stay in EUR and are converted')) : ''}
     ${kind !== 'reminder' ? ofdF('vat_mode', tr('VAT'), ofdSel('vat_mode', d.vat_mode, [['vat', tr('with VAT')], ['novat', tr('without VAT (reverse charge / abroad)')]])) : ''}
     ${kind !== 'reminder' ? ofdF('contract_id', tr('Framework contract'), ofdSel('contract_id', d.contract_id, contracts, tr('none|contract')), d.contract ? tr('presets raw data, rights and closing; special rates apply to new positions') : '') : ''}
-    ${clients.length ? ofdF('client_id', tr('Client'), ofdSel('client_id', d.client_id, clients, tr('free recipient'))) : ''}
+    ${clients.length ? ofdF('client_id', tr('Client'), ofdSel('client_id', d.client_id, clients, tr('free recipient'))) : typeof clientsOn === 'function' && clientsOn() ? `<div class="row fx8a_nocl"><label>${esc(tr('Client'))}</label><span class="muted">${esc(tr('No clients in this area yet'))}</span>${ro ? '' : `<button type="button" class="btn sm" data-ofd="client-new">${ic('plus', 's')}<span>${tr('Add client')}</span></button>`}</div>` : ''}
     ${d.client_id && (d.client_contacts || []).length ? ofdF('contact_id', tr('Contact person'), ofdSel('contact_id', d.contact_id ?? d.client_contacts[0].id, [...d.client_contacts.map(k => [k.id, k.name + (k.role ? ` (${k.role})` : '') + (k.is_default ? ' · ' + tr('default') : '')]), [0, tr('no contact person')]]), tr('the attention line of the address follows the choice')) : ''}
     ${ofdF('recipient_name', tr('Recipient'), ofdIn('recipient_name', d.recipient?.name, {ph: tr('Company or name')}))}
     ${ofdF('recipient_lines', tr('Address lines'), ofdTa('recipient_lines', (d.recipient?.lines || []).join('\n'), 3, {ph: tr('one line each: name, attention, street, place')}))}
@@ -423,6 +432,7 @@ async function ofdClick(e) {
   }
   if (a === 'it-del') { d.items.splice(+b.dataset.i, 1); await ofdPutItems(); return; }
   if (a === 'it-up' || a === 'it-down') { const i = +b.dataset.i, j = a === 'it-up' ? i - 1 : i + 1; if (j < 0 || j >= d.items.length) return; [d.items[i], d.items[j]] = [d.items[j], d.items[i]]; await ofdPutItems(); setTimeout(() => $(`.ofdits [data-ofd="${a}"][data-i="${j}"]`)?.focus(), 0); return; }
+  if (a === 'client-new') { if (typeof clientModal === 'function') clientModal(null, {org_id: pb_clOrg(), stay: true}); return; }  // 2.80.0 (#1842)
   if (a === 'fld-add') { d.fields = [...(d.fields || []), {name: '', value: ''}]; OFD.open.fields = true; ofdDraw(); setTimeout(() => $(`#ofd-fields [data-fld="${d.fields.length - 1}"][data-k="name"]`)?.focus(), 0); return; }
   if (a === 'fld-del') { d.fields.splice(+b.dataset.i, 1); await ofdPatch({fields: d.fields}); return; }
 }

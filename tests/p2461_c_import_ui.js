@@ -2,6 +2,7 @@
 // - #1557 legacy import: every area of the preview has a switch "Take over" and "Skip all"; an area switched off folds away,
 //   the import button counts only the areas switched on and the import sends only them; the import runs show
 //   "Only undo the equipment" per area and an undone area as a tag
+// - 2.80.0 (#1836): a client created while the app is open shows in the import's client choice on the next visit of the page
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -62,6 +63,13 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(((await call('GET', '/api/office/equipment')).items || []).length === 2 && !(cl.clients || []).some(c => c.name === 'Bergtal Studios'), '#1557: the import wrote services + equipment, no client');
   const runs = (await call('GET', '/api/office/legacy/runs')).runs || [];
   check(runs[0] && Object.keys(runs[0].areas || {}).sort().join(',') === 'equipment,services', '#1557: the new run has the two areas: ' + JSON.stringify(runs[0]?.areas));
+  // 2.80.0 (#1836): a client created meanwhile is in the client choice after leaving and opening the import page again
+  const ncl = await call('POST', '/api/clients', {name: 'Nordlicht Medien', org_id: ORG});
+  check(ncl.http === 201 || !!ncl.id, '#1836: client created ' + ncl.http);
+  w.location.hash = '#office/settings'; await sleep(200);
+  w.location.hash = '#office/import';
+  const seen = await until(() => w.eval(`(OIM.clients || []).some(c => c.name === 'Nordlicht Medien')`), 40);
+  check(seen && /Nordlicht Medien/.test(w.eval(`oimClientOpts('')`)), '#1836: the new client is in the import client choice without a reload');
   w.close();
 
   console.log(`p2461_c_import_ui: ${ok} ok, ${F.length} failed`);
