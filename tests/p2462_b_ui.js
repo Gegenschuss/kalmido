@@ -60,6 +60,7 @@ const shift = card => card.style.transform;
   pe(w, hd, 'pointerdown', 500, 250); pe(w, d, 'pointermove', 600, 300); pe(w, d, 'pointerup', 600, 300);
   check(shift(card) === 'translate(100px, 50px)', '#1665: dragging the header moves the dialog: ' + shift(card));
   pe(w, hd, 'pointerdown', 600, 300); pe(w, d, 'pointermove', 3000, -900); pe(w, d, 'pointermove', 3000, -900);
+  await sleep(60);  // 2.87.9 (#1965): a move shows in the next frame
   check(shift(card) === 'translate(312px, -234px)', '#1665: the dialog stays inside the window (top right corner): ' + shift(card));
   // the drag ends over the backdrop: up + click there do not close it
   pe(w, md, 'pointerup', 3000, -900); md.dispatchEvent(new w.MouseEvent('click', {bubbles: true}));
