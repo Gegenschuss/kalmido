@@ -7,6 +7,23 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.87.0] - 2026-10-18
+
+Hardening from the security audit, part 3 (two high findings at the organisation boundary) and a calmer agent chat header.
+
+### Security
+- Appointments: a person who leaves an organisation or is removed from it (also with their agents) is no longer invited
+  to the appointments in its calendars - no view, reply, reminder push or CalDAV entry. Appointments in an organisation
+  calendar invite only people of that organisation (in the app, over CalDAV and ICS); a calendar with outside guests
+  moves into an organisation only after they are removed. Invitations in private calendars stay as they are.
+- Lists: a list is handed over only to people you can see (or who are members of it); any other account answers exactly
+  like an unknown one. Freelancers without an organisation hand lists to their contacts as before.
+- The nightly boundary check finds and removes left-over invitations of former members (and counts those of agents).
+
+### Changed
+- Agent chat: the info button next to the agent's name is gone, so it no longer covers the usage ring; the note on when an
+  agent answers is now in the agent's settings (own agents: *Permissions*, team agents: *Edit agent*).
+
 ## [2.86.0] - 2026-10-17
 
 Hardening from the security audit, part 1 (low findings, #1896). No new features; normal use stays the same.
