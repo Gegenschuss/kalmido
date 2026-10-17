@@ -175,9 +175,10 @@ att = {x["name"]: x for x in Bo.get(B + f"/api/tasks/{T1}").json().get("attachme
 check((att.get("up") or {}).get("text") == "found", f"#1820 (with #1818's marks): the task file carries up.text found ({att.get('up')})")
 n_words = dbx("SELECT COUNT(*) FROM file_words w JOIN file_text f ON f.id=w.ft_id WHERE f.kind='att' AND f.ref_id=?", (A1,))[0][0]
 # 2.81.0 (#1856): the nightly boundary check counts a recognised text kept for another workspace than its file's list
-dbx("UPDATE file_text SET org_id=? WHERE kind='att' AND ref_id=?", (ORG, A1), write=True)
+FT_ORG = dbx("SELECT org_id FROM file_text WHERE kind='att' AND ref_id=?", (A1,))[0][0]
+dbx("UPDATE file_text SET org_id=? WHERE kind='att' AND ref_id=?", (None if FT_ORG else ORG, A1), write=True)
 bd = A.get(B + "/api/admin/orgs").json().get("boundary", {})
-dbx("UPDATE file_text SET org_id=NULL WHERE kind='att' AND ref_id=?", (A1,), write=True)
+dbx("UPDATE file_text SET org_id=? WHERE kind='att' AND ref_id=?", (FT_ORG, A1), write=True)
 check(bd.get("kinds", {}).get("file_text") == 1, "#1856: the boundary check counts file_text across the boundary " + str(bd.get("kinds")))
 check(not A.get(B + "/api/admin/orgs").json().get("boundary", {}).get("kinds", {}).get("file_text"), "#1856: ... and nothing when it fits")
 # 2.81.0 (#1856): a run of 35 minutes is not taken up again (the longest recognition, 30 pages x 60 s, is still going on)
