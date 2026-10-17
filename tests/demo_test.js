@@ -4,6 +4,10 @@
 // (localStorage), the main views render, a server feature shows the "not available" notice, the simulated agent waits for
 // an approval, "Reset demo" brings the sample back, and the page never asks for anything but its own static files (the
 // server log: no /api/, nothing outside the demo folder; window.fetch of the browser is never reached).
+// 2.74.0 (#1653): the demo starts like a new account: Basket, "Getting started" list and the welcome tour; the sample comes
+// with the button (POST /api/sample), "Reset demo" starts a new account again; an old demo storage (version 1) is kept;
+// no fetch / XHR / WebSocket / EventSource / sendBeacon of the browser, no http(s) source in index.html, every API call
+// answered by the shim (KDEMO.miss). The office flow: p274_b_demo_test.js.
 // usage: node demo_test.js          (needs python3 + jsdom)
 const {JSDOM, VirtualConsole} = require('jsdom');
 const http = require('http'), fs = require('fs'), path = require('path'), {execFileSync} = require('child_process');
@@ -17,6 +21,10 @@ check(/build_demo: .* languages: en de es fr it nl/.test(build), 'demo build: ' 
 const html = fs.readFileSync(path.join(OUT, 'index.html'), 'utf-8');
 check(/connect-src 'none'/.test(html) && /<meta name="robots" content="noindex/.test(html), 'index.html: CSP connect-src none + noindex');
 check(!/\/static\/|rel="manifest"|sw\.js/.test(html), 'index.html: relative paths, no manifest, no service worker');
+// 2.74.0 (#1653): the full CSP and nothing loaded from outside the demo folder
+const csp = (html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/) || [])[1] || '';
+check(/default-src 'none'/.test(csp) && /connect-src 'none'/.test(csp) && /script-src 'self';/.test(csp) && !/https?:/.test(csp), 'CSP meta: default-src none, connect-src none, scripts only from the demo: ' + csp.slice(0, 80));
+check(!/(src|href)="(https?:)?\/\//i.test(html), 'index.html loads no http(s) source');
 const app = fs.readFileSync(path.join(OUT, 'static', 'app.js'), 'utf-8');
 check(!/serviceWorker\.register\(/.test(app), 'app.js: no service worker registration');
 check(!/googletagmanager|google-analytics|plausible|matomo|umami/i.test(html + app), 'no analytics');
@@ -50,6 +58,10 @@ const srv = http.createServer((req, res) => {
         // the browser's own fetch must never be reached: the shim replaces it before the app runs
         w.fetch = () => { w.__netFetch++; return Promise.reject(new TypeError('network')); };
         w.XMLHttpRequest = function () { w.__netFetch++; throw new Error('XHR in the demo'); };
+        // 2.74.0 (#1653): no other way out either
+        w.WebSocket = function () { w.__netFetch++; throw new Error('WebSocket in the demo'); };
+        w.EventSource = function () { w.__netFetch++; throw new Error('EventSource in the demo'); };
+        w.navigator.sendBeacon = () => { w.__netFetch++; return false; };
         w.scrollTo = () => {}; w.Element.prototype.scrollIntoView = () => {};
         w.confirm = () => true; w.prompt = () => null;
       }});
@@ -57,17 +69,29 @@ const srv = http.createServer((req, res) => {
     return dom.window;
   };
 
-  // 1. first visit (German browser): sample data in German, demo bar
+  // 1. first visit (German browser): a new account in German (Basket, "Getting started", the welcome tour), demo bar
   let w = await open('de-DE');
   let d = w.document;
   check(w.__netFetch === 0, `browser fetch never reached (${w.__netFetch})`);
+  // 2.74.0 (#1653): no sample data at the start, the onboarding of a new account
+  const side0 = d.querySelector('#side')?.textContent || '';
+  check(/Erste Schritte/.test(side0) && !/Café Aurora/.test(side0), 'new account: "Erste Schritte" list, no sample project: ' + side0.slice(0, 120));
+  check(w.eval(`S.settings.onboard`) === 'done' && w.eval(`[...S.tasks.values()].some(t => t.title === 'Hak mich ab')`), 'onboarding tasks in German');
+  check(!!d.querySelector('.tour .tcard'), 'welcome tour open');
+  const nOnb = w.eval('S.tasks.size');
+  w.eval('tourEnd(true)'); await sleep(300);
+  check(w.eval(`S.settings.tour`) === 'done' && !d.querySelector('.tour'), 'tour closed and remembered');
+  check(w.eval('S.agents.length') === 1 && w.eval('S.agents[0].waiting') === 0, 'simulated agent there, nothing waiting yet');
+  // the sample on request (Settings > Data / the tour's last card): Café Aurora in German
+  await w.eval(`sampleCreate({open: false})`); await sleep(500);
   check(!!d.querySelector('#kd-bar') && /Demo – deine Daten bleiben in diesem Browser/.test(d.querySelector('#kd-bar').textContent), 'demo bar in German');
   check(/Demo zurücksetzen/.test(d.querySelector('#kd-reset')?.textContent || ''), 'reset button');
   const side = d.querySelector('#side')?.textContent || '';
   check(/Website-Relaunch für Café Aurora/.test(side) && /Privat/.test(side), 'sidebar: German sample project + personal list');
   check(w.eval('I18N.code') === 'de', 'app runs in German (' + w.eval('I18N.code') + ')');
   const nTasks = w.eval('S.tasks.size');
-  check(nTasks > 20, `sample tasks loaded (${nTasks})`);
+  check(nTasks > 20 + nOnb - 1, `sample tasks loaded (${nTasks})`);
+  check(w.eval('!!S.sample && S.sample.lists.length === 2'), 'S.sample: the two sample lists (button "Remove sample project")');
   // 2. add a task via quick add (German words), it is parsed and stored
   const qi = d.querySelector('#qinput');
   check(!!qi, 'quick add input');
@@ -80,7 +104,7 @@ const srv = http.createServer((req, res) => {
     w.location.hash = h; await sleep(500);
     check((d.querySelector('#view')?.innerHTML || '').length > 50, `view ${h} renders`);
   }
-  const pid = w.eval(`S.lists.find(l => l.kind === 'project').id`);
+  const pid = w.eval(`S.lists.find(l => l.kind === 'project' && l.tickets).id`);
   for (const v of ['kanban', 'timeline', 'list']) {
     w.location.hash = 'l/' + pid; await sleep(300);
     await w.eval(`api('PATCH', '/api/lists/${pid}', {view: '${v}'}).then(load).then(render)`); await sleep(500);
@@ -122,18 +146,40 @@ const srv = http.createServer((req, res) => {
   w.KDEMO.reset(); await sleep(300);
   w.close();
   w = await open('de-DE'); d = w.document;
-  check(!w.eval(`[...S.tasks.values()].some(t => t.title === 'Rauchtest Demo')`) && w.eval('S.tasks.size') === nTasks, 'reset: sample data back, own task gone');
-  check(w.eval('S.agents[0].waiting') === 1, 'reset: agent waits again');
+  // 2.74.0 (#1653): reset = a new account again (no sample, "Getting started" + tour)
+  check(!w.eval(`[...S.tasks.values()].some(t => t.title === 'Rauchtest Demo')`) && w.eval('S.tasks.size') === nOnb && !w.eval('S.sample'), 'reset: own task and sample gone, onboarding again: ' + w.eval('S.tasks.size'));
+  check(!!w.document.querySelector('.tour .tcard'), 'reset: welcome tour again');
+  check(w.eval('S.agents[0].waiting') === 0, 'reset: no agent job');
+  // the sample can be removed again (Settings > Data): only what it created
+  w.eval('tourEnd(true)'); await w.eval(`api('POST', '/api/sample', {}).then(load)`);
+  const rm = JSON.parse(await w.eval(`api('DELETE', '/api/sample').then(j => load().then(() => JSON.stringify(j)))`));
+  check(rm.ok && rm.tasks > 20 && rm.lists === 2 && !w.eval('S.sample') && w.eval('S.tasks.size') === nOnb, 'sample removed: ' + JSON.stringify(rm));
   w.close();
 
   // 8. another browser language on a fresh storage: French sample
   for (const k of Object.keys(store)) delete store[k];
   w = await open('fr-FR');
-  check(/Refonte du site du Café Aurora/.test(w.document.querySelector('#side')?.textContent || '') && w.eval('I18N.code') === 'fr', 'French browser: French sample + UI');
+  check(/Premiers pas/.test(w.document.querySelector('#side')?.textContent || '') && w.eval('I18N.code') === 'fr', 'French browser: French onboarding + UI');
+  await w.eval(`api('POST', '/api/sample', {}).then(load).then(render)`); await sleep(300);
+  check(/Refonte du site du Café Aurora/.test(w.document.querySelector('#side')?.textContent || ''), 'French browser: French sample on request');
   w.close();
   for (const k of Object.keys(store)) delete store[k];
   w = await open('pt-BR');
-  check(/Website relaunch for Café Aurora/.test(w.document.querySelector('#side')?.textContent || '') && /your data stays in this browser/.test(w.document.querySelector('#kd-bar')?.textContent || ''), 'other browser language: English');
+  check(/Getting started/.test(w.document.querySelector('#side')?.textContent || '') && /your data stays in this browser/.test(w.document.querySelector('#kd-bar')?.textContent || ''), 'other browser language: English');
+  w.close();
+
+  // 2.74.0 (#1653): a visitor of the old demo (storage version 1, the sample from the start) keeps the data, no tour
+  for (const k of Object.keys(store)) delete store[k];
+  store['kalmido-demo.db'] = JSON.stringify({ver: 1, v: 3, seq: {list: 2, task: 1}, settings: {lang: 'de', onboard: 'done', tour: 'done', features: 'cal,comments', sample_ask: '0'},
+    me: {id: 1, username: 'demo', display_name: 'Demo', avatar: ''}, lists: [{id: 1, name: 'Eingang', is_inbox: 1, sort: -1, kind: 'list', tags: [], milestones: [], members: []},
+      {id: 2, name: 'Alte Liste', is_inbox: 0, sort: 1, kind: 'list', tags: [], milestones: [], members: []}],
+    sections: [], tasks: [{id: 1, list_id: 2, title: 'Alte Aufgabe', status: 0, tags: [], fields: {}, sort: 1, priority: 0, parent_id: null, section_id: null, deleted_at: null, due: null}],
+    fields: [], deps: [], comments: [], activity: [], time: [], timer: null, habits: [], filters: [], status: [], chat: [], jobs: [], agent: {status: 'idle', status_text: '', status_task: null, step: 0}});
+  store['tasks.lang'] = '"de"';
+  w = await open('de-DE');
+  check(/Alte Liste/.test(w.document.querySelector('#side')?.textContent || '') && w.eval(`[...S.tasks.values()].some(t => t.title === 'Alte Aufgabe')`), 'old demo storage: data kept');
+  check(!w.document.querySelector('.tour') && !/Erste Schritte/.test(w.document.querySelector('#side')?.textContent || '') && JSON.parse(store['kalmido-demo.db']).ver === 2, 'old demo storage: migrated to version 2, no tour');
+  check(!w.KDEMO.miss.length, 'every API call answered by the shim: ' + JSON.stringify(w.KDEMO.miss.slice(0, 5)));
   w.close();
 
   // 9. real layout in Firefox (skipped without firefox): phone 390 px (touch) and desktop 1280 px, light and dark; the demo bar
@@ -146,7 +192,9 @@ const srv = http.createServer((req, res) => {
       for (const theme of ['light', 'dark']) {
         await nav(B); await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
         await nav(B); await sleep(2500);
-        const pid = await ev(`String(S.lists.find(l => l.kind === 'project').id)`);
+        // 2.74.0 (#1653): a new account: close the tour, the sample on request
+        await ev(`(async () => { tourEnd(true); await api('POST', '/api/sample', {}); await load(); render(); return 1; })()`); await sleep(500);
+        const pid = await ev(`String(S.lists.find(l => l.kind === 'project' && l.tickets).id)`);
         await ev(`(() => { location.hash = '${vw < 600 ? 'today' : 'l/'}${vw < 600 ? '' : pid}'; return 1; })()`); await sleep(1200);
         const r = await ev(`JSON.stringify({n: S.tasks.size, bar: document.querySelector('#kd-bar').getBoundingClientRect().height, rows: document.querySelectorAll('#view .task, #view [data-id]').length,
           over: document.documentElement.scrollWidth - innerWidth, csp: KDEMO.csp, theme: document.documentElement.dataset.theme || '',

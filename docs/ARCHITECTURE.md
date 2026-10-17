@@ -396,6 +396,23 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
 - CI (`.github/workflows/ci.yml`): Python and JavaScript syntax of every file, `tools/check_layout.py`, translations,
   the MCP bridge, bandit (high severity), pip-audit, the browser demo, semgrep and the test shards.
 
+## Browser demo (2.12.0, rebuilt per release since 2.74.0)
+
+`tools/build_demo.py OUT_DIR` turns the current client (`static/`) into a static folder that runs without a server:
+`tools/demo/shim.js` replaces `fetch` and answers the API from the visitor's `localStorage`, `tools/demo/texts.js` holds
+the demo's own texts and the sample data in the six languages. The page allows no network connection at all
+(`Content-Security-Policy: connect-src 'none'`, also as `.htaccess`), has no service worker and no analytics.
+
+- It starts like a new account: Basket, the "Getting started" list and the welcome tour; the sample project only when the
+  visitor asks for it (tour or Settings > Data). Old browser storage of an earlier demo is migrated, not thrown away.
+- Office & finance works locally (clients, services, quotations, invoices, payments; totals and VAT like the server).
+  Instead of the server's PDF the demo opens a print view of the document (`window.print()`, no PDF library). Office
+  features that need a server (DATEV, e-invoice XML, mail, agents, imports, cash flow …) show the calm "not available in
+  the demo" notice.
+- **Release step:** build the demo from the release's sources with `python3 tools/build_demo.py <folder>` and upload the
+  folder to the website's `/demo/`. The build fails when a text replacement no longer matches the app, so a changed
+  client never ships a demo that talks to a server. `tests/demo_test.js` (suite `demo`, CI job "demo") checks the build.
+
 ## Organisations and who sees whom (2.22.0)
 
 People belong to one or more **organisations** (`accounts/orgs.py`; tables `orgs`, `org_members`). The instance setting

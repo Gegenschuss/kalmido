@@ -14,3 +14,4 @@ tests/cal_ids.json
 tests/.demo/
 /demo/
 tests/.demo-quick/
+tests/.demo-office/
