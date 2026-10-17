@@ -368,6 +368,19 @@ r = A.patch(B + L + f"/archive/{A3}", json={"paid": 1, "number": "changed"})
 check(r.ok and r.json()["paid"] == 1 and r.json()["number"] == it[2]["number"], "archive: PATCH sets paid, the number stays")
 check(Bo.patch(B + L + f"/archive/{A3}", json={"paid": 0}).status_code == 403, "rights: member cannot change an archived document")
 check(Ca.patch(B + L + f"/archive/{A3}", json={"paid": 0}).status_code == 404, "tenant-matrix: office -- PATCH another organisation's archive = 404")
+# 2.80.0 (#1837): amounts with thousand separators (German and English), currency signs and spaces, upload and PATCH
+AMTS = {"2.436,53": 2436.53, "2436,53": 2436.53, "2436.53": 2436.53, "1.500": 1500, "12.000": 12000, "1.500,00": 1500, "2,436.53": 2436.53,
+        "€ 2.436,53": 2436.53, "2.436,53 EUR": 2436.53, "2 436,53": 2436.53, "1,5": 1.5}
+for t, want in AMTS.items():
+    r = A.patch(B + L + f"/archive/{A3}", json={"amount": t})
+    check(r.ok and r.json()["amount"] == want, f"archive: PATCH amount {t!r} = {want} " + r.text[:160])
+for t in ("abc", "1.2.3", "1,2,3.4", "12,3.4.5"):
+    check(A.patch(B + L + f"/archive/{A3}", json={"amount": t}).status_code == 400, f"archive: PATCH amount {t!r} = 400")
+check(A.patch(B + L + f"/archive/{A3}", json={"amount": "1000"}).json()["amount"] == 1000, "archive: PATCH amount back to 1000")
+RC = A.post(B + L + "/archive/run").json()["run_id"]
+r = up(A, mini_pdf("amt1837"), {"run_id": RC, "kind": "invoice", "number": "amt1837", "amount": "2.436,53", "paid": 0}, "amt1837.pdf")
+check(r.status_code == 201 and r.json()["amount"] == 2436.53, "archive: upload with amount 2.436,53 " + r.text[:200])
+check(A.post(B + L + f"/runs/{RC}/undo").ok, "archive: undo the amount run")
 r = A.post(B + L + "/archive/parse", json={"names": [NAMES[0]]})
 check(r.json()["items"][0]["taken"], "archive: parse marks a number that is in the archive")
 
