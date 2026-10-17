@@ -23,14 +23,21 @@ def office_pack_codes():
     for f in sorted(os.listdir(PACK_DIR)) if os.path.isdir(PACK_DIR) else []:
         if f.endswith(".json") and _CODE_RE.match(f[:-5].upper()):
             out.append(f[:-5].upper())
-    return out
+    from .catalog import pkc_codes  # 2.76.0 (#1023): + the packs installed in the bound office area
+    return sorted(set(out) | pkc_codes("country"))
 
 
-def office_pack(code):
-    """The country pack dict for code ("DE"), or None when there is none. Cached per process (packs are files)."""
+def office_pack(code, builtin=False):
+    """The country pack dict for code ("DE"), or None when there is none. Cached per process (packs are files).
+    2.76.0 (#1023): an installation of the bound office area (office/catalog.py) comes first; builtin=True: the file only."""
     code = (code or "").strip().upper()
     if not _CODE_RE.match(code):
         return None
+    if not builtin:
+        from .catalog import pkc_installed
+        inst = pkc_installed("country", code)
+        if inst:
+            return inst
     if code in _cache:
         return _cache[code]
     p = os.path.join(PACK_DIR, code.lower() + ".json")

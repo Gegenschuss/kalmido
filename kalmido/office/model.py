@@ -205,6 +205,8 @@ def office_settings(c, oid):
                 out[k].update(d[k])
             else:
                 out[k] = d[k]
+    from .catalog import pkc_bind
+    pkc_bind(c, oid)  # 2.76.0 (#1023): office_pack / dk_pack resolve the packs installed in this office area from here on
     pack = office_pack(out["pack"]) or office_pack("DE")
     if pack:
         out["currency"] = out["currency"] or pack["currency"]

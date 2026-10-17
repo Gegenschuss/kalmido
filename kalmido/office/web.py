@@ -95,18 +95,22 @@ def office_number_preview():
 @app.get("/api/office/packs")
 def office_packs_get():
     c, uid, oid = _ctx()
+    from .catalog import pkc_packs_extra
+    src, industry = pkc_packs_extra(c, oid)  # 2.76.0 (#1023): + the packs installed in my office area, source / badge, industry packs
     out = []
     for code in office_pack_codes():
         p = office_pack(code)
         if p:
             out.append({"code": p["code"], "name": p["name"], "name_en": p.get("name_en", p["name"]), "currency": p["currency"],
-                        "version": p["version"], "community": p.get("community", False), "tax": p["tax"]})
-    return jsonify(packs=out)
+                        "version": p["version"], "community": p.get("community", False), "tax": p["tax"],
+                        "source": src.get(code, ("builtin", "verified"))[0], "badge": src.get(code, ("builtin", "verified"))[1]})
+    return jsonify(packs=out, industry=industry)
 
 
 @app.get("/api/office/packs/<code>")
 def office_pack_get(code):
     c, uid, oid = _ctx()
+    office_settings(c, oid)  # 2.76.0 (#1023): binds my office area (its installed packs)
     p = office_pack(code)
     if not p:
         raise Denied(404)

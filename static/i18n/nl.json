@@ -8208,5 +8208,11 @@
   "Back to the whole chat": "Terug naar de hele chat",
   "Job has ended": "Job is beëindigd",
   "The job reads it after its next step.": "De job leest het na zijn volgende stap.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)",
+  "No catalogue is set up": "Er is geen catalogus ingesteld",
+  "The catalogue could not be read": "De catalogus kon niet worden gelezen",
+  "This pack is not in the catalogue": "Dit pakket staat niet in de catalogus",
+  "This pack is not installed": "Dit pakket is niet geïnstalleerd",
+  "Built-in packs cannot be removed": "Ingebouwde pakketten kunnen niet worden verwijderd",
+  "Another version of this pack is installed": "Er is een andere versie van dit pakket geïnstalleerd"
 }

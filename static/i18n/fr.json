@@ -8208,5 +8208,11 @@
   "Back to the whole chat": "Retour au chat complet",
   "Job has ended": "La tâche est terminée",
   "The job reads it after its next step.": "La tâche le lit après sa prochaine étape.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agent ne reçoit pas ce message pour l'instant (en pause, ou la liste de la tâche n'est pas partagée avec lui)",
+  "No catalogue is set up": "Aucun catalogue n'est configuré",
+  "The catalogue could not be read": "Le catalogue n'a pas pu être lu",
+  "This pack is not in the catalogue": "Ce paquet n'est pas dans le catalogue",
+  "This pack is not installed": "Ce paquet n'est pas installé",
+  "Built-in packs cannot be removed": "Les paquets intégrés ne peuvent pas être supprimés",
+  "Another version of this pack is installed": "Une autre version de ce paquet est installée"
 }

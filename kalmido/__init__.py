@@ -154,6 +154,7 @@ ORDER = (
     "office.web",
     "office.calc",  # 2.36.1 (#1021): the quotation calculator (C, no imports)
     "office.sheet",  # 2.47.0 (#1216): the shoot calculation sheet + industry packs (C, imports office.calc)
+    "office.catalog",  # 2.76.0 A (#1023): the pack catalogue, installed packs per office area (imports office.sheet)
     "office.costs",  # 2.47.0 (#1645, #1649): producing per document, purchases of accepted quotations (part D, no routes)
     "office.docs",  # 2.36.1 (#1021): quotations (C)
     "office.pdf",  # 2.36.1 (#1021): the PDF writer (D, no kalmido imports)
