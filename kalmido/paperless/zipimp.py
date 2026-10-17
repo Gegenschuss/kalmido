@@ -60,8 +60,9 @@ PLH_DISK_MARGIN = 1024 * 1024 * 1024  # bytes that stay free on the disk of PLH_
 PLH_SRC = P.pl_src("paperless-export")  # pl_imported.src of every ZIP import up to 2.80 (not an address: no clash with pl_src(url))
 _CTX = b"pl_uploads.part|"
 _SWEPT = [0.0]
-_CK = {"thread": None}
+_CK = {"thread": None, "again": False}
 _CK_LOCK = threading.Lock()
+_CK_RUN = threading.Lock()  # review: one check at a time per process (the kick thread and the worker before its claim)
 _MIME_RE = re.compile(r"[a-z0-9][a-z0-9.+-]{0,60}/[a-z0-9][a-z0-9.+-]{0,60}")
 
 P.PL_ERR.update({
@@ -233,11 +234,12 @@ def plh_src(users, labels):
     """2.81.0 (#1875): the source key of an export: from its first user (pk, name, the time it joined -- set once when that
     Paperless-ngx was set up, the same in every later export of it), without users from its labels (ids + names). Only the
     hash is kept; never the shared PLH_SRC (rules of a second server with the same label ids are its own)."""
-    first = min(users) if users else None
+    first = min(users, key=lambda u: [str(x) for x in u]) if users else None  # review: pk may be int or str
     if first and first[2]:
         fp = "user:" + json.dumps(first)
     else:
-        fp = "labels:" + json.dumps(sorted([k, x["id"], x["name"]] for k, v in labels.items() for x in v.values()))
+        fp = "labels:" + json.dumps(sorted(([k, str(x["id"]), x["name"]] for k, v in labels.items() for x in v.values()),
+                                           key=lambda t: [str(x) for x in t]))
     return P.pl_src("paperless-export:" + fp)
 
 
@@ -337,10 +339,20 @@ def _check(c, r):
         c.execute("UPDATE pl_uploads SET state='bad', error=?, updated_at=? WHERE id=?", (e.code, _now(), r["id"]))
 
 
-def plh_check_one(c):
+def plh_check_one(c, wait=False):
     """2.81.0 (#1874): checks one upload whose last part came in (state 'check') -- in the background, never in the web request
     (a large export binds no web thread and its memory only here, one check at a time per process). FOR UPDATE SKIP LOCKED:
-    two processes never check the same upload, a discard waits for the check. Returns 1 when it checked one. Never raises."""
+    two processes never check the same upload, a discard waits for the check. Returns 1 when it checked one. Never raises.
+    wait=False: another check of this process is running -> 0 at once (the worker claims on, the kick thread checks the rest)."""
+    if not _CK_RUN.acquire(blocking=wait):
+        return 0
+    try:
+        return _check_one(c)
+    finally:
+        _CK_RUN.release()
+
+
+def _check_one(c):
     try:
         r = c.execute("SELECT * FROM pl_uploads WHERE state='check' ORDER BY updated_at, id LIMIT 1 FOR UPDATE SKIP LOCKED").fetchone()
         if not r:
@@ -367,14 +379,20 @@ def _check_loop():
     from ..core.pg import system_ctx
     try:
         while True:
+            with _CK_LOCK:
+                _CK["again"] = False
             with GATE.bg():
                 c = connect()
                 try:
                     with system_ctx(c):  # paperless check: the uploads of every workspace (sealed with their own key)
-                        if not plh_check_one(c):
-                            return
+                        done = plh_check_one(c, wait=True)
                 finally:
                     c.close()
+            if not done:
+                with _CK_LOCK:  # review: a kick between the empty look and here would find this thread alive -> look again
+                    if not _CK["again"]:
+                        _CK["thread"] = None
+                        return
     except Exception as e:  # noqa: BLE001 -- the paperless worker checks what is left before its next claim
         print("paperless: zip check worker", type(e).__name__, e, flush=True)
 
@@ -382,6 +400,7 @@ def _check_loop():
 def plh_check_kick():
     """2.81.0 (#1874): checks the waiting uploads in a thread of its own (an import run of the paperless worker may last hours)."""
     with _CK_LOCK:
+        _CK["again"] = True
         if _CK["thread"] is None or not _CK["thread"].is_alive():
             _CK["thread"] = threading.Thread(target=_check_loop, daemon=True, name="paperless-zipcheck")
             _CK["thread"].start()

@@ -71,6 +71,7 @@ body = {"contacts": [{"id": K1, "name": "Petra Buyer", "contact_id": CT}]}
 r = A.patch(B + f"/api/clients/{CL}", json=body)
 j = r.json() if r.headers.get("Content-Type", "").startswith("application/json") else {}
 check(r.status_code == 400 and j.get("code") == "contact_gone" and j.get("contact_id") == CT, f"#1852: stale link -> 400 contact_gone ({r.status_code} {r.text[:200]})")
+check(isinstance(j.get("error"), str) and not j["error"].startswith("("), f"#1852: error is the plain message ({j.get('error')!r})")  # 2.81.0 review
 r = A.patch(B + f"/api/clients/{CL}", json={"contacts": [{"id": K1, "name": "Petra Buyer", "contact_id": None}]})
 check(r.ok and r.json()["contacts"][0]["contact_id"] is None, f"#1852: without the link the save works ({r.status_code})")
 r = A.patch(B + f"/api/clients/{CL}", json={"contacts": [{"id": K1, "name": "Petra Buyer", "contact_id": 999999}]})

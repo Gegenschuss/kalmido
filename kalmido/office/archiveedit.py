@@ -50,6 +50,12 @@ def r81b_lines(r):
 def r81b_public(d, r):
     """The tax lines + net / tax sums into the public dict of an entry (_archive_public); None = only the gross known."""
     lines = r81b_lines(r) if "tax_lines" in r.keys() else None
+    if lines:  # review: the gross changed without them (an older version) -> they no longer fit, tax unknown again
+        try:
+            if sum(Decimal(x["net"]) + Decimal(x["amount"]) for x in lines) != Decimal(str(r["amount"])):
+                lines = None
+        except Exception:  # noqa: BLE001 -- no readable gross
+            lines = None
     d["tax_lines"] = lines
     d["net"] = float(sum(Decimal(x["net"]) for x in lines)) if lines else None
     d["tax"] = float(sum(Decimal(x["amount"]) for x in lines)) if lines else None

@@ -174,7 +174,7 @@ class CklGone(BadInput):
 
 @app.errorhandler(CklGone)
 def ckl_gone(e):
-    return jsonify(error=str(e), code="contact_gone", contact_id=e.args[1]), 400  # only the id the caller sent, no foreign data
+    return jsonify(error=e.args[0], code="contact_gone", contact_id=e.args[1]), 400  # only the id the caller sent, no foreign data
 
 
 def ckl_want(c, cl, x, old):
