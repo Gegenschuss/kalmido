@@ -7,6 +7,22 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.72.0] - 2026-10-17
+
+### Added
+- **Household budget** at home (#1333): module *Budget* (off by default) under *Settings > Modules > At home*. A budget is a
+  list of its own: entries (income / expense) with category, counterpart, note and receipts, categories with a monthly
+  limit, the month view with planned / spent / left, the last six months as bars and a card in *Home & life*.
+- Recurring entries (monthly, quarterly, yearly, from / until a month) are templates: *Open this month* books them with
+  one tap (once per month); *Take over from contracts* turns contracts of the same space into recurring entries and
+  shows when a contract's cost changed later (*Match*).
+- CSV import of a bank statement (no bank access): delimiter, header lines, German and English numbers, signs and separate
+  debit / credit columns are recognised, the column mapping is remembered per header, duplicates and broken lines are
+  left out, a category is suggested from earlier entries and a line that matches an open recurring entry is booked on it.
+- Shared like any list (family, read-only or writing). Agents never see a budget (like Health), API tokens only with the
+  scope `private`; no API v1 / MCP routes. Amounts, texts and receipts are encrypted at rest with the key of the list's
+  space; the start-up pass and `orgcrypt_cli decrypt-all` / `decrypt-private` cover the new tables.
+
 ## [2.64.0] - 2026-10-17
 
 ### Security
