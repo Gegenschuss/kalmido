@@ -141,9 +141,23 @@ has the display option `done_at_bottom` (*Show completed at the bottom*: complet
 come back with one tap). Existing checklists became `kind: "list"` with `done_at_bottom: true`. **Deprecated aliases**
 (still accepted): `kind: "checklist"` = `kind: "list"` + `done_at_bottom: true`; the boolean `checklist` = `done_at_bottom`.
 
-**Dependent tasks move along**: if a list has *Move dependent tasks along* switched on (list dialog in the app), a
-`PATCH /tasks/{id}` that postpones a task's `due` also moves the open tasks of that list that wait on it and would now
-start too early, by the same number of days (their history shows it). Moving a task earlier never moves anything.
+**Dependent tasks move along** (2.67.0: the whole chain): if the list of a task has *Move dependent tasks along* switched
+on (list dialog in the app; on by default in a new project list), a `PATCH /tasks/{id}` that postpones the task's `due`
+by n days moves every task waiting on it by the same n days (`start` and `due`, so the gaps stay), and so on down the
+whole chain (each task once, at most 500). The setting of the changed task's list counts for the whole chain. Completed
+tasks, milestones, tasks without a date and tasks you may not change stay where they are, and so does the chain behind
+them. Every move is a normal date change (history, reminders, events, webhooks). Moving a task earlier never moves
+anything back (the app has a button *Pull the chain in* for that). Send `"shift_chain": false` to leave the waiting tasks
+where they are. When something moved or stayed, the answer carries `chain`:
+
+```json
+{"id": 41, "due": "2026-10-28", "chain": {"days": 3,
+  "moved": [{"id": 77, "title": "Campaign concept", "start": "2026-10-29", "due": "2026-11-04", "old_start": "2026-10-26", "old_due": "2026-11-01"}],
+  "skipped": [{"id": null, "title": null, "hidden": true, "reason": "no_access"}]}}
+```
+
+`reason` is `done`, `milestone`, `no_date`, `no_access`, `limit` or `error`; a task you cannot see comes without id and
+title. To undo, `PATCH` the task and every moved one back to its old dates.
 
 **List roles** (1.10.0): a token sees exactly what its user sees. For a `participant` of a shared list every endpoint
 returns only the tasks assigned to that user, their subtasks (all levels) and, read-only, the main task of an assigned
@@ -473,8 +487,8 @@ without a start) to the latest due date; `null` when there are none. `deps`: the
 `POST /lists/{id}/shift` with `{"days": 7}` (-3650 to 3650, not 0) moves every open task with a date in the list,
 subtasks included, by that many calendar days: `start` and `due`, so the length stays; the time of day, tasks without a
 date, completed tasks and the trash stay as they are. Everything happens in one transaction. Moving later also moves
-tasks in other lists that wait on a moved task and would now start too early, when their list has *Move dependent
-tasks along* on (same rules as for a single task). Needs edit rights on the list (403 for viewers and participants, 404 when
+the tasks in other lists that wait on a moved task (the whole chain by the same days) when this list has *Move dependent
+tasks along* on (same rules as for a single task, 2.67.0). Needs edit rights on the list (403 for viewers and participants, 404 when
 the list is not visible); more than 500 dated tasks: 409 with a message. The answer lists the old and new dates:
 
 ```json
