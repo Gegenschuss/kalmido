@@ -8348,5 +8348,8 @@
   "Safety numbers": "Números de seguridad",
   "Titles, descriptions, comments, notes, attachments and the list chat are encrypted in the browser.": "Títulos, descripciones, comentarios, notas, adjuntos y el chat de la lista están cifrados en el navegador.",
   "Key changed: {0}": "Clave cambiada: {0}",
-  "The key of {0} has changed.": "La clave de {0} ha cambiado."
+  "The key of {0} has changed.": "La clave de {0} ha cambiado.",
+  "The key of this list was changed meanwhile.": "La clave de esta lista se ha cambiado mientras tanto.",
+  "The members of this list changed meanwhile. Try again.": "Los miembros de esta lista han cambiado mientras tanto. Inténtalo de nuevo.",
+  "{0} texts of this list cannot be decrypted with the keys you hold.": "{0} textos de esta lista no se pueden descifrar con tus claves."
 }

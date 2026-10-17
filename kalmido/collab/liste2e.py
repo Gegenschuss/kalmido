@@ -644,19 +644,59 @@ def le2a_blockers(c, lr, agents):
 # what /e2e/todo hands out: (key, table, id columns, text column, field name)
 _LE2A_PLAIN = "(COALESCE({0}, '')<>'' AND left({0}, 5)<>'e2e1:')"  # the prefix exactly (left(), not LIKE: pg_dialect)
 _LE2A_CIPHER = "(left({0}, 5)='e2e1:')"
+# 2.64.2 A (#1817): a ciphertext of a generation older than the target of the re-encryption after a key change ("g" of the
+# compact JSON; {1} = the target generation)
+_LE2A_OLD = "(left({0}, 5)='e2e1:' AND substring({0} from '\"g\":([0-9]+)')::bigint < {1})"
+LE2A_FILES_MAX = 20  # 2.64.2 A (#1817): files per todo call (each one is converted through its own upload, part B)
 
 
-def _le2a_conds(enc):
-    t = _LE2A_PLAIN if enc else _LE2A_CIPHER
-    snip = "jsonb_typeof(t.snippets)='array' AND jsonb_array_length(t.snippets)>0" if enc else "jsonb_typeof(t.snippets)='string'"
+def _le2a_conds(mode, reenc=0):
+    """SQL conditions (template for a text column, snippets) of the values not yet in the target format of mode."""
+    if mode == "encrypting":
+        return _LE2A_PLAIN, "jsonb_typeof(t.snippets)='array' AND jsonb_array_length(t.snippets)>0"
+    if mode == "decrypting":
+        return _LE2A_CIPHER, "jsonb_typeof(t.snippets)='string'"
+    # 2.64.2 A (#1817): 'on' -- plain texts (there should be none) and, after a key change, ciphertexts older than reenc
+    r = int(reenc or 0)
+    old = _LE2A_OLD.replace("{1}", str(r))
+    t = f"({_LE2A_PLAIN} OR {old})" if r > 0 else _LE2A_PLAIN
+    snip = "(jsonb_typeof(t.snippets)='array' AND jsonb_array_length(t.snippets)>0)"
+    if r > 0:
+        snip = f"({snip} OR (jsonb_typeof(t.snippets)='string' AND {old.replace('{0}', '(t.snippets #>> ARRAY[]::text[])')}))"
     return t, snip
 
 
-def le2a_left(c, lid, mode, limit=None):
-    """The values of list lid that are not yet in the target format of the running switch (mode encrypting: plain texts,
-    decrypting: ciphertexts), deleted tasks (trash) included. -> ({tasks, comments, notes, sections, fields}, left counts)."""
-    enc = mode == "encrypting"
-    t, snip = _le2a_conds(enc)
+def _le2a_extra(c, lid, mode, gen, uid, limit):
+    """2.64.2 A (#1817): the files (part B) and channel messages (part C) of the list still to convert ->
+    (files, number of files, msgs, number of msgs); gen = the target generation, always lists.e2e_gen (on: older ones are
+    re-encrypted to it), limit 0 = only the numbers."""
+    files, nf, msgs, nm = [], 0, [], 0
+    try:
+        from .liste2efile import le2f_left
+    except ImportError:  # FALLBACK until part B is merged
+        le2f_left = None
+    try:
+        from .liste2echan import le2c_left
+    except ImportError:  # FALLBACK until part C is merged
+        le2c_left = None
+    if le2f_left:
+        files, nf = le2f_left(c, lid, mode, gen, uid, min(limit, LE2A_FILES_MAX))
+    if le2c_left:
+        msgs, nm = le2c_left(c, lid, mode, gen, limit)
+    return list(files or [])[:LE2A_FILES_MAX] if limit else [], int(nf or 0), list(msgs or [])[:limit] if limit else [], int(nm or 0)
+
+
+def le2a_left(c, lid, mode, limit=None, uid=None):
+    """The values of list lid that are not yet in the target format (mode encrypting: plain texts, decrypting: ciphertexts,
+    on [2.64.2 A]: plain texts and ciphertexts older than e2e_gen, i.e. after a key change), deleted tasks (trash) included, plus
+    the files and channel messages (2.64.2: parts B / C). -> ({tasks, comments, notes, sections, fields, files, msgs},
+    left counts); uid = who converts (files encrypted for one person only count for that person)."""
+    lr = c.execute("SELECT e2e_gen FROM lists WHERE id=?", (lid,)).fetchone()
+    gen = int(lr[0] or 0) if lr else 0
+    # 'on': every ciphertext older than the current generation (normally only during the re-encryption after a key change;
+    # a write of an outdated tab afterwards is picked up by the next run), the same target as files / messages
+    reenc = gen
+    t, snip = _le2a_conds(mode, reenc)
     tc = " OR ".join([t.format("t.title"), t.format("t.content"), t.format("t.url"), f"(t.snippets IS NOT NULL AND {snip})"])
     tasks_sql = f"FROM tasks t WHERE t.list_id=? AND ({tc})"
     com_sql = f"FROM comments cm JOIN tasks t ON t.id=cm.task_id WHERE t.list_id=? AND {t.format('cm.body')}"
@@ -666,14 +706,20 @@ def le2a_left(c, lid, mode, limit=None):
                f"WHERE t.list_id=? AND {t.format('v.value')}")
     left = {k: c.execute(f"SELECT COUNT(*) {s}", (lid,)).fetchone()[0]
             for k, s in (("tasks", tasks_sql), ("comments", com_sql), ("notes", note_sql), ("sections", sec_sql), ("fields", fld_sql))}
+    files, left["files"], msgs, left["msgs"] = _le2a_extra(c, lid, mode, gen, uid, limit or 0)
     if limit is None:
         return None, left
 
     def todo(v):
-        if enc:
-            return isinstance(v, str) and v != "" and not le2e_is_cipher(v)
-        return le2e_is_cipher(v)
-    out, n = {"tasks": [], "comments": [], "notes": [], "sections": [], "fields": []}, 0
+        if not isinstance(v, str) or v == "":
+            return False
+        if not le2e_is_cipher(v):
+            return mode != "decrypting"
+        if mode != "on":
+            return mode == "decrypting"
+        d = le2e_parse(v)  # 2.64.2 A (#1817): an older generation than the target of the key change
+        return bool(d) and d["g"] < reenc
+    out, n = {"tasks": [], "comments": [], "notes": [], "sections": [], "fields": [], "files": files, "msgs": []}, 0
     for r in c.execute(f"SELECT t.id, t.title, t.content, t.url, t.snippets {tasks_sql} ORDER BY t.id LIMIT ?", (lid, limit)).fetchall():
         if n >= limit:
             break
@@ -681,11 +727,11 @@ def le2a_left(c, lid, mode, limit=None):
         for k in ("title", "content", "url"):
             d[k] = r[k] if todo(r[k]) else None
         sc = le2a_snip_cipher(r["snippets"])
-        if enc:  # the whole JSON text of the snippets is one value
-            from ..tasks.snippets import snip_parse
-            d["snippets"] = r["snippets"] if not sc and snip_parse(r["snippets"]) else None
-        else:
+        if mode == "decrypting":
             d["snippets"] = sc
+        else:  # the whole JSON text of the snippets is one value
+            from ..tasks.snippets import snip_parse
+            d["snippets"] = r["snippets"] if not sc and snip_parse(r["snippets"]) else (sc if sc and mode == "on" and todo(sc) else None)
         for k in ("title", "content", "url", "snippets"):  # at most limit values (the rest comes with the next call)
             if d[k] is not None:
                 if n >= limit:
@@ -709,11 +755,14 @@ def le2a_left(c, lid, mode, limit=None):
     if n < limit:
         for r in c.execute(f"SELECT v.task_id, v.field_id, v.value {fld_sql} ORDER BY 1, 2 LIMIT ?", (lid, limit - n)).fetchall():
             out["fields"].append({"task_id": r[0], "field_id": r[1], "value": r[2]})
+            n += 1
+    if n < limit:  # 2.64.2 A (#1817): channel messages go through bulk too (part C)
+        out["msgs"] = msgs[:limit - n]
     return out, left
 
 
 def le2a_info(c, lr, role, uid):
-    """The answer of GET /api/lists/<id>/e2e (also of start)."""
+    """The answer of GET /api/lists/<id>/e2e (also of start and rotate)."""
     lid = lr["id"]
     people, agents = le2a_people(c, lr)
     pnames = {p["user_id"]: p for p in people}
@@ -725,9 +774,11 @@ def le2a_info(c, lr, role, uid):
     mode = lr["e2e"] or None
     d = {"list_id": lid, "mode": mode, "gen": int(lr["e2e_gen"] or 0), "rotate": int(lr["e2e_rotate"] or 0), "by": lr["e2e_by"],
          "at": lr["e2e_at"], "can_manage": role in LE2A_MANAGE, "keys": keys, "pending": pend, "members": people, "agents": agents,
-         "blockers": le2a_blockers(c, lr, agents) if not mode else []}
-    if mode in ("encrypting", "decrypting"):
-        d["left"] = le2a_left(c, lid, mode)[1]
+         "blockers": le2a_blockers(c, lr, agents) if not mode else [],
+         "reenc": int(lr["e2e_reenc"] or 0)}  # 2.64.2 A (#1817): target generation of the re-encryption after a key change
+    if mode in ("encrypting", "decrypting") or (mode == "on" and role in LE2A_MANAGE):
+        # 2.64.2 A (#1817): in 'on' what the background re-encryption still has to do (only for those who run it)
+        d["left"] = le2a_left(c, lid, mode, uid=uid)[1]
     return d
 
 
@@ -793,7 +844,7 @@ def le2a_start(lid):
     ts = iso(now_utc())
     # 2.64.1 review (M1): the switch itself first and only from the open state -- a second start at the same moment (another
     # admin) gets 409 and never replaces the keys the first browser already encrypts with
-    if not c.execute("UPDATE lists SET e2e='encrypting', e2e_gen=?, e2e_rotate=0, e2e_by=?, e2e_at=? WHERE id=? AND e2e IS NULL AND "
+    if not c.execute("UPDATE lists SET e2e='encrypting', e2e_gen=?, e2e_rotate=0, e2e_reenc=0, e2e_by=?, e2e_at=? WHERE id=? AND e2e IS NULL AND "
                      "COALESCE(e2e_gen, 0)=?", (gen, uid, ts, lid, gen - 1)).rowcount:
         c.rollback()
         return err(tr("The list is already encrypted in the browser."), 409)
@@ -812,12 +863,13 @@ def le2a_start(lid):
     return jsonify(le2a_info(c, c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone(), role, uid))
 
 
-def _le2a_switch(c, lid):
+def _le2a_switch(c, lid, on_ok=False):
     """todo / bulk / finish: only during a switch, only the owner / list admins (whoever started it was one; a person who lost
-    that role meanwhile does not continue)."""
+    that role meanwhile does not continue). on_ok (2.64.2 A): also in 'on' -- the background re-encryption after a key change
+    (and files / channel messages of a list locked before 2.64.2)."""
     uid = _le2a_person()
     lr, role = _le2a_list(c, lid)
-    if lr["e2e"] not in ("encrypting", "decrypting"):
+    if lr["e2e"] not in (("encrypting", "decrypting", "on") if on_ok else ("encrypting", "decrypting")):
         return uid, lr, role, err(tr("No encryption change is running for this list."), 409)
     if role not in LE2A_MANAGE:
         raise Denied(403, tr("Only the owner and list admins can change this setting"))
@@ -826,35 +878,40 @@ def _le2a_switch(c, lid):
 
 @app.get("/api/lists/<int:lid>/e2e/todo")
 def le2a_todo(lid):
-    """?limit=200 -- the next values the browser converts (only those not in the target format yet; others null)."""
+    """?limit=200 -- the next values the browser converts (only those not in the target format yet; others null). 2.64.2 A:
+    also in 'on' (re-encryption after a key change), plus files (converted one by one through /e2e/files/<id>, part B) and
+    channel messages (written back through bulk, part C)."""
     c = db()
-    _uid, lr, _role, e = _le2a_switch(c, lid)
+    uid, lr, _role, e = _le2a_switch(c, lid, on_ok=True)
     if e:
         return e
     try:
         limit = max(1, min(LE2A_BULK_MAX, int(request.args.get("limit") or LE2A_BULK_MAX)))
     except ValueError:
         return err(tr("Invalid value: {0}", "limit"))
-    out, left = le2a_left(c, lid, lr["e2e"], limit)
-    return jsonify({**out, "left": left, "mode": lr["e2e"], "gen": int(lr["e2e_gen"] or 0)})
+    out, left = le2a_left(c, lid, lr["e2e"], limit, uid=uid)
+    return jsonify({**out, "left": left, "mode": lr["e2e"], "gen": int(lr["e2e_gen"] or 0), "reenc": int(lr["e2e_reenc"] or 0)})
 
 
 @app.post("/api/lists/<int:lid>/e2e/bulk")
 def le2a_bulk(lid):
     """{tasks: [{id, title?, content?, url?, snippets?}], comments: [{id, body}], notes: [{id, title?, body?}], sections: [{id, name}],
-    fields: [{task_id, field_id, value}]} -- converted values (at most 200): encrypting = ciphertexts of the current generation
-    (or ''), decrypting = plain texts. No history entries, one live update per call; repeating a call is harmless."""
+    fields: [{task_id, field_id, value}], msgs: [{id, enc} | {id, body}]} -- converted values (at most 200): encrypting = ciphertexts
+    of the current generation (or ''), decrypting = plain texts, on (2.64.2 A: re-encryption after a key change) = ciphertexts of
+    the current generation that replace an older ciphertext or a plain text (a value already of the current generation -- someone
+    edited it meanwhile -- stays). No history entries, one live update per call; repeating a call is harmless."""
     from ..personal.timetrack import BadInput
     from ..tasks.validation import CONTENT_MAX, TITLE_MAX
     from .notes import NOTE_BODY_MAX, NOTE_TITLE_MAX
     from .comments import MAX_COMMENT
     c = db()
-    _uid, lr, _role, e = _le2a_switch(c, lid)
+    _uid, lr, _role, e = _le2a_switch(c, lid, on_ok=True)
     if e:
         return e
-    enc, gen = lr["e2e"] == "encrypting", int(lr["e2e_gen"] or 0)
+    mode, gen = lr["e2e"], int(lr["e2e_gen"] or 0)
+    enc, on = mode in ("encrypting", "on"), mode == "on"
     b = body()
-    groups = {k: b.get(k) or [] for k in ("tasks", "comments", "notes", "sections", "fields")}
+    groups = {k: b.get(k) or [] for k in ("tasks", "comments", "notes", "sections", "fields", "msgs")}
     if any(not isinstance(v, list) or any(not isinstance(x, dict) for x in v) for v in groups.values()):
         return err(tr("Invalid data"))
     bad = lambda what: BadInput(tr("Invalid value: {0}", what))  # noqa: E731
@@ -874,12 +931,19 @@ def le2a_bulk(lid):
             raise bad(what)
         return v
 
+    def stale(cur):
+        """2.64.2 A (#1817): 'on' -- may the stored value be replaced? (a plain text or an older generation)"""
+        if not on or cur in (None, ""):
+            return True
+        d = le2e_parse(cur)
+        return not le2e_is_cipher(cur) or (bool(d) and d["g"] < gen)
+
     def iid(x, k="id"):
         v = x.get(k)
         if isinstance(v, bool) or not isinstance(v, int):
             raise bad(k)
         return v
-    n = 0
+    n = len(groups["msgs"])
     for key, cols in (("tasks", ("title", "content", "url", "snippets")), ("comments", ("body",)), ("notes", ("title", "body")),
                       ("sections", ("name",)), ("fields", ("value",))):
         n += sum(1 for x in groups[key] for k in cols if x.get(k) is not None)
@@ -888,17 +952,20 @@ def le2a_bulk(lid):
     try:
         for x in groups["tasks"]:
             tid = iid(x)
-            if not c.execute("SELECT 1 FROM tasks WHERE id=? AND list_id=?", (tid, lid)).fetchone():
+            row = c.execute("SELECT title, content, url, snippets FROM tasks WHERE id=? AND list_id=?", (tid, lid)).fetchone()
+            if not row:
                 raise bad("tasks")
             upd = {}
             for k, mx in (("title", TITLE_MAX), ("content", CONTENT_MAX), ("url", 2000)):
                 v = val(x.get(k), k, mx)
-                if v is not None:
+                if v is not None and stale(row[k]):
                     upd[k] = v
             if x.get("snippets") is not None:
                 s = x["snippets"]
                 if enc:
-                    upd["snippets"] = val(s, "snippets", 0)
+                    v = val(s, "snippets", 0)
+                    if not on or stale(le2a_snip_cipher(row["snippets"])):
+                        upd["snippets"] = v
                 else:
                     if isinstance(s, str) and le2e_is_cipher(s):
                         raise bad("snippets")
@@ -909,57 +976,87 @@ def le2a_bulk(lid):
         for x in groups["comments"]:
             v = val(x.get("body"), "body", MAX_COMMENT)
             cid = iid(x)
-            if v is None or not c.execute("SELECT 1 FROM comments cm JOIN tasks t ON t.id=cm.task_id WHERE cm.id=? AND t.list_id=?",
-                                          (cid, lid)).fetchone():
+            row = c.execute("SELECT cm.body FROM comments cm JOIN tasks t ON t.id=cm.task_id WHERE cm.id=? AND t.list_id=?",
+                            (cid, lid)).fetchone()
+            if v is None or not row:
                 raise bad("comments")
-            c.execute("UPDATE comments SET body=? WHERE id=?", (v, cid))
+            if stale(row[0]):
+                c.execute("UPDATE comments SET body=? WHERE id=?", (v, cid))
         for x in groups["notes"]:
             nid = iid(x)
-            if not c.execute("SELECT 1 FROM notes WHERE id=? AND list_id=?", (nid, lid)).fetchone():
+            row = c.execute("SELECT title, body FROM notes WHERE id=? AND list_id=?", (nid, lid)).fetchone()
+            if not row:
                 raise bad("notes")
             for k, col, mx in (("title", "title", NOTE_TITLE_MAX), ("body", "body", NOTE_BODY_MAX)):
                 v = val(x.get(k), k, mx)
                 if v is not None:
                     if k == "title" and v == "":
                         raise bad("title")
-                    c.execute(f"UPDATE notes SET {col}=? WHERE id=?", (v, nid))
+                    if stale(row[col]):
+                        c.execute(f"UPDATE notes SET {col}=? WHERE id=?", (v, nid))
         for x in groups["sections"]:
             v = val(x.get("name"), "name", 200)
             sid = iid(x)
-            if not v or not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (sid, lid)).fetchone():
+            row = c.execute("SELECT name FROM sections WHERE id=? AND list_id=?", (sid, lid)).fetchone()
+            if not v or not row:
                 raise bad("sections")
-            c.execute("UPDATE sections SET name=? WHERE id=?", (v, sid))
+            if stale(row[0]):
+                c.execute("UPDATE sections SET name=? WHERE id=?", (v, sid))
         for x in groups["fields"]:
             tid, fid = iid(x, "task_id"), iid(x, "field_id")
             v = val(x.get("value"), "value", 1000)
-            if v is None or not c.execute("""SELECT 1 FROM task_field_values v JOIN list_fields lf ON lf.id=v.field_id AND lf.type='text'
-                                             JOIN tasks t ON t.id=v.task_id WHERE v.task_id=? AND v.field_id=? AND t.list_id=?""",
-                                          (tid, fid, lid)).fetchone():
+            row = c.execute("""SELECT v.value FROM task_field_values v JOIN list_fields lf ON lf.id=v.field_id AND lf.type='text'
+                               JOIN tasks t ON t.id=v.task_id WHERE v.task_id=? AND v.field_id=? AND t.list_id=?""",
+                            (tid, fid, lid)).fetchone()
+            if v is None or not row:
                 raise bad("fields")
+            if not stale(row[0]):
+                continue
             if v == "":
                 c.execute("DELETE FROM task_field_values WHERE task_id=? AND field_id=?", (tid, fid))
             else:
                 c.execute("UPDATE task_field_values SET value=? WHERE task_id=? AND field_id=?", (v, tid, fid))
+        if groups["msgs"]:  # 2.64.2 A (#1817): channel messages of the list room (part C checks and writes them)
+            try:
+                from .liste2echan import le2c_bulk
+            except ImportError:  # FALLBACK until part C is merged
+                raise bad("msgs") from None
+            try:
+                le2c_bulk(c, lid, mode, gen, groups["msgs"])
+            except ValueError:
+                raise bad("msgs") from None
     except BadInput as x:
         c.rollback()
         return err(str(x))
     bump(c)
     c.commit()
-    return jsonify(ok=True, left=le2a_left(c, lid, lr["e2e"])[1])
+    return jsonify(ok=True, left=le2a_left(c, lid, mode, uid=_uid)[1])
 
 
 @app.post("/api/lists/<int:lid>/e2e/finish")
 def le2a_finish(lid):
     """Ends a switch when nothing is left: encrypting -> 'on' (copies of plain texts elsewhere go, part B), decrypting -> open
-    (the list keys and the waiting list go)."""
+    (the list keys and the waiting list go). 2.64.2 A: 'on' -> the re-encryption after a key change is done (e2e_reenc 0)."""
     c = db()
-    uid, lr, _role, e = _le2a_switch(c, lid)
+    uid, lr, _role, e = _le2a_switch(c, lid, on_ok=True)
     if e:
         return e
-    left = le2a_left(c, lid, lr["e2e"])[1]
+    if lr["e2e"] == "on" and not int(lr["e2e_reenc"] or 0):  # no key change to finish (review M1: a second finish = 409)
+        return err(tr("No encryption change is running for this list."), 409)
+    left = le2a_left(c, lid, lr["e2e"], uid=uid)[1]
     if any(left.values()):
         return jsonify(error=tr("Not all texts are converted yet."), code="list_e2e_left", left=left), 409
     ts = iso(now_utc())
+    if lr["e2e"] == "on":  # 2.64.2 A (#1817): only for the generation this call checked (a key change in between: its own run)
+        if not c.execute("UPDATE lists SET e2e_reenc=0 WHERE id=? AND e2e='on' AND e2e_gen=? AND e2e_reenc=?",
+                         (lid, int(lr["e2e_gen"] or 0), int(lr["e2e_reenc"] or 0))).rowcount:
+            c.rollback()
+            return err(tr("No encryption change is running for this list."), 409)
+        c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
+                  (lid, uid, "e2e", json.dumps({"reenc": True, "done": True, "gen": int(lr["e2e_gen"] or 0)}), ts))
+        bump(c)
+        c.commit()
+        return jsonify(ok=True, mode="on")
     # 2.64.1 review (M1): only from the state this call checked (a stop or another finish in between = 409)
     if not c.execute("UPDATE lists SET e2e=?, e2e_at=? WHERE id=? AND e2e=? AND COALESCE(e2e_gen, 0)=?",
                      ("on" if lr["e2e"] == "encrypting" else None, ts, lid, lr["e2e"], int(lr["e2e_gen"] or 0))).rowcount:
@@ -970,7 +1067,7 @@ def le2a_finish(lid):
         from .liste2eguard import le2b_scrub  # H2: copies of the plain texts in other tables (history, time entries, pushes, webhooks, agent events ...)
         le2b_scrub(c, lid)
     else:
-        c.execute("UPDATE lists SET e2e_rotate=0 WHERE id=?", (lid,))
+        c.execute("UPDATE lists SET e2e_rotate=0, e2e_reenc=0 WHERE id=?", (lid,))
         c.execute("DELETE FROM list_keys WHERE list_id=?", (lid,))
         c.execute("DELETE FROM list_key_pending WHERE list_id=?", (lid,))
     c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
@@ -1065,3 +1162,64 @@ def le2a_keys(lid):
     bump(c)
     c.commit()
     return jsonify(ok=True, released=sorted(got), skipped=sorted(skipped))
+
+
+# ---------------------------------------------------------------- 2.64.2 A (#1817): key change (rotation)
+@app.post("/api/lists/<int:lid>/e2e/rotate")
+def le2a_rotate(lid):
+    """{gen, keys: [{user_id, wrapped}]} -- a new generation of the list key (after someone left, or on request): only the
+    owner / list admins holding the key of the current generation, only in 'on'. gen must be e2e_gen + 1 (a second rotation at
+    the same moment gets 409 code list_e2e_gen and does not rotate again). Everyone who held the previous generation and is not
+    in keys (e.g. a changed key not confirmed yet) goes on the waiting list; an entry for someone who is not the owner / a member
+    -> 400. The server stores the wrapper's public key itself. Starts the background re-encryption (e2e_reenc = gen); old
+    generations stay (members need them for texts not re-encrypted yet and for backups)."""
+    from .e2e import e2e_keys_of
+    c = db()
+    uid, lr, role = _le2a_manage(c, lid)
+    if lr["e2e"] != "on":
+        return err(tr("The list is not encrypted in the browser."), 409)
+    cur = int(lr["e2e_gen"] or 0)
+    mine = e2e_keys_of(c, uid)
+    if not mine or not c.execute("SELECT 1 FROM list_keys WHERE list_id=? AND user_id=? AND gen=?", (lid, uid, cur)).fetchone():
+        return err(tr("You have no key for this list yet."), 409)
+    b = body()
+    gen, keys = b.get("gen"), b.get("keys")
+    if isinstance(gen, bool) or not isinstance(gen, int):
+        return err(tr("Invalid value: {0}", "gen"))
+    if gen != cur + 1:
+        return jsonify(error=tr("The key of this list was changed meanwhile."), code="list_e2e_gen", gen=cur), 409
+    if not isinstance(keys, list) or not keys or len(keys) > LE2A_KEYS_MAX:
+        return err(tr("Invalid value: {0}", "keys"))
+    people = {p["user_id"]: p for p in le2a_people(c, lr)[0]}
+    given = {}
+    for k in keys:
+        w = _le2a_wrapped(k.get("wrapped")) if isinstance(k, dict) else None
+        u = k.get("user_id") if isinstance(k, dict) else None
+        if not w or isinstance(u, bool) or not isinstance(u, int) or u in given or u not in people or not people[u]["has_keys"]:
+            return err(tr("Invalid value: {0}", "keys"))
+        given[u] = w
+    if uid not in given:
+        return err(tr("Invalid value: {0}", "keys"))
+    ts = iso(now_utc())
+    # atomic: only from the generation this browser wrapped for (another rotation first = 409, nothing written)
+    if not c.execute("UPDATE lists SET e2e_gen=?, e2e_rotate=0, e2e_reenc=?, e2e_by=?, e2e_at=? WHERE id=? AND e2e='on' AND e2e_gen=?",
+                     (gen, gen, uid, ts, lid, cur)).rowcount:
+        c.rollback()
+        return jsonify(error=tr("The key of this list was changed meanwhile."), code="list_e2e_gen", gen=cur), 409
+    # the list row is locked now: a member who left in the meantime must not get the new key (the browser asks again)
+    now = {p["user_id"] for p in le2a_people(c, c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone())[0]}
+    if set(given) - now:
+        c.rollback()
+        return jsonify(error=tr("The members of this list changed meanwhile. Try again."), code="list_e2e_members"), 409
+    for u, w in given.items():
+        c.execute("INSERT INTO list_keys(list_id,gen,user_id,wrapped,wrapped_by,wrapper_pub,created_at) VALUES(?,?,?,?,?,?,?)",
+                  (lid, gen, u, w, uid, mine["pub"], ts))
+        c.execute("DELETE FROM list_key_pending WHERE list_id=? AND user_id=?", (lid, u))
+    for r in c.execute("SELECT user_id FROM list_keys WHERE list_id=? AND gen=?", (lid, cur)).fetchall():
+        if r[0] not in given and r[0] in now:
+            c.execute("INSERT INTO list_key_pending(list_id,user_id,since) VALUES(?,?,?) ON CONFLICT DO NOTHING", (lid, r[0], ts))
+    c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
+              (lid, uid, "e2e", json.dumps({"rotate": True, "gen": gen}), ts))
+    bump(c)
+    c.commit()
+    return jsonify(le2a_info(c, c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone(), role, uid))

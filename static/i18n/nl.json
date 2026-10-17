@@ -8348,5 +8348,8 @@
   "Safety numbers": "Veiligheidsnummers",
   "Titles, descriptions, comments, notes, attachments and the list chat are encrypted in the browser.": "Titels, beschrijvingen, opmerkingen, notities, bijlagen en de lijstchat zijn versleuteld in de browser.",
   "Key changed: {0}": "Sleutel gewijzigd: {0}",
-  "The key of {0} has changed.": "De sleutel van {0} is gewijzigd."
+  "The key of {0} has changed.": "De sleutel van {0} is gewijzigd.",
+  "The key of this list was changed meanwhile.": "De sleutel van deze lijst is inmiddels gewijzigd.",
+  "The members of this list changed meanwhile. Try again.": "De leden van deze lijst zijn inmiddels gewijzigd. Probeer het opnieuw.",
+  "{0} texts of this list cannot be decrypted with the keys you hold.": "{0} teksten van deze lijst kunnen niet worden ontsleuteld met jouw sleutels."
 }
