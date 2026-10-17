@@ -418,6 +418,7 @@
     const lid = sampleMake(); return {ok: true, created: true, list_id: lid, sample: sampleState()}; });
   on('DELETE', '/api/sample', () => { if (!sampleState()) { DB.sample = null; throw new Http(404, {error: tx('There is no sample project')}); } return sampleRemove(); });
   on('GET', '/api/version', () => ({v: DB.v, n: '0', c: '0'}));
+  on('GET', '/api/servers', () => ({links: [], self: {name: 'Kalmido', short: 'K', color: '#6e56cf'}}));  // 2.73.0 (#661): no other servers in the demo
   on('GET', '/api/me', () => ({auth: 'session', avatar: DB.me.avatar, display_name: DB.me.display_name, has_password: true, id: 1, is_admin: false, username: DB.me.username, twofa: [], via: 'password', drop_token: '', proxy_login: '', ntfy_topic: ''}));
   on('PATCH', '/api/me', (q, b) => { for (const k of ['display_name', 'avatar']) if (k in b) DB.me[k] = b[k]; return {ok: true}; });
   on('PATCH', '/api/settings', (q, b) => { for (const [k, v] of Object.entries(b)) DB.settings[k] = typeof v === 'string' ? v : typeof v === 'boolean' ? (v ? '1' : '0') : typeof v === 'object' ? JSON.stringify(v) : String(v); return {ok: true}; });
