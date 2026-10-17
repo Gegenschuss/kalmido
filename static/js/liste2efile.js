@@ -80,9 +80,10 @@ async function le2eFileUpload(tid, files, commentId, quiet) {
 // ------------------------------------------------------------------ names and tiles
 // the plain name of a list file known on this page, else '' (decrypted in the background; the tiles are filled in then)
 function le2eFileName(a, lid) {
-  if (!le2eIs(a?.name)) return a?.name || '';
-  const s = LE2E.memo.get(a.name); if (s != null) return s;
-  LE2F.aid.set(a.id, [lid, a.name]); le2fFill();
+  const c = le2eIs(a?.name) ? a.name : a?._enc?.name;  // the data layer keeps the cipher in _enc (name '' until opened)
+  if (!le2eIs(c)) return a?.name || '';
+  const s = LE2E.memo.get(c); if (s != null) return s;
+  LE2F.aid.set(a.id, [lid, c]); le2fFill();
   return '';
 }
 let le2fT = null;

@@ -14,7 +14,7 @@ const LE2E = {on: new Set(), sig: {}, keys: {}, info: {}, infoP: {}, tried: {}, 
   changed: {}, objs: new Set(), kickT: 0, draining: false, again: false, busy: {}, got: new Map(), badL: new Map()};
 const LE2E_PRE = 'e2e1:';
 // the props that carry a cipher -> the field names of their AAD (tried in order: a task title and a note title share "title")
-const LE2E_CANDS = {title: ['title', 'note_title'], content: ['content'], url: ['url'], snippets: ['snippets'], body: ['comment', 'note_body'], name: ['section'], value: ['field']};
+const LE2E_CANDS = {title: ['title', 'note_title'], content: ['content'], url: ['url'], snippets: ['snippets'], body: ['comment', 'note_body'], name: ['section', 'file_name'], value: ['field']};  // 2.64.2 B (#1817): + the names of list files
 const LE2E_PROPS = Object.keys(LE2E_CANDS);
 const LE2E_TASK = ['title', 'content', 'url', 'snippets'];
 // the names of the protocol are function declarations (window properties): other parts and tests can wrap or stub them
