@@ -7,6 +7,23 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.85.0] - 2026-10-17
+
+Feeds (RSS reader), list lock hint, test clock.
+
+### Added
+- *At home*: **Feeds**, an RSS / Atom reader of your own (module, off by default; private to you, agents do not see it).
+  Follow up to 100 feeds, the server fetches them hourly and keeps articles for 30 days; filter per feed, unread only,
+  mark read (with undo), *Read later* puts one task with the link into your *Read later* list. OPML import and export.
+  Fetching only goes to public http / https addresses (also after redirects), with time and size limits; feeds with a
+  DTD are refused and article texts are shown as plain text (#1162).
+
+### Fixed
+- *Edit list* no longer says the own encryption is not set up right after loading the app, when it is; the lock switch is
+  free at once. The same for the wiki area dialog (#1904).
+- Tests take "today" in the app's time zone (Europe/Berlin) instead of UTC, so they no longer fail between midnight and
+  2 am; a test clock (`KALMIDO_TEST_NOW`) checks that window (#1863).
+
 ## [2.83.0] - 2026-10-17
 
 Organisation view, list themes, team room.
