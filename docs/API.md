@@ -66,7 +66,9 @@ every token and comes back when it is allowed again. `GET /api/v1/me` shows `tok
 `POST /api/me/tokens` and `PATCH /api/me/tokens/{id}`; empty = every list its user sees). Every `/api/v1` request checks
 it: other lists and their tasks answer `404` as if they did not exist and are left out of every query. `GET /api/v1/me`
 shows it as `token.list_ids`. Agents get the same restriction in their dialog, see
-[Lists, people and agents](#lists-people-and-agents-2300).
+[Lists, people and agents](#lists-people-and-agents-2300). 2.86.0: such a token never creates lists on
+`POST /api/v1/import/{source}`: without `target` every list of the file must match one of its allowed lists (by name, or
+the inbox), else `403`; with `target` = an allowed list it imports as usual.
 
 **A Kalmido app on another server (2.73.0).** *Settings > Account > Servers* shows the accounts of a person on several
 Kalmido servers in one app; the home server reads and changes the tasks over there through this API with a personal token

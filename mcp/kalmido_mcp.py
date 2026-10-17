@@ -1460,7 +1460,7 @@ TOOLS += [
            "color": {"type": "string"}, "note_append": {"type": "string"}, "items": {"type": "array", "items": {"type": "object"}}}, ["action"]),
      lambda api, a: api.call("POST", "/clients/bulk", body=_pick(a, ("ids", "action", "rate", "budget_h", "budget_amount", "color", "note_append", "items")))),
     ("get_workload", "2.23.0 (module workload): planned hours per person and week against their capacity (open assigned tasks, "
-                     "their duration as the estimate).", _obj({"start": D, "weeks": {"type": "integer", "minimum": 1, "maximum": 12},
+                     "their duration as the estimate). 2.86.0: only the people who share a list with you.", _obj({"start": D, "weeks": {"type": "integer", "minimum": 1, "maximum": 12},
                                                                "org": {"type": "integer"}}),
      lambda api, a: api.call("GET", "/workload", _pick(a, ("start", "weeks", "org")))),
     ("get_absences", "2.50.0 (#1195): who of your organisation is away when (vacation, sick leave, days off) - only 'away' and the "

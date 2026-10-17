@@ -87,7 +87,8 @@ needs no permission. Agents created before 2.15.0 keep everything they could do 
 - **Only these lists (2.30.0).** An agent (its dialog; a personal agent: the permissions dialog) and every personal API
   token can be limited to selected lists on top of membership: `list_ids` (empty = all its lists) on
   `PATCH /api/admin/agents/{id}`, `PATCH /api/my/agents/{id}` and `POST` / `PATCH /api/me/tokens`; `GET /api/v1/me`
-  shows `token.list_ids`. Other lists answer `404`, queries leave them out, and no events about them arrive. See
+  shows `token.list_ids`. Other lists answer `404`, queries leave them out, and no events about them arrive (2.86.0: also
+  events queued before the list was taken away or limited are left out when polled). See
   [AGENT-SECURITY.md](AGENT-SECURITY.md#server-enforced-boundaries-230).
 
 ## Personal agents (2.7.2)

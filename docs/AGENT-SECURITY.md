@@ -63,6 +63,13 @@ These hold no matter what the model decides:
 - **Approval for dangerous changes (2.15.0).** Deleting lists or fields, emptying the trash, batches of 10+ tasks,
   moving lists and sharing by an agent wait as a job until a person approves; the request then runs as the agent with
   its rights at that moment. See [AGENTS.md](AGENTS.md#requests-that-wait-for-a-person-2150).
+- **Hardening (2.86.0).** A share request names a person or group only when the agent may see them (else `404`, no job;
+  someone outside the list's workspace: `409`);
+  the approval of a batch names the changed fields and the lists with their task counts (lists the approver cannot see
+  only as a count); at most 500 pushes per agent and person a day (`KALMIDO_AGENT_PUSH_DAY`; past it the message still
+  arrives in the chat, only without a push); queued events of a list or task the agent no longer sees are left out when
+  it polls; `GET /api/v1/workload` shows an agent only the people who share a list with it; a token limited to selected
+  lists cannot create lists when importing (`403`, import into one of its lists instead).
 - **Who may address the agent (2.26.0).** Per list, the owner decides with *Members may see and use the agent*
   (default **off**, also for lists from before 2.26): off, only the owner, list admins and instance admins can chat with
   the agent, @mention it, assign it tasks or ask it for proposals there. Mentions and comments of other members reach it
