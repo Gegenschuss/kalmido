@@ -93,7 +93,7 @@ const FEAT = 'collab,comments,clients,contacts';
 
   // ---- the e-mail inbox: assign + undo, delete + undo
   w.eval(`go('clients')`); await sleep(500);
-  check(d.querySelector('#view a[href="#mailhub"]'), 'Office > Clients: the entry "E-mail inbox"');
+  check(d.querySelector('#view a[href="#mailhub"]'), 'Office > Clients: the entry "E-mail filing"');
   w.eval(`go('mailhub')`);
   await until(async () => d.querySelector('.hbmhub .hbmrow'), 6000);
   check(d.querySelector('.hbmhub .hbmsp') && d.querySelector('.hbmhub .hbmsp').textContent.includes(IN), 'inbox: my filing address');

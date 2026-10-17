@@ -76,7 +76,7 @@ function hbm_projHtml(l) {
   return `<section class="povs hbmsec hbmpov" id="pov-mails"><div class="povh"><h3>${tr('E-mails')}</h3></div>${hbm_bodyHtml(key)}</section>`;
 }
 // the entry in Office > Clients
-const hbm_hubBtn = () => `<a class="btn sm" href="#mailhub" title="${esc(tr('E-mail inbox'))}">${ic('inbox', 's')}<span class="cdl">${tr('E-mail inbox')}</span></a>`;
+const hbm_hubBtn = () => `<a class="btn sm" href="#mailhub" title="${esc(tr('E-mail filing'))}">${ic('inbox', 's')}<span class="cdl">${tr('E-mail filing')}</span></a>`;
 function hbm_hubView() {
   const key = 'inbox:0', j = hbm_state(key).j;
   const sp = (j?.spaces || []).map(x => `<li class="hbmsp"><span class="hbmspn"><b>${esc(x.name)}</b><small class="muted">${x.address ? esc(x.address) : tr('No address yet')}</small></span>
@@ -84,7 +84,7 @@ function hbm_hubView() {
       ${x.address ? `<button type="button" class="iconbtn" data-hbma="menu" data-hbmk="${key}" data-ws="${esc(x.ws)}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}</li>`).join('');
   const intro = !j ? '' : j.enabled ? `<p class="muted">${tr('Forward e-mails to your filing address (or send it a copy): a mail from the address of a client or of one of its contact persons is filed with that client, everything else waits here until you assign it.')}</p>`
     : `<p class="muted">${tr('Receiving e-mail is not set up on this server (an admin sets up the mailbox).')}</p>`;
-  return `<div class="ctview hbmhub"><h2 class="msclh"><a href="#clients" class="linkbtn">${ic('back', 's')}<span>${tr('Clients')}</span></a><span class="muted" aria-hidden="true">›</span><span>${tr('E-mail inbox')}</span></h2>
+  return `<div class="ctview hbmhub"><h2 class="msclh"><a href="#clients" class="linkbtn">${ic('back', 's')}<span>${tr('Clients')}</span></a><span class="muted" aria-hidden="true">›</span><span>${tr('E-mail filing')}</span></h2>
     ${intro}${sp ? `<h4>${tr('Your filing addresses')}</h4><ul class="hbmspaces" role="list">${sp}</ul>` : ''}
     <h4>${tr('Not assigned')}</h4>${hbm_bodyHtml(key)}</div>`;
 }

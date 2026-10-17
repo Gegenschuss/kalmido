@@ -9,16 +9,15 @@ minor one, anything that needs action on your side a major one.
 
 ## [2.84.0] - 2026-10-17
 
-E-mail inbox for clients and projects.
+E-mails filed at clients and projects.
 
 ### Added
-- Clients and projects: file e-mails at them. Every client and project has its own address, every person one inbox
-  address per workspace; mails to the inbox are matched by the sender (client e-mail, contact persons, linked contacts),
-  forwarded mails by their original sender, anything unclear waits under *Not assigned*. Filed mails are searchable on
-  the client card and the project page; the original mail and its attachments land in the file store under
-  *E-mails / client / date subject* and go through the usual upload checks. No mail client: nothing is sent or answered.
-  Needs the mail import (IMAP) of *Tasks by e-mail* (#1198).
-
+- Clients and projects: file e-mails at them. Every client and project has its own address, every person one filing
+  address per workspace (*Office > Clients > E-mail filing*); mails to it are matched by the sender (client e-mail,
+  contact persons, linked contacts), forwarded mails by their original sender, anything unclear waits under
+  *Not assigned*. Filed mails are searchable on the client card and the project page; the original mail and its
+  attachments land in the file store under *E-mails / client / date subject* and go through the usual upload checks.
+  No mail client: nothing is sent or answered. Needs the mail import (IMAP) of *Tasks by e-mail* (#1198).
 - The account export includes your own private filed e-mails (#1903).
 
 ### Fixed

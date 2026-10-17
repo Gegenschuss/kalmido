@@ -328,10 +328,10 @@ answers these mails, does not sync a mailbox and shows the text as plain text. I
 e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addresses are not offered.
 
 - **Addresses** (plus addresses of the server's mailbox, made on the first tap of *Copy address*): one per client (everybody
-  who sees the client gets the same one), one per project (people who may change the project), and an **e-mail inbox** per
-  person and workspace (Office > Clients > *E-mail inbox*, one for the private space and one per organisation). The menu
+  who sees the client gets the same one), one per project (people who may change the project), and a **filing address** per
+  person and workspace (Office > Clients > *E-mail filing*, one for the private space and one per organisation). The menu
   next to an address makes a new one (the old one stops at once) or turns it off.
-- **Matching in the inbox**: the sender is compared with the client's e-mail, its contact persons and the address book
+- **Matching at the filing address**: the sender is compared with the client's e-mail, its contact persons and the address book
   contacts linked to them - only clients of the same workspace that the recipient sees. A mail the person forwards (or
   sends a copy of) counts with the original sender of the forwarding header, else with To / Cc. No match or several
   clients: the mail waits under *Not assigned* (only its recipient sees it) until it is assigned by hand. A client's or
