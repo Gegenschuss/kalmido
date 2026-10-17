@@ -456,6 +456,38 @@ j = wait(Da, iid)
 check(j.get("state") == "preview", f"N4: the leftover bytes were cut, the file checks fine ({j.get('state')}: {j.get('error')})")
 Da.delete(B + f"/api/account/import/{iid}")
 
+# ---------------------------------------------------------------- 2.73.0 (#1473) review N6: values in a form the app never writes
+n6 = mkzip({
+    "lists": [{"id": 1, "name": "Formatpruefung Test", "color": "rot", "created_at": ts}],
+    "tasks": [{"id": 1, "list_id": 1, "title": "Kaputte Wiederholung", "due": "2026-99-99", "due_time": "25:99", "repeat": "FREQ=DAILY",
+               "priority": 999, "reminders": "abc", "duration": -5, "repeat_from": "irgendwann", "created_at": "gestern", "updated_at": ts},
+              {"id": 2, "list_id": 1, "title": "Gute Wiederholung", "due": "2026-10-20", "due_time": "09:30", "repeat": "RRULE:FREQ=WEEKLY",
+               "priority": 3, "reminders": "15,0", "created_at": ts, "updated_at": ts},
+              {"id": 3, "list_id": 1, "title": "Kaputte Regel", "due": "2026-10-20", "repeat": "FREQ=SECONDLY;INTERVAL=1", "created_at": ts,
+               "updated_at": ts}],
+    "habits": [{"id": 1, "name": "Formatgewohnheit", "color": "#12345", "remind_at": "abends", "days": "89", "goal": 0, "created_at": ts}],
+})
+iid = upload(Da, n6)
+j = wait(Da, iid)
+j = run(Da, iid) if j.get("state") == "preview" else j
+check(j.get("state") == "done", f"N6: import done {j.get('state')} {j.get('error')}")
+n6l = dbx("SELECT id, color FROM lists WHERE owner_id=? AND name='Formatpruefung Test'", (DAVE,))
+check(n6l and n6l[0]["color"] in ("", None), f"N6: a wrong colour is left out {n6l and n6l[0]['color']}")
+n6t = {r_["title"]: r_ for r_ in dbx("SELECT id, title, due, due_time, repeat, priority, reminders, duration, repeat_from, created_at FROM tasks "
+                                     "WHERE list_id=?", (n6l[0]["id"] if n6l else 0,))}
+kb, gu = n6t.get("Kaputte Wiederholung"), n6t.get("Gute Wiederholung")
+check(kb and kb["due"] is None and kb["due_time"] is None and kb["priority"] == 0 and kb["reminders"] in ("", None) and kb["duration"] is None
+      and kb["repeat_from"] == "due" and kb["created_at"] != "gestern", f"N6: broken values left out {kb and dict(zip(kb.keys(), kb))}")
+check(gu and gu["due"] == "2026-10-20" and gu["due_time"] == "09:30" and gu["repeat"] == "FREQ=WEEKLY" and gu["priority"] == 3 and gu["reminders"] == "15,0",
+      f"N6: valid values kept {gu and dict(zip(gu.keys(), gu))}")
+check(n6t.get("Kaputte Regel") and not n6t["Kaputte Regel"]["repeat"], "N6: a rule the app refuses is left out")
+for t_ in (kb, gu):
+    r = Da.post(B + f"/api/tasks/{t_['id'] if t_ else 0}/complete", json={})
+    check(r.ok, f"N6: {t_ and t_['title']} can be ticked off ({r.status_code} {r.text[:200]})")
+hb = dbx("SELECT color, remind_at, days, goal FROM habits WHERE user_id=? AND name='Formatgewohnheit'", (DAVE,))
+check(hb and hb[0]["color"] in ("", None) and hb[0]["remind_at"] == "" and hb[0]["days"] == "1234567" and hb[0]["goal"] == 1,
+      f"N6: habit defaults {hb and dict(zip(hb[0].keys(), hb[0]))}")
+
 # ---------------------------------------------------------------- attacks
 bad(Da, b"this is not a zip" * 100, "no ZIP")
 bad(Da, mkzip({"lists": []}, extra=[("../evil.txt", b"x")]), "path traversal")

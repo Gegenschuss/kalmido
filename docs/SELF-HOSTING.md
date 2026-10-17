@@ -578,7 +578,8 @@ most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX
 person (hosting) is checked before the upload and for every file during the import -- when it is full, the import stops
 and what came over so far can be undone. The import refuses ZIP files with unsafe names, duplicate parts, encryption,
 extreme compression ratios or wrong checksums; ids, owners, organisations and authors in the file are never taken over
-as they are.
+as they are. Values in a form the app never writes (a date like 2026-99-99, a time 25:99, an unknown priority, a colour
+that is no #rrggbb, a repeat rule the app refuses) are left out, so the default applies.
 
 ## Server hardening
 
