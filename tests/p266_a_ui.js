@@ -8,6 +8,7 @@ const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const firefox = require('./ff')({tag: 'p266_a_ui', check, shots: 'P266A_SHOTS'});  // 2.80.0 (#1897): the real phone layout
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.KMT_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});  // KMT_NOSTART=1: a running app
@@ -106,6 +107,25 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   await until(() => !d.querySelector('.modal.mgdlg'), 20);
   check(!d.querySelector('.modal.mgdlg') && (await call('GET', `/api/contacts/${C2}`, null, CB)).http === 200, '#1835 phone: Cancel changes nothing');
   w.close();
+
+  // 2.80.0 (#1897) Firefox at 402 px with touch, German (the longest labels): the selection bar never scrolls sideways,
+  // "Clear selection" lies on the screen, the toast's Undo button is at least 44 px high
+  await call('PATCH', '/api/settings', {lang: 'de'}, CB);
+  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+    await nav(B + 'static/icon.svg');
+    check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'bob', password: 'password123'})}).then(r => r.status)`) === 200, '#1897 Firefox: login');
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 402, height: 874}});
+    await nav(B + '?v=1897#contacts');
+    for (let i = 0; i < 30 && !(await ev(`document.querySelectorAll('#view .ctrow').length >= 2`).catch(() => false)); i++) await sleep(300);
+    await ev(`(() => { const ids = [...document.querySelectorAll('#view .ctrow[data-ctopen]')].map(x => +x.dataset.ctopen); bk_start(ids[0]); CT.pick.add(ids[1]); ctDraw(); return 1; })()`); await sleep(400);
+    const bar = await ev(`(() => { const b = document.querySelector('#ct-sbar'), x = b && b.querySelector('.mbx'), r = x && x.getBoundingClientRect();
+      return b ? {sw: b.scrollWidth, cw: b.clientWidth, xr: r ? Math.round(r.right) : -1, xh: r ? Math.round(r.height) : 0, vw: innerWidth, doc: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1} : null; })()`);
+    check(bar && bar.sw <= bar.cw + 1 && bar.xr > 0 && bar.xr <= bar.vw && bar.doc, '#1897: the selection bar fits, no sideways scrolling, Clear selection on screen ' + JSON.stringify(bar));
+    await shot('p266a-1897-bar-402.png');
+    const th = await ev(`(() => { toast('Kontakte zusammengeführt', () => {}); const b = document.querySelector('#toast button:not(.tx)'); return b ? Math.round(b.getBoundingClientRect().height) : 0; })()`);
+    check(th >= 44, '#1897: the toast\'s Undo button at least 44 px high: ' + th);
+  }, true);
+  await call('PATCH', '/api/settings', {lang: 'en'}, CB);
 
   console.log(`p266_a_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
