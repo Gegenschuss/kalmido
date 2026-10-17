@@ -608,6 +608,7 @@ function applyState(j) {
   S.notifAsk = j.notif_ask || [];  // 2.33.0 (#927): the one-time question about notification templates
   S.storage = j.storage || null; S.announce = j.announce || null;  // 2.24.0 (#910 / #907)  // 2.23.0 (#799): organisation | shared | multi
   S.clients = j.clients || [];  // 2.23.0 (#463): the clients I see, with their lists
+  if (S.booted && typeof OIM !== 'undefined' && OIM.clients && S.route?.mod === 'office' && S.route.tab === 'import') fx8a_oimClients();  // 2.80.0 (#1836): the import's client choice too
   if (S.booted && S.route?.mod === 'clients') clReload();  // a change elsewhere: the client's sums again
   // 2.50.0 (#1195, #1194); 2.50.1: the shown tab loads again and keeps its rows until the new ones are there (a null
   // without a redraw left absence and booking rows that no longer opened on a tap)

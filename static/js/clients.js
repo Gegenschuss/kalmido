@@ -103,7 +103,7 @@ function clientSheet(c) {  // the time view of the client's month, then its prin
 }
 
 // ---- the client dialog
-function clientModal(c) {
+function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's area, null = private), o.stay (no jump to the client)
   const md = modal(`<h3>${c ? tr('Edit client') : tr('New client')}</h3>
     <div class="row"><label for="cl-name">${tr('Name')}</label><input id="cl-name" maxlength="80" value="${esc(c?.name || '')}" autocomplete="organization"></div>
     <div class="row"><label for="cl-icon">${tr('Symbol')}</label><input id="cl-icon" maxlength="8" class="numin" value="${esc(c?.icon || '')}" placeholder="🏢"></div>
@@ -133,13 +133,14 @@ function clientModal(c) {
       }
       const body = {name: $('#cl-name', md).value, icon: $('#cl-icon', md).value, contacts: clkValue(md), email: $('#cl-email', md).value,
         phone: $('#cl-phone', md).value, address: $('#cl-addr', md).value, note: $('#cl-note', md).value};
+      if (!c && 'org_id' in o) body.org_id = o.org_id;
       if ($('#cl-rate', md)) Object.assign(body, {rate: num($('#cl-rate', md).value), budget_h: num($('#cl-bh', md).value), budget_amount: num($('#cl-ba', md).value)});
       if ($('#cl-arch', md)) body.archived = $('#cl-arch', md).checked;
       for (const el of md.querySelectorAll('[data-clb]')) if (!(el.dataset.clb === 'country' && !ctyValid(el.value) && el.value === (c?.billing?.country || ''))) body[el.dataset.clb] = el.dataset.clb === 'payment_terms_days' ? (el.value.trim() === '' ? null : +el.value.trim()) : el.value;
       const r = await rawFetch(c ? 'PATCH' : 'POST', c ? `/api/clients/${c.id}` : '/api/clients', body);
       md.remove(); await load(); render(); clReload();
       toast(c ? tr('Saved') : tr('Added: {0}', r.name));
-      if (!c) go('client/' + r.id);
+      if (!c && !o.stay) go('client/' + r.id);
     } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
   setTimeout(() => { if (!isTouch()) $('#cl-name', md)?.focus(); }, 50);

@@ -12,9 +12,15 @@ if (typeof fgWatch === 'function') fgWatch(() => !!OIM.pv || OIM.arch.some(x => 
 async function oimLoad() {
   try { const j = await api('GET', '/api/office/legacy/runs'); OIM.runs = j.runs || []; } catch (x) { OIM.runs = []; }
   try { OIM.counter = await api('GET', '/api/office/legacy/counter'); } catch { OIM.counter = null; }
+  await fx8a_oimClients();
+}
+// 2.80.0 (#1836): the client choice is read again on every visit of the import page and whenever the clients change
+// (core.js), not only once per page load -- a client created meanwhile was missing until a reload
+async function fx8a_oimClients() {
   try { const j = await api('GET', '/api/clients'); OIM.clients = (j.clients || []).filter(c => !c.archived && (c.org_id || null) === pb_clOrg()); } catch { OIM.clients = []; }
   ofcDraw();
 }
+window.addEventListener('hashchange', () => { if (/^#office\/import\b/.test(location.hash) && OIM.runs !== null) fx8a_oimClients(); });
 const oimClientOpts = cur => [['', tr('no client')], ...(OIM.clients || []).map(c => [c.id, c.name])].map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('');
 
 // ---- the page
@@ -234,6 +240,7 @@ async function oimImport() {
     toast(tr('Imported: {0} clients, {1} services, {2} devices', c.clients || 0, c.services || 0, c.equipment || 0) + (c.contacts ? ' · ' + trn('{0} contact person added', '{0} contact persons added', c.contacts) : '')
       + (roles ? ' · ' + trn('{0} role', '{0} roles', roles) : '') + (filled ? ' · ' + trn('{0} entry completed', '{0} entries completed', filled) : ''));  // 2.47.0 (#1648, #1649)
     OIM.pv = null; ofcReload('services'); ofcReload('equipment'); ofcReload('roles'); ofcReload('crew');
+    if (c.clients && typeof load === 'function') await load();  // 2.80.0 (#1842): the documents' client field knows the imported clients
     await oimLoad();
   } catch (x) { const el = $('.oimpv .aerr'); if (el) el.textContent = x.message || ''; else toast(x.message || ''); }
   OIM.busy = false; ofcDraw();

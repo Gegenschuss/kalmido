@@ -9473,5 +9473,7 @@
   "Only a token for all lists with the permissions “Calendar” and “Contacts” may create an app password": "Solo un token para todas las listas con los permisos «Calendario» y «Contactos» puede crear una contraseña de aplicación",
   "This account is not linked to the login provider yet. Log in with your password first, then use the provider's button once in the same browser.": "Esta cuenta aún no está vinculada al proveedor de inicio de sesión. Inicia sesión primero con tu contraseña y luego usa una vez el botón del proveedor en el mismo navegador.",
   "A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).": "Un inicio de sesión con el proveedor OIDC coincidió con {0} por {1}, pero no se vinculó (administrador, segundo factor o ningún correo verificado coincidente).",
-  "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Aún no se ha comprobado si tiene malware: el archivo se podrá abrir cuando el antivirus lo haya comprobado"
+  "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Aún no se ha comprobado si tiene malware: el archivo se podrá abrir cuando el antivirus lo haya comprobado",
+  "No clients in this area yet": "Todavía no hay clientes en esta área",
+  "Add client": "Añadir cliente"
 }

@@ -32,9 +32,13 @@ async function ofcInfo(force) {
   if (OFC.infoLoading || OFC.pbWait) return;  // 2.47.3 (#1360): not while the new workspace is being saved
   if (OFC.info && !force) return;
   OFC.infoLoading = true;
-  try { OFC.info = await api('GET', '/api/office/settings'); OFC.infoErr = null; }
-  catch (x) { OFC.info = null; OFC.infoErr = x.message || tr('unknown'); }
+  const ws = OFC.ws;  // 2.80.0 (#1842): an answer for the workspace before a switch is dropped and read again
+  let info = null, err = null;
+  try { info = await api('GET', '/api/office/settings'); }
+  catch (x) { err = x.message || tr('unknown'); }
   OFC.infoLoading = false;
+  if (OFC.ws !== ws) { ofcInfo(); return; }
+  OFC.info = info; OFC.infoErr = err;
   ofcDraw();
 }
 async function ofcLoad(kind, force) {
@@ -80,7 +84,7 @@ function viewOffice() {
 function pb_reset(nav) {
   OFC.info = null; OFC.infoErr = null; OFC.data = {};
   if (typeof OFD !== 'undefined') { OFD.list = null; OFD.doc = null; OFD.docId = null; OFD.log = null; }
-  if (typeof OIM !== 'undefined') OIM.list = null;
+  if (typeof OIM !== 'undefined') { OIM.list = null; OIM.runs = null; OIM.clients = null; }  // 2.80.0 (#1836): runs, counter and clients of the new workspace
   if (nav && S.route.mod === 'office' && S.route.id) setTimeout(() => go('office/' + (S.route.tab || 'offers')), 0);  // a document of the other area
 }
 function pb_wsFollow() {

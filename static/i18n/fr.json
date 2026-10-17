@@ -9473,5 +9473,7 @@
   "Only a token for all lists with the permissions “Calendar” and “Contacts” may create an app password": "Seul un jeton pour toutes les listes avec les droits « Calendrier » et « Contacts » peut créer un mot de passe d’application",
   "This account is not linked to the login provider yet. Log in with your password first, then use the provider's button once in the same browser.": "Ce compte n’est pas encore lié au fournisseur de connexion. Connecte-toi d’abord avec ton mot de passe, puis utilise une fois le bouton du fournisseur dans le même navigateur.",
   "A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).": "Une connexion via le fournisseur OIDC correspondait à {0} par {1}, mais n’a pas été liée (admin, second facteur ou aucune adresse e-mail vérifiée correspondante).",
-  "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Pas encore vérifié contre les logiciels malveillants : le fichier pourra être ouvert dès que l’antivirus l’aura vérifié"
+  "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Pas encore vérifié contre les logiciels malveillants : le fichier pourra être ouvert dès que l’antivirus l’aura vérifié",
+  "No clients in this area yet": "Pas encore de clients dans cet espace",
+  "Add client": "Ajouter un client"
 }
