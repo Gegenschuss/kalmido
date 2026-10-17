@@ -125,6 +125,7 @@ APP_TO_API = {
     "PATCH /api/templates/{}": ["PATCH /templates/{}"],
     "DELETE /api/templates/{}": ["DELETE /templates/{}"],
     "POST /api/templates/{}/apply": ["POST /templates/{}/apply"],
+    "POST /api/lists/{}/duplicate": ["POST /lists/{}/duplicate"],  # 2.78.0 (#1881)
     "POST /api/habits": ["POST /habits"],
     "PATCH /api/habits/{}": ["PATCH /habits/{}"],
     "DELETE /api/habits/{}": ["DELETE /habits/{}"],

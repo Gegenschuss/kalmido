@@ -1123,6 +1123,11 @@ TOOLS += [
      _obj({"template_id": S_ID, "list_id": S_ID, "section_id": S_ID, "name": {"type": "string"}, "folder": {"type": "string"},
            "start": {"type": "string"}, "end": {"type": "string"}}, ["template_id"]),
      lambda api, a: api.call("POST", f"/templates/{_id(a, 'template_id')}/apply", body=_without(a, "template_id"))),
+    ("duplicate_list", "2.78.0: duplicate a list into a new list of yours: sections, tasks with their dates and subtasks, fields, "
+                       "dependencies, Playbook, notepads and page arrangement (members, shares and assignees stay). name optional "
+                       "(default \"<list> (copy)\"), done = also the completed tasks, folder optional (default your folder of the list).",
+     _obj({"list_id": S_ID, "name": {"type": "string"}, "done": {"type": "boolean"}, "folder": {"type": "string"}}, ["list_id"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/duplicate", body=_without(a, "list_id"))),
     # ---- saved filters
     ("list_filters", "Your saved filters (name + rules).", _obj({}), lambda api, a: api.call("GET", "/filters")),
     ("create_filter", "Save a filter: rules as the app stores them (see docs/API.md).",

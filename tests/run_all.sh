@@ -931,6 +931,9 @@ fresh; run p263_c_ui node p263_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.63.0 part B: #1513 the customer portal (status page, answers, sign-in, mails, agents) and the task panel's customer report
 fresh; run p263_b_api "$PY" p263_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p263_b_ui node p263_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.78.0: "Duplicate list" - the copy with sections, tasks, dates, notepads; done optional; who may; REST API (#1881)
+fresh; run p278_dup_api "$PY" p278_dup_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p278_dup_ui node p278_dup_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

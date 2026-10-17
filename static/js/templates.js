@@ -52,6 +52,30 @@ function tplUseModal(tp) {
   });
   if (!isTouch()) setTimeout(() => $('#tu-name', md).focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
+// 2.78.0 (#1881): "Duplicate list…" (list menu, list dialog): a copy of the list as a list template used at once (server
+// POST /api/lists/{id}/duplicate): sections, tasks with their dates, notepads, page arrangement and colours; members and shares stay
+const dupOk = l => !!l && !l.is_inbox && !l.archived && l.role !== 'participant';
+function listDuplicate(id) {
+  const l = listById(id); if (!dupOk(l)) return;
+  const md = modal(`<h3>${tr('Duplicate “{0}”', esc(lname(l)))}</h3>
+    <div class="row"><label for="ld-name">${tr('Name')}</label><input id="ld-name" value="${esc(tr('{0} (copy)', lname(l)))}" maxlength="200"></div>
+    <div class="row"><label class="chkl"><input type="checkbox" id="ld-done"> ${tr('Copy completed tasks too')}</label></div>
+    <div class="shint keep">${tr('Sections, tasks with subtasks and dates, fields, notepads and the page arrangement come along. Members, shares and assignees do not: the copy is yours alone.')}</div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Duplicate')}</button></div>`);
+  md.classList.add('ldmodal');
+  const go_ = async () => {
+    const name = $('#ld-name', md).value.trim(); if (!name) { need($('#ld-name', md)); return; }
+    const b = $('[data-m="ok"]', md); if (b.disabled) return; b.disabled = true;
+    let j; try { j = await api('POST', `/api/lists/${id}/duplicate`, {name, done: $('#ld-done', md).checked}); } catch { b.disabled = false; return; }
+    md.remove(); await load(); go('l/' + j.list_id); toast(tr('List duplicated'));
+  };
+  md.addEventListener('click', e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') md.remove(); else if (b.dataset.m === 'ok') go_();
+  });
+  $('#ld-name', md).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go_(); } });
+  if (!isTouch()) setTimeout(() => { const n = $('#ld-name', md); n.focus(); n.select(); }, 50);
+}
 function templateMenu(anchor, kind) {
   const ts = tplOf(kind);
   if (!ts.length) { toast(kind === 'list' ? tr('No list templates yet: list dialog > Save as template') : tr('No task templates yet: task menu > Save as template')); return; }

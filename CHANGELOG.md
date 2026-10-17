@@ -7,6 +7,20 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.78.0] - 2026-10-17
+
+### Added
+- **Duplicate list** (list menu *Duplicate list…* and the button *Duplicate* in the list dialog, next to *Save as
+  template*): a new list of yours named *<list> (copy)* with the sections, the open tasks with their subtasks, tags,
+  priorities and dates as they are (an overdue task stays overdue), custom fields and their values, dependencies,
+  milestones, ticket types, the Playbook, the notepads, the page arrangement and the block colours - the same parts a list
+  template carries since 2.63.0. *Copy completed tasks too* brings the completed and won't-do tasks along with their state.
+  Members, shares, assignees and the public link stay with the original; the copy lands in your folder of the list and in
+  the original's workspace when you belong to it (a private list stays private). Participants cannot duplicate a list
+  (#1881).
+- REST API `POST /api/v1/lists/{id}/duplicate` (`structure`; `{name?, done?, folder?}` -> `{list_id}`) and the MCP tool
+  `duplicate_list`.
+
 ## [2.61.0] - 2026-10-17
 
 **In short:** uploads get safe - every file is **checked for malware** (ClamAV) before it is stored, **photos lose their

@@ -8549,5 +8549,14 @@
   "Your e-mail": "Votre e-mail",
   "Your report": "Votre signalement",
   "Turn mails off": "Désactiver les mails",
-  "No more mails about “{0}”? The status page stays available.": "Plus de mails concernant « {0} » ? La page d’état reste disponible."
+  "No more mails about “{0}”? The status page stays available.": "Plus de mails concernant « {0} » ? La page d’état reste disponible.",
+  "Participants cannot duplicate the whole list": "Les participants ne peuvent pas dupliquer toute la liste",
+  "List too large to duplicate (at most {0} tasks)": "Liste trop grande pour être dupliquée (au plus {0} tâches)",
+  "{0} (copy)": "{0} (copie)",
+  "Duplicate “{0}”": "Dupliquer « {0} »",
+  "Copy completed tasks too": "Copier aussi les tâches terminées",
+  "Sections, tasks with subtasks and dates, fields, notepads and the page arrangement come along. Members, shares and assignees do not: the copy is yours alone.": "Les sections, les tâches avec sous-tâches et dates, les champs, les blocs-notes et la disposition de la page sont copiés. Les membres, les partages et les responsables non : la copie n’appartient qu’à toi.",
+  "List duplicated": "Liste dupliquée",
+  "Duplicate list…": "Dupliquer la liste…",
+  "A copy of this list with its sections, tasks and notepads": "Une copie de cette liste avec ses sections, tâches et blocs-notes"
 }
