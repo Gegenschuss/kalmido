@@ -17,6 +17,7 @@ import base64
 import binascii
 import functools
 import http.client
+import ipaddress
 import json
 import re
 import socket
@@ -38,10 +39,11 @@ from ..core.access import Denied, list_role, need_task, WRITE_ROLES
 from ..core.serializers import load_tasks
 from ..accounts.session import me
 from ..accounts.colors import ACCOUNT_COLORS
-from ..calendars.subscriptions import _cal_connector, _CalHTTPConnection, _CalHTTPSConnection, cal_allow, cal_host_allowed, cal_ip_public, CalError
+from ..calendars.subscriptions import _CalHTTPConnection, _CalHTTPSConnection, cal_allow, cal_host_allowed, cal_ip_public, CalError
 
 MSV_MAX = 10                       # accounts per person
 MSV_TIMEOUT = 8                    # s per request to the other server (socket + whole answer)
+MSV_ADDRS = 3                      # addresses tried per connect (review 2)
 MSV_CONNECT = 3                    # s to connect (review H1: a dead address frees the thread early)
 MSV_MAX_BYTES = 8 * 1024 * 1024    # per answer
 MSV_ERR_BYTES = 64 * 1024          # of an error answer (only its message is used)
@@ -196,14 +198,17 @@ def msv_allow(c, base):
     return allow
 
 
-def _msv_internal(host, port):
-    """True when every address of host is internal (the SSRF guard refuses it as 'blocked'), False when one is public:
-    the token would cross the internet unencrypted. Only chooses the message: http never goes out without the allow-list."""
+def _msv_internal(host, port):  # noqa: ARG001
+    """True when host is plainly internal (the SSRF guard refuses it as 'blocked'), False otherwise: then the token would
+    cross the internet unencrypted. Only chooses the message: http never goes out without the allow-list. No DNS lookup
+    here (review 2: a silent resolver must not hold the request thread) -- an IP literal or a local name only."""
+    h = str(host or "").lower().strip("[]").rstrip(".")
     try:
-        infos = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
-    except (socket.gaierror, UnicodeError):
-        return False
-    return not any(cal_ip_public(sa[0]) for *_, sa in infos)
+        ipaddress.ip_address(h.split("%", 1)[0])
+        return not cal_ip_public(h)
+    except ValueError:
+        pass
+    return h == "localhost" or h.endswith((".localhost", ".local", ".lan", ".internal", ".home.arpa")) or "." not in h
 
 
 def msv_is_self(base):
@@ -226,13 +231,35 @@ def _sem(uid):
 
 
 def _msv_connector(allow):
-    """_cal_connector (the SSRF guard) with MSV_CONNECT for connecting; then the socket waits up to its read timeout."""
-    inner = _cal_connector(allow)
-
+    """The SSRF guard of _cal_connector (every address checked, connect to exactly a checked one), but with ONE connect
+    deadline of MSV_CONNECT over at most MSV_ADDRS addresses (review 2: a name with many silent addresses must not hold a
+    slot for addresses x timeout); then the socket waits up to its read timeout."""
     def create(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None, *a, **k):  # noqa: ARG001
-        s = inner(address, MSV_CONNECT, source_address)
-        s.settimeout(None if timeout is socket._GLOBAL_DEFAULT_TIMEOUT else timeout)
-        return s
+        host, port = address
+        trusted = cal_host_allowed(allow, host, port)
+        try:
+            infos = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+        except (socket.gaierror, UnicodeError) as e:
+            raise CalError("network") from e
+        end, fail, tried = time.monotonic() + MSV_CONNECT, None, 0
+        for fam, typ, proto, _, sa in infos:
+            if not trusted and not cal_ip_public(sa[0]):
+                fail = fail or CalError("blocked")
+                continue
+            left = end - time.monotonic()
+            if tried >= MSV_ADDRS or left <= 0:
+                break
+            tried += 1
+            sk = socket.socket(fam, typ, proto)
+            try:
+                sk.settimeout(left)
+                sk.connect(sa)  # exactly the checked address
+                sk.settimeout(None if timeout is socket._GLOBAL_DEFAULT_TIMEOUT else timeout)
+                return sk
+            except OSError as e:
+                sk.close()
+                fail = e
+        raise fail or CalError("network")
     return create
 
 
