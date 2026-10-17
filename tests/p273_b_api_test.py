@@ -6,7 +6,7 @@
    with me only as a reference with my own comment there; no list of others, no secrets (column names); sealed on disk (0600);
    another person 404, an agent token 401/403; GET /api/export.json unchanged
  - import into another person (private): the upload in pieces (wrong offset 409, another person's upload 404), the preview
-   (counts, people found by e-mail, again-warning), target checks (an organisation without admin rights 403, a foreign one
+   (counts, people found by the hash of their address -- review M1: no address of others in the file or the preview, again-warning), target checks (an organisation without admin rights 403, a foreign one
    404), everything created anew with new ids, subtask + dependency mapped, the comment authors mapped (me -> me, a ticked
    person -> that person), a found person shared only with a tick, the attachment readable; the upload is gone afterwards;
    undo removes everything (also the files)
@@ -39,6 +39,10 @@ KEY = base64.b64encode(os.urandom(32)).decode()
 FAILS, OKS = [], [0]
 SECRET = {"password_hash", "password", "token", "token_hash", "secret", "hook_secret", "totp_secret", "p256dh", "auth", "endpoint",
           "api_key", "access_token", "refresh_token", "drop_token", "ical_token", "code_hash", "webauthn_handle", "oidc_subject", "token_enc"}
+
+
+def EH(email):  # review M1: other people's addresses only as this hash
+    return hashlib.sha256(("kalmido-people|" + email.strip().lower()).encode()).hexdigest()
 
 
 def check(cond, what):
@@ -241,10 +245,14 @@ titles = {t["title"] for t in D["tasks"]}
 check({"Umzugskartons packen", "Kartons beschriften", "Moebelwagen buchen", "Orgaufgabe Uebergabe"} <= titles, "own tasks in it")
 check("Bob Geheimaufgabe" not in titles and not any(L["name"] in ("Bob Geheimliste", "Carol Geheimliste", "Erin Privatsache") for L in D["lists"]),
       "no lists / tasks of other people")
-check(any(x["name"] == "Bob Geheimliste" and x["owner_email"] == "bob@example.com" for x in D["shared_lists"]), "bob's list as a reference")
+# 2.73.0 (#1473) review M1: the owner's address only as a hash
+check(any(x["name"] == "Bob Geheimliste" and x["owner_email_hash"] == EH("bob@example.com") and "owner_email" not in x for x in D["shared_lists"]),
+      "bob's list as a reference")
 check([x["body"] for x in D["shared_comments"]] == ["Alice schreibt bei Bob"], "my comment on bob's list (Art. 15)")
 check({"Kommentar von Alice", "Kommentar von Bob"} <= {x["body"] for x in D["comments"]}, "comments of my lists")
-check(any(p["email"] == "bob@example.com" and str(LP) in p["lists"] for p in D["people"]), "bob among the people (mapping)")
+check(any(p["email_hash"] == EH("Bob@Example.com ") and "email" not in p and str(LP) in p["lists"] for p in D["people"]), "bob among the people (mapping)")
+check(not any(b"bob@example.com" in z.read(n) or b"carol@example.com" in z.read(n) for n in names if not n.startswith("files/")),
+      "no address of another person anywhere in the file (review M1)")
 check(D["event_calendars"] and D["events"] and D["contacts"] and D["habits"], "calendar, event, contact, habit")
 att = {a["name"]: a for a in D["attachments"]}
 check(z.read(att["packliste.txt"]["file"]) == ATT and z.read(att["org.txt"]["file"]) == OATT, "attachments in it (the org one decrypted)")
@@ -276,14 +284,14 @@ check(j.get("state") == "preview", f"preview {j.get('state')} {j.get('error')}")
 pv = j.get("preview") or {}
 check(pv.get("counts", {}).get("tasks") == len(D["tasks"]) and pv.get("user", {}).get("email") == "alice@example.com" and not pv.get("again"),
       f"preview counts + source {pv.get('counts')}")
-pb = [p for p in pv.get("people", []) if p["email"] == "bob@example.com"]
-check(pb and pb[0]["found"], f"bob found by e-mail {pb}")
+pb = [p for p in pv.get("people", []) if p["key"] == EH("bob@example.com")]
+check(pb and pb[0]["found"] and pb[0]["found_name"] and "email" not in pb[0], f"bob found by the hash, no address in the preview {pb}")
 check(not pv.get("can_invite"), "dave may not invite")
 check({t["id"] for t in pv.get("targets", [])} == {"private"}, f"dave: only private (member, not admin of Alpha) {pv.get('targets')}")
 check(Da.post(B + f"/api/account/import/{iid}/run", json={"target": ORG}).status_code == 403, "target: organisation without admin rights 403")
 check(Da.post(B + f"/api/account/import/{iid}/run", json={"target": ORG2}).status_code == 404, "target: foreign organisation 404")
 DAVE = ids["dave"]
-j = run(Da, iid, people={"bob@example.com": {"share": True}})
+j = run(Da, iid, people={EH("bob@example.com"): {"share": True}})
 check(j.get("state") == "done", f"import done {j.get('state')} {j.get('error')}")
 res = j.get("result") or {}
 check(res.get("import_id") and res.get("created", {}).get("tasks") == len([t for t in D["tasks"] if not t.get("deleted_at")]),
@@ -363,10 +371,11 @@ j = wait(A, iid)
 pv = j.get("preview") or {}
 check(j.get("state") == "preview" and pv.get("kind") == "org", f"opened: preview {j.get('state')} {j.get('error')}")
 check("private" not in [t["id"] for t in pv.get("targets", [])] and GAMMA in [t["id"] for t in pv.get("targets", [])], "targets: organisations only")
-check(any(x["email"] == "bob@example.com" and x["found"] for x in pv.get("people", [])) and
-      not any(x["email"] == "alice@example.com" for x in pv.get("people", [])), "the members: bob found, alice herself not listed")
+check(any(x["key"] == EH("bob@example.com") and x["found"] for x in pv.get("people", [])) and
+      not any(x["key"] == EH("alice@example.com") for x in pv.get("people", [])) and not any("email" in x for x in pv.get("people", [])),
+      "the members: bob found, alice herself not listed, no address in the preview")
 check(A.post(B + f"/api/account/import/{iid}/run", json={"target": "private"}).status_code == 400, "not into the private space")
-j = run(A, iid, target=GAMMA, people={"bob@example.com": {"share": True}})
+j = run(A, iid, target=GAMMA, people={"bob@example.com": {"share": True}})  # a plain address as key (older client) still works
 check(j.get("state") == "done", f"organisation import done {j.get('error')}")
 gl = dbx("SELECT id, owner_id FROM lists WHERE org_id=? AND name='Alpha Orgliste'", (GAMMA,))
 check(gl and gl[0]["owner_id"] == ALICE, "the list is in the target organisation")
@@ -388,12 +397,24 @@ crafted = mkzip({
               {"id": 11, "list_id": 999, "title": "Ohne Liste Test", "created_at": ts, "updated_at": ts},
               {"id": 12, "list_id": 5, "title": "x" * 100000, "created_at": ts, "updated_at": ts}],
     "comments": [{"id": 1, "task_id": 9, "user_id": CAROL, "body": "Fremder Kommentar Test", "created_at": ts}],
-    "people": [{"user_id": 77, "name": "Frank Neu", "email": "frank@example.com", "lists": {"5": "edit"}}],
+    "people": [{"user_id": 77, "name": "Frank Neu", "email": "frank@example.com", "lists": {"5": "edit"}},  # an older file: plain address
+               # review M1: only hashes -- the admin types the address; a wrong one invites nobody
+               {"user_id": 78, "name": "Gina Neu", "email_hash": EH("gina@example.com"), "lists": {"5": "edit"}},
+               {"user_id": 79, "name": "Hugo Neu", "email_hash": EH("hugo@example.com"), "lists": {"5": "view"}},
+               {"user_id": 80, "name": "Bob im Hash", "email_hash": EH("bob@example.com"), "lists": {}}],
 })
 iid = upload(A, crafted)
 j = wait(A, iid)
-check(j.get("state") == "preview" and any(p["email"] == "frank@example.com" and not p["found"] for p in j["preview"]["people"]), "frank: not here")
-j = run(A, iid, people={"frank@example.com": {"invite": True}})
+pp = {p["key"]: p for p in (j.get("preview") or {}).get("people", [])}
+check(j.get("state") == "preview" and not pp.get(EH("frank@example.com"), {}).get("found", True) and pp[EH("frank@example.com")]["need_address"] is False,
+      "frank: not here (address in the older file)")
+check(pp.get(EH("gina@example.com"), {}).get("need_address") is True and pp.get(EH("bob@example.com"), {}).get("found"), "gina: address needed; bob found by hash")
+j = run(A, iid, people={EH("frank@example.com"): {"invite": True}, EH("gina@example.com"): {"invite": True, "email": "Gina@Example.com"},
+                        EH("hugo@example.com"): {"invite": True, "email": "nothugo@example.com"}})
+st = {p.get("name"): p.get("state") for p in (j.get("result") or {}).get("people", [])}
+check(st.get("Gina Neu") == "invited" and st.get("Hugo Neu") == "mismatch" and not any("email" in p for p in j["result"]["people"]), f"invite states {st}")
+check(dbx("SELECT 1 FROM users WHERE lower(email)='gina@example.com'") and not dbx("SELECT 1 FROM users WHERE email IN ('nothugo@example.com', 'hugo@example.com')"),
+      "gina invited with the typed address, a wrong one invites nobody")
 check(j.get("state") == "done", f"crafted import done {j.get('error')}")
 fl = dbx("SELECT id, owner_id, org_id FROM lists WHERE name='Fremdliste Test'")
 check(len(fl) == 1 and fl[0]["owner_id"] == ALICE and fl[0]["org_id"] is None, f"owner / org from the file ignored {[dict(zip(x.keys(), x)) for x in fl]}")

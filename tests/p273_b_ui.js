@@ -77,6 +77,7 @@ async function dataPane(w) {
   const ck = box()?.querySelector('[data-umzp][data-k="share"]');
   check(ck && !ck.checked && /found: Carol Team/.test(box().textContent), 'carol found, the tick is off');
   check(/Nothing is shared without a tick/.test(box().textContent), 'the hint on ticks');
+  check(!/carol@example\.com/.test(box().innerHTML), 'no address of another person in the preview');  // 2.73.0 (#1473): review M1
   ck.checked = true;
   click(w, box().querySelector('[data-umz="go"]'));
   await until(() => md.querySelector('#s-umz-imp [data-umz="undo"]'), 100);
