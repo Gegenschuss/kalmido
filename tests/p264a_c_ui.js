@@ -6,7 +6,7 @@
 // - incoming ciphers become plain texts in memory (_enc keeps the ciphers), outgoing texts leave encrypted (task, comment)
 // - H1: offline outbox and every localStorage entry hold ciphers only (sweep for a marker); lock = wipe
 // - moving a task out of a locked list carries its texts, its comments in the target format (le2e_move)
-// With part A's routes (after the merge) also end to end: Bob sets up encryption, Alice switches the lock on (le2eStart), the server
+// With part A's routes also end to end: Bob sets up encryption, Alice switches the lock on (le2eStart), the server
 // keeps ciphers only, Bob reads with his own key, Alice switches it off again (le2eStop) and the texts are plain on the server.
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -51,10 +51,11 @@ const M = 'ZQXmark';  // every plain text of a locked list carries it: no storag
   // ---------------------------------------------------------------- without part A: the data layer with a key set in the page
   await session('alice', async ({ev, waitFor, sweep}) => {
     check(await ev(`e2eCreate(${JSON.stringify(PASS)}).then(c => !!c && e2eUnlocked())`), 'encryption set up and unlocked');
-    // a list key of generation 1 for list L, as if the lock were on
-    await ev(`(async () => {
-      const raw = crypto.getRandomValues(new Uint8Array(32)); window.__raw = raw.slice();
-      LE2E.keys[${L}] = {1: await le2eImport(raw)};
+    // list L locked with a key of generation 1: with part A switched on for real (le2eStart), else a key set in the page
+    await ev(`(window.__raw = crypto.getRandomValues(new Uint8Array(32)), 1)`);  // the raw key of the wrapping cases
+    if (hasA) check(await ev(`le2eStart(${L}, () => {}).then(r => !!r && listById(${L})?.e2e === 'on' && le2eReady(${L}) && listById(${L}).e2e_gen === 1)`), 'le2eStart on an own list (part A)');
+    else await ev(`(async () => {
+      LE2E.keys[${L}] = {1: await le2eImport(window.__raw.slice())};
       const fix = j => { for (const l of j.lists || []) if (l.id === ${L}) Object.assign(l, {e2e: 'on', e2e_gen: 1, e2e_mine: true}); };
       fix({lists: S.lists}); LE2E.on.add(${L});
       const as0 = applyState; applyState = j => { fix(j); return as0(j); };  // the server of this suite has no lock yet
@@ -165,6 +166,7 @@ const M = 'ZQXmark';  // every plain text of a locked list carries it: no storag
     check(await ev(`(e2eLock(), (() => { const t = S.tasks.get(${T}); return t.title === '' && t._le2e === 'locked' && !LE2E.memo.size && !Object.keys(LE2E.keys).length && !JSON.stringify(HIST.undo).includes('${M}') && !JSON.stringify(HIST.redo).includes('${M}'); })())`), 'lock: plain texts, keys and undo steps of the list wiped');
   });
 
+  check(hasA, 'the server has the lock routes (part A)');
   if (!hasA) { console.log('p264a_c_ui: part A routes missing, end-to-end cases skipped'); }
   else {
     // ---------------------------------------------------------------- end to end with part A
@@ -181,6 +183,7 @@ const M = 'ZQXmark';  // every plain text of a locked list carries it: no storag
       const st = (await call('GET', '/api/state')).j, row = (st.tasks || []).find(t => t.id === TT), l = (st.lists || []).find(x => x.id === L3);
       check(l?.e2e === 'on' && row?.title.startsWith('e2e1:') && row?.content.startsWith('e2e1:'), 'the server keeps ciphers only');
       await boot('#l/' + L3);
+      await ev(`(async () => { await e2eLoad(true); await e2eAdopt(await e2eUnwrapPass(E2E.st.bundle_pass, ${JSON.stringify(PASS)})); await le2eUnlock(${L3}); return 1; })()`);  // keys not remembered on this device
       check(await waitFor(`S.tasks.get(${TT})?.title === '${M} shared task'`), 'Alice reads the task after a reload');
       check(!(await sweep()), 'H1 end to end: localStorage holds no plain text ' + await sweep());
     });
