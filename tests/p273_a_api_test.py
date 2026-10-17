@@ -20,6 +20,8 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from datetime import date, timedelta
 
 import requests
@@ -310,6 +312,18 @@ check(r.ok and d["lists"] == [{"id": 3, "name": "<img src=x onerror=alert(1)>", 
       f"odd values over there: type-checked, extra fields dropped {d}")
 log = open(os.path.join(DATA, "msv.log")).read()
 check("bearer=True" in log and "abk_" not in log, "the stub got the token as a bearer header (the log names no token)")
+# 2.73.0 (#661) review N3: the copy exists over there, its subtasks fail -> counted, the source still goes to the trash
+r = A.post(B + "/api/servers", json={"base_url": f"{STUB}/nosub", "token": "abk_" + "n" * 40})
+check(r.status_code == 201, f"N3: the stub that refuses subtasks is linked {r.text[:200]}")
+SIDN = r.json().get("id")
+tn = A.post(B + "/api/tasks", json={"title": "Move with subtasks", "list_id": la}).json()["id"]
+for x in ("Sub A", "Sub B"):
+    A.post(B + "/api/tasks", json={"title": x, "parent_id": tn})
+r = A.post(B + "/api/servers/move", json={"from": {"server": 0, "task": tn}, "to": {"server": SIDN, "list_id": None}})
+j = r.json() if r.ok else {}
+check(r.ok and j["task"] == {"server": SIDN, "id": 50} and j["lost"].get("subtasks") == 2 and not j.get("source_kept") and gone(tn),
+      f"N3: the move succeeds, two subtasks named as not created, the source in the trash {r.status_code} {r.text[:300]}")
+A.delete(B + f"/api/servers/{SIDN}")
 # the account goes offline / the token is revoked
 dbx("UPDATE msv_links SET base_url='http://127.0.0.1:3999' WHERE id=?", (SIDC,))
 r = A.get(B + f"/api/servers/{SIDC}/data")
@@ -320,11 +334,49 @@ check(Bo.delete(B + f"/api/me/tokens/{cj['token_id']}").ok, "bob revokes the tok
 r = A.get(B + f"/api/servers/{SID}/data?fresh=1")
 check(r.status_code == 424 and r.json()["code"] == "auth", f"a revoked token: auth {r.text[:200]}")
 
+# ================================================================== 2.73.0 (#661) review H1: a slow other server holds no thread
+dbx("UPDATE msv_links SET base_url=? WHERE id=?", (f"{STUB}/hang", SIDC))  # accepts and sends nothing
+RES = []
+
+
+def hit(path):
+    t0 = time.monotonic()
+    rr = A.get(B + path)
+    RES.append((rr.status_code, rr.json().get("code") if "json" in (rr.headers.get("Content-Type") or "") else None, time.monotonic() - t0))
+
+
+ths = [threading.Thread(target=hit, args=(f"/api/servers/{SIDC}/search?q=x",)) for _ in range(6)]
+for t_ in ths:
+    t_.start()
+time.sleep(1.5)
+t0 = time.monotonic()
+r = Bo.get(B + "/api/state")
+t_state = time.monotonic() - t0
+check(r.ok and t_state < 2, f"H1: other routes answer while four requests hang ({t_state:.1f} s)")
+for t_ in ths:
+    t_.join(40)
+busy = [x for x in RES if x[1] == "busy"]
+slow = [x for x in RES if x[1] == "offline"]
+check(len(busy) == 2 and all(x[0] == 424 and x[2] < 1.5 for x in busy), f"H1: requests five and six of a person: 424 busy at once {RES}")
+check(len(slow) == 4 and all(x[2] < 12 for x in slow), f"H1: the hanging ones end as offline within the read limit {RES}")
+RES.clear()
+ths = [threading.Thread(target=hit, args=(f"/api/servers/{SIDC}/data?fresh=1",)) for _ in range(3)]
+for t_ in ths:
+    t_.start()
+for t_ in ths:
+    t_.join(40)
+check(sorted(x[1] for x in RES) == ["busy", "busy", "offline"] and all(x[2] < 1.5 for x in RES if x[1] == "busy"),
+      f"H1: /data of one account runs once, parallel ones answer busy at once (no thread waits) {RES}")
+dbx("UPDATE msv_links SET base_url='http://127.0.0.1:3999' WHERE id=?", (SIDC,))
+
 # ================================================================== SSRF without the allow-list entry (127.0.0.1 is allowed here)
 for u in ("http://10.0.0.1", "http://169.254.169.254", "http://[::1]:3040", "http://[fd00::1]", "http://[::ffff:127.0.0.2]", "http://localhost:3040",
           "http://172.20.0.9"):
     r = A.post(B + "/api/servers", json={"base_url": u, "token": BTOK})
     check(r.status_code == 400 and "internal" in r.json()["error"], f"{u}: refused as internal ({r.status_code} {r.text[:120]})")
+# review M3: plain http to a public address would send the token unencrypted: refused like a hosted server does
+r = A.post(B + "/api/servers", json={"base_url": "http://93.184.215.14", "token": BTOK})
+check(r.status_code == 400 and "https" in r.json()["error"], f"M3: http to a public address refused ({r.status_code} {r.text[:150]})")
 for u in ("ftp://example.com", "https://user:pw@example.com", "javascript:alert(1)", "https://example.com/a b", "https://example.com/<x>", "https://example.com/../x"):
     check(A.post(B + "/api/servers", json={"base_url": u, "token": BTOK}).status_code == 400, f"{u}: an invalid address 400")
 
@@ -354,6 +406,20 @@ check(A.get(B + f"/api/servers/{SIDE}/data").status_code == 404 and SIDE not in 
 r = A.post(B + f"/api/servers/{SIDE}/restore")
 check(r.ok and r.json()["id"] == SIDE, "restore (undo)")
 check(A.post(B + f"/api/servers/{SIDE}/restore").status_code == 404, "restoring a live account: 404")
+# 2.73.0 (#661) review N1: a removed account keeps its sealed token 30 days (undo), then the watchdog wipes it
+r = A.post(B + "/api/servers", json={"base_url": f"{STUB}/evil/n8", "token": "abk_" + "w" * 40})
+SIDW = r.json().get("id")
+check(r.status_code == 201 and A.delete(B + f"/api/servers/{SIDW}").ok, f"N1: an account added and removed {r.text[:150]}")
+time.sleep(2.5)
+check(dbx("SELECT token_enc FROM msv_links WHERE id=?", (SIDW,))[0][0] != "", "N1: a freshly removed account keeps its token (undo)")
+dbx("UPDATE msv_links SET deleted_at='2020-01-01T00:00:00Z' WHERE id=?", (SIDW,))
+for _ in range(20):
+    if dbx("SELECT token_enc FROM msv_links WHERE id=?", (SIDW,))[0][0] == "":
+        break
+    time.sleep(0.5)
+check(dbx("SELECT token_enc FROM msv_links WHERE id=?", (SIDW,))[0][0] == "", "N1: 30 days after removing the watchdog wiped the token")
+r = A.post(B + f"/api/servers/{SIDW}/restore")
+check(r.status_code == 409 and "token again" in r.json()["error"], f"N1: restoring it then asks for the token again {r.status_code} {r.text[:200]}")
 r = A.patch(B + f"/api/servers/{SIDE}", json={"default_inbox": True, "position": 5, "short": "ev"})
 check(r.ok and r.json()["default_inbox"] is True and r.json()["short"] == "EV", "quick add lands there by default")
 A.patch(B + f"/api/servers/{SIDC}", json={"default_inbox": True})
@@ -379,6 +445,10 @@ r = A.post(B + "/api/servers", json={"base_url": "https://127.0.0.1:3040", "toke
 check(r.status_code == 400 and "internal" in r.json()["error"], f"hosted: an internal https address refused, the allow-list does not count {r.text[:150]}")
 r = A.get(B + f"/api/servers/{SIDE}/data")
 check(r.status_code == 424 and r.json()["code"] == "offline", f"hosted: a stored http account is not reached {r.text[:150]}")
+
+# review H1: at most 120 reads of other servers per person and minute (here they fail fast: hosted refuses http)
+codes = [A.get(B + f"/api/servers/{SIDE}/data").json().get("code") for _ in range(125)]
+check(codes.count("busy") >= 5 and codes[-1] == "busy" and codes[0] == "offline", f"H1: the 121st read in a minute: busy {codes[-8:]}")
 
 print(f"p273_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

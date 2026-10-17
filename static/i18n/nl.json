@@ -690,7 +690,7 @@
   "Notifications (ntfy)": "Meldingen (ntfy)",
   "Topic": "Topic",
   "Subscribe in the ntfy app: server {0}, topic as above": "Abonneer je in de ntfy-app: server {0}, topic zoals hierboven",
-  ", with a user that has read access": ", met een gebruiker met leesrechten",
+  ", logged in as user mo": ", ingelogd als gebruiker mo",
   "Web view": "Webweergave",
   "Send test": "Test versturen",
   "All-day reminder at": "Herinnering voor hele dag om",
@@ -702,7 +702,7 @@
   "Default": "Standaard",
   "Modules": "Modules",
   "In the ntfy app, add server {0} once": "Voeg in de ntfy-app eenmalig server {0} toe",
-  " and log in with a user that may write to the topic (Settings > Manage users).": " en log in met een gebruiker die naar het topic mag schrijven (Instellingen > Gebruikers beheren).",
+  " and log in as user <b>mo</b> (Settings > Manage users; password in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).": " en log in als gebruiker <b>mo</b> (Instellingen > Gebruikers beheren; wachtwoord in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).",
   "Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.": "Daarna: deel een afbeelding of tekst > ntfy > server zoals hierboven, topic {0}. Een paar seconden later is het een taak in de mand, bestanden als bijlagen.",
   "Color scheme": "Kleurenschema",
   "Automatic": "Automatisch",
@@ -8384,5 +8384,8 @@
   "E-mail address of {0}": "E-mailadres van {0}",
   "This is not the address in the file: nobody is invited.": "Dit is niet het adres uit het bestand: er wordt niemand uitgenodigd.",
   "Address does not match": "Adres komt niet overeen",
-  "Type the e-mail address of {0} for the invitation.": "Typ voor de uitnodiging het e-mailadres van {0}."
+  "Type the e-mail address of {0} for the invitation.": "Typ voor de uitnodiging het e-mailadres van {0}.",
+  "The token of this server was deleted 30 days after removing it. Enter the token again: connect the server anew.": "Het token van deze server is 30 dagen na het verwijderen gewist. Voer het token opnieuw in: verbind de server opnieuw.",
+  "{0} subtask could not be created on {1}.": ["{0} subtaak kon niet worden aangemaakt op {1}.", "{0} subtaken konden niet worden aangemaakt op {1}."],
+  "The task leaves the organisation {0} with it.": "De taak verlaat daarmee de organisatie {0}."
 }

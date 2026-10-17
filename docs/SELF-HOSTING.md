@@ -783,16 +783,19 @@ and no server needs to trust another one.
   CORS, no change of the Content Security Policy, no token in the browser. The token is stored sealed with a key derived
   from `KALMIDO_SECRET_KEY` (without a server key the feature refuses to store one) and never leaves the server: not in
   answers, logs or the account export. Nothing of the other server is stored either; answers are held in memory for at
-  most 15 seconds, at most 4 requests per person run at once, each with an 8-second limit and at most 8 MB.
+  most 15 seconds, at most 4 requests per person and 6 on the whole server run at once (a further one answers "busy"
+  at once instead of waiting), at most 120 reads per person and minute, each request with 3 seconds to connect, an
+  8-second limit and at most 8 MB.
 - **Connecting.** On the other server: *Settings > Account > Servers > Create a connection code for another server*. That
   creates a personal API token with exactly the scopes `read`, `tasks:write`, `delete`, `calendar` and `comments` and
   packs it with the server's `PUBLIC_URL` into a code that is shown once. Paste it on the home server. Instead of a code,
   the address and a token made by hand work too (any Kalmido server with the REST API, the code button needs 2.73).
-  The token stays visible under *API tokens* on the other server and can be revoked there at any time.
+  The token stays visible under *API tokens* on the other server and can be revoked there at any time. A removed account
+  can be restored for 30 days; then its stored token is wiped and the account has to be connected anew.
 - **Network.** Every request goes through the same guard as calendar subscriptions: public addresses only, no
-  redirects, every resolved address is checked (no DNS rebinding). A **self-hosted** server may use `http://` and
-  reaches internal servers only when they are on the allow-list of internal hosts (*Settings > Administration > Advanced*,
-  or `KALMIDO_CALENDAR_ALLOW_HOSTS`). A **hosted** server (`KALMIDO_HOSTED=1`) connects to `https://` addresses only and
+  redirects, every resolved address is checked (no DNS rebinding). A **self-hosted** server reaches internal servers only
+  when they are on the allow-list of internal hosts (*Settings > Administration > Advanced*, or
+  `KALMIDO_CALENDAR_ALLOW_HOSTS`), and uses `http://` only for those: the token never crosses the internet unencrypted. A **hosted** server (`KALMIDO_HOSTED=1`) connects to `https://` addresses only and
   never to an internal one.
 - **Agents** see nothing of it: there is no `/api/v1` route, no MCP tool and no event for it; an agent only ever works on
   its own server.
@@ -816,7 +819,9 @@ Nothing is copied or synced: every task stays on its server, and the app asks th
   with the badge; a slow or offline server never holds up your own results.
 - **Move to another server:** from the task menu (own tasks) or the panel (tasks of another server). The task is created anew on
   the target (title, notes, date, priority, open subtasks); comments, attachments and history stay in the trash of the source,
-  where it can still be restored. The app says this before it moves anything.
+  where it can still be restored. The app says this before it moves anything, and for a task of an organisation's list also
+  that it leaves the organisation. Should the other server refuse a subtask once the copy exists, the move still completes
+  and the app names how many subtasks are missing.
 - A server that does not answer shows one quiet line ("Work not reachable – last update 10:42") instead of error messages; a
   change on it is never queued offline, it is either done or reported.
 - Agents only ever see the server they are connected to.

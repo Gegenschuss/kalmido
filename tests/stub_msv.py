@@ -4,9 +4,12 @@
 #   redir  302 to the real app                       html   200 text/html
 #   rate   429 with Retry-After: 7                   e500   500
 #   evil   a well-formed Kalmido answer with odd values (HTML in titles, wrong types, extra fields) for /me, /lists, /tasks
+#   hang   accepts the request and sends nothing for 30 s (review H1)
+#   nosub  a Kalmido that creates tasks but fails on every subtask (review N3)
 # Every request goes to /data/msv.log (method, path, whether a bearer token came along -- never the token itself).
 import json
 import re
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 LOG = open('/data/msv.log', 'a', buffering=1)
@@ -29,6 +32,9 @@ class H(BaseHTTPRequestHandler):
 
     def _any(self):
         auth = (self.headers.get('Authorization') or '').startswith('Bearer ')
+        n = int(self.headers.get('Content-Length') or 0)
+        if n:
+            self.rfile.read(n)  # read the body first: closing with unread data would reset the connection
         LOG.write(f"{self.command} {self.path} bearer={auth}\n")
         kind, _, rest = self.path.lstrip('/').partition('/')
         rest = re.sub(r'^/n\d+(?=/)', '', '/' + rest.split('?')[0])  # /evil/n3/... = another address of the same server
@@ -44,6 +50,16 @@ class H(BaseHTTPRequestHandler):
             return self._send(429, b'{"error":{"code":"rate_limited","message":"slow down"}}', extra={'Retry-After': '7'})
         if kind == 'e500':
             return self._send(500, b'{}')
+        if kind == 'hang':
+            time.sleep(30)
+            return None
+        if kind == 'nosub':
+            if rest == '/api/v1/me':
+                return self._send(200, json.dumps({"id": 8, "username": "nosub", "kind": "user", "token": {"effective_scopes": ["read"]}}).encode())
+            if rest == '/api/v1/tasks' and self.command == 'POST':
+                return self._send(201, json.dumps({"id": 50, "title": "copy", "status": "open"}).encode())
+            if rest.endswith('/subtasks'):
+                return self._send(500, b'{}')
         if kind == 'evil':
             if rest == '/api/v1/me':
                 return self._send(200, json.dumps({"id": 7, "username": "<b>x</b>", "display_name": "<script>alert(1)</script>", "kind": "user",

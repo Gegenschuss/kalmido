@@ -530,6 +530,8 @@ def watchdog_tick(c):
     _wd_section(c, "org export cleanup", ox_cleanup)  # 2.42.0 (#833): archives after 24 h
     from ..admin.acctexport import umz_cleanup
     _wd_section(c, "account export cleanup", umz_cleanup)  # 2.73.0 B (#1473): account exports + import uploads after 24 h
+    from ..accounts.servers import msv_cleanup
+    _wd_section(c, "server link tokens", msv_cleanup)  # 2.73.0 A (#661) review N1: tokens of removed accounts after 30 days
     _wd_section(c, "tidy events", tidy_tick)  # 2.27.0 (#999)
     _wd_section(c, "agent bursts", burst_tick)  # 2.29.0 (#1031)
     from ..agents.schedules import sched_tick

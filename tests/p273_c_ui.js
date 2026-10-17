@@ -35,7 +35,7 @@ const MOCK = `(() => {
     const body = o.body ? JSON.parse(o.body) : null; __msv.calls.push({m, url, body});
     const p = url.split('?')[0].split('/').slice(3);  // ['', ] -> [sid, part, ...]
     if (!p.length) return J(200, {links: [W, C].slice(0, __msv.links), self: {name: 'Base', short: 'BS', color: '#30a46c'}});
-    if (p[0] === 'move') return J(200, {ok: true, task: {server: body.to.server, id: 300}, lost: {comments: 1, attachments: 0}});
+    if (p[0] === 'move') return J(200, {ok: true, task: {server: body.to.server, id: 300}, lost: {comments: 1, attachments: 0, subtasks: 2}});  // 2.73.0 (#661) review N3: subtasks
     if (p[0] === '2') return OFF();
     const tid = +p[2];
     if (p[1] === 'data') return J(200, {lists: [{id: 10, name: 'Work inbox', color: '', folder: '', inbox: true, can_write: true}, {id: 11, name: 'Projects', color: '', folder: '', inbox: false, can_write: true}, {id: 12, name: 'Read only', color: '', folder: '', inbox: false, can_write: false}], tasks: __msv.tasks, today: t0, at: new Date().toISOString()});
@@ -182,7 +182,10 @@ const MOCK = `(() => {
     await ev(`(() => { const s = document.querySelector('#msvvmv-s'); s.value = '1'; s.dispatchEvent(new Event('change')); const l = document.querySelector('#msvvmv-l'); l.value = '11'; document.querySelector('.msvvmv button[type="submit"]').click(); return 1; })()`); await sleep(500);
     const q = await ev(`document.querySelector('.cdlg #cdlg-b')?.textContent || ''`);
     check(/created anew on Work/.test(q) && /stay on Base in the trash/.test(q), '#661: the move question in plain words ' + JSON.stringify(q));
-    await ev(`(() => { document.querySelector('.cdlg [data-cd="yes"]').click(); return 1; })()`); await sleep(800);
+    check(!/leaves the organisation/.test(q), '#661 review question 1: a private task says nothing about an organisation');
+    await ev(`(() => { window.__toasts = []; const T0 = window.toast; window.toast = (...a) => { __toasts.push(String(a[0])); return T0(...a); }; document.querySelector('.cdlg [data-cd="yes"]').click(); return 1; })()`); await sleep(800);
+    const tsts = await ev(`window.__toasts`);
+    check(tsts.some(x => /2 subtasks could not be created on Work/.test(x)), '#661 review N3: the toast names the subtasks the other server did not take ' + JSON.stringify(tsts));
     c = await calls(ev);
     const mv = c.find(x => x.url === '/api/servers/move');
     check(mv && mv.body.from.server === 0 && mv.body.from.task === OWN && mv.body.to.server === 1 && mv.body.to.list_id === 11, '#661: the move call ' + JSON.stringify(mv));

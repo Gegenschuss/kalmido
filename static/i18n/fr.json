@@ -690,7 +690,7 @@
   "Notifications (ntfy)": "Notifications (ntfy)",
   "Topic": "Topic",
   "Subscribe in the ntfy app: server {0}, topic as above": "Abonnez-vous dans l'app ntfy : serveur {0}, topic comme ci-dessus",
-  ", with a user that has read access": ", avec un utilisateur disposant d'un accès en lecture",
+  ", logged in as user mo": ", connecté en tant qu'utilisateur mo",
   "Web view": "Vue web",
   "Send test": "Envoyer un test",
   "All-day reminder at": "Rappel journée entière à",
@@ -702,7 +702,7 @@
   "Default": "Par défaut",
   "Modules": "Modules",
   "In the ntfy app, add server {0} once": "Dans l'app ntfy, ajoutez une fois le serveur {0}",
-  " and log in with a user that may write to the topic (Settings > Manage users).": " et connectez-vous avec un utilisateur autorisé à écrire dans le topic (Paramètres > Gérer les utilisateurs).",
+  " and log in as user <b>mo</b> (Settings > Manage users; password in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).": " et connectez-vous en tant qu'utilisateur <b>mo</b> (Paramètres > Gérer les utilisateurs ; mot de passe dans <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).",
   "Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.": "Ensuite : partagez une image ou un texte > ntfy > serveur comme ci-dessus, topic {0}. Quelques secondes plus tard, c'est une tâche dans le panier, les fichiers en pièces jointes.",
   "Color scheme": "Thème",
   "Automatic": "Automatique",
@@ -8384,5 +8384,8 @@
   "E-mail address of {0}": "Adresse e-mail de {0}",
   "This is not the address in the file: nobody is invited.": "Ce n'est pas l'adresse du fichier : personne n'est invité.",
   "Address does not match": "L'adresse ne correspond pas",
-  "Type the e-mail address of {0} for the invitation.": "Saisis l'adresse e-mail de {0} pour l'invitation."
+  "Type the e-mail address of {0} for the invitation.": "Saisis l'adresse e-mail de {0} pour l'invitation.",
+  "The token of this server was deleted 30 days after removing it. Enter the token again: connect the server anew.": "Le jeton de ce serveur a été supprimé 30 jours après son retrait. Saisissez à nouveau le jeton : reconnectez le serveur.",
+  "{0} subtask could not be created on {1}.": ["{0} sous-tâche n'a pas pu être créée sur {1}.", "{0} sous-tâches n'ont pas pu être créées sur {1}."],
+  "The task leaves the organisation {0} with it.": "La tâche quitte ainsi l'organisation {0}."
 }
