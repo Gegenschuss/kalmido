@@ -116,6 +116,11 @@ AG, AGS = agent("importbot", ["read", "comments", "import"], org=ORG)
 AG0, AG0S = agent("plainbot", ["read", "comments"], org=ORG)
 AGB, AGBS = agent("betabot", ["read", "comments", "import"], org=ORG2)
 PAG, PAGS = agent("erinbot", ["read", "comments", "import"], owner=ERIN)
+# a team agent works for people who share a list with it (agents/core.py agent_shares)
+SL = A.post(B + "/api/lists", json={"name": "Shared Alpha"}).json()["id"]
+for u in (AG, BOB, DAVE):
+    assert A.put(B + f"/api/lists/{SL}/members", json={"user_id": u, "role": "edit"}).ok, u
+dbx("UPDATE lists SET agent_members=1 WHERE id=?", (SL,), write=True)  # members may use the list's agents
 IMP = V + "/agent/proposals/import"
 F = B + "/api/office/fixed-costs"
 
@@ -210,7 +215,7 @@ check(cl.get("repeat") == "quarterly" and cl.get("amount") == "1200.50" and cl.g
 NEW_IDS = sorted(x["id"] for x in new)
 dbrows = dbx(f"SELECT org_id, created_by FROM office_fixed_costs WHERE id IN ({','.join(str(i) for i in NEW_IDS)})")
 check(all(x[0] == ORG and x[1] == ALICE for x in dbrows) and 999999 not in NEW_IDS, f"the office of alice, created by alice; a row's org_id / id / created_by ignored {dbrows}")
-check(str(dbx("SELECT label FROM office_fixed_costs WHERE id=?", (NEW_IDS[0],))[0][0]).startswith("kenc1:"), "stored encrypted like every fixed cost")
+check(str(dbx("SELECT amount FROM office_fixed_costs WHERE id=?", (NEW_IDS[0],))[0][0]).startswith("kenc1:"), "the amount stored encrypted like every fixed cost")
 check(bool(dbx("SELECT 1 FROM office_doc_log WHERE org_id=? AND action='import' AND target='fixed_costs' AND user_id=?", (ORG, ALICE))), "the office log: import by alice")
 ev = [e for e in events(AG) if (e.get("job") or {}).get("id") == J1]
 check(ev and ev[-1].get("action") == "approve" and ev[-1]["proposal"].get("created") == 3 and ev[-1]["proposal"].get("skipped") == 4,
