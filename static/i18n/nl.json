@@ -8379,5 +8379,8 @@
   "The recovery key does not open this export. Attempts left: {0}": "De herstelsleutel opent deze export niet. Resterende pogingen: {0}",
   "An organisation export goes into an organisation: choose one you administer.": "Een organisatie-export gaat naar een organisatie: kies er een die je beheert.",
   "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Dit is geen herstelsleutel (52 tekens A-Z en 2-7, in groepen van 4).",
-  "Personal list kept in your private space: {0}": "Persoonlijke lijst blijft in je privéruimte: {0}"
+  "Personal list kept in your private space: {0}": "Persoonlijke lijst blijft in je privéruimte: {0}",
+  "The token of this server was deleted 30 days after removing it. Enter the token again: connect the server anew.": "Het token van deze server is 30 dagen na het verwijderen gewist. Voer het token opnieuw in: verbind de server opnieuw.",
+  "{0} subtask could not be created on {1}.": ["{0} subtaak kon niet worden aangemaakt op {1}.", "{0} subtaken konden niet worden aangemaakt op {1}."],
+  "The task leaves the organisation {0} with it.": "De taak verlaat daarmee de organisatie {0}."
 }

@@ -8379,5 +8379,8 @@
   "The recovery key does not open this export. Attempts left: {0}": "Der Wiederherstellungsschlüssel öffnet diesen Export nicht. Verbleibende Versuche: {0}",
   "An organisation export goes into an organisation: choose one you administer.": "Ein Organisations-Export kommt in eine Organisation: Wähle eine, deren Admin du bist.",
   "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Das ist kein Wiederherstellungsschlüssel (52 Zeichen A-Z und 2-7, in Vierergruppen).",
-  "Personal list kept in your private space: {0}": "Persönliche Liste bleibt in deinem privaten Bereich: {0}"
+  "Personal list kept in your private space: {0}": "Persönliche Liste bleibt in deinem privaten Bereich: {0}",
+  "The token of this server was deleted 30 days after removing it. Enter the token again: connect the server anew.": "Der Token dieses Servers wurde 30 Tage nach dem Entfernen gelöscht. Token erneut eingeben: den Server neu verbinden.",
+  "{0} subtask could not be created on {1}.": ["{0} Unteraufgabe konnte auf {1} nicht angelegt werden.", "{0} Unteraufgaben konnten auf {1} nicht angelegt werden."],
+  "The task leaves the organisation {0} with it.": "Die Aufgabe verlässt damit die Organisation {0}."
 }

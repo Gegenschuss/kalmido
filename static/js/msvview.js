@@ -12,7 +12,7 @@ S.msvv = {self: null, links: [], data: {}, news: {}, cal: {key: '', ev: {}}, sea
 S.msvvQ = null;  // the quick add target picked by hand: {key, sid, lid}
 const MSVV_POLL = 60e3, MSVV_NEWS = 300e3;
 const MSVV_ERR = {offline: N_('not reachable'), auth: N_('sign-in no longer valid'), denied: N_('no access'), notfound: N_('not found'),
-  rate: N_('too many requests, please wait a moment'), version: N_('needs a newer Kalmido version'), invalid: N_('unexpected answer')};
+  rate: N_('too many requests, please wait a moment'), busy: N_('too many requests, please wait a moment'), version: N_('needs a newer Kalmido version'), invalid: N_('unexpected answer')};
 const msvvErrText = code => tr(MSVV_ERR[code] || MSVV_ERR.offline);
 const msvvOn = () => !!S.msvv.links.length;
 const msvvLink = sid => S.msvv.links.find(l => l.id === +sid) || null;
@@ -52,20 +52,26 @@ async function msvvLoad() {
     S.msvv.loaded = true; S.msvv.at = Date.now();
     for (const k of Object.keys(S.msvv.data)) if (!msvvLink(k)) delete S.msvv.data[k];
     if (!msvvOn()) { if (had) { S.msvv.sig = ''; msvvDraw(); } return; }
-    await Promise.all(S.msvv.links.map(l => msvvData(l.id)));
+    // 2.73.0 A (#661) review H1: at most three at once (the server answers "busy" at once instead of waiting for a slot)
+    const q = S.msvv.links.map(l => l.id);
+    await Promise.all([0, 1, 2].map(async () => { while (q.length) await msvvData(q.shift()); }));
     if (Date.now() - (S.msvv.newsAt || 0) > MSVV_NEWS || S.route.mod === 'news') msvvNewsLoad();
     // the poll redraws only when something changed (the answer's time aside)
     const sig = JSON.stringify([S.msvv.self, S.msvv.links.map(({at, ...l}) => l), S.msvv.links.map(l => { const d = S.msvv.data[l.id] || {}; return [d.lists, d.tasks, d.today, d.err]; })]);
     if (sig !== S.msvv.sig) { S.msvv.sig = sig; msvvDraw(); }
   } finally { S.msvv.busy = false; }
 }
-async function msvvData(sid) {
+async function msvvData(sid, again) {
   const d0 = S.msvv.data[sid] || {lists: [], tasks: [], today: '', at: '', err: null};
   try {
     const j = await msvvFetch('GET', `/api/servers/${sid}/data`);
     S.msvv.data[sid] = {lists: msvvArr(j.lists).map(l => ({...l, id: +l.id})), tasks: msvvArr(j.tasks).map(t => ({...t, id: +t.id, list_id: +t.list_id, parent_id: +t.parent_id || null, priority: msvvPrio(t.priority), status: +t.status || 0, tags: msvvArr(t.tags)})),
       today: /^\d{4}-\d{2}-\d{2}$/.test(j.today || '') ? j.today : today(), at: j.at || new Date().toISOString(), err: null};
-  } catch (e) { S.msvv.data[sid] = {...d0, err: e.code || 'offline'}; }
+  } catch (e) {
+    // review H1: "busy" = this server has no free slot right now: once more after a moment, then the last state stays quietly
+    if (e.code === 'busy') { if (!again) { await new Promise(r => setTimeout(r, 1500 + Math.random() * 1000)); return msvvData(sid, true); } S.msvv.data[sid] = d0; return; }
+    S.msvv.data[sid] = {...d0, err: e.code || 'offline'};
+  }
 }
 // what a change of S.msvv redraws: the sidebar, and the view when it shows foreign data
 function msvvDraw() {
@@ -277,7 +283,7 @@ function msvvDetailDraw(md, sid, t) {
 // ---- move a task to another server (own or foreign): pick server + list, a plain question, POST /api/servers/move
 function msvvMoveItem(t) {
   if (!msvvOn() || !t || !(t.id > 0) || t.context || !canEdit(t)) return [];
-  return [{label: tr('Move to another server…'), icon: 'arrow', fn: () => msvvMoveDlg({server: 0, task: t.id, title: t.title || ''})}];
+  return [{label: tr('Move to another server…'), icon: 'arrow', fn: () => msvvMoveDlg({server: 0, task: t.id, title: t.title || '', lid: t.list_id})}];
 }
 const msvvTargets = from => [...(from ? [0] : []), ...S.msvv.links.map(l => l.id).filter(id => id !== from)];
 function msvvTargetLists(sid) {
@@ -302,16 +308,20 @@ function msvvMoveDlg(src, parent) {
     const lid = +$('#msvvmv-l', md).value || null, srcN = msvvName(src.server), dstN = msvvName(to);
     if (!msvvTargetLists(to).length) { toast(tr('No list on {0} that you can add to', dstN)); return; }
     md.remove();
-    if (!await askConfirm(tr('Move to {0}?', dstN), tr('It is created anew on {0} (title, notes, date, priority, open subtasks). Comments, attachments and history stay on {1} in the trash.', dstN, srcN), {ok: tr('Move')})) return;
+    // 2.73.0 A (#661) review question 1: a task of an organisation's list says that it leaves the organisation (no lock: the product owner decides)
+    const org = !src.server && typeof listById === 'function' ? listById(src.lid)?.org_id : null;
+    const orgLine = org && typeof wsLabel === 'function' ? ' ' + tr('The task leaves the organisation {0} with it.', wsLabel(org)) : '';
+    if (!await askConfirm(tr('Move to {0}?', dstN), tr('It is created anew on {0} (title, notes, date, priority, open subtasks). Comments, attachments and history stay on {1} in the trash.', dstN, srcN) + orgLine, {ok: tr('Move')})) return;
     let j;
     try { j = await msvvFetch('POST', '/api/servers/move', {from: {server: src.server, task: src.task}, to: {server: to, list_id: lid}}); }
     catch (er) { msvvFail(to || src.server, er); return; }
     if (parent?.isConnected) parent.remove();
     if (!src.server && S.sel === src.task && typeof closeDetail === 'function') closeDetail();
     const lost = j.lost || {}, nl = (+lost.comments || 0) + (+lost.attachments || 0);
-    toast([tr('Moved to {0}', dstN), j.source_kept ? tr('The original stays on {0}: it could not be moved to the trash.', srcN) : nl ? tr('Comments and attachments stay on {0} in the trash.', srcN) : ''].filter(Boolean).join(' · '), null, 6000);
+    const ls = +lost.subtasks || 0;  // review N3: subtasks the other server did not take
+    toast([tr('Moved to {0}', dstN), ls ? trn('{0} subtask could not be created on {1}.', '{0} subtasks could not be created on {1}.', ls, dstN) : '', j.source_kept ? tr('The original stays on {0}: it could not be moved to the trash.', srcN) : nl ? tr('Comments and attachments stay on {0} in the trash.', srcN) : ''].filter(Boolean).join(' · '), null, 6000);
     if (!src.server || !to) refreshNow().catch(() => {});
-    await Promise.all([src.server, to].filter(Boolean).map(msvvData)); msvvDraw();
+    await Promise.all([src.server, to].filter(Boolean).map(id => msvvData(id))); msvvDraw();
   });
 }
 

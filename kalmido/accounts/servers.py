@@ -8,12 +8,14 @@ there. The browser only ever talks to this server: no CORS, no CSP change, no to
 - Nothing of the other server is stored: /data is held in memory for at most MSV_CACHE_S seconds per account (parallel
   requests of the views fall together), at most MSV_PAR requests per person at once.
 - Every request goes through the SSRF guard of the calendar subscriptions (_cal_opener: public addresses only, no
-  redirects, every resolved address checked). Hosted servers: https only, no internal hosts; self-hosted: http too and
-  the admin's allow-list of internal hosts (Settings > Calendars), so company servers in the internal network work.
+  redirects, every resolved address checked). Hosted servers: https only, no internal hosts; self-hosted: the admin's
+  allow-list of internal hosts (Settings > Calendars), so company servers in the internal network work -- http only to
+  those (review M3).
 - Errors of the other side answer 424 {error, code}: offline | auth | denied | notfound | rate | version | invalid.
 - People only (cookie session / sign-in proxy): agents and API tokens get 403 -- an agent sees only its own server."""
 import base64
 import binascii
+import functools
 import http.client
 import json
 import re
@@ -24,6 +26,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import timedelta
 
 from flask import g, jsonify, request
 
@@ -35,14 +38,19 @@ from ..core.access import Denied, list_role, need_task, WRITE_ROLES
 from ..core.serializers import load_tasks
 from ..accounts.session import me
 from ..accounts.colors import ACCOUNT_COLORS
-from ..calendars.subscriptions import _cal_opener, cal_allow, CalError
+from ..calendars.subscriptions import _cal_connector, _CalHTTPConnection, _CalHTTPSConnection, cal_allow, cal_host_allowed, cal_ip_public, CalError
 
 MSV_MAX = 10                       # accounts per person
 MSV_TIMEOUT = 8                    # s per request to the other server (socket + whole answer)
+MSV_CONNECT = 3                    # s to connect (review H1: a dead address frees the thread early)
 MSV_MAX_BYTES = 8 * 1024 * 1024    # per answer
 MSV_ERR_BYTES = 64 * 1024          # of an error answer (only its message is used)
 MSV_CACHE_S = 15                   # /data held in memory per account
 MSV_PAR = 4                        # requests to other servers per person at once
+MSV_PAR_ALL = 6                    # requests to other servers at once on this server (under half of the waitress threads)
+MSV_READS = 120                    # reads of other servers per person and minute (review H1)
+MSV_TOKEN_KEEP_D = 30               # days a removed account keeps its sealed token (undo); then it is wiped (review N1)
+MSV_FRESH_S = 5                    # ?fresh=1 skips the memory at most this often per account
 MSV_TASKS_MAX = 3000               # open tasks per account in /data
 MSV_TRIES = 60                     # connection tries (a new account / token) per person and hour
 MSV_SCOPES = ("read", "tasks:write", "delete", "calendar", "comments")  # what a connection code's token gets
@@ -81,7 +89,7 @@ class MsvError(Exception):
         self.code, self.arg, self.retry, self.scope = code, arg, retry, scope
 
     def api_code(self):
-        return {"blocked": "offline", "https": "offline", "redirect": "version", "too_large": "invalid", "busy": "rate"}.get(self.code, self.code)
+        return {"blocked": "offline", "https": "offline", "redirect": "version", "too_large": "invalid"}.get(self.code, self.code)
 
     def text(self):
         t = MSV_TEXT.get(self.code, MSV_TEXT["offline"])
@@ -180,7 +188,22 @@ def msv_allow(c, base):
         if not base.startswith("https://"):
             raise MsvError("https")
         return frozenset()
-    return cal_allow(c)
+    allow = cal_allow(c)
+    if base.startswith("http://"):  # review M3: plain http only to an internal host of the admin's allow-list
+        p = urllib.parse.urlsplit(base)
+        if not cal_host_allowed(allow, p.hostname, p.port or 80):
+            raise MsvError("blocked" if _msv_internal(p.hostname, p.port or 80) else "https")
+    return allow
+
+
+def _msv_internal(host, port):
+    """True when every address of host is internal (the SSRF guard refuses it as 'blocked'), False when one is public:
+    the token would cross the internet unencrypted. Only chooses the message: http never goes out without the allow-list."""
+    try:
+        infos = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+    except (socket.gaierror, UnicodeError):
+        return False
+    return not any(cal_ip_public(sa[0]) for *_, sa in infos)
 
 
 def msv_is_self(base):
@@ -188,7 +211,10 @@ def msv_is_self(base):
 
 
 # ---- requests to the other server
+# 2.73.0 A (#661) review H1: a slow other server must never hold this server's request threads -- the slots are taken
+# without waiting (none free = 424 busy at once), per person (MSV_PAR) and for the whole server (MSV_PAR_ALL)
 _SEMS, _SEM_LOCK = {}, threading.Lock()
+_SEM_ALL = threading.BoundedSemaphore(MSV_PAR_ALL)
 
 
 def _sem(uid):
@@ -197,6 +223,56 @@ def _sem(uid):
         if s is None:
             s = _SEMS[uid] = threading.BoundedSemaphore(MSV_PAR)
         return s
+
+
+def _msv_connector(allow):
+    """_cal_connector (the SSRF guard) with MSV_CONNECT for connecting; then the socket waits up to its read timeout."""
+    inner = _cal_connector(allow)
+
+    def create(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None, *a, **k):  # noqa: ARG001
+        s = inner(address, MSV_CONNECT, source_address)
+        s.settimeout(None if timeout is socket._GLOBAL_DEFAULT_TIMEOUT else timeout)
+        return s
+    return create
+
+
+class _MsvHTTPConnection(_CalHTTPConnection):
+    def __init__(self, *a, cal_allow=frozenset(), **k):
+        super().__init__(*a, cal_allow=cal_allow, **k)
+        self._create_connection = _msv_connector(cal_allow)
+
+
+class _MsvHTTPSConnection(_CalHTTPSConnection):
+    def __init__(self, *a, cal_allow=frozenset(), **k):
+        super().__init__(*a, cal_allow=cal_allow, **k)
+        self._create_connection = _msv_connector(cal_allow)
+
+
+class _MsvHTTPHandler(urllib.request.HTTPHandler):
+    def __init__(self, allow):
+        super().__init__()
+        self._allow = allow
+
+    def http_open(self, req):
+        return self.do_open(functools.partial(_MsvHTTPConnection, cal_allow=self._allow), req)
+
+
+class _MsvHTTPSHandler(urllib.request.HTTPSHandler):
+    def __init__(self, allow):
+        super().__init__(context=ssl.create_default_context())
+        self._allow = allow
+
+    def https_open(self, req):
+        return self.do_open(functools.partial(_MsvHTTPSConnection, cal_allow=self._allow), req, context=self._context)
+
+
+def _msv_opener(allow):
+    """Like _cal_opener (no proxy, no redirects), with the separate connect timeout."""
+    o = urllib.request.OpenerDirector()
+    for h in (_MsvHTTPHandler(allow), _MsvHTTPSHandler(allow), urllib.request.HTTPDefaultErrorHandler(),
+              urllib.request.HTTPErrorProcessor()):
+        o.add_handler(h)
+    return o
 
 
 def _read(r, cap, deadline):
@@ -237,7 +313,7 @@ def msv_http(base, tok, path, method="GET", query=None, payload=None, allow=froz
     req = urllib.request.Request(url, data=data, method=method, headers=hd)
     deadline = time.monotonic() + MSV_TIMEOUT
     try:
-        r = _cal_opener(allow).open(req, timeout=MSV_TIMEOUT)
+        r = _msv_opener(allow).open(req, timeout=MSV_TIMEOUT)
     except urllib.error.HTTPError as e:
         try:
             raw = _read(e, MSV_ERR_BYTES, deadline) if e.fp else b""
@@ -280,10 +356,15 @@ def msv_call(c, link, path, method="GET", query=None, payload=None, base=None, t
         raise MsvError("auth")
     allow = msv_allow(c, base)
     s = _sem(me())
-    if not s.acquire(timeout=MSV_TIMEOUT):
+    if not s.acquire(blocking=False):  # review H1: never wait for a slot
         raise MsvError("busy", retry=2)
     try:
-        st, hdrs, j = msv_http(base, tok, path, method, query, payload, allow)
+        if not _SEM_ALL.acquire(blocking=False):
+            raise MsvError("busy", retry=2)
+        try:
+            st, hdrs, j = msv_http(base, tok, path, method, query, payload, allow)
+        finally:
+            _SEM_ALL.release()
     finally:
         s.release()
     if 200 <= st < 300:
@@ -612,6 +693,8 @@ def msv_restore(sid):
     r = c.execute("SELECT * FROM msv_links WHERE id=? AND user_id=? AND deleted_at IS NOT NULL", (sid, uid)).fetchone()
     if not r:
         raise Denied(404)
+    if not r["token_enc"]:  # review N1: wiped MSV_TOKEN_KEEP_D days after removing
+        return err(tr("The token of this server was deleted 30 days after removing it. Enter the token again: connect the server anew."), 409)
     if c.execute("SELECT COUNT(*) FROM msv_links WHERE user_id=? AND deleted_at IS NULL", (uid,)).fetchone()[0] >= MSV_MAX:
         return err(tr("At most {0} servers", MSV_MAX), 409)
     try:
@@ -627,6 +710,16 @@ def msv_restore(sid):
     c.execute("UPDATE msv_links SET deleted_at=NULL, updated_at=? WHERE id=?", (iso(now_utc()), sid))
     c.commit()
     return jsonify(msv_public(msv_row(c, sid, uid)))
+
+
+def msv_cleanup(c):
+    """Watchdog (review N1): a removed account keeps its sealed token MSV_TOKEN_KEEP_D days for undo, then it is wiped
+    (new backups no longer carry it). msv_links has no org_id: no row-level security to pass."""
+    old = iso(now_utc() - timedelta(days=MSV_TOKEN_KEEP_D))
+    n = c.execute("UPDATE msv_links SET token_enc='' WHERE deleted_at IS NOT NULL AND deleted_at<? AND token_enc!=''", (old,)).rowcount
+    if n:
+        c.commit()
+    return n
 
 
 @app.patch("/api/servers/self")
@@ -665,7 +758,7 @@ def msv_code():
 
 
 # ---- the data of an account (nothing stored: at most MSV_CACHE_S in memory)
-_CACHE, _LOCKS, _LOCKS_LOCK = {}, {}, threading.Lock()
+_CACHE, _LOCKS, _LOCKS_LOCK, _FRESH = {}, {}, threading.Lock(), {}
 
 
 def _link_lock(sid):
@@ -676,9 +769,22 @@ def _link_lock(sid):
         return lk
 
 
+def msv_read_gate():
+    """review H1: the reads of other servers per person and minute (a person, not an agent: msv_gate came first)."""
+    from ..api.v1 import hit_limit
+    if hit_limit(f"msv:{me()}", MSV_READS, 60):
+        raise MsvError("busy", retry=10)
+
+
 def msv_data(c, r):
     sid = r["id"]
-    with _link_lock(sid):
+    lk = _link_lock(sid)
+    if not lk.acquire(blocking=False):  # review H1: a request for this account runs already -- no thread waits for it
+        hit = _CACHE.get(sid)
+        if hit and hit[1] == r["updated_at"]:
+            return hit[2]
+        raise MsvError("busy", retry=2)
+    try:
         hit = _CACHE.get(sid)
         if hit and time.monotonic() - hit[0] < MSV_CACHE_S and hit[1] == r["updated_at"]:
             return hit[2]
@@ -700,6 +806,8 @@ def msv_data(c, r):
             _CACHE.pop(k, None)
         _CACHE[sid] = (now, r["updated_at"], out)
         return out
+    finally:
+        lk.release()
 
 
 @app.get("/api/servers/<int:sid>/data")
@@ -707,8 +815,10 @@ def msv_get_data(sid):
     """{lists, tasks (open, at most MSV_TASKS_MAX), today, at}; ?fresh=1 skips the short memory."""
     uid = msv_gate()
     c = db()
+    msv_read_gate()
     r = msv_row(c, sid, uid)
-    if request.args.get("fresh") == "1":
+    if request.args.get("fresh") == "1" and time.monotonic() - _FRESH.get(sid, -MSV_FRESH_S) >= MSV_FRESH_S:
+        _FRESH[sid] = time.monotonic()  # review H1: else the memory answers
         _CACHE.pop(sid, None)
     return jsonify(msv_data(c, r))
 
@@ -716,6 +826,7 @@ def msv_get_data(sid):
 @app.get("/api/servers/<int:sid>/tasks/<int:tid>")
 def msv_task_get(sid, tid):
     uid = msv_gate()
+    msv_read_gate()
     c = db()
     r = msv_row(c, sid, uid)
     j = msv_req(c, r, f"/tasks/{tid}")
@@ -813,6 +924,7 @@ def msv_task_delete(sid, tid):
 @app.get("/api/servers/<int:sid>/search")
 def msv_search(sid):
     uid = msv_gate()
+    msv_read_gate()
     c = db()
     r = msv_row(c, sid, uid)
     q = (request.args.get("q") or "").strip()
@@ -827,6 +939,7 @@ def msv_events(sid):
     """?from=&to= (dates) -> {events: [{id, occ, title, start, end, all_day, cal_name, color, url}]}; id + occ = one
     occurrence (a series has one id)."""
     uid = msv_gate()
+    msv_read_gate()
     c = db()
     r = msv_row(c, sid, uid)
     lo, hi = request.args.get("from") or "", request.args.get("to") or ""
@@ -853,6 +966,7 @@ def msv_events(sid):
 def msv_news(sid):
     """?limit= (1..200, default 50) -> {items: [{id, kind, text, task_id, at, read}], unread}."""
     uid = msv_gate()
+    msv_read_gate()
     c = db()
     r = msv_row(c, sid, uid)
     lim = request.args.get("limit") or "50"
@@ -922,6 +1036,7 @@ def _src_read(c, uid, srv, tid):
 
 
 def _dst_create(c, srv, lid, s):
+    """The copy -> (its id, how many subtasks could not be created there)."""
     p = {"title": s["title"] or tr("(untitled)"), "priority": s["priority"]}
     if s["notes"]:
         p["notes"] = s["notes"]
@@ -939,12 +1054,18 @@ def _dst_create(c, srv, lid, s):
         nid = v1_call(task_create, body=v1_task_in(p))["id"]
         for st in s["subs"]:
             v1_call(task_create, body={"title": st, "parent_id": nid})
-        return nid
+        return nid, 0
     nid = _t_or_fail(srv, msv_req(c, srv, "/tasks", "POST", payload=p))["id"]
+    lost = 0
     for st in s["subs"]:
-        msv_req(c, srv, f"/tasks/{nid}/subtasks", "POST", payload={"title": st})
+        # review N3: the copy exists over there now -- a failed subtask is counted, never answered as a failed move
+        # (the source would stay and a second try make a second copy)
+        try:
+            msv_req(c, srv, f"/tasks/{nid}/subtasks", "POST", payload={"title": st})
+        except MsvError:
+            lost += 1
     _CACHE.pop(srv["id"], None)
-    return nid
+    return nid, lost
 
 
 def _src_delete(c, srv, tid):
@@ -967,7 +1088,7 @@ def _src_delete(c, srv, tid):
 @app.post("/api/servers/move")
 def msv_move():
     """{from: {server: 0 | sid, task}, to: {server: 0 | sid, list_id | null}} -> {ok, task: {server, id}, lost: {comments,
-    attachments}, source_kept?}. Copies title, note, due date, priority and the titles of open subtasks, then moves the source
+    attachments, note, subtasks (not created over there)}, source_kept?}. Copies title, note, due date, priority and the titles of open subtasks, then moves the source
     into the trash. server 0 = this server; list_id null = the inbox there. Nothing is deleted when the copy fails."""
     from ..api.v1 import V1Error
     uid = msv_gate()
@@ -990,12 +1111,12 @@ def msv_move():
     dst = msv_row(c, ts, uid) if ts else None
     try:
         s = _src_read(c, uid, src, tid)
-        nid = _dst_create(c, dst, lid, s)
+        nid, lost_subs = _dst_create(c, dst, lid, s)
     except (V1Error, Denied) as e:
         c.rollback()
         return _local_err(e)
     out = {"ok": True, "task": {"server": ts, "id": nid}, "source": {"server": fs, "id": tid},
-           "lost": {"comments": s["comments"], "attachments": s["attachments"], "note": s["note_lost"]}}
+           "lost": {"comments": s["comments"], "attachments": s["attachments"], "note": s["note_lost"], "subtasks": lost_subs}}
     if not _src_delete(c, src, tid):
         out["source_kept"] = True
     return jsonify(out)

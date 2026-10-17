@@ -8379,5 +8379,8 @@
   "The recovery key does not open this export. Attempts left: {0}": "La clé de récupération n’ouvre pas cet export. Essais restants : {0}",
   "An organisation export goes into an organisation: choose one you administer.": "Un export d’organisation va dans une organisation : choisissez-en une que vous administrez.",
   "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Ce n’est pas une clé de récupération (52 caractères A-Z et 2-7, par groupes de 4).",
-  "Personal list kept in your private space: {0}": "Liste personnelle gardée dans votre espace privé : {0}"
+  "Personal list kept in your private space: {0}": "Liste personnelle gardée dans votre espace privé : {0}",
+  "The token of this server was deleted 30 days after removing it. Enter the token again: connect the server anew.": "Le jeton de ce serveur a été supprimé 30 jours après son retrait. Saisissez à nouveau le jeton : reconnectez le serveur.",
+  "{0} subtask could not be created on {1}.": ["{0} sous-tâche n'a pas pu être créée sur {1}.", "{0} sous-tâches n'ont pas pu être créées sur {1}."],
+  "The task leaves the organisation {0} with it.": "La tâche quitte ainsi l'organisation {0}."
 }
