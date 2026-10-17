@@ -67,11 +67,13 @@ def load_tasks(c, where, args=(), full_snips=False):
     ltags = ltags_for(c, ids) if ids else {}
     atts = {}  # the task's own files; files of comments are shown inside their comment (timeline)
     # 2.30.0 (#380): agent = the name of the agent that stored the file ("Created by agent" in the app), else absent
-    for a in c.execute("""SELECT a.id, a.task_id, a.name, a.mime, a.size, a.created_at, u.kind, u.display_name, u.username, a.enc, a.enc_by
+    for a in c.execute("""SELECT a.id, a.task_id, a.name, a.mime, a.size, a.created_at, u.kind, u.display_name, u.username, a.enc, a.enc_by, a.e2e_gen
                           FROM attachments a LEFT JOIN users u ON u.id=a.user_id WHERE a.comment_id IS NULL ORDER BY a.id"""):
         if a["task_id"] in ids:
             d = {k: a[k] for k in ("id", "name", "mime", "size", "created_at")}
-            if a["enc"]:  # 2.42.0 (#828): encrypted in the browser; mine = I uploaded it (only I can open it)
+            if a["enc"] == 2:  # 2.64.2 B (#1817): a list file (name = list ciphertext, the browser decrypts it)
+                d.update(enc=2, e2e_gen=a["e2e_gen"])
+            elif a["enc"]:  # 2.42.0 (#828): encrypted in the browser; mine = I uploaded it (only I can open it)
                 d.update(enc=True, enc_mine=bool(viewer) and a["enc_by"] == viewer)
             if a["kind"] == "agent":
                 d["agent"] = a["display_name"] or a["username"]

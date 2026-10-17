@@ -103,7 +103,7 @@ def dl_comment_message(c, cid):
         raise Denied(400, tr("Only comments of agents can be saved as a task"))
     t = c.execute("SELECT id, title FROM tasks WHERE id=?", (k["task_id"],)).fetchone()
     files = [(f["name"], f["mime"], f["size"], f["path"]) for f in c.execute(
-        "SELECT name, mime, size, path FROM attachments WHERE comment_id=? ORDER BY id", (cid,))]
+        "SELECT name, mime, size, path FROM attachments WHERE comment_id=? AND enc=0 ORDER BY id", (cid,))]  # 2.64.2 B (#1817): no encrypted file
     who = user_names(c, [k["user_id"]]).get(k["user_id"], "?")
     return k["body"] or "", files, tr("Comment on {0}", t["title"]), who, k["created_at"], f"#t/{t['id']}"
 
@@ -112,6 +112,9 @@ def _copy_files(c, tid, uid, files):
     """Copies the message's files to the task (the person's storage counts; what does not fit is skipped). -> skipped names."""
     from ..admin.hosting import quota_fits
     skipped, ts = [], iso(now_utc())
+    from .liste2efile import le2f_plain_skip
+    if le2f_plain_skip(c, tid):  # 2.64.2 B (#1817): no plain file in a list with the lock
+        return [f[0] for f in files]
     for name, mime, size, path in files:
         src = os.path.join(ATT_DIR, path)
         if not os.path.isfile(src) or not quota_fits(c, uid, size or 0):

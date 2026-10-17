@@ -245,6 +245,8 @@ def le2a_task_write(c, tid, cur, f, b, lid):
     """apply_update (PATCH, batch, undo): the texts of task tid (row cur) written into list lid. A move into / out of /
     between locked lists needs every text of the moved subtree in the target format (browser, field le2e_move)."""
     if lid != cur["list_id"] and le2a_moving(c, cur["list_id"], lid):
+        from .liste2efile import le2f_move_guard  # 2.64.2 B (#1817): list files stay in their list
+        le2f_move_guard(c, tid, cur["list_id"], lid)
         return le2a_move(c, tid, cur, f, b.get("le2e_move"), lid)
     le2e_guard(c, lid, le2a_task_texts(f), cur=le2a_task_cur(cur))
     return None

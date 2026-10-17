@@ -160,6 +160,10 @@ def save_attachment_bytes(c, tid, name, mime, data):
     from ..notify.alerts import aa_count, aa_oserr
     from ..admin.hosting import quota_fits
     name = safe_name(name)
+    from ..collab.liste2efile import le2f_plain_skip
+    if le2f_plain_skip(c, tid):  # 2.64.2 B (#1817): no plain file in a list with the lock
+        print("share / mail file skipped: list encrypted in the browser", flush=True)
+        return
     who = c.execute("SELECT created_by FROM tasks WHERE id=?", (tid,)).fetchone()
     who = who[0] if who else None
     if not quota_fits(c, who, len(data)):  # 2.24.0 (#910): storage full -> the task comes without the file (never an error)

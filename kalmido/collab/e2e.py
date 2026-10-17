@@ -297,6 +297,9 @@ def e2e_attachment_upload(tid):
 
 def e2e_att_guard(a):
     """need_attachment(read): an encrypted file only for its uploader (people; agents never)."""
+    if "enc" in a.keys() and a["enc"] == 2:  # 2.64.2 B (#1817): a list file: every person with the list key (read right checked by the caller)
+        from .liste2efile import le2f_att_guard
+        return le2f_att_guard(a)
     if "enc" in a.keys() and a["enc"]:
         if not g.get("user") or is_agent(g.user) or a["enc_by"] != me():
             raise Denied(404)

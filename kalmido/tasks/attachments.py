@@ -72,6 +72,8 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=N
     None (caller commits; on an error the caller rolls back and unlinks `saved`). `ids` (a list) gets the new row ids."""
     from ..notify.alerts import aa_count, aa_oserr
     from ..admin.hosting import quota_guard
+    from ..collab.liste2efile import le2f_plain_guard
+    le2f_plain_guard(c, tid)  # 2.64.2 B (#1817): a list with the lock takes only list files (encrypted in the browser)
     if uid is None:  # the uploader: the signed-in person (/drop passes the token's owner)
         uid = g.user["id"] if has_request_context() and g.get("user") else None
     quota_guard(c, uid)  # 2.24.0 (#910): refused before anything is written (413 quota_exceeded)
@@ -229,7 +231,9 @@ def send_stored(a):
         return e
     inline = a["mime"] in INLINE_TYPES and request.args.get("dl") != "1"
     resp = oc_send_file(db(), full, mimetype=a["mime"] if inline else "application/octet-stream",  # 2.42.0 (#828): sealed -> decrypted
-                        as_attachment=not inline, download_name=a["name"], conditional=True, max_age=0)
+                        as_attachment=not inline, conditional=True, max_age=0,
+                        # 2.64.2 B (#1817): a list file's name is a ciphertext (the real one is inside the file)
+                        download_name="encrypted.kenc" if "enc" in a.keys() and a["enc"] == 2 else a["name"])
     if a["mime"] != "application/pdf":  # the browser pdf viewer does not run inside a sandboxed CSP
         resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"
     # 2.13.0: the app asks with ?v=<size>: only that versioned address is cached for a day; anything else revalidates

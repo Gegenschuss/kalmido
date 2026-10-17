@@ -72,8 +72,11 @@ def comment_plain(c, text, names=None):
 
 def att_dicts(c, where, args):
     out = {}
-    for a in c.execute(f"SELECT id, comment_id, name, mime, size, created_at FROM attachments WHERE {where} ORDER BY id", args):
-        out.setdefault(a["comment_id"], []).append({k: a[k] for k in ("id", "name", "mime", "size", "created_at")})
+    for a in c.execute(f"SELECT id, comment_id, name, mime, size, created_at, enc, e2e_gen FROM attachments WHERE {where} ORDER BY id", args):
+        d = {k: a[k] for k in ("id", "name", "mime", "size", "created_at")}
+        if a["enc"] == 2:  # 2.64.2 B (#1817): a list file (name = list ciphertext)
+            d.update(enc=2, e2e_gen=a["e2e_gen"])
+        out.setdefault(a["comment_id"], []).append(d)
     return out
 
 
@@ -248,7 +251,11 @@ def comment_create(tid):
     if sug and sug.get("kind") == "merge_request":
         git_merge_link(c, t, sug)
     saved = []
-    e = save_attachments(c, tid, files, comment_id=cid, saved=saved) if files else None
+    if files and le2e_mode(c, t["list_id"]):  # 2.64.2 B (#1817): list files, encrypted in the browser (names: list ciphertexts)
+        from .liste2efile import le2f_save
+        e = le2f_save(c, tid, files, request.form.getlist("le2e_name"), comment_id=cid, saved=saved)
+    else:
+        e = save_attachments(c, tid, files, comment_id=cid, saved=saved) if files else None
     if e:
         c.rollback()
         unlink_files(saved)

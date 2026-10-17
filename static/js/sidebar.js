@@ -221,7 +221,8 @@ async function filesToTasks(l, files) {
       try {
         t = await createTask({title: (f.name || tr('File')).replace(/\.[^.]+$/, '') || f.name, list_id: l.id, priority: 0});
         const fd = new FormData(); fd.append('file', f, f.name);
-        putTask(await api('POST', `/api/tasks/${t.id}/attachments`, fd)); n++;
+        // 2.64.2 B (#1817): a list with the lock takes the file encrypted with the list key
+        putTask(typeof le2eFileUpload === 'function' && le2eOn(l.id) ? await le2eFileUpload(t.id, [f], null, true) : await api('POST', `/api/tasks/${t.id}/attachments`, fd)); n++;
       } catch {
         // 2.32 review: the upload failed (size limit of the server, network): no task without its file stays behind
         if (t?.id) { try { await api('DELETE', `/api/tasks/${t.id}`); S.tasks.delete(t.id); } catch {} }
