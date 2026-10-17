@@ -268,6 +268,8 @@ def task_create():
     newtask_events(c, cur_id)
     if f.get("parent_id"):
         log_act(c, f["parent_id"], "subtask", {"id": cur_id, "title": f["title"][:200]})
+    from ..lists.rules import rul_fire, rul_snap_new
+    rul_fire(c, cur_id, rul_snap_new(c))  # 2.71.0 A (#1457): created right in a column / with a list tag
     bump(c)
     c.commit()
     return jsonify(one_task(c, cur_id))

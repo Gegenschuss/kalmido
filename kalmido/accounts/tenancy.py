@@ -94,6 +94,10 @@ CHECKS = {
     # bells; the read layer ignores rows of another workspace: notify/taskbell.py tbl_rows)
     "task_bell_person": ("SELECT b.task_id, b.user_id FROM task_bell b JOIN users u ON u.id=b.user_id WHERE b.org_id IS NOT NULL AND "
                          "(u.kind='agent' OR " + _PERSON.format(o="b", m="b") + ")"),
+    # 2.71.0 A (#1457): a rule in another workspace than its list, or whose move goes into a list of another workspace (it
+    # pauses itself when it runs: lists/rules.py rul_target_ok)
+    "list_rule": ("SELECT r.id, r.created_by FROM list_rules r JOIN lists l ON l.id=r.list_id LEFT JOIN lists t ON t.id=r.target_list_id "
+                  "WHERE r.deleted_at IS NULL AND (r.org_id IS DISTINCT FROM l.org_id OR (t.id IS NOT NULL AND t.org_id IS DISTINCT FROM l.org_id))"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 

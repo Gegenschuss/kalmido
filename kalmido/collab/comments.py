@@ -82,7 +82,8 @@ def comment_dict(r, atts):
             "edited_at": r["edited_at"], "mentions": [int(x) for x in (r["mentions"] or "").split(",") if x],
             "attachments": atts.get(r["id"], []), "suggestion": json.loads(r["suggestion"]) if r["suggestion"] else None,
             "reply_to": r["reply_to"] if "reply_to" in r.keys() else None,  # 2.33.0 (#1076): + reply (with_replies)
-            "ext_name": r["ext_name"] if "ext_name" in r.keys() else None}  # 2.50.0 (#329): written by a customer through the public link
+            "ext_name": r["ext_name"] if "ext_name" in r.keys() else None,  # 2.50.0 (#329): written by a customer through the public link
+            "rule_name": r["rule_name"] if "rule_name" in r.keys() else None}  # 2.71.0 A (#1457): written by a list rule
 
 
 def need_live_comment(c, cid):
