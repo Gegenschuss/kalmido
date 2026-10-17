@@ -271,7 +271,7 @@ def umz_extra_queries(uid):
         "shared_comments": (f"""SELECT c.id, c.task_id, t.title AS task_title, t.list_id, c.body, c.created_at, c.edited_at FROM comments c
                                 JOIN tasks t ON t.id=c.task_id WHERE c.user_id=? AND c.deleted_at IS NULL AND t.list_id IN {shared}""",
                             (uid, uid, uid)),
-        # 2.84.0 (#1903): my own filed e-mails (private and not assigned; organisation mails are in the organisation export)
+        # 2.84.0 (#1903): my own private filed e-mails (organisation mails, also the not assigned ones, are in the organisation export)
         "hub_mails": ("""SELECT id, client_id, list_id, message_id, from_addr, from_name, to_addrs, subject, sent_at, body, created_at
                          FROM hub_mails WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL""", (uid,)),
     }

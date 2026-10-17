@@ -9511,6 +9511,7 @@
   "Only the recipient can take an e-mail back to Not assigned": "Seul le destinataire peut remettre un e-mail dans Non attribué",
   "{0}: left out, the virus scanner found something": "{0} : ignoré, l'antivirus a trouvé quelque chose",
   "The storage is full: the attachments were not filed": "Le stockage est plein : les pièces jointes n'ont pas été classées",
+  "The original mail and its attachments could not be filed": "Le mail d'origine et ses pièces jointes n'ont pas pu être classés",
   "Mails to this address are filed here": "Les e-mails envoyés à cette adresse sont classés ici",
   "No e-mail matches.": "Aucun e-mail ne correspond.",
   "Nothing waits here: every e-mail found its client.": "Rien n'attend ici : chaque e-mail a trouvé son client.",

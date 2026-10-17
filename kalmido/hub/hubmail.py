@@ -32,7 +32,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list
-from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
+from ..core.orgcrypt import oc_active, oc_dec_fields, oc_enc_fields
 from ..accounts.session import me
 
 HBM_BODY_MAX = 200000   # characters of the plain text kept
@@ -63,9 +63,16 @@ def _ws(org_id, owner_id):
 
 
 def _visible_client(c, uid, cid):
-    """The client row when uid sees client cid (team/clients.py client_rows), else None."""
+    """The client row when uid sees client cid (team/clients.py client_rows), else None. 2.84.0 review: in a request the
+    clients of uid are read once (hbm_can runs per mail row)."""
+    from flask import has_request_context
     from ..team.clients import client_rows
-    return next((r for r in client_rows(c, uid) if r["id"] == cid), None)
+    if not has_request_context():
+        return next((r for r in client_rows(c, uid) if r["id"] == cid), None)
+    seen = g.setdefault("hbm_clients", {})
+    if uid not in seen:
+        seen[uid] = {r["id"]: r for r in client_rows(c, uid)}
+    return seen[uid].get(cid)
 
 
 def _list_row(c, lid):
@@ -531,28 +538,72 @@ def hbm_mail_import(c, msg, raw):
     return out
 
 
-def _import(c, r, msg, raw, mail_text):
-    from ..files.store import fs_folder, fs_put
-    from ..files.upsafe import UploadRefused
-    from ..admin.hosting import QuotaExceeded
-    u = c.execute("SELECT disabled, email FROM users WHERE id=?", (r["user_id"],)).fetchone()
-    if not u or u["disabled"]:
-        return 0
-    uid, org, cid, lid = r["user_id"], r["org_id"], r["client_id"], r["list_id"]
-    if r["kind"] == "client":
+def _holder_ok(c, kind, uid, org, cid, lid):
+    """May account uid receive for an address of kind (client / list / inbox)? -> (org_id, client_id) or None: the account
+    active and a person, the client seen / the project changeable and without the lock, a member of the workspace."""
+    u = c.execute("SELECT disabled, kind, kid FROM users WHERE id=?", (uid,)).fetchone()
+    if not u or u["disabled"] or u["kid"] or (u["kind"] or "user") == "agent":
+        return None
+    if kind == "client":
         cl = _visible_client(c, uid, cid)
         if not cl:
-            return 0  # the address' owner no longer sees the client
+            return None  # no longer sees the client
         org = cl["org_id"]
-    elif r["kind"] == "list":
+    elif kind == "list":
         l = _list_row(c, lid)
         if not l or l["e2e"] or list_role(c, lid, uid) not in WRITE_ROLES:
-            return 0  # gone, locked or no longer changeable for the address' owner
+            return None  # gone, locked or no longer changeable
         org = l["org_id"]
         cl = _visible_client(c, uid, l["client_id"]) if l["client_id"] else None
         cid = cl["id"] if cl and (cl["org_id"] or None) == (org or None) else None
     if org and int(org) not in acx_of(c, uid).org_ids:
-        return 0  # no longer a member: nothing goes in
+        return None  # no longer a member
+    return org, cid
+
+
+def hbm_heir(c, r, not_uid=None):
+    """2.84.0 review: another person who may receive for the shared address r (a client's / project's) when the one who made
+    it may not any more (left, locked, lost the right, deleted) -- the project's owner and its members with a write role, or the
+    members of the client's organisation who see it (a private client has none). None = nobody."""
+    if r["kind"] == "list":
+        cand = [x[0] for x in c.execute("SELECT owner_id FROM lists WHERE id=? UNION SELECT user_id FROM list_members WHERE list_id=?",
+                                        (r["list_id"], r["list_id"]))]
+    elif r["kind"] == "client":
+        o = c.execute("SELECT org_id FROM clients WHERE id=?", (r["client_id"],)).fetchone()
+        cand = [x[0] for x in c.execute("SELECT user_id FROM org_members WHERE org_id=? ORDER BY user_id", (o["org_id"],))] if o and o["org_id"] else []
+    else:
+        return None
+    for uid in sorted({x for x in cand if x and x != r["user_id"] and x != not_uid}):
+        if _holder_ok(c, r["kind"], uid, r["org_id"], r["client_id"], r["list_id"]):
+            return uid
+    return None
+
+
+def hbm_user_purge(c, uid):
+    """Account uid goes (accounts/users.py): its client / project addresses pass to another person who may receive, so mails to
+    them are not lost; the rest goes with the account (foreign key)."""
+    for r in c.execute("SELECT * FROM hub_tokens WHERE user_id=? AND kind IN ('client', 'list')", (uid,)).fetchall():
+        h = hbm_heir(c, r, not_uid=uid)
+        if h:
+            c.execute("UPDATE hub_tokens SET user_id=? WHERE token=?", (h, r["token"]))
+
+
+def _import(c, r, msg, raw, mail_text):
+    from ..files.store import fs_folder, fs_put
+    from ..tasks.attachments import unexec_name
+    from ..files.upsafe import UploadRefused
+    from ..admin.hosting import QuotaExceeded
+    uid, cid, lid = r["user_id"], r["client_id"], r["list_id"]
+    ok = _holder_ok(c, r["kind"], uid, r["org_id"], cid, lid)
+    if not ok and r["kind"] != "inbox":
+        h = hbm_heir(c, r)  # 2.84.0 review: the shared address passes on instead of losing the mails for everybody
+        if h:
+            c.execute("UPDATE hub_tokens SET user_id=? WHERE token=?", (h, r["token"]))
+            uid, ok = h, _holder_ok(c, r["kind"], h, r["org_id"], cid, lid)
+    if not ok:
+        return 0
+    org, cid = ok
+    u = c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone()
     ws = _ws(org, uid)
     msgid = str(msg.get("Message-ID", "")).strip()[:300] or ("sha:" + hashlib.sha256(raw).hexdigest())
     if c.execute("SELECT 1 FROM hub_mails WHERE ws=? AND message_id=?", (ws, msgid)).fetchone():
@@ -593,14 +644,20 @@ def _import(c, r, msg, raw, mail_text):
     cn, ln = _names(c, cid, lid)
     day = (sent or ts)[:10]
     notes, node_ids, folder, eml_id = [], [], None, None
+    sealed = bool(org) and oc_active(c)
     try:
         with c.savepoint():
-            folder = fs_folder(c, uid, org, [ROOT, cn or ln or tr("Not assigned", lg=lg), f"{day} {subj or tr('E-mail', lg=lg)}"[:120]])
+            # 2.84.0: file store names are not sealed -- with the organisation encryption on, no subject in the names
+            label = tr("E-mail", lg=lg) + f" {mid}" if sealed else (subj or tr("E-mail", lg=lg))
+            folder = fs_folder(c, uid, org, [ROOT, cn or ln or tr("Not assigned", lg=lg), f"{day} {label}"[:120]])
     except (Denied, ValueError) as e:
         print("hubmail: no folder", type(e).__name__, flush=True)
+        notes.append(tr("The original mail and its attachments could not be filed", lg=lg))  # 2.84.0 review
     if folder:
-        eml = (re.sub(r"[\\/:*?\"<>|]+", "-", subj)[:60].strip() or "mail") + ".eml"
+        eml = ("mail" if sealed else re.sub(r"[\\/:*?\"<>|]+", "-", subj)[:60].strip() or "mail") + ".eml"
         for name, mime, data in [(eml, "message/rfc822", raw)] + files[:HBM_FILES]:
+            if data is not raw:
+                name = unexec_name(name)  # 2.84.0 review: an executable ending from outside gets ".txt" (as agents' files)
             try:
                 with c.savepoint():
                     nid = fs_put(c, uid, folder, name, data, mime, org)

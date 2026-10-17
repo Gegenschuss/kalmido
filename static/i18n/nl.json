@@ -9511,6 +9511,7 @@
   "Only the recipient can take an e-mail back to Not assigned": "Alleen de ontvanger kan een e-mail terugzetten naar Niet toegewezen",
   "{0}: left out, the virus scanner found something": "{0}: weggelaten, de virusscanner vond iets",
   "The storage is full: the attachments were not filed": "De opslag is vol: de bijlagen zijn niet opgeslagen",
+  "The original mail and its attachments could not be filed": "De oorspronkelijke mail en de bijlagen konden niet worden opgeslagen",
   "Mails to this address are filed here": "Mails naar dit adres worden hier opgeslagen",
   "No e-mail matches.": "Geen e-mail komt overeen.",
   "Nothing waits here: every e-mail found its client.": "Hier wacht niets: elke e-mail heeft zijn klant gevonden.",

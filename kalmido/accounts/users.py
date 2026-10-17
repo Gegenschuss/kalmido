@@ -406,6 +406,8 @@ def user_purge(c, uid):
     # 2.84.0 A (#1198): the person's private filed mails and their mails nobody else sees (not assigned) go; an organisation's
     # client / project mails stay with the client / project
     c.execute("DELETE FROM hub_mails WHERE owner_id=? AND (org_id IS NULL OR (client_id IS NULL AND list_id IS NULL))", (uid,))
+    from ..hub.hubmail import hbm_user_purge
+    hbm_user_purge(c, uid)  # 2.84.0 review: its client / project addresses pass to another person who may receive
     from ..contacts.orgbooks import obk_user_purge
     obk_user_purge(c, uid)  # 2.52.0 C (#1438): the organisations' address books it manages get another manager and stay
     # 2.64.0 (#1864): files sealed with the account key that lie elsewhere now are sealed for their space; then the key row
