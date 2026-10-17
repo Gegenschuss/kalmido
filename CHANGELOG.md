@@ -7,6 +7,21 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.80.2] - 2026-10-18
+
+Live fixes: the bell, document previews of imports, switching the workspace.
+
+### Fixed
+- Bell: comments of agents that reach you count at the bell again - with *only replies to me* their replies, mentions and
+  approval cards, with *all comments* every agent comment; other agent actions (completing, status, new tasks) stay
+  Activity without a number. A bundle of comments counts as soon as one of them is for you (#1943).
+- Documents: imports that bring their own text (Paperless, ZIP archive) get a preview image and the QR / archive number check
+  again; documents imported earlier get their missing preview once in the background after the update, a few at a time
+  (`KALMIDO_DOCS_THUMB_FILL=off` turns it off) (#1944).
+- Documents: switching the workspace (organisation <-> private) reloads the list, the *To check* count and the filters at once
+  and closes a document of the other workspace; an answer that arrives late for the old workspace is dropped. An open wiki
+  page closes on the switch too. A new guard test switches every view tied to a workspace in both directions (#1945).
+
 ## [2.80.1] - 2026-10-17
 
 CI fixes for the 2.80 bundle.
