@@ -20,6 +20,8 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from datetime import date, timedelta
 
 import requests
@@ -320,11 +322,49 @@ check(Bo.delete(B + f"/api/me/tokens/{cj['token_id']}").ok, "bob revokes the tok
 r = A.get(B + f"/api/servers/{SID}/data?fresh=1")
 check(r.status_code == 424 and r.json()["code"] == "auth", f"a revoked token: auth {r.text[:200]}")
 
+# ================================================================== 2.73.0 (#661) review H1: a slow other server holds no thread
+dbx("UPDATE msv_links SET base_url=? WHERE id=?", (f"{STUB}/hang", SIDC))  # accepts and sends nothing
+RES = []
+
+
+def hit(path):
+    t0 = time.monotonic()
+    rr = A.get(B + path)
+    RES.append((rr.status_code, rr.json().get("code") if "json" in (rr.headers.get("Content-Type") or "") else None, time.monotonic() - t0))
+
+
+ths = [threading.Thread(target=hit, args=(f"/api/servers/{SIDC}/search?q=x",)) for _ in range(6)]
+for t_ in ths:
+    t_.start()
+time.sleep(1.5)
+t0 = time.monotonic()
+r = Bo.get(B + "/api/state")
+t_state = time.monotonic() - t0
+check(r.ok and t_state < 2, f"H1: other routes answer while four requests hang ({t_state:.1f} s)")
+for t_ in ths:
+    t_.join(40)
+busy = [x for x in RES if x[1] == "busy"]
+slow = [x for x in RES if x[1] == "offline"]
+check(len(busy) == 2 and all(x[0] == 424 and x[2] < 1.5 for x in busy), f"H1: requests five and six of a person: 424 busy at once {RES}")
+check(len(slow) == 4 and all(x[2] < 12 for x in slow), f"H1: the hanging ones end as offline within the read limit {RES}")
+RES.clear()
+ths = [threading.Thread(target=hit, args=(f"/api/servers/{SIDC}/data?fresh=1",)) for _ in range(3)]
+for t_ in ths:
+    t_.start()
+for t_ in ths:
+    t_.join(40)
+check(sorted(x[1] for x in RES) == ["busy", "busy", "offline"] and all(x[2] < 1.5 for x in RES if x[1] == "busy"),
+      f"H1: /data of one account runs once, parallel ones answer busy at once (no thread waits) {RES}")
+dbx("UPDATE msv_links SET base_url='http://127.0.0.1:3999' WHERE id=?", (SIDC,))
+
 # ================================================================== SSRF without the allow-list entry (127.0.0.1 is allowed here)
 for u in ("http://10.0.0.1", "http://169.254.169.254", "http://[::1]:3040", "http://[fd00::1]", "http://[::ffff:127.0.0.2]", "http://localhost:3040",
           "http://172.20.0.9"):
     r = A.post(B + "/api/servers", json={"base_url": u, "token": BTOK})
     check(r.status_code == 400 and "internal" in r.json()["error"], f"{u}: refused as internal ({r.status_code} {r.text[:120]})")
+# review M3: plain http to a public address would send the token unencrypted: refused like a hosted server does
+r = A.post(B + "/api/servers", json={"base_url": "http://93.184.215.14", "token": BTOK})
+check(r.status_code == 400 and "https" in r.json()["error"], f"M3: http to a public address refused ({r.status_code} {r.text[:150]})")
 for u in ("ftp://example.com", "https://user:pw@example.com", "javascript:alert(1)", "https://example.com/a b", "https://example.com/<x>", "https://example.com/../x"):
     check(A.post(B + "/api/servers", json={"base_url": u, "token": BTOK}).status_code == 400, f"{u}: an invalid address 400")
 
@@ -379,6 +419,10 @@ r = A.post(B + "/api/servers", json={"base_url": "https://127.0.0.1:3040", "toke
 check(r.status_code == 400 and "internal" in r.json()["error"], f"hosted: an internal https address refused, the allow-list does not count {r.text[:150]}")
 r = A.get(B + f"/api/servers/{SIDE}/data")
 check(r.status_code == 424 and r.json()["code"] == "offline", f"hosted: a stored http account is not reached {r.text[:150]}")
+
+# review H1: at most 120 reads of other servers per person and minute (here they fail fast: hosted refuses http)
+codes = [A.get(B + f"/api/servers/{SIDE}/data").json().get("code") for _ in range(125)]
+check(codes.count("busy") >= 5 and codes[-1] == "busy" and codes[0] == "offline", f"H1: the 121st read in a minute: busy {codes[-8:]}")
 
 print(f"p273_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
