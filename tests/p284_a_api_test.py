@@ -340,6 +340,21 @@ time.sleep(4)
 check(row(OLD) is None, "the old address files nothing")
 check(Bo.delete(B + "/api/hubmail/address", params={"client_id": ACME}).ok and not dbx("SELECT 1 FROM hub_tokens WHERE client_id=?", (ACME,)), "turn the address off")
 
+# ---- 2.84.0 (#1903): the account export has a person's own private filed mails, never an organisation's
+import io, zipfile  # noqa: E402
+r = Er.post(B + "/api/account/export")
+st = {}
+for _ in range(240):
+    st = Er.get(B + "/api/account/export").json()
+    if st.get("state") != "running":
+        break
+    time.sleep(0.25)
+zf = zipfile.ZipFile(io.BytesIO(Er.get(B + "/api/account/export/file").content)) if st.get("state") == "done" else None
+hm = json.loads(zf.read("data/hub_mails.json")) if zf and "data/hub_mails.json" in zf.namelist() else None
+hm = hm.get("rows", hm) if isinstance(hm, dict) else hm
+HX = {x.get("id") for x in hm} if isinstance(hm, list) else set()
+check(R["m8"]["id"] in HX and R["m1"]["id"] not in HX and HX <= {x[0] for x in dbx("SELECT id FROM hub_mails WHERE owner_id=? AND org_id IS NULL", (ERIN,))}, f"account export: erin's private mails only ({st.get('state')}, {hm if hm is None else len(hm)})")
+
 # ---- deleting an account: its private filed mails go, an organisation's client mails stay
 r = A.delete(B + f"/api/users/{ERIN}")
 check(r.ok and not dbx("SELECT 1 FROM hub_mails WHERE id=?", (R["m8"]["id"],)), f"erin deleted: her private mail is gone ({r.status_code})")
