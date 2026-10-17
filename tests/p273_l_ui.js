@@ -35,8 +35,8 @@ const bobTasks = async () => { const j = await call('GET', '/api/state', null, C
   const bc = await call('POST', '/api/servers/code', {name: 'Alice'}, CB);
   check(bc._status === 201 && bc.code, 'bob makes a connection code');
   const {code, t: TOK} = recode(bc.code, 'http://127.0.0.1:3040');
-  const ln = await call('POST', '/api/servers', {code, name: 'Home', short: 'HM'});
-  check(ln.id && ln.short === 'HM', 'alice links bob\'s account ' + JSON.stringify(ln));
+  const ln = await call('POST', '/api/servers', {code, name: 'Remote', short: 'RM'});
+  check(ln.id && ln.short === 'RM', 'alice links bob\'s account ' + JSON.stringify(ln));
   const SID = ln.id;
   const OWN = (await call('POST', '/api/tasks', {title: 'Alice moves this', notes: 'carry me'})).id;
 
@@ -50,9 +50,9 @@ const bobTasks = async () => { const j = await call('GET', '/api/state', null, C
     await nav(B + '#today');
     await ready(ev, `#view .trow[data-msv="${SID}:${BT.id}"]`);
     const td = await ev(`(() => { const r = document.querySelector('#view .trow[data-msv="${SID}:${BT.id}"]'); return {b: r?.querySelector('.msvb')?.textContent, t: r?.textContent || ''}; })()`);
-    check(td.b === 'HM' && /Bob due today/.test(td.t), '#661: Today shows bob\'s task with the badge ' + JSON.stringify(td));
+    check(td.b === 'RM' && /Bob due today/.test(td.t), '#661: Today shows bob\'s task with the badge ' + JSON.stringify(td));
     const sg = await ev(`(() => { const g = document.querySelector('#side .sg-msv'); return {b: g?.querySelector('.msvb')?.textContent, t: g?.textContent || ''}; })()`);
-    check(sg.b === 'HM' && /Bob project/.test(sg.t), '#661: the sidebar group lists bob\'s lists ' + JSON.stringify(sg));
+    check(sg.b === 'RM' && /Bob project/.test(sg.t), '#661: the sidebar group lists bob\'s lists ' + JSON.stringify(sg));
     check(await ev(`!document.documentElement.innerHTML.includes(${JSON.stringify(TOK)})`), '#661: no token in the page');
     await shot('p273l-today.png');
     // complete it through the details -> done on bob's side
@@ -65,9 +65,9 @@ const bobTasks = async () => { const j = await call('GET', '/api/state', null, C
     await nav(B + '#inbox'); await ready(ev, '#qinput');
     await ev(`(() => { const i = document.querySelector('#qinput'); i.focus(); i.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`); await sleep(400);
     await ev(`(() => { document.querySelector('#qdchips .msvvqc')?.click(); return 1; })()`); await sleep(500);
-    await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Home/.test(b.textContent))?.click(); return 1; })()`); await sleep(500);
+    await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Remote/.test(b.textContent))?.click(); return 1; })()`); await sleep(500);
     await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Bob project/.test(b.textContent))?.click(); return 1; })()`); await sleep(400);
-    check(/Home · Bob project/.test(await ev(`document.querySelector('#qdchips .msvvqc')?.textContent || ''`)), '#661: the target chip shows bob\'s list');
+    check(/Remote · Bob project/.test(await ev(`document.querySelector('#qdchips .msvvqc')?.textContent || ''`)), '#661: the target chip shows bob\'s list');
     await ev(`(async () => { const i = document.querySelector('#qinput'); i.value = 'Typed for Bob'; await submitQuick(i); return 1; })()`); await sleep(1500);
     const qa = (await bobTasks()).find(t => t.title === 'Typed for Bob');
     check(qa && qa.list_id === BL.id, '#661: the quick add landed in bob\'s list ' + JSON.stringify(qa));
@@ -83,7 +83,7 @@ const bobTasks = async () => { const j = await call('GET', '/api/state', null, C
     await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to another server/.test(b.textContent))?.click(); return 1; })()`); await sleep(800);
     await ev(`(() => { const s = document.querySelector('#msvvmv-s'); s.value = '${SID}'; s.dispatchEvent(new Event('change')); return 1; })()`); await sleep(1200);
     await ev(`(() => { const l = document.querySelector('#msvvmv-l'); l.value = '${BL.id}'; document.querySelector('.msvvmv button[type="submit"]').click(); return 1; })()`); await sleep(800);
-    check(/created anew on Home/.test(await ev(`document.querySelector('.cdlg #cdlg-b')?.textContent || ''`)), '#661: the move question names the target');
+    check(/created anew on Remote/.test(await ev(`document.querySelector('.cdlg #cdlg-b')?.textContent || ''`)), '#661: the move question names the target');
     await ev(`(() => { document.querySelector('.cdlg [data-cd="yes"]')?.click(); return 1; })()`); await sleep(2000);
     const mv = (await bobTasks()).find(t => t.title === 'Alice moves this');
     check(mv && mv.list_id === BL.id, '#661: the moved task is on bob\'s server ' + JSON.stringify(mv));
