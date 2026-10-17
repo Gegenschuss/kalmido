@@ -8281,5 +8281,7 @@
   "the person to assign is no longer in the list": "de toe te wijzen persoon zit niet meer in de lijst",
   "the person who set it up has no access to the list any more": "de persoon die hem heeft ingesteld heeft geen toegang meer tot de lijst",
   "the person who set it up is no longer owner or admin of the list": "de persoon die hem heeft ingesteld is geen eigenaar of beheerder van de lijst meer",
-  "make it due in {0} day": ["maak hem over {0} dag vervallen", "maak hem over {0} dagen vervallen"]
+  "make it due in {0} day": ["maak hem over {0} dag vervallen", "maak hem over {0} dagen vervallen"],
+  "the target column no longer exists": "de doelkolom bestaat niet meer",
+  "rules are no longer available in this list": "regels zijn in deze lijst niet meer beschikbaar"
 }

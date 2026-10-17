@@ -544,7 +544,9 @@ def export_json():
         "filters": ("SELECT * FROM filters WHERE user_id=?", (uid,)),
         "attachments": (f"SELECT * FROM attachments WHERE task_id IN {task_ids}", (uid,)),
         "comments": (f"SELECT * FROM comments WHERE task_id IN {task_ids} AND deleted_at IS NULL", (uid,)),
-        "activity": (f"SELECT * FROM activity WHERE task_id IN {task_ids}", (uid,)),
+        # 2.71.0 (#1459, review N5): "also in list X" lines without the id of a list the person may not see
+        "activity": (f"SELECT id, task_id, user_id, kind, CASE WHEN kind IN ('ml_add', 'ml_rm') THEN '{{}}'::jsonb ELSE data END AS data, "
+                     f"created_at FROM activity WHERE task_id IN {task_ids}", (uid,)),
         # 2.48.0 (#1642): notes locked with a password, as stored (ciphertext; their tasks have an empty note)
         "task_note_locks": (f"SELECT * FROM task_note_locks WHERE task_id IN {task_ids}", (uid,)),
         "settings": ("SELECT key, value FROM user_settings WHERE user_id=?", (uid,)),

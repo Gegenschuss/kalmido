@@ -148,6 +148,10 @@ check(ra and ra[0]["user_id"] == ALICE and ra[0]["data"]["rule"]["name"] == "Rev
       f"history: the assignment is 'Rule Review', run as alice ({[(a['kind'], a['user_id'], a['data']) for a in tl['activity']]})")
 t1b = task(Bo, W, "Born in review", section_id=REVIEW)
 check(get(A, t1b).get("assignee_id") == CAROL, "a task created right in the column triggers the rule")
+# 2.71.0 (#1457, review H1): dragging (board column, POST /api/tasks/reorder) starts the rules too
+t1c = task(A, W, "Dragged", section_id=TODO)
+check(Bo.post(B + "/api/tasks/reorder", json={"items": [{"id": t1c, "sort": 1, "section_id": REVIEW}]}).ok, "bob drags the card into Review")
+check(get(A, t1c).get("assignee_id") == CAROL, "rule column -> assigned after a drag")
 
 # ---- trigger done -> comment; reopen -> due date
 R2 = rule(A, W, "Thanks", {"kind": "done"}, {"kind": "comment", "text": "Please write the invoice"})
@@ -166,6 +170,12 @@ t3 = task(A, W, "Old idea")
 check(Bo.patch(B + f"/api/tasks/{t3}", json={"ltags": ["urgent"]}).ok, "bob tags it")
 x = get(A, t3)
 check(x.get("list_id") == W2 and x.get("section_id") == ARCH, f"rule tag -> moved to Archive / Old ({x.get('list_id')}, {x.get('section_id')})")
+
+# 2.71.0 (#1457, review M1): an admin who cannot see the target list does not get its name
+r4c = [r for r in Ca.get(B + f"/api/lists/{W}/rules").json()["rules"] if r["id"] == R4][0]
+check(not r4c["names"].get("list") and not r4c["names"].get("section_to"), f"carol does not see the target's names ({r4c['names']})")
+r4a = [r for r in A.get(B + f"/api/lists/{W}/rules").json()["rules"] if r["id"] == R4][0]
+check(r4a["names"].get("list") == "Archive", "alice sees the target list's name")
 
 # ---- loop protection: W column Done -> W2 column Old, W2 column Old -> W column Done
 R5 = rule(A, W, "Out", {"kind": "section", "section_id": DONE}, {"kind": "move", "list_id": W2, "section_id": ARCH})
@@ -254,6 +264,16 @@ p2 = requests.post(V + f"/lists/{W}/rules/proposals", headers=AGH, json={"name":
 check(p2.status_code == 201 and A.post(B + f"/api/proposals/{p2.json()['id']}/discard").ok, "alice declines a proposal")
 spec = requests.get(V + "/openapi.json").json()["paths"]
 check("/lists/{id}/rules" in spec and spec["/lists/{id}/rules/proposals"]["post"]["x-kalmido-scope"] == "structure", "OpenAPI lists the routes")
+
+# 2.71.0 (#1457, review N2): a deleted target column pauses the rule (reason section)
+TMP = section(A, W, "Temp")
+R9 = rule(A, W, "To temp", {"kind": "reopen"}, {"kind": "move", "section_id": TMP})
+check(A.delete(B + f"/api/sections/{TMP}").ok, "the target column is deleted")
+t9 = task(A, W, "Again")
+A.post(B + f"/api/tasks/{t9}/complete", json={})
+A.post(B + f"/api/tasks/{t9}/reopen", json={})
+r9 = [r for r in A.get(B + f"/api/lists/{W}/rules").json()["rules"] if r["id"] == R9][0]
+check(not r9["active"] and r9["paused_reason"] == "section", f"the rule paused: section ({r9['paused_reason']})")
 
 # ---- a person without an organisation (freelancer): own list = owner
 F = mklist(Er, "Freelance", org=None)

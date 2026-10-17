@@ -8281,5 +8281,7 @@
   "the person to assign is no longer in the list": "la persona da assegnare non è più nella lista",
   "the person who set it up has no access to the list any more": "la persona che l'ha impostata non ha più accesso alla lista",
   "the person who set it up is no longer owner or admin of the list": "la persona che l'ha impostata non è più proprietaria o amministratrice della lista",
-  "make it due in {0} day": ["imposta la scadenza tra {0} giorno", "imposta la scadenza tra {0} giorni"]
+  "make it due in {0} day": ["imposta la scadenza tra {0} giorno", "imposta la scadenza tra {0} giorni"],
+  "the target column no longer exists": "la colonna di destinazione non esiste più",
+  "rules are no longer available in this list": "le regole non sono più disponibili in questa lista"
 }

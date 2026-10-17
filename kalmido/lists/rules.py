@@ -45,6 +45,8 @@ RUL_PAUSE = {  # paused_reason -> the text the settings show
     "target": N_("no write access to the target list any more"),
     "assignee": N_("the person to assign is no longer in the list"),
     "locked": N_("the list or the target list is locked"),
+    "section": N_("the target column no longer exists"),  # 2.71.0 (#1457, review N2)
+    "list": N_("rules are no longer available in this list"),  # 2.71.0 (#1457, review N4)
 }
 _NEW = {"new": True}  # rul_fire: the task was just created
 
@@ -216,10 +218,12 @@ def rul_dict(c, r):
     if r["act"] == "assign":
         names["user"] = user_names(c, [a.get("user_id")]).get(a.get("user_id"))
     elif r["act"] == "move":
-        if a.get("list_id") and a["list_id"] != r["list_id"]:
+        # 2.71.0 (#1457, review M1): the target's names only for a viewer who sees the target list
+        see = not a.get("list_id") or a["list_id"] == r["list_id"] or bool(has_request_context() and g.get("user") and list_role(c, a["list_id"]))
+        if a.get("list_id") and a["list_id"] != r["list_id"] and see:
             s = c.execute("SELECT name FROM lists WHERE id=?", (a["list_id"],)).fetchone()
             names["list"] = s[0] if s else None
-        if a.get("section_id"):
+        if a.get("section_id") and see:
             s = c.execute("SELECT name FROM sections WHERE id=?", (a["section_id"],)).fetchone()
             names["section_to"] = s[0] if s else None
     by = r["created_by"]
@@ -293,7 +297,7 @@ def rule_update(rid):
         return err(e, 409)
     try:
         f = rul_clean(c, r["list_id"], b, partial=r)
-        if f.get("active") and not r["active"] and "act" not in f:  # on again: the stored action is checked with my rights
+        if ((f.get("active") and not r["active"]) or "trig" in f) and "act" not in f:  # on again / new owner (review N1): the stored action is checked with my rights
             rul_clean(c, r["list_id"], {"action": rul_dict(c, r)["action"]}, partial=r)
     except BadInput as e:
         return err(str(e))
@@ -442,7 +446,12 @@ def rul_check(c, r, tid):
         return "role"
     if rul_locked(c, r["list_id"]):
         return "locked"
+    if rul_list_ok(c, r["list_id"]):  # 2.71.0 (#1457, review N4): the list became a health list afterwards
+        return "list"
     a = json.loads(r["act_val"] or "{}")
+    if r["act"] == "move" and a.get("section_id") and not c.execute(  # review N2: a deleted target column pauses the rule
+            "SELECT 1 FROM sections WHERE id=? AND list_id=?", (a["section_id"], a.get("list_id") or r["list_id"])).fetchone():
+        return "section"
     if r["act"] == "move" and a.get("list_id") and a["list_id"] != r["list_id"]:
         if rul_locked(c, a["list_id"]):
             return "locked"
@@ -543,9 +552,13 @@ def rul_due_tick(c):
                 bump(c)
                 c.commit()
                 send_pushes(g.pop("pushes", None))
-            except Exception:
+            except Exception as e:  # noqa: BLE001  review N3: one failing row never blocks the others; its marker stays
                 c.rollback()
-                raise
+                print("list rule", r["id"], "due run failed:", type(e).__name__, e, flush=True)
+                with pg_system(c):  # 2.71.0 (#1457): system on purpose: only the run marker of this rule and task
+                    c.execute("INSERT INTO list_rule_runs(rule_id,task_id,key,at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
+                              (r["id"], x["tid"], "due:" + day, iso(now_utc())))
+                c.commit()
             finally:
                 g.pop("db", None)  # the watchdog's connection: closed by the watchdog, not by this context
         c.set_ctx(role="system")  # back to the watchdog's own context (the request context above followed the creator)
