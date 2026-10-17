@@ -282,6 +282,16 @@ check(Bo.delete(B + f"/api/tasks/{T2}").ok, "trash T2")
 wait_for(lambda: T2 not in vec_ids(), "a trashed task loses its vector")
 check(T2 not in ids_of(Bo.get(B + f"/api/tasks/{T1}/related").json()), "a trashed task is not related any more")
 
+# ================================================================== 2.82.0 (#1880): private lists per person (no shared cache bucket)
+LPC = Ca.post(B + "/api/lists", json={"name": "Home desk", "org_id": None}).json()["id"]
+TPB = task(Bo, "Invoice template for clients at home", LP)  # a twin of TP in bob's private list
+TPC = task(Ca, "Invoice template for clients at home", LPC)  # the same in carol's private list
+wait_for(lambda: {TPB, TPC} <= vec_ids(), "the private twins get their vectors")
+got = ids_of(Bo.get(B + f"/api/tasks/{TP}/related").json())
+check(TPB in got and TPC not in got, f"#1880: bob's private twin is related, carol's private one never {got}")
+got = ids_of(Ca.get(B + f"/api/tasks/{TPC}/related").json())
+check(not (got & {TP, TPB}), f"#1880: carol never gets bob's private tasks {got}")
+
 # ================================================================== the switch off / on
 r = A.put(B + "/api/admin/related", json={"on": False})
 check(r.ok and r.json()["on"] is False, "admin: switch off")
