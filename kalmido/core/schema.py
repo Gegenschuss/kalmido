@@ -2102,6 +2102,11 @@ MIGRATIONS = [
     # 2.86 audit B3 (#1968): the office role of the person behind a history row of an archived document ('member' = shown
     # "by member"; '' = admin or a row of before)
     ("office_archive_log", "role", "ALTER TABLE office_archive_log ADD COLUMN role TEXT NOT NULL DEFAULT ''"),
+    # 2.88.0 (#1915): a quotation's chain of versions (version_of = the id of the chain's first quotation, set by duplicating;
+    # NULL = the first one / not a copy) and its share in the cash flow plan (auto | yes | no, office/cashflow.py cf8_*);
+    # 2.87.0 ignores both
+    ("office_docs", "version_of", "ALTER TABLE office_docs ADD COLUMN version_of BIGINT"),
+    ("office_docs", "cashflow", "ALTER TABLE office_docs ADD COLUMN cashflow TEXT NOT NULL DEFAULT 'auto'"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
