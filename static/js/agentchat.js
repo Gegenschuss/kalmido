@@ -621,8 +621,7 @@ function chatInner(aid) {
   // page header (body.in-chat hides #top)
   const back = chatFull() ? `<button class="iconbtn chback" data-act="chat-close" title="${esc(tr('Back'))}" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : '';
   // 2.13.0 (#453): the note that used to sit under the input is behind the (i) next to the name
-  const info = `<button type="button" class="ib" data-ii="chat-info" aria-describedby="chat-info" aria-expanded="false" aria-label="${esc(tr('More information'))}">${ic('info', 's')}</button><span class="shint iisrc" id="chat-info" data-ii="1">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the lists shared with it.', esc(a.name))}</span>`;
-  return `<div class="chath">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}${info}${chatModeHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatModelHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>
+  return `<div class="chath">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}${chatModeHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatModelHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>
       ${msgSearchBtn('a', a.id)}${chatStepsTog()}${back ? '' : chatWinBtns()}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
     ${jc_barHtml()}${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div>${cpnBarHtml('a:' + a.id)}<div class="chmsgs" id="chat-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
     <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
@@ -1188,6 +1187,7 @@ function agModal(a, done, o = {}) {
     ${a && typeof oa_switchRowHtml === 'function' ? oa_switchRowHtml(a.id) : ''}${''/* 2.51.0 A (#1348): the office switch, saved at once */}
     <div class="row"><label for="ag-url">${tr('Webhook URL')}</label><input id="ag-url" type="url" value="${esc(a?.webhook?.url || '')}" placeholder="${tr('optional: https://… (empty = the agent polls)')}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
     <div class="shint">${tr('With a webhook every event is POSTed there at once, signed like the webhooks. Without one the agent fetches its events: GET /api/v1/agent/events (with ?wait=60 it gets them within seconds).')}</div>
+    ${a ? `<div class="shint keep">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the lists shared with it.', esc(a.name))}</div>` : ''}
     ${a ? `<div class="row"><label></label><button class="btn sm" data-m="ains-setup">${ic('download', 's')} ${tr('Set up on a computer')}</button><button class="btn sm" data-m="token">${ic('key', 's')} ${tr('New API token')}</button>${a.webhook ? `<button class="btn sm" data-m="secret">${ic('key', 's')} ${tr('New signing secret')}</button>` : ''}</div>
     <div class="shint keep">${esc(trn('{0} list shared with it', '{0} lists shared with it', a.lists.length))}${a.lists.length ? ': ' + esc(a.lists.map(l => l.name).join(', ')) : ''}</div>` : ''}
     ${aiuLimFields(a)}
