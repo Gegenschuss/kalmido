@@ -1388,6 +1388,7 @@ A `reply_to` of another place, an unknown id or a deleted message is refused wit
   to me* (setting `agent_comments` = `replies`, default `all`). Then an agent's task comment reaches them (News and push)
   only when it carries `reply_to` on their comment, comes right after their comment on that task, or @mentions them.
   Answer a person's comment with `reply_to` so the answer arrives.
+  Since 2.66.1 the comments that reach a person count at their bell (*For you*); other agent actions stay *Activity*.
 
 ### Saving a chat message as a task (2.37.0)
 

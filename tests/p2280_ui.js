@@ -60,8 +60,13 @@ const V = B + 'api/v1';
   // News: bob mentions and assigns (for me), the agent comments (activity)
   await call('POST', `/api/tasks/${TW}/comments`, {body: '<@1> can you check the DNS?'}, BCK);
   await call('PATCH', `/api/tasks/${TW2}`, {assignee_id: 1}, BCK);
+  // 2.66.1 (#1943): an agent's comments that reach me count at the bell now -> alice takes "only replies to me" (the plain
+  // comments below stay away) and the agent's completion is the Activity
+  await call('PATCH', '/api/settings', {agent_comments: 'replies'});
   await fetch(V + `/tasks/${TW}/comments`, {method: 'POST', headers: AGH, body: JSON.stringify({body: 'I looked at the build, all green.'})});
   await fetch(V + `/tasks/${TW2}/comments`, {method: 'POST', headers: AGH, body: JSON.stringify({body: 'Stock levels noted.'})});
+  const TAC = (await call('POST', '/api/tasks', {title: 'Check the backups', list_id: W1})).id;
+  await fetch(V + `/tasks/${TAC}/complete`, {method: 'POST', headers: AGH});
   // a question with buttons in the chat
   const q = await (await fetch(V + '/agent/chats/1', {method: 'POST', headers: AGH, body: JSON.stringify({body: 'May I run the deploy?\n```\n./deploy.sh prod\n```', choices: [{id: 'go', label: 'Allow', style: 'primary'}, {id: 'stop', label: 'Deny', style: 'danger'}]})})).json();  // 2.30.0: ids allow / deny = a permission question (p2300_chat_ui)
   check(q.choices && q.choices.choices.length === 2, '#1005: the question with buttons is stored');
@@ -142,7 +147,7 @@ const V = B + 'api/v1';
   check(items.length === 2 && items.every(x => x.classList.contains('tome')) && items.some(x => /mentioned you/.test(x.textContent)) && items.some(x => /assigned a task to you/.test(x.textContent)), '#987: "For you" = the mention and the assignment ' + items.map(x => x.querySelector('.ntext')?.textContent).join('|'));
   click(w, d.querySelector('.ntabs [data-tab="act"]')); await sleep(200);
   items = [...d.querySelectorAll('#view .nitem')];
-  check(items.length >= 1 && items.every(x => !x.classList.contains('tome')) && items.some(x => /Claude/.test(x.textContent)), '#987: "Activity" = the agent\'s comments ' + items.length);
+  check(items.length >= 1 && items.every(x => !x.classList.contains('tome')) && items.some(x => /Claude/.test(x.textContent)), '#987: "Activity" = the agent\'s completion (2.66.1 #1943: no longer its comments) ' + items.length);
   click(w, d.querySelector('.ntabs [data-tab="all"]')); await sleep(200);
   check(d.querySelectorAll('#view .nitem').length >= 3 && d.querySelectorAll('#view .nsec').length === 2, '#987: "All" shows everything in two sections');
   // the bell's dropdown: sections
