@@ -20,8 +20,13 @@ document.addEventListener('click', async e => {
   const b = e.target.closest?.('[data-accol]'); if (!b) return;
   e.preventDefault();
   const c = b.dataset.accol, who = b.dataset.acwho, aid = who === 'me' ? 0 : +who;
+  const prev = (S.colors || {})[aid || S.me.id] || '';
   try { await api('PATCH', aid ? `/api/agents/${aid}/color` : '/api/me', {color: c}); } catch { return; }  // the error is shown
   (S.colors ||= {})[aid || S.me.id] = c;
+  if (aid && prev && prev !== c && typeof histAdd === 'function') {  // 2.83.0 (#1775): one undo step for an agent's colour
+    const put = v => async () => { await api('PATCH', `/api/agents/${aid}/color`, {color: v}); S.colors[aid] = v; render(); return {}; };
+    offerUndo(tr('Saved'), histAdd({label: tr('Colour changed'), undo: put(prev), redo: put(c)}));
+  }
   for (const x of b.parentElement.children) x.setAttribute('aria-pressed', String(x === b));
   const acct = $('.acct'); if (acct && !aid) acct.firstElementChild.outerHTML = av(S.me.id, S.me.display_name);
   render();

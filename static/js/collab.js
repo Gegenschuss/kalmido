@@ -562,6 +562,7 @@ function personCard(anchor, id) {
       <span class="muted">${esc(role || (U[id] ? '' : tr('Not a member of this list')))}</span>${st}</div></div>
     ${l && p ? `<div class="mcsec"><div class="mch">${esc(tr('Assigned in {0}', lname(l)))} <span class="c">${mine.length}</span></div>${mine.slice(0, 5).map(x => `<button type="button" class="mctask" data-mc="task" data-id="${x.id}">${ic('check', 's')}<span>${esc(x.title)}</span></button>`).join('') || `<div class="muted mhint">${esc(tr('No other open tasks'))}</div>`}${mine.length > 5 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', mine.length - 5))}</div>` : ''}</div>` : ''}
     ${curHtml}
+    ${a?.can_color ? `<div class="mcsec"><div class="mch" id="mc-col-h">${esc(tr('Colour'))}</div><div class="pfcol" role="group" aria-labelledby="mc-col-h">${ac_pickHtml((S.colors || {})[id] || '', id)}</div></div>` : ''}${''/* 2.83.0 (#1775): org admins, owner, instance admin */}
     ${acts.length ? `<div class="mcacts">${acts.map(([k, i, lab]) => `<button type="button" class="btn sm ${k === 'dm' ? 'pri mcdm' : ''}" data-mc="${k}">${ic(i, 's')} ${esc(lab)}</button>`).join('')}</div>` : ''}</div>`);
   pop.onclick = async e => {
     const b = e.target.closest('[data-mc]'); if (!b) return;

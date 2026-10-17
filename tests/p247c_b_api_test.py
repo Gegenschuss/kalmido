@@ -156,6 +156,16 @@ check(Da.patch(B + f"/api/agents/{AG[0]}/color", json={"color": PAL[10]}).status
 check(A.patch(B + f"/api/agents/{AG[1]}/color", json={"color": PAL[11]}).ok and color(AG[1]) == PAL[11], "the instance admin")
 check(Bo.patch(B + f"/api/agents/{AG[0]}/color", json={"color": "#000000"}).status_code == 400, "an agent: only the palette")
 check(Bo.patch(B + "/api/agents/999999/color", json={"color": PAL[0]}).status_code == 404, "an unknown agent: 404")
+# 2.83.0 (#1775): the agent list tells the viewer whether they may change the colour (the person card shows the colour row)
+def can_color(s, aid):
+    j = s.get(B + "/api/agents").json()
+    return next((x.get("can_color") for x in (j.get("agents") if isinstance(j, dict) else j) if x["id"] == aid), None)
+
+
+check(can_color(Bo, AG[0]) in (True, None), "can_color: the organisation's admin (when the agent is listed for them at all)")
+check(can_color(A, AG[0]) is True, "can_color: the instance admin")
+check(can_color(Ca, AG[0]) is not True, "can_color: a plain member does not get it")
+check(can_color(Da, AG[0]) is not True, "can_color: the admin of another organisation does not get it")
 # a personal agent: its owner
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
 r = Er.post(B + "/api/my/agents", json={"username": "erinbot", "display_name": "Erin bot"})

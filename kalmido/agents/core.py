@@ -973,7 +973,23 @@ def agent_public(c, a, uid=None):
             # 2.35.0 (#1103): open approval requests + permission questions to the viewer (the badge "1 approval open")
             "approvals_open": _approvals_open(c, a["user_id"], uid),
             # 2.58.0 (#1761): its list limit, only for the people who manage it (owner / admin); [] = all its lists
-            **({"list_ids": f8c_list_ids(a)} if uid and may_set_runtime(c, a, uid) else {})}
+            **({"list_ids": f8c_list_ids(a)} if uid and may_set_runtime(c, a, uid) else {}),
+            # 2.83.0 (#1775): the viewer may change its colour (same rule as PATCH /api/agents/<id>/color)
+            "can_color": o3b_can_color(c, a, uid)}
+
+
+def o3b_can_color(c, a, uid):
+    """2.83.0 (#1775): instance admin, owner of a personal agent or admin of the agent's organisation."""
+    from ..accounts.orgs import is_org_admin
+    if not uid:
+        return False
+    if "owner_id" in a.keys() and a["owner_id"] == uid:
+        return True
+    u = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
+    if u and u["is_admin"]:
+        return True
+    org = a["org_id"] if "org_id" in a.keys() else None
+    return bool(org and is_org_admin(c, uid, org))
 
 
 def f8c_list_ids(a):
