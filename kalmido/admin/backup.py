@@ -589,7 +589,7 @@ def backup_tick(c):
             c.commit()
     if time.time() - _BK["stale_at"] >= 3600:  # "no backup for 2 days" at most hourly (+ the alert cooldown)
         _BK["stale_at"] = time.time()
-        ref = gsetting(c, "bk_last_ok") or gsetting(c, "bk_enabled_at")
+        ref = max(gsetting(c, "bk_last_ok") or "", gsetting(c, "bk_enabled_at") or "")  # 2.81.0 (#1627): switched on again = the clock starts then (ISO text sorts by time)
         if ref and (now_utc() - parse_iso(ref)).total_seconds() > BK_STALE_S:
             last = gsetting(c, "bk_last_ok")
             aa_now("storage", "backup:stale", N_("The last successful backup is older than 2 days ({0})."),

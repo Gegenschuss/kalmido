@@ -137,9 +137,17 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
       if ($('#cl-rate', md)) Object.assign(body, {rate: num($('#cl-rate', md).value), budget_h: num($('#cl-bh', md).value), budget_amount: num($('#cl-ba', md).value)});
       if ($('#cl-arch', md)) body.archived = $('#cl-arch', md).checked;
       for (const el of md.querySelectorAll('[data-clb]')) if (!(el.dataset.clb === 'country' && !ctyValid(el.value) && el.value === (c?.billing?.country || ''))) body[el.dataset.clb] = el.dataset.clb === 'payment_terms_days' ? (el.value.trim() === '' ? null : +el.value.trim()) : el.value;
-      const r = await rawFetch(c ? 'PATCH' : 'POST', c ? `/api/clients/${c.id}` : '/api/clients', body);
+      let r, gone = false;
+      try { r = await rawFetch(c ? 'PATCH' : 'POST', c ? `/api/clients/${c.id}` : '/api/clients', body); }
+      catch (x) {
+        // 2.81.0 (#1852): a linked contact was deleted elsewhere -> drop that link, save once more, tell the person
+        if (x.data?.code !== 'contact_gone' || !body.contacts.some(k => k.contact_id === x.data.contact_id)) throw x;
+        body.contacts = body.contacts.map(k => k.contact_id === x.data.contact_id ? {...k, contact_id: null} : k);
+        r = await rawFetch(c ? 'PATCH' : 'POST', c ? `/api/clients/${c.id}` : '/api/clients', body);
+        gone = true;
+      }
       md.remove(); await load(); render(); clReload();
-      toast(c ? tr('Saved') : tr('Added: {0}', r.name));
+      toast(gone ? tr('The linked contact no longer exists; link removed.') : c ? tr('Saved') : tr('Added: {0}', r.name));
       if (!c && !o.stay) go('client/' + r.id);
     } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });

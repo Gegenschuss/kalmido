@@ -349,5 +349,9 @@ check(r.ok and r.json()["removed"]["clients"] == 1 and r.json()["removed"]["cont
 cls = {c["name"]: c for c in A.get(B + "/api/clients").json()["clients"]}
 check("Leuchtturm Verlag GmbH" not in cls and "Herrn Paul Neu" not in [k["name"] for k in cls["Muster Medien GmbH"]["contacts"]], "undo: clients as before")
 
+# 2.81.0 (#1463): reading an address shares the /api/pdf-text budget (10 per account in 10 minutes) -> 429
+codes = [addr(A, P1).status_code for _ in range(12)]
+check(429 in codes and codes.index(429) <= 10 and set(codes[codes.index(429):]) == {429}, f"#1463: the address read is throttled per account {codes}")
+
 print(f"p2400_k_api_test: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

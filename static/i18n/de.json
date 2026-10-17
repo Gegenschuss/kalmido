@@ -694,7 +694,7 @@
   "Notifications (ntfy)": "Benachrichtigungen (ntfy)",
   "Topic": "Topic",
   "Subscribe in the ntfy app: server {0}, topic as above": "In der ntfy-App abonnieren: Server {0}, Topic wie oben",
-  ", with a user that has read access": ", mit einem Benutzer mit Leserecht",
+  ", logged in as user mo": ", angemeldet als Benutzer mo",
   "Web view": "Web-Ansicht",
   "Send test": "Test senden",
   "All-day reminder at": "Ganztägig erinnern um",
@@ -706,7 +706,7 @@
   "Default": "Standard",
   "Modules": "Module",
   "In the ntfy app, add server {0} once": "In der ntfy-App einmal Server {0}",
-  " and log in with a user that may write to the topic (Settings > Manage users).": " mit einem Benutzer anmelden, der auf das Topic schreiben darf (Einstellungen > Benutzer verwalten).",
+  " and log in as user <b>mo</b> (Settings > Manage users; password in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).": " mit Benutzer <b>mo</b> anmelden (Einstellungen > Benutzer verwalten; Passwort in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).",
   "Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.": "Dann: Bild oder Text teilen > ntfy > Server wie oben, Topic {0}. Nach ein paar Sekunden liegt es als Aufgabe im Korb, Dateien als Anhang.",
   "Color scheme": "Farbschema",
   "Automatic": "Automatisch",
@@ -9486,5 +9486,6 @@
   "gross, tax unknown": "brutto, Steuer unbekannt",
   "Net {0} + VAT {1} = gross {2}": "Netto {0} + MwSt. {1} = Brutto {2}",
   "{0}: {1} → {2}": "{0}: {1} → {2}",
-  "No changes yet.": "Noch keine Änderungen."
+  "No changes yet.": "Noch keine Änderungen.",
+  "The linked contact no longer exists; link removed.": "Der verknüpfte Kontakt existiert nicht mehr; Verknüpfung gelöst."
 }

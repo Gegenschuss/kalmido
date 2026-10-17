@@ -922,7 +922,7 @@ one id you do not see: `404`, nothing changes). `delete`: a client used in quota
 instead, only its creator or an admin deletes (the others: `skipped`); `set`: `rate`, `budget_h`, `budget_amount`, `color` (`null`
 clears), `note_append` (appended to the note). The answer's `undo` sent back as `items` with `action: restore` puts the old values back.
 2.40.0 (#1380): `contacts` lists the client's contact persons (`id`, `name`, `role`, `email`, `phone`, `is_default`; the default
-first) and `contact` stays the default's name. `POST` / `PATCH` with `contacts` replace the whole list (an entry with `id` is
+first; 2.81.0 (#1466): agent tokens get only `id`, `name`, `role`, `is_default` per contact person) and `contact` stays the default's name. `POST` / `PATCH` with `contacts` replace the whole list (an entry with `id` is
 kept / changed, without one added, a missing one deleted; `is_default` marks the default, else the first); writing only
 `contact` renames the default (empty removes it). Office documents choose one with `contact_id` (`null` = the default, `0` = none;
 the "attn." line of the address and the buyer contact BT-56 of the e-invoice follow it; `client_contacts` in the document).

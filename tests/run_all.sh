@@ -1036,6 +1036,8 @@ fresh; run p278_dup_ui node p278_dup_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p279_sec_api "$PY" p279_sec_api_test.py "$KALMIDO_TEST_DATA"
 # 2.81.0 part B: correct archived office documents (client, tax lines, paid, history, #1834), DATEV customer number of locked invoices (#1867)
 fresh; run p281_b_api "$PY" p281_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.81.0 part A: #1852 stale contact link, #1466 agent contact persons
+fresh; run p281_a_api "$PY" p281_a_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
