@@ -7,6 +7,22 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.66.0] - 2026-10-17
+
+**In short:** duplicate contacts and duplicate clients can be merged by hand - pick the record that stays and, per field,
+the value it keeps; everything linked moves along, and the merge can be undone for 30 days.
+
+### Added
+- **Merge contacts:** tick two or more contacts, *Merge*: choose the contact that stays and, where the entries differ, which
+  value each field keeps; phone numbers, e-mail addresses, addresses, web links and groups are joined. Linked tasks, event
+  attendances, client contact persons and "stay in touch" move to the kept contact; the others disappear from the address
+  book and, over CardDAV, from your devices (#1835).
+- **Merge clients:** the same in the clients list; offers, invoices, contracts, archive entries, projects, trips, deals and
+  contact persons move to the kept client. Issued invoices keep the address they were printed with, only the client
+  changes (#1835).
+- **Undo and history:** an overview of what moves where before the merge, *Undo* right after it and in the history of the
+  kept contact / client for 30 days (#1835).
+
 ## [2.64.0] - 2026-10-17
 
 ### Security
