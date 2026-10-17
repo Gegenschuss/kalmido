@@ -39,9 +39,31 @@ def user_names(c, ids):
             for r in c.execute(f"SELECT id, username, display_name FROM users WHERE id IN ({q})", ids)}
 
 
+def h6r_shared_people(c, lid, uid):
+    """2.86.0 (N20 review): the people a participant uid of list lid may see in it -- the owner, uid and everybody who
+    shares a task with uid (full roles see every task, other participants only their own); None = uid is no participant."""
+    from ..core.access import pvis
+    if list_role(c, lid, uid) != "participant":
+        return None
+    own = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
+    keep = {uid, own[0]} if own else {uid}
+    mine = pvis(c, uid, lid)[1]  # the tasks uid sees in full
+    if not mine:
+        return keep
+    for (p,) in c.execute("SELECT user_id FROM list_members WHERE list_id=? AND user_id<>?", (lid, uid)).fetchall():
+        role = list_role(c, lid, p)
+        if role and (role != "participant" or pvis(c, p, lid)[1] & mine):
+            keep.add(p)
+    return keep
+
+
 def task_people(c, lid, tid=None):
     """Enabled users who can see the tasks of a list (owner + members): the mention picker."""
     ids = list_people(c, lid)
+    if not tid and has_request_context():  # 2.86.0 (N20 review): a participant without a task: who shares one with them
+        sh = h6r_shared_people(c, lid, me())
+        if sh is not None:
+            ids = ids & sh
     q = ",".join("?" * len(ids)) or "NULL"
     out = [{"id": r["id"], "name": r["display_name"] or r["username"]}
            for r in c.execute(f"SELECT id, username, display_name FROM users WHERE id IN ({q}) AND disabled=0 ORDER BY id",
@@ -212,7 +234,7 @@ def comment_create(tid):
     if not text and not files:
         return err(tr("The comment is empty"))
     if le2e_mode(c, t["list_id"]) or text.startswith("e2e1:"):  # 2.64.1 (#1817): ciphertext + mentions from the browser
-        text, mentions = le2a_comment_in(c, t["list_id"], text)
+        text, mentions = le2a_comment_in(c, t["list_id"], text, t["id"])  # 2.86.0 (N20 review): + task
     else:
         text, mentions = clean_mentions(c, t["list_id"], text, t["id"]) if collab_all() else (text, [])
     try:  # 2.33.0 (#1076): a reply to a comment of the same task (else 400)
@@ -317,7 +339,7 @@ def comment_update(cid):
     if not text and not nfiles:
         return err(tr("The comment is empty"))
     if le2e_mode(c, t["list_id"]) or text.startswith("e2e1:"):  # 2.64.1 (#1817): ciphertext + mentions from the browser
-        text, mentions = le2a_comment_in(c, t["list_id"], text)
+        text, mentions = le2a_comment_in(c, t["list_id"], text, t["id"])  # 2.86.0 (N20 review): + task
     else:
         text, mentions = clean_mentions(c, t["list_id"], text, t["id"]) if collab_all() else (text, [])
     old = {int(x) for x in (r["mentions"] or "").split(",") if x}

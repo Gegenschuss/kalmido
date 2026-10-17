@@ -161,6 +161,11 @@ def visible_lists(c, uid):
         else:
             d["role"] = "owner"
         d["members"] = members.get(r["id"], [])
+        if d["role"] == "participant" and d["members"]:  # 2.86.0 (N20 review): only the people who share a task with uid
+            from ..collab.comments import h6r_shared_people
+            keep = h6r_shared_people(c, r["id"], uid)
+            if keep is not None:
+                d["members"] = [m for m in d["members"] if m["user_id"] in keep]
         d["shared"] = bool(d["members"])
         d["tags"] = ltags.get(r["id"], [])
         d["owner_name"] = names.get(r["owner_id"], "")

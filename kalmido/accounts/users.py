@@ -490,6 +490,8 @@ def me_update():
 
 @app.post("/api/me/drop-token")
 def me_drop_token():
+    if g.user["kid"]:  # 2.86.0 (N3 review): a child account has no upload token (also if KID_WRITE ever widens)
+        return err(tr("Not possible with a child account"), 403)
     c = db()
     tok = secrets.token_urlsafe(24)
     c.execute("UPDATE users SET drop_token=? WHERE id=?", (tok, me()))

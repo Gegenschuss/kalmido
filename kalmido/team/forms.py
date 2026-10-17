@@ -51,7 +51,10 @@ FRM_EMAIL_HOUR, FRM_MAIL_HOUR, FRM_LINKS_MAX = 5, 3, 5
 FRM_TTYPES = ("", "bug", "feature", "task")
 # 2.86.0 (N24): the file bytes anonymous visitors may send through ONE form per hour (20 full files); more = the report
 # is refused with a "try later" page (a link in the open cannot fill the disk); signed-in senders count on their quota.
-FRM_BYTES_HOUR = max(1, int(os.environ.get("KALMIDO_FORM_FILES_MB_HOUR", "200") or 200)) * 1024 * 1024
+try:  # 2.86.0 (review): a typo in the variable must not stop the server
+    FRM_BYTES_HOUR = max(1, int(os.environ.get("KALMIDO_FORM_FILES_MB_HOUR") or 200)) * 1024 * 1024
+except ValueError:
+    FRM_BYTES_HOUR = 200 * 1024 * 1024
 _FRM_BYTES, _FRM_BYTES_LOCK = {}, threading.Lock()
 
 

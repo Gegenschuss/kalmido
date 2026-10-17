@@ -9,6 +9,7 @@ reminder: draft -> issued -> sent. Numbers come with finalising (OFX_NUMBER_AT_F
 last value. Amounts: the calculator (calc.inv_calc) is Decimal throughout; totals of these kinds are decimal strings.
 Every route: office_gate (no agents, no kids) + office_org; foreign documents are 404. No agent reaches any of this."""
 import json
+import os
 import re
 import smtplib
 from datetime import date, timedelta
@@ -815,9 +816,20 @@ def inv_own_text_quota(c, oid, uid):
 
 
 # 2.86.0 (N27): the day's budget of document mails (any text), generous so month-end billing never hits it
-H6C_SEND_DAY_ORG = 300     # per organisation and day (UTC)
-H6C_SEND_DAY_PERSON = 150  # per person and day
-H6C_SEND_DAY_RCPT = 20     # per organisation, receiving address and day
+# (review: adjustable per environment; a broken value keeps the default)
+
+
+def h6r_env_int(name, default):
+    """A positive whole number from the environment variable name, else default (unset / not a number)."""
+    try:
+        return max(1, int(os.environ.get(name) or default))
+    except ValueError:
+        return default
+
+
+H6C_SEND_DAY_ORG = h6r_env_int("KALMIDO_OFFICE_MAILS_DAY_ORG", 300)         # per organisation and day (UTC)
+H6C_SEND_DAY_PERSON = h6r_env_int("KALMIDO_OFFICE_MAILS_DAY_PERSON", 150)   # per person and day
+H6C_SEND_DAY_RCPT = h6r_env_int("KALMIDO_OFFICE_MAILS_DAY_ADDRESS", 20)     # per organisation, receiving address and day
 
 
 def h6c_send_budget(c, oid, uid, rcpts):

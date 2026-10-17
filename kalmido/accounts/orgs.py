@@ -365,6 +365,11 @@ def list_org_set(c, lid, v):
     for (uid,) in c.execute("SELECT user_id FROM list_members WHERE list_id=? ORDER BY user_id", (lid,)).fetchall():
         ws_check_member(c, lid, uid, org_id=oid or 0)
     c.execute("UPDATE lists SET org_id=? WHERE id=?", (oid, lid))
+    # 2.86.0 (N11): a client of another workspace does not travel along (as list_client_set refuses it)
+    from ..team.clients import _org_boundary
+    if _org_boundary(c):
+        c.execute("UPDATE lists SET client_id=NULL WHERE id=? AND client_id IS NOT NULL AND client_id NOT IN"
+                  " (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)", (lid, oid))
     from ..admin.orgcrypt_cli import oc_settle_kick
     # 2.42.0 (#828): the list's files get the organisation's key now; 2.64.0 (#1864): out of it the owner's account key
     # (only this list's files, after the request)

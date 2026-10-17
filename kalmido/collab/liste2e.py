@@ -402,7 +402,7 @@ def le2a_snip_store(v):
     return json.dumps(v, ensure_ascii=False, separators=(",", ":")) if v else None
 
 
-def le2a_comment_in(c, lid, text):
+def le2a_comment_in(c, lid, text, tid=None):
     """A comment in a locked list: the body is a ciphertext (guarded); mentions come from the browser (mentions: [ids] or the
     form field "mentions" = "1,2"), only people of the list count."""
     from .comments import task_people
@@ -417,7 +417,7 @@ def le2a_comment_in(c, lid, text):
             ids.append(int(x))
         except (TypeError, ValueError):
             continue
-    allowed = {p["id"] for p in task_people(c, lid)} if collab_all() else set()
+    allowed = {p["id"] for p in task_people(c, lid, tid)} if collab_all() else set()  # 2.86.0 (N20 review)
     return text, list(dict.fromkeys(i for i in ids if i in allowed and i != me()))[:50]
 
 

@@ -943,8 +943,13 @@ def v1_members(c, lid):
 def v1_list_members(lid):
     v1_args(())
     c = db()
-    need_list(c, lid, write=False)
-    return jsonify(data=v1_members(c, lid), next_cursor=None)
+    role = need_list(c, lid, write=False)
+    data = v1_members(c, lid)
+    if role == "participant":  # 2.86.0 (N20 review): only the people who share a task with them
+        from ..collab.comments import h6r_shared_people
+        keep = h6r_shared_people(c, lid, me()) or set()
+        data = [m for m in data if m["user_id"] in keep]
+    return jsonify(data=data, next_cursor=None)
 
 
 @app.put("/api/v1/lists/<int:lid>/members/<user_id>")
