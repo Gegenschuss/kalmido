@@ -711,6 +711,7 @@ function taskMenu(anchor, id, o = {}) {
     {head: tr('Organize')},
     // where it lives
     ...(open ? [moveListItem(anchor, id)] : []),
+    ...(open ? ml_menuItems(anchor, t) : []),  // 2.71.0 B (#1459): show also in another list / remove from it
     ...(open && !t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, id)}] : []),
     ...(open ? spr_menuItems(t, anchor) : []),  // 2.60.0 (#343): Sprint… (lists with sprints on)
     // 2.16.0 (#473, WCAG 2.5.7): what dragging does, as menu items (also Alt+↑ / ↓)
@@ -732,8 +733,8 @@ function taskMenu(anchor, id, o = {}) {
       {label: tr('Add time…'), icon: 'plus', fn: () => entryModal(null, {task_id: id})}] : []),
     {head: tr('Structure')},
     // template
-    {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title)},
-    {label: tr('Duplicate'), icon: 'sub', fn: async () => { const sn = await snipLoad(t).catch(() => []); return createTask({title: t.title, content: t.content, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {}), ...(sn.length ? {snippets: sn.map(({id, by, updated_at, ...x}) => x)} : {})}); }},  // 2.35.0 (#1095): the snippets come along (loaded first)
+    {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title), ...(listById(t.list_id)?.e2e ? {dis: true, title: tr('Not available in encrypted lists')} : {})},  // 2.64.1 (#1817)
+    {label: tr('Duplicate'), icon: 'sub', fn: async () => { const sn = await snipLoad(t).catch(() => []); return createTask({title: t.title, content: t.content, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {}), ...(sn.length ? {snippets: sn.map(({id, by, updated_at, ...x}) => x)} : {})}); }, ...(typeof le2eLocked === 'function' && le2eLocked(t) ? {dis: true, title: tr('Unlock first: this list is encrypted in the browser.')} : {})},  // 2.35.0 (#1095): the snippets come along (loaded first); 2.64.1 (#1817): not while its texts are locked
     ...(t.id > 0 && !t.context && !t.url ? [{label: tr('Add link'), icon: 'link', fn: () => linkAdd(id)}] : []),  // 2.41.0 (#1475)
     ...(t.id > 0 && !t.context && canEdit(t) && !snipShown(t) ? [{label: tr('Add code snippet'), icon: 'code', fn: () => snipOpen(id, 'new')}] : []),  // 2.35.0 (#1095)
     // structure + more
@@ -743,6 +744,7 @@ function taskMenu(anchor, id, o = {}) {
     ...(t.parent_id && S.tasks.get(t.parent_id)?.parent_id ? [{label: tr('Make it a main task'), icon: 'arrow', fn: () => patchTask(id, {parent_id: null})}] : []),
     ...(propBreakOk(t) ? [{label: propWith(N_('Break down with {0}…'), N_('Break down with an agent…')), icon: 'bot', fn: () => propRequest('subtasks', {tid: id})}] : []),  // 2.3.0 (#261)
     ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
+    ...msvvMoveItem(t),  // 2.73.0 C (#661): "Move to another server…"
     '-',
     {label: t.status === -1 ? tr('Reopen') : tr("Won't do (discard)"), icon: 'ban', fn: () => t.status === -1 ? toggleTask(id) : wontDo(id)},
     ...(canDelete(t) ? [{label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}] : []),

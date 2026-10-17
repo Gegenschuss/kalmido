@@ -73,6 +73,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "review_requested",  # 2.60.0 C (#1512): the agent is the reviewer of a task that went into review
                 "sprint_started", "sprint_closed",  # 2.60.0 (#343): a sprint of a list shared with the agent started / was closed
                 "chat_pinned",  # 2.62.0 (#1848): the person pinned / unpinned a message of its chat (message, pinned, user)
+                "contract_notice",  # 2.70.0 C (#1359): a shared contract's last day to cancel is near (once; agents/contractprop.py)
                 )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop", "message")  # 2.56.0 (#1791): message = text to a running job, no state change
@@ -183,8 +184,8 @@ def agent_emit(c, aid, event, data, actor="auto"):
     if isinstance(data, dict):  # 2.22.0 (#663): nothing of a health list ever reaches an agent
         lid = data.get("list_id") or (data.get("task") or {}).get("list_id") or (data.get("list") or {}).get("id") \
             or (data.get("room") or {}).get("list_id")
-        if lid and c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone():
-            return None
+        if lid and c.execute("SELECT 1 FROM lists WHERE id=? AND (life IN ('health', 'budget') OR e2e IS NOT NULL)", (lid,)).fetchone():
+            return None  # 2.64.1 B (#1817): nor of a list with the lock; 2.72.0 (#1333): nor of a budget
         if lid and a["list_ids"]:  # 2.30.0 (#919): an agent limited to selected lists hears nothing of the others
             from ..agents.safety import ids_parse
             if lid not in ids_parse(a["list_ids"]):

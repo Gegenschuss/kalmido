@@ -158,6 +158,9 @@ def main(argv=None):
     if enc.get("attachments") or enc.get("task_notes"):
         print(f"note: {len(enc.get('attachments') or [])} attachments and {enc.get('task_notes') or 0} task notes were encrypted "
               "in the browser by their authors and stay ciphertext (see manifest.json)")
+    if enc.get("locked_lists"):  # 2.64.1 B (#1817)
+        print(f"note: {enc['locked_lists']} lists are encrypted in the browser: their texts (values starting with e2e1:) stay "
+              "ciphertext and can only be read in Kalmido with a member's own passphrase")
     return 0
 
 

@@ -216,8 +216,9 @@ def org_files(c, oid):
     project files of its lists, its office files, the lists' own pictures (2.58.0)."""
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         rows = c.execute("SELECT a.path FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id "
-                         "WHERE l.org_id=? UNION ALL SELECT f.path FROM list_files f JOIN lists l ON l.id=f.list_id WHERE l.org_id=?",
-                         (oid, oid)).fetchall()
+                         "WHERE l.org_id=? UNION ALL SELECT f.path FROM list_files f JOIN lists l ON l.id=f.list_id WHERE l.org_id=? "
+                         "UNION ALL SELECT f.path FROM budget_files f JOIN lists l ON l.id=f.list_id WHERE l.org_id=?",  # 2.72.0 (#1333)
+                         (oid, oid, oid)).fetchall()
     return [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + _office_files(oid) + list(f8f_icon_files(c, oid))
 
 
@@ -226,7 +227,7 @@ def all_files(c):
     2.64.0 (#1864): also the file store's versions and the chat files."""
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         rows = c.execute("SELECT path FROM attachments UNION ALL SELECT path FROM list_files UNION ALL SELECT path FROM fs_versions "
-                         "UNION ALL SELECT path FROM chat_files").fetchall()
+                         "UNION ALL SELECT path FROM chat_files UNION ALL SELECT path FROM budget_files").fetchall()  # 2.72.0 (#1333)
     out = [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + list(f8f_icon_files(c))  # 2.58.0 (#1805)
     if os.path.isdir(OFFICE_DIR):
         for name in sorted(os.listdir(OFFICE_DIR)):
@@ -315,7 +316,16 @@ SPACE_SQL = (
                             "WHERE v.path<>''", None),
     ("chat_files", "f.id", "SELECT f.id AS rid, f.path, NULL AS org_id, m.user_id AS owner_id FROM chat_files f "
                            "JOIN agent_chat m ON m.id=f.message_id WHERE f.path<>''", None),
+    # 2.72.0 (#1333): the receipts of the household budget
+    ("budget_files", "f.id", "SELECT f.id AS rid, f.path, l.org_id, l.owner_id FROM budget_files f JOIN lists l ON l.id=f.list_id "
+                             "WHERE f.path<>''", "f.list_id"),
 )
+
+
+def _bud():
+    """2.72.0 (#1333): life/budget.py (imported late: this module is also a command line tool)."""
+    from ..life import budget
+    return budget
 
 
 def _row_space(r):
@@ -432,6 +442,7 @@ def decrypt_private(c):
         c.execute("UPDATE user_keys SET migrated_at=NULL")
     c.commit()
     st = {}
+    _bud().bud_settle(c, plain=lambda sid: sid < 0)  # 2.72.0 (#1333): budgets of private spaces plain again
     n, bad = files_decrypt(c, all_files(c), only=lambda hid: hid is not None and hid < 0, stats=st)
     return {"files": n, "failed": bad, "kept": st.get("kept", 0)}
 
@@ -455,6 +466,7 @@ def before_user_delete(c, uid):
 
     def target(p):  # sealed for the space it lies in now (also when that space is switched off: never lost, never plain)
         return where.get(p) or None
+    _bud().bud_settle(c, force_from=me_sid, commit=False)  # 2.72.0 (#1333): budget rows of this key in lists of another space now
     return files_decrypt(c, list(where), only_org=me_sid, reseal=target)
 
 
@@ -497,6 +509,7 @@ def encrypt_all(c, stop=None, pause=0.0):
             tot[k] += r[k]
     # 2.64.0 (#1864): the private spaces' files, and files that lie in another space now
     st = files_settle(c, stop, pause=pause)
+    tot["fields"] += _bud().bud_settle(c, stop=stop)  # 2.72.0 (#1333): the household budget's rows in their list's space
     tot["files"] += st["sealed"]
     tot["resealed"], tot["failed"] = st["resealed"], tot["failed"] + st["failed"]
     if not (stop and stop()) and not st["failed"] and oc.oc_active(c) and oc.oc_private_on(c):
@@ -522,6 +535,7 @@ def decrypt_all(c):
         if key is None:
             continue
         tot["fields"] += fields_pass(c, oid, False, key)
+    tot["fields"] += _bud().bud_settle(c, plain=lambda sid: True)  # 2.72.0 (#1333): the household budget plain again
     from ..tasks.related import emb_drop_sealed
     emb_drop_sealed(c)  # 2.59.0 B (#1375): no sealed task vector stays behind (computed again, plain)
     c.commit()
@@ -560,6 +574,7 @@ def before_org_delete(c, oid):
     def target(p):  # 2.64.0 (#1864): sealed for the space it lies in now (also when that space is switched off)
         t = att.get(p)
         return t if (t and t != oid) else None
+    _bud().bud_settle(c, force_from=oid, commit=False)  # 2.72.0 (#1333): budget rows of this key in lists of another space now
     return files_decrypt(c, list(att), only_org=oid, reseal=target)
 
 
@@ -632,6 +647,7 @@ def oc_settle_lists(list_ids):
     try:
         c = connect()
         files_settle(c, list_ids=list_ids, pause=_pause())
+        _bud().bud_settle(c, list_ids=list_ids)  # 2.72.0 (#1333): a moved budget list's rows for its new space
     except Exception as e:  # noqa: BLE001 -- a background thread never takes the server down
         print(TAG, "resealing moved files failed:", type(e).__name__, flush=True)
     finally:

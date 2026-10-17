@@ -20,10 +20,23 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.77.0** (2026-10-17): a **pack catalogue** in Office & finance: search, install, update and remove country and industry packs per office (verified / community, checked by SHA-256, data only).
+- **2.74.0** (2026-10-17): **several Kalmido servers in one app** (work + home side by side, with server badges) and **moving** between app.kalmido.com and your own server (export everything, import with people matched by e-mail).
+- **2.73.0** (2026-10-17): **household budget** at home (module *Budget*, off by default): income and expenses with
+  categories and a monthly limit, planned / spent per month, recurring entries (also taken over from your contracts), CSV
+  import of your bank's statement with column mapping and duplicate check, receipts on an entry; shared with your family
+  like any list, never visible to agents, amounts and texts stored encrypted.
 - **2.66.0** (2026-10-17): **merge duplicate contacts and clients** - pick the record that stays and the value per field,
   everything linked moves along, undo for 30 days.
 - **2.65.0** (2026-10-17): **faster start** (compressed answers, areas load when first opened) and **smooth long lists**
   (only the visible rows are drawn).
+- **2.64.3** (2026-10-17): **encrypted knowledge space**: a whole knowledge space (private or an organisation's) can be
+  encrypted in the browser; search, backlinks and export run in the browser, agents have no access.
+- **2.64.2** (2026-10-17): **lock per list, stage 2**: attachments and the team chat of a locked list are encrypted
+  too, and when a member leaves the key changes and older contents are encrypted again in the background.
+- **2.64.1** (2026-10-17): **lock per list**: a list's titles, descriptions, subtasks, comments, notes, section names,
+  text fields, links and snippets **encrypted in the browser** with a key per list for every member (waiting list, safety
+  numbers); agents, mail address, public link and templates stay out of such a list, search runs in the browser.
 - **2.64.0** (2026-10-17): **files in the private space are stored encrypted** on the server (a key per person, like the
   organisations' files since 2.42; server-side, not end-to-end). Security fix (files at rest).
 - **2.63.0** (2026-10-17): **report forms** with a type, one file and a **status link** for the sender, the **customer
@@ -451,6 +464,14 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   accounts an admin created (or automatic accounts, if you want), optional group check and admin group
 - **Encryption** (2.42.0): an end-to-end encrypted note and files per task and encrypted direct messages (WebCrypto in
   the browser, the server only stores ciphertext), plus encryption at rest with a key per organisation for bank and tax
+  data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md)
+- **Lock per list** (2.64.1): a list can be *encrypted in the browser* (list dialog): titles, descriptions, subtasks,
+  comments, list notes, section names, text fields, links and code snippets are encrypted with a key per list that each
+  member gets wrapped with their own key; dates, status, assignees and the list name stay readable. Members without a key
+  wait until the owner releases it; agents, the mail address, public links and templates are not available there.
+  Since 2.64.2 attachments and the list's team chat are encrypted too, and the key changes when a member leaves;
+  since 2.64.3 a whole knowledge space can be encrypted the same way (see docs/ARCHITECTURE.md, *Lock per list*, and
+  docs/SELF-HOSTING.md, *Exporting encrypted content*)
   data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md). 2.64.0: the files
   of the private space are stored encrypted on the server as well, with a key per person (server-side, not end-to-end)
 - **Automatic backups** of the database and all attachments, daily with retention, optionally encrypted, downloadable,
@@ -1073,6 +1094,14 @@ calendar, CalDAV, sharing and the API work as everywhere.
   bookmarks into tasks with their link and archives the ticked ones in Karakeep.
 - API v1 and MCP: `/life`, `/life/contracts`, `/life/devices`, `/life/upkeep`, `/life/health` (permission `private`),
   `/life/trips`, `/life/review`, `/life/journal/{day}` (`private`), `/contacts/{id}/care`, `/life/karakeep/sync`.
+- **Budget** (2.72.0; its own part of *At home*): a budget is a list of its own that opens the budget view. Entries
+  (income or expense, amount, day, title, category, counterpart, note, receipts), categories with a monthly limit, a
+  month view with planned / spent / left and the last six months as bars. **Recurring entries** (monthly, quarterly,
+  yearly) are templates: *Open this month* books them with one tap; *Take over from contracts* turns your contracts into
+  recurring entries. **CSV import**: the file you download from your bank (no bank access), columns mapped once and
+  remembered, duplicates and errors left out, categories suggested from earlier entries. Share it with your family like
+  any list (read-only or writing); agents never see it, there is no API v1 / MCP for it. Amounts, texts and receipts are
+  encrypted at rest with the key of the list's space (needs `KALMIDO_SECRET_KEY`).
 
 ## Events
 
@@ -1304,7 +1333,11 @@ the kill switch only. *Add agent…* asks **team agent or personal agent** and e
 agent into a person's personal agent. Every agent works in **one workspace** (private or an organisation, see
 *Workspaces*) and joins only its lists. A small **robot badge** marks agents wherever people appear (#985). Kalmido
 itself never starts an AI or any other process; the agent runs wherever you like and talks to Kalmido through the REST
-API, webhooks or the MCP server.
+API, webhooks or the MCP server. The one exception is the optional **built-in assistant** (2.75.0, #1411, off by default):
+the operator points Kalmido at a single OpenAI-compatible chat model (a provider in the EU, or Ollama on the same
+server); every person switches it on for themselves and ticks the lists it may read, and gets summaries, extracted
+tasks, basket sorting, tag / due-date suggestions, short drafts and day plans as proposal cards with yes / no - never a
+direct change, every call in a log without texts. See [docs/ASSISTANT.md](docs/ASSISTANT.md).
 
 **Which agent?** A personal agent runs on your computer with your Claude access and only you give it orders; a team
 agent runs on a shared, always-on computer and colleagues give it orders. See [Which agent when?](docs/AGENTS.md#which-agent-when-2466).
@@ -1913,6 +1946,11 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_STORAGE_QUOTA_MB` | `0` | 2.24.0: storage per person in MB (0 = unlimited); admins can change it in *Administration > Server* |
 | `KALMIDO_SUPPORT_EMAIL` | *(empty)* | 2.24.0: where *Contact support* writes to when storage is full (else the admin setting, else the first admin's address) |
 | `KALMIDO_HOSTED` | `0` | 2.24.0: `1` = a server run as a service for others: integrations only reach public HTTPS addresses |
+| `KALMIDO_AI_BASE_URL` | *(empty)* | 2.75.0: base URL of an OpenAI-compatible chat API (`…/v1`) for the built-in assistant; empty = no assistant (no menu entry, routes 404) |
+| `KALMIDO_AI_MODEL` | *(empty)* | 2.75.0: model name sent to that API (required together with the URL) |
+| `KALMIDO_AI_KEY_FILE` | *(empty)* | 2.75.0: file with the API key (one line); `KALMIDO_AI_KEY` sets it directly; Ollama needs none. Never logged or shown |
+| `KALMIDO_AI_NAME` | *(host of the URL)* | 2.75.0: provider name people see when they share lists with the assistant |
+| `KALMIDO_AI_TIMEOUT_S` | `60` | 2.75.0: time limit of one model call; `KALMIDO_AI_MAX_CHARS` (`24000`) caps the input, `KALMIDO_AI_MAX_TOKENS` (`1500`) the answer |
 | `KALMIDO_ONBOARDING` | `1` | `0`: new accounts start empty (no "Getting started" list, no welcome tour) |
 | `KALMIDO_SEARCH_INDEX` | `0` | 2.29.0: search engines stay out by default (`X-Robots-Tag: noindex, nofollow` on every answer, `/robots.txt` with `Disallow: /`); `1` lets them index the sign-in page. Public list links, forms, feeds and the API stay noindex either way |
 | `KALMIDO_AGENT_EVENTS_STALE_H` | `48` | 2.29.0: agent events older than this many hours reach a poller as one `missed` summary instead of one by one (`0` = off; see docs/AGENTS.md) |

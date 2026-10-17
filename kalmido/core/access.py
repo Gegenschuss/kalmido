@@ -75,7 +75,8 @@ FEAT_OFF = {"pomo": N_("The focus timer is turned off in your settings"), "habit
             "clients": N_("Clients are turned off in your settings"), "workload": N_("Workload is turned off in your settings"),
             "forms": N_("Forms are turned off in your settings"),
             "office": N_("Office & finance is turned off in your settings"),  # 2.36.1 (#1021)
-            "dispo": N_("The disposition is turned off in your settings")}  # 2.50.0 (#1194)
+            "dispo": N_("The disposition is turned off in your settings"),  # 2.50.0 (#1194)
+            "budget": N_("The household budget is turned off in your settings")}  # 2.72.0 (#1333)
 
 
 # 2.22.0 (#663): health lists (lists.life 'health') are private. An agent never sees them (whatever list it is a member
@@ -375,7 +376,9 @@ def acx_lists_sql(write=False, req=True, ov=True):
 def _req_filters_sql():
     """The request's own filters as plain WHERE conditions on l (health lists, token allowlist) -- no set operations, so
     the precedence is the same in every SQL dialect."""
-    out = " AND COALESCE(l.life, '')!='health'" if health_hidden() else ""
+    out = " AND COALESCE(l.life, '') NOT IN ('health', 'budget')" if health_hidden() else ""  # 2.72.0 (#1333): budgets too
+    if has_request_context() and getattr(g, "user", None) is not None and "kind" in g.user.keys() and g.user["kind"] == "agent":
+        out += " AND l.e2e IS NULL"  # 2.64.1 B (#1817): an agent never sees a list with the lock (it is never a member either)
     tl = token_lists()
     if tl is not None:
         out += f" AND l.id IN ({','.join(str(int(x)) for x in sorted(tl)) or '0'})"
@@ -488,7 +491,7 @@ def list_role(c, lid, uid=None):
     r = c.execute("SELECT owner_id, life, org_id, family, org_visibility, org_edit FROM lists WHERE id=?", (lid,)).fetchone()
     if not r:
         return None
-    if r[1] == "health" and health_hidden(c, uid):  # 2.22.0 (#663)
+    if r[1] in ("health", "budget") and health_hidden(c, uid):  # 2.22.0 (#663); 2.72.0 (#1333): budgets too
         return None
     if not acx_org_ok(c, uid, r[2]):  # 2.36.2 (#1142): an organisation's list only for its members
         return None

@@ -283,6 +283,8 @@ def wg_pad_create(lid):
     v = _wg_pad_text(b, False)
     c = db()
     role = _wg_role(c, lid, True)
+    from ..collab.liste2e import le2a_locked_text
+    le2a_locked_text(c, lid, v["title"], v["body"])  # 2.64.1 (#1817): notepads are not encrypted: not in a list with the lock
     # 2.51.0 (#1352): the agents' notepads (at most 3 each, agents/agentpin.py) do not fill the people's pin board
     if c.execute("SELECT COUNT(*) FROM list_notepads WHERE list_id=? AND agent_id IS NULL", (lid,)).fetchone()[0] >= WG_PADS_MAX:
         raise Denied(409, tr("At most {0} notepads", WG_PADS_MAX))
@@ -311,6 +313,8 @@ def wg_pad_patch(pid):
     v = _wg_pad_text(b, True)
     c = db()
     r, role = _wg_pad(c, pid, True)
+    from ..collab.liste2e import le2a_locked_text
+    le2a_locked_text(c, r["list_id"], *v.values())  # 2.64.1 (#1817): notepads are not encrypted: not in a list with the lock
     if b.get("base") and b["base"] != r["updated_at"] and r["updated_by"] != me():
         return jsonify({"error": tr("Someone else changed this notepad in the meantime"), "pad": wg_pad_dict(r)}), 409
     if v:

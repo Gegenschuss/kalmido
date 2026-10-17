@@ -113,6 +113,23 @@ CHECKS = {
     "task_reviewer": ("SELECT t.id, t.reviewer_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.reviewer_id IS NOT NULL "
                       "AND l.org_id IS NOT NULL AND t.reviewer_id<>l.owner_id AND NOT EXISTS (SELECT 1 FROM list_members m "
                       "WHERE m.list_id=t.list_id AND m.user_id=t.reviewer_id)"),
+    # 2.64.3 A (#1817): a wrapped key of an organisation's knowledge space with the lock held by an agent or by a person outside
+    # the organisation, or a key of a private space held by another person (the trigger wiki_e2e_members removes it when someone leaves; counted only)
+    "wiki_key": ("SELECT k.space_id, k.user_id FROM wiki_keys k JOIN wiki_spaces s ON s.id=k.space_id JOIN users u ON u.id=k.user_id "
+                 "WHERE (s.org_id IS NULL AND k.user_id<>s.owner_id) OR (s.org_id IS NOT NULL AND (u.kind='agent' OR "
+                 + _PERSON.format(o="s", m="k") + "))"),
+    # 2.71.0 B (#1459): a task shown in a list of another workspace (the trigger kalmido_ml_prune drops such links on every
+    # move; the read layer ignores them: tasks/multilist.py ml_fill) -- (further list, who linked it)
+    "list_task_link": ("SELECT k.list_id, k.added_by FROM task_links k JOIN tasks t ON t.id=k.task_id JOIN lists o ON o.id=t.list_id "
+                       "JOIN lists x ON x.id=k.list_id WHERE o.org_id IS DISTINCT FROM x.org_id OR k.org_id IS DISTINCT FROM x.org_id"),
+    # 2.71.0 A (#1457): a rule in another workspace than its list, or whose move goes into a list of another workspace (it
+    # pauses itself when it runs: lists/rules.py rul_target_ok)
+    "list_rule": ("SELECT r.id, r.created_by FROM list_rules r JOIN lists l ON l.id=r.list_id LEFT JOIN lists t ON t.id=r.target_list_id "
+                  "WHERE r.deleted_at IS NULL AND (r.org_id IS DISTINCT FROM l.org_id OR (t.id IS NOT NULL AND t.org_id IS DISTINCT FROM l.org_id))"),
+    # 2.75.0 A (#1411): a list of an organisation shared with the built-in assistant by a person outside it, or by an agent
+    # (the assistant reads only lists the person sees right now: assistant/web.py asst_lists; the row is taken out)
+    "assistant_person": ("SELECT a.list_id, a.user_id FROM assistant_access a JOIN lists l ON l.id=a.list_id JOIN users u ON u.id=a.user_id "
+                         "WHERE l.org_id IS NOT NULL AND (u.kind='agent' OR " + _PERSON.format(o="l", m="a") + ")"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
@@ -140,7 +157,8 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "cal_person": ("ev_cal_members", "cal_id"), "book_person": ("book_members", "book_id"),
           "file_person": ("fs_shares", "node_id"),  # 2.48.0 (#1207)
           "doc_mail_person": ("doc_mail", "org_id"),  # 2.48.0 (#1111)
-          "task_bell_person": ("task_bell", "task_id")}  # 2.53.0 C (#1424)
+          "task_bell_person": ("task_bell", "task_id"),  # 2.53.0 C (#1424)
+          "assistant_person": ("assistant_access", "list_id")}  # 2.75.0 A (#1411)
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Administration > Organisations")
 
 

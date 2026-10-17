@@ -87,6 +87,7 @@ function accountHtml() {
   const m = S.me, pw = m.auth === 'session' || m.has_password;
   return `<h4 id="s-account-h">${tr('Account')}</h4>
     <div class="row"><label>${tr('Logged in as')}</label><span class="acct">${av(m.id, m.display_name)}<b>${esc(m.display_name)}</b> <span class="muted">${esc(m.username)}${m.auth === 'proxy' ? ' · ' + tr('via single sign-on') : ''}</span></span></div>
+    ${sup_accountRow()}${''/* 2.74.0 (#338): the supporter badge (self-hosted only) */}
     <div class="row"><label for="a-name">${tr('Display name')}</label><input id="a-name" value="${esc(m.display_name)}" maxlength="60" autocomplete="name" enterkeyhint="done"></div>
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="a-avpick">${avPickHtml()}</div></div>
     <div class="row"><label id="a-col-h">${tr('Colour')}</label><div class="pfcol" id="a-col" role="group" aria-labelledby="a-col-h">${ac_pickHtml((S.colors || {})[m.id] || '', 'me')}</div></div>

@@ -20,6 +20,7 @@ function attHtml(a) {
   const t = taskById(S.sel);
   const del = (!canEdit(t) ? '' : `<button class="attdel" data-act="att-del" data-att="${a.id}" title="${tr('Remove')}">${ic('x', 's')}</button>`)
     + (!a.enc && typeof ab_linkBtn === 'function' ? ab_linkBtn('att', a.id, listById(t?.list_id)?.org_id, 'attdel attlink') : '');  // 2.48.0 (#1207): "Show in the file store"
+  if (a.enc === 2 && typeof le2eFileHtml === 'function') return le2eFileHtml(a, del, t?.list_id);  // 2.64.2 B (#1817): a list file (liste2efile.js)
   if (a.enc) return e2eAttHtml(a, del);  // 2.42.0 (#828): encrypted in the browser (e2e.js): only its uploader opens it
   if (upLocked(a)) return scnLockedTile(a, del);  // 2.61.0 (#1818)
   if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="att-view" data-att="${a.id}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${scnImgMark(a)}${del}</div>`;
@@ -38,6 +39,7 @@ async function uploadFiles(taskId, files) {
   if (!files.length) return;
   if (taskId < 0) { toast(tr('Task is still syncing, try again in a moment')); return; }
   if (!canEdit(taskById(taskId))) { roToast(); return; }
+  if (typeof le2eFileUpload === 'function' && le2eOn(taskById(taskId)?.list_id)) return le2eFileUpload(taskId, files);  // 2.64.2 B (#1817): encrypted with the list key
   const max = 50 * 1024 * 1024, big = files.find(f => f.size > max);
   if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
   const fd = new FormData();
@@ -435,7 +437,7 @@ async function patchTask(id, body, quiet) {
   const t = await api('PATCH', '/api/tasks/' + id, body);
   putTask(t); render(); if (S.sel === id) renderDetail();
   if (!quiet && before) {
-    if (t?.shifted?.length) shiftUndo(before, t, '');
+    if (t?.shifted?.length || t?.chain?.skipped?.length) shiftUndo(before, t, '');  // 2.67.0 B (#1865): + what stayed
     else histFields(histLabel(before, S.tasks.get(id) || t), [[before, snapTask(S.tasks.get(id) || t)]], {res: t});
   }
   return t;
@@ -446,7 +448,7 @@ function shiftUndo(before, t, msg) {
   const sh = t?.shifted || [];
   if (sh.length) load().then(() => render()).catch(() => {});
   const after = t && snapTask(S.tasks.get(t.id) || t), rev = before && after && reverseOf(before, after, HIST_FIELDS);
-  const m = [msg, sh.length ? trn('{0} dependent task moved', '{0} dependent tasks moved', sh.length) : ''].filter(Boolean).join(' · ');
+  const m = [msg, sh.length ? trn('{0} dependent task moved', '{0} dependent tasks moved', sh.length) : '', dch_skipText(t?.chain)].filter(Boolean).join(' · ');  // 2.67.0 B (#1865)
   if (!rev && !sh.length) { if (msg) toast(msg); return; }
   const pairs = [...(rev ? [[before, after, HIST_FIELDS]] : []), ...sh.map(x => [{id: x.id, start: x.prev_start, due: x.prev_due}, {id: x.id, start: x.start, due: x.due}, ['start', 'due']])];
   const e = histFields([before && after ? histLabel(before, after) : '', sh.length ? trn('{0} dependent task moved', '{0} dependent tasks moved', sh.length) : ''].filter(Boolean).join(' · '), pairs, {res: t});

@@ -6,7 +6,7 @@
 // the sidebar keeps its nodes (no avatar flicker, #1225). Office / clients views are never redrawn by a change of someone
 // else. Unsaved form input (formguard.js, #1371) holds every redraw back like a focused field. Tasks / lists / "other"
 // keep the full reload. S.lpOff = true switches it off (the old way, used by the measurement in the tests).
-const LP_LIGHT = new Set(['comments', 'agentchat', 'team', 'news', 'calendar']);
+const LP_LIGHT = new Set(['comments', 'agentchat', 'team', 'news', 'calendar', 'budget']);  // 2.72.0 (#1333): + the household budget (its own fetch)
 const LP_KEEP = new Set(['office', 'clients']);  // views a change of someone else never redraws
 const LP_DEFER_MS = 15000;
 S.lpN = {render: 0, state: 0, light: 0};  // counters for the measurement (render() calls, full state loads, light updates)
@@ -32,6 +32,7 @@ function lpLive(v, ch, n) {
   if (n !== undefined && collab() && n !== S.news?.sig && !lpBusy()) loadNews();
   if (ch.includes('comments') && S.sel > 0 && (cmtOn() || collab()) && S.tl.id === S.sel) loadTimeline(S.sel);
   if (ch.includes('agentchat') && S.chat.aid && collab()) chatLoad();
+  if (ch.includes('budget') && typeof bg_live === 'function') bg_live();  // 2.72.0 (#1333)
   if (!lpT) lpT = setTimeout(lpFollow, LP_DEFER_MS);
   return true;
 }

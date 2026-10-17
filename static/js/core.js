@@ -52,6 +52,7 @@ const S = {
 const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix', N_('Eisenhower matrix')], ['habits', N_('Habits')], ['pomo', N_('Focus timer')], ['kanban', N_('Kanban')], ['collab', N_('Collaboration')], ['stats', N_('Statistics')], ['time', N_('Time tracking')], ['progress', N_('Project progress')], ['deps', N_('Dependencies')], ['fields', N_('Custom fields')], ['agents', N_('Agents')], ['comments', N_('Comments')], ['family', N_('Family')], ['events', N_('Events')], ['contacts', N_('Contacts')],
   // 2.22.0 (#663): Home & life, each off by default
   ['contracts', N_('Contracts')], ['home', N_('Home & devices')], ['care', N_('Staying in touch')], ['health', N_('Health')], ['review', N_('Review & journal')], ['travel', N_('Travel')], ['reading', N_('Read later')],
+  ['budget', N_('Budget')],  // 2.72.0 (#1333): the household budget, off by default
   // 2.23.0 (#463): package "Team, family, clients", each off by default
   ['clients', N_('Clients')], ['workload', N_('Workload')], ['forms', N_('Forms')],
   // 2.36.1 (#1021): Office & finance (business area: needs an organisation), off by default
@@ -86,7 +87,7 @@ const tlForeign = t => !!t && collab() && S.tl.id === t.id ? (S.tl.activity || [
 // admins: a newer release was found by the server's daily update check (dot on the settings gear)
 const updDot = () => !!(S.me?.is_admin && S.about?.available);
 // module views: tasks always, News with the collaboration module, the overview with "progress" (see overviewOn), the rest by their own switch
-const modOn = m => m === 'tasks' || m === 'home' || m === 'notes' || m === 'tags' || (m === 'team' ? teamOn() : m === 'agents' ? agentsTab() : m === 'news' ? collab() : m === 'overview' ? overviewOn() : m === 'time' ? timeOn() : m === 'family' ? feat(m) || !!S.me?.kid : m === 'life' ? lifeOn() : m === 'workload' ? workloadOn() : m === 'office' ? officeOn() : m === 'ablage' ? ab_on() : m === 'docs' ? typeof viewDocs === 'function' && feat('docs') : feat(m));  // 2.48.0 (#1207, #1111)
+const modOn = m => m === 'tasks' || m === 'home' || m === 'msv' || m === 'notes' || m === 'tags' || (m === 'team' ? teamOn() : m === 'agents' ? agentsTab() : m === 'news' ? collab() : m === 'overview' ? overviewOn() : m === 'time' ? timeOn() : m === 'family' ? feat(m) || !!S.me?.kid : m === 'life' ? lifeOn() : m === 'workload' ? workloadOn() : m === 'office' ? officeOn() : m === 'ablage' ? ab_on() : m === 'docs' ? typeof viewDocs === 'function' && feat('docs') : feat(m));  // 2.48.0 (#1207, #1111)
 // no "+" button on views without tasks
 // views of the tasks module that are not a task list (no quick add, no selection, no open-count)
 const NOLIST_KEYS = ['done', 'trash', 'search', 'archived'];
@@ -119,7 +120,7 @@ document.addEventListener('scroll', e => {
   if (e.target !== v || QS.top == null || Date.now() - QS.at > 400 || document.activeElement?.id !== 'qinput') return;
   if (Math.abs(v.scrollTop - QS.top) > 1) v.scrollTop = QS.top;
 }, true);
-const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts', 'life', 'review', 'clients', 'workload', 'office', 'ablage', 'docs', 'wiki', 'tags'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
+const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts', 'life', 'review', 'clients', 'workload', 'office', 'ablage', 'docs', 'wiki', 'tags', 'budget', 'msv'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
 // package 3: progress bar / overview (switch "progress"), project status (+ collaboration), custom fields, dependencies
 // 2.13.0 (#453, Fold screenshots): the round + only on phones; tablets / an unfolded Fold add with the docked "Add task"
 // bar or, in views without it (calendar, Kanban, timeline), the header's "New task" button
@@ -259,7 +260,7 @@ function kidsIndex() {
   return ix;
 }
 const children = id => (kidsIndex().get(id) || []).slice();
-const bySort = (a, b) => a.sort - b.sort || a.id - b.id;
+const bySort = (a, b) => ((a.also || b.also) ? ml_sortOf(a, ml_viewList()) - ml_sortOf(b, ml_viewList()) : a.sort - b.sort) || a.id - b.id;  // 2.71.0 B (#1459): a linked task's place in a further list
 // 1.5.1: the tasks of an archived list are hidden everywhere except in that list itself (Today, Tomorrow, Next 7 days,
 // counts, Assigned, filters, tags, calendar, matrix, overview); unarchiving brings them back
 const archivedTask = t => !!t && !!listById(t.list_id)?.archived;
@@ -281,9 +282,17 @@ function setOnline(b) { if (OUT.online !== b) { OUT.online = b; if (S.booted) re
 // a write finished while its GET /api/state was on the way: that answer may predate the write and would undo it locally
 // (S.settings went back to the old value; an Undo right after then saw "changed elsewhere" and skipped the step)
 async function rawFetch(method, url, body) {
-  if (method === 'GET') return rawFetch0(method, url, body);
+  // 2.64.1 (#1817): texts of a locked list leave encrypted, ciphers in answers become plain texts in memory (liste2e.js)
+  if (typeof le2eOut === 'function') body = await le2eOut(method, url, body);
+  const in_ = j => typeof le2eIn === 'function' ? le2eIn(j, url) : j;
+  if (method === 'GET') return in_(await rawFetch0(method, url, body));
   S.wseq = (S.wseq || 0) + 1;
-  try { return await rawFetch0(method, url, body); } finally { S.wseq++; }
+  try { return in_(await rawFetch0(method, url, body)); }
+  catch (e) {  // 2.64.1 (#1817): a move missed texts (a subtask in the trash): fetched, converted, sent once more
+    const b2 = e.data?.code === 'list_e2e_move' && e.data.need && typeof le2eFix === 'function' ? await le2eFix(url, body, e.data.need).catch(() => null) : null;
+    if (!b2) throw e;
+    return in_(await rawFetch0(method, url, b2));
+  } finally { S.wseq++; }
 }
 async function rawFetch0(method, url, body) {
   const opt = {method, headers: {'X-Requested-With': 'kalmido'}, redirect: 'manual'};
@@ -323,6 +332,10 @@ function savedPing() {
 }
 async function api(method, url, body) {
   const lk = tlkGuard(method, url, body); if (lk) throw lk;  // 2.36.0 (#1118)
+  // 2.64.1 (#1817): encrypted before the outbox (it holds ciphers only); a Promise only when there is something to encrypt, so
+  // an offline edit is still applied locally at once
+  const lo = typeof le2eOut === 'function' ? le2eOut(method, url, body) : body;
+  if (lo instanceof Promise) { try { body = await lo; } catch (e) { if (e.message !== 'auth') toast(e.message); throw e; } } else body = lo;
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
   try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return j; }
   catch (e) {
@@ -338,7 +351,7 @@ function enqueue(method, url, body) {
   const pm = method === 'PATCH' && url.match(/^\/api\/tasks\/(-?\d+)$/);
   if (pm && body && !body._prev && +pm[1] > 0) {
     const t = S.tasks.get(+pm[1]);
-    if (t) body = {...body, _prev: Object.fromEntries(Object.keys(body).filter(k => !k.startsWith('_')).map(k => [k, k === 'tags' ? [...(t.tags || [])] : (t[k] ?? null)]))};
+    if (t) body = {...body, _prev: Object.fromEntries(Object.keys(body).filter(k => !k.startsWith('_')).map(k => [k, k === 'tags' ? [...(t.tags || [])] : t._enc && k in t._enc ? t._enc[k] : (t[k] ?? null)]))};  // 2.64.1 (#1817): a locked list's text = its cipher
   }
   // 2.13.0 (#453): typed text waiting in the outbox is coalesced: a newer title / description of the same task replaces
   // the queued one (which keeps its _prev = the base the server last confirmed), so a replay sends only the latest text
@@ -585,6 +598,7 @@ function applyState(j) {
   S.sample = j.sample || null;
   S.agents = j.agents || []; S.agentsAt = Date.now(); S.setupPending = !!j.setup_pending;  // 2.13.0 (#453 A16)
   S.proposers = j.proposers || [];  // 2.3.0: agents I may ask for a proposal
+  S.assistant = j.assistant || null;  // 2.75.0 (#1411): only with a configured assistant
   S.groups = j.groups || []; S.myGroups = j.my_groups || [];  // 2.10.0 (#441)
   S.dayplan = j.dayplan || {work_start: '09:00', work_end: '17:00', review_time: '', default_duration: 30};  // 2.10.0 (#440)
   S.kids = j.kids || []; S.kidIds = new Set(j.kid_ids || []);  // 2.19.0 (#653)
@@ -604,6 +618,7 @@ function applyState(j) {
   // language changed on another device: switch once its file is loaded (the boot awaits it itself)
   if (S.booted && (j.settings.lang || 'en') !== I18N.code) i18nLoad(j.settings.lang).then(ok => { if (ok) render(); });
   for (const p of OPT) p.put();  // 2.41.2 (#1501): own changes still on the way stay on top of a state fetched meanwhile
+  if (typeof le2eState === 'function') le2eState();  // 2.64.1 (#1817): locked lists, ciphers of the offline cache
 }
 // 2.41.2 (#1501): optimistic writes. A click shows at once: put() changes the local state and returns how to take it back,
 // the request runs behind it (no GET /api/state afterwards; other devices / tabs get it with the live update). An error
@@ -870,6 +885,8 @@ function parseHash() {
   if (a === 'nagoff' && b) return {mod: 'tasks', key: LS.get('lastKey', START_KEY), nagoff: +b};  // 2.7.0 (#413): push "Stop reminding"
   if (a === 'prop' && b) return {mod: 'tasks', key: LS.get('lastKey', START_KEY), prop: +b};  // 2.3.0: push "Proposal ready"
   if (a === 'f' && b) return {mod: 'tasks', key: 'f:' + b};
+  if (a === 'l' && listById(+b)?.life === 'budget') return {mod: 'budget', key: 'budget'};  // 2.72.0 (#1333): a budget list opens its budget
+  if (a === 'budget') return {mod: 'budget', key: 'budget'};  // 2.72.0 (#1333): budget/<list id> (budget.js reads the id)
   if (a === 'l') return {mod: 'tasks', key: 'l:' + b};
   if (a === 'tag') return {mod: 'tasks', key: 'tag:' + b};
   if (a === 'who' && +b) return {mod: 'tasks', key: 'who:' + +b};  // 2.7.2 (#418): "Tasks of …"
@@ -877,6 +894,7 @@ function parseHash() {
   if (a === 'today' && b === 'review') return {mod: 'tasks', key: 'today', review: true};  // 2.10.0 (#440): push "Daily review"
   if (a === 'folder' && b) return {mod: 'tasks', key: 'folder:' + h.slice(7)};  // 2.4.0: a path has a slash
   if (a === 'lists' && b) return {mod: 'tasks', key: 'lists:' + b};  // 2.47.3 (#1727): several marked lists (sidebar.js)
+  if (a === 'srv' && +b) return {mod: 'msv', key: 'msv', sid: +b, lid: +(h.split('/')[2]) || null};  // 2.73.0 C (#661): a list on another server (msvview.js)
   if (a === 'agents') return {mod: 'agents', key: 'agents', agent: +b || null};
   if (a === 'job' && +b) return {mod: 'agents', key: 'agents', job: +b};  // 2.36.2 (#1141): one job, unfolded with its history
   if (a === 'ev' && +b) return {mod: 'cal', key: 'cal', ev: +b};  // 2.21.0 (#659): a push / News about an event
@@ -903,7 +921,7 @@ async function route() {
   if (r.key.startsWith('f:') && !S.filters.some(f => f.id === +r.key.slice(2))) r.key = START_KEY;
   if (r.mod === 'tasks' && wsOn()) wsFollow(r.key);  // 2.49.0 (#1770): a list of another workspace switches the filter along
   if (!r.task) S.bellBack = false;
-  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid} : r.mod === 'docs' ? {id: r.id} : {}), ...(r.mod === 'wiki' ? {wid: r.wid} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>
+  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid} : r.mod === 'docs' ? {id: r.id} : {}), ...(r.mod === 'wiki' ? {wid: r.wid} : {}), ...(r.mod === 'msv' ? {sid: r.sid, lid: r.lid} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>
   if (r.mod === 'team') teamRoute(r.rid || null); else if (S.tc.rid) teamRoute(null);  // 2.17.0
   if (r.mod === 'notes') noteRoute(r.lid, r.nid || null); else if (S.nt.id) { noteFlush(); S.nt.id = null; }
   if (r.noteMissing) setTimeout(() => toast(tr('This note does not exist or you cannot see it.')), 0);  // 2.10.0: review = #today/review

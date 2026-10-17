@@ -225,7 +225,13 @@ def t_get_task(api, a):
 
 def t_update_task(api, a):
     b = {k: v for k, v in a.items() if k != "task_id"}
-    return api.call("PATCH", f"/tasks/{int(a['task_id'])}", body=b)
+    r = api.call("PATCH", f"/tasks/{int(a['task_id'])}", body=b)
+    ch = r.get("chain") if isinstance(r, dict) else None
+    if ch:  # 2.67.0 (#1865): a later due date moved the tasks waiting on it along
+        n, m = len(ch.get("moved") or []), len(ch.get("skipped") or [])
+        r["chain_note"] = f"{n} dependent task{'s' if n != 1 else ''} moved along by {ch.get('days')} day(s)" + \
+            (f"; {m} left in place (completed, milestone, no date or no access)" if m else "")
+    return r
 
 
 def t_add_comment(api, a):
@@ -469,8 +475,11 @@ TOOLS = [
      _obj({"task_id": S_ID}, ["task_id"]), t_get_task),
     ("create_task", "Create a task (or a subtask with parent_id) in a list the agent may change.",
      _obj(TASK_FIELDS, ["title"]), lambda api, a: api.call("POST", "/tasks", body=a)),
-    ("update_task", "Change fields of a task. Only the given fields change.",
-     _obj({"task_id": S_ID, **{k: v for k, v in TASK_FIELDS.items() if k != "parent_id"}}, ["task_id"]), t_update_task),
+    ("update_task", "Change fields of a task. Only the given fields change. 2.67.0: a LATER due date also moves the tasks waiting "
+                    "on it (the whole chain, same number of days) when the list has \"Move dependent tasks along\" on; the answer's chain "
+                    "names them (chain_note); shift_chain false leaves them where they are.",
+     _obj({"task_id": S_ID, **{k: v for k, v in TASK_FIELDS.items() if k != "parent_id"},
+           "shift_chain": {"type": "boolean", "description": "false: the tasks waiting on this one stay (default true)"}}, ["task_id"]), t_update_task),
     ("add_snippet", "2.35.0: add one code snippet to a task (a diff, a log, a proposed change, an error message): plain code with a "
                     "language (no Markdown), optional file path + line. At most 20 per task, 20000 characters each. People see it in "
                     "the task's Code snippets section with highlighting and a Copy button.",
@@ -624,7 +633,7 @@ TOOLS = [
            "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"}}, ["title"]),
      lambda api, a: api.call("POST", "/agent/jobs", body=a)),
     ("get_job", "One of the agent's jobs. A proposal job (event job_request) also carries kind (project | subtasks | triage | "
-                "extract | dayplan | cleanup | inquiry | setup), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
+                "extract | dayplan | cleanup | inquiry | setup | merge), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
      _obj({"job_id": S_ID}, ["job_id"]), lambda api, a: api.call("GET", f"/agent/jobs/{int(a['job_id'])}")),
     ("submit_proposal", "Answer a job_request with ONE structured proposal; the person reviews, edits and applies it. Never create "
                         "the lists / tasks yourself. proposal by kind -- project: {name, folder?, sections: [names], tasks: [{title, "
@@ -647,6 +656,10 @@ TOOLS = [
                         "unit?, price?, discount? (%)}]} (a quotation draft; only when input.office.ok, never with input.offer)}. "
                         "setup (2.51.0): {modules: [{key, on}] (input.modules), lists: [{name, color?, folder?, sections?}], project?: "
                         "{type, name}}. "
+                        "merge (2.70.0, \"Tidy up contacts\", input.contacts of one address book: id, fn, given, family, org, "
+                        "emails, phones): {groups: [{target_id, ids: [2-10 contact ids, target included], reason?}]} -- only ids "
+                        "from input.contacts, each in one group at most, at most 200 groups; only clear duplicates (same e-mail / "
+                        "phone, a name variant with a shared detail); none found = {groups: []}. "
                         "Every kind may add summary (a short explanation). Dates YYYY-MM-DD, priority none | low | medium | high. "
                         "At most 200 entries; resubmitting replaces the proposal until the person applied or discarded it.",
      _obj({"job_id": S_ID, "proposal": {"type": "object"}}, ["job_id", "proposal"]), t_submit_proposal),
@@ -1040,6 +1053,17 @@ TOOLS += [
     ("move_task", "Move a task (with its subtasks): to another list / section / parent and to a place: before_id or after_id (a "
                   "sibling) or position top | bottom. Moving into another list needs edit rights there.",
      _obj({"task_id": S_ID, **TASK_PLACE}, ["task_id"]), t_move_task),
+    # 2.71.0 (#1459): a task in several lists without a copy
+    ("link_task_to_list", "Show a task also in another list (no copy: changes are the same everywhere). Rights stay with the task's "
+                          "own list: who sees only the other list does not see the task. Needs edit rights on the task and on the "
+                          "list; both lists in the same workspace (organisation or private), no health or locked lists, top-level "
+                          "tasks only, at most 10 further lists. section_id: a section of that list. The task's also = its further "
+                          "lists you see.",
+     _obj({"task_id": S_ID, "list_id": S_ID, "section_id": {"type": ["integer", "null"], "minimum": 1}}, ["task_id", "list_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/links", body=_without(a, "task_id"))),
+    ("unlink_task_from_list", "Remove a task from a further list (the task itself stays in its own list).",
+     _obj({"task_id": S_ID, "list_id": S_ID}, ["task_id", "list_id"]),
+     lambda api, a: api.call("DELETE", f"/tasks/{int(a['task_id'])}/links/{int(a['list_id'])}")),
     ("batch_tasks", "Change many tasks at once (1-500 ids): action update (changes = task fields as in update_task) | complete | "
                     "reopen | wont_do | delete | restore. Tasks you may not change are skipped (errors). An agent's batch with 10 or "
                     "more tasks waits for a person's approval (approval_required + job).",
@@ -1691,6 +1715,46 @@ TOOLS += [
                      "average, a planning aid for the next sprint.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/velocity")),
 ]
+
+# 2.68.0 (#1839): old data for the office (scope import, off until a person turns it on): you read the old data yourself
+# (any format) and send it in this one shape; the person checks the preview and takes it over -- you never write the office
+_IMPORT_ROW = {"type": "object", "description": "{label, amount (net euros > 0: number or \"1.200,50\"), repeat monthly|quarterly|yearly|once "
+                                               "(default monthly), start YYYY-MM-DD, until? YYYY-MM-DD, category?, vat_rate? 0|7|19 "
+                                               "(left out: 19, insurances / contributions 0)}"}
+TOOLS += [
+    ("propose_import", "2.68.0 (scope import): ONE import proposal of old data for the person's office, today area fixed_costs (at most 500 "
+                       "rows). Read the old data yourself (spreadsheet, PDF, mail), one row per fixed cost; put rows you could not read "
+                       "into note. The person sees a preview (new / already there / error per row), ticks rows, may change the VAT and "
+                       "takes them over into their office; you never see the office. The answer comes as the event job (counts only).",
+     _obj({"area": {"type": "string", "enum": ["fixed_costs"]}, "items": {"type": "array", "items": _IMPORT_ROW, "maxItems": 500},
+           "title": {"type": "string"}, "summary": {"type": "string"}, "note": {"type": "string"}, "user_id": S_ID}, ["items"]),
+     lambda api, a: api.call("POST", "/agent/proposals/import", body=_pick(a, ("area", "items", "title", "summary", "note", "user_id")))),
+    # 2.70.0 C (#1359): after the event contract_notice
+    ("propose_contract_notice", "2.70.0: after the event contract_notice: ONE sentence for the person (in data.lang, at most 300 characters) "
+                                "when the notice period of the contract ends and what it costs, so they can decide (cancel, renew, compare); "
+                                "no pressure, never say it was cancelled. The person takes it as a note on the contract (optionally with a "
+                                "reminder 3 days before) or discards it (job event). Only for a contract_notice you got; a new one replaces "
+                                "your open one. You never cancel, send or change anything.",
+     _obj({"task_id": S_ID, "text": {"type": "string", "minLength": 1, "maxLength": 300}}, ["task_id", "text"]),
+     lambda api, a: api.call("POST", "/agent/proposals", body={"kind": "notice", **_pick(a, ("task_id", "text"))})),
+]
+# 2.71.0 A (#1457): rules of a list (When ... then ...): read them, propose one (the owner / an admin accepts it)
+_RULE_TRIG = {"type": "object", "description": "{kind: section (a task comes into column section_id) | done | reopen | ltag (gets the list "
+                                               "tag tag_id) | due (its due day is today), section_id?, tag_id?}"}
+_RULE_ACT = {"type": "object", "description": "{kind: assign (user_id, a person of the list) | due (days from today 0..365, null = clear) | "
+                                              "comment (text, at most 2000 characters) | move (list_id and / or section_id)}"}
+TOOLS += [
+    ("list_rules", "2.71.0: the rules of a list (trigger, action, active, paused_reason, who set it up). A rule runs with the rights "
+                   "of the person who set it up; a change made by a rule never triggers another rule.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/rules")),
+    ("propose_rule", "2.71.0 (scope structure): PROPOSE ONE rule for a list shared with you (name, trigger, action, a short summary why). "
+                     "The list's owner (or user_id: an owner / admin of the list) accepts or declines it; accepted, it belongs to them and "
+                     "runs with their rights. You never create or change rules yourself. At most 20 per day; the answer comes as the event job.",
+     _obj({"list_id": S_ID, "name": {"type": "string", "maxLength": 80}, "trigger": _RULE_TRIG, "action": _RULE_ACT,
+           "summary": {"type": "string"}, "title": {"type": "string"}, "user_id": S_ID}, ["list_id", "name", "trigger", "action"]),
+     lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/rules/proposals",
+                             body=_pick(a, ("name", "trigger", "action", "summary", "title", "user_id")))),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -1699,7 +1763,7 @@ TOOL_SCOPES = {
               "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "chat_typing", "send_chat", "request_chat_approval", "withdraw_chat_choices", "pin_chat_message", "report_usage", "get_usage",
               "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
-                    "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
+                    "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "link_task_to_list", "unlink_task_from_list", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
                     "update_habit", "check_in_habit", "shift_list_dates", "request_approval"),
     "comments": ("comment_typing", "request_comment_approval", "withdraw_comment_choices", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "pin_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "request_integration_approval", "request_deploy_approval", "update_comment", "delete_comment", "mark_news_read",
@@ -1733,9 +1797,12 @@ TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_
 TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2.51.0 (#1355)
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
 TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
+TOOL_SCOPES["import"] = ("propose_import",)  # 2.68.0 (#1839)
+TOOL_SCOPES["agent"] += ("propose_contract_notice",)  # 2.70.0 C (#1359)
+TOOL_SCOPES["structure"] += ("propose_rule",)  # 2.71.0 A (#1457)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
-              "private", "files:read", "files:write", "office", "pinboard", "layouts")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts
+              "private", "files:read", "files:write", "office", "pinboard", "layouts", "import")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts; 2.68.0 (#1839): + import
 _ME = {"at": 0.0, "v": None}
 ME_TTL = 300  # s: a changed scope shows in tools/list within 5 minutes (a call is refused by the server at once anyway)
 

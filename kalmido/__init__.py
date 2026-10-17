@@ -61,6 +61,7 @@ ORDER = (
     "accounts.orglists",  # 2.35.0 (#1101)
     "lists.templates",
     "tasks.dependencies",
+    "tasks.depchain",  # 2.67.0 B (#1865)
     "lists.projects",
     "lists.envs",  # 2.60.0 D (#1514)
     "lists.formula",  # 2.43.0 (#1328): the formula parser (no routes; used by lists.fields)
@@ -99,6 +100,7 @@ ORDER = (
     "lists.playbook",  # 2.39.0 (#1168)
     "tasks.attachtext",  # 2.34.0 (#368)
     "tasks.snippets",  # 2.35.0 (#1095)
+    "tasks.multilist",  # 2.71.0 B (#1459): a task in several lists without a copy (after api.v1)
     "agents.gates",  # 2.26.0 (#949)
     "agents.safety",  # 2.30.0 (#919)
     "agents.usage",
@@ -123,6 +125,11 @@ ORDER = (
     "collab.e2e",  # 2.42.0 (#828, #909): end-to-end encryption (keys, encrypted notes / files / DMs)
     "integrations.mailtrim",  # 2.49.0 (#971)
     "collab.notelock",  # 2.48.0 (#1642): a task's note locked with one's own password (needs collab.e2e)
+    "collab.liste2e",  # 2.64.1 (#1817): the lock per list (texts encrypted in the browser; needs collab.e2e)
+    "collab.liste2eguard",  # 2.64.1 B (#1817): the lock per list on the other ways (API, agents, CalDAV, mail, push, copies)
+    "collab.liste2efile",  # 2.64.2 B (#1817): files of lists with the lock, encrypted with the list key
+    "collab.liste2echan",  # 2.64.2 C (#1817): the list channel (team chat of a list) with the lock
+    "wiki.wikie2e",  # 2.64.3 (#1817): the lock per knowledge space (path + text encrypted in the browser)
     "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
@@ -152,6 +159,8 @@ ORDER = (
     "life.karakeep",
     "life.web",
     "life.v1",
+    "life.budget",  # 2.72.0 (#1333): the household budget
+    "life.budget_web",
     "team.clients",
     "team.clients_bulk",  # 2.47.3 (#1733): several clients at once
     "team.clientmerge",  # 2.66.0 B (#1835): merging duplicate clients (reversible)
@@ -165,6 +174,7 @@ ORDER = (
     "office.web",
     "office.calc",  # 2.36.1 (#1021): the quotation calculator (C, no imports)
     "office.sheet",  # 2.47.0 (#1216): the shoot calculation sheet + industry packs (C, imports office.calc)
+    "office.catalog",  # 2.76.0 A (#1023): the pack catalogue, installed packs per office area (imports office.sheet)
     "office.costs",  # 2.47.0 (#1645, #1649): producing per document, purchases of accepted quotations (part D, no routes)
     "office.docs",  # 2.36.1 (#1021): quotations (C)
     "office.pdf",  # 2.36.1 (#1021): the PDF writer (D, no kalmido imports)
@@ -200,6 +210,8 @@ ORDER = (
     "agents.agenttime",  # 2.51.0 C (#1353): agents check time tracking + propose entries from events
     "agents.lyprop",  # 2.55.0 B (#1066): agents propose arrangements of views (the person accepts)
     "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
+    "admin.acctexport",  # 2.73.0 B (#1473): account export (moving between servers, GDPR copy)
+    "admin.acctimport",  # 2.73.0 B (#1473): account import with the mapping of people
     "admin.orgcrypt_cli",  # 2.42.0 (#828): the organisation keys' start-up pass + command line (no routes)
     "docs.extract",  # 2.48.0 (#1111): date / due date / amount from a text (no routes, standard library only)
     "docs.rules",  # 2.48.0 (#1111): sorting rules (no routes)
@@ -212,6 +224,9 @@ ORDER = (
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
     "paperless.ngx",  # 2.48.0 (#1152): Paperless-ngx connection + import into the documents (self-hosted only)
     "paperless.web",  # 2.48.0 (#1152): the routes of the Paperless-ngx connection (self-hosted only)
+    "paperless.learn",  # 2.69.0 B (#1847): rules + learning from an import (URL and ZIP)
+    "paperless.zipimp",  # 2.69.0 A (#1846): the import of an uploaded Paperless-ngx export (ZIP)
+    "accounts.servers",  # 2.73.0 A (#661): several Kalmido servers in one app (server accounts, the other servers' /api/v1)
     "newsletter.adapters",  # 2.55.0 (#1455): listmonk / Brevo / CleverReach (no routes)
     "newsletter.sync",  # 2.55.0 (#1455): connection, segments, consent, the sync runs (no routes)
     "newsletter.web",  # 2.55.0 (#1455): the routes of the newsletter connection
@@ -219,6 +234,15 @@ ORDER = (
     "accounts.layouts_more",  # 2.55.0 (#1067): the new views' blocks for the agents' proposals (after agents.lyprop)
     "tasks.related",  # 2.59.0 B (#1375): related tasks (text vectors from the optional embedding service, API v1, agent events)
     "lists.points",  # 2.60.0 B (#1511): story points velocity (after api.v1)
+    "office.fixedimport",  # 2.67.0 A (#1838): fixed costs from a spreadsheet + the monthly check task of the cash flow
+    "agents.importprop",  # 2.68.0 A (#1839): agents propose old data for the office (fixed costs), the person takes it over
+    "agents.meetprop",  # 2.70.0 A (#1354): a meeting becomes tasks (extract with photos, the chat's cards)
+    "agents.dupprop",  # 2.70.0 B (#1357): duplicate contacts as a proposal (no routes)
+    "agents.contractprop",  # 2.70.0 C (#1359): contract_notice + the proposal kind notice (no routes of its own)
+    "lists.rules",  # 2.71.0 A (#1457): rules of a list (When ... then ...), after api.v1
+    "admin.supporter",  # 2.74.0 (#338): the supporter licence (self-hosted only, a badge, unlocks nothing)
+    "assistant.core",  # 2.75.0 (#1411): the built-in assistant -- configuration, model call, prompts (off unless configured)
+    "assistant.web",  # 2.75.0 (#1411): the routes of the built-in assistant
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

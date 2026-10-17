@@ -7,6 +7,253 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.77.0] - 2026-10-17
+
+### Added
+- **Pack catalogue** (Office & finance > Settings > Packs): search country and industry packs by name, code or author, see
+  version, author, licence and a badge **Verified** / **Community** (community packs ask with a warning first), install,
+  update and uninstall them per office (an organisation or a person's own office). Packs are data only (rates, formats,
+  labels, texts), never code; every file must match the catalogue's SHA-256, its schema and a size limit (#1023).
+- Updates are shown, never installed automatically; a pack still in use (the office's country pack, a switched-on industry
+  pack, open quotations) cannot be uninstalled and says why. Install, update and uninstall can be undone.
+- Finalised quotations and invoices keep the exact pack they were made with (version, SHA-256, source): updating or removing
+  a pack never changes them.
+- For operators: `KALMIDO_PACKS_CATALOG` (the catalogue's address; empty = only the built-in packs, no network call),
+  `KALMIDO_PACKS_ALLOW_HOSTS`, the tool `tools/packs_catalog.py` and [docs/PACKS.md](docs/PACKS.md) (index format,
+  checks, your own catalogue); contributing packs: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## [2.76.0] - 2026-10-17
+
+### Added
+- Built-in assistant (#1411), the one exception to "Kalmido never calls a language model": an operator points Kalmido at a
+  single OpenAI-compatible chat model (`KALMIDO_AI_BASE_URL`, `KALMIDO_AI_MODEL`, `KALMIDO_AI_KEY_FILE`; a provider in the
+  EU, or Ollama on the same server). Off by default: without the variables there is no menu entry and the routes answer
+  404. Every person switches it on for themselves (*Settings > Assistant*) and ticks the lists it may read; basket tasks go
+  only when you pick them. It summarises a task with its notes, comments or mail text, drafts a short reply, pulls tasks out
+  of a text, suggests tags and a due date, sorts the basket and proposes a day plan - always as a proposal card with
+  yes / no, never a direct change. Locked notes, health lists, attachments and office documents never go to the model;
+  every call leaves a log line with numbers only, the key appears nowhere. Admins see calls and errors per day. Your own
+  agents stay as they are (docs/ASSISTANT.md, docs/PRIVACY-ASSISTANT-DRAFT.md for the operator's privacy texts).
+## [2.75.0] - 2026-10-17
+
+### Added
+- Supporter licence for self-hosted servers, like Immich: voluntary, paid once, unlocks nothing. Settings > Help >
+  "Support Kalmido" takes a server licence (admins) or a personal licence, checked offline (Ed25519, no network), and shows
+  a small "Supporter" badge under About and in Account. Admins see a quiet hint at most once a year (switchable off, never
+  in the first 30 days). Optional payment link via `KALMIDO_SUPPORT_URL`. Hidden completely on hosted servers
+  (`KALMIDO_HOSTED=1`: no section, no hint, no badge, the routes answer 404) (#338).
+- Browser demo starts like a new account: inbox, "Getting started" and the welcome tour; the sample project only on request
+  and removable again. Old demo data is kept (#1653).
+- Office & finance in the browser demo: clients, services, quotations, invoices and payments with the same sums and VAT as
+  the server; a print view in the browser instead of the PDF (#1653).
+
+### Changed
+- The browser demo is rebuilt from the current sources with every release and still works without any network connection
+  (CSP `connect-src 'none'`, now tested) (#1653).
+
+## [2.74.0] - 2026-10-17
+
+### Added
+- **Several Kalmido servers in one app** (#661): *Settings > Account > Servers* connects accounts on other Kalmido servers
+  (work + home) with a connection code, or an address and an API token. Their lists appear as their own group in the
+  sidebar, their tasks in Today, Basket, Search, the calendar and News, each with the server's short name in its colour so
+  nothing gets mixed up. Open, edit, complete and delete tasks of the other server without switching; the quick add shows
+  where a task goes. "Move to another server…" asks in plain words first (comments and attachments stay in the old
+  server's trash). Data stays on its server: your own server talks to the other server's API, the token is sealed and never
+  reaches the browser, nothing of the other server is stored, agents see none of it.
+- **Moving between app.kalmido.com and your own server** (#1473): *Settings > Data > Export everything* builds one file with
+  your lists, tasks, comments, files, calendars, contacts and settings (ZIP with JSON and checksums), also usable as a copy
+  of your data under the GDPR. *Take over from a Kalmido export* uploads it on another server (large files in pieces),
+  checks it, shows a preview with the people of your lists matched to accounts there (shared only where you tick it,
+  missing people can be invited by an admin), imports privately or into an organisation and can be undone.
+- Organisation exports (2.42) can be taken over into an organisation on another server with the recovery key (stage 1:
+  lists, tasks, comments, files, calendars and address books; members matched by e-mail).
+
+## [2.73.0] - 2026-10-17
+
+### Added
+- **Household budget** at home (#1333): module *Budget* (off by default) under *Settings > Modules > At home*. A budget is a
+  list of its own: entries (income / expense) with category, counterpart, note and receipts, categories with a monthly
+  limit, the month view with planned / spent / left, the last six months as bars and a card in *Home & life*.
+- Recurring entries (monthly, quarterly, yearly, from / until a month) are templates: *Open this month* books them with
+  one tap (once per month); *Take over from contracts* turns contracts of the same space into recurring entries and
+  shows when a contract's cost changed later (*Match*).
+- CSV import of a bank statement (no bank access): delimiter, header lines, German and English numbers, signs and separate
+  debit / credit columns are recognised, the column mapping is remembered per header, duplicates and broken lines are
+  left out, a category is suggested from earlier entries and a line that matches an open recurring entry is booked on it.
+- Shared like any list (family, read-only or writing). Agents never see a budget (like Health), API tokens only with the
+  scope `private`; no API v1 / MCP routes. Amounts, texts and receipts are encrypted at rest with the key of the list's
+  space; the start-up pass and `orgcrypt_cli decrypt-all` / `decrypt-private` cover the new tables.
+
+## [2.72.0] - 2026-10-17
+
+Project automation: lists that do the routine steps themselves, and one task that lives in several lists.
+
+### Added
+- **Rules in lists:** in the list settings the owner and the list admins set up rules in one sentence: *When* a task
+  comes into a column, is completed, is opened again, gets a list tag or its due date is reached, *then* assign it to a
+  person of the list, set or remove the due date, write a comment or move it to a column or another list of the same
+  workspace. A rule runs with the rights of the person who set it up and pauses itself (with the reason) when a right is
+  missing. A change made by a rule never starts another rule - no chains, no ping-pong. History and comments show
+  "Rule <name>". Health lists, the inbox and locked lists have no rules (#1457).
+- **A task in several lists:** "Show also in list…" in a task's menu puts it into a further list of the same workspace
+  without a copy - one task, every change everywhere, its own column and place in the further list (also on the board).
+  The row says "Also in <list>" / "From <list>"; "Remove from <list>" never deletes the task. Who sees it is decided by its
+  own list only: someone who sees only the further list does not see the task. Other organisations, health and locked
+  lists cannot be used. Statistics, search, calendar and exports count it once (#1459).
+
+### Agents
+- Rules: `GET /api/v1/lists/{id}/rules`, MCP `list_rules`; agents only propose a rule (proposal kind `rule`, MCP
+  `propose_rule`); the owner or a list admin accepts it and then owns it.
+- Tasks carry `also` (only the further lists the caller may see); `POST/DELETE /api/v1/tasks/{id}/links`, MCP
+  `link_task_to_list` / `unlink_task_from_list`.
+
+### Database
+- New tables only: `list_rules`, `list_rule_runs`, `task_links`; new column `comments.rule_name` (default empty).
+  Older versions ignore them.
+
+## [2.71.0] - 2026-10-17
+
+Agent workflows: three everyday jobs an agent prepares and you decide. The agent only proposes; nothing is sent, merged or
+cancelled until a person applies it, and it works the same for freelancers without an organisation.
+
+### Added
+- **A meeting becomes tasks:** in the chat with an agent, "Turn a meeting into tasks" hands over notes and / or up to four
+  photos (whiteboard, handwritten notes; on a phone the camera opens) for a list you choose. The agent proposes tasks with
+  assignees and due dates; one card in the chat lists them with a tick each, "Create N tasks" creates the ticked ones in your
+  name, one undo step. "Tasks from notes…" in the list menu takes photos too; health lists cannot be chosen (#1354).
+- **Tidy up contacts:** "Find duplicates with an agent…" in the contacts. The agent gets only the name, company, e-mail
+  addresses and phone numbers of one address book and proposes groups of duplicates. You check each group, pick the contact
+  that stays and merge them with the 2.66 merge; undo takes the whole proposal back (#1357).
+- **Contracts in view:** shortly before a contract's last day to cancel, an agent the contracts list is shared with sends
+  one sentence on what the contract costs. Take it as a note on the contract (optionally with a reminder three days before
+  the deadline) or discard it. Nothing is ever cancelled; amounts never appear in push texts (#1359).
+
+### Agents
+- `job_request` of kind `extract` may carry `input.images` (photos of the meeting, read with `get_attachment`, source chat).
+- New proposal kind `merge` (`input.contacts`, answer `groups: [{target_id, ids, reason}]`).
+- New event `contract_notice` and proposal kind `notice` (`POST /agent/proposals`, MCP `propose_contract_notice`).
+- Reference launcher: capabilities `meeting_images`, `merge_proposal`, `contract_notice`.
+
+### Security
+- Health lists and the journal stay closed to agents; new tests cover events, proposals and the review.
+
+## [2.70.0] - 2026-10-17
+
+### Added
+- Paperless-ngx import on hosted servers: only public HTTPS addresses there, the allow-list of internal hosts does not
+  apply (#1846).
+- Import from a Paperless-ngx export without a connection: upload the ZIP of `document_exporter` in the documents
+  settings, with the same preview and mapping as the import over the address (#1846).
+- Storage quota in the import: the preview shows what is needed and what is free; at a full storage the import stops
+  cleanly ("after X of Y documents") (#1846).
+- One import per server at a time; others wait in a queue and show their place (#1846).
+- The matching rules of Paperless-ngx tags, correspondents and document types become document rules (any, all, literal,
+  regex, fuzzy; case-sensitive kept; "auto" covered by Kalmido's learning), switchable in the preview, never twice (#1847).
+- After every import the classifier learns the imported senders, types, tags and folders once, as confirmed examples (#1847).
+- Document rules can be case-sensitive.
+
+### Security
+- Security fix: Paperless-ngx import (network boundary on hosted servers, upload handling).
+
+## [2.69.0] - 2026-10-17
+
+### Added
+- Import old data with your own agent, starting with fixed costs: the agent reads the old data in any format and sends it in
+  a fixed JSON format as an "Import" proposal. The card shows the same preview as the spreadsheet import (new / already
+  there / error with reason, VAT rate per row, duplicates unticked); nothing is written before you accept it, then with
+  your account and one undo step. Freelancers without an organisation import into their personal office (#1839).
+- Agents: new permission "import" (off until you turn it on), route `POST /api/v1/agent/proposals/import`, MCP tool
+  `propose_import`; the agent never sees the office (#1839).
+
+## [2.68.0] - 2026-10-17
+
+### Added
+- Office > Cash flow: import fixed costs from a spreadsheet (.xlsx). A preview shows every row (amount, repeat, due month,
+  category, VAT rate); duplicates (same name, amount and repeat) are marked and unticked, rows without a name or amount are
+  shown with the reason and skipped; only "Import" writes. A template can be downloaded. Group rows become the category;
+  quarterly costs become four yearly rows (#1838).
+- Fixed costs have a category and a VAT rate (0 / 7 / 19 %). The list is grouped by category and shows net and gross; the
+  cash flow counts gross and its totals switch between net and gross. Existing fixed costs keep 0 %, so their values do not
+  change (#1838).
+- Optional monthly task "Cash flow: check the actual state" on the 1st for a chosen office admin - with a link, never with
+  amounts; switching it off ends the task (#1838).
+- Timeline: when a task becomes due later, every task waiting on it moves along by the same number of days, down the whole
+  chain, gaps kept - when dragging, in the task detail, through the API and for agents. A preview shows what moves while
+  dragging; "N dependent tasks moved along" comes with one undo. Completed tasks, milestones, tasks without a date and tasks
+  you cannot edit stay where they are and are named (#1865).
+- "Pull the chain in": a task that became earlier does not drag its chain back by itself; a button (bar menu, task detail,
+  the message) moves the chain up to right behind it (#1865).
+- "Move dependent tasks along" is on from the start in new project lists. API / MCP: field `chain` in the answer,
+  `shift_chain: false` turns it off for one change (#1865).
+
+## [2.64.3] - 2026-10-17
+
+### Added
+- **Encrypted knowledge space** (lock per list, stage 3): an organisation admin (or the owner of the private space) can
+  encrypt a whole knowledge space in the browser (*Knowledge pages > … > Encryption…*). Page names and texts are then
+  encrypted with a key per space that every member of the organisation gets wrapped with their own key; the server
+  stores only ciphertext and no links. Search, backlinks, "mentioned in", link suggestions, templates, renaming with its
+  links and export / import as ZIP run in the browser. New members of the organisation wait until an admin releases the
+  key; when a member who held it leaves, the key changes and the pages are encrypted again in the background. Agents
+  have no access to an encrypted space; switching back needs the password (#1817).
+- Settings > Administration > Encryption lists the encrypted knowledge spaces; a help paragraph in Settings > Account
+  and new documentation explain how to export encrypted lists, chats and knowledge spaces and what is lost without the
+  keys (docs/SELF-HOSTING.md *Encryption in the browser*, *Exporting encrypted content*; docs/WIKI.md, AGENT-SETUP.md).
+
+### Security
+- Security fix (encryption in the browser: knowledge pages and lists).
+
+### Note
+- Before going back to an older version, switch the encryption of every knowledge space off again (and open the lock of
+  every list, as for 2.64.1 / 2.64.2): older versions show the encrypted names as page titles and do not guard such a
+  space, and a backup of 2.64.3 is refused by older versions.
+
+## [2.64.2] - 2026-10-17
+
+### Added
+- **Lock per list, stage 2**: when a member who held the key leaves a list with the lock (or the organisation), the
+  browser of the next owner or list admin changes the list key automatically and encrypts the older contents again in the
+  background (resumable, with progress; a button *Change the key now* for owners and list admins). The honest hint in the
+  member dialog stays until that run is done. New members get every key generation and read older contents too (#1817).
+- Attachments of tasks and comments in a list with the lock are encrypted in the browser with the list key; every member
+  opens them, agents and the API see only "encrypted". Switching the lock on, the key change and the way back convert
+  existing attachments in the browser. Project files and the other ways to add files (mail, API, sharing) are not
+  available in such a list; a task with encrypted files stays in its list.
+- The team chat of a list with the lock is encrypted with the list key; agents and the API read no text and cannot write
+  there, search and *Save as task* leave it out, a mention still notifies the person.
+- Safety numbers of all members of a list with the lock, reachable from its team chat and its attachments; a changed key
+  is shown there too.
+
+### Changed
+- Pushes about a list with the lock show the neutral word in the language of the person who gets them, and a comment
+  push names the list instead of quoting the comment.
+
+### Note
+- Before going back to an older version, open the lock of every list again (as for 2.64.1): older versions do not know
+  the lock, and 2.64.1 cannot open the encrypted attachments and team chat messages of 2.64.2.
+
+## [2.64.1] - 2026-10-17
+
+### Added
+- **Lock per list** (encrypted in the browser): the owner or a list admin can lock a list in the list dialog. Titles,
+  descriptions, subtasks, comments, list notes, section names, text fields, links and code snippets of that list are then
+  encrypted in the browser with a key per list that every member gets wrapped with their own key; the server stores only
+  ciphertext. Dates, status, priority, assignees and the list name stay readable. Members without a key wait on a list
+  until the owner releases it with one click; every member has a safety number, a changed key is shown. Agents, the mail
+  address, public links, templates, the participant role and "everyone in the organisation" are not available in such a
+  list, and lists of the Family and Household & Life modules cannot be locked (the server writes into them); in a locked
+  list CalDAV shows "🔒 Task" with dates, pushes and mails name only the list, search runs in the browser. The offline copy
+  in the browser keeps only ciphertext; texts that do not open with your key are reported (compare the safety numbers). The
+  way back decrypts everything again (owner, with the password). Not yet:
+  attachments, the list channel and a new key when a member leaves (the member dialog says so) (#1817).
+- Before going back to an older version, open the lock of every list again: older versions do not know the lock and
+  would show and accept texts of such a list unprotected.
+- Settings > Administration > Encryption lists a third kind: "Encrypted in the browser (lists with a lock)".
+
+### Fixed
+- Encrypted direct messages: the notice for your own switch says "You switched encryption on" (it read "You has ..." in
+  German), and the *Attach encrypted* button has an accessible name (#1518).
 ## [2.66.0] - 2026-10-17
 
 **In short:** duplicate contacts and duplicate clients can be merged by hand - pick the record that stays and, per field,

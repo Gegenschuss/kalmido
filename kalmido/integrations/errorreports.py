@@ -177,7 +177,9 @@ def errhook_in(lid, token):
     made = c.execute("""SELECT COUNT(*) FROM tasks t WHERE t.list_id=? AND t.created_at>? AND t.created_by IS NULL AND EXISTS
                         (SELECT 1 FROM activity a WHERE a.task_id=t.id AND a.kind='created' AND a.data::text ILIKE '%"report":%')""",
                      (lid, hour)).fetchone()[0]
-    if made >= ERR_NEW_PER_HOUR or r["archived"]:  # only counted
+    from ..collab.liste2eguard import le2b_list_locked
+    # 2.64.1 B (#1817): a list with the lock gets no plain-text tickets (only counted)
+    if made >= ERR_NEW_PER_HOUR or r["archived"] or le2b_list_locked(c, lid):  # only counted
         c.execute("""INSERT INTO issue_reports(list_id,fp,task_id,count,first_at,last_at) VALUES(?,?,NULL,1,?,?)
                      ON CONFLICT(list_id,fp) DO UPDATE SET count=issue_reports.count+1, last_at=excluded.last_at""", (lid, rep["fp"], now, now))
         c.commit()

@@ -100,6 +100,25 @@ every change has to pass the test suite. Contributions made with AI tools are we
 as any other: you understand and can explain the change, it has tests, and you have checked the result
 yourself. Please mention it in the pull request.
 
+## Packs
+
+Country and industry packs (tax rates, formats, printed words, default texts, calculation defaults) are **data
+only** and are meant to be shared through a separate packs repository with a catalogue index, not through this one
+(the README names it once it exists; see [docs/OFFICE.md](docs/OFFICE.md), *Packs*, for how an office installs them).
+
+- A pack is one JSON file in exactly the shape of the built-in ones: `kalmido/office/packs/<code>.json` for a country
+  (checked by `office_pack_validate`), `kalmido/office/packs/industry/<code>.json` for an industry (checked like
+  `film.json`). `POST /api/office/packs/validate` runs the check on a pack you paste. Raise `version` with every change.
+- No markup, no scripts, no links that load anything: the texts are printed as they are, and a pack is never code.
+- The catalogue entry names the version, the download address (https), its SHA-256 checksum and size, the author and
+  the license (CC0-1.0 or another open data license). Kalmido refuses a file whose checksum, size, code, kind or
+  version does not match the entry.
+- New packs start with the badge *Community*; *Verified* is only given after a review by the maintainers.
+- The [CLA](CLA.md) applies to packs as to any other contribution.
+
+Code parts - new e-invoice formats, exports, bookkeeping interfaces, new rules of the calculator - are not packs: they
+come as a pull request to this repository, with tests, like any other change.
+
 ## Pull requests
 
 - One topic per pull request, with a short description of the *why* and how you tested it.

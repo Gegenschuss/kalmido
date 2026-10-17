@@ -50,6 +50,7 @@ ROW_ICON_LEVELS = ("all", "key", "calm", "custom")
 ROW_ICON_KEYS = ("due", "repeat", "remind", "deadline", "occ", "note", "attach", "link", "sub", "cmt", "code", "tracked", "plan",
                  "ttype", "ms", "blocked", "wait", "stale", "pin", "list", "tags", "fields", "created", "num", "person", "turns")
 SETTINGS_FLAGS += ("photo_meta_strip",)  # 2.61.0 B (#1819): remove the metadata of my photos on upload
+SETTINGS_FLAGS += ("assistant_on",)  # 2.75.0 A (#1411): the built-in assistant for this person (assistant/web.py)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
@@ -570,12 +571,8 @@ def push_test():
     return jsonify(ok=ok, channel=push_channel(s), devices=webpush_count(c, me()))
 
 
-@app.get("/api/export.json")
-def export_json():
-    """My data: lists I own (also shared ones, with their tasks incl. link / sections / files / comments /
-    activity / custom fields + values / dependencies / status updates), my tags, habits, focus sessions, my time entries, filters and settings. Attachment files stay in data/attachments/."""
-    c = db()
-    uid = me()
+def umz_export_queries(uid):
+    """2.73.0 B (#1473): the tables of "my data" (GET /api/export.json and the account export) -> {name: (sql, args)}."""
     own = "(SELECT id FROM lists WHERE owner_id=?)"
     task_ids = f"(SELECT id FROM tasks WHERE list_id IN {own})"
     q = {
@@ -592,10 +589,12 @@ def export_json():
         "filters": ("SELECT * FROM filters WHERE user_id=?", (uid,)),
         "attachments": (f"SELECT * FROM attachments WHERE task_id IN {task_ids}", (uid,)),
         "comments": (f"SELECT * FROM comments WHERE task_id IN {task_ids} AND deleted_at IS NULL", (uid,)),
-        "activity": (f"SELECT * FROM activity WHERE task_id IN {task_ids}", (uid,)),
+        # 2.71.0 (#1459, review N5): "also in list X" lines without the id of a list the person may not see
+        "activity": (f"SELECT id, task_id, user_id, kind, CASE WHEN kind IN ('ml_add', 'ml_rm') THEN '{{}}'::jsonb ELSE data END AS data, "
+                     f"created_at FROM activity WHERE task_id IN {task_ids}", (uid,)),
         # 2.48.0 (#1642): notes locked with a password, as stored (ciphertext; their tasks have an empty note)
         "task_note_locks": (f"SELECT * FROM task_note_locks WHERE task_id IN {task_ids}", (uid,)),
-        "settings": ("SELECT key, value FROM user_settings WHERE user_id=?", (uid,)),
+        "settings": ("SELECT key, value FROM user_settings WHERE user_id=? AND key NOT LIKE 'sup_key%'", (uid,)),  # 2.74.0 (#338): never the licence key
         "templates": ("SELECT id, kind, name, data, created_at, updated_at FROM templates WHERE user_id=?", (uid,)),
         "time_entries": ("SELECT * FROM time_entries WHERE user_id=? ORDER BY start", (uid,)),
         "list_fields": (f"SELECT * FROM list_fields WHERE list_id IN {own}", (uid,)),
@@ -646,11 +645,30 @@ def export_json():
         "webhooks": ("SELECT id, name, url, events, enabled, created_at FROM webhooks WHERE user_id=?", (uid,)),
         "public_links": (f"SELECT list_id, mode, notes, password_hash IS NOT NULL AS has_password, expires_at, created_at FROM public_links "
                          f"WHERE list_id IN {own}", (uid,)),
+        # 2.75.0 A (#1411): the lists I shared with the built-in assistant and its log (numbers only, no texts)
+        "assistant_access": ("SELECT list_id, created_at FROM assistant_access WHERE user_id=?", (uid,)),
+        "assistant_log": ("SELECT id, kind, task_id, list_id, job_id, status, ms, chars_in, chars_out, model, at FROM assistant_log "
+                          "WHERE user_id=? ORDER BY id", (uid,)),
     }
-    data = {t: [dict(r) for r in c.execute(sql, args)] for t, (sql, args) in q.items()}
-    for a in data["activity"]:  # 2.36.0 (#1116): old entries of the removed Paperless connection carry no document data
-        if a["kind"] in ("paperless", "paperless_rm", "paperless_send"):
-            a["data"] = "{}"
+    return q
+
+
+def umz_export_clean(table, row):
+    """2.73.0 B (#1473): a row of "my data" as exported (the same in export.json and the account export)."""
+    if table == "activity" and row.get("kind") in ("paperless", "paperless_rm", "paperless_send"):
+        row["data"] = "{}"  # 2.36.0 (#1116): old entries of the removed Paperless connection carry no document data
+    return row
+
+
+@app.get("/api/export.json")
+def export_json():
+    """My data: lists I own (also shared ones, with their tasks incl. link / sections / files / comments /
+    activity / custom fields + values / dependencies / status updates), my tags, habits, focus sessions, my time entries, filters and settings. Attachment files stay in data/attachments/."""
+    c = db()
+    q = umz_export_queries(me())  # 2.73.0 B (#1473): shared with the account export (admin/acctexport.py)
+    data = {t: [umz_export_clean(t, dict(r)) for r in c.execute(sql, args)] for t, (sql, args) in q.items()}
+    from ..life.budget import bud_export
+    data["budget"] = bud_export(c, me())  # 2.72.0 (#1333): my budgets, decrypted (receipt files stay in data/attachments/)
     data["user"] = user_public(g.user)
     name = f"kalmido-export-{local_now():%Y-%m-%d}.json"
     return Response(json.dumps(data, ensure_ascii=False, indent=1), mimetype="application/json",

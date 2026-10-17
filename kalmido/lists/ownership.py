@@ -89,12 +89,15 @@ def list_owner_get(lid):
                    history=list_owner_log(c, lid))
 
 
-def owner_transfer(c, lr, new):
-    """Moves list lr to user id new (checked by the caller); returns (old owner id, new owner name)."""
+def owner_transfer(c, lr, new, force=False):
+    """Moves list lr to user id new (checked by the caller); returns (old owner id, new owner name). force (2.64.1, #1817): a
+    transfer that must happen (leaving an organisation) also to someone without the key of a list with the lock."""
     from ..collab.comments import user_names
     from ..collab.news import list_push, news_add
     from ..agents.core import agent_ids
     lid, old = lr["id"], lr["owner_id"]
+    from ..collab.liste2e import le2a_owner_keep, le2a_owner_restore
+    le2_keep = le2a_owner_keep(c, lid, new, force)  # 2.64.1 (#1817): a list with the lock only to someone holding its key (409)
     ag = agent_ids(c)
     ts = iso(now_utc())
     mnew = c.execute("SELECT * FROM list_members WHERE list_id=? AND user_id=?", (lid, new)).fetchone()
@@ -111,6 +114,7 @@ def owner_transfer(c, lr, new):
         from ..admin.orgcrypt_cli import oc_settle_kick
         oc_settle_kick([lid])
     grp_sync(c, [lid])  # 2.10.0 (#441): the old owner's folder shares no longer reach it, the new owner's may
+    le2a_owner_restore(c, lid, le2_keep)  # 2.64.1 (#1817): the new owner's keys stay (their member row went, no rotation)
     names = user_names(c, [old, new, me()])
     c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
               (lid, me(), "owner", json.dumps({"from": old, "to": new, "from_name": names.get(old, ""), "to_name": names.get(new, "")},

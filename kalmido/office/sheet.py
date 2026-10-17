@@ -41,19 +41,34 @@ _CODE_RE = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
 _cache = {}
 
 
+def _pkc(name, *a):
+    """2.76.0 (#1023): office/catalog.py's view of the installed packs of the bound office area (None without the app, e.g.
+    tools/packs_catalog.py or a pure test loading this file alone: then only the shipped packs exist)."""
+    try:
+        from . import catalog
+    except ImportError:
+        return None
+    return getattr(catalog, name)(*a)
+
+
 # ---------------------------------------------------------------- industry packs
 def dk_pack_codes():
     """The codes of the industry packs shipped with the app (sorted)."""
     if not os.path.isdir(IND_DIR):
         return []
-    return sorted(f[:-5] for f in os.listdir(IND_DIR) if f.endswith(".json") and _CODE_RE.match(f[:-5]))
+    return sorted({f[:-5] for f in os.listdir(IND_DIR) if f.endswith(".json") and _CODE_RE.match(f[:-5])} | (_pkc("pkc_codes", "industry") or set()))  # 2.76.0 (#1023): + the installed packs
 
 
-def dk_pack(code):
-    """The industry pack dict for code ("film"), or None (unknown / invalid). Cached per process."""
+def dk_pack(code, builtin=False):
+    """The industry pack dict for code ("film"), or None (unknown / invalid). Cached per process.
+    2.76.0 (#1023): an installation of the bound office area (office/catalog.py) comes first; builtin=True: the file only."""
     code = (code or "").strip().lower()
     if not _CODE_RE.match(code):
         return None
+    if not builtin:
+        inst = _pkc("pkc_installed", "industry", code)
+        if inst:
+            return inst
     if code in _cache:
         return _cache[code]
     p = os.path.join(IND_DIR, code + ".json")

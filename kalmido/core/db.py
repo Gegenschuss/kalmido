@@ -15,7 +15,7 @@ from ..core.pg import (  # noqa: F401  (re-exported: the app imports the databas
     connect_pooled, insert_id, like_escape, table_columns, table_exists, wait_ready, write_lock,
 )
 from ..core.schema import (
-    GLOBAL_DEFAULTS, INDEXES, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
+    GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
 )
 from ..core.i18n import LANGS, tr
 
@@ -327,8 +327,12 @@ def init_db(guard=True, load=None):
         c.execute("CREATE INDEX IF NOT EXISTS tasks_agroup ON tasks(assignee_group_id) WHERE assignee_group_id IS NOT NULL")
         c.execute("DROP INDEX IF EXISTS tasks_tt")  # tt_id is unique per user now (tasks_tt_user)
         c.executescript(TIME_TITLE_TRIGGER)
+        c.executescript(LIST_E2E_TRIGGER)  # 2.64.1 (#1817): members of lists with the lock
+        c.executescript(WIKI_E2E_TRIGGER)  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
         from ..tasks.delta import dl_setup
         dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
+        from ..tasks.multilist import ml_setup
+        ml_setup(c)  # 2.71.0 B (#1459): links never cross a workspace boundary
         for stmt in INDEXES.strip().split(";"):
             if stmt.strip():
                 c.execute(stmt)
@@ -776,6 +780,7 @@ LV_AREAS = (
     ("calendar", re.compile(r"^/api/(v1/)?(events|evcals|cal/|calendars)")),
     ("news", re.compile(r"^/api/(v1/)?news")),
     ("tasks", re.compile(r"^/api/(v1/)?(tasks|lists|sections|folders|batch|projects|tags)")),
+    ("budget", re.compile(r"^/api/budget")),  # 2.72.0 (#1333): the household budget (the open budget view reloads)
 )
 LV_AREA_KEYS = tuple(k for k, _ in LV_AREAS) + ("other",)
 

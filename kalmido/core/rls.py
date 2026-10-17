@@ -31,9 +31,11 @@ TABLES = (
     "office_trips", "office_trip_items", "office_fixed_costs",  # 2.47.3 (#1022, #1652, part B)
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
+    "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)
     "fs_nodes",  # 2.48.0 (#1207): the file store (org_id NULL = a person's own tree)
     "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "doc_models", "doc_cfg", "doc_mail",  # 2.48.0 (#1111): documents
     "pl_sources", "pl_imported",  # 2.48.0 (#1152): the Paperless-ngx connection + what came in
+    "pl_rules",  # 2.69.0 B (#1847): where a document rule from Paperless-ngx came from
     "rc_receipts", "rc_suggest",  # 2.48.0 (#1356): receipts: project / category, the agents' suggestions
     "office_deals",  # 2.50.0 B (#1196): the sales pipeline
     "hub_absences",  # 2.50.0 A (#1195): absences (the area they were entered in; the app hides the kind)
@@ -47,6 +49,10 @@ TABLES = (
     "file_text",  # 2.61.0 C (#1820): recognised text of stored files (NULL = a private file, the app checks the file)
     "portal_tickets", "portal_logins",  # 2.63.0 (#1513): customer reports + portal sign-ins (NULL = a private list, the app checks owner_id)
     "merge_runs",  # 2.66.0 (#1835): merges of contacts / clients (NULL = a person's own book / office, the app checks)
+    "pl_uploads",  # 2.69.0 A (#1846): an uploaded Paperless-ngx export (NULL = a person's own space)
+    "task_links",  # 2.71.0 B (#1459): a task shown in a further list (NULL = private lists, the app checks both lists)
+    "list_rules",  # 2.71.0 A (#1457): rules of a list (org_id follows the list, NULL = a private list)
+    "office_pack_installs",  # 2.76.0 A (#1023): packs installed from the catalogue per office area
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

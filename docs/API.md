@@ -68,6 +68,13 @@ it: other lists and their tasks answer `404` as if they did not exist and are le
 shows it as `token.list_ids`. Agents get the same restriction in their dialog, see
 [Lists, people and agents](#lists-people-and-agents-2300).
 
+**A Kalmido app on another server (2.73.0).** *Settings > Account > Servers* shows the accounts of a person on several
+Kalmido servers in one app; the home server reads and changes the tasks over there through this API with a personal token
+of the person's account there. That token needs `read`, `tasks:write`, `delete`, `calendar` and `comments` (the
+connection code of 2.73 creates it with exactly these, named "Kalmido-App: …"); with fewer scopes the matching actions
+answer `403` with `error.required_scope`, and the app names the missing one. See
+[SELF-HOSTING.md](SELF-HOSTING.md#several-servers-in-one-app-273).
+
 Send it in every request:
 
 ```
@@ -142,9 +149,23 @@ has the display option `done_at_bottom` (*Show completed at the bottom*: complet
 come back with one tap). Existing checklists became `kind: "list"` with `done_at_bottom: true`. **Deprecated aliases**
 (still accepted): `kind: "checklist"` = `kind: "list"` + `done_at_bottom: true`; the boolean `checklist` = `done_at_bottom`.
 
-**Dependent tasks move along**: if a list has *Move dependent tasks along* switched on (list dialog in the app), a
-`PATCH /tasks/{id}` that postpones a task's `due` also moves the open tasks of that list that wait on it and would now
-start too early, by the same number of days (their history shows it). Moving a task earlier never moves anything.
+**Dependent tasks move along** (2.67.0: the whole chain): if the list of a task has *Move dependent tasks along* switched
+on (list dialog in the app; on by default in a new project list), a `PATCH /tasks/{id}` that postpones the task's `due`
+by n days moves every task waiting on it by the same n days (`start` and `due`, so the gaps stay), and so on down the
+whole chain (each task once, at most 500). The setting of the changed task's list counts for the whole chain. Completed
+tasks, milestones, tasks without a date and tasks you may not change stay where they are, and so does the chain behind
+them. Every move is a normal date change (history, reminders, events, webhooks). Moving a task earlier never moves
+anything back (the app has a button *Pull the chain in* for that). Send `"shift_chain": false` to leave the waiting tasks
+where they are. When something moved or stayed, the answer carries `chain`:
+
+```json
+{"id": 41, "due": "2026-10-28", "chain": {"days": 3,
+  "moved": [{"id": 77, "title": "Campaign concept", "start": "2026-10-29", "due": "2026-11-04", "old_start": "2026-10-26", "old_due": "2026-11-01"}],
+  "skipped": [{"id": null, "title": null, "hidden": true, "reason": "no_access"}]}}
+```
+
+`reason` is `done`, `milestone`, `no_date`, `no_access`, `limit` or `error`; a task you cannot see comes without id and
+title. To undo, `PATCH` the task and every moved one back to its old dates.
 
 **List roles** (1.10.0): a token sees exactly what its user sees. For a `participant` of a shared list every endpoint
 returns only the tasks assigned to that user, their subtasks (all levels) and, read-only, the main task of an assigned
@@ -229,7 +250,7 @@ had been made in the app. Webhooks fire too.
 | (app) `POST /api/agents/{id}/chat/{message_id}/pin` · `POST /api/team/messages/{id}/pin` | session | 2.62.0 (#1848): pin / unpin a chat message `{pinned?}` (toggles without; at most 5 per conversation, else 409); messages carry `pinned_at` / `pinned_by`, the conversation's page `pins`. The agent gets `chat_pinned`. 2.62.0 (#1530): the app sends `client_id` with a new chat message; the same text with the same `client_id` within 10 seconds returns the stored message (200) instead of a new one |
 | (app) `GET /api/agents/jobs?limit=&before=` · `GET /api/tasks?scope=done\|trash&limit=&before=` · `GET /api/news?limit=&before=` | session | 2.40.0 (#1432): "Load more" pages in the app (not with a token). The answer carries `next` (null = the end); pass it as `before` for the following page. Jobs: `limit` 20 by default (at most 200), the first page also brings every running / waiting job, the pages hold the ended ones (newest change first, cursor = change time + id); without `limit` / `before` the list is unchanged (up to 200 visible jobs), `id=` still returns one job. Completed / trash: `limit` as before (default 300, at most 2000), cursor = completion resp. deletion time + id; the first trash page also says `deletable` and `kept` for the whole trash (`DELETE /api/trash` empties all of it, not only the loaded page). News: the pages count read items (`limit` at most 500); the first page also brings every unread item; `unread`, `unread_me`, "mark all as read" and `filter=` always cover the whole feed; without `limit` the whole feed as before |
 | (app) `POST /api/agents/jobs/{id}/action` · `GET /api/agents/{id}/chat?job=` | session | 2.56.0 (#1791 / #1793): `{action: message, text}` writes to a running job (the agent gets the `job` event, the job does not change; the same people as Stop, empty 400, ended 409); `?job=<job id>` = only that job's messages in my chat with the agent (its `job_id` messages, mine addressed to it, the agent's answers to those); jobs carry `name` |
-| `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); `POST /agent/jobs/{id}/proposal` answers a `job_request` (2.39.0: kind `cleanup` = tidy up a list, see AGENTS.md *Tidy up a list*; 2.51.0: kinds `inquiry` and `setup`, also as the agent's own proposal `POST /agent/proposals {kind, user_id, proposal}`, see AGENTS.md *An inquiry becomes a project, the setup assistant*); the status may name the task it works on (`task_id`, shows "… is writing" there); 2.37.0: a chat message with `offer_save: true` offers the person "Save as task" (saving itself is a click in the app, never an API call of an agent); 2.41.0: `kind: "notice"` on `POST /agent/chats/{user_id}` = a small grey line in the chat (e.g. a new session of the agent), no push, never unread, see AGENTS.md *Notices in the chat*; 2.44.0: `host` in `PUT /agent/status` names the computer (kept on the token in use, see AGENTS.md *Set up on a computer with one command*); 2.47.3: `job_parent` (with `job_id`) on `POST /agent/chats/{user_id}` = the leading job of a part job, the chat colours a message `Job #N: …` by its job (AGENTS.md *Chat*); 2.58.0: `name` on `POST /agent/jobs` = the job's own short name (AGENTS.md *Jobs*) |
+| `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); `POST /agent/jobs/{id}/proposal` answers a `job_request` (2.39.0: kind `cleanup` = tidy up a list, see AGENTS.md *Tidy up a list*; 2.51.0: kinds `inquiry` and `setup`, also as the agent's own proposal `POST /agent/proposals {kind, user_id, proposal}`, see AGENTS.md *An inquiry becomes a project, the setup assistant*; 2.70.0: kind `merge` = groups of duplicate contacts `{groups: [{target_id, ids, reason}]}`, see AGENTS.md *Tidy up contacts*; the contact routes stay refused for agent tokens); the status may name the task it works on (`task_id`, shows "… is writing" there); 2.37.0: a chat message with `offer_save: true` offers the person "Save as task" (saving itself is a click in the app, never an API call of an agent); 2.41.0: `kind: "notice"` on `POST /agent/chats/{user_id}` = a small grey line in the chat (e.g. a new session of the agent), no push, never unread, see AGENTS.md *Notices in the chat*; 2.44.0: `host` in `PUT /agent/status` names the computer (kept on the token in use, see AGENTS.md *Set up on a computer with one command*); 2.47.3: `job_parent` (with `job_id`) on `POST /agent/chats/{user_id}` = the leading job of a part job, the chat colours a message `Job #N: …` by its job (AGENTS.md *Chat*); 2.58.0: `name` on `POST /agent/jobs` = the job's own short name (AGENTS.md *Jobs*) |
 | `POST /agent/usage` · `GET /agent/usage?from=&to=&group=` | agent | **Agent tokens only** (2.1.1): report model usage (numbers and ids only), read it grouped by day, task, list or model; over its hard limit an agent gets `429` on every other call, see [AGENTS.md](AGENTS.md#usage-and-limits) |
 | `GET /search?q=` | read | Search titles, notes, links and custom field values. 2.59.0 (#1375): `&semantic=1` adds, after the text hits, tasks of similar meaning (each with `"similar": true`; only on servers with the embedding service, otherwise nothing is added; at most 6 such queries per account in 10 seconds, more add nothing) |
 | `GET /search?scope=messages&q=&art=&sender=&room=&agent=&task=&limit=&cursor=` | read | 2.33.0 (#1080): search task comments, team chat (channels, direct messages) and agent chats -- only what you may read (comments of tasks you see, rooms you are in, your own agent chats; an agent: the lists shared with it, their channels, its own chats, never direct messages). Words match word beginnings; case, accents and ä / ae do not matter. Newest first, `{data, total, next_cursor}`; a hit `{art: c \| t \| a, chat_type: task \| list \| dm \| agent, id, task_id?, list_id?, room_id?, agent_id?, user_id?, chat_name, sender {id, name, agent}, created_at, snippet, marks}`: `snippet` is plain text (never HTML) around the hit, `marks` the `[start, end)` ranges of the hits in it (characters = Unicode code points). Filters: `art` (comma-separated), `sender` (user id), `room`, `agent` (an agent: the person), `task`; a foreign id simply finds nothing |
@@ -248,6 +269,7 @@ had been made in the app. Webhooks fire too.
 | `PATCH /sections/{id}` `{wip_limit}` | structure | 2.60.0: the WIP limit of a kanban column (the most open tasks it should hold; `null` / `0` = none). A hint only: the app shows "2/3" in the column head and marks it above the limit, moving stays allowed. Sections carry `wip_limit`; `POST /lists/{id}/sections` takes it too |
 | `GET /lists/{id}/velocity` | read | 2.60.0: the completed story points (`points`) and tasks (`count`) of the list's last up to 6 closed sprints, oldest first, and their `average` (null = no closed sprint yet). Participants count only the tasks they see |
 | `POST /tasks/{id}/move` | tasks:write | 2.15.0: `{list_id?, section_id?, parent_id?, before_id? \| after_id? \| position?: top \| bottom}`: another list / section / parent and a place among the siblings; subtasks move along; the same rights as in the app (into a list you may edit, out of a shared list only as its owner) |
+| `POST /tasks/{id}/links` · `DELETE /tasks/{id}/links/{list_id}` | tasks:write | 2.71.0 (#1459): show a task also in another list `{list_id, section_id?}` (no copy) / remove it from that list (the task stays). Rights stay with the task's own list; edit rights on the task and the list, same workspace, no health / locked lists, top-level tasks, at most 10 further lists. Tasks carry `also: [{list_id, section_id, sort}]` = the further lists you see (absent when none) |
 | `POST /tasks/batch` | tasks:write (+ delete) | 2.15.0: `{ids (1-500), action: update \| complete \| reopen \| wont_do \| delete \| restore, changes? (update)}`: one transaction; tasks you may not change are skipped (`errors`). `delete` / `restore` also need `delete`. Agents: 10 or more tasks wait for approval (`202`) |
 | `POST /tasks/{id}/skip` | tasks:write | 2.15.0: skip this occurrence of a repeating task (next date, no completed copy) |
 | `GET /trash` · `DELETE /trash` | read · delete | 2.15.0: tasks in the trash (`list_id`, pages); empty it for good (lists you own; admins also shared lists they may edit; agents: approval) |
@@ -334,6 +356,21 @@ output (REST, webhooks, MCP). Nothing can read or overwrite a locked note: `PATC
 answers `409` (other fields still change); CalDAV clients keep the lock (their description is ignored). Search, exports
 and calendar feeds leave the note out. Only the person who locked it unlocks it, in the app (`/api/tasks/{id}/note-lock`,
 signed-in person only, agents `403`).
+
+**Lists encrypted in the browser** (2.64.1): the members of a list can encrypt its texts in their browsers (titles, notes,
+links, code snippets, comments, list notes, section names, free-text field values). The server only holds ciphertexts, so
+such a list is not readable through the API: every `/api/v1/` answer has empty texts there and the object carries
+`"encrypted": true` (a task, a comment); a write that touches such a list (a task, comment, note or section in it, a move
+into it, a new task with its `list_id`) answers `403` with `"code": "list_e2e"`. Agents never see such a list and cannot be
+added to it (`409`); "share all lists", automatic sharing, folders and groups skip it. Webhooks of such a list carry ids,
+dates and status with `"encrypted": true`, never a text; CalDAV and the calendar feed show the neutral word "🔒 Task" with
+the due date and the reminders (a calendar app cannot change the texts or create tasks there, `403`); pushes, the daily mail,
+the status report and News name the list instead of a task; the server search and the message search leave it out (the app
+searches it on the device). Exports keep the ciphertexts as they are (values starting with `e2e1:`); they can only be read in
+Kalmido with a member's own passphrase. Templates (private copies of a person) made before the switch are kept. Since 2.64.2 the
+files of such a list and the messages of its team chat are encrypted too: the API lists those files with `"encrypted": true`
+and no name (download `404`), team chat messages come with an empty `body`, `"enc": null` and `"encrypted": true`, and
+posting, editing or reacting there answers `403` with `"code": "list_e2e"`.
 
 **Locked tasks** (2.36.0): `locked: true` makes a task read-only **in the app**: title, notes, date and time,
 priority, list, tags, repeat and assignee stay as they are until someone who may change the task unlocks it there
@@ -484,8 +521,8 @@ without a start) to the latest due date; `null` when there are none. `deps`: the
 `POST /lists/{id}/shift` with `{"days": 7}` (-3650 to 3650, not 0) moves every open task with a date in the list,
 subtasks included, by that many calendar days: `start` and `due`, so the length stays; the time of day, tasks without a
 date, completed tasks and the trash stay as they are. Everything happens in one transaction. Moving later also moves
-tasks in other lists that wait on a moved task and would now start too early, when their list has *Move dependent
-tasks along* on (same rules as for a single task). Needs edit rights on the list (403 for viewers and participants, 404 when
+the tasks in other lists that wait on a moved task (the whole chain by the same days) when this list has *Move dependent
+tasks along* on (same rules as for a single task, 2.67.0). Needs edit rights on the list (403 for viewers and participants, 404 when
 the list is not visible); more than 500 dated tasks: 409 with a message. The answer lists the old and new dates:
 
 ```json
@@ -1216,6 +1253,58 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
 The answer comes as the event `job`. A proposal job can be replaced with `POST /agent/jobs/{id}/proposal` (scope `layouts`)
 while it is open. People decide with `POST /api/proposals/{id}/apply` (`{"select": ["0"], "use": true}`) or `.../discard`.
 
+## Import proposals of agents (2.68.0)
+
+New scope `import` (agents only; off for new agents and not part of the legacy `write`). The agent sends old data in one
+JSON shape, the person checks the preview and takes it over into the office (see docs/AGENTS.md *Importing old data into the
+office*). Nothing of the office comes back to the agent.
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"area": "fixed_costs", "user_id": 3, "summary": "From the old spreadsheet Kosten 2025",
+       "note": "Row 14 (phone) had no amount, left out",
+       "items": [{"label": "Office rent", "amount": 950, "repeat": "monthly", "start": "2026-01-01", "category": "Rooms"},
+                 {"label": "Liability insurance", "amount": "240,00", "repeat": "yearly", "start": "2026-03-01", "category": "Insurances", "vat_rate": 0},
+                 {"label": "Software subscription", "amount": 29.9, "start": "2026-01-01", "vat_rate": 19}]}' \
+  https://kalmido.example/api/v1/agent/proposals/import
+
+## Rules of a list (2.71.0)
+
+Read only for tokens; agents propose (see docs/AGENTS.md *Rules of a list*). People manage rules in the app (list
+settings > Rules: `GET` / `POST /api/lists/{id}/rules`, `PATCH` / `DELETE /api/rules/{id}`, `POST /api/rules/{id}/restore`).
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" https://kalmido.example/api/v1/lists/12/rules
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"name": "Review", "trigger": {"kind": "section", "section_id": 40}, "action": {"kind": "assign", "user_id": 3},
+       "summary": "Everything in Review goes to the reviewer"}' \
+  https://kalmido.example/api/v1/lists/12/rules/proposals
+```
+
+| Route | Scope | |
+|---|---|---|
+| `POST /agent/proposals/import` | import | `area` (`fixed_costs`), `items` [{`label`, `amount`, `repeat`, `start`, `until`, `category`, `vat_rate`}] (1-500), `title`, `summary`, `note`, `user_id`; 201 = a ready proposal job (kind `import`) with `rows` and `expires_at` |
+
+Errors: 400 (the office module off for the person, another area, no rows, more than 500 rows), 403 (scope), 404 (not your
+person / not in your organisation), 409 (usage limit), 413 (body over 256 KB), 429 (5 open import proposals, 20 per person and day). People see
+the judged rows in `GET /api/proposals/{id}` (`import`: `version`, `office`, `problem`, `rows` with `status` new / dup / error,
+`counts`) and decide with `POST /api/proposals/{id}/apply` (`{"select": ["0", "2"], "edits": {"2": {"vat_rate": 7}}, "version": "…"}`;
+`version` optional: 409 when the agent replaced the rows since),
+`.../discard`, `.../undo`, `.../redo`. A card stays bound to the organisation its agent had when it sent it.
+## Tidy up contacts (2.70.0)
+
+A person asks with `POST /api/proposals {agent_id, kind: "merge", book_id}` (web session; an address book they may change,
+read-only 403, unknown 404; an organisation's book only for an agent of that organisation, an agent limited to selected
+lists 403; more than 2,000 contacts 400). The event `job_request` carries `input.contacts` (id, fn, given, family, org,
+emails, phones) of that book only. The agent answers with `POST /agent/jobs/{id}/proposal`
+`{groups: [{target_id, ids, reason?}]}` (ids from the input, 2-10 per group with the target, each once, at most 200
+groups, reason at most 300 characters; `{groups: []}` = none found). `GET /api/proposals/{id}` adds `dup_groups`
+(`key, target_id, reason, ok, contacts: [{id, fn, org, emails, phones, state: "" | changed | gone}]`, loaded fresh);
+`POST /api/proposals/{id}/apply {select: ["0", ...], edits: {"0": {target_id}}}` merges the ticked groups as the person
+(`merged`, `skipped`), `.../undo` and `.../redo` take all of them back / again.
+| `GET /lists/{id}/rules` | read | `trigger` {kind section / done / reopen / ltag / due, section_id, tag_id}, `action` {kind assign / due / comment / move, user_id, days, text, list_id, section_id}, `names`, `active`, `paused_reason`, `created_by` |
+| `POST /lists/{id}/rules/proposals` | structure | agents only: `name`, `trigger`, `action`, `summary`, `title`, `user_id`; 201 = a ready proposal job (kind `rule`) |
+
 ## Pin board, time check and shoot planning for agents (2.51.0)
 
 New scope `pinboard` (write notepads on project pages; an agent changes only its own, at most 3 per project). Off for new agents and not part of the legacy `write`.
@@ -1272,3 +1361,60 @@ checked by the server's virus scanner when the operator runs one ([SELF-HOSTING.
   answers `403`; deleting it works as before.
 - A file whose content does not match its type (a program or HTML page named `.png`) is stored as
   `application/octet-stream`.
+## A meeting becomes tasks (2.70.0)
+
+The app's routes for the guided *Tasks from notes* (session of a person, never an agent token):
+
+- `POST /api/agents/{id}/meeting-images` (multipart, `file` 1 to 4 times, images only) stores the photos as the person's
+  files in their chat with that agent (only an agent they may chat with and ask for proposals; no `chat` event) ->
+  `201 {images: [{id, name, mime, size}], message_id}`.
+- `POST /api/proposals` with `kind: "extract"` takes `image_ids` (at most 4; only the person's own files of their chat
+  with that agent, images only, else 400); `text` may then be empty. A health list answers 400. The job input carries
+  `images: [{id, name, mime, size, url}]` (`url` = `/api/v1/chat-attachments/{id}`, readable by the agent of that chat).
+- `GET /api/agents/{id}/meeting-proposals` -> `{proposals: [{id, title, list: {id, name}, images, summary, tasks:
+  [{title, due, assignee_id, assignee}]}]}`: the person's own ready `extract` proposals of that agent (at most 5, newest
+  first), the cards in the chat. Apply / discard as every proposal (`POST /api/proposals/{id}/apply` `{select}`, `.../discard`).
+## Contracts: notice deadlines for agents (2.70.0)
+
+| Endpoint | Scope | Notes |
+|---|---|---|
+| `POST /agent/proposals` `{kind: "notice", task_id, text}` | write | agent tokens only; after the event `contract_notice` for that contract's current deadline (else `409`), a contract the agent cannot see `404`; `text` one sentence, at most 300 characters; 201 = a ready proposal job (kind `notice`) for the person whose contract it is |
+
+Accepting is a click of the person (`POST /api/proposals/{id}/apply`, optionally `remind: true` = also a reminder 3 days
+before the last day to cancel): a comment on the contract task as that person, one undo step (`POST /api/proposals/{id}/undo`).
+OpenAPI: the third body variant of `POST /agent/proposals` (`x-kalmido-scope` write). Nothing is cancelled or sent.
+
+## Built-in assistant (2.75.0)
+
+Kalmido calls no language model itself, with one exception: the built-in assistant, which exists only when the server
+operator configured an OpenAI-compatible endpoint (`KALMIDO_AI_BASE_URL` + `KALMIDO_AI_MODEL`, see SELF-HOSTING.md). Without
+that configuration every route below answers `404` and `/api/state` has no field `assistant`. Web API only (the signed-in
+person, session or sign-on proxy): no `/api/v1` route, no MCP tool, agents and API tokens never reach it (agents are models
+themselves and have their own proposals API); child accounts get `403`.
+
+- `/api/state` field `assistant`: `{enabled, provider, host, model, on, list_ids}` -- `on` is the person's setting
+  `assistant_on` (`"0"` default, `PATCH /api/settings`), `list_ids` the lists they shared with it. The key is never shown.
+- `GET /api/assistant` -> `{enabled, provider, host, model, on, lists: [{id, name}], limits: {max_chars, max_items, open_max}}`.
+- `PUT /api/assistant/lists` `{list_ids: [..]}` replaces the shared lists. Kept are only lists the person sees right now;
+  the basket, health lists, archived lists and unknown ids are left out without an error. Shares the person may no longer
+  use (left the list, list archived) are removed on the next `GET`.
+- `POST /api/assistant/run` `{kind, task_id?, task_ids?, text?, instruction?, list_id?, day?}` -- one synchronous call
+  (time limit `KALMIDO_AI_TIMEOUT_S`):
+  - `summary` (`task_id` and / or `text`), `draft` (`task_id` and / or `text`, `instruction`) -> `{kind, text, truncated, log_id}`
+  - `extract` (`text` or `task_id`, `list_id` = target, shared) -> a ready proposal of kind `extract`
+  - `tags` (`task_id`) -> a ready proposal of kind `triage` with one item (tags, due date, priority; never a move)
+  - `triage` (`task_ids`, at most 30; the person's own basket items or tasks of shared lists; targets = shared lists)
+  - `dayplan` (`day`, default today; only tasks of shared lists, events as busy times without titles)
+
+  Proposals answer `{kind, job_id, job, proposal, truncated}`: a proposal job of the person themself (`input.assistant` =
+  `true`, `input.provider`), shown, applied, discarded and undone with the existing `/api/proposals/{id}` routes; no agent
+  gets an event about it. A task must be visible to the person (`404` otherwise) and lie in a shared list or their own
+  basket (`403` "Share this list with the assistant first"). Never sent: locked notes, health lists, attachments, files,
+  office documents, other people's e-mail addresses. Errors: `403` while the person has it off, `400` input, `429` too many
+  open proposals, `502` provider unreachable or no usable answer, `504` time limit; the texts never carry the provider's
+  answer, its address or the key.
+- `GET /api/assistant/log?limit=50` (up to 500) -> `{items: [{id, kind, task_id, list_id, job_id, status, ms, chars_in,
+  chars_out, at}]}`: the person's own calls, numbers only (`status` ok | error | timeout | denied | truncated), never a prompt
+  or an answer; kept `KALMIDO_AUDIT_DAYS` days.
+- `GET /api/admin/assistant` (admins) -> `{provider, host, model, timeout_s, max_chars, today: {calls, errors}, days: [{day,
+  calls, errors, chars_in, chars_out}]}` for 30 days, without people.

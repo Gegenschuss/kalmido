@@ -16,7 +16,7 @@ function render0() {
   wsc_sync();  // 2.53.0 (#1474): its workspace's colour as the header stripe and the frame of the input fields (wscolor.js)
   sideSearchSync(); badgeSync();
   if (S.shop) shopDraw();  // 2.19.0: shopping mode follows every reload (the app's own poll included)
-  fitLayout(true); renderSide(); annSync(); ntfAskSync(); renderTop(); renderView(); renderTabs(); quotaNudge();
+  fitLayout(true); renderSide(); annSync(); ntfAskSync(); if (typeof le2u_barSync === 'function') le2u_barSync(); renderTop(); renderView(); renderTabs(); quotaNudge(); sup_barSync();  // 2.64.1 (#1817): le2u = the bar of a locked list; 2.74.0 (#338): + the yearly supporter hint
   $('#fab').innerHTML = ic('plus'); $('#fab').setAttribute('aria-label', tr('New task')); $('#fab').title = kt(tr('New task'), 'n');
   fabSync();
   if (S.sel && S.tasks.has(S.sel) && !$('#detail').contains(document.activeElement)) renderDetail();
@@ -180,6 +180,7 @@ function counts() {
     if (mineAssigned(t) && mtCounts(t, t0)) c.assigned++;  // 2.41.0 (#1365): not the hidden lists (except due today / overdue)
     if (dsxByMe(t)) c.byme++;  // 2.36.2 (#1138)
     c.lists[t.list_id] = (c.lists[t.list_id] || 0) + 1;
+    for (const x of t.also || []) c.lists[x.list_id] = (c.lists[x.list_id] || 0) + 1;  // 2.71.0 B (#1459): a further list counts it too (everything else once)
     for (const g of new Set([...t.tags, ...(t.ltags || [])])) c.tags[g] = (c.tags[g] || 0) + 1;
     if ((t.due && t.due <= t0 || dlToday(t) || planToday(t, t0)) && !(t.blocked && hideBlockedToday())) c.today++;  // 2.11.0: + planned for today
     else if (todayInbox() && isTodayInbox(t, t0)) c.today++;  // 2.22.0 (#681): the inbox counts in Today when it is shown there
@@ -313,7 +314,7 @@ function renderSide() {
     const pg = progressFor(l) && l.progress?.total && sbiProg() && !progHidden(l.id) ? `<span class="sprog" role="img" style="--p:${pct(l.progress)}%" aria-label="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}" title="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}"></span>` : '';
     const shr = (l.status && statusFor(l) && rsy_sideDot() ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
       (l.shared && collab() && l.bell === 'mute' ? `<span class="shr bellm" title="${esc(tr('Notifications: {0}', bellLabel('mute')))}">${ic('belloff', 's')}</span>` : '') +
-      ovSideMark(l) + (l.shared && collab() && rsy_sideShr() ? licShareHtml(l) : sbc_ph());  // 2.56.0 (#1797): the symbol columns come last  // 2.36.2 (#1139): person / robot, always shown; 2.46.0 (#1603): not joined
+      (l.e2e && typeof le2u_sideMark === 'function' ? le2u_sideMark(l) : '') + ovSideMark(l) + (l.shared && collab() && rsy_sideShr() ? licShareHtml(l) : sbc_ph());  // 2.64.1 (#1817): the lock  // 2.56.0 (#1797): the symbol columns come last  // 2.36.2 (#1139): person / robot, always shown; 2.46.0 (#1603): not joined
     // 2.22.0 (#692): sort mode: a grip on the left, the name shortens with …, the buttons in a fixed column on the right
     // 2.25.0 (UX-02): the full name (it wraps), a grip to drag by (touch: at once, no long press) and ONE "…" button with
     // up / down / folder for keyboards and anyone who does not drag (WCAG 2.5.7)
@@ -351,9 +352,9 @@ function renderSide() {
   // 2.25.0 (UX-03 / UX-49): Plan (the smart lists) as [key, html]: each entry can be hidden in Settings > Appearance > Sidebar;
   // (UX-47) the team chat and News moved to the group "Conversations" with the people and agents
   const hid = x => sideHidden(x);
-  const plan = [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), c.lists[inbox()?.id]))],
+  const plan = [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), msvvCount(c.lists[inbox()?.id], 'inbox')))],
     ['assigned', row('assigned', ic('user'), tr('My tasks'), c.assigned)],  // 2.40.0 (#1344): right under the basket, always shown
-    ['today', row('today', ic('sun'), tr('Today'), c.today)], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
+    ['today', row('today', ic('sun'), tr('Today'), msvvCount(c.today, 'today'))], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
     ['week', row('week', ic('week'), tr('Next 7 days'), c.week)], ['doable', row('doable', ic('zap'), tr('Now doable'), c.doable)],
     ['pinned', c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : ''],  // 2.16.0 (#648): only while something is pinned
     ['waiting', c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on someone'), c.waiting) : ''],
@@ -422,7 +423,7 @@ function renderSide() {
     ${wsBarHtml()}
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
     ${favSideHtml(lists, listRow, head)}</div>
-    ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => SB[g] || '').join('')}
+    ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('')}
     <div class="sgroup sfoot">
       <button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
     </div>`;
@@ -460,7 +461,9 @@ function renderTop0() {
   const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload'), wiki: N_('Knowledge pages'), tags: N_('Tags')};  // 2.49.0 (#1199): + wiki
   let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? (S.nt.lid ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : tr('Notes')) : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
+  if (!title && m === 'budget') title = tr('Budget');  // 2.72.0 (#1333)
   if (!title && (m === 'ablage' || m === 'docs')) title = tr(m === 'ablage' ? 'File store' : 'Documents');  // 2.48.0 (#1207, #1111)
+  if (m === 'msv') title = msvvTitle();  // 2.73.0 C (#661)
   if (mg_title(m) && !S.me?.kid) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below
   let acts = '';
   if (m === 'tasks' && (k.startsWith('l:') || k === 'inbox')) {
@@ -482,6 +485,7 @@ function renderTop0() {
   if (fk && feat('matrix') && !isMobile()) acts += `<div class="seg vseg fseg tf" role="group" aria-label="${esc(tr('View'))}"><button class="${m === 'tasks' ? 'on' : ''}" data-act="fview" data-k="list" data-ico="list" data-f="${esc(fk)}" title="${esc(tr('List'))}" aria-pressed="${m === 'tasks'}">${ic('list', 's')}</button><button class="${m === 'matrix' ? 'on' : ''}" data-act="fview" data-k="matrix" data-ico="grid" data-f="${esc(fk)}" title="${esc(tr('Matrix'))}" aria-pressed="${m === 'matrix'}">${ic('grid', 's')}</button></div>`;
   if (m === 'tasks' && k === 'all' && feat('timeline')) { const v = isRoadmap() ? 'timeline' : 'list'; acts += `<div class="seg tf" role="group" aria-label="${tr('View')}"><button class="${v === 'list' ? 'on' : ''}" data-act="rm-view" data-k="list" data-ico="list" title="${tr('List')}" aria-pressed="${v === 'list'}">${ic('list', 's')}</button><button class="${v === 'timeline' ? 'on' : ''}" data-act="rm-view" data-k="timeline" data-ico="timeline" title="${tr('Timeline')}" aria-pressed="${v === 'timeline'}">${ic('timeline', 's')}</button></div>`; }
   if (m === 'tasks' && k === 'inbox') acts += kbSortBtn();  // 2.39.1 (#1219)
+  if (m === 'tasks' && k === 'inbox') acts += asst_inboxBtn();  // 2.75.0 (#1411)
   if (m === 'tasks' && k.startsWith('lists:') && typeof dx_listsActs === 'function') acts += dx_listsActs(k);  // 2.47.3 (#1727)
   if (m === 'tasks' && k === 'trash' && (S.hist?.k === 'trash' && S.hist.deletable != null ? S.hist.deletable > 0 : (S.extra || []).some(t => !t.keep))) acts += `<button class="btn sm danger" data-act="trash-empty">${tr('Empty')}</button>`;
   if (m === 'tasks' && k === 'done' && (S.extra || []).length) acts += `<button class="btn sm" data-act="done-clean" title="${esc(tr('Move completed tasks to the trash'))}">${ic('trash', 's')}<span class="bl">${tr('Delete completed…')}</span></button>`;
@@ -495,7 +499,7 @@ function renderTop0() {
   const off = !OUT.online || OUT.q.length ? `<span class="offline" role="status" title="${esc([oflab, ofn, tr('Changes are sent as soon as the server is reachable')].filter(Boolean).join(' · '))}" aria-label="${esc([oflab, ofn].filter(Boolean).join(' · '))}">${ic(OUT.online ? 'sync' : 'cloudoff', 's')}<span class="ofl">${oflab}</span>${OUT.q.length ? `<span class="ofn">${OUT.q.length}</span>` : ''}</span>` : '';
   const cf = S.conflicts?.length ? `<button class="cfpill" data-act="conflicts" title="${tr('Review conflicts')}">${ic('alert', 's')}${S.conflicts.length}</button>` : '';
   // open tasks of the view next to the title (Geist Mono), task views only
-  const nOpen = m === 'tasks' && !NOLIST_KEYS.includes(k) ? viewTasks().open.length : 0;
+  const nOpen = m === 'tasks' && !NOLIST_KEYS.includes(k) ? msvvCount(viewTasks().open.length, k) : 0;  // 2.73.0 C (#661): + other servers in Today / Basket
   // 2.8.0 (#434): the command bar (search + commands + the agents' chat) and "New task" (mouse screens; touch has the + button)
   // 2.18.0 (#651, owner decision: the magnifier is always visible): Search never folds into "…" (no .tf4); the title gets cut instead (fitTop)
   const pal = `<button class="kbtn cmdbar" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span>${kb('Mod+K')}</button>`;
@@ -509,7 +513,7 @@ function renderTop0() {
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
   const badge = kl?.kind === 'project' ? `<span class="kbadge" title="${esc(projectParts().join(', '))}">${tr('Project')}</span>` : '';
   S.bandOn = bandAgents().length > 0;  // 2.8.0 (#434): the band shows the agents' dots, the header pill keeps only the robot
-  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${badge}${wsBadge(kl)}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${favTopBtn(kl)}${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${tnew}${kl && wsBadge(kl) ? '' : wsChip()}${stChip()}${agentChip()}${bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
+  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${badge}${kl?.e2e && typeof le2u_headMark === 'function' ? le2u_headMark(kl) : ''}${wsBadge(kl)}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${favTopBtn(kl)}${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${tnew}${kl && wsBadge(kl) ? '' : wsChip()}${stChip()}${agentChip()}${bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
   fitTop();
   netDotDraw();  // 2.31.0 (#378): the dot at the own picture follows every change of the connection
 }
@@ -609,6 +613,7 @@ function topMoreItems() {
   if (isMobile()) for (const dir of ['undo', 'redo']) { const b = histBtn(dir); if (b.off && !b.p) continue; out.push({label: b.lab, icon: dir, dis: b.off, cls: 'hmi' + (b.p ? ' pend' : ''), title: b.p ? tr('waiting for the connection') : '', fn: () => histStep(dir)}); }
   // 2.24.0 (UX-35): Today's planners live here now (the header keeps its room for the tasks)
   if (m === 'tasks' && k === 'today') out.push({label: tr('Plan my day'), icon: 'cal', fn: () => dayplanModal('day')}, {label: tr('Fill free time'), icon: 'clock', fn: () => dayplanModal('fill')});
+  if (m === 'tasks' && k === 'today' && asst_ready()) out.push({label: tr('Assistant plan'), icon: 'sparkle', fn: () => asst_go({kind: 'dayplan', day: today()})});  // 2.75.0 (#1411)
   if (m === 'tasks' && k === 'today') out.push({label: tr('Customize Today…'), icon: 'sliders', fn: () => lyOpen('today', true)});  // 2.32.0 (#1063)
   if (m === 'tasks' && k === 'today' && typeof lyv_viewMenu === 'function') out.push(...lyv_viewMenu('today'));  // 2.55.0 (#1069): Today has no header switch
   if (m === 'time') out.push({label: tr('Customize…'), icon: 'sliders', fn: () => lyOpen('time', true)});
@@ -686,7 +691,7 @@ let refreshing = false;
 async function refreshNow() {
   if (refreshing) return;
   refreshing = true; $$('[data-act="refresh"]').forEach(b => b.classList.add('spin'));
-  try { await flushSaves(); await load(); render(); if (S.sel && (cmtOn() || collab())) loadTimeline(S.sel); S.syncOk = Date.now(); toast(tr('Up to date')); }
+  try { await flushSaves(); await load(); render(); msvvLoad();  /* 2.73.0 C (#661) */ if (S.sel && (cmtOn() || collab())) loadTimeline(S.sel); S.syncOk = Date.now(); toast(tr('Up to date')); }
   catch (e) { if (e instanceof Offline) toast(tr('You are offline')); }
   finally { refreshing = false; $$('[data-act="refresh"]').forEach(b => b.classList.remove('spin')); }
 }
@@ -869,7 +874,7 @@ function renderView0() {
   else if (m === 'matrix') setHtml(el, viewMatrix());
   else if (m === 'habits') setHtml(el, viewHabits());
   else if (m === 'pomo') { setHtml(el, mg_wrap(m, viewPomo())); loadPomoStats(); }
-  else if (m === 'news') setHtml(el, viewNews());
+  else if (m === 'news') setHtml(el, viewNews() + msvvNewsHtml());  // 2.73.0 C (#661): + the other servers' news
   else if (m === 'stats') setHtml(el, mg_wrap(m, viewStats()));
   else if (m === 'time') setHtml(el, mg_wrap(m, viewTime()));  // 2.44.0 (#1187): mg_wrap = the area's tabs on top
   else if (m === 'overview') setHtml(el, viewOverview());
@@ -880,6 +885,7 @@ function renderView0() {
   else if (m === 'family') setHtml(el, mg_wrap(m, viewFamily()));  // 2.19.0 (#653)
   else if (m === 'contacts') setHtml(el, mg_wrap(m, viewContacts()));  // 2.21.0 (#658)
   else if (m === 'life') setHtml(el, mg_wrap(m, viewLife()));  // 2.22.0 (#663)
+  else if (m === 'budget') setHtml(el, mg_wrap(m, viewBudget()));  // 2.72.0 (#1333)
   else if (m === 'review') setHtml(el, mg_wrap(m, viewReview()));
   else if (m === 'clients') setHtml(el, mg_wrap(m, viewClients()));  // 2.23.0 (#463)
   else if (m === 'workload') setHtml(el, viewWorkload());
@@ -888,6 +894,7 @@ function renderView0() {
   else if (m === 'wiki') setHtml(el, viewWiki());  // 2.49.0 (#1199)
   else if (m === 'ablage') setHtml(el, mg_wrap(m, viewAblage()));  // 2.48.0 (#1207)
   else if (m === 'docs') setHtml(el, mg_wrap(m, typeof viewDocs === 'function' ? viewDocs() : ''));  // 2.48.0 (#1111): docs.js
+  else if (m === 'msv') setHtml(el, msvvViewList());  // 2.73.0 C (#661): a list on another server
   else if (S.route.key === 'search') setHtml(el, viewSearch());
   else if (S.route.key === 'done' || S.route.key === 'trash') setHtml(el, viewHistory());
   else if (S.route.key === 'archived') setHtml(el, viewArchived());
@@ -945,9 +952,9 @@ function taskRow(t, opts = {}) {
   if (S.route.key === 'stale' && !opts.trash && staleOf(t) && rs('stale')) meta.push(staleChipHtml(t));  // 2.34.0 (#266)
   if (t.approval === 'pending' && t.status === 0 && !opts.trash) meta.push(approvalChip(t));  // 2.23.0 (#463)
   if (t.pinned && !opts.trash && rs('pin')) meta.push(`<span class="pinm">${ic('pin', 's')}</span>`);
+  if (t.also && !opts.trash && !opts.depth) { const m = ml_rowMark(t); if (m) meta.push(m); }  // 2.71.0 B (#1459): also in / from another list
   if (lst && !rs('list')) { /* 2.56.1 (#1799): the list is switched off */ }
-  else if (lst && moOwn() && !opts.depth) meta.unshift(moSubHtml(t));  // 2.40.0 (#1344): My tasks, own order: "List › Section"
-  else if (lst) meta.push(`<span class="lst${mc}" title="${esc(lst)}">${licMark(listById(t.list_id), 'lsm')}${esc(lst)}</span>`);  // 2.36.2 (#1135)
+  else if (lst && moOwn() && !opts.depth) meta.unshift(moSubHtml(t));  // 2.40.0 (#1344): My tasks, own order: "List › Section"  else if (lst) meta.push(`<span class="lst${mc}" title="${esc(lst)}">${licMark(listById(t.list_id), 'lsm')}${esc(lst)}</span>`);  // 2.36.2 (#1135)
   // 2.16.0 (#473): overdue is not only red: the alert icon + a word for screen readers
   // 2.31.0 (#1051): in Today a task due today carries no "Today" chip (the view says it), only its time
   const inDay = opts.inToday && t.due === today() && t.status === 0;
@@ -991,6 +998,7 @@ function taskRow(t, opts = {}) {
   // 2.0.8 (#319): sorted by "Created": a small creation date on the row
   if (!lc && !opts.trash && !opts.checklist && t.created_at && opts.crd && rs('created')) meta.push(`<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>`);
   if (opts.trash) meta.push(`<span>${tr('deleted {0}', dayLabel(t.deleted_at.slice(0, 10)))}</span>`);
+  const msvb = msvvSelfBadge(opts); if (msvb) meta.unshift(msvb);  // 2.73.0 C (#661): merged views, a server linked
   if (opts.trash && t.keep) meta.push(`<span class="tkeep" title="${esc(tr('Only the list owner can delete it for good'))}">${ic('lock', 's')}${tr('stays')}</span>`);  // 2.0.5
   // 2.8.0 (#434): the status glyph (circle; priority = its colour; an agent working on it = an open arc + dot) and, in
   // lists with tickets, the ticket number in a mono gutter
@@ -1013,7 +1021,7 @@ function taskRow(t, opts = {}) {
   let h = `<div class="trow ${t.priority && !opts.checklist ? 'pr' + t.priority : ''} ${opts.checklist ? 'ck' : ''} ${tc || lc ? 'hascols' : ''} ${lc ? 'haslc' : ''} ${t.status ? 'done' : ''} ${opts.depth ? 'sub d' + opts.depth : ''} ${opts.subRow ? 'subrow' : ''} ${S.sel === t.id ? 'sel' : ''} ${gut ? 'hasgut' : ''} ${S.kf === t.id && !opts.subRow ? 'kfocus' : ''} ${S.multi.has(t.id) ? 'msel' : ''} ${ro ? 'ro' : ''} ${opts.next && !opts.depth ? 'flownext' : ''}${lp_cls(t)}" data-id="${t.id}"${lp_attr(t) /* 2.53.0 (#1426): the list's colour as the card edge */} ${opts.drag !== false && !opts.trash && !ro && !isMobile() ? 'draggable="true"' : ''}>
     ${caret}
     ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(isMs(t) ? tr('Complete milestone: {0}', mdPlain(t.title)) : tr('Complete: {0}', mdPlain(t.title)))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}${gut}
-    <div class="tmain" data-act="${opts.trash ? '' : 'open'}"><div class="ttl"${opts.trash ? '' : ` data-kt role="button" tabindex="-1" aria-describedby="${lc ? `tc-${t.id} ` : ''}tm-${t.id}"`}>${mdTitle(t.title)}${tlkIs(t) && !opts.trash && rs('blocked') ? `<span class="tlkr" role="img" title="${esc(tr('Locked'))}" aria-label="${esc(tr('Locked'))}">${ic('lock', 's')}</span>` : ''}${t.priority && !opts.checklist && !opts.trash && t.status === 0 && !(lc && lc.includes('prio')) ? prioMark(t.priority) : ''}</div><div class="meta" id="tm-${t.id}">${meta.join('')}</div></div>
+    <div class="tmain" data-act="${opts.trash ? '' : 'open'}"><div class="ttl"${opts.trash ? '' : ` data-kt role="button" tabindex="-1" aria-describedby="${lc ? `tc-${t.id} ` : ''}tm-${t.id}"`}>${typeof le2u_locked === 'function' && le2u_locked(t) ? le2u_ttlHtml(t) : mdTitle(t.title) /* 2.64.1 (#1817): locked list, not decrypted */}${tlkIs(t) && !opts.trash && rs('blocked') ? `<span class="tlkr" role="img" title="${esc(tr('Locked'))}" aria-label="${esc(tr('Locked'))}">${ic('lock', 's')}</span>` : ''}${t.priority && !opts.checklist && !opts.trash && t.status === 0 && !(lc && lc.includes('prio')) ? prioMark(t.priority) : ''}</div><div class="meta" id="tm-${t.id}">${meta.join('')}</div></div>
     ${!opts.trash && !ro && t.id > 0 && !isTouch() ? `<button class="iconbtn rpin ${t.pinned ? 'on' : ''}" data-act="pin" title="${esc(t.pinned ? tr('Unpin') : tr('Pin'))}" aria-label="${esc(t.pinned ? tr('Unpin') : tr('Pin'))}" aria-pressed="${!!t.pinned}">${ic('pin', 's')}</button>` : ''}
     ${opts.cols ? `<div class="fcols" data-act="open">${opts.cols.map(f => `<span class="fcell t-${esc(f.type)}">${fieldCell(f, t.fields?.[f.id], t.list_id)}</span>`).join('')}</div>` : ''}
     ${cols}${lcH}
@@ -1453,6 +1461,7 @@ function qdockChips() {
     (d.noList && !o.list_id && !r.list_id ? `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No list with {0} that you can add to: share a list with them first.', personNameAny(d.who) || '?'))}</span>` :
     `<button type="button" class="qdc set ${o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>`) +
     `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>`;
+  msvvQSync(box);  // 2.73.0 C (#661): "→ Server · List" once another server is linked
 }
 const total0 = groups => groups.some(g => g.tasks.length);
 const ROW_CAP = 400;
@@ -1474,7 +1483,7 @@ function viewList() {
 function viewListBody() {
   const v = viewTasks();
   FLOW.cyc = false;
-  const groups = groupTasks(v), flow = sortMode() === 'flow', crd = sortMode().startsWith('created');
+  const groups = msvvMerge(groupTasks(v), v), flow = sortMode() === 'flow', crd = sortMode().startsWith('created');  // 2.73.0 C (#661): + other servers
   const showList = !v.list;
   const rl = v.list && listById(v.list), ro = rl && !canEditList(rl.id), ck = !!(rl && rl.checklist);
   const lc = rl ? listCols(rl) : null;  // 2.14.0 (#425)
@@ -1525,11 +1534,11 @@ function viewListBody() {
     // 1.7.0 Flow: the first task of each group that waits on nothing is marked "Next" (2.0.4: "Ready to start", and only
     // when some open task shown here waits on something; without dependencies the badge would say nothing)
     const nx = flow && flowDeps ? g.tasks.find(t => t.status === 0 && !t.context && !(t.blocked && dFor(t)))?.id : 0;
-    if (!closed) { const n = Math.max(0, Math.min(g.tasks.length, budget)), row = (t, i) => (g.byList && (!i || g.tasks[i - 1].list_id !== t.list_id) ? mtListHead(t.list_id) : '') + taskRow(t, {showList: showList && !g.lic, tree: true, cols, lc, tcols: {list: showList && !g.lic && !moOwn()}, next: t.id === nx, crd, inToday: S.route.key === 'today', ...(v.dsx ? {dsx: showDone(), ...(t.status ? {drag: false} : {})} : {})}); h += vl ? vl_seg(g.id ?? '-', g.tasks, row, vl_tree(!!v.dsx && showDone())) : g.tasks.slice(0, n).map(row).join(''); budget -= n; cut += g.tasks.length - n; }
+    if (!closed) { const n = Math.max(0, Math.min(g.tasks.length, budget)), row = (t, i) => (g.byList && (!i || g.tasks[i - 1].list_id !== t.list_id) ? mtListHead(t.list_id) : '') + (t._msv ? msvvRow(t._msv.sid, t._msv.t, {showList: true}) : taskRow(t, {showList: showList && !g.lic, tree: true, cols, lc, tcols: {list: showList && !g.lic && !moOwn()}, next: t.id === nx, crd, inToday: S.route.key === 'today', ...(v.dsx ? {dsx: showDone(), ...(t.status ? {drag: false} : {})} : {})}));  /* 2.73.0 C (#661): a task of another server */ h += vl ? vl_seg(g.id ?? '-', g.tasks, row, vl_tree(!!v.dsx && showDone())) : g.tasks.slice(0, n).map(row).join(''); budget -= n; cut += g.tasks.length - n; }
     // 2.46.2 (#1662): no drop field under an empty section any more; the section name takes the drop (.ghead.drop)
     if (g.name) h += '</div>';
   }
-  if (lc && rl && total) h += fxSumRow(rl, lc, groups.flatMap(g => g.tasks));  // 2.43.0 (#1328): the sum row (formula.js)
+  if (lc && rl && total) h += fxSumRow(rl, lc, groups.flatMap(g => g.tasks).filter(t => !t._msv));  // 2.43.0 (#1328): the sum row (formula.js)
   if (tin.length) { if (tdc) tdc.inbox = todayInboxHtml(tin); else h += todayInboxHtml(tin); }
   // 2.19.0 (#667): the end of a list takes a dragged task into a new section
   if (rl && !ro && !rl.is_inbox && total && canEditList(rl.id)) h += `<div class="sdrop snew" data-newsec="1">${ic('plus', 's')}<span>${tr('New section')}</span></div>`;
@@ -1620,7 +1629,7 @@ function viewHistory() {
 // 2.40.0 (#1432): "Load more" under Completed / Trash, only while the server has more
 const histMoreHtml = () => S.hist?.next && S.hist.k === S.route.key ? `<div class="audmore"><button type="button" class="btn sm" data-act="hist-more">${tr('Load more')}</button></div>` : '';
 function viewSearch() {
-  return `<div class="search"><input id="searchq" type="search" aria-label="${esc(tr('Search'))}" placeholder="${tr('Search titles and notes')}" autocomplete="off" enterkeyhint="search"></div>${typeof rt9_searchToggleHtml === 'function' ? rt9_searchToggleHtml() : ''}<div id="sresults">${S.searchRes ? renderSearchRes() : ''}</div><div id="smsgs">${msgSecHtml()}</div>`;
+  return `<div class="search"><input id="searchq" type="search" aria-label="${esc(tr('Search'))}" placeholder="${tr('Search titles and notes')}" autocomplete="off" enterkeyhint="search"></div>${typeof rt9_searchToggleHtml === 'function' ? rt9_searchToggleHtml() : ''}<div id="sresults">${S.searchRes ? renderSearchRes() : ''}</div><div id="msvvsearch">${msvvSearchHtml()}</div><div id="smsgs">${msgSecHtml()}</div>`;
 }
 function renderSearchRes() {
   if (!S.searchRes.length) return heronEmpty('empty', tr('No results.'), tr('Try fewer or other words.'));
@@ -1639,11 +1648,13 @@ async function doSearch(q) {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(async () => {
     if (S.msg.q !== q) msgSecRun(q);  // 2.33.0 (#1080): "Messages" below the tasks (chat.js)
+    if (S.msvv.search.q !== q) msvvSearch(q);  // 2.73.0 C (#661): the other servers, in parallel
     if (!q.trim()) { S.searchRes = null; $('#sresults').innerHTML = ''; return; }
     const j = await api('GET', '/api/tasks?scope=search&q=' + encodeURIComponent(q) + (typeof rt9_semQ === 'function' ? rt9_semQ() : ''));  // 2.59.0 B (#1375): + semantic=1
     // 2.13.0: "#447" / "447" puts that task (one this person sees) first
     const nm = q.trim().match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
     if (hit) j.tasks = [hit, ...j.tasks.filter(t => t.id !== hit.id)];
+    if (typeof le2eSearch === 'function') j.tasks = le2eSearch(q, j.tasks);  // 2.64.1 (#1817): locked lists, searched here (the server cannot)
     S.searchRes = j.tasks; S.extra = j.tasks; S.searchResQ = q;
     $('#sresults').innerHTML = renderSearchRes(); vl_after();
     if (S.searchEnter === q) { S.searchEnter = null; searchEnterOpen(q); }

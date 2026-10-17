@@ -78,11 +78,12 @@ SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments
           "files:read", "files:write",  # 2.48.0 (#1207): the file store (folders / files shared with the token's account)
           "office",  # 2.51.0 A (#1348): office drafts of agents (office/agentdocs.py; never in the legacy "write" or a default)
           "pinboard",  # 2.51.0 (#1352): notepads on project pages (an agent changes only its own; off for new agents)
-          "layouts")  # 2.55.0 (#1066): agents read how views are arranged and propose arrangements (off for new agents)
+          "layouts",  # 2.55.0 (#1066): agents read how views are arranged and propose arrangements (off for new agents)
+          "import")  # 2.68.0 (#1839): agents propose old data for the office as an import card (off for new agents)
 # 2.22.0 (#663): "private" = health lists and the journal (reading included); like "contacts" never part of the legacy
 # "write" and never in an agent's default (agents never see health lists at all, see core/access.py)
 # 2.51.0 (#1352): nor "pinboard" (an old "write" token must not open the pin board for agents)
-SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private", "office", "pinboard", "layouts"))   # what the legacy "write" stands for; 2.55.0 (#1066): nor layouts
+SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private", "office", "pinboard", "layouts", "import"))   # what the legacy "write" stands for; 2.55.0 (#1066): nor layouts; 2.68.0 (#1839): nor import
 SCOPES_AGENT_NEVER = ("account", "admin-read", "private")   # never for an agent: credentials / settings of the account, admin data, health + journal (2.22.0)
 # 2.48.0 (#1207): a new agent may use the file store: it sees only what is shared with it (and its own folder) anyway
 SCOPES_AGENT_DEFAULT = ("read", "tasks:write", "comments", "files:read", "files:write")
@@ -378,6 +379,8 @@ def v1_task(d):
         out["encrypted_note"] = True
     if d.get("note_locked"):  # 2.48.0 (#1642): the note is locked with its owner's password: notes stays empty
         out["note_locked"] = True
+    if d.get("also"):  # 2.71.0 B (#1459): the further lists the token's user sees (absent: none)
+        out["also"] = d["also"]
     return out
 
 
@@ -1019,14 +1022,22 @@ def v1_task_update(tid):
     v1_args(())
     c = db()
     _v1_live(c, tid)
-    b = v1_task_in(v1_json())
+    raw = dict(v1_json())
+    sc = raw.pop("shift_chain", True)  # 2.67.0 B (#1865): false = the tasks waiting on it stay where they are
+    if not isinstance(sc, bool):
+        raise BadInput(tr("Invalid value: {0}", "shift_chain"))
+    b = v1_task_in(raw)
     if not b:
         raise BadInput(tr("Nothing to change"))
     if b.get("list_id"):
         from ..agents.safety import move_gate
         move_gate(c, [(tid, b["list_id"])])  # 2.30.0 (#919): an agent moving it to other people waits for approval
-    v1_call(task_update, tid, body=b)
-    return jsonify(v1_one(c, tid))
+    r = v1_call(task_update, tid, body={**b, "shift_chain": sc})
+    out = v1_one(c, tid)
+    ch = (r or {}).get("chain") or {}
+    if ch.get("moved") or ch.get("skipped"):
+        out["chain"] = ch  # 2.67.0 B (#1865): the dependent tasks moved along / left in place
+    return jsonify(out)
 
 
 @app.delete("/api/v1/tasks/<int:tid>")

@@ -183,6 +183,7 @@ OX_AREAS = (
     ("lists/links.json", "list_links", f"list_id IN ({LSQ})"),
     ("lists/notepads.json", "list_notepads", f"list_id IN ({LSQ})"),  # 2.43.0 (#1346): notepads on the project page
     ("lists/milestones.json", "list_milestones", f"list_id IN ({LSQ})"),
+    ("lists/rules.json", "list_rules", f"list_id IN ({LSQ})"),  # 2.71.0 A (#1457)
     ("lists/history.json", "list_activity", f"list_id IN ({LSQ})"),
     ("lists/notes.json", "notes", f"list_id IN ({LSQ})"),
     ("lists/files.json", "list_files", f"list_id IN ({LSQ})"),
@@ -243,6 +244,7 @@ OX_AREAS = (
     ("office/fixed_costs.json", "office_fixed_costs", "org_id=?"),  # 2.47.3 (#1652): fixed costs of the cash flow
     ("office/deals.json", "office_deals", "org_id=?"),  # 2.50.0 (#1196): the sales pipeline
     ("office/archive.json", "office_archive", "org_id=?"),
+    ("office/pack-installs.json", "office_pack_installs", "org_id=?"),  # 2.76.0 review (N2): installed catalogue packs (data only)
     ("office/import_runs.json", "office_import_runs", "org_id=?"),
     ("office/log.json", "office_doc_log", "org_id=?"),
     ("wiki/pages.json", "wiki_pages", "org_id=?"),  # 2.49.0 (#1199): knowledge pages
@@ -371,6 +373,19 @@ def ox_build(c, oid, out, by=None):
             man.client_enc["task_notes"] = man.counts["tasks/encrypted_notes.json"]
         if "tasks/locked_notes.json" in man.counts:
             man.client_enc["locked_notes"] = man.counts["tasks/locked_notes.json"]
+        if "e2e" in _table_cols(c, "lists"):  # 2.64.1 B (#1817): lists with the lock: texts are browser ciphertexts ("e2e1:...")
+            lk = [r[0] for r in c.execute(f"SELECT id FROM lists WHERE e2e IS NOT NULL AND id IN ({LSQ})", (oid,))]
+            if lk:
+                q = ",".join("?" * len(lk))
+                man.client_enc["locked_lists"] = len(lk)
+                man.client_enc["locked_list_tasks"] = c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN ({q})", lk).fetchone()[0]
+                man.client_enc["locked_list_note"] = ("Texts of lists encrypted in the browser (values starting with e2e1:) can only be "
+                                                      "read in Kalmido with a member's own passphrase; no offline tool opens them.")
+        if c.execute("SELECT 1 FROM wiki_spaces WHERE org_id=? AND e2e IS NOT NULL", (oid,)).fetchone():  # 2.64.3 A (#1817)
+            man.client_enc["locked_wiki_pages"] = c.execute("SELECT COUNT(*) FROM wiki_pages WHERE org_id=?", (oid,)).fetchone()[0]
+            man.client_enc["locked_wiki_note"] = ("Name and text of the knowledge pages of a space encrypted in the browser (values starting "
+                                                  "with e2e1:) can only be read in Kalmido with a member's own passphrase; export them "
+                                                  "decrypted from the knowledge pages in the app.")
         manifest = {
             "format": "kalmido-org-export", "format_version": OX_FORMAT, "kalmido_version": APP_VERSION,
             "org": {"id": int(oid), "name": org["name"]}, "created_at": iso(now_utc()), "created_by": by,

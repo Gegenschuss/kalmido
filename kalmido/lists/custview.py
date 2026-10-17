@@ -161,7 +161,7 @@ def cv_extras(c, link, tasks, show, lg, day):
         for r in c.execute(f"SELECT tt.task_id, lt.name, lt.color FROM task_list_tags tt JOIN list_tags lt ON lt.id=tt.tag_id "
                            f"WHERE tt.task_id IN ({ph}) AND lt.list_id=? ORDER BY lt.sort, lt.id", (*ids, link["list_id"])):
             out[r["task_id"]]["tags"].append((r["name"], r["color"]))
-    if show["files"]:  # 2.61.0 review: browser-encrypted files (e2e) never go out through a link
+    if show["files"]:  # 2.61.0 review, 2.64.2 B (#1817): files encrypted in the browser (enc 1 / 2) never go out through a link
         for r in c.execute(f"SELECT id, task_id, name, size FROM attachments WHERE task_id IN ({ph}) AND comment_id IS NULL AND COALESCE(enc, 0)=0 ORDER BY id", tuple(ids)):
             out[r["task_id"]]["files"].append((r["id"], r["name"], r["size"], (r["size"] or 0) <= CV_FILE_MAX))
     return out
@@ -171,7 +171,7 @@ def cv_file(c, link, show, visible_ids, aid):
     """The attachment row a link may hand out (a task file of a visible task, files switched on), or None."""
     if not show["files"] or not visible_ids:
         return None
-    r = c.execute("SELECT * FROM attachments WHERE id=? AND comment_id IS NULL AND COALESCE(enc, 0)=0", (aid,)).fetchone()
+    r = c.execute("SELECT * FROM attachments WHERE id=? AND comment_id IS NULL AND COALESCE(enc, 0)=0", (aid,)).fetchone()  # 2.64.2 B (#1817)
     if not r or r["task_id"] not in visible_ids or (r["size"] or 0) > CV_FILE_MAX:
         return None
     from ..files.scan import sc_locked

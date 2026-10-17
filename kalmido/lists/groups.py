@@ -84,7 +84,7 @@ def grp_sync(c, lids, actor=None):
     agents = agent_ids(c)
     kids = {r[0] for r in c.execute("SELECT id FROM users WHERE kid=1")}
     for lid in sorted({int(x) for x in lids if x}):
-        lr = c.execute("SELECT id, owner_id, name, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
+        lr = c.execute("SELECT id, owner_id, name, is_inbox, e2e FROM lists WHERE id=?", (lid,)).fetchone()
         if not lr:
             continue
         want, gname = {}, {}
@@ -109,6 +109,10 @@ def grp_sync(c, lids, actor=None):
             eff = role_max(own, gr)
             if eff and uid in kids:  # 2.19.0 (#653)
                 eff, gr = "participant", ("participant" if gr else gr)
+            if eff == "participant" and lr["e2e"]:  # 2.64.1 (#1817): a list with the lock has no participants (no access)
+                eff = None
+                if r is None:
+                    continue
             if r is None:
                 c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,grole,sort,added_at) VALUES(?,?,?,?,?,?,?)",
                           (lid, uid, eff, None, gr, my_max_sort(c, uid) + 1, iso(now_utc())))
@@ -350,6 +354,9 @@ def list_group_set(lid, gid):
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The basket cannot be shared"))
     role = grp_role(body())
+    from ..collab.liste2e import le2e_mode
+    if role == "participant" and le2e_mode(c, lid):  # 2.64.1 (#1817)
+        return jsonify(error=tr("Lists encrypted in the browser have no participants. Choose another role."), code="list_e2e_member"), 409
     from ..accounts.orgs import ws_member_problem
     for uid in grp_members(c, gid):  # 2.28.0 (#935): everyone in the group must belong to the list's workspace
         p = ws_member_problem(c, lid, uid)
@@ -426,6 +433,10 @@ def folder_group_set(gid):
     if not f:
         return err(tr("Name missing"))
     role = grp_role(b)
+    from ..collab.liste2e import le2a_folder_problem
+    p = le2a_folder_problem(c, me(), f, role)  # 2.64.1 (#1817): no participants in lists with the lock
+    if p:
+        return jsonify(error=p, code="list_e2e_member"), 409
     from ..accounts.orgs import ws_member_problem
     from ..lists.lists import _in_folder
     for l in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall():  # 2.28.0 (#935)

@@ -27,6 +27,7 @@ function bootDone() {
   const i18nBoot = i18nLoad(uiLang());  // last used language (localStorage), in parallel with the state
   try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { bootDone(); if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = heronEmpty(navigator.onLine === false ? 'offline' : 'error', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
   await i18nBoot; await i18nLoad(uiLang()); S.booted = true;
+  setTimeout(msvvBoot, 0);  // 2.73.0 C (#661): the other servers (msvview.js), after the own state
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)
   if (LS.get('after2fa', false)) { LS.set('after2fa', false); setTimeout(() => settingsModal('account'), 400); }  // 2.22.0 (#697)
   setTimeout(() => { if (document && !document.hidden) wpSweep(); }, 2500);

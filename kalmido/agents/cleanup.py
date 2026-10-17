@@ -57,8 +57,11 @@ def cln_request(c, uid, b):
     lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
     if not lst or not list_role(c, lid, uid):
         raise Denied(404)
-    if (lst["life"] or "") == "health":
-        return err(tr("Health lists never reach an agent"), 403)
+    if (lst["life"] or "") in ("health", "budget"):  # 2.72.0 (#1333): budgets neither
+        return err(tr("Health lists and budgets never reach an agent"), 403)
+    if lst["e2e"]:  # 2.64.1 B (#1817): no tidying by an agent in a list with the lock
+        from ..collab.liste2eguard import le2b_off
+        return err(le2b_off(), 409)
     if list_role(c, lid, uid) not in WRITE_ROLES:
         raise Denied(403)
     aid = tidy_agent_of(c, lid)

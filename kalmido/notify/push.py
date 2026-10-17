@@ -51,6 +51,8 @@ def ntfy(title, msg, prio="4", click=None, topic=None, actions=None, admin=False
     from ..notify.alerts import aa_err, aa_fail, aa_ok
     if not topic or not NTFY_TOPIC_RE.fullmatch(topic):
         return False
+    from ..collab.liste2eguard import le2b_net
+    title, msg = le2b_net(title), le2b_net(msg)  # 2.64.1 B (#1817): never a ciphertext of a list with the lock in a push
     title, msg = md_plain(title), md_plain(msg)  # 2.40.0 (#1409): no Markdown marks in the push
     hdr = {"Title": title.encode("utf-8"), "Priority": prio}  # no Tags header: no emoji icon in the push
     if click:
@@ -408,6 +410,8 @@ def push_reachable(c, uid, s):
 def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None):
     """What the notification shows, nothing more: title, text, the in-app link (hash only), buttons."""
     hash_ = urllib.parse.urlsplit(click).fragment if click else ""
+    from ..collab.liste2eguard import le2b_net
+    title, msg = le2b_net(title), le2b_net(msg)  # 2.64.1 B (#1817): never a ciphertext of a list with the lock in a push
     title, msg = md_plain(title), md_plain(msg)  # 2.40.0 (#1409): no Markdown marks in the push
     p = {"title": (title or APP_NAME)[:200], "body": (msg or "")[:1000], "url": "/#" + hash_ if hash_ else "/",
          "prio": int(prio) if str(prio).isdigit() else 4, "ts": int(time.time() * 1000)}
@@ -440,6 +444,10 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
                 s = usettings(c, uid)
         finally:
             c.close()
+    from ..collab.liste2eguard import le2b_net
+    from ..core.i18n import LANGS
+    lg = s.get("lang") if s.get("lang") in LANGS else "en"
+    title, msg = le2b_net(title, lg), le2b_net(msg, lg)  # 2.64.2 D (#1817): the neutral word in the recipient's language
     ch = push_channel(s)
     sent = 0
     if WEBPUSH_ON and ch in ("webpush", "both"):
@@ -530,6 +538,10 @@ def watchdog_tick(c):
     _wd_section(c, "org export cleanup", ox_cleanup)  # 2.42.0 (#833): archives after 24 h
     from ..core.merges import mg_prune
     _wd_section(c, "merge snapshots", mg_prune, False)  # 2.66.0 (#1835): the undo data of merges after 30 days
+    from ..admin.acctexport import umz_cleanup
+    _wd_section(c, "account export cleanup", umz_cleanup)  # 2.73.0 B (#1473): account exports + import uploads after 24 h
+    from ..accounts.servers import msv_cleanup
+    _wd_section(c, "server link tokens", msv_cleanup)  # 2.73.0 A (#661) review N1: tokens of removed accounts after 30 days
     _wd_section(c, "tidy events", tidy_tick)  # 2.27.0 (#999)
     _wd_section(c, "agent bursts", burst_tick)  # 2.29.0 (#1031)
     from ..lists.sprints import spr_tick
@@ -545,6 +557,8 @@ def watchdog_tick(c):
     _wd_section(c, "follow-ups", _wd_followups, users, S, LG, now)  # 2.1.0 (#335)
     from ..tasks.stale import _wd_stale
     _wd_section(c, "stale tasks", _wd_stale, now)  # 2.34.0 (#266): once a day, agents of lists with "Agent follows up"
+    from ..agents.contractprop import ctr_tick
+    _wd_section(c, "contract notices", ctr_tick, now)  # 2.70.0 C (#1359): contract_notice once per contract, deadline and agent
     _wd_section(c, "rotations", _wd_rotations, users, S, LG, now)  # 2.19.0 (#653)
     _wd_section(c, "events", _wd_events, users, S, LG, now)  # 2.21.0 (#659): event reminders, purge of deleted events
     _wd_section(c, "focus", _wd_focus, users, S, LG)
@@ -558,6 +572,8 @@ def watchdog_tick(c):
     from ..newsletter.sync import nwl_tick
     _wd_section(c, "newsletter", nwl_tick)  # 2.55.0 (#1455): the daily sync of connections with "auto" (own threads)
     from ..accounts.tenancy import boundary_tick
+    from ..lists.rules import rul_due_tick
+    _wd_section(c, "list rules", rul_due_tick)  # 2.71.0 A (#1457): rules "due date reached"
     _wd_section(c, "boundary check", boundary_tick)  # 2.30.0 (#1036): once a night, before the alerts go out
     from ..notify.sev import sev_scan
     _wd_section(c, "security watch", sev_scan)  # 2.36.2 (#1133): new admins / org admins / agents / agent tokens

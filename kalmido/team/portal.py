@@ -104,8 +104,10 @@ def _pt_rt():
 
 
 def _pt_space_sql(p="p.", l="l."):
-    """The ticket's list is still in the ticket's space (a task moved into another space leaves its ticket behind)."""
-    return f"({l}org_id={p}org_id OR ({p}org_id IS NULL AND {l}org_id IS NULL AND {l}owner_id={p}owner_id))"
+    """The ticket's list is still in the ticket's space (a task moved into another space leaves its ticket behind) and has no
+    lock: 2.64.1 (#1817) a list encrypted in the browser has no customer portal (like forms and public links; its texts and
+    answers are ciphertexts the server cannot show or mail, a customer's plain answer must not land in it)."""
+    return f"(({l}org_id={p}org_id OR ({p}org_id IS NULL AND {l}org_id IS NULL AND {l}owner_id={p}owner_id)) AND {l}e2e IS NULL)"
 
 
 def pt_find(c, token):
