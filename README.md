@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.81.0** (2026-10-17): security fixes (customer portal sign-out, single-use form pages, rate limits, agent data -
+  **portal users sign in once again**); office archive entries can be corrected after the import (client, net amounts
+  per tax rate, paid, with history); DATEV keeps the customer number of locked invoices; the Paperless ZIP check runs in
+  the background.
 - **2.80.0** (2026-10-17): small fixes - import amounts with thousands separators, new clients at once in the import and
   in quotations / invoices (with *Add client* when there is none), undo of a contact merge across workspaces, larger
   Undo button and a wrapping selection bar on the phone, all quota windows named in the agent chat.

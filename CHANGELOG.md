@@ -7,6 +7,38 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.81.0] - 2026-10-17
+
+Remaining fixes: office, import, clients, uploads. Contains security fixes.
+
+### Security
+- Security fix (customer portal): signing out ends the portal session on the server too. **Portal users sign in once
+  again after the update** (#1866).
+- Security fix (forms): a form page can be sent only once; at most 50 confirmation mails per form and day (#1866).
+- Security fix (rate limits): reading the address from archive PDFs shares the per-account PDF limit (#1463).
+- Security fix (agent data): agents see only name and role of a client's contact persons (#1466).
+
+### Added
+- Office archive: client, amount (net per tax rate - 19 %, 7 %, 0 %, reverse charge - Kalmido computes the gross) and
+  *Paid* can be corrected after the import by everyone in the office, with a history per entry and undo; the archive
+  list shows the client and filters by it. Number and file stay unchanged (#1834).
+- Org export: includes customer portal reports (without status links) (#1866).
+- Agent API: the search names the attachment whose text matched (`file_hit`) (#1856).
+- Self-hosting: `KALMIDO_PHOTO_MAX_PIXELS` limits photo re-encoding on small servers (#1856).
+
+### Fixed
+- DATEV export: issued invoices keep the customer number they were locked with, also after the client is changed or
+  merged (#1867).
+- Paperless ZIP import: the export is checked in the background (*Export is being checked ...*), not in the upload
+  request; lower entry limits (#1874). A run that took too long no longer runs twice, and exports of two different
+  Paperless servers keep their own rules (#1875).
+- Archive import: a failed import leaves no half-written file behind (#1462).
+- Client dialog: if the linked contact was deleted meanwhile, the link is removed and the client is saved with a hint (#1852).
+- Sharing to Kalmido: a refused file is reported instead of dropped silently (#1856). The nightly boundary check also
+  covers recognised file texts; a long text recognition is resumed after 45 instead of 30 minutes (#1856).
+- Self-hosting: concurrent first requests print one setup code; the backup warning counts from re-enabling; the install
+  scripts point to the newest setup code in the log (#1627).
+
 ## [2.80.0] - 2026-10-17
 
 Small fixes: import, clients, contacts.
