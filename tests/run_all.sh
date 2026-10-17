@@ -863,6 +863,14 @@ fresh; run p256_b_ui node p256_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.56.0 part A: a message to a job from its card, a job's own chat history (#1791 #1793)
 fresh; run p256_a_api "$PY" p256_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p256_a_ui node p256_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.1 part C: #1817 lock per list - client data layer
+fresh; run p264a_c_ui node p264a_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.1 part D: #1817 lock per list - dialogs and display, #1518
+fresh; run p264a_d_ui node p264a_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.1 part A: #1817 lock per list - server core
+fresh; run p264a_a_api "$PY" p264a_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.64.1 part B: #1817 lock per list - other ways, neutral texts, copies
+fresh; run p264a_b_api "$PY" p264a_b_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

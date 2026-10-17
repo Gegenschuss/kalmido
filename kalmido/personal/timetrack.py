@@ -196,7 +196,11 @@ def entry_out(r, uid, vis, ref, rm):
     if seen and r["task_id"] and isinstance(vis, VisIds):  # 1.10.0: a task a participant no longer sees
         seen = vis.task_ok(r["task_id"], r["list_id"], full=True)
     title = r["t_title"] if seen and r["t_title"] is not None else r["task_title"]
-    return {"id": r["id"], "user_id": r["user_id"], "user_name": r["u_name"] or r["u_login"] or "",
+    from ..collab.liste2e import le2e_is_cipher, le2e_neutral
+    e2e = le2e_is_cipher(title)  # 2.64.1 B (#1817): a title of a list with the lock: the neutral word, the app resolves it
+    if e2e:
+        title = le2e_neutral()
+    return {**({"e2e": True} if e2e else {}), "id": r["id"], "user_id": r["user_id"], "user_name": r["u_name"] or r["u_login"] or "",
             "task_id": r["task_id"] if seen else None, "list_id": r["list_id"] if seen else None,
             "title": title or "", "start": r["start"], "end": r["end"], "seconds": sec, "rounded": rnd_up(sec, rm),
             "note": r["note"], "source": r["source"], "running": r["end"] is None, "mine": r["user_id"] == uid,
@@ -728,6 +732,8 @@ def _time_watch_one(c, r, users, S, LG, ref):
     seen = r["list_id"] is not None and list_role(c, r["list_id"], uid) and \
         (not r["task_id"] or task_visible(c, r["task_id"], uid, full=True))
     label = (r["t_title"] if seen else None) or r["task_title"] or tr("No task", lg=lg)
+    from ..collab.liste2e import le2e_show
+    label = le2e_show(label)  # 2.64.1 B (#1817): never a ciphertext in a push
     fnum = (lambda x: f"{x:.1f}".rstrip("0").rstrip(".").replace(".", "," if dec_comma(lg) else "."))
     if stop_h > 0 and hrs >= stop_h:
         end = start + timedelta(hours=stop_h)

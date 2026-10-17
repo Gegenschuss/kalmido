@@ -309,7 +309,7 @@ try { if (screen.orientation?.addEventListener) screen.orientation.addEventListe
 document.addEventListener('focusout', () => { if (vpPending) setTimeout(() => { if (!editFocused()) stableViewport(); }, 0); }, true);
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('tasks.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('tasks.' + k, JSON.stringify(v)); } catch { /* private mode */ } },
+  set(k, v) { try { localStorage.setItem('tasks.' + k, JSON.stringify(v, typeof le2eRepl === 'function' ? le2eRepl() : undefined)); } catch { /* private mode */ } },  // 2.64.1 (#1817): ciphers only (H1)
   del(k) { try { localStorage.removeItem('tasks.' + k); } catch { /* private mode */ } },
 };
 // multi-user: everything under tasks.* belongs to the logged-in user (cache, outbox, tab bar, ...) except

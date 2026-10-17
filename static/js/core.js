@@ -281,9 +281,17 @@ function setOnline(b) { if (OUT.online !== b) { OUT.online = b; if (S.booted) re
 // a write finished while its GET /api/state was on the way: that answer may predate the write and would undo it locally
 // (S.settings went back to the old value; an Undo right after then saw "changed elsewhere" and skipped the step)
 async function rawFetch(method, url, body) {
-  if (method === 'GET') return rawFetch0(method, url, body);
+  // 2.64.1 (#1817): texts of a locked list leave encrypted, ciphers in answers become plain texts in memory (liste2e.js)
+  if (typeof le2eOut === 'function') body = await le2eOut(method, url, body);
+  const in_ = j => typeof le2eIn === 'function' ? le2eIn(j, url) : j;
+  if (method === 'GET') return in_(await rawFetch0(method, url, body));
   S.wseq = (S.wseq || 0) + 1;
-  try { return await rawFetch0(method, url, body); } finally { S.wseq++; }
+  try { return in_(await rawFetch0(method, url, body)); }
+  catch (e) {  // 2.64.1 (#1817): a move missed texts (a subtask in the trash): fetched, converted, sent once more
+    const b2 = e.data?.code === 'list_e2e_move' && e.data.need && typeof le2eFix === 'function' ? await le2eFix(url, body, e.data.need).catch(() => null) : null;
+    if (!b2) throw e;
+    return in_(await rawFetch0(method, url, b2));
+  } finally { S.wseq++; }
 }
 async function rawFetch0(method, url, body) {
   const opt = {method, headers: {'X-Requested-With': 'kalmido'}, redirect: 'manual'};
@@ -323,6 +331,10 @@ function savedPing() {
 }
 async function api(method, url, body) {
   const lk = tlkGuard(method, url, body); if (lk) throw lk;  // 2.36.0 (#1118)
+  // 2.64.1 (#1817): encrypted before the outbox (it holds ciphers only); a Promise only when there is something to encrypt, so
+  // an offline edit is still applied locally at once
+  const lo = typeof le2eOut === 'function' ? le2eOut(method, url, body) : body;
+  if (lo instanceof Promise) { try { body = await lo; } catch (e) { if (e.message !== 'auth') toast(e.message); throw e; } } else body = lo;
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
   try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return j; }
   catch (e) {
@@ -338,7 +350,7 @@ function enqueue(method, url, body) {
   const pm = method === 'PATCH' && url.match(/^\/api\/tasks\/(-?\d+)$/);
   if (pm && body && !body._prev && +pm[1] > 0) {
     const t = S.tasks.get(+pm[1]);
-    if (t) body = {...body, _prev: Object.fromEntries(Object.keys(body).filter(k => !k.startsWith('_')).map(k => [k, k === 'tags' ? [...(t.tags || [])] : (t[k] ?? null)]))};
+    if (t) body = {...body, _prev: Object.fromEntries(Object.keys(body).filter(k => !k.startsWith('_')).map(k => [k, k === 'tags' ? [...(t.tags || [])] : t._enc && k in t._enc ? t._enc[k] : (t[k] ?? null)]))};  // 2.64.1 (#1817): a locked list's text = its cipher
   }
   // 2.13.0 (#453): typed text waiting in the outbox is coalesced: a newer title / description of the same task replaces
   // the queued one (which keeps its _prev = the base the server last confirmed), so a replay sends only the latest text
@@ -604,6 +616,7 @@ function applyState(j) {
   // language changed on another device: switch once its file is loaded (the boot awaits it itself)
   if (S.booted && (j.settings.lang || 'en') !== I18N.code) i18nLoad(j.settings.lang).then(ok => { if (ok) render(); });
   for (const p of OPT) p.put();  // 2.41.2 (#1501): own changes still on the way stay on top of a state fetched meanwhile
+  if (typeof le2eState === 'function') le2eState();  // 2.64.1 (#1817): locked lists, ciphers of the offline cache
 }
 // 2.41.2 (#1501): optimistic writes. A click shows at once: put() changes the local state and returns how to take it back,
 // the request runs behind it (no GET /api/state afterwards; other devices / tabs get it with the live update). An error

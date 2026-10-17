@@ -118,6 +118,8 @@ ORDER = (
     "collab.e2e",  # 2.42.0 (#828, #909): end-to-end encryption (keys, encrypted notes / files / DMs)
     "integrations.mailtrim",  # 2.49.0 (#971)
     "collab.notelock",  # 2.48.0 (#1642): a task's note locked with one's own password (needs collab.e2e)
+    "collab.liste2e",  # 2.64.1 (#1817): the lock per list (texts encrypted in the browser; needs collab.e2e)
+    "collab.liste2eguard",  # 2.64.1 B (#1817): the lock per list on the other ways (API, agents, CalDAV, mail, push, copies)
     "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
     "files.v1",  # 2.48.0 (#1207): the file store in the REST API (files:read / files:write)

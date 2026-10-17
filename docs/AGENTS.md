@@ -1483,6 +1483,11 @@ never reach agents (agents take no part in DMs). Do not ask anyone to paste encr
 task then has empty `notes` and `note_locked: true`; locked notes are not readable for agents, and writing `notes` on such a
 task answers `409` (other fields can still change). Work with the title, dates and comments; do not ask for the note's text.
 
+**Lists encrypted in the browser (2.64.1).** A list whose members encrypt it in their browsers is not readable for agents
+and the API: an agent is never a member (adding one answers `409`), it gets no events of it, and with a person's token the
+list's tasks and comments come with empty texts and `encrypted: true`; every write there answers `403` (`list_e2e`). Leave
+such tasks alone and do not ask anyone to paste their texts.
+
 **Reading a file as text (2.34.0).** `GET /api/v1/attachments/{id}/text` (MCP `read_attachment`, scope
 `attachments:read`, same rights as the file itself, else `404`) answers `{id, task_id, comment_id, name, mime, size, url,
 kind, text, chars, truncated, message}`:

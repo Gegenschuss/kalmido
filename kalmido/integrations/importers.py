@@ -75,7 +75,7 @@ def import_ticktick(c, text, uid):
     if i < 0:
         raise ValueError(tr("Not a TickTick CSV (header 'Folder Name' missing)", lg=lang(c, uid)))
     rows = list(csv.DictReader(io.StringIO(text[i:])))
-    lists = {r["name"]: r["id"] for r in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0", (uid,))}
+    lists = {r["name"]: r["id"] for r in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND e2e IS NULL", (uid,))}
     inbox = my_inbox(c, uid)
     sections = {}
     stats = dict(tasks=0, skipped=0, lists=0)
@@ -1300,6 +1300,10 @@ def imp_run(c, uid, plan, opts, dry):
         plan["lists"][0]["name"] = imp_line(opts["list_name"], LIST_NAME_MAX) or plan["lists"][0]["name"]
     skip_done = opts.get("completed") == "skip"
     target = opts.get("target")
+    from ..collab.liste2eguard import le2b_list_locked, le2b_off
+    if target and le2b_list_locked(c, target):  # 2.64.1 B (#1817): the server cannot write texts into a list with the lock
+        # 2.64.1 review (H1): raised, not returned -- import_any / the v1 route jsonify the result (a response tuple was a 500)
+        raise Denied(409, le2b_off())
     c.commit()  # a clean transaction: nothing of this import is written before it is complete
     ts, now = iso(now_utc()), local_now()
     src = plan["source"]
@@ -1309,8 +1313,8 @@ def imp_run(c, uid, plan, opts, dry):
     s_all = usettings(c, uid)
     base_t = s_all.get("allday_time") or "09:00"
     own = {}
-    for r in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 ORDER BY id", (uid,)):
-        own.setdefault(r["name"], r["id"])
+    for r in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND e2e IS NULL ORDER BY id", (uid,)):
+        own.setdefault(r["name"], r["id"])  # 2.64.1 B (#1817): never into a list with the lock (a new list of that name instead)
     collab = collab_all()
     # a task's effective parent: same list, at most MAX_DEPTH levels (deeper ones hang below the deepest allowed level)
     where = {}
@@ -1462,6 +1466,8 @@ def imp_opts(form, uid):
     if tg != "new":
         o["target"] = as_int(tg, "target", 1)
         need_list(db(), o["target"])  # 404 / 403 (view only) like every other write
+        from ..collab.liste2e import le2a_gen_refuse
+        le2a_gen_refuse(db(), o["target"])  # 2.64.1 review (H1): 409 code list_e2e_plain before the file is even parsed
     for k, allowed in (("mode", ("sections", "lists")), ("archived", ("skip", "done")), ("completed", ("import", "skip")),
                        ("priority_scale", ("auto", "1", "4"))):
         v = str(form.get(k) or "").strip()

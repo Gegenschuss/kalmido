@@ -204,7 +204,7 @@ def ics_build(c, u):
     if s.get("ical_scope") == "mine":
         where += " AND ((l.owner_id=? AND (t.assignee_id IS NULL OR t.assignee_id=?)) OR t.assignee_id=?)"
         args += [uid, uid, uid]
-    rows = c.execute(f"""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox FROM tasks t JOIN lists l ON l.id=t.list_id
+    rows = c.execute(f"""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.e2e AS list_e2e FROM tasks t JOIN lists l ON l.id=t.list_id
                          WHERE {where} ORDER BY t.due, t.id LIMIT {ICAL_MAX}""", args).fetchall()
     host = urllib.parse.urlparse(PUBLIC_URL).hostname or "kalmido"
     key = getattr(TZ, "key", "UTC")
@@ -215,7 +215,10 @@ def ics_build(c, u):
              "REFRESH-INTERVAL;VALUE=DURATION:PT15M", "X-PUBLISHED-TTL:PT15M"]
     if any(r["due_time"] for r in rows):
         lines += ics_vtimezone(TZ, local_now().year)
+    from ..collab.liste2e import LE2E_NEUTRAL
     for t in rows:
+        if t["list_e2e"]:  # 2.64.1 B (#1817): a list with the lock: the neutral word, date and alarms stay, no text
+            t = {**dict(t), "title": tr(LE2E_NEUTRAL, lg=lg), "content": "", "url": ""}
         try:
             lines += ics_event(t, s, lg, host, key, stamp)
         except (ValueError, TypeError) as e:  # one broken row never breaks the whole feed

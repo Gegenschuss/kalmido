@@ -71,6 +71,8 @@ def op_book_edit(c, uid, bid, b):
             lid = as_int(lid, "birthdays_list_id", 1)
             if list_role(c, lid, uid) not in WRITE_ROLES:
                 raise Denied(404)
+            from ..collab.liste2e import le2a_gen_refuse
+            le2a_gen_refuse(c, lid)  # 2.64.1 review (M3): birthdays would land in plain text
             if bk["src_id"]:
                 raise BadInput(tr("The birthdays of an imported address book come from its source"))
             f["occ_list_id"] = lid

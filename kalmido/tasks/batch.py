@@ -56,6 +56,9 @@ def task_reorder():
                 raise Denied(403, tr("Participants cannot move tasks to another list"))
             need_list(c, as_int(it["list_id"], "list_id", 1))
             check_move(c, r[0], int(it["list_id"]))
+            from ..collab.liste2e import LE2EDenied, le2a_moving
+            if le2a_moving(c, r[0], int(it["list_id"])):  # 2.64.1 (#1817): into / out of a list with the lock only with the texts (PATCH)
+                raise LE2EDenied("list_e2e_move")
         items.append(it)
     shifted = []
     for it in items:

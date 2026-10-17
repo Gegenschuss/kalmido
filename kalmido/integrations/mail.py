@@ -72,8 +72,12 @@ def mail_info():
     for lid, t in toks.items():
         if lid is None:
             continue
-        l = c.execute("SELECT id, name FROM lists WHERE id=?", (lid,)).fetchone()
+        l = c.execute("SELECT id, name, e2e FROM lists WHERE id=?", (lid,)).fetchone()
         if l and list_role(c, lid) in WRITE_ROLES:
+            if l["e2e"]:  # 2.64.1 B (#1817): the address is off in a list with the lock (the dialog shows why)
+                from ..collab.liste2eguard import le2b_off
+                lists.append({"list_id": lid, "name": l["name"], "address": "", "e2e": True, "reason": le2b_off()})
+                continue
             lists.append({"list_id": lid, "name": l["name"], "address": mail_addr(t)})
     u = c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone()
     return jsonify(enabled=MAIL_IN_ON, address=mail_addr(toks.get(None)) if MAIL_IN_ON else "", plain=MAIL_ADDRESS if MAIL_IN_ON else "",
@@ -95,6 +99,9 @@ def mail_token_new():
         if isinstance(lid, bool) or not isinstance(lid, int):
             return err(tr("Invalid value: {0}", "list_id"))
         need_list(c, lid)
+        from ..collab.liste2eguard import le2b_list_locked, le2b_off
+        if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): no mail address for a list with the lock
+            return jsonify(error=le2b_off(), code="list_e2e"), 409
     tok = secrets.token_urlsafe(12).replace("-", "x").replace("_", "y")
     c.execute("DELETE FROM mail_tokens WHERE user_id=? AND list_id IS NOT DISTINCT FROM ?", (me(), lid))
     c.execute("INSERT INTO mail_tokens(token,user_id,list_id,created_at) VALUES(?,?,?,?)", (tok, me(), lid, iso(now_utc())))
@@ -158,6 +165,9 @@ def mail_target(c, msg):
             u = c.execute("SELECT disabled FROM users WHERE id=?", (r["user_id"],)).fetchone()
             if not u or u["disabled"]:
                 return None, None
+            from ..collab.liste2eguard import le2b_list_locked
+            if r["list_id"] and le2b_list_locked(c, r["list_id"]):
+                return None, None  # 2.64.1 B (#1817): a list with the lock takes no mail (like an unknown address)
             if r["list_id"] and list_role(c, r["list_id"], r["user_id"]) not in WRITE_ROLES:
                 return r["user_id"], None  # no longer allowed in that list: the inbox
             return r["user_id"], r["list_id"]
@@ -282,6 +292,9 @@ def mail_send(to, subject, text, html_body=None, images=None, from_name=None, at
     """Sends one mail with KALMIDO_SMTP_*; raises on failure. images: {cid: (bytes, subtype)} shown in the HTML part
     (2.22.0: the logo of the invitation); from_name: a display name for the sender. 2.38.0 (#1021): attachments =
     [(file name, bytes, mime type)] (invoice PDF / XML), cc = a second address, reply_to = the sender's own address."""
+    from ..collab.liste2eguard import le2b_net
+    subject, text = le2b_net(subject), le2b_net(text)  # 2.64.1 B (#1817): never a ciphertext of a list with the lock in a mail
+    html_body = le2b_net(html_body) if html_body else html_body
     m = email.message.EmailMessage()
     m["From"], m["To"], m["Subject"] = (email.utils.formataddr((from_name, SMTP["from"])) if from_name else SMTP["from"]), to, subject
     if cc:
@@ -317,7 +330,7 @@ def mail_send(to, subject, text, html_body=None, images=None, from_name=None, at
 def digest_mail_content(c, uid, today):
     """(subject, text, html) of a person's daily summary: due today / overdue, tomorrow, what waits for them, unread."""
     lg = lang(c, uid)
-    rows = c.execute(f"""SELECT t.id, t.title, t.due, t.due_time, t.priority, l.name AS lname FROM tasks t JOIN lists l ON l.id=t.list_id
+    rows = c.execute(f"""SELECT t.id, t.title, t.due, t.due_time, t.priority, l.name AS lname, l.e2e AS le2e FROM tasks t JOIN lists l ON l.id=t.list_id
                          WHERE t.status=0 AND t.deleted_at IS NULL AND t.parent_id IS NULL AND t.due IS NOT NULL AND t.due<=? AND l.archived=0
                            AND ((l.owner_id=? AND (t.assignee_id IS NULL OR t.assignee_id=?)) OR (t.assignee_id=? AND t.list_id IN {vis_sql()}))
                          ORDER BY t.due, t.due_time IS NULL, t.due_time, t.priority DESC LIMIT 60""",
@@ -334,7 +347,14 @@ def digest_mail_content(c, uid, today):
     parts = []
     for head, xs in ((tr("Overdue", lg=lg), over), (tr("Today", lg=lg), tod), (tr("Tomorrow", lg=lg), tmr)):
         if xs:
-            parts.append(f"{head} ({len(xs)})\n" + "\n".join(line(r) for r in xs[:25]))
+            # 2.64.1 B (#1817): tasks of a list with the lock as one line per list ("3 tasks in <list> (encrypted)")
+            lk = {}
+            for r in xs:
+                if r["le2e"]:
+                    lk[r["lname"]] = lk.get(r["lname"], 0) + 1
+            shown = [line(r) for r in xs if not r["le2e"]][:25]
+            shown += ["- " + trn("{0} task in {1} (encrypted)", "{0} tasks in {1} (encrypted)", k, ln, lg=lg) for ln, k in lk.items()]
+            parts.append(f"{head} ({len(xs)})\n" + "\n".join(shown))
     extra = []
     if waits:
         extra.append(trn("{0} approval waits for you", "{0} approvals wait for you", waits, lg=lg))

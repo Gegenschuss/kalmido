@@ -49,6 +49,8 @@ def log_act(c, tid, kind, data=None, uid=None):
         wh_note(c, tid, kind)  # webhooks: collected per request, queued after a successful response
         from ..notify.taskbell import tbl_note
         tbl_note(c, tid, kind, uid)  # 2.53.0 C (#1424): "Urgent" on the task: every change is a push
+    from ..collab.liste2eguard import le2b_act_data
+    data = le2b_act_data(c, tid, kind, data)  # 2.64.1 B (#1817): never a text of a list with the lock in the history
     ts, js = iso_ms(now_utc()), json.dumps(data or {}, ensure_ascii=False)
     if kind in ACT_MERGE:
         last = c.execute("SELECT id, user_id, kind, data, created_at FROM activity WHERE task_id=? ORDER BY id DESC LIMIT 1",
@@ -74,7 +76,9 @@ def log_changes(c, tid, old, act=None):
     if ch("content") and act == "md_subtasks" and (old["content"] or "").strip():
         # 2.40.0 (#1409): "Turn the open checklist items into subtasks" keeps the text before in the history (own entry, never
         # merged), the app offers "Restore" there -- after a reload and on every device
-        log_act(c, tid, "md_subtasks", {"prev": (old["content"] or "")[:20000]})
+        # 2.64.1 B (#1817): a ciphertext is kept whole (cut it would be lost)
+        prev = old["content"] or ""
+        log_act(c, tid, "md_subtasks", {"prev": prev if prev.startswith("e2e1:") else prev[:20000]})
     elif ch("content"):
         log_act(c, tid, "content")
     if ch("due") or ch("due_time") or ch("start"):
@@ -116,6 +120,10 @@ def check_url(f):
     if "url" not in f:
         return None
     u = (f["url"] or "").strip() if isinstance(f["url"], (str, type(None))) else ""
+    from ..collab.liste2e import le2e_is_cipher, le2e_parse
+    if le2e_is_cipher(u):  # 2.64.1 (#1817): the encrypted link of a list with the lock (le2e_guard checks the list)
+        f["url"] = u
+        return None if le2e_parse(u) else tr("Invalid value: {0}", "url")
     f["url"] = u or None
     return tr("The link must be a web address (https://…) or a file link (smb://…, file://…)") if u and not valid_link(u) else None  # 2.35.0 (#186): file links too
 
@@ -306,6 +314,7 @@ def clean_task(b):
     """Client values -> column values (validated; BadInput with a message otherwise)."""
     from ..personal.timetrack import BadInput
     from ..family.family import clean_fam, clean_rotation, STARS_MAX
+    from ..collab.liste2e import le2a_clean_cipher, le2e_is_cipher
     out = {}
     for k in TASK_FIELDS:
         if k in b:
@@ -317,11 +326,12 @@ def clean_task(b):
             if k == "title":
                 if v is not None and not isinstance(v, str):
                     raise BadInput(tr("Invalid value: {0}", tr("Title")))
-                v = (v or "").strip()[:TITLE_MAX]
+                # 2.64.1 (#1817): a ciphertext of a list with the lock is never stripped or cut (le2e_guard checks the list)
+                v = le2a_clean_cipher(v, tr("Title")) if le2e_is_cipher(v) else (v or "").strip()[:TITLE_MAX]
             if k == "content":
                 if v is not None and not isinstance(v, str):
                     raise BadInput(tr("Invalid value: {0}", tr("Description")))
-                v = (v or "")[:CONTENT_MAX]
+                v = le2a_clean_cipher(v, tr("Description")) if le2e_is_cipher(v) else (v or "")[:CONTENT_MAX]
             if k in ("list_id", "section_id", "parent_id", "assignee_id", "assignee_group_id") and v is not None:
                 v = as_int(v, k, 1)
             if k == "priority":

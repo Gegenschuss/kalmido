@@ -187,8 +187,8 @@ def _reminders(lead):
 # ---- the lists of the package
 def life_list(c, uid, kind, create=True):
     """The first not archived list of life kind `kind` the user may write (own first), created when missing (create)."""
-    r = c.execute(f"""SELECT id FROM lists WHERE life=? AND archived=0 AND id IN {wr_sql()}
-                      ORDER BY owner_id!=?, id LIMIT 1""", (kind, uid, uid, uid)).fetchone()
+    r = c.execute(f"""SELECT id FROM lists WHERE life=? AND archived=0 AND e2e IS NULL AND id IN {wr_sql()}
+                      ORDER BY owner_id!=?, id LIMIT 1""", (kind, uid, uid, uid)).fetchone()  # 2.64.1 review (M3): never a list with the lock
     if r:
         return r[0]
     return life_list_create(c, uid, kind) if create else None
@@ -211,6 +211,8 @@ def _target_list(c, uid, b, kind):
     if lid not in (None, ""):
         lid = as_int(lid, "list_id", 1)
         need_list(c, lid)
+        from ..collab.liste2e import le2a_gen_refuse
+        le2a_gen_refuse(c, lid)  # 2.64.1 review (M3)
         return lid
     return life_list(c, uid, kind)
 

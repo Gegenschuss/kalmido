@@ -191,7 +191,8 @@ def _report(lid, a):
     from ..core.i18n import LANGS
     if lg and lg != "en" and lg not in LANGS:
         raise BadInput(tr("Invalid value: {0}", "lang"))
-    d["markdown"] = status_markdown(d, lg or None)
+    from ..collab.liste2eguard import le2b_net
+    d["markdown"] = le2b_net(status_markdown(d, lg or None))  # 2.64.1 B (#1817): the text names locked tasks with the neutral word
     return d
 
 

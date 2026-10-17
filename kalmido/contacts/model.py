@@ -913,6 +913,9 @@ def occ_sync(c, cid):
         return
     if list_role(c, r["occ_list_id"], r["owner_id"]) not in WRITE_ROLES:
         return
+    from ..collab.liste2e import le2a_gen_locked
+    if le2a_gen_locked(c, r["occ_list_id"]):  # 2.64.1 review (M3): no plain birthday titles in a list with the lock
+        return
     lg = lang(c, r["owner_id"])
     for kind, val in (("birthday", r["bday"]), ("anniversary", r["anniversary"])):
         ln = c.execute("SELECT * FROM contact_occ WHERE contact_id=? AND kind=?", (cid, kind)).fetchone()

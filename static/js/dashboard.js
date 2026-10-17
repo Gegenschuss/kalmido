@@ -473,9 +473,9 @@ function mailHtml(j) {
   if (!j) return `<div class="muted">${tr('Loading…')}</div>`;
   const row = (lab, addr, lid) => `<div class="row mailrow"><label>${esc(lab)}</label>${addr ? `<code class="topic mailaddr">${esc(addr)}</code><button type="button" class="btn sm" data-mail="copy" data-addr="${esc(addr)}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm" data-mail="new" data-lid="${lid ?? ''}">${ic('sync', 's')} ${tr('New address')}</button><button type="button" class="iconbtn" data-mail="del" data-lid="${lid ?? ''}" aria-label="${esc(tr('Remove') + ': ' + addr)}">${ic('x', 's')}</button>`
     : `<button type="button" class="btn sm pri" data-mail="new" data-lid="${lid ?? ''}">${ic('plus', 's')} ${tr('Create an address')}</button>`}</div>`;
-  const own = S.lists.filter(l => !l.archived && !l.is_inbox && canEditList(l.id) && !j.lists.some(x => x.list_id === l.id));
+  const own = S.lists.filter(l => !l.archived && !l.is_inbox && !l.e2e && canEditList(l.id) && !j.lists.some(x => x.list_id === l.id));  // 2.64.1 (#1817): not for a locked list
   return j.enabled ? `${row(tr('Your basket'), j.address)}
-    ${j.lists.map(x => row(x.name, x.address, x.list_id)).join('')}
+    ${j.lists.map(x => listById(x.list_id)?.e2e && typeof le2u_mailRow === 'function' ? le2u_mailRow(x) : row(x.name, x.address, x.list_id)).join('')}${''/* 2.64.1 (#1817): a locked list has no mail address */}
     ${own.length ? `<div class="row"><label for="mail-list">${tr('For a list')}</label><select id="mail-list" data-native>${own.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select><button type="button" class="btn sm" data-mail="newlist">${ic('plus', 's')} ${tr('Create')}</button></div>` : ''}
     <div class="shint">${tr('Subject = title, the text = description, attachments become files. Keep the address secret: whoever knows it can add tasks.')}</div>
     <div class="row"><label></label>${mchk('s-mailme', j.from_me, tr('Mails from my own address ({0}) to {1} go to my basket', j.email || tr('none set'), j.plain))}</div>
