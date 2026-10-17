@@ -44,7 +44,7 @@ const recode = (code, u) => { const j = JSON.parse(Buffer.from(code.slice('kalmi
   check(/No other server connected yet/.test(box().textContent), 'the empty state');
 
   // ---- a broken code: the reason in the dialog
-  click(w, d.querySelector('.smodal [data-msv="add"]')); await until(() => d.querySelector('.msvmodal'));
+  click(w, d.querySelector('.smodal [data-msva="add"]')); await until(() => d.querySelector('.msvmodal'));
   let md = d.querySelector('.msvmodal');
   md.querySelector('#msv-code').value = 'kalmido-link:nonsense';
   click(w, md.querySelector('[data-m="ok"]'));
@@ -64,7 +64,7 @@ const recode = (code, u) => { const j = JSON.parse(Buffer.from(code.slice('kalmi
   const SID = links[0].id;
 
   // ---- edit: short name, colour, quick add default; one undo step
-  click(w, row().querySelector('[data-msv="edit"]')); await until(() => d.querySelector('.msvmodal'));
+  click(w, row().querySelector('[data-msva="edit"]')); await until(() => d.querySelector('.msvmodal'));
   md = d.querySelector('.msvmodal');
   check(md.querySelector('#msv-en').value === 'Home' && md.querySelectorAll('[data-msvcol]').length === 12, 'the edit dialog: name, 12 colours');
   const es = md.querySelector('#msv-es'); es.value = 'h2x'; es.dispatchEvent(new w.Event('input', {bubbles: true}));
@@ -85,7 +85,7 @@ const recode = (code, u) => { const j = JSON.parse(Buffer.from(code.slice('kalmi
 
   // ---- remove with the confirmation, undo
   await until(() => row());
-  click(w, row().querySelector('[data-msv="del"]')); await until(() => d.querySelector('.cdlg'));
+  click(w, row().querySelector('[data-msva="del"]')); await until(() => d.querySelector('.cdlg'));
   check(/revoke/.test(d.querySelector('.cdlg').textContent), 'the confirmation names revoking the token over there');
   d.querySelector('.cdlg [data-cd="yes"]').click();
   await until(async () => (await call('GET', '/api/servers')).links.length === 0);
@@ -96,7 +96,7 @@ const recode = (code, u) => { const j = JSON.parse(Buffer.from(code.slice('kalmi
   check((await call('GET', '/api/servers')).links[0]?.id === SID, 'undo brings the same account back');
 
   // ---- a connection code for another server
-  click(w, d.querySelector('.smodal [data-msv="code"]')); await until(() => d.querySelector('.msvmodal'));
+  click(w, d.querySelector('.smodal [data-msva="code"]')); await until(() => d.querySelector('.msvmodal'));
   md = d.querySelector('.msvmodal');
   check(md.querySelector('.msvout').hidden && md.querySelector('[data-m="copy"]').hidden, 'before: no code, no copy button');
   md.querySelector('#msv-cn').value = 'Phone';
