@@ -28,14 +28,14 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
   check(r.ok, 'setup');
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
-  const feats = async ck => { const st = (await call('GET', '/api/state', null, ck)).j; await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: [...(st.settings?.features || '').split(',').filter(Boolean), 'wiki'].join(',')}, ck); };
+  const feats = async ck => { const st = (await call('GET', '/api/state', null, ck)).j; await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: [...(st.settings?.features || '').split(',').filter(Boolean), 'wiki', 'collab'].join(',')}, ck); };
   await feats(CK);
   const ME = (await call('GET', '/api/state')).j.me.id;
   const ORG = (await call('POST', '/api/admin/orgs', {name: 'Alpha', admin_id: ME})).j.id;
   const SP = 'org:' + ORG;
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'})).j.id;
   const CAROL = (await call('POST', '/api/users', {username: 'carol', display_name: 'Carol', password: 'password123', email: 'carol@example.com'})).j.id;
-  check((await call('PUT', `/api/orgs/${ORG}/members`, {user_id: BOB, role: 'member'})).status < 300, 'setup: Bob in the organisation');
+  check((await call('PUT', `/api/orgs/${ORG}/members`, {email: 'bob@example.com', role: 'member'})).status < 300, 'setup: Bob in the organisation');
   const CKB = await login('bob'), CKC = await login('carol');
   await feats(CKB); await feats(CKC);
   const T = (await call('POST', '/api/tasks', {title: 'Task for the mention'})).j.id;
@@ -115,26 +115,29 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
       return es.map(x => x.name + '=' + td.decode(x.data()).slice(0, 40)); })().catch(e => ['ERR ' + e.message])`);
     check(ex.some(x => x.startsWith(`Notes/Start.md=${M} start page`)) && ex.some(x => x.startsWith('Templates/Meeting.md=')), 'export: a ZIP of the decrypted .md files with the plain names ' + JSON.stringify(ex).slice(0, 300));
     const im = await ev(`(async () => { const te = new TextEncoder();
-      const z = wkeZip([{name: 'Imp/One.md', data: te.encode('${M} imported one')}, {name: '../evil/Two.md', data: te.encode('${M} two')}, {name: 'notes.txt', data: te.encode('x')}, {name: 'notes/start.md', data: te.encode('dup')}]);
+      const z = wkeZip([{name: 'Imp/One.md', data: te.encode('${M} imported one')}, {name: ' Sub / Two [x].md', data: te.encode('${M} two')}, {name: '../evil/Three.md', data: te.encode('x')}, {name: 'notes.txt', data: te.encode('x')}, {name: 'notes/start.md', data: te.encode('dup')}]);
       const r = await wkeImport(${JSON.stringify(SP)}, new File([z], 'w.zip', {type: 'application/zip'}));
       await wk_load(${JSON.stringify(SP)}, true);
       const cs = new Blob([te.encode('${M} deflated')]).stream().pipeThrough(new CompressionStream('deflate-raw'));
       const inf = new TextDecoder().decode(await wkeInflate(new Uint8Array(await new Response(cs).arrayBuffer())));
       return {c: r.created.length, s: r.skipped, paths: wk_pages(${JSON.stringify(SP)}).map(x => x.path), inf}; })().catch(e => ({err: e.message}))`);
-    check(im.c === 2 && im.paths?.includes('Imp/One') && im.paths?.includes('evil/Two') && im.s?.includes('notes.txt') && im.s?.includes('notes/start.md'), 'import: .md files created encrypted, paths cleaned, others / taken names skipped ' + JSON.stringify(im).slice(0, 300));
+    check(im.c === 2 && im.paths?.includes('Imp/One') && im.paths?.includes('Sub/Two x') && im.s?.includes('../evil/Three.md') && im.s?.includes('notes.txt') && im.s?.includes('notes/start.md'), 'import: .md files created encrypted, paths cleaned, others / taken names skipped ' + JSON.stringify(im).slice(0, 300));
     check(im.inf === `${M} deflated`, 'import: deflate entries open with DecompressionStream');
     idx = (await call('GET', '/api/wiki?space=' + SP + '&bodies=1')).j;
-    check(!JSON.stringify(idx).includes(M) && !JSON.stringify(idx).includes('evil'), 'the imported pages are ciphers on the server');
+    check(!JSON.stringify(idx).includes(M) && !JSON.stringify(idx).includes('Sub/'), 'the imported pages are ciphers on the server');
 
     // the view: lock mark, tree, dialog
     await boot('#wiki');
-    check(await waitFor(`!!document.querySelector('#view .wkemark') && [...document.querySelectorAll('#view .wkitem')].some(a => a.textContent.includes('Start'))`), 'the view: lock mark at the space and the decrypted tree');
+    await unlock();  // the keys of this device: the passphrase again after the reload
+    check(await waitFor(`!!document.querySelector('#view .wkemark')`), 'the view: lock mark at the space ' + await ev(`(document.querySelector('#view')?.innerHTML || '').slice(0, 300)`));
+    await ev(`(document.querySelector('#view [data-wke="unlock"]')?.click(), 1)`);  // the lock box: "Unlock"
+    check(await waitFor(`[...document.querySelectorAll('#view .wkitem')].some(a => a.textContent.includes('Start'))`), 'the view: the decrypted tree after "Unlock" ' + await ev(`(document.querySelector('#wk-res')?.textContent || '').slice(0, 200)`));
     await ev(`(wkeDlg(${JSON.stringify(SP)}), 1)`);
     check(await waitFor(`(document.querySelector('.wkedlg')?.textContent || '').includes('Bob')`), 'the dialog "Encryption…" lists the members with their key state');
     await shot('dialog');
     await ev(`(document.querySelector('.cdlg [data-cd="yes"]')?.click(), 1)`);
     check(!(await sweep()), 'H1: no localStorage entry holds a plain text of the space ' + await sweep());
-    check(await ev(`(e2eLock(), !WKE.memo.size && !Object.keys(WKE.keys).length && !WK.idx[${JSON.stringify(SP)}] && !JSON.stringify(HIST.undo).includes('Notes'))`), 'lock: the decrypted pages and keys leave the page');
+    check(await ev(`(e2eLock(), !WKE.memo.size && !Object.keys(WKE.keys).length && !(WK.idx[${JSON.stringify(SP)}]?.pages || []).some(p => p.path) && !JSON.stringify(HIST.undo).includes('Notes'))`), 'lock: the decrypted pages and keys leave the page');
   });
 
   // ---------------------------------------------------------------- Bob reads with his own key
@@ -146,7 +149,7 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
 
   // ---------------------------------------------------------------- Carol joins: waiting list, release, she reads
   await session('carol', async ({ev, unlock}) => { check(await unlock(), 'Carol sets up encryption'); });
-  check((await call('PUT', `/api/orgs/${ORG}/members`, {user_id: CAROL, role: 'member'})).status < 300, 'Carol joins the organisation');
+  check((await call('PUT', `/api/orgs/${ORG}/members`, {email: 'carol@example.com', role: 'member'})).status < 300, 'Carol joins the organisation');
   await session('carol', async ({ev, unlock}) => {
     await unlock();
     const c = await ev(`(async () => { const sp = ${JSON.stringify(SP)}; await wk_load(sp, true); return {mine: WKE.st[sp]?.mine, n: wk_pages(sp).length, lock: wkeLockHtml(sp)}; })().catch(e => ({err: e.message}))`);
