@@ -696,6 +696,18 @@ Setting up listmonk (version 4 or newer) for Kalmido:
    the API user's name and the token.
 4. Mark the consent of your contacts (contact card > *Newsletter*), create a segment and press *Sync now*.
 
+### Office: pack catalogue (2.76)
+
+Country and industry packs beyond the shipped ones come from a catalogue the operator chooses (details, index format and
+the security model: [PACKS.md](PACKS.md)). Without a catalogue Kalmido makes no network request for packs.
+
+- `KALMIDO_PACKS_CATALOG=https://example.com/kalmido-packs/index.json` - the index file; empty (default) = only the
+  shipped packs.
+- `KALMIDO_PACKS_ALLOW_HOSTS=mirror.example.com:8080` - hosts that may be internal addresses and may use `http://` (an
+  own mirror); every other host: `https://` and a public address only.
+- Installations are stored per office area in the database (table `office_pack_installs`) and travel with backups;
+  finalised documents keep their own copy of the pack.
+
 ## Moving to a new server
 
 1. **Before:** lower the DNS TTL of the name a day ahead; make a backup (*Back up now*).
