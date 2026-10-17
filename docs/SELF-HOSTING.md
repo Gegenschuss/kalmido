@@ -829,7 +829,8 @@ published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the co
   taken and marked *Unchecked* in the app. 2.79.0: with the scanner configured, an unchecked file is **held back** (403 "not
   checked for malware yet") until the later scan finds it clean - downloads, previews, public links and agents alike
   (`KALMIDO_CLAMD_STRICT=0` gives the old behaviour: unchecked files stay readable with their mark). A file too large for the
-  scanner stays unchecked, so raise `KALMIDO_CLAMD_MAX_MB` together with clamd's limit if you allow large uploads.
+  scanner is never scanned and stays readable with its mark, so keep the upload limit at or below `KALMIDO_CLAMD_MAX_MB`
+  (raise it together with clamd's `StreamMaxLength` if you allow large uploads).
   Once the scanner answers again, the server checks these files in the background
   (up to 20 per minute). Clean: the mark goes. A find: the file is **locked** - it stays stored, but nobody can download or
   preview it any more (403), and the person who uploaded it gets a News item. Deleting it is up to the people of the list.
@@ -843,7 +844,7 @@ published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the co
 | `KALMIDO_CLAMD` | `clamav:3310` in the compose file, else empty | `host:port` of clamd (TCP) or the path of its unix socket; empty = no scan |
 | `KALMIDO_CLAMD_MAX_MB` | `100` | larger files are not sent to the scanner (marked *Unchecked*); keep it at or below clamd's `StreamMaxLength` |
 | `KALMIDO_CLAMD_TIMEOUT` | `60` | seconds one scan may take |
-| `KALMIDO_CLAMD_STRICT` | on when `KALMIDO_CLAMD` is set | 2.79.0: `1` = unchecked files are held back until the later scan, `0` = they stay readable (as up to 2.78) |
+| `KALMIDO_CLAMD_STRICT` | on when `KALMIDO_CLAMD` is set | 2.79.0: `1` = unchecked files are held back until the later scan (not those too large for the scanner), `0` = they stay readable (as up to 2.78) |
 
 **Switch it off** on a small server (e.g. a Raspberry Pi with 1 GB): set `KALMIDO_CLAMD=` (empty) in `.env` and delete the
 `clamav:` block (and the `clamav-db` volume entry) from `docker-compose.yml`, then `docker compose up -d --remove-orphans`.

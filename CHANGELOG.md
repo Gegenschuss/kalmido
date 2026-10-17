@@ -19,7 +19,8 @@ Security release: the fixes of the security audit #476, part 1 (one finding "hig
   client and CalDAV may see plain http. Proxies on their own Docker network had to be listed already and are not affected.
   Before, with a port published directly to the internet, every client could send forged `X-Forwarded-For` headers.
 - **Virus scanner strict mode:** with a scanner configured (`KALMIDO_CLAMD`), an upload the scanner could not check
-  (scanner down, error, file larger than `KALMIDO_CLAMD_MAX_MB`) is held back (403) until the later scan finds it clean.
+  (scanner down, error) is held back (403) until the later scan finds it clean. A file larger than `KALMIDO_CLAMD_MAX_MB`
+  is never scanned and stays readable with its *Unchecked* mark - keep the upload limit at or below it.
   `KALMIDO_CLAMD_STRICT=0` keeps the behaviour of 2.61-2.78.
 
 ### Security
@@ -31,7 +32,8 @@ Security release: the fixes of the security audit #476, part 1 (one finding "hig
 - An admin token with read-only scopes (`read`, `admin-read`) could write admin routes such as the server announcement.
   Admin routes now need their own scope as well (#1888).
 - The first OIDC login could take over an existing local account (also an admin, bypassing its second factor) through a
-  matching user name claim alone. A user name match now needs the same verified e-mail; admins, accounts with a second
+  matching user name claim alone. A user name match now needs the same verified e-mail (accounts made for SSO without
+  password and e-mail link as before); admins, accounts with a second
   factor and child accounts are linked only from their own open session (log in with the password, then use the provider's
   button once in the same browser). Accounts already linked are not affected (#1889).
 - About 100 wrong invitation / password / sign-in link tokens from a few addresses locked these links for everybody for 15

@@ -186,9 +186,12 @@ check(err_of(r) == "disabled" and "kalmido_session" not in r.cookies, "disabled 
 s, r = oidc_login({"sub": "sub-other", "preferred_username": "frank"})
 check(err_of(r) == "no_account", "a second subject cannot take over an already linked user by name")
 # 2.79.0 (#476 M3): a first link by the user name claim alone takes no local account over
-assert A.post(B + "/api/users", json={"username": "kim"}).ok
-s, r = oidc_login({"sub": "sub-kim", "preferred_username": "kim"})
-check(err_of(r) == "link" and dbx("SELECT oidc_subject FROM users WHERE username='kim'")[0][0] is None, "M3: user name without a verified e-mail -> link, not linked")
+assert A.post(B + "/api/users", json={"username": "kai", "password": "password123"}).ok
+s, r = oidc_login({"sub": "sub-kai", "preferred_username": "kai"})
+check(err_of(r) == "link" and dbx("SELECT oidc_subject FROM users WHERE username='kai'")[0][0] is None, "M3: a local account (password) by user name alone -> link, not linked")
+assert A.post(B + "/api/users", json={"username": "ssoonly"}).ok
+s, r = oidc_login({"sub": "sub-ssoonly", "preferred_username": "ssoonly"})
+check(err_of(r) == "ok" and dbx("SELECT oidc_subject FROM users WHERE username='ssoonly'")[0][0] == ISS + "|sub-ssoonly", "M3: an account made for SSO (no password, no e-mail) still links by user name")
 s, r = oidc_login({"sub": "sub-hank3", "preferred_username": "hank", "email": "mallory@example.test", "email_verified": True})
 check(err_of(r) == "link" and dbx("SELECT oidc_subject FROM users WHERE username='hank'")[0][0] is None, "M3: user name with another verified e-mail -> link")
 s, r = oidc_login({"sub": "sub-alice-x", "preferred_username": "alice"})

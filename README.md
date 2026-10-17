@@ -1845,7 +1845,7 @@ Register Kalmido at the provider as a confidential client with the redirect URI 
 **Accounts:** by default only users an admin created can log in. The first OIDC login links a user whose user name
 equals the username claim, or whose e-mail (optional field in *Settings > Administration*) equals the provider's **verified**
 e-mail; from then on the provider's subject (issuer + `sub`) decides, even if the name changes. 2.79.0: a user name match
-needs the same verified e-mail as well, and admins, accounts with a second factor and child accounts are linked only from
+needs the same verified e-mail as well (accounts made for SSO, without password and e-mail, link as before), and admins, accounts with a second factor and child accounts are linked only from
 their own open session (log in with the password, then use the provider's button once in the same browser). Without a match the
 login page says "no account, ask the admin". *Create accounts on the first OIDC login* (admin switch) creates them
 instead (no admin rights unless the admin group says so, no password). An admin can unlink a user again.

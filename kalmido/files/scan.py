@@ -334,8 +334,8 @@ def sc_up(c, kind, items, key="id"):
 
 
 def sc_strict():
-    """2.79.0 (#476 M7): strict mode = a file the scanner could not check yet (scanner down, error, too large for it) is
-    locked like an infected one until the later scan finds it clean. KALMIDO_CLAMD_STRICT=1 / 0; not set = on whenever a
+    """2.79.0 (#476 M7): strict mode = a file the scanner could not check yet (scanner down, error) is locked like an
+    infected one until the later scan finds it clean (a file too large for the scanner keeps its mark only). KALMIDO_CLAMD_STRICT=1 / 0; not set = on whenever a
     scanner is configured (KALMIDO_CLAMD). Off = the behaviour of 2.61-2.78: unchecked files stay readable, with their mark."""
     v = (os.environ.get("KALMIDO_CLAMD_STRICT") or "").strip().lower()
     if v in ("0", "off", "no", "false"):
@@ -343,14 +343,14 @@ def sc_strict():
     return sc_target() is not None
 
 
-def _sc_state_row(c, kind, ref_id, ver, state):
+def _sc_state_row(c, kind, ref_id, ver, state, more=""):
     from ..core.pg import system_ctx
     if kind == "fs":
         cur, args = ("?", (int(ver),)) if ver else ("COALESCE((SELECT cur_version FROM fs_nodes WHERE id=?), 0)", (int(ref_id),))
     else:
         cur, args = "0", ()
     with system_ctx(c):  # a public link / an agent sees the lock like everyone (the caller checked the read right)
-        return c.execute(f"SELECT sig FROM upload_scan WHERE kind=? AND ref_id=? AND state=? AND ver={cur}",
+        return c.execute(f"SELECT sig FROM upload_scan WHERE kind=? AND ref_id=? AND state=? AND ver={cur} {more}",
                          (kind, int(ref_id), state, *args)).fetchone()
 
 
@@ -363,8 +363,12 @@ def sc_locked(c, kind, ref_id, ver=None):
 
 
 def sc_waiting(c, kind, ref_id, ver=None):
-    """2.79.0 (#476 M7): True when strict mode holds this file back because it is not checked yet."""
-    return bool(ref_id) and sc_strict() and bool(_sc_state_row(c, kind, ref_id, ver, "unchecked"))
+    """2.79.0 (#476 M7): True when strict mode holds this file back because it is not checked yet. A file too large for
+    the scanner (why 'size') is never scanned later, so it stays readable with its mark (else it would be locked for good)."""
+    if not ref_id or not sc_strict():
+        return False
+    r = _sc_state_row(c, kind, ref_id, ver, "unchecked", "AND why=''")
+    return bool(r)
 
 
 def sc_guard(c, kind, ref_id, ver=None):

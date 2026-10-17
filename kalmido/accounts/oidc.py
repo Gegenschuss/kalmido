@@ -328,13 +328,18 @@ def oidc_link_ok(c, u, how, email, sess_uid):
     """2.79.0 (#476 M3): may this login link the existing local account u for the first time (how = username | email)?
     The account's own open session always may. Otherwise never an agent, a child account, an admin or an account with a
     second factor (the provider's login would skip it), and a match by user name only with the same verified e-mail too
-    (a provider where people choose their user name must not take over a local account). Linked accounts stay as they are."""
+    (a provider where people choose their user name must not take over a local account) or for an account made for single
+    sign-on (no password, no e-mail). Linked accounts stay as they are."""
     if sess_uid is not None and sess_uid == u["id"]:
         return True
     from .login import twofa_methods
     if u["kind"] != "user" or u["kid"] or u["is_admin"] or twofa_methods(c, u):
         return False
-    return how == "email" or bool(email and (u["email"] or "").strip().lower() == email)
+    if how == "email" or bool(email and (u["email"] or "").strip().lower() == email):
+        return True
+    # an account an admin made for single sign-on (no password, no e-mail: README "New user (SSO login = ...)") is linked
+    # by its user name as before; it cannot log in any other way, so there is no session to link it from
+    return not u["password_hash"] and not (u["email"] or "").strip()
 
 
 def _oidc_account(c, claims, sess_uid=None):
