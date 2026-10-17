@@ -593,6 +593,9 @@ ROUTES = {
     "GET /api/newsletter": "newsletter", "PUT /api/newsletter": "newsletter", "DELETE /api/newsletter": "newsletter",
     "GET /api/newsletter/lists": "newsletter", "POST /api/newsletter/segments": "newsletter", "PATCH /api/newsletter/segments/{}": "newsletter",
     "DELETE /api/newsletter/segments/{}": "newsletter", "POST /api/newsletter/sync": "newsletter", "PUT /api/newsletter/consent": "newsletter",
+    # 2.71.0 A (#1457): rules of a list (owner / list admins; agents read + propose) -- p271_a_api_test.py: other org 404
+    "GET /api/lists/{}/rules": "list", "POST /api/lists/{}/rules": "list", "PATCH /api/rules/{}": "list", "DELETE /api/rules/{}": "list",
+    "POST /api/rules/{}/restore": "list", "GET /api/v1/lists/{}/rules": "list", "POST /api/v1/lists/{}/rules/proposals": "list",
 }
 
 # ---- 1. every route is classified, nothing stale
