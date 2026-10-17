@@ -1041,6 +1041,9 @@ fresh; run p283_a_api "$PY" p283_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.83.0 part C: themes, header strips of lists and folders, progress rings, tick animation, the K on empty pages (#1427)
 fresh; run p283_c_api "$PY" p283_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p283_c_ui node p283_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.84.0 part A: e-mail as an input of the hub, mails filed with clients / projects (#1198)
+fresh; run p284_a_api "$PY" p284_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p284_a_ui node p284_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

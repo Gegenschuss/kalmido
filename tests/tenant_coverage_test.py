@@ -121,6 +121,8 @@ KINDS = {
                          "person's budget 404, read-only shared = no change, agents / tokens without the scope private never"),
     # 2.73.0 A (#661): the accounts of one person on other Kalmido servers (accounts/servers.py) -- private per person
     "servers": ("matrix", "p273_a_api_test.py: the server accounts of another person 404 (read, change, delete, restore, data, tasks, move); agents 403; nothing of another person's tasks moves"),
+    # 2.84.0 A (#1198): mails filed with a client / project (hub/hubmail.py hbm_can: the client / list / recipient, always in the mail's workspace)
+    "hubmail": ("matrix", "p284_a_api_test.py: a mail / attachment / address of another organisation or a private client of another person 404, a forged sender finds only the recipient's workspace, after leaving nothing, assigning across workspaces refused, agents 403"),
 }
 
 ROUTES = {
@@ -703,6 +705,11 @@ ROUTES = {
     # 2.83.0 (#1427): the header strip of a list (need_list like the list icon; p283_c_api_test.py) and of an owner's folder
     "PUT /api/lists/{}/header": "list", "POST /api/lists/{}/header": "list", "GET /api/list-header/{}/{}.jpg": "list",
     "GET /api/folder-heads": "folder", "PUT /api/folder-heads": "folder",
+    # 2.84.0 A (#1198): e-mail as an input of the hub (p284_a_api_test.py)
+    "POST /api/hubmail/address": "hubmail", "DELETE /api/hubmail/address": "hubmail", "GET /api/hubmail/mails": "hubmail",
+    "GET /api/hubmail/inbox": "hubmail", "GET /api/hubmail/mails/{}": "hubmail", "GET /api/hubmail/mails/{}/files/{}": "hubmail",
+    "GET /api/hubmail/targets": "hubmail", "POST /api/hubmail/mails/{}/assign": "hubmail", "DELETE /api/hubmail/mails/{}": "hubmail",
+    "POST /api/hubmail/mails/{}/restore": "hubmail",
 }
 
 # ---- 1. every route is classified, nothing stale
