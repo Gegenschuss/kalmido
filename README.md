@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.79.0** (2026-10-17): **security release** (audit part 1): calendar imports invite only people you may see, tighter
+  token permissions (app passwords, admin routes, child accounts, health time entries), safer first OIDC login, uploads
+  held back until the virus scan, complete backups. **Check your proxy setting** if a reverse proxy on the host reaches a
+  published Docker port (see CHANGELOG).
 - **2.78.0** (2026-10-17): **Duplicate list** in the list menu and the list dialog: a copy with sections, tasks and their dates, notepads and the page arrangement (completed tasks optional; members and shares stay with the original).
 - **2.77.0** (2026-10-17): a **pack catalogue** in Office & finance: search, install, update and remove country and industry packs per office (verified / community, checked by SHA-256, data only).
 - **2.74.0** (2026-10-17): **several Kalmido servers in one app** (work + home side by side, with server badges) and **moving** between app.kalmido.com and your own server (export everything, import with people matched by e-mail).
@@ -1840,7 +1844,9 @@ Register Kalmido at the provider as a confidential client with the redirect URI 
 
 **Accounts:** by default only users an admin created can log in. The first OIDC login links a user whose user name
 equals the username claim, or whose e-mail (optional field in *Settings > Administration*) equals the provider's **verified**
-e-mail; from then on the provider's subject (issuer + `sub`) decides, even if the name changes. Without a match the
+e-mail; from then on the provider's subject (issuer + `sub`) decides, even if the name changes. 2.79.0: a user name match
+needs the same verified e-mail as well, and admins, accounts with a second factor and child accounts are linked only from
+their own open session (log in with the password, then use the provider's button once in the same browser). Without a match the
 login page says "no account, ask the admin". *Create accounts on the first OIDC login* (admin switch) creates them
 instead (no admin rights unless the admin group says so, no password). An admin can unlink a user again.
 
@@ -1918,7 +1924,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `AUTH_PROXY_HEADER` | | Header with the user name from an authenticating proxy (e.g. `Remote-User`); empty = built-in login only |
 | `AUTH_TRUSTED_PROXIES` | | Comma list of IPs / CIDRs whose header is trusted (direct peer) |
 | `AUTH_PROXY_PORT` | | Extra container port; if set, the header is only trusted on it (see *Login*) |
-| `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1,172.17.0.1` | Reverse proxies (IPs / CIDRs of the direct peer) whose `X-Forwarded-For` / `-Proto` / `-Host` are believed: the real client address for login lockouts, logs and alerts, https for cookies and CalDAV. The `AUTH_TRUSTED_PROXIES` peers count too; `none` = trust nobody. A proxy in another container on its own Docker network arrives from that network's gateway (e.g. `172.18.0.1`): add it |
+| `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1` | Reverse proxies (IPs / CIDRs of the direct peer) whose `X-Forwarded-For` / `-Proto` / `-Host` are believed: the real client address for login lockouts, logs and alerts, https for cookies and CalDAV. The `AUTH_TRUSTED_PROXIES` peers count too; `none` = trust nobody. A proxy in another container on its own Docker network arrives from that network's gateway (e.g. `172.18.0.1`): add it. 2.79.0: the docker bridge gateway `172.17.0.1` is no longer in the default; a proxy on the host in front of a port published on Docker's default bridge needs `127.0.0.1,::1,172.17.0.1` |
 | `KALMIDO_IP_WARN_ACCOUNTS` | `3` | 2.33.0 (#834): warn in the log and under *Administration > Server* when at least this many accounts sign in from one private address within 7 days (the client addresses do not arrive: check the reverse proxy, see docs/SELF-HOSTING.md); only private addresses are kept, 14 days |
 | `KALMIDO_NOTIF_TEMPLATE` | `read` | 2.33.0 (#927): the notification template a newly shared list or folder starts with: `read` (mentions, assignments, direct replies), `work`, `all` |
 | `KALMIDO_TRUSTED_PROXY_COUNT` | `1` | Proxies in a row in front of Kalmido; the client is the entry that many places from the right in `X-Forwarded-For` |
@@ -2170,7 +2176,7 @@ setup); an existing server keeps its setting. *Back up now* makes one at any tim
 **Restore** a listed backup or an uploaded file (larger files: copy them into the backup folder, they show up in the
 list). You type `RESTORE` to confirm. Kalmido then:
 
-1. checks the archive completely: only the expected members (`manifest.json`, `kalmido.dump`, `attachments/<task>/<file>`, 2.46.0: `attachments/avatars|listicons/<file>` - a 2.45 server refuses such an archive;
+1. checks the archive completely: only the expected members (`manifest.json`, `kalmido.dump`, `attachments/<task>/<file>`, 2.46.0: `attachments/avatars|listicons/<file>` - a 2.45 server refuses such an archive; 2.79.0: `attachments/chat|budget|docthumbs/...` - a 2.78 server refuses such an archive;
    no paths outside, no links, no folders), size and member limits (`KALMIDO_BACKUP_MAX_MB`), compression ratio (zip
    bombs), free disk space, every SHA-256 while extracting, the dump's table of contents and statements (only tables,
    data, sequences, indexes, constraints and plain defaults are taken; functions, triggers and access rules are always

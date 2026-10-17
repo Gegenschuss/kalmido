@@ -263,7 +263,8 @@ This should answer `207 Multi-Status` with `current-user-principal`. A `302` to 
 App passwords can also be managed with a personal access token (`read` to list them, `write` to create or revoke). See [API.md](API.md):
 
 - `GET /api/v1/me/app-passwords`
-- `POST /api/v1/me/app-passwords` with `{"name": "..."}`
+- `POST /api/v1/me/app-passwords` with `{"name": "..."}` (2.79.0: only a token for all lists with `calendar` and `contacts`;
+  an app password opens CalDAV / CardDAV without the token's limits)
 - `DELETE /api/v1/me/app-passwords/{id}`
 
 Agents' tokens get 403.

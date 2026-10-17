@@ -7,6 +7,46 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.79.0] - 2026-10-17
+
+Security release: the fixes of the security audit #476, part 1 (one finding "high", nine "medium"; no critical finding).
+
+### Action needed (self-hosted servers)
+- **Reverse proxy on the host in front of a published Docker port:** `KALMIDO_TRUSTED_PROXIES` now defaults to loopback
+  only (`127.0.0.1,::1`); the docker bridge gateway 172.17.0.1 is no longer believed by default. If your proxy runs on the
+  host and reaches Kalmido through a port published on Docker's default bridge, set
+  `KALMIDO_TRUSTED_PROXIES=127.0.0.1,::1,172.17.0.1` in `.env` - otherwise login lockouts count per proxy instead of per
+  client and CalDAV may see plain http. Proxies on their own Docker network had to be listed already and are not affected.
+  Before, with a port published directly to the internet, every client could send forged `X-Forwarded-For` headers.
+- **Virus scanner strict mode:** with a scanner configured (`KALMIDO_CLAMD`), an upload the scanner could not check
+  (scanner down, error, file larger than `KALMIDO_CLAMD_MAX_MB`) is held back (403) until the later scan finds it clean.
+  `KALMIDO_CLAMD_STRICT=0` keeps the behaviour of 2.61-2.78.
+
+### Security
+- Importing an ICS file or saving an event from a calendar app (CalDAV) invited any account of the server named by its
+  Kalmido id as an attendee - with a News item and a push, also across organisations. Now only people you may see are
+  invited this way; other ids stay a plain address (#1886).
+- A personal API token limited to some lists (or without calendar / contacts) could create a CalDAV app password with full
+  access. Creating app passwords through the API now needs a token for all lists with `calendar` and `contacts` (#1887).
+- An admin token with read-only scopes (`read`, `admin-read`) could write admin routes such as the server announcement.
+  Admin routes now need their own scope as well (#1888).
+- The first OIDC login could take over an existing local account (also an admin, bypassing its second factor) through a
+  matching user name claim alone. A user name match now needs the same verified e-mail; admins, accounts with a second
+  factor and child accounts are linked only from their own open session (log in with the password, then use the provider's
+  button once in the same browser). Accounts already linked are not affected (#1889).
+- About 100 wrong invitation / password / sign-in link tokens from a few addresses locked these links for everybody for 15
+  minutes. The limit now counts per address only (#1890).
+- Child accounts kept working API tokens and CalDAV app passwords made before; the API and CalDAV now refuse child accounts
+  and making an account a child account deletes its tokens and app passwords (#1891).
+- A token without the `private` scope saw the titles and notes of health and budget tasks through its own time entries.
+  These entries are left out for such tokens and for agents (#1892).
+- Uploads the virus scanner could not check were readable at once, also through public links (strict mode above, #1893).
+
+### Fixed
+- Backups now contain the files of agent chats, the receipts of the household budget and the document previews; before,
+  their database rows were saved but the files were skipped. The manifest counts files outside the known folders
+  (`skipped_files`). A server before 2.79 refuses archives with these new members (#1894).
+
 ## [2.78.0] - 2026-10-17
 
 ### Added

@@ -41,6 +41,7 @@ You can set the provider up in **Settings › Administration › Sign-in › Set
 
 - An account linked to the provider's subject (`issuer|sub`) logs in directly.
 - Otherwise the **first** login links one existing account: the one whose user name equals the user name claim, or the one whose e-mail equals the **verified** e-mail claim (`email_verified: true`; for Microsoft Entra also `xms_edov`). Accounts are never linked any other way.
+- 2.79.0: a match by **user name** links only when the account's e-mail equals the provider's verified e-mail too (a provider where people choose their own user name cannot take over a local account). **Admins**, accounts with a **second factor** (authenticator app, passkey) and child accounts are never linked by such a match: log in with the password first, then press the provider's button once **in the same browser** - the open session links the account. The login page shows "This account is not linked to the login provider yet ..." in these cases. Accounts already linked are not affected.
 - Nobody matches: "no account". The exception is when **Create accounts on the first OIDC login** is on, in which case the person gets a new account. When the user name claim is not a valid Kalmido user name (Google sends none, Entra sends `anna@corp.example`), the new account is named after the local part of the verified e-mail. That name is used only for creating, never for matching an existing account.
 - Unlink an account under Settings › Administration › Users › edit. The next login links it again.
 

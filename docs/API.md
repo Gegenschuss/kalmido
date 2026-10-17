@@ -188,7 +188,7 @@ had been made in the app. Webhooks fire too.
 | `PATCH /me/notifications` | account | 2.1.0: change them partially: `{events?: {event: {news?, push?}}, lists?: {list_id: "all" \| "default" \| "mute" \| "custom" \| {mode: "custom", events: {event: {news?, push?}}}}}` (2.6.1: `custom` = your own choice per event for that list, events `newtask`, `comment`, `mention`, `assign`, `complete`, `status`, `unblock`, `approval`; a ticked one comes from every task of the list, an unticked one never; `"custom"` alone brings back the stored choice). Events: `comment`, `reply`, `follow`, `mention`, `assign`, `newtask`, `complete`, `status`, `share`, `unblock`, `approval`, `followup`, `reminder` (push only), `nag` (2.7.0, push only: reminders repeated until done; a muted list bell stops them) |
 | `GET /lists/{id}/notify-template` | read | 2.33.0: the list owner's notification template, a ceiling for the pushes of everyone else in the list (they can be quieter, never louder; the News list stays complete): `read` (pushes only for mentions, assignments, direct replies and approvals), `work` (+ comments on own / assigned tasks and due reminders), `all` (no limit), `custom` (the ticked events). The owner gets the whole setting (`own`, `inherited` from a shared folder, `people` with their own template); everyone else, agents included, `effective`, `by` (the owner) and `allowed` (the events that may push). Read only: only the owner changes it, in the app (*Share > Notifications for members*); agents never. A share without a template starts with `read` (server setting `KALMIDO_NOTIF_TEMPLATE`) |
 | `GET /me/app-passwords` | read | 2.9.0: your app passwords for calendar apps (`id`, `name`, `created_at`, `last_used_at`, `last_client`; never the password) and `caldav` (`url`, `server`, `username`, `principal`, `home`, `done_days`). Persons only: an agent's token gets `403` |
-| `POST /me/app-passwords` | account | 2.9.0: `{name}` -> `201` with `password` (shown only in this answer; Kalmido keeps a hash). At most 20. Log in to `/dav/` with your user name and it (see [CALDAV.md](CALDAV.md)) |
+| `POST /me/app-passwords` | account | 2.9.0: `{name}` -> `201` with `password` (shown only in this answer; Kalmido keeps a hash). At most 20. 2.79.0: only a token for all lists that also has `calendar` and `contacts` (an app password opens CalDAV / CardDAV without limits), else `403`. Log in to `/dav/` with your user name and it (see [CALDAV.md](CALDAV.md)) |
 | `DELETE /me/app-passwords/{id}` | account | 2.9.0: revoke it; the calendar app using it stops at once |
 | `GET /lists` | read | Lists the user can see: own and shared, with role (`owner`, `admin`, `edit` = member, `participant`, `view` = viewer), `done_at_bottom` (2.7.2; `checklist` = the same, deprecated), progress, `icon` (URL of the list's own picture, empty = none; set in the app), `agent_tidy`, (2.0.8) its sections `[{id, name}]` and (2.41.0) `time_tracking` (boolean: time tracking on for this list) |
 | `POST /lists` | structure | Create a list: `{name, color?, folder?, kind?, done_at_bottom?, nag?, day_hours?, time_tracking?}` (2.41.0: `time_tracking` boolean, default `false`) (`kind`: `list` default or `project`; `checklist` (deprecated) = `list` + `done_at_bottom`). `project_type` (`agency`, `software`, `private`) creates a project of that built-in type; 2.27.0: its standard sections only with `sections: true` (a boolean, only together with `project_type`) |
@@ -437,7 +437,8 @@ the turn moves on after each completion or every Monday), `people` (who comes al
 participants, and get its reminders), `stars` (what a kid account gets for completing it; `null` = 1). Lists have
 `family`: `shopping`, `meals`, `birthdays`, `household`, `packing` or `null`. A kid account takes part in shared lists
 only as a participant; it can complete / reopen what it sees, ask for rewards and change its own account, every other
-change answers `403`.
+change answers `403`. 2.79.0: a kid account has no API and no CalDAV / CardDAV (its limits live in the app): its tokens
+answer `401`, and making an account a kid account deletes its API tokens and app passwords.
 A parent can give a kid account a PIN (2.49.0, in the app only: Family > the kid's card > PIN; 4 to 6 digits, stored only as
 a hash). With a PIN the kid needs it in the app to change its account and settings or to log out; ticking off and asking
 for rewards stay free. Five wrong PINs lock it for 15 minutes and the parents get a push. Agents never see or set the
@@ -866,9 +867,11 @@ Redirects are never followed. `KALMIDO_WEBHOOKS=0` turns webhooks off.
 ## Behind a reverse proxy
 
 2.10.0: Kalmido believes `X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Host` only from the proxies in
-`KALMIDO_TRUSTED_PROXIES` (default loopback and the Docker bridge gateway `172.17.0.1`). Then rate limits, failed-login
+`KALMIDO_TRUSTED_PROXIES` (2.79.0: default loopback only, `127.0.0.1,::1`). Then rate limits, failed-login
 lockouts, logs and admin alerts see the client's real address. A proxy in another container on its own Docker network
-arrives from that network's gateway: add it (see the README's settings table).
+arrives from that network's gateway: add it (see the README's settings table). A proxy on the host that reaches a port
+published on Docker's default bridge arrives from the docker bridge gateway 172.17.0.1, which was trusted by default up to
+2.78: set `KALMIDO_TRUSTED_PROXIES=127.0.0.1,::1,172.17.0.1` for that setup.
 
 If your proxy puts a login (Authelia, Authentik, oauth2-proxy, ...) in front of Kalmido, API clients cannot pass it:
 they have a token, not a login cookie. Let requests to `/api/v1/` **that carry an Kalmido token** bypass the login, and
@@ -1359,7 +1362,8 @@ checked by the server's virus scanner when the operator runs one ([SELF-HOSTING.
 - File lists carry `up` only for files with a mark: `{"scan": "unchecked"}` (the scanner was not reachable or the file is too
   large for it; `scan_why: "size"`), `{"scan": "infected", "sig": "<signature>"}` (found later: the file is locked).
 - Reading a locked file (`GET /api/v1/attachments/{id}`, `.../text`, `GET /api/v1/files/{id}/content`, project / chat files)
-  answers `403`; deleting it works as before.
+  answers `403`; deleting it works as before. 2.79.0: with the scanner's strict mode (the default when a scanner is
+  configured) the same `403` holds for an unchecked file until the later scan found it clean.
 - A file whose content does not match its type (a program or HTML page named `.png`) is stored as
   `application/octet-stream`.
 ## A meeting becomes tasks (2.70.0)

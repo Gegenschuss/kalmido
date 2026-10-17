@@ -407,7 +407,11 @@ docker compose up -d kalmido
   maintenance mode with a safety backup first. Backups from before 2.37 (SQLite, a `tasks.db` in the zip) can
   still be restored: the database file goes through the same move to PostgreSQL as an upgrade. Since 2.48 the archive
   also holds the file store (`attachments/files/<id>/`, every version) and the project files (`attachments/lists/<id>/`,
-  which earlier archives left out); a server before 2.48 restores such an archive without them.
+  which earlier archives left out); a server before 2.48 restores such an archive without them. 2.79.0: also the files of
+  agent chats (`attachments/chat/`), the receipts of the household budget (`attachments/budget/<id>/`) and the document
+  previews (`attachments/docthumbs/`), which archives up to 2.78 left out although their rows were in the dump; the manifest
+  counts files outside the known folders (`skipped_files`, the server log names their folders). An older server refuses
+  an archive with these members, restore it with 2.79 or newer.
 
 - **Fail closed when the data disk is missing.** Keep the data folder on its own disk or volume and mount it so that
   Docker refuses to start without it, instead of creating an empty folder (an empty start shows the setup page again;
@@ -822,7 +826,11 @@ published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the co
 
 - **A find**: the upload is refused with the name of the signature ("file.pdf: malware found (...), not uploaded").
 - **Scanner not reachable** (still loading, stopped, crashed) or a file larger than `KALMIDO_CLAMD_MAX_MB`: the upload is
-  taken and marked *Unchecked* in the app. Once the scanner answers again, the server checks these files in the background
+  taken and marked *Unchecked* in the app. 2.79.0: with the scanner configured, an unchecked file is **held back** (403 "not
+  checked for malware yet") until the later scan finds it clean - downloads, previews, public links and agents alike
+  (`KALMIDO_CLAMD_STRICT=0` gives the old behaviour: unchecked files stay readable with their mark). A file too large for the
+  scanner stays unchecked, so raise `KALMIDO_CLAMD_MAX_MB` together with clamd's limit if you allow large uploads.
+  Once the scanner answers again, the server checks these files in the background
   (up to 20 per minute). Clean: the mark goes. A find: the file is **locked** - it stays stored, but nobody can download or
   preview it any more (403), and the person who uploaded it gets a News item. Deleting it is up to the people of the list.
   *Settings > Users > Whole server* shows the scanner's state and how many files wait or are locked.
@@ -835,6 +843,7 @@ published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the co
 | `KALMIDO_CLAMD` | `clamav:3310` in the compose file, else empty | `host:port` of clamd (TCP) or the path of its unix socket; empty = no scan |
 | `KALMIDO_CLAMD_MAX_MB` | `100` | larger files are not sent to the scanner (marked *Unchecked*); keep it at or below clamd's `StreamMaxLength` |
 | `KALMIDO_CLAMD_TIMEOUT` | `60` | seconds one scan may take |
+| `KALMIDO_CLAMD_STRICT` | on when `KALMIDO_CLAMD` is set | 2.79.0: `1` = unchecked files are held back until the later scan, `0` = they stay readable (as up to 2.78) |
 
 **Switch it off** on a small server (e.g. a Raspberry Pi with 1 GB): set `KALMIDO_CLAMD=` (empty) in `.env` and delete the
 `clamav:` block (and the `clamav-db` volume entry) from `docker-compose.yml`, then `docker compose up -d --remove-orphans`.
