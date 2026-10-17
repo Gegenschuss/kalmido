@@ -199,8 +199,9 @@ def ics_build(c, u):
     uid = u["id"]
     s = usettings(c, uid)
     lg = s.get("lang") if s.get("lang") in LANGS else "en"
-    where, args = (f"t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND l.archived=0 AND t.list_id IN {vis_sql(ov=False)} "
-                   f"AND {tvis(c, uid, 't.', write=True)}"), [uid, uid]  # 1.10.0: participants only their own tasks; 2.46.0 (#1603): joined lists
+    where, args = (f"t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND l.archived=0 AND (t.list_id IN {vis_sql(ov=False)} "
+                   f"OR (t.assignee_id=? AND t.list_id IN {vis_sql()})) "  # 2.83.0 (#1725): + my tasks of lists seen through the organisation
+                   f"AND {tvis(c, uid, 't.', write=True)}"), [uid, uid, uid, uid, uid]  # 1.10.0: participants only their own tasks; 2.46.0 (#1603): joined lists
     if s.get("ical_scope") == "mine":
         where += " AND ((l.owner_id=? AND (t.assignee_id IS NULL OR t.assignee_id=?)) OR t.assignee_id=?)"
         args += [uid, uid, uid]

@@ -50,7 +50,7 @@ const mg_sideKeys = id => mg_area(id)[3].map(p => p[0]);
 const mg_sideHidden = (id, hid) => mg_sideKeys(id).every(k => hid('e:' + k));
 function mg_sideRow(id, hid) {
   const a = mg_area(id), here = mg_areaOf(S.route.mod) === a;
-  if (!mg_on(id) || (mg_sideHidden(id, hid) && !here)) return '';
+  if (!mg_on(id) || (mg_sideHidden(id, hid) && !here) || o3a_hid(id)) return '';  // 2.83.0 (#1845)
   const rec = id === 'time' && (S.timer || S.pomo), req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0;
   const after = rec ? '<span class="c"><span class="recdot"></span></span>' : req ? `<span class="c nunread">${req}</span>` : '';
   return `<button class="srow smod ${here ? 'on' : ''}" data-go="${mg_target(id)}" data-mgside="${id}">${ic(a[1])}<span class="n">${esc(tr(a[2]))}</span>${after}</button>`;
@@ -90,4 +90,20 @@ async function mg_areaSwitch(md, el) {
   for (const x of $$('[data-feat]', md)) { x.checked = feat(x.dataset.feat); x.closest('[data-modrow]')?.classList.toggle('off', !x.checked); }
   mg_setSync(md); modCountsSync(md);
   if (id === 'time' && on && !$('#s-trnd', md)) { const cur = LS.get('settingsSec'); md._noflush = true; md.remove(); settingsModal(cur); }  // the time options
+}
+// ---- 2.83.0 (#1845): an organisation's view shows only what belongs to the organisation. Home (home & life, family,
+// budget), habits, review (review & journal, statistics) and notes are private -- hidden in the sidebar, the phone's tab
+// bar and the search while an organisation is the shown workspace (Time stays); an old link opens them in Private
+const O3A_PRIV = ['life', 'family', 'budget', 'habits', 'review', 'stats', 'notes'];
+const o3a_privOnly = mod => O3A_PRIV.includes(mod);
+const o3a_orgView = () => typeof wsCur === 'function' && wsCur().startsWith('org:');
+const o3a_hid = mod => !!mod && o3a_privOnly(mod) && o3a_orgView();
+// a tab bar / "More" item ({mod}) or a sidebar row (its data-go route) hidden in an organisation's view
+const o3a_hidT = t => !!t && o3a_hid(t.mod);
+const o3a_hidRow = h => { const m = /data-go="(\w+)/.exec(h); return !!m && o3a_hid(m[1]); };
+// the router: a private module opened in an organisation's view switches quietly to Private (like wsFollow), then opens it
+function o3a_toPrivate(mod) {
+  if (!o3a_hid(mod)) return;
+  S.settings.workspace = 'private'; LS.set('ws', 'private');
+  api('PATCH', '/api/settings', {workspace: 'private'}).catch(() => {});
 }

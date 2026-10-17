@@ -206,7 +206,7 @@ const canAssign = t => !!t && collab() && canEditList(t.list_id);
 const isOwner = l => !l || !l.role || l.role === 'owner';
 const hasSharing = () => collab() && S.lists.some(l => l.shared);
 const listPeople = l => !l ? [] : [{user_id: l.owner_id, name: l.owner_name || S.me?.display_name || '', role: 'owner'}, ...(l.members || [])];
-const personName = (lid, uid) => listPeople(listById(lid)).find(p => p.user_id === uid)?.name || '';
+const personName = (lid, uid) => listPeople(listById(lid)).find(p => p.user_id === uid)?.name || (uid && o3a_ovAssignable(listById(lid)) ? o3a_name(uid) : '');  // 2.83.0 (#1725): + assigned without joining
 const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
 // 1.9.0 profile pictures: S.avatars = {user id: URL} (me + everybody sharing a list with me, from /api/state; the News
 // answer adds its people). av() = the round picture, or the initials as before. cls/attrs: the caller's classes + title.
@@ -913,6 +913,7 @@ function go(hash) { if (location.hash !== '#' + hash) location.hash = hash; else
 async function route() {
   const r = parseHash();
   if (S.me?.kid && r.mod !== 'family' && !r.complete && !r.snooze) { r.mod = 'family'; r.key = 'family'; }  // 2.19.0 (#653): a kid's home
+  o3a_toPrivate(r.mod);  // 2.83.0 (#1845): a private module in an organisation's view -> Private
   const mgAlt = !modOn(r.mod) && mg_alt(r.mod); if (mgAlt) { if (S.booted && r.mod === 'time') setTimeout(() => toast(tr('Time tracking is off (Settings > Modules)')), 0); r.mod = mgAlt; r.key = mgAlt; delete r.client; delete r.contact; } mg_seen(r.mod);  // 2.44.0 (#1187): a part that is off: its area's other tab
   if (!modOn(r.mod)) {  // e.g. the "News" app shortcut while collaboration is off
     const off = r.mod;

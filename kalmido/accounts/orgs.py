@@ -803,6 +803,8 @@ def org_leave(c, oid, uid, heir):
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
         c.execute("DELETE FROM task_people WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
+    # 2.83.0 (#1725): tasks assigned without joining (a list everyone in the organisation may edit)
+    c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?)", (uid, oid, uid))
     from ..contacts.orgbooks import obk_leave
     obk_leave(c, oid, uid, heir)  # 2.52.0 C (#1438): the organisation's own address books stay with it (another manager)
     # 2.30.0 (#1036): the organisation's calendars and address books follow the same way: the leaver's go to heir (else
