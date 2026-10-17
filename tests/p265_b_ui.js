@@ -43,7 +43,8 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview'], mindmap: 
   const sizes = await Promise.all(tags.map(async f => (await get('static/js/' + f + '.js')).length));
   const start = sizes.reduce((a, b) => a + b, 0) + appCss.length + (await get('static/i18n.js')).length;
   console.log(`start: ${tags.length} scripts, ${start} characters (scripts + app.css + i18n.js), app.css ${appCss.length}`);
-  check(start < 3500000 && appCss.length < 580000, `the start is smaller than 2.56.3 (3.76 MB, app.css 611 KB): ${start}`);
+  // vorint G4 (17.10.2026): the parked releases 2.57-2.76 add start scripts; the limit stays below 2.56.3 (see tools/perf_budget.json)
+  check(start < 3750000 && appCss.length < 600000, `the start is smaller than 2.56.3 (3.76 MB, app.css 611 KB): ${start}`);
 
   // ================= jsdom: the app
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
