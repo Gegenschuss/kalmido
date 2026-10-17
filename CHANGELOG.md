@@ -7,6 +7,24 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.73.0] - 2026-10-17
+
+### Added
+- **Several Kalmido servers in one app** (#661): *Settings > Account > Servers* connects accounts on other Kalmido servers
+  (work + home) with a connection code, or an address and an API token. Their lists appear as their own group in the
+  sidebar, their tasks in Today, Basket, Search, the calendar and News, each with the server's short name in its colour so
+  nothing gets mixed up. Open, edit, complete and delete tasks of the other server without switching; the quick add shows
+  where a task goes. "Move to another server…" asks in plain words first (comments and attachments stay in the old
+  server's trash). Data stays on its server: your own server talks to the other server's API, the token is sealed and never
+  reaches the browser, nothing of the other server is stored, agents see none of it.
+- **Moving between app.kalmido.com and your own server** (#1473): *Settings > Data > Export everything* builds one file with
+  your lists, tasks, comments, files, calendars, contacts and settings (ZIP with JSON and checksums), also usable as a copy
+  of your data under the GDPR. *Take over from a Kalmido export* uploads it on another server (large files in pieces),
+  checks it, shows a preview with the people of your lists matched to accounts there (shared only where you tick it,
+  missing people can be invited by an admin), imports privately or into an organisation and can be undone.
+- Organisation exports (2.42) can be taken over into an organisation on another server with the recovery key (stage 1:
+  lists, tasks, comments, files, calendars and address books; members matched by e-mail).
+
 ## [2.56.4] - 2026-10-17
 
 ### Fixed
