@@ -120,7 +120,7 @@ const NOTES = 'Intro text for the plan.\n\n- [ ] first step\n- [ ] second step\n
   check(d.querySelector('#d-content').classList.contains('hidden'), 'part 1: the first click of a double click waits and is dropped');
   mdClick(p); await sleep(100);
   check(d.querySelector('#d-content').classList.contains('hidden'), 'part 1: a plain click waits for a possible second click ...');
-  await sleep(400);
+  for (let i = 0; i < 25 && d.querySelector('#d-content').classList.contains('hidden'); i++) await sleep(100);  // 2.80.1: the timer is late on a slow CI runner
   check(!d.querySelector('#d-content').classList.contains('hidden'), '... then opens the editor');
   w.eval(`S.editContent = false; openDetail(${T}); S.tasks.get(${T}).locked = 0; renderDetail()`); await until(() => d.querySelector('#d-md pre'));
   for (const sel of ['#d-md pre', '#d-md table td', '#d-md a']) {

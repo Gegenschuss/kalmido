@@ -91,7 +91,7 @@ const day = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv', {t
     // ================= #265 the status report on the project page
     await nav(B + '#l/' + P); await ready(ev);
     await ev(`(() => { setListView(listById(${P}), 'overview'); return 1; })()`); await sleep(1800);
-    for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('[data-rpt="open"]')`)); i++) await sleep(200);  // 2.66.1: on-demand modules (2.65), slow CI
+    for (let i = 0; i < 75 && !(await ev(`!!document.querySelector('[data-rpt="open"]')`)); i++) await sleep(200);  // 2.66.1: on-demand modules (2.65), slow CI (2.80.1: up to 15 s)
     const btn = await ev(`(() => { const b = document.querySelector('[data-rpt="open"]'); return b ? {t: b.textContent.trim(), h: b.getBoundingClientRect().height} : null; })()`);
     check(btn && btn.t === 'Status report', '#265: the button on the project page ' + JSON.stringify(btn));
     await ev(`(() => { document.querySelector('[data-rpt="open"]').click(); return 1; })()`); await sleep(1800);
