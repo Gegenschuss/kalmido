@@ -385,7 +385,7 @@ def dav_login():
     c = db()
     u = c.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
     rows = c.execute("SELECT * FROM app_passwords WHERE user_id=? ORDER BY id DESC", (u["id"],)).fetchall() \
-        if u and not u["disabled"] and not is_agent(u) and pw else []
+        if u and not u["disabled"] and not is_agent(u) and not u["kid"] and pw else []  # 2.79.0 (#476 M5): no CalDAV for kids
     hit, ph, now = None, hashlib.sha256(pw.encode()).hexdigest(), time.monotonic()
     for r in rows:
         k = (r["id"], r["pw_hash"], ph)

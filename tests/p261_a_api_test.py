@@ -158,7 +158,10 @@ v1 = A.get(B + f"/api/v1/tasks/{T}/attachments")
 if v1.ok:  # sessions may not reach /api/v1 on every setup; the mark is the same serializer as the app's
     check(any((x.get("up") or {}).get("scan") == "unchecked" for x in v1.json().get("data", [])), "API: up.scan in the attachments list")
 g = A.get(B + f"/api/attachments/{fs['later-bad.txt']['id']}")
-check(g.ok, "unchecked file: still downloadable (not blocked)")
+# 2.79.0 (#476 M7): strict mode (default with a scanner): an unchecked file is locked until the later scan
+check(g.status_code == 403 and "not checked" in g.text.lower(), f"unchecked file: locked until the later scan ({g.status_code} {g.text[:200]})")
+check(A.get(B + f"/api/attachments/{fs['later-ok.txt']['id']}").status_code == 403, "unchecked harmless file: locked as well")
+check(st.get("strict") is True, f"admin: strict mode on ({st})")
 
 # ---- scanner back: the later scan
 scanner(True)
@@ -224,7 +227,7 @@ fs = task_files(A, T)
 check(r.ok and "up" not in fs.get("eicar.txt", {"up": 1}), f"scanner off: taken without a mark ({r.status_code})")
 check(not dbx("SELECT 1 FROM upload_scan"), "scanner off: no unchecked rows")
 st = A.get(B + "/api/admin/upload-scan").json()
-check(st.get("state") == "off" and st.get("unchecked") == 0, f"admin: state off ({st})")
+check(st.get("state") == "off" and st.get("unchecked") == 0 and st.get("strict") is False, f"admin: state off, no strict mode ({st})")
 r = up_task(A, T, "page.png", b"<!DOCTYPE html><html></html>", "image/png")
 check(task_files(A, T).get("page.png", {}).get("mime") == "application/octet-stream", "scanner off: the type from the content still applies")
 

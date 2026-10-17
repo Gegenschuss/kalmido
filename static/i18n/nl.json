@@ -9469,5 +9469,9 @@
   "Sections, tasks with subtasks and dates, fields, notepads and the page arrangement come along. Members, shares and assignees do not: the copy is yours alone.": "Secties, taken met subtaken en datums, velden, notitieblokken en de indeling van de pagina gaan mee. Leden, delingen en toegewezen personen niet: de kopie is alleen van jou.",
   "List duplicated": "Lijst gedupliceerd",
   "Duplicate list…": "Lijst dupliceren…",
-  "A copy of this list with its sections, tasks and notepads": "Een kopie van deze lijst met secties, taken en notitieblokken"
+  "A copy of this list with its sections, tasks and notepads": "Een kopie van deze lijst met secties, taken en notitieblokken",
+  "Only a token for all lists with the permissions “Calendar” and “Contacts” may create an app password": "Alleen een token voor alle lijsten met de rechten ‘Agenda’ en ‘Contacten’ mag een app-wachtwoord aanmaken",
+  "This account is not linked to the login provider yet. Log in with your password first, then use the provider's button once in the same browser.": "Dit account is nog niet gekoppeld aan de inlogdienst. Log eerst in met je wachtwoord en gebruik daarna één keer de knop van de inlogdienst in dezelfde browser.",
+  "A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).": "Een aanmelding bij de OIDC-provider kwam via {1} overeen met {0}, maar is niet gekoppeld (beheerder, tweede factor of geen overeenkomend geverifieerd e-mailadres).",
+  "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Nog niet op malware gecontroleerd: het bestand kan worden geopend zodra de virusscanner het heeft gecontroleerd"
 }

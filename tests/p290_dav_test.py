@@ -198,6 +198,11 @@ check(db("SELECT last_used_at IS NOT NULL FROM app_passwords WHERE id=?", (PWID,
 # token API: persons only, write scope
 tok = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "write"]}).json()["token"]
 th = {"Authorization": "Bearer " + tok}
+# 2.79.0 (#476 M1): an app password opens CalDAV / CardDAV without limits -> only a token for all lists with calendar + contacts
+r = requests.post(V + "/me/app-passwords", headers=th, json={"name": "Thunderbird"})
+check(r.status_code == 403, f"token API: read + write alone creates no app password {r.status_code}")
+tok = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "write", "calendar", "contacts"]}).json()["token"]
+th = {"Authorization": "Bearer " + tok}
 r = requests.post(V + "/me/app-passwords", headers=th, json={"name": "Thunderbird"})
 check(r.status_code == 201 and r.json().get("password"), "token API: create an app password")
 TBPW, TBID = r.json()["password"], r.json()["id"]

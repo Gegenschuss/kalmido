@@ -9469,5 +9469,9 @@
   "Sections, tasks with subtasks and dates, fields, notepads and the page arrangement come along. Members, shares and assignees do not: the copy is yours alone.": "Abschnitte, Aufgaben mit Unteraufgaben und Terminen, Felder, Notizblöcke und die Anordnung der Seite kommen mit. Mitglieder, Freigaben und Zuständige nicht: Die Kopie gehört nur dir.",
   "List duplicated": "Liste dupliziert",
   "Duplicate list…": "Liste duplizieren…",
-  "A copy of this list with its sections, tasks and notepads": "Eine Kopie dieser Liste mit Abschnitten, Aufgaben und Notizblöcken"
+  "A copy of this list with its sections, tasks and notepads": "Eine Kopie dieser Liste mit Abschnitten, Aufgaben und Notizblöcken",
+  "Only a token for all lists with the permissions “Calendar” and “Contacts” may create an app password": "Nur ein Token für alle Listen mit den Rechten „Kalender“ und „Kontakte“ darf ein App-Passwort anlegen",
+  "This account is not linked to the login provider yet. Log in with your password first, then use the provider's button once in the same browser.": "Dieses Konto ist noch nicht mit dem Anmeldedienst verknüpft. Melde dich zuerst mit deinem Passwort an und nutze dann im selben Browser einmal die Schaltfläche des Anmeldedienstes.",
+  "A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).": "Eine Anmeldung beim OIDC-Anbieter passte über {1} zu {0}, wurde aber nicht verknüpft (Admin, zweiter Faktor oder keine passende bestätigte E-Mail).",
+  "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Noch nicht auf Schadsoftware geprüft: Die Datei lässt sich öffnen, sobald der Virenscanner sie geprüft hat"
 }

@@ -167,7 +167,7 @@ def api_authenticate():
     u = c.execute("SELECT * FROM users WHERE id=?", (row["user_id"],)).fetchone() if row else None
     if u and is_agent(u):  # 2.2.1 (#358): every request with an agent's token lands in its audit log (see audit_after)
         g.audit_aid = u["id"]
-    if u and u["disabled"]:
+    if u and (u["disabled"] or u["kid"]):  # 2.79.0 (#476 M5): a child account has no API (its limits live in the web session)
         u = None
     expired = bool(row and row["expires_at"] and parse_iso(row["expires_at"]) <= now_utc())
     if not u or expired:
@@ -194,6 +194,8 @@ def api_authenticate():
     if request.path.startswith(API_PREFIX + "admin/"):
         if "admin-read" not in scopes or not u["is_admin"]:
             return v1_err(403, tr("This token may not read admin data"), required_scope="admin-read")
+        if need is None or need not in scopes:  # 2.79.0 (#476 M2): an admin route that writes needs its own scope too
+            return v1_err(403, tr("This token lacks the permission “{0}”", tr(SCOPE_LABELS.get(need, need or "?"))), required_scope=need)
     elif need == "agent":
         pass  # the agent's own channel (status, events, jobs, chat, usage): the routes check need_agent()
     elif need is None:
@@ -668,6 +670,11 @@ def v1_apppw_create():
     b = v1_json()
     reject_unknown(b, ("name",))
     v1_person()
+    from ..core.access import token_lists
+    if token_lists() is not None or not {"calendar", "contacts"} <= set(g.scopes):  # 2.79.0 (#476 M1): an app password
+        # opens CalDAV / CardDAV without any limit, so only a token that may already do all of that creates one
+        return v1_err(403, tr("Only a token for all lists with the permissions “Calendar” and “Contacts” may create an app password"),
+                      required_scope="contacts")
     row, pw = apppw_create(db(), g.user, b.get("name"))
     return jsonify({**row, "password": pw}), 201
 

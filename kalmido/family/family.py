@@ -155,6 +155,9 @@ def kid_set(c, uid, on, parents=None):
     c.execute("UPDATE users SET kid=? WHERE id=?", (1 if on else 0, uid))
     if on:
         kid_force_participant(c, uid)
+        # 2.79.0 (#476 M5): API tokens and app passwords made before bypass the child limits -> revoked (like a disabled account)
+        c.execute("DELETE FROM api_tokens WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM app_passwords WHERE user_id=?", (uid,))
         if parents is None and not kid_parents(c, uid) and has_request_context():
             parents = [me()]
     if parents is not None:

@@ -174,8 +174,8 @@ def cv_file(c, link, show, visible_ids, aid):
     r = c.execute("SELECT * FROM attachments WHERE id=? AND comment_id IS NULL AND COALESCE(enc, 0)=0", (aid,)).fetchone()  # 2.64.2 B (#1817)
     if not r or r["task_id"] not in visible_ids or (r["size"] or 0) > CV_FILE_MAX:
         return None
-    from ..files.scan import sc_locked
-    if sc_locked(c, "att", aid):  # 2.61.0 (#1818): a file found infected later is never handed out
+    from ..files.scan import sc_locked, sc_waiting
+    if sc_locked(c, "att", aid) or sc_waiting(c, "att", aid):  # 2.61.0 (#1818): never a file found infected; 2.79.0 (#476 M7): strict mode: not before the scan
         return None
     full = os.path.join(ATT_DIR, r["path"])
     return (r, full) if os.path.isfile(full) else None
