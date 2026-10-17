@@ -1058,6 +1058,8 @@ fresh; run testclock "$PY" testclock_test.py
 # 2.85.0 part B: feeds (#1162) - follow, RSS/Atom/RDF, SSRF guard, DTD refused, read later, OPML, rights; the view (fake feed server in the container)
 fresh; run p285_b_api "$PY" p285_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p285_b_ui node p285_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.87.9 part C: the office menu with four groups (#1917), computer + phone
+fresh; run p287b_c_ui node p287b_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.86.0 (#1896): hardening from audit #476 part 1, groups A-E
 fresh; run p286_a_api "$PY" p286_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"
