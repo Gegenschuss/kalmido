@@ -2043,6 +2043,8 @@ MIGRATIONS = [
     ("pl_sources", "run_learn", "ALTER TABLE pl_sources ADD COLUMN run_learn TEXT NOT NULL DEFAULT ''"),
     # 2.71.0 A (#1457): a comment written by a list rule: the rule's name (the client marks it "Rule <name>"), NULL otherwise
     ("comments", "rule_name", "ALTER TABLE comments ADD COLUMN rule_name TEXT"),
+    # 2.81.0 C (#1866): a portal sign-in carries its cookie; signing out revokes it (NULL = still valid until it expires)
+    ("portal_logins", "revoked_at", "ALTER TABLE portal_logins ADD COLUMN revoked_at TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
