@@ -52,8 +52,9 @@ const FEAT = 'cal,comments,collab,clients';
   w.eval(`go('office/services')`); await until(() => d.querySelector('.office[data-ofctab="services"] .ofcbar'), 60);
   // 2.47.3 (#1022, #1652): travel expenses and cash flow are two more tabs (admins only)
   // 2.50.0 (#1196, #1197): pipeline and figures are two more tabs (admins only)
-  check(d.querySelectorAll('.office .ofctabs [role=tab]').length === 10, 'the view has ten tabs (admin)');
-  check(d.querySelector('.office .ofctabs [role=tab][aria-selected="true"]')?.dataset.go === 'office/services', 'tab Services selected');
+  // 2.87.9 (#1917): the office menu with its four groups instead of the tab row: ten points of the office for the admin
+  check([...d.querySelectorAll('#view .ofmenu [data-ofm]')].filter(b => b.dataset.go.startsWith('office/')).length === 10, 'the menu has ten office points (admin)');
+  check(d.querySelector('#view .ofmenu [data-ofm][aria-current="page"]')?.dataset.go === 'office/services', 'point Services shown');
   check(!!d.querySelector('.office [data-ofc="new"][data-kind="services"]'), 'admin: "New service"');
   check(/Nothing here yet/.test(d.querySelector('.office .ofcbody')?.textContent || ''), 'empty hint');
   d.querySelector('.office [data-ofc="new"][data-kind="services"]').click(); await until(() => d.querySelector('.ofcdlg'));
@@ -126,7 +127,7 @@ const FEAT = 'cal,comments,collab,clients';
     check(await ffLogin(o) === 200, '390: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await o.nav(B + '#office/services'); await ready(ev); await sleep(1200);
-    const g = await ev(`(() => { const r = document.querySelector('.office .ofcrow'); if (!r) return null; const b = r.getBoundingClientRect(); const t = document.querySelector('.office .ofctabs [role=tab]').getBoundingClientRect(); return {h: Math.round(b.height), w: Math.round(b.width), th: Math.round(t.height), over: document.documentElement.scrollWidth > window.innerWidth + 1}; })()`);
+    const g = await ev(`(() => { const r = document.querySelector('.office .ofcrow'); if (!r) return null; const b = r.getBoundingClientRect(); const t = document.querySelector('#view .ofmbar .ofmi').getBoundingClientRect();  /* 2.87.9 (#1917): the group's points on a phone */ return {h: Math.round(b.height), w: Math.round(b.width), th: Math.round(t.height), over: document.documentElement.scrollWidth > window.innerWidth + 1}; })()`);
     check(g && g.h >= 44 && g.w >= 300 && g.th >= 24 && !g.over, '390: rows >= 44 px, tabs >= 24 px, no horizontal overflow ' + JSON.stringify(g));
     await shot('p2361b-390-services.png');
     await ev(`(() => { document.querySelector('.office [data-ofc="new"][data-kind="services"]').click(); return 1; })()`); await sleep(800);
