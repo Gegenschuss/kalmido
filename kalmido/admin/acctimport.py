@@ -34,7 +34,7 @@ from flask import g, jsonify, request
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
 from ..core.db import body, bump, connect, db, err, iso, now_utc, usettings, uset
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import N_, tr
+from ..core.i18n import lang, LANGS, N_, tr as _tr_base
 from ..core.access import Denied, ROLES
 from ..accounts.session import me
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS
@@ -58,7 +58,8 @@ UMZ_IMPORT_MAX_MB = _env_mb("KALMIDO_ACCOUNT_IMPORT_MAX_MB", 4096)
 # one piece per request: 8 MB, never above the request limit, a whole number of sealed blocks
 UMZ_CHUNK = max(UMZ_BLOCK, min(8 * UMZ_BLOCK, ((app.config.get("MAX_CONTENT_LENGTH") or 8 * UMZ_BLOCK) - 65536) // UMZ_BLOCK * UMZ_BLOCK))
 UMZ_MAX_ENTRIES = 200_000
-UMZ_JSON_MAX = 512 * 1024 * 1024  # one data/<table>.json
+UMZ_JSON_MAX = 128 * 1024 * 1024  # one data/<table>.json
+UMZ_JSON_TOTAL = 512 * 1024 * 1024  # all data/*.json together (they are held in memory during the check and the run)
 UMZ_MANIFEST_MAX = 32 * 1024 * 1024
 UMZ_RATIO = 200  # uncompressed / compressed of one entry above 1 MB
 UMZ_TEXT_MAX = 1_000_000  # characters of one text value
@@ -82,6 +83,13 @@ UMZ_DROP = {
 
 _UMI = {}  # user id -> running check / import thread
 _UMI_LOCK = threading.Lock()
+_PIECE_LOCK = threading.Lock()  # one piece at a time: two requests at the same offset must not both append
+_L = threading.local()  # the language of the person a background thread works for
+
+
+def tr(key, *a, lg=None):
+    """core.i18n.tr in the language of the person a background thread works for (in a request: as usual)."""
+    return _tr_base(key, *a, lg=lg or getattr(_L, "lg", None))
 
 
 class UmzBad(Exception):
@@ -151,7 +159,8 @@ def umz_import_cleanup():
             q = os.path.join(p, iid)
             try:
                 old = time.time() - os.path.getmtime(os.path.join(q, "state.json")) > UMZ_KEEP_H * 3600
-                st = json.load(open(os.path.join(q, "state.json"), encoding="utf-8"))
+                with open(os.path.join(q, "state.json"), encoding="utf-8") as f:
+                    st = json.load(f)
             except (OSError, ValueError):
                 old, st = True, {}
             if old or st.get("state") in ("done", "stopped", "failed", "invalid"):
@@ -256,6 +265,8 @@ def umz_open(path, key, size, full=True):
                 raise UmzBad(N_("Checksum wrong: {0}. The file is damaged or was changed."), p[:120])
             files[p] = (zi, f["sha256"])
         data = {}
+        if sum(zi.file_size for p, (zi, _s) in files.items() if p.startswith("data/")) > UMZ_JSON_TOTAL:
+            raise UmzBad(N_("The file contains a part that is too large: {0}"), "data/")
         for p, (zi, sha) in files.items():
             if p.startswith("data/") and p.endswith(".json") and "/" not in p[5:]:
                 rows = _json(_read_entry(zf, zi, UMZ_JSON_MAX, sha), p)
@@ -752,6 +763,8 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         k, v = r.get("key"), r.get("value")
         if k not in UMZ_SETTINGS or not isinstance(v, str) or len(v) > 20000:
             continue
+        if (k == "lang" and v not in LANGS) or (k not in ("lang", "folders") and not re.fullmatch(r"[A-Za-z0-9:,._ -]{0,64}", v)):
+            continue  # only plain values (the app checks the others when they are set by hand)
         if k == "folders":  # my folders stay; the file's are added behind them
             try:
                 mine, theirs = json.loads(cur.get("folders") or "[]"), json.loads(v)
@@ -826,6 +839,7 @@ def umz_run(uid, iid, opts):
     run = None
     try:
         umz_user_conn(c, uid)
+        _L.lg = lang(c, uid)
         st = _st(uid, iid) or {}
         key = umz_key(uid, "upload") if st.get("sealed") else None
         zf, man, files, data = umz_open(os.path.join(_dir(uid, iid), "upload.bin"), key, st["size"], full=False)
@@ -907,6 +921,7 @@ def umz_check(uid, iid, can_invite):
     c = connect()
     try:
         umz_user_conn(c, uid)
+        _L.lg = lang(c, uid)
         st = _st(uid, iid) or {}
         key = umz_key(uid, "upload") if st.get("sealed") else None
         zf, man, files, data = umz_open(os.path.join(_dir(uid, iid), "upload.bin"), key, st["size"])
@@ -1047,11 +1062,14 @@ def umz_piece(iid):
         return err(tr("Invalid value: {0}", "chunk"))
     path = os.path.join(_dir(uid, iid), "upload.bin")
     key = umz_key(uid, "upload") if st.get("sealed") else None
-    with open(path, "ab") as f:
-        w = UmzWriter.resume(f, path, key, off)
-        w.write(data)
-        w.finish()
-    st = _set(uid, iid, received=off + n)
+    with _PIECE_LOCK:
+        if (_st(uid, iid) or {}).get("received") != off:  # another request at the same offset was faster
+            return jsonify(error=tr("Invalid value: {0}", "offset"), received=(_st(uid, iid) or {}).get("received")), 409
+        with open(path, "ab") as f:
+            w = UmzWriter.resume(f, path, key, off)
+            w.write(data)
+            w.finish()
+        st = _set(uid, iid, received=off + n)
     if last:
         _set(uid, iid, state="checking")
         try:
