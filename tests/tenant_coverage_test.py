@@ -328,7 +328,7 @@ ROUTES = {
     "DELETE /api/forms/{}": "form", "GET /f/{}": "form", "POST /f/{}": "form", "GET /api/v1/lists/{}/forms": "form",
     "POST /api/v1/lists/{}/forms": "form", "PATCH /api/v1/forms/{}": "form", "DELETE /api/v1/forms/{}": "form",
     # 2.63.0 B (#1513): the customer portal
-    "GET /p/{}": "portal", "POST /p/{}/comment": "portal", "GET /p/{}/stop": "portal", "POST /p/{}/notify": "portal",
+    "GET /p/{}": "portal", "POST /p/{}/comment": "portal", "GET /p/{}/stop": "portal", "POST /p/{}/stop": "portal", "POST /p/{}/notify": "portal",
     "POST /p/{}/login": "portal", "GET /portal/login/{}": "portal", "POST /portal/login/{}": "portal", "GET /portal": "portal",
     "POST /portal/logout": "portal", "PATCH /api/tasks/{}/ticket": "portal",
     # ---- group (6)
