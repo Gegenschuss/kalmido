@@ -167,7 +167,7 @@ def msv_norm_url(u):
     path = p.path.rstrip("/")
     if path.lower().endswith("/api/v1"):
         path = path[:-7].rstrip("/")
-    if not re.fullmatch(r"(/[A-Za-z0-9._~-]+)*", path):
+    if not re.fullmatch(r"(/[A-Za-z0-9._~-]+)*", path) or any(x in (".", "..") for x in path.split("/")):
         return None
     host = p.hostname.lower().rstrip(".")
     return f"{p.scheme.lower()}://{'[' + host + ']' if ':' in host else host}{f':{port}' if port else ''}{path}"

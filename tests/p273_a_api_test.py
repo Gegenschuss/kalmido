@@ -325,7 +325,7 @@ for u in ("http://10.0.0.1", "http://169.254.169.254", "http://[::1]:3040", "htt
           "http://172.20.0.9"):
     r = A.post(B + "/api/servers", json={"base_url": u, "token": BTOK})
     check(r.status_code == 400 and "internal" in r.json()["error"], f"{u}: refused as internal ({r.status_code} {r.text[:120]})")
-for u in ("ftp://example.com", "https://user:pw@example.com", "javascript:alert(1)", "https://example.com/a b", "https://example.com/<x>"):
+for u in ("ftp://example.com", "https://user:pw@example.com", "javascript:alert(1)", "https://example.com/a b", "https://example.com/<x>", "https://example.com/../x"):
     check(A.post(B + "/api/servers", json={"base_url": u, "token": BTOK}).status_code == 400, f"{u}: an invalid address 400")
 
 # ================================================================== another person, agents, tokens (tenant-matrix: servers)
