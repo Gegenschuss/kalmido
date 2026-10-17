@@ -7232,3 +7232,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
   #ct-sbar .mbb .mbl{max-width:100%;overflow:hidden;text-overflow:ellipsis}
   .ctpicking .ctlistw{padding-bottom:6.5rem}
 }
+
+/* 2.82.0 B (#1880) review bar: 44 px targets for Approve / Back on phones */
+@media (pointer:coarse){.apbar.rvwbar .apacts .btn{min-height:2.75rem}}

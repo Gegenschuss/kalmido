@@ -4401,6 +4401,8 @@
   "Accept": "Accetta",
   "Maybe": "Forse",
   "Decline": "Rifiuta",
+  "Accept|proposal": "Accetta",
+  "Decline|proposal": "Rifiuta",
   "Accepted": "Accettato",
   "No answer yet": "Nessuna risposta ancora",
   "On the day at 9:00": "Il giorno stesso alle 9:00",
@@ -9479,5 +9481,6 @@
   "A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).": "Un accesso con il provider OIDC corrispondeva a {0} tramite {1}, ma non è stato collegato (admin, secondo fattore o nessuna e-mail verificata corrispondente).",
   "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Non ancora controllato per malware: il file si potrà aprire non appena l’antivirus lo avrà controllato",
   "No clients in this area yet": "Ancora nessun cliente in quest'area",
-  "Add client": "Aggiungi cliente"
+  "Add client": "Aggiungi cliente",
+  "Sent as {0}": "Inviato come {0}"
 }

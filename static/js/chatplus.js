@@ -43,7 +43,14 @@ function cpnText(m, art) {
   const t = mdBrief(decodeMentions(body, art === 't' ? S.tc.users || {} : {})) || (m.attachments || [])[0]?.name || '';
   return t.length > 140 ? t.slice(0, 140) + '…' : t;
 }
+// 2.82.0 (#1862): another conversation on screen closes the open pin / unpin Undo toast (it would hit the old conversation)
+function cpnUndoDrop(k) {
+  if (!CPN.undoK || CPN.undoK === k) return;
+  if (HIST.toastE === CPN.undoE) { HIST.toastE = null; $('#toast')?.classList.add('hidden'); }
+  CPN.undoK = CPN.undoE = null;
+}
 function cpnBarHtml(k) {
+  cpnUndoDrop(k);
   const pins = cpnPins(k), art = k[0];
   if (!pins.length) return `<div class="cpnbar" data-cpn="${k}" hidden></div>`;
   const i = (CPN.idx[k] || 0) % pins.length, m = pins[i], n = pins.length;
@@ -76,6 +83,7 @@ async function cpnToggle(art, id, on) {
   if (on) CPN.idx[k] = 0;  // the new pin shows first
   const e = histAdd({label: on ? tr('Message pinned') : tr('Message unpinned'), undo: () => cpnSet(art, place, id, !on), redo: () => cpnSet(art, place, id, on)});
   offerUndo(on ? tr('Message pinned') : tr('Message unpinned'), e);
+  CPN.undoK = k; CPN.undoE = e;
 }
 document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-act="cpn-go"],[data-act="cpn-next"],[data-act="cpn-x"]'); if (!a) return;

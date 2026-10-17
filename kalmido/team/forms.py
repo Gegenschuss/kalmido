@@ -287,7 +287,7 @@ def _page(c, f, token, lg, vals=None, error=""):
     me_row = g.user
     who = ""
     if me_row:
-        who = f'<p class="sub">{e(t("Sent as {0}", me_row["display_name"] or me_row["username"]))}</p>'
+        who = f'<p class="sub">{e(tr("Sent as {0}", me_row["display_name"] or me_row["username"], lg=lg))}</p>'
     fields = [f'<label for="ff-subject">{e(t("Subject"))}</label><input id="ff-subject" name="subject" required maxlength="{FORM_SUBJECT_MAX}" value="{e(v.get("subject", ""))}">',
               f'<label for="ff-text">{e(t("Description"))}</label><textarea id="ff-text" name="text" rows="6" maxlength="{FORM_TEXT_MAX}">{e(v.get("text", ""))}</textarea>']
     if not me_row:
