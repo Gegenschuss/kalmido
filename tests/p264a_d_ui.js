@@ -191,6 +191,12 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
     check(await ev(`/released the key for/.test(newsText({kind: 'e2e_key', list_id: ${L}, actor_id: ${BOB}, data: {}}, {${BOB}: 'Bob'}))`), '#1817: News "<name> released the key for <list> to you"');
     check(await ev(`(() => { S.nf.users = S.nf.users || {}; const h = newsItemHtml({kind: 'comment', enc: true, task_id: ${T}, task_title: null, list_id: ${L}, excerpt: 'e2e1:x', actor_id: ${BOB}, created_at: new Date().toISOString(), count: 1}, 0); return /Encrypted task/.test(h) && !h.includes('e2e1:'); })()`), '#1817: a News entry of a locked list: no excerpt, the title neutral until decrypted');
     check(await ev(`/Lists with a lock/.test(le2u_helpHtml())`), '#1817: in-app help: a short part "Lists with a lock"');
+    // ---- 2.85.0 (#1904): fresh load, keys state not yet fetched -> no "not set up" hint, the switch is free
+    await ev(`(() => { document.querySelector('.lmodal [data-m="close"]')?.click(); window.__info = {list_id: ${L}, mode: null, gen: 0, rotate: 0, can_manage: true, keys: [], pending: [], members: [], agents: [], blockers: [], left: {}};
+      E2E.st = null; window.e2eLoad = async () => (E2E.st = {set: true, password: true}); return 1; })()`); await sleep(300);
+    await ev(`(listModal(${L}), 1)`);
+    check(await waitFor(`(() => { const s = document.querySelector('#l-e2e-sw'); return !!s && !s.disabled; })()`), '#1904: the lock switch is free after a fresh load');
+    check(await ev(`!/not set up yet/.test(document.querySelector('#l-e2e')?.textContent || '')`), '#1904: no "not set up yet" hint when the passphrase exists');
   }, false);
 
   console.log(`p264a_d_ui: ${ok} passed, ${F.length} failed`);
