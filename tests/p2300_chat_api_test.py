@@ -5,8 +5,7 @@
    agent withdraws buttons (POST /api/v1/agent/chats/{uid}/messages/{mid}/withdraw); v1 and the agent's chat list carry
    choice_state
  - #1041 permission questions: permission: true adds Allow / Deny (allow / deny ids of 2.28 hosts count too), expires_in;
-   a button press sends chat_choice (approval, via button) AND the reaction event a 👍 sends; a 👍 / 👎 answers it the other
-   way round (choice via reaction, chat_choice too); a permission question does not expire with newer messages; after
+   a button press sends chat_choice (approval, via button) AND the reaction event a 👍 sends; (2.87.9: a 👍 / 👎 never answers it, only the buttons); a permission question does not expire with newer messages; after
    expires_at a press is 409 and a 👍 no approval; withdraw with an outcome
  - #1034 listening in by project type: software lists -> every agent listens in (task_added for created AND moved tasks,
    every comment); other lists only @mention / assignment; a switch per list (listen_agent_ids, listen_default), a change
@@ -168,15 +167,15 @@ check(cc and cc[0]["data"]["permission"] is True and cc[0]["data"]["approval"] =
 check(rx and rx[0]["data"]["approval"] == "approved" and rx[0]["data"]["chat_message"]["id"] == p1["id"] and rx[0]["data"]["reaction"]["emoji"] == "up" and rx[0]["data"].get("via") == "button",
       "#1041: ... and the reaction event a 👍 sends (hosts that listen for 👍 keep working) " + str(rx)[:200])
 check(press(p1["id"], ["deny"]).status_code == 409, "#1041: answered once")
-# a 👍 / 👎 answers the other way round
+# 2.87.9 (#1963): a 👍 / 👎 no longer answers a permission question - only the buttons decide
 cur = latest()
 r = A.post(B + f"/api/agents/{CL}/chat/{p_mid['id']}/reactions", json={"emoji": "down"})
-check(r.ok and r.json()["approval"] == "rejected", "#1041: 👎 on a permission question is a rejection " + r.text[:120])
+check(r.ok and r.json()["approval"] is None, "#1963: 👎 on a permission question is a plain reaction " + r.text[:120])
 m = msgs()[p_mid["id"]]
-check(m["choice"] and m["choice"]["ids"] == ["deny"] and m["choice"]["via"] == "reaction" and m["choice_state"] == "answered", "#1041: ... and answers it like the Deny button " + str(m["choice"]))
+check(not m["choice"] and m["choice_state"] == "open", "#1963: ... the question stays open " + str(m["choice"]))
 ev = events(cur)["data"]
-check(sorted(e["event"] for e in ev) == ["chat_choice", "reaction"] and all(e["data"]["approval"] == "rejected" for e in ev), "#1041: ... chat_choice (via reaction) + reaction " + str([(e["event"], e["data"].get("via")) for e in ev]))
-check(press(p_mid["id"], ["allow"]).status_code == 409, "#1041: a button after the 👎 is refused")
+check(not any(e["event"] == "chat_choice" for e in ev) and all(e["data"].get("approval") is None for e in ev), "#1963: ... no chat_choice, no approval " + str([(e["event"], e["data"].get("approval")) for e in ev]))
+check(press(p_mid["id"], ["deny"]).ok, "#1963: ... the Deny button still answers it")
 # 2.28 / 2.29 hosts: buttons allow / deny count as a permission question
 old = agent_say("Darf ich das ausführen?", choices=[{"id": "allow", "label": "Erlauben", "style": "primary"}, {"id": "deny", "label": "Ablehnen", "style": "danger"}])
 check(old["choices"].get("permission") is True and old["asks"] is True, "#1041: allow / deny ids of older hosts count as a permission question")

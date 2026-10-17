@@ -6,8 +6,7 @@
  - it stays open while newer messages come (and does not make other buttons expire); the app's agent list carries
    approvals_open (only for the person of the chat), the chat carries approvals_open (also older than the loaded page)
  - only the person of the chat answers: another person 404, the agent's own token never; a press sends chat_choice with
-   approval approved / rejected + approval_request; a second press 409; a 👎 on the open card answers it (via reaction,
-   chat_choice + reaction); after expires_at: expired, a press 409; withdraw with an outcome
+   approval approved / rejected + approval_request; a second press 409; a 👎 on the open card answers nothing (2.87.9); after expires_at: expired, a press 409; withdraw with an outcome
  - push "Approval needed: <agent>" (notification row approval, on by default); switched off: the plain chat push
  - no schema change (choices is json in an existing column): the rollback image 2.34 keeps running
 usage: p2350_b_api_test.py <datadir>"""
@@ -175,13 +174,13 @@ check(len(ev) == 1 and d.get("approval") == "approved" and d.get("approval_reque
 check(press(A, m1["id"], ["no"]).status_code == 409, "a second press -> 409")
 check(open_n() == 2, "approvals_open counts down " + str(open_n()))
 cur = latest()
-r = A.post(B + f"/api/agents/{CL}/chat/{m2['id']}/reactions", json={"emoji": "down"})
-check(r.ok and r.json().get("approval") == "rejected", "a 👎 on the open card rejects it " + r.text[:160])
+r = A.post(B + f"/api/agents/{CL}/chat/{m2['id']}/reactions", json={"emoji": "down"})  # 2.87.9 (#1963): a thumb never decides a card
+check(r.ok and not r.json().get("approval"), "a 👎 on the open card is a plain reaction " + r.text[:160])
 evs = events(cur)["data"]
-cc = [e["data"] for e in evs if e["event"] == "chat_choice"]
-check(len(cc) == 1 and cc[0]["approval"] == "rejected" and cc[0]["via"] == "reaction" and cc[0]["choice_ids"] == ["no"], "... chat_choice rejected via reaction " + str(cc)[:200])
-check(any(e["event"] == "reaction" and e["data"].get("approval") == "rejected" for e in evs), "... and the reaction event with approval rejected")
-check(msgs()[m2["id"]]["choice_state"] == "answered", "the card is answered")
+check(not any(e["event"] == "chat_choice" for e in evs) and all(e["data"].get("approval") is None for e in evs), "... no chat_choice, no approval")
+check(msgs()[m2["id"]]["choice_state"] == "open", "the card stays open")
+r = press(A, m2["id"], ["no"])
+check(r.ok and r.json()["choice_state"] == "answered", "only the No button answers it " + r.text[:120])
 
 # ================================================================== time limit, withdraw
 m3 = say(approval={"title": "Restart the worker"}, expires_in=60).json()
