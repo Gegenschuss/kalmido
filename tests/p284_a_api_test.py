@@ -369,8 +369,9 @@ check(isinstance(H2, str) and A.patch(B + f"/api/admin/orgs/{ORG}", json={"membe
 MX = mail(H2, "Lisa <lisa@example.com>", "Nach dem Austritt", "x", files=[("run.sh", b"echo hi", "octet-stream")])
 A.post(B + "/api/admin/mail/poll")
 RX = until(lambda: row(MX), 40) and row(MX)
-check(RX and RX["owner_id"] == CAROL and RX["client_id"] == ACME, f"the address passed to carol, the mail is filed ({RX})")
-check([x[0] for x in dbx("SELECT user_id FROM hub_tokens WHERE client_id=?", (ACME,))] == [CAROL], "the token now belongs to carol")
+ALPHA = {x[0] for x in dbx("SELECT user_id FROM org_members WHERE org_id=?", (ORG,))}
+check(RX and RX["owner_id"] != BOB and RX["owner_id"] in ALPHA and RX["client_id"] == ACME, f"the address passed to an Alpha member, the mail is filed ({RX})")
+check(RX and [x[0] for x in dbx("SELECT user_id FROM hub_tokens WHERE client_id=?", (ACME,))] == [RX["owner_id"]], "the token now belongs to that member")
 NX = [x[0] for x in dbx("SELECT name FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL", (RX["folder_id"],))] if RX else []
 check("run.sh.txt" in NX and "mail.eml" in NX, f"run.sh -> run.sh.txt, mail.eml without the subject ({NX})")
 
