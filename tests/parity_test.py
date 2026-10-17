@@ -218,7 +218,9 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
-    ("2.66.0 (#1835): merging duplicate contacts / clients and its undo stay with people for now; the agent tool follows with #1357",
+    # 2.70.0 (#1357): agents propose contact merges as a proposal (kind merge); the person applies them, the routes stay with people
+    ("2.66.0 (#1835): merging duplicate contacts / clients and its undo stay with people; agents propose contact merges "
+     "(proposal kind merge, #1357), the person applies them",
      ("=POST /api/contacts/merge", "=POST /api/contacts/merges/{}/undo", "=POST /api/clients/merge", "=POST /api/clients/merges/{}/undo")),
     ("2.59.0 (#1375): the hint while a person types a new task's title and the client's on / off of the related tasks; agents "
      "use related_tasks and search_tasks with semantic", ("=POST /api/tasks/similar", "=GET /api/related/config")),
@@ -394,6 +396,10 @@ APP_ONLY = [
      "(the link in every mail); agents answer customers with portal comments", ("=PATCH /api/tasks/{}/ticket",)),
     ("2.67.0 (#1865): \"Pull the chain in\" is a person's button in the timeline / task panel; agents move the waiting tasks "
      "with update_task (a later due date moves the chain along by itself)", ("=POST /api/tasks/{}/chain/pull",)),
+    # 2.70.0 A (#1354): a person hands an agent a meeting (photos into their own chat, the cards of their own proposals)
+    ("2.70.0 (#1354): a person's photos of a meeting for a proposal request and the chat's cards of their ready proposals; "
+     "proposals come only from people, the agent reads the photos with GET /chat-attachments/{id} and answers with "
+     "POST /agent/jobs/{id}/proposal", ("=POST /api/agents/{}/meeting-images", "=GET /api/agents/{}/meeting-proposals")),
 ]
 
 

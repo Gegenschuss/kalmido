@@ -243,7 +243,7 @@ had been made in the app. Webhooks fire too.
 | (app) `POST /api/agents/{id}/chat/{message_id}/pin` · `POST /api/team/messages/{id}/pin` | session | 2.62.0 (#1848): pin / unpin a chat message `{pinned?}` (toggles without; at most 5 per conversation, else 409); messages carry `pinned_at` / `pinned_by`, the conversation's page `pins`. The agent gets `chat_pinned`. 2.62.0 (#1530): the app sends `client_id` with a new chat message; the same text with the same `client_id` within 10 seconds returns the stored message (200) instead of a new one |
 | (app) `GET /api/agents/jobs?limit=&before=` · `GET /api/tasks?scope=done\|trash&limit=&before=` · `GET /api/news?limit=&before=` | session | 2.40.0 (#1432): "Load more" pages in the app (not with a token). The answer carries `next` (null = the end); pass it as `before` for the following page. Jobs: `limit` 20 by default (at most 200), the first page also brings every running / waiting job, the pages hold the ended ones (newest change first, cursor = change time + id); without `limit` / `before` the list is unchanged (up to 200 visible jobs), `id=` still returns one job. Completed / trash: `limit` as before (default 300, at most 2000), cursor = completion resp. deletion time + id; the first trash page also says `deletable` and `kept` for the whole trash (`DELETE /api/trash` empties all of it, not only the loaded page). News: the pages count read items (`limit` at most 500); the first page also brings every unread item; `unread`, `unread_me`, "mark all as read" and `filter=` always cover the whole feed; without `limit` the whole feed as before |
 | (app) `POST /api/agents/jobs/{id}/action` · `GET /api/agents/{id}/chat?job=` | session | 2.56.0 (#1791 / #1793): `{action: message, text}` writes to a running job (the agent gets the `job` event, the job does not change; the same people as Stop, empty 400, ended 409); `?job=<job id>` = only that job's messages in my chat with the agent (its `job_id` messages, mine addressed to it, the agent's answers to those); jobs carry `name` |
-| `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); `POST /agent/jobs/{id}/proposal` answers a `job_request` (2.39.0: kind `cleanup` = tidy up a list, see AGENTS.md *Tidy up a list*; 2.51.0: kinds `inquiry` and `setup`, also as the agent's own proposal `POST /agent/proposals {kind, user_id, proposal}`, see AGENTS.md *An inquiry becomes a project, the setup assistant*); the status may name the task it works on (`task_id`, shows "… is writing" there); 2.37.0: a chat message with `offer_save: true` offers the person "Save as task" (saving itself is a click in the app, never an API call of an agent); 2.41.0: `kind: "notice"` on `POST /agent/chats/{user_id}` = a small grey line in the chat (e.g. a new session of the agent), no push, never unread, see AGENTS.md *Notices in the chat*; 2.44.0: `host` in `PUT /agent/status` names the computer (kept on the token in use, see AGENTS.md *Set up on a computer with one command*); 2.47.3: `job_parent` (with `job_id`) on `POST /agent/chats/{user_id}` = the leading job of a part job, the chat colours a message `Job #N: …` by its job (AGENTS.md *Chat*); 2.58.0: `name` on `POST /agent/jobs` = the job's own short name (AGENTS.md *Jobs*) |
+| `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); `POST /agent/jobs/{id}/proposal` answers a `job_request` (2.39.0: kind `cleanup` = tidy up a list, see AGENTS.md *Tidy up a list*; 2.51.0: kinds `inquiry` and `setup`, also as the agent's own proposal `POST /agent/proposals {kind, user_id, proposal}`, see AGENTS.md *An inquiry becomes a project, the setup assistant*; 2.70.0: kind `merge` = groups of duplicate contacts `{groups: [{target_id, ids, reason}]}`, see AGENTS.md *Tidy up contacts*; the contact routes stay refused for agent tokens); the status may name the task it works on (`task_id`, shows "… is writing" there); 2.37.0: a chat message with `offer_save: true` offers the person "Save as task" (saving itself is a click in the app, never an API call of an agent); 2.41.0: `kind: "notice"` on `POST /agent/chats/{user_id}` = a small grey line in the chat (e.g. a new session of the agent), no push, never unread, see AGENTS.md *Notices in the chat*; 2.44.0: `host` in `PUT /agent/status` names the computer (kept on the token in use, see AGENTS.md *Set up on a computer with one command*); 2.47.3: `job_parent` (with `job_id`) on `POST /agent/chats/{user_id}` = the leading job of a part job, the chat colours a message `Job #N: …` by its job (AGENTS.md *Chat*); 2.58.0: `name` on `POST /agent/jobs` = the job's own short name (AGENTS.md *Jobs*) |
 | `POST /agent/usage` · `GET /agent/usage?from=&to=&group=` | agent | **Agent tokens only** (2.1.1): report model usage (numbers and ids only), read it grouped by day, task, list or model; over its hard limit an agent gets `429` on every other call, see [AGENTS.md](AGENTS.md#usage-and-limits) |
 | `GET /search?q=` | read | Search titles, notes, links and custom field values. 2.59.0 (#1375): `&semantic=1` adds, after the text hits, tasks of similar meaning (each with `"similar": true`; only on servers with the embedding service, otherwise nothing is added; at most 6 such queries per account in 10 seconds, more add nothing) |
 | `GET /search?scope=messages&q=&art=&sender=&room=&agent=&task=&limit=&cursor=` | read | 2.33.0 (#1080): search task comments, team chat (channels, direct messages) and agent chats -- only what you may read (comments of tasks you see, rooms you are in, your own agent chats; an agent: the lists shared with it, their channels, its own chats, never direct messages). Words match word beginnings; case, accents and ä / ae do not matter. Newest first, `{data, total, next_cursor}`; a hit `{art: c \| t \| a, chat_type: task \| list \| dm \| agent, id, task_id?, list_id?, room_id?, agent_id?, user_id?, chat_name, sender {id, name, agent}, created_at, snippet, marks}`: `snippet` is plain text (never HTML) around the hit, `marks` the `[start, end)` ranges of the hits in it (characters = Unicode code points). Filters: `art` (comma-separated), `sender` (user id), `room`, `agent` (an agent: the person), `task`; a foreign id simply finds nothing |
@@ -1271,6 +1271,17 @@ the judged rows in `GET /api/proposals/{id}` (`import`: `version`, `office`, `pr
 `counts`) and decide with `POST /api/proposals/{id}/apply` (`{"select": ["0", "2"], "edits": {"2": {"vat_rate": 7}}, "version": "…"}`;
 `version` optional: 409 when the agent replaced the rows since),
 `.../discard`, `.../undo`, `.../redo`. A card stays bound to the organisation its agent had when it sent it.
+## Tidy up contacts (2.70.0)
+
+A person asks with `POST /api/proposals {agent_id, kind: "merge", book_id}` (web session; an address book they may change,
+read-only 403, unknown 404; an organisation's book only for an agent of that organisation, an agent limited to selected
+lists 403; more than 2,000 contacts 400). The event `job_request` carries `input.contacts` (id, fn, given, family, org,
+emails, phones) of that book only. The agent answers with `POST /agent/jobs/{id}/proposal`
+`{groups: [{target_id, ids, reason?}]}` (ids from the input, 2-10 per group with the target, each once, at most 200
+groups, reason at most 300 characters; `{groups: []}` = none found). `GET /api/proposals/{id}` adds `dup_groups`
+(`key, target_id, reason, ok, contacts: [{id, fn, org, emails, phones, state: "" | changed | gone}]`, loaded fresh);
+`POST /api/proposals/{id}/apply {select: ["0", ...], edits: {"0": {target_id}}}` merges the ticked groups as the person
+(`merged`, `skipped`), `.../undo` and `.../redo` take all of them back / again.
 
 ## Pin board, time check and shoot planning for agents (2.51.0)
 
@@ -1328,3 +1339,25 @@ checked by the server's virus scanner when the operator runs one ([SELF-HOSTING.
   answers `403`; deleting it works as before.
 - A file whose content does not match its type (a program or HTML page named `.png`) is stored as
   `application/octet-stream`.
+## A meeting becomes tasks (2.70.0)
+
+The app's routes for the guided *Tasks from notes* (session of a person, never an agent token):
+
+- `POST /api/agents/{id}/meeting-images` (multipart, `file` 1 to 4 times, images only) stores the photos as the person's
+  files in their chat with that agent (only an agent they may chat with and ask for proposals; no `chat` event) ->
+  `201 {images: [{id, name, mime, size}], message_id}`.
+- `POST /api/proposals` with `kind: "extract"` takes `image_ids` (at most 4; only the person's own files of their chat
+  with that agent, images only, else 400); `text` may then be empty. A health list answers 400. The job input carries
+  `images: [{id, name, mime, size, url}]` (`url` = `/api/v1/chat-attachments/{id}`, readable by the agent of that chat).
+- `GET /api/agents/{id}/meeting-proposals` -> `{proposals: [{id, title, list: {id, name}, images, summary, tasks:
+  [{title, due, assignee_id, assignee}]}]}`: the person's own ready `extract` proposals of that agent (at most 5, newest
+  first), the cards in the chat. Apply / discard as every proposal (`POST /api/proposals/{id}/apply` `{select}`, `.../discard`).
+## Contracts: notice deadlines for agents (2.70.0)
+
+| Endpoint | Scope | Notes |
+|---|---|---|
+| `POST /agent/proposals` `{kind: "notice", task_id, text}` | write | agent tokens only; after the event `contract_notice` for that contract's current deadline (else `409`), a contract the agent cannot see `404`; `text` one sentence, at most 300 characters; 201 = a ready proposal job (kind `notice`) for the person whose contract it is |
+
+Accepting is a click of the person (`POST /api/proposals/{id}/apply`, optionally `remind: true` = also a reminder 3 days
+before the last day to cancel): a comment on the contract task as that person, one undo step (`POST /api/proposals/{id}/undo`).
+OpenAPI: the third body variant of `POST /agent/proposals` (`x-kalmido-scope` write). Nothing is cancelled or sent.

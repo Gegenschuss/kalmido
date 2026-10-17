@@ -297,6 +297,21 @@
   send `propose_to_person` kind `setup` (modules, lists, a first project). If no agent is connected yet, the app shows
   them how to connect one.
 
+### A meeting becomes tasks (2.70.0)
+- A `job_request` of kind `extract` turns meeting notes into tasks; it may carry photos of the meeting (`input.images`,
+  text may then be empty). Look at every image with `get_attachment` (`source: "chat"`, the id) together with the notes.
+- Answer with ONE `submit_proposal` (`tasks: [{title, notes?, assignee_id?, due?, section?}]`): assignees only from
+  `input.members`, a due date only where the notes or the photo name one (otherwise none), nothing invented. What you
+  cannot read stays out; say so in `summary`. Never create the tasks yourself: the person ticks and applies them.
+### Tidy up contacts (2.70.0, job_request kind merge)
+- The input is ONE address book's contacts (id, name parts, company, e-mails, phones): all you get. Answer with ONE
+  `submit_proposal` `{groups: [{target_id, ids, reason}]}`; the person ticks the groups and merges them.
+- Group only clear duplicates: the same e-mail address (case ignored), the same phone number (compare digits and a leading
+  + only, a national 0 may match the country code), or a name variant (initial, nickname, typo, swapped first / last name)
+  together with a shared company, e-mail or phone. A similar name alone is not enough. When in doubt leave it out.
+- target_id = the most complete contact of the group; ids only from the input, each in one group, 2 to 10 per group;
+  reason short (why they belong together). None found: `{groups: []}`. Never merge, change or write to contacts yourself.
+
 ### Reference starter: files, long work, bundled tasks (2.44.0)
 Only when your host runs `mcp/agent_run.py` (the prompt then says so):
 - **Files for the person**: put them into the folder `$KALMIDO_OUTBOX`; they are attached to your chat answer. An image you
@@ -365,6 +380,14 @@ vat_rate? 0|7|19}`, at most 500 rows; put what you could not read or assumed int
 `summary`. Never invent amounts or dates. You never write or see the office: the person checks the preview (new / already
 there / error), ticks rows and takes them over. The answer comes as the event `job` with counts only.
 
+### Contracts and notice deadlines (2.70.0)
+The event `contract_notice` comes once per contract and deadline when the last day to cancel a contract in a list shared
+with you is near (the contract's own lead, else 30 days): `name`, `provider`, `cost` / `per`, `monthly`, `due` (cancel by),
+`ends`, `renew_months`, `user` and `lang` (the person whose contract it is). Answer with ONE `propose_contract_notice`: one
+sentence in their language that says what cancelling saves or what staying costs and until when they can decide, without
+pressure; never write that something was cancelled. The person takes it as a note on the contract (optionally with a reminder)
+or discards it (event `job`). You never cancel, send or change a contract yourself; health lists and the journal never reach you.
+
 <!-- kalmido-tool-index:start -->
 ## Events and tools (index)
 
@@ -404,6 +427,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
   `review_task` approve, or changes with a short note what should change. Never approve a task assigned to you
 - `sprint_started` / `sprint_closed`: a sprint of a project list shared with you started / was closed (`sprint`, with `review` when closed: done / moved / added task ids and points). Sprints: `list_sprints`, `get_sprint` (tasks + burndown), `set_task_sprint` (into a sprint or back to the backlog; people plan and close sprints)
 - `chat_pinned`: the person pinned (`pinned: true`) or unpinned a message of your chat (`message`); information only, nothing to answer
+- `contract_notice`: a shared contract's last day to cancel is near (once per deadline): answer with ONE `propose_contract_notice`
 
 Related tasks (2.59.0): task events may carry `task.related` = up to 5 tasks close in meaning `[{id, title, score}]` (only
 tasks you may see; missing while the server has not computed the task yet or runs without its embedding service). Before
@@ -438,8 +462,8 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
-`move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_import`, `propose_layout`, `propose_playbook`, `propose_shoot`, `propose_time_entries`,
-`propose_to_other_topic`,
+`move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_contract_notice`, `propose_import`, `propose_layout`, `propose_playbook`,
+`propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
 `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,

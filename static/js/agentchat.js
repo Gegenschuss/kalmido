@@ -75,6 +75,7 @@ async function chatLoad() {
     if (j.now) S.chat.off = Date.now() - Date.parse(j.now);  // 2.7.2 (#422): the server's clock
     const a = agentById(aid), sg = jobSideSig(a); if (a) { if (j.agent) { Object.assign(a, j.agent); S.agentsAt = Date.now(); } a.chat_unread = 0; }
     if (jobSideSig(a) !== sg) setTimeout(renderSide, 0);  // 2.36.2 (#1123): an approval answered in the chat leaves the sidebar's counter at once
+    mtg_load(aid);  // 2.70.0 A (#1354): the cards of ready meeting proposals (meetprop.js)
   }
   catch (e) { S.chat.err = e instanceof Offline ? tr('Only available online.') : e.message; }
   chatDraw(); renderTop(); if (S.route.mod === 'agents' && !S.route.agent) fl_viewSoon(true, 'agents');  // 2.46.2 (#1718): gathered
@@ -622,8 +623,9 @@ function chatInner(aid) {
     <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTypers(a), 'chat-typing')}
     ${chatStepsLiveHtml()}
+    <div class="mtgcards" id="chat-mtg">${mtg_cardsHtml(a.id)}</div>
     <div class="cfiles chfiles" id="chat-files">${chatFilesHtml(a.id)}</div>
-    ${replyBarHtml('a:' + a.id)}<div class="chcomp"><button type="button" class="iconbtn chclip" data-act="chat-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}" ${a.enabled ? '' : 'disabled'}>${ic('clip')}</button><input type="file" id="chat-file" multiple hidden><textarea id="chat-in" rows="1" placeholder="${esc(jc_ph(a))}" aria-label="${esc(jc_ph(a))}" ${a.enabled && !jc_ended() ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><button class="btn sm pri" data-act="chat-send" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button></div>`;
+    ${replyBarHtml('a:' + a.id)}<div class="chcomp"><button type="button" class="iconbtn chclip" data-act="chat-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}" ${a.enabled ? '' : 'disabled'}>${ic('clip')}</button>${mtg_btnHtml(a)}<input type="file" id="chat-file" multiple hidden><textarea id="chat-in" rows="1" placeholder="${esc(jc_ph(a))}" aria-label="${esc(jc_ph(a))}" ${a.enabled && !jc_ended() ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><button class="btn sm pri" data-act="chat-send" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button></div>`;
 }
 function chatViewHtml(aid) {
   if (S.chat.aid !== +aid) { S.chat = {aid: +aid, msgs: [], err: null}; setTimeout(chatLoad, 0); }

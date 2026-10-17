@@ -6949,3 +6949,47 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .plh-zip { margin-top: .8rem; }
 .plh-zip code { font-family: var(--mono, monospace); font-size: .9em; overflow-wrap: anywhere; }
 .pl-warn { margin: .3rem 0; padding: .4rem .6rem; border-radius: .375rem; background: var(--bg3, rgba(127,127,127,.12)); }
+/* 2.70.0 A (#1354) a meeting becomes tasks: the photos in the request dialog, the cards of ready proposals in the agent chat */
+.mtgreq .mtgimgrow{align-items:center;gap:.5rem}
+.mtgreq .mtgadd{min-height:2.75rem;display:inline-flex;align-items:center;gap:.375rem;cursor:pointer}
+.mtgreq .mtgadd.dis{opacity:.5;pointer-events:none}
+.mtgreq .mtgimgs{display:flex;flex-wrap:wrap;gap:.375rem;margin:-.25rem 0 .5rem}
+.mtgcards{display:flex;flex-direction:column;gap:.5rem;padding:0 .75rem;max-height:45vh;overflow:auto}
+.mtgcards:empty{display:none}
+.mtgcard{border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line2));background:var(--accent-soft);border-radius:var(--radius);padding:.5rem .625rem}
+.mtgcard .mtgh{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;margin-bottom:.375rem}
+.mtgcard .mtgh .muted{font-size:var(--fs-s)}
+.mtgcard .mtgsum{font-size:var(--fs-m);color:var(--text2);margin-bottom:.375rem}
+.mtgcard .mtgl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.125rem}
+.mtgcard .mtgl li.off{opacity:.55}
+.mtgcard .mtgl label{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-height:2.75rem;padding:.25rem 0;cursor:pointer}
+.mtgcard .mtgl input{flex:none;width:1.125rem;height:1.125rem}
+.mtgcard .mtgt{flex:1 1 10rem;min-width:0;overflow-wrap:anywhere}
+.mtgcard .mtgm{display:inline-flex;gap:.625rem;font-size:var(--fs-s)}
+.mtgcard .mtgm span{display:inline-flex;align-items:center;gap:.25rem}
+.mtgcard .mtgf{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;margin-top:.375rem}
+.mtgcard .mtgf .btn{min-height:2.5rem}
+
+/* 2.70.0 B (#1357) tidy up contacts: one row per group of the merge proposal, the contacts side by side (stacked on a phone) */
+.dupg .ppn{white-space:normal}
+.dupcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.375rem}
+.dupc{display:flex;flex-direction:column;gap:.125rem;min-width:0;padding:.375rem .5rem;border:1px solid var(--line2);border-radius:var(--radius);overflow-wrap:anywhere}
+.dupc small{display:flex;align-items:center;gap:.25rem}
+.dupc.tgt{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.dupc.dupx{opacity:.55}
+.dupst{color:var(--muted);font-style:italic}
+.dupg.dupx{opacity:.6}
+.duprow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.duprow select{min-height:2.5rem;flex:1;min-width:10rem}
+.dupbook{margin:.25rem 0}
+.dupskip{font-size:var(--fs-s)}
+/* 2.70.0 C (#1359) contracts: an agent's reminder of a notice deadline (proposal card, contractprop.js) */
+.ctr-head{font-size:.8125rem;margin:.125rem 0 .5rem;color:var(--muted)}
+.ctr-head b{color:var(--text)}
+.ctr-by{color:var(--accent)}
+.ctr-text{margin:0 0 .75rem;padding:.625rem .75rem;border-left:.1875rem solid var(--accent);background:var(--accent-soft);border-radius:.375rem;overflow-wrap:anywhere}
+.ctr-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.5rem;margin-bottom:.5rem}
+.ctr-f{display:flex;flex-direction:column;gap:.125rem;font-size:.875rem;min-width:0}
+.ctr-f .muted{font-size:.75rem}
+.ppm .card:has(.ctr-head) .foot{flex-wrap:wrap;gap:.5rem}
+.ppm .card:has(.ctr-head) .foot .btn{min-height:2.75rem}

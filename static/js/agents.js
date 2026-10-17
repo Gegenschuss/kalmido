@@ -547,6 +547,7 @@ function propAgentRow() {  // the agent choice: a select when there are several
 }
 function propRequest(kind, ctx = {}) {
   if (!propOn()) return;
+  if (kind === 'extract') return mtg_request(ctx);  // 2.70.0 A (#1354): notes and / or photos, list choice (meetprop.js)
   const who = () => { const id = +($('#pp-agent')?.value || 0); return esc((S.proposers.find(a => a.id === id) || S.proposers[0]).name); };
   let title = '', body = '';
   const inbox = S.lists.find(l => l.is_inbox && isOwner(l));
@@ -645,6 +646,8 @@ function propKeys(v) {
   if (pk2_is(v.kind)) return pk2_keys(v);  // 2.51.0 (#1351 #1358): propkinds2.js
   if (lyp_is(v)) return ['0'];  // 2.55.0 (#1066): one arrangement (lyprop.js)
   if (aim_is(v)) return aim_keys(v);  // 2.68.0 (#1839): the new rows of an import (importprop.js)
+  if (dup_is(v)) return dup_keys(v);  // 2.70.0 B (#1357): the groups still mergeable (dupprop.js)
+  if (ctr_is(v)) return ['0'];  // 2.70.0 C (#1359): one note (contractprop.js)
   if (v.kind === 'project') return p.tasks.flatMap((t, i) => [String(i), ...t.subtasks.map((s, k) => `${i}.${k}`)]);
   if (v.kind === 'dayplan') return p.items.map((x, i) => String(i));  // 2.10.0 (#440); 2.11.0: "does not fit" entries change nothing
   return (v.kind === 'extract' ? p.tasks : p.items).map((x, i) => String(i));
@@ -686,6 +689,7 @@ async function propOpen(jid) {
 function propEdit(el) {
   if (aim_propEdit(el)) return;  // 2.68.0 (#1839): tick / VAT of an import row (importprop.js)
   if (ap_propEdit(el)) return;  // 2.51.0 C (#1353 #1355): times / place of time and shoot proposals (agentplan.js)
+  if (dup_edit(el)) return;  // 2.70.0 B (#1357): the main contact of a group (dupprop.js)
   const f = el.dataset?.f, row = el.closest?.('.ppi'); if (!f || !row || !S.prop) return;
   const k = row.dataset.k, v = el.value, e = S.prop.ed[k] ||= {};
   if (f === 'title') e.title = v.trim();
@@ -716,6 +720,8 @@ function propItemsHtml() {
   const {v} = S.prop, p = v.proposal, inp = v.input;
   if (pk2_is(v.kind)) return pk2_itemsHtml();  // 2.51.0 B (#1351 #1358): propkinds2.js
   if (lyp_is(v)) return '';  // 2.55.0 (#1066): lyp_draw shows it
+  if (dup_is(v)) return '';  // 2.70.0 B (#1357): dup_draw shows it
+  if (ctr_is(v)) return '';  // 2.70.0 C (#1359): ctr_draw shows it
   if (v.kind === 'dayplan') return propDayplanHtml();  // 2.10.0 (#440)
   if (v.kind === 'cleanup') return clnItemsHtml();  // 2.39.0 (#1151): cleanup.js
   if (AP_KINDS.includes(v.kind)) return ap_propItemsHtml();  // 2.51.0 C (#1353 #1355): agentplan.js
@@ -748,6 +754,8 @@ function propCount() {
   const P = S.prop, n = P.sel.size, all = propKeys(P.v).length, b = $('[data-pp="apply"]', P.md);
   if (lyp_is(P.v)) return;  // 2.55.0 (#1066): its own buttons
   if (aim_is(P.v)) return aim_count();  // 2.68.0 (#1839)
+  if (dup_is(P.v)) return dup_count(P);  // 2.70.0 B (#1357): groups to merge
+  if (ctr_is(P.v)) return;  // 2.70.0 C (#1359): its own buttons
   $$('.ppcount', P.md).forEach(c => { c.textContent = tr('{0} of {1} selected', n, all); });
   if (b) { b.disabled = !n; b.innerHTML = `${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', n))}`; }
 }
@@ -769,6 +777,8 @@ function propDraw() {
     foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
     if (lyp_is(v)) ({main, foot} = lyp_draw(v));  // 2.55.0 (#1066): before / after, 👍 / 👎 (lyprop.js)
     if (aim_is(v)) ({main, foot} = aim_draw(v));  // 2.68.0 (#1839): the import preview (importprop.js)
+    if (dup_is(v)) ({main, foot} = dup_draw(v));  // 2.70.0 B (#1357): one row per group (dupprop.js)
+    if (ctr_is(v)) ({main, foot} = ctr_draw(v));  // 2.70.0 C (#1359): the contract, the sentence, note / remind me (contractprop.js)
   } else {
     main = `<div class="ppwait">${ic(st === 'applied' ? 'check' : 'x')}<p>${st === 'applied' ? (v.applied?.undone ? tr('Applied, then undone.') : tr('Applied.')) : tr('Discarded. {0} was told.', agent)}</p></div>`;
   }
@@ -784,6 +794,7 @@ async function propApply(b) {
   if (v.kind === 'project' || v.kind === 'inquiry') { q.name = $('#pp-name', P.md).value.trim() || v.proposal.name; q.folder = $('#pp-folder', P.md).value.trim(); q.share_agent = $('#pp-share', P.md).checked; }
   if (lyp_is(v)) q.use = $('#lyp-use', P.md)?.checked !== false;  // 2.55.0 (#1066)
   if (aim_is(v)) q.version = v.import?.version;  // 2.68.0 (#1839, review): 409 when the agent replaced the rows meanwhile
+  if (ctr_is(v)) q.remind = b.dataset.ctrRemind === '1';  // 2.70.0 C (#1359): "Remind me"
   b.disabled = true;
   let r;
   try { r = await calReq('POST', `/api/proposals/${P.jid}/apply`, q); } catch (x) { const e = $('#pp-err', P.md); e.textContent = x.message; e.hidden = false; b.disabled = false; return; }
@@ -796,7 +807,9 @@ async function propApply(b) {
   const e = histAdd({label: tr('Applied the proposal of {0}', name), snaps: [], after: [], ids: [], lids: r.list_id ? [r.list_id] : [],
     undo: async () => { const x = await api('POST', `/api/proposals/${jid}/undo`); ly(); f8c_back(); return {skipped: x.skipped || [], none: !!x.none}; },
     redo: async () => { const x = await api('POST', `/api/proposals/${jid}/redo`); ly(); return {skipped: x.skipped || [], none: !!x.none}; }});
-  histToast(lyp_is(v) ? lyp_toast(v, r) : aim_is(v) ? aim_toast(r) : pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e, proj ? F8C_PROJ_TOAST_MS : undefined);
+  if (dup_is(v)) dup_hist(e);  // 2.70.0 B (#1357): the contacts view follows undo / redo
+  if (ctr_is(v)) { histToast(ctr_toast(v, r), e); if (S.route.mod === 'agents') loadJobs(); return; }  // 2.70.0 C (#1359)
+  histToast(dup_is(v) ? dup_toast(r) : lyp_is(v) ? lyp_toast(v, r) : aim_is(v) ? aim_toast(r) : pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e, proj ? F8C_PROJ_TOAST_MS : undefined);
   if (proj) go('l/' + r.list_id);
   if (S.route.mod === 'agents') loadJobs();
 }

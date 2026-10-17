@@ -7,6 +7,32 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.71.0] - 2026-10-17
+
+Agent workflows: three everyday jobs an agent prepares and you decide. The agent only proposes; nothing is sent, merged or
+cancelled until a person applies it, and it works the same for freelancers without an organisation.
+
+### Added
+- **A meeting becomes tasks:** in the chat with an agent, "Turn a meeting into tasks" hands over notes and / or up to four
+  photos (whiteboard, handwritten notes; on a phone the camera opens) for a list you choose. The agent proposes tasks with
+  assignees and due dates; one card in the chat lists them with a tick each, "Create N tasks" creates the ticked ones in your
+  name, one undo step. "Tasks from notes…" in the list menu takes photos too; health lists cannot be chosen (#1354).
+- **Tidy up contacts:** "Find duplicates with an agent…" in the contacts. The agent gets only the name, company, e-mail
+  addresses and phone numbers of one address book and proposes groups of duplicates. You check each group, pick the contact
+  that stays and merge them with the 2.66 merge; undo takes the whole proposal back (#1357).
+- **Contracts in view:** shortly before a contract's last day to cancel, an agent the contracts list is shared with sends
+  one sentence on what the contract costs. Take it as a note on the contract (optionally with a reminder three days before
+  the deadline) or discard it. Nothing is ever cancelled; amounts never appear in push texts (#1359).
+
+### Agents
+- `job_request` of kind `extract` may carry `input.images` (photos of the meeting, read with `get_attachment`, source chat).
+- New proposal kind `merge` (`input.contacts`, answer `groups: [{target_id, ids, reason}]`).
+- New event `contract_notice` and proposal kind `notice` (`POST /agent/proposals`, MCP `propose_contract_notice`).
+- Reference launcher: capabilities `meeting_images`, `merge_proposal`, `contract_notice`.
+
+### Security
+- Health lists and the journal stay closed to agents; new tests cover events, proposals and the review.
+
 ## [2.70.0] - 2026-10-17
 
 ### Added

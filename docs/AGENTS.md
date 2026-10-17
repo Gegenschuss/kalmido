@@ -680,7 +680,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
 | `ping` | the "Send test" button in the admin settings | `message` |
 | `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it); 2.46.1: in a list where the agent listens in, every message of a person in its channel, without an @mention (`mentioned` false; never a message of an agent) | `room` `{id, kind, list_id}`, `mentioned`, `listening` (2.46.1), `message` `{id, text, user_id, task_id, created_at, reply_to, reply}`, `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message-2330)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
-| `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}`; 2.39.0 kind `cleanup` ([Tidy up a list](#tidy-up-a-list-2390)): + `list_id` (and the list's `playbook`) |
+| `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}`; 2.39.0 kind `cleanup` ([Tidy up a list](#tidy-up-a-list-2390)): + `list_id` (and the list's `playbook`); 2.70.0 kind `extract`: `input.images` = photos of the meeting ([A meeting becomes tasks](#a-meeting-becomes-tasks-2700)) |
 | `task_added` | 2.23.0 (#795): a top-level task was created in, or moved into, a list shared with the agent (not for its own tasks); 2.30.0: only when the agent [listens in](#agent-listens-in-2300) there | `task`, `list`, `how`: `created` or `moved`, `moved_from` `{id, name}` (only when the agent sees that list), `source`: `form`, `mail`, `errors`, `proposal` (when not made in the app); 2.63.0: a form's report also carries `ttype` (when the form sets one) and `portal: true` (the sender has a status link and sees only the answers meant for them, never internal comments) |
 | `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction`; 2.35.0 approval requests (`request_chat_approval`): `approval`, `approval_request` `{title, what}`, `via` |
 | `followup_due` | 2.1.0: the follow-up day of a task *waiting on someone* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
@@ -696,6 +696,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `sprint_started` | 2.60.0 (#343): a sprint of a project list shared with the agent started (switched on, started by hand, or the next one after closing) | `list_id`, `list`, `sprint` (id, num, title, start, end, goal, state, progress) |
 | `sprint_closed` | 2.60.0 (#343): a sprint was closed (by a person or after its last day); `sprint.review` holds the done / moved / added task ids, counts and points | `list_id`, `list`, `sprint` (with `review`), `next_sprint_id` |
 | `chat_pinned` | 2.62.0 (#1848): the person pinned or unpinned a message of the agent's chat (see [Pinned chat messages](#pinned-chat-messages-2620)); information only, nothing to answer (the reference launcher starts no run) | `message` (the chat message, with `pinned_at` / `pinned_by`), `pinned` (true / false), `user` `{id, name}` |
+| `contract_notice` | 2.70.0 (#1359): the last day to cancel a contract (Home & life) in a list shared with the agent is near: from the contract's own lead (else 30 days) before it; once per contract, deadline and agent; never from a health list; only while the person has the module *Contracts* on. Answer with ONE `propose_contract_notice` (see [Contracts and notice deadlines](#contracts-and-notice-deadlines-2700)) | `task_id`, `list_id`, `name`, `provider`, `cost`, `per`, `monthly`, `yearly`, `notice`, `notice_unit`, `due` (cancel by), `ends`, `renew_months`, `days`, `user` `{id, name}`, `lang`, `hint` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -2004,8 +2005,9 @@ lists and a first project. Nothing is sent or booked; you tick what you want and
 1. A person starts it in the app: *New project from briefing…* (Lists > +, command palette), *Break down with
    <agent>…* (task menu, palette), *Sort the basket with <agent>…* (the inbox's menu - in the app the inbox is called “Basket” since 2.39.1 -, palette,
    or the bot button when inbox items are selected), *Tasks from notes…* (a list's menu, palette), *Tidy up the list…* (2.39.0: a list's menu, or
-   *Tidy up…* for selected tasks; always the list's tidy agent). With several agents they pick one.
-2. Kalmido creates a job (kind `project`, `subtasks`, `triage`, `extract`, `dayplan`, `cleanup`, `inquiry` or `setup`; state `running`, `proposal_state`
+   *Tidy up…* for selected tasks; always the list's tidy agent), *Find duplicates with an agent…* (2.70.0: the contacts view's
+   menu, palette; one address book). With several agents they pick one.
+2. Kalmido creates a job (kind `project`, `subtasks`, `triage`, `extract`, `dayplan`, `cleanup`, `inquiry`, `setup` or `merge`; state `running`, `proposal_state`
    `requested`) and sends the agent the event `job_request` with the input.
 3. The agent reads the input, sets its status to `working`, and submits ONE proposal:
    `POST /api/v1/agent/jobs/{id}/proposal` (MCP `submit_proposal`). Kalmido validates it (400 with the reason,
@@ -2032,9 +2034,11 @@ the proposal in the app.
 | `project` | `{text, file_name, folder}`: the pasted briefing (or a loaded .txt / .md file), at most 50,000 characters |
 | `subtasks` | `{task: {id, title, notes, due, subtasks: [titles]}, hint}` |
 | `triage` | `{items: [{task_id, title, notes}], lists: [{id, name, folder, sections: [{id, name}]}]}`: the selected open inbox items (or all, at most 100) and the lists the person ticked (default: every list they may change) |
-| `extract` | `{list: {id, name, sections: [names]}, members: [{id, name}], text}`: the people of the list (no agents) so the agent can suggest assignees |
+| `extract` | `{list: {id, name, sections: [names]}, members: [{id, name}], text, images?}`: the people of the list (no agents) so the agent can suggest assignees; 2.70.0: `text` may be empty when `images` (photos of the meeting: `[{id, name, mime, size, url}]`, see [A meeting becomes tasks](#a-meeting-becomes-tasks-2700)) are there |
 | `dayplan` | `{date, mode, now, work: {start, end}, from, default_duration, events, fixed, tasks, builtin}` (2.10.0, see [Day plans](#day-plans-2100)) |
 | `cleanup` | `{list: {id, name, sections: [{id, name}]}, package: {n, of, group}, snapshot_at, hint, items: [{task_id, title, notes, section_id, sort, due, priority, list_tags, assignee_id, created_at, updated_at, comments_count}]}` (2.39.0, see [Tidy up a list](#tidy-up-a-list-2390)) |
+(2.39.0, see [Tidy up a list](#tidy-up-a-list-2390)) |
+| `merge` | `{book: {id, name}, contacts: [{id, fn, given, family, org, emails: [values], phones: [values]}], limits}` (2.70.0): the contacts of ONE address book the person may change (at most 2,000), only these fields - no notes, addresses, birthdays, groups |
 
 **Proposals** (the body of `POST /api/v1/agent/jobs/{id}/proposal`). Every kind may carry `summary` (a short
 explanation, Markdown, at most 2,000 characters) and `kind` (must match the job). Dates are `YYYY-MM-DD`, priority
@@ -2065,10 +2069,44 @@ explanation, Markdown, at most 2,000 characters) and `kind` (must match the job)
            {"op": "rename", "task_id": 82, "title": "Call the printer about the paper", "reason": "clearer"},
            {"op": "move", "task_id": 83, "section_id": 40, "position": 1},     // section (null = none) and / or place in it
            {"op": "close", "task_id": 84, "reason": "the fair was in 2025"}]}  // closed as won't do; reason required
+// merge (2.70.0): only ids from input.contacts, 2-10 per group (target included), each id in one group at most, at most 200 groups
+{"summary": "Two people are in the book twice.",
+ "groups": [{"target_id": 12, "ids": [12, 31], "reason": "same e-mail address"},   // 12 stays, 31 is merged into it
+            {"target_id": 40, "ids": [40, 41, 57], "reason": "same phone, name variants"}]}   // none found: {"groups": []}
 ```
+
+**Tidy up contacts (2.70.0, kind `merge`).** The person picks one address book they may change (a synced external book
+cannot be merged) and an agent; an organisation's book only goes to an agent of that organisation, an agent limited to
+selected lists gets no contacts. The agent proposes groups of duplicates; the review shows each group with the contacts as
+they are now, the reason and the main contact (switchable), each with its own tick. Applying merges the ticked groups
+as the person, exactly like merging by hand (links, attendances, contact persons move; the history of the contact names the
+agent's proposal); a group with a contact that was deleted or changed since the request is skipped. One undo step takes
+every merge of the proposal back. The agent still cannot read or merge contacts through the API: the job input is all
+it gets. `job` event on apply: `proposal: {state: "applied", merged, skipped}`.
 
 A section name in `extract` that the list does not have yet is created on apply. In `triage`, `tags` are the person's
 own (personal) tags; leave `list_id` out to keep an item in the inbox.
+
+### A meeting becomes tasks (2.70.0)
+
+The guided way to *Tasks from notes*: in the chat with an agent that takes proposal requests from the person, the button
+*Turn a meeting into tasks* (next to the clip) opens the request with this agent chosen. The person picks a list (one
+they may write in; health lists are never offered and answer 400), pastes the notes and / or adds up to 4 photos (a
+whiteboard, handwritten minutes; on the phone the camera). Text or an image is required. The photos are stored as the
+person's files in their chat with that agent (same limits as any chat file) and the job input carries them:
+
+```jsonc
+{"list": {"id": 12, "name": "Shoot", "sections": ["Prep"]}, "members": [{"id": 7, "name": "Sam"}], "text": "",
+ "images": [{"id": 301, "name": "whiteboard.jpg", "mime": "image/jpeg", "size": 812345, "url": "/api/v1/chat-attachments/301"}]}
+```
+
+Read each image with `GET /api/v1/chat-attachments/{id}` (MCP `get_attachment`, `source: "chat"`); an agent reads only
+files of its own chats. Propose as usual (`submit_proposal`, kind `extract`): assignees only from `members`, a due date
+only where the notes or the photo name one (else leave it out), nothing invented; what you cannot read stays out (say so
+in `summary`). When the proposal is ready, the person's chat with the agent shows ONE card: each task with its assignee
+and date and a tick, *Create N tasks* (the selected ones, as the person, one undo step) and *Discard*; *Edit* opens the
+usual review. The same dialog (with the list fixed) opens from a list's menu *Tasks from notes…*. Freelancers without an
+organisation have the same flow with their own lists and agents.
 
 **Snippet for your agent's CLAUDE.md** (or system prompt):
 
@@ -2078,9 +2116,12 @@ own (personal) tags; leave `list_id` out to keep an item in the inbox.
   and all you may use. Never ask for or fetch more of their inbox or lists.
 - set_status working (task_id if there is one), then build ONE proposal of that kind (docs/AGENTS.md "Proposals"):
   project {name, sections, tasks[..]}, subtasks {items[..]}, triage {items[{task_id, list_id?, ...}]} with ids from
-  the input only, extract {tasks[..]} with assignee_id only from input.members, dayplan {items[{task_id, start,
+  the input only, extract {tasks[..]} with assignee_id only from input.members (2.70.0: look at input.images, the
+  meeting's photos, with get_attachment source chat; due dates only where named), dayplan {items[{task_id, start,
   duration?}], nofit[{task_id}]} with task ids from input.tasks only (a plan never changes due dates), cleanup
   {items[{op: merge|rename|move|close, ...}]} with task ids from input.items only, each once (follow the list's playbook).
+  merge {groups[{target_id, ids, reason}]} with contact ids from input.contacts only, each in one group (2.70.0: only clear
+  duplicates - same e-mail / phone, a name variant with a shared detail; when in doubt leave it out; none = groups []).
   Add a short summary.
 - submit_proposal(job_id, proposal). On a 400, fix what the message names and submit again.
 - NEVER create the lists, sections or tasks yourself (no create_task / create_job for this): the person applies them.
@@ -2745,3 +2786,27 @@ page without an account and may answer there. For agents:
   user names or e-mail addresses. The ticket's space (organisation, or the owner of a list without organisation) is its
   boundary: the portal never shows tickets of another space.
 - The reference starter adds one line to such events (capability `customer_comment`).
+## Contracts and notice deadlines (2.70.0)
+
+Home & life keeps a contract as a task (the last day to cancel is its due date, the renewal its repeat). Kalmido itself never
+phrases anything: once per contract and deadline the agents that see the contract's list get the event `contract_notice`
+(the contract's own lead before the last day to cancel, else 30 days; never from a health list, never across the agent's
+organisation or its list limit). The agent answers with ONE sentence; the person decides.
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| Remind of a notice deadline (kind `notice`) | `POST /api/v1/agent/proposals` `{kind: "notice", task_id, text}` | `propose_contract_notice` | write |
+
+- **The sentence** (`text`, at most 300 characters, one line): in the person's language (`lang`), what cancelling saves or
+  what staying costs and until when they can decide; no pressure, never "cancelled".
+- **Allowed**: only for a contract the agent got a `contract_notice` for its current deadline (else 409); a contract it
+  cannot see is 404. A new proposal for the same contract replaces the agent's open one; at most 50 a day; the usage limit
+  applies. `POST /api/proposals` with kind `notice` answers 400 (a person cannot ask for it).
+- **The card** (News + push "Proposal ready" per the person's settings; the title names the contract, never its cost): the
+  contract (cancel by, end of the term, notice period, cost), the sentence, and *Take it as a note* (a comment on the contract
+  task as the person, history "applied a proposal by <agent>"; a quiet note: no comment push, news or `comment` event
+  for the list's members and agents), *Remind me* (the same plus a reminder 3 days before the last
+  day to cancel, shown while that is still ahead) or *Discard*. One undo step takes the note (and the reminder) back. The
+  agent gets the event `job` (approve / reject). Open cards end with their deadline.
+- Nothing is ever cancelled, sent or deleted. Health lists and the journal never reach an agent (no event, no read, no
+  scope `private` for agents), also when a person tries to share a health list with it.

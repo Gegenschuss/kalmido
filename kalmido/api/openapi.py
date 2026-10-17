@@ -708,6 +708,8 @@ def openapi_spec():
     spt_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.60.0 B (#1511)
     from ..lists.sprints import spr_spec
     spr_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.60.0 (#343)
+    from ..agents.contractprop import ctr_spec
+    ctr_spec(paths)  # 2.70.0 C (#1359): the kind notice of POST /agent/proposals
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",

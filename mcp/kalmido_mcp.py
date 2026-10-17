@@ -633,7 +633,7 @@ TOOLS = [
            "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"}}, ["title"]),
      lambda api, a: api.call("POST", "/agent/jobs", body=a)),
     ("get_job", "One of the agent's jobs. A proposal job (event job_request) also carries kind (project | subtasks | triage | "
-                "extract | dayplan | cleanup | inquiry | setup), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
+                "extract | dayplan | cleanup | inquiry | setup | merge), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
      _obj({"job_id": S_ID}, ["job_id"]), lambda api, a: api.call("GET", f"/agent/jobs/{int(a['job_id'])}")),
     ("submit_proposal", "Answer a job_request with ONE structured proposal; the person reviews, edits and applies it. Never create "
                         "the lists / tasks yourself. proposal by kind -- project: {name, folder?, sections: [names], tasks: [{title, "
@@ -656,6 +656,10 @@ TOOLS = [
                         "unit?, price?, discount? (%)}]} (a quotation draft; only when input.office.ok, never with input.offer)}. "
                         "setup (2.51.0): {modules: [{key, on}] (input.modules), lists: [{name, color?, folder?, sections?}], project?: "
                         "{type, name}}. "
+                        "merge (2.70.0, \"Tidy up contacts\", input.contacts of one address book: id, fn, given, family, org, "
+                        "emails, phones): {groups: [{target_id, ids: [2-10 contact ids, target included], reason?}]} -- only ids "
+                        "from input.contacts, each in one group at most, at most 200 groups; only clear duplicates (same e-mail / "
+                        "phone, a name variant with a shared detail); none found = {groups: []}. "
                         "Every kind may add summary (a short explanation). Dates YYYY-MM-DD, priority none | low | medium | high. "
                         "At most 200 entries; resubmitting replaces the proposal until the person applied or discarded it.",
      _obj({"job_id": S_ID, "proposal": {"type": "object"}}, ["job_id", "proposal"]), t_submit_proposal),
@@ -1714,6 +1718,14 @@ TOOLS += [
      _obj({"area": {"type": "string", "enum": ["fixed_costs"]}, "items": {"type": "array", "items": _IMPORT_ROW, "maxItems": 500},
            "title": {"type": "string"}, "summary": {"type": "string"}, "note": {"type": "string"}, "user_id": S_ID}, ["items"]),
      lambda api, a: api.call("POST", "/agent/proposals/import", body=_pick(a, ("area", "items", "title", "summary", "note", "user_id")))),
+    # 2.70.0 C (#1359): after the event contract_notice
+    ("propose_contract_notice", "2.70.0: after the event contract_notice: ONE sentence for the person (in data.lang, at most 300 characters) "
+                                "when the notice period of the contract ends and what it costs, so they can decide (cancel, renew, compare); "
+                                "no pressure, never say it was cancelled. The person takes it as a note on the contract (optionally with a "
+                                "reminder 3 days before) or discards it (job event). Only for a contract_notice you got; a new one replaces "
+                                "your open one. You never cancel, send or change anything.",
+     _obj({"task_id": S_ID, "text": {"type": "string", "minLength": 1, "maxLength": 300}}, ["task_id", "text"]),
+     lambda api, a: api.call("POST", "/agent/proposals", body={"kind": "notice", **_pick(a, ("task_id", "text"))})),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
@@ -1758,6 +1770,7 @@ TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
 TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
 TOOL_SCOPES["import"] = ("propose_import",)  # 2.68.0 (#1839)
+TOOL_SCOPES["agent"] += ("propose_contract_notice",)  # 2.70.0 C (#1359)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
               "private", "files:read", "files:write", "office", "pinboard", "layouts", "import")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts; 2.68.0 (#1839): + import

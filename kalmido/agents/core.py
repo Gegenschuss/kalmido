@@ -73,6 +73,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "review_requested",  # 2.60.0 C (#1512): the agent is the reviewer of a task that went into review
                 "sprint_started", "sprint_closed",  # 2.60.0 (#343): a sprint of a list shared with the agent started / was closed
                 "chat_pinned",  # 2.62.0 (#1848): the person pinned / unpinned a message of its chat (message, pinned, user)
+                "contract_notice",  # 2.70.0 C (#1359): a shared contract's last day to cancel is near (once; agents/contractprop.py)
                 )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop", "message")  # 2.56.0 (#1791): message = text to a running job, no state change

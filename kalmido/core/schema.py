@@ -1379,6 +1379,13 @@ CREATE TABLE IF NOT EXISTS pl_uploads (
   run_skip BIGINT NOT NULL DEFAULT 0, run_fail BIGINT NOT NULL DEFAULT 0, run_beat TEXT, run_error TEXT NOT NULL DEFAULT '',
   run_learn TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS pl_uploads_ws ON pl_uploads(ws);
+-- 2.70.0 C (#1359): the event contract_notice went out (agents/contractprop.py): once per contract task, its last day to
+-- cancel (due) and agent; user_id = the person whose contract it is, list_id = the contract's list then. A proposal of kind
+-- notice needs such a row. New table only
+CREATE TABLE IF NOT EXISTS ctr_notices (
+  task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, due TEXT NOT NULL,
+  agent_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  list_id BIGINT, sent_at TEXT NOT NULL, PRIMARY KEY (task_id, due, agent_id));
 """
 # Bumped when the database layout changes (stored in kalmido_meta.schema_version; SQLite: PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -2015,6 +2022,8 @@ CREATE INDEX IF NOT EXISTS agent_chat_pinned ON agent_chat(agent_id, user_id) WH
 CREATE INDEX IF NOT EXISTS merge_runs_target ON merge_runs(kind, target_id);
 -- 2.64.1 (#1817): the wrapped list keys of a person
 CREATE INDEX IF NOT EXISTS list_keys_user ON list_keys(user_id);
+-- 2.70.0 C (#1359): pruning the sent markers of contract_notice
+CREATE INDEX IF NOT EXISTS ctr_notices_sent ON ctr_notices(sent_at);
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 3  # task > subtask > sub-subtask
