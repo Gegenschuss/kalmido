@@ -222,7 +222,13 @@ def t_get_task(api, a):
 
 def t_update_task(api, a):
     b = {k: v for k, v in a.items() if k != "task_id"}
-    return api.call("PATCH", f"/tasks/{int(a['task_id'])}", body=b)
+    r = api.call("PATCH", f"/tasks/{int(a['task_id'])}", body=b)
+    ch = r.get("chain") if isinstance(r, dict) else None
+    if ch:  # 2.67.0 (#1865): a later due date moved the tasks waiting on it along
+        n, m = len(ch.get("moved") or []), len(ch.get("skipped") or [])
+        r["chain_note"] = f"{n} dependent task{'s' if n != 1 else ''} moved along by {ch.get('days')} day(s)" + \
+            (f"; {m} left in place (completed, milestone, no date or no access)" if m else "")
+    return r
 
 
 def t_add_comment(api, a):
@@ -446,8 +452,11 @@ TOOLS = [
      _obj({"task_id": S_ID}, ["task_id"]), t_get_task),
     ("create_task", "Create a task (or a subtask with parent_id) in a list the agent may change.",
      _obj(TASK_FIELDS, ["title"]), lambda api, a: api.call("POST", "/tasks", body=a)),
-    ("update_task", "Change fields of a task. Only the given fields change.",
-     _obj({"task_id": S_ID, **{k: v for k, v in TASK_FIELDS.items() if k != "parent_id"}}, ["task_id"]), t_update_task),
+    ("update_task", "Change fields of a task. Only the given fields change. 2.67.0: a LATER due date also moves the tasks waiting "
+                    "on it (the whole chain, same number of days) when the list has \"Move dependent tasks along\" on; the answer's chain "
+                    "names them (chain_note); shift_chain false leaves them where they are.",
+     _obj({"task_id": S_ID, **{k: v for k, v in TASK_FIELDS.items() if k != "parent_id"},
+           "shift_chain": {"type": "boolean", "description": "false: the tasks waiting on this one stay (default true)"}}, ["task_id"]), t_update_task),
     ("add_snippet", "2.35.0: add one code snippet to a task (a diff, a log, a proposed change, an error message): plain code with a "
                     "language (no Markdown), optional file path + line. At most 20 per task, 20000 characters each. People see it in "
                     "the task's Code snippets section with highlighting and a Copy button.",

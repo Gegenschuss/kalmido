@@ -787,6 +787,16 @@ free. Every task in events and in the API has `"locked": true | false`.
   they ask you to.
 - Locking and unlocking show in the task's history; existing tasks were not locked by the update.
 
+### Dates move the dependency chain (2.67.0)
+
+In a project list with *Move dependent tasks along* on (the default for new project lists), postponing a task's due
+date (`PATCH /api/v1/tasks/{id}`, MCP `update_task`) moves every task waiting on it by the same number of days, down the
+whole chain (gaps stay, each task once, at most 500). Completed tasks, milestones, tasks without a date and tasks the
+agent may not change (lists not shared with it included) stay, and so does the chain behind them. The answer carries
+`chain` (`moved` with old and new dates, `skipped` with a reason; a task the agent cannot see comes without id and
+title, MCP adds `chain_note`). An earlier date never moves the chain back. `"shift_chain": false` leaves the waiting
+tasks where they are; use it only when the person asks for that.
+
 ### Waiting on someone (2.1.0)
 
 (Called *waiting on external* before 2.25.0; the API and the MCP tools kept their names.) A task can wait for someone

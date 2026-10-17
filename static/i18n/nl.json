@@ -8251,5 +8251,15 @@
   "Liability insurance": "Aansprakelijkheidsverzekering",
   "fixed-costs-template": "sjabloon-vaste-kosten",
   "Compare the cash flow in the office with the bank account.": "De kasstroom in het kantoor vergelijken met de bankrekening.",
-  "This person does not see the cash flow of this office": "Deze persoon ziet de kasstroom van dit kantoor niet"
+  "This person does not see the cash flow of this office": "Deze persoon ziet de kasstroom van dit kantoor niet",
+  "milestone": "mijlpaal",
+  "without a date": "zonder datum",
+  "limit of 500 reached": "grens van 500 bereikt",
+  "{0} not moved": ["{0} niet verplaatst", "{0} niet verplaatst"],
+  "Pull the chain in": "Keten aantrekken",
+  "{0} task pulled in": ["{0} taak naar voren gehaald", "{0} taken naar voren gehaald"],
+  "Nothing to pull in: the waiting tasks already follow right after it": "Niets aan te trekken: de wachtende taken volgen er al direct op",
+  "The waiting tasks stay where they are": "De wachtende taken blijven waar ze zijn",
+  "The tasks waiting on this one move up to the day after it is due (the gaps between them stay)": "De taken die hierop wachten schuiven op tot de dag na deze vervaldatum (de afstanden ertussen blijven)",
+  "This task has no date": "Deze taak heeft geen datum"
 }

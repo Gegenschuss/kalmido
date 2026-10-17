@@ -8251,5 +8251,15 @@
   "Liability insurance": "Seguro de responsabilidad civil",
   "fixed-costs-template": "plantilla-costes-fijos",
   "Compare the cash flow in the office with the bank account.": "Comparar el flujo de caja de la oficina con la cuenta bancaria.",
-  "This person does not see the cash flow of this office": "Esta persona no ve el flujo de caja de esta oficina"
+  "This person does not see the cash flow of this office": "Esta persona no ve el flujo de caja de esta oficina",
+  "milestone": "hito",
+  "without a date": "sin fecha",
+  "limit of 500 reached": "límite de 500 alcanzado",
+  "{0} not moved": ["{0} no movida", "{0} no movidas"],
+  "Pull the chain in": "Acercar la cadena",
+  "{0} task pulled in": ["{0} tarea adelantada", "{0} tareas adelantadas"],
+  "Nothing to pull in: the waiting tasks already follow right after it": "Nada que acercar: las tareas en espera ya siguen justo después",
+  "The waiting tasks stay where they are": "Las tareas en espera se quedan donde están",
+  "The tasks waiting on this one move up to the day after it is due (the gaps between them stay)": "Las tareas que esperan a esta se adelantan hasta el día siguiente a su vencimiento (las distancias entre ellas se mantienen)",
+  "This task has no date": "Esta tarea no tiene fecha"
 }

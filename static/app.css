@@ -7707,3 +7707,7 @@ button.jobtag b{font-weight:600}
 .fcichk .row{display:flex;align-items:center;flex-wrap:wrap;gap:.75rem}
 .fcichk select{min-height:2.75rem}
 @media (max-width:40rem){.fcirow{flex-wrap:wrap}.fciamt{flex-direction:row;align-items:center;margin-left:auto}}
+
+/* 2.67.0 B (#1865) dependency chain: the bars that move along while a timeline bar is dragged */
+.tl-bar.dch-ghost{opacity:.6;outline:.0625rem dashed var(--accent);outline-offset:.0625rem;transition:transform .15s ease-out,opacity .15s ease-out}
+@media (prefers-reduced-motion:reduce){.tl-bar.dch-ghost{transition:none}}

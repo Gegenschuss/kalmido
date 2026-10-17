@@ -359,6 +359,8 @@ APP_ONLY = [
     # 2.55.0 (#1455): the newsletter connection holds access data of an outside service and decides who gets mail: people only
     ("2.55.0 (#1455): the newsletter connection, segments, sync and the consent of contacts are set by people (admins / the "
      "person); agents read the consent with the contact (field newsletter), no new agent rights", ("* /api/newsletter",)),
+    ("2.67.0 (#1865): \"Pull the chain in\" is a person's button in the timeline / task panel; agents move the waiting tasks "
+     "with update_task (a later due date moves the chain along by itself)", ("=POST /api/tasks/{}/chain/pull",)),
 ]
 
 

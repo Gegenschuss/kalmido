@@ -8251,5 +8251,15 @@
   "Liability insurance": "Haftpflichtversicherung",
   "fixed-costs-template": "feste-kosten-vorlage",
   "Compare the cash flow in the office with the bank account.": "Den Cashflow im Büro mit dem Bankkonto abgleichen.",
-  "This person does not see the cash flow of this office": "Diese Person sieht den Cashflow dieses Büros nicht"
+  "This person does not see the cash flow of this office": "Diese Person sieht den Cashflow dieses Büros nicht",
+  "milestone": "Meilenstein",
+  "without a date": "ohne Datum",
+  "limit of 500 reached": "Grenze von 500 erreicht",
+  "{0} not moved": ["{0} nicht verschoben", "{0} nicht verschoben"],
+  "Pull the chain in": "Kette nachziehen",
+  "{0} task pulled in": ["{0} Aufgabe nachgezogen", "{0} Aufgaben nachgezogen"],
+  "Nothing to pull in: the waiting tasks already follow right after it": "Nichts nachzuziehen: die wartenden Aufgaben folgen schon direkt danach",
+  "The waiting tasks stay where they are": "Die wartenden Aufgaben bleiben, wo sie sind",
+  "The tasks waiting on this one move up to the day after it is due (the gaps between them stay)": "Die Aufgaben, die hierauf warten, rücken bis zum Tag nach dieser Fälligkeit vor (ihre Abstände bleiben)",
+  "This task has no date": "Diese Aufgabe hat kein Datum"
 }

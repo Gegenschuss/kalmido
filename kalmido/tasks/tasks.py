@@ -1,5 +1,4 @@
 """Creating and changing tasks: milestones, moving subtrees, tags, assignees, waiting on external."""
-from datetime import date, timedelta
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app, PUBLIC_URL
@@ -9,7 +8,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, inbox_default, iso, now_utc
 from ..accounts.session import me
 from ..core.access import (
-    Denied, list_people, list_role, my_inbox, need_collab, need_list, need_task, task_visible, WRITE_ROLES,
+    Denied, list_people, list_role, my_inbox, need_collab, need_list, need_task, task_visible,
 )
 from ..core.serializers import attachment_files, load_tasks
 from ..lists.lists import LIST_FIELDS
@@ -154,7 +153,7 @@ def check_assignee(c, lid, aid):
 
 # 2.2.1 (#359): the fields the web API's task / list / comment endpoints know (others: warning, see web_fields)
 WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields", "people"}
-WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
+WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act", "shift_chain"}  # 2.67.0 B (#1865): shift_chain
 WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family", "sections", "org_id", "time_tracking"})  # 2.28.0 (#935): org_id; 2.41.0 (#1471): time_tracking
 WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"col_sums", "kpis", "client_id", "rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "agent_members", "agent_peers", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype", "sort_mode", "org_id", "stale_days", "agent_followup", "done_in_section", "folder_adopt", "org_visibility", "org_edit"}  # 2.36.2 (#1136): done_in_section; 2.46.0 (#1603)
 WEB_LIST_EDIT |= {"tap_done"}  # 2.46.4 (#1751): "Tap does not open details" (owner / list admins)
@@ -440,6 +439,7 @@ def task_update(tid):
     conflicts = []
     old = c.execute("SELECT due, status, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
     b = web_fields(field_alias(body(), "content", "notes"), WEB_TASK_EDIT, "PATCH /api/tasks/{tid}")
+    chain_on = b.pop("shift_chain", True) is not False if isinstance(b, dict) else True  # 2.67.0 B (#1865): undo / agents opt out
     from ..collab.notelock import ln_guard
     if ln_guard(c, tid, b):  # 2.48.0 (#1642): app, API and agents: a locked note is not overwritten (409, a clear message)
         return err(ln_guard(c, tid, b), 409)
@@ -447,57 +447,19 @@ def task_update(tid):
     if e:
         return err(e)
     new_due = c.execute("SELECT due FROM tasks WHERE id=?", (tid,)).fetchone()[0]
-    shifted = dep_shift(c, tid, old["due"], new_due) if old["status"] == 0 and not old["deleted_at"] else []
+    skipped = []
+    shifted = dep_shift(c, tid, old["due"], new_due, skipped=skipped) if chain_on and old["status"] == 0 and not old["deleted_at"] else []
     bump(c)
     c.commit()
-    return jsonify({**one_task(c, tid), "conflicts": conflicts, "shifted": shifted})
+    from ..tasks.depchain import dch_chain, dch_days
+    return jsonify({**one_task(c, tid), "conflicts": conflicts, "shifted": shifted,
+                    "chain": dch_chain(shifted, skipped, dch_days(old["due"], new_due))})
 
 
-# "Move dependent tasks along" (list setting dep_shift, package D2): when a task's due date moves LATER, the open
-# tasks waiting on it that would now start before it is due move by the same number of days (start and due, so
-# the duration stays), and so on down the chain. Only tasks in lists with the setting on that the user may change,
-# breadth-first, at most DEP_SHIFT_MAX tasks and DEP_SHIFT_DEPTH levels, each task once. Every move is a normal
-# change (activity line, reminders re-armed, webhooks). Moving a task earlier never moves anything.
-DEP_SHIFT_MAX, DEP_SHIFT_DEPTH = 50, 10
-
-
-def dep_shift(c, root, old_due, new_due, seen=None, moved=None):
-    """Returns [{id, title, start, due, prev_start, prev_due}] of the tasks moved along. seen / moved: shared by the
-    calls of one request (D3: a whole list moved -- its own tasks are never moved twice, the cap counts once)."""
-    from ..tasks.lifecycle import apply_update
-    try:
-        delta = (date.fromisoformat(new_due) - date.fromisoformat(old_due)).days if old_due and new_due else 0
-    except ValueError:
-        return []
-    moved = [] if moved is None else moved
-    if delta <= 0:
-        return moved
-    uid = me()
-    seen = {root} if seen is None else seen
-    seen.add(root)
-    level = [(root, new_due)]
-    for _ in range(DEP_SHIFT_DEPTH):
-        nxt = []
-        for bid, bdue in level:
-            for w in c.execute("""SELECT t.id, t.title, t.start, t.due, t.list_id FROM task_deps d JOIN tasks t ON t.id=d.task_id
-                                  JOIN lists l ON l.id=t.list_id
-                                  WHERE d.blocker_id=? AND t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL
-                                  AND l.dep_shift=1 AND l.kind='project' ORDER BY t.id""", (bid,)).fetchall():
-                if w["id"] in seen or (w["start"] or w["due"]) >= bdue or list_role(c, w["list_id"], uid) not in WRITE_ROLES:
-                    continue
-                if len(moved) >= DEP_SHIFT_MAX:
-                    return moved
-                seen.add(w["id"])
-                try:
-                    nd = (date.fromisoformat(w["due"]) + timedelta(days=delta)).isoformat()
-                    ns = (date.fromisoformat(w["start"]) + timedelta(days=delta)).isoformat() if w["start"] else None
-                except (ValueError, OverflowError):
-                    continue
-                if apply_update(c, w["id"], {"due": nd, "start": ns, "_act": "dep_shift"}):
-                    continue
-                moved.append({"id": w["id"], "title": w["title"], "start": ns, "due": nd, "prev_start": w["start"], "prev_due": w["due"]})
-                nxt.append((w["id"], nd))
-        if not nxt:
-            break
-        level = nxt
-    return moved
+# "Move dependent tasks along" (list setting dep_shift, package D2). 2.67.0 B (#1865): the whole chain moves by the same
+# number of days (gaps stay), not only the tasks that would start too early; see tasks/depchain.py
+def dep_shift(c, root, old_due, new_due, seen=None, moved=None, skipped=None):
+    """Returns [{id, title, start, due, prev_start, prev_due}] of the tasks moved along. seen / moved / skipped: shared by
+    the calls of one request (D3: a whole list moved -- its own tasks are never moved twice, the cap counts once)."""
+    from ..tasks.depchain import dch_shift
+    return dch_shift(c, me(), root, old_due, new_due, seen, moved, skipped)

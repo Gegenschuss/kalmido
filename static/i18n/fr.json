@@ -8251,5 +8251,15 @@
   "Liability insurance": "Assurance responsabilité civile",
   "fixed-costs-template": "modele-frais-fixes",
   "Compare the cash flow in the office with the bank account.": "Comparer la trésorerie du bureau avec le compte bancaire.",
-  "This person does not see the cash flow of this office": "Cette personne ne voit pas la trésorerie de ce bureau"
+  "This person does not see the cash flow of this office": "Cette personne ne voit pas la trésorerie de ce bureau",
+  "milestone": "jalon",
+  "without a date": "sans date",
+  "limit of 500 reached": "limite de 500 atteinte",
+  "{0} not moved": ["{0} non déplacée", "{0} non déplacées"],
+  "Pull the chain in": "Rapprocher la chaîne",
+  "{0} task pulled in": ["{0} tâche avancée", "{0} tâches avancées"],
+  "Nothing to pull in: the waiting tasks already follow right after it": "Rien à rapprocher : les tâches en attente suivent déjà juste après",
+  "The waiting tasks stay where they are": "Les tâches en attente restent où elles sont",
+  "The tasks waiting on this one move up to the day after it is due (the gaps between them stay)": "Les tâches qui attendent celle-ci avancent jusqu’au lendemain de son échéance (les écarts entre elles restent)",
+  "This task has no date": "Cette tâche n’a pas de date"
 }

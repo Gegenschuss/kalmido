@@ -596,6 +596,8 @@ ROUTES = {
     "GET /api/newsletter": "newsletter", "PUT /api/newsletter": "newsletter", "DELETE /api/newsletter": "newsletter",
     "GET /api/newsletter/lists": "newsletter", "POST /api/newsletter/segments": "newsletter", "PATCH /api/newsletter/segments/{}": "newsletter",
     "DELETE /api/newsletter/segments/{}": "newsletter", "POST /api/newsletter/sync": "newsletter", "PUT /api/newsletter/consent": "newsletter",
+    # 2.67.0 (#1865): Pull the chain in: the task must be visible, each waiting task that moves needs write access
+    "POST /api/tasks/{}/chain/pull": "task",
 }
 
 # ---- 1. every route is classified, nothing stale

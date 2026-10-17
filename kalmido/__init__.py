@@ -59,6 +59,7 @@ ORDER = (
     "accounts.orglists",  # 2.35.0 (#1101)
     "lists.templates",
     "tasks.dependencies",
+    "tasks.depchain",  # 2.67.0 B (#1865)
     "lists.projects",
     "lists.formula",  # 2.43.0 (#1328): the formula parser (no routes; used by lists.fields)
     "lists.fields",
