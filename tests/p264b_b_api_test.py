@@ -162,7 +162,7 @@ for s in (Bo, Ca, Da):
     s.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": "collab,comments"})
 for s in (A, Bo, Ca):
     assert s.put(B + "/api/e2e/keys", json=keys()).ok
-L = A.post(B + "/api/lists", json={"name": "Vault"}).json()["id"]
+L = A.post(B + "/api/lists", json={"name": "Strongbox"}).json()["id"]
 LO = A.post(B + "/api/lists", json={"name": "Open list"}).json()["id"]
 assert A.put(B + f"/api/lists/{L}/members", json={"user_id": BOB, "role": "edit"}).ok
 assert A.put(B + f"/api/lists/{L}/members", json={"user_id": CAROL, "role": "view"}).ok
