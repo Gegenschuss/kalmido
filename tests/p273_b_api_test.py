@@ -52,6 +52,10 @@ def check(cond, what):
     else:
         FAILS.append(what)
         print("FAIL:", what, flush=True)
+        if len(FAILS) == 1:  # the server's side of the first failure (a traceback of the import thread)
+            ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+            print(subprocess.run(["docker", "logs", "--tail", "60", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 text=True).stdout[-6000:], flush=True)
 
 
 def sess(user, pw="password123"):
