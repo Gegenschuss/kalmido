@@ -147,6 +147,18 @@ const M = 'ZQXmark';  // every plain text of a locked list carries it: no storag
     check(await waitFor(`!OUT.q.length`) && ((st.tasks || []).find(t => t.id === T)?.title || '').startsWith('e2e1:'), 'offline change sent encrypted once online');
     // search: locked lists are searched in this page
     check(await ev(`le2eSearch('${M} offline', []).some(t => t.id === ${T})`), 'M7: the local search finds the task of the locked list');
+    // 2.64.1 review 2 (M1): a task outside S.tasks (done / trash view, search result) or not on the page at all: its texts leave encrypted
+    const m1 = await ev(`(async () => { const t = S.tasks.get(${T3}), out = {}; S.tasks.delete(${T3}); S.extra = [t];
+      try {
+        out.extra = (await le2eOut('PATCH', '/api/tasks/${T3}', {title: '${M} done view'})).title;
+        out.cmt = (await le2eOut('POST', '/api/tasks/${T3}/comments', {body: '${M} c'})).body;
+        S.extra = null; LE2E.got.clear();
+        out.fetched = (await le2eOut('PATCH', '/api/tasks/${T3}', {title: '${M} unknown'})).title;
+        LE2E.got.clear();
+        out.batch = (await le2eOut('POST', '/api/tasks/batch', {action: 'patch', ids: [${T3}], data: {title: '${M} b'}})).data.title;
+      } catch (e) { out.err = e.message; } finally { S.tasks.set(${T3}, t); S.extra = null; LE2E.got.clear(); }
+      return out; })()`);
+    check(['extra', 'cmt', 'fetched', 'batch'].every(k => String(m1[k] || '').startsWith('e2e1:')), 'review 2 (M1): done view / unknown task / batch: texts leave encrypted ' + JSON.stringify(m1).slice(0, 200));
     // moving out: texts + comments in plain text (le2e_move); moving in: ciphers
     const mv = await ev(`(async () => { const t = S.tasks.get(${T}); t.comment_count = 1; const b = await le2eOut('PATCH', '/api/tasks/${T}', {list_id: ${L2}});
       return {title: b.title, move: b.le2e_move}; })()`);
