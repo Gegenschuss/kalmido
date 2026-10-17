@@ -12,7 +12,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   const ck = await login('alice');
   const post = async (u, b) => (await fetch(B + u.replace(/^\//, ''), {method: 'POST', headers: {...H, Cookie: ck}, body: JSON.stringify(b)})).json().catch(() => ({}));
-  const today = new Date().toISOString().slice(0, 10);
+  // 2.84.0 (#1868): the local date -- the UTC date is yesterday between 00:00 and 02:00 (CEST), the card then says "Overdue since"
+  const today = (n => `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`)(new Date());
   const t1 = await post('/api/tasks', {title: 'Paint the fence', tags: ['garden', 'weekend'], due: today});
   const t2 = await post('/api/tasks', {title: 'Buy seeds', tags: ['garden']});
   const t3 = await post('/api/tasks', {title: 'Old job', tags: ['garden']});

@@ -18,12 +18,14 @@ async function pl_load() {
   if (seq !== PL.seq) return;
   PL.d = d || {available: false};
   pl_draw();
+  // 2.81.0 (#1874): the server checks an uploaded export in the background; once it is ready the preview opens as before
+  if (PL.zopen === ws && PL.d?.zip?.state !== 'check') { PL.zopen = null; if (PL.d?.zip?.state === 'ready' && PL.d.zip.mine) pl_preview(true); }
 }
 function pl_draw() {
   const el = $('.pl-slot'); if (el) el.innerHTML = pl_html();
   clearTimeout(PL.poll);
   const st = PL.d?.conn?.run?.state, zs = PL.d?.zip?.run?.state;
-  if (el && !PL.up && (['queued', 'busy', 'stop'].includes(st) || ['queued', 'busy', 'stop'].includes(zs))) PL.poll = setTimeout(pl_load, 2000);
+  if (el && !PL.up && (['queued', 'busy', 'stop'].includes(st) || ['queued', 'busy', 'stop'].includes(zs) || PL.d?.zip?.state === 'check')) PL.poll = setTimeout(pl_load, 2000);
 }
 function pl_html() {
   const d = PL.d; if (!d || !d.available) return '';
@@ -184,6 +186,9 @@ function plh_html(d) {
       <span>${r.state === 'stop' ? tr('Stopping…') : r.state === 'queued' ? (r.place ? tr('Waiting, place {0} in the queue', r.place) : tr('Import starts…')) : r.total ? tr('{0} of {1} documents', r.done, r.total) : tr('Import starts…')}</span>
       ${r.state !== 'stop' ? `<button type="button" class="btn sm" data-pl="zip-stop">${tr('Stop')}</button>` : ''}</div></div>`;
   }
+  if (z?.state === 'check' && z.mine) {  // 2.81.0 (#1874): the server checks the export in the background
+    return h + `<div class="pl-run" role="status"><div class="pl-bar"><i style="transform:scaleX(1)"></i></div><span>${tr('Checking the export…')}</span></div></div>`;
+  }
   if (z?.state === 'ready' && z.mine) {
     return h + `<p>${tr('Uploaded: {0}', esc(z.name || 'ZIP'))} <span class="muted">${fmtBytes(z.size)}</span></p>
       <div class="foot"><button type="button" class="btn sm" data-pl="zip-drop">${tr('Discard')}</button><span class="spacer"></span><button type="button" class="btn sm pri" data-pl="zip-preview">${tr('Import documents…')}</button></div></div>`;
@@ -198,7 +203,7 @@ function plh_html(d) {
     h += `<p class="muted">${tr('Last import from a ZIP: {0} new, {1} already there, {2} failed', r.new, r.skipped, r.failed)}</p>`;
     h += pll_line(r.learn);
   }
-  if (z && ['upload', 'ready'].includes(z.state) && !z.mine) return h + `<p class="muted">${tr('Another import is under way in this area')}</p></div>`;
+  if (z && ['upload', 'check', 'ready'].includes(z.state) && !z.mine) return h + `<p class="muted">${tr('Another import is under way in this area')}</p></div>`;
   return h + intro + `<p class="pl-err plh-err" role="alert"></p>${pick(tr('Choose ZIP file…'))}</div>`;
 }
 function plh_size_html(sz) {
@@ -233,6 +238,8 @@ async function plh_upload(f) {
       PL.d = j; pl_draw();
     }
   } catch (x) { return fail(x?.message || tr('The upload failed')); }
-  PL.up = null; pl_draw();
+  PL.up = null;
+  if (PL.d?.zip?.state === 'check') PL.zopen = ws;  // 2.81.0 (#1874): pl_load opens the preview once the check is done
+  pl_draw();
   if (PL.d?.zip?.state === 'ready') pl_preview(true);
 }

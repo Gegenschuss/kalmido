@@ -320,6 +320,7 @@ UMZ_ORG_SKIP = (  # archive prefix -> what the preview names as not taken over
     ("lists/forms.json", N_("Forms")), ("lists/playbooks.json", N_("Playbooks")), ("lists/notes.json", N_("Project notes")),
     ("lists/notepads.json", N_("Notepads")), ("time_entries.json", N_("Time entries")),
     ("tasks/encrypted_notes.json", N_("Encrypted notes")), ("tasks/locked_notes.json", N_("Encrypted notes")),
+    ("portal/", N_("Customer reports")),  # 2.81.0 (#1866)
 )
 
 
@@ -484,7 +485,8 @@ def umz_preview(c, uid, man, data, can_invite):
         skipped.append({"what": tr(what), "count": n})
     for t, text in (("api_tokens", N_("API tokens")), ("webhooks", N_("Webhooks")), ("calendar_subscriptions", N_("Calendar subscriptions")),
                     ("karakeep", N_("Karakeep connection")), ("newsletter_connection", N_("Newsletter connection")),
-                    ("agent_schedules", N_("Planned agent jobs")), ("public_links", N_("Public links"))):
+                    ("agent_schedules", N_("Planned agent jobs")), ("public_links", N_("Public links")),
+                    ("feeds", N_("Feeds"))):  # 2.85.0 B (#1162): moved by OPML export / import
         if tables.get(t):
             skipped.append({"what": tr(text), "count": tables[t]})
     return {

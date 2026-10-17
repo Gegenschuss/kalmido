@@ -11,6 +11,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2400_v_ui', check, shots: 'P2400V_SHOTS'});
@@ -40,7 +41,7 @@ const ORGNAME = 'Northwind Trading Company';
   const HOME = (await call('POST', '/api/lists', {name: 'Household', ...(ORG ? {org_id: ORG} : {})})).id;
   await call('PUT', `/api/lists/${TEAM}/members`, {user_id: bob.id, role: 'edit'});
   const SEC = (await call('POST', '/api/sections', {list_id: TEAM, name: 'Backlog'})).id;
-  const today = (await call('GET', '/api/state')).today || new Date().toISOString().slice(0, 10);
+  const today = (await call('GET', '/api/state')).today || TC.today();
   const mk = async (title, list_id, extra = {}) => (await call('POST', '/api/tasks', {title, list_id, ...extra})).id;
   const P1 = await mk('Write the plan', PRJ, {due: today}); await mk('Book the room', PRJ);
   const TD = await mk('Team today', TEAM, {due: today});

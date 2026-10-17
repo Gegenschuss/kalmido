@@ -20,9 +20,10 @@ import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -104,7 +105,7 @@ for u in ("bob", "carol", "pete", "vic", "dave"):
     assert r.ok, r.text
     ids[u] = r.json()["id"]
 Bo, C, P, V, D = (sess(u) for u in ("bob", "carol", "pete", "vic", "dave"))
-T0 = date.today().isoformat()
+T0 = testclock.today().isoformat()
 
 # ------------------------------------------------------------------ the shared project list
 L = A.post(B + "/api/lists", json={"name": "Film", "kind": "project", "time_tracking": True}).json()["id"]  # 2.41.0 (#1471): time tracking is a switch
@@ -232,10 +233,10 @@ ed = P.get(B + "/api/deps").json()
 check(not any(T3 in e for e in ed["edges"]), f"all deps: none with hidden tasks {ed}")
 check(any(e == [T1, T3] for e in A.get(B + "/api/deps").json()["edges"]), "owner sees the edge")
 # occurrences (calendar ghosts)
-occ = P.get(B + "/api/occurrences", params={"from": T0, "to": (date.today() + timedelta(days=5)).isoformat()}).json()
+occ = P.get(B + "/api/occurrences", params={"from": T0, "to": (testclock.today() + timedelta(days=5)).isoformat()}).json()
 check(not any(o.get("id") == T3 or o.get("task_id") == T3 for o in occ.get("items", [])) and "Hidden" not in json.dumps(occ),
       f"occurrences: no hidden repeat {str(occ)[:200]}")
-check(str(T3) in json.dumps(A.get(B + "/api/occurrences", params={"from": T0, "to": (date.today() + timedelta(days=5)).isoformat()}).json()),
+check(str(T3) in json.dumps(A.get(B + "/api/occurrences", params={"from": T0, "to": (testclock.today() + timedelta(days=5)).isoformat()}).json()),
       "owner gets the repeat")
 # ICS feed
 for s_, n in ((P, "pete"), (C, "carol")):
@@ -248,7 +249,7 @@ for x in ("Hidden task", "Secret parent", "Sibling secret", "Carol only", "SECRE
 check("Hidden task" in ics_c and "Secret parent" in ics_c, "ICS member: everything")
 # roadmap
 for s_, path in ((P, "/api/roadmap"),):
-    rm = s_.get(B + path, params={"from": (date.today() - timedelta(days=3)).isoformat()}).json()
+    rm = s_.get(B + path, params={"from": (testclock.today() - timedelta(days=3)).isoformat()}).json()
     g = next(x for x in rm["groups"] if x["list"]["id"] == L)
     got = {t["id"] for t in g["tasks"]}
     check(got <= PETE and T3 not in got and T4 not in got and not g["can_edit"], f"roadmap tasks {got} can_edit {g['can_edit']}")
@@ -258,7 +259,7 @@ check(any(x["list"]["id"] == L and x["can_edit"] for x in Bo.get(B + "/api/roadm
 # statistics
 check(P.get(B + "/api/stats").ok, "stats work for a participant")
 # time tracking
-te = P.get(B + "/api/time/entries", params={"scope": "all", "from": (date.today() - timedelta(days=1)).isoformat()}).json()["entries"]
+te = P.get(B + "/api/time/entries", params={"scope": "all", "from": (testclock.today() - timedelta(days=1)).isoformat()}).json()["entries"]
 notes = sorted(e["note"] for e in te)
 # 2.63.0 (#1523): lists / reports / CSV show a participant only their own entries (the entries of one task stay)
 check(notes == ["pete own"], f"time entries: only mine {notes}")
@@ -266,15 +267,15 @@ check(sorted(e["note"] for e in P.get(B + "/api/time/entries", params={"task_id"
       "entries of my task: everyone's")
 check(P.get(B + "/api/time/entries", params={"task_id": T3}).status_code == 404, "time of hidden task 404")
 check(P.get(B + "/api/time/entries", params={"task_id": T2}).status_code == 404, "time of context task 404")
-rep = P.get(B + "/api/time/report", params={"scope": "all", "from": (date.today() - timedelta(days=1)).isoformat()}).json()
+rep = P.get(B + "/api/time/report", params={"scope": "all", "from": (testclock.today() - timedelta(days=1)).isoformat()}).json()
 check("hidden" not in json.dumps(rep).lower() and "list-level" not in json.dumps(rep), "report without hidden entries")
 check(rep["total"]["count"] == 1, f"report count {rep['total']}")  # 2.63.0 (#1523): own only
-csvt = P.get(B + "/api/time/export.csv", params={"scope": "all", "from": (date.today() - timedelta(days=1)).isoformat()}).text
+csvt = P.get(B + "/api/time/export.csv", params={"scope": "all", "from": (testclock.today() - timedelta(days=1)).isoformat()}).text
 check("Hidden" not in csvt and "carol on hidden" not in csvt and len(list(csv.reader(io.StringIO(csvt.lstrip("﻿"))))) == 2, "CSV without hidden entries")  # 2.63.0 (#1523): own only
-cte = C.get(B + "/api/time/entries", params={"scope": "all", "from": (date.today() - timedelta(days=1)).isoformat()}).json()["entries"]
+cte = C.get(B + "/api/time/entries", params={"scope": "all", "from": (testclock.today() - timedelta(days=1)).isoformat()}).json()["entries"]
 # 2.63.0 (#1523): an editor sees own entries only (3), the list admin all 4
 check(len(cte) == 3, f"editor sees her 3 entries ({len(cte)})")
-check(len(Bo.get(B + "/api/time/entries", params={"scope": "all", "from": (date.today() - timedelta(days=1)).isoformat()}).json()["entries"]) == 4, "admin sees all 4 entries")
+check(len(Bo.get(B + "/api/time/entries", params={"scope": "all", "from": (testclock.today() - timedelta(days=1)).isoformat()}).json()["entries"]) == 4, "admin sees all 4 entries")
 check(P.post(B + "/api/time/entries", json={"task_id": T3, "minutes": 5}).status_code == 404, "no time on hidden task")
 hidden_entry = dbx("SELECT id FROM time_entries WHERE note='carol on hidden'")[0][0]
 check(P.patch(B + f"/api/time/entries/{hidden_entry}", json={"note": "x"}).status_code == 404, "hidden entry 404")
@@ -326,7 +327,7 @@ check(lj["role"] == "participant" and {s_["id"] for s_ in lj["sections"]} == {se
 check({t["id"] for t in v1("GET", "/search", params={"q": "HIDDEN"}).json()["data"]} == set(), "v1 search")
 check({t["id"] for t in v1("GET", "/search", params={"q": "Secret"}).json()["data"]} == set(), "v1 search context title")
 check(all(x["name"] != "stale" for x in v1("GET", "/tags").json()["data"]), "v1 tags")
-vr = v1("GET", "/roadmap", params={"from": (date.today() - timedelta(days=3)).isoformat()}).json()
+vr = v1("GET", "/roadmap", params={"from": (testclock.today() - timedelta(days=3)).isoformat()}).json()
 check(not ({t["id"] for g in vr["groups"] for t in g["tasks"]} - PETE), "v1 roadmap")
 vte = v1("GET", "/time/entries", params={"scope": "all"}).json()["data"]
 check(sorted(e["note"] for e in vte) == ["pete own"], f"v1 time {[e['note'] for e in vte]}")  # 2.63.0 (#1523): own only

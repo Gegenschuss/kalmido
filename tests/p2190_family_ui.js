@@ -13,6 +13,7 @@ const {execFileSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2190_family_ui', check, shots: 'P2190F_SHOTS'});
@@ -26,7 +27,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
-const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };  // local date (TZ of the container)
+const day = n => TC.day(n);  // 2.85.0 (#1863): the Berlin day, as the app
 const FAM = 'cal,habits,comments,collab,family';
 
 (async () => {
@@ -81,7 +82,7 @@ const FAM = 'cal,habits,comments,collab,family';
   check(['occ', 'rot', 'meals', 'shop', 'dl', 'kids', 'pack'].every(k => cards.includes(k)), 'the cards: ' + cards);
   check([...d.querySelectorAll('#view .fcard h2')].length === cards.length && !d.querySelector('#view .fam h3'), 'card titles are h2 (heading order after the h1)');
   const occRow = d.querySelector('#view .fc-occ .frow');
-  check(/Grandma Erika/.test(occRow?.textContent) && new RegExp('turns ' + (new Date().getFullYear() + (day(5) < new Date().toISOString().slice(0, 10) ? 1 : 0) - 1946)).test(occRow.textContent) && /in 5 days/.test(occRow.textContent),
+  check(/Grandma Erika/.test(occRow?.textContent) && new RegExp('turns ' + (new Date().getFullYear() + (day(5) < TC.today() ? 1 : 0) - 1946)).test(occRow.textContent) && /in 5 days/.test(occRow.textContent),
     'the birthday: name, "turns N", "in 5 days": ' + occRow?.textContent);
   check(/Alice → Bob → Lina/.test(d.querySelector('#view .fc-rot')?.textContent), 'whose turn: the whole order, Alice → Bob → Lina');
   const days = d.querySelectorAll('#view .fc-meals .fday');

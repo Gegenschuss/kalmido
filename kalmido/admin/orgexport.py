@@ -5,13 +5,14 @@ collects the organisation's data into a ZIP and encrypts it on the fly (the plai
 OX_KEEP_H hours below the data folder (exports/<org id>/, not in the backups) and is removed by the watchdog after that.
 
 What belongs to the organisation: its lists (lists.org_id, never inboxes) with sections, members, fields, tags, status
-updates, links, milestones, history, project notes, project files, forms and playbooks; every task of those lists (subtasks,
-field values, dependencies, people, history, the trash too), their comments and attachments, the time entries on those
-lists, the team chat channels of those lists, its calendars (ev_cals.org_id) with their events, its address books
-(books.org_id) with their contacts, its clients and the whole office (master data, documents with positions, payments, the
-office log, the archive and every file below OFFICE_DIR/<org id>) and its members with their roles. Never: private lists
-(org_id NULL) and other organisations, passwords, sessions, tokens, two-factor data, push subscriptions, webhook secrets,
-connection credentials (OX_SECRET_COLS is dropped from every row as a second floor), people's own tags and settings.
+updates, links, milestones, history, project notes, project files, forms, playbooks and customer reports (2.81.0); every
+task of those lists (subtasks, field values, dependencies, people, history, the trash too), their comments and
+attachments, the time entries on those lists, the team chat channels of those lists, its calendars (ev_cals.org_id) with
+their events, its address books (books.org_id) with their contacts, its clients and the whole office (master data,
+documents with positions, payments, the office log, the archive and every file below OFFICE_DIR/<org id>) and its members
+with their roles. Never: private lists (org_id NULL) and other organisations, passwords, sessions, tokens, two-factor
+data, push subscriptions, webhook secrets, connection credentials (OX_SECRET_COLS is dropped from every row as a second
+floor), people's own tags and settings.
 
 Fields and files that the server encrypts with the organisation's key (core/orgcrypt.py) are decrypted into the archive;
 browser-encrypted content (attachments.enc, task_enc_notes) stays ciphertext -- only its author can open it -- and is listed
@@ -140,6 +141,13 @@ def _ox_dec_row(c, oid, table, row):
         if isinstance(v, str) and v.startswith("kenc1:"):
             row[k] = oc_dec(c, oid, f"{table}.{k}", v)
     row.pop("cost_enc", None)
+    if table == "portal_tickets":  # 2.81.0 (#1866): sealed with the server key -> plain inside the encrypted archive; the
+        from ..accounts.login import unseal  # keyed hash only works on this server (token / token_hash: OX_SECRET_COLS)
+        try:
+            row["email"] = unseal(c, "portal-email", row["email"]) if row.get("email") else ""
+        except Exception:  # noqa: BLE001  (sealed under an older server key: leave the address out, not the export)
+            row["email"] = ""
+        row.pop("email_hash", None)
     return row
 
 
@@ -189,6 +197,8 @@ OX_AREAS = (
     ("lists/files.json", "list_files", f"list_id IN ({LSQ})"),
     ("lists/forms.json", "forms", f"list_id IN ({LSQ})"),
     ("lists/playbooks.json", "playbooks", f"list_id IN ({LSQ})"),
+    # 2.81.0 (#1866): customer reports of those lists (team/portal.py): the address in plain text, never the status link
+    ("portal/tickets.json", "portal_tickets", f"list_id IN ({LSQ})"),
     ("lists/admin_log.json", "org_list_log", "org_id=?"),
     ("tasks.json", "tasks", f"list_id IN ({LSQ})"),
     ("tasks/dependencies.json", "task_deps", f"task_id IN ({TSQ})"),
@@ -244,6 +254,7 @@ OX_AREAS = (
     ("office/fixed_costs.json", "office_fixed_costs", "org_id=?"),  # 2.47.3 (#1652): fixed costs of the cash flow
     ("office/deals.json", "office_deals", "org_id=?"),  # 2.50.0 (#1196): the sales pipeline
     ("office/archive.json", "office_archive", "org_id=?"),
+    ("office/archive-log.json", "office_archive_log", "org_id=?"),  # 2.81.0 B (#1834): the history of the archived documents
     ("office/pack-installs.json", "office_pack_installs", "org_id=?"),  # 2.76.0 review (N2): installed catalogue packs (data only)
     ("office/import_runs.json", "office_import_runs", "org_id=?"),
     ("office/log.json", "office_doc_log", "org_id=?"),
@@ -259,6 +270,7 @@ OX_AREAS = (
     ("documents/settings.json", "doc_cfg", "org_id=?"),
     ("hub/absences.json", "hub_absences", "org_id=?"),  # 2.50.0 (#1195): absences (kind + note decrypted like the others)
     ("hub/bookings.json", "hub_bookings", "org_id=?"),  # 2.50.0 (#1194): bookings of the disposition
+    ("hub/mails.json", "hub_mails", "org_id=?"),  # 2.84.0 A (#1198): filed e-mails (texts decrypted; not the addresses, not the word index)
 )
 OX_NOT_INCLUDED = (
     "private lists and private sharing of the members (lists without the organisation), other organisations",

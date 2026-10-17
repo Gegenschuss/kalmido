@@ -13,7 +13,8 @@ const MG_AREAS = [
   ['time', 'clock', N_('Time|area'), [['time', 'clock', N_('Time tracking'), () => timeOn(), () => ['time']], ['pomo', 'timer', N_('Focus timer'), () => feat('pomo'), () => ['pomo']]]],
   ['review', 'journal', N_('Review|area'), [['review', 'journal', N_('Review & journal'), () => feat('review'), () => ['review']], ['stats', 'chart', N_('Statistics'), () => feat('stats'), () => ['stats']]]],
   ['life', 'home', N_('Home|area'), [['life', 'home', N_('Home & life'), () => lifeOn(), () => LIFE_MODS], ['family', 'family', N_('Family'), () => famOn(), () => ['family']],
-    ['budget', 'wallet', N_('Budget'), () => feat('budget'), () => ['budget']]]],  // 2.72.0 (#1333): the household budget (budget.js)
+    ['budget', 'wallet', N_('Budget'), () => feat('budget'), () => ['budget']],  // 2.72.0 (#1333): the household budget (budget.js)
+    ['feeds', 'news', N_('Feeds'), () => feat('feeds'), () => ['feeds']]]],  // 2.85.0 B (#1162): feeds (feeds.js)
   // 2.48.0 (#1207, #1111): the file store with its parts files (ablage.js) and documents (docs.js)
   ['ablage', 'folder', N_('File store|area'), [['ablage', 'folder', N_('Files'), () => ab_on(), () => ['files']],
     ['docs', 'file', N_('Documents'), () => typeof viewDocs === 'function' && feat('docs'), () => ['docs']]]]];
@@ -94,7 +95,7 @@ async function mg_areaSwitch(md, el) {
 // ---- 2.83.0 (#1845): an organisation's view shows only what belongs to the organisation. Home (home & life, family,
 // budget), habits, review (review & journal, statistics) and notes are private -- hidden in the sidebar, the phone's tab
 // bar and the search while an organisation is the shown workspace (Time stays); an old link opens them in Private
-const O3A_PRIV = ['life', 'family', 'budget', 'habits', 'review', 'stats', 'notes'];
+const O3A_PRIV = ['life', 'family', 'budget', 'habits', 'review', 'stats', 'notes', 'feeds'];  // 2.85.0 B (#1162): + feeds
 const o3a_privOnly = mod => O3A_PRIV.includes(mod);
 const o3a_orgView = () => typeof wsCur === 'function' && wsCur().startsWith('org:');
 const o3a_hid = mod => !!mod && o3a_privOnly(mod) && o3a_orgView();

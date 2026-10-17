@@ -13,12 +13,12 @@ import os
 import re
 import subprocess
 import sys
-import datetime
 import json
 import time
 
 import dbx as dbxm
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -127,7 +127,7 @@ check(r.status_code in (400, 403), f"#1378: an import without the header is refu
 
 # ---------------------------------------------------------------- #1379: producing / raw data switched on per organisation
 D = O + "/docs"
-Y = datetime.date.today().year
+Y = testclock.today().year
 
 
 def sql(q, args=()):

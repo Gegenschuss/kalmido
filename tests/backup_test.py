@@ -270,7 +270,9 @@ old = (datetime.now(TZ) - timedelta(days=3)).astimezone(ZoneInfo("UTC")).isoform
 dbx("UPDATE settings SET value=? WHERE key='bk_last_ok'", (old,))
 r = A.patch(B + "/api/admin/backups", json={"on": True, "time": "00:00"})
 check(r.ok and r.json()["on"], "switched on")
-check(bool(wait_alert("backup:stale")), "alert: last successful backup older than 2 days")
+# 2.81.0 (#1627): switching on again starts the clock then -- an old bk_last_ok alone no longer alerts at once
+time.sleep(4)
+check(not alerts("backup:stale"), "no 'older than 2 days' alert right after switching on again (clock starts at bk_enabled_at)")
 check(bool(wait_alert("switch:bk_on:1")), "switching backups on is a security alert")
 today = datetime.now(TZ).date().isoformat()
 check(dbx("SELECT value FROM settings WHERE key='bk_last_day'")[0][0] == today, "time already passed today: first automatic backup tomorrow")

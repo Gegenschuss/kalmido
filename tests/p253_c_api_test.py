@@ -17,17 +17,18 @@ import os
 import subprocess
 import sys
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 
 import dbx as dbxm
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 FAILS, OKS = [], [0]
-T0 = date.today()
+T0 = testclock.today()
 
 
 def check(cond, what):

@@ -1196,6 +1196,7 @@ characters, no digits or colons, no plain words such as `Release` or `Fix` (else
 
 ```
 GET  /api/v1/agent/chats?since=<message id>   -> {data: [{id, user: {id, name}, from: "user" | "agent", body, task_id, created_at}], cursor}
+GET  /api/v1/agent/chats?user_id=<person>    -> the same for one conversation, plus pins (2.82.0; MCP list_chats user_id)
 POST /api/v1/agent/chats/{user_id}           {"body": "…", "task_id": 51, "job_id": 42 (2.32.0: the job whose result this is), "job_parent": 40 (2.47.3, optional)}
 ```
 
@@ -1484,8 +1485,8 @@ the same way (`kind: comment` with `comment`, `task`, `list`; `kind: team` with 
 A message of the agent chat or of a team chat conversation can be pinned: it shows in a bar at the top of the
 conversation (newest pin first, a tap jumps to it). At most 5 per conversation (a 6th answers 409); a deleted message
 leaves the bar. Every message carries `pinned_at` (null = not pinned) and `pinned_by`; the conversation's page
-(`GET /api/v1/team/rooms/{id}/messages`, in the app also the agent chat) carries `pins`, also when they are older than
-the page.
+(`GET /api/v1/team/rooms/{id}/messages`, in the app also the agent chat; 2.82.0: `GET /api/v1/agent/chats?user_id=` too, empty while the person shares nothing with the agent) carries
+`pins`, also when they are older than the page.
 
 ```
 POST /api/v1/agent/chats/{user_id}/messages/{message_id}/pin {"pinned": true}   (the agent, own conversations; MCP pin_chat_message)
@@ -1515,6 +1516,10 @@ Scopes: `files:read` (list, read) and `files:write` (add files and folders, new 
 | Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text`) | `GET /api/v1/files/search?q=` | `search_files` |
 | A new file / folder (`{parent_id?, name, content \| content_base64, mime?, kind?}`; without `parent_id`: your own folder) | `POST /api/v1/files` | `write_file`, `create_file_folder` |
 | A new version of a file (`{content \| content_base64}`, role edit; the older versions stay) | `POST /api/v1/files/{id}/versions` | `write_file` with `file_id` |
+
+2.84.0 (#1198): mails filed with clients and projects keep their `.eml` and attachments in the folder *E-Mails* of the file
+store; an agent reaches them only when a person shares such a folder with it. The filed mails themselves (headers, text,
+assigning) have no agent route yet.
 
 A name that is taken gets " (2)"; an agent's executable ending gets ".txt" (#380). Renaming, moving, the trash and shares
 stay with people. Without a share the answer is 404 (the file does not exist for you); a view share answers 403 on writes.

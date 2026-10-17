@@ -26,9 +26,10 @@ import dbx
 import subprocess
 import sys
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -231,9 +232,9 @@ r = audit(A, "status=4xx")
 check(r.ok and all(400 <= x["status"] < 500 for x in r.json()["data"]) and len(r.json()["data"]) >= 5, "filter: 4xx")
 check(audit(A, "status=teapot").status_code == 400, "filter: bad status 400")
 check(audit(A, "day=2020-13-01").status_code == 400, "filter: bad day 400")
-today = date.today().isoformat()
+today = testclock.today().isoformat()
 check(len(audit(A, f"day={today}").json()["data"]) == len(D), "filter: today")
-check(audit(A, f"day={(date.today() - timedelta(days=1)).isoformat()}").json()["data"] == [], "filter: yesterday empty")
+check(audit(A, f"day={(testclock.today() - timedelta(days=1)).isoformat()}").json()["data"] == [], "filter: yesterday empty")
 p1 = audit(A, "limit=3").json()
 check(len(p1["data"]) == 3 and p1["next_before"] == p1["data"][-1]["id"], "paging: limit + next_before")
 p2 = audit(A, f"limit=3&before={p1['next_before']}").json()
@@ -354,7 +355,7 @@ check("X-Kalmido-Unknown-Fields" not in A.post(B + f"/api/tasks/{WT}/comments", 
 
 # ================================================================== retention + switched off
 con = db()
-old = (date.today() - timedelta(days=5)).isoformat()
+old = (testclock.today() - timedelta(days=5)).isoformat()
 con.execute("INSERT INTO agent_audit(agent_id,at,day,method,route,status,ms) VALUES(?,?,?,?,?,?,0)", (AG, old + "T10:00:00.000+00:00", old, "GET", "/api/v1/me", 200))
 con.commit()
 con.close()

@@ -20,6 +20,7 @@ import os
 import subprocess
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -173,6 +174,20 @@ check(st and st[0] == "found" and st[2] == "pdf", f"#1820: the PDF's text layer 
 att = {x["name"]: x for x in Bo.get(B + f"/api/tasks/{T1}").json().get("attachments", [])}.get("bill.pdf") or {}
 check((att.get("up") or {}).get("text") == "found", f"#1820 (with #1818's marks): the task file carries up.text found ({att.get('up')})")
 n_words = dbx("SELECT COUNT(*) FROM file_words w JOIN file_text f ON f.id=w.ft_id WHERE f.kind='att' AND f.ref_id=?", (A1,))[0][0]
+# 2.81.0 (#1856): the nightly boundary check counts a recognised text kept for another workspace than its file's list
+FT_ORG = dbx("SELECT org_id FROM file_text WHERE kind='att' AND ref_id=?", (A1,))[0][0]
+dbx("UPDATE file_text SET org_id=? WHERE kind='att' AND ref_id=?", (None if FT_ORG else ORG, A1), write=True)
+bd = A.get(B + "/api/admin/orgs").json().get("boundary", {})
+dbx("UPDATE file_text SET org_id=? WHERE kind='att' AND ref_id=?", (FT_ORG, A1), write=True)
+check(bd.get("kinds", {}).get("file_text") == 1, "#1856: the boundary check counts file_text across the boundary " + str(bd.get("kinds")))
+check(not A.get(B + "/api/admin/orgs").json().get("boundary", {}).get("kinds", {}).get("file_text"), "#1856: ... and nothing when it fits")
+# 2.81.0 (#1856): a run of 35 minutes is not taken up again (the longest recognition, 30 pages x 60 s, is still going on)
+old = (datetime.now(timezone.utc) - timedelta(minutes=35)).isoformat()
+dbx("UPDATE file_text SET state='run', updated_at=? WHERE kind='att' AND ref_id=?", (old, A1), write=True)
+time.sleep(12)
+st35 = ft("att", A1)
+dbx("UPDATE file_text SET state='found' WHERE kind='att' AND ref_id=?", (A1,), write=True)
+check(st35 and st35[0] == "run", f"#1856: a long run stays with its worker ({st35})")
 check(n_words > 0, f"#1820: the words are in the keyed index ({n_words})")
 hits = tsearch(Bo, "wolkenkratzer")
 check(T1 in hits and hits[T1].get("file_hit") == "bill.pdf", f"#1820: the task search finds the task by its file's text, file_hit = the name ({hits.get(T1, {}).get('file_hit')})")
@@ -251,6 +266,10 @@ j = v1(Bo, "/files/search?q=zitronenbaum").json()
 check(any(x["id"] == NF and x["hit"] == "text" and x.get("url") for x in j.get("data", [])), f"#1820 API: GET /files/search finds the file by its text {str(j)[:200]}")
 check(v1(Zo, "/files/search?q=zitronenbaum").json().get("data") == [], "#1820 API: another organisation finds nothing")
 check(v1(Bo, "/files/search").status_code == 400, "#1820 API: q is needed")
+# 2.81.0 (#1856): the API's task search names the file whose text matched, like the app
+j = v1(Bo, "/search?q=wolkenkratzer").json()
+hit = [x for x in j.get("data", []) if x["id"] == T1]
+check(hit and (hit[0].get("file_hit") or "").endswith(".pdf"), f"#1856 API: GET /search carries file_hit {str(hit)[:300]}")
 
 P = Bo.post(B + "/api/lists", json={"name": "Site", "kind": "project", "org_id": ORG}).json()["id"]
 r = Bo.post(B + f"/api/lists/{P}/files", files={"file": ("plan.pdf", text_pdf(["Kirschgarten Bauabschnitt"]), "application/pdf")})

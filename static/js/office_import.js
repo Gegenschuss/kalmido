@@ -207,14 +207,15 @@ async function oimLoadList() {
 }
 function oimArchiveListHtml(q) {
   if (!OIM.list) { setTimeout(oimLoadList, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
-  const items = (OIM.list.items || []).filter(r => !q || [r.number, r.client, r.client_name, r.project].some(v => (v || '').toLowerCase().includes(q)));
+  const items = (OIM.list.items || []).filter(r => (!q || [r.number, r.client, r.client_name, r.project].some(v => (v || '').toLowerCase().includes(q))) && (!OIM.cl || String(r.client_id) === OIM.cl));
   const sum = OIM.list.sum_invoices ? `<p class="muted oimsum">${esc(tr('Archived invoices: {0}, of which paid: {1}', ofcMoney(OIM.list.sum_invoices), ofcMoney(OIM.list.sum_paid)))}</p>` : '';
   const imp = ofcAdmin() ? `<a class="btn sm" href="#office/import">${ic('upload', 's')} ${tr('Import legacy data')}</a>` : '';
-  if (!items.length) return `<div class="empty nempty eact">${ic('archive')}<span>${q ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Import legacy data.')}</span>${q ? '' : imp}</div>`;
+  const sum0 = r81b_clFilter() + sum;  // 2.81.0 (#1834): the client filter above the list
+  if (!items.length) return (OIM.cl ? sum0 : '') + `<div class="empty nempty eact">${ic('archive')}<span>${q || OIM.cl ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Import legacy data.')}</span>${q ? '' : imp}</div>`;
   // 2.40.0 (#1366): the row shows the PDF in the browser, the button next to it downloads it
-  return sum + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener"${typeof pv_attr === 'function' ? pv_attr({url: `/api/office/legacy/archive/${r.id}/pdf`, name: (r.number || tr('Document')) + '.pdf', dlUrl: `/api/office/legacy/archive/${r.id}/pdf?download=1`}) : ''}>
+  return sum0 + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener"${typeof pv_attr === 'function' ? pv_attr({url: `/api/office/legacy/archive/${r.id}/pdf`, name: (r.number || tr('Document')) + '.pdf', dlUrl: `/api/office/legacy/archive/${r.id}/pdf?download=1`}) : ''}>
     <span class="ofcn"><b>${esc(r.number || r.file_name)}${r.client || r.client_name ? ` · ${esc(r.client || r.client_name)}` : ''}</b><small class="muted">${esc([r.kind === 'offer' ? tr('Quotation') : tr('Invoice'), r.project, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>
-    <span class="ofdsum"><b>${r.amount != null ? esc(ofcMoney(r.amount)) : ''}</b><small class="rotag">${ic('archive', 's')}${tr('Archive|documents')}${r.kind === 'invoice' ? ' · ' + (r.paid ? tr('Paid') : tr('open')) : ''}</small></span>${ic('file', 's')}</a><a class="ib oimdl" href="/api/office/legacy/archive/${r.id}/pdf?download=1" download aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}</a></li>`).join('')}</ul>` + `<div class="lacts">${imp}</div>`;
+    <span class="ofdsum"><b>${r.amount != null ? esc(ofcMoney(r.amount)) : ''}</b><small class="rotag">${ic('archive', 's')}${tr('Archive|documents')}${r.kind === 'invoice' ? ' · ' + (r.paid ? tr('Paid') : tr('open')) : ''}</small></span>${ic('file', 's')}</a><a class="ib oimdl" href="/api/office/legacy/archive/${r.id}/pdf?download=1" download aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}</a><button type="button" class="ib oimdl" data-oim="arch-edit" data-id="${r.id}" aria-label="${esc(tr('Correct archived document'))}" title="${esc(tr('Correct archived document'))}">${ic('edit', 's')}</button></li>`).join('')}</ul>` + `<div class="lacts">${imp}</div>`;
 }
 
 // ---- actions
@@ -296,6 +297,7 @@ document.addEventListener('click', async e => {
   else if (a === 'arch-rm') { OIM.arch.splice(+b.dataset.i, 1); ofcDraw(); }
   else if (a === 'arch-clear') { OIM.arch = []; ofcDraw(); }
   else if (a === 'arch-go') oimArchiveGo();
+  else if (a === 'arch-edit') r81b_archEdit(+b.dataset.id);
   else if (a === 'counter') {
     try { await api('POST', '/api/office/legacy/counter', {kind: b.dataset.kind, last: +b.dataset.last}); toast(tr('Saved')); await oimLoad(); await ofcInfo(true); } catch (x) { toast(x.message || ''); }
   } else if (a === 'area-skip') bk_skipAll(b.dataset.area);
@@ -334,3 +336,89 @@ document.addEventListener('input', e => {
   if (t.dataset?.oimC && OIM.pv) { const x = OIM.pv.clients[+t.dataset.oimC]; if (x) x[t.dataset.k] = t.value; }
   else if (t.dataset?.oimA && t.tagName === 'INPUT' && t.type !== 'checkbox') { const x = OIM.arch[+t.dataset.oimA]; if (x) x[t.dataset.k] = t.value; }
 });
+
+// ---- 2.81.0 (#1834): correct an archived document afterwards -- client, net + tax lines (Kalmido adds the gross), paid
+// (invoices); number and PDF stay. Everybody who reads the archive may (the server checks); each save is one undo step
+// and goes into the entry's history (shown folded in the dialog).
+const R81B_TAX = [['19', '19 %'], ['7', '7 %'], ['0', '0 %'], ['rc', N_('Reverse charge')]];
+const R81B_PCT = {19: 19, 7: 7, 0: 0, rc: 0};
+function r81b_clFilter() {
+  const seen = new Map();
+  for (const r of OIM.list?.items || []) if (r.client_id && !seen.has(r.client_id)) seen.set(r.client_id, r.client || r.client_name || '#' + r.client_id);
+  if (!seen.size && !OIM.cl) return '';
+  const opts = [...seen].sort((a, b) => a[1].localeCompare(b[1])).map(([v, n]) => `<option value="${v}" ${String(v) === OIM.cl ? 'selected' : ''}>${esc(n)}</option>`).join('');
+  return `<div class="ofcbar r81b-clf"><select id="oim-cl" aria-label="${esc(tr('Client'))}"><option value="">${esc(tr('All clients'))}</option>${opts}</select></div>`;
+}
+document.addEventListener('change', e => { if (e.target.id === 'oim-cl') { OIM.cl = e.target.value || ''; if (typeof ofdDraw === 'function') ofdDraw(); } });
+const r81b_num = v => { const t = String(v ?? '').trim().replace(/\s|€/g, ''); if (!t) return null; const n = +(/,\d{1,2}$/.test(t) ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '')); return Number.isFinite(n) ? n : NaN; };
+const r81b_round = n => Math.round(n * 100) / 100;
+function r81b_lineHtml(ln, i, n) {
+  return `<div class="r81b-ln" data-i="${i}"><input class="numin" inputmode="decimal" data-r81b="net" value="${esc(ln.net != null && ln.net !== '' ? ofdNumIn(ln.net) : '')}" maxlength="16" aria-label="${esc(tr('Net'))}" placeholder="${esc(tr('Net'))}">
+    <select data-r81b="tax" aria-label="${esc(tr('VAT rate'))}">${R81B_TAX.map(([v, t]) => `<option value="${v}" ${v === String(ln.tax) ? 'selected' : ''}>${esc(tr(t))}</option>`).join('')}</select>
+    ${n > 1 ? `<button type="button" class="ib" data-r81b="rm" aria-label="${esc(tr('Remove'))}" title="${esc(tr('Remove'))}">${ic('x', 's')}</button>` : ''}</div>`;
+}
+function r81b_val(field, v) {
+  if (field === 'paid') return v ? tr('Paid') : tr('open');
+  if (field === 'client') return v ? v.name || '#' + v.id : tr('no client');
+  if (!v || v.gross == null) return '–';
+  return v.lines ? v.lines.map(l => `${ofcMoney(l.net)} ${l.tax === 'rc' ? tr('Reverse charge') : l.tax + ' %'}`).join(' + ') + ' = ' + ofcMoney(v.gross) : `${ofcMoney(v.gross)} (${tr('gross, tax unknown')})`;
+}
+async function r81b_archEdit(id) {
+  let d;
+  try { d = await api('GET', `/api/office/legacy/archive/${id}`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  if (OIM.clients === null && typeof fx8a_oimClients === 'function') await fx8a_oimClients(true);
+  const cls = [...(OIM.clients || [])];
+  if (d.client_id && !cls.some(c => c.id === d.client_id)) cls.push({id: d.client_id, name: d.client || '#' + d.client_id});
+  let lines = d.tax_lines ? d.tax_lines.map(l => ({...l})) : [{net: '', tax: '19'}];
+  const inv = d.kind === 'invoice', lbl = {client: tr('Client'), amount: tr('Amount'), paid: tr('Paid')};
+  const hist = (d.history || []).map(h => `<li><small class="muted">${esc([ofdWhen(h.at), h.user_name].filter(Boolean).join(' · '))}</small><span>${esc(tr('{0}: {1} → {2}', lbl[h.field] || h.field, r81b_val(h.field, h.old), r81b_val(h.field, h.new)))}</span></li>`).join('');
+  const body = `<p class="muted ofchint">${esc([d.kind === 'offer' ? tr('Quotation') : tr('Invoice'), d.number || d.file_name, d.date ? fmtDateLoc(d.date) : ''].filter(Boolean).join(' · '))}. ${esc(tr('Number and file stay unchanged.'))}</p>
+    <div class="row"><label for="r81b-cl">${esc(tr('Client'))}</label><select id="r81b-cl">${[['', tr('no client')], ...cls.map(c => [c.id, c.name])].map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(d.client_id ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+    <div class="row"><span class="r81b-lbl">${esc(tr('Amount'))}</span>${!d.tax_lines && d.amount != null ? `<span class="muted ofchint">${esc(ofcMoney(d.amount) + ' (' + tr('gross, tax unknown') + ')')}</span>` : ''}
+      <div id="r81b-lines"></div><button type="button" class="btn sm ghost" data-r81b="add">${ic('plus', 's')} ${esc(tr('Add tax rate'))}</button><p class="muted r81b-sum" id="r81b-sum" aria-live="polite"></p></div>
+    ${inv ? `<label class="chkl r81b-paid"><input type="checkbox" id="r81b-paid" ${d.paid ? 'checked' : ''}> ${esc(tr('Paid'))}</label>` : ''}
+    <details class="r81b-hist"><summary>${esc(tr('History'))} (${(d.history || []).length})</summary>${hist ? `<ul role="list">${hist}</ul>` : `<p class="muted">${esc(tr('No changes yet.'))}</p>`}</details>`;
+  const read = md => $$('.r81b-ln', md).map(el => ({net: $('[data-r81b="net"]', el).value, tax: $('[data-r81b="tax"]', el).value}));
+  const paint = md => {
+    const box = $('#r81b-lines', md); box.innerHTML = lines.map((l, i) => r81b_lineHtml(l, i, lines.length)).join('');
+    sum(md);
+  };
+  const sum = md => {
+    const ls = read(md), nets = ls.map(l => r81b_num(l.net));
+    const el = $('#r81b-sum', md);
+    if (nets.some(n => n === null) && nets.every(n => n === null)) { el.textContent = ''; return; }
+    if (nets.some(n => n === null || Number.isNaN(n))) { el.textContent = tr('Invalid value: {0}', tr('Net')); return; }
+    const net = r81b_round(nets.reduce((a, b) => a + b, 0)), tax = r81b_round(ls.reduce((a, l, i) => a + r81b_round(nets[i] * R81B_PCT[l.tax] / 100), 0));
+    el.textContent = tr('Net {0} + VAT {1} = gross {2}', ofcMoney(net), ofcMoney(tax), ofcMoney(r81b_round(net + tax)));
+  };
+  const md = ofdDlg(tr('Correct archived document'), body, tr('Save'), async m => {
+    const ls = read(m), b = {}, old = {};
+    const cid = $('#r81b-cl', m).value ? +$('#r81b-cl', m).value : null;
+    if (cid !== (d.client_id || null)) { b.client_id = cid; old.client_id = d.client_id || null; }
+    if (ls.some(l => String(l.net).trim())) {
+      if (ls.some(l => !String(l.net).trim() || Number.isNaN(r81b_num(l.net)))) throw new Error(tr('Invalid value: {0}', tr('Net')));
+      const nl = ls.map(l => ({net: r81b_num(l.net), tax: l.tax}));
+      if (JSON.stringify(nl) !== JSON.stringify((d.tax_lines || []).map(l => ({net: +l.net, tax: l.tax})))) {
+        b.tax_lines = nl;
+        if (d.tax_lines) old.tax_lines = d.tax_lines.map(l => ({net: l.net, tax: l.tax})); else old.amount = d.amount ?? '';
+      }
+    } else if (d.tax_lines) { b.amount = ''; old.tax_lines = d.tax_lines.map(l => ({net: l.net, tax: l.tax})); }  // all lines emptied: no amount
+    if (inv && $('#r81b-paid', m).checked !== !!d.paid) { b.paid = $('#r81b-paid', m).checked ? 1 : 0; old.paid = d.paid ? 1 : 0; }
+    if (!Object.keys(b).length) return;
+    const url = `/api/office/legacy/archive/${id}`, after = () => { OIM.list = null; if (typeof ofdDraw === 'function') ofdDraw(); return {}; };
+    await api('PATCH', url, b);
+    after();
+    const name = d.number || d.file_name || '';
+    offerUndo(tr('Saved'), histAdd({label: tr('Correct archived document') + (name ? ` “${name}”` : ''), undo: () => api('PATCH', url, old).then(after), redo: () => api('PATCH', url, b).then(after)}));
+  });
+  md.classList.add('r81b-dlg');
+  paint(md);
+  md.addEventListener('input', e => { if (e.target.dataset.r81b === 'net') sum(md); });
+  md.addEventListener('change', e => { if (e.target.dataset.r81b === 'tax') sum(md); });
+  md.addEventListener('click', e => {
+    const b = e.target.closest('[data-r81b]'); if (!b || b.tagName === 'INPUT' || b.tagName === 'SELECT') return;
+    lines = read(md);
+    if (b.dataset.r81b === 'add') { lines.push({net: '', tax: lines.some(l => l.tax === '19') ? '7' : '19'}); paint(md); $$('[data-r81b="net"]', md).pop()?.focus(); }
+    else if (b.dataset.r81b === 'rm') { lines.splice(+b.closest('.r81b-ln').dataset.i, 1); paint(md); }
+  });
+}

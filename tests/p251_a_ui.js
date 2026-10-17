@@ -10,6 +10,7 @@
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p251_a_ui', check, shots: 'P251A_SHOTS'});
@@ -19,7 +20,7 @@ if (!process.env.P251_NOSTART) execFileSync('bash', [path.join(__dirname, 'start
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
 const agent = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1/office' + url, {method, headers: {...H, Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
 const FEAT = 'cal,comments,collab,office,clients';
-const today = new Date().toISOString().slice(0, 10);
+const today = TC.today();
 
 (async () => {
   await sleep(600);

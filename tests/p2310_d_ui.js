@@ -11,6 +11,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2310_d_ui', check, shots: 'P2310D_SHOTS'});
@@ -43,7 +44,7 @@ const axe = async (ev, where) => {  // the rules of p2160_a11y over the list wit
   const L = (await call('POST', '/api/lists', {name: 'Sorted things'})).id;
   await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});
   check((await call('PATCH', `/api/lists/${L}`, {columns: ['due', 'prio', 'who']})).status === 200, 'the list gets its own columns');
-  const d0 = new Date(), day = n => { const x = new Date(d0.getTime() + n * 864e5); return x.toISOString().slice(0, 10); };
+  const d0 = new Date(), day = n => TC.day(n);
   const T = {};
   for (const [title, due, priority] of [['Bravo', day(5), 1], ['Alpha', day(2), 5], ['Charlie', null, 3], ['Delta', day(9), 0]]) T[title] = (await call('POST', '/api/tasks', {title, list_id: L, due, priority})).id;
   await call('PATCH', `/api/tasks/${T.Delta}`, {assignee_id: BOB});

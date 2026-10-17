@@ -172,6 +172,13 @@ def dx_debtor(st, customer_no):
     return st["debtor"] or _acct(st, "debtor")
 
 
+def r81b_customer_no(r):
+    """2.81.0 (#1867): the customer number a locked document was issued under (its recipient snapshot), so a client changed
+    or merged later keeps old invoices on their debtor; a snapshot without one (older, or the client had none) reads it live."""
+    snap = _j(r["recipient_snapshot"]) if r["locked_at"] else {}
+    return str(snap.get("customer_no") or "").strip() or r["dx_customer_no"]
+
+
 # ---------------------------------------------------------------- the batch
 def _ddmm(iso_date):
     return iso_date[8:10] + iso_date[5:7] if iso_date and len(iso_date) >= 10 else ""
@@ -219,7 +226,7 @@ def dx_rows(c, oid, d_from, d_to, s=None):
     for r in docs:
         t = _j(r["totals"])
         fx = _fx(r, t)
-        debtor = dx_debtor(st, r["dx_customer_no"])
+        debtor = dx_debtor(st, r81b_customer_no(r))
         name = (_j(r["recipient"]).get("name") or r["dx_client_name"] or "").strip()
         text = (r["number"] + " " + name).strip()[:60]
         perf = _ddmmyyyy(r["service_to"] or r["date"] or "") if "service_to" in r.keys() else ""
@@ -262,7 +269,7 @@ def dx_rows(c, oid, d_from, d_to, s=None):
         name = (_j(r["recipient"]).get("name") or r["dx_client_name"] or "").strip()
         out.append({"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": sign, "WKZ Umsatz": "EUR",
                     "Konto": (st["cash"] or _acct(st, "cash")) if r["p_method"] == "cash" else (st["bank"] or _acct(st, "bank")),
-                    "Gegenkonto (ohne BU-Schlüssel)": dx_debtor(st, r["dx_customer_no"]), "BU-Schlüssel": "",
+                    "Gegenkonto (ohne BU-Schlüssel)": dx_debtor(st, r81b_customer_no(r)), "BU-Schlüssel": "",
                     "Belegdatum": _ddmm(r["p_date"]), "Belegfeld 1": BELEG_RE.sub("-", r["number"] or "")[:36],
                     "Buchungstext": ("Zahlung " + (r["number"] or "") + " " + name).strip()[:60], "Festschreibung": "0",
                     "_date": r["p_date"], "_kind": "payment"})

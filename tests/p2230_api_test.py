@@ -19,9 +19,10 @@ import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -90,7 +91,7 @@ A = sess("alice")
 A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True, "time_all": True, "modules": ["cal", "comments", "collab"]})
 FEAT = "cal,comments,collab,time,progress,agents"
 A.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": FEAT})
-T0 = date.today()
+T0 = testclock.today()
 D = lambda n: (T0 + timedelta(days=n)).isoformat()  # noqa: E731
 BOB = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123"}).json()["id"]
 CAROL = A.post(B + "/api/users", json={"username": "carol", "display_name": "Carol", "password": "password123"}).json()["id"]

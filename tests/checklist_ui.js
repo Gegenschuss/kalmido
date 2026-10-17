@@ -6,6 +6,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, errs, sleep, B} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
@@ -26,7 +27,7 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   const L = await call(ca, 'POST', '/api/lists', {name: 'Groceries', checklist: true});
   await call(ca, 'PUT', `/api/lists/${L.id}/members`, {user_id: 2, role: 'edit'});
   const mk = t => call(ca, 'POST', '/api/tasks', {list_id: L.id, ...t});
-  const milk = await mk({title: 'Milk', due: new Date().toISOString().slice(0, 10), priority: 5});
+  const milk = await mk({title: 'Milk', due: TC.today(), priority: 5});
   const bread = await mk({title: 'Bread'});
   const eggs = await mk({title: 'Eggs'});
   await call(ca, 'POST', `/api/tasks/${eggs.id}/complete`, {});

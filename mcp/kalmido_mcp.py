@@ -668,8 +668,10 @@ TOOLS = [
            "log": {"type": "string"}, "append_log": {"type": "string"}}, ["job_id"]), t_update_job),
     ("list_chats", "Chat messages people sent to the agent (all conversations) after message id `since`, with reactions and "
                    "delivered_at (reading them marks them delivered). 2.39.0: edited_at = the person edited the message later "
-                   "(body is the current text; edited after you had it: the event message_edited).",
-     _obj({"since": {"type": "integer", "minimum": 0}}), lambda api, a: api.call("GET", "/agent/chats", _pick(a, ("since",)))),
+                   "(body is the current text; edited after you had it: the event message_edited). 2.82.0: user_id = only that "
+                   "person's conversation, then the answer also carries its pinned messages (pins).",
+     _obj({"since": {"type": "integer", "minimum": 0}, "user_id": S_ID}),
+     lambda api, a: api.call("GET", "/agent/chats", _pick(a, ("since", "user_id")))),
     ("chat_typing", "Show typing dots in one person's chat for 10 seconds while you write an answer (call again to keep them; "
                     "send_chat ends them).",
      _obj({"chat_user_id": S_ID}, ["chat_user_id"]), lambda api, a: api.call("POST", "/agent/typing", body=_pick(a, ("chat_user_id",)))),

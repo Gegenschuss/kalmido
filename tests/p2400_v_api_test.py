@@ -124,5 +124,18 @@ check(A.patch(B + "/api/settings", json={"mine_view": "lists"}).ok and st(A)["se
 check(A.patch(B + "/api/settings", json={"mine_view": "date"}).status_code == 400, "#1344: mine_view own | lists")
 check(A.put(B + "/api/tasks/mine-order", json={"ids": []}).ok and st(A)["mine_order"] == {}, "#1344: an empty order resets it")
 
+# 2.82.0 (#1464): the own order only carries tasks the person still sees
+TB1, TB2 = mk(A, "Team one", TEAM), mk(A, "Team two", TEAM)
+check(Bo.put(B + "/api/tasks/mine-order", json={"ids": [TB1, TB2]}).json().get("count") == 2, "#1464: bob places two team tasks")
+r = A.put(B + f"/api/lists/{TEAM}/members", json={"user_id": BOB, "role": "participant"})
+check(r.ok, "#1464: bob made a participant " + r.text[:200])
+mo = st(Bo)["mine_order"]
+check(mo == {}, "#1464: as a participant (tasks not assigned) the places are not in the state " + json.dumps(mo))
+A.put(B + f"/api/lists/{TEAM}/members", json={"user_id": BOB, "role": "edit"})
+check(st(Bo)["mine_order"] == {str(TB1): 0, str(TB2): 1}, "#1464: visible again = places back")
+check(A.delete(B + f"/api/lists/{TEAM}/members/{BOB}").ok and st(Bo)["mine_order"] == {}, "#1464: removed from the list = no places")
+r = A.put(B + f"/api/lists/{TEAM}/members", json={"user_id": BOB, "role": "edit"})
+check(r.ok and st(Bo)["mine_order"] == {}, "#1464: the places of a list one was removed from are gone (re-invite starts unplaced)")
+
 print(f"{OKS[0]} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

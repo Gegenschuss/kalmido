@@ -16,12 +16,12 @@ import os
 import subprocess
 import sys
 import time
-from datetime import date
 
 import http_ece
 import requests
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -311,7 +311,7 @@ check(cl_c.status_code == 201, "the agent comments (follows the task)")
 Bo.patch(B + "/api/settings", json={"allday_time": "00:00"})
 time.sleep(3.2)
 clear()
-Bo.put(B + f"/api/tasks/{F}/waiting", json={"note": "tax office", "until": date.today().isoformat()})
+Bo.put(B + f"/api/tasks/{F}/waiting", json={"note": "tax office", "until": testclock.today().isoformat()})
 p = settle(bphone.notes, 8)
 check(len(p) == 1 and p[0]["title"] == "Follow up: Ping the tax office" and "tax office" in p[0]["body"], f"follow-up push: {p}")
 fn = news(Bo, "followup")

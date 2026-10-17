@@ -22,6 +22,7 @@ import time
 
 import dbx as dbxm
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -91,8 +92,8 @@ for s in (A, Bo):
     s.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 O = "/api/office"
 D = O + "/docs"
-TODAY = datetime.date.today().isoformat()
-Y = datetime.date.today().year
+TODAY = testclock.today().isoformat()
+Y = testclock.today().year
 
 # ---------------------------------------------------------------- #1645 producing / raw data per quotation
 st = A.get(B + O + "/settings").json()["settings"]

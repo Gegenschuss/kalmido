@@ -8,6 +8,9 @@ a finalised document keeps its snapshot. The legacy import adds contacts to an e
 removes them again). 2.59.0 (#1735): a contact person may be linked to an address book contact (contact_id, see ckl_*)."""
 import re
 
+from flask import jsonify
+
+from ..core.config import app
 from ..core.db import iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import insert_id
@@ -165,6 +168,15 @@ def ckl_contact_ok(c, uid, cl, kid):
     return r if b and ckl_book_fits(cl, b) else None
 
 
+class CklGone(BadInput):
+    """2.81.0 (#1852): the linked contact is gone / not allowed; the dialog unlinks that entry and saves again."""
+
+
+@app.errorhandler(CklGone)
+def ckl_gone(e):
+    return jsonify(error=e.args[0], code="contact_gone", contact_id=e.args[1]), 400  # only the id the caller sent, no foreign data
+
+
 def ckl_want(c, cl, x, old):
     """The contact_id entry x of the client dialog asks for: missing = unchanged (old), null / 0 = not linked, an id = linked
     after the check (a colleague without access to the book keeps an existing link by sending it back unchanged)."""
@@ -182,7 +194,7 @@ def ckl_want(c, cl, x, old):
     need_scope("contacts")  # a token links a contact only with the permission to read contacts
     u = g.get("user")
     if not u or not cl or not ckl_contact_ok(c, u["id"], cl, v):
-        raise BadInput(tr("Invalid value: {0}", "contact_id"))
+        raise CklGone(tr("Invalid value: {0}", "contact_id"), v)
     return v
 
 

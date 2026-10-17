@@ -299,7 +299,7 @@
     Write-Host ''
     Write-Host "    $code" -ForegroundColor White
     Write-Host ''
-    Say "(It is also in the log: cd `"$Dir`"; docker compose logs kalmido. A restart prints a new one.)"
+    Say "(It is also in the log of the running container: cd `"$Dir`"; docker compose logs kalmido. Only the newest Setup code line counts; a restart prints a new one.)"
   } else { Say 'Open it now and log in.' }
   Say ''
   Say "Folder:     $Dir (settings in .env, your data in data\)"

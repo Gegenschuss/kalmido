@@ -11,13 +11,13 @@ Invented companies, people and figures only.
  - #1350: an invoice draft from an accepted quotation, a reminder draft over an open invoice, payment suggestions that
    an admin accepts (booked) or rejects (a member: 403)
 usage: p251_a_api_test.py <datadir>   (P251_NOSTART=1: against a running instance on KALMIDO_TEST_PORT)"""
-import datetime
 import os
 import subprocess
 import sys
 import time
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
@@ -70,7 +70,7 @@ for s, o in ((A, ORG), (Bo, ORG), (Ca, ORG2)):
 O = "/api/office"
 D = O + "/docs"
 V = B + "/api/v1/office"
-TODAY = datetime.date.today().isoformat()
+TODAY = testclock.today().isoformat()
 A.get(B + O + "/settings")
 A.put(B + O + "/settings", json={"company_fields": {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE",
                                                      "vat_id": "DE123456789", "iban": "DE02120300000000202051", "bic": "BYLADEM1001", "bank_name": "Beispielbank"}})

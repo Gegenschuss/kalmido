@@ -8,6 +8,7 @@
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p268_a_ui', check, shots: 'P268A_SHOTS'});
@@ -17,7 +18,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore',
 const call = async (hd, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...hd}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
 const sql = (q, a = []) => JSON.parse(execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, q, JSON.stringify(a)]).toString() || '[]');
 const FEAT = 'cal,comments,collab,office,clients';
-const ym = new Date().toISOString().slice(0, 7);
+const ym = TC.today().slice(0, 7);
 
 (async () => {
   await sleep(600);

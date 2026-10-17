@@ -121,6 +121,8 @@ KINDS = {
                          "person's budget 404, read-only shared = no change, agents / tokens without the scope private never"),
     # 2.73.0 A (#661): the accounts of one person on other Kalmido servers (accounts/servers.py) -- private per person
     "servers": ("matrix", "p273_a_api_test.py: the server accounts of another person 404 (read, change, delete, restore, data, tasks, move); agents 403; nothing of another person's tasks moves"),
+    # 2.84.0 A (#1198): mails filed with a client / project (hub/hubmail.py hbm_can: the client / list / recipient, always in the mail's workspace)
+    "hubmail": ("matrix", "p284_a_api_test.py: a mail / attachment / address of another organisation or a private client of another person 404, a forged sender finds only the recipient's workspace, after leaving nothing, assigning across workspaces refused, agents 403"),
 }
 
 ROUTES = {
@@ -278,6 +280,7 @@ ROUTES = {
     "PATCH /api/office/legacy/archive/{}": "office", "GET /api/office/legacy/archive/{}/pdf": "office", "GET /api/office/legacy/counter": "office",
     "POST /api/office/legacy/counter": "office",
     "POST /api/office/legacy/archive/address": "office",  # 2.40.0 (#1421): the address of an archived PDF (p2400_k_api_test.py)
+    "GET /api/office/legacy/archive/{}": "office",  # 2.81.0 B (#1834): one archived document + its history (p281_b_api_test.py)
     # ---- comment (9)
     "POST /api/comments/{}/decide": "comment", "POST /api/v1/comments/{}/reactions": "comment",
     "DELETE /api/v1/comments/{}/reactions/{}": "comment", "PATCH /api/v1/comments/{}": "comment",
@@ -703,6 +706,15 @@ ROUTES = {
     # 2.83.0 (#1427): the header strip of a list (need_list like the list icon; p283_c_api_test.py) and of an owner's folder
     "PUT /api/lists/{}/header": "list", "POST /api/lists/{}/header": "list", "GET /api/list-header/{}/{}.jpg": "list",
     "GET /api/folder-heads": "folder", "PUT /api/folder-heads": "folder",
+    # 2.84.0 A (#1198): e-mail as an input of the hub (p284_a_api_test.py)
+    "POST /api/hubmail/address": "hubmail", "DELETE /api/hubmail/address": "hubmail", "GET /api/hubmail/mails": "hubmail",
+    "GET /api/hubmail/inbox": "hubmail", "GET /api/hubmail/mails/{}": "hubmail", "GET /api/hubmail/mails/{}/files/{}": "hubmail",
+    "GET /api/hubmail/targets": "hubmail", "POST /api/hubmail/mails/{}/assign": "hubmail", "DELETE /api/hubmail/mails/{}": "hubmail",
+    "POST /api/hubmail/mails/{}/restore": "hubmail",
+    # 2.85.0 B (#1162): feeds, a person's own (no organisation, never an agent's; p285_b_api_test.py: another person gets 404)
+    "GET /api/feeds": "own", "POST /api/feeds": "own", "DELETE /api/feeds/{}": "own", "POST /api/feeds/{}/restore": "own",
+    "GET /api/feeds/items": "own", "POST /api/feeds/read": "own", "POST /api/feeds/items/{}/later": "own",
+    "GET /api/feeds/opml": "own", "POST /api/feeds/opml": "own",
 }
 
 # ---- 1. every route is classified, nothing stale

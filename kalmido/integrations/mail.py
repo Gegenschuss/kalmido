@@ -120,8 +120,9 @@ def mail_token_del():
     return jsonify(ok=True)
 
 
-def mail_text(msg):
-    """(text, [(name, mime, bytes)]) of an email.message.EmailMessage: text/plain preferred, else HTML without tags."""
+def mail_text(msg, limit=MAIL_BODY_MAX):
+    """(text, [(name, mime, bytes)]) of an email.message.EmailMessage: text/plain preferred, else HTML without tags.
+    2.84.0 (#1198): limit = characters kept (the hub files longer texts)."""
     plain = html_ = None
     files = []
     for part in msg.walk():
@@ -152,7 +153,7 @@ def mail_text(msg):
         t = re.sub(r"<[^>]+>", "", t)
         plain = html.unescape(t)
     text = re.sub(r"\n{3,}", "\n\n", (plain or "").replace("\r\n", "\n")).strip()
-    return text[:MAIL_BODY_MAX], files
+    return text[:limit], files
 
 
 def mail_target(c, msg):
@@ -186,6 +187,10 @@ def mail_import(c, raw):
     d = docs_mail_import(c, msg, raw)
     if d is not None:
         return d or None
+    from ..hub.hubmail import hbm_mail_import  # 2.84.0 (#1198): a hub address (client / project / hub inbox) -> a filed mail
+    h = hbm_mail_import(c, msg, raw)
+    if h is not None:
+        return h or None
     mid = str(msg.get("Message-ID", "")).strip()[:300] or ("sha:" + hashlib.sha256(raw).hexdigest())
     if c.execute("SELECT 1 FROM tasks WHERE tt_id=?", ("mail:" + mid,)).fetchone():
         return None

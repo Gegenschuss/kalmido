@@ -61,6 +61,12 @@ CHECKS = {
     # 2.63.0 B (#1513): a customer report in another workspace than its list, or bound to a client of another workspace
     "portal_ticket": ("SELECT p.id, p.list_id FROM portal_tickets p JOIN lists l ON l.id=p.list_id WHERE p.org_id IS DISTINCT FROM l.org_id "
                       "OR (p.org_id IS NULL AND p.owner_id IS DISTINCT FROM l.owner_id)"),
+    # 2.81.0 (#1856): a file's recognised text kept for another workspace than its file's (task / project file: the list's,
+    # Ablage file: the node's); the queue's workspace sweep (files/textscan.py) moves it within minutes
+    "file_text": ("SELECT f.id, f.ref_id FROM file_text f LEFT JOIN attachments a ON f.kind='att' AND a.id=f.att_id "
+                  "LEFT JOIN tasks t ON t.id=a.task_id LEFT JOIN list_files lf ON f.kind='list' AND lf.id=f.list_file_id "
+                  "LEFT JOIN lists l ON l.id=COALESCE(t.list_id, lf.list_id) LEFT JOIN fs_nodes n ON f.kind='fs' AND n.id=f.node_id "
+                  "WHERE (l.id IS NOT NULL AND f.org_id IS DISTINCT FROM l.org_id) OR (n.id IS NOT NULL AND f.org_id IS DISTINCT FROM n.org_id)"),
     "portal_client": ("SELECT p.id, p.client_id FROM portal_tickets p JOIN clients k ON k.id=p.client_id WHERE k.org_id IS DISTINCT FROM p.org_id"),
     # 2.49.0 (#1106): a connection (accepted request) of an agent or a kid account -- requests are for people only
     "conn_agent": ("SELECT l.a_id, l.b_id FROM conn_links l JOIN users u ON u.id IN (l.a_id, l.b_id) "
@@ -130,6 +136,14 @@ CHECKS = {
     # (the assistant reads only lists the person sees right now: assistant/web.py asst_lists; the row is taken out)
     "assistant_person": ("SELECT a.list_id, a.user_id FROM assistant_access a JOIN lists l ON l.id=a.list_id JOIN users u ON u.id=a.user_id "
                          "WHERE l.org_id IS NOT NULL AND (u.kind='agent' OR " + _PERSON.format(o="l", m="a") + ")"),
+    # 2.84.0 A (#1198): a filed mail bound to a client / project of another workspace (the read layer shows it nowhere:
+    # hub/hubmail.py hbm_can; boundary_repair takes the binding off, the mail goes back to its recipient's "Not assigned"),
+    # and an organisation's hub address held by a person who left it (the mail input refuses it anyway; taken out)
+    "hub_mail_ref": ("SELECT m.id, m.owner_id FROM hub_mails m LEFT JOIN clients cl ON cl.id=m.client_id LEFT JOIN lists l ON l.id=m.list_id "
+                     "WHERE m.deleted_at IS NULL AND ((cl.id IS NOT NULL AND cl.org_id IS DISTINCT FROM m.org_id) OR "
+                     "(l.id IS NOT NULL AND l.org_id IS DISTINCT FROM m.org_id))"),
+    "hub_token_person": ("SELECT m.org_id, m.user_id FROM hub_tokens m JOIN users u ON u.id=m.user_id WHERE m.org_id IS NOT NULL AND "
+                         + _PERSON.format(o="m", m="m")),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
@@ -158,7 +172,8 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "file_person": ("fs_shares", "node_id"),  # 2.48.0 (#1207)
           "doc_mail_person": ("doc_mail", "org_id"),  # 2.48.0 (#1111)
           "task_bell_person": ("task_bell", "task_id"),  # 2.53.0 C (#1424)
-          "assistant_person": ("assistant_access", "list_id")}  # 2.75.0 A (#1411)
+          "assistant_person": ("assistant_access", "list_id"),  # 2.75.0 A (#1411)
+          "hub_token_person": ("hub_tokens", "org_id")}  # 2.84.0 A (#1198)
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Administration > Organisations")
 
 
@@ -173,6 +188,11 @@ def boundary_repair(c):
                   "AND cl.id=k.client_id AND ct.id=k.contact_id AND b.id=ct.book_id AND " + CHECKS["client_contact"].split(" WHERE ", 1)[1], (cid,))
     if ckl:
         out["client_contact"] = [[r[0], r[1]] for r in ckl]
+    hbm = c.execute(CHECKS["hub_mail_ref"] + " ORDER BY 1, 2").fetchall()  # 2.84.0 A (#1198): also without workspaces (private <-> org)
+    for mid, _ in hbm:
+        c.execute("UPDATE hub_mails SET client_id=NULL, list_id=NULL WHERE id=?", (mid,))
+    if hbm:
+        out["hub_mail_ref"] = [[r[0], r[1]] for r in hbm]
     if not has_workspaces(c):
         return out
     for k, (table, col) in REPAIR.items():
@@ -256,7 +276,7 @@ def oa_details(c, limit=OA_DETAIL_MAX):
                 name, who, ag = (row[0] if row else ""), oid_, True
             u = c.execute("SELECT display_name FROM users WHERE id=?", (who,)).fetchone()
             out.append({"kind": k, "type": ot, "id": oid_, "name": name, "user_id": who, "user": u[0] if u else "", "agent": ag,
-                        "fixable": k in REPAIR or k == "client_contact"})
+                        "fixable": k in REPAIR or k in ("client_contact", "hub_mail_ref")})
     return out
 
 

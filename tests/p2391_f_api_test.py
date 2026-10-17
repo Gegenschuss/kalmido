@@ -366,7 +366,9 @@ check(Ca.get(B + L + f"/archive/{A1}/pdf").status_code == 404 and Ca.get(B + L +
 check(requests.get(B + L + "/archive", headers=AGH).status_code == 403, "rights: agent cannot read the archive")
 r = A.patch(B + L + f"/archive/{A3}", json={"paid": 1, "number": "changed"})
 check(r.ok and r.json()["paid"] == 1 and r.json()["number"] == it[2]["number"], "archive: PATCH sets paid, the number stays")
-check(Bo.patch(B + L + f"/archive/{A3}", json={"paid": 0}).status_code == 403, "rights: member cannot change an archived document")
+# 2.81.0 (#1834): members may correct an archived document (client, amount, paid) -- decision 16.10.2026; back to paid
+check(Bo.patch(B + L + f"/archive/{A3}", json={"paid": 0}).ok and A.patch(B + L + f"/archive/{A3}", json={"paid": 1}).json()["paid"] == 1,
+      "rights: member corrects an archived document")
 check(Ca.patch(B + L + f"/archive/{A3}", json={"paid": 0}).status_code == 404, "tenant-matrix: office -- PATCH another organisation's archive = 404")
 # 2.80.0 (#1837): amounts with thousand separators (German and English), currency signs and spaces, upload and PATCH
 AMTS = {"2.436,53": 2436.53, "2436,53": 2436.53, "2436.53": 2436.53, "1.500": 1500, "12.000": 12000, "1.500,00": 1500, "2,436.53": 2436.53,

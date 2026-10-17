@@ -23,9 +23,10 @@ import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -335,7 +336,7 @@ check(A.patch(B + "/api/settings", json={"work_start": "25:00"}).status_code == 
 check(A.patch(B + "/api/settings", json={"review_time": "7"}).status_code == 400, "bad review time 400")
 check(A.patch(B + "/api/settings", json={"work_start": "08:00", "work_end": "12:00"}).ok, "working hours 08:00-12:00")
 check(A.get(B + "/api/state").json()["dayplan"]["work_start"] == "08:00", "state: dayplan.work_start")
-D = date.today() + timedelta(days=7)
+D = testclock.today() + timedelta(days=7)
 while D.weekday() != 2:  # a Wednesday in the future: the window is the whole working day
     D += timedelta(days=1)
 DS = D.isoformat()
@@ -458,12 +459,12 @@ A.delete(B + f"/api/tasks/{REP}")
 check(A.post(B + "/api/proposals", json={"agent_id": AG, "kind": "dayplan", "date": DS, "secret": 1}).status_code == 400, "unknown request field 400")
 
 # the daily review
-TODAY = date.today().isoformat()
+TODAY = testclock.today().isoformat()
 DONE = mk("Done today", due=TODAY)
 OPEN = mk("Still open", due=TODAY)
 MOVED = mk("Moved away", due=TODAY)
 A.post(B + f"/api/tasks/{DONE}/complete", json={})
-A.patch(B + f"/api/tasks/{MOVED}", json={"due": (date.today() + timedelta(days=2)).isoformat()})
+A.patch(B + f"/api/tasks/{MOVED}", json={"due": (testclock.today() + timedelta(days=2)).isoformat()})
 rv = A.get(B + "/api/dayplan/review").json()
 check(DONE in [x["task_id"] for x in rv["done"]], "review: done today")
 check(OPEN in [x["task_id"] for x in rv["open"]] and DONE not in [x["task_id"] for x in rv["open"]], "review: still open")

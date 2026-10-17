@@ -22,13 +22,14 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 
 import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import testclock  # noqa: E402
 
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -170,7 +171,7 @@ SIDC = r.json().get("id")
 # ================================================================== data over there
 LH = Bo.post(B + "/api/lists", json={"name": "Home"}).json()["id"]
 BIN = inbox(Bo)
-t1 = Bo.post(B + "/api/tasks", json={"title": "Water the plants", "list_id": LH, "due": str(date.today()), "priority": 5}).json()["id"]
+t1 = Bo.post(B + "/api/tasks", json={"title": "Water the plants", "list_id": LH, "due": str(testclock.today()), "priority": 5}).json()["id"]
 t2 = Bo.post(B + "/api/tasks", json={"title": "<img src=x onerror=alert(1)>", "list_id": BIN}).json()["id"]
 Bo.post(B + "/api/tasks", json={"title": "Done one", "list_id": LH}).json()
 CRO = Ca.post(B + "/api/lists", json={"name": "Carol shared", "org_id": ORG}).json()["id"]
@@ -183,7 +184,7 @@ check(LH in ls and ls[LH]["name"] == "Home" and ls[LH]["can_write"] is True and 
       f"bob's lists: inbox, write right, carol's list read only {list(ls.values())[:4]}")
 check(set(ls[LH]) == {"id", "name", "color", "folder", "inbox", "can_write"}, f"a list has the interface's fields only {set(ls[LH])}")
 ts = {x["id"]: x for x in D.get("tasks", [])}
-check(t1 in ts and ts[t1]["priority"] == "high" and ts[t1]["due"] == str(date.today()) and ts[t1]["url"] == f"{SELF}/#t/{t1}",
+check(t1 in ts and ts[t1]["priority"] == "high" and ts[t1]["due"] == str(testclock.today()) and ts[t1]["url"] == f"{SELF}/#t/{t1}",
       f"an open task with priority, due date and the link over there {ts.get(t1)}")
 check(set(ts[t1]) == {"id", "list_id", "parent_id", "title", "due", "due_time", "priority", "status", "tags", "updated_at", "url"},
       f"a task has the interface's fields only {set(ts[t1])}")
@@ -221,9 +222,9 @@ r = A.get(B + f"/api/servers/{SID}/search?q=plants")
 check(r.ok and [x["id"] for x in r.json()["tasks"]] == [t1], f"search over there {r.text[:200]}")
 check(A.get(B + f"/api/servers/{SID}/search?q=").status_code == 400, "search without q: 400")
 cal = Bo.post(B + "/api/evcals", json={"name": "Bob cal", "color": "#2dd4bf"}).json()
-D3 = date.today() + timedelta(days=3)
+D3 = testclock.today() + timedelta(days=3)
 Bo.post(B + "/api/events", json={"title": "Dentist", "cal_id": cal["id"], "start": f"{D3}T15:00", "end": f"{D3}T16:00"})
-r = A.get(B + f"/api/servers/{SID}/events?from={date.today()}&to={date.today() + timedelta(days=7)}")
+r = A.get(B + f"/api/servers/{SID}/events?from={testclock.today()}&to={testclock.today() + timedelta(days=7)}")
 ev = r.json().get("events") if r.ok else None
 check(ev and ev[0]["title"] == "Dentist" and ev[0]["cal_name"] == "Bob cal" and ev[0]["color"] == "#2dd4bf" and ev[0]["all_day"] is False
       and ev[0]["url"] == f"{SELF}/#cal" and isinstance(ev[0]["id"], int), f"events over there with calendar name + colour {r.text[:300]}")

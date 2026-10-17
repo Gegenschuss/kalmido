@@ -172,6 +172,11 @@ check("<script" not in r.text.lower() and "default-src 'none'" in r.headers.get(
       and "noindex" in r.headers.get("X-Robots-Tag", "") and r.headers.get("Referrer-Policy") == "no-referrer", "#1513: no scripts, CSP, noindex, no referrer")
 check('class="ptst ptst-open"' in r.text, "#1513: state open (received)")
 check(dbq("SELECT last_seen_at FROM portal_tickets WHERE task_id=?", (T1,))[0][0], "#1513: last_seen_at set")
+# 2.81.0 (#1866): a reload within 5 minutes does not write last_seen_at again
+seen = dbq("SELECT last_seen_at FROM portal_tickets WHERE task_id=?", (T1,))[0][0]
+time.sleep(1.1)
+P.get(B + f"/p/{TK1}")
+check(dbq("SELECT last_seen_at FROM portal_tickets WHERE task_id=?", (T1,))[0][0] == seen, "#1866: last_seen_at is written at most every 5 minutes")
 r404a, r404b = P.get(B + "/p/" + secrets.token_urlsafe(24)), P.get(B + "/p/" + secrets.token_urlsafe(24))
 check(r404a.status_code == 404 and r404b.status_code == 404 and r404a.text == r404b.text, "#1513: a guessed token = 404, always the same page")
 check(P.get(B + "/p/short").status_code == 404, "#1513: a malformed token = 404")
@@ -290,6 +295,11 @@ fo = re.search(r'name="f" value="([0-9a-f]{64})"', pg)
 check(J.post(B + "/portal/logout", data={"f": "x"}).status_code == 403, "#1513: sign-out needs its check value")
 r = J.post(B + "/portal/logout", data={"f": fo.group(1) if fo else ""}, allow_redirects=False)
 check(r.status_code == 303 and "Export button" not in J.get(B + "/portal").text, "#1513: signed out")
+# 2.81.0 (#1866): signing out revokes the cookie on the server: a copy kept elsewhere no longer opens the portal
+kept = requests.Session()
+kept.cookies.set("kalmido_portal", v, path="/portal")
+check(v.count(".") == 5 and "Export button" not in kept.get(B + "/portal").text, "#1866: a copied cookie is dead after signing out")
+check(dbq("SELECT revoked_at FROM portal_logins WHERE used_at IS NOT NULL ORDER BY id DESC LIMIT 1")[0][0], "#1866: the sign-in is marked revoked")
 
 # ---------------------------------------------------------------- deleted task = gone
 A.delete(B + f"/api/tasks/{T3}")

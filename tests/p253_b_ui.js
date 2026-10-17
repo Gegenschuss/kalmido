@@ -9,6 +9,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -32,7 +33,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const TEAL = (await call('POST', '/api/lists', {name: 'Teal list', color: '#2dd4bf', org_id: null})).id;
   const W = (await call('POST', '/api/lists', {name: 'Website', org_id: ORG})).id;
   const P = (await call('POST', '/api/lists', {name: 'Garden', org_id: null})).id;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = TC.today();
   const T1 = (await call('POST', '/api/tasks', {title: 'Teal task', list_id: TEAL, due: today})).id;
   const T2 = (await call('POST', '/api/tasks', {title: 'Private task', list_id: P})).id;
 

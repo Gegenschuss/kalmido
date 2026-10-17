@@ -1307,10 +1307,14 @@ def fi_archive_add(c, oid, uid, raw, file_name, b):
     # and removes it when the commit fails -- an archive-*.pdf never exists without its row
     fd = os.open(p + ".part", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o600)
     from ..core.orgcrypt import oc_seal
-    with os.fdopen(fd, "wb") as fh:
-        fh.write(oc_seal(c, oid, raw, fresh=True))  # 2.42.0 (#828): sealed with the organisation's key at rest (sha256 = the original)
-    c.execute("UPDATE office_archive SET file=? WHERE id=? AND org_id=?", (name, aid, oid))
-    _run_count(c, oid, rid)
+    try:  # 2.81.0 (#1462): any failure after the open leaves no orphan ".part" (the caller only cleans up after a return)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(oc_seal(c, oid, raw, fresh=True))  # 2.42.0 (#828): sealed with the organisation's key at rest (sha256 = the original)
+        c.execute("UPDATE office_archive SET file=? WHERE id=? AND org_id=?", (name, aid, oid))
+        _run_count(c, oid, rid)
+    except BaseException:
+        fk_archive_done(p, False)
+        raise
     return aid, p
 
 
@@ -1337,15 +1341,19 @@ def _archive_public(r, names=None):
     d["archive"] = True
     if names is not None and r["client_id"]:
         d["client"] = names.get(r["client_id"]) or ""
-    return d
+    from .archiveedit import r81b_public
+    return r81b_public(d, r)  # 2.81.0 (#1834): net + tax lines when known
 
 
-def fi_archive_rows(c, oid, kind=""):
+def fi_archive_rows(c, oid, kind="", client_id=0):
     names = {r["id"]: r["name"] for r in c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)}")}
     sql, args = "SELECT * FROM office_archive WHERE org_id=?", [oid]
     if kind in ("invoice", "offer"):
         sql += " AND kind=?"
         args.append(kind)
+    if client_id:  # 2.81.0 (#1834): the documents of one client
+        sql += " AND client_id=?"
+        args.append(client_id)
     return [_archive_public(r, names) for r in c.execute(sql + " ORDER BY date DESC, id DESC", args)]
 
 
@@ -1721,6 +1729,10 @@ def fk_archive_address_post():
     """2.40.0 (#1421) org admin. multipart 'file' (PDF) + client_id? (the file name's proposal) -> the recipient's address
     read from the text layer of page 1 and the proposals (new client / contact person / address differs); nothing stored."""
     c, uid, oid = _ctx()
+    from ..api.v1 import hit_limit
+    from ..tasks.attachtext import PDF_RATE
+    if hit_limit(f"pdftext:{uid}", PDF_RATE, 600):  # 2.81.0 (#1463): the same budget as POST /api/pdf-text
+        raise Denied(429, tr("Too many requests, please slow down"))
     f, raw = _upload("file", FI_PDF_MAX)
     if raw[:1024].find(b"%PDF-") < 0:
         raise BadInput(tr("Only PDF files can be archived"))
@@ -1762,9 +1774,13 @@ def fi_archive_post():
 
 @app.get("/api/office/legacy/archive")
 def fi_archive_get():
-    """Members read the archive (?kind=invoice|offer): the documents and the sums (all / paid)."""
+    """Members read the archive (?kind=invoice|offer, ?client_id=): the documents and the sums (all / paid)."""
     c, uid, oid = _ctx(admin=False)
-    rows = fi_archive_rows(c, oid, request.args.get("kind") or "")
+    try:
+        cid = int(request.args.get("client_id") or 0)
+    except ValueError:
+        cid = 0
+    rows = fi_archive_rows(c, oid, request.args.get("kind") or "", cid)
     tot = sum(Decimal(str(r["amount"])) for r in rows if r["amount"] is not None and r["kind"] == "invoice")
     paid = sum(Decimal(str(r["amount"])) for r in rows if r["amount"] is not None and r["kind"] == "invoice" and r["paid"])
     return jsonify(items=rows, sum_invoices=float(tot), sum_paid=float(paid), admin=office_role(c, uid, oid) == "admin")
@@ -1772,14 +1788,13 @@ def fi_archive_get():
 
 @app.patch("/api/office/legacy/archive/<int:aid>")
 def fi_archive_patch(aid):
-    """Org admin: only the bookkeeping notes of an archived document (amount, paid, client); the PDF and its number stay."""
-    c, uid, oid = _ctx()
-    if not c.execute("SELECT 1 FROM office_archive WHERE id=? AND org_id=?", (aid, oid)).fetchone():
-        raise Denied(404)
+    """Members (2.81.0 #1834, before: org admins): only the bookkeeping notes of an archived document (client, amount or
+    tax_lines [{net, tax: 19|7|0|rc}], paid for invoices); the PDF and its number stay. Each change goes into its history."""
+    c, uid, oid = _ctx(admin=False)
     b = body() or {}
-    f = _archive_fields(c, oid, {k: v for k, v in b.items() if k in ("amount", "paid", "client_id")}, partial=True)
+    from .archiveedit import r81b_archive_patch
+    f = r81b_archive_patch(c, oid, uid, aid, b if isinstance(b, dict) else {})
     if f:
-        c.execute(f"UPDATE office_archive SET {', '.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), aid, oid])
         from .ledger import ofx_log
         ofx_log(c, oid, "update", target="archive", detail={"archive_id": aid, "fields": sorted(f)})
     c.commit()

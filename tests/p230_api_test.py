@@ -25,9 +25,10 @@ import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -435,7 +436,7 @@ check(A.patch(B + "/api/settings", json={"notify": {"proposal": {"news": False}}
       A.get(B + "/api/state").json()["notify"]["proposal"]["news"] is False, "the row can be switched off")
 
 # ================================================================== retention (30 days) after a restart
-old = (date.today() - timedelta(days=31)).isoformat() + "T00:00:00Z"
+old = (testclock.today() - timedelta(days=31)).isoformat() + "T00:00:00Z"
 dbx_w = dbxm.connect(os.path.join(DATA, "tasks.db"))
 dbx_w.execute("UPDATE agent_jobs SET updated_at=? WHERE id IN (?,?)", (old, J2, J5))
 dbx_w.commit()

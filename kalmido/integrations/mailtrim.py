@@ -149,3 +149,27 @@ def md_trim_forward(text):
     head = (("Von " if de else "From ") + who + (", " + when if when else "")) if who else when
     parts = ["\n".join(before).strip("\n"), head, body]
     return "\n\n".join(p for p in parts if p).strip()
+
+
+ADDR_RE = re.compile(r"[\w.!#$%&'*+/=?^`{|}~-]+@[\w-]+(?:\.[\w-]+)+")
+
+
+def md_forward_from(text):
+    """2.84.0 (#1198): (name, address) of the original sender in the first forwarding header of text, ("", "") without one."""
+    lines = (text or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    for i in range(len(lines)):
+        at = None
+        if MARKER_RE.match(lines[i]):
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            at = j if j < len(lines) and _is_hdr(lines[j]) else None
+        elif _starts_block(lines, i):
+            at = i
+        if at is None:
+            continue
+        f, _ = _hdr_block(lines, at)
+        v = next((f[k] for k in FROM_KEYS if k in f), "")
+        m = ADDR_RE.search(v)
+        return (_sender(v) if m and _sender(v) != m.group(0) else ""), (m.group(0).lower() if m else "")
+    return "", ""

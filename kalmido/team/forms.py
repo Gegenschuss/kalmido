@@ -48,6 +48,7 @@ FORMS_PER_LIST = 20
 FRM_FILE_MAX = 10 * 1024 * 1024
 FRM_MIN_S, FRM_MAX_S = 3, 24 * 3600
 FRM_EMAIL_HOUR, FRM_MAIL_HOUR, FRM_LINKS_MAX = 5, 3, 5
+FRM_MAIL_DAY = 50  # 2.81.0 (#1866): confirmation mails per form and day
 FRM_TTYPES = ("", "bug", "feature", "task")
 # 2.86.0 (N24): the file bytes anonymous visitors may send through ONE form per hour (20 full files); more = the report
 # is refused with a "try later" page (a link in the open cannot fill the disk); signed-in senders count on their quota.
@@ -287,19 +288,31 @@ def _may_use(c, f):
     return None
 
 
-def frm_stamp(c, fid, t=None):
-    """2.63.0 (#1513): the signed time a visitor's page was made (form id + seconds, server key)."""
+def frm_stamp(c, fid, t=None, n=None):
+    """2.63.0 (#1513): the signed time a visitor's page was made (form id + seconds, server key). 2.81.0 (#1866): plus a
+    random part n, so two pages of the same second differ (a stamp counts once, r81c_stamp_once)."""
     t = int(time.time()) if t is None else t
-    sig = hmac.new(auth_key(c), f"kalmido-form-stamp|{fid}|{t}".encode(), hashlib.sha256).hexdigest()[:32]
-    return f"{t}.{sig}"
+    n = secrets.token_hex(6) if n is None else n
+    sig = hmac.new(auth_key(c), f"kalmido-form-stamp|{fid}|{t}|{n}".encode(), hashlib.sha256).hexdigest()[:32]
+    return f"{t}.{n}.{sig}"
 
 
 def frm_stamp_age(c, fid, v):
     """Seconds since the stamp v was made for form fid; None when it is missing or not ours."""
-    t, _, sig = (v or "").partition(".")
-    if not t.isdigit() or len(t) > 12 or not hmac.compare_digest(frm_stamp(c, fid, int(t)), f"{t}.{sig}"):
+    t, _, rest = (v or "").partition(".")
+    n, _, sig = rest.partition(".")
+    if not t.isdigit() or len(t) > 12 or not re.fullmatch(r"[0-9a-f]{12}", n) or not hmac.compare_digest(frm_stamp(c, fid, int(t), n), f"{t}.{n}.{sig}"):
         return None
     return time.time() - int(t)
+
+
+def r81c_stamp_once(c, v):
+    """2.81.0 (#1866): a stamp counts once: the first send marks it used until it has expired (mail_counts keeps the
+    marks, the day = the stamp's last valid day, mail_budget's daily sweep drops them after). False = used before."""
+    t, _, sig = (v or "").partition(".")  # sig = the random part + the signature, unique per page
+    last = time.strftime("%Y-%m-%d", time.gmtime(int(t) + FRM_MAX_S))
+    c.execute("DELETE FROM mail_counts WHERE k LIKE 'fs:%' AND day<?", (now_utc().strftime("%Y-%m-%d"),))
+    return c.execute("INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO NOTHING", (f"fs:{sig}", last)).rowcount == 1
 
 
 def _page(c, f, token, lg, vals=None, error=""):
@@ -309,7 +322,7 @@ def _page(c, f, token, lg, vals=None, error=""):
     me_row = g.user
     who = ""
     if me_row:
-        who = f'<p class="sub">{e(t("Sent as {0}", me_row["display_name"] or me_row["username"]))}</p>'
+        who = f'<p class="sub">{e(tr("Sent as {0}", me_row["display_name"] or me_row["username"], lg=lg))}</p>'
     fields = [f'<label for="ff-subject">{e(t("Subject"))}</label><input id="ff-subject" name="subject" required maxlength="{FORM_SUBJECT_MAX}" value="{e(v.get("subject", ""))}">',
               f'<label for="ff-text">{e(t("Description"))}</label><textarea id="ff-text" name="text" rows="6" maxlength="{FORM_TEXT_MAX}">{e(v.get("text", ""))}</textarea>']
     if not me_row:
@@ -370,7 +383,7 @@ def form_send(token):
     anon = not g.user
     if anon:  # 2.63.0 (#1513): the page's signed stamp: not sooner than FRM_MIN_S, not later than FRM_MAX_S after loading
         age = frm_stamp_age(c, f["id"], fv.get("stamp"))
-        if age is None or not FRM_MIN_S <= age <= FRM_MAX_S:
+        if age is None or not FRM_MIN_S <= age <= FRM_MAX_S or not r81c_stamp_once(c, fv.get("stamp")):
             return _page(c, f, token, lg, vals, tr("Please send the form once more: it was sent very quickly or the page was open for a long time.", lg=lg))
     subject = re.sub(r"\s+", " ", vals["subject"])[:FORM_SUBJECT_MAX]
     if not subject:
@@ -437,7 +450,7 @@ def form_send(token):
     finally:
         if not uid:
             g.user = None
-    mailed = portal and frm_mail_ok(c, ehash, email)
+    mailed = portal and frm_mail_ok(c, ehash, email, f["id"])
     bump(c)
     c.commit()
     if mailed:
@@ -459,13 +472,25 @@ def frm_thanks(token, url, mailed_to, lg):
                     f'<p><a href="/f/{e(token)}">{e(tr("Send another one", lg=lg))}</a></p></div>', lg, 200, foot=False)
 
 
-def frm_mail_ok(c, ehash, email):
+def frm_mail_ok(c, ehash, email, fid=None):
     """One confirmation per report, and only a few per address: nobody floods someone else's mailbox (caller commits)."""
     from ..integrations.mail import MAIL_OUT_ON
     from ..admin.hosting import mail_budget
     if not MAIL_OUT_ON or not ehash or hit_limit(f"frmm:{ehash}", FRM_MAIL_HOUR, 3600):
         return False
-    return mail_budget(c, None, email)
+    return (fid is None or r81c_form_mail_day(c, fid)) and mail_budget(c, None, email)
+
+
+def r81c_form_mail_day(c, fid):
+    """2.81.0 (#1866): at most FRM_MAIL_DAY confirmation mails per form and day (counted in mail_counts like mail_budget)."""
+    day = now_utc().strftime("%Y-%m-%d")
+    k = f"fm:{fid}"
+    r = c.execute("SELECT n, day FROM mail_counts WHERE k=?", (k,)).fetchone()
+    if r and r[1] == day and r[0] >= FRM_MAIL_DAY:
+        return False
+    c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET
+                 n=CASE WHEN mail_counts.day=excluded.day THEN mail_counts.n+1 ELSE 1 END, day=excluded.day""", (k, day))
+    return True
 
 
 def frm_mail_text(form_title, subject, url, lg):

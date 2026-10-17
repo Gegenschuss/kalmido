@@ -42,7 +42,9 @@ REHOME_S = max(1, int(os.environ.get("KALMIDO_FILE_OCR_REHOME_S", "300") or 300)
 MIMES = ("application/pdf", "image/jpeg", "image/png", "image/heic", "image/heif")
 EXTS = (".pdf", ".jpg", ".jpeg", ".png", ".heic", ".heif")
 IDLE = 5             # s the queue sleeps when there is nothing to do
-RUN_STALE = 30       # min after which a cut-off run is taken up again
+# min after which a cut-off run is taken up again. 2.81.0 (#1856): longer than the longest recognition (pages x time per
+# page, docs/ocr.py: 30 x 60 s by default) plus a margin, so a slow scan is never recognised twice at the same time
+RUN_STALE = 45
 TRIES = 3
 SEARCH_MAX = 100     # hits of the Ablage search
 BF_KEY = "ts_backfill"  # settings: {kind: lowest id queued so far, "done": [kinds]}
@@ -234,7 +236,8 @@ def ts_run_once():
             if _docs_busy(c):
                 c.commit()
                 return 0
-            stale = iso(now_utc() - timedelta(minutes=RUN_STALE))
+            from ..docs.ocr import OCR_PAGES, OCR_PAGE_S
+            stale = iso(now_utc() - timedelta(minutes=max(RUN_STALE, OCR_PAGES * OCR_PAGE_S // 60 + 15)))
             c.execute("UPDATE file_text SET state='wait' WHERE state='run' AND updated_at < ?", (stale,))
             c.execute("UPDATE file_text SET state='error', error='failed' WHERE state='wait' AND tries >= ?", (TRIES,))
             r = c.execute("""UPDATE file_text SET state='run', tries=tries+1, updated_at=? WHERE id=(

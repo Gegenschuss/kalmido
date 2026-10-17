@@ -427,6 +427,12 @@ APP_ONLY = [
     # 2.75.0 (#1411): the built-in assistant calls a language model for a person in the web app; agents are models themselves
     ("2.75.0 (#1411): the built-in assistant (session only: a person's own switch, shared lists, log; the admin overview); agents "
      "never use it and have their own proposals API", ("* /api/assistant", "* /api/admin/assistant")),
+    # 2.84.0 A (#1198): agents get no access to filed mails in this release (a follow-up step of the agents list)
+    ("2.84.0 (#1198): mails filed with clients / projects (addresses, the hub inbox, assigning, deleting): people only in 2.84.0; "
+     "agent access to filed mails comes as its own step", ("* /api/hubmail",)),
+    # 2.85.0 B (#1162): feeds are a person's own reading in the app
+    ("2.85.0 (#1162): Feeds are only for people in 2.85.0 (a person's own feeds, never shared, never an agent's; no REST v1 / MCP)",
+     ("* /api/feeds",)),
 ]
 
 

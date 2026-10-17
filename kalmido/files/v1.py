@@ -288,6 +288,11 @@ def files_spec(paths, schemas, op, ok, errs, ref, pid, q):
                                                  [nid, q("version", "An older version number", {"type": "integer"})], scope="files:read"),
                                             "responses": {"200": {"description": "The file's bytes"}, **errs("400", "403", "404", "409")}}}
     paths["/files/{id}/text"] = {"get": op("The text of a file: UTF-8 text, the text layer of a PDF (2.48.0)", T,
-                                           ok({"type": "object"}) | errs("403", "404", "409"), [nid], scope="files:read")}
+                                           ok({"type": "object", "properties": {  # 2.81.0 (#1856): the fields, with source
+                                               "id": {"type": "integer"}, "name": {"type": "string"}, "kind": {"type": "string", "enum": ["pdf", "text", "image", "other"]},
+                                               "text": {"type": ["string", "null"]}, "chars": {"type": "integer"}, "truncated": {"type": "boolean"},
+                                               "pages": {"type": "integer"}, "no_text_layer": {"type": "boolean"},
+                                               "source": {"type": "string", "enum": ["ocr"], "description": "2.61.0: the text was recognised in the background (scanned PDF, photo)"},
+                                               "message": {"type": ["string", "null"]}}}) | errs("403", "404", "409"), [nid], scope="files:read")}
     paths["/files/{id}/versions"] = {"post": op("Upload a new version of a file (2.48.0)", T, ok(ref("FileNode"), "Created", "201") | errs("400", "403", "404", "409", "413"),
                                                 [nid], body=ver, scope="files:write", desc="Role edit; the older versions stay and can be restored in the app.")}

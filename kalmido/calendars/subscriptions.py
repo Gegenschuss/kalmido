@@ -339,7 +339,7 @@ def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozen
                 while True:
                     if time.monotonic() > deadline:
                         raise CalError("timeout")
-                    b = r.read(65536)
+                    b = r.read1(65536)  # 2.85.0 (#1162 review): one receive per call, so the deadline is checked at least every timeout
                     if not b:
                         break
                     n += len(b)

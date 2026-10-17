@@ -188,8 +188,10 @@ def clm_merge(c, uid, target, ids, pick=None, dry=False):
             cn = (new.get("customer_no", t["customer_no"]) or "").strip()
             dif = [i for i in others if (rows[i]["customer_no"] or "").strip() != cn]
             if dif:
-                n = c.execute(f"SELECT COUNT(*) FROM office_docs WHERE locked_at IS NOT NULL AND client_id IN ({','.join('?' * len(dif))})",
-                              dif).fetchone()[0]
+                # 2.81.0 (#1867): an invoice locked with a customer number keeps it (datev.r81b_customer_no); only the others move
+                from ..office.datev import r81b_customer_no
+                n = sum(1 for r in c.execute("SELECT locked_at, recipient_snapshot, '' AS dx_customer_no FROM office_docs WHERE locked_at "
+                                             f"IS NOT NULL AND client_id IN ({','.join('?' * len(dif))})", dif) if not r81b_customer_no(r))
                 if n:
                     counts["datev"] = int(n)
         nk = c.execute(f"SELECT COUNT(*) FROM office_client_contacts WHERE client_id IN ({','.join('?' * len(ids))})", ids).fetchone()[0]

@@ -1,0 +1,34 @@
+/* Kalmido web client: the styles of the feeds (feeds.js, module "feeds", loaded on demand with it). */
+/* 2.85.0 B (#1162): the add form, the filter bar, the articles (unread = accent bar), the feed list */
+.rssview{max-width:50rem;margin:0 auto;padding:.75rem 1rem 6rem;display:flex;flex-direction:column;gap:.75rem}
+.rsshead{display:flex;gap:.5rem;align-items:center}
+.rssadd{display:flex;gap:.5rem;flex:1;min-width:0}
+.rssadd input{flex:1;min-width:0;min-height:2.75rem}
+.rssadd .btn{min-height:2.75rem}
+.rssmenu .bgmenul a,.rssmenu .rssmi{display:flex;align-items:center;gap:.625rem;padding:.625rem .75rem;border-radius:var(--r-s);min-height:2.75rem;cursor:pointer;color:inherit;text-decoration:none}
+.rssmenu .bgmenul a:hover,.rssmenu .rssmi:hover,.rssmenu .rssmi:focus-visible{background:var(--bg3)}
+.rssbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.rssbar select{min-height:2.75rem;max-width:100%}
+.rssbar .btn{min-height:2.75rem}
+.rssbar .btn.on{border-color:var(--accent);color:var(--accent)}
+.rsslist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem}
+.rssitem{border:1px solid var(--line2);border-radius:var(--r-l);padding:.75rem .875rem;background:var(--bg2);border-left:.25rem solid transparent}
+.rssitem.unread{border-left-color:var(--accent)}
+.rssitem.read .rsst b{font-weight:500;color:var(--text2)}
+.rsst a{color:inherit;text-decoration:none}
+.rsst a:hover b,.rsst a:focus-visible b{text-decoration:underline}
+.rsst b{display:block;line-height:1.35}
+.rssmeta{display:block;font-size:.8125rem;margin-top:.125rem}
+.rsssum{margin:.375rem 0 0;color:var(--text2);font-size:.875rem;line-height:1.45;overflow-wrap:anywhere}
+.rssacts{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.625rem}
+.rssacts .btn{min-height:2.5rem}
+.rssacts .btn[aria-pressed="true"]{color:var(--accent)}
+.rssmore{align-self:center}
+.rssfeeds{border-top:1px solid var(--line2);padding-top:.75rem}
+.rssfeeds>summary{cursor:pointer;min-height:2.75rem;display:flex;align-items:center;gap:.5rem}
+.rssfl{list-style:none;margin:0;padding:0}
+.rssfl li{display:flex;align-items:center;gap:.5rem;padding:.375rem 0;border-bottom:1px solid var(--line)}
+.rssfn{flex:1;min-width:0;display:flex;flex-direction:column}
+.rssfn b,.rssfn .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rssfl .iconbtn{min-width:2.75rem;min-height:2.75rem}
+@media (max-width:40rem){ .rssacts .btn{flex:1;justify-content:center} }

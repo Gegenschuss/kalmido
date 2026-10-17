@@ -816,6 +816,7 @@ function wkeDlgHtml(sp, j, chg) {
 }
 async function wkeDlg(sp) {
   let j;
+  if (!E2E.st && typeof e2eLoad === 'function') await e2eLoad().catch(() => {});  // 2.85.0 (#1904)
   try { j = await wkeInfo(sp, true); } catch (x) { toast(x?.message || tr('Not possible right now')); return; }
   const chg = async () => new Set((j.members || []).filter(m => m.pub && m.user_id !== S.me?.id && le2eKeyChanged(m.user_id)).map(m => m.user_id));
   let changed = await chg();

@@ -36,6 +36,40 @@ Hardening from the security audit, part 1 (low findings, #1896). No new features
   with it; a token limited to certain lists cannot create lists on import; participants see only the people of the task
   in the mention picker.
 
+## [2.85.0] - 2026-10-17
+
+Feeds (RSS reader), list lock hint, test clock.
+
+### Added
+- *At home*: **Feeds**, an RSS / Atom reader of your own (module, off by default; private to you, agents do not see it).
+  Follow up to 100 feeds, the server fetches them hourly and keeps articles for 30 days; filter per feed, unread only,
+  mark read (with undo), *Read later* puts one task with the link into your *Read later* list. OPML import and export.
+  Fetching only goes to public http / https addresses (also after redirects), with time and size limits; feeds with a
+  DTD are refused and article texts are shown as plain text (#1162).
+
+### Fixed
+- *Edit list* no longer says the own encryption is not set up right after loading the app, when it is; the lock switch is
+  free at once. The same for the wiki area dialog (#1904).
+- Tests take "today" in the app's time zone (Europe/Berlin) instead of UTC, so they no longer fail between midnight and
+  2 am; a test clock (`KALMIDO_TEST_NOW`) checks that window (#1863).
+
+## [2.84.0] - 2026-10-17
+
+E-mails filed at clients and projects.
+
+### Added
+- Clients and projects: file e-mails at them. Every client and project has its own address, every person one filing
+  address per workspace (*Office > Clients > E-mail filing*); mails to it are matched by the sender (client e-mail,
+  contact persons, linked contacts), forwarded mails by their original sender, anything unclear waits under
+  *Not assigned*. Filed mails are searchable on the client card and the project page; the original mail and its
+  attachments land in the file store under *E-mails / client / date subject* and go through the usual upload checks.
+  No mail client: nothing is sent or answered. Needs the mail import (IMAP) of *Tasks by e-mail* (#1198).
+- The account export includes your own private filed e-mails (#1903).
+
+### Fixed
+- *Switch all modules on* also switches the household budget on, like every other module (#1808).
+- Tests: a tags overview check took the UTC date as today and failed at night (#1868).
+
 ## [2.83.0] - 2026-10-17
 
 Organisation view, list themes, team room.
@@ -58,6 +92,57 @@ Organisation view, list themes, team room.
 
 ### Fixed
 - The hint of the monthly cash flow task says *basket*, not *inbox*, in every language (#1838).
+
+## [2.82.0] - 2026-10-17
+
+Leftover fixes: tasks, agents, chat.
+
+### Security
+- Security fix (permission boundaries): folder defaults, birthday tasks of moved contacts, the personal *My tasks*
+  order and the related-tasks cache keep to the person's rights and visibility (#1464, #1831, #1832, #1880).
+- Security fix (agent permissions): an agent that is a list admin no longer renames, recolours or archives the list (#1467).
+
+### Fixed
+- Locked lists: a title or text beginning with `e2e1:` no longer blocks opening the lock; it gets a leading space and a
+  short hint (#1878).
+- Agents page: *Load more* stops at the scan limit also after a full page (#1465).
+- Layout proposals of an agent: the buttons read *Accept* / *Decline* (#1821).
+- Pinning: *Undo* closes when you switch to another conversation; the team chat takes live changes while you type; the
+  agent API chat feed with `user_id` also returns the conversation's `pins` (#1862).
+- Reviews: *Approve* / *Back* are 44 px high on the phone, the history names the reviewer instead of *Deleted user*,
+  and the public form page translates *Sent as* (#1880).
+
+## [2.81.0] - 2026-10-17
+
+Remaining fixes: office, import, clients, uploads. Contains security fixes.
+
+### Security
+- Security fix (customer portal): signing out ends the portal session on the server too. **Portal users sign in once
+  again after the update** (#1866).
+- Security fix (forms): a form page can be sent only once; at most 50 confirmation mails per form and day (#1866).
+- Security fix (rate limits): reading the address from archive PDFs shares the per-account PDF limit (#1463).
+- Security fix (agent data): agents see only name and role of a client's contact persons (#1466).
+
+### Added
+- Office archive: client, amount (net per tax rate - 19 %, 7 %, 0 %, reverse charge - Kalmido computes the gross) and
+  *Paid* can be corrected after the import by everyone in the office, with a history per entry and undo; the archive
+  list shows the client and filters by it. Number and file stay unchanged (#1834).
+- Org export: includes customer portal reports (without status links) (#1866).
+- Agent API: the search names the attachment whose text matched (`file_hit`) (#1856).
+- Self-hosting: `KALMIDO_PHOTO_MAX_PIXELS` limits photo re-encoding on small servers (#1856).
+
+### Fixed
+- DATEV export: issued invoices keep the customer number they were locked with, also after the client is changed or
+  merged (#1867).
+- Paperless ZIP import: the export is checked in the background (*Export is being checked ...*), not in the upload
+  request; lower entry limits (#1874). A run that took too long no longer runs twice, and exports of two different
+  Paperless servers keep their own rules (#1875).
+- Archive import: a failed import leaves no half-written file behind (#1462).
+- Client dialog: if the linked contact was deleted meanwhile, the link is removed and the client is saved with a hint (#1852).
+- Sharing to Kalmido: a refused file is reported instead of dropped silently (#1856). The nightly boundary check also
+  covers recognised file texts; a long text recognition is resumed after 45 instead of 30 minutes (#1856).
+- Self-hosting: concurrent first requests print one setup code; the backup warning counts from re-enabling; the install
+  scripts point to the newest setup code in the log (#1627).
 
 ## [2.80.0] - 2026-10-17
 

@@ -23,9 +23,20 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **2.86.0** (2026-10-17): hardening from the security audit - sign-in floods no longer lock owners out, child
   accounts and instance admins kept to their organisation, stricter rights for approvals, list rules and office data,
   upload limits, sandboxed PDFs, push and mail day limits, agents see only what is shared with them.
+- **2.85.0** (2026-10-17): Feeds - an RSS / Atom reader in *At home* (private, hourly, OPML, *Read later* as a
+  task); *Edit list* shows the lock state right after loading; tests use the Berlin day.
+- **2.84.0** (2026-10-17): e-mails filed at clients and projects - own addresses, matching by sender, search, original
+  mail and attachments in the file store.
 - **2.83.0** (2026-10-17): themes (Paper, Night, Contrast) and header strips for lists and folders, progress rings;
   the organisation view hides the private areas; assigned tasks of organisation-wide lists without joining; agent colour
   on the person card for organisation admins; team rooms open in a split window from their header.
+- **2.82.0** (2026-10-17): **security release** - tighter permission boundaries (folder defaults, birthday tasks, the
+  *My tasks* order, agents as list admins), locked lists open with texts that begin with `e2e1:`, *Accept* / *Decline* on
+  layout proposals, pinning leftovers, 44 px review buttons on the phone and the reviewer's name in the history.
+- **2.81.0** (2026-10-17): security fixes (customer portal sign-out, single-use form pages, rate limits, agent data -
+  **portal users sign in once again**); office archive entries can be corrected after the import (client, net amounts
+  per tax rate, paid, with history); DATEV keeps the customer number of locked invoices; the Paperless ZIP check runs in
+  the background.
 - **2.80.0** (2026-10-17): small fixes - import amounts with thousands separators, new clients at once in the import and
   in quotations / invoices (with *Add client* when there is none), undo of a contact merge across workspaces, larger
   Undo button and a wrapping selection bar on the phone, all quota windows named in the agent chat.
@@ -1107,6 +1118,9 @@ calendar, CalDAV, sharing and the API work as everywhere.
   list from a template and, with Events on, an all-day event.
 - **Read later**: a reading list; *Connect Karakeep…* with your own address and API key (stored encrypted) turns
   bookmarks into tasks with their link and archives the ticked ones in Karakeep.
+- **Feeds** (2.85.0; its own module, off by default): follow RSS / Atom feeds (up to 100, fetched hourly by the server,
+  articles kept 30 days), unread first, *Read later* turns an article into a task of your reading list; OPML import and
+  export. Private to you; agents and API tokens do not see feeds.
 - API v1 and MCP: `/life`, `/life/contracts`, `/life/devices`, `/life/upkeep`, `/life/health` (permission `private`),
   `/life/trips`, `/life/review`, `/life/journal/{day}` (`private`), `/contacts/{id}/care`, `/life/karakeep/sync`.
 - **Budget** (2.72.0; its own part of *At home*): a budget is a list of its own that opens the budget view. Entries

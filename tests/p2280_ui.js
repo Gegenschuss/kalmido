@@ -12,6 +12,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2280_ui', check, shots: 'P2280_SHOTS'});
@@ -53,9 +54,9 @@ const V = B + 'api/v1';
   for (const lid of [W1, W2]) await call('PUT', `/api/lists/${lid}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${W1}/members`, {user_id: AG, role: 'edit'});
   await call('PATCH', `/api/lists/${W1}`, {agent_members: true});
-  const TW = (await call('POST', '/api/tasks', {title: 'Deploy the website', list_id: W1, due: new Date().toISOString().slice(0, 10)})).id;
+  const TW = (await call('POST', '/api/tasks', {title: 'Deploy the website', list_id: W1, due: TC.today()})).id;
   const TW2 = (await call('POST', '/api/tasks', {title: 'Order stock', list_id: W2})).id;
-  const TP = (await call('POST', '/api/tasks', {title: 'Cut the hedge', list_id: P1, due: new Date().toISOString().slice(0, 10)})).id;
+  const TP = (await call('POST', '/api/tasks', {title: 'Cut the hedge', list_id: P1, due: TC.today()})).id;
   await call('POST', '/api/tasks', {title: 'Dentist', list_id: P2});
   // News: bob mentions and assigns (for me), the agent comments (activity)
   await call('POST', `/api/tasks/${TW}/comments`, {body: '<@1> can you check the DNS?'}, BCK);

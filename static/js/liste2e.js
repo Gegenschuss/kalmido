@@ -54,7 +54,8 @@ function le2eRemember(lid, field, plain, cipher) {
 // text -> "e2e1:{v,g,iv,ct}" with the list's current generation ("" stays ""; a cipher stays as it is)
 async function le2eEnc(lid, field, text, asText) {
   if (text == null || text === '') return '';
-  const s = String(text); if (!asText && le2eParse(s)) return s;  // review 2 (L5): a typed "e2e1:..." is a text
+  let s = String(text); if (!asText && le2eParse(s)) return s;  // review 2 (L5): a typed "e2e1:..." is a text
+  if (asText && le2eIs(s)) s = ' ' + s;  // 2.82.0 (#1878): opened again it must never look like a cipher
   const l = listById(lid), g = l?.e2e_gen;
   let key = LE2E.keys[lid]?.[g];
   if (!key && l?.e2e) key = (await le2eKeys(lid))[g];
@@ -753,8 +754,15 @@ const le2eLeft = left => Object.values(left || {}).reduce((a, n) => a + (+n || 0
 // 2.64.2 A (#1817): one value of the todo in the target format of mode: encrypting = a cipher of the current generation,
 // decrypting = the plain text, on (re-encryption after a key change) = an older cipher opened with its generation and encrypted
 // with the current one (a plain text: encrypted)
+const fr2a_prefixSaid = new Set();  // 2.82.0 (#1878): lists whose way back already said it
 async function le2eConv(lid, mode, gen, p, f, v) {
-  if (mode === 'decrypting') { if (!le2eIs(v)) return v; v = await le2eDec(lid, f, v); return p === 'snippets' ? le2eSnip(v) : v; }
+  if (mode === 'decrypting') {
+    if (!le2eIs(v)) return v; v = await le2eDec(lid, f, v);
+    if (p === 'snippets') return le2eSnip(v);
+    // 2.82.0 (#1878): a text that begins with "e2e1:" is refused by the open list: it goes back with a space in front (said once)
+    if (le2eIs(v)) { v = ' ' + v; if (!fr2a_prefixSaid.has(lid)) { fr2a_prefixSaid.add(lid); if (typeof toast === 'function') toast(tr('Texts beginning with "e2e1:" got a space in front.')); } }
+    return v;
+  }
   if (le2eParse(v)?.g === gen) return v;
   // M4 / L5: an old text that only looks like a cipher (encrypting) is encrypted as a text: no endless switch
   if (mode === 'on' && le2eIs(v)) return le2eEnc(lid, f, await le2eDec(lid, f, v), true);

@@ -269,6 +269,12 @@ is guessed in the background and no language model is involved.
   client matches), a contact person for a client that has another one, a note when the address differs from the client
   card. A scan without text gets a hint - there is no text recognition. The archive file is written only after the
   database commit.
+- **Correcting an archived document (2.81.0)**: the pencil next to an entry of the archive list opens a dialog for
+  everybody who reads the organisation's archive (members too, no lock after the first entry): client, amount as net
+  plus tax lines (19 %, 7 %, 0 %, reverse charge; "Add tax rate" for mixed invoices; Kalmido adds up tax and gross)
+  and "Paid" (invoices only). Number and PDF never change. An entry with only one amount counts as gross with unknown
+  tax until it is corrected. Every change is kept in the entry's history (time, person, old and new value), folded in
+  the dialog; saving is one undo step. A select above the list filters by client. Amounts are not read from the PDF.
 - **Numbers**: an archived number is never given to a new document (the automatic number skips it, a manual one is
   refused). The import page proposes to continue the invoice / quotation counter after the highest archived number (a
   number that follows today's scheme, else the project number of the file name); the person confirms, the counter is
@@ -278,7 +284,7 @@ is guessed in the background and no language model is involved.
   stays, as does a service used in a document or as the producing rate, and equipment in a set; the answer says what
   stayed. Fields a merge filled are emptied again while they still hold the imported value.
 
-Routes (organisation admin; members only read the archive): `POST /api/office/legacy/preview` (multipart `file`, stores
+Routes (organisation admin; members read the archive and, 2.81.0, correct it): `POST /api/office/legacy/preview` (multipart `file`, stores
 nothing), `POST /api/office/legacy/split` `{address}`, `POST /api/office/legacy/import` `{clients, roles, crew, services, equipment}`
 (the preview's rows with `action` new / merge / fill / skip and `merge_id`; 2.46.1: `areas` = only these of clients / roles /
 crew / services / equipment, the others are neither written nor checked), `GET /api/office/legacy/runs` (2.46.1: a data run lists its
@@ -286,8 +292,11 @@ crew / services / equipment, the others are neither written nor checked), `GET /
 areas of a data run, `409` for an area undone already; the whole undo afterwards takes the areas left), `POST /api/office/legacy/archive/parse` `{names}`,
 `POST /api/office/legacy/archive/run`, `POST /api/office/legacy/archive` (multipart `file` + `run_id`, `kind`, `number`,
 `project_no`, `project`, `client_id`, `client_name`, `date`, `amount`, `paid`; 409 for a used number or the same PDF
-twice), `GET /api/office/legacy/archive?kind=`, `PATCH /api/office/legacy/archive/<id>` (only `amount`, `paid`,
-`client_id`), `GET /api/office/legacy/archive/<id>/pdf`, `GET/POST /api/office/legacy/counter` `{kind, last}`.
+twice), `GET /api/office/legacy/archive?kind=&client_id=`, `PATCH /api/office/legacy/archive/<id>` (only `amount`, `paid`,
+`client_id`; 2.81.0: members too, `tax_lines` `[{net, tax: 19 | 7 | 0 | rc}]` (1-10 lines) instead of `amount` -> the
+gross, `amount` alone = gross with unknown tax (`tax_lines` null), `paid` only for invoices; the answer has `tax_lines`,
+`net`, `tax`), `GET /api/office/legacy/archive/<id>` (2.81.0: the entry with `history` [{at, user_name, field: client |
+amount | paid, old, new}], newest first), `GET /api/office/legacy/archive/<id>/pdf`, `GET/POST /api/office/legacy/counter` `{kind, last}`.
 2.40.0: the import takes `action` `contact` (with `merge_id` = the existing client or `contact_row` = the earlier row);
 `POST /api/office/legacy/archive/address` (multipart `file`, `client_id`?) -> `{status: ok | no_text | none | busy | error,
 address, unsure, client_id, client_name, new_client, add_contact, address_differs}` (nothing stored); the archive upload
@@ -315,11 +324,39 @@ client that stays and, where the values differ, which value it keeps; the contac
 default stays the default). The next step lists what moves: quotations and invoices, framework contracts, archive entries,
 projects, contact persons, trips and sales opportunities. A finalised document keeps its printed address, only its client
 changes; drafts and open quotations show the kept client's address afterwards. The DATEV export takes the customer number from the client:
-issued invoices of a merged client go out under the kept client's number afterwards (the overview says so when the numbers differ). The other clients are gone then; the toast
+issued invoices of a merged client go out under the kept client's number afterwards (the overview says so when the numbers differ).
+2.81.0 (#1867): an invoice finalised while its client had a customer number keeps that number in the export; only issued
+invoices without one follow the kept client (and only those are counted in the overview). The other clients are gone then; the toast
 and the "History" of the kept client offer "Undo" for 30 days (a field or a link changed since stays as it is). Only the
 clients of one workspace can be merged, and only by people who may delete the others (their creator or an admin).
 `POST /api/clients/merge` `{target, ids, pick: {field: client id}, dry}` (dry: `{lines}` = the overview), then `{run_id,
 target}`; `POST /api/clients/merges/{run_id}/undo`; the client's answer carries `merges` (the history). Not in the agent API yet.
+
+## E-mails at clients and projects (2.84)
+
+Mails can be filed with a client or a project: filed, assigned and searchable. Kalmido is no mail client: it never sends or
+answers these mails, does not sync a mailbox and shows the text as plain text. It needs the mail input of *Tasks by
+e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addresses are not offered.
+
+- **Addresses** (plus addresses of the server's mailbox, made on the first tap of *Copy address*): one per client (everybody
+  who sees the client gets the same one), one per project (people who may change the project), and a **filing address** per
+  person and workspace (Office > Clients > *E-mail filing*, one for the private space and one per organisation). The menu
+  next to an address makes a new one (the old one stops at once) or turns it off.
+- **Matching at the filing address**: the sender is compared with the client's e-mail, its contact persons and the address book
+  contacts linked to them - only clients of the same workspace that the recipient sees. A mail the person forwards (or
+  sends a copy of) counts with the original sender of the forwarding header, else with To / Cc. No match or several
+  clients: the mail waits under *Not assigned* (only its recipient sees it) until it is assigned by hand. A client's or
+  project's address files without matching; a project's mail names the project's client as well.
+- **Where it goes**: the headers and the text are stored with the mail (sealed with the organisation's key when encryption
+  is on); the original `.eml` and the attachments go into the file store, folder *E-Mails / client / date subject* of the
+  workspace (the virus scan and the storage limit apply; a find leaves the attachment out, a full storage all of them -
+  the mail says so). Assigning moves the folder along when the person may change it.
+- **Who sees a mail**: a client's mail everybody who sees the client, a project's mail everybody who sees the project, a mail
+  that is not assigned only its recipient - never across workspaces. Assigning and deleting need the right to change the
+  project / see the client (taking a mail back to *Not assigned*: its recipient). Both are one undo step each; a deleted
+  mail can be restored with Undo. The attachments of a mail can be opened by everybody who sees the mail.
+- **Search**: subject, sender and text (a hashed word index, no plain index).
+- **Agents** have no access to filed mails in 2.84 (no API route, no MCP tool).
 
 ## Sales pipeline and figures (2.50)
 
@@ -619,7 +656,8 @@ decimal comma, document date DDMM, CRLF; the period must lie within one fiscal y
 4300 / 4100 / 4337 / 4338 / 4185, collective debtor 10000, bank 1200 / 1800, cash 1000 / 1600, stretched to the ledger
 length), `accounts` / `bu` (own account / tax key per case `standard`, `reduced`, `exempt`, `reverse`, `abroad`,
 `small`), `debtor`, `bank`, `cash`. A client's customer number is its debtor when it is a debtor number (digits, ledger
-length + 1, first digit 1-6). Documents without VAT go by their VAT note (reverse charge, abroad, small business; small
+length + 1, first digit 1-6); 2.81.0 (#1867): a finalised document uses the customer number of its snapshot (the client
+at finalising), the live client only when the snapshot has none. Documents without VAT go by their VAT note (reverse charge, abroad, small business; small
 business never with a tax key). Foreign currency documents are booked in EUR by the document's rate. The export is in
 the office log (`export`, target `datev`).
 

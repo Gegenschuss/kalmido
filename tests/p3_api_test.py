@@ -4,8 +4,9 @@ unblock push + News, trash / restore, undo, recurring, batch), project status (p
 progress numbers on seeded data, custom fields (CRUD per type, validation, permissions, values, moves, member
 removal, search, activity, export, templates, recurring copies)."""
 import json, os, dbx, sys, time
-from datetime import date, timedelta
+from datetime import timedelta
 import requests
+import testclock
 
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1]
@@ -54,7 +55,7 @@ def news(s):
     return s.get(B + "/api/news").json()["items"]
 
 
-D = lambda n: (date.today() + timedelta(days=n)).isoformat()  # noqa: E731
+D = lambda n: (testclock.today() + timedelta(days=n)).isoformat()  # noqa: E731
 
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")

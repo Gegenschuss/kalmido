@@ -38,6 +38,10 @@ function bootDone() {
   if (new URLSearchParams(location.search).get('share') === 'err') {
     history.replaceState(null, '', '/#inbox'); await route();
     toast(tr('Share: the file could not be received'));
+  } else if (new URLSearchParams(location.search).get('share') === 'refused') {  // 2.81.0 (#1856): the server path kept the task, not every file
+    history.replaceState(null, '', '/' + (location.hash || ''));
+    await route();
+    toast(tr('Share: not every file was added (too large, empty or refused by the upload check)'));
   } else if (new URLSearchParams(location.search).get('share') === '1') {  // files shared via the service worker
     let meta = {title: '', text: '', url: '', files: []}, files = [];
     try {

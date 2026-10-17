@@ -162,6 +162,8 @@ ORDER = (
     "life.v1",
     "life.budget",  # 2.72.0 (#1333): the household budget
     "life.budget_web",
+    "life.rss",  # 2.85.0 B (#1162): feeds
+    "life.rss_web",
     "team.clients",
     "team.clients_bulk",  # 2.47.3 (#1733): several clients at once
     "team.clientmerge",  # 2.66.0 B (#1835): merging duplicate clients (reversible)
@@ -170,6 +172,7 @@ ORDER = (
     "hub.absence",  # 2.50.0 A (#1195): absences + German public holidays
     "hub.dispo",  # 2.50.0 A (#1194): resources and disposition (bookings of crew and equipment)
     "hub.agentdispo",  # 2.51.0 C (#1355): shoot planning by agents (event drafts, options), the disposition in the REST API
+    "hub.hubmail",  # 2.84.0 A (#1198): e-mail as an input of the hub (mails filed with clients / projects)
     "office.packs",  # 2.36.1 (#1021): country packs (data), used by office.model
     "office.model",  # 2.36.1 (#1021): office & finance (B); C/D append office.calc, office.docs, office.pdf
     "office.web",
@@ -188,6 +191,7 @@ ORDER = (
     "office.countries",  # 2.40.0 (#1372): the ISO 3166-1 alpha-2 list (no routes)
     "office.contacts_cl",  # 2.40.0 (#1380): contact persons of a client (no routes; used by team.clients, office.docs, legacyimport)
     "office.legacyimport",  # 2.39.1 (#1182): legacy import (clients / services / equipment from .xlsx, archive of old PDFs)
+    "office.archiveedit",  # 2.81.0 B (#1834): correct an archived document afterwards (client, tax lines, paid) + its history
     "office.parts",  # 2.47.0 (#1215): parts of a quotation (Teilangebote): routes, title page calculation, invoice modes
     "office.travel",  # 2.47.3 (#1022, part B): travel expenses (trips, receipts, evaluation, billing on)
     "office.cashflow",  # 2.47.3 (#1652, part B): cash flow per month + fixed costs

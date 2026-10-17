@@ -1176,8 +1176,13 @@ def v1_agent_chats():
     names = user_names(c, [r["user_id"] for r in rows])
     rx, fs = chat_reactions_of(c, [r["id"] for r in rows]), chat_files_of(c, [r["id"] for r in rows])
     nw = {u: chat_newest(c, aid, u) for u in {r["user_id"] for r in rows}}  # 2.30.0 (#1037): choice_state
+    extra = {}
+    if a.get("user_id"):  # 2.82.0 (#1862): one person's conversation also brings its pinned messages (like the app routes)
+        from ..collab.chatpins import cpin_agent_list
+        uid = as_int(a["user_id"], "user_id", 1)
+        extra["pins"] = cpin_agent_list(c, aid, uid, api=True) if agent_shares(c, aid, uid) else []
     return jsonify(data=jn9_chat_jobs(c, [{**chat_dict(r, rx, fs, api=True, newest=nw[r["user_id"]]), "user": {"id": r["user_id"], "name": names.get(r["user_id"], "")}} for r in rows], aid),  # 2.59.0 (#1827)
-                   cursor=rows[-1]["id"] if rows else since, has_more=more)
+                   cursor=rows[-1]["id"] if rows else since, has_more=more, **extra)
 
 
 def _approval_pushes_hour(c, aid, uid):

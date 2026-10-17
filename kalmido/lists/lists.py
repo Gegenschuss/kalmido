@@ -460,6 +460,9 @@ def list_update(lid):
     else:
         # 2.39.1 (#1188): a list admin archives / restores (deleting needs the archive); 2.40.0 (#1431): and renames / recolours it
         adm = ("archived", "name", "color") if role == "admin" else ()
+        from ..agents.core import is_agent
+        if adm and is_agent(g.user):  # 2.82.0 (#1467): agents never rename / recolour / archive a list (#1431 is for people)
+            adm = ()
         if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS + adm):
             return err(tr("Only the owner can change this list"), 403)
         if adm and ("name" in vals or "color" in vals):
@@ -1156,6 +1159,8 @@ def member_remove(lid, uid):
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
     # 2.53.0 (#1424, review): a removed member's task bells of this list go (no old "Urgent" coming back on re-invite)
     c.execute("DELETE FROM task_bell WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
+    # 2.82.0 (#1464): their own "My tasks" places of this list's tasks go too (the state filters them anyway)
+    c.execute("DELETE FROM user_task_order WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
     c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE list_id=? AND type='person')",
               (str(uid), lid))
     agent_share_skip(c, lid, uid, True)  # 2.4.2 (#391): unshared by hand -> "Share all" leaves it out

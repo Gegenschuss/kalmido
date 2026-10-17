@@ -203,6 +203,8 @@ The most used helpers:
 | `life/web.py` | Home & life: the web API (overview, contracts, devices, upkeep, health, trips, review + journal, staying in touch, Karakeep). |
 | `life/budget.py` | 2.72.0 (#1333) Home & life: the household budget (a list of kind `budget`): categories with monthly limits, entries, recurring items + taking them over from contracts, the month (planned / actual), the bank import (CSV), receipts; fields encrypted with the list's space key, `bud_settle` reseals after a move. |
 | `life/budget_web.py` | 2.72.0 (#1333): the web API of the household budget (`/api/budget...`; no REST v1 / MCP, never for agents). |
+| `life/rss.py` | 2.85.0 (#1162): feeds of a person (module `feeds`): fetch through the SSRF guard of the calendar subscriptions (`cal_http`), RSS 2.0 / Atom / RSS 1.0 parsed without DTDs (`xml_no_dtd`), plain text only, "Read later" -> a task in the reading list, OPML, the watchdog step (hourly, 30 days). |
+| `life/rss_web.py` | 2.85.0 (#1162): the web API of the feeds (`/api/feeds...`; no REST v1 / MCP, never for agents or API tokens). |
 | `life/v1.py` | Home & life: the REST API v1 (+ MCP) and its OpenAPI part (health + journal: scope "private"). |
 | `team/clients.py` | Clients (module "clients"): clients of an organisation above the lists, hours, budget, estimate vs. actual. |
 | `team/workload.py` | Workload (module "workload"): planned hours per person and week against their capacity. |
@@ -333,6 +335,7 @@ registering the ones of its area.
 | `dispo.js` | 2.50.0 (#1194): the disposition tab (week grid per resource, a day list on phones, booking sheet, who is free, my bookings). |
 | `life.js` | Home & life: the view, its dialogs (contract, device, upkeep, health, trip, Karakeep), the review + journal, staying in touch on a contact's card. |
 | `budget.js` | 2.72.0 (#1333): the household budget (`#budget/<list id>`, a tab of the area Home): month view with totals, six-month bars, categories with their limit, "Open this month" (recurring entries to book), entries per day; the dialogs entry (+ receipts), categories, recurring entries, taking over contracts, CSV import with column mapping; the card on Home & life; reloads on the area `budget` of `/api/version`. |
+| `feeds.js` | 2.85.0 (#1162): feeds (`#feeds`, a tab of the area Home, loaded on demand): follow a feed by its address, OPML import / export, the articles newest first (unread marked, plain text, links with noopener) with Open / Read later / Read, all read, manage feeds; the card on Home & life. |
 | `areas.js` | 2.44.0 (#1187): the areas Office, Time, Review and Home: one sidebar row / tab each, the tabs of their parts on top of the page (each part keeps its route), one switch per area in Settings > Modules. |
 | `sbnav.js` | 2.45.0 (#1509): the messenger in the sidebar: "Messages" with the unread count, the last five conversations, a speech bubble at every person for a direct message. |
 | `wiki.js` | 2.49.0 (#1199): `#wiki` / `#wiki/<id>` = the knowledge pages of a space (an organisation or private): tree from the paths, editor with `[[` suggestions and autosave, backlinks, templates, ZIP export / import. |
@@ -393,6 +396,7 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 | `integrations` | `integrations.js` | Settings, the agent chat (tokens, webhooks, CalDAV) |
 | `playbook` | `playbook.js` | the playbook area of a list / folder dialog, Settings |
 | `timeline` | `timeline.js`, `roadmap.js` | a list's timeline, the roadmap, the calendar's timeline |
+| `feeds` | `feeds.js` (+ `css/feeds.css`) | 2.85.0 (#1162): the view Feeds, the card Feeds on Home & life |
 
 `contacts` now also loads `newsletter.js`, `settings` first `acctset.js` (the settings sections of `account.js`; sign-in,
 invitations and logout stay in `account.js`). What the start needs of them stays at start: `chatbase.js` (the phone /
