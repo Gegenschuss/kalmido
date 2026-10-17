@@ -97,7 +97,7 @@ SP = f"org:{ORG}"
 U = {}
 for name in ("bob", "carol", "dave", "erin", "frank"):
     r = A.post(B + "/api/users", json={"username": name, "display_name": name.title(), "password": "password123",
-                                       **({"orgs": [ORG]} if name != "frank" else {})})
+                                       **({"orgs": [ORG]} if name != "frank" else {"email": "frank@example.com"})})
     assert r.ok, r.text
     U[name] = r.json()["id"]
 BOB, CAROL, DAVE, ERIN, FRANK = (U[k] for k in ("bob", "carol", "dave", "erin", "frank"))
@@ -201,7 +201,7 @@ for word in ("Hello world", "plain other", "Checklist", "Daily notes", "Trash me
     like = f"%{word}%"
     for t, col in (("wiki_pages", "path"), ("wiki_pages", "body"), ("wiki_pages", "attrs"), ("wiki_links", "to_path"),
                    ("notifications", "data"), ("list_activity", "data")):
-        if dbx(f"SELECT 1 FROM {t} WHERE {col} ILIKE ?" + (" AND org_id IS NOT NULL" if t == "wiki_pages" else ""), (like,)):
+        if dbx(f"SELECT 1 FROM {t} WHERE {col}::text ILIKE ?" + (" AND org_id IS NOT NULL" if t == "wiki_pages" else ""), (like,)):
             leak.append((word, t, col))
 check(not leak, "plain-text sweep after finish: " + str(leak))
 
@@ -258,7 +258,8 @@ check(A.delete(B + f"/api/wiki/pages/{NEWP}").ok and A.post(B + "/api/wiki/resto
       "on: trash and restore stay allowed")
 
 # ---------------------------------------------------------------- members: join, release, leave
-assert A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": FRANK, "role": "member"}).ok
+r = A.put(B + f"/api/orgs/{ORG}/members", json={"email": "frank@example.com", "role": "member"})  # an admin adds by address
+assert r.ok and dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG, FRANK)), r.text
 check(dbx("SELECT 1 FROM wiki_key_pending WHERE space_id=? AND user_id=?", (SID, FRANK)), "join: frank waits for the key")
 d = A.get(B + "/api/wiki/e2e", params={"space": SP}).json()
 check({p["user_id"] for p in d["pending"]} == {DAVE, FRANK}, "GET: the waiting list " + str(d["pending"])[:200])
