@@ -31,6 +31,8 @@ CTR_TEXT_MAX = 300            # the agent's sentence
 CTR_DAY_MAX = 50              # notice proposals of one agent per 24 hours
 CTR_REMIND_DAYS = 3           # "Remind me": this many days before the last day to cancel
 CTR_KEEP_DAYS = 400           # sent markers are kept this long (a yearly contract comes back after a year)
+CTR_EVERY_TICKS = 10          # the scan runs every 10th watchdog interval (5 min in production), not on every tick
+_CTR_LAST = {"at": 0.0}
 CTR_HINT = ("Write ONE friendly sentence for the person in their language (lang): when the notice period ends and what the "
             "contract costs a month or a year, so they can decide whether to cancel, renew or compare. No pressure, never say it "
             "was cancelled. Send it with POST /api/v1/agent/proposals {kind: notice, task_id, text} (MCP propose_contract_notice). "
@@ -103,9 +105,15 @@ def _contracts(c):
 
 
 def ctr_tick(c, now=None):
-    """Watchdog: the event contract_notice for every contract in reach, once per contract, last day to cancel and agent."""
+    """Watchdog: the event contract_notice for every contract in reach, once per contract, last day to cancel and agent.
+    Runs at most every CTR_EVERY_TICKS watchdog intervals (the deadlines are whole days)."""
+    import time
+    from ..core.config import WATCHDOG_INTERVAL
     from ..agents.core import agent_active, agent_emit, agent_ids, agent_row
     from ..life.model import feat_on
+    if time.monotonic() - _CTR_LAST["at"] < CTR_EVERY_TICKS * WATCHDOG_INTERVAL:
+        return
+    _CTR_LAST["at"] = time.monotonic()
     due = _contracts(c)
     if not due:
         return
@@ -120,9 +128,10 @@ def ctr_tick(c, now=None):
             pid = pid or ctr_person(c, t)
             if not pid or not feat_on(c, pid, "contracts"):
                 break  # nobody's contract (any more) / the module is off: no agent hears of it
+            if agent_emit(c, a["user_id"], CTR_EVENT, {**ctr_data(c, t, pid), "hint": CTR_HINT}, actor=None) is None:
+                continue  # not delivered (filtered): no marker, so no proposal for an event the agent never got
             c.execute("INSERT INTO ctr_notices(task_id,due,agent_id,user_id,list_id,sent_at) VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING",
                       (t["id"], t["due"], a["user_id"], pid, t["list_id"], iso(now_utc())))
-            agent_emit(c, a["user_id"], CTR_EVENT, {**ctr_data(c, t, pid), "hint": CTR_HINT}, actor=None)
             c.commit()
 
 
@@ -228,7 +237,8 @@ def _rem_with(rem):
 
 def ctr_run(c, j, sel, ed, extra, rec):
     """Take it (as the person): the sentence becomes a comment on the contract task; with remind also a reminder
-    CTR_REMIND_DAYS days before the last day to cancel. rec = the undo record."""
+    CTR_REMIND_DAYS days before the last day to cancel. rec = the undo record. Written straight into comments on purpose:
+    a private note of the person, no comment push / news / comment event to the list's members and agents."""
     from ..tasks.lifecycle import apply_update
     from ..tasks.validation import log_act
     p, inp, uid = json.loads(j["proposal"]), json.loads(j["input"] or "{}"), me()

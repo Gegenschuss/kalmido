@@ -2622,7 +2622,8 @@ organisation or its list limit). The agent answers with ONE sentence; the person
   applies. `POST /api/proposals` with kind `notice` answers 400 (a person cannot ask for it).
 - **The card** (News + push "Proposal ready" per the person's settings; the title names the contract, never its cost): the
   contract (cancel by, end of the term, notice period, cost), the sentence, and *Take it as a note* (a comment on the contract
-  task as the person, history "applied a proposal by <agent>"), *Remind me* (the same plus a reminder 3 days before the last
+  task as the person, history "applied a proposal by <agent>"; a quiet note: no comment push, news or `comment` event
+  for the list's members and agents), *Remind me* (the same plus a reminder 3 days before the last
   day to cancel, shown while that is still ahead) or *Discard*. One undo step takes the note (and the reminder) back. The
   agent gets the event `job` (approve / reject). Open cards end with their deadline.
 - Nothing is ever cancelled, sent or deleted. Health lists and the journal never reach an agent (no event, no read, no
