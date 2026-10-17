@@ -108,6 +108,7 @@ async function e2eForget() {
   E2E.priv = E2E.ckey = E2E.own = null; E2E.badPub = false; E2E.dm = {}; E2E.dec = {}; E2E.notes = {};
   if (typeof ln_wipe === 'function') ln_wipe();  // 2.48.0 review (S3): the decrypted locked notes too
   if (typeof le2eWipe === 'function') le2eWipe();  // 2.64.1 (#1817): the texts of locked lists too
+  if (typeof wkeWipe === 'function') wkeWipe();  // 2.64.3 B (#1817): the pages of encrypted knowledge spaces too
   try { await new Promise(res => { const r = indexedDB.deleteDatabase('kalmido-e2e'); r.onsuccess = r.onerror = r.onblocked = () => res(); }); } catch { /* none */ }
 }
 
@@ -135,6 +136,7 @@ function e2eLock() {
   E2E.priv = E2E.ckey = E2E.own = null; E2E.badPub = false; E2E.dm = {}; E2E.dec = {}; E2E.notes = {};
   if (typeof ln_wipe === 'function') ln_wipe();  // 2.48.0 review (S3): the decrypted locked notes too (e2eRefresh redraws)
   if (typeof le2eWipe === 'function') le2eWipe();  // 2.64.1 (#1817): the texts of locked lists too
+  if (typeof wkeWipe === 'function') wkeWipe();  // 2.64.3 B (#1817): the pages of encrypted knowledge spaces too
   e2eIdbDel();
   e2eRefresh(); toast(tr('Encryption locked'));
 }
@@ -312,12 +314,14 @@ async function e2eRemove() {
 
 // ------------------------------------------------------------------ Settings > Account > End-to-end encryption
 const e2eHtml = () => S.me?.kind === 'agent' ? '' : `<h4 id="s-e2e-h">${tr('End-to-end encryption')}</h4><div id="s-e2e"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+// 2.64.3 (#1817): help text on exporting encrypted content (same statements as the self-hosting guide)
+const e2eExportHelp = () => `<p class="muted"><b>${esc(tr('Exporting encrypted content'))}</b> ${esc(tr('Encrypted content can only be read in Kalmido, after you unlocked your encryption. An encrypted knowledge space is exported as a ZIP of plain Markdown files from the browser (menu of the unlocked space). Exports of your account or organisation and backups contain the encrypted texts, which only the members can read in Kalmido with their passphrase; for a plain copy of a list, switch its lock off first. Print the recovery code. If passphrase and recovery code are both lost, the content is gone; in a list or an organisation space another member can release the key again, in a private space nobody can.'))}</p>`;
 async function e2eDraw(md) {
   const box = $('#s-e2e', md); if (!box) return;
   if (!globalThis.crypto?.subtle) { box.innerHTML = `<div class="shint">${tr('This browser cannot encrypt here (it needs HTTPS and a current browser).')}</div>`; return; }
   const st = await e2eLoad(true);
   if (!st) { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
-  const limits = `<details class="e2einfo"><summary>${tr('What it protects, and what not')}</summary><p class="muted">${tr('Encrypted notes, files and direct messages are encrypted in your browser. The server, its database and its backups only hold unreadable data: neither the operator nor agents can read them. Titles, dates and reminders stay normal. A web app has a limit: whoever controls the server could deliver a changed script. Encrypted direct messages have no forward secrecy: whoever gets your keys later can read old messages too. Encrypted files have no preview and are not searched.')}</p>${typeof le2u_helpHtml === 'function' ? le2u_helpHtml() : ''}</details>`;  // 2.64.1 (#1817): + lists with a lock
+  const limits = `<details class="e2einfo"><summary>${tr('What it protects, and what not')}</summary><p class="muted">${tr('Encrypted notes, files and direct messages are encrypted in your browser. The server, its database and its backups only hold unreadable data: neither the operator nor agents can read them. Titles, dates and reminders stay normal. A web app has a limit: whoever controls the server could deliver a changed script. Encrypted direct messages have no forward secrecy: whoever gets your keys later can read old messages too. Encrypted files have no preview and are not searched.')}</p>${typeof le2u_helpHtml === 'function' ? le2u_helpHtml() : ''}${e2eExportHelp()}</details>`;  // 2.64.1 (#1817): + lists with a lock
   if (!st.set) {
     box.innerHTML = `<div class="row"><label>${tr('State')}</label><span class="tfastate">${tr('Not set up')}</span><button class="btn sm pri" data-e2e="setup">${ic('lock', 's')} ${tr('Set up')}</button></div>
       <div class="shint">${tr('For an encrypted note on a task, encrypted files and encrypted direct messages. Only you hold the keys.')}</div>${limits}`;

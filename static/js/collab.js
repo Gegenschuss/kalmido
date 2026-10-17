@@ -188,6 +188,7 @@ function newsText(it, U) {
   switch (it.kind) {
     case 'mention': return tr('{0} mentioned you', who);
     case 'e2e_key': return le2u_newsText(it, who, q);  // 2.64.1 (#1817): the key of a locked list was released to me
+    case 'wiki_e2e_key': return typeof wkeNewsText === 'function' ? wkeNewsText(it, who, q) : '';  // 2.64.3 B (#1817): the key of an encrypted knowledge space
     case 'tbl_urgent': return tbl_newsText(it, who);  // 2.53.0 C (#1424)
     case 'comment': if ((it.tasks || []).length > 1) return trn('{1} left {0} comments on {2} tasks', '{1} left {0} comments on {2} tasks', it.count, who, it.tasks.length);  // 2.13.0 (#453 A5)
       return it.count > 1 ? trn('{1} left {0} comments', '{1} left {0} comments', it.count, (it.actors || [it.actor_id]).map(a => `<b>${esc(uname(a, U))}</b>`).join(', ')) : tr('{0} commented', who);
@@ -238,7 +239,7 @@ function newsText(it, U) {
   }
   return tr('{0} changed something', who);
 }
-const NEWS_ICON = {orglist: 'archive', mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot', e2e_key: 'key'};  // 2.64.1 (#1817): e2e_key
+const NEWS_ICON = {orglist: 'archive', mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot', e2e_key: 'key', wiki_e2e_key: 'key'};  // 2.64.3 B (#1817): wiki_e2e_key  // 2.64.1 (#1817): e2e_key
 function newsItemHtml(it, i, pop) {
   const U = S.nf.users;
   const many = (it.tasks || []).length > 1;  // 2.13.0 (#453 A5): an agent's comments on several tasks

@@ -94,6 +94,11 @@ CHECKS = {
     # bells; the read layer ignores rows of another workspace: notify/taskbell.py tbl_rows)
     "task_bell_person": ("SELECT b.task_id, b.user_id FROM task_bell b JOIN users u ON u.id=b.user_id WHERE b.org_id IS NOT NULL AND "
                          "(u.kind='agent' OR " + _PERSON.format(o="b", m="b") + ")"),
+    # 2.64.3 A (#1817): a wrapped key of an organisation's knowledge space with the lock held by an agent or by a person outside
+    # the organisation, or a key of a private space held by another person (the trigger wiki_e2e_members removes it when someone leaves; counted only)
+    "wiki_key": ("SELECT k.space_id, k.user_id FROM wiki_keys k JOIN wiki_spaces s ON s.id=k.space_id JOIN users u ON u.id=k.user_id "
+                 "WHERE (s.org_id IS NULL AND k.user_id<>s.owner_id) OR (s.org_id IS NOT NULL AND (u.kind='agent' OR "
+                 + _PERSON.format(o="s", m="k") + "))"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 

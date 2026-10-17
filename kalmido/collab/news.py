@@ -392,6 +392,14 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):
                 continue
+        elif kind == "wiki_e2e_key":  # 2.64.3 (#1817): the key of a knowledge space, while I am in its organisation
+            from ..accounts.orgs import user_orgs
+            try:
+                wo = int(json.loads(r["data"] or "{}").get("org_id") or 0)
+            except (ValueError, TypeError, AttributeError):
+                wo = 0
+            if wo not in user_orgs(c, uid):
+                continue
         elif kind != "unshare":
             if r["t_title"] is None or r["t_del"] or not sees(r["t_list"]) or not sees_task(r["task_id"], True):
                 continue

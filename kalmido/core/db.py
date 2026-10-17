@@ -15,7 +15,7 @@ from ..core.pg import (  # noqa: F401  (re-exported: the app imports the databas
     connect_pooled, insert_id, like_escape, table_columns, table_exists, wait_ready, write_lock,
 )
 from ..core.schema import (
-    GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
+    GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
 )
 from ..core.i18n import LANGS, tr
 
@@ -328,6 +328,7 @@ def init_db(guard=True, load=None):
         c.execute("DROP INDEX IF EXISTS tasks_tt")  # tt_id is unique per user now (tasks_tt_user)
         c.executescript(TIME_TITLE_TRIGGER)
         c.executescript(LIST_E2E_TRIGGER)  # 2.64.1 (#1817): members of lists with the lock
+        c.executescript(WIKI_E2E_TRIGGER)  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
         from ..tasks.delta import dl_setup
         dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
         for stmt in INDEXES.strip().split(";"):

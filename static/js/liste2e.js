@@ -353,7 +353,7 @@ function le2eUrlLid(url) {
 const le2eAny = j => LE2E.on.size || LE2E.memo.size || (Array.isArray(j?.lists) && j.lists.some(l => l && l.e2e));
 // every answer of the server passes here (rawFetch): ciphers are taken into _enc, the plain text shown where known
 function le2eIn(j, url) {
-  if (!j || typeof j !== 'object' || /\/e2e(\/|$)/.test(url || '') || !le2eAny(j)) return j;
+  if (!j || typeof j !== 'object' || /\/e2e(\/|$)|^\/api\/wiki(\/|\?|$)/.test(url || '') || !le2eAny(j)) return j;  // 2.64.3 B (#1817): wiki ciphers are wikie2e.js'
   le2eWalk(j, le2eUrlLid(url || ''), 0);
   return j;
 }

@@ -656,7 +656,7 @@ _LE2A_PLAIN = "(COALESCE({0}, '')<>'' AND left({0}, 5)<>'e2e1:')"  # the prefix 
 _LE2A_CIPHER = "(left({0}, 5)='e2e1:')"
 # 2.64.2 A (#1817): a ciphertext of a generation older than the target of the re-encryption after a key change ("g" of the
 # compact JSON; {1} = the target generation)
-_LE2A_OLD = "(left({0}, 5)='e2e1:' AND substring({0} from '\"g\":([0-9]+)')::bigint < {1})"
+_LE2A_OLD = "(left({0}, 5)='e2e1:' AND substring({0} from '\"g\"\\s*:\\s*([0-9]+)')::bigint < {1})"  # 2.64.3 (review L2): also with spaces
 LE2A_FILES_MAX = 20  # 2.64.2 A (#1817): files per todo call (each one is converted through its own upload, part B)
 
 

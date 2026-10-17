@@ -379,6 +379,11 @@ def ox_build(c, oid, out, by=None):
                 man.client_enc["locked_list_tasks"] = c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN ({q})", lk).fetchone()[0]
                 man.client_enc["locked_list_note"] = ("Texts of lists encrypted in the browser (values starting with e2e1:) can only be "
                                                       "read in Kalmido with a member's own passphrase; no offline tool opens them.")
+        if c.execute("SELECT 1 FROM wiki_spaces WHERE org_id=? AND e2e IS NOT NULL", (oid,)).fetchone():  # 2.64.3 A (#1817)
+            man.client_enc["locked_wiki_pages"] = c.execute("SELECT COUNT(*) FROM wiki_pages WHERE org_id=?", (oid,)).fetchone()[0]
+            man.client_enc["locked_wiki_note"] = ("Name and text of the knowledge pages of a space encrypted in the browser (values starting "
+                                                  "with e2e1:) can only be read in Kalmido with a member's own passphrase; export them "
+                                                  "decrypted from the knowledge pages in the app.")
         manifest = {
             "format": "kalmido-org-export", "format_version": OX_FORMAT, "kalmido_version": APP_VERSION,
             "org": {"id": int(oid), "name": org["name"]}, "created_at": iso(now_utc()), "created_by": by,

@@ -405,6 +405,8 @@ def user_purge(c, uid):
     files += fs_user_purge(c, uid)  # 2.48.0 (#1207): the file store (organisation branches go to an admin, the own tree goes)
     from ..contacts.orgbooks import obk_user_purge
     obk_user_purge(c, uid)  # 2.52.0 C (#1438): the organisations' address books it manages get another manager and stay
+    from ..wiki.wikie2e import wke_user_purge
+    wke_user_purge(c, uid)  # 2.64.3 A (#1817): knowledge spaces with the lock whose key the person held: rotation pending
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     return files
 

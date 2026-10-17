@@ -6,5 +6,6 @@ function pm_cryptScopeHtml(sc) {
   const ul = (h, xs, cls, note = '') => `<div class="pmcs ${cls}"><b>${esc(h)}</b><ul>${xs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>${note ? `<small class="muted pmcsn">${esc(note)}</small>` : ''}</div>`;
   // 2.64.1 (#1817): a third list, what the browser encrypts in lists with a lock; the plain list says it holds those apart
   const br = typeof le2u_scopeHtml === 'function' ? le2u_scopeHtml(sc) : '';
-  return `<div class="pmcsw">${ul(tr('Encrypted'), sc.encrypted, 'on')}${br}${ul(tr('Not encrypted'), sc.plain || [], 'off', br ? sc.plain_note : '')}</div>`;
+  const wb = typeof wkeScopeHtml === 'function' ? wkeScopeHtml() : '';  // 2.64.3 B (#1817): the encrypted knowledge spaces by name
+  return `<div class="pmcsw">${ul(tr('Encrypted'), sc.encrypted, 'on')}${br}${wb}${ul(tr('Not encrypted'), sc.plain || [], 'off', br ? sc.plain_note : '')}</div>`;
 }
