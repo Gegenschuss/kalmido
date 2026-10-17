@@ -12,7 +12,8 @@
  - errors: timeout 504, provider 500 / broken JSON / oversized answer 502 with a neutral text; every call one log row
    (status ok | error | timeout | denied | truncated), no texts in the log, the server log or any answer
  - agents (token) never reach the routes; the admin overview has counts only
-usage: p275_a_api_test.py <datadir>      (starts its own containers)"""
+usage: p275_a_api_test.py <datadir>      (starts its own containers)
+tenant-matrix: assistant"""
 import json
 import os
 import shutil
