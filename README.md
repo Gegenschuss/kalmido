@@ -20,13 +20,23 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.63.0** (2026-10-17): **report forms** with a type, one file and a **status link** for the sender, the **customer
+  portal** (state, public answers, answering without an account; comments stay internal), a conversation on job cards,
+  project templates with notepads, and a security fix for project time entries.
+- **2.62.0** (2026-10-17): **pin chat messages**, agents' comments **only as replies to you** if you like, chat messages
+  sent exactly once, and *Change position...* in the list menu.
+- **2.61.0** (2026-10-17): **safe uploads** - every file is checked for malware (ClamAV), photos lose location and camera
+  data, and PDFs and pictures become **searchable by their text**.
 - **2.60.0** (2026-10-17): Software team - **sprints** with burndown and review, **WIP limits** per kanban column,
   **story points** and velocity, a **review step** (done only after approval) and **environments** (Staging, Live:
   where a milestone runs since when). All off until a list switches it on.
+- **2.59.0** (2026-10-17): **related tasks** and probable duplicates by meaning (optional local `kalmido-embed` service,
+  nothing leaves the server), client contacts linked to the address book, and job names with their own colour.
 - **2.58.0** (2026-10-17): a collection of **fixes** - Back on Android closes dialogs, invoices from quotations with parts
   exact to the cent, share expiry on the chosen day, constant-time password reset, sealed list pictures in encrypted
   organisations, **job names** for agents,
   **fewer symbols** in task rows and the sidebar, and the archive import finds the **recipient's address** of old PDFs again.
+- **2.57.1** (2026-10-17): the drawer on phones no longer scrolls sideways.
 - **2.57.0** (2026-10-17): the sidebar's head (brand, workspace, search, favourites) **stays in place** while the rest
   scrolls, **anything in the sidebar can be a favourite** - icon tiles in your own order on all devices -, and **your own
   colour per workspace** tints the sidebar.

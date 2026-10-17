@@ -364,7 +364,7 @@ def _backfill(c):
         return
     _Q["bf"] = time.monotonic()
     m = ",".join(f"'{x}'" for x in MIMES)
-    ext = "(" + " OR ".join(f"LOWER(a.name) LIKE '%{e}'" for e in EXTS) + ")"
+    ext = "(" + " OR ".join(f"LOWER(a.name) LIKE '%{e}'" for e in EXTS) + ")"  # pg-ok: LOWER() on both sides
     for kind in KINDS:
         if kind in done:
             continue

@@ -7,6 +7,56 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.63.0] - 2026-10-17
+
+**In short:** a list's form becomes a **report form for customers** - a type for every report, one file, and a **link to
+the status** for the sender - and the **customer portal** behind it: the reporter sees the state and the public answers
+and can answer, without an account; comments stay internal unless you send them to the customer. Plus a security fix
+(time entries of a project) and smaller follow-ups. This release takes 2.57.1 to 2.62.0 live along.
+
+### Added
+- Report forms (#1513): *Type of report* (bug, feature, task), *Allow one file* (up to 10 MB) and *The sender gets a
+  link to the status*. The sender sees the link on the thank-you page and gets it once by mail. Spam protection without
+  any outside service: a signed time stamp, limits per e-mail address, at most 5 links per report.
+- Customer portal (#1513): the status page of a report shows its state, the text sent and the public answers; the
+  reporter can answer there. *All my reports* sends a one-time sign-in link and lists the reporter's reports of the same
+  space. In the app, a report has a *Customer report* box (copy the status link, mails to the customer on / off) and the
+  comment bar a switch *Internal / Send to customer* (internal by default). Mails to the customer: at most one per report
+  every 10 minutes, each with a link to stop them. Reports belong to the client of the list (or of the address) and show
+  on the client's card. Agents answer customers with `portal: true` (API, MCP, reference starter).
+- Job cards (#1482): a collapsible *Conversation* with the job's latest messages and a link into its whole history.
+
+### Changed
+- Project templates keep the project page: notepads, the standard arrangement and the block colours (#1523).
+- Undo after *Delete all times* restores the entries exactly, including the link to a timer started on a phone (#1523).
+- Knowledge pages show their own space list only when the workspace switch is on *All* (#1857).
+
+### Security
+- Security fix (time entries of a project): the time window, time reports, the CSV and the REST API show everyone's
+  entries only to the list's owner and admins and the organisation's admins (#1523).
+
+## [2.62.0] - 2026-10-17
+
+**In short:** **pin chat messages** in the team and the agent chat, comments by agents **only as replies to you** if you
+like, a message is **sent exactly once**, and a tidier list menu.
+
+### Added
+- Pin messages in the team chat and the agent chat (at most 5 per conversation): a bar at the top shows them, a tap jumps
+  to the message, older ones too (#1848). Agents: event `chat_pinned`, MCP tools `pin_chat_message` / `pin_team_message`,
+  fields `pinned_at` / `pinned_by` and the list `pins` (#1848, #1861).
+- Settings > Notifications: *Comments by agents: All / Only replies to me*. With *only replies* an agent's comment reaches
+  you only when it answers your comment, follows it directly or mentions you; approval cards and questions always arrive.
+  Comments by people stay as they are (#1854).
+
+### Changed
+- A chat message is sent only once: it shows at once as *Sending...* in the conversation, Send and Enter wait for the
+  server, after waking up the chat reloads at once (#1530).
+- List and basket menu: the four move entries are under *Change position...* (#1853).
+- The head of the list and folder settings stays at the top while scrolling, *Saved - Undo* is always visible (#1485).
+
+### Fixed
+- Files > Documents reloads when opened and no longer stays empty (#1844).
+
 ## [2.61.0] - 2026-10-17
 
 **In short:** uploads get safe - every file is **checked for malware** (ClamAV) before it is stored, **photos lose their
@@ -146,6 +196,12 @@ show fewer symbols, and the archive import finds the recipient's address again.
 - **Switch on all modules** switches on every module of *Settings > Modules* (also agents, knowledge pages, file store,
   dispatch and the business modules); switching it off leaves only lists and tasks. Its explanation stands below the
   title (#1808).
+
+## [2.57.1] - 2026-10-17
+
+### Fixed
+- The drawer on phones no longer scrolls sideways: the background of the sidebar's fixed head was 4 px wider than the
+  sidebar (#1798).
 
 ## [2.57.0] - 2026-10-17
 

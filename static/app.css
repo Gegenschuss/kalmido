@@ -7672,7 +7672,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
    name as hint, one order the person arranges (favtiles.js); the head keeps the sidebar's background (--sbbg from part B) and
    sticks where it starts (top = the sidebar's top padding, --fv2-top), so it does not move at all */
 #side .sbfix{position:sticky;top:var(--fv2-top,1.25rem);z-index:3;background:var(--sbbg,var(--bg2));padding-bottom:.375rem}
-#side .sbfix::before{content:"";position:absolute;inset:-8rem -1rem 0;background:inherit;z-index:-1}
+#side .sbfix::before{content:"";position:absolute;inset:-8rem -.75rem 0;background:inherit;z-index:-1}  /* 2.57.1: as wide as #side's padding (.75rem); 1rem stuck out 4 px and the drawer scrolled sideways */
 #side.fv2-scrolled .sbfix{box-shadow:0 1px 0 var(--line)}
 @media (max-width:899px){ #side .sbfix{--fv2-top:calc(.75rem + var(--safe-t,0px))} }
 :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbfix{--fv2-top:.875rem}

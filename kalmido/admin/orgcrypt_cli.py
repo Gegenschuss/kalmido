@@ -197,7 +197,7 @@ def f8f_icon_files(c, oid=None):
     """2.58.0 (#1805): {path: org id} of the lists' own pictures (all lists, or only those of organisation oid)."""
     from ..accounts.pictures import list_icon_path
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
-        rows = c.execute("SELECT id, icon, org_id FROM lists WHERE icon LIKE 'u:%'" + ("" if oid is None else " AND org_id=?"),
+        rows = c.execute("SELECT id, icon, org_id FROM lists WHERE icon LIKE 'u:%'" + ("" if oid is None else " AND org_id=?"),  # pg-ok: prefix marker u: is case-exact
                          () if oid is None else (oid,)).fetchall()
     return {list_icon_path(r[0], r[1][2:]): r[2] for r in rows if re.fullmatch(r"u:[A-Za-z0-9_-]{8,40}", r[1])}
 

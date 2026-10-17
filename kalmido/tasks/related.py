@@ -295,7 +295,7 @@ def _emb_model(c):
 def _emb_batch(c):
     from ..core.orgcrypt import oc_active, OrgCryptError, PREFIX
     model = _emb_model(c)
-    enc = " OR (l.org_id IS NOT NULL AND v.vec NOT LIKE ?)" if oc_active(c) else ""
+    enc = " OR (l.org_id IS NOT NULL AND v.vec NOT LIKE ?)" if oc_active(c) else ""  # pg-ok: kenc1: prefix is case-exact
     now = time.monotonic()
     for k in [k for k, until in _BADORG.items() if until <= now]:
         del _BADORG[k]
@@ -357,7 +357,7 @@ def emb_drop_org(c, org_id, sealed=None):
 def emb_drop_sealed(c):
     """decrypt-all (the way back): no sealed vector stays behind."""
     with system_ctx(c):  # orgcrypt pass: server-side bulk work on derived data
-        c.execute("DELETE FROM task_vectors WHERE vec LIKE 'kenc1:%'")
+        c.execute("DELETE FROM task_vectors WHERE vec LIKE 'kenc1:%'")  # pg-ok: kenc1: prefix is case-exact
     rt9_forget()
 
 
@@ -512,7 +512,7 @@ def _mix(c, qv, title, text, cos, vis, k, own=None):
         for i in range(0, len(ids), 5000):
             part = ids[i:i + 5000]
             for r in c.execute(f"SELECT id, title, content FROM tasks WHERE id IN ({','.join('?' * len(part))}) "
-                               "AND (title LIKE ? OR content LIKE ?)", (*part, pat, pat)):
+                               "AND (title LIKE ? OR content LIKE ?)", (*part, pat, pat)):  # pg-ok: #<number> has no case
                 if int(own) in {int(x) for x in _REF.findall((r[1] or "") + "\n" + (r[2] or ""))}:
                     refs.add(r[0])
     shown = {x[1] for x in sim}
