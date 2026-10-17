@@ -7687,3 +7687,52 @@ button.jobtag b{font-weight:600}
 .jcend{flex:0 0 auto;color:var(--muted);font-size:var(--fs-xs);padding:.125rem .5rem;border-radius:62.5rem;background:var(--bg3)}
 .jc-text{width:100%;min-height:6rem;resize:vertical;box-sizing:border-box}
 .jc-hint{margin:.5rem 0 0;font-size:var(--fs-xs)}
+/* 2.59.0 C (#1827) job colours from the name: a part job takes its leader's tone, a little lighter -- mixed with the
+   page background, so it turns lighter in the light theme and softer in the dark one */
+.cmsg.jobm.jpart .cbub{box-shadow:inset .25rem 0 0 color-mix(in srgb,var(--jcol) 70%,var(--bg))}
+.jpart .jobtag i,.jcbar.jpart .jcdot{background:color-mix(in srgb,var(--jcol) 70%,var(--bg))}
+/* 2.59.0 A (#1735) a client's contact person linked to an address book contact: the mark in the client dialog, the search */
+.clkc .lacts{flex-wrap:wrap}
+.clkc .cklk{display:inline-flex;align-items:center;gap:.25rem;color:var(--accent);font-size:.8125rem}
+.clkc [data-clk-unlink]{min-height:2.75rem;font-size:.8125rem}
+#pop .cklpick .ctpl{max-height:min(20rem,50dvh)}
+
+/* 2.59.0 B (#1375) related tasks: the folded section in a task, the hint while adding, the search switch (related.js) */
+.rt9sec>summary{display:flex;align-items:center;gap:.5rem;cursor:pointer;list-style:none;min-height:2.75rem;font-size:var(--fs-s);font-weight:600;color:var(--text2)}
+.rt9sec>summary::-webkit-details-marker{display:none}
+.rt9sec>summary::before{content:'';width:.4rem;height:.4rem;border-right:.125rem solid currentColor;border-bottom:.125rem solid currentColor;transform:rotate(-45deg);transition:transform .2s ease;flex:none}
+.rt9sec[open]>summary::before{transform:rotate(45deg)}
+.rt9list{display:flex;flex-direction:column;gap:.125rem;padding:0 0 .5rem}
+.rt9it{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;padding:.25rem .5rem;border:0;border-radius:var(--radius);background:none;color:var(--text);text-align:left;font:inherit;font-size:var(--fs-s);cursor:pointer;min-width:0}
+.rt9it:hover,.rt9it:focus-visible{background:var(--bg3)}
+.rt9n{flex:none;color:var(--muted);font-family:var(--mono);font-size:var(--fs-xs)}
+.rt9t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rt9done .rt9t{color:var(--muted);text-decoration:line-through}
+.rt9dup,.rt9dupb{flex:none;padding:.0625rem .5rem;border-radius:62.5rem;background:var(--accent-soft);color:var(--accent-ink);font-size:var(--fs-xs);font-weight:500}
+.rt9empty{padding:.25rem .5rem;font-size:var(--fs-s)}
+.rt9refh{padding:.5rem .5rem .125rem;color:var(--muted);font-size:var(--fs-xs);font-weight:600}
+.rt9qh{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;margin:.25rem 0 0;padding:.25rem .5rem;font-size:var(--fs-s);color:var(--text2);min-width:0;animation:rt9in .2s ease}
+.rt9ql{display:inline-flex;align-items:center;gap:.25rem;color:var(--muted)}
+.rt9qi{color:var(--accent);text-align:left;min-height:2rem;max-width:100%;overflow-wrap:anywhere}
+.rt9semw:empty{display:none}
+.rt9sem{display:inline-flex;align-items:center;gap:.5rem;min-height:2.75rem;padding:0 .25rem;font-size:var(--fs-s);color:var(--text2)}
+.rt9simh{margin-top:.75rem}
+@keyframes rt9in{from{opacity:0;transform:translateY(-.25rem)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.rt9qh{animation:none}.rt9sec>summary::before{transition:none}}
+/* 2.66.0 (#1835): merging records (multisel.js ms_merge) */
+.mgdlg .mgset{border:0;padding:0;margin:0 0 .75rem;display:flex;flex-direction:column;gap:.25rem}
+.mgdlg .mgset legend{font-weight:600;font-size:var(--fs-s);color:var(--text2);margin-bottom:.25rem}
+.mgdlg .mgopt{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75rem;padding:.375rem .5rem;border:1px solid var(--line2);border-radius:.5rem;cursor:pointer;overflow-wrap:anywhere}
+.mgdlg .mgopt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.mgdlg .mgopt input{margin-top:.2rem;flex:none}
+.mgdlg .mgopt span{display:flex;flex-direction:column}
+.mgdlg .mgjoin{display:flex;flex-direction:column;gap:.25rem;margin:0 0 .75rem;font-size:var(--fs-s);overflow-wrap:anywhere}
+.mgdlg .mglines{margin:.25rem 0 .75rem;padding-left:1.25rem}
+.mgdlg .mgwarn{font-size:var(--fs-s);color:var(--text2)}
+/* 2.66.0 B (#1835): the merges in a client's card (Undo next to the line) */
+.clmhist .ctlinks li{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-height:2.75rem}
+.clmhist .ctlinks li>span{flex:1 1 12rem;overflow-wrap:anywhere}
+/* 2.66.0 A (#1835) contacts: the merge history on a contact's card (one line per merge, Undo while possible) */
+.ctmsec .ctmrow{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
+.ctmsec .ctmrow>span{min-width:0;overflow-wrap:anywhere}
+.ctmsec .ctmrow .btn{min-height:2.5rem}

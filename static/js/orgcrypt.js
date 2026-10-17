@@ -74,7 +74,7 @@ async function ocAdminDraw(md) {
 
 // ---- 2.46.0 (#1563): the boundary check in Administration > Organisation: unfolds to kind, object and person / agent; "Clean up"
 // takes out the memberships of people (the server rule of the nightly run), agents must be moved to the right workspace by hand
-const OA_TYPE = {list: N_('List'), calendar: N_('Calendar'), book: N_('Address book'), agent: N_('Agent')};
+const OA_TYPE = {list: N_('List'), calendar: N_('Calendar'), book: N_('Address book'), agent: N_('Agent'), client: N_('Client')};  // 2.59.0 (#1735): client: a contact person's address book link
 function oa_boundaryHtml(bd) {
   if (!bd.violations) return `<div class="mhint muted" id="a-orgs-bd">${esc(tr('Boundary check: nothing crosses the boundary between workspaces'))}</div>`;
   const head = trn('Boundary check: {0} membership crosses the boundary between workspaces', 'Boundary check: {0} memberships cross the boundary between workspaces', bd.violations);

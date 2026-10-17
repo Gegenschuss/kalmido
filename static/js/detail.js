@@ -492,6 +492,7 @@ function renderDetail0() {
       ${typeof ln_btnHtml === 'function' ? ln_btnHtml(t, ro || ck || tlkR) : ''}${typeof rf_btnHtml === 'function' ? rf_btnHtml('d', ro || tlkR || t.id < 0) : '' /* 2.53.0 (#1449): Insert reference (touch) */}`}
       ${ck ? '' : e2eNoteHtml(t)}${''/* 2.42.0 (#828): my encrypted note (e2e.js) */}
       ${ck ? '' : wk_mentionHtml(t)}${''/* 2.49.0 (#1199): mentioned in knowledge pages (wiki.js) */}
+      ${ck || typeof rt9_detailHtml !== 'function' ? '' : rt9_detailHtml(t)}${''/* 2.59.0 B (#1375): related tasks (related.js) */}
       ${msT && t.id > 0 ? `<div class="dsec mssec" id="d-ms">${msReportHtml(t)}</div>` : ''}
       ${(() => {  // 2.24.0 (UX-41)
         const keep = k => (k === 'snippets' && (snipCount(t) || S.snip?.tid === t.id || listById(t.list_id)?.ptype === 'software'))  // 2.35.0 (#1095)

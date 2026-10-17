@@ -23,7 +23,7 @@ def v1_clients():
 def v1_client_create():
     v1_args(())
     b = v1_json()
-    reject_unknown(b, CLIENT_FIELDS)
+    reject_unknown(b, CLIENT_FIELDS + ("contacts",))  # 2.59.0 (#1735): the contact persons (documented since 2.40.0, contact_id)
     return jsonify(v1_call(client_create, body=b)), 201
 
 
@@ -39,7 +39,7 @@ def v1_client(cid):
 def v1_client_update(cid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, CLIENT_FIELDS)
+    reject_unknown(b, CLIENT_FIELDS + ("contacts",))  # 2.59.0 (#1735): the contact persons (documented since 2.40.0, contact_id)
     return jsonify(v1_call(client_update, cid, body=b))
 
 
@@ -115,7 +115,9 @@ def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "estimate_min": {"type": "integer", "description": "Sum of the tasks' durations (estimate) in minutes"},
         "estimated": {"type": "integer"}, "open": {"type": "integer"}, "done": {"type": "integer"}}}
     kin = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string", "maxLength": 120}, "role": {"type": "string"},
-                                            "email": {"type": "string"}, "phone": {"type": "string"}, "is_default": {"type": "boolean"}}}
+                                            "email": {"type": "string"}, "phone": {"type": "string"}, "is_default": {"type": "boolean"},
+                                            "contact_id": {"type": ["integer", "null"], "description": "2.59.0 (#1735): the linked address book contact (a book of the "
+                                                           "client's organisation; null = not linked, missing in PATCH = unchanged; a new link needs the scope contacts)"}}}
     schemas["Client"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "name": {"type": "string"}, "icon": {"type": "string"}, "color": {"type": "string"},
         "contact": {"type": "string", "description": "Contact person (2.40.0: the name of the default one of contacts)"}, "email": {"type": "string"}, "phone": {"type": "string"},

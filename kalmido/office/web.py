@@ -260,6 +260,7 @@ def pb_move_post():
             q = ",".join("?" * len(moved))
             c.execute(f"UPDATE clients SET org_id=? WHERE id IN ({q})", (oid, *moved))
             c.execute(f"UPDATE office_client_contacts SET org_id=? WHERE client_id IN ({q})", (oid, *moved))
+            c.execute(f"UPDATE office_client_contacts SET contact_id=NULL WHERE client_id IN ({q})", moved)  # 2.59.0 (#1735): own books stay private
     g.pop("pb_owner", None)
     acx_drop()
     uset(c, uid, "workspace", f"org:{oid}")

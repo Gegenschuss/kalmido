@@ -107,8 +107,10 @@ function ctCardHtml(c) {
     </div>
     ${c.note ? `<div class="ctnote md">${renderMd(c.note, false, {})}</div>` : ''}
     ${lifeCareHtml(c)}
+    ${(c.clients || []).length ? `<div class="ctsec cklsec"><h4>${tr('Contact person at')}</h4><ul class="ctlinks">${c.clients.map(x => `<li><a class="linkbtn" href="#client/${x.client_id}">${ic('brief', 's')} ${esc(x.name)}</a>${x.role ? `<span class="muted"> · ${esc(x.role)}</span>` : ''}</li>`).join('')}</ul></div>` : ''}${''/* 2.59.0 (#1735): the clients this contact is a contact person of (only who may open them) */}
     <div class="ctsec"><h4>${tr('Tasks')}</h4>${(c.tasks || []).length ? `<ul class="ctlinks">${c.tasks.map(t => `<li><button type="button" class="linkbtn ${t.status ? 'done' : ''}" data-cttask="${t.task_id}">${ic(t.status ? 'done' : 'list', 's')} ${esc(t.title)}</button><span class="muted"> · ${esc(tr(kinds[t.kind] || 'About'))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No linked tasks yet: “Link a contact” in a task’s panel.')}</p>`}</div>
     ${(c.events || []).length ? `<div class="ctsec"><h4>${tr('Events')}</h4><ul class="ctlinks">${c.events.map(e => `<li><button type="button" class="linkbtn" data-evopen="${e.event_id}">${ic('cal', 's')} ${esc(e.title)}</button><span class="muted"> · ${esc(e.all_day ? fmtDayAbs(e.start.slice(0, 10)) : fmtDayAbs(e.start.slice(0, 10)) + ' ' + fmtTimeLoc(e.start.slice(11, 16)))}</span></li>`).join('')}</ul></div>` : ''}
+    ${w && (c.merges || []).length ? ctm_histHtml(c) : ''}
   </article>`;
 }
 document.addEventListener('input', e => {
@@ -121,6 +123,8 @@ document.addEventListener('change', e => {
   if (e.target.id === 'ct-book') { CT.book = e.target.value; ctLoad(); }
 });
 document.addEventListener('click', async e => {
+  const mu = e.target.closest('[data-ctmundo]');  // 2.66.0 A (#1835): undo a merge from the card's history
+  if (mu) { ctm_undoCard(+mu.dataset.ctmundo, mu); return; }
   const bb = e.target.closest('#ct-sbar [data-ctb]');
   if (bb) { bk_barAct(bb.dataset.ctb, bb); return; }
   const o = e.target.closest('[data-ctopen]');
@@ -181,7 +185,7 @@ function bk_click(id, shift) {  // 2.47.3 (#1733): Shift-click ticks the rows be
 function bk_start(id) { CT.pick = new Set(); bk_toggle(id); if (!CT.pick.size) ctDraw(); }
 function bk_end() { CT.pick = null; ctDraw(); }
 function bk_barHtml() {
-  return ms_barHtml('ct-sbar', 'ctb', CT.pick.size, tr('Tap contacts'), [['all', 'all', bk_allOn() ? tr('Select none') : tr('All')], ['edit', 'edit', tr('Edit')], ['move', 'folder', tr('Move')], ['del', 'trash', tr('Delete'), 'danger']]);
+  return ms_barHtml('ct-sbar', 'ctb', CT.pick.size, tr('Tap contacts'), [['all', 'all', bk_allOn() ? tr('Select none') : tr('All')], ['edit', 'edit', tr('Edit')], ['move', 'folder', tr('Move')], ['merge', 'collapse', tr('Merge'), '', 2], ['del', 'trash', tr('Delete'), 'danger']]);
 }
 // every contact of the current search / group / address book (the list shows 500, an import has more): fetched as pages
 async function bk_matching() {
@@ -215,6 +219,7 @@ async function bk_barAct(k, el) {
     if (CT.pick && CT.sel && ids.includes(CT.sel)) { CT.sel = null; CT.card = null; }
     bk_end(); await load().catch(() => {}); ctLoad();
   } else if (k === 'edit') bk_edit(ids);
+  else if (k === 'merge') ctm_merge(ids);  // 2.66.0 A (#1835)
   else if (k === 'move') {
     const books = (S.books || []).filter(b => ctWrite(b) && wsObjIn(b) && !b.imported);
     if (!books.length) { toast(tr('No address book you may change')); return; }
@@ -551,4 +556,51 @@ function ob_roleItems(b, done) {
     try { await put(k)(); } catch { return; }
     offerUndo(tr('Saved'), histAdd({label: tr('Changed setting: {0}', tr('Members of the organisation')), undo: put(from), redo: put(k)}));
   }}));
+}
+// 2.66.0 A (#1835): merging duplicate contacts (the selection bar's Merge, 2 to 10 ticked): ms_merge (multisel.js) with the
+// fields of the contacts, the overview from the server (dry run), then the merge. One undo step (toast, Ctrl+Z; redo = the
+// same merge again) and on the target's card the history with Undo (30 days)
+const CTM_MAX = 10;
+const ctm_F = () => [['fn', tr('Name')], ['given', tr('First name')], ['family', tr('Last name')], ['middle', tr('Middle name')],
+  ['prefix', tr('Name prefix')], ['suffix', tr('Name suffix')], ['nickname', tr('Nickname')], ['kind', tr('Kind')], ['org', tr('Company')],
+  ['dept', tr('Department')], ['title', tr('Job title')], ['bday', tr('Birthday')], ['anniversary', tr('Anniversary')], ['photo', tr('Photo')],
+  ['note', tr('Note')]];
+const ctm_L = () => [['phones', tr('Phone')], ['emails', tr('E-mail')], ['addresses', tr('Addresses')], ['urls', tr('Website')], ['groups', tr('Groups')]];
+const ctm_name = c => c.fn || c.org || '?';
+const ctm_adr = a => [a.street, [a.code, a.city].filter(Boolean).join(' '), a.region, a.country].filter(Boolean).join(', ');
+async function ctm_merge(ids) {
+  if (ids.length < 2) { toast(tr('Choose at least two contacts')); return; }
+  if (ids.length > CTM_MAX) { toast(tr('At most {0} contacts at once', CTM_MAX)); return; }
+  let recs; try { recs = await Promise.all(ids.map(i => api('GET', `/api/contacts/${i}`))); } catch { return; }
+  const photo = {}; for (const c of recs) if (c.photo && !(c.photo in photo)) photo[c.photo] = ctm_name(c);
+  const val = (c, k) => k === 'photo' ? (c.photo ? tr('Photo of {0}', photo[c.photo]) : '') : k === 'kind' ? (c.kind === 'org' ? tr('Company') : tr('Person'))
+    : k === 'bday' || k === 'anniversary' ? (c[k] ? ctDate(c[k]) : '') : k === 'note' ? ((c.note || '').length > 160 ? c.note.slice(0, 159) + '…' : c.note || '') : c[k] || '';
+  const lv = (c, k) => (c[k] || []).map(x => typeof x === 'string' ? x : k === 'addresses' ? ctm_adr(x) : x.value || '');
+  const body = (target, pick, dry) => ({target, ids: recs.map(c => c.id), pick, ...(dry ? {dry: true} : {})});
+  const book = c => ctBook(c.book_id)?.name || '';
+  ms_merge({title: trn('Merge {0} contact', 'Merge {0} contacts', recs.length),
+    recs: recs.map(c => ({id: c.id, label: ctm_name(c), sub: [c.org !== c.fn ? c.org : '', lv(c, 'emails')[0] || lv(c, 'phones')[0], (S.books || []).length > 1 ? book(c) : ''].filter(Boolean).join(' · ')})),
+    fields: ctm_F().map(([k, label]) => ({k, label, vals: Object.fromEntries(recs.map(c => [c.id, val(c, k)]))})),
+    lists: ctm_L().map(([k, label]) => ({k, label, vals: Object.fromEntries(recs.map(c => [c.id, lv(c, k)]))})),
+    preview: (target, pick) => rawFetch('POST', '/api/contacts/merge', body(target, pick, true)),
+    run: async (target, pick) => {
+      const j = await rawFetch('POST', '/api/contacts/merge', body(target, pick));
+      let run = j.run_id;
+      const show = async () => { await load().catch(() => {}); ctLoad(); if (isMobile()) go('contacts/' + target); else ctOpen(target); };
+      bk_end(); show();
+      ms_hist(trn('{0} contact merged', '{0} contacts merged', recs.length), tr('Contacts merged'),
+        async () => { await api('POST', `/api/contacts/merges/${run}/undo`); await show(); },
+        async () => { run = (await api('POST', '/api/contacts/merge', body(target, pick))).run_id; await show(); });
+      return true;
+    }});
+}
+function ctm_histHtml(c) {
+  return `<div class="ctsec ctmsec"><h4>${tr('History')}</h4><ul class="ctlinks">${c.merges.map(m => `<li class="ctmrow"><span>${esc(tr('Merged with {0}', (m.summary?.merged || []).map(x => x.fn).join(', ') || '?'))}<small class="muted"> · ${esc([fmtWhen(m.at), m.by_name].filter(Boolean).join(' · '))}${m.undone_at ? ' · ' + esc(tr('undone')) : ''}</small></span>${m.undo === '' ? `<button type="button" class="btn sm" data-ctmundo="${m.id}">${ic('undo', 's')} ${tr('Undo')}</button>` : ''}</li>`).join('')}</ul></div>`;
+}
+async function ctm_undoCard(rid, el) {
+  el.disabled = true;
+  let j; try { j = await api('POST', `/api/contacts/merges/${rid}/undo`); } catch { el.disabled = false; return; }
+  toast(j.note || tr('Merge undone'));
+  await load().catch(() => {}); ctLoad();
+  if (CT.sel) ctOpen(CT.sel);
 }

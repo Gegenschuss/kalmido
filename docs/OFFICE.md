@@ -269,6 +269,26 @@ clients and the company take an ISO 3166-1 alpha-2 code, chosen by name (the bro
 Switzerland on top, empty = Germany); `UK` becomes `GB`, `EL` `GR`, anything else is refused, and an old unknown value
 stops the finalising of an invoice instead of turning silently into `DE`.
 
+**Contact persons from the address book (2.59)**: in the client dialog, "From the address book" next to a contact person
+searches the address books the client's organisation owns (a client without an organisation: your own address books;
+private books never) and copies name, function, e-mail and phone into the fields; the contact person is then linked
+("Linked", "Unlink" drops the link). Saving the client stores the link, Cancel drops it. Later changes of the contact do not
+follow: documents keep reading the copy at the contact person. The contact's card shows "Contact person at" with the clients,
+only to people who may open those clients. Deleting the contact or its address book only drops the link; a client moved into
+another workspace loses its links. The nightly boundary check reports a link to an address book outside the client's
+organisation and drops it.
+
+**Merging duplicate clients (2.66)**: tick two or more clients (Office > Clients, selection mode) and choose "Merge". Pick the
+client that stays and, where the values differ, which value it keeps; the contact persons are joined (the kept client's
+default stays the default). The next step lists what moves: quotations and invoices, framework contracts, archive entries,
+projects, contact persons, trips and sales opportunities. A finalised document keeps its printed address, only its client
+changes; drafts and open quotations show the kept client's address afterwards. The DATEV export takes the customer number from the client:
+issued invoices of a merged client go out under the kept client's number afterwards (the overview says so when the numbers differ). The other clients are gone then; the toast
+and the "History" of the kept client offer "Undo" for 30 days (a field or a link changed since stays as it is). Only the
+clients of one workspace can be merged, and only by people who may delete the others (their creator or an admin).
+`POST /api/clients/merge` `{target, ids, pick: {field: client id}, dry}` (dry: `{lines}` = the overview), then `{run_id,
+target}`; `POST /api/clients/merges/{run_id}/undo`; the client's answer carries `merges` (the history). Not in the agent API yet.
+
 ## Sales pipeline and figures (2.50)
 
 Two tabs for the admins of the office area (a personal office: its owner; members get `403`).

@@ -69,6 +69,7 @@ set +a
 # kalmido-capability: rules_block (2.46.6: the fixed rules of mcp/agent_rules.md in front of every prompt, in mcp/agent_run.py)
 # kalmido-capability: workflow_file (2.46.6: WORKFLOW-KALMIDO.md, asked for once, in mcp/agent_run.py)
 # kalmido-capability: job_wake (2.46.6: a wake run after a job, a lost job continued once; mcp/agent_run.py + agent_job.py)
+# kalmido-capability: job_names (2.59.0: a name per job, part jobs name their leader; mcp/agent_job.py)
 # kalmido-capability: layout_answer (2.55.0: the answer to an arrangement proposal, in mcp/agent_run.py)
 # kalmido-capability: job_message (2.56.0: a message to a job from its card, in mcp/agent_run.py)
 # (2.44.0: agent_run.py; perm_relay and session_resume only when COMMAND is Claude Code)

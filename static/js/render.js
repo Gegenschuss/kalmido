@@ -1605,11 +1605,11 @@ function viewHistory() {
 // 2.40.0 (#1432): "Load more" under Completed / Trash, only while the server has more
 const histMoreHtml = () => S.hist?.next && S.hist.k === S.route.key ? `<div class="audmore"><button type="button" class="btn sm" data-act="hist-more">${tr('Load more')}</button></div>` : '';
 function viewSearch() {
-  return `<div class="search"><input id="searchq" type="search" aria-label="${esc(tr('Search'))}" placeholder="${tr('Search titles and notes')}" autocomplete="off" enterkeyhint="search"></div><div id="sresults">${S.searchRes ? renderSearchRes() : ''}</div><div id="smsgs">${msgSecHtml()}</div>`;
+  return `<div class="search"><input id="searchq" type="search" aria-label="${esc(tr('Search'))}" placeholder="${tr('Search titles and notes')}" autocomplete="off" enterkeyhint="search"></div>${typeof rt9_searchToggleHtml === 'function' ? rt9_searchToggleHtml() : ''}<div id="sresults">${S.searchRes ? renderSearchRes() : ''}</div><div id="smsgs">${msgSecHtml()}</div>`;
 }
 function renderSearchRes() {
   if (!S.searchRes.length) return heronEmpty('empty', tr('No results.'), tr('Try fewer or other words.'));
-  return S.searchRes.map(t => taskRow(t, {showList: true, drag: false, tcols: {list: true}})).join('');
+  return S.searchRes.map((t, i) => (typeof rt9_simHead === 'function' ? rt9_simHead(t, S.searchRes[i - 1]) : '') + taskRow(t, {showList: true, drag: false, tcols: {list: true}})).join('');  // 2.59.0 B (#1375): + heading of the similar hits
 }
 let searchTimer;
 function snavMore(nav) {
@@ -1623,7 +1623,7 @@ async function doSearch(q) {
   searchTimer = setTimeout(async () => {
     if (S.msg.q !== q) msgSecRun(q);  // 2.33.0 (#1080): "Messages" below the tasks (chat.js)
     if (!q.trim()) { S.searchRes = null; $('#sresults').innerHTML = ''; return; }
-    const j = await api('GET', '/api/tasks?scope=search&q=' + encodeURIComponent(q));
+    const j = await api('GET', '/api/tasks?scope=search&q=' + encodeURIComponent(q) + (typeof rt9_semQ === 'function' ? rt9_semQ() : ''));  // 2.59.0 B (#1375): + semantic=1
     // 2.13.0: "#447" / "447" puts that task (one this person sees) first
     const nm = q.trim().match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
     if (hit) j.tasks = [hit, ...j.tasks.filter(t => t.id !== hit.id)];

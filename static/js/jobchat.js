@@ -46,8 +46,8 @@ function jc_need(no) {
 // ---- the chat (agentchat.js): the tag, the leading name, the bar, sending, the box of an ended job
 function jc_tagHtml(jb, m) {
   const j = S.jc.jobs[jb.no]; if (!j) jc_need(jb.no);
-  const t = tr('Open the chat of {0}', jc_label(j || {id: jb.no})), here = S.chat.job && +S.chat.job.id === jb.no;
-  return `<button type="button" class="jobtag jc-tag" data-act="jc-open" data-jid="${jb.no}" data-aid="${+m.agent_id || +S.chat.aid}"${here ? ' disabled' : ''} title="${esc(t)}" aria-label="${esc(t)}"><i></i>${j?.name ? `<b>${esc(j.name)}</b> · ` : ''}${esc(tr('Job #{0}', jb.no))}</button>`;
+  const t = tr('Open the chat of {0}', jc_label(j?.name ? j : {id: jb.no, name: jb.name})), here = S.chat.job && +S.chat.job.id === jb.no;
+  return `<button type="button" class="jobtag jc-tag" data-act="jc-open" data-jid="${jb.no}" data-aid="${+m.agent_id || +S.chat.aid}"${here ? ' disabled' : ''} title="${esc(t)}" aria-label="${esc(t)}"><i></i>${jb.name || j?.name ? `<b>${esc(jb.name || j.name)}</b>` : esc(tr('Job #{0}', jb.no))}</button>`;  // 2.59.0 (#1827): the name, else "Job #N"
 }
 // "Clara: …" / "Clara (Release …)" at the very start of a job's message: the name becomes the same link as the tag
 function jc_bodyHtml(html, jb) {
@@ -58,7 +58,8 @@ function jc_bodyHtml(html, jb) {
 function jc_barHtml() {
   if (!S.chat.job) return '';
   const j = jc_cur(), end = jc_ended(), rest = jc_rest(j);
-  return `<div class="jcbar" id="jc-bar" style="--jcol:${ux_jobColor(j.id)}"><button type="button" class="iconbtn jcback" data-act="jc-back" title="${esc(tr('Back to the whole chat'))}" aria-label="${esc(tr('Back to the whole chat'))}">${ic('back', 's')}</button><i class="jcdot" aria-hidden="true"></i><div class="jcn"><b>${esc(jc_label(j))}</b>${rest ? `<span>${esc(rest)}</span>` : ''}</div>${end ? `<span class="jcend">${esc(tr('Job has ended'))}</span>` : ''}</div>`;
+  const pj = +j.parent_id || 0, jb = {no: +j.id, name: j.name || '', parent: pj, pname: pj ? S.jc.jobs[pj]?.name || '' : ''};  // 2.59.0 (#1827)
+  return `<div class="jcbar${jn9_part(jb) ? ' jpart' : ''}" id="jc-bar" style="--jcol:${jn9_jobColor(jb)}"><button type="button" class="iconbtn jcback" data-act="jc-back" title="${esc(tr('Back to the whole chat'))}" aria-label="${esc(tr('Back to the whole chat'))}">${ic('back', 's')}</button><i class="jcdot" aria-hidden="true"></i><div class="jcn"><b>${esc(jc_label(j))}</b>${rest ? `<span>${esc(rest)}</span>` : ''}</div>${end ? `<span class="jcend">${esc(tr('Job has ended'))}</span>` : ''}</div>`;
 }
 const jc_ph = a => S.chat.job ? (jc_ended() ? tr('Job has ended') : tr('Message to {0}…', jc_label(jc_cur()))) : tr('Message to {0}…', a.name);
 // what the box sends: in a job's history "Job 220: <text>" (unless it already starts with that or the job's name) --

@@ -97,6 +97,7 @@ APP_TO_API = {
     "POST /api/lists/{}/sections/order": ["PUT /lists/{}/sections/order"],
     "GET /api/lists/{}/overview": ["GET /lists/{}/overview"],
     "GET /api/lists/{}/kpis": ["GET /lists/{}/kpis"],  # 2.43.0 (#1328): key figures
+    "GET /api/tasks/{}/related": ["GET /tasks/{}/related"],  # 2.59.0 (#1375): related tasks
     "POST /api/lists/{}/join": ["POST /lists/{}/join"],  # 2.46.0 (#1603): join a list visible to the organisation
     "PATCH /api/lists/{}/overview": ["PATCH /lists/{}/overview"],
     "POST /api/lists/{}/links": ["POST /lists/{}/links"],
@@ -210,6 +211,10 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.66.0 (#1835): merging duplicate contacts / clients and its undo stay with people for now; the agent tool follows with #1357",
+     ("=POST /api/contacts/merge", "=POST /api/contacts/merges/{}/undo", "=POST /api/clients/merge", "=POST /api/clients/merges/{}/undo")),
+    ("2.59.0 (#1375): the hint while a person types a new task's title and the client's on / off of the related tasks; agents "
+     "use related_tasks and search_tasks with semantic", ("=POST /api/tasks/similar", "=GET /api/related/config")),
     ("2.48.0 (#1207): managing the file store stays with people -- rename, move, trash, restore a version, shares, organisation-wide "
      "access, links to task / project files, the move targets; agents list, read and write files where they may edit",
      ("=PATCH /api/files/nodes/{}", "=DELETE /api/files/nodes/{}", "=POST /api/files/nodes/{}/restore", "=POST /api/files/nodes/{}/versions/{}/restore",
@@ -359,6 +364,9 @@ APP_ONLY = [
     # 2.55.0 (#1455): the newsletter connection holds access data of an outside service and decides who gets mail: people only
     ("2.55.0 (#1455): the newsletter connection, segments, sync and the consent of contacts are set by people (admins / the "
      "person); agents read the consent with the contact (field newsletter), no new agent rights", ("* /api/newsletter",)),
+    # 2.59.0 (#1735): the search of the client dialog; the API sets contact_id with PATCH /clients/{id} and finds contacts with GET /contacts
+    ("2.59.0 (#1735): the address book search of the client dialog (contacts a person may link to a client's contact persons); "
+     "the API links with PATCH /clients/{id} contacts[].contact_id and searches with GET /contacts", ("=GET /api/clients/{}/book-contacts",)),
 ]
 
 
