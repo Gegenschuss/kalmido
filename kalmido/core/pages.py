@@ -42,7 +42,7 @@ def headers(resp):
     # 2.29.0 (#1026): never indexed unless the operator allows it; public list links, forms and feeds never
     if not SEARCH_INDEX or request.path.startswith((PUB_PREFIX, ICAL_PREFIX, "/f/", "/api/", "/dav")):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
-    if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/chat-files/", "/api/avatar/", "/api/group-avatar/", "/api/list-icon/", "/api/list-files/")):
+    if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/chat-files/", "/api/avatar/", "/api/group-avatar/", "/api/list-icon/", "/api/list-files/", "/api/list-header/")):
         resp.headers["Cache-Control"] = "no-store"
     return resp
 

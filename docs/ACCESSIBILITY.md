@@ -51,6 +51,17 @@ the app has not yet been tested by people who use a screen reader every day (see
   the status circle and the due date) or *Custom* (a box per symbol, in groups). Overdue tasks, an agent waiting for
   your yes and the status circle always show; the task itself still shows everything. *Settings > Appearance > Sidebar*
   can hide the task counts, the status dots of lists and the share marks (person / robot). Per person, on every device.
+- **Themes, header strips, small moments (2.83.0).** *Settings > Appearance > Theme* offers *Control room* (the default
+  look), *Paper* (warm and light; switches to the light scheme), *Night* (deep blue; switches to the dark scheme) and
+  *High contrast* (pure black or white backgrounds, stronger lines, brighter secondary text; in light and dark). A theme
+  sets the background tones and the look of cards per device; accent colour, density and font stay as chosen, and every
+  accent keeps at least 4.5:1 on every theme. A list can have a slim header strip on top of its view (list settings >
+  *Header*: a gradient from the list colour, dots, lines, a grid or an own picture, JPEG / PNG / WebP up to 2 MB; the same
+  for everyone in the list; set by the owner and the list admins; a locked list offers no picture), a folder too (its
+  menu > *Header…*, only for you). The strip is decorative and hidden from screen readers; *Settings > Appearance >
+  Show header pictures* turns it off on a device. *Progress rings in the sidebar* show done / all of a list's tasks
+  (with a text label for screen readers) and can be turned off. Ticking a task off makes its circle pop for 0.2 s (none
+  with reduced motion); empty lists and an empty Today show a calm line drawing of the K.
 - **Dragging is never the only way.** Tasks: *Move up / Move down* in the task menu or Alt+↑ / Alt+↓, *Move to
   section…*, *Move to list* (m), the date picker; the panels and columns that can be resized by dragging have a grip
   that works with ← → and Enter (standard width) or a double-click. The divider between the chats of the split chat

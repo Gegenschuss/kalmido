@@ -507,6 +507,7 @@ def v1_list(d):
             "repos": d.get("repos") or [], "tickets": bool(d.get("tickets")),
             "time_tracking": bool(d.get("time_tracking")),  # 2.41.0 (#1471): time tracking on for this list
             "points_on": bool(d.get("points_on")),  # 2.60.0 (#1511): story points shown in the app
+            "header_style": d.get("header_style") or "",  # 2.83.0 (#1427): the list's header strip in the app (read only)
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
             "columns": d.get("columns"),  # 2.14.0 (#425): the list's columns (null = default)
             "project_type": d.get("ptype") or None,  # 2.18.0 (#408): agency | software | private, null = none

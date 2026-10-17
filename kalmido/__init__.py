@@ -36,6 +36,7 @@ ORDER = (
     "lists.sections",
     "lists.folders",
     "lists.foldershare",  # 2.41.0 (#1420)
+    "lists.listhead",  # 2.83.0 C (#1427)
     "tasks.validation",
     "tasks.tasks",
     "tasks.roadmap",

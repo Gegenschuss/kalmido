@@ -938,6 +938,7 @@ function settingsModal(focus) {
     if (b.dataset.langSet) { setLang(b.dataset.langSet); return; }
     if (b.dataset.m === 'fs-reset') { fsStep(0); return; }  // 2.13.0 (#429)
     if (b.dataset.m === 'sto-check') { stoCheck(md); return; }  // 2.13.0
+    if (b.dataset.look === 'pack') { o3c_packPick(md, b.dataset.v); return; }  // 2.83.0 C (#1427): theme + scheme in one step
     if (b.dataset.look) {
       const k = b.dataset.look, v = b.dataset.v, n = {theme: N_('Color scheme'), density: N_('Density'), densitySide: N_('Density'), densityRows: N_('Density'), fsize: N_('Font size'), font: N_('Font'), accent: N_('Accent color')}[k];
       setLocal(tr(n), () => lookCur(k), x => { lookSet(k, x); lookRedraw(md, `[data-look="${k}"][data-v="${x}"]`); }, v); return;

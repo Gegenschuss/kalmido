@@ -378,7 +378,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#iitip:
 document.addEventListener('scroll', () => iiHide(true), true);
 const hintK = t => `<div class="shint keep">${t}</div>`;  // 2.13.0: a helper line that stays inline (security, data loss, a state)
 const kt = (label, keys) => isTouch() ? label : `${label} (${kbText(keys)})`;  // a label with its keyboard shortcut
-const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.cwins', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold']);
+const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.cwins', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.pack', 'tasks.headShow', 'tasks.rings']);  // 2.83.0 C (#1427): + theme, header pictures, rings
 function clearLocal() {
   try {
     const ks = [];
@@ -448,6 +448,8 @@ const LOOK = {
   // The default is never stored (lookSet null), so every device that never picked a colour gets violet; picked ones stay.
   accent: [['violet', N_('Violet'), '#a78bfa', '#6d4bd8'], ['raspberry', N_('Raspberry'), '#f472b6', '#be185d'], ['mint', N_('Mint'), '#2dd4bf', '#0a766b'], ['sky', N_('Sky'), '#38bdf8', '#0b6aa2'],
     ['rose', N_('Rose'), '#f472b6', '#b8306f'], ['orange', N_('Orange'), '#fb923c', '#ad4c07'], ['lime', N_('Lime'), '#a3e635', '#4a7110']],
+  // 2.83.0 C (#1427): the theme (a preset of background tones + card style, listhead.js); "control" = the default look
+  pack: [['control', N_('Control room')], ['paper', N_('Paper')], ['night', N_('Night')], ['contrast', N_('High contrast')]],
 };
 try { if (localStorage.getItem('tasks.accent') === '"amber"') localStorage.setItem('tasks.accent', '"orange"'); } catch { /* private mode */ }  // 1.1.3: Amber became Orange
 // 2.8.0 (#434): a device that had the old default (mint) gets the new default once; a colour picked later stays
@@ -469,6 +471,7 @@ function applyLook() {
   if (named) document.documentElement.style.removeProperty('--ui');
   document.documentElement.classList.toggle('ui-small', pct < 100);
   r.font = lookPref('font'); r.accent = lookPref('accent');
+  r.pack = lookPref('pack');  // 2.83.0 C (#1427)
 }
 applyLook();
 // one setter for all device appearance settings (settings pane, palette); v = null -> default

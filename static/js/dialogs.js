@@ -802,6 +802,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="shint lhint" id="l-dsxhint">${tr('Completed tasks stay at their place in their section, crossed out, with their subtasks. For everyone in the list. Not with “Show completed at the bottom” or for shopping lists.')}</div>` : ''}
     ${id ? tp_rowHtml(l) : ''}
     ${id ? rvw_rowHtml(l) : ''}${''/* 2.60.0 C (#1512): review step (review.js) */}
+    ${id ? o3c_rowHtml(l) : ''}${''/* 2.83.0 C (#1427): header strip (listhead.js) */}
     <div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint">${tr('Default for the tasks of this list with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>
     ${id && ['owner', 'admin'].includes(l.role || 'owner') && !l.family && !l.life ? staleRowHtml(l) : ''}
@@ -828,6 +829,7 @@ function listModal(id, folder = '', o = {}) {
   if (id) ovWire(md, id);  // 2.46.0 (#1603): "Everyone in the organisation"
   if (id) tp_wire(md, id);  // 2.46.4 (#1751): "Tap does not open details"
   if (id) rvw_wire(md, id);  // 2.60.0 C (#1512): review step
+  if (id) o3c_wire(md, id);  // 2.83.0 C (#1427): header strip
   $('#l-dsx', md)?.addEventListener('change', e => { e.stopPropagation(); dsxSet(id, e.target.checked).then(() => { const x = listById(id), c = $('#l-dsx', md); if (x && c) c.checked = dsxOn(x); }); });  // 2.36.2 (#1136)
   $('[data-m="bell-custom"]', md)?.addEventListener('click', e => { e.stopPropagation(); bellCustomModal(id); });
   // ---- autosave (existing lists)
@@ -1114,7 +1116,7 @@ function orphWire(md) {
   });
 }
 // Settings > Appearance: all per-device visual settings, applied instantly (no Save), with a live preview
-const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent'];  // 2.18.0: densSideV / densRowsV
+const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow', 'rings'];  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
 const THEMES = [['auto', N_('Automatic')], ['dark', N_('Dark')], ['light', N_('Light')]];
 const DENSITIES = [['compact', N_('Compact')], ['comfortable', N_('Comfortable')], ['custom', N_('Custom|density')]];
 const FSIZE_ORDER = ['s', 'm', 'l', 'xl'];
@@ -1128,6 +1130,7 @@ function lookHtml() {
       <div class="trow pr1"><span class="chk p1"></span><div class="tmain"><div class="ttl">${tr('Renew the library books')}</div><div class="meta">${rsy_pv(1)}</div></div></div>
       <div class="lpv-foot"><span class="btn sm pri">${ic('plus', 's')} ${tr('Add task')}</span><span class="lpv-link">${tr('Show completed')}</span><span class="lpv-prio flag-5">${ic('flag', 's')}${tr('high')}</span></div>
     </div>
+    ${o3c_packHtml() /* 2.83.0 C (#1427): themes (listhead.js) */}
     <h4>${tr('Color scheme')}<span class="devtag">${tr('This device')}</span></h4>
     <div class="row">${seg('theme', THEMES)}</div>
     <h4>${tr('Density')}</h4>
@@ -1143,6 +1146,7 @@ function lookHtml() {
     <div class="shint">${tr('Atkinson Hyperlegible is designed for low vision readers. Dates, times, counters and tags always stay in Geist Mono.')}</div>
     <h4>${tr('Accent color')}</h4>
     <div class="lkopts lkacc" id="s-accent" role="group">${LOOK.accent.map(([v, n, d, l]) => `<button ${on('accent', v)} style="--sw-d:${d};--sw-l:${l}" title="${tr(n)}"><i class="lksw"></i><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
+    ${o3c_lookHtml() /* 2.83.0 C (#1427): header pictures + progress rings */}
     <div class="row lkreset"><button class="btn sm" data-m="look-reset">${ic('undo', 's')} ${tr('Reset to defaults')}</button><span class="muted">${tr('Applies to this device only.')}</span></div>`;
 }
 const lookCur = k => k === 'theme' ? LS.get('theme', 'auto') : k === 'density' ? densityMode() : k === 'densitySide' ? sideDensityPref() : k === 'densityRows' ? densityPref() : k === 'fsize' ? fsPct() : lookPref(k);
