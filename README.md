@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.80.0** (2026-10-17): small fixes - import amounts with thousands separators, new clients at once in the import and
+  in quotations / invoices (with *Add client* when there is none), undo of a contact merge across workspaces, larger
+  Undo button and a wrapping selection bar on the phone, all quota windows named in the agent chat.
 - **2.79.0** (2026-10-17): **security release** (audit part 1): calendar imports invite only people you may see, tighter
   token permissions (app passwords, admin routes, child accounts, health time entries), safer first OIDC login, uploads
   held back until the virus scan, complete backups. **Check your proxy setting** if a reverse proxy on the host reaches a

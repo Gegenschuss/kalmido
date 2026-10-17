@@ -7,6 +7,24 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.80.0] - 2026-10-17
+
+Small fixes: import, clients, contacts.
+
+### Fixed
+- Import (archive documents): amounts with thousands separators are read correctly - `2.436,53` was refused and `1.500`
+  was stored as 1.50; `2,436.53`, `€` / `EUR` and spaces work too, also when correcting an archived document (#1837).
+- Import: a client created while the app is open shows in the client choice of the import without reloading the page (#1836).
+- Quotations / invoices: the client field is always there when clients are on; without clients in the area it shows a
+  hint and *Add client* (created in the office's organisation, you stay on the document); new clients show at once, and
+  the office follows a workspace switch reliably (#1842).
+- Merging contacts: undo also links client contact persons again that lie in another workspace or did not fit the
+  address book (#1885).
+- Phone: the *Undo* button of a message is at least 44 px high on every touch device, and the contacts' selection bar
+  wraps instead of scrolling sideways (#1897).
+- Agent chat usage ring: further quota windows are named (week incl. extra usage, Opus, Sonnet), unknown ones read
+  *Other quota* instead of the raw English key, and an idle weekly window at 0 % is left out (#1841).
+
 ## [2.79.0] - 2026-10-17
 
 Security release: the fixes of the security audit #476, part 1 (one finding "high", nine "medium"; no critical finding).
