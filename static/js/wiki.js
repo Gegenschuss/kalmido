@@ -28,7 +28,7 @@ async function wk_load(sp, force) {
   if (WK.busy['i' + sp] || (!force && d.pages && d.v === S.v)) return;
   WK.busy['i' + sp] = true;
   try { let j = await rawFetch('GET', '/api/wiki?space=' + encodeURIComponent(sp) + '&bodies=1'); if (typeof wkeIndex === 'function') j = await wkeIndex(sp, j); d.pages = j.pages; d.mayWrite = j.may_write; d.err = ''; }  // 2.64.3 B (#1817): texts of an encrypted space open here
-  catch (e) { if (e.message === 'auth') return; d.err = e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; d.pages = d.pages || null; }
+  catch (e) { if (e.message === 'auth') return; d.err = e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; d.pages = d.pages || null; if ([403, 404].includes(e.status) && typeof wkeForget === 'function') wkeForget(sp); }  // 2.64.3 E (#1817): no access any more
   finally { d.v = S.v; WK.busy['i' + sp] = false; }
   if (S.route.mod === 'wiki') viewSafeRender();
 }

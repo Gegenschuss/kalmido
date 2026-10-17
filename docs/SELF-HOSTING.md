@@ -495,7 +495,8 @@ browser can notice that.
   calendar subscriptions, notifications and digests, server-side search (search runs in the browser over the unlocked content),
   and for knowledge spaces export and import on the server (the browser does both).
 - **Members.** A new member gets the key from an admin (a waiting list shows who is missing it). When a member leaves, the key
-  changes and older content is encrypted again in the background; this protects new content, not what the person already saw.
+  changes and older content is encrypted again in the background as soon as an admin opens it with their encryption unlocked (for a
+  key seen there for the first time, by a button); this protects new content, not what the person already saw.
 - **Operation.** Nothing to do for the operator. The server stores ciphertext (`e2e1:...` in the usual columns) and wrapped keys
   and cannot repair a lost key. Do not hand out a database dump of such content as if it were readable.
 - **Limits stay as documented in *Architecture*:** the server could swap ciphertexts inside a list or space (integrity) and the

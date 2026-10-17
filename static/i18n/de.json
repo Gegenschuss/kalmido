@@ -8403,10 +8403,11 @@
   "Encryption…": "Verschlüsselung…",
   "Encryption of the knowledge pages · {0}": "Verschlüsselung der Wissensseiten · {0}",
   "Switch off the encryption of the knowledge pages?": "Verschlüsselung der Wissensseiten ausschalten?",
-  "Your browser decrypts every page and stores it readable again. Then the search, backlinks on the server and agents work again. Old backups keep the encrypted pages.": "Dein Browser entschlüsselt jede Seite und speichert sie wieder lesbar. Danach funktionieren Suche, Rückverweise auf dem Server und Agenten wieder. Alte Sicherungen behalten die verschlüsselten Seiten.",
   "Switching off the encryption of the knowledge pages needs your account password.": "Zum Ausschalten der Verschlüsselung der Wissensseiten brauchst du dein Kontopasswort.",
   "Encrypted in the browser (knowledge pages)": "Im Browser verschlüsselt (Wissensseiten)",
   "Agents have no access to these knowledge pages.": "Agenten haben keinen Zugriff auf diese Wissensseiten.",
   "{0} released the key for the knowledge pages of {1} to you": "{0} hat dir den Schlüssel für die Wissensseiten von {1} freigegeben",
-  "These pages start with \"e2e1:\" and cannot be encrypted. Change them first: {0}": "Diese Seiten beginnen mit „e2e1:“ und lassen sich nicht verschlüsseln. Bitte zuerst ändern: {0}"
+  "These pages start with \"e2e1:\" and cannot be encrypted. Change them first: {0}": "Diese Seiten beginnen mit „e2e1:“ und lassen sich nicht verschlüsseln. Bitte zuerst ändern: {0}",
+  "{0} name or text began like an encrypted value and got a character in front": ["{0} Name oder Text begann wie ein verschlüsselter Wert und hat ein Zeichen davor bekommen", "{0} Namen oder Texte begannen wie ein verschlüsselter Wert und haben ein Zeichen davor bekommen"],
+  "Your browser decrypts every page and stores it readable again. Then the search and backlinks on the server work again. Old backups keep the encrypted pages.": "Dein Browser entschlüsselt jede Seite und speichert sie wieder lesbar. Danach funktionieren Suche und Rückverweise auf dem Server wieder. Alte Sicherungen behalten die verschlüsselten Seiten."
 }

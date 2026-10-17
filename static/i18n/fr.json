@@ -8403,10 +8403,11 @@
   "Encryption…": "Chiffrement…",
   "Encryption of the knowledge pages · {0}": "Chiffrement des pages de connaissances · {0}",
   "Switch off the encryption of the knowledge pages?": "Désactiver le chiffrement des pages de connaissances ?",
-  "Your browser decrypts every page and stores it readable again. Then the search, backlinks on the server and agents work again. Old backups keep the encrypted pages.": "Votre navigateur déchiffre chaque page et l’enregistre à nouveau lisible. La recherche, les rétroliens sur le serveur et les agents fonctionnent alors à nouveau. Les anciennes sauvegardes gardent les pages chiffrées.",
   "Switching off the encryption of the knowledge pages needs your account password.": "Désactiver le chiffrement des pages de connaissances nécessite le mot de passe de votre compte.",
   "Encrypted in the browser (knowledge pages)": "Chiffré dans le navigateur (pages de connaissances)",
   "Agents have no access to these knowledge pages.": "Les agents n’ont pas accès à ces pages de connaissances.",
   "{0} released the key for the knowledge pages of {1} to you": "{0} vous a partagé la clé des pages de connaissances de {1}",
-  "These pages start with \"e2e1:\" and cannot be encrypted. Change them first: {0}": "Ces pages commencent par « e2e1: » et ne peuvent pas être chiffrées. Modifiez-les d’abord : {0}"
+  "These pages start with \"e2e1:\" and cannot be encrypted. Change them first: {0}": "Ces pages commencent par « e2e1: » et ne peuvent pas être chiffrées. Modifiez-les d’abord : {0}",
+  "{0} name or text began like an encrypted value and got a character in front": ["{0} nom ou texte commençait comme une valeur chiffrée et a reçu un caractère devant", "{0} noms ou textes commençaient comme une valeur chiffrée et ont reçu un caractère devant"],
+  "Your browser decrypts every page and stores it readable again. Then the search and backlinks on the server work again. Old backups keep the encrypted pages.": "Ton navigateur déchiffre chaque page et l'enregistre de nouveau lisible. Ensuite, la recherche et les rétroliens sur le serveur fonctionnent à nouveau. Les anciennes sauvegardes gardent les pages chiffrées."
 }

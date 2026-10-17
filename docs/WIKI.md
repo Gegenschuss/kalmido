@@ -49,7 +49,8 @@ organisation.
   converts back.
 - **Members.** All members of the organisation read the space. A member who has not set up encryption waits on a list with their name
   until they have and an admin releases the key. A new member of the organisation gets the key from an admin; when a member
-  leaves, the key changes and older pages are encrypted again in the background.
+  leaves, the key changes and older pages are encrypted again in the background as soon as an admin opens the knowledge pages
+  with their encryption unlocked (for a key seen there for the first time, by a button).
 - **In use.** Search, backlinks, "mentioned in", page links, templates, and moving a folder (every page is renamed) work in the browser over the decrypted pages. A locked space shows a placeholder until you unlock.
 - **Export and import** of such a space are done by the browser: the menu entry to export it as a ZIP gives plain Markdown files;
   import reads a ZIP and encrypts the pages. The server answers its own export and import with an error there.
