@@ -131,6 +131,11 @@ LE2A_BLOCKERS = {
     "folder_participant": N_("A folder share with the role \"Participant\" reaches this list: change it first."),
     "note_lock": N_("Unlock the notes locked with a password in this list first."),
     "notepad": N_("Empty the notepads of this list first: they cannot be encrypted yet."),
+    "owner_setup": N_("The owner needs to set up encryption first."),  # 2.64.1 review (M2)
+    # 2.64.1 review (M3): lists the server itself writes texts into
+    "family": N_("Lists of the Family module cannot be encrypted yet."),
+    "life": N_("Lists of Home & life cannot be encrypted yet."),
+    "generator": N_("Birthdays from an address book land in this list: choose another list for them first."),
 }
 
 
@@ -344,16 +349,16 @@ def le2a_move(c, tid, cur, f, extra, dst):
             else:
                 c.execute("UPDATE task_field_values SET value=? WHERE task_id=? AND field_id=?", (v, *key))
         if mode == "on":
+            # 2.64.1 review (L2): the waiting note is not encrypted (like finish: it goes)
+            if ids:
+                c.execute(f"UPDATE tasks SET wait_note='' WHERE id IN ({','.join('?' * len(ids))}) AND COALESCE(wait_note, '')<>''", ids)
             le2a_scrub_tasks(c, ids)
     return post
 
 
 def le2a_scrub_tasks(c, ids):
     """Tasks that came into a locked list: what other tables kept of their plain texts goes (part B, liste2eguard)."""
-    try:
-        from .liste2eguard import le2b_scrub_tasks
-    except ImportError:  # until part B is merged (the lead removes this fallback)
-        return
+    from .liste2eguard import le2b_scrub_tasks
     le2b_scrub_tasks(c, ids)
 
 
@@ -487,6 +492,18 @@ def le2a_folder_problem(c, owner, folder, role, uid=None):
     return None
 
 
+def le2a_gen_locked(c, lid):
+    """2.64.1 review (M3): server generators (birthdays from contacts / CardDAV, family deadlines, Home & life) skip a list with
+    the lock -- they would write plain titles into it. True = skip."""
+    return bool(lid) and le2e_mode(c, lid) is not None
+
+
+def le2a_gen_refuse(c, lid):
+    """The same for a list chosen explicitly in a request: 409 instead of a plain text in a locked list."""
+    if le2a_gen_locked(c, lid):
+        raise LE2EDenied("list_e2e_plain")
+
+
 def le2a_owner_keep(c, lid, new, force=False):
     """Transfer of ownership: the new owner needs a key of the current generation (409 otherwise; force: a transfer that must
     happen -- someone leaves the organisation -- puts the heir on the waiting list instead). Returns what the members trigger
@@ -496,7 +513,9 @@ def le2a_owner_keep(c, lid, new, force=False):
         return None
     has = c.execute("SELECT 1 FROM list_keys WHERE list_id=? AND user_id=? AND gen=?", (lid, new, gen)).fetchone()
     if not has and not force:
-        raise Denied(409, tr("The new owner needs the key of this list first."))
+        # 2.64.1 review (L6): named -- a folder / organisation transfer moves many lists at once
+        name = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
+        raise Denied(409, tr("The new owner needs the key of the list “{0}” first.", name[0] if name else ""))
     keys = [dict(r) for r in c.execute("SELECT * FROM list_keys WHERE list_id=? AND user_id=?", (lid, new))]
     rot = c.execute("SELECT e2e_rotate FROM lists WHERE id=?", (lid,)).fetchone()[0]
     return {"keys": keys, "rotate": rot, "wait": not has}
@@ -593,6 +612,9 @@ def le2a_blockers(c, lr, agents):
         out.append({"code": code, "text": tr(LE2A_BLOCKERS[code])})
     if lr["is_inbox"]:
         add("inbox")
+    # 2.64.1 review (M2): a list admin must not lock the owner out of their own list (waiting list, no way back without a key)
+    if not c.execute("SELECT 1 FROM e2e_keys WHERE user_id=?", (lr["owner_id"],)).fetchone():
+        add("owner_setup")
     if agents:
         add("agent")
     if c.execute("SELECT 1 FROM public_links WHERE list_id=?", (lid,)).fetchone():
@@ -609,6 +631,12 @@ def le2a_blockers(c, lr, agents):
         add("note_lock")
     if c.execute("SELECT 1 FROM list_notepads WHERE list_id=? AND (title<>'' OR body<>'') LIMIT 1", (lid,)).fetchone():
         add("notepad")
+    if lr["family"]:  # 2.64.1 review (M3)
+        add("family")
+    if lr["life"]:
+        add("life")
+    if c.execute("SELECT 1 FROM books WHERE occ_list_id=? UNION ALL SELECT 1 FROM contact_srcs WHERE list_id=? LIMIT 1", (lid, lid)).fetchone():
+        add("generator")
     return out
 
 
@@ -753,12 +781,21 @@ def le2a_start(lid):
             return err(tr("Invalid value: {0}", "keys"))
         given[u] = w
     missing = ready - set(given)
+    if lr["owner_id"] not in given:  # 2.64.1 review (M2): the owner always gets the key (the blocker above checks the setup)
+        return jsonify(error=tr("The owner needs to set up encryption first."), code="list_e2e_keys",
+                       missing=sorted(missing | {lr["owner_id"]})), 409
     if missing or uid not in given:
         names = _le2a_names(c, missing)
         return jsonify(error=tr("A key is missing for: {0}", ", ".join(sorted(names.get(u, "?") for u in missing))),
                        code="list_e2e_keys", missing=sorted(missing)), 409
     gen = int(lr["e2e_gen"] or 0) + 1
     ts = iso(now_utc())
+    # 2.64.1 review (M1): the switch itself first and only from the open state -- a second start at the same moment (another
+    # admin) gets 409 and never replaces the keys the first browser already encrypts with
+    if not c.execute("UPDATE lists SET e2e='encrypting', e2e_gen=?, e2e_rotate=0, e2e_by=?, e2e_at=? WHERE id=? AND e2e IS NULL AND "
+                     "COALESCE(e2e_gen, 0)=?", (gen, uid, ts, lid, gen - 1)).rowcount:
+        c.rollback()
+        return err(tr("The list is already encrypted in the browser."), 409)
     c.execute("DELETE FROM list_keys WHERE list_id=?", (lid,))
     c.execute("DELETE FROM list_key_pending WHERE list_id=?", (lid,))
     for u, w in given.items():
@@ -767,7 +804,6 @@ def le2a_start(lid):
     for p in people:
         if p["user_id"] not in given:
             c.execute("INSERT INTO list_key_pending(list_id,user_id,since) VALUES(?,?,?) ON CONFLICT DO NOTHING", (lid, p["user_id"], ts))
-    c.execute("UPDATE lists SET e2e='encrypting', e2e_gen=?, e2e_rotate=0, e2e_by=?, e2e_at=? WHERE id=?", (gen, uid, ts, lid))
     c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
               (lid, uid, "e2e", json.dumps({"on": True, "gen": gen}), ts))
     bump(c)
@@ -923,17 +959,17 @@ def le2a_finish(lid):
     if any(left.values()):
         return jsonify(error=tr("Not all texts are converted yet."), code="list_e2e_left", left=left), 409
     ts = iso(now_utc())
+    # 2.64.1 review (M1): only from the state this call checked (a stop or another finish in between = 409)
+    if not c.execute("UPDATE lists SET e2e=?, e2e_at=? WHERE id=? AND e2e=? AND COALESCE(e2e_gen, 0)=?",
+                     ("on" if lr["e2e"] == "encrypting" else None, ts, lid, lr["e2e"], int(lr["e2e_gen"] or 0))).rowcount:
+        c.rollback()
+        return err(tr("No encryption change is running for this list."), 409)
     if lr["e2e"] == "encrypting":
-        c.execute("UPDATE lists SET e2e='on', e2e_at=? WHERE id=?", (ts, lid))
         c.execute("UPDATE tasks SET wait_note='' WHERE list_id=? AND COALESCE(wait_note, '')<>''", (lid,))  # not encrypted: it goes
-        try:  # H2: copies of the plain texts in other tables (history, time entries, pushes, webhooks, agent events ...)
-            from .liste2eguard import le2b_scrub
-        except ImportError:  # until part B is merged (the lead removes this fallback)
-            le2b_scrub = None
-        if le2b_scrub:
-            le2b_scrub(c, lid)
+        from .liste2eguard import le2b_scrub  # H2: copies of the plain texts in other tables (history, time entries, pushes, webhooks, agent events ...)
+        le2b_scrub(c, lid)
     else:
-        c.execute("UPDATE lists SET e2e=NULL, e2e_rotate=0, e2e_at=? WHERE id=?", (ts, lid))
+        c.execute("UPDATE lists SET e2e_rotate=0 WHERE id=?", (lid,))
         c.execute("DELETE FROM list_keys WHERE list_id=?", (lid,))
         c.execute("DELETE FROM list_key_pending WHERE list_id=?", (lid,))
     c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
@@ -961,7 +997,11 @@ def le2a_stop(lid):
     if e is not None:
         return e
     ts = iso(now_utc())
-    c.execute("UPDATE lists SET e2e='decrypting', e2e_by=?, e2e_at=? WHERE id=?", (uid, ts, lid))
+    # 2.64.1 review (M1): conditional, like start and finish
+    if not c.execute("UPDATE lists SET e2e='decrypting', e2e_by=?, e2e_at=? WHERE id=? AND e2e IN ('on', 'encrypting')",
+                     (uid, ts, lid)).rowcount:
+        c.rollback()
+        return err(tr("The list is not encrypted in the browser."), 409)
     c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
               (lid, uid, "e2e", json.dumps({"on": False}), ts))
     bump(c)
@@ -1000,18 +1040,27 @@ def le2a_keys(lid):
             return err(tr("You have no key for this list yet."), 409)
         rows.append((u, gn, w))
     ts = iso(now_utc())
-    got = set()
+    got, skipped = set(), set()
     for u, gn, w in rows:
+        # 2.64.1 review (L3): an existing copy is replaced only for myself or after the recipient set up new keys (a lost
+        # passphrase); otherwise an admin could slip a copy the recipient cannot open under them
+        old = c.execute("SELECT created_at FROM list_keys WHERE list_id=? AND gen=? AND user_id=?", (lid, gn, u)).fetchone()
+        if old and u != uid:
+            ku = c.execute("SELECT updated_at FROM e2e_keys WHERE user_id=?", (u,)).fetchone()
+            if not ku or (ku[0] or "") <= (old[0] or ""):
+                skipped.add(u)
+                continue
         c.execute("INSERT INTO list_keys(list_id,gen,user_id,wrapped,wrapped_by,wrapper_pub,created_at) VALUES(?,?,?,?,?,?,?) "
                   "ON CONFLICT (list_id,gen,user_id) DO UPDATE SET wrapped=excluded.wrapped, wrapped_by=excluded.wrapped_by, "
                   "wrapper_pub=excluded.wrapper_pub, created_at=excluded.created_at", (lid, gn, u, w, uid, mine["pub"], ts))
         if gn == int(lr["e2e_gen"] or 0):
             c.execute("DELETE FROM list_key_pending WHERE list_id=? AND user_id=?", (lid, u))
         got.add(u)
+    skipped -= got
     by = _le2a_names(c, [uid]).get(uid, "")
     for u in got:
         if u != uid:
             news_add(c, u, "e2e_key", list_id=lid, data={"list_id": lid, "name": lr["name"], "by": uid, "by_name": by}, row="share")
     bump(c)
     c.commit()
-    return jsonify(ok=True, released=sorted(got))
+    return jsonify(ok=True, released=sorted(got), skipped=sorted(skipped))

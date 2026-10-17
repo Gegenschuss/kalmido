@@ -416,8 +416,8 @@ def occ_rule(month, day):
 
 def fam_list(c, uid, kind, create=True):
     """The first list of family kind `kind` the user may write (own first), created when missing (create)."""
-    r = c.execute(f"""SELECT id FROM lists WHERE family=? AND archived=0 AND id IN {wr_sql()}
-                      ORDER BY owner_id!=?, id LIMIT 1""", (kind, uid, uid, uid)).fetchone()
+    r = c.execute(f"""SELECT id FROM lists WHERE family=? AND archived=0 AND e2e IS NULL AND id IN {wr_sql()}
+                      ORDER BY owner_id!=?, id LIMIT 1""", (kind, uid, uid, uid)).fetchone()  # 2.64.1 review (M3): never a list with the lock
     if r:
         return r[0]
     if not create:
@@ -529,6 +529,8 @@ def occ_create(c, uid, b, check=True):
         lid = as_int(lid, "list_id", 1)
         if check:
             need_list(c, lid)
+        from ..collab.liste2e import le2a_gen_refuse
+        le2a_gen_refuse(c, lid)  # 2.64.1 review (M3): a plain birthday title never goes into a list with the lock
         sid = pm_fam_sec_of(c, lid, "birthdays", uid)
     else:
         lid, sid = pm_fam_target(c, uid, "birthdays")  # 2.46.1 (#1615)
@@ -575,6 +577,8 @@ def deadline_create(c, uid, b):
     if lid not in (None, ""):
         lid = as_int(lid, "list_id", 1)
         need_list(c, lid)
+        from ..collab.liste2e import le2a_gen_refuse
+        le2a_gen_refuse(c, lid)  # 2.64.1 review (M3)
         sid = pm_fam_sec_of(c, lid, "deadlines", uid)
     else:
         lid, sid = pm_fam_target(c, uid, "deadlines")  # 2.46.1 (#1615)
@@ -621,7 +625,7 @@ def shop_key(title):
 
 def shop_remember(c, lid, title, sid):
     k = shop_key(title)
-    if not k:
+    if not k or title.startswith("e2e1:"):  # 2.64.1 B (#1817): nothing remembered of a list with the lock
         return
     if sid:
         c.execute("INSERT INTO shop_memory(list_id,item,section_id,at) VALUES(?,?,?,?) ON CONFLICT(list_id,item) "
@@ -730,6 +734,9 @@ def to_shopping(c, uid, items, lid=None, source=None):
             raise BadInput(tr("This is not a shopping list"))
     else:
         lid = fam_list(c, uid, "shopping")
+    from ..collab.liste2eguard import le2b_list_locked, le2b_off
+    if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): the server cannot add plain items to a list with the lock (the app does)
+        raise BadInput(le2b_off())
     have = {shop_key(r[0]) for r in c.execute("SELECT title FROM tasks WHERE list_id=? AND status=0 AND deleted_at IS NULL AND parent_id IS NULL", (lid,))}
     srt = c.execute("SELECT COALESCE(MAX(sort),0) FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
     ts = iso(now_utc())

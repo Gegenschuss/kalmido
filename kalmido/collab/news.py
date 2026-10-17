@@ -442,6 +442,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                     "read": read, "to_me": tome})
         if kind == "comment" and r["actor_id"] in agents:
             out[-1].update(agent=True, tasks=[{"id": r["task_id"], "title": r["t_title"]}])
+    from ..collab.liste2eguard import le2b_news
+    le2b_news(c, out)  # 2.64.1 B (#1817): items of lists with the lock: no title, no excerpt, enc + list_id (the app resolves)
     return out, user_names(c, uids)
 
 

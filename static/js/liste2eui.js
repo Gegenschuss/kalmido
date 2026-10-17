@@ -38,7 +38,7 @@ function le2u_who(lid) {  // who can release the key: the owner (a list admin ca
 }
 function le2u_ttlHtml(t) {
   if (le2u_waiting(t.list_id)) return `<span class="le2uph wait">${ic('lock', 's')}<span>${esc(tr('Key pending – {0} has to release it', le2u_who(t.list_id)))}</span></span>`;
-  return `<span class="le2uph" role="button" tabindex="-1" data-le2u="unlock" data-lid="${t.list_id}" aria-label="${esc(tr('Encrypted – unlock'))}">${ic('lock', 's')}<span>${esc(tr('Encrypted – unlock'))}</span></span>`;
+  return `<span class="le2uph" role="button" tabindex="0" data-le2u="unlock" data-lid="${t.list_id}" aria-label="${esc(tr('Encrypted – unlock'))}">${ic('lock', 's')}<span>${esc(tr('Encrypted – unlock'))}</span></span>`;
 }
 function le2u_detailHtml(t) {
   if (le2u_waiting(t.list_id)) return `<div class="dsec le2ud"><div class="lnph">${ic('lock')}<div><b>${esc(tr('Encrypted in the browser'))}</b><span class="muted">${esc(tr('Key pending – {0} has to release it', le2u_who(t.list_id)))}</span></div></div></div>`;
@@ -51,6 +51,13 @@ async function le2u_unlock(lid) {
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-le2u="unlock"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();  // the row would open the detail: here it unlocks first
+  le2u_unlock(+b.dataset.lid);
+}, true);
+// 2.64.1 review (L5): the row's placeholder is reachable with Tab; Enter / Space on it unlocks (the row's own keys stay as they are)
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const b = e.target.closest?.('.le2uph[data-le2u="unlock"]'); if (!b || e.target !== b) return;
+  e.preventDefault(); e.stopPropagation();
   le2u_unlock(+b.dataset.lid);
 }, true);
 
@@ -135,7 +142,9 @@ async function le2u_release(lid) {
 const le2u_listRowHtml = l => !l?.id || l.is_inbox || S.me?.kind === 'agent' || !globalThis.crypto?.subtle ? ''
   : `<h4 id="l-e2e-h">${ic('lock', 's')} ${tr('Encrypted in the browser')}</h4><div class="le2ul" id="l-e2e" data-lid="${l.id}" aria-labelledby="l-e2e-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 const LE2U_WAY = {agent: N_('Remove the agent first'), public_link: N_('Delete the public link first'), org_open: N_('Take back “Everyone in the organisation” first'),
-  participant: N_('Change the participant role first'), folder_open: N_('Take back “Everyone in the organisation” of the folder first')};
+  participant: N_('Change the participant role first'),
+  // 2.64.1 review (L4): the server's code is folder_participant; owner_setup (M2)
+  folder_participant: N_('Change the participant role of the folder first'), owner_setup: N_('The owner sets it up in Settings > Account')};
 function le2u_blockersHtml(bl) {
   if (!bl?.length) return '';
   return `<ul class="le2ubl" aria-label="${esc(tr('Not possible yet'))}">${bl.map(b => `<li>${ic('alert', 's')}<span>${esc(b.text || '')}${LE2U_WAY[b.code] ? ` <b>${esc(tr(LE2U_WAY[b.code]))}</b>` : ''}</span>${['agent', 'public_link', 'participant'].includes(b.code) ? `<button type="button" class="linkbtn" data-le2ul="share" data-code="${esc(b.code)}">${esc(tr('Share…'))}</button>` : ''}</li>`).join('')}</ul>`;

@@ -371,6 +371,14 @@ def ox_build(c, oid, out, by=None):
             man.client_enc["task_notes"] = man.counts["tasks/encrypted_notes.json"]
         if "tasks/locked_notes.json" in man.counts:
             man.client_enc["locked_notes"] = man.counts["tasks/locked_notes.json"]
+        if "e2e" in _table_cols(c, "lists"):  # 2.64.1 B (#1817): lists with the lock: texts are browser ciphertexts ("e2e1:...")
+            lk = [r[0] for r in c.execute(f"SELECT id FROM lists WHERE e2e IS NOT NULL AND id IN ({LSQ})", (oid,))]
+            if lk:
+                q = ",".join("?" * len(lk))
+                man.client_enc["locked_lists"] = len(lk)
+                man.client_enc["locked_list_tasks"] = c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN ({q})", lk).fetchone()[0]
+                man.client_enc["locked_list_note"] = ("Texts of lists encrypted in the browser (values starting with e2e1:) can only be "
+                                                      "read in Kalmido with a member's own passphrase; no offline tool opens them.")
         manifest = {
             "format": "kalmido-org-export", "format_version": OX_FORMAT, "kalmido_version": APP_VERSION,
             "org": {"id": int(oid), "name": org["name"]}, "created_at": iso(now_utc()), "created_by": by,

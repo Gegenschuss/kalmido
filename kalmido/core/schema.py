@@ -1261,7 +1261,7 @@ CREATE TABLE IF NOT EXISTS list_key_pending (
 # schema version is not newer than this one (older ones are migrated by init_db).
 SCHEMA_VERSION = 2  # package B only added tables + a column: older versions can still restore its backups
 # triggers / views a restored database may contain (anything else is refused: it would run inside this app)
-SCHEMA_TRIGGERS = {"time_task_list", "time_task_title", "list_e2e_members"} | {  # 2.64.1 (#1817): + list_e2e_members
+SCHEMA_TRIGGERS = {"time_task_list", "time_task_title", "list_e2e_members", "time_title_e2e"} | {  # 2.64.1 (#1817): + list_e2e_members, time_title_e2e
       # 2.33.0 (#1080): FTS5 triggers of SQLite backups 2.33-2.36 (Postgres 2.37: no triggers, see msgsearch.py)
     f"msg_fts_{t}_{w}" for t in ("comments", "tchat_msgs", "agent_chat") for w in ("ai", "au", "ad")}
 # time_entries.task_title follows a rename only for entries of users who still see the task (a former
@@ -1271,7 +1271,12 @@ BEGIN UPDATE time_entries SET task_title=NEW.title WHERE task_id=NEW.id AND user
   (SELECT owner_id FROM lists WHERE id=NEW.list_id UNION SELECT user_id FROM list_members WHERE list_id=NEW.list_id
    AND (role!='participant' OR user_id IS NOT DISTINCT FROM NEW.assignee_id)); RETURN NULL; END $fn$;
 CREATE OR REPLACE TRIGGER time_task_title AFTER UPDATE OF title ON tasks FOR EACH ROW
-  WHEN (NEW.title IS DISTINCT FROM OLD.title) EXECUTE FUNCTION kalmido_time_task_title()"""  # 1.10.0: participants only while it is theirs
+  WHEN (NEW.title IS DISTINCT FROM OLD.title) EXECUTE FUNCTION kalmido_time_task_title();
+-- 2.64.1 B (#1817): a ciphertext of a list with the lock is never kept as a time entry snapshot (empty; the app shows the task)
+CREATE OR REPLACE FUNCTION kalmido_time_title_e2e() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN IF NEW.task_title LIKE 'e2e1:%' THEN NEW.task_title := ''; END IF; RETURN NEW; END $fn$;
+CREATE OR REPLACE TRIGGER time_title_e2e BEFORE INSERT OR UPDATE OF task_title ON time_entries FOR EACH ROW
+  EXECUTE FUNCTION kalmido_time_title_e2e()"""  # 1.10.0: participants only while it is theirs
 # 2.64.1 (#1817): members of a list with the lock (lists.e2e not NULL). Every way a membership changes (share dialog, group
 # and folder shares, organisation exit, account deletion, cascades) passes here, also those without a browser:
 # - a new member without a key of the current generation lands on the waiting list (list_key_pending);
@@ -1285,9 +1290,12 @@ BEGIN
   IF TG_OP = 'DELETE' THEN
     SELECT e2e, e2e_gen INTO m, g FROM lists WHERE id=OLD.list_id;
     IF m IS NOT NULL THEN
+      -- rotation pending only when the person really held a key (not for someone who only waited on the list)
+      IF EXISTS (SELECT 1 FROM list_keys WHERE list_id=OLD.list_id AND user_id=OLD.user_id) THEN
+        UPDATE lists SET e2e_rotate=e2e_gen WHERE id=OLD.list_id;
+      END IF;
       DELETE FROM list_keys WHERE list_id=OLD.list_id AND user_id=OLD.user_id;
       DELETE FROM list_key_pending WHERE list_id=OLD.list_id AND user_id=OLD.user_id;
-      UPDATE lists SET e2e_rotate=e2e_gen WHERE id=OLD.list_id;
     END IF;
     RETURN OLD;
   END IF;

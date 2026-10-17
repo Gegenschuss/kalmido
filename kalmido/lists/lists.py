@@ -412,6 +412,9 @@ def list_update(lid):
     vals = {k: clean_list_value(k, b[k], member=role != "owner") for k in LIST_FIELDS if k in b}  # BadInput: 400
     if b.get("kind") == "checklist" and "checklist" not in vals:  # deprecated alias: a plain list with the option on
         vals["checklist"] = 1
+    if vals.get("family") or vals.get("life"):  # 2.64.1 review (M3): their generators write plain texts -> not with the lock
+        from ..collab.liste2e import le2a_gen_refuse
+        le2a_gen_refuse(c, lid)
     if role == "owner":
         if vals.get("family") or vals.get("life"):  # 2.28.0 (#935): "Used for" / Home & life make the list private (409 with an organisation agent in it)
             from ..accounts.orgs import ws_private_for
@@ -655,6 +658,10 @@ def member_set(lid):
         return err(tr("unknown user"), 404)
     if uid == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The owner's role cannot be changed"), 403)
+    from ..collab.liste2eguard import le2b_agent_problem
+    p = le2b_agent_problem(c, lid, uid)  # 2.64.1 review: the lock's own code first (ws_check_member below says the same without it)
+    if p:
+        return jsonify(error=p, code="list_e2e_member"), 409
     from ..accounts.orgs import ws_check_member
     ws_check_member(c, lid, uid)  # 2.28.0 (#935): an organisation's list only inside it, agents only in their workspace (409)
     if not (b.get("email") and not b.get("user_id")):  # 2.30.0 (#919): no agent bridge between lists with different people
@@ -1018,6 +1025,9 @@ def list_agent_set(lid):
     new = b.get("agent_id")
     if new is not None and (isinstance(new, bool) or not isinstance(new, int) or new not in agent_ids(c)):
         return err(tr("Invalid value: {0}", "agent_id"))
+    from ..collab.liste2eguard import le2b_agent_problem
+    if new is not None and le2b_agent_problem(c, lid, new):  # 2.64.1 B (#1817): no agent in a list with the lock
+        return err(le2b_agent_problem(c, lid, new), 409)
     lr = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
     if lr["owner_id"] in agent_ids(c):
         return err(tr("The list belongs to an agent"), 409)

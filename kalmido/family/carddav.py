@@ -198,6 +198,9 @@ def contacts_sync(c, sid):
                 if not lid:
                     raise CalError("no_list")
                 c.execute("UPDATE contact_srcs SET list_id=? WHERE id=?", (lid, sid))
+            from ..collab.liste2e import le2a_gen_locked
+            if le2a_gen_locked(c, lid):  # 2.64.1 review (M3): no plain birthday titles in a list with the lock
+                raise CalError("no_list")
             lg = lang(c, s["user_id"])
             n = 0
             for uid_, kind, name, mo, dy, y, book in occs[:CONTACT_CARDS_MAX]:
@@ -293,6 +296,8 @@ def family_contacts_add():
     if lid not in (None, ""):
         lid = as_int(lid, "list_id", 1)
         need_list(c, lid)
+        from ..collab.liste2e import le2a_gen_refuse
+        le2a_gen_refuse(c, lid)  # 2.64.1 review (M3)
     else:
         lid = pm_fam_target(c, uid, "birthdays")[0]  # 2.46.1 (#1615): an old list Birthdays, else the list "Family"
     lead = as_int(b.get("lead_days", 7), "lead_days", 0, FAM_LEAD_MAX)
@@ -327,6 +332,8 @@ def family_contacts_edit(sid):
         lid = as_int(b["list_id"], "list_id", 1) if b["list_id"] not in (None, "") else None
         if lid:
             need_list(c, lid)
+            from ..collab.liste2e import le2a_gen_refuse
+            le2a_gen_refuse(c, lid)  # 2.64.1 review (M3)
         upd["list_id"] = lid
     if "lead_days" in b:
         upd["lead"] = as_int(b["lead_days"], "lead_days", 0, FAM_LEAD_MAX)

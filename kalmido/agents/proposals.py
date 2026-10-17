@@ -463,6 +463,9 @@ def proposal_request():
                  (uid,)).fetchone()[0] >= PROP_OPEN_MAX:
         return err(tr("You have {0} open proposal requests: apply or discard some first", PROP_OPEN_MAX), 429)
     inp, title, tid, lid = prop_input(c, uid, kind, b)
+    from ..collab.liste2eguard import le2b_list_locked, le2b_off, le2b_task_locked
+    if le2b_list_locked(c, lid) or le2b_task_locked(c, tid):  # 2.64.1 B (#1817): agents never get texts of a list with the lock
+        return err(le2b_off(), 409)
     from ..agents.core import agent_usable
     if lid and prop_mode(a) != "all" and list_role(c, lid, aid) and not agent_usable(c, aid, uid, lid):  # 2.26.0 (#928)
         return err(tr("The list owner has not opened this agent to members"), 403)
@@ -560,6 +563,9 @@ def prop_sel(b):
 def prop_insert(c, aid, lid, ts, title, notes="", section_id=None, parent_id=None, due=None, start=None, priority=0,
                 assignee_id=None, duration=None, sort=0):
     """A task created from a proposal: owned / created by the person applying it; history "from a proposal by <agent>"."""
+    from ..collab.liste2eguard import le2b_list_locked, le2b_off
+    if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): a proposal never writes plain texts into a list with the lock
+        raise Denied(409, le2b_off())
     uid = me()
     tid = insert_id(c, """INSERT INTO tasks(list_id,section_id,parent_id,title,content,priority,due,start,duration,sort,created_at,updated_at,
                        created_by,assignee_id,assigned_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",

@@ -376,6 +376,8 @@ def _req_filters_sql():
     """The request's own filters as plain WHERE conditions on l (health lists, token allowlist) -- no set operations, so
     the precedence is the same in every SQL dialect."""
     out = " AND COALESCE(l.life, '')!='health'" if health_hidden() else ""
+    if has_request_context() and getattr(g, "user", None) is not None and "kind" in g.user.keys() and g.user["kind"] == "agent":
+        out += " AND l.e2e IS NULL"  # 2.64.1 B (#1817): an agent never sees a list with the lock (it is never a member either)
     tl = token_lists()
     if tl is not None:
         out += f" AND l.id IN ({','.join(str(int(x)) for x in sorted(tl)) or '0'})"

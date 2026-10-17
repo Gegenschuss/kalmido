@@ -59,6 +59,9 @@ def cln_request(c, uid, b):
         raise Denied(404)
     if (lst["life"] or "") == "health":
         return err(tr("Health lists never reach an agent"), 403)
+    if lst["e2e"]:  # 2.64.1 B (#1817): no tidying by an agent in a list with the lock
+        from ..collab.liste2eguard import le2b_off
+        return err(le2b_off(), 409)
     if list_role(c, lid, uid) not in WRITE_ROLES:
         raise Denied(403)
     aid = tidy_agent_of(c, lid)

@@ -445,5 +445,75 @@ r = A.delete(B + f"/api/lists/{L2}")
 check(r.ok and not dbx("SELECT 1 FROM tasks WHERE id=?", (T3,)) and not dbx("SELECT 1 FROM list_keys WHERE list_id=?", (L2,)),
       "delete: tasks and keys go with the list (no unreadable ciphertexts in the trash) " + r.text[:200])
 
+# ================================================================== 2.64.1 review round 1 (part E)
+LK = A.post(B + "/api/lists", json={"name": "Review lock", "kind": "project"}).json()["id"]
+assert A.patch(B + f"/api/lists/{LO}", json={"kind": "project"}).ok  # dependencies across lists need two projects
+assert A.put(B + f"/api/lists/{LK}/members", json={"user_id": BOB, "role": "edit"}).ok
+TK = A.post(B + "/api/tasks", json={"title": "Review task", "list_id": LK}).json()["id"]
+TW = A.post(B + "/api/tasks", json={"title": "Moving waiter", "list_id": LO}).json()["id"]
+TD = A.post(B + "/api/tasks", json={"title": "Open waiting", "list_id": LO}).json()["id"]
+# 2.64.1 review (M3): lists the server writes texts into cannot be locked
+LF = A.post(B + "/api/lists", json={"name": "Groceries"}).json()["id"]
+assert A.patch(B + f"/api/lists/{LF}", json={"family": "shopping"}).ok
+check("family" in [b["code"] for b in A.get(B + f"/api/lists/{LF}/e2e").json()["blockers"]], "review M3: blocker family")
+LL = A.post(B + "/api/lists", json={"name": "House"}).json()["id"]
+assert A.patch(B + f"/api/lists/{LL}", json={"life": "home"}).ok
+check("life" in [b["code"] for b in A.get(B + f"/api/lists/{LL}/e2e").json()["blockers"]], "review M3: blocker life")
+# 2.64.1 review (M2): a list admin cannot lock an owner without encryption out of their own list
+LD = Da.post(B + "/api/lists", json={"name": "Dave's list"}).json()["id"]
+assert Da.put(B + f"/api/lists/{LD}/members", json={"user_id": 1, "role": "admin"}).ok
+j = A.get(B + f"/api/lists/{LD}/e2e").json()
+check(j["can_manage"] and "owner_setup" in [b["code"] for b in j["blockers"]], "review M2: blocker owner_setup " + json.dumps(j["blockers"]))
+r = A.post(B + f"/api/lists/{LD}/e2e/start", json={"keys": [{"user_id": 1, "wrapped": wrapped()}]})
+check(r.status_code == 409 and code(r) == "list_e2e_blocked" and not dbx("SELECT 1 FROM list_keys WHERE list_id=?", (LD,)),
+      "review M2: start refused, no keys stored " + r.text[:200])
+# 2.64.1 review (M1): a second start does not replace the keys of the first
+r = A.post(B + f"/api/lists/{LK}/e2e/start", json={"keys": [{"user_id": 1, "wrapped": wrapped()}, {"user_id": BOB, "wrapped": wrapped()}]})
+check(r.ok and r.json()["mode"] == "encrypting", "review M1: first start " + r.text[:200])
+w0 = dbx("SELECT user_id, wrapped FROM list_keys WHERE list_id=? ORDER BY user_id", (LK,))
+r = A.post(B + f"/api/lists/{LK}/e2e/start", json={"keys": [{"user_id": 1, "wrapped": wrapped()}, {"user_id": BOB, "wrapped": wrapped()}]})
+check(r.status_code == 409 and dbx("SELECT user_id, wrapped FROM list_keys WHERE list_id=? ORDER BY user_id", (LK,)) == w0
+      and dbx("SELECT e2e_gen FROM lists WHERE id=?", (LK,))[0][0] == 1, "review M1: second start 409, the first keys stay")
+assert A.post(B + f"/api/lists/{LK}/e2e/bulk", json=enc_all(A.get(B + f"/api/lists/{LK}/e2e/todo").json())).ok
+check(A.post(B + f"/api/lists/{LK}/e2e/finish").ok and A.post(B + f"/api/lists/{LK}/e2e/finish").status_code == 409, "review M1: finish once")
+# 2.64.1 review (M3): explicit targets and the purpose of a locked list
+r = A.patch(B + f"/api/lists/{LK}", json={"life": "home"})  # (a project is never a family list anyway)
+check(r.status_code == 409 and code(r) == "list_e2e_plain", "review M3: a locked list does not become a Home & life list " + r.text[:200])
+r = A.post(B + "/api/family/occasions", json={"name": "Grandma", "date": "--05-04", "list_id": LK})
+check(r.status_code == 409 and code(r) == "list_e2e_plain", "review M3: no birthday into a locked list " + r.text[:200])
+# 2.64.1 review (H1): import with a locked list as target
+r = A.post(B + "/api/import/todoist", files={"file": ("p.csv", b"TYPE,CONTENT,PRIORITY\ntask,Imported secret,1\n", "text/csv")}, data={"target": str(LK)})
+check(r.status_code == 409 and code(r) == "list_e2e_plain", "review H1: import into a locked list 409 " + r.text[:200])
+check(dbx("SELECT COUNT(*) FROM tasks WHERE list_id=?", (LK,))[0][0] == 1, "review H1/M3: nothing written into the locked list")
+# 2.64.1 review (L1): an open task waiting on a locked one: no (cut) ciphertext in its history
+r = A.post(B + "/api/deps", json={"task_id": TD, "blocker_id": TK})
+acts = dbx("SELECT data FROM activity WHERE task_id=?", (TD,))
+check(r.ok and acts and "e2e1:" not in json.dumps([str(a[0]) for a in acts]), "review L1: no ciphertext in the history " + r.text[:200])
+# 2.64.1 review (L2): the waiting note goes when a task moves into a locked list
+dbx("UPDATE tasks SET wait_note='Waiting for the plumber' WHERE id=?", (TW,))
+r = A.patch(B + f"/api/tasks/{TW}", json={"list_id": LK, "title": ct(1)})
+check(r.ok and dbx("SELECT wait_note FROM tasks WHERE id=?", (TW,))[0][0] == "", "review L2: waiting note gone " + r.text[:200])
+# 2.64.1 review (L3): someone else's copy stays unless they set up new keys
+wb = dbx("SELECT wrapped FROM list_keys WHERE list_id=? AND user_id=? AND gen=1", (LK, BOB))[0][0]
+r = A.post(B + f"/api/lists/{LK}/e2e/keys", json={"keys": [{"user_id": BOB, "gen": 1, "wrapped": wrapped()}]})
+check(r.ok and r.json().get("skipped") == [BOB] and r.json().get("released") == []
+      and dbx("SELECT wrapped FROM list_keys WHERE list_id=? AND user_id=? AND gen=1", (LK, BOB))[0][0] == wb, "review L3: copy kept, skipped " + r.text[:200])
+dbx("UPDATE e2e_keys SET updated_at='2099-01-01T00:00:00+00:00' WHERE user_id=?", (BOB,))
+r = A.post(B + f"/api/lists/{LK}/e2e/keys", json={"keys": [{"user_id": BOB, "gen": 1, "wrapped": wrapped()}]})
+check(r.ok and r.json().get("released") == [BOB] and dbx("SELECT wrapped FROM list_keys WHERE list_id=? AND user_id=? AND gen=1", (LK, BOB))[0][0] != wb,
+      "review L3: replaced after a new set-up " + r.text[:200])
+check(A.post(B + f"/api/lists/{LK}/e2e/keys", json={"keys": [{"user_id": 1, "gen": 1, "wrapped": wrapped()}]}).json().get("released") == [1],
+      "review L3: my own copy may always be replaced")
+# 2.64.1 review: someone on the waiting list (no key) leaves -> no rotation mark (trigger d4ca177)
+r = A.put(B + f"/api/lists/{LK}/members", json={"user_id": DAVE, "role": "edit"})
+check(r.ok and r.json().get("e2e_pending") == [DAVE], "review: dave waits " + r.text[:200])
+assert A.delete(B + f"/api/lists/{LK}/members/{DAVE}").ok
+check(dbx("SELECT e2e_rotate FROM lists WHERE id=?", (LK,))[0][0] == 0 and not dbx("SELECT 1 FROM list_key_pending WHERE list_id=? AND user_id=?", (LK, DAVE)),
+      "review: a waiting person leaves, rotation stays 0")
+# 2.64.1 review (L6): the refusal of a transfer names the list
+assert A.put(B + f"/api/lists/{LK}/members", json={"user_id": FRANK, "role": "edit"}).ok
+r = A.post(B + f"/api/lists/{LK}/owner", json={"user_id": FRANK})
+check(r.status_code == 409 and "Review lock" in r.text, "review L6: the list's name in the refusal " + r.text[:200])
+
 print(f"p264a_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

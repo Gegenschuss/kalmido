@@ -49,6 +49,8 @@ def log_act(c, tid, kind, data=None, uid=None):
         wh_note(c, tid, kind)  # webhooks: collected per request, queued after a successful response
         from ..notify.taskbell import tbl_note
         tbl_note(c, tid, kind, uid)  # 2.53.0 C (#1424): "Urgent" on the task: every change is a push
+    from ..collab.liste2eguard import le2b_act_data
+    data = le2b_act_data(c, tid, kind, data)  # 2.64.1 B (#1817): never a text of a list with the lock in the history
     ts, js = iso_ms(now_utc()), json.dumps(data or {}, ensure_ascii=False)
     if kind in ACT_MERGE:
         last = c.execute("SELECT id, user_id, kind, data, created_at FROM activity WHERE task_id=? ORDER BY id DESC LIMIT 1",
@@ -74,7 +76,9 @@ def log_changes(c, tid, old, act=None):
     if ch("content") and act == "md_subtasks" and (old["content"] or "").strip():
         # 2.40.0 (#1409): "Turn the open checklist items into subtasks" keeps the text before in the history (own entry, never
         # merged), the app offers "Restore" there -- after a reload and on every device
-        log_act(c, tid, "md_subtasks", {"prev": (old["content"] or "")[:20000]})
+        # 2.64.1 B (#1817): a ciphertext is kept whole (cut it would be lost)
+        prev = old["content"] or ""
+        log_act(c, tid, "md_subtasks", {"prev": prev if prev.startswith("e2e1:") else prev[:20000]})
     elif ch("content"):
         log_act(c, tid, "content")
     if ch("due") or ch("due_time") or ch("start"):
