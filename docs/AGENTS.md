@@ -1489,6 +1489,8 @@ list's tasks and comments come with empty texts and `encrypted: true`; every wri
 such tasks alone and do not ask anyone to paste their texts. Since 2.64.2 the files of such a list are encrypted with the
 list key as well: `GET /api/v1/tasks/{id}/attachments` lists them with `"encrypted": true` and an empty name, and their
 download and `/text` answer `404`; a task with such files cannot be moved to another list (`409`, `list_e2e_files`).
+The list's team chat is encrypted too: messages come with an empty `body` and `"encrypted": true`, and posting there
+answers `403`.
 
 **Reading a file as text (2.34.0).** `GET /api/v1/attachments/{id}/text` (MCP `read_attachment`, scope
 `attachments:read`, same rights as the file itself, else `404`) answers `{id, task_id, comment_id, name, mime, size, url,
