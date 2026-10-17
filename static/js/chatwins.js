@@ -281,6 +281,7 @@ function cw_act(k) {
     else { S.cw.home = cw_tcGet(); cw_idsOff($('#view .tcroom')); }
     const st = cw_stOf(k); cw_tcPut(st); delete S.cw.st[k]; S.cw.lt = k; cw_idsOn(cw_sec(k));
     if (S.tc.room?.kind === 'dm') e2eRoomDecrypt(S.tc.rid).then(() => { if (S.cw.lt === k) tcPatch(); });  // 2.42.0 (#909): encrypted DMs
+    else if (le2eChanOn(S.tc.room)) le2eChanDecrypt(S.tc.rid).then(() => { if (S.cw.lt === k) tcPatch(); });  // 2.64.2 (#1817)
   }
 }
 for (const ev of ['pointerdown', 'focusin']) document.addEventListener(ev, e => {

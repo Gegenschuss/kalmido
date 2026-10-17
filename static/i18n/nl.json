@@ -8339,5 +8339,18 @@
   "{0} texts of this list cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.": "{0} teksten van deze lijst kunnen niet worden ontsleuteld met jouw sleutels. Als lege teksten overnemen? Ze kunnen niet worden hersteld.",
   "Take over as empty": "Als leeg overnemen",
   "{0} texts of this list cannot be decrypted. The list stays locked until they are taken over as empty.": "{0} teksten van deze lijst kunnen niet worden ontsleuteld. De lijst blijft vergrendeld tot ze als leeg zijn overgenomen.",
-  "iPhone and iPad forget it after about a week without use; then the passphrase is asked again.": "iPhone en iPad vergeten dit na ongeveer een week zonder gebruik; dan wordt de wachtwoordzin opnieuw gevraagd."
+  "iPhone and iPad forget it after about a week without use; then the passphrase is asked again.": "iPhone en iPad vergeten dit na ongeveer een week zonder gebruik; dan wordt de wachtwoordzin opnieuw gevraagd.",
+  "{0} commented in {1}": "{0} heeft gereageerd in {1}",
+  "{0} mentioned you in {1}": "{0} heeft je genoemd in {1}",
+  "{0} replied to your message in {1}": "{0} heeft in {1} op je bericht gereageerd",
+  "A member has left this list. The key is being changed; until everything is encrypted again, former members can still decrypt older contents with their old key.": "Een lid heeft deze lijst verlaten. De sleutel wordt gewisseld; tot alles opnieuw versleuteld is, kunnen oud-leden oudere inhoud nog met hun oude sleutel ontsleutelen.",
+  "Attachments and the messages of the list chat are encrypted with it.": "Bijlagen en de berichten in de lijstchat worden ook versleuteld.",
+  "Change the key now": "Sleutel nu wisselen",
+  "Compare each number with the person (in person or by phone). If it is the same on both devices, nobody sits in between.": "Vergelijk elk nummer met de persoon (persoonlijk of telefonisch). Is het op beide apparaten gelijk, dan zit er niemand tussen.",
+  "In the list dialog the owner or a list admin switches on “Encrypted in the browser”: titles, descriptions, comments, notes, section names, free-text fields, links and code snippets are then only readable for members with a key. Attachments and the list chat are encrypted with it. Agents, tasks by e-mail, public links and texts in calendars and notifications are off in such a list. When a member leaves, the key changes and older contents are encrypted again in the background. Your personal recovery code is enough.": "In het lijstvenster zet de eigenaar of een lijstbeheerder „Versleuteld in de browser” aan: titels, beschrijvingen, opmerkingen, notities, sectienamen, vrije-tekstvelden, links en codefragmenten zijn dan alleen leesbaar voor leden met een sleutel. Bijlagen en de lijstchat worden ook versleuteld. Agenten, taken per e-mail, openbare links en teksten in agenda's en meldingen staan in zo'n lijst uit. Als een lid vertrekt, wisselt de sleutel en wordt oudere inhoud op de achtergrond opnieuw versleuteld. Je persoonlijke herstelcode is genoeg.",
+  "Nobody else in this list has a key yet.": "Verder heeft niemand in deze lijst nog een sleutel.",
+  "Safety numbers": "Veiligheidsnummers",
+  "Titles, descriptions, comments, notes, attachments and the list chat are encrypted in the browser.": "Titels, beschrijvingen, opmerkingen, notities, bijlagen en de lijstchat zijn versleuteld in de browser.",
+  "Key changed: {0}": "Sleutel gewijzigd: {0}",
+  "The key of {0} has changed.": "De sleutel van {0} is gewijzigd."
 }

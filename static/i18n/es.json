@@ -8339,5 +8339,18 @@
   "{0} texts of this list cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.": "{0} textos de esta lista no se pueden descifrar con tus claves. ¿Tomarlos como textos vacíos? No se podrán recuperar.",
   "Take over as empty": "Tomar como vacíos",
   "{0} texts of this list cannot be decrypted. The list stays locked until they are taken over as empty.": "{0} textos de esta lista no se pueden descifrar. La lista sigue bloqueada hasta que se tomen como vacíos.",
-  "iPhone and iPad forget it after about a week without use; then the passphrase is asked again.": "El iPhone y el iPad lo olvidan tras una semana sin uso; entonces se vuelve a pedir la frase de contraseña."
+  "iPhone and iPad forget it after about a week without use; then the passphrase is asked again.": "El iPhone y el iPad lo olvidan tras una semana sin uso; entonces se vuelve a pedir la frase de contraseña.",
+  "{0} commented in {1}": "{0} comentó en {1}",
+  "{0} mentioned you in {1}": "{0} te mencionó en {1}",
+  "{0} replied to your message in {1}": "{0} respondió a tu mensaje en {1}",
+  "A member has left this list. The key is being changed; until everything is encrypted again, former members can still decrypt older contents with their old key.": "Un miembro ha dejado esta lista. La clave se está cambiando; hasta que todo esté cifrado de nuevo, los antiguos miembros aún pueden descifrar contenidos anteriores con su clave antigua.",
+  "Attachments and the messages of the list chat are encrypted with it.": "Los adjuntos y los mensajes del chat de la lista también se cifran.",
+  "Change the key now": "Cambiar la clave ahora",
+  "Compare each number with the person (in person or by phone). If it is the same on both devices, nobody sits in between.": "Compara cada número con la persona (en persona o por teléfono). Si es igual en ambos dispositivos, nadie está en medio.",
+  "In the list dialog the owner or a list admin switches on “Encrypted in the browser”: titles, descriptions, comments, notes, section names, free-text fields, links and code snippets are then only readable for members with a key. Attachments and the list chat are encrypted with it. Agents, tasks by e-mail, public links and texts in calendars and notifications are off in such a list. When a member leaves, the key changes and older contents are encrypted again in the background. Your personal recovery code is enough.": "En el diálogo de la lista, el propietario o un administrador de la lista activa «Cifrado en el navegador»: títulos, descripciones, comentarios, notas, nombres de secciones, campos de texto libre, enlaces y fragmentos de código solo son legibles para miembros con clave. Los adjuntos y el chat de la lista también se cifran. Agentes, tareas por correo, enlaces públicos y textos en calendarios y notificaciones están desactivados en una lista así. Cuando un miembro se va, la clave cambia y los contenidos anteriores se vuelven a cifrar en segundo plano. Tu código de recuperación personal basta.",
+  "Nobody else in this list has a key yet.": "Nadie más en esta lista tiene clave todavía.",
+  "Safety numbers": "Números de seguridad",
+  "Titles, descriptions, comments, notes, attachments and the list chat are encrypted in the browser.": "Títulos, descripciones, comentarios, notas, adjuntos y el chat de la lista están cifrados en el navegador.",
+  "Key changed: {0}": "Clave cambiada: {0}",
+  "The key of {0} has changed.": "La clave de {0} ha cambiado."
 }

@@ -6,14 +6,14 @@
 // Wording (decision E10): "encrypted in the browser"; "end-to-end" only in the explanation, together with its limit.
 // The display reads the lock state from the list in the state (l.e2e, e2e_gen, e2e_rotate, e2e_pending, e2e_mine); every
 // action goes through the data layer (le2eStart / le2eStop / le2eResume / le2eRelease / le2eUnlock / le2eSafety ...).
-const LE2U = {run: {}};  // list id -> {kind: 'start' | 'stop' | 'resume', done, total} while a switch runs in this tab
+const LE2U = {run: {}, rot: {}, chg: {}};  // rot: list id -> {done, total} of the re-encryption after a key change (2.64.2); chg: key changes per list  // list id -> {kind: 'start' | 'stop' | 'resume', done, total} while a switch runs in this tab
 const LE2U_NA = N_('Not available in encrypted lists');
 const le2u_mode = lid => listById(lid)?.e2e || null;
 const le2u_on = lid => !!le2u_mode(lid);
 // the data layer (part C) by name; typeof works for names that are not declared (yet)
 const le2u_fns = () => ({le2eLocked: typeof le2eLocked, le2eInfo: typeof le2eInfo, le2eUnlock: typeof le2eUnlock, le2eReady: typeof le2eReady,
   le2eStart: typeof le2eStart, le2eStop: typeof le2eStop, le2eResume: typeof le2eResume, le2eRelease: typeof le2eRelease, le2eSafety: typeof le2eSafety,
-  le2eKeyChanged: typeof le2eKeyChanged, le2eAcceptKey: typeof le2eAcceptKey});
+  le2eKeyChanged: typeof le2eKeyChanged, le2eAcceptKey: typeof le2eAcceptKey, le2eRotate: typeof le2eRotate, le2eReenc: typeof le2eReenc});
 const le2u_fn = n => le2u_fns()[n] === 'function';
 const le2u_locked = t => !!t && le2u_on(t.list_id) && (le2u_fn('le2eLocked') ? !!le2eLocked(t) : t._le2e === 'locked');
 // a member of a locked list who has no key of the current generation yet (waits for the owner / a list admin)
@@ -156,8 +156,37 @@ function le2u_blockersHtml(bl) {
   return `<ul class="le2ubl" aria-label="${esc(tr('Not possible yet'))}">${bl.map(b => `<li>${ic('alert', 's')}<span>${esc(b.text || '')}${LE2U_WAY[b.code] ? ` <b>${esc(tr(LE2U_WAY[b.code]))}</b>` : ''}</span>${['agent', 'public_link', 'participant'].includes(b.code) ? `<button type="button" class="linkbtn" data-le2ul="share" data-code="${esc(b.code)}">${esc(tr('Share…'))}</button>` : ''}</li>`).join('')}</ul>`;
 }
 const le2u_ruleHtml = () => `<p class="shint lhint keep le2uexp">${esc(tr('End-to-end in the browser: the server only sees encrypted texts. Limit: a manipulated server could deliver changed app code; members keep what they have seen.'))}</p>`;
-const le2u_attHint = () => `<div class="shint lhint keep">${ic('clip', 's')} ${esc(tr('Attachments of this list are not yet encrypted in the browser'))}</div>`;
-const le2u_rotHint = () => `<div class="shint lhint keep le2urot">${ic('alert', 's')} ${esc(tr('Former members can still decrypt old contents with their old key; the key change follows in a later update.'))}</div>`;
+// 2.64.2 D (#1817): attachments and the list chat are encrypted with the list key now (the hint "not yet encrypted", E9, is gone).
+// After a member left, the key changes (rotation) and the older contents are encrypted again in the background; until that is
+// done the honest hint stays, with the progress and, for the owner / a list admin, the button to change the key or to continue.
+const le2u_rotBusy = j => !!j && (j.rotate > 0 || j.reenc > 0);
+function le2u_rotHint(j, lid) {
+  if (!le2u_rotBusy(j)) return '';
+  const r = LE2U.rot[lid], run = !!r;
+  const btn = !j.can_manage || run ? '' : j.rotate > 0 ? (le2u_fn('le2eRotate') ? `<button type="button" class="btn sm" data-le2rot="rotate" data-lid="${lid}">${esc(tr('Change the key now'))}</button>` : '')
+    : le2u_fn('le2eReenc') ? `<button type="button" class="btn sm" data-le2rot="reenc" data-lid="${lid}">${esc(tr('Continue'))}</button>` : '';
+  return `<div class="shint lhint keep le2urot" data-lid="${lid}">${ic('alert', 's')} <span>${esc(tr('A member has left this list. The key is being changed; until everything is encrypted again, former members can still decrypt older contents with their old key.'))}</span>`
+    + (run ? `<span class="le2urotp">${le2u_pbar(r)}</span>` : '') + (btn ? `<span class="row">${btn}</span>` : '') + '</div>';
+}
+document.addEventListener('le2e:progress', e => {
+  const d = e.detail || {}; if (!d.lid || d.kind !== 'reenc') return;
+  if (d.total && d.done >= d.total) delete LE2U.rot[d.lid]; else LE2U.rot[d.lid] = {done: +d.done || 0, total: +d.total || 0};
+  $$(`.le2urot[data-lid="${d.lid}"] .le2urotp`).forEach(x => { if (LE2U.rot[d.lid]) x.innerHTML = le2u_pbar(LE2U.rot[d.lid]); });
+  if (!LE2U.rot[d.lid]) le2u_listRedraw(d.lid);
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('[data-le2rot]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const lid = +b.dataset.lid, a = b.dataset.le2rot;
+  if (typeof e2eEnsure === 'function' && !await e2eEnsure()) return;
+  b.disabled = true; LE2U.rot[lid] = {done: 0, total: 0};
+  try {
+    if (a === 'rotate') await le2eRotate(lid, true);
+    else await le2eReenc(lid, () => {});
+  } catch (x) { if (x?.message) toast(x.message); } finally { delete LE2U.rot[lid]; }
+  try { await load(); } catch { /* next sync */ }
+  render(); le2u_listRedraw(lid);
+}, true);
 function le2u_listHtml(l, j, err) {
   const own = isOwner(l), run = LE2U.run[l.id];
   if (err) return `<div class="muted mhint">${esc(err)}</div>`;
@@ -172,10 +201,10 @@ function le2u_listHtml(l, j, err) {
   }
   if (mode === 'on') {
     const mine = (j.keys || []).some(k => k.gen === j.gen);
-    return `<div class="row"><span class="tfastate on" id="l-e2e-st">${ic('lock', 's')} ${esc(tr('On'))}</span><span class="muted">${esc(tr('Titles, descriptions, comments and notes are encrypted in the browser.'))}</span></div>
+    return `<div class="row"><span class="tfastate on" id="l-e2e-st">${ic('lock', 's')} ${esc(tr('On'))}</span><span class="muted">${esc(tr('Titles, descriptions, comments, notes, attachments and the list chat are encrypted in the browser.'))}</span></div>
       ${mine ? '' : `<div class="shint lhint keep">${esc(tr('Key pending – {0} has to release it', l.owner_name || tr('The owner')))}</div>`}
       ${j.can_manage && (j.pending || []).length ? `<div class="row"><span class="muted">${esc(trn('{0} person is waiting for the key', '{0} people are waiting for the key', j.pending.length))}</span><button type="button" class="btn sm" data-le2ul="release">${esc(tr('Release'))}</button></div>` : ''}
-      ${j.rotate > 0 ? le2u_rotHint() : ''}${le2u_attHint()}${le2u_ruleHtml()}
+      ${le2u_rotHint(j, l.id)}${le2u_ruleHtml()}
       <div class="row le2uacts"><button type="button" class="btn sm" data-le2ul="share">${ic('users', 's')} ${esc(tr('Members and keys…'))}</button>${own ? `<button type="button" class="btn sm" data-le2ul="stop">${esc(tr('Open the lock…'))}</button>` : ''}</div>`;
   }
   // open list
@@ -235,7 +264,7 @@ async function le2u_startDlg(lid, j) {
     </ol>
     ${miss.length ? `<p class="shint keep">${esc(tr('{0}: not set up yet. They go on the waiting list and see placeholders until they have set it up and the key is released to them.', miss.map(m => m.name).join(', ')))}</p>` : ''}
     <p class="shint keep">${esc(tr('Encrypted: titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets. Readable stay: dates, status, priority, assignees, list name and tags.'))}</p>
-    ${le2u_attHint()}
+    <p class="shint keep">${esc(tr('Attachments and the messages of the list chat are encrypted with it.'))}</p>
     <p class="shint keep">${esc(tr('Your personal recovery code is enough: there is no extra code for the list.'))}</p>
     <label class="chkl le2uack"><input type="checkbox" id="le2u-ack"> ${esc(tr('I have read this'))}</label>`;
   return askDialog({title: tr('Encrypt this list in the browser?'), html, ok: tr('Encrypt list'), after: d => {
@@ -275,7 +304,7 @@ function le2u_shareHtml(j, changed) {
   const n = (j.pending || []).filter(p => p.has_keys).length;
   const warn = changed.map(([uid, name]) => `<div class="e2ewarn le2uchg" role="alert">${ic('alert', 's')}<span>${esc(tr('The key of {0} has changed. Compare the safety number with them before you release a key to them.', name))}</span><button type="button" class="btn sm" data-le2us="safety" data-uid="${uid}">${esc(tr('Safety number'))}</button><button type="button" class="btn sm" data-le2us="accept" data-uid="${uid}">${esc(tr('Understood'))}</button></div>`).join('');
   return `<div class="shint lhint keep">${ic('lock', 's')} ${esc(tr('Encrypted in the browser: compare the safety number with each person once on each of your devices; until then the key seen first counts unchecked. Participants and agents are not possible in this list.'))}</div>`
-    + (j.rotate > 0 ? le2u_rotHint() : '') + warn
+    + le2u_rotHint(j, j.list_id) + warn
     + (j.can_manage && n ? `<div class="row le2upend"><span>${esc(trn('{0} person is waiting for the key', '{0} people are waiting for the key', n))}</span><button type="button" class="btn sm pri" data-le2us="release-all">${esc(tr('Release'))}</button></div>` : '');
 }
 async function le2u_changed(j) {  // [[uid, name]] whose public key differs from the one this browser saw before
@@ -342,6 +371,56 @@ async function le2u_safetyDlg(uid, name) {
     : `<p>${esc(tr('{0} has not set up encryption yet', name))}</p>`, ok: tr('OK'), cancel: tr('Close')});
 }
 
+// ------------------------------------------------------------------ 2.64.2 D (#1817): safety numbers of all members, list chat and attachments
+// le2uSafetyList: every person of the list with a key, their safety number and the warning when a key changed (with "Understood").
+// le2uChanHead(room) / le2uAttHead(task): the line in the head of the list chat (part C) and of the attachments (part B) of a
+// list with the lock -- synchronous HTML; the key-change warning is filled in after the check (le2u_headFill).
+async function le2u_chgOf(lid, force) {
+  const j = await le2u_info(lid, force);
+  LE2U.chg[lid] = await le2u_changed(j);
+  return j;
+}
+async function le2uSafetyList(lid) {
+  if (typeof e2eEnsure === 'function' && !await e2eEnsure()) return;
+  let j; try { j = await le2u_chgOf(lid, true); } catch (x) { toast(x?.message || tr('Not possible right now')); return; }
+  const chg = new Set((LE2U.chg[lid] || []).map(c => c[0]));
+  const ppl = (j.members || []).filter(m => m.kind !== 'agent' && m.has_keys && !(S.me && m.user_id === S.me.id));
+  const nums = await Promise.all(ppl.map(m => (le2u_fn('le2eSafety') ? le2eSafety(m.user_id) : Promise.resolve(null)).catch(() => null)));
+  const rows = ppl.map((m, i) => `<li class="le2usl${chg.has(m.user_id) ? ' chg' : ''}"><b>${esc(m.name)}</b>`
+    + (chg.has(m.user_id) ? `<span class="e2ewarn" role="alert">${ic('alert', 's')} ${esc(tr('The key of {0} has changed.', m.name))} <button type="button" class="btn sm" data-le2usl="accept" data-uid="${m.user_id}">${esc(tr('Understood'))}</button></span>` : '')
+    + `<code class="e2ecode">${esc(nums[i] || tr('Not available'))}</code></li>`).join('');
+  await askDialog({title: tr('Safety numbers'), html: `<p class="shint">${esc(tr('Compare each number with the person (in person or by phone). If it is the same on both devices, nobody sits in between.'))}</p>`
+    + (rows ? `<ul class="le2uslist">${rows}</ul>` : `<p class="muted">${esc(tr('Nobody else in this list has a key yet.'))}</p>`), ok: tr('OK'), cancel: tr('Close'), after: d => {
+    d.addEventListener('click', async e => {
+      const b = e.target.closest('[data-le2usl="accept"]'); if (!b) return;
+      e.preventDefault();
+      const uid = +b.dataset.uid;
+      if (le2u_fn('le2eAcceptKey')) await le2eAcceptKey(uid);
+      LE2U.chg[lid] = (LE2U.chg[lid] || []).filter(c => c[0] !== uid);
+      b.closest('li')?.classList.remove('chg'); b.closest('.e2ewarn')?.remove();
+      le2u_headFill(lid);
+    });
+  }});
+}
+function le2u_head(lid, what) {
+  const l = listById(lid); if (!l?.e2e) return '';
+  if (LE2U.chg[lid] === undefined && !LE2U['chk' + lid]) { LE2U['chk' + lid] = 1; le2u_chgOf(lid).catch(() => {}).finally(() => { delete LE2U['chk' + lid]; le2u_headFill(lid); }); }
+  return `<div class="le2uhd" data-lid="${lid}" data-what="${what}">${ic('lock', 's')}<span>${esc(tr('Encrypted in the browser'))}</span>`
+    + `<button type="button" class="linkbtn" data-le2uhd="safety" data-lid="${lid}">${esc(tr('Safety numbers'))}</button><span class="le2uhdw">${le2u_headWarn(lid)}</span></div>`;
+}
+function le2u_headWarn(lid) {
+  const c = LE2U.chg[lid] || [];
+  return c.length ? `<span class="e2ewarn" role="alert">${ic('alert', 's')} ${esc(tr('Key changed: {0}', c.map(x => x[1]).join(', ')))}</span>` : '';
+}
+function le2u_headFill(lid) { $$(`.le2uhd[data-lid="${lid}"] .le2uhdw`).forEach(x => { x.innerHTML = le2u_headWarn(lid); }); }
+const le2uChanHead = room => le2u_head(room?.list_id, 'chan');
+const le2uAttHead = t => le2u_head(t?.list_id, 'att');
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-le2uhd="safety"]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  le2uSafetyList(+b.dataset.lid);
+}, true);
+
 // ------------------------------------------------------------------ features that are off in a locked list
 // the share dialog's public link part (dialogs.js shareModal)
 const le2u_pubHtml = () => le2u_grey(tr('Public link'));
@@ -364,4 +443,4 @@ function le2u_scopeHtml(sc) {
 }
 
 // ------------------------------------------------------------------ in-app help: Settings > Account > End-to-end encryption (e2e.js)
-const le2u_helpHtml = () => `<p class="muted le2uhelp"><b>${esc(tr('Lists with a lock'))}</b> ${esc(tr('In the list dialog the owner or a list admin switches on “Encrypted in the browser”: titles, descriptions, comments, notes, section names, free-text fields, links and code snippets are then only readable for members with a key. Agents, tasks by e-mail, public links and texts in calendars and notifications are off in such a list; attachments are not encrypted in the browser yet. Your personal recovery code is enough.'))}</p>`;
+const le2u_helpHtml = () => `<p class="muted le2uhelp"><b>${esc(tr('Lists with a lock'))}</b> ${esc(tr('In the list dialog the owner or a list admin switches on “Encrypted in the browser”: titles, descriptions, comments, notes, section names, free-text fields, links and code snippets are then only readable for members with a key. Attachments and the list chat are encrypted with it. Agents, tasks by e-mail, public links and texts in calendars and notifications are off in such a list. When a member leaves, the key changes and older contents are encrypted again in the background. Your personal recovery code is enough.'))}</p>`;

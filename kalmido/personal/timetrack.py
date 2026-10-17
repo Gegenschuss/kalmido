@@ -733,7 +733,7 @@ def _time_watch_one(c, r, users, S, LG, ref):
         (not r["task_id"] or task_visible(c, r["task_id"], uid, full=True))
     label = (r["t_title"] if seen else None) or r["task_title"] or tr("No task", lg=lg)
     from ..collab.liste2e import le2e_show
-    label = le2e_show(label)  # 2.64.1 B (#1817): never a ciphertext in a push
+    label = le2e_show(label, lg)  # 2.64.1 B (#1817): never a ciphertext in a push (2.64.2 D: in the recipient's language)
     fnum = (lambda x: f"{x:.1f}".rstrip("0").rstrip(".").replace(".", "," if dec_comma(lg) else "."))
     if stop_h > 0 and hrs >= stop_h:
         end = start + timedelta(hours=stop_h)

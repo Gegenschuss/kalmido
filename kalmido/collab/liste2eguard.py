@@ -198,6 +198,15 @@ def le2b_v1_target(c):
         r = c.execute("SELECT task_id FROM comments WHERE id=?", (va["cid"],)).fetchone()
         if r:
             tids.add(r[0])
+    # 2.64.2 C (#1817): the channel of a list with the lock (room / message ids of the team chat)
+    rid = va.get("rid") if path.startswith(f"{API_PREFIX}team/rooms/") else None
+    if "mid" in va and path.startswith(f"{API_PREFIX}team/messages/"):
+        r = c.execute("SELECT room_id FROM tchat_msgs WHERE id=?", (va["mid"],)).fetchone()
+        rid = r[0] if r else None
+    if rid:
+        r = c.execute("SELECT list_id FROM tchat_rooms WHERE id=? AND kind='list'", (rid,)).fetchone()
+        if r:
+            lids.add(r[0])
     b = request.get_json(silent=True) if request.data else None
     if isinstance(b, (dict, list)):
         _body_ids(b, lids, tids)
@@ -397,12 +406,12 @@ def le2b_agent_problem(c, lid, uid):
 LE2B_CIPHER_RE = re.compile(r"e2e1:\{[^}]*\}?")
 
 
-def le2b_net(s):
+def le2b_net(s, lg=None):
     """Every ciphertext of a list with the lock (also a cut one) inside a text -> the neutral word ("Due: 🔒 Task"). The
     service worker and the mail reader never get a key, so a ciphertext there would only be noise and a length leak."""
     if not isinstance(s, str) or "e2e1:" not in s:
         return s
-    return LE2B_CIPHER_RE.sub(lambda _m: le2e_neutral(), s)
+    return LE2B_CIPHER_RE.sub(lambda _m: le2e_neutral(lg), s)  # 2.64.2 D (#1817): in the recipient's language
 
 
 def le2b_scrub_tasks(c, ids):

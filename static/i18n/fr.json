@@ -8339,5 +8339,18 @@
   "{0} texts of this list cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.": "{0} textes de cette liste ne peuvent pas être déchiffrés avec tes clés. Les reprendre comme textes vides ? Ils ne pourront pas être restaurés.",
   "Take over as empty": "Reprendre vides",
   "{0} texts of this list cannot be decrypted. The list stays locked until they are taken over as empty.": "{0} textes de cette liste ne peuvent pas être déchiffrés. La liste reste verrouillée jusqu'à ce qu'ils soient repris vides.",
-  "iPhone and iPad forget it after about a week without use; then the passphrase is asked again.": "L'iPhone et l'iPad l'oublient après environ une semaine sans utilisation ; la phrase secrète est alors redemandée."
+  "iPhone and iPad forget it after about a week without use; then the passphrase is asked again.": "L'iPhone et l'iPad l'oublient après environ une semaine sans utilisation ; la phrase secrète est alors redemandée.",
+  "{0} commented in {1}": "{0} a commenté dans {1}",
+  "{0} mentioned you in {1}": "{0} vous a mentionné dans {1}",
+  "{0} replied to your message in {1}": "{0} a répondu à votre message dans {1}",
+  "A member has left this list. The key is being changed; until everything is encrypted again, former members can still decrypt older contents with their old key.": "Un membre a quitté cette liste. La clé est en cours de changement ; tant que tout n'est pas rechiffré, les anciens membres peuvent encore déchiffrer les contenus plus anciens avec leur ancienne clé.",
+  "Attachments and the messages of the list chat are encrypted with it.": "Les pièces jointes et les messages du chat de la liste sont également chiffrés.",
+  "Change the key now": "Changer la clé maintenant",
+  "Compare each number with the person (in person or by phone). If it is the same on both devices, nobody sits in between.": "Comparez chaque numéro avec la personne (en personne ou par téléphone). S'il est identique sur les deux appareils, personne ne s'interpose.",
+  "In the list dialog the owner or a list admin switches on “Encrypted in the browser”: titles, descriptions, comments, notes, section names, free-text fields, links and code snippets are then only readable for members with a key. Attachments and the list chat are encrypted with it. Agents, tasks by e-mail, public links and texts in calendars and notifications are off in such a list. When a member leaves, the key changes and older contents are encrypted again in the background. Your personal recovery code is enough.": "Dans la boîte de dialogue de la liste, le propriétaire ou un administrateur de la liste active « Chiffré dans le navigateur » : titres, descriptions, commentaires, notes, noms de sections, champs de texte libre, liens et extraits de code ne sont alors lisibles que par les membres disposant d'une clé. Les pièces jointes et le chat de la liste sont également chiffrés. Les agents, les tâches par e-mail, les liens publics et les textes dans les calendriers et notifications sont désactivés dans une telle liste. Lorsqu'un membre part, la clé change et les contenus plus anciens sont rechiffrés en arrière-plan. Votre code de récupération personnel suffit.",
+  "Nobody else in this list has a key yet.": "Personne d'autre dans cette liste n'a encore de clé.",
+  "Safety numbers": "Numéros de sécurité",
+  "Titles, descriptions, comments, notes, attachments and the list chat are encrypted in the browser.": "Titres, descriptions, commentaires, notes, pièces jointes et chat de la liste sont chiffrés dans le navigateur.",
+  "Key changed: {0}": "Clé modifiée : {0}",
+  "The key of {0} has changed.": "La clé de {0} a changé."
 }

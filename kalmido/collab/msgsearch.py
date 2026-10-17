@@ -196,7 +196,8 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
     if "t" in arts and (collab_all() if agent_me else tchat_on(c, uid)):
         rows = c.execute(f"""SELECT m.id, m.room_id, m.user_id, m.body, m.created_at, r.kind, r.list_id, r.a, r.b
             FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
-            WHERE {mcond} AND m.deleted_at IS NULL AND m.enc IS NULL AND ((r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN {vis_sql()})){snd}
+            WHERE {mcond} AND m.deleted_at IS NULL AND m.enc IS NULL AND ((r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN {vis_sql()}
+              AND r.list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL))){snd}
             {' AND m.room_id=?' if room is not None else ''} ORDER BY m.id DESC LIMIT {MSG_CAND}""",
                          match + [uid, uid, uid, uid] + ([sender] if sender is not None else []) + ([room] if room is not None else [])).fetchall()
         ok, lnames = {}, {}
