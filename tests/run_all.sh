@@ -875,6 +875,9 @@ fresh; run p264a_b_api "$PY" p264a_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p264b_c_api "$PY" p264b_c_api_test.py "$KALMIDO_TEST_DATA"
 # 2.64.2 parts C + D: #1817 lock per list stage 2 - the list channel in the web app, safety numbers
 fresh; run p264b_c_ui node p264b_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.64.2 part A: #1817 lock per list stage 2 - key change and re-encryption
+fresh; run p264b_a_api "$PY" p264b_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p264b_a_ui node p264b_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
