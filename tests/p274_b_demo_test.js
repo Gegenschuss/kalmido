@@ -174,6 +174,38 @@ const srv = http.createServer((req, res) => {
   check(/Quotation KVA-/.test(ept) && /€1,469\.06/.test(ept) && /Print view/.test(ept), 'English print view: ' + ept.slice(0, 120));
   w.close();
 
+  // 10. real layout in Firefox (skipped without firefox): phone 390 px (touch) and desktop 1280 px; the invoice editor and the
+  // print view fit without horizontal scrolling of the page, the print page has no overflow, the CSP blocks nothing.
+  // P274B_SHOTS=<dir> saves screenshots.
+  const firefox = require('./ff')({tag: 'p274b', check, shots: 'P274B_SHOTS'});
+  for (const [vw, vh, touch] of [[390, 844, true], [1280, 800, false]]) {
+    await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
+      await nav(B); await ev(`(() => { localStorage.clear(); return 1; })()`); await nav(B); await sleep(2500);
+      const id = await ev(`(async () => { tourEnd(true); await api('POST', '/api/me/purpose', {purpose: 'office'}); await load();
+        const c = await api('POST', '/api/clients', {name: 'Beispiel GmbH', street: 'Hauptstraße 5', zip: '20095', city: 'Hamburg'}); await load();
+        const o = await api('POST', '/api/office/docs', {}); await api('PATCH', '/api/office/docs/' + o.id, {client_id: c.id, recipient_from_client: true, project_title: 'Website-Relaunch mit Buchungssystem'});
+        await api('PUT', '/api/office/docs/' + o.id + '/items', {items: [{kind: 'service', title: 'Konzept und Workshop mit dem Team vor Ort', detail: 'zwei Tage inklusive Protokoll', qty: 2.5, unit: 'day', rate: 800},
+          {kind: 'service', title: 'Fachbuch', qty: 3, unit: 'piece', rate: 19.99, tax: 'reduced'}]});
+        const i = await api('POST', '/api/office/docs/' + o.id + '/invoice'); await api('POST', '/api/office/docs/' + i.id + '/finalize', {});
+        location.hash = 'office/offers/' + i.id; return String(i.id); })()`);
+      await sleep(1500);
+      const tag = `Firefox ${vw}px`;
+      const e = JSON.parse(await ev(`JSON.stringify({over: document.documentElement.scrollWidth - innerWidth, txt: (document.querySelector('#view') || {}).textContent || '', csp: KDEMO.csp})`));
+      check(e.over <= 0 && /2\.444,17 €/.test(e.txt), `${tag}: invoice editor fits (${e.over}), total shown`);
+      await shot(`p274b-editor-${vw}.png`);
+      await ev(`(() => { KDEMO.printView(${id}); return 1; })()`); await sleep(500);
+      const p = JSON.parse(await ev(`(() => { const pg = document.querySelector('.kp-page'), sc = document.querySelector('#kd-print .kd-pscroll'), bar = document.querySelector('#kd-print .kd-pbar');
+        const btn = [...document.querySelectorAll('#kd-print .kd-btn')].map(b => b.getBoundingClientRect().height);
+        return JSON.stringify({page: pg ? pg.scrollWidth - pg.clientWidth : -1, sc: sc ? sc.scrollWidth - sc.clientWidth : -1, over: document.documentElement.scrollWidth - innerWidth,
+          bar: bar ? bar.getBoundingClientRect().height : 0, btn: Math.min(...btn), csp: KDEMO.csp}); })()`));
+      check(p.page <= 0 && p.sc <= 0 && p.over <= 0, `${tag}: print view without horizontal overflow (page ${p.page}, scroll ${p.sc}, doc ${p.over})`);
+      if (touch) check(p.btn >= 43.9, `${tag}: print view buttons 44 px on touch (${p.btn})`);
+      check(!p.csp.length && !e.csp.length, `${tag}: nothing blocked by the CSP ${JSON.stringify(p.csp)}`);
+      await shot(`p274b-print-${vw}.png`);
+    }, touch);
+  }
+
   const bad = hits.filter(h => h !== 'GET /favicon.ico' && !/^GET \/demo\/(index\.html|static\/[\w./-]+)?$/.test(h) || /\/api\//.test(h));
   check(!bad.length, 'only static demo files requested: ' + JSON.stringify(bad.slice(0, 5)));
   check(!errs.length, 'no JS errors: ' + errs.slice(0, 3).join(' | '));
