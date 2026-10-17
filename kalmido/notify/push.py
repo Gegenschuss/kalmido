@@ -569,6 +569,8 @@ def watchdog_tick(c):
     _wd_section(c, "briefing", _wd_briefing, users, S, LG, now)  # 2.34.0 (#264)
     _wd_section(c, "staying in touch", _wd_care, users, S, LG, now)  # 2.22.0 (#663)
     _wd_section(c, "read later", _wd_reading, users, S, LG, now)  # 2.22.0 (#663)
+    from ..life.rss import _wd_feeds
+    _wd_section(c, "feeds", _wd_feeds, users, S, LG, now)  # 2.85.0 B (#1162): fetch due feeds, drop articles after 30 days
     from ..newsletter.sync import nwl_tick
     _wd_section(c, "newsletter", nwl_tick)  # 2.55.0 (#1455): the daily sync of connections with "auto" (own threads)
     from ..accounts.tenancy import boundary_tick

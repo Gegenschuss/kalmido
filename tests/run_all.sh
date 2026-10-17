@@ -1043,6 +1043,9 @@ fresh; run p283_c_api "$PY" p283_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p283_c_ui node p283_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.85.0 part A: test clock gives the Berlin calendar day (#1863)
 fresh; run testclock "$PY" testclock_test.py
+# 2.85.0 part B: feeds (#1162) - follow, RSS/Atom/RDF, SSRF guard, DTD refused, read later, OPML, rights; the view (fake feed server in the container)
+fresh; run p285_b_api "$PY" p285_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p285_b_ui node p285_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

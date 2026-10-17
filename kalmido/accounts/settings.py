@@ -637,6 +637,8 @@ def umz_export_queries(uid):
         # 2.66.0 A (#1835): my merges of contacts / clients (the history lines, without the undo snapshot)
         "merge_runs": ("SELECT id, kind, target_id, merged_ids, summary, created_at, undone_at FROM merge_runs WHERE user_id=?", (uid,)),
         "karakeep": ("SELECT url, list_id, source, archive, synced_at, created_at FROM kk_conns WHERE user_id=?", (uid,)),
+        # 2.85.0 B (#1162): my feeds (the articles are fetched again)
+        "feeds": ("SELECT url, title, site_url, created_at FROM rss_feeds WHERE user_id=? AND deleted_at IS NULL ORDER BY id", (uid,)),
         # calendar subscriptions without the (encrypted) link / password
         "calendar_subscriptions": ("SELECT id, kind, name, color, visible, interval, url_hint, username, created_at FROM cal_subs "
                                    "WHERE user_id=?", (uid,)),

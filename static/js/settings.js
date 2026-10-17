@@ -203,7 +203,8 @@ const MOD_DESC = {office: N_('Quotations with a calculator, services and rates, 
   review: N_('Your day and week in review (done, still open, coming up) with a private journal'),
   travel: N_('Trips as lists with dates, bookings, things to do before you leave and a packing list'),
   reading: N_('A “Read later” list, filled from Karakeep if you like (bookmarks become tasks)'),
-  budget: N_('A household budget: income and expenses per month with categories, recurring entries, CSV import from your bank file and receipts; shareable with the family, never visible to agents')};  // 2.72.0 (#1333)
+  budget: N_('A household budget: income and expenses per month with categories, recurring entries, CSV import from your bank file and receipts; shareable with the family, never visible to agents'),  // 2.72.0 (#1333)
+  feeds: N_('Follow blogs and news sites: new articles in one list, fetched by your server about once an hour; “Read later” saves one as a task. Private, never visible to agents')};  // 2.85.0 B (#1162)
 // 2.25.0 (UX-20): Integrations start with what people want to do, in plain words; a tap jumps to the part that does it
 // (the technical parts below stay for those who need them)
 function integrCardsHtml() {
