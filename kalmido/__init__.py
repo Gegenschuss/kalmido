@@ -120,6 +120,8 @@ ORDER = (
     "collab.notelock",  # 2.48.0 (#1642): a task's note locked with one's own password (needs collab.e2e)
     "collab.liste2e",  # 2.64.1 (#1817): the lock per list (texts encrypted in the browser; needs collab.e2e)
     "collab.liste2eguard",  # 2.64.1 B (#1817): the lock per list on the other ways (API, agents, CalDAV, mail, push, copies)
+    "collab.liste2efile",  # 2.64.2 B (#1817): files of lists with the lock, encrypted with the list key
+    "collab.liste2echan",  # 2.64.2 C (#1817): the list channel (team chat of a list) with the lock
     "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
     "files.v1",  # 2.48.0 (#1207): the file store in the REST API (files:read / files:write)

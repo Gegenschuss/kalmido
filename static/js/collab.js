@@ -578,6 +578,7 @@ function encodeMentions(text, people) {
 }
 function cattHtml(a, cid, editing) {
   const del = editing ? `<button class="attdel" data-act="catt-del" data-att="${a.id}" title="${tr('Remove')}">${ic('x', 's')}</button>` : '';
+  if (a.enc === 2 && typeof le2eFileHtml === 'function') return le2eFileHtml(a, del, taskById(S.sel)?.list_id);  // 2.64.2 B (#1817)
   if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="catt-view" data-att="${a.id}" data-cid="${cid}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${del}</div>`;
   return `<div class="att file">${attFileA(a)}${del}</div>`;  // 2.30.0 (#1035): text files open in the viewer
 }
@@ -699,7 +700,10 @@ async function sendComment() {
   const text = encodeMentions(raw, S.tl.id === tid ? S.tl.people : []);
   const rto = replyTo('c:' + tid);  // 2.33.0 (#1076)
   let payload = {body: text, ...(rto ? {reply_to: rto} : {})};
-  if (files.length) { payload = new FormData(); payload.append('body', text); if (rto) payload.append('reply_to', rto); files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
+  // 2.64.2 B (#1817): in a list with the lock the files go encrypted with the list key (names as list ciphers)
+  let lf = null;
+  if (files.length && typeof le2eFileParts === 'function') { try { lf = await le2eFileParts(taskById(tid)?.list_id, files); } catch (x) { toast(x.message); return; } }
+  if (files.length) { payload = new FormData(); payload.append('body', text); if (rto) payload.append('reply_to', rto); if (lf) lf.forEach(p => { payload.append('file', p.blob, 'encrypted.kenc'); payload.append('le2e_name', p.name); }); else files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
   const btn = $('[data-act="c-send"]'); if (btn) btn.disabled = true;
   try { await capi('POST', `/api/tasks/${tid}/comments`, payload); }
   catch { return; }

@@ -444,6 +444,10 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
                 s = usettings(c, uid)
         finally:
             c.close()
+    from ..collab.liste2eguard import le2b_net
+    from ..core.i18n import LANGS
+    lg = s.get("lang") if s.get("lang") in LANGS else "en"
+    title, msg = le2b_net(title, lg), le2b_net(msg, lg)  # 2.64.2 D (#1817): the neutral word in the recipient's language
     ch = push_channel(s)
     sent = 0
     if WEBPUSH_ON and ch in ("webpush", "both"):

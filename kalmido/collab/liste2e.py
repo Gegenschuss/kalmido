@@ -93,13 +93,14 @@ def le2e_open_sql(alias="l"):
     return f"{alias}.e2e IS NULL"
 
 
-def le2e_neutral():
-    return tr(LE2E_NEUTRAL)
+def le2e_neutral(lg=None):
+    """2.64.2 D (#1817): lg = the recipient's language (background pushes have no request language)."""
+    return tr(LE2E_NEUTRAL, lg=lg) if lg else tr(LE2E_NEUTRAL)
 
 
-def le2e_show(v):
+def le2e_show(v, lg=None):
     """A text for server output (push, mail, CalDAV, time entries, news): a ciphertext becomes the neutral word."""
-    return le2e_neutral() if le2e_is_cipher(v) else v
+    return le2e_neutral(lg) if le2e_is_cipher(v) else v
 
 
 # ================================================================ part A: write guard, routes, memberships (2.64.1, #1817)
@@ -244,6 +245,8 @@ def le2a_task_write(c, tid, cur, f, b, lid):
     """apply_update (PATCH, batch, undo): the texts of task tid (row cur) written into list lid. A move into / out of /
     between locked lists needs every text of the moved subtree in the target format (browser, field le2e_move)."""
     if lid != cur["list_id"] and le2a_moving(c, cur["list_id"], lid):
+        from .liste2efile import le2f_move_guard  # 2.64.2 B (#1817): list files stay in their list
+        le2f_move_guard(c, tid, cur["list_id"], lid)
         return le2a_move(c, tid, cur, f, b.get("le2e_move"), lid)
     le2e_guard(c, lid, le2a_task_texts(f), cur=le2a_task_cur(cur))
     return None

@@ -1730,6 +1730,11 @@ MIGRATIONS = [
     ("lists", "e2e_rotate", "ALTER TABLE lists ADD COLUMN e2e_rotate BIGINT NOT NULL DEFAULT 0"),
     ("lists", "e2e_by", "ALTER TABLE lists ADD COLUMN e2e_by BIGINT"),
     ("lists", "e2e_at", "ALTER TABLE lists ADD COLUMN e2e_at TEXT"),
+    # 2.64.2 (#1817): stage 2 of the lock per list -- e2e_reenc = the generation the background re-encryption after a key change
+    # (rotation) aims at (0 = nothing to re-encrypt); attachments.enc 2 = a file encrypted with the list key (KENC\x02,
+    # collab/liste2efile.py), e2e_gen = its generation (0 for other files)
+    ("lists", "e2e_reenc", "ALTER TABLE lists ADD COLUMN e2e_reenc BIGINT NOT NULL DEFAULT 0"),
+    ("attachments", "e2e_gen", "ALTER TABLE attachments ADD COLUMN e2e_gen BIGINT NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

@@ -72,8 +72,11 @@ def comment_plain(c, text, names=None):
 
 def att_dicts(c, where, args):
     out = {}
-    for a in c.execute(f"SELECT id, comment_id, name, mime, size, created_at FROM attachments WHERE {where} ORDER BY id", args):
-        out.setdefault(a["comment_id"], []).append({k: a[k] for k in ("id", "name", "mime", "size", "created_at")})
+    for a in c.execute(f"SELECT id, comment_id, name, mime, size, created_at, enc, e2e_gen FROM attachments WHERE {where} ORDER BY id", args):
+        d = {k: a[k] for k in ("id", "name", "mime", "size", "created_at")}
+        if a["enc"] == 2:  # 2.64.2 B (#1817): a list file (name = list ciphertext)
+            d.update(enc=2, e2e_gen=a["e2e_gen"])
+        out.setdefault(a["comment_id"], []).append(d)
     return out
 
 
@@ -248,7 +251,11 @@ def comment_create(tid):
     if sug and sug.get("kind") == "merge_request":
         git_merge_link(c, t, sug)
     saved = []
-    e = save_attachments(c, tid, files, comment_id=cid, saved=saved) if files else None
+    if files and le2e_mode(c, t["list_id"]):  # 2.64.2 B (#1817): list files, encrypted in the browser (names: list ciphertexts)
+        from .liste2efile import le2f_save
+        e = le2f_save(c, tid, files, request.form.getlist("le2e_name"), comment_id=cid, saved=saved)
+    else:
+        e = save_attachments(c, tid, files, comment_id=cid, saved=saved) if files else None
     if e:
         c.rollback()
         unlink_files(saved)
@@ -396,6 +403,9 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     names = user_names(c, [author] + [int(x) for x in MENTION_RE.findall(text)])
     snippet = comment_plain(c, text, names)
     snippet = snippet[:280] + ("…" if len(snippet) > 280 else "")
+    from .liste2e import le2e_mode, le2e_neutral
+    lk = le2e_mode(c, t["list_id"])  # 2.64.2 D (#1817): a list with the lock: no words of the comment, the list's name instead
+    lname = (c.execute("SELECT name FROM lists WHERE id=?", (t["list_id"],)).fetchone() or [""])[0] if lk else ""
     out = []
     ag = agent_ids(c)
     for uid in sorted(ids):
@@ -418,6 +428,11 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
         if lv == "urgent":
             if push_reachable(c, uid, s) and not tbl_sent(uid, t["id"]):
                 lg = lang_of(s)
+                if lk:
+                    out.append((uid, tr("Urgent: {0}", le2e_neutral(lg), lg=lg), tr("{0} commented in {1}", names.get(author, "?"), lname, lg=lg),
+                                f"{PUBLIC_URL}/#t/{t['id']}", TBL_PRIO, comment_push_extra(t, lg)))
+                    continue
+                lg = lang_of(s)
                 out.append((uid, tr("Urgent: {0}", t["title"], lg=lg), tr("{0} commented: {1}", names.get(author, "?"), snippet or
                             trn("{0} file", "{0} files", nfiles, lg=lg), lg=lg), f"{PUBLIC_URL}/#t/{t['id']}", TBL_PRIO, comment_push_extra(t, lg)))
             continue
@@ -429,6 +444,11 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
         lg = lang_of(s)
         what = snippet or trn("{0} file", "{0} files", nfiles, lg=lg)
         who = names.get(author, "?")
+        if lk:
+            msg = tr("{0} mentioned you in {1}", who, lname, lg=lg) if uid in notify_mentions else \
+                tr("{0} replied to your message in {1}", who, lname, lg=lg) if uid == replied else tr("{0} commented in {1}", who, lname, lg=lg)
+            out.append((uid, le2e_neutral(lg), msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), comment_push_extra(t, lg)))
+            continue
         msg = tr("{0} mentioned you: {1}", who, what, lg=lg) if uid in notify_mentions else \
             tr("{0} replied to your message: {1}", who, what, lg=lg) if uid == replied else tr("{0} commented: {1}", who, what, lg=lg)
         out.append((uid, t["title"], msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), comment_push_extra(t, lg)))
