@@ -99,6 +99,10 @@ member of the office area, writing = its admin. There is no REST API / MCP tool 
 | `DELETE /api/office/packs/installed/<kind>/<code>` | admin: uninstall (409 with the reason while it is in use) |
 | `POST /api/office/packs/installed/<kind>/<code>/restore` | admin: undo of an uninstall |
 
+Each catalogue item also carries `in_use` / `in_use_text` (why it cannot be uninstalled now) and `affects` /
+`affects_text`: how many open (not finalised) documents an update or uninstall of the pack in effect would recalculate
+- a hint for the confirmation, never blocking. The organisation export contains the installed packs (`office/pack-installs.json`).
+
 ## Security model
 
 What the catalogue code defends against:

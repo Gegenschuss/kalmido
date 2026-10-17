@@ -184,6 +184,11 @@ operator of the server names in `KALMIDO_PACKS_CATALOG`; without it the list sho
 - **Uninstalling** asks first. It is refused, with the reason, while the pack is still in use: the country pack chosen
   in the settings, an industry pack switched on in the calculation rules, or used by open quotations. Change those
   first.
+  Exception: a pack that replaces a built-in one (a newer `DE`) can be uninstalled while chosen - the office goes back
+  to the built-in version.
+- **Open documents follow the pack in effect**: quotations and invoices that are not finalised yet are calculated with
+  the pack the office uses now. Updating or uninstalling that pack therefore changes their rates and texts; the
+  confirmation says how many open documents are affected.
 - **Undo**: every install, update and uninstall is one step of the undo history (the arrow or Ctrl/Cmd+Z). Undoing an
   update installs the version before again, as long as the catalogue still has it.
 - **Finalised documents keep their pack**: a finalised quotation or invoice stores the pack version, its checksum and
