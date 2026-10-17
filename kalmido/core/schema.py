@@ -1465,6 +1465,11 @@ CREATE TABLE IF NOT EXISTS office_pack_installs (
   kind TEXT NOT NULL, code TEXT NOT NULL, version BIGINT NOT NULL, sha256 TEXT NOT NULL, data TEXT NOT NULL,
   meta TEXT NOT NULL DEFAULT '{}', badge TEXT NOT NULL, source TEXT NOT NULL DEFAULT '', installed_at TEXT NOT NULL,
   installed_by BIGINT, removed_at TEXT);
+-- 2.83.0 C (#1427): the header strip of an owner's folder (style: gradient | dots | lines | grid; no row = none). Per owner
+-- like folder_props, no organisation column: only the owner sees and sets it (lists/listhead.py)
+CREATE TABLE IF NOT EXISTS folder_heads (
+  owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, folder TEXT NOT NULL, style TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL, PRIMARY KEY (owner_id, folder));
 """
 # Bumped when the database layout changes (stored in kalmido_meta.schema_version; SQLite: PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -2043,6 +2048,10 @@ MIGRATIONS = [
     ("pl_sources", "run_learn", "ALTER TABLE pl_sources ADD COLUMN run_learn TEXT NOT NULL DEFAULT ''"),
     # 2.71.0 A (#1457): a comment written by a list rule: the rule's name (the client marks it "Rule <name>"), NULL otherwise
     ("comments", "rule_name", "ALTER TABLE comments ADD COLUMN rule_name TEXT"),
+    # 2.83.0 C (#1427): the header strip of a list ('' = none, gradient | dots | lines | grid | image; lists/listhead.py) and
+    # the token of its own picture ('' = none; the file lives below ATT_DIR/listheads)
+    ("lists", "header_style", "ALTER TABLE lists ADD COLUMN header_style TEXT NOT NULL DEFAULT ''"),
+    ("lists", "header_file", "ALTER TABLE lists ADD COLUMN header_file TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

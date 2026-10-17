@@ -7232,3 +7232,43 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
   #ct-sbar .mbb .mbl{max-width:100%;overflow:hidden;text-overflow:ellipsis}
   .ctpicking .ctlistw{padding-bottom:6.5rem}
 }
+/* 2.83.0 C (#1427) themes, header strips of lists and folders, small moments (listhead.js) */
+/* themes (Settings > Appearance, per device): background tones and card style, each scoped to the colour scheme it is made for
+   (Paper: light, Night: dark, High contrast: both). The accent stays the device's accent; every accent passes AA on every
+   theme background (tests/appearance_ui.js). "Control room" (the default) has no rules. */
+:root[data-pack="paper"][data-theme="light"]{--bg:#fbf8f2;--bg2:#f5f0e7;--bg3:#efe9de;--bg4:#ddd3c2;--line:#ebe3d5;--line2:#ddd3c2;--text:#1f1a13;--text2:#4b4337;--muted:#5f5648;--faint:#8a8070;--field-line:#8a8070;--radius:.5rem;--r-l:.875rem;--shadow:0 .75rem 2.25rem rgba(70,50,20,.12),0 0 0 1px var(--line2)}
+@media (prefers-color-scheme: light){ :root[data-pack="paper"][data-theme="auto"]{--bg:#fbf8f2;--bg2:#f5f0e7;--bg3:#efe9de;--bg4:#ddd3c2;--line:#ebe3d5;--line2:#ddd3c2;--text:#1f1a13;--text2:#4b4337;--muted:#5f5648;--faint:#8a8070;--field-line:#8a8070;--radius:.5rem;--r-l:.875rem;--shadow:0 .75rem 2.25rem rgba(70,50,20,.12),0 0 0 1px var(--line2)} }
+:root[data-pack="night"][data-theme="dark"]{--bg:#0b1020;--bg2:#111830;--bg3:#19223d;--bg4:#27324f;--line:#1a2340;--line2:#243052;--text:#e8ecf6;--text2:#b6bfd4;--muted:#98a3bd;--faint:#6c7792;--field-line:#6c7792;--radius:.5rem;--r-l:.75rem;--shadow:0 1rem 3rem rgba(2,6,20,.6),0 0 0 1px var(--line2)}
+@media (prefers-color-scheme: dark){ :root[data-pack="night"][data-theme="auto"]{--bg:#0b1020;--bg2:#111830;--bg3:#19223d;--bg4:#27324f;--line:#1a2340;--line2:#243052;--text:#e8ecf6;--text2:#b6bfd4;--muted:#98a3bd;--faint:#6c7792;--field-line:#6c7792;--radius:.5rem;--r-l:.75rem;--shadow:0 1rem 3rem rgba(2,6,20,.6),0 0 0 1px var(--line2)} }
+:root[data-pack="contrast"]{--bg:#000000;--bg2:#0a0a0a;--bg3:#161616;--bg4:#333333;--line:#5c5c5c;--line2:#8a8a8a;--text:#ffffff;--text2:#f0f0f0;--muted:#c4c4c4;--faint:#a3a3a3;--field-line:#a3a3a3}
+:root[data-pack="contrast"][data-theme="light"]{--bg:#ffffff;--bg2:#ffffff;--bg3:#f0f0f0;--bg4:#c8c8c8;--line:#8a8a8a;--line2:#5c5c5c;--text:#000000;--text2:#1a1a1a;--muted:#3d3d3d;--faint:#5a5a5a;--field-line:#5a5a5a}
+@media (prefers-color-scheme: light){ :root[data-pack="contrast"][data-theme="auto"]{--bg:#ffffff;--bg2:#ffffff;--bg3:#f0f0f0;--bg4:#c8c8c8;--line:#8a8a8a;--line2:#5c5c5c;--text:#000000;--text2:#1a1a1a;--muted:#3d3d3d;--faint:#5a5a5a;--field-line:#5a5a5a} }
+:root[data-pack="contrast"] .trow{border-bottom-color:var(--line)}
+.o3c-packs{grid-template-columns:repeat(auto-fill,minmax(6.5rem,1fr))}
+.o3c-pv{display:flex;flex-direction:column;gap:.25rem;width:4rem;height:2.5rem;padding:.375rem;border-radius:var(--r-s);background:var(--pb);border:1px solid var(--pl)}
+.o3c-pv i{display:block;height:.25rem;border-radius:.125rem;background:var(--pt);width:70%}
+.o3c-pv i:nth-child(2){flex:1;width:100%;background:var(--pb3);border:1px solid var(--pl)}
+.o3c-pv i:nth-child(3){width:30%;background:var(--accent)}
+/* header strip: between the header and the view; a list takes its accent (#main.lp-acc), a folder its own colour */
+.o3c-head{flex:none;height:5.5rem;margin:.125rem 1.75rem .625rem;border-radius:var(--r-l);border:1px solid var(--line);--o3c-c:var(--accent);background-color:color-mix(in srgb,var(--o3c-c) 12%,var(--bg2));background-position:center;background-size:cover;background-repeat:no-repeat}
+.o3c-head[style*="--o3c-d"]{--o3c-c:var(--o3c-d)}
+:root[data-theme="light"] .o3c-head[style*="--o3c-l"]{--o3c-c:var(--o3c-l)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] .o3c-head[style*="--o3c-l"]{--o3c-c:var(--o3c-l)} }
+.o3c-h-gradient{background-image:linear-gradient(110deg,color-mix(in srgb,var(--o3c-c) 60%,var(--bg2)),color-mix(in srgb,var(--o3c-c) 10%,var(--bg2)) 75%)}
+.o3c-h-dots{background-image:radial-gradient(color-mix(in srgb,var(--o3c-c) 55%,transparent) .09375rem,transparent .125rem);background-size:.75rem .75rem;background-repeat:repeat}
+.o3c-h-lines{background-image:repeating-linear-gradient(135deg,color-mix(in srgb,var(--o3c-c) 35%,transparent) 0 .0625rem,transparent .0625rem .625rem);background-repeat:repeat}
+.o3c-h-grid{background-image:linear-gradient(color-mix(in srgb,var(--o3c-c) 28%,transparent) .0625rem,transparent .0625rem),linear-gradient(90deg,color-mix(in srgb,var(--o3c-c) 28%,transparent) .0625rem,transparent .0625rem);background-size:1rem 1rem;background-repeat:repeat}
+.o3c-h-image{background-color:var(--bg3)}
+@media (max-width:899px){ .o3c-head{height:3.5rem;margin:0 .75rem .5rem} }
+@media print{ .o3c-head{display:none} }
+.o3c-hrow .seg{flex:1}
+/* progress ring in the sidebar row (done / all) */
+.o3c-ring{flex:none;width:.875rem;height:.875rem;border-radius:50%;background:conic-gradient(var(--accent) calc(var(--p) * 1%),var(--bg4) 0);-webkit-mask:radial-gradient(farthest-side,transparent 58%,#000 62%);mask:radial-gradient(farthest-side,transparent 58%,#000 62%)}
+/* ticking off: the circle pops (transform + opacity only, 200 ms); none with reduced motion */
+@keyframes o3c-pop{0%{transform:scale(.7);opacity:.4}60%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:1}}
+.chk.o3c-pop{animation:o3c-pop .2s ease-out}
+@media (prefers-reduced-motion: reduce){ .chk.o3c-pop{animation:none} }
+/* empty pages: the K as a calm line drawing, its dot in the accent */
+.empty svg.o3c-k{width:7.5rem;height:5.625rem;opacity:1;margin:0 auto .75rem;color:var(--text2);stroke-width:2.4}
+.o3c-k .o3c-kdot{fill:var(--accent);stroke:none}
+@media (max-width:899px){ .empty svg.o3c-k{width:6rem;height:4.5rem} }

@@ -298,6 +298,9 @@ APP_ONLY = [
     ("the app's personal settings, onboarding and sample data", ("PATCH /api/settings", "POST /api/briefing/read", "POST /api/onboarding", "* /api/sample")),
     ("2.32.0 (#1063, #983): how a person arranges their views and the project page: people only, never agents", ("* /api/lists/{}/layout",)),
     ("the focus timer is a personal on-screen timer; time is tracked with /time/timer", ("* /api/pomo/",)),
+    # 2.83.0 (#1427): the header strip is how the app draws a list (agents read header_style in GET /lists)
+    ("2.83.0 (#1427): the header strip of a list (style, own picture) and of a person's folder is set by people in the app; "
+     "agents read header_style in GET /lists", ("* /api/lists/{}/header", "GET /api/list-header/", "* /api/folder-heads")),
     ("views computed for the screen (the data is in /tasks, /tasks/{id}/dependencies, /time/entries)", (
         "GET /api/stats", "GET /api/occurrences", "GET /api/deps", "GET /api/imports")),
     ("app conveniences: undo of a completion (= reopen), read markers, News removal, sidebar order, folder of a person's "

@@ -155,7 +155,7 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   // heron: empty list, search without hits, Today
   await w.eval(`go('l/${EMPTY}')`); await sleep(500);
   let he = d.querySelector('#view .empty.hempty');
-  check(he && he.querySelector('svg.heron[aria-hidden="true"] .hr-sun') && /No tasks/.test(he.textContent) && /field below/.test(he.textContent), 'empty list: the heron + a hint');
+  check(he && he.querySelector('svg.o3c-k[aria-hidden="true"] .o3c-kdot') && /No tasks/.test(he.textContent) && /field below/.test(he.textContent), 'empty list: the K line drawing + a hint');  // 2.83.0 (#1427): the K instead of the heron (no animal)
   check([...d.querySelectorAll('svg.heron')].every(x => x.getAttribute('aria-hidden') === 'true' && !x.querySelector('title')), 'the heron is decorative (aria-hidden, no title)');
   w.eval(`S.searchQ = 'zzzqqq'; S.searchRes = []; go('search')`); await sleep(400);
   he = d.querySelector('#view .empty.hempty');
@@ -165,7 +165,7 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   await call('POST', '/api/users', {username: 'dora', display_name: 'Dora', password: 'password123'});
   const CD = await login('dora'); await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'}, CD);
   w = await boot({user: 'dora', hash: 'today'}); d = w.document;
-  check(/Nothing left for today/.test(d.querySelector('#view .hempty')?.textContent || '') && d.querySelector('#view .hempty .heron'), 'Today without tasks: the heron looks into the water');
+  check(/Nothing left for today/.test(d.querySelector('#view .hempty')?.textContent || '') && d.querySelector('#view .hempty .o3c-k'), 'Today without tasks: the K line drawing');  // 2.83.0 (#1427): the K instead of the heron
   w.close();
   const dt = await call('POST', '/api/tasks', {title: 'Done today', due: day(0)}, CD);
   await call('PATCH', `/api/tasks/${dt.id}`, {status: 2}, CD);
@@ -276,10 +276,11 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   const DLG = `(() => { const c = document.querySelector('.colmd .card'); if (!c) return null; const r = c.getBoundingClientRect();
     const small = [...c.querySelectorAll('.colmv, .colr .chkl, .colnum, .foot .btn')].filter(e => e.offsetWidth).map(e => e.getBoundingClientRect()).filter(b => b.height < 43.5).length;
     return {fits: r.left >= 0 && r.right <= innerWidth + .5 && r.top >= 0 && r.bottom <= innerHeight + .5, small, over: c.scrollWidth - c.clientWidth}; })()`;
-  const SUN = `(() => { const s = document.querySelector('#view .heron .hr-sun'); if (!s) return null; const acc = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  // 2.83.0 (#1427): the empty list shows the K line drawing; its dot is the accent (was the heron's sun)
+  const SUN = `(() => { const s = document.querySelector('#view .o3c-k .o3c-kdot'); if (!s) return null; const acc = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
     const probe = document.createElement('span'); probe.style.color = 'var(--accent)'; document.body.appendChild(probe); const want = getComputedStyle(probe).color; probe.remove();
-    const h = document.querySelector('#view .heron').getBoundingClientRect();
-    return {fill: getComputedStyle(s).fill, want, acc, w: Math.round(h.width), line: getComputedStyle(document.querySelector('#view .heron')).color}; })()`;
+    const h = document.querySelector('#view .o3c-k').getBoundingClientRect();
+    return {fill: getComputedStyle(s).fill, want, acc, w: Math.round(h.width), line: getComputedStyle(document.querySelector('#view .o3c-k')).color}; })()`;
   const layout = async ({cmd, ev, nav, ctx, shot}, vw, vh, tag, phone) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + '#l/' + P); await ready(ev);
@@ -314,7 +315,7 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
     check(qb.n === 2 && qb.inside && (!phone || (qb.minW >= 43.5 && qb.minH >= 43.5)), `${tag}: quick add shows the paper clip + "Add and open"` + (phone ? ' with 44 px targets ' : ' ') + JSON.stringify(qb));
     await sleep(300);
     const s = await ev(SUN);
-    check(s && s.fill === s.want && s.w >= 90 && s.line !== s.fill, `${tag}: the heron's sun is the accent colour, lines in the text colour ` + JSON.stringify(s));
+    check(s && s.fill === s.want && s.w >= 90 && s.line !== s.fill, `${tag}: the K's dot is the accent colour, lines in the text colour ` + JSON.stringify(s));
     await shot(`p2140-${tag}-empty.png`);
   };
   // phones (touch)

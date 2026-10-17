@@ -605,6 +605,8 @@ def list_purge(c, lid, inbox):
     icon = c.execute("SELECT icon FROM lists WHERE id=?", (lid,)).fetchone()[0]
     lfiles = [r[0] for r in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))] + tfiles  # 2.7.1 (#410)
     lfiles += [r[0] for r in c.execute("SELECT path FROM budget_files WHERE list_id=?", (lid,))]  # 2.72.0 (#1333): receipts
+    from ..lists.listhead import o3c_head_rel
+    lfiles += [o3c_head_rel(lid, r[0]) for r in c.execute("SELECT header_file FROM lists WHERE id=? AND header_file!=''", (lid,))]  # 2.83.0 C (#1427)
     from ..integrations.gitfolder import gf_before_list_delete
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository hanging on it moves to another list of its folder
     c.execute("DELETE FROM lists WHERE id=?", (lid,))

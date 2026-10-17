@@ -700,6 +700,9 @@ ROUTES = {
     # 2.75.0 (#1411): the built-in assistant (session only; p275_a_api_test.py)
     "GET /api/assistant": "assistant", "PUT /api/assistant/lists": "assistant", "GET /api/assistant/log": "assistant",
     "POST /api/assistant/run": "assistant", "GET /api/admin/assistant": "assistant",
+    # 2.83.0 (#1427): the header strip of a list (need_list like the list icon; p283_c_api_test.py) and of an owner's folder
+    "PUT /api/lists/{}/header": "list", "POST /api/lists/{}/header": "list", "GET /api/list-header/{}/{}.jpg": "list",
+    "GET /api/folder-heads": "folder", "PUT /api/folder-heads": "folder",
 }
 
 # ---- 1. every route is classified, nothing stale

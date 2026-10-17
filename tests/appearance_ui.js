@@ -41,6 +41,15 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
     check(new RegExp(`\\['${k}', N_\\('\\w+'\\), '${a.d}', '${a.l}'\\]`).test(js), `${k}: LOOK table matches app.css`);
   }
   console.log('worst accent text contrast', worst.toFixed(2));
+  // 2.83.0 (#1427): every theme (Paper light, Night dark, High contrast both) keeps every accent and the text colours readable
+  const packs = [...css.matchAll(/:root\[data-pack="(\w+)"\](?:\[data-theme="(\w+)"\])?\{([^}]*)\}/g)].map(([, k, th, body]) => { const o = {}; for (const [, n, v] of body.matchAll(/--([\w-]+):([^;]+)/g)) o[n] = v.trim(); return {k, th, light: th === 'light', o}; }).filter(p => p.th !== 'auto');  // the auto copies (inside @media) repeat the same values
+  check(['paper', 'night', 'contrast'].every(k => packs.some(p => p.k === k)) && packs.filter(p => p.k === 'contrast').length === 2, 'themes in app.css: paper, night, contrast (dark + light) ' + packs.map(p => p.k + (p.light ? '-l' : '-d')));
+  check(/pack: \[\['control', N_\('Control room'\)\], \['paper', N_\('Paper'\)\], \['night', N_\('Night'\)\], \['contrast', N_\('High contrast'\)\]\]/.test(js), 'LOOK.pack: control room (default), paper, night, high contrast');
+  for (const p of packs) {
+    const base = p.light ? light : root, bgs = ['bg', 'bg2', 'bg3'].map(n => p.o[n] || base[n]);
+    for (const [k, a] of Object.entries(accents)) for (const bg of bgs) { const r = ratio(p.light ? a.l : a.d, bg); check(r >= 4.5, `theme ${p.k}${p.light ? ' light' : ''}: accent ${k} on ${bg}: ${r.toFixed(2)}`); }
+    for (const t of ['text', 'text2', 'muted']) for (const bg of bgs) { const r = ratio(p.o[t] || base[t], bg); check(r >= 4.5, `theme ${p.k}${p.light ? ' light' : ''}: ${t} on ${bg}: ${r.toFixed(2)}`); }
+  }
   // 1.1.3: Amber became Orange; it must stay apart from the high-priority red (--p5) in both themes (hue >= 15 degrees)
   const hue = hex => { const [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(1 + i, 3 + i), 16) / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), dd = mx - mn;
     if (!dd) return 0; const h = mx === r ? ((g - b) / dd) % 6 : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4; return (h * 60 + 360) % 360; };
@@ -99,6 +108,13 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   key(w, '-', {ctrlKey: true}, d.body); check(w.__store['tasks.fsize'] === '120', 'Ctrl + -: 5 % smaller'); key(w, '0', {ctrlKey: true}, d.body); check(!('tasks.fsize' in w.__store) && de.fsize === 'm', 'Ctrl + 0: back to 100 %'); await slide(125);
   // font
   for (const v of ['atkinson', 'system']) { await pick('font', v); check(de.font === v && w.__store['tasks.font'] === JSON.stringify(v), `font ${v}: applied + stored`); }
+  // 2.83.0 (#1427): themes: a preset over the colour scheme, one undo step, Control room = no attribute rules
+  check(pane().querySelectorAll('#s-pack button').length === 4 && pane().querySelector('[data-look="pack"][data-v="control"]').getAttribute('aria-pressed') === 'true' && de.pack === 'control', 'themes: four, Control room by default');
+  await pick('pack', 'paper'); check(de.pack === 'paper' && de.theme === 'light' && w.__store['tasks.pack'] === '"paper"' && w.__store['tasks.theme'] === '"light"', 'Paper: applied, light scheme, stored');
+  await pick('pack', 'night'); check(de.pack === 'night' && de.theme === 'dark', 'Night: dark scheme');
+  await pick('pack', 'contrast'); check(de.pack === 'contrast' && de.theme === 'dark', 'High contrast keeps the scheme');
+  w.eval(`histStep('undo')`); await sleep(80); check(de.pack === 'night', 'undo: one step back (Night)');
+  await pick('pack', 'control'); check(de.pack === 'control' && !('tasks.pack' in w.__store), 'Control room: nothing stored');
   // accent
   for (const v of ['sky', 'raspberry', 'rose', 'orange', 'lime']) { await pick('accent', v); check(de.accent === v && w.__store['tasks.accent'] === JSON.stringify(v), `accent ${v}: applied + stored`); }
   // theme + density (moved here)
