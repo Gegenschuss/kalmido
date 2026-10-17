@@ -35,7 +35,7 @@ from ..agents.core import (
 )
 from ..collab.reactions import clean_suggestion, tidy_apply
 from ..agents.chat import (
-    chat_delivered, chat_dict, chat_file_access, chat_newest, chat_file_delete, chat_files_of, chat_input, chat_one, chat_post,
+    chat_delivered, chat_dict, chat_file_access, chat_newest, jn9_chat_jobs, chat_file_delete, chat_files_of, chat_input, chat_one, chat_post,
     chat_react_req, chat_reactions_of, chat_unlink_trimmed, cx_notice_post, APPROVAL_PUSH_HOUR,
 )
 
@@ -1064,7 +1064,7 @@ def v1_agent_chats():
     names = user_names(c, [r["user_id"] for r in rows])
     rx, fs = chat_reactions_of(c, [r["id"] for r in rows]), chat_files_of(c, [r["id"] for r in rows])
     nw = {u: chat_newest(c, aid, u) for u in {r["user_id"] for r in rows}}  # 2.30.0 (#1037): choice_state
-    return jsonify(data=[{**chat_dict(r, rx, fs, api=True, newest=nw[r["user_id"]]), "user": {"id": r["user_id"], "name": names.get(r["user_id"], "")}} for r in rows],
+    return jsonify(data=jn9_chat_jobs(c, [{**chat_dict(r, rx, fs, api=True, newest=nw[r["user_id"]]), "user": {"id": r["user_id"], "name": names.get(r["user_id"], "")}} for r in rows], aid),  # 2.59.0 (#1827)
                    cursor=rows[-1]["id"] if rows else since, has_more=more)
 
 
@@ -1136,6 +1136,8 @@ def v1_agent_chat_post(uid):
     from ..agents.steps import steps_take
     if jid or offer:
         c.execute("UPDATE agent_chat SET job_id=?, job_parent=?, offer_save=? WHERE id=?", (jid, jpar, 1 if offer else 0, r["id"]))
+        if jid and jpar:  # 2.59.0 (#1827): the job keeps its leader (once set it stays), so all its messages share the colour
+            c.execute("UPDATE agent_jobs SET parent_id=? WHERE id=? AND parent_id IS NULL", (jpar, jid))
         r = c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()
     if not b.get("permission"):  # 2.32.0 (#1081): the answer takes the live steps of the run along (a permission question: the run goes on)
         steps_take(c, aid, uid, r["id"])

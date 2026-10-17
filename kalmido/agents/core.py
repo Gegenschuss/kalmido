@@ -267,6 +267,10 @@ def agent_task_data(c, tid, aid, full=None, **extra):
     task, lst = task_for(c, row, aid), lst_brief(c, row["list_id"])
     from ..tasks.snippets import snip_event, snip_parse  # 2.35.0 (#1095): a shortened copy (full code: get_task)
     task["snippets"], task["snippets_total"] = snip_event(row["snippets"]), len(snip_parse(row["snippets"]))
+    from ..tasks.related import rt9_event  # 2.59.0 B (#1375): the related tasks the agent sees (cache only; none without a vector)
+    rel = rt9_event(c, tid, aid)
+    if rel is not None:
+        task["related"] = rel
     if full is None:
         full = task_visible(c, tid, aid, full=True)
     if full:
@@ -860,7 +864,31 @@ def job_dict(c, j, names=None):
             "created_at": j["created_at"], "updated_at": j["updated_at"],
             "kind": j["kind"], "proposal_state": j["prop_state"] or None,  # 2.3.0: proposal jobs
             "approval": bool(j["approval"]) if "approval" in j.keys() else False,  # 2.15.0 (#479): a request waiting for approval
-            "name": jc_job_name(j["title"], j["name"] if "name" in j.keys() else None)}  # 2.56.0 (#1793), 2.58.0 (#1803): own field first: "Clara" of "Clara: Release 2.50" (null without)
+            "name": jc_job_name(j["title"], j["name"] if "name" in j.keys() else None),  # 2.56.0 (#1793), 2.58.0 (#1803): own field first: "Clara" of "Clara: Release 2.50" (null without)
+            "parent_id": j["parent_id"] if "parent_id" in j.keys() else None}  # 2.59.0 (#1827): the leading job of a part job
+
+
+# 2.59.0 (#1827): name + leading job of the jobs ids that uid may see ({id: {"name", "parent_id", "parent_name"}}; jobs
+# uid may not see are left out, so is the name of a leader uid may not see). The one place that derives a job's name for
+# the chat (jc_job_name), so a name column only needs adding here.
+def jn9_job_names(c, ids, uid):
+    ids = sorted({int(i) for i in ids if i})
+    if not ids:
+        return {}
+    rows = {j["id"]: j for j in c.execute(f"SELECT * FROM agent_jobs WHERE id IN ({','.join('?' * len(ids))})", ids)}
+    pids = sorted({j["parent_id"] for j in rows.values() if "parent_id" in j.keys() and j["parent_id"]} - set(rows))
+    if pids:
+        rows.update({j["id"]: j for j in c.execute(f"SELECT * FROM agent_jobs WHERE id IN ({','.join('?' * len(pids))})", pids)})
+    seen = {i: j for i, j in rows.items() if job_visible(c, j, uid)}
+    out = {}
+    for i in ids:
+        j = seen.get(i)
+        if not j:
+            continue
+        par = seen.get(j["parent_id"]) if "parent_id" in j.keys() and j["parent_id"] else None
+        out[i] = {"name": jc_job_name(j["title"], j["name"] if "name" in j.keys() else None), "parent_id": par["id"] if par else None,
+                  "parent_name": jc_job_name(par["title"], par["name"] if "name" in par.keys() else None) if par else None}
+    return out
 
 
 def job_visible(c, j, uid):

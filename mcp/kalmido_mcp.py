@@ -424,9 +424,16 @@ TOOLS = [
                        "working day.",
      _obj({"date": {"type": "string", "description": "YYYY-MM-DD, default today"}}),
      lambda api, a: api.call("GET", "/dayplan/review", _pick(a, ("date",)))),
-    ("search_tasks", "Full-text search in titles, notes, links and custom fields of visible tasks.",
-     _obj({"q": {"type": "string", "minLength": 1}, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}, ["q"]),
-     lambda api, a: api.call("GET", "/search", _pick(a, ("q", "limit")))),
+    ("search_tasks", "Full-text search in titles, notes, links and custom fields of visible tasks. 2.59.0: semantic=true adds "
+                     "tasks of similar meaning after the text hits (flag similar; needs the server's embedding service).",
+     _obj({"q": {"type": "string", "minLength": 1}, "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+           "semantic": {"type": "boolean"}}, ["q"]),
+     lambda api, a: api.call("GET", "/search", {**_pick(a, ("q", "limit")), **({"semantic": "1"} if a.get("semantic") else {})})),
+    ("related_tasks", "2.59.0: up to 5 tasks close in meaning to a task (local text vectors on the server, similar titles, "
+                      "#references), only tasks you may see: {enabled, pending, items: [{id, title, list_id, done, score, dup, ref}]}. "
+                      "dup = probably a duplicate, ref = named by #number in either direction. enabled false = the server has no embedding service; pending = not computed yet. "
+                      "Use it before creating a task (duplicates) and to find context. Read-only.",
+     _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/related")),
     ("search_messages", "2.33.0: full-text search in task comments, team chat and your own chats with people (only what you may read: "
                         "the lists shared with you, their channels, your chats). Words match word beginnings; case, accents and ä/ae do not "
                         "matter. Newest first; each hit: art (c comment | t team chat | a agent chat), chat_type, task_id / room_id / "
@@ -646,7 +653,7 @@ TOOLS = [
                                                "show what the person answered)"},
            "job_id": {**S_ID, "description": "2.32.0: this message is the result of your job for this person (its history shows under it)"},
            "job_parent": {**S_ID, "description": "2.47.3: with job_id: the leading job of this part job (another job of yours); the app colours a message "
-                                                 "'Job #N: ...' by its job and gives a part job the colour of its leader"},
+                                                 "'Job #N: ...' by its job and gives a part job the colour of its leader; 2.59.0: the job keeps it (parent_id)"},
            "permission": {"type": "boolean"}, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800},
            "choices": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {
                "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
@@ -1346,8 +1353,9 @@ _CLIENT = {"name": {"type": "string"}, "icon": {"type": "string"}, "color": {"ty
            "rate": {"type": "number"}, "budget_h": {"type": "number"}, "budget_amount": {"type": "number"}, "org_id": {"type": "integer"},
            "archived": {"type": "boolean"},
            # 2.40.0 (#1380): the contact persons (the whole list; "contact" stays the default's name)
-           "contacts": {"type": "array", "description": "2.40.0: the contact persons [{id?, name, role?, email?, phone?, is_default?}]: "
-                        "the whole list (with id = keep, without = new, missing = deleted)", "items": {"type": "object"}}}
+           "contacts": {"type": "array", "description": "2.40.0: the contact persons [{id?, name, role?, email?, phone?, is_default?, contact_id?}]: "
+                        "the whole list (with id = keep, without = new, missing = deleted); 2.59.0: contact_id = a contact of an address "
+                        "book of the client's organisation (null = unlink, missing = unchanged; needs the scope contacts)", "items": {"type": "object"}}}
 _FORM = {"title": {"type": "string"}, "intro": {"type": "string"}, "access": {"type": "string", "enum": ["org", "public"]},
          "section_id": {"type": "integer"}, "ask_email": {"type": "boolean"}}
 TOOLS += [

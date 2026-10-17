@@ -5,7 +5,8 @@ that survives a restart of the event runner (agent_run.py), reports to a Kalmido
 (with the files in its outbox) into the chat when it is done.
 
 usage (from inside a run; KALMIDO_URL / KALMIDO_TOKEN / KALMIDO_CHAT_USER are in the environment of the run):
-  agent_job.py start --title "Release 2.29" [--name Clara] [--worktree] [--task ID] [--timeout-h 6] -    brief on stdin ("-") or a file
+  agent_job.py start --title "Release 2.29" [--name Alma] [--parent ID] [--worktree] [--task ID] [--timeout-h 6] -
+                                            brief on stdin ("-") or a file
   agent_job.py list                         the jobs of this host (open ones first)
   agent_job.py status ID                    one job: state, pid, resumes, last progress line
   agent_job.py progress ID "text"           a milestone for the person (job log + status line)
@@ -23,6 +24,9 @@ How it works
   - plan limit: the job waits until the window resets (+ 2 min, state "paused" counts as active) and resumes the SAME
     session (--resume, at most 3 times). Stop works during the wait.
   - a time limit (KALMIDO_JOB_TIMEOUT_H, default 6) ends the job; it says so in its result.
+  - 2.59.0 (#1827): every job gets a name, its title starts with it ("Alma: Release 2.29"): --name, else the next free one
+    of JOB_NAMES; --parent ID makes it a part job of job ID ("Alma B", the result posts job_parent). The app shows the
+    name on the job's messages and derives the job's colour from it; a part job takes its leader's colour, lighter.
   - --worktree: its own `git worktree` + branch job/<id> next to the state, at most KALMIDO_JOB_WORKTREES (default 2) open.
   - the result goes to the chat of the person; then (2.46.6) the job wakes the chat agent: one file in <state dir>/wakes/ that
     the runner turns into ONE chat run (event job_wake); without a chat person a line in the runner's notes instead. The
@@ -72,6 +76,10 @@ def redact(text):
     return text
 
 
+# 2.59.0 (#1827): neutral first names for jobs (kalmido-capability: job_names); the app reads a name the same way (NAME_RE)
+JOB_NAMES = ("Alma", "Bruno", "Cora", "Dina", "Emil", "Fiona", "Greta", "Hugo", "Ida", "Jonas", "Kira", "Leo", "Mila", "Nils",
+             "Olga", "Paula", "Rosa", "Theo", "Vera", "Yara")
+NAME_RE = re.compile(r"^([A-ZÄÖÜ][a-zäöüß]{1,11}(?: [A-Z])?): ")
 STATE_DIR = None  # set by the runner (agent_extras) when its --state differs from the environment
 
 
@@ -162,6 +170,27 @@ def is_open(j):
     return j.get("state") in OPEN_STATES
 
 
+def job_name(title, name="", parent=None, jobs=None):
+    """2.59.0 (#1827): the name of a new job: the one its title starts with, --name, a part job's leader + a letter, else
+    the first of JOB_NAMES no open job of this host carries (in turn)."""
+    m = NAME_RE.match(title)
+    if m:
+        return m.group(1)
+    if name:
+        return name
+    jobs = all_jobs() if jobs is None else jobs
+    if parent:
+        lead = next((j for j in jobs if int(j["id"]) == int(parent)), None)
+        base = (lead or {}).get("name") or (NAME_RE.match((lead or {}).get("title") or "") or [None, None])[1]
+        if base:
+            n = sum(1 for j in jobs if str(j.get("parent") or "") == str(parent))
+            return f"{base.split(' ')[0]} {chr(ord('A') + n % 26)}"
+    used = {(j.get("name") or "").split(" ")[0] for j in jobs if is_open(j)}
+    k = len(jobs)
+    return next((JOB_NAMES[(k + i) % len(JOB_NAMES)] for i in range(len(JOB_NAMES)) if JOB_NAMES[(k + i) % len(JOB_NAMES)] not in used),
+                JOB_NAMES[k % len(JOB_NAMES)])
+
+
 # ---- the Kalmido API (the few calls a job needs)
 
 class Api:
@@ -245,6 +274,8 @@ def post_result(api, j, text, files):
         body = {"body": part or "(no text)"}
         if j.get("kalmido_job"):
             body["job_id"] = j["kalmido_job"]
+            if j.get("parent"):  # 2.59.0 (#1827): a part job names its leader (the job keeps it; colour of the leader)
+                body["job_parent"] = j["parent"]
         try:
             if i == 0 and files:
                 raw, ct = multipart({k: str(v) for k, v in body.items()}, [("file", p) for p in files])
@@ -253,6 +284,12 @@ def post_result(api, j, text, files):
                 api.req("POST", f"/agent/chats/{int(uid)}", body, timeout=60)
         except Exception as e:
             log(f"result part {i + 1} not posted: {str(e)[:150]}")
+            if body.pop("job_parent", None):  # an older server or a leader it does not accept: the same without it
+                try:
+                    api.req("POST", f"/agent/chats/{int(uid)}", body, timeout=60)
+                    continue
+                except Exception:
+                    pass
             if i == 0 and files and body.get("job_id"):  # maybe the files or the job link: the text alone
                 try:
                     api.req("POST", f"/agent/chats/{int(uid)}", {"body": body["body"]}, timeout=60)
@@ -373,16 +410,18 @@ def revive_lost(api=None):
 
 def cmd_start(argv):
     title, task, worktree, timeout_h, src = "", None, False, float(os.environ.get("KALMIDO_JOB_TIMEOUT_H") or 6), None
-    name = ""  # 2.58.0 (#1803): the job's own name (POST /agent/jobs {name}), shown on its badge; people address it with "Name: ..."
+    name, parent = "", None  # 2.58.0 (#1803): own name (POST /agent/jobs {name}); 2.59.0 (#1827): part job of job ID
     i = 0
     while i < len(argv):
         a = argv[i]
         if a == "--title":
             title = argv[i + 1]; i += 2
-        elif a == "--name":
-            name = argv[i + 1]; i += 2
         elif a == "--task":
             task = int(argv[i + 1]); i += 2
+        elif a == "--name":
+            name = argv[i + 1].strip(); i += 2
+        elif a == "--parent":
+            parent = int(argv[i + 1]); i += 2
         elif a == "--timeout-h":
             timeout_h = float(argv[i + 1]); i += 2
         elif a == "--worktree":
@@ -390,7 +429,10 @@ def cmd_start(argv):
         else:
             src = a; i += 1
     if not title.strip() or not src:
-        print("usage: agent_job.py start --title TITLE [--name NAME] [--worktree] [--task ID] [--timeout-h N] - (brief on stdin) | FILE")
+        print("usage: agent_job.py start --title TITLE [--name NAME] [--parent ID] [--worktree] [--task ID] [--timeout-h N] - (brief on stdin) | FILE")
+        return 2
+    if name and not NAME_RE.match(name + ": "):
+        print("--name: one word with a capital letter first, 2 to 12 letters, optionally a capital letter after a space (\"Alma\", \"Alma B\")")
         return 2
     brief = sys.stdin.read() if src == "-" else open(os.path.expanduser(src), encoding="utf-8").read()
     if not brief.strip():
@@ -406,6 +448,9 @@ def cmd_start(argv):
     if worktree and sum(1 for j in all_jobs() if is_open(j) and j.get("worktree")) >= cap:
         print(f"{cap} jobs with their own working copy are open already: wait for one or start this one without --worktree")
         return 3
+    name = job_name(title.strip(), name, parent)  # 2.59.0 (#1827): the title starts with the job's name
+    if not NAME_RE.match(title.strip()):
+        title = f"{name}: {title.strip()}"
     api = Api()
     uid = os.environ.get("KALMIDO_CHAT_USER") or ""
     body = {"title": title.strip()[:200], "state": "running"}
@@ -425,7 +470,7 @@ def cmd_start(argv):
     os.makedirs(os.path.join(d, "outbox"), exist_ok=True)
     with open(os.path.join(d, "brief.txt"), "w", encoding="utf-8") as f:
         f.write(brief)
-    j = {"id": jid, "kalmido_job": jid, "title": title.strip(), "state": "starting", "cmd": cmd, "task": task,
+    j = {"id": jid, "kalmido_job": jid, "title": title.strip(), "name": name, "parent": parent, "state": "starting", "cmd": cmd, "task": task,
          "chat_user": int(uid) if uid.isdigit() else None, "timeout_s": int(timeout_h * 3600), "resumes": 0,
          "created": time.time(), "cwd": os.getcwd(), "worktree": None, "session": ""}
     if worktree:

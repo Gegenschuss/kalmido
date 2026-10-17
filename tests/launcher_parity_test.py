@@ -330,5 +330,15 @@ posts, calls = agent_run("stubborn")
 check(len(calls) == 1 and "Hinweis" not in posts[0]["body"], "KALMIDO_APPROVAL_CHECK=0 switches it off")
 ar.APPROVAL_CHECK = True
 
+# ---- 2.59.0 (#1827): job names of agent_job.py (the title starts with the name; part jobs: the leader's + a letter)
+spec = importlib.util.spec_from_file_location("agent_job", os.path.join(MCP, "agent_job.py"))
+aj = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(aj)
+JS = [{"id": 5, "name": "Alma", "state": "running", "title": "Alma: Release"}, {"id": 6, "name": "Alma A", "parent": 5, "state": "running"}]
+check(aj.job_name("Bo: x", jobs=JS) == "Bo" and aj.job_name("x", name="Vera", jobs=JS) == "Vera", "a name in the title or --name wins")
+check(aj.job_name("x", parent=5, jobs=JS) == "Alma B", "a part job: the leader's name + the next letter")
+check(aj.job_name("x", jobs=JS) in aj.JOB_NAMES and aj.job_name("x", jobs=JS) != "Alma", "else a free name of the list")
+check(all(aj.NAME_RE.match(n + ": ") for n in aj.JOB_NAMES) and len(set(aj.JOB_NAMES)) == len(aj.JOB_NAMES), "every listed name is read back as a name")
+
 print(f"launcher_parity: {ok} ok, {len(F)} failed")
 sys.exit(1 if F else 0)

@@ -107,6 +107,7 @@ function ctCardHtml(c) {
     </div>
     ${c.note ? `<div class="ctnote md">${renderMd(c.note, false, {})}</div>` : ''}
     ${lifeCareHtml(c)}
+    ${(c.clients || []).length ? `<div class="ctsec cklsec"><h4>${tr('Contact person at')}</h4><ul class="ctlinks">${c.clients.map(x => `<li><a class="linkbtn" href="#client/${x.client_id}">${ic('brief', 's')} ${esc(x.name)}</a>${x.role ? `<span class="muted"> · ${esc(x.role)}</span>` : ''}</li>`).join('')}</ul></div>` : ''}${''/* 2.59.0 (#1735): the clients this contact is a contact person of (only who may open them) */}
     <div class="ctsec"><h4>${tr('Tasks')}</h4>${(c.tasks || []).length ? `<ul class="ctlinks">${c.tasks.map(t => `<li><button type="button" class="linkbtn ${t.status ? 'done' : ''}" data-cttask="${t.task_id}">${ic(t.status ? 'done' : 'list', 's')} ${esc(t.title)}</button><span class="muted"> · ${esc(tr(kinds[t.kind] || 'About'))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No linked tasks yet: “Link a contact” in a task’s panel.')}</p>`}</div>
     ${(c.events || []).length ? `<div class="ctsec"><h4>${tr('Events')}</h4><ul class="ctlinks">${c.events.map(e => `<li><button type="button" class="linkbtn" data-evopen="${e.event_id}">${ic('cal', 's')} ${esc(e.title)}</button><span class="muted"> · ${esc(e.all_day ? fmtDayAbs(e.start.slice(0, 10)) : fmtDayAbs(e.start.slice(0, 10)) + ' ' + fmtTimeLoc(e.start.slice(11, 16)))}</span></li>`).join('')}</ul></div>` : ''}
   </article>`;

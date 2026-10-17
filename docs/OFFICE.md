@@ -269,6 +269,15 @@ clients and the company take an ISO 3166-1 alpha-2 code, chosen by name (the bro
 Switzerland on top, empty = Germany); `UK` becomes `GB`, `EL` `GR`, anything else is refused, and an old unknown value
 stops the finalising of an invoice instead of turning silently into `DE`.
 
+**Contact persons from the address book (2.59)**: in the client dialog, "From the address book" next to a contact person
+searches the address books the client's organisation owns (a client without an organisation: your own address books;
+private books never) and copies name, function, e-mail and phone into the fields; the contact person is then linked
+("Linked", "Unlink" drops the link). Saving the client stores the link, Cancel drops it. Later changes of the contact do not
+follow: documents keep reading the copy at the contact person. The contact's card shows "Contact person at" with the clients,
+only to people who may open those clients. Deleting the contact or its address book only drops the link; a client moved into
+another workspace loses its links. The nightly boundary check reports a link to an address book outside the client's
+organisation and drops it.
+
 ## Sales pipeline and figures (2.50)
 
 Two tabs for the admins of the office area (a personal office: its owner; members get `403`).

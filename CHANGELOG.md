@@ -7,6 +7,38 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.59.0] - 2026-10-17
+
+**In short:** **related tasks** - every task can show up to five tasks with a similar meaning and flags probable
+duplicates, a quiet hint while adding, "similar meaning" in the search - computed by a small local model in the new
+optional `kalmido-embed` service (no language model, nothing leaves the server); a client's **contact persons link to
+address book contacts**; agent job messages show the **job's name with a colour of its own**.
+
+### Added
+- **Related tasks:** a folded section *Related tasks* in a task lists up to five tasks with a similar meaning (only tasks
+  you can see) and marks *probably a duplicate*; tasks mentioned by number (#123) stand apart below. While adding a
+  task a quiet hint "Similar: #… title" appears (tap opens it, nothing blocks), the search gets *also similar meaning*.
+  Admins switch it on and off under *Administration > Server* and see the state of the service. Agents get `related` in
+  task events, `GET /api/v1/tasks/{id}/related`, `search?semantic=1` and the MCP tool `related_tasks` (#1375).
+- **Optional embedding service `kalmido-embed`:** `docker compose --profile embed up -d --build` plus
+  `KALMIDO_EMBED_URL=http://embed:8090` in `.env`. A small multilingual model (multilingual-e5-small, int8, MIT) turns
+  task texts into numbers on your CPU (~0.15 s per task on a small 4-core machine, ~0.6 GB RAM), without network at run
+  time and without logging texts. Vectors live in the new table `task_vectors`, protected like tasks (row-level
+  security, sealed with the organisation's key in encrypted organisations). Without the service nothing changes (#1375).
+- **Clients:** a contact person of a client can be linked to a contact from the organisation's address books (*Pick
+  from address book* takes over name, role, e-mail and phone); freelancers without an organisation link their own
+  books. The contact card shows "Contact person at <client>" to everybody who may open the client. Deleting a contact
+  or a book only drops the link; the nightly boundary check unlinks contacts across organisations (#1735).
+
+### Changed
+- **Job messages in the agent chat** carry the job's name in their tag (without a name "Job #N" as before); the colour
+  comes from the name, so a follow-up job with the same name keeps it, and part jobs take their leader's tone, a little
+  lighter. Messages deliver `job_name`, `job_parent`, `job_parent_name`; jobs `parent_id`; the reference launcher
+  `mcp/agent_job.py` names its jobs (`--name`, else from a list) (#1827).
+
+### Fixed
+- `POST/PATCH /api/v1/clients` accept `contacts` (with `contact_id`) as documented since 2.40.0 (#1735).
+
 ## [2.58.0] - 2026-10-17
 
 **In short:** a collection of fixes - Back on Android closes dialogs, invoices from quotations with parts are exact to the

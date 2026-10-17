@@ -748,13 +748,19 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "task_id": nul("integer"), "user_id": nul("integer"), "title": {"type": "string"}, "state": {"type": "string", "enum": list(JOB_STATES)},
         "log": {"type": "string"}, "action": nul("string", enum=[*JOB_ACTIONS, None]), "created_at": {"type": "string"}, "updated_at": {"type": "string"},
         "kind": nul("string", enum=[*PROP_KINDS, None]), "proposal_state": nul("string", enum=[*PROP_STATES, None]),
-        "name": nul("string", description="2.58.0 (#1803): the job's name (own field, else the \"Name: \" start of the title)")}}
+        "name": nul("string", description="2.58.0 (#1803): the job's name (own field, else the \"Name: \" start of the title)"),
+        "parent_id": nul("integer", description="2.59.0 (#1827): the leading job of a part job (set by a chat answer with job_parent)")}}
     agent = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "status": {"type": "string", "enum": list(AGENT_STATUSES)},
                                               "status_text": {"type": "string"}, "status_task": nul("integer"),
                                               "job_tasks": {"type": "array", "items": {"type": "integer"}}, "running": {"type": "integer"}, "waiting": {"type": "integer"},
                                               "enabled": {"type": "boolean"}}}
     msg = {"type": "object", "properties": {"id": {"type": "integer"}, "user_id": {"type": "integer"}, "from": {"type": "string", "enum": ["user", "agent"]},
                                             "body": {"type": "string"}, "task_id": nul("integer"), "created_at": {"type": "string"},
+                                            "job_id": nul("integer", description="2.32.0 (#1081): the job whose result this message is"),
+                                            # 2.59.0 (#1827): the app shows the job's name and derives its colour from it
+                                            "job_name": nul("string", description="2.59.0 (#1827): the name of that job (\"Clara\" of \"Clara: ...\")"),
+                                            "job_parent": nul("integer", description="2.47.3 (#1764): the leading job of that part job (of the message or the job)"),
+                                            "job_parent_name": nul("string", description="2.59.0 (#1827): the name of the leading job"),
                                             "reply_to": nul("integer", description="2.33.0 (#1076): the answered message of this conversation; reply = its quote"),
                                             "reply": {"anyOf": [ref("ReplyQuote"), {"type": "null"}]},
                                             "delivered_at": nul("string", description="2.7.2 (#422): when the agent fetched the person's message (event poll, MCP, webhook, chat read); null = not yet / an agent message"),
@@ -957,6 +963,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                               "with this person (else 400); the app shows the quote above your answer"},
                                                  "job_id": {"type": "integer", "description": "2.32.0 (#1081): this message is the result of your job "
                                                             "(for this person): its history shows under it"},
+                                                 "job_parent": {"type": "integer", "description": "2.47.3 (#1764) / 2.59.0 (#1827): with job_id, the leading "
+                                                                "job of this part job (your job for this person, else 400); the job keeps it, the app gives the "
+                                                                "part the leader's colour, a little lighter"},
                                                  "choices": {"type": "array", "maxItems": 8, "description": "2.28.0 (#1005): answer buttons; the person's answer comes as the event chat_choice (message_id, choice_ids, labels)",
                                                              "items": {"type": "object", "required": ["id", "label"], "properties": {"id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
                                                                                                                                     "style": {"type": "string", "enum": ["default", "primary", "danger"]}}}},
@@ -980,6 +989,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                                              "yes_label": {"type": "string", "maxLength": 80}, "no_label": {"type": "string", "maxLength": 80}}}}}},
                                              "multipart/form-data": {"schema": {"type": "object", "properties": {
                                                  "body": {"type": "string"}, "task_id": {"type": "integer"}, "reply_to": {"type": "integer"},
+                                                 "job_id": {"type": "integer"}, "job_parent": {"type": "integer"},  # 2.59.0 (#1827)
                                                  "approval": {"type": "string", "description": "2.35.0 (#1103): the approval object as a JSON string"},
                                                  "file": {"type": "array", "items": {"type": "string", "format": "binary"}}}}}}}}},
         "/agent/usage": {  # 2.1.1 (#326)

@@ -105,6 +105,9 @@ KINDS = {
     # 2.50.0 A (#1195, #1194): absences and bookings of an organisation / a personal area (row-level security + the app)
     "hub": ("matrix", "p250_a_api_test.py: absences and bookings by id of another organisation 404 (read, change, delete, restore), "
                       "the kind of an absence only for the person and the admins, resources of another organisation cannot be booked"),
+    # 2.59.0 B (#1375): related tasks -- candidates only among the tasks the asker sees
+    "related": ("matrix", "p259_b_api_test.py: related tasks, the hint while adding, search semantic=1, API v1 and agent events never "
+                          "name a task of another organisation, an unshared list or a private list; another organisation's task 404"),
 }
 
 ROUTES = {
@@ -202,6 +205,7 @@ ROUTES = {
     "GET /api/clients": "client", "GET /api/clients/{}": "client", "POST /api/clients": "client",
     "PATCH /api/clients/{}": "client", "DELETE /api/clients/{}": "client", "GET /api/v1/clients": "client",
     "POST /api/clients/bulk": "client", "POST /api/v1/clients/bulk": "client",  # 2.47.3 (#1733): every id checked first (p2473_c_api_test.py)
+    "GET /api/clients/{}/book-contacts": "client",  # 2.59.0 (#1735): only the client's own address books (p259_a_api_test.py)
     "POST /api/v1/clients": "client", "GET /api/v1/clients/{}": "client", "PATCH /api/v1/clients/{}": "client",
     "DELETE /api/v1/clients/{}": "client", "GET /api/v1/workload": "client", "GET /api/workload": "client",
     "PUT /api/workload/capacity/{}": "client",
@@ -593,6 +597,9 @@ ROUTES = {
     "GET /api/newsletter": "newsletter", "PUT /api/newsletter": "newsletter", "DELETE /api/newsletter": "newsletter",
     "GET /api/newsletter/lists": "newsletter", "POST /api/newsletter/segments": "newsletter", "PATCH /api/newsletter/segments/{}": "newsletter",
     "DELETE /api/newsletter/segments/{}": "newsletter", "POST /api/newsletter/sync": "newsletter", "PUT /api/newsletter/consent": "newsletter",
+    # 2.59.0 B (#1375): related tasks (tasks/related.py)
+    "GET /api/tasks/{}/related": "related", "GET /api/v1/tasks/{}/related": "related", "POST /api/tasks/similar": "related",
+    "GET /api/related/config": "public", "GET /api/admin/related": "admin", "PUT /api/admin/related": "admin",
 }
 
 # ---- 1. every route is classified, nothing stale

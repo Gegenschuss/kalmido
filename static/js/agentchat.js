@@ -105,9 +105,25 @@ function ux_jobOf(m) {
   if (m.from !== 'agent' || m.kind === 'notice') return null;
   const x = UX_JOB_RE.exec(m.body || ''); if (!x && !m.job_id) return null;  // 2.56.0 (#1793): or a message the service tied to its job
   const no = x ? +x[1] : +m.job_id, par = +m.job_parent || 0;
-  return {no, parent: par && par !== no ? par : 0};
+  // 2.59.0 (#1827): + the job's name and its leader's (the server sends them with job_id), else what the job list knows
+  const own = !x || +x[1] === +m.job_id, name = (own && m.job_name) || S.jc?.jobs?.[no]?.name || '';
+  const p = par && par !== no ? par : 0, pname = p ? (own && m.job_parent_name) || S.jc?.jobs?.[p]?.name || '' : '';
+  return {no, parent: p, name, pname};
 }
-const ux_jobColor = n => AC_COLORS[(+n || 0) % AC_COLORS.length];
+// 2.59.0 (#1827): the colour of a job comes from its name (FNV-1a over the name in small letters, so "Walker" and a
+// follow-up job "Walker (Fortsetzung)" share it), without a name from the number as before. A part job: its leader's.
+function jn9_hash(name) {
+  const k = String(name || '').toLowerCase().replace(/\s*\(.*\)\s*$/, '').trim();
+  let h = 0x811c9dc5;
+  for (let i = 0; i < k.length; i++) { h ^= k.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return k ? h : -1;
+}
+const ux_jobColor = (n, name) => { const h = name ? jn9_hash(name) : -1; return AC_COLORS[(h >= 0 ? h : +n || 0) % AC_COLORS.length]; };
+// 2.59.0 (#1827): a part job whose leader is not known (no job_parent yet) is told by its name "Walker E": the leader's
+// tone from "Walker", lighter
+const JN9_PART_RE = /^(.+) [A-Z]$/;
+const jn9_part = jb => !!jb.parent || JN9_PART_RE.test(jb.name || '');
+const jn9_jobColor = jb => jb.parent ? ux_jobColor(jb.parent, jb.pname) : ux_jobColor(jb.no, (JN9_PART_RE.exec(jb.name || '') || [])[1] || jb.name);
 const ux_jobTag = jb => `<span class="jobtag" aria-hidden="true"><i></i>${esc(tr('Job #{0}', jb.no))}</span>`;
 function chatMsgs() {
   const a = agentById(S.chat.aid);
@@ -121,8 +137,8 @@ function chatMsgs() {
     // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
     const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
     const ap = !mine && apvKind(m), apo = ap && chatChoiceSt(m) === 'open', ed = mine && S.chat.edit === m.id;  // 2.39.0 (#1179): my message in edit mode
-    const jb = !mine && ux_jobOf(m), jcol = jb ? ux_jobColor(jb.parent || jb.no) : '';  // 2.47.3 (#1764)
-    return `<div class="cmsg ${mine ? 'me' : 'ag agc'}${jb ? ' jobm' + (jb.parent ? ' jpart' : '') : ''}${rxShow('c' + m.id)}${chatPerm(m) ? ' perm' : ''}${ap ? ' apv' + (apo ? ' apvopen' : '') : ''}" data-k="m${m.id}${m.choice ? 'a' : ''}${ap ? chatChoiceSt(m)[0] : ''}${m.edited_at ? 'e' + m.edited_at : ''}${ed ? 'E' : ''}" data-mid="a:${m.id}" ${ap ? `id="apv-${m.id}"` : ''}${jb ? ` style="--jcol:${jcol}"` : ''}>${!mine && stepsAlwaysOn() ? chatStepsKept(m) : ''}${replyQuoteHtml(m, 'a')}${ap ? apvHead(m, apo) : ''}${jb ? jc_tagHtml(jb, m) : ''}${ed ? chatEditHtml(m) : m.body && !(ap === 'a' && m.body.trim() === m.choices.approval.title) ? `<div class="cbub">${jb ? jc_bodyHtml(commentBody(m.body, {}), jb) : commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${tlkChSug(m) ? '' : chatChoicesHtml(m)}${!mine && m.job_id && m.job_steps ? jobStepsHtml(m.job_id, m.job_steps) : ''}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${!mine && m.offer_save && !m.saved_task_id ? `<div class="csoffer"><button type="button" class="btn sm" data-act="chat-save" data-mid="${m.id}">${ic('bookmark', 's')} ${tr('Save as task')}</button></div>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${mine && m.edited_at ? chatEditedHtml(m) : ''}${chatRxHtml(m, a)}${a?.enabled ? replyBtn('chrbtn mreply') : ''}${chatSavedMark(m)}<button type="button" class="rx rxtog" data-act="chat-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>${tlkChSug(m) ? chatChoicesHtml(m) : ''}</div>`; }).join('')
+    const jb = !mine && ux_jobOf(m), jcol = jb ? jn9_jobColor(jb) : '';  // 2.47.3 (#1764), 2.59.0 (#1827): from the name
+    return `<div class="cmsg ${mine ? 'me' : 'ag agc'}${jb ? ' jobm' + (jn9_part(jb) ? ' jpart' : '') : ''}${rxShow('c' + m.id)}${chatPerm(m) ? ' perm' : ''}${ap ? ' apv' + (apo ? ' apvopen' : '') : ''}" data-k="m${m.id}${m.choice ? 'a' : ''}${ap ? chatChoiceSt(m)[0] : ''}${m.edited_at ? 'e' + m.edited_at : ''}${ed ? 'E' : ''}" data-mid="a:${m.id}" ${ap ? `id="apv-${m.id}"` : ''}${jb ? ` style="--jcol:${jcol}"` : ''}>${!mine && stepsAlwaysOn() ? chatStepsKept(m) : ''}${replyQuoteHtml(m, 'a')}${ap ? apvHead(m, apo) : ''}${jb ? jc_tagHtml(jb, m) : ''}${ed ? chatEditHtml(m) : m.body && !(ap === 'a' && m.body.trim() === m.choices.approval.title) ? `<div class="cbub">${jb ? jc_bodyHtml(commentBody(m.body, {}), jb) : commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${tlkChSug(m) ? '' : chatChoicesHtml(m)}${!mine && m.job_id && m.job_steps ? jobStepsHtml(m.job_id, m.job_steps) : ''}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${!mine && m.offer_save && !m.saved_task_id ? `<div class="csoffer"><button type="button" class="btn sm" data-act="chat-save" data-mid="${m.id}">${ic('bookmark', 's')} ${tr('Save as task')}</button></div>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${mine && m.edited_at ? chatEditedHtml(m) : ''}${chatRxHtml(m, a)}${a?.enabled ? replyBtn('chrbtn mreply') : ''}${chatSavedMark(m)}<button type="button" class="rx rxtog" data-act="chat-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>${tlkChSug(m) ? chatChoicesHtml(m) : ''}</div>`; }).join('')
     + (off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
 }
 // 2.41.0 (#1206): a notice of the agent ("New session, summary taken over (22:10)"): one grey line in the middle, no bubble,

@@ -24,6 +24,7 @@ addresses and paths to your setup.
 - [Mail](#mail)
 - [Documents: text recognition](#documents-text-recognition)
   - [Import from Paperless-ngx (2.48)](#import-from-paperless-ngx-248)
+- [Related tasks: the embedding service (2.59)](#related-tasks-the-embedding-service-259)
 - [Moving to a new server](#moving-to-a-new-server)
 - [Production updates](#production-updates)
 
@@ -703,6 +704,28 @@ Setting up listmonk (version 4 or newer) for Kalmido:
 3. In Kalmido: *Contacts > More > Newsletter…*, service *listmonk*, its address (e.g. `https://listmonk.example.com`),
    the API user's name and the token.
 4. Mark the consent of your contacts (contact card > *Newsletter*), create a segment and press *Sync now*.
+
+## Related tasks: the embedding service (2.59)
+
+Optional. With it Kalmido shows *Related tasks* in a task, a hint on likely duplicates while you type a new task, and *also
+similar meaning* in the search; agents get the related tasks in their events and the tool `related_tasks`. A small
+multilingual embedding model (multilingual-e5-small, MIT) runs in its own container on your CPU and turns the text of each
+task (folder, list, parent, title, description) into numbers. It writes no text, keeps no data and has no way out to the
+internet: the model is part of its image, the container sits only on an internal network that Kalmido reaches. Kalmido
+itself never calls a language model or an outside service for this.
+
+1. Build and start it: `docker compose --profile embed up -d --build` (downloads the model once while building, about
+   120 MB; the container needs about 0.6 GB RAM, one CPU thread).
+2. Set `KALMIDO_EMBED_URL=http://embed:8090` in `.env` and restart Kalmido (`docker compose up -d`).
+3. *Settings > Administration > Server > Related tasks* shows whether the service answers, the model and how many tasks
+   are computed. The first start computes every task in the background, throttled (a few minutes per thousand tasks on a
+   small 4-core server); then only new or changed tasks.
+
+Without the service (or with the switch off) everything works as before and the new parts are hidden. The vectors are
+stored in the table `task_vectors`: per organisation like its tasks (row-level security), sealed with the organisation's
+key when its data is encrypted, deleted with the task; they are not part of the organisation export (Kalmido computes them
+again). Thresholds for another model: `KALMIDO_RELATED_MIN`, `KALMIDO_RELATED_DUP`, `KALMIDO_RELATED_SEARCH`,
+`KALMIDO_RELATED_MIX`, `KALMIDO_RELATED_NORM` (see `.env.example`). A Raspberry Pi works too, only slower; leave the service out if the box is busy.
 
 ## Moving to a new server
 
