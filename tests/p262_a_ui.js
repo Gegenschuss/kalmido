@@ -43,7 +43,7 @@ const menuItem = (d, label) => [...d.querySelectorAll('[role="menuitem"]')].find
   // ================= #1848 team chat
   let w = await boot({user: 'alice', hash: `team/${RID}`}), d = w.document;
   const bar = await until(() => { const b = d.querySelector(`[data-cpn="t:${RID}"]`); return b && !b.hidden && /Message 0/.test(b.textContent) && b; });
-  check(bar && /Pinned/.test(bar.textContent), '#1848 team: the bar shows the pin that is older than the page ' + (d.querySelector('[data-cpn]')?.outerHTML || 'none').slice(0, 200));
+  check(bar && bar.querySelectorAll('.cpnrow').length === 1, '#1848 team: the bar shows the pin that is older than the page ' + (d.querySelector('[data-cpn]')?.outerHTML || 'none').slice(0, 200));
   check(!d.querySelector(`#tc-msgs [data-mid="t:${tm[0]}"]`), '#1848 team: ... which is not loaded yet');
   if (bar) click(w, bar.querySelector('[data-act="cpn-go"]'));
   check(await until(() => d.querySelector(`#tc-msgs [data-mid="t:${tm[0]}"]`)), '#1848 team: a tap jumps to it (older pages loaded)');
@@ -54,16 +54,15 @@ const menuItem = (d, label) => [...d.querySelectorAll('[role="menuitem"]')].find
   const pin = await until(() => menuItem(d, 'Pin'));
   check(pin && menuItem(d, 'Reply'), '#1848 team: "Pin" sits in the menu next to "Reply"');
   if (pin) click(w, pin);
-  const two = await until(() => /Pinned 1\/2/.test(d.querySelector(`[data-cpn="t:${RID}"]`)?.textContent || ''));
-  check(two && /Message 59/.test(d.querySelector(`[data-cpn="t:${RID}"]`).textContent), '#1848 team: the new pin shows first, 1/2');
+  const two = await until(() => d.querySelectorAll(`[data-cpn="t:${RID}"] .cpnrow`).length === 2);  // 2.87.9 (#1909): one line per pin
+  check(two && /Message 59/.test(d.querySelector(`[data-cpn="t:${RID}"]`).textContent), '#1848 team: the new pin shows first');
   check(((await call('GET', `/api/team/rooms/${RID}/messages`)).pins || []).length === 2, '#1848 team: the server has two pins');
-  click(w, d.querySelector(`[data-cpn="t:${RID}"] [data-act="cpn-next"]`));
-  check(/Pinned 2\/2/.test(d.querySelector(`[data-cpn="t:${RID}"]`)?.textContent || '') && /Message 0/.test(d.querySelector(`[data-cpn="t:${RID}"]`).textContent), '#1848 team: the arrow goes to the other pin');
-  click(w, d.querySelector(`[data-cpn="t:${RID}"] [data-act="cpn-x"]`));
+  check(/Message 0/.test(d.querySelector(`[data-cpn="t:${RID}"]`)?.textContent || '') && !d.querySelector(`[data-cpn="t:${RID}"] [data-act="cpn-next"]`), '#1848 team: both pins are in the bar, no arrow');
+  click(w, d.querySelector(`[data-cpn="t:${RID}"] .cpnrow:last-child [data-act="cpn-x"]`));
   await until(async () => ((await call('GET', `/api/team/rooms/${RID}/messages`)).pins || []).length === 1);
   const left = (await call('GET', `/api/team/rooms/${RID}/messages`)).pins || [];
-  check(left.length === 1 && left[0].id === tm[59], '#1848 team: the x unpins the shown message');
-  await until(() => !/\//.test(d.querySelector(`[data-cpn="t:${RID}"] b`)?.textContent || '/'));
+  check(left.length === 1 && left[0].id === tm[59], '#1848 team: the x unpins its line');
+  await until(() => d.querySelectorAll(`[data-cpn="t:${RID}"] .cpnrow`).length === 1);
   check(/Message 59/.test(d.querySelector(`[data-cpn="t:${RID}"]`)?.textContent || ''), '#1848 team: the bar follows');
   // ================= #1530 team chat: Enter twice
   const ta = d.querySelector('#tc-in');
@@ -91,7 +90,7 @@ const menuItem = (d, label) => [...d.querySelectorAll('[role="menuitem"]')].find
   const apin = await until(() => menuItem(d, 'Pin'));
   check(apin, '#1848 chat: "Pin" in the menu');
   if (apin) click(w, apin);
-  check(await until(() => /Pinned 1\/2/.test(d.querySelector(`[data-cpn="a:${CL}"]`)?.textContent || '')), '#1848 chat: two pins in the bar');
+  check(await until(() => d.querySelectorAll(`[data-cpn="a:${CL}"] .cpnrow`).length === 2), '#1848 chat: two pins in the bar');
   // ================= #1530 agent chat: Enter twice
   const ci = d.querySelector('#chat-in');
   ci.value = 'Mac back online'; ci.dispatchEvent(new w.Event('input', {bubbles: true}));
