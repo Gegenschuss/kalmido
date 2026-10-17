@@ -44,6 +44,8 @@ subscription or API key. Kalmido provides:
   host itself or another machine that reaches Kalmido over HTTPS.
 - A Claude Code subscription or API key (or another agent of your choice; the steps then change in 4, 6, 7 and 9).
 - About 30 minutes.
+- Think about encryption first: lists with a lock and knowledge spaces encrypted in the browser (2.64) are invisible to agents (no
+  texts, no access, no writes). An agent never joins such a list; switch the lock on only where that is intended.
 
 The examples use these names; change them if you like, but consistently:
 

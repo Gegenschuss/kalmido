@@ -37,6 +37,28 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
 Organisation exports (Settings > Organisation) contain the pages (`wiki/pages.json`). Agents have no access to knowledge
 pages yet.
 
+## Encrypted space (2.64.3)
+
+A knowledge space can be encrypted in the browser: page names and texts are then only readable for people whose encryption is
+unlocked; the server, its database and backups hold ciphertext only. A space is the whole of one room: *Private* or one
+organisation.
+
+- **Switch.** Needs your encryption set up (*Settings > Account*). Private space: you. Organisation space: an admin of the
+  organisation. The switch for the space asks for confirmation (passphrase and recovery code lost = content lost)
+  and converts all pages with a progress bar; it can be resumed if the page is closed. Switching it off asks for your password and
+  converts back.
+- **Members.** All members of the organisation read the space. A member who has not set up encryption waits on a list with their name
+  until they have and an admin releases the key. A new member of the organisation gets the key from an admin; when a member
+  leaves, the key changes and older pages are encrypted again in the background.
+- **In use.** Search, backlinks, "mentioned in", page links, templates, and moving a folder (every page is renamed) work in the browser over the decrypted pages. A locked space shows a placeholder until you unlock.
+- **Export and import** of such a space are done by the browser: the menu entry to export it as a ZIP gives plain Markdown files;
+  import reads a ZIP and encrypts the pages. The server answers its own export and import with an error there.
+- **Not available:** access for agents or the API, templates copied by the server, and the server's own search.
+- **Limits.** A changed script delivered by the server could capture the passphrase; page names are encrypted but the number of pages,
+  their sizes (in steps of 64 bytes) and who changed them when stay visible. Content a member saw stays with them.
+
+See *Exporting encrypted content* in the self-hosting guide for backups, moving servers and lost keys.
+
 ## Mind map (2.49.0)
 
 Every list (not the inbox) can be shown as a **Mind map**, next to List, Kanban and Timeline (the view switch in the list

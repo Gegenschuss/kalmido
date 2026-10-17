@@ -1492,6 +1492,9 @@ download and `/text` answer `404`; a task with such files cannot be moved to ano
 The list's team chat is encrypted too: messages come with an empty `body` and `"encrypted": true`, and posting there
 answers `403`.
 
+**Knowledge spaces encrypted in the browser (2.64.3).** Agents have no tools for knowledge pages, and an encrypted space (private or
+of an organisation) is out of reach for them in any case: no texts, no access.
+
 **Reading a file as text (2.34.0).** `GET /api/v1/attachments/{id}/text` (MCP `read_attachment`, scope
 `attachments:read`, same rights as the file itself, else `404`) answers `{id, task_id, comment_id, name, mime, size, url,
 kind, text, chars, truncated, message}`:

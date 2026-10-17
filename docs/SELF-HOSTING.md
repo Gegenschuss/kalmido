@@ -18,6 +18,8 @@ addresses and paths to your setup.
 - [Upgrade to 2.37 (PostgreSQL required)](#upgrade-to-237-postgresql-required)
 - [Backup and encryption](#backup-and-encryption)
 - [Encryption of organisation data](#encryption-of-organisation-data)
+- [Encryption in the browser (2.64)](#encryption-in-the-browser-264)
+- [Exporting encrypted content](#exporting-encrypted-content)
 - [Organisation export](#organisation-export)
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
@@ -467,6 +469,60 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
 - **Deleting an organisation** deletes its key and its office folder: whatever of it is left encrypted can no longer
   be read on this server. Files of lists that moved to another workspace are re-sealed first. Older backups still
   contain the wrapped key, so with the master key a restored old backup can read that organisation's data again.
+
+## Encryption in the browser (2.64)
+
+Kalmido has two kinds of encryption. They are independent and can be used together:
+
+| | Server-side, per organisation (2.42) | In the browser, per list / list chat / knowledge space (2.64) |
+|---|---|---|
+| Key | derived from `KALMIDO_SECRET_KEY`, one per organisation | a random key per list or space, created in the browser, wrapped for each member with their personal keys |
+| Who can read | the server, so everyone who may see the value (also agents) | only members whose browser is unlocked; not the server, its database, its backups, the operator or administrators |
+| Protects | database leaks, backups, the data folder | the same, and also the operator and the host |
+| Does not protect | an operator or host with access to the running server | members who already saw the content, metadata (dates, assignees, who writes when, text lengths) and a changed script delivered by the server itself |
+| Covers | office data and files of organisations | lists (titles, descriptions, comments, notes, free-text fields), the chat and the files of such a list, and knowledge spaces (page names and texts) |
+
+In the app the second kind is called "Encrypted in the browser". "End-to-end" is only used in the explanation, together with its
+limit: a web app loads its code from the server, so a server whose code was changed could capture the passphrase. Nothing in a
+browser can notice that.
+
+- **Setting up.** Every person sets up their encryption once (*Settings > Account*): a passphrase and a recovery code. The owner
+  or admin of a list (or of an organisation's knowledge space, or the owner of the private space) then switches the lock on; all
+  members need their encryption set up, and the browser converts the existing content with a progress bar. Members without it
+  wait on a list ("key pending") until an admin releases the key.
+- **Server settings.** None. The feature needs HTTPS (the browser's WebCrypto) and works with or without `KALMIDO_SECRET_KEY`.
+- **What drops out** where the lock is on: agents and API tokens (no texts, no writes), e-mail intake, public links, texts in
+  calendar subscriptions, notifications and digests, server-side search (search runs in the browser over the unlocked content),
+  and for knowledge spaces export and import on the server (the browser does both).
+- **Members.** A new member gets the key from an admin (a waiting list shows who is missing it). When a member leaves, the key
+  changes and older content is encrypted again in the background; this protects new content, not what the person already saw.
+- **Operation.** Nothing to do for the operator. The server stores ciphertext (`e2e1:...` in the usual columns) and wrapped keys
+  and cannot repair a lost key. Do not hand out a database dump of such content as if it were readable.
+- **Limits stay as documented in *Architecture*:** the server could swap ciphertexts inside a list or space (integrity) and the
+  first public key a device sees for a person is trusted until the safety numbers are compared.
+
+## Exporting encrypted content
+
+Encrypted content is only readable inside Kalmido, after the person has unlocked their encryption in the browser. There is no
+offline tool that opens it; the keys exist only in the members' browsers.
+
+- **Knowledge space.** Unlock the encryption, open the space and use the menu entry to export it as a ZIP. The ZIP is built in
+  the browser from the decrypted pages and contains plain Markdown files. This is the way to take a space with you.
+- **Lists, list chat, list files.** Kalmido offers no decrypted export of these. The server's own exports hold ciphertext for
+  them: *Settings > Account > Export > Download JSON* (the data of your own lists) and the backups. What you see in the unlocked app
+  can be copied from there. Plan for it: if you need a plain copy of a list, switch its lock off first (the browser converts the
+  content back, the list is then readable on the server again) and export it.
+- **Account export, organisation export, backups.** They contain the ciphertext as stored (the organisation export lists it in the
+  manifest under `client_encrypted`; the organisation recovery key and `tools/kalmido_export_decrypt.py` open the archive, not the
+  browser ciphertext inside). The content stays readable only in Kalmido, with the passphrases of the members. A restored
+  backup therefore works as long as the members still have their passphrase or recovery code.
+- **What is lost without the key.** If a person loses passphrase **and** recovery code, they can set up their encryption anew,
+  but cannot read what was only encrypted for them. In a list or an organisation's space another member can release the key to the new
+  setup again. In a private knowledge space there is nobody else: the content is gone. If all members lose their keys, the content
+  is gone and nobody (not the operator) can restore it.
+- **Recovery code.** Print it or store it in a password manager when the app shows it; it is shown only once.
+- **Moving to another server.** Copy the database and the data folder as usual (see *Moving to a new server*). Members keep their
+  passphrase and recovery code; their wrapped keys are part of the database, so everything stays readable after the move.
 
 ## Organisation export
 
