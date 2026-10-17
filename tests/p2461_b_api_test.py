@@ -16,6 +16,7 @@ import subprocess
 import sys
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -113,7 +114,7 @@ r = A.post(B + "/api/me/purpose", json={"purpose": "software", "examples": True}
 check(len(r.json()["created"]) == 1, "#1602: examples true: the software project")
 
 # ================================================================== #1615: the list Family with sections
-from datetime import date, timedelta  # noqa: E402
+from datetime import timedelta  # noqa: E402
 for u in ("carol", "dave"):
     check(A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123"}).ok, u)
 Ca, Da = sess("carol"), sess("dave")
@@ -130,12 +131,12 @@ check(len([x for x in st["sections"] if x["list_id"] == SHOP]) == 8 and fl["shop
 check(not [t for t in st["tasks"] if t["list_id"] in (FAM, SHOP)], "#1602: no example entries without the switch")
 O = Ca.post(B + "/api/family/occasions", json={"name": "Oma", "date": "1950-03-04"}).json()
 check(O["list_id"] == FAM and O["section_id"] == fsec["Geburtstage"], "#1615: a birthday without a list: Familie / Geburtstage")
-D = Ca.post(B + "/api/family/deadlines", json={"type": "passport", "who": "Kim", "expires": (date.today() + timedelta(days=400)).isoformat()}).json()
+D = Ca.post(B + "/api/family/deadlines", json={"type": "passport", "who": "Kim", "expires": (testclock.today() + timedelta(days=400)).isoformat()}).json()
 check(D["list_id"] == FAM and D["section_id"] == fsec["Fristen"], "#1615: a deadline without a list: Familie / Fristen")
 O2 = Ca.post(B + "/api/family/occasions", json={"name": "Opa", "date": "--05-06", "list_id": FAM}).json()
 check(O2["section_id"] == fsec["Geburtstage"], "#1615: the list Familie chosen: in its section")
 OTHER = Ca.post(B + "/api/lists", json={"name": "Wochenende"}).json()["id"]
-M = Ca.post(B + "/api/tasks", json={"title": "Pizza", "list_id": OTHER, "due": date.today().isoformat(), "fam": {"kind": "meal"}}).json()
+M = Ca.post(B + "/api/tasks", json={"title": "Pizza", "list_id": OTHER, "due": testclock.today().isoformat(), "fam": {"kind": "meal"}}).json()
 check(M.get("fam") == {"kind": "meal"}, f"#1615: a task marked as a meal {M.get('fam')}")
 check(Ca.post(B + "/api/tasks", json={"title": "x", "list_id": OTHER, "fam": {"kind": "meal", "x": 1}}).status_code == 400, "#1615: a meal mark takes nothing else")
 ov = Ca.get(B + "/api/family").json()
@@ -147,7 +148,7 @@ Da.post(B + "/api/me/purpose", json={"purpose": "family"})
 check(not [l for l in Da.get(B + "/api/state").json()["lists"] if l["family"] == "family"], "#1615: an old family list: no list Family")
 check(Da.post(B + "/api/family/occasions", json={"name": "X", "date": "--01-02"}).json()["list_id"] == OLD, "#1615: the old Birthdays list stays the target")
 MP = Da.post(B + "/api/lists", json={"name": "Essen", "family": "meals"}).json()["id"]
-T = Da.post(B + "/api/tasks", json={"title": "Suppe", "list_id": MP, "due": date.today().isoformat()}).json()
+T = Da.post(B + "/api/tasks", json={"title": "Suppe", "list_id": MP, "due": testclock.today().isoformat()}).json()
 check(T["id"] in {m["task_id"] for m in Da.get(B + "/api/family").json()["meals"]}, "#1615: an old Meal plan list still counts")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")

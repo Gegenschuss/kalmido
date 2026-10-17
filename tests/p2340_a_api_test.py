@@ -20,9 +20,10 @@ import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -82,7 +83,7 @@ for u in ("bob", "carol", "dave"):
 ALICE = A.get(B + "/api/me").json().get("id") or dbx("SELECT id FROM users WHERE username='alice'")[0][0]
 BOB, CAROL, DAVE = ids["bob"], ids["carol"], ids["dave"]
 Bo, Ca, Da = sess("bob"), sess("carol"), sess("dave")
-T0 = date.today()
+T0 = testclock.today()
 D = lambda n: (T0 + timedelta(days=n)).isoformat()  # noqa: E731
 
 

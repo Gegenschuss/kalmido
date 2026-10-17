@@ -11,6 +11,7 @@
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -34,7 +35,7 @@ const cnt = (w, code) => w.eval(`__cnt(async () => { ${code} })`);
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'events', 'comments', 'timeline', 'kanban', 'agents']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const L = (await call('POST', '/api/lists', {name: 'Shoot'})).id;
-  const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  const day = n => TC.day(n);
   for (let i = 0; i < 8; i++) await call('POST', '/api/tasks', {title: 'Step ' + i, list_id: L, due: day(i % 5), start: day(i % 5 - 1)});
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write'], username: 'claude', display_name: 'Claude'});
   const AGH = {Authorization: 'Bearer ' + ag.token};

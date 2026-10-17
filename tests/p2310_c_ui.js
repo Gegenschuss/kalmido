@@ -11,6 +11,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2310_c_ui', check, shots: 'P2310C_SHOTS'});
@@ -39,7 +40,7 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
   await call('PATCH', `/api/lists/${P}`, {view: 'list'});
   await call('PUT', `/api/lists/${P}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${P}/members`, {user_id: AG, role: 'edit'});
-  const T1 = (await call('POST', '/api/tasks', {title: 'Weekly report', list_id: P, due: new Date().toISOString().slice(0, 10), repeat: 'FREQ=WEEKLY', priority: 3})).id;
+  const T1 = (await call('POST', '/api/tasks', {title: 'Weekly report', list_id: P, due: TC.today(), repeat: 'FREQ=WEEKLY', priority: 3})).id;
   check(T1 > 0, 'a repeating task');
   await call('POST', '/api/tasks', {title: 'Second task', list_id: P});
   for (let i = 1; i <= 12; i++) await call('POST', '/api/lists', {name: 'List ' + String(i).padStart(2, '0')});  // a drawer taller than a phone

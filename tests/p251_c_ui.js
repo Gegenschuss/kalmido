@@ -10,6 +10,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const firefox = require('./ff')({tag: 'p251_c_ui', check: (c, w) => check(c, w), shots: 'P251C_SHOTS'});
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -53,7 +54,7 @@ const FEAT = 'cal,collab,comments,time,events,dispo';
   w.close();
 
   // ================= #1355 a draft in the calendar
-  const now = new Date(), t1 = dstr(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+  const now = new Date(TC.today() + 'T12:00:00'), t1 = dstr(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));  // 2.85.0 (#1863): Berlin day
   const ev = await call('POST', '/api/events', {title: 'Shoot day draft', start: `${t1}T09:00`, end: `${t1}T17:00`, status: 'tentative'});
   check(ev.http === 201 && ev.status === 'tentative', 'setup: a tentative event ' + ev.http);
   w = await boot({user: 'alice', hash: 'cal', ls: {'tasks.calMode': '"week"'}}); d = w.document;

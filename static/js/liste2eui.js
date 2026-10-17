@@ -228,6 +228,7 @@ function le2u_listRedraw(lid) { const box = $(`#l-e2e[data-lid="${lid}"]`); if (
 async function le2u_listLoad(md, lid, force) {
   const box = md && $('#l-e2e', md); if (!box) return;
   le2u_listDraw(md, lid);
+  if (!E2E.st && typeof e2eLoad === 'function') await e2eLoad().catch(() => {});  // 2.85.0 (#1904): own keys state before the setup hint is judged
   try { box._j = await le2u_info(lid, force); box._err = ''; } catch (x) { box._err = x?.message || tr('Not possible right now'); }
   if (box.isConnected) le2u_listDraw(md, lid);
 }

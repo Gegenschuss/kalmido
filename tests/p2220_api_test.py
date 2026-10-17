@@ -18,6 +18,7 @@ import time
 from datetime import date, timedelta
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -83,7 +84,7 @@ assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_na
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True, "time_all": True, "modules": ["cal", "comments", "collab"]})
 A.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": "cal,comments,collab"})
-T0 = date.today()
+T0 = testclock.today()
 D = lambda n: (T0 + timedelta(days=n)).isoformat()  # noqa: E731
 LIFE = "contracts,home,care,health,review,travel,reading"
 

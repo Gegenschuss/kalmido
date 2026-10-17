@@ -45,6 +45,7 @@ function viewLife() {
     cards.push(card('contracts', 'file', tr('Contracts & subscriptions'), sum + rows, btn('life-contract', 'plus', tr('Contract')), its.filter(x => x.days != null && x.days <= 45).length || ''));
   }
   if (feat('budget')) cards.push(bg_homeCard());  // 2.72.0 (#1333): the household budget (budget.js)
+  if (feat('feeds')) cards.push(rss_homeCard());  // 2.85.0 B (#1162): feeds (feeds.js)
   if (d.home) {
     const h = d.home;
     const devs = h.devices.length ? `<h3 class="lsub">${tr('Devices & warranty')}</h3><ul class="flist">${h.devices.map(x => `<li><a ${open(x.task_id)} class="frow"><span class="ft"><b>${esc(x.name)}</b><span class="muted">${esc([x.model, x.bought ? tr('bought {0}', fmtDateLoc(x.bought)) : ''].filter(Boolean).join(' · '))}</span></span>${x.warranty ? `<span class="lwhen"><small class="muted">${x.days < 0 ? tr('warranty ended') : tr('warranty until')}</small>${lifeWhen(x.warranty, 60)}</span>` : `<span class="muted">${tr('no warranty date')}</span>`}</a></li>`).join('')}</ul>` : '';

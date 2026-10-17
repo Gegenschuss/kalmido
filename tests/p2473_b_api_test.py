@@ -14,7 +14,6 @@ companies, people and figures only.
 usage: p2473_b_api_test.py <datadir>"""
 import base64
 import csv
-import datetime
 import io
 import os
 import subprocess
@@ -23,6 +22,7 @@ import time
 
 import dbx as dbxm
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -87,7 +87,7 @@ for s, o in ((A, ORG), (Bo, ORG), (Ca, ORG2)):
 O = "/api/office"
 D = O + "/docs"
 T = O + "/trips"
-TODAY = datetime.date.today().isoformat()
+TODAY = testclock.today().isoformat()
 M0 = TODAY[:7]
 M1, M2, M3 = ym_add(M0, 1), ym_add(M0, 2), ym_add(M0, 3)
 A.put(B + O + "/settings", json={"company_fields": {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE",

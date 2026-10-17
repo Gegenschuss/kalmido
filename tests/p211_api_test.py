@@ -22,12 +22,13 @@ import dbx
 import subprocess
 import sys
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 
 import http_ece
 import requests
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -189,7 +190,7 @@ check(cl.post("/agent/usage", json={**ok, "job_id": job2}).status_code == 400, "
 r = cl.post("/agent/usage", json={**ok, "input_tokens": 1000, "output_tokens": 200, "cache_read_tokens": 5000, "cache_write_tokens": 300,
                                   "cost_usd": 0.5, "task_id": T1, "job_id": job, "note": "session 1"})
 j = r.json()
-check(r.status_code == 201 and j["list_id"] == TEAM and j["task_id"] == T1 and j["day"] == date.today().isoformat() and j["limit"] is None,
+check(r.status_code == 201 and j["list_id"] == TEAM and j["task_id"] == T1 and j["day"] == testclock.today().isoformat() and j["limit"] is None,
       f"report: list from the task: {r.text[:300]}")
 check(cl.post("/agent/usage", json={**ok, "input_tokens": 400, "output_tokens": 100, "task_id": T2}).status_code == 201, "report on T2")
 check(cl.post("/agent/usage", json={**ok, "model": "claude-other", "input_tokens": 70, "output_tokens": 30, "task_id": TS}).status_code == 201, "report on the secret list")
@@ -209,7 +210,7 @@ j = cl.get("/agent/usage").json()
 tot = j["totals"]
 check(tot["input"] == 2385 and tot["output"] == 445 and tot["cache_read"] == 5000 and tot["cache_write"] == 300 and tot["tokens"] == 2385 + 445 + 300
       and tot["calls"] == 6 and abs(tot["cost"] - 0.75) < 1e-9, f"totals: {tot}")
-check(j["group"] == "day" and [d["day"] for d in j["data"]] == [date.today().isoformat()], "group day")
+check(j["group"] == "day" and [d["day"] for d in j["data"]] == [testclock.today().isoformat()], "group day")
 j = cl.get("/agent/usage", params={"group": "task"}).json()
 bt = {d["task_id"]: d for d in j["data"]}
 check(bt[T1]["title"] == "Write the release notes" and bt[T1]["tokens"] == 1500 and None in bt, f"group task: {j['data'][:2]}")
@@ -217,7 +218,7 @@ j = cl.get("/agent/usage", params={"group": "list"}).json()
 check({d["list_id"]: d["name"] for d in j["data"]}.get(SECRET) == "Secret", "group list with names")
 j = cl.get("/agent/usage", params={"group": "model"}).json()
 check({d["model"] for d in j["data"]} == {"claude-test-1", "claude-other"}, "group model")
-check(cl.get("/agent/usage", params={"from": (date.today() + timedelta(days=1)).isoformat()}).status_code == 400, "from after to: 400")
+check(cl.get("/agent/usage", params={"from": (testclock.today() + timedelta(days=1)).isoformat()}).status_code == 400, "from after to: 400")
 check(cl.get("/agent/usage", params={"group": "week"}).status_code == 400, "bad group: 400")
 check(cl.get("/agent/usage", params={"from": "2020-01-01", "to": "2022-01-01"}).status_code == 400, "range > 366 days: 400")
 check(cl.get("/agent/usage", params={"x": "1"}).status_code == 400, "unknown parameter: 400")
@@ -230,7 +231,7 @@ d = A.get(B + "/api/agents/usage").json()
 ag = {a["id"]: a for a in d["agents"]}
 check(d["admin"] and set(ag) == {AG, AG2} and ag[AG]["totals"]["today"]["tokens"] == 3130 and ag[AG]["totals"]["d30"]["calls"] == 6
       and ag[AG2]["totals"]["d7"]["tokens"] == 100 and "limit" in ag[AG], f"admin: every agent, totals: {ag.get(AG, {}).get('totals')}")
-check(len(d["per_day"]) == 30 and d["per_day"][-1]["day"] == date.today().isoformat() and d["per_day"][-1]["tokens"] == 3230, "30 days, today last")
+check(len(d["per_day"]) == 30 and d["per_day"][-1]["day"] == testclock.today().isoformat() and d["per_day"][-1]["tokens"] == 3230, "30 days, today last")
 tk = {t["task_id"]: t for t in d["tasks"]}
 check(tk[T1]["tokens"] == 1600 and tk[T1]["title"] == "Write the release notes" and d["tasks"][0]["task_id"] == T1, f"top tasks: {d['tasks'][:3]}")
 check(None in tk and tk[None]["hidden"] and "Bobs private thing" not in json.dumps(d), "admin: bob's task counted without its title")
@@ -312,7 +313,7 @@ r = cl.get("/lists")
 check(r.status_code == 429 and "this month" in r.json()["error"]["message"] and "$0.75 of $0.70" in r.json()["error"]["message"], f"cost / month: {r.text[:200]}")
 st = A.get(B + "/api/admin/agents").json()["agents"]
 st = [a for a in st if a["id"] == AG][0]["usage"]
-check(st["key"] == date.today().strftime("%Y-%m") and st["metric"] == "cost" and abs(st["used"] - 0.75) < 1e-9, f"month key + cost: {st}")
+check(st["key"] == testclock.today().strftime("%Y-%m") and st["metric"] == "cost" and abs(st["used"] - 0.75) < 1e-9, f"month key + cost: {st}")
 check(A.patch(B + f"/api/admin/agents/{AG}", json={"limits": None}).json()["limits"] is None and cl.get("/lists").ok, "limits removed: calls work")
 check(cl.get("/agent").json()["usage_limit"] is None, "no limit: usage_limit null")
 # the notification setting "usage": off -> no News, no push

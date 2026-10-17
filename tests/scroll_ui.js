@@ -8,13 +8,14 @@
 const {spawn, execFileSync} = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 const {B, login, sleep} = require('./boot');
+const TC = require('./testclock');
 const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(`${method} ${url} ${r.status} ${JSON.stringify(j)}`); return j; };
-const ymd = n => { const x = new Date(); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
+const ymd = n => TC.day(n);
 
 try { execFileSync('firefox', ['--version'], {stdio: 'ignore'}); } catch { console.log('scroll_ui: skipped (no firefox on PATH)\n0 ok, 0 failed'); process.exit(0); }
 

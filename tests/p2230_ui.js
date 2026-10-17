@@ -13,6 +13,7 @@ const {execFileSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2230_ui', check, shots: 'P2230_SHOTS'});
@@ -103,7 +104,7 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   w.close();
 
   // ================= workload (Bob)
-  await call('POST', '/api/tasks', {title: 'Build', list_id: P, assignee_id: BOB, due: new Date().toISOString().slice(0, 10), duration: 600});
+  await call('POST', '/api/tasks', {title: 'Build', list_id: P, assignee_id: BOB, due: TC.today(), duration: 600});
   w = await boot({user: 'bob', hash: 'workload'}); d = w.document;
   await until(() => d.querySelector('#view .wltable tbody tr'));
   const rows = [...d.querySelectorAll('#view .wltable tbody tr')].map(r => r.querySelector('th').textContent);

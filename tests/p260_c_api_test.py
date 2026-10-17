@@ -19,11 +19,12 @@ import os
 import subprocess
 import sys
 import time
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 import requests
 
 import dbx as dbxm
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -267,7 +268,8 @@ check((m.get("review") or {}).get("push") is False, "the matrix has the row revi
 clear()
 T5 = task("Quiet")
 Bo.patch(B + f"/api/tasks/{T5}", json={"section_id": S2})
-check(not pushes("t-carol"), "row off: no push")
+_pc = pushes("t-carol")
+check(not [x for x in _pc if "Quiet" in json.dumps(x)], "row off: no push " + json.dumps(_pc)[:400])  # 2.85.0 (#1863): only the push about this task counts (an evening push of the watchdog came along once at 19:35)
 check(any(x["task_id"] == T5 for x in news(Ca)), "the News item stays")
 
 # ---------------------------------------------------------------- an agent as reviewer
@@ -318,7 +320,7 @@ acts = [a for a in tl.get("activity", tl.get("items", [])) if a.get("kind") == "
 check(any("acme/app#21" in json.dumps(a) for a in acts) or not acts, "the history names the pull request")
 
 # ---------------------------------------------------------------- repeats: the next occurrence needs its own approval
-T9 = task("Weekly release", due=date.today().isoformat(), repeat="FREQ=WEEKLY")
+T9 = task("Weekly release", due=testclock.today().isoformat(), repeat="FREQ=WEEKLY")
 Bo.patch(B + f"/api/tasks/{T9}", json={"section_id": S2})
 rvw(Ca, T9, action="approve")
 r = Bo.post(B + f"/api/tasks/{T9}/complete")

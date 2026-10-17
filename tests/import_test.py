@@ -20,6 +20,7 @@ import zipfile
 from datetime import date, timedelta
 
 import requests
+import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
 FX = os.path.join(N, "fixtures", "import")
@@ -28,7 +29,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 FAILS, OKS = [], [0]
-T = date.today()
+T = testclock.today()
 
 
 def check(cond, what):

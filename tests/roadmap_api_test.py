@@ -9,6 +9,7 @@ setting "roadmap", and the token API (/api/v1/roadmap read scope, /api/v1/lists/
 import os, dbx, sys
 from datetime import date, timedelta
 import requests
+import testclock
 
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1]
@@ -51,7 +52,7 @@ def row(tid):
         return dict(c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone())
 
 
-D = lambda n: (date.today() + timedelta(days=n)).isoformat()  # noqa: E731
+D = lambda n: (testclock.today() + timedelta(days=n)).isoformat()  # noqa: E731
 
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")

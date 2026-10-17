@@ -9,6 +9,7 @@
 const {execFileSync, spawn} = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 const {boot, errs, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -124,7 +125,7 @@ const firefox = require('./ff')({tag: 'p221_ui', check, shots: 'P221_SHOTS'});  
   // ================= #359: the app sends only known fields
   const before = (logsAll().match(/unknown field\(s\) ignored/g) || []).length;
   w = await boot({user: 'alice', hash: 'l/' + TEAM}); d = w.document;
-  await w.eval(`createTask({title: 'From the app', list_id: ${TEAM}, tags: ['x'], due: '${new Date().toISOString().slice(0, 10)}'})`);
+  await w.eval(`createTask({title: 'From the app', list_id: ${TEAM}, tags: ['x'], due: '${TC.today()}'})`);
   const nt = (await call('GET', '/api/state')).tasks.find(t => t.title === 'From the app');
   check(nt, 'task created in the app');
   w.eval(`openDetail(${nt.id})`); await sleep(800);

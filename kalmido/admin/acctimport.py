@@ -485,7 +485,8 @@ def umz_preview(c, uid, man, data, can_invite):
         skipped.append({"what": tr(what), "count": n})
     for t, text in (("api_tokens", N_("API tokens")), ("webhooks", N_("Webhooks")), ("calendar_subscriptions", N_("Calendar subscriptions")),
                     ("karakeep", N_("Karakeep connection")), ("newsletter_connection", N_("Newsletter connection")),
-                    ("agent_schedules", N_("Planned agent jobs")), ("public_links", N_("Public links"))):
+                    ("agent_schedules", N_("Planned agent jobs")), ("public_links", N_("Public links")),
+                    ("feeds", N_("Feeds"))):  # 2.85.0 B (#1162): moved by OPML export / import
         if tables.get(t):
             skipped.append({"what": tr(text), "count": tables[t]})
     return {

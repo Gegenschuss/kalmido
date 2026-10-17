@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.85.0** (2026-10-17): Feeds - an RSS / Atom reader in *At home* (private, hourly, OPML, *Read later* as a
+  task); *Edit list* shows the lock state right after loading; tests use the Berlin day.
 - **2.84.0** (2026-10-17): e-mails filed at clients and projects - own addresses, matching by sender, search, original
   mail and attachments in the file store.
 - **2.83.0** (2026-10-17): themes (Paper, Night, Contrast) and header strips for lists and folders, progress rings;
@@ -1113,6 +1115,9 @@ calendar, CalDAV, sharing and the API work as everywhere.
   list from a template and, with Events on, an all-day event.
 - **Read later**: a reading list; *Connect Karakeep…* with your own address and API key (stored encrypted) turns
   bookmarks into tasks with their link and archives the ticked ones in Karakeep.
+- **Feeds** (2.85.0; its own module, off by default): follow RSS / Atom feeds (up to 100, fetched hourly by the server,
+  articles kept 30 days), unread first, *Read later* turns an article into a task of your reading list; OPML import and
+  export. Private to you; agents and API tokens do not see feeds.
 - API v1 and MCP: `/life`, `/life/contracts`, `/life/devices`, `/life/upkeep`, `/life/health` (permission `private`),
   `/life/trips`, `/life/review`, `/life/journal/{day}` (`private`), `/contacts/{id}/care`, `/life/karakeep/sync`.
 - **Budget** (2.72.0; its own part of *At home*): a budget is a list of its own that opens the budget view. Entries

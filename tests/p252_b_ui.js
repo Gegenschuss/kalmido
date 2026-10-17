@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p252_b_ui', check, shots: 'P252B_SHOTS'});
@@ -22,7 +23,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore',
 execFileSync('docker', ['exec', '-d', CT, 'python', '/data/stub_calendar.py']);
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
 const store = () => { try { return JSON.parse(fs.readFileSync(path.join(DATA, 'rwstore.json'), 'utf8')).rw || {}; } catch { return {}; } };
-const ymd = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; };
+const ymd = n => TC.day(n).replace(/-/g, '');
 
 (async () => {
   await sleep(900);
