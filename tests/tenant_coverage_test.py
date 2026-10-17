@@ -105,6 +105,8 @@ KINDS = {
     # 2.50.0 A (#1195, #1194): absences and bookings of an organisation / a personal area (row-level security + the app)
     "hub": ("matrix", "p250_a_api_test.py: absences and bookings by id of another organisation 404 (read, change, delete, restore), "
                       "the kind of an absence only for the person and the admins, resources of another organisation cannot be booked"),
+    # 2.73.0 A (#661): the accounts of one person on other Kalmido servers (accounts/servers.py) -- private per person
+    "servers": ("matrix", "p273_a_api_test.py: the server accounts of another person 404 (read, change, delete, restore, data, tasks, move); agents 403; nothing of another person's tasks moves"),
 }
 
 ROUTES = {
@@ -593,6 +595,12 @@ ROUTES = {
     "GET /api/newsletter": "newsletter", "PUT /api/newsletter": "newsletter", "DELETE /api/newsletter": "newsletter",
     "GET /api/newsletter/lists": "newsletter", "POST /api/newsletter/segments": "newsletter", "PATCH /api/newsletter/segments/{}": "newsletter",
     "DELETE /api/newsletter/segments/{}": "newsletter", "POST /api/newsletter/sync": "newsletter", "PUT /api/newsletter/consent": "newsletter",
+    # 2.73.0 A (#661): several servers in one app (the person's own server accounts; p273_a_api_test.py)
+    "GET /api/servers": "servers", "POST /api/servers": "servers", "PATCH /api/servers/{}": "servers", "DELETE /api/servers/{}": "servers",
+    "POST /api/servers/{}/restore": "servers", "PATCH /api/servers/self": "servers", "POST /api/servers/code": "servers", "GET /api/servers/{}/data": "servers",
+    "GET /api/servers/{}/tasks/{}": "servers", "POST /api/servers/{}/tasks": "servers", "PATCH /api/servers/{}/tasks/{}": "servers", "POST /api/servers/{}/tasks/{}/{}": "servers",
+    "DELETE /api/servers/{}/tasks/{}": "servers", "GET /api/servers/{}/search": "servers", "GET /api/servers/{}/events": "servers", "GET /api/servers/{}/news": "servers",
+    "POST /api/servers/{}/news/read": "servers", "POST /api/servers/move": "servers",
 }
 
 # ---- 1. every route is classified, nothing stale
