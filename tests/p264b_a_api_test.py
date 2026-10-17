@@ -257,6 +257,12 @@ td = A.get(B + f"/api/lists/{L}/e2e/todo").json()
 check([x["body"] for x in td["comments"]] == ["left plain"] and td["left"]["comments"] == 1, "todo: a plain leftover in 'on' " + json.dumps(td["comments"]))
 check(A.post(B + f"/api/lists/{L}/e2e/bulk", json={"comments": [{"id": C1, "body": ct(2)}]}).ok and gen_of(dbx("SELECT body FROM comments WHERE id=?", (C1,))[0][0]) == 2,
       "bulk: the leftover encrypted")
+# an outdated tab writes a ciphertext of the old generation after the re-encryption: the next run picks it up
+assert Bo.patch(B + f"/api/tasks/{T1}", json={"content": ct(1)}).ok
+j = A.get(B + f"/api/lists/{L}/e2e").json()
+check(j["reenc"] == 0 and j["left"]["tasks"] == 1, "info: a late ciphertext of generation 1 is work again " + json.dumps(j["left"]))
+check(A.post(B + f"/api/lists/{L}/e2e/bulk", json={"tasks": [{"id": T1, "content": ct(2)}]}).ok and gen_of(dbx("SELECT content FROM tasks WHERE id=?", (T1,))[0][0]) == 2,
+      "bulk: re-encrypted without a running key change")
 
 # ================================================================== release of every generation
 r = A.post(B + f"/api/lists/{L}/e2e/keys", json={"keys": [{"user_id": CAROL, "gen": 1, "wrapped": wrapped()}, {"user_id": CAROL, "gen": 2, "wrapped": wrapped()}]})
