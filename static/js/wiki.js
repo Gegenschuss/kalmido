@@ -308,3 +308,9 @@ async function wk_mentions(tid) {
   await Promise.all(wk_spaces().filter(sp => !WK.idx[sp]).map(sp => wk_load(sp)));  // 2.64.3 B (#1817): + the unlocked encrypted spaces
   return [...ps, ...await wkeMentions(tid)];
 }
+// 2.66.1 (#1945): an open page keeps its own space (wk_cur); switching to another workspace leaves it for that workspace's pages
+if (typeof p61b_wsOn === 'function') p61b_wsOn('wiki', after => {
+  const ws = wsCur();
+  if (after || ws === 'all' || S.route.mod !== 'wiki' || !WK.pg || WK.pg.space === ws) return;
+  WK.pg = null; S.route.wid = null; go('wiki');
+});
