@@ -417,6 +417,9 @@ APP_ONLY = [
     # ever works on its own server
     ("2.73.0 (#661): several Kalmido servers in one app: the person's accounts on other servers, their data through the other "
      "server's own API; people only, never agents", ("* /api/servers",)),
+    # 2.74.0 (#338): the supporter licence (self-hosted only) is entered by people; it unlocks nothing, agents have no use for it
+    ("2.74.0 (#338): the supporter licence (server: admins, personal: the person) and its yearly hint: people only, session routes",
+     ("* /api/supporter",)),
 ]
 
 

@@ -115,6 +115,11 @@ jobs:
           TZ: Europe/Berlin
           PYTHON: python
         run: cd tests && node demo_test.js
+      - name: Office in the demo (2.74.0, #1653)
+        env:
+          TZ: Europe/Berlin
+          PYTHON: python
+        run: cd tests && node p274_b_demo_test.js
       - name: Quick add in six languages
         env:
           TZ: Europe/Berlin

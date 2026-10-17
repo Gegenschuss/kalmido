@@ -687,6 +687,10 @@ ROUTES = {
     "GET /api/servers/{}/tasks/{}": "servers", "POST /api/servers/{}/tasks": "servers", "PATCH /api/servers/{}/tasks/{}": "servers", "POST /api/servers/{}/tasks/{}/{}": "servers",
     "DELETE /api/servers/{}/tasks/{}": "servers", "GET /api/servers/{}/search": "servers", "GET /api/servers/{}/events": "servers", "GET /api/servers/{}/news": "servers",
     "POST /api/servers/{}/news/read": "servers", "POST /api/servers/move": "servers",
+    # 2.74.0 (#338): the supporter licence -- the person's own licence + the yearly hint (user_id = me), the server licence
+    # (need_admin, the instance settings); no organisation data at all
+    "GET /api/supporter": "own", "PUT /api/supporter/{}": "own", "DELETE /api/supporter/{}": "own", "POST /api/supporter/{}/swap": "own",
+    "PATCH /api/supporter/nudge": "own",
 }
 
 # ---- 1. every route is classified, nothing stale

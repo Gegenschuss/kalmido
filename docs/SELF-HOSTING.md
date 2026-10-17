@@ -33,6 +33,7 @@ addresses and paths to your setup.
 - [Several servers in one app (2.73)](#several-servers-in-one-app-273)
 - [Moving to a new server](#moving-to-a-new-server)
 - [Production updates](#production-updates)
+- [Support Kalmido (supporter licence)](#support-kalmido-supporter-licence)
 
 ## Requirements
 
@@ -1068,3 +1069,30 @@ Nothing is copied or synced: every task stays on its server, and the app asks th
   attachments) against the values before. If anything is off, roll back automatically to the previous version and the
   backup.
 - **Keep the previous image** until the new version has proven itself; do not prune images right after an update.
+
+## Support Kalmido (supporter licence)
+
+Since 2.74. A supporter licence is voluntary and paid once. It **unlocks nothing**: every feature stays free (AGPL-3.0).
+It only shows a small "Supporter" badge in Settings > Help > About and in Settings > Account. It exists on self-hosted
+servers only; with `KALMIDO_HOSTED=1` the section, the badge and the hint are hidden and the routes answer 404.
+
+- **Two kinds.** A *server licence* counts for the whole instance (only admins enter or remove it); a *personal licence*
+  counts for one account (every person enters their own).
+- **Checked offline.** A key looks like `KSUP1.<data>.<signature>` (Ed25519). The server checks the signature against
+  the public key built into Kalmido; nothing is sent anywhere. A key carries only its kind, a date and a label, nothing
+  about the server, so it keeps working after a move. The key itself is never shown again, logged or exported; the app
+  shows the kind, the date and the label.
+- **Remove / Undo.** Removing a licence is one undo step (the server keeps the previous key for that).
+- **The hint.** Admins see a quiet, dismissable line at the top at most once a year, never in the first 30 days of a
+  new server, and only while there is neither a server licence nor their own personal licence. No push, no e-mail.
+  Settings > Help > Support Kalmido > "Remind me once a year" turns it off. Members never see it.
+- **Payment link.** `KALMIDO_SUPPORT_URL=https://…` shows a "Become a supporter" button in that section. Unset (the
+  default) means only the explanation and the key field are shown; only `https://` addresses are accepted.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KALMIDO_SUPPORT_URL` | empty | Payment page for supporter licences (https only); empty = no button |
+| `KALMIDO_SUPPORTER_EXTRA_PUBKEYS` | empty | Further trusted public keys (base64, comma separated) -- for tests; a licence unlocks nothing |
+
+Keys are made with `tools/supporter_key.py` (`genkey --out FILE` keeps the private key outside the repository with mode
+600 and prints only the public key; `sign --key FILE --type server|person [--id X] [--date YYYY-MM-DD]` prints a key).

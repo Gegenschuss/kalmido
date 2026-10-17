@@ -214,6 +214,7 @@ The most used helpers:
 | `accounts/signup.py` | Self-registration on the login page and sign-in links (QR) for people without e-mail. |
 | `admin/hosting.py` | Running Kalmido for others (2.24.0): storage quota per person, the notice / maintenance banner, daily e-mail limits, the "agent joined" notice, `KALMIDO_HOSTED`. |
 | `admin/clientip.py` | 2.33.0 (#834): does the client's address arrive? Private sign-in addresses (14 days), the warning when many accounts sign in from one private address (log + Administration > Server), "Your IP". |
+| `admin/supporter.py` | 2.74.0 (#338): the supporter licence (self-hosted only): Ed25519 keys checked offline, server / personal licence, the badge and the yearly admin hint; unlocks nothing. |
 | `startup.py` | Start-up: init_db() and the background threads (watchdog, update check, calendars, backups, webhooks, mail, git). |
 
 ### Adding a route
@@ -463,6 +464,23 @@ anything: every script tag (raw and gzip size, count) and the stylesheets, and l
 To raise a limit on purpose, change the value in `tools/perf_budget.json` in the same commit as the growth and say why;
 otherwise move the code into a module loaded on demand (see "Modules loaded on demand"). `--json` prints machine-readable
 output, `--budget FILE` and `--root DIR` are for tests.
+
+## Browser demo (2.12.0, rebuilt per release since 2.74.0)
+
+`tools/build_demo.py OUT_DIR` turns the current client (`static/`) into a static folder that runs without a server:
+`tools/demo/shim.js` replaces `fetch` and answers the API from the visitor's `localStorage`, `tools/demo/texts.js` holds
+the demo's own texts and the sample data in the six languages. The page allows no network connection at all
+(`Content-Security-Policy: connect-src 'none'`, also as `.htaccess`), has no service worker and no analytics.
+
+- It starts like a new account: Basket, the "Getting started" list and the welcome tour; the sample project only when the
+  visitor asks for it (tour or Settings > Data). Old browser storage of an earlier demo is migrated, not thrown away.
+- Office & finance works locally (clients, services, quotations, invoices, payments; totals and VAT like the server).
+  Instead of the server's PDF the demo opens a print view of the document (`window.print()`, no PDF library). Office
+  features that need a server (DATEV, e-invoice XML, mail, agents, imports, cash flow …) show the calm "not available in
+  the demo" notice.
+- **Release step:** build the demo from the release's sources with `python3 tools/build_demo.py <folder>` and upload the
+  folder to the website's `/demo/`. The build fails when a text replacement no longer matches the app, so a changed
+  client never ships a demo that talks to a server. `tests/demo_test.js` (suite `demo`, CI job "demo") checks the build.
 
 ## Organisations and who sees whom (2.22.0)
 

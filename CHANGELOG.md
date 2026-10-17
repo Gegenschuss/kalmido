@@ -7,6 +7,23 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.75.0] - 2026-10-17
+
+### Added
+- Supporter licence for self-hosted servers, like Immich: voluntary, paid once, unlocks nothing. Settings > Help >
+  "Support Kalmido" takes a server licence (admins) or a personal licence, checked offline (Ed25519, no network), and shows
+  a small "Supporter" badge under About and in Account. Admins see a quiet hint at most once a year (switchable off, never
+  in the first 30 days). Optional payment link via `KALMIDO_SUPPORT_URL`. Hidden completely on hosted servers
+  (`KALMIDO_HOSTED=1`: no section, no hint, no badge, the routes answer 404) (#338).
+- Browser demo starts like a new account: inbox, "Getting started" and the welcome tour; the sample project only on request
+  and removable again. Old demo data is kept (#1653).
+- Office & finance in the browser demo: clients, services, quotations, invoices and payments with the same sums and VAT as
+  the server; a print view in the browser instead of the PDF (#1653).
+
+### Changed
+- The browser demo is rebuilt from the current sources with every release and still works without any network connection
+  (CSP `connect-src 'none'`, now tested) (#1653).
+
 ## [2.74.0] - 2026-10-17
 
 ### Added

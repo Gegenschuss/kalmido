@@ -4,7 +4,9 @@
 window.KDEMO_TEXTS = {
   en: {
     banner: 'Demo – your data stays in this browser', reset: 'Reset demo', install: 'Install Kalmido',
-    resetAsk: 'Reset the demo? Everything you changed here is deleted and the sample data comes back.',
+    resetAsk: 'Reset the demo? Everything you changed here is deleted and the demo starts again like a new account.',
+    inbox: 'Basket',  // 2.74.0 (#1653): the Basket of a new account, as the server names it
+    printTitle: 'Print view', printNote: 'The demo shows the document here; the installed Kalmido makes a PDF (with e-invoice data).', print: 'Print', coName: 'Demo Studio',  // 2.74.0 (#1653): the print view of office documents
     gated: 'Not available in the demo – install Kalmido (5 minutes)', gatedMore: 'This needs a server: push notifications, calendar sync, agents, Git, webhooks, sign-in providers and working with other people run on your own Kalmido.',
     installLink: 'Install in 5 minutes', close: 'Close', simulated: 'simulated',
     agentName: 'Demo-Agent', agentTexts: ['simulated: checking the contact form', 'simulated: writing the test report', 'simulated: waiting for your approval'],
@@ -31,7 +33,9 @@ window.KDEMO_TEXTS = {
   },
   de: {
     banner: 'Demo – deine Daten bleiben in diesem Browser', reset: 'Demo zurücksetzen', install: 'Kalmido installieren',
-    resetAsk: 'Demo zurücksetzen? Alles, was du hier geändert hast, wird gelöscht und die Beispieldaten kommen zurück.',
+    resetAsk: 'Demo zurücksetzen? Alles, was du hier geändert hast, wird gelöscht und die Demo startet wieder wie ein neues Konto.',
+    inbox: 'Korb',  // 2.74.0 (#1653): the Basket of a new account, as the server names it
+    printTitle: 'Druckansicht', printNote: 'Die Demo zeigt das Dokument hier; das installierte Kalmido erzeugt ein PDF (mit E-Rechnungsdaten).', print: 'Drucken', coName: 'Demo Studio',  // 2.74.0 (#1653): the print view of office documents
     gated: 'In der Demo nicht verfügbar – installiere Kalmido (5 Minuten)', gatedMore: 'Dafür braucht es einen Server: Push-Benachrichtigungen, Kalender-Sync, Agenten, Git, Webhooks, Anmeldung über Anbieter und die Zusammenarbeit mit anderen laufen auf deinem eigenen Kalmido.',
     installLink: 'In 5 Minuten installieren', close: 'Schließen', simulated: 'simuliert',
     agentName: 'Demo-Agent', agentTexts: ['simuliert: prüft das Kontaktformular', 'simuliert: schreibt den Testbericht', 'simuliert: wartet auf deine Freigabe'],
@@ -58,7 +62,9 @@ window.KDEMO_TEXTS = {
   },
   fr: {
     banner: 'Démo – vos données restent dans ce navigateur', reset: 'Réinitialiser la démo', install: 'Installer Kalmido',
-    resetAsk: 'Réinitialiser la démo ? Tout ce que vous avez modifié ici est supprimé et les données d’exemple reviennent.',
+    resetAsk: 'Réinitialiser la démo ? Tout ce que vous avez modifié ici est supprimé et la démo recommence comme un nouveau compte.',
+    inbox: 'Panier',  // 2.74.0 (#1653): the Basket of a new account, as the server names it
+    printTitle: 'Aperçu avant impression', printNote: 'La démo affiche le document ici ; Kalmido installé crée un PDF (avec les données de facture électronique).', print: 'Imprimer', coName: 'Demo Studio',  // 2.74.0 (#1653): the print view of office documents
     gated: 'Indisponible dans la démo – installez Kalmido (5 minutes)', gatedMore: 'Il faut un serveur : notifications push, synchronisation de calendrier, agents, Git, webhooks, connexion via un fournisseur et travail à plusieurs fonctionnent sur votre propre Kalmido.',
     installLink: 'Installer en 5 minutes', close: 'Fermer', simulated: 'simulé',
     agentName: 'Demo-Agent', agentTexts: ['simulé : vérifie le formulaire de contact', 'simulé : rédige le rapport de test', 'simulé : attend votre validation'],
@@ -85,7 +91,9 @@ window.KDEMO_TEXTS = {
   },
   es: {
     banner: 'Demo – tus datos se quedan en este navegador', reset: 'Restablecer la demo', install: 'Instalar Kalmido',
-    resetAsk: '¿Restablecer la demo? Se borra todo lo que cambiaste aquí y vuelven los datos de ejemplo.',
+    resetAsk: '¿Restablecer la demo? Se borra todo lo que cambiaste aquí y la demo empieza de nuevo como una cuenta nueva.',
+    inbox: 'Cesta',  // 2.74.0 (#1653): the Basket of a new account, as the server names it
+    printTitle: 'Vista de impresión', printNote: 'La demo muestra el documento aquí; Kalmido instalado crea un PDF (con datos de factura electrónica).', print: 'Imprimir', coName: 'Demo Studio',  // 2.74.0 (#1653): the print view of office documents
     gated: 'No disponible en la demo – instala Kalmido (5 minutos)', gatedMore: 'Esto necesita un servidor: notificaciones push, sincronización de calendarios, agentes, Git, webhooks, inicio de sesión con proveedores y el trabajo con otras personas funcionan en tu propio Kalmido.',
     installLink: 'Instalar en 5 minutos', close: 'Cerrar', simulated: 'simulado',
     agentName: 'Demo-Agent', agentTexts: ['simulado: revisa el formulario de contacto', 'simulado: escribe el informe de pruebas', 'simulado: espera tu aprobación'],
@@ -112,7 +120,9 @@ window.KDEMO_TEXTS = {
   },
   it: {
     banner: 'Demo – i tuoi dati restano in questo browser', reset: 'Reimposta la demo', install: 'Installa Kalmido',
-    resetAsk: 'Reimpostare la demo? Tutto ciò che hai cambiato qui viene eliminato e tornano i dati di esempio.',
+    resetAsk: 'Reimpostare la demo? Tutto ciò che hai cambiato qui viene eliminato e la demo riparte come un nuovo account.',
+    inbox: 'Raccolta',  // 2.74.0 (#1653): the Basket of a new account, as the server names it
+    printTitle: 'Anteprima di stampa', printNote: 'La demo mostra il documento qui; Kalmido installato crea un PDF (con i dati della fattura elettronica).', print: 'Stampa', coName: 'Demo Studio',  // 2.74.0 (#1653): the print view of office documents
     gated: 'Non disponibile nella demo – installa Kalmido (5 minuti)', gatedMore: 'Serve un server: notifiche push, sincronizzazione del calendario, agenti, Git, webhook, accesso tramite provider e il lavoro con altre persone funzionano sul tuo Kalmido.',
     installLink: 'Installa in 5 minuti', close: 'Chiudi', simulated: 'simulato',
     agentName: 'Demo-Agent', agentTexts: ['simulato: controlla il modulo di contatto', 'simulato: scrive il rapporto di test', 'simulato: attende la tua approvazione'],
@@ -139,7 +149,9 @@ window.KDEMO_TEXTS = {
   },
   nl: {
     banner: 'Demo – je gegevens blijven in deze browser', reset: 'Demo resetten', install: 'Kalmido installeren',
-    resetAsk: 'Demo resetten? Alles wat je hier hebt veranderd wordt verwijderd en de voorbeeldgegevens komen terug.',
+    resetAsk: 'Demo resetten? Alles wat je hier hebt veranderd wordt verwijderd en de demo begint opnieuw als een nieuw account.',
+    inbox: 'Mand',  // 2.74.0 (#1653): the Basket of a new account, as the server names it
+    printTitle: 'Afdrukweergave', printNote: 'De demo toont het document hier; de geïnstalleerde Kalmido maakt een pdf (met e-factuurgegevens).', print: 'Afdrukken', coName: 'Demo Studio',  // 2.74.0 (#1653): the print view of office documents
     gated: 'Niet beschikbaar in de demo – installeer Kalmido (5 minuten)', gatedMore: 'Hiervoor is een server nodig: pushmeldingen, agendasynchronisatie, agents, Git, webhooks, inloggen via een provider en samenwerken met anderen draaien op je eigen Kalmido.',
     installLink: 'In 5 minuten installeren', close: 'Sluiten', simulated: 'gesimuleerd',
     agentName: 'Demo-Agent', agentTexts: ['gesimuleerd: controleert het contactformulier', 'gesimuleerd: schrijft het testrapport', 'gesimuleerd: wacht op je goedkeuring'],

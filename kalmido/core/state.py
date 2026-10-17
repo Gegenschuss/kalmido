@@ -286,7 +286,7 @@ def state():
                            f"AND {tvis(c, uid)}", (uid, uid)).fetchone()[0],
             trash=c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN {wr_sql()} AND deleted_at IS NOT NULL",
                             (uid, uid)).fetchone()[0]),
-        settings={k: v for k, v in s.items() if k not in ("digest_sent", "digest_mail_sent", "review_sent")},
+        settings={k: v for k, v in s.items() if k not in ("digest_sent", "digest_mail_sent", "review_sent") and not k.startswith("sup_key")},  # 2.74.0 (#338): never the licence key
         mine_order=vw_mine_order(c, uid),  # 2.40.0 (#1344): the own order of "My tasks" {task id: pos}
         mine_hidden=mt_mine_hidden(c, uid),  # 2.41.0 (#1365): ids of the lists I switched off for "My tasks"
         notify=notif_matrix(s),  # 2.1.0 (#317)

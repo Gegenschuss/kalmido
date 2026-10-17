@@ -1190,6 +1190,7 @@ function aboutHtml(chk, hint) {
   let h = `<h4 id="s-about-h">${tr('About')}</h4><div class="row"><label>${tr('Version')}</label><span class="aboutver">Kalmido v${esc(a.version || '?')}</span></div>${aboutVerRows(a)}
     <div class="row aboutcopy"><label>©</label><span class="muted">2026 Gegenschuss Doberenz Enders Grund eGbR · AGPL-3.0</span></div>
     <div class="row aboutlinks"><label></label>${ABOUT_LINKS.map(([u, n, i]) => `<a class="btn sm" href="${u}" target="_blank" rel="noopener noreferrer">${ic(i, 's')} ${tr(n)}</a>`).join('')}</div>`;
+  h += sup_aboutHtml();  // 2.74.0 (#338): "Support Kalmido" (self-hosted only)
   return h;
 }
 // 2.46.6 (#1710): Administration > Server: the result of the daily update check (server side, never automatic)
