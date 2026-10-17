@@ -208,6 +208,9 @@ ROUTES = {
     # ---- office (B: settings, packs, master data, import / export)
     "GET /api/office/settings": "office", "PUT /api/office/settings": "office", "GET /api/office/number-preview": "office",
     "GET /api/office/packs": "office", "GET /api/office/packs/{}": "office", "POST /api/office/packs/validate": "office",
+    # 2.76.0 (#1023): the pack catalogue (p276_a_packs_api_test.py carries the office marker)
+    "GET /api/office/catalog": "office", "POST /api/office/catalog/refresh": "office", "POST /api/office/packs/install": "office",
+    "DELETE /api/office/packs/installed/{}/{}": "office", "POST /api/office/packs/installed/{}/{}/restore": "office",
     "GET /api/office/{}": "office", "POST /api/office/{}": "office", "GET /api/office/{}/{}": "office", "PATCH /api/office/{}/{}": "office",
     "DELETE /api/office/{}/{}": "office", "GET /api/office/export": "office", "POST /api/office/import": "office",
     "POST /api/office/move": "office",  # 2.47.3 (#1360): the personal office becomes an organisation (p2473_a_api_test.py)
