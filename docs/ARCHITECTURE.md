@@ -597,7 +597,9 @@ lock opened first.
   key: `KENC\x02 | gen | iv | AES-GCM(list key, AAD kalmido-lfile:v1:<list>:<gen>, header {name, type, size} + bytes)`,
   `attachments.enc = 2`, the file name as a list ciphertext. Every other way to add a file there is refused; downloads go
   to people in the web app only (agents and API tokens 404), no text extract, no preview. Switching on, the key change and
-  the way back convert existing files in the browser; files encrypted per person (2.42) stay readable for that person only.
+  the way back convert existing files in the browser; files encrypted per person (2.42) are converted when their uploader
+  runs the switch, else they stay readable for that person only. A task with list files cannot move to another list
+  (409 `list_e2e_files`); project files cannot be added to such a list.
 - **List channel** (`collab/liste2echan.py`). Messages in the team chat of such a list are `tchat_msgs.enc = {v, g, iv, ct}`
   with the list key (AAD `kalmido-chan:v1:<room>:<gen>:<sender>`, padded like the texts); plain text is refused, the browser
   names @mentioned members for their push. Agents and API tokens read no text (`encrypted: true`) and cannot write;
