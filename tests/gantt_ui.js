@@ -70,7 +70,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   ptr(w, knob(E), 'pointerdown', 0);
   check(d.querySelector('.tl.linking') && bar(Cc).classList.contains('tl-ok') && bar(E).classList.contains('tl-from'), 'drag started: valid targets marked');
   check(bar(A).classList.contains('tl-ok') && !bar(Bt).classList.contains('tl-no'), 'unrelated tasks are valid targets');
-  ptr(w, bar(Cc), 'pointermove', 60);
+  ptr(w, bar(Cc), 'pointermove', 60); await sleep(60);  // 2.87.9 (#1965): the line follows in the next frame
   check(bar(Cc).classList.contains('hot') && /^M[\d.]+,[\d.]+L/.test(d.querySelector('#tl-deps .rubber').getAttribute('d')), 'rubber band to the hovered target');
   ptr(w, bar(Cc), 'pointerup', 60);
   check(await until(async () => (await blockers(Cc)).includes(E)), 'drop: Launch now waits on Copy (server)');
@@ -80,7 +80,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   // invalid: Launch -> Design would be a loop (Launch waits on Build waits on Design)
   ptr(w, knob(Cc), 'pointerdown', 0);
   check(bar(A).classList.contains('tl-no') && bar(Bt).classList.contains('tl-no'), 'a target that would create a loop is marked not allowed');
-  ptr(w, bar(A), 'pointermove', 40);
+  ptr(w, bar(A), 'pointermove', 40); await sleep(60);  // 2.87.9 (#1965): the line follows in the next frame
   check(d.querySelector('#tl-deps .rubber').classList.contains('no'), 'rubber band turns red over an invalid target');
   ptr(w, bar(A), 'pointerup', 40);
   check(await until(() => /circular/.test(toastText(d))), `server error as a toast: ${toastText(d)}`);
