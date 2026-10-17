@@ -3,6 +3,8 @@
 // starts the export, the state turns into a download link; an upload (made over the API: the pieces) shows its preview in the
 // section after opening it again (the source person, the counts, the people with "found" and a tick that is off); with the
 // tick the import starts, the result names the counts and offers undo; undo asks, then removes the imported list.
+// Part 4: an uploaded organisation export asks for the recovery key in the section; a wrong key is named, the right one
+// opens the preview (organisation export, the tick adds to the organisation, no private space as target).
 // Firefox 390 touch: the section fits the phone, screenshot.
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -12,7 +14,8 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
 const firefox = require('./ff')({tag: 'p273_b_ui', check, shots: 'P273B_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
-execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
+const KEY = require('crypto').randomBytes(32).toString('base64');  // the organisation export needs the server key
+execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, EXTRA: `${process.env.EXTRA || ''} -e KALMIDO_SECRET_KEY=${KEY}`}});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
 const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
 const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
@@ -92,6 +95,38 @@ async function dataPane(w) {
   check(!md.querySelector('#s-umz-imp .umzbox'), 'the box is closed');
   w.close();
   void bob;
+
+  // ================= part 4: an organisation export asks for the recovery key
+  const up2 = async (ck, buf) => {
+    const u = await call(ck, 'POST', '/api/account/import', {size: buf.length, name: 'org.kalmido-export'});
+    for (let off = 0; off < buf.length; off += u.chunk) await fetch(B + `api/account/import/${u.id}?offset=${off}`, {method: 'PUT', headers: {'X-Requested-With': 'kalmido', 'Content-Type': 'application/octet-stream', Cookie: ck}, body: buf.subarray(off, off + u.chunk)});
+    return u.id;
+  };
+  await call(CA, 'POST', '/api/lists', {name: 'Org UI Liste', org_id: 1});
+  await call(CA, 'POST', '/api/orgs/1/export');
+  await until(async () => (await call(CA, 'GET', '/api/orgs/1/export')).state !== 'running', 100);
+  const ox = Buffer.from(await (await fetch(B + 'api/orgs/1/export/file', {headers: {Cookie: CA}})).arrayBuffer());
+  const rk = (await call(CA, 'POST', '/api/orgs/1/encryption/recovery', {password: 'password123'})).recovery_key;
+  check(ox.length > 100 && rk, 'organisation export + recovery key');
+  const oid = await up2(CA, ox);
+  await until(async () => (await call(CA, 'GET', `/api/account/import/${oid}`)).state === 'key');
+  w = await boot({user: 'alice'});
+  md = await dataPane(w);
+  await until(() => md.querySelector('#s-umz-key'));
+  check(md.querySelector('#s-umz-key')?.type === 'password' && /Organisation export of Kalmido/.test(md.querySelector('#s-umz-imp').textContent), 'the key field of an organisation export');
+  md.querySelector('#s-umz-key').value = Array(13).fill('ABCD').join('-');
+  click(w, md.querySelector('[data-umz="key"]'));
+  await until(() => /Attempts left/.test(md.querySelector('#s-umz-imp')?.textContent || ''), 100);
+  check(/Attempts left: 9/.test(md.querySelector('#s-umz-imp').textContent), 'a wrong key is named');
+  md.querySelector('#s-umz-key').value = rk;
+  click(w, md.querySelector('[data-umz="key"]'));
+  await until(() => md.querySelector('#s-umz-imp .umzbox [data-umz="go"]'), 100);
+  const ob = md.querySelector('#s-umz-imp .umzbox');
+  check(ob && /Organisation export of Kalmido/.test(ob.textContent) && !/Private/.test(md.querySelector('#s-umz-tgt')?.textContent || 'Private'), 'opened: preview, organisations only as target');
+  check(!ob.querySelector('[data-k="share"]') || /Add to the organisation/.test(ob.textContent), 'the tick adds to the organisation');
+  click(w, ob.querySelector('[data-umz="cancel"]')); await sleep(400);
+  check(!md.querySelector('#s-umz-imp .umzbox'), 'cancel');
+  w.close();
 
   // ================= Firefox: the phone (390, touch)
   const ffLogin = async ({ev, nav}) => {
