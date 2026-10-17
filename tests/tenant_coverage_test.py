@@ -603,6 +603,8 @@ ROUTES = {
     # 2.59.0 B (#1375): related tasks (tasks/related.py)
     "GET /api/tasks/{}/related": "related", "GET /api/v1/tasks/{}/related": "related", "POST /api/tasks/similar": "related",
     "GET /api/related/config": "public", "GET /api/admin/related": "admin", "PUT /api/admin/related": "admin",
+    # 2.70.0 A (#1354): meeting photos into my own chat with an agent I may ask, the chat's cards = my own proposals (p270_a_api_test.py)
+    "POST /api/agents/{}/meeting-images": "agent", "GET /api/agents/{}/meeting-proposals": "agent",
 }
 
 # ---- 1. every route is classified, nothing stale
