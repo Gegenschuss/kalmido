@@ -386,7 +386,7 @@ removes them again. The agent never sees the office; an agent of an organisation
 Freelancers without an organisation import into their personal office.
 
 **Monthly check** (optional): a tick creates the task "Cash flow: check the actual state" for one admin of the area, due
-on the 1st of every month in that person's inbox, with only a link to the cash flow (never an amount). Another person
+on the 1st of every month in that person's basket, with only a link to the cash flow (never an amount). Another person
 ends the old task and creates a new one; switching it off ends the task (done, without a next date; not deleted). If the
 person later loses access to the cash flow, the tab says so; nobody else is picked automatically.
 
