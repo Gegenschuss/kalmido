@@ -36,7 +36,14 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   rows[0].dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(800);
   check(w.eval('S.sel') === first.task_id, 'click opens the task');
   const st2 = await api(w, 'GET', '/api/news');
-  check(st2.items.find(x => x.id === first.id)?.read && st2.unread === st.unread - 1 - (st.items.filter(x => x.task_id === first.task_id && !x.read).length - 1), `click marks read (${st.unread} -> ${st2.unread})`);
+  // 2.80.1: by meaning instead of by count (CI saw 4 -> 1 twice, the Mac passes): every item of the clicked task is read,
+  // every other unread item stays unread; the message lists the items that differ
+  const otherWas = st.items.filter(x => x.task_id !== first.task_id && !x.read).map(x => x.id);
+  const nowRead = otherWas.filter(i => st2.items.find(x => x.id === i)?.read);
+  const sameOpen = st2.items.filter(x => x.task_id === first.task_id && !x.read).map(x => x.id);
+  check(st2.items.find(x => x.id === first.id)?.read && !sameOpen.length && !nowRead.length && st2.unread < st.unread,
+    `click marks read (${st.unread} -> ${st2.unread}; other tasks read too: ${nowRead.join(',') || '-'}; same task still unread: ${sameOpen.join(',') || '-'}; `
+    + `before: ${st.items.map(x => `${x.id}/${x.task_id}/${x.kind}/${x.read ? 'r' : 'u'}`).join(' ')})`);
   w.eval('closeDetail()'); await sleep(200);
   // filter
   // 1.9.0: "Mentions & assigned to me" (mentions + assignments) replaced "Only mentions"
