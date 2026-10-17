@@ -8280,5 +8280,18 @@
   "Uploading… {0} of {1}": "Téléversement… {0} sur {1}",
   "You have imported this export already. Importing it again creates everything a second time.": "Vous avez déjà importé cet export. L’importer de nouveau crée tout une deuxième fois.",
   "Your export is already running": "Votre export est déjà en cours",
-  "Your storage is full: the import stopped. What came over so far can be undone.": "Votre stockage est plein : l’import s’est arrêté. Ce qui a été repris jusqu’ici peut être annulé."
+  "Your storage is full: the import stopped. What came over so far can be undone.": "Votre stockage est plein : l’import s’est arrêté. Ce qui a été repris jusqu’ici peut être annulé.",
+  "Add to the organisation and share the lists": "Ajouter à l’organisation et partager les listes",
+  "Organisation export of {0}": "Export d’organisation de {0}",
+  "You are not the admin of an organisation on this server. Create one or ask its admin first.": "Vous n’êtes administrateur d’aucune organisation sur ce serveur. Créez-en une ou demandez d’abord à son administrateur.",
+  "The file is encrypted. Enter the recovery key of the organisation (on the old server: Settings > Organisation > Encryption).": "Le fichier est chiffré. Saisissez la clé de récupération de l’organisation (sur l’ancien serveur : Réglages > Organisation > Chiffrement).",
+  "Absences and bookings": "Absences et réservations",
+  "Playbooks": "Playbooks",
+  "Project notes": "Notes de projet",
+  "Notepads": "Blocs-notes",
+  "Time entries": "Entrées de temps",
+  "Encrypted notes": "Notes chiffrées",
+  "The recovery key does not open this export. Attempts left: {0}": "La clé de récupération n’ouvre pas cet export. Essais restants : {0}",
+  "An organisation export goes into an organisation: choose one you administer.": "Un export d’organisation va dans une organisation : choisissez-en une que vous administrez.",
+  "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Ce n’est pas une clé de récupération (52 caractères A-Z et 2-7, par groupes de 4)."
 }

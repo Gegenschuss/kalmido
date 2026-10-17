@@ -8280,5 +8280,18 @@
   "Uploading… {0} of {1}": "Bezig met uploaden… {0} van {1}",
   "You have imported this export already. Importing it again creates everything a second time.": "Je hebt deze export al geïmporteerd. Opnieuw importeren maakt alles een tweede keer aan.",
   "Your export is already running": "Je export loopt al",
-  "Your storage is full: the import stopped. What came over so far can be undone.": "Je opslag is vol: de import is gestopt. Wat tot nu toe is overgenomen, kun je ongedaan maken."
+  "Your storage is full: the import stopped. What came over so far can be undone.": "Je opslag is vol: de import is gestopt. Wat tot nu toe is overgenomen, kun je ongedaan maken.",
+  "Add to the organisation and share the lists": "Toevoegen aan de organisatie en lijsten delen",
+  "Organisation export of {0}": "Organisatie-export van {0}",
+  "You are not the admin of an organisation on this server. Create one or ask its admin first.": "Je bent op deze server geen beheerder van een organisatie. Maak er een aan of vraag eerst de beheerder.",
+  "The file is encrypted. Enter the recovery key of the organisation (on the old server: Settings > Organisation > Encryption).": "Het bestand is versleuteld. Voer de herstelsleutel van de organisatie in (op de oude server: Instellingen > Organisatie > Versleuteling).",
+  "Absences and bookings": "Afwezigheden en boekingen",
+  "Playbooks": "Playbooks",
+  "Project notes": "Projectnotities",
+  "Notepads": "Kladblokken",
+  "Time entries": "Tijdregistraties",
+  "Encrypted notes": "Versleutelde notities",
+  "The recovery key does not open this export. Attempts left: {0}": "De herstelsleutel opent deze export niet. Resterende pogingen: {0}",
+  "An organisation export goes into an organisation: choose one you administer.": "Een organisatie-export gaat naar een organisatie: kies er een die je beheert.",
+  "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Dit is geen herstelsleutel (52 tekens A-Z en 2-7, in groepen van 4)."
 }

@@ -8280,5 +8280,18 @@
   "Uploading… {0} of {1}": "Subiendo… {0} de {1}",
   "You have imported this export already. Importing it again creates everything a second time.": "Ya importaste esta exportación. Importarla de nuevo lo crea todo por segunda vez.",
   "Your export is already running": "Tu exportación ya está en marcha",
-  "Your storage is full: the import stopped. What came over so far can be undone.": "Tu almacenamiento está lleno: la importación se detuvo. Lo transferido hasta ahora se puede deshacer."
+  "Your storage is full: the import stopped. What came over so far can be undone.": "Tu almacenamiento está lleno: la importación se detuvo. Lo transferido hasta ahora se puede deshacer.",
+  "Add to the organisation and share the lists": "Añadir a la organización y compartir las listas",
+  "Organisation export of {0}": "Exportación de organización de {0}",
+  "You are not the admin of an organisation on this server. Create one or ask its admin first.": "No eres administrador de ninguna organización en este servidor. Crea una o pregunta primero a su administrador.",
+  "The file is encrypted. Enter the recovery key of the organisation (on the old server: Settings > Organisation > Encryption).": "El archivo está cifrado. Introduce la clave de recuperación de la organización (en el servidor antiguo: Ajustes > Organización > Cifrado).",
+  "Absences and bookings": "Ausencias y reservas",
+  "Playbooks": "Playbooks",
+  "Project notes": "Notas de proyecto",
+  "Notepads": "Blocs de notas",
+  "Time entries": "Registros de tiempo",
+  "Encrypted notes": "Notas cifradas",
+  "The recovery key does not open this export. Attempts left: {0}": "La clave de recuperación no abre esta exportación. Intentos restantes: {0}",
+  "An organisation export goes into an organisation: choose one you administer.": "Una exportación de organización va a una organización: elige una que administres.",
+  "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "No es una clave de recuperación (52 caracteres A-Z y 2-7, en grupos de 4)."
 }

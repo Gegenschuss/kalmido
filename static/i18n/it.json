@@ -8280,5 +8280,18 @@
   "Uploading… {0} of {1}": "Caricamento… {0} di {1}",
   "You have imported this export already. Importing it again creates everything a second time.": "Hai già importato questa esportazione. Importarla di nuovo crea tutto una seconda volta.",
   "Your export is already running": "La tua esportazione è già in corso",
-  "Your storage is full: the import stopped. What came over so far can be undone.": "Il tuo spazio è pieno: l’importazione si è fermata. Ciò che è stato importato finora può essere annullato."
+  "Your storage is full: the import stopped. What came over so far can be undone.": "Il tuo spazio è pieno: l’importazione si è fermata. Ciò che è stato importato finora può essere annullato.",
+  "Add to the organisation and share the lists": "Aggiungi all’organizzazione e condividi gli elenchi",
+  "Organisation export of {0}": "Esportazione dell’organizzazione {0}",
+  "You are not the admin of an organisation on this server. Create one or ask its admin first.": "Non sei amministratore di un’organizzazione su questo server. Creane una o chiedi prima al suo amministratore.",
+  "The file is encrypted. Enter the recovery key of the organisation (on the old server: Settings > Organisation > Encryption).": "Il file è cifrato. Inserisci la chiave di ripristino dell’organizzazione (sul vecchio server: Impostazioni > Organizzazione > Crittografia).",
+  "Absences and bookings": "Assenze e prenotazioni",
+  "Playbooks": "Playbook",
+  "Project notes": "Note di progetto",
+  "Notepads": "Blocchi note",
+  "Time entries": "Registrazioni di tempo",
+  "Encrypted notes": "Note cifrate",
+  "The recovery key does not open this export. Attempts left: {0}": "La chiave di ripristino non apre questa esportazione. Tentativi rimasti: {0}",
+  "An organisation export goes into an organisation: choose one you administer.": "Un’esportazione di organizzazione va in un’organizzazione: scegline una che amministri.",
+  "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Non è una chiave di ripristino (52 caratteri A-Z e 2-7, in gruppi di 4)."
 }

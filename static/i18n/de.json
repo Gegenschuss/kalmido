@@ -8280,5 +8280,18 @@
   "Uploading… {0} of {1}": "Wird hochgeladen… {0} von {1}",
   "You have imported this export already. Importing it again creates everything a second time.": "Du hast diesen Export schon importiert. Ein erneuter Import legt alles ein zweites Mal an.",
   "Your export is already running": "Dein Export läuft bereits",
-  "Your storage is full: the import stopped. What came over so far can be undone.": "Dein Speicher ist voll: Der Import wurde angehalten. Was bisher übernommen wurde, lässt sich rückgängig machen."
+  "Your storage is full: the import stopped. What came over so far can be undone.": "Dein Speicher ist voll: Der Import wurde angehalten. Was bisher übernommen wurde, lässt sich rückgängig machen.",
+  "Add to the organisation and share the lists": "Zur Organisation hinzufügen und Listen teilen",
+  "Organisation export of {0}": "Organisations-Export von {0}",
+  "You are not the admin of an organisation on this server. Create one or ask its admin first.": "Du bist auf diesem Server nicht Admin einer Organisation. Lege eine an oder frag zuerst ihren Admin.",
+  "The file is encrypted. Enter the recovery key of the organisation (on the old server: Settings > Organisation > Encryption).": "Die Datei ist verschlüsselt. Gib den Wiederherstellungsschlüssel der Organisation ein (auf dem alten Server: Einstellungen > Organisation > Verschlüsselung).",
+  "Absences and bookings": "Abwesenheiten und Buchungen",
+  "Playbooks": "Playbooks",
+  "Project notes": "Projektnotizen",
+  "Notepads": "Notizblöcke",
+  "Time entries": "Zeiteinträge",
+  "Encrypted notes": "Verschlüsselte Notizen",
+  "The recovery key does not open this export. Attempts left: {0}": "Der Wiederherstellungsschlüssel öffnet diesen Export nicht. Verbleibende Versuche: {0}",
+  "An organisation export goes into an organisation: choose one you administer.": "Ein Organisations-Export kommt in eine Organisation: Wähle eine, deren Admin du bist.",
+  "This is not a recovery key (52 characters A-Z and 2-7, in groups of 4).": "Das ist kein Wiederherstellungsschlüssel (52 Zeichen A-Z und 2-7, in Vierergruppen)."
 }

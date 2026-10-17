@@ -431,7 +431,7 @@ ROUTES = {
     "GET /api/account/export": "own", "POST /api/account/export": "own", "DELETE /api/account/export": "own",
     "GET /api/account/export/file": "own", "GET /api/account/import": "own", "POST /api/account/import": "own",
     "GET /api/account/import/{}": "own", "PUT /api/account/import/{}": "own", "DELETE /api/account/import/{}": "own",
-    "POST /api/account/import/{}/run": "own",
+    "POST /api/account/import/{}/run": "own", "POST /api/account/import/{}/key": "own",
     "POST /api/me/mail/token": "own", "DELETE /api/me/mail/token": "own", "POST /api/me/mail/test": "own",
     "GET /api/v1/life": "own", "GET /api/v1/life/upkeep-presets": "own",
     "POST /api/v1/life/contracts": "own", "POST /api/v1/life/devices": "own", "POST /api/v1/life/upkeep": "own",

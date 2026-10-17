@@ -17,12 +17,15 @@ objects. Nothing of the file is trusted as an id: every row is created anew, ids
 columns are set to the importing person and the chosen target, only columns this server has are taken, any other
 column pointing at a row (*_id, *_by, foreign keys) is dropped unless it is mapped here. Sharing with a person found by
 e-mail happens only for the people ticked in the preview; inviting a missing person needs an instance admin."""
+import base64
 import hashlib
+import io
 import json
 import os
 import re
 import secrets
 import shutil
+import struct
 import threading
 import time
 import uuid
@@ -233,9 +236,17 @@ def umz_open(path, key, size, full=True):
             names[zi.filename] = zi
         if total > 2 * UMZ_IMPORT_MAX_MB * 1024 * 1024:
             raise UmzBad(N_("The file is too large (at most {0} MB)"), UMZ_IMPORT_MAX_MB)
-        if "manifest.json" not in names or "checksum.sha256" not in names:
+        if "manifest.json" not in names:
             raise UmzBad(N_("This is not a Kalmido export (manifest.json is missing)."))
         mraw = _read_entry(zf, names["manifest.json"], UMZ_MANIFEST_MAX)
+        if "checksum.sha256" not in names and b'"kalmido-org-export"' in mraw[:4096]:
+            # an organisation export, opened with its recovery key (umz_unlock): its blocks were authenticated, every
+            # entry carries its SHA-256 in the manifest
+            man = _json(mraw, "manifest.json")
+            if isinstance(man, dict) and man.get("format") == "kalmido-org-export":
+                return (zf, *umz_org_open(zf, names, man, mraw, full))
+        if "checksum.sha256" not in names:
+            raise UmzBad(N_("This is not a Kalmido export (manifest.json is missing)."))
         sums = {}
         for line in _read_entry(zf, names["checksum.sha256"], UMZ_MANIFEST_MAX).decode("utf-8", "replace").splitlines():
             m = re.fullmatch(r"([0-9a-f]{64})\s+\*?(.+)", line.strip())
@@ -282,6 +293,79 @@ def umz_open(path, key, size, full=True):
     except (zipfile.BadZipFile, OSError, EOFError, ValueError, NotImplementedError, RuntimeError):
         zf.close()
         raise UmzBad(N_("The file contains a broken part: {0}"), "ZIP") from None
+
+
+# 2.73.0 B (#1473, part 4): the parts of an organisation export (admin/orgexport.py OX_AREAS) that move along, under the
+# table names of the account export; everything else of the archive is named in the preview as not taken over
+UMZ_ORG_MAP = {
+    "lists.json": "lists", "lists/sections.json": "sections", "lists/members.json": "list_members", "lists/fields.json": "list_fields",
+    "lists/tags.json": "list_tags", "lists/status.json": "list_status", "lists/links.json": "list_links",
+    "lists/milestones.json": "list_milestones", "lists/files.json": "list_files", "tasks.json": "tasks",
+    "tasks/dependencies.json": "task_deps", "tasks/field_values.json": "task_field_values", "tasks/tags.json": "task_list_tags",
+    "comments.json": "comments", "attachments.json": "attachments", "calendars.json": "event_calendars", "events.json": "events",
+    "events/attendees.json": "event_attendees", "books.json": "address_books", "books/contacts.json": "contacts",
+    "members.json": "members",
+}
+UMZ_ORG_SKIP = (  # archive prefix -> what the preview names as not taken over
+    ("office/", N_("Office")), ("store/", N_("File store")), ("chat/", N_("Team chat")), ("wiki/", N_("Knowledge pages")),
+    ("documents/", N_("Documents")), ("newsletter/", N_("Newsletter")), ("clients.json", N_("Clients")), ("hub/", N_("Absences and bookings")),
+    ("lists/forms.json", N_("Forms")), ("lists/playbooks.json", N_("Playbooks")), ("lists/notes.json", N_("Project notes")),
+    ("lists/notepads.json", N_("Notepads")), ("time_entries.json", N_("Time entries")),
+    ("tasks/encrypted_notes.json", N_("Encrypted notes")), ("tasks/locked_notes.json", N_("Encrypted notes")),
+)
+
+
+def umz_org_open(zf, names, man, mraw, full):
+    """-> (manifest, files, data) of an opened organisation export, in the shape of an account export."""
+    from .orgexport import _safe_part
+    fl = man.get("files")
+    if man.get("format_version") != 1 or not isinstance(fl, dict) or not isinstance(man.get("org"), dict):
+        raise UmzBad(N_("This export comes from a newer Kalmido version. Update this server first."))
+    listed = set(fl) - {"manifest.json"}
+    if set(names) - {"manifest.json"} != listed:
+        raise UmzBad(N_("A part of the file is missing: {0}"), ", ".join(sorted(listed ^ (set(names) - {"manifest.json"})))[:120])
+    files, data, skipped = {}, {}, {}
+    total = sum(names[p].file_size for p in listed if p.endswith(".json"))
+    if total > UMZ_JSON_TOTAL:
+        raise UmzBad(N_("The file contains a part that is too large: {0}"), "*.json")
+    for p in sorted(listed):
+        f = fl[p]
+        if not isinstance(f, dict) or not isinstance(f.get("sha256"), str):
+            raise UmzBad(N_("The file contains a broken part: {0}"), "manifest.json")
+        zi = names[p]
+        files[p] = (zi, f["sha256"])
+        if p in UMZ_ORG_MAP:
+            rows = _json(_read_entry(zf, zi, UMZ_JSON_MAX, f["sha256"]), p)
+            if not isinstance(rows, list) or not all(isinstance(x, dict) for x in rows):
+                raise UmzBad(N_("The file contains a broken part: {0}"), p)
+            data[UMZ_ORG_MAP[p]] = rows
+        elif full or p.endswith(".json"):
+            raw = _read_entry(zf, zi, UMZ_JSON_MAX if p.endswith(".json") else MAX_FILE_MB * 1024 * 1024 * 4, f["sha256"])
+            what = next((w for pre, w in UMZ_ORG_SKIP if p.startswith(pre)), None)
+            if what and p.endswith(".json"):
+                try:
+                    n = len(json.loads(raw.decode("utf-8")))
+                except (ValueError, UnicodeDecodeError, RecursionError, TypeError):
+                    n = 0
+                if n:
+                    skipped[what] = skipped.get(what, 0) + n
+    for kind, table in (("attachments", "attachments"), ("list_files", "list_files")):
+        for r in data.get(table, []):
+            path = f"files/{kind}/{_oid(r.get('id')) or 0}-{_safe_part(r.get('name'))}"
+            if path in files:
+                r["file"] = path
+    lists = {}
+    for m in data.pop("list_members", []):
+        lists.setdefault(_oid(m.get("user_id")), {})[str(_oid(m.get("list_id")))] = m.get("role")
+    data["people"] = [{"user_id": _oid(m.get("id")), "name": _txt(m.get("display_name"), 100) or _txt(m.get("username"), 100),
+                       "email": "" if m.get("kind") == "agent" else _txt(m.get("email"), 200), "lists": lists.get(_oid(m.get("id")), {}),
+                       **({"agent": True} if m.get("kind") == "agent" else {})} for m in data.pop("members", [])]
+    org = man["org"]
+    m2 = {"format": "kalmido-org-export", "kind": "org", "v": 1, "kalmido_version": _txt(man.get("kalmido_version"), 40),
+          "created_at": _txt(man.get("created_at"), 40), "source": {"url": "", "hosted": False},
+          "user": {"id": None, "name": _txt(org.get("name"), 100), "email": ""}, "export_id": hashlib.sha256(mraw).hexdigest()[:32],
+          "client_encrypted": {}, "org_skipped": skipped}
+    return m2, files, data
 
 
 def _oid(v):
@@ -335,9 +419,10 @@ def umz_preview(c, uid, man, data, can_invite):
               "tasks": sum(1 for t in data.get("tasks", []) if t.get("list_id") == L.get("id") and not t.get("deleted_at"))}
              for L in data.get("lists", [])]
     people = []
+    mine = ((c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0] or "").lower()
     for p in data.get("people", []):
         em = _email(p.get("email"))
-        if not em or p.get("agent"):
+        if not em or p.get("agent") or em == mine:
             continue
         hit = umz_find(c, uid, em)
         people.append({"email": em, "name": _txt(p.get("name"), 100), "lists": len(p.get("lists") or {}) if isinstance(p.get("lists"), dict) else 0,
@@ -349,6 +434,9 @@ def umz_preview(c, uid, man, data, can_invite):
     src = man.get("source") if isinstance(man.get("source"), dict) else {}
     u = man.get("user") or {}
     skipped = []
+    org_kind = man.get("kind") == "org"
+    for what, n in (man.get("org_skipped") or {}).items():  # an organisation export: the areas that do not move
+        skipped.append({"what": tr(what), "count": n})
     for t, text in (("api_tokens", N_("API tokens")), ("webhooks", N_("Webhooks")), ("calendar_subscriptions", N_("Calendar subscriptions")),
                     ("karakeep", N_("Karakeep connection")), ("newsletter_connection", N_("Newsletter connection")),
                     ("agent_schedules", N_("Planned agent jobs")), ("public_links", N_("Public links"))):
@@ -365,7 +453,8 @@ def umz_preview(c, uid, man, data, can_invite):
         "server_links": [_txt(x.get("name"), 100) or _txt(x.get("base_url"), 200) for x in data.get("server_links", [])][:20],
         "encrypted": {"attachments": len(ce.get("attachments") or []) if isinstance(ce.get("attachments"), list) else 0,
                       "locked_notes": ce.get("locked_notes") if isinstance(ce.get("locked_notes"), int) else 0},
-        "not_taken": skipped, "again": again, "export_id": eid, "targets": umz_targets(c, uid),
+        "not_taken": skipped, "again": again, "export_id": eid, "kind": "org" if org_kind else "account",
+        "targets": [t for t in umz_targets(c, uid) if not org_kind or t["id"] != "private"],
     }
 
 
@@ -472,6 +561,7 @@ class _Run:
         self.task_list, self.field_list = {}, {}
         self.written = []  # full paths of files written (removed again when the run fails)
         self.stopped = None
+        self.kind = "account"  # or "org": an organisation export (part 4)
 
     def m(self, kind, old):
         o = _oid(old)
@@ -701,12 +791,15 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         if nid:
             run.created["time_entries"].append(nid)
             run.count("time_entries")
+    org_kind = man.get("kind") == "org"
     for src, table, kind, fixed in (("habits", "habits", "habits", {"user_id": uid}), ("filters", "filters", None, {"user_id": uid}),
                                     ("templates", "templates", None, {"user_id": uid}),
-                                    ("address_books", "books", "books", {"owner_id": uid, "org_id": None, "owner_org_id": None}),
-                                    ("event_calendars", "ev_cals", "ev_cals", {"owner_id": uid, "org_id": None})):
+                                    ("address_books", "books", "books", {"owner_id": uid, "org_id": org if org_kind else None, "owner_org_id": None}),
+                                    ("event_calendars", "ev_cals", "ev_cals", {"owner_id": uid, "org_id": org if org_kind else None})):
         for r in data.get(src, []):
             run.step()
+            if table == "books" and org_kind and _oid(r.get("owner_org_id")):
+                fixed = {**fixed, "owner_org_id": org}  # an address book of the organisation itself (2.52.0 C, #1438)
             d = umz_row(c, table, r, {**fixed, "updated_at": ts, "changed_at": ts}, ts)
             nid = umz_insert(c, table, d) if d else None
             if not nid:
@@ -793,6 +886,11 @@ def umz_share(c, run, uid, data, picks, can_invite):
         target, state = None, "skipped"
         if hit and pick.get("share"):
             target, state = hit["id"], "shared"
+            if run.org and run.kind == "org":  # an organisation export: the ticked member joins the target organisation
+                from ..accounts.orgs import org_member_add, org_role
+                if not org_role(c, hit["id"], run.org):
+                    with system_ctx(c):  # the organisation's admin adds the person they ticked (structure)
+                        org_member_add(c, run.org, hit["id"], "member")
         elif not hit and pick.get("invite") and can_invite:
             target = umz_invite(c, run, uid, em, _txt(p.get("name"), 60))
             state = "invited" if target else "failed"
@@ -870,9 +968,16 @@ def umz_run(uid, iid, opts):
                     hit = umz_find(c, uid, em)
                     if hit and _oid(p.get("user_id")):
                         people[_oid(p.get("user_id"))] = hit["id"]
+            if man.get("kind") == "org":  # an organisation export: my own account there has my e-mail address
+                mine = (c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0] or ""
+                hit = [p for p in data.get("people", []) if mine and _email(p.get("email")) == mine.lower()]
+                man["user"]["id"] = _oid(hit[0].get("user_id")) if hit else None
+                if hit and hit[0].get("user_id") in people:
+                    people.pop(_oid(hit[0].get("user_id")), None)
             total = sum(len(v) for v in data.values())
             eid = st.get("export_id") or secrets.token_hex(8)
             run = _Run(uid, iid, eid, opts["org"], total)
+            run.kind = man.get("kind") or "account"
             c.commit()
             try:
                 umz_write(c, run, uid, man, zf, files, data, people)
@@ -949,6 +1054,12 @@ def umz_check(uid, iid, can_invite):
         _L.lg = lang(c, uid)
         st = _st(uid, iid) or {}
         key = umz_key(uid, "upload") if st.get("sealed") else None
+        head = umz_org_head(os.path.join(_dir(uid, iid), "upload.bin"), key, st["size"])
+        if head is not None:  # an encrypted organisation export: the recovery key opens it (umz_unlock)
+            c.rollback()
+            _set(uid, iid, state="key", preview={"kind": "org", "org": _txt(head.get("org"), 100), "created_at": _txt(head.get("created_at"), 40),
+                                                  "kalmido_version": _txt(head.get("kalmido_version"), 40)})
+            return
         zf, man, files, data = umz_open(os.path.join(_dir(uid, iid), "upload.bin"), key, st["size"])
         zf.close()
         pv = umz_preview(c, uid, man, data, can_invite)
@@ -965,6 +1076,116 @@ def umz_check(uid, iid, can_invite):
         _set(uid, iid, state="invalid", error=tr("The file could not be read."))
     finally:
         c.close()
+        with _UMI_LOCK:
+            _UMI.pop(int(uid), None)
+
+
+def _buffered(path, key, size):
+    return io.BufferedReader(UmzReader(path, key, size), UMZ_BLOCK)
+
+
+def umz_org_head(path, key, size):
+    """The header of an encrypted organisation export (orgexport.py ox_header), None for anything else."""
+    from .orgexport import OX_MAGIC
+    with _buffered(path, key, size) as r:
+        if r.read(len(OX_MAGIC)) != OX_MAGIC:
+            return None
+        raw = r.read(4)
+        n = struct.unpack(">I", raw)[0] if len(raw) == 4 else 0
+        if not 0 < n <= 1 << 16:
+            raise UmzBad(N_("The file contains a broken part: {0}"), "header")
+        head = r.read(n)
+    try:
+        h = json.loads(head.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, RecursionError):
+        raise UmzBad(N_("The file contains a broken part: {0}"), "header") from None
+    if not isinstance(h, dict) or h.get("format") != "kalmido-org-export" or h.get("alg") != "AES-256-GCM":
+        raise UmzBad(N_("The file contains a broken part: {0}"), "header")
+    if h.get("v") != 1:
+        raise UmzBad(N_("This export comes from a newer Kalmido version. Update this server first."))
+    return {**h, "_raw": raw, "_head": head}
+
+
+class UmzWrongKey(Exception):
+    pass
+
+
+def umz_org_decrypt(path, key, size, okey, out):
+    """Writes the plain ZIP of the organisation export in path into out (an UmzWriter), block by block as
+    tools/kalmido_export_decrypt.py does: a wrong key -> UmzWrongKey, a damaged / cut / reordered file -> UmzBad."""
+    from cryptography.exceptions import InvalidTag
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from .orgexport import OX_FK_AAD, OX_MAGIC
+    h = umz_org_head(path, key, size)
+    hh = hashlib.sha256(OX_MAGIC + h["_raw"] + h["_head"]).digest()
+    try:
+        w = base64.b64decode(h["wrapped_fk"])
+        prefix = base64.b64decode(h["nonce_prefix"])
+        block = int(h["block"])
+        fk = AESGCM(okey).decrypt(w[:12], w[12:], OX_FK_AAD + str(int(h["org_id"])).encode())
+    except InvalidTag:
+        raise UmzWrongKey() from None
+    except (KeyError, ValueError, TypeError):
+        raise UmzBad(N_("The file contains a broken part: {0}"), "header") from None
+    if len(prefix) != 8 or not 0 < block <= 1 << 26:
+        raise UmzBad(N_("The file contains a broken part: {0}"), "header")
+    aes, i = AESGCM(fk), 0
+    with _buffered(path, key, size) as r:
+        r.read(len(OX_MAGIC) + 4 + len(h["_head"]))
+        cur = r.read(block + 16)
+        while True:
+            if len(cur) < 16:
+                raise UmzBad(N_("The upload is damaged. Please upload the file again."))
+            nxt = r.read(block + 16) if len(cur) == block + 16 else b""
+            last = not nxt
+            try:
+                out.write(aes.decrypt(prefix + struct.pack(">I", i), cur, hh + struct.pack(">QB", i, 1 if last else 0)))
+            except InvalidTag:
+                raise UmzBad(N_("The upload is damaged. Please upload the file again.")) from None
+            if last:
+                return
+            cur, i = nxt, i + 1
+
+
+UMZ_KEY_TRIES = 10  # wrong recovery keys per upload; then the upload is removed
+
+
+def umz_unlock(uid, iid, okey, can_invite):
+    """The thread: open the organisation export with the recovery key, then check it like any other file."""
+    try:
+        _L.lg = lang(uid=uid)
+        st = _st(uid, iid) or {}
+        key = umz_key(uid, "upload") if st.get("sealed") else None
+        src = os.path.join(_dir(uid, iid), "upload.bin")
+        dst = os.path.join(_dir(uid, iid), "plain.part")
+        try:
+            with os.fdopen(os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "wb") as f:
+                w = UmzWriter(f, key)
+                umz_org_decrypt(src, key, st["size"], okey, w)
+                w.finish()
+        except UmzWrongKey:
+            os.remove(dst)
+            tries = int(st.get("tries") or 0) + 1
+            if tries >= UMZ_KEY_TRIES:
+                _drop(uid, iid)
+                return
+            _set(uid, iid, state="key", tries=tries, key_error=True)
+            return
+        except Exception:
+            if os.path.exists(dst):
+                os.remove(dst)
+            raise
+        os.replace(dst, src)
+        _set(uid, iid, state="checking", size=w.size, key_error=False)
+        umz_check(uid, iid, can_invite)  # the opened ZIP is checked like any other file (same thread)
+    except UmzBad as e:
+        _set(uid, iid, state="invalid", error=tr(e.text, *e.args_))
+        return
+    except Exception as e:  # noqa: BLE001
+        print(f"account import unlock of user {uid} failed: {type(e).__name__}", flush=True)
+        _set(uid, iid, state="invalid", error=tr("The file could not be read."))
+        return
+    finally:
         with _UMI_LOCK:
             _UMI.pop(int(uid), None)
 
@@ -1027,6 +1248,8 @@ def _view(uid, iid, st):
     if st.get("state") in ("checking", "running") and not _busy(uid):
         out["state"] = "failed"
         out["error"] = tr("The import was interrupted. Please start it again.")
+    if st.get("state") == "key" and st.get("key_error"):
+        out["error"] = tr("The recovery key does not open this export. Attempts left: {0}", UMZ_KEY_TRIES - int(st.get("tries") or 0))
     for k in ("preview", "error", "progress", "result"):
         if st.get(k) is not None and k not in out:
             out[k] = st[k]
@@ -1138,6 +1361,8 @@ def umz_go(iid):
     c = db()
     tg = b.get("target", "private")
     org = None
+    if tg == "private" and (st.get("preview") or {}).get("kind") == "org":
+        return err(tr("An organisation export goes into an organisation: choose one you administer."))
     if tg != "private":
         if not isinstance(tg, int) or isinstance(tg, bool):
             return err(tr("Invalid value: {0}", "target"))
@@ -1155,6 +1380,29 @@ def umz_go(iid):
         _thread(uid, umz_run, iid, {"org": org, "people": picks, "can_invite": bool(g.user["is_admin"])})
     except Denied:
         _set(uid, iid, state="preview")
+        raise
+    return jsonify(_view(uid, iid, _st(uid, iid))), 202
+
+
+@app.post("/api/account/import/<iid>/key")
+def umz_key_route(iid):
+    """{recovery_key}: opens an uploaded organisation export (Settings > Organisation > Encryption of the source server).
+    Wrong keys answer later in the state (key_error); after UMZ_KEY_TRIES the upload is removed."""
+    umz_person()
+    uid = me()
+    st = _need(uid, iid)
+    if st.get("state") != "key":
+        return err(tr("The file is not ready for the import"), 409)
+    from ..core.orgcrypt import oc_parse_recovery
+    try:
+        okey = oc_parse_recovery(body().get("recovery_key"))
+    except ValueError:
+        return err(tr("This is not a recovery key (52 characters A-Z and 2-7, in groups of 4)."))
+    _set(uid, iid, state="checking")
+    try:
+        _thread(uid, umz_unlock, iid, okey, bool(g.user["is_admin"]))
+    except Denied:
+        _set(uid, iid, state="key")
         raise
     return jsonify(_view(uid, iid, _st(uid, iid))), 202
 

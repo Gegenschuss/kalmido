@@ -332,6 +332,46 @@ check(ol and ol[0]["org_id"] == ORG, "the list belongs to the organisation")
 oa = dbx("SELECT a.path FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.list_id=? AND a.name='packliste.txt'", (ol[0]["id"] if ol else 0,))
 check(oa and open(os.path.join(DATA, "attachments", oa[0]["path"]), "rb").read(6) == b"KENC1\n", "the attachment is sealed (organisation key)")
 
+# ---------------------------------------------------------------- part 4: an organisation export into another organisation
+r = A.post(B + f"/api/orgs/{ORG}/export")
+check(r.status_code == 202, "organisation export started " + r.text[:120])
+for _ in range(480):
+    if A.get(B + f"/api/orgs/{ORG}/export").json().get("state") != "running":
+        break
+    time.sleep(0.25)
+OX = A.get(B + f"/api/orgs/{ORG}/export/file").content
+RK = A.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
+check(OX[:13] == b"KALMIDO-ORGX\n" and RK, "organisation export + recovery key")
+r = A.post(B + "/api/admin/orgs", json={"name": "Gamma Ziel", "admin_id": ALICE})
+GAMMA = r.json()["id"]
+iid = upload(A, OX, name="alpha.kalmido-export")
+j = wait(A, iid)
+check(j.get("state") == "key" and j["preview"]["org"] == "Alpha Umzug", f"an organisation export asks for the recovery key {j.get('state')}")
+check(A.post(B + f"/api/account/import/{iid}/key", json={"recovery_key": "nonsense"}).status_code == 400, "not a recovery key 400")
+check(Bo.post(B + f"/api/account/import/{iid}/key", json={"recovery_key": RK}).status_code == 404, "bob: alice's upload 404")
+wrong = "-".join(["ABCD"] * 13)
+check(A.post(B + f"/api/account/import/{iid}/key", json={"recovery_key": wrong}).status_code == 202, "a wrong key is taken")
+j = wait(A, iid)
+check(j.get("state") == "key" and "Attempts left: 9" in (j.get("error") or ""), f"wrong key: asked again {j.get('error')}")
+check(A.post(B + f"/api/account/import/{iid}/key", json={"recovery_key": RK}).status_code == 202, "the right key")
+j = wait(A, iid)
+pv = j.get("preview") or {}
+check(j.get("state") == "preview" and pv.get("kind") == "org", f"opened: preview {j.get('state')} {j.get('error')}")
+check("private" not in [t["id"] for t in pv.get("targets", [])] and GAMMA in [t["id"] for t in pv.get("targets", [])], "targets: organisations only")
+check(any(x["email"] == "bob@example.com" and x["found"] for x in pv.get("people", [])) and
+      not any(x["email"] == "alice@example.com" for x in pv.get("people", [])), "the members: bob found, alice herself not listed")
+check(A.post(B + f"/api/account/import/{iid}/run", json={"target": "private"}).status_code == 400, "not into the private space")
+j = run(A, iid, target=GAMMA, people={"bob@example.com": {"share": True}})
+check(j.get("state") == "done", f"organisation import done {j.get('error')}")
+gl = dbx("SELECT id, owner_id FROM lists WHERE org_id=? AND name='Alpha Orgliste'", (GAMMA,))
+check(gl and gl[0]["owner_id"] == ALICE, "the list is in the target organisation")
+ga = dbx("SELECT a.id, a.path FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.list_id=? AND a.name='org.txt'", (gl[0]["id"] if gl else 0,))
+check(ga and open(os.path.join(DATA, "attachments", ga[0]["path"]), "rb").read(6) == b"KENC1\n" and
+      A.get(B + f"/api/attachments/{ga[0]['id']}").content == OATT, "the file: sealed with the new organisation's key, readable")
+check(dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (GAMMA, ids["bob"])), "bob (ticked) joined the organisation")
+check(not dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (GAMMA, DAVE)), "dave (not ticked) did not")
+A.delete(B + f"/api/account/import/{iid}")
+
 # ---------------------------------------------------------------- a crafted file: nothing from it is trusted
 CAROL = ids["carol"]
 ts = "2026-10-01T08:00:00Z"

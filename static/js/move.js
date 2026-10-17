@@ -32,10 +32,10 @@ const umzCount = (k, n) => ({lists: trn('{0} list', '{0} lists', n), tasks: trn(
   time_entries: trn('{0} time entry', '{0} time entries', n), templates: trn('{0} template', '{0} templates', n), filters: trn('{0} filter', '{0} filters', n)})[k];
 const umzCounts = o => Object.entries(o || {}).filter(([k, n]) => n && umzCount(k, n)).map(([k, n]) => esc(umzCount(k, n))).join(' · ');
 function umzPreviewHtml(j) {
-  const p = j.preview, src = p.source.url ? esc(p.source.url) : tr('unknown');
+  const p = j.preview, org = p.kind === 'org', src = p.source.url ? esc(p.source.url) : tr('unknown');
   const people = p.people.length ? `<div class="muted mhint">${tr('People of your lists')}</div>` + p.people.map((x, i) => `<div class="mrow umzp">
     <span class="n">${esc(x.name || x.email)} <span class="muted">${esc(x.email)}</span><br><span class="muted">${x.found ? esc(tr('found: {0}', x.found_name)) : esc(tr('not on this server'))}</span></span>
-    ${x.found ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="share"> ${tr('Share my lists')}</label>`
+    ${x.found ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="share"> ${org ? tr('Add to the organisation and share the lists') : tr('Share my lists')}</label>`
       : p.can_invite ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="invite"> ${tr('Invite by e-mail')}</label>` : `<span class="muted">${tr('Skipped')}</span>`}</div>`).join('')
     + hintK(tr('Nothing is shared without a tick: an address on another server can belong to somebody else here.')) : '';
   const lists = p.lists.length ? `<div class="umzlists">${p.lists.slice(0, 12).map(l => `<div class="mrow"><span class="n">${esc(l.inbox ? tr('Basket') : l.name)}${l.folder ? ` <span class="muted">${esc(l.folder)}</span>` : ''}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}</span></div>`).join('')}${p.lists.length > 12 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', p.lists.length - 12))}</div>` : ''}</div>` : '';
@@ -43,11 +43,13 @@ function umzPreviewHtml(j) {
     p.server_links.length ? hintK(tr('Set up the connection to {0} again (Settings > Account > Servers): access keys never move along.', p.server_links.map(esc).join(', '))) : '',
     p.encrypted.attachments || p.encrypted.locked_notes ? hintK(tr('Encrypted content stays encrypted: you open it with your passwords as before.')) : '',
     p.not_taken.length ? hintK(tr('Not taken over: {0}', p.not_taken.map(x => `${esc(x.what)} (${x.count})`).join(', '))) : ''].join('');
-  const tgt = p.targets.length > 1 ? `<div class="row"><label for="s-umz-tgt">${tr('Into')}</label><select id="s-umz-tgt">${p.targets.map(t => `<option value="${esc(String(t.id))}">${esc(t.id === 'private' ? tr('Private|workspace') : t.name)}</option>`).join('')}</select></div>` : '';
-  return `<div class="impbox umzbox" role="status"><div class="imphead"><b>${tr('Export of {0}', esc(p.user.name || p.user.email))}</b></div>
-    <div class="muted">${tr('From {0}, created {1}', src, esc(fmtWhen(p.created_at)))}</div>
+  const tgt = p.targets.length > 1 || org ? `<div class="row"><label for="s-umz-tgt">${tr('Into')}</label><select id="s-umz-tgt">${p.targets.map(t => `<option value="${esc(String(t.id))}">${esc(t.id === 'private' ? tr('Private|workspace') : t.name)}</option>`).join('')}</select></div>` : '';
+  const none = org && !p.targets.length;  // 2.73.0 B (part 4): an organisation export needs an organisation I administer here
+  return `<div class="impbox umzbox" role="status"><div class="imphead"><b>${org ? tr('Organisation export of {0}', esc(p.user.name)) : tr('Export of {0}', esc(p.user.name || p.user.email))}</b></div>
+    <div class="muted">${org ? esc(fmtWhen(p.created_at)) : tr('From {0}, created {1}', src, esc(fmtWhen(p.created_at)))}</div>
     <div class="umzcnt">${umzCounts(p.counts)}</div>${lists}${people}${notes}${tgt}
-    <div class="row"><button type="button" class="btn sm pri" data-umz="go">${ic('download', 's')} ${tr('Start the import')}</button><button type="button" class="btn sm" data-umz="cancel">${tr('Cancel')}</button></div></div>`;
+    ${none ? hintK(tr('You are not the admin of an organisation on this server. Create one or ask its admin first.')) : ''}
+    <div class="row"><button type="button" class="btn sm pri" data-umz="go" ${none ? 'disabled' : ''}>${ic('download', 's')} ${tr('Start the import')}</button><button type="button" class="btn sm" data-umz="cancel">${tr('Cancel')}</button></div></div>`;
 }
 function umzResultHtml(j) {
   const r = j.result || {};
@@ -64,6 +66,11 @@ function umzImpHtml(j) {
     + `<div class="row"><button type="button" class="btn sm" data-umz="cancel">${tr('Cancel')}</button></div>`;
   if (j.state === 'checking') return bar(0, 0, tr('Checking the file…'));
   if (j.state === 'preview') return umzPreviewHtml(j);
+  if (j.state === 'key') return `<div class="impbox umzbox" role="status"><div class="imphead"><b>${tr('Organisation export of {0}', esc(j.preview?.org || ''))}</b></div>
+    <div class="shint">${tr('The file is encrypted. Enter the recovery key of the organisation (on the old server: Settings > Organisation > Encryption).')}</div>
+    ${j.error ? `<div class="shint keep" role="alert">${ic('alert', 's')} ${esc(j.error)}</div>` : ''}
+    <div class="row"><label for="s-umz-key">${tr('Recovery key')}</label><input id="s-umz-key" type="password" autocomplete="off" spellcheck="false" autocapitalize="characters"></div>
+    <div class="row"><button type="button" class="btn sm pri" data-umz="key">${tr('Open')}</button><button type="button" class="btn sm" data-umz="cancel">${tr('Cancel')}</button></div></div>`;
   if (j.state === 'running') return bar(j.progress?.done, j.progress?.total, tr('Importing…'));
   if (j.state === 'done' || j.state === 'stopped') return umzResultHtml(j);
   return `<div class="shint keep" role="alert">${ic('alert', 's')} ${esc(j.error || tr('The import failed.'))}</div><div class="row"><button type="button" class="btn sm" data-umz="cancel">${tr('Close')}</button></div>`;
@@ -110,6 +117,11 @@ function umzInit(md) {
       }
       if (a === 'cancel') { UMZ.up = null; if (UMZ.cur?.id) await api('DELETE', `/api/account/import/${UMZ.cur.id}`).catch(() => {}); return umzImpDraw(md, null); }
       if (a === 'close') { if (UMZ.cur?.id) await api('DELETE', `/api/account/import/${UMZ.cur.id}`).catch(() => {}); return umzImpDraw(md, null); }
+      if (a === 'key') {
+        const k = $('#s-umz-key', md)?.value || ''; if (!k.trim()) return;
+        b.disabled = true;
+        return umzImpDraw(md, await api('POST', `/api/account/import/${UMZ.cur.id}/key`, {recovery_key: k}));
+      }
       if (a === 'go') {
         const p = UMZ.cur.preview, people = {};
         md.querySelectorAll('[data-umzp]').forEach(x => { if (x.checked) { const em = p.people[+x.dataset.umzp].email; people[em] = {...people[em], [x.dataset.k]: true}; } });
