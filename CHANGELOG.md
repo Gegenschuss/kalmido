@@ -10,6 +10,16 @@ minor one, anything that needs action on your side a major one.
 ## [2.69.0] - 2026-10-17
 
 ### Added
+- Import old data with your own agent, starting with fixed costs: the agent reads the old data in any format and sends it in
+  a fixed JSON format as an "Import" proposal. The card shows the same preview as the spreadsheet import (new / already
+  there / error with reason, VAT rate per row, duplicates unticked); nothing is written before you accept it, then with
+  your account and one undo step. Freelancers without an organisation import into their personal office (#1839).
+- Agents: new permission "import" (off until you turn it on), route `POST /api/v1/agent/proposals/import`, MCP tool
+  `propose_import`; the agent never sees the office (#1839).
+
+## [2.68.0] - 2026-10-17
+
+### Added
 - Office > Cash flow: import fixed costs from a spreadsheet (.xlsx). A preview shows every row (amount, repeat, due month,
   category, VAT rate); duplicates (same name, amount and repeat) are marked and unticked, rows without a name or amount are
   shown with the reason and skipped; only "Import" writes. A template can be downloaded. Group rows become the category;
