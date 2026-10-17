@@ -408,6 +408,8 @@ APP_ONLY = [
     ("2.71.0 (#1457): the rules of a list are managed by its owner / list admins in the app; agents read them and only propose "
      "one (the person accepts it, it runs with their rights)",
      ("* /api/lists/{}/rules", "* /api/rules/")),
+    ("2.72.0 (#1333): the household budget is private like health lists: people only, never an agent; no REST v1 / MCP in 2.72.0",
+     ("* /api/budget",)),
 ]
 
 

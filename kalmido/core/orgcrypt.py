@@ -69,6 +69,11 @@ FIELDS = {
     "office_fixed_costs": ("amount",),  # 2.47.3 (#1652): fixed costs of the cash flow
     "office_deals": ("value", "contact", "note", "lost_reason"),  # 2.50.0 (#1196): the sales pipeline
     "hub_absences": ("kind", "note"),  # 2.50.0 (#1195): the kind of an absence (sick leave = health data) and its note
+    # 2.72.0 (#1333): the household budget -- per row with the key of its list's space (column sid, life/budget.py bud_enc;
+    # the passes of admin/orgcrypt_cli.py call life/budget.py bud_settle, not fields_pass: these tables have no org_id)
+    "budget_entries": ("amount", "title", "note", "counterpart"),
+    "budget_recurring": ("title", "amount"),
+    "budget_cats": ("lim",),
 }
 JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"): ("costs", "margin"),
              ("office_doc_parts", "totals"): ("costs", "margin")}  # 2.47.0 (#1215)
@@ -87,7 +92,9 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  # 2.47.3 (#1022, #1652): travel expenses (participants, amounts) and fixed costs
                  "office_trips": N_("Travel expenses"), "office_trip_items": N_("Travel expenses"), "office_fixed_costs": N_("Fixed costs"),
                  "office_deals": N_("Sales pipeline"),  # 2.50.0 (#1196)
-                 "hub_absences": N_("Kind and note of absences")}  # 2.50.0 (#1195)
+                 "hub_absences": N_("Kind and note of absences"),  # 2.50.0 (#1195)
+                 # 2.72.0 (#1333): amounts, texts and limits of the household budget, its receipts
+                 "budget_entries": N_("Household budget"), "budget_recurring": N_("Household budget"), "budget_cats": N_("Household budget")}
 PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))
 # 2.64.1 (#1817): what the browser encrypts in lists with a lock (collab/liste2e.py LE2E_FIELDS); the plain list holds them apart
 PM_CRYPT_BROWSER = (N_("Titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets of lists with a lock"),)

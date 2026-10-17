@@ -461,6 +461,7 @@ function renderTop0() {
   const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload'), wiki: N_('Knowledge pages'), tags: N_('Tags')};  // 2.49.0 (#1199): + wiki
   let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? (S.nt.lid ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : tr('Notes')) : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
+  if (!title && m === 'budget') title = tr('Budget');  // 2.72.0 (#1333)
   if (!title && (m === 'ablage' || m === 'docs')) title = tr(m === 'ablage' ? 'File store' : 'Documents');  // 2.48.0 (#1207, #1111)
   if (mg_title(m) && !S.me?.kid) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below
   let acts = '';
@@ -881,6 +882,7 @@ function renderView0() {
   else if (m === 'family') setHtml(el, mg_wrap(m, viewFamily()));  // 2.19.0 (#653)
   else if (m === 'contacts') setHtml(el, mg_wrap(m, viewContacts()));  // 2.21.0 (#658)
   else if (m === 'life') setHtml(el, mg_wrap(m, viewLife()));  // 2.22.0 (#663)
+  else if (m === 'budget') setHtml(el, mg_wrap(m, viewBudget()));  // 2.72.0 (#1333)
   else if (m === 'review') setHtml(el, mg_wrap(m, viewReview()));
   else if (m === 'clients') setHtml(el, mg_wrap(m, viewClients()));  // 2.23.0 (#463)
   else if (m === 'workload') setHtml(el, viewWorkload());

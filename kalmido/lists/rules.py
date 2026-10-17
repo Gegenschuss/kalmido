@@ -81,7 +81,7 @@ def rul_list_ok(c, lid):
     r = _list_row(c, lid)
     if not r:
         raise Denied(404)
-    if r["life"] == "health" or r["is_inbox"]:
+    if r["life"] in ("health", "budget") or r["is_inbox"]:  # 2.72.0 (#1333): budgets neither
         return tr("Rules are not available in this list")
     if rul_locked(c, lid):
         return tr("Rules are not available in locked lists")
@@ -96,7 +96,7 @@ def rul_target_ok(c, src, dst, uid, see_only=False):
     role = list_role(c, dst, uid) if d else None
     if not d or not role:
         raise Denied(404)
-    if d["life"] == "health" or rul_locked(c, dst):
+    if d["life"] in ("health", "budget") or rul_locked(c, dst):
         return tr("Tasks cannot be moved into this list by a rule")
     if (s["org_id"] or 0) != (d["org_id"] or 0):
         return tr("The target list must be in the same workspace")

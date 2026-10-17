@@ -72,7 +72,7 @@ def ml_fill(c, out, viewer):
                            JOIN lists o ON o.id=t.list_id JOIN lists x ON x.id=k.list_id
                            WHERE k.task_id IN ({q}) AND k.list_id!=t.list_id AND t.parent_id IS NULL
                            AND o.org_id IS NOT DISTINCT FROM x.org_id
-                           AND COALESCE(o.life, '')!='health' AND COALESCE(x.life, '')!='health'
+                           AND COALESCE(o.life, '') NOT IN ('health', 'budget') AND COALESCE(x.life, '') NOT IN ('health', 'budget')
                            AND k.list_id IN {vis_sql()} ORDER BY k.task_id, k.list_id""", (*ids, viewer, viewer)):
         if ml_locked(c, r["list_id"]):
             continue
@@ -115,6 +115,8 @@ def ml_check(c, tid, lid):
         return tr("Both lists must be in the same workspace"), 400
     if (o["life"] or "") == "health" or (x["life"] or "") == "health":
         return tr("Health lists cannot share tasks with other lists"), 400
+    if "budget" in ((o["life"] or ""), (x["life"] or "")):  # 2.72.0 (#1333): a budget stays private, like a health list
+        return tr("Budgets cannot share tasks with other lists"), 400
     if ml_locked(c, t["list_id"]) or ml_locked(c, lid):
         return tr("Locked lists cannot share tasks with other lists"), 400
     if x["archived"]:

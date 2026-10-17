@@ -114,6 +114,9 @@ KINDS = {
     "tasklink": ("matrix", "p271_b_api_test.py: linking into a list of another organisation / private <-> organisation refused, "
                            "a reader of only the further list gets the task nowhere (state, search, feed, public link, agent), "
                            "\"also\" names only visible lists"),
+    # 2.72.0 (#1333): the household budget
+    "budget": ("matrix", "p272_a_budget_api_test.py: categories, entries, templates, contracts, import and receipts by id of another "
+                         "person's budget 404, read-only shared = no change, agents / tokens without the scope private never"),
 }
 
 ROUTES = {
@@ -661,6 +664,15 @@ ROUTES = {
     # 2.71.0 A (#1457): rules of a list (owner / list admins; agents read + propose) -- p271_a_api_test.py: other org 404
     "GET /api/lists/{}/rules": "list", "POST /api/lists/{}/rules": "list", "PATCH /api/rules/{}": "list", "DELETE /api/rules/{}": "list",
     "POST /api/rules/{}/restore": "list", "GET /api/v1/lists/{}/rules": "list", "POST /api/v1/lists/{}/rules/proposals": "list",
+    # 2.72.0 (#1333): the household budget (a list of kind budget; p272_a_budget_api_test.py)
+    "GET /api/budget": "budget", "POST /api/budget/lists": "budget", "GET /api/budget/{}": "budget",
+    "POST /api/budget/{}/cats": "budget", "PATCH /api/budget/cats/{}": "budget", "DELETE /api/budget/cats/{}": "budget",
+    "POST /api/budget/{}/entries": "budget", "PATCH /api/budget/entries/{}": "budget", "DELETE /api/budget/entries/{}": "budget",
+    "GET /api/budget/{}/recurring": "budget", "POST /api/budget/{}/recurring": "budget", "PATCH /api/budget/recurring/{}": "budget",
+    "DELETE /api/budget/recurring/{}": "budget", "POST /api/budget/recurring/{}/book": "budget",
+    "GET /api/budget/{}/contracts": "budget", "POST /api/budget/{}/contracts": "budget",
+    "POST /api/budget/{}/import/parse": "budget", "POST /api/budget/{}/import/commit": "budget",
+    "POST /api/budget/entries/{}/files": "budget", "GET /api/budget/files/{}": "budget", "DELETE /api/budget/files/{}": "budget",
 }
 
 # ---- 1. every route is classified, nothing stale

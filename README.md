@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.73.0** (2026-10-17): **household budget** at home (module *Budget*, off by default): income and expenses with
+  categories and a monthly limit, planned / spent per month, recurring entries (also taken over from your contracts), CSV
+  import of your bank's statement with column mapping and duplicate check, receipts on an entry; shared with your family
+  like any list, never visible to agents, amounts and texts stored encrypted.
 - **2.64.3** (2026-10-17): **encrypted knowledge space**: a whole knowledge space (private or an organisation's) can be
   encrypted in the browser; search, backlinks and export run in the browser, agents have no access.
 - **2.64.2** (2026-10-17): **lock per list, stage 2**: attachments and the team chat of a locked list are encrypted
@@ -1074,6 +1078,14 @@ calendar, CalDAV, sharing and the API work as everywhere.
   bookmarks into tasks with their link and archives the ticked ones in Karakeep.
 - API v1 and MCP: `/life`, `/life/contracts`, `/life/devices`, `/life/upkeep`, `/life/health` (permission `private`),
   `/life/trips`, `/life/review`, `/life/journal/{day}` (`private`), `/contacts/{id}/care`, `/life/karakeep/sync`.
+- **Budget** (2.72.0; its own part of *At home*): a budget is a list of its own that opens the budget view. Entries
+  (income or expense, amount, day, title, category, counterpart, note, receipts), categories with a monthly limit, a
+  month view with planned / spent / left and the last six months as bars. **Recurring entries** (monthly, quarterly,
+  yearly) are templates: *Open this month* books them with one tap; *Take over from contracts* turns your contracts into
+  recurring entries. **CSV import**: the file you download from your bank (no bank access), columns mapped once and
+  remembered, duplicates and errors left out, categories suggested from earlier entries. Share it with your family like
+  any list (read-only or writing); agents never see it, there is no API v1 / MCP for it. Amounts, texts and receipts are
+  encrypted at rest with the key of the list's space (needs `KALMIDO_SECRET_KEY`).
 
 ## Events
 

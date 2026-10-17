@@ -1191,7 +1191,10 @@ def storage_check():
                                     "LEFT JOIN lists l ON l.id=f.list_id"),
                       # 2.13.1 (#465): files in the agent chats (where = the agent's name)
                       ("chat_file", "SELECT f.id, m.agent_id AS owner, f.name, f.size, f.path, u.display_name AS where_ FROM chat_files f "
-                                    "JOIN agent_chat m ON m.id=f.message_id LEFT JOIN users u ON u.id=m.agent_id")):
+                                    "JOIN agent_chat m ON m.id=f.message_id LEFT JOIN users u ON u.id=m.agent_id"),
+                      # 2.72.0 (#1333): receipts of the household budget (where = the budget list's name)
+                      ("budget_file", "SELECT f.id, f.list_id AS owner, f.name, f.size, f.path, l.name AS where_ FROM budget_files f "
+                                      "LEFT JOIN lists l ON l.id=f.list_id")):
         for r in c.execute(sql):
             n += 1
             full = os.path.join(ATT_DIR, r["path"] or "")

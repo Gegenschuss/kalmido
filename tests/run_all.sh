@@ -1000,6 +1000,10 @@ fresh; run p271_b_ui node p271_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.71.0 part A: rules of a list (When ... then ...), run as their creator, agents propose (#1457)
 fresh; run p271_a_api "$PY" p271_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p271_a_ui node p271_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.72.0 part A: #1333 the household budget (server), own container with KALMIDO_SECRET_KEY
+fresh; run p272_a_budget_api "$PY" p272_a_budget_api_test.py "$KALMIDO_TEST_DATA"
+# 2.72.0 part B: the household budget in the app (#1333)
+fresh; run p272_b_budget_ui node p272_b_budget_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

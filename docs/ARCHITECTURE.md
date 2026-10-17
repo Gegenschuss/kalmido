@@ -201,6 +201,8 @@ The most used helpers:
 | `life/model.py` | Home & life (modules contracts, home, care, health, review, travel, reading): contracts, devices + upkeep, staying in touch, the private health list, review + journal, trips. |
 | `life/karakeep.py` | Home & life: "Read later" from Karakeep (a person's own connection, sealed API key, bookmarks -> tasks, archive back). |
 | `life/web.py` | Home & life: the web API (overview, contracts, devices, upkeep, health, trips, review + journal, staying in touch, Karakeep). |
+| `life/budget.py` | 2.72.0 (#1333) Home & life: the household budget (a list of kind `budget`): categories with monthly limits, entries, recurring items + taking them over from contracts, the month (planned / actual), the bank import (CSV), receipts; fields encrypted with the list's space key, `bud_settle` reseals after a move. |
+| `life/budget_web.py` | 2.72.0 (#1333): the web API of the household budget (`/api/budget...`; no REST v1 / MCP, never for agents). |
 | `life/v1.py` | Home & life: the REST API v1 (+ MCP) and its OpenAPI part (health + journal: scope "private"). |
 | `team/clients.py` | Clients (module "clients"): clients of an organisation above the lists, hours, budget, estimate vs. actual. |
 | `team/workload.py` | Workload (module "workload"): planned hours per person and week against their capacity. |
@@ -329,6 +331,7 @@ registering the ones of its area.
 | `absence.js` | 2.50.0 (#1195): the tabs of the workload view, the absences tab (month grid, list, "Enter an absence" sheet, public holidays), the day plan hint, the warning when assigning to somebody away. |
 | `dispo.js` | 2.50.0 (#1194): the disposition tab (week grid per resource, a day list on phones, booking sheet, who is free, my bookings). |
 | `life.js` | Home & life: the view, its dialogs (contract, device, upkeep, health, trip, Karakeep), the review + journal, staying in touch on a contact's card. |
+| `budget.js` | 2.72.0 (#1333): the household budget (`#budget/<list id>`, a tab of the area Home): month view with totals, six-month bars, categories with their limit, "Open this month" (recurring entries to book), entries per day; the dialogs entry (+ receipts), categories, recurring entries, taking over contracts, CSV import with column mapping; the card on Home & life; reloads on the area `budget` of `/api/version`. |
 | `areas.js` | 2.44.0 (#1187): the areas Office, Time, Review and Home: one sidebar row / tab each, the tabs of their parts on top of the page (each part keeps its route), one switch per area in Settings > Modules. |
 | `sbnav.js` | 2.45.0 (#1509): the messenger in the sidebar: "Messages" with the unread count, the last five conversations, a speech bubble at every person for a direct message. |
 | `wiki.js` | 2.49.0 (#1199): `#wiki` / `#wiki/<id>` = the knowledge pages of a space (an organisation or private): tree from the paths, editor with `[[` suggestions and autosave, backlinks, templates, ZIP export / import. |

@@ -153,7 +153,7 @@ def wh_send(url, secret, event, delivery, attempt, body_bytes, allow):
 def wh_note(c, tid, kind, cid=None):
     if not WH_ON or not has_request_context():
         return
-    if c.execute("SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=? AND l.life='health'", (tid,)).fetchone():
+    if c.execute("SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=? AND l.life IN ('health', 'budget')", (tid,)).fetchone():
         return  # 2.22.0 (#663): health lists never leave the server through a webhook
     n = g.setdefault("wh", {})
     e = n.get(("task", tid))
@@ -172,7 +172,7 @@ def wh_note(c, tid, kind, cid=None):
 
 
 def wh_note_list(lid, event, data):
-    if WH_ON and has_request_context() and not db().execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone():
+    if WH_ON and has_request_context() and not db().execute("SELECT 1 FROM lists WHERE id=? AND life IN ('health', 'budget')", (lid,)).fetchone():  # 2.72.0 (#1333)
         g.setdefault("wh", {})[("list", lid, event, data.get("member_id"))] = data
 
 

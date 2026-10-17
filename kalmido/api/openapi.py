@@ -252,7 +252,7 @@ def openapi_spec():
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
                           "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),
-            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", None], description="2.22.0: what the list is for in "
+            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", "budget", None], description="2.22.0: what the list is for in "
                         "Home & life (health lists are private: never visible to agents, tokens need the scope private); null = none"),
             "trip": {"type": ["object", "null"], "description": "2.22.0: a trip list's {from, to, where?}", "properties": {
                 "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}},
@@ -282,7 +282,7 @@ def openapi_spec():
         "ListPatch": {"type": "object", "additionalProperties": False, "properties": {
             "org_id": nul("integer", description="2.28.0: the list's workspace (the owner; 409 while people / agents in it do not fit, for family / Home & life lists and the inbox)"),
             "client_id": nul("integer", description="2.23.0: the client of the list (owner / list admins; a client you see); null = none"),
-            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", None], description="2.22.0: what the list is for in "
+            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", "budget", None], description="2.22.0: what the list is for in "
                         "Home & life (health lists are private: never visible to agents, tokens need the scope private); null = none"),
             "trip": {"type": ["object", "null"], "description": "2.22.0: a trip list's {from, to, where?}", "properties": {
                 "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}},

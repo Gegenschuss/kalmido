@@ -437,7 +437,7 @@ def _visible_agent(c, aid, exclude=()):
     if not a:
         return {}
     rows = c.execute(f"SELECT t.id, l.org_id, l.id AS lid FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.list_id IN "
-                     f"{acx_lists_sql(req=False)} AND t.deleted_at IS NULL AND COALESCE(l.life, '')!='health' AND l.e2e IS NULL "
+                     f"{acx_lists_sql(req=False)} AND t.deleted_at IS NULL AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND l.e2e IS NULL "
                      f"AND {tvis(c, aid, 't.', write=True)}", (aid, aid)).fetchall()
     only = set(ids_parse(a["list_ids"])) if a["list_ids"] else None
     ex = set(exclude)

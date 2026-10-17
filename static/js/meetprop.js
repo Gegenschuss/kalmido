@@ -13,7 +13,7 @@ const MTG_IMG = 4, MTG_IMG_MB = 50;
 S.mtg = {};      // agent id -> its ready "extract" proposals for me (the chat's cards)
 S.mtgSel = {};   // proposal id -> Set of the ticked task keys
 const mtg_ok = aid => typeof propOn === 'function' && propOn() && (S.proposers || []).some(a => a.id === +aid);
-const mtg_lists = () => S.lists.filter(l => !l.archived && l.life !== 'health' && !l.e2e && canEditList(l.id));  // 2.64.1 (#1817): no list with the lock
+const mtg_lists = () => S.lists.filter(l => !l.archived && l.life !== 'health' && l.life !== 'budget' && !l.e2e && canEditList(l.id));  // 2.64.1 (#1817): no list with the lock
 
 // the entry in the chat's input line (only for an agent that takes my proposal requests)
 function mtg_btnHtml(a) {

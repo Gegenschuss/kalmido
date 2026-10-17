@@ -311,7 +311,8 @@ def _pub_rows(c, f):
         lr = c.execute("SELECT life, e2e FROM lists WHERE id=?", (r["id"],)).fetchone()
         p = c.execute("SELECT * FROM public_links WHERE list_id=?", (r["id"],)).fetchone()
         out.append({"id": r["id"], "name": r["name"], "health": (lr["life"] or "") == "health", "link": pub_public(c, p) if p else None,
-                    "e2e": bool(lr["e2e"])})  # 2.64.1 (#1817): a list with the lock never gets one
+                    "e2e": bool(lr["e2e"]),  # 2.64.1 (#1817): a list with the lock never gets one
+                    "budget": (lr["life"] or "") == "budget"})  # 2.72.0 (#1333)
     return out
 
 
@@ -346,7 +347,7 @@ def sh_pub_put():
         return err(tr("Public links are turned off on this server"), 409)
     created = removed = 0
     for r in _pub_rows(c, f):
-        if on and not r["link"] and not r["health"] and not r["e2e"]:
+        if on and not r["link"] and not r["health"] and not r["e2e"] and not r.get("budget"):  # 2.72.0 (#1333): a budget neither
             _, h, sealed = pub_new_token(c, r["id"])
             c.execute("""INSERT INTO public_links(list_id,token_hash,token,mode,notes,password_hash,pw_rev,expires_at,created_by,created_at)
                          VALUES(?,?,?,?,?,?,?,?,?,?)""", (r["id"], h, sealed, "view", 1 if b.get("notes") else 0, None, 0, None, me(), iso(now_utc())))
