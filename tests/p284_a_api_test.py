@@ -3,7 +3,9 @@
  - addresses: one per client (shared), per project, a hub inbox per person and workspace; only with the rights on the target
  - the mail input (the stub IMAP server of the tests, POST /api/admin/mail/poll): client / project address = fixed; the hub
    inbox matches the sender (client e-mail, contact person) inside the recipient's workspace only, a forwarded mail of the
-   person themselves takes the sender of the forwarding header; no / unknown match = "Not assigned"; doubles dropped
+   person themselves takes the sender of the forwarding header -- audit I4: only with the receiving server's
+   Authentication-Results passing for the own domain (the topmost header; a forged one below, another domain, none = the
+   mail is "Not assigned" with its From as it stands); no / unknown match = "Not assigned"; doubles dropped
  - texts sealed with the organisation's key; the .eml + attachments in the file store ("E-Mails / <client> / ..."), a virus
    find left out with a note, scanner gone = "unchecked"
  - visibility: client mail = who sees the client, project mail = who sees the list, not assigned = the recipient;
@@ -76,10 +78,12 @@ def until(fn, secs=40):
 NEXT = [0]
 
 
-def mail(to, frm, subject, text, mid=None, files=(), cc=None):
-    """Drop one mail into the stub mailbox; returns its Message-ID."""
+def mail(to, frm, subject, text, mid=None, files=(), cc=None, auth=()):
+    """Drop one mail into the stub mailbox; returns its Message-ID. auth: Authentication-Results headers, topmost first."""
     NEXT[0] += 1
     m = email.message.EmailMessage()
+    for a in auth:
+        m["Authentication-Results"] = a
     m["From"], m["To"], m["Subject"] = frm, to, subject
     if cc:
         m["Cc"] = cc
@@ -209,7 +213,16 @@ check(AG.post(B + "/api/hubmail/address", json={"ws": "private"}).status_code in
 M1 = mail(IN_B, "Lisa <lisa@example.com>", "Angebot Fruehjahr", "Hallo Bob, anbei das Angebot.", files=[("brief.txt", b"offer text", "octet-stream")])
 FWD = ("Siehe unten.\n\n---------- Forwarded message ---------\nFrom: Acme Sales <acme@example.com>\nDate: Thu, 15 Oct 2026\n"
        "Subject: Rechnung 17\nTo: bob@example.com\n\nDie Rechnung kommt morgen.")
-M2 = mail(IN_B, "Bob <bob@example.com>", "WG: Rechnung 17", FWD)
+AR_OK = "mx.example.com; dkim=pass (2048-bit key; unprotected) header.d=example.com header.s=s1; spf=pass smtp.mailfrom=bob@example.com; dmarc=pass header.from=example.com"
+M2 = mail(IN_B, "Bob <bob@example.com>", "WG: Rechnung 17", FWD, auth=[AR_OK])
+FWD2 = FWD.replace("Rechnung 17", "Zahlung offen").replace("Die Rechnung kommt morgen.", "Bitte sofort zahlen.")
+M13 = mail(IN_B, "Bob <bob@example.com>", "WG: Zahlung offen", FWD2)  # audit I4: forged, no Authentication-Results
+M14 = mail(IN_B, "Bob <bob@example.com>", "WG: Zahlung offen 2", FWD2, mid="<hub-i4b@example.com>",
+           auth=["mx.example.com; dkim=none; spf=softfail smtp.mailfrom=bob@example.com", "mx.example.com; dkim=pass header.d=example.com"])
+M15 = mail(IN_B, "Bob <bob@example.com>", "WG: Zahlung offen 3", FWD2, mid="<hub-i4c@example.com>",
+           auth=["mx.example.com; dkim=pass header.d=evil.example; dmarc=fail header.from=example.com"])
+M16 = mail(IN_B, "Bob <bob@example.com>", "Kopie an Acme", "Meine Mail an Acme.", cc="acme@example.com")  # unproven copy
+M17 = mail(IN_B, "Bob <bob@example.com>", "Kopie an Acme 2", "Meine Mail an Acme.", cc="acme@example.com", auth=[AR_OK])
 M3 = mail(IN_B, "stranger@example.org", "Unknown sender", "Wer bin ich?")
 M4 = mail(A_ACME, "anyone@example.org", "Direct to Acme", "Kundenadresse.")
 M5 = mail(A_P, "anyone@example.org", "Project mail", "Zum Launch.")
@@ -219,7 +232,7 @@ M8 = mail(IN_E, "Solo <solo@example.com>", "Freelance", "Privat.")
 M9 = mail(IN_D, "acme@example.com", "Forged Acme", "Gefälscht?")  # dave's inbox: only Beta's clients count
 M10 = mail(IN_B, "Mixed <mixed@example.org>", "Two clients", "Cc both", cc="acme@example.com")  # sender unknown -> not assigned
 M11 = mail("tasks+guessedtoken0000@example.test", "a@example.org", "Guessed", "Nobody")
-check(poll(9), f"the mails were filed ({len(dbx('SELECT id FROM hub_mails'))})")
+check(poll(14), f"the mails were filed ({len(dbx('SELECT id FROM hub_mails'))})")
 time.sleep(1)
 R = {k: row(v) for k, v in {"m1": M1, "m2": M2, "m3": M3, "m4": M4, "m5": M5, "m7": M7, "m8": M8, "m9": M9, "m10": M10, "m11": M11}.items()}
 check(R["m1"] and R["m1"]["client_id"] == ACME and R["m1"]["org_id"] == ORG and R["m1"]["owner_id"] == BOB, f"inbox: a contact person's mail -> Acme ({R['m1']})")
@@ -236,6 +249,17 @@ check(str(R["m1"]["subject"]).startswith("kenc1:") and str(R["m1"]["from_addr"])
 check(not str(R["m8"]["subject"]).startswith("kenc1:"), "a private mail stays like the private texts")
 d = Bo.get(B + f"/api/hubmail/mails/{R['m2']['id']}").json()
 check(d.get("subject") == "Rechnung 17" and d.get("from_addr") == "acme@example.com", f"forwarded: subject without WG:, original sender ({d.get('subject')}, {d.get('from_addr')})")
+# audit I4: a From with bob's own address is a forward only when the receiving server confirmed his domain
+for k, mid, what in (("m13", M13, "no Authentication-Results"), ("m14", M14, "the topmost header fails, a forged pass below"),
+                     ("m15", M15, "a pass for another domain"), ("m16", M16, "an unproven copy with Acme in Cc")):
+    rr = row(mid)
+    check(rr and rr["client_id"] is None and rr["list_id"] is None, f"I4: {what}: not assigned ({rr and rr['client_id']})")
+    if rr:
+        dd = Bo.get(B + f"/api/hubmail/mails/{rr['id']}").json()
+        check(dd.get("from_addr") == "bob@example.com", f"I4: {what}: the From stays bob, not the text's sender ({dd.get('from_addr')})")
+d = Bo.get(B + f"/api/hubmail/mails/{row(M13)['id']}").json()
+check(d.get("subject") == "WG: Zahlung offen", f"I4: an unproven forward keeps its subject ({d.get('subject')})")
+check(row(M17) and row(M17)["client_id"] == ACME, f"I4: a confirmed copy with Acme in Cc -> Acme ({row(M17)})")
 
 # attachments in the file store
 d = Bo.get(B + f"/api/hubmail/mails/{R['m1']['id']}").json()
@@ -258,7 +282,7 @@ check("virus" in (d7.get("note") or ""), f"the note names the find ({d7.get('not
 open(os.path.join(DATA, "clamd.off"), "w").close()
 time.sleep(1.5)
 M12 = mail(A_ACME, "x@example.org", "Unchecked", "Scanner down", files=[("later.txt", b"later", "octet-stream")])
-check(poll(10), "the mail with the scanner gone was filed")
+check(poll(15), "the mail with the scanner gone was filed")
 time.sleep(0.5)
 d12 = Bo.get(B + f"/api/hubmail/mails/{row(M12)['id']}").json()
 check(any(a["name"] == "later.txt" and a["scan"] == "unchecked" for a in d12.get("attachments", [])), f"scanner gone: unchecked ({d12.get('attachments')})")

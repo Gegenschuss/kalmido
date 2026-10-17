@@ -6,8 +6,10 @@ project and one hub inbox per person and workspace (an organisation or the priva
 address is filed there (a project's mail also names the project's client). A mail to the hub inbox is matched by its
 sender: the client e-mail, the e-mails of the client's contact persons and of the address book contacts linked to them --
 only clients of the same workspace that the recipient sees. Is the sender the person themselves (a forwarded mail), the
-original sender of the forwarding header counts, else To / Cc. No hit or several clients = "Not assigned" (only the
-recipient sees it and assigns it by hand).
+original sender of the forwarding header counts, else To / Cc -- audit I4: only when the receiving server confirmed the
+own domain (hbm_from_verified: the topmost Authentication-Results, DKIM / DMARC / SPF pass for it); a From with the own
+address without that proof may be forged and files the mail "Not assigned" with the From as it stands. No hit or
+several clients = "Not assigned" (only the recipient sees it and assigns it by hand).
 
 hub_mails keeps the headers and the plain text (subject, sender, recipients and text sealed with the organisation's key
 like the other office texts, core/orgcrypt.py FIELDS); the original .eml and the attachments go into the file store
@@ -22,6 +24,7 @@ accounts get nothing (no v1 route, no MCP tool in 2.84.0). Deleting sets deleted
 import email.utils
 import hashlib
 import json
+import os
 import re
 import secrets
 
@@ -39,6 +42,10 @@ HBM_BODY_MAX = 200000   # characters of the plain text kept
 HBM_FILES = 20          # attachments of one mail at most
 HBM_PAGE = 200          # mails in one list answer
 HBM_KINDS = ("inbox", "client", "list")
+# audit I4: the authserv-id of the receiving mail server (its Authentication-Results); empty = the topmost such header
+HBM_AUTHSERV = os.environ.get("KALMIDO_MAIL_AUTHSERV_ID", "").strip().lower()
+_AR_RE = re.compile(r"\s*(dkim|spf|dmarc)\s*=\s*([a-z]+)(.*)", re.I | re.S)
+_AR_PROP_RE = re.compile(r"([a-z][\w.-]*)\s*=\s*(\"[^\"]*\"|[^\s;()]+)", re.I)
 ROOT = "E-Mails"        # the folder at the root of the workspace's file tree
 ADDR_RE = re.compile(r"[\w.!#$%&'*+/=?^`{|}~-]+@[\w-]+(?:\.[\w-]+)+")
 
@@ -538,6 +545,31 @@ def hbm_mail_import(c, msg, raw):
     return out
 
 
+def hbm_from_verified(msg, addr):
+    """Audit I4: did the receiving mail server confirm the domain of addr for this mail? Only the Authentication-Results
+    it added itself count -- the one with KALMIDO_MAIL_AUTHSERV_ID, else the topmost (a sender's own headers sit below
+    it): dkim=pass with header.d (or header.i), dmarc=pass with header.from or spf=pass with smtp.mailfrom of that domain.
+    No such header (a server that adds none) = not confirmed."""
+    dom = (addr or "").rpartition("@")[2].strip().lower()
+    if not dom:
+        return False
+    for h in msg.get_all("Authentication-Results") or []:
+        h = re.sub(r"\([^()]*\)", " ", re.sub(r"\s+", " ", str(h)))  # comments may carry ";"
+        sid = (h.split(";", 1)[0].split() or [""])[0].lower()
+        if HBM_AUTHSERV and sid != HBM_AUTHSERV:
+            continue
+        for part in h.split(";")[1:]:
+            m = _AR_RE.match(part)
+            if not m or m.group(2).lower() != "pass":
+                continue
+            props = {k.lower(): v.strip('"').lower() for k, v in _AR_PROP_RE.findall(m.group(3))}
+            key = {"dkim": ("header.d", "header.i"), "dmarc": ("header.from",), "spf": ("smtp.mailfrom",)}[m.group(1).lower()]
+            if any(props.get(k, "").rpartition("@")[2] == dom for k in key):
+                return True
+        return False  # only the receiving server's header counts
+    return False
+
+
 def _holder_ok(c, kind, uid, org, cid, lid):
     """May account uid receive for an address of kind (client / list / inbox)? -> (org_id, client_id) or None: the account
     active and a person, the client seen / the project changeable and without the lock, a member of the workspace."""
@@ -614,7 +646,8 @@ def _import(c, r, msg, raw, mail_text):
     subj = re.sub(r"\s+", " ", str(msg.get("Subject", ""))).strip()[:500]
     text, files = mail_text(msg, HBM_BODY_MAX)
     own = (u["email"] or "").strip().lower()
-    fwd = bool(own) and from_addr == own
+    mine = bool(own) and from_addr == own
+    fwd = mine and hbm_from_verified(msg, own)  # audit I4: a From with the own address can be forged
     if fwd:  # a mail the person forwarded / copied in: the original sender counts, the "Fwd:" goes
         from ..integrations.mailtrim import md_forward_from
         name0, addr0 = md_forward_from(text)
@@ -624,7 +657,12 @@ def _import(c, r, msg, raw, mail_text):
     if r["kind"] == "inbox":
         from ..integrations.mail import mail_addr
         own_addrs = {own, mail_addr(r["token"]).lower()}
-        cand = [from_addr] if not fwd or from_addr != own else [a for a in to if a not in own_addrs]
+        if mine and not fwd:
+            cand = []  # audit I4: unproven -> "Not assigned", the person assigns it by hand
+        elif fwd and from_addr == own:
+            cand = [a for a in to if a not in own_addrs]  # a copy of a sent mail: the recipients
+        else:
+            cand = [from_addr]
         cid = hbm_match(c, uid, org, cand)
     sent = None
     try:
