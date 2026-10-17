@@ -542,7 +542,10 @@ padded to 64-byte steps) and wraps that key for every member with ECDH between t
   is switched off; templates from or into it, imports, forms and the shopping memory refuse or skip it; pushes, mail
   digests, briefing, report, news and webhooks carry no texts of it; server search skips it. Switching on removes the
   plain copies the server kept elsewhere (history texts, time entry title snapshots, news and queued webhook / agent
-  event payloads, shopping memory, proposals). Lists of the Family and Household & Life modules (and lists a contact sync
+  event payloads, shopping memory, proposals, an agent's chat answers and step texts about the list's tasks). Kept on
+  purpose: the person's own chat messages to an agent (their own words), the note of a time entry (`time_entries.note`)
+  and the ids of people mentioned in a comment (metadata for the notification). Imports keep only ids and counts,
+  the webhook log never bodies. Lists of the Family and Household & Life modules (and lists a contact sync
   writes birthdays into) cannot be locked.
 
 ### Lock per list (2.64.1, browser side)
@@ -561,12 +564,20 @@ padded to 64-byte steps) and wraps that key for every member with ECDH between t
   plain text exists only in memory and is wiped (with the undo steps of such lists) when the encryption is locked or on
   logout. The list keys are not stored on the device: offline, a locked list stays unreadable until the next unlock.
 - **Switching** runs in the browser of the owner / list admin with a progress bar (`le2eStart`, `le2eStop`, resumable).
+  On the way back, texts no key of this browser opens (a broken or foreign ciphertext) are listed; the owner can take them
+  over as empty texts, otherwise the list stays locked. A text a person types that merely begins with `e2e1:` is a text
+  (encrypted in a locked list; refused with a clear message in an open one).
 - **Search** for such lists runs over the decrypted texts in memory (search page, command palette, message search).
 
 **Limits.** No protection against a changed script delivered by the server itself (a web app loads its code from the
 server), against members who saw the texts, or against metadata (who writes when and how much, dates, assignees, text
 lengths in steps of 64 bytes). The AAD binds list, generation and field but no task id: the server can copy a ciphertext
-inside a list (repeating tasks) and could therefore swap two of the same field (integrity, not confidentiality). A member
+inside a list (repeating tasks) and could therefore swap two of the same field (integrity, not confidentiality); a task
+title and a note title, or a comment and a note text, can be swapped the same way (the browser tries both field names).
+Trust on first use: on every device the first public key seen for a member counts unchecked until the safety numbers
+are compared; a server that hands out a forged key (or a forged list key wrapped with it) before that comparison is not
+noticed by the key check. The browser then counts texts that do not open with the list key it holds and says so
+("compare the safety numbers") instead of leaving silent placeholders. A member
 who leaves keeps what they saw and, until the rotation of a later version, could decrypt older ciphertexts of a backup
 with their old key; the member dialog says so. Exports keep the ciphertexts; they are readable again only in Kalmido with
 a member's passphrase (`tools/kalmido_export_decrypt.py` says so). Going back to a version before 2.64.1 needs every
