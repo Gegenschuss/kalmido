@@ -477,8 +477,8 @@ check(r.status_code == 409 and dbx("SELECT user_id, wrapped FROM list_keys WHERE
 assert A.post(B + f"/api/lists/{LK}/e2e/bulk", json=enc_all(A.get(B + f"/api/lists/{LK}/e2e/todo").json())).ok
 check(A.post(B + f"/api/lists/{LK}/e2e/finish").ok and A.post(B + f"/api/lists/{LK}/e2e/finish").status_code == 409, "review M1: finish once")
 # 2.64.1 review (M3): explicit targets and the purpose of a locked list
-r = A.patch(B + f"/api/lists/{LK}", json={"family": "shopping"})
-check(r.status_code == 409 and code(r) == "list_e2e_plain", "review M3: a locked list does not become a family list " + r.text[:200])
+r = A.patch(B + f"/api/lists/{LK}", json={"life": "home"})  # (a project is never a family list anyway)
+check(r.status_code == 409 and code(r) == "list_e2e_plain", "review M3: a locked list does not become a Home & life list " + r.text[:200])
 r = A.post(B + "/api/family/occasions", json={"name": "Grandma", "date": "--05-04", "list_id": LK})
 check(r.status_code == 409 and code(r) == "list_e2e_plain", "review M3: no birthday into a locked list " + r.text[:200])
 # 2.64.1 review (H1): import with a locked list as target
