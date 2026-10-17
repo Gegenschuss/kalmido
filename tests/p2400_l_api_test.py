@@ -210,6 +210,11 @@ L3 = A.post(B + "/api/lists", json={"name": "In the agents folder", "folder": "A
 check(dbx("SELECT agent_peers, agent_members FROM lists WHERE id=?", (L3,))[0] == (0, 1), "#1373: a new list in the folder gets no agent_peers")
 check(A.post(B + f"/api/lists/{L3}/folder-reset", json={"keys": ["agent_peers"]}).ok, "#1373: folder-reset with agent_peers: no error")
 
+# 2.82.0 (#1467): an agent is never allowed to rename / recolour a list, even with the role admin (set by hand: the app refuses it)
+dbx("UPDATE list_members SET role='admin', own_role='admin' WHERE list_id=? AND user_id=?", (L2, CL), write=True)
+requests.patch(V + f"/lists/{L2}", headers=CLH, json={"name": "Agent was here", "color": "#123456"})
+check(dbx("SELECT name FROM lists WHERE id=?", (L2,)) == [("Legacy two agents",)], "#1467: an agent as list admin cannot rename the list")
+
 # ================================================================== #1422 the workspace sent along is not "differs from the folder"
 check(Bo.put(B + "/api/folders/props", json={"folder": "Org", "props": {"org_id": ORG}}).ok, "#1422: setup: a folder with a workspace default")
 SAME = Bo.post(B + "/api/lists", json={"name": "Same workspace", "folder": "Org", "org_id": ORG}).json()["id"]
