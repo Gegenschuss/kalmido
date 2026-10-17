@@ -58,6 +58,9 @@ def office_settings_put():
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
+    if "pack" in b or "industry_packs" in b:  # 2.76.0 review (N8): the pack choice and an uninstall never interleave
+        from ..core.pg import write_lock
+        write_lock(c, f"office_packs_{int(oid)}")
     cur = office_settings(c, oid)
     new = office_settings_clean(c, oid, b, cur)
     if "company_fields" in b:

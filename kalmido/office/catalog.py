@@ -60,6 +60,8 @@ PKC_E_OTHER = N_("Another version of this pack is installed")
 PKC_E_USE_COUNTRY = N_("This pack is the country pack of this office. Choose another one first.")
 PKC_E_USE_RULES = N_("This pack is switched on in the calculation rules. Switch it off first.")
 PKC_E_USE_OFFERS = N_("{0} open quotations use this pack.")
+PKC_E_ADDR = N_("The catalogue address is not allowed (https only)")  # 2.76.0 review (N4)
+PKC_AFFECTS = N_("{0} open documents will be calculated with the new rates and texts.")  # 2.76.0 review (M1)
 
 _CODE = {"country": re.compile(r"^[A-Z]{2}$"), "industry": re.compile(r"^[a-z][a-z0-9_]{1,30}$")}
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -254,8 +256,10 @@ def pkc_index(force=False):
             raw = _fetch(PKC_URL, PKC_INDEX_MAX)
             new["entries"], new["skipped"] = pkc_index_parse(json.loads(raw.decode("utf-8")))
             new["fetched_at"] = iso(now_utc())
-        except CalError:
-            new["error"] = PKC_E_NET
+        except CalError as ex:
+            if ex.code == "config":  # 2.76.0 review (N4): KALMIDO_PACKS_CATALOG refused by the guard (http / not a URL)
+                print("packs: KALMIDO_PACKS_CATALOG not allowed (https only, or the host in KALMIDO_PACKS_ALLOW_HOSTS)", flush=True)
+            new["error"] = PKC_E_ADDR if ex.code == "config" else PKC_E_NET
         except (ValueError, UnicodeDecodeError, RecursionError):
             new["error"] = PKC_E_BAD
         if new["error"] and cur and not cur["error"]:  # keep the last good list, show the failure
@@ -314,7 +318,9 @@ def pkc_bind(c, oid):
 
 
 def pkc_unbind():
-    """Drops the binding (background work after one area)."""
+    """Drops the binding (background work after one area). 2.76.0 review (N1): no background run uses office code yet; a
+    future loop over several areas must call office_settings(c, oid) (or pkc_bind) for EACH area before office_pack /
+    dk_pack and pkc_unbind() after it -- outside a request the last binding stays in this context."""
     if has_request_context():
         g.pop("pkc_bound", None)
     _BOUND.set(None)
@@ -434,21 +440,41 @@ def pkc_item(c, oid, kind, code, idx, rows=None):
         except ValueError:
             meta = {}
     b = _builtin_item(kind, code) if _builtin(kind, code) else None
-    name = (e or {}).get("name") or meta.get("name") or (b or {}).get("name") or {}
+    if b and not r:  # 2.76.0 review (N6): a built-in pack: its own name, no link / texts from the catalogue under "Verified"
+        name, src = b.get("name") or {}, {"description": (e or {}).get("description"), "author": (e or {}).get("author") or "",
+                                            "license": (e or {}).get("license") or "", "homepage": ""}
+    else:
+        name, src = (e or {}).get("name") or meta.get("name") or (b or {}).get("name") or {}, (e or meta)
     lt = _latest(e)
     if r:
         badge, cur = r["badge"], r["version"]
     else:
         badge, cur = "verified" if b or (e and e["verified"]) else "community", (b or {}).get("version")
     in_use = pkc_in_use(c, oid, kind, code) if r else ""
+    affects = pkc_affects(c, oid, kind, code) if r or (b and lt) else 0
     return {"kind": kind, "code": code, "name": _pick(name, lg) or code,
-            "description": _pick((e or meta).get("description"), lg), "author": (e or meta).get("author") or "",
-            "license": (e or meta).get("license") or "", "homepage": (e or meta).get("homepage") or "",
+            "description": _pick(src.get("description"), lg), "author": src.get("author") or "",
+            "license": src.get("license") or "", "homepage": src.get("homepage") or "",
             "badge": badge, "builtin": bool(b),
             "latest": {"version": lt["version"], "size": lt["size"], "released": lt["released"], "changes": _pick(lt["changes"], lg)} if lt else None,
             "installed": _inst_public(c, r) if r else None,
             "update": bool(lt and cur is not None and lt["version"] > cur),
-            "in_use": bool(in_use), "in_use_text": in_use}
+            "in_use": bool(in_use), "in_use_text": in_use,
+            "affects": affects, "affects_text": tr(PKC_AFFECTS, affects) if affects else ""}
+
+
+def pkc_affects(c, oid, kind, code):
+    """2.76.0 review (M1): how many open (not finalised) documents an update / removal of the pack in effect would
+    recalculate -- shown in the confirmation, never blocking (finalised documents keep their snapshot)."""
+    s = office_settings(c, oid)
+    if kind == "country":
+        if s.get("pack") != code:
+            return 0
+        return c.execute("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NULL", (oid,)).fetchone()[0]
+    if code not in (s.get("industry_packs") or []):
+        return 0
+    return c.execute("SELECT COUNT(DISTINCT d.id) FROM office_doc_parts p JOIN office_docs d ON d.id=p.doc_id WHERE p.org_id=? "
+                     "AND d.org_id=? AND p.kind='shoot' AND d.kind='offer' AND d.locked_at IS NULL", (oid, oid)).fetchone()[0]
 
 
 def pkc_catalog(c, uid, oid, q="", kind="", force=False):
@@ -567,8 +593,11 @@ def pkc_install():
         return _fail(["pack: not JSON"])
     if not isinstance(d, dict):
         return _fail(["pack must be an object"])
-    _clean_pack_texts(d)
-    problems = pkc_validate(kind, d)
+    try:  # 2.76.0 review (N3): _clean_pack_texts / the validators recurse -> a very deep file is refused, not a 500
+        _clean_pack_texts(d)
+        problems = pkc_validate(kind, d)
+    except RecursionError:
+        return _fail(["pack: too deeply nested"])
     if d.get("code") != code:
         problems.append("code: does not match the catalogue")
     if kind == "industry" and d.get("kind") != "industry" or kind == "country" and d.get("kind") not in (None, "country"):

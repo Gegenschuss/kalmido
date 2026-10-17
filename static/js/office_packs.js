@@ -119,8 +119,11 @@ const pkc_req = async (m, url, b) => { try { await api(m, url, b); } catch (x) {
 async function pkc_install(k, update) {
   const it = pkc_item(k); if (!it?.latest || PKC.busy) return;
   const body = {kind: it.kind, code: it.code, version: it.latest.version}, prev = it.installed?.version || null, name = it.name || it.code;
-  const ask = () => askConfirm(tr('Install the community pack “{0}”?', name), tr('Community packs are not checked by the Kalmido team. Check tax rates and texts before you send documents with it.'), {ok: update ? tr('Update') : tr('Install')});
+  // 2.76.0 review (M1): an update of the pack in effect recalculates the open documents -- said before, never blocking
+  const aff = it.affects_text ? ' ' + it.affects_text : '';
+  const ask = () => askConfirm(tr('Install the community pack “{0}”?', name), tr('Community packs are not checked by the Kalmido team. Check tax rates and texts before you send documents with it.') + aff, {ok: update ? tr('Update') : tr('Install')});
   if (it.badge === 'community') { if (!await ask()) return; body.accept_community = true; }
+  else if (aff && !await askConfirm(tr('Update “{0}”?', name), aff.trim(), {ok: tr('Update')})) return;
   PKC.busy = k; delete PKC.err[k]; pkc_paint();
   try {
     try { await api('POST', '/api/office/packs/install', body); }
@@ -134,15 +137,26 @@ async function pkc_install(k, update) {
     return;
   } finally { PKC.busy = ''; pkc_paint(); }
   // undo: a new install is removed again; an update goes back to the version before (built in: remove the installed one)
-  const undo = !prev ? () => pkc_req('DELETE', pkc_url(it)) : () => pkc_req('POST', '/api/office/packs/install', {kind: it.kind, code: it.code, version: prev, accept_community: true});
+  const undo = !prev ? () => pkc_req('DELETE', pkc_url(it)) : () => pkc_back(it, prev, name);
   const redo = () => pkc_req('POST', '/api/office/packs/install', {...body, accept_community: true});
   offerUndo(update ? tr('“{0}” updated to v{1}', name, body.version) : tr('“{0}” installed', name), histAdd({label: update ? tr('Update “{0}”', name) : tr('Install “{0}”', name), undo, redo}));
   await pkc_after();
 }
+// 2.76.0 review (N5): undo of an update installs the version before; a community version asks with the warning again
+async function pkc_back(it, version, name) {
+  const b = {kind: it.kind, code: it.code, version};
+  try { await api('POST', '/api/office/packs/install', b); }
+  catch (x) {
+    if (x.status === 409 && await askConfirm(tr('Install the community pack “{0}”?', name), tr('Community packs are not checked by the Kalmido team. Check tax rates and texts before you send documents with it.'), {ok: tr('Install')})) return pkc_req('POST', '/api/office/packs/install', {...b, accept_community: true});
+    if (x.status !== 409) toast(x.status === 404 ? tr('That version is no longer in the catalogue.') : x.message || tr('unknown'));
+  }
+  await pkc_after(); return {};
+}
 async function pkc_remove(k) {
   const it = pkc_item(k); if (!it?.installed || PKC.busy) return;
   const name = it.name || it.code;
-  if (!await askConfirm(tr('Uninstall “{0}”?', name), it.builtin ? tr('The office goes back to the built-in version. Finalised documents keep the pack version they were made with.') : tr('Finalised documents keep the pack version they were made with.'), {ok: tr('Uninstall'), danger: true})) return;
+  const aff = it.affects_text ? ' ' + it.affects_text : '';  // 2.76.0 review (M1)
+  if (!await askConfirm(tr('Uninstall “{0}”?', name), (it.builtin ? tr('The office goes back to the built-in version. Finalised documents keep the pack version they were made with.') : tr('Finalised documents keep the pack version they were made with.')) + aff, {ok: tr('Uninstall'), danger: true})) return;
   PKC.busy = k; delete PKC.err[k]; pkc_paint();
   try { await api('DELETE', pkc_url(it)); }
   catch (x) { PKC.err[k] = x instanceof Offline ? tr('Offline: only works again with a connection') : x.message || tr('unknown'); return; }  // 409: what still uses it, in plain words

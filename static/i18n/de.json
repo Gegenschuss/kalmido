@@ -8256,5 +8256,8 @@
   "This pack is not in the catalogue": "Dieses Paket steht nicht im Katalog",
   "This pack is not installed": "Dieses Paket ist nicht installiert",
   "Built-in packs cannot be removed": "Eingebaute Pakete lassen sich nicht entfernen",
-  "Another version of this pack is installed": "Eine andere Version dieses Pakets ist installiert"
+  "Another version of this pack is installed": "Eine andere Version dieses Pakets ist installiert",
+  "Update “{0}”?": "„{0}“ aktualisieren?",
+  "The catalogue address is not allowed (https only)": "Die Katalog-Adresse ist nicht erlaubt (nur https)",
+  "{0} open documents will be calculated with the new rates and texts.": "{0} offene Belege werden mit den neuen Sätzen und Texten berechnet."
 }
