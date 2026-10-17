@@ -470,10 +470,14 @@ def entry_insert(c, uid, lid, v, source):
     sid0 = bud_sid(c, lid)
     enc, sid = bud_enc(c, "budget_entries", sid0, {k: v[k] for k in oc.FIELDS["budget_entries"]})
     ts = _ts()
-    return insert_id(c, """INSERT INTO budget_entries(list_id,day,amount,kind,title,note,counterpart,cat_id,recurring_id,rmonth,source,
+    try:
+        with c.savepoint():
+            return insert_id(c, """INSERT INTO budget_entries(list_id,day,amount,kind,title,note,counterpart,cat_id,recurring_id,rmonth,source,
                                                      dkey,sid,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                     (lid, v["day"], enc["amount"], v["kind"], enc["title"], enc["note"], enc["counterpart"], v["cat_id"], v["recurring_id"],
-                      v["rmonth"], source, bud_dkey(c, lid, sid, v["day"], v["amount"], v["kind"], v["title"]), sid, uid, ts, ts))
+                             (lid, v["day"], enc["amount"], v["kind"], enc["title"], enc["note"], enc["counterpart"], v["cat_id"], v["recurring_id"],
+                              v["rmonth"], source, bud_dkey(c, lid, sid, v["day"], v["amount"], v["kind"], v["title"]), sid, uid, ts, ts))
+    except IntegrityError:  # 2.72.0 (#1333): a parallel booking of the same month (unique index)
+        raise Denied(409, tr("This item is already booked in this month")) from None
 
 
 def entry_create(c, uid, lid, b):
@@ -495,10 +499,14 @@ def entry_update(c, uid, eid, b):
     if v["recurring_id"] and _booked(c, v["recurring_id"], v["rmonth"], but=r["id"]):
         raise Denied(409, tr("This item is already booked in this month"))
     enc, sid = bud_enc(c, "budget_entries", bud_sid(c, lid), {k: v[k] for k in oc.FIELDS["budget_entries"]})
-    c.execute("""UPDATE budget_entries SET day=?, amount=?, kind=?, title=?, note=?, counterpart=?, cat_id=?, recurring_id=?, rmonth=?,
-                 dkey=?, sid=?, updated_at=? WHERE id=?""",
-              (v["day"], enc["amount"], v["kind"], enc["title"], enc["note"], enc["counterpart"], v["cat_id"], v["recurring_id"], v["rmonth"],
-               bud_dkey(c, lid, sid, v["day"], v["amount"], v["kind"], v["title"]), sid, _ts(), r["id"]))
+    try:
+        with c.savepoint():
+            c.execute("""UPDATE budget_entries SET day=?, amount=?, kind=?, title=?, note=?, counterpart=?, cat_id=?, recurring_id=?, rmonth=?,
+                         dkey=?, sid=?, updated_at=? WHERE id=?""",
+                      (v["day"], enc["amount"], v["kind"], enc["title"], enc["note"], enc["counterpart"], v["cat_id"], v["recurring_id"], v["rmonth"],
+                       bud_dkey(c, lid, sid, v["day"], v["amount"], v["kind"], v["title"]), sid, _ts(), r["id"]))
+    except IntegrityError:  # 2.72.0 (#1333): a parallel booking of the same month (unique index)
+        raise Denied(409, tr("This item is already booked in this month")) from None
     return entry_get(c, r["id"])
 
 
