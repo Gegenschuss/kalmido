@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.86.0** (2026-10-17): hardening from the security audit - sign-in floods no longer lock owners out, child
+  accounts and instance admins kept to their organisation, stricter rights for approvals, list rules and office data,
+  upload limits, sandboxed PDFs, push and mail day limits, agents see only what is shared with them.
 - **2.83.0** (2026-10-17): themes (Paper, Night, Contrast) and header strips for lists and folders, progress rings;
   the organisation view hides the private areas; assigned tasks of organisation-wide lists without joining; agent colour
   on the person card for organisation admins; team rooms open in a split window from their header.

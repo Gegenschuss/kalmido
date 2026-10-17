@@ -7,6 +7,35 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.86.0] - 2026-10-17
+
+Hardening from the security audit, part 1 (low findings, #1896). No new features; normal use stays the same.
+
+### Security
+- Sign-in: a flood of reset or login attempts from foreign addresses no longer locks the owner out (addresses the
+  account signed in from recently and re-authentication in a signed-in session are exempt); sign-in links re-check admin
+  status and the two-factor policy when used; an SSO account sets its first local password only right after a fresh sign-in.
+- Child accounts: no way past their write limit through *Share* or the drop address; instance admins see and manage only
+  the children of their own organisations (a household without organisation as before), and the state lists only children
+  the person sees. *Share* refuses foreign sites and logs no form contents.
+- Rights: approval decisions need write access (viewers are no approvers); history lines in a blocking task only with write
+  access to it; a parent task is checked for access before its rules (no existence hint); list rules over the API only for
+  owners and list admins, as in the app; restoring wiped time entries of others only as they were deleted; tasks of
+  organisation-wide lists move only into equally open lists.
+- Office: clients stay in their workspace; bank lines, bank fields and DATEV export data only for office admins; an invoice
+  from time tracking counts only lists the creator sees; a decided quotation PDF only until the link expires (else 30 days);
+  DATEV text fields starting with = + - @ are protected; document mails have a day limit (150 per person, 300 per
+  organisation, 20 per address).
+- Files: uploads stop reading at the size limit and "too large" is a clear message everywhere (it showed as "session
+  expired" outside the contact import); inline PDFs open in a sandbox; public forms have an hourly file budget
+  (`KALMIDO_FORM_FILES_MB_HOUR`, default 200); final deletion in the file store removes files only after saving; job chat
+  name prefixes are escaped in searches.
+- Agents: sharing over the API checks visibility before an approval names anyone; the approval card of a batch change names
+  fields and lists; a daily push limit per agent and person (`KALMIDO_AGENT_PUSH_DAY`, default 500, the message still
+  arrives); events of lists the agent no longer sees are left out; the workload shows an agent only people who share a list
+  with it; a token limited to certain lists cannot create lists on import; participants see only the people of the task
+  in the mention picker.
+
 ## [2.83.0] - 2026-10-17
 
 Organisation view, list themes, team room.
