@@ -113,7 +113,7 @@ function tabItem(id) {
   if (id === 'settings') return {id, act: 'settings', icon: ic('gear', 'l'), label: tr('Settings'), upd: updDot()};
   return null;
 }
-const tabItems = () => tabIds().map(tabItem).filter(Boolean);
+const tabItems = () => tabIds().map(tabItem).filter(t => t && !o3a_hidT(t));  // 2.83.0 (#1845): private modules not in an organisation's view
 // which pinned item is "on": exact key match first, else the module (Aufgaben = any task view)
 function tabOn(items) {
   const r = S.route, exact = items.find(t => t.key && r.mod === 'tasks' && t.key === r.key);
@@ -134,8 +134,8 @@ function tabBtn(t, on, cls = '') {
 function tabOverflow() {
   const items = tabItems(), shown = items.length > TAB_MAX ? items.slice(0, TAB_MAX - 1) : items;
   const rest = items.slice(shown.length);
-  const mods2 = mods().filter(([m]) => !items.some(t => t.mod === m)).map(([m]) => tabItem('m:' + m));
-  const misc = ['home', 'team', 'news', 'agents', 'overview', ...MG_IDS.map(x => 'a:' + x), 'search', 'settings'].filter(k => !items.some(t => t.id === k)).map(tabItem).filter(Boolean);
+  const mods2 = mods().filter(([m]) => !items.some(t => t.mod === m)).map(([m]) => tabItem('m:' + m)).filter(t => t && !o3a_hidT(t));
+  const misc = ['home', 'team', 'news', 'agents', 'overview', ...MG_IDS.map(x => 'a:' + x), 'search', 'settings'].filter(k => !items.some(t => t.id === k)).map(tabItem).filter(t => t && !o3a_hidT(t));  // 2.83.0 (#1845)
   // search + settings are also in the side menu: they alone do not justify a "Mehr" tab
   return {shown, more: rest.length || mods2.length ? [...rest, ...mods2, ...misc] : []};
 }
@@ -382,7 +382,7 @@ function renderSide() {
     famOn() ? mrow('family', 'family', tr('Family'), (S.kids || []).some(k => (k.requests || 0) > 0) ? `<span class="c nunread">${(S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)}</span>` : '') : '',
     overviewOn() ? mrow('overview', 'pulse', tr('Project status'), `<span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span>`, `title="${esc(tr('Where is it stuck?'))}"`) : '',
     agentsTab() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : '',
-    sb_notesShown() ? mrow('notes', 'note', tr('Notes'), `<span class="c">${sb_noteCount() || ''}</span>`) : ''].filter(h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return !m || !hid('e:' + (m[1] || m[2])) || S.route.mod === m[1]; });
+    sb_notesShown() ? mrow('notes', 'note', tr('Notes'), `<span class="c">${sb_noteCount() || ''}</span>`) : ''].filter(h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return !m || !hid('e:' + (m[1] || m[2])) || S.route.mod === m[1]; }).filter(h => !o3a_hidRow(h));  // 2.83.0 (#1845): private modules not in an organisation's view
   // 2.39.1 (#1185): split into "Views" and "Areas", each in its fixed order
   const modKey = h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return m ? m[1] || m[2] : ''; };
   const modIn = keys => keys.map(x => MG_IDS.includes(x) ? mg_sideRow(x, hid) : modRows.find(h => modKey(h) === x) || '').join('');  // 2.44.0 (#1187): one row per area
@@ -1066,8 +1066,9 @@ function whoCell(t) {
   return canAssign(t) ? `<button type="button" class="whob${t.assignee_id ? '' : ' wnone'}" data-act="assign" title="${esc(tip + ' · ' + tr('Assign…'))}" aria-label="${esc(tip + ' · ' + tr('Assign…'))}" aria-haspopup="menu">${inner}</button>`
     : t.assignee_id ? `<span class="whob ro" title="${esc(tip)}">${avBtn(t.assignee_id, name, `who ${me ? 'me' : ''}`)}</span>` : '';  // 2.7.2 (#418)
 }
-function assignMenu(anchor, id) {
+async function assignMenu(anchor, id) {
   const t = taskById(id); if (!t) return;
+  if (o3a_ovAssignable(listById(t.list_id)) && canAssign(t)) await o3a_orgsLoad();  // 2.83.0 (#1725): the organisation's people
   const take = myGroup(t.assignee_group_id) ? [{label: tr('Take it'), icon: 'check', cls: 'mtake', fn: () => takeTask(id)}] : [];  // 2.10.0 (#441)
   if (!canAssign(t)) { if (take.length) menu(anchor, take); else roToast(); return; }
   if (!take.length && tlkStop(t)) return;  // 2.36.0 (#1118): locked
@@ -1077,7 +1078,7 @@ function assignMenu(anchor, id) {
   const gs = listGroups(t.list_id);
   menu(anchor, [...take, ...(take.length ? ['-'] : []), ...(t.assignee_id ? [{label: tr('Show {0}', cur || '?'), icon: 'user', cls: 'mshow', fn: () => personCard(anchor, t.assignee_id)}, '-'] : []),  // 2.7.2 (#418)
     {label: tr('Nobody'), icon: 'x', on: !t.assignee_id && !t.assignee_group_id, fn: () => set(null)}, '-',
-    ...listPeople(listById(t.list_id)).filter(p => listById(t.list_id)?.agents_open !== false || !(p.agent || agentById(p.user_id)) || p.user_id === t.assignee_id).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : '') + (p.role === 'participant' ? ' · ' + tr('Participant') : p.role === 'view' ? ' · ' + tr('Viewer') : ''),
+    ...[...listPeople(listById(t.list_id)), ...o3a_ovPeople(listById(t.list_id))].filter(p => listById(t.list_id)?.agents_open !== false || !(p.agent || agentById(p.user_id)) || p.user_id === t.assignee_id).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : '') + (p.role === 'participant' ? ' · ' + tr('Participant') : p.role === 'view' ? ' · ' + tr('Viewer') : p.role === 'reader' ? ' · ' + tr('Not joined') : ''),
       ...ac_mi(p.user_id), on: p.user_id === t.assignee_id, fn: () => set(p.user_id)})),  // 2.47.1 (#1721): + the person's colour
     ...(gs.length ? ['-', ...gs.map(g => ({label: g.name + ' · ' + tr('Group'), icon: 'users', on: g.group_id === t.assignee_group_id, fn: () => setG(g.group_id)}))] : [])]);
 }

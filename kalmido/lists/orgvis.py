@@ -40,15 +40,29 @@ def ov_list_patch(c, lid, role, b):
         if isinstance(v, float) or v not in (0, 1, True, False, "0", "1"):
             return err(tr("Invalid value: {0}", "org_edit"))
         c.execute("UPDATE lists SET org_edit=? WHERE id=?", (int(v), lid))
+    if r["org_visibility"] == "org" and r["org_edit"]:  # 2.83.0 (#1725): was open for editing
+        o3a_unassign_readers(c, lid)
     return None
+
+
+def o3a_unassign_readers(c, lid):
+    """2.83.0 (#1725): tasks assigned to a member of the organisation who has not joined (allowed while everyone in the
+    organisation may edit the list) are unassigned once the list is no longer open to them for editing -- like leaving."""
+    c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id IS NOT NULL "
+              "AND NOT EXISTS (SELECT 1 FROM lists l WHERE l.id=tasks.list_id AND l.org_visibility='org' AND l.org_edit=1) "
+              "AND assignee_id NOT IN (SELECT owner_id FROM lists WHERE id=?) "
+              "AND assignee_id NOT IN (SELECT user_id FROM list_members WHERE list_id=?)", (lid, lid, lid))
 
 
 def ov_private_reset(c, lid, org0=None):
     """A list that became private (no organisation, Home & life, family) or moved to another organisation (org0 = the one
     before) is shared again only with its members."""
+    was = c.execute("SELECT 1 FROM lists WHERE id=? AND org_visibility='org' AND org_edit=1", (lid,)).fetchone()  # 2.83.0 (#1725)
     c.execute("UPDATE lists SET org_visibility='', org_edit=0 WHERE id=? AND (org_id IS NULL OR COALESCE(life, '')!='' "
               "OR COALESCE(family, '')!='' OR (CAST(? AS BIGINT) IS NOT NULL AND org_id!=CAST(? AS BIGINT))) AND (org_visibility!='' OR org_edit!=0)",
               (lid, org0, org0))
+    if was:
+        o3a_unassign_readers(c, lid)  # 2.83.0 (#1725)
 
 
 def ov_join(c, lid, uid):

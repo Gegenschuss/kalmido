@@ -8,7 +8,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, inbox_default, iso, now_utc
 from ..accounts.session import me
 from ..core.access import (
-    Denied, list_people, list_role, my_inbox, need_collab, need_list, need_task, task_visible,
+    Denied, list_people, list_role, my_inbox, need_collab, need_list, need_task, ov_role, task_visible,
 )
 from ..core.serializers import attachment_files, load_tasks
 from ..lists.lists import LIST_FIELDS
@@ -148,7 +148,9 @@ def check_assignee(c, lid, aid):
         aid = int(aid)
     except (TypeError, ValueError):
         return tr("unknown user")
-    if aid not in list_people(c, lid):
+    # 2.83.0 (#1725): + a member of the organisation who may edit the list without joining (org_edit; ov_role: people only,
+    # current members of the list's organisation) -- a read-only reader could not tick the task off
+    if aid not in list_people(c, lid) and ov_role(c, lid, aid) != "edit":
         return tr("Only the owner or a member of the list can be assigned")
     # 2.26.0 (#928): an agent only by someone it is open to in this list (owner / list admins, or everyone with "Members
     # may see and use the agent")

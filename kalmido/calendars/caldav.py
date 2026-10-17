@@ -31,7 +31,7 @@ from ..accounts.session import (
     _DUMMY_HASH, _rate_blocked, _rate_fail, _rate_keys, _rate_reset, client_ip, FAIL_WINDOW, me,
 )
 from ..accounts.login import RC_ALPHABET
-from ..core.access import acx_lists_sql, collab_all, Denied, plists, pvis, task_visible, tvis, WRITE_ROLES
+from ..core.access import acx_lists_sql, collab_all, Denied, ov_role, plists, pvis, task_visible, tvis, WRITE_ROLES
 from ..core.pages import valid_url
 from ..tasks.validation import (
     check_parent, CONTENT_MAX, REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm, rr_problem, TITLE_MAX, valid_date,
@@ -526,7 +526,21 @@ def dav_lists(c, u):
         role = "owner" if r["owner_id"] == u["id"] else r["m_role"]
         if role:
             out[r["id"]] = {**dict(r), "role": role}
+    # 2.83.0 (#1725): a list seen only through "Everyone in the organisation" with an open task assigned to u: a read-only
+    # calendar with only those tasks (ov_role: a current member of the list's organisation, people only)
+    rest = [r for r in rows if r["id"] not in out]
+    if rest:
+        held = o3a_assigned_lists(c, [r["id"] for r in rest], u["id"])
+        for r in rest:
+            if r["id"] in held and ov_role(c, r["id"], u["id"]):
+                out[r["id"]] = {**dict(r), "role": "view", "o3a_ov": True}
     return out
+
+
+def o3a_assigned_lists(c, lids, uid):
+    """2.83.0 (#1725): the ids among lids with a task (not deleted) assigned to uid."""
+    q = ",".join(str(int(x)) for x in lids)
+    return {r[0] for r in c.execute(f"SELECT DISTINCT list_id FROM tasks WHERE list_id IN ({q}) AND assignee_id=? AND deleted_at IS NULL", (uid,))}
 
 
 def dav_done_cutoff():
@@ -576,7 +590,7 @@ class DavColl:
 
 def dav_coll(c, u, lst):
     """The rendered collection of list lst for u (cached per person, list, change counter and day)."""
-    key = (u["id"], lst["id"], gsetting(c, "version"), dav_done_cutoff(), lst["name"], lst["color"], lst["role"], collab_all())
+    key = (u["id"], lst["id"], gsetting(c, "version"), dav_done_cutoff(), lst["name"], lst["color"], lst["role"], collab_all(), bool(lst.get("o3a_ov")))
     now = time.monotonic()
     with _DAV_CACHE_LOCK:
         hit = _DAV_CACHE.get(key)
@@ -586,7 +600,8 @@ def dav_coll(c, u, lst):
     pl = plists(c, uid)
     rows = c.execute(f"""SELECT * FROM tasks t WHERE t.list_id=? AND t.deleted_at IS NULL
                          AND (t.status=0 OR COALESCE(t.completed_at, t.updated_at)>=?) AND {tvis(c, uid, 't.')}
-                         ORDER BY t.id""", (lst["id"], dav_done_cutoff())).fetchall()
+                         {"AND t.assignee_id=?" if lst.get("o3a_ov") else ""}
+                         ORDER BY t.id""", (lst["id"], dav_done_cutoff(), *((uid,) if lst.get("o3a_ov") else ()))).fetchall()  # 2.83.0 (#1725)
     ctx = dav_ctx(c, u, [r["id"] for r in rows])
     if lst["id"] in pl:
         _, _, ctx["context"] = pvis(c, uid, lst["id"])
@@ -791,6 +806,8 @@ def dav_member(c, u, lst, name):
         return None
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if not task_visible(c, tid, u["id"]):
+        return None
+    if lst.get("o3a_ov") and t["assignee_id"] != u["id"]:  # 2.83.0 (#1725): only the tasks assigned to u
         return None
     ctx = dav_ctx(c, u, [tid])
     if lst["role"] == "participant":
@@ -1381,6 +1398,8 @@ def dav(p):
         if m == "DELETE":
             if kind != "member":
                 raise DavError(403, "Lists are deleted in the app")
+            if lst.get("o3a_ov"):  # 2.83.0 (#1725): read-only like its privileges say
+                raise DavError(403, "Read only", "<D:need-privileges/>")
             have = dav_member(c, u, lst, name)
             if not have:
                 raise DavError(404, "Not found")

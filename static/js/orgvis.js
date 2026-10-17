@@ -6,7 +6,8 @@
 // a list that can open itself to its organisation: of an organisation, not the basket, not Home & life / "Used for"
 const ovOk = l => !!l && !!l.org_id && !l.is_inbox && !l.family && !l.life && collab();
 // tasks of a list seen only through the organisation stay out of the smart lists (Today, All, ...) until one joins
-const ovHidden = t => { const l = t && listById(t.list_id); return !!l?.org_reader && !(S.route.mod === 'tasks' && S.route.key === 'l:' + l.id); };
+// 2.83.0 (#1725): except the ones assigned to me -- they are in Today / All without joining
+const ovHidden = t => { const l = t && listById(t.list_id); return !!l?.org_reader && !(S.route.mod === 'tasks' && S.route.key === 'l:' + l.id) && !(S.me && t.assignee_id === S.me.id); };
 
 function ovRowHtml(l) {
   if (!ovOk(l)) return '';
@@ -63,3 +64,25 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-ovjoin]'); if (!b) return;
   e.preventDefault(); e.stopPropagation(); b.disabled = true; ovJoin(+b.dataset.ovjoin).finally(() => { b.disabled = false; });
 });
+
+// ---- 2.83.0 (#1725): in a list everyone in the organisation may edit (org_edit) its members can be assigned without
+// joining (the server: check_assignee with ov_role 'edit'); their names come from GET /api/orgs, loaded once on demand
+let o3a_orgs = null, o3a_orgsP = null;
+const o3a_ovAssignable = l => ovOk(l) && l.org_visibility === 'org' && !!l.org_edit;
+function o3a_orgsLoad() {
+  if (!o3a_orgsP) o3a_orgsP = api('GET', '/api/orgs').then(j => (o3a_orgs = j.orgs || [])).catch(() => (o3a_orgs = []));
+  return o3a_orgsP;
+}
+// the organisation's people (no agents, not disabled) who are not among the list's people: [{user_id, name, role: 'reader'}]
+function o3a_ovPeople(l) {
+  if (!o3a_ovAssignable(l) || !o3a_orgs) return [];
+  const have = new Set(listPeople(l).map(p => p.user_id)), o = o3a_orgs.find(x => x.id === l.org_id);
+  return (o?.members || []).filter(m => !m.agent && !m.disabled && !have.has(m.id)).map(m => ({user_id: m.id, name: m.name, role: 'reader'}));
+}
+// the name of an assignee outside the list's people (assigned without joining); the first miss loads the organisations
+function o3a_name(id) {
+  if (S.me && S.me.id === +id) return S.me.display_name || '';
+  if (!o3a_orgs) { if (S.me?.workspaces?.length) o3a_orgsLoad().then(os => { if (os.length) render(); }); return ''; }
+  for (const o of o3a_orgs) { const m = (o.members || []).find(x => x.id === +id); if (m) return m.name || ''; }
+  return '';
+}

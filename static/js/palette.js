@@ -213,7 +213,7 @@ function palAll() {
   }
   add('a:dayplan', 'action', tr('Plan my day'), 'cal', () => dayplanModal('day'));  // 2.10.0 (#440)
   add('a:dayfill', 'action', tr('Fill free time'), 'clock', () => dayplanModal('fill'));
-  if (feat('habits')) add('a:newhabit', 'action', tr('New habit'), 'habit', () => { go('habits'); habitModal(); });
+  if (feat('habits') && !o3a_hid('habits')) add('a:newhabit', 'action', tr('New habit'), 'habit', () => { go('habits'); habitModal(); });
   if (famOn()) {  // 2.19.0 (#653)
     add('a:occ', 'action', tr('New birthday or anniversary'), 'cake', () => occModal());
     add('a:dl', 'action', tr('New household deadline'), 'hourglass', () => dlModal());
@@ -285,8 +285,8 @@ function palAll() {
   for (const n of S.notes || []) add('n:' + n.id, 'note', n.title, 'edit', () => go('note/' + n.id), {sub: lname(listById(n.list_id)) || ''});  // 2.17.0 (#442)
   wk_palAdd(add);  // 2.49.0 (#1199): knowledge pages (wiki.js)
   for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus timer')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Project status')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')], ['life', 'home', N_('Home & life')], ['review', 'journal', N_('Review & journal')], ['clients', 'brief', N_('Clients')], ['workload', 'chart', N_('Workload')], ['office', 'receipt', N_('Office & finance')]])
-    if (modOn(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab
-  for (const id of MG_IDS) if (mg_on(id)) add('v:a-' + id, 'view', tr(mg_area(id)[2]), mg_area(id)[1], () => go(mg_target(id)));  // 2.44.0 (#1187): the areas
+    if (modOn(m) && !o3a_hid(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab
+  for (const id of MG_IDS) if (mg_on(id) && !o3a_hid(id)) add('v:a-' + id, 'view', tr(mg_area(id)[2]), mg_area(id)[1], () => go(mg_target(id)));  // 2.44.0 (#1187): the areas
   // 2.8.0 (#434): the command bar also opens the timeline, the agents and their chats ("ask an agent")
   if (feat('timeline')) add('v:timeline', 'view', tr('Timeline'), 'timeline', () => { S.rmScrollReset = true; Promise.resolve(rmSet({v: 'timeline'}, 'none')).then(() => go('all')); });  // 2.65.0 (#1823): rmSet may load the timeline first
   if (agentsTab()) {
