@@ -8323,5 +8323,16 @@
   "{0} merged, {1} skipped": "{0} uniti, {1} saltati",
   "{0} group merged": ["{0} gruppo unito", "{0} gruppi uniti"],
   "from a proposal by {0}": "da una proposta di {0}",
-  "{0} found no duplicates in this address book.": "{0} non ha trovato duplicati in questa rubrica."
+  "{0} found no duplicates in this address book.": "{0} non ha trovato duplicati in questa rubrica.",
+  "At most {0} contract reminders per day": "Al massimo {0} promemoria di contratti al giorno",
+  "Cancel by": "Disdire entro",
+  "Note added, reminder 3 days before": "Nota aggiunta, promemoria 3 giorni prima",
+  "Note added to the contract": "Nota aggiunta al contratto",
+  "Notice deadline: {0}": "Termine di disdetta: {0}",
+  "Take it as a note": "Salva come nota",
+  "Taking it adds the sentence as your note on the contract; nothing is cancelled or sent. One step, undo takes it back.": "La frase viene aggiunta come tua nota al contratto; non si disdice né si invia nulla. Un passo, annulla lo ritira.",
+  "Term ends": "Fine della durata",
+  "The contract is no longer available.": "Il contratto non è più disponibile.",
+  "This contract has no open notice deadline": "Questo contratto non ha un termine di disdetta aperto",
+  "You can only propose a reminder for a contract_notice you received": "Puoi proporre un promemoria solo per un contract_notice ricevuto"
 }

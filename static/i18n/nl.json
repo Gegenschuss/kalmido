@@ -8323,5 +8323,16 @@
   "{0} merged, {1} skipped": "{0} samengevoegd, {1} overgeslagen",
   "{0} group merged": ["{0} groep samengevoegd", "{0} groepen samengevoegd"],
   "from a proposal by {0}": "uit een voorstel van {0}",
-  "{0} found no duplicates in this address book.": "{0} heeft geen dubbele contacten in dit adresboek gevonden."
+  "{0} found no duplicates in this address book.": "{0} heeft geen dubbele contacten in dit adresboek gevonden.",
+  "At most {0} contract reminders per day": "Maximaal {0} contractherinneringen per dag",
+  "Cancel by": "Opzeggen vóór",
+  "Note added, reminder 3 days before": "Notitie toegevoegd, herinnering 3 dagen vooraf",
+  "Note added to the contract": "Notitie bij het contract toegevoegd",
+  "Notice deadline: {0}": "Opzegtermijn: {0}",
+  "Take it as a note": "Als notitie overnemen",
+  "Taking it adds the sentence as your note on the contract; nothing is cancelled or sent. One step, undo takes it back.": "Overnemen voegt de zin toe als jouw notitie bij het contract; er wordt niets opgezegd of verstuurd. Eén stap, ongedaan maken draait het terug.",
+  "Term ends": "Looptijd eindigt",
+  "The contract is no longer available.": "Het contract is niet meer beschikbaar.",
+  "This contract has no open notice deadline": "Dit contract heeft geen open opzegtermijn",
+  "You can only propose a reminder for a contract_notice you received": "Je kunt alleen een herinnering voorstellen voor een ontvangen contract_notice"
 }
