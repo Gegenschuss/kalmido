@@ -4,6 +4,8 @@
 // - a member of one organisation in the workspace "Private": the empty personal office names the organisation's office with
 //   a button; the button switches the workspace and the office follows (the organisation's office), back to "Private" again
 // - 2.56.3 (#1842): in the organisation's office a document's client field offers the organisation's clients
+// - 2.80.0 (#1842): without clients the field still shows with a hint and "Add client" (creates in the office's
+//   organisation, stays on the document); a client created while the document is open shows once it opens again
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -57,6 +59,28 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(await until(() => w.eval('OFC.info && OFC.info.personal') === 1, 60), 'back in Private: the office follows the switch (the personal office)');
   check(await until(() => d.querySelector('.office .pbhint'), 30), '... with the hint again');
   w.close();
+
+  // ================= 2.80.0 (#1842): no clients yet = the field with a hint and "Add client"; a client created meanwhile
+  // shows when the document opens again, without a reload of the app
+  await call('PATCH', '/api/settings', {workspace: 'org:' + org.id});
+  const edoc = await call('POST', '/api/office/docs', {project_title: 'Leer-Beleg'});
+  check(edoc.http === 201, '#1842: a quotation without clients ' + edoc.http);
+  w = await boot({hash: `office/offers/${edoc.id}`}); d = w.document;
+  const nocl = await until(() => d.querySelector('.fx8a_nocl'), 60);
+  check(nocl && /No clients in this area yet/.test(nocl.textContent) && !!nocl.querySelector('[data-ofd="client-new"]') && !d.querySelector('#ofd-client_id'), '#1842: empty client list = hint + "Add client"');
+  nocl?.querySelector('[data-ofd="client-new"]').click();
+  const nm = await until(() => d.querySelector('#cl-name'), 30);
+  check(!!nm, '#1842: "Add client" opens the client dialog');
+  if (nm) { nm.value = 'Hafenwerk KG'; d.querySelector('[data-m="save"]').click(); }
+  const made = await until(async () => ((await call('GET', '/api/clients')).clients || []).find(c => c.name === 'Hafenwerk KG'), 40);
+  check(made && made.org_id === org.id, '#1842: the new client belongs to the office\'s organisation ' + JSON.stringify(made && made.org_id));
+  check(await until(() => /#office\/offers\//.test(w.location.hash) && d.querySelector('#ofd-client_id') && [...d.querySelector('#ofd-client_id').options].some(o => o.textContent === 'Hafenwerk KG'), 40),
+    '#1842: back on the document, the client field offers the new client at once: ' + w.location.hash);
+  const late = await call('POST', '/api/clients', {name: 'Spaet AG', org_id: org.id});
+  w.eval(`ofdLoadDoc(${edoc.id}, true)`);
+  check(await until(() => [...(d.querySelector('#ofd-client_id')?.options || [])].some(o => o.textContent === 'Spaet AG'), 40), '#1842: a client created elsewhere shows when the document opens again');
+  w.close();
+  for (const c of [made, late]) if (c?.id) await call('PATCH', `/api/clients/${c.id}`, {archived: true});  // the next block counts the organisation's clients
 
   // ================= 2.56.3 (#1842): in the organisation's office a document's client field offers the organisation's
   // clients (/api/state names their org_id), never the private ones
