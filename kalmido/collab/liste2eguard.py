@@ -234,11 +234,32 @@ def le2b_v1_mask(resp):
         m = le2b_mask(c, d)
         if m != d:
             resp.set_data(json.dumps(m, ensure_ascii=False))
-    except Exception as e:  # noqa: BLE001  (fail closed: no answer rather than a text)
+    except Exception as e:  # noqa: BLE001
+        # 2.64.1 review 2 (L7): a failed lookup must not turn every v1 answer into a 500: the answer goes out with every
+        # ciphertext emptied (a list that is 'on' holds no plain text on the server, so nothing readable is left); while a
+        # list is being switched, or when even that fails, no answer rather than a text (fail closed)
         print("liste2eguard: mask failed:", type(e).__name__, flush=True)
-        resp.set_data(json.dumps({"error": {"code": "error", "message": tr("Error")}}))
-        resp.status_code = 500
+        try:
+            if db().execute("SELECT 1 FROM lists WHERE e2e IN ('encrypting', 'decrypting') LIMIT 1").fetchone():
+                raise ValueError("switching")  # plain texts may still sit in a list that is being switched: no answer
+            resp.set_data(json.dumps(_le2b_strip(resp.get_json(silent=True)), ensure_ascii=False))
+        except Exception:  # noqa: BLE001
+            resp.set_data(json.dumps({"error": {"code": "error", "message": tr("Error")}}))
+            resp.status_code = 500
     return resp
+
+
+def _le2b_strip(x, depth=0):
+    """Every string that carries a ciphertext -> "" (the fallback of the v1 masking)."""
+    if depth > 40:
+        raise ValueError("deep")
+    if isinstance(x, str):
+        return "" if LE2E_PREFIX in x else x
+    if isinstance(x, list):
+        return [_le2b_strip(v, depth + 1) for v in x]
+    if isinstance(x, dict):
+        return {k: _le2b_strip(v, depth + 1) for k, v in x.items()}
+    return x
 
 
 # ---- history (tasks/validation.py log_act)
@@ -283,6 +304,17 @@ def le2b_scrub(c, lid):
     n["agent_jobs"] = c.execute(f"""UPDATE agent_jobs SET input='{{}}', proposal='{{}}', applied='{{}}',
                                     prop_state=CASE WHEN prop_state IN ('', 'applied', 'discarded') THEN prop_state ELSE 'discarded' END
                                     WHERE kind IS NOT NULL AND (list_id=? OR task_id IN ({tq}))""", (lid, lid)).rowcount
+    # 2.64.1 review 2 (M5): an agent's chat answers about tasks of the list (an agent was a member before the switch) quote
+    # their texts: they become the neutral word (earlier versions go too), the agent's steps of those answers and of the
+    # list's jobs go empty. The person's own chat messages stay (their own words; docs/ARCHITECTURE.md names it).
+    # imports (ids and counts only), webhook_log (never bodies) and journal (a person's day notes, no list) hold no copy.
+    nw = le2e_neutral()
+    n["agent_chat"] = c.execute(f"UPDATE agent_chat SET body=?, edits=NULL WHERE sender='agent' AND body!=? AND task_id IN ({tq})",
+                                (nw, nw, lid)).rowcount
+    n["agent_steps"] = c.execute(f"""UPDATE agent_steps SET text='' WHERE text!='' AND (
+                                    message_id IN (SELECT id FROM agent_chat WHERE task_id IN ({tq}))
+                                    OR job_id IN (SELECT id FROM agent_jobs WHERE list_id=? OR task_id IN ({tq})))""",
+                                 (lid, lid, lid)).rowcount
     for fn in _SCRUB_MORE:
         n.update(fn(c, lid) or {})
     return n

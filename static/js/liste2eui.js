@@ -46,7 +46,12 @@ function le2u_detailHtml(t) {
 }
 async function le2u_unlock(lid) {
   if (!le2u_fn('le2eUnlock')) return;
-  try { await le2eUnlock(lid); } catch (x) { if (x?.message) toast(x.message); }
+  let ok = false;
+  try { ok = await le2eUnlock(lid); } catch (x) { if (x?.message) toast(x.message); return; }
+  // 2.64.1 review 2 (M2): texts that do not open with the unwrapped key (a swapped list key) or no key at all: said, never silent
+  const n = typeof le2eUnreadable === 'function' ? le2eUnreadable(lid) : 0;
+  if (n) toast(tr('{0} texts of this list cannot be opened with your key. Compare the safety numbers with the members.', n));
+  else if (!ok && !le2u_waiting(lid) && typeof e2eUnlocked === 'function' && e2eUnlocked()) toast(tr('The list key could not be opened. Compare the safety numbers with the members.'));
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-le2u="unlock"]'); if (!b) return;
@@ -269,7 +274,7 @@ function le2u_rowExtra(j, uid, name, changed) {
 function le2u_shareHtml(j, changed) {
   const n = (j.pending || []).filter(p => p.has_keys).length;
   const warn = changed.map(([uid, name]) => `<div class="e2ewarn le2uchg" role="alert">${ic('alert', 's')}<span>${esc(tr('The key of {0} has changed. Compare the safety number with them before you release a key to them.', name))}</span><button type="button" class="btn sm" data-le2us="safety" data-uid="${uid}">${esc(tr('Safety number'))}</button><button type="button" class="btn sm" data-le2us="accept" data-uid="${uid}">${esc(tr('Understood'))}</button></div>`).join('');
-  return `<div class="shint lhint keep">${ic('lock', 's')} ${esc(tr('Encrypted in the browser: compare the safety number with each person once. Participants and agents are not possible in this list.'))}</div>`
+  return `<div class="shint lhint keep">${ic('lock', 's')} ${esc(tr('Encrypted in the browser: compare the safety number with each person once on each of your devices; until then the key seen first counts unchecked. Participants and agents are not possible in this list.'))}</div>`
     + (j.rotate > 0 ? le2u_rotHint() : '') + warn
     + (j.can_manage && n ? `<div class="row le2upend"><span>${esc(trn('{0} person is waiting for the key', '{0} people are waiting for the key', n))}</span><button type="button" class="btn sm pri" data-le2us="release-all">${esc(tr('Release'))}</button></div>` : '');
 }

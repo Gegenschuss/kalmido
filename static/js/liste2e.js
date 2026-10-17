@@ -11,7 +11,7 @@
 // bad: ciphers that did not open; changed: user id -> the new key id of a person whose key differs from the remembered one;
 // objs: WeakRefs of every object that carries ciphers (_enc), to fill in after a decryption and to wipe on lock
 const LE2E = {on: new Set(), sig: {}, keys: {}, info: {}, infoP: {}, tried: {}, memo: new Map(), rev: new Map(), q: new Map(), bad: new Set(),
-  changed: {}, objs: new Set(), kickT: 0, draining: false, again: false, busy: {}};
+  changed: {}, objs: new Set(), kickT: 0, draining: false, again: false, busy: {}, got: new Map(), badL: new Map()};
 const LE2E_PRE = 'e2e1:';
 // the props that carry a cipher -> the field names of their AAD (tried in order: a task title and a note title share "title")
 const LE2E_CANDS = {title: ['title', 'note_title'], content: ['content'], url: ['url'], snippets: ['snippets'], body: ['comment', 'note_body'], name: ['section'], value: ['field']};
@@ -51,9 +51,9 @@ function le2eRemember(lid, field, plain, cipher) {
   LE2E.rev.set(`${lid}|${field}|${plain}`, cipher);
 }
 // text -> "e2e1:{v,g,iv,ct}" with the list's current generation ("" stays ""; a cipher stays as it is)
-async function le2eEnc(lid, field, text) {
+async function le2eEnc(lid, field, text, asText) {
   if (text == null || text === '') return '';
-  const s = String(text); if (le2eIs(s)) return s;
+  const s = String(text); if (!asText && le2eParse(s)) return s;  // review 2 (L5): a typed "e2e1:..." is a text
   const l = listById(lid), g = l?.e2e_gen;
   let key = LE2E.keys[lid]?.[g];
   if (!key && l?.e2e) key = (await le2eKeys(lid))[g];
@@ -95,7 +95,7 @@ const le2eWrapAad = (lid, gen, r, w) => `kalmido-listkey:v1:${lid}:${gen}:${r}:$
 async function le2eKek(pub, lid, gen) {
   const pk = await crypto.subtle.importKey('jwk', {kty: 'EC', crv: 'P-256', x: pub.x, y: pub.y}, {name: 'ECDH', namedCurve: 'P-256'}, false, []);
   const bits = await crypto.subtle.deriveBits({name: 'ECDH', public: pk}, E2E.priv, 256);
-  const hk = await crypto.subtle.importKey('raw', bits, 'HKDF', false, ['deriveKey']);
+  let hk; try { hk = await crypto.subtle.importKey('raw', bits, 'HKDF', false, ['deriveKey']); } finally { new Uint8Array(bits).fill(0); }  // review 2 (L3)
   return crypto.subtle.deriveKey({name: 'HKDF', hash: 'SHA-256', salt: e2eTEnc().encode(`${lid}:${gen}`), info: e2eTEnc().encode('kalmido-listkey:v1')}, hk, {name: 'AES-GCM', length: 256}, false, ['encrypt', 'decrypt']);
 }
 async function le2eWrap(raw, lid, gen, uid, pub) {
@@ -189,6 +189,7 @@ async function le2eSafety(uid) {
 // waiting members get the key: unwrap mine of the current generation, wrap it for each, POST keys (M9)
 async function le2eRelease(lid, userIds) {
   if (!await e2eEnsure()) return false;
+  if (E2E.badPub) throw le2eErr(tr('Your public key on the server does not match your keys. Encrypted messages are blocked.'), 'list_e2e_badpub');  // review 2 (L2)
   const info = await le2eInfo(lid, true), gen = info.gen;
   const mine = (info.keys || []).find(k => k.gen === gen);
   if (!mine) throw le2eErr(tr('You do not have the key of this list yet.'), 'list_e2e_key');
@@ -214,7 +215,7 @@ function le2eTrack(o) {
 }
 function le2eLidOf(o, hint) {
   if (typeof o.list_id === 'number') return o.list_id;
-  if (o.task_id) { const t = S.tasks?.get(o.task_id); if (t) return t.list_id; }
+  if (o.task_id) { const t = le2eTaskAny(o.task_id); if (t) return t.list_id; }
   return hint || null;
 }
 const le2eSnip = s => { try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch { return []; } };
@@ -268,10 +269,10 @@ function le2eWalk(x, lid, depth) {
 }
 // the list an address belongs to (a hint for objects without list_id / task_id)
 function le2eUrlLid(url) {
-  let m = /^\/api\/tasks\/(\d+)/.exec(url); if (m) return S.tasks?.get(+m[1])?.list_id || null;
+  let m = /^\/api\/tasks\/(\d+)/.exec(url); if (m) return le2eTaskAny(+m[1])?.list_id || null;
   m = /^\/api\/lists\/(\d+)/.exec(url); if (m) return +m[1];
   m = /^\/api\/notes\/(\d+)/.exec(url); if (m) return le2eNoteOf(+m[1])?.list_id || null;
-  if (/^\/api\/comments\//.test(url) && S.tl?.id) return S.tasks?.get(S.tl.id)?.list_id || null;
+  if (/^\/api\/comments\//.test(url) && S.tl?.id) return le2eTaskAny(S.tl.id)?.list_id || null;
   return null;
 }
 const le2eAny = j => LE2E.on.size || LE2E.memo.size || (Array.isArray(j?.lists) && j.lists.some(l => l && l.e2e));
@@ -304,7 +305,7 @@ async function le2eDrain() {
         let s;
         for (const l of lidsTry) { s = await le2eTry(l, c, x.cands, await le2eKeys(l)); if (s != null) { lids.add(l); break; } }
         LE2E.q.delete(c);
-        if (s === null) LE2E.bad.add(c);
+        if (s === null) { LE2E.bad.add(c); LE2E.badL.set(c, x.lid || 0); }
       }
     }
   } catch (e) { console.warn('le2e: decrypt', e?.message); }
@@ -312,6 +313,8 @@ async function le2eDrain() {
   if (lids.size) le2eRefill(lids);
   if (LE2E.again) { LE2E.again = false; le2eKick(); }
 }
+// review 2 (M2): how many texts of the list did not open with the keys this browser holds (a wrong / swapped list key: H4)
+function le2eUnreadable(lid) { let n = 0; for (const [c, l] of LE2E.badL) if (l === lid && LE2E.bad.has(c)) n++; return n; }
 // after decryptions: every tracked object that still shows placeholders takes the plain texts, one redraw
 function le2eEach(fn) {
   for (const r of LE2E.objs) { const o = r.deref(); if (!o) { LE2E.objs.delete(r); continue; } fn(o); }
@@ -335,7 +338,7 @@ function le2eRequeue() {
 async function le2eUnlock(lid) {
   if (!await e2eEnsure()) return false;
   await le2eKeys(lid, true);
-  LE2E.bad.clear();
+  LE2E.bad.clear(); LE2E.badL.clear();
   le2eRequeue();
   await le2eDrain();
   le2eRedraw();
@@ -346,7 +349,7 @@ async function le2eUnlock(lid) {
 function le2eState() {
   const on = new Set();
   for (const l of S.lists || []) {
-    if (!l.e2e) { if (LE2E.sig[l.id]) { delete LE2E.sig[l.id]; delete LE2E.info[l.id]; } continue; }
+    if (!l.e2e) { if (LE2E.sig[l.id]) { delete LE2E.sig[l.id]; delete LE2E.info[l.id]; delete LE2E.keys[l.id]; } continue; }  // review 2 (L1): keys go after the way back
     on.add(l.id);
     const sg = [l.e2e, l.e2e_gen, l.e2e_rotate, l.e2e_pending, l.e2e_mine].join('|');
     if (LE2E.sig[l.id] !== sg) { LE2E.sig[l.id] = sg; delete LE2E.info[l.id]; delete LE2E.tried[l.id]; }
@@ -363,7 +366,7 @@ function le2eState() {
 }
 // lock / logout (e2e.js): no plain text of a locked list stays in this page
 function le2eWipe() {
-  LE2E.memo.clear(); LE2E.rev.clear(); LE2E.q.clear(); LE2E.bad.clear();
+  LE2E.memo.clear(); LE2E.rev.clear(); LE2E.q.clear(); LE2E.bad.clear(); LE2E.badL.clear();
   LE2E.keys = {}; LE2E.info = {}; LE2E.tried = {};
   le2eEach(o => {
     const e = o._enc; if (!e) return;
@@ -418,24 +421,33 @@ function le2eRepl() {
 // le2eOut(method, url, body) -> the body as it is (nothing to do: synchronous, so api() keeps applying offline edits at once) or a
 // Promise of the wire body. Called by api() before the outbox and by rawFetch() (a body that is already encrypted passes unchanged).
 function le2eOut(method, url, body) {
+  // review 2 (L5): a typed text that starts like a cipher (the server refuses it in an open list): a clear word, before it is sent
+  if (method !== 'GET' && body && typeof body === 'object' && !(body instanceof FormData) && /^\/api\/(tasks|comments|notes|sections|lists\/\d+\/notes)/.test(url) && !/\/e2e(\/|$)/.test(url)
+    && ['title', 'content', 'url', 'body', 'name'].some(p => le2eIs(body[p]) && !le2eParse(body[p]))) return Promise.reject(le2eErr(tr('A text cannot begin with "e2e1:" (reserved for encrypted texts).'), 'list_e2e_prefix'));
   if (method === 'GET' || method === 'DELETE' || !body || typeof body !== 'object' || !LE2E.on.size || /\/e2e(\/|$)/.test(url)) return body;
   let m;
+  // review 2 (M1): a task of the done / trash view or a search result is found too; one this page does not hold is fetched
+  // first (its list may be locked: no plain text leaves before that is known)
+  const need = (id, has, go) => { const t = le2eTaskAny(id); return t || !(id > 0) || !has ? go(t) : le2eTaskFetch(id).then(go); };
   if (method === 'POST' && url === '/api/tasks') {
-    const lid = body.list_id ?? S.tasks.get(body.parent_id)?.list_id ?? inbox()?.id;
-    return le2eOn(lid) && le2eHasText(body) ? le2eTaskBody(body, null, lid) : body;
+    return need(body.list_id == null ? body.parent_id : null, le2eHasText(body), p => {
+      const lid = body.list_id ?? p?.list_id ?? inbox()?.id;
+      return le2eOn(lid) && le2eHasText(body) ? le2eTaskBody(body, null, lid) : body;
+    });
   }
   if (method === 'PATCH' && (m = /^\/api\/tasks\/(-?\d+)$/.exec(url))) {
-    const t = S.tasks.get(+m[1]), src = t?.list_id, dst = body.list_id ?? src;
-    return (le2eOn(src) || le2eOn(dst)) && (le2eHasText(body) || dst !== src || body._prev) ? le2eTaskBody(body, t, dst) : body;
+    return need(+m[1], le2eHasText(body) || body.list_id != null || !!body._prev, t => {
+      const src = t?.list_id, dst = body.list_id ?? src;
+      return (le2eOn(src) || le2eOn(dst)) && (le2eHasText(body) || dst !== src || body._prev) ? le2eTaskBody(body, t, dst) : body;
+    });
   }
   if (method === 'POST' && url === '/api/tasks/batch') return le2eBatchNeeds(body) ? le2eBatch(body) : body;
   if ((m = /^\/api\/tasks\/(-?\d+)\/comments$/.exec(url)) && method === 'POST') {
-    const lid = S.tasks.get(+m[1])?.list_id;
-    return le2eOn(lid) ? le2eCmt(body, lid) : body;
+    return need(+m[1], true, t => le2eOn(t?.list_id) ? le2eCmt(body, t.list_id) : body);
   }
   if ((m = /^\/api\/comments\/(\d+)$/.exec(url)) && method === 'PATCH') {
-    const lid = S.tasks.get(S.tl?.id)?.list_id;
-    return le2eOn(lid) && 'body' in (body instanceof FormData ? {body: 1} : body) ? le2eCmt(body, lid) : body;
+    const has = 'body' in (body instanceof FormData ? {body: 1} : body);
+    return need(S.tl?.id, has, t => le2eOn(t?.list_id) && has ? le2eCmt(body, t.list_id) : body);
   }
   if (body instanceof FormData) return body;
   if ((m = /^\/api\/lists\/(\d+)\/notes$/.exec(url)) && method === 'POST') return le2eOn(+m[1]) ? le2eNoteBody(body, null, +m[1]) : body;
@@ -451,6 +463,19 @@ function le2eOut(method, url, body) {
   return body;
 }
 const le2eHasText = b => LE2E_TASK.some(p => p in b) || !!(b.fields && Object.keys(b.fields).some(k => fieldById(+k)?.type === 'text'));
+// review 2 (M1): a task of this page: the loaded ones, the extra views (done, trash, search results) or one fetched for a write
+const le2eTaskAny = id => id == null ? null : S.tasks?.get(id) || (Array.isArray(S.extra) && S.extra.find(t => t && t.id === id)) || (Array.isArray(S.searchRes) && S.searchRes.find(t => t && t.id === id)) || LE2E.got.get(id) || null;
+// a task this page does not hold: fetched (as stored; a trashed one from the trash list) so its list is known; unknown = no write
+async function le2eTaskFetch(id) {
+  const t = le2eTaskAny(id); if (t) return t;
+  let r = null;
+  try { r = await rawFetch('GET', `/api/tasks/${id}`); }
+  catch { r = ((await rawFetch('GET', '/api/tasks?scope=trash&limit=2000').catch(() => ({}))).tasks || []).find(x => x && x.id === id) || null; }
+  if (!r || typeof r.list_id !== 'number') throw le2eErr(tr('The list of this task is not known on this page. Reload and try again.'), 'list_e2e_unknown');
+  if (LE2E.got.size > 200) LE2E.got.clear();
+  LE2E.got.set(id, r);
+  return r;
+}
 const le2eNoteOf = id => (S.nt?.notes || []).find(n => n.id === id) || (S.notes || []).find(n => n.id === id) || null;
 const le2eSnipStr = v => v == null || v === '' ? '' : typeof v === 'string' ? v : Array.isArray(v) && !v.length ? '' : JSON.stringify(v);
 // the plain text of a prop of a local object (a placeholder = not readable now -> throw: never send "" over a real text)
@@ -504,7 +529,7 @@ async function le2eTaskBody(body, t, dst) {
 async function le2eMove(ids, dst) {
   const out = {tasks: [], comments: [], fields: []}, seen = new Set(), dOn = le2eOn(dst);
   const all = [];
-  const walk = id => { if (seen.has(id)) return; seen.add(id); const x = S.tasks.get(id); if (x) all.push(x); for (const c of children(id)) walk(c.id); };
+  const walk = id => { if (seen.has(id)) return; seen.add(id); const x = le2eTaskAny(id); if (x) all.push(x); for (const c of children(id)) walk(c.id); };
   ids.forEach(walk);
   const conv = (field, plain) => !plain ? plain : dOn ? le2eEnc(dst, field, plain) : field === 'snippets' ? le2eSnip(plain) : plain;
   // the plain text of a prop: the local one, or the cipher opened now (a placeholder is never sent as the text)
@@ -587,25 +612,29 @@ async function le2eFix(url, body, need) {
 }
 function le2eBatchNeeds(body) {
   const ids = body.ids || [], d = body.data || {};
-  const lids = new Set(ids.map(i => S.tasks.get(i)?.list_id));
+  if (ids.some(i => i > 0 && !le2eTaskAny(i)) || Object.keys(d.items || {}).some(i => +i > 0 && !le2eTaskAny(+i))) return true;  // M1: fetched first
+  const lids = new Set(ids.map(i => le2eTaskAny(i)?.list_id));
   if (body.action === 'patch') return [...lids].some(le2eOn) || (d.list_id != null && le2eOn(d.list_id));
-  if (body.action === 'patch_each') return Object.entries(d.items || {}).some(([id, it]) => le2eOn(S.tasks.get(+id)?.list_id) || (it && le2eOn(it.list_id)));
+  if (body.action === 'patch_each') return Object.entries(d.items || {}).some(([id, it]) => le2eOn(le2eTaskAny(+id)?.list_id) || (it && le2eOn(it.list_id)));
   return false;
 }
 async function le2eBatch(body) {
   const d = {...(body.data || {})}, ids = body.ids || [];
+  for (const i of [...ids, ...Object.keys(d.items || {}).map(Number)]) if (i > 0 && !le2eTaskAny(i)) await le2eTaskFetch(i);
+  if (!ids.some(i => le2eOn(le2eTaskAny(i)?.list_id)) && !(d.list_id != null && le2eOn(d.list_id)) && !Object.entries(d.items || {}).some(([id, it]) => le2eOn(le2eTaskAny(+id)?.list_id) || (it && le2eOn(it.list_id)))) return body;
   if (body.action === 'patch') {
-    if (d.list_id != null && ids.some(i => { const s = S.tasks.get(i)?.list_id; return s !== d.list_id && (le2eOn(s) || le2eOn(d.list_id)); })) d.le2e_move = await le2eMove(ids, d.list_id);
+    if (d.list_id != null && ids.some(i => { const s = le2eTaskAny(i)?.list_id; return s !== d.list_id && (le2eOn(s) || le2eOn(d.list_id)); })) d.le2e_move = await le2eMove(ids, d.list_id);
     if (LE2E_TASK.some(p => p in d)) {
-      const ls = new Set(ids.map(i => d.list_id ?? S.tasks.get(i)?.list_id));
-      if (ls.size > 1) throw le2eErrLocked();
+      const ls = new Set(ids.map(i => d.list_id ?? le2eTaskAny(i)?.list_id));
+      // review 2 (L6): one text for tasks of several lists, one of them locked: each list needs its own cipher
+      if (ls.size > 1) throw le2eErr(tr('Texts of tasks from several lists cannot be changed together while one of them is encrypted in the browser.'), 'list_e2e_multi');
       const lid = [...ls][0];
       if (le2eOn(lid)) for (const p of LE2E_TASK) if (p in d && d[p] != null) d[p] = await le2eEnc(lid, p, p === 'snippets' ? le2eSnipStr(d[p]) : d[p]);
     }
   } else if (body.action === 'patch_each') {
     const items = {};
     for (const [id, it] of Object.entries(d.items || {})) {
-      const t = S.tasks.get(+id);
+      const t = le2eTaskAny(+id);
       items[id] = it && t ? await le2eTaskBody(it, t, it.list_id ?? t.list_id) : it;
     }
     d.items = items;
@@ -644,7 +673,8 @@ const le2eLeft = left => Object.values(left || {}).reduce((a, n) => a + (+n || 0
 async function le2eMigrate(lid, onProgress) {
   if (LE2E.busy[lid]) return LE2E.busy[lid];
   const run = (async () => {
-    let total = null, last = -1;
+    let total = null, last = -1, blank = false, spins = 0;
+    const bad = new Set();  // review 2 (M4): values that do not open with any key held here (decrypting)
     for (;;) {
       const todo = await rawFetch('GET', `/api/lists/${lid}/e2e/todo?limit=200`);
       const left = le2eLeft(todo.left);
@@ -652,8 +682,7 @@ async function le2eMigrate(lid, onProgress) {
       total = Math.max(total, left);
       onProgress?.({done: total - left, total});
       if (!left) break;
-      if (left === last) throw le2eErr(tr('Encryption of this list stopped without progress. Try again later.'), 'list_e2e_stuck');
-      last = left;
+      if (left === last && (++spins > 2 || !(bad.size && !blank))) throw le2eErr(tr('Encryption of this list stopped without progress. Try again later.'), 'list_e2e_stuck');
       const mode = todo.mode || listById(lid)?.e2e, enc = mode === 'encrypting', out = {};
       if (enc) await le2eKeys(lid, !le2eReady(lid));
       for (const kind in LE2E_ROWS) {
@@ -663,14 +692,28 @@ async function le2eMigrate(lid, onProgress) {
           let n = 0;
           for (const [p, f] of LE2E_ROWS[kind]) {
             let v = r[p]; if (v == null) continue;
-            if (enc) v = le2eIs(v) ? v : await le2eEnc(lid, f, p === 'snippets' ? le2eSnipStr(v) : String(v));
-            else if (le2eIs(v)) { v = await le2eDec(lid, f, v); if (p === 'snippets') v = le2eSnip(v); }
+            // M4 / L5: an old text that only looks like a cipher (not of this generation) is encrypted as a text: no endless switch
+            if (enc) v = le2eParse(v)?.g === (todo.gen ?? listById(lid)?.e2e_gen) ? v : await le2eEnc(lid, f, p === 'snippets' ? le2eSnipStr(v) : String(v), true);
+            else if (le2eIs(v)) {
+              const k = `${kind}:${o.id ?? o.task_id + '.' + o.field_id}:${p}`;
+              try { v = await le2eDec(lid, f, v); if (p === 'snippets') v = le2eSnip(v); }
+              catch { if (!blank) { bad.add(k); continue; } v = p === 'snippets' ? [] : ''; }  // M4: kept back, or taken over as empty
+            }
             o[p] = v; n++;
           }
           if (n) rows.push(o);
         }
         if (rows.length) out[kind] = rows;
       }
+      if (!Object.keys(out).length && bad.size && !blank) {
+        // M4: only texts no key here opens are left (a broken or foreign cipher): the owner decides, else the way back stops here
+        const yes = typeof askConfirm === 'function' && await askConfirm(tr('Texts that cannot be decrypted'),
+          tr('{0} texts of this list cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
+        if (!yes) throw le2eErr(tr('{0} texts of this list cannot be decrypted. The list stays locked until they are taken over as empty.', bad.size), 'list_e2e_unreadable');
+        blank = true; last = -1;
+        continue;
+      }
+      last = left;
       await rawFetch('POST', `/api/lists/${lid}/e2e/bulk`, out);
     }
     await rawFetch('POST', `/api/lists/${lid}/e2e/finish`);
@@ -719,7 +762,7 @@ async function le2eResume(lid, onProgress) {
 
 // ------------------------------------------------------------------ texts the server gives neutral (history, time, news)
 // the title of a task of a locked list as far as this page can read it, else the fallback (the server's "🔒 Task")
-function le2eTitle(tid, fallback) { const t = S.tasks?.get(tid); return t && le2eOn(t.list_id) && !le2eLocked(t) && t.title ? t.title : fallback; }
+function le2eTitle(tid, fallback) { const t = le2eTaskAny(tid); return t && le2eOn(t.list_id) && !le2eLocked(t) && t.title ? t.title : fallback; }
 
 // ------------------------------------------------------------------ local search (M7): the server finds nothing in locked lists
 const le2eWords = q => String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
