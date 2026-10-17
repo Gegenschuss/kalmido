@@ -481,6 +481,23 @@ def _set(c, sid, **kw):
     c.execute("UPDATE pl_sources SET " + ", ".join(f"{k}=?" for k in kw) + " WHERE id=?", (*kw.values(), sid))
 
 
+class PlLost(Exception):
+    """2.81.0 (#1875): the run lost its claim (no heartbeat for PL_STALE minutes: queued again, maybe taken by another process,
+    or discarded) -- it ends at once and writes nothing more."""
+
+
+def pl_beat(c, table, rid, own, **kw):
+    """2.81.0 (#1875): the heartbeat of a run (+ kw) only while it still holds its claim: the row is busy / stop with the beat
+    this run wrote last (own[0], the claim's at first); else PlLost. A long document no longer lets a second run in parallel.
+    The caller commits right after it (a rollback would bring back an older beat than own[0])."""
+    b = _now()
+    n = c.execute(f"UPDATE {table} SET " + "".join(f"{k}=?, " for k in kw) + "run_beat=? WHERE id=? AND run_state IN ('busy','stop') "
+                  "AND run_beat=?", (*kw.values(), b, rid, own[0])).rowcount
+    if not n:
+        raise PlLost()
+    own[0] = b
+
+
 def _stopped(c, sid):
     r = c.execute("SELECT run_state FROM pl_sources WHERE id=?", (sid,)).fetchone()
     return not r or r[0] == "stop"
@@ -499,6 +516,7 @@ def pl_run(c, sid):
         c.commit()
         return
     tok = pl_token(c, r)
+    own = [r["run_beat"]]  # 2.81.0 (#1875): the claim's beat; every later write checks it is still this run's
     counts = {"new": 0, "skip": 0, "dup": 0, "fail": 0, "done": 0}
     since, full = _now(), None  # 2.69.0 B (#1847): learn.py takes the documents of this run at its end
     try:
@@ -512,7 +530,7 @@ def pl_run(c, sid):
             if not isinstance(j, dict) or not isinstance(j.get("results"), list):
                 raise PlError("answer")
             if page == 1 and r["run_kind"] == "all":
-                _set(c, sid, run_total=int(j.get("count") or 0))
+                pl_beat(c, "pl_sources", sid, own, run_total=int(j.get("count") or 0))
                 c.commit()
             fresh = 0
             for doc in j["results"]:
@@ -521,6 +539,8 @@ def pl_run(c, sid):
                 if _stopped(c, sid):
                     stop = True
                     break
+                pl_beat(c, "pl_sources", sid, own)  # 2.81.0 (#1875): before the document; the beat after it guards its filing
+                c.commit()
                 try:
                     with c.savepoint():
                         res = pl_import_doc(c, r, uid, tok, doc, labels, fields)
@@ -537,17 +557,26 @@ def pl_run(c, sid):
                 counts[res if res in counts else "fail"] += 1
                 counts["done"] += 1
                 fresh += res == "new"
-                _set(c, sid, run_done=counts["done"], run_new=counts["new"], run_skip=counts["skip"] + counts["dup"], run_fail=counts["fail"])
+                pl_beat(c, "pl_sources", sid, own, run_done=counts["done"], run_new=counts["new"], run_skip=counts["skip"] + counts["dup"],
+                        run_fail=counts["fail"])
                 c.commit()
                 if res == "new":
                     kick()
             if not j.get("next") or (r["run_kind"] != "all" and not fresh):
                 break
             page += 1
-        _set(c, sid, run_state="", synced_at=_now(), error="", run_error="")
+        pl_beat(c, "pl_sources", sid, own, run_state="", synced_at=_now(), error="", run_error="")
+    except PlLost:  # 2.81.0 (#1875): another run has it now (or nobody): nothing more from this one
+        c.rollback()
+        print("paperless: run lost its claim", sid, flush=True)
+        return
     except PlError as e:
         c.rollback()
-        _set(c, sid, run_state="", run_error=e.stored(), error=e.stored(), synced_at=_now())
+        try:
+            pl_beat(c, "pl_sources", sid, own, run_state="", run_error=e.stored(), error=e.stored(), synced_at=_now())
+        except PlLost:
+            c.rollback()
+            return
     if full is not None:  # 2.69.0 B (#1847): rules + learning once per run, also after a stop / a full storage
         from .learn import pll_finish
         res = pll_finish(c, r["ws"], r["org_id"], uid, pl_src(r["url"]), since, full, pl_mapping(c, r))
@@ -605,6 +634,9 @@ def pl_run_once():
     c = connect()
     try:
         with system_ctx(c):  # paperless worker: the import of every workspace's connection; the right of run_by is checked in pl_run
+            from .zipimp import plh_check_one
+            if plh_check_one(c):  # 2.81.0 (#1874): an uploaded export left unchecked (a restart) is checked before the claim
+                return 1
             x = pl_claim(c)
             if not x:
                 return 0

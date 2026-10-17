@@ -941,9 +941,11 @@ follows (tags, correspondents, document types with their mapping), then the impo
 - The parts are stored sealed (the workspace's key) in `KALMIDO_PAPERLESS_ZIP_DIR` (default `paperless-zip` next to the
   database file in the data folder), not in the backups, and are deleted right after the run (done, stopped, failed) or
   when the upload is discarded; uploads without a run are removed after 24 hours.
-- The ZIP is never unpacked onto the disk: only the manifest and the files it names are read. Encrypted ZIPs, too many
-  entries, a manifest above 64 MB, a file above `TASKS_MAX_FILE_MB` and files that unpack to far more than their size
-  (zip bombs) are refused.
+- The ZIP is never unpacked onto the disk: only the manifest and the files it names are read. Encrypted ZIPs, more than
+  300 000 entries (2.81; before 500 000), a manifest above 64 MB, a file above `TASKS_MAX_FILE_MB` and files that unpack to
+  far more than their size (zip bombs) are refused.
+- The check of the uploaded ZIP runs in the background (2.81): after the last part the settings show *Checking the
+  export…* until it is ready (then the preview opens) or refused with the reason.
 - Never twice: a document of an earlier ZIP import with the same id and the same file, or the same file already in the
   workspace, is left out.
 
