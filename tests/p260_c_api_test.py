@@ -268,7 +268,8 @@ check((m.get("review") or {}).get("push") is False, "the matrix has the row revi
 clear()
 T5 = task("Quiet")
 Bo.patch(B + f"/api/tasks/{T5}", json={"section_id": S2})
-check(not pushes("t-carol"), "row off: no push")
+_pc = pushes("t-carol")
+check(not [x for x in _pc if "Quiet" in json.dumps(x)], "row off: no push " + json.dumps(_pc)[:400])  # 2.85.0 (#1863): only the push about this task counts (an evening push of the watchdog came along once at 19:35)
 check(any(x["task_id"] == T5 for x in news(Ca)), "the News item stays")
 
 # ---------------------------------------------------------------- an agent as reviewer
