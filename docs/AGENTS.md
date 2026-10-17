@@ -680,7 +680,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
 | `ping` | the "Send test" button in the admin settings | `message` |
 | `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it); 2.46.1: in a list where the agent listens in, every message of a person in its channel, without an @mention (`mentioned` false; never a message of an agent) | `room` `{id, kind, list_id}`, `mentioned`, `listening` (2.46.1), `message` `{id, text, user_id, task_id, created_at, reply_to, reply}`, `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message-2330)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
-| `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}`; 2.39.0 kind `cleanup` ([Tidy up a list](#tidy-up-a-list-2390)): + `list_id` (and the list's `playbook`) |
+| `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}`; 2.39.0 kind `cleanup` ([Tidy up a list](#tidy-up-a-list-2390)): + `list_id` (and the list's `playbook`); 2.70.0 kind `extract`: `input.images` = photos of the meeting ([A meeting becomes tasks](#a-meeting-becomes-tasks-2700)) |
 | `task_added` | 2.23.0 (#795): a top-level task was created in, or moved into, a list shared with the agent (not for its own tasks); 2.30.0: only when the agent [listens in](#agent-listens-in-2300) there | `task`, `list`, `how`: `created` or `moved`, `moved_from` `{id, name}` (only when the agent sees that list), `source`: `form`, `mail`, `errors`, `proposal` (when not made in the app) |
 | `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction`; 2.35.0 approval requests (`request_chat_approval`): `approval`, `approval_request` `{title, what}`, `via` |
 | `followup_due` | 2.1.0: the follow-up day of a task *waiting on someone* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
@@ -1904,7 +1904,7 @@ the proposal in the app.
 | `project` | `{text, file_name, folder}`: the pasted briefing (or a loaded .txt / .md file), at most 50,000 characters |
 | `subtasks` | `{task: {id, title, notes, due, subtasks: [titles]}, hint}` |
 | `triage` | `{items: [{task_id, title, notes}], lists: [{id, name, folder, sections: [{id, name}]}]}`: the selected open inbox items (or all, at most 100) and the lists the person ticked (default: every list they may change) |
-| `extract` | `{list: {id, name, sections: [names]}, members: [{id, name}], text}`: the people of the list (no agents) so the agent can suggest assignees |
+| `extract` | `{list: {id, name, sections: [names]}, members: [{id, name}], text, images?}`: the people of the list (no agents) so the agent can suggest assignees; 2.70.0: `text` may be empty when `images` (photos of the meeting: `[{id, name, mime, size, url}]`, see [A meeting becomes tasks](#a-meeting-becomes-tasks-2700)) are there |
 | `dayplan` | `{date, mode, now, work: {start, end}, from, default_duration, events, fixed, tasks, builtin}` (2.10.0, see [Day plans](#day-plans-2100)) |
 | `cleanup` | `{list: {id, name, sections: [{id, name}]}, package: {n, of, group}, snapshot_at, hint, items: [{task_id, title, notes, section_id, sort, due, priority, list_tags, assignee_id, created_at, updated_at, comments_count}]}` (2.39.0, see [Tidy up a list](#tidy-up-a-list-2390)) |
 
@@ -1942,6 +1942,27 @@ explanation, Markdown, at most 2,000 characters) and `kind` (must match the job)
 A section name in `extract` that the list does not have yet is created on apply. In `triage`, `tags` are the person's
 own (personal) tags; leave `list_id` out to keep an item in the inbox.
 
+### A meeting becomes tasks (2.70.0)
+
+The guided way to *Tasks from notes*: in the chat with an agent that takes proposal requests from the person, the button
+*Turn a meeting into tasks* (next to the clip) opens the request with this agent chosen. The person picks a list (one
+they may write in; health lists are never offered and answer 400), pastes the notes and / or adds up to 4 photos (a
+whiteboard, handwritten minutes; on the phone the camera). Text or an image is required. The photos are stored as the
+person's files in their chat with that agent (same limits as any chat file) and the job input carries them:
+
+```jsonc
+{"list": {"id": 12, "name": "Shoot", "sections": ["Prep"]}, "members": [{"id": 7, "name": "Sam"}], "text": "",
+ "images": [{"id": 301, "name": "whiteboard.jpg", "mime": "image/jpeg", "size": 812345, "url": "/api/v1/chat-attachments/301"}]}
+```
+
+Read each image with `GET /api/v1/chat-attachments/{id}` (MCP `get_attachment`, `source: "chat"`); an agent reads only
+files of its own chats. Propose as usual (`submit_proposal`, kind `extract`): assignees only from `members`, a due date
+only where the notes or the photo name one (else leave it out), nothing invented; what you cannot read stays out (say so
+in `summary`). When the proposal is ready, the person's chat with the agent shows ONE card: each task with its assignee
+and date and a tick, *Create N tasks* (the selected ones, as the person, one undo step) and *Discard*; *Edit* opens the
+usual review. The same dialog (with the list fixed) opens from a list's menu *Tasks from notes…*. Freelancers without an
+organisation have the same flow with their own lists and agents.
+
 **Snippet for your agent's CLAUDE.md** (or system prompt):
 
 ```markdown
@@ -1950,7 +1971,8 @@ own (personal) tags; leave `list_id` out to keep an item in the inbox.
   and all you may use. Never ask for or fetch more of their inbox or lists.
 - set_status working (task_id if there is one), then build ONE proposal of that kind (docs/AGENTS.md "Proposals"):
   project {name, sections, tasks[..]}, subtasks {items[..]}, triage {items[{task_id, list_id?, ...}]} with ids from
-  the input only, extract {tasks[..]} with assignee_id only from input.members, dayplan {items[{task_id, start,
+  the input only, extract {tasks[..]} with assignee_id only from input.members (2.70.0: look at input.images, the
+  meeting's photos, with get_attachment source chat; due dates only where named), dayplan {items[{task_id, start,
   duration?}], nofit[{task_id}]} with task ids from input.tasks only (a plan never changes due dates), cleanup
   {items[{op: merge|rename|move|close, ...}]} with task ids from input.items only, each once (follow the list's playbook).
   Add a short summary.

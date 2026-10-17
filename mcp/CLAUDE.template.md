@@ -289,6 +289,13 @@
   send `propose_to_person` kind `setup` (modules, lists, a first project). If no agent is connected yet, the app shows
   them how to connect one.
 
+### A meeting becomes tasks (2.70.0)
+- A `job_request` of kind `extract` turns meeting notes into tasks; it may carry photos of the meeting (`input.images`,
+  text may then be empty). Look at every image with `get_attachment` (`source: "chat"`, the id) together with the notes.
+- Answer with ONE `submit_proposal` (`tasks: [{title, notes?, assignee_id?, due?, section?}]`): assignees only from
+  `input.members`, a due date only where the notes or the photo name one (otherwise none), nothing invented. What you
+  cannot read stays out; say so in `summary`. Never create the tasks yourself: the person ticks and applies them.
+
 ### Reference starter: files, long work, bundled tasks (2.44.0)
 Only when your host runs `mcp/agent_run.py` (the prompt then says so):
 - **Files for the person**: put them into the folder `$KALMIDO_OUTBOX`; they are attached to your chat answer. An image you

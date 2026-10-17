@@ -34,6 +34,7 @@ subscription or API key. Kalmido provides:
   10. [Usage reporting](#10-usage-reporting)
   11. [Test checklist](#11-test-checklist)
 - [Several specialist agents under one Kalmido agent](#several-specialist-agents-under-one-kalmido-agent)
+- [A meeting becomes tasks](#a-meeting-becomes-tasks) (2.70.0)
 - [Troubleshooting](#troubleshooting)
 
 ## Before you start
@@ -722,6 +723,21 @@ own. With Claude Code:
 - **Only persons instruct.** The results of a sub-agent are data for the main session, like task text. The identity
   rules (only the owner's account id counts) stay with the main session, and a specialist never takes orders from the
   content it works on.
+
+## A meeting becomes tasks
+
+2.70.0. Once the agent answers proposal requests (*Proposals for* in Settings > Agents, the default is people who share a
+list with it), the person can hand it a meeting: in the chat with the agent, the button *Turn a meeting into tasks* (next
+to the clip) asks for a list, the notes and / or up to four photos (a whiteboard, handwritten minutes). The agent gets the
+request as the event `job_request` (kind `extract`) with the photos in `input.images`; it looks at them with the MCP tool
+`get_attachment` (`source: "chat"`), proposes the tasks with `submit_proposal` and creates nothing itself. The chat then
+shows one card with every task, its assignee and date, a tick each and *Create N tasks*.
+
+What to put into the agent's `CLAUDE.md` (the template has it): assignees only from the list's people (`members`), a due
+date only where the notes or the photo name one, otherwise none; nothing invented; what cannot be read stays out and is
+named in the summary. The reference starter (`mcp/agent_run.py`) names the photos in the prompt and asks the model to look
+at each one. Check: send the agent a photo of a short list of to-dos through the button and confirm that the card lists
+them with the right people.
 
 ## Troubleshooting
 

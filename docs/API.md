@@ -1213,3 +1213,17 @@ agents get no pushes and never mark people urgent.
 - Setting `tbl_accept` (`"1"` default, `"0"` = urgency set by others counts as *As the list*; it stays visible on the task).
 - The task history gets a line `bell` for urgency set for others (`{level, until, n}`, a count, no names) and when a person
   switches off an urgency someone else set (`{level, self: 1}`).
+
+## A meeting becomes tasks (2.70.0)
+
+The app's routes for the guided *Tasks from notes* (session of a person, never an agent token):
+
+- `POST /api/agents/{id}/meeting-images` (multipart, `file` 1 to 4 times, images only) stores the photos as the person's
+  files in their chat with that agent (only an agent they may chat with and ask for proposals; no `chat` event) ->
+  `201 {images: [{id, name, mime, size}], message_id}`.
+- `POST /api/proposals` with `kind: "extract"` takes `image_ids` (at most 4; only the person's own files of their chat
+  with that agent, images only, else 400); `text` may then be empty. A health list answers 400. The job input carries
+  `images: [{id, name, mime, size, url}]` (`url` = `/api/v1/chat-attachments/{id}`, readable by the agent of that chat).
+- `GET /api/agents/{id}/meeting-proposals` -> `{proposals: [{id, title, list: {id, name}, images, summary, tasks:
+  [{title, due, assignee_id, assignee}]}]}`: the person's own ready `extract` proposals of that agent (at most 5, newest
+  first), the cards in the chat. Apply / discard as every proposal (`POST /api/proposals/{id}/apply` `{select}`, `.../discard`).
