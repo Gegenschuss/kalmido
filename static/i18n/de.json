@@ -8290,5 +8290,16 @@
   "Contact person links dropped (the address book does not fit the client): {0}": "Ansprechpartner-Verknüpfungen, die gelöst werden (das Adressbuch passt nicht zum Kunden): {0}",
   "Default contact person": "Standard-Ansprechpartner",
   "One of the clients was changed meanwhile, please try again": "Einer der Kunden wurde inzwischen geändert, bitte noch einmal versuchen",
-  "{0} issued invoice is exported to DATEV under the customer number of {1} afterwards": ["{0} ausgestellte Rechnung geht danach mit der Kundennummer von {1} in den DATEV-Export", "{0} ausgestellte Rechnungen gehen danach mit der Kundennummer von {1} in den DATEV-Export"]
+  "{0} issued invoice is exported to DATEV under the customer number of {1} afterwards": ["{0} ausgestellte Rechnung geht danach mit der Kundennummer von {1} in den DATEV-Export", "{0} ausgestellte Rechnungen gehen danach mit der Kundennummer von {1} in den DATEV-Export"],
+  "Agents never see health lists": "Agenten sehen Gesundheitslisten nie",
+  "At most {0} images": "Höchstens {0} Bilder",
+  "Only images": "Nur Bilder",
+  "Turn a meeting into tasks": "Besprechung in Aufgaben verwandeln",
+  "There is no list you can write in": "Es gibt keine Liste, in die du schreiben kannst",
+  "Add a photo or image": "Foto oder Bild hinzufügen",
+  "up to {0}": "bis zu {0}",
+  "Paste the notes or add a photo": "Füge die Notizen ein oder ein Foto hinzu",
+  "{1} gets these notes, {0} image and the names of the people in {2} (to suggest who does what) and proposes tasks for this list. Nothing is created until you apply them. The image stays in your chat with {1}.": ["{1} bekommt diese Notizen, {0} Bild und die Namen der Personen in {2} (um vorzuschlagen, wer was macht) und schlägt Aufgaben für diese Liste vor. Es wird nichts angelegt, bis du sie übernimmst. Das Bild bleibt in deinem Chat mit {1}.", "{1} bekommt diese Notizen, {0} Bilder und die Namen der Personen in {2} (um vorzuschlagen, wer was macht) und schlägt Aufgaben für diese Liste vor. Es wird nichts angelegt, bis du sie übernimmst. Die Bilder bleiben in deinem Chat mit {1}."],
+  "{0} task from the meeting": ["{0} Aufgabe aus der Besprechung", "{0} Aufgaben aus der Besprechung"],
+  "Create {0} task": ["{0} Aufgabe anlegen", "{0} Aufgaben anlegen"]
 }

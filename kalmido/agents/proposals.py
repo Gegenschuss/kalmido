@@ -413,17 +413,8 @@ def prop_input(c, uid, kind, b):
         if not inp["tasks"]:
             raise BadInput(tr("There are no open tasks to plan"))
         return inp, tr(PROP_TITLES["dayplan"], day.isoformat()), None, None
-    _p_keys(b, "", ("agent_id", "kind", "list_id", "text"))
-    lid = _p_int(b.get("list_id"), "list_id")
-    need_list(c, lid)
-    lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
-    ag = agent_ids(c)
-    ppl = [p for p in sorted(list_people(c, lid)) if p not in ag]
-    names = user_names(c, ppl)
-    inp = {"list": {"id": lid, "name": "Inbox" if lst["is_inbox"] else lst["name"], "sections": [s["name"] for s in list_sections(c, uid, lid)]},
-           "members": [{"id": p, "name": names.get(p, "")} for p in ppl],
-           "text": _p_str(b.get("text"), "text", PROP_TEXT_MAX, True, line=False)}
-    return inp, tr(PROP_TITLES["extract"], inp["list"]["name"][:80]), None, lid
+    from ..agents.meetprop import mtg_input  # 2.70.0 A (#1354): extract = notes and / or meeting photos (agents/meetprop.py)
+    return mtg_input(c, uid, b)
 
 
 @app.get("/api/proposals/agents")

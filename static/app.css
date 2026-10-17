@@ -7736,3 +7736,23 @@ button.jobtag b{font-weight:600}
 .ctmsec .ctmrow{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
 .ctmsec .ctmrow>span{min-width:0;overflow-wrap:anywhere}
 .ctmsec .ctmrow .btn{min-height:2.5rem}
+/* 2.70.0 A (#1354) a meeting becomes tasks: the photos in the request dialog, the cards of ready proposals in the agent chat */
+.mtgreq .mtgimgrow{align-items:center;gap:.5rem}
+.mtgreq .mtgadd{min-height:2.75rem;display:inline-flex;align-items:center;gap:.375rem;cursor:pointer}
+.mtgreq .mtgadd.dis{opacity:.5;pointer-events:none}
+.mtgreq .mtgimgs{display:flex;flex-wrap:wrap;gap:.375rem;margin:-.25rem 0 .5rem}
+.mtgcards{display:flex;flex-direction:column;gap:.5rem;padding:0 .75rem;max-height:45vh;overflow:auto}
+.mtgcards:empty{display:none}
+.mtgcard{border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line2));background:var(--accent-soft);border-radius:var(--radius);padding:.5rem .625rem}
+.mtgcard .mtgh{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;margin-bottom:.375rem}
+.mtgcard .mtgh .muted{font-size:var(--fs-s)}
+.mtgcard .mtgsum{font-size:var(--fs-m);color:var(--text2);margin-bottom:.375rem}
+.mtgcard .mtgl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.125rem}
+.mtgcard .mtgl li.off{opacity:.55}
+.mtgcard .mtgl label{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-height:2.75rem;padding:.25rem 0;cursor:pointer}
+.mtgcard .mtgl input{flex:none;width:1.125rem;height:1.125rem}
+.mtgcard .mtgt{flex:1 1 10rem;min-width:0;overflow-wrap:anywhere}
+.mtgcard .mtgm{display:inline-flex;gap:.625rem;font-size:var(--fs-s)}
+.mtgcard .mtgm span{display:inline-flex;align-items:center;gap:.25rem}
+.mtgcard .mtgf{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;margin-top:.375rem}
+.mtgcard .mtgf .btn{min-height:2.5rem}

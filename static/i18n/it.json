@@ -8290,5 +8290,16 @@
   "Contact person links dropped (the address book does not fit the client): {0}": "Collegamenti dei referenti rimossi (la rubrica non corrisponde al cliente): {0}",
   "Default contact person": "Referente predefinito",
   "One of the clients was changed meanwhile, please try again": "Uno dei clienti è stato modificato nel frattempo, riprova",
-  "{0} issued invoice is exported to DATEV under the customer number of {1} afterwards": ["{0} fattura emessa viene poi esportata in DATEV con il numero cliente di {1}", "{0} fatture emesse vengono poi esportate in DATEV con il numero cliente di {1}"]
+  "{0} issued invoice is exported to DATEV under the customer number of {1} afterwards": ["{0} fattura emessa viene poi esportata in DATEV con il numero cliente di {1}", "{0} fatture emesse vengono poi esportate in DATEV con il numero cliente di {1}"],
+  "Agents never see health lists": "Gli agenti non vedono mai le liste salute",
+  "At most {0} images": "Al massimo {0} immagini",
+  "Only images": "Solo immagini",
+  "Turn a meeting into tasks": "Trasforma una riunione in attività",
+  "There is no list you can write in": "Non c’è nessuna lista in cui puoi scrivere",
+  "Add a photo or image": "Aggiungi una foto o un’immagine",
+  "up to {0}": "fino a {0}",
+  "Paste the notes or add a photo": "Incolla le note o aggiungi una foto",
+  "{1} gets these notes, {0} image and the names of the people in {2} (to suggest who does what) and proposes tasks for this list. Nothing is created until you apply them. The image stays in your chat with {1}.": ["{1} riceve queste note, {0} immagine e i nomi delle persone in {2} (per suggerire chi fa cosa) e propone attività per questa lista. Non viene creato nulla finché non le applichi. L’immagine resta nella tua chat con {1}.", "{1} riceve queste note, {0} immagini e i nomi delle persone in {2} (per suggerire chi fa cosa) e propone attività per questa lista. Non viene creato nulla finché non le applichi. Le immagini restano nella tua chat con {1}."],
+  "{0} task from the meeting": ["{0} attività dalla riunione", "{0} attività dalla riunione"],
+  "Create {0} task": ["Crea {0} attività", "Crea {0} attività"]
 }

@@ -546,6 +546,7 @@ function propAgentRow() {  // the agent choice: a select when there are several
 }
 function propRequest(kind, ctx = {}) {
   if (!propOn()) return;
+  if (kind === 'extract') return mtg_request(ctx);  // 2.70.0 A (#1354): notes and / or photos, list choice (meetprop.js)
   const who = () => { const id = +($('#pp-agent')?.value || 0); return esc((S.proposers.find(a => a.id === id) || S.proposers[0]).name); };
   let title = '', body = '';
   const inbox = S.lists.find(l => l.is_inbox && isOwner(l));
