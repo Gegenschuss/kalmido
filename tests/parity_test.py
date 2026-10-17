@@ -359,6 +359,9 @@ APP_ONLY = [
     # 2.55.0 (#1455): the newsletter connection holds access data of an outside service and decides who gets mail: people only
     ("2.55.0 (#1455): the newsletter connection, segments, sync and the consent of contacts are set by people (admins / the "
      "person); agents read the consent with the contact (field newsletter), no new agent rights", ("* /api/newsletter",)),
+    # 2.75.0 (#1411): the built-in assistant calls a language model for a person in the web app; agents are models themselves
+    ("2.75.0 (#1411): the built-in assistant (session only: a person's own switch, shared lists, log; the admin overview); agents "
+     "never use it and have their own proposals API", ("* /api/assistant", "* /api/admin/assistant")),
 ]
 
 

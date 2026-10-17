@@ -759,6 +759,8 @@ def prop_run(c, j, sel, ed, extra):
 
 def prop_notify_agent(c, j, action, state, extra=None):
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (j["id"],)).fetchone()
+    if json.loads(j["input"] or "{}").get("assistant"):  # 2.75.0 A (#1411): the built-in assistant's proposal, no agent to tell
+        return
     data = {"job": job_dict(c, j), "action": action, "proposal": {"state": state, **(extra or {})},
             "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}}
     if j["kind"] == "cleanup":  # 2.39.0 (#1151): the list on top (agent_emit: health list, list limit, playbook)

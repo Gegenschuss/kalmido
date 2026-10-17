@@ -8208,5 +8208,17 @@
   "Back to the whole chat": "Terug naar de hele chat",
   "Job has ended": "Job is beëindigd",
   "The job reads it after its next step.": "De job leest het na zijn volgende stap.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)",
+  "Switch the assistant on in Settings first": "Zet de assistent eerst aan in de instellingen",
+  "Share this list with the assistant first": "Deel deze lijst eerst met de assistent",
+  "The assistant is not reachable right now": "De assistent is nu niet bereikbaar",
+  "The assistant gave no usable answer": "De assistent gaf geen bruikbaar antwoord",
+  "The assistant took too long": "De assistent deed er te lang over",
+  "Summary": "Samenvatting",
+  "Tags and due date": "Tags en vervaldatum",
+  "Sort tasks": "Taken sorteren",
+  "Day plan": "Dagplan",
+  "Assistant: {0}": "Assistent: {0}",
+  "Busy": "Bezet",
+  "Only open tasks can be sorted": "Alleen open taken kunnen worden gesorteerd"
 }

@@ -8208,5 +8208,17 @@
   "Back to the whole chat": "Torna alla chat completa",
   "Job has ended": "Il job è terminato",
   "The job reads it after its next step.": "Il job lo legge dopo il suo prossimo passo.",
-  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agente non riceve questo messaggio ora (in pausa, oppure la lista del lavoro non è condivisa con lui)"
+  "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agente non riceve questo messaggio ora (in pausa, oppure la lista del lavoro non è condivisa con lui)",
+  "Switch the assistant on in Settings first": "Attiva prima l'assistente nelle impostazioni",
+  "Share this list with the assistant first": "Condividi prima questa lista con l'assistente",
+  "The assistant is not reachable right now": "L'assistente non è raggiungibile in questo momento",
+  "The assistant gave no usable answer": "L'assistente non ha dato una risposta utilizzabile",
+  "The assistant took too long": "L'assistente ha impiegato troppo tempo",
+  "Summary": "Riepilogo",
+  "Tags and due date": "Tag e scadenza",
+  "Sort tasks": "Ordina attività",
+  "Day plan": "Piano della giornata",
+  "Assistant: {0}": "Assistente: {0}",
+  "Busy": "Occupato",
+  "Only open tasks can be sorted": "Si possono ordinare solo attività aperte"
 }
