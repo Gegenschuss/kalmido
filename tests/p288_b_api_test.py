@@ -3,7 +3,8 @@
  - DELETE /api/users/{id}: without a parameter still 409 while the account owns lists; ?lists=transfer&to={id} hands every
    list to one person (an unknown / invisible person 404, an agent / a disabled account / the account itself 400, a person
    who does not fit one list -- an organisation's list stays in its organisation -- 409 and nothing changes);
-   ?lists=delete&confirm={user name} deletes the lists along (a wrong name 400); an account without organisation too
+   ?lists=delete&confirm={user name} deletes the lists along (a wrong name 400; a list of an organisation the admin is not
+   in: 409, it can only be handed over); an account without organisation too
  - GET /api/users/{id}/delete-info: the lists (names only where the admin may see the list), the common candidates
  - an organisation admin deletes an account of their organisation alone; another organisation too, a server admin or
    private lists: 403 (delete-info says so and names the members for "Remove"); DELETE /api/orgs/{o}/members/{u}?to=
@@ -125,6 +126,11 @@ check(Fr.get(B + f"/api/lists/{FA}/owner").json().get("owner", {}).get("id") == 
 check(Fr.get(B + "/api/me").ok, "409: Frank's account is still there")
 r = deluser(A, "frank", lists="delete", confirm="Frank")
 check(r.status_code == 400, "delete along with a wrong name: 400")
+
+check(info.get(FB, {}).get("foreign") is True and info.get(FA, {}).get("foreign") is False and info.get(FP, {}).get("foreign") is False, "delete-info: the Beta list is foreign to alice")
+r = deluser(A, "frank", lists="delete", confirm="frank")
+check(r.status_code == 409 and r.json().get("lists") == [FB], "delete along: a list of an organisation alice is not in -> 409 " + r.text[:200])
+check(Fr.get(B + f"/api/lists/{FA}/owner").ok, "409: Frank's lists are all still there")
 
 # ---- transfer to ivy (Alpha + Beta)
 r = deluser(A, "frank", lists="transfer", to=uid["ivy"])
