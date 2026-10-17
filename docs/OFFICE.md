@@ -325,6 +325,14 @@ earlier row of the file; not ticked) or error (no name, amount 0 or missing; nev
 "Take over N rows"; then every row is checked again, all are written in one step (the undo removes them again), at most
 500 fixed costs per area. Files up to 2 MB and 500 rows; cells are read as text, formulas are never run.
 
+**Import with your own agent** (2.68): old fixed costs in any other format (an old spreadsheet, a PDF, a list in a mail)
+can be read by your own agent, which sends them as an import proposal in a fixed JSON shape (permission *Propose imports*,
+off by default; format in [AGENTS.md](AGENTS.md#importing-old-data-into-the-office-2680)). Kalmido does not read the data
+itself. The proposal card shows the same preview as the Excel import (new / duplicate unticked / error greyed out with the
+reason, VAT per row, net and gross) and the office it goes into; "Take over N rows" writes them as you, one undo step
+removes them again. The agent never sees the office; an agent of an organisation imports only into that organisation.
+Freelancers without an organisation import into their personal office.
+
 **Monthly check** (optional): a tick creates the task "Cash flow: check the actual state" for one admin of the area, due
 on the 1st of every month in that person's inbox, with only a link to the cash flow (never an amount). Another person
 ends the old task and creates a new one; switching it off ends the task (done, without a next date; not deleted). If the

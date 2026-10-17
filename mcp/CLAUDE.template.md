@@ -335,6 +335,14 @@ the start page, or when they ask. One open proposal per view (a new one replaces
 `job` (approve / reject): after a decline never propose the same again unasked. The project page (`list:<id>`) only for a
 list shared with you.
 
+### Importing old data into the office (2.68.0)
+With the right `import` (off until a person turns it on for you) you may read the person's old data (today: fixed costs, in
+whatever format they give you) and send it with `propose_import` as ONE proposal: `area` `fixed_costs`, `items` = one row per
+cost `{label, amount (net euros, best a number), repeat monthly|quarterly|yearly|once, start YYYY-MM-DD, until?, category?,
+vat_rate? 0|7|19}`, at most 500 rows; put what you could not read or assumed into `note`, where the data comes from into
+`summary`. Never invent amounts or dates. You never write or see the office: the person checks the preview (new / already
+there / error), ticks rows and takes them over. The answer comes as the event `job` with counts only.
+
 <!-- kalmido-tool-index:start -->
 ## Events and tools (index)
 
@@ -398,7 +406,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
-`move_task`, `post_team_message`, `propose_layout`, `propose_playbook`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
+`move_task`, `post_team_message`, `propose_import`, `propose_layout`, `propose_playbook`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
 `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,

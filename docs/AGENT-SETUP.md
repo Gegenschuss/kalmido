@@ -157,6 +157,10 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    default) when the agent may suggest how the start page, Today or a shared project page could be arranged. It reads only
    block names and widths, never their content, and every proposal waits for the person's 👍 / 👎
    ([AGENTS.md](AGENTS.md#arrangements-of-views-2550)).
+8. Optional, **Importing old data** (2.68.0): turn on the permission *Propose imports* (scope `import`, off by default)
+   when the agent may read old fixed costs (a spreadsheet, a PDF, any format) and send them as ONE import proposal in the
+   JSON shape of [AGENTS.md](AGENTS.md#importing-old-data-into-the-office-2680). The person checks the preview (new /
+   already there / error per row) and takes the rows over into their office; the agent never sees or writes the office.
 
 ### 2. A Linux user without sudo
 
