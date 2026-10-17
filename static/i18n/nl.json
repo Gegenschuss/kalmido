@@ -5932,7 +5932,6 @@
   "The payment exceeds the open amount": "De betaling overschrijdt het openstaande bedrag",
   "Payments are recorded on this invoice; remove them first": "Op deze factuur zijn betalingen geboekt; verwijder die eerst",
   "The stored file of this document is missing": "Het opgeslagen bestand van dit document ontbreekt",
-  "Health lists never reach an agent": "Gezondheidslijsten bereiken nooit een agent",
   "This list has no agent that may tidy it up: share it with an agent with edit rights first": "Deze lijst heeft geen agent die haar mag opschonen: deel haar eerst met een agent met bewerkrechten",
   "{0} does not make proposals": "{0} doet geen voorstellen",
   "{0} is limited to other lists": "{0} is beperkt tot andere lijsten",
@@ -8226,7 +8225,6 @@
   "comma (1.234,56)": "komma (1.234,56)",
   "Contract changed: now {0} {1}": "Contract gewijzigd: nu {0} {1}",
   "Create a budget": "Budget aanmaken",
-  "Create the budget again with “Create a budget”": "Maak het budget opnieuw aan met ‘Budget aanmaken’",
   "Date format": "Datumnotatie",
   "Decimal separator": "Decimaalteken",
   "Delete entry": "Post verwijderen",
@@ -8325,5 +8323,7 @@
   "This item is not due in this month": "Deze post is deze maand niet verschuldigd",
   "Too many categories": "Te veel categorieën",
   "Too many files": "Te veel bestanden",
-  "Too many recurring items": "Te veel terugkerende posten"
+  "Too many recurring items": "Te veel terugkerende posten",
+  "A budget is private: it cannot get a public link": "Een budget is privé: het krijgt geen openbare link",
+  "Health lists and budgets never reach an agent": "Gezondheidslijsten en budgetten bereiken nooit een agent"
 }

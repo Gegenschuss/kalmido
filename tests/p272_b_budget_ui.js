@@ -41,8 +41,10 @@ const DE = d => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
   const sw = d.querySelector('[data-feat="budget"]');
   check(sw && !sw.checked, '#1333: Settings > Modules has the switch, off');
   if (sw) { sw.checked = true; sw.dispatchEvent(new w.Event('change', {bubbles: true})); }
-  await until(async () => ((await call('GET', '/api/settings')).features || '').includes('budget'));
-  check(((await call('GET', '/api/settings')).features || '').split(',').includes('budget'), '#1333: the switch turns the module on');
+  // 2.72.0 (#1333): the settings come with /api/state (there is no GET /api/settings)
+  const fts = async () => ((await call('GET', '/api/state')).settings?.features || '').split(',');
+  await until(async () => (await fts()).includes('budget'));
+  check((await fts()).includes('budget'), '#1333: the switch turns the module on ' + (await fts()).join(','));
   w.close();
   await call('PATCH', '/api/settings', {features: FEAT});
 
@@ -115,7 +117,8 @@ const DE = d => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
   click(w, dlg().querySelector('[data-m="close"]')); await until(() => !dlg());
   await call('POST', `/api/budget/${LID}/entries`, {day: DAY, amount: 60, kind: 'out', title: 'Cinema', cat_id: FUN.id});
   w.eval(`bg_after()`);
-  await until(() => [...d.querySelectorAll('.bgcat')].some(x => /Fun/.test(x.textContent) && x.querySelector('.bgbar i')));
+  // 2.72.0 (#1333): wait for the reloaded bar (the bar at 0 % is there before the reload)
+  await until(() => [...d.querySelectorAll('.bgcat')].some(x => /Fun/.test(x.textContent) && /width:\s*60%/.test(x.querySelector('.bgbar i')?.getAttribute('style') || '')));
   let fc = [...d.querySelectorAll('.bgcat')].find(x => /Fun/.test(x.textContent));
   check(fc && /width:\s*60%/.test(fc.querySelector('.bgbar i')?.getAttribute('style') || '') && !fc.classList.contains('over'), '#1333: the bar shows 60 of 100 ' + fc?.innerHTML.slice(0, 200));
   await call('POST', `/api/budget/${LID}/entries`, {day: DAY, amount: 50, kind: 'out', title: 'Concert', cat_id: FUN.id});
@@ -148,7 +151,7 @@ const DE = d => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
   w.__csv = [new w.File([csv], 'konto.csv', {type: 'text/csv'})];
   w.eval(`(() => { const f = document.querySelector('[data-cs-file]'); Object.defineProperty(f, 'files', {configurable: true, value: window.__csv}); f.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
   await until(() => dlg()?.querySelector('#cs-date'));
-  check(dlg()?.querySelector('#cs-date') && dlg().querySelector('#cs-title') && dlg().querySelector('.bgtbl'), '#1333: the columns to map, with a preview');
+  check(dlg()?.querySelector('#cs-date') && dlg().querySelector('#cs-title') && dlg().querySelector('.bgtbl'), '#1333: the columns to map, with a preview ' + (dlg()?.querySelector('.aerr')?.textContent || '') + ' ' + (dlg()?.querySelector('.bgcsv')?.innerHTML || 'no dialog').slice(0, 300));
   const opt = (sel, rx) => [...dlg().querySelectorAll(`${sel} option`)].find(o => rx.test(o.textContent))?.value;
   dlg().querySelector('#cs-date').value = opt('#cs-date', /Buchungstag/);
   dlg().querySelector('#cs-amt').value = opt('#cs-amt', /Betrag/);

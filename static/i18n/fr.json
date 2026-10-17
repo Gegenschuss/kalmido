@@ -5932,7 +5932,6 @@
   "The payment exceeds the open amount": "Le paiement dépasse le montant ouvert",
   "Payments are recorded on this invoice; remove them first": "Des paiements sont enregistrés sur cette facture ; supprimez-les d'abord",
   "The stored file of this document is missing": "Le fichier archivé de ce document est manquant",
-  "Health lists never reach an agent": "Les listes de santé ne parviennent jamais à un agent",
   "This list has no agent that may tidy it up: share it with an agent with edit rights first": "Cette liste n'a aucun agent autorisé à y mettre de l'ordre : partagez-la d'abord avec un agent ayant le droit de modifier",
   "{0} does not make proposals": "{0} ne fait pas de propositions",
   "{0} is limited to other lists": "{0} est limité à d'autres listes",
@@ -8226,7 +8225,6 @@
   "comma (1.234,56)": "virgule (1.234,56)",
   "Contract changed: now {0} {1}": "Contrat modifié : maintenant {0} {1}",
   "Create a budget": "Créer un budget",
-  "Create the budget again with “Create a budget”": "Recrée le budget avec « Créer un budget »",
   "Date format": "Format de date",
   "Decimal separator": "Séparateur décimal",
   "Delete entry": "Supprimer l’opération",
@@ -8325,5 +8323,7 @@
   "This item is not due in this month": "Ce poste n'est pas dû ce mois-ci",
   "Too many categories": "Trop de catégories",
   "Too many files": "Trop de fichiers",
-  "Too many recurring items": "Trop de postes récurrents"
+  "Too many recurring items": "Trop de postes récurrents",
+  "A budget is private: it cannot get a public link": "Un budget est privé : il ne peut pas avoir de lien public",
+  "Health lists and budgets never reach an agent": "Les listes de santé et les budgets ne parviennent jamais à un agent"
 }

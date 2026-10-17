@@ -134,7 +134,7 @@ function bg_entryModal(e) {
     <div class="row"><label for="bg-title">${tr('What')}</label><input id="bg-title" maxlength="200" autocomplete="off" value="${esc(e?.title || '')}" placeholder="${esc(tr('e.g. Groceries, rent, salary'))}"></div>
     <div class="row"><label for="bg-cat">${tr('Category')}</label><select id="bg-cat">${bg_catOpts(kind, e?.cat_id)}</select></div>
     <div class="row"><label for="bg-cp">${tr('Paid to / from')}</label><input id="bg-cp" maxlength="200" autocomplete="off" value="${esc(e?.counterpart || '')}" placeholder="${esc(tr('optional'))}"></div>
-    <div class="row"><label for="bg-note">${tr('Note')}</label><textarea id="bg-note" rows="2" maxlength="2000" placeholder="${esc(tr('optional'))}">${esc(e?.note || '')}</textarea></div>
+    <div class="row"><label for="bg-note">${tr('Note')}</label><textarea id="bg-note" rows="2" maxlength="1000" placeholder="${esc(tr('optional'))}">${esc(e?.note || '')}</textarea></div>
     <div class="bgfwrap">${filesHtml(e)}</div>
     ${e && w ? `<div class="row"><span></span><button type="button" class="btn sm danger" data-bg-del>${ic('trash', 's')}<span>${tr('Delete entry')}</span></button></div>` : ''}
     ${w ? lifeFoot(e ? tr('Save') : tr('Add')) : `<div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`}`, async md => {
@@ -203,7 +203,7 @@ async function bg_book(rid) {
 // categories: name, kind, monthly limit, order (arrows); every change at once, each ONE undo step
 function bg_catsModal() {
   const lid = BG.lid;
-  const rowHtml = (c, i, n) => `<li class="bgcr" data-cid="${c.id}"><input class="bgcn" data-f="name" value="${esc(c.name)}" maxlength="80" aria-label="${esc(tr('Name'))}">
+  const rowHtml = (c, i, n) => `<li class="bgcr" data-cid="${c.id}"><input class="bgcn" data-f="name" value="${esc(c.name)}" maxlength="60" aria-label="${esc(tr('Name'))}">
     <select data-f="kind" aria-label="${esc(tr('Kind'))}"><option value="out" ${c.kind === 'out' ? 'selected' : ''}>${tr('Expense')}</option><option value="in" ${c.kind === 'in' ? 'selected' : ''}>${tr('Income')}</option></select>
     <input class="numin" data-f="limit" inputmode="decimal" value="${esc(bg_numStr(c.limit))}" placeholder="${esc(tr('no limit'))}" aria-label="${esc(tr('Limit per month'))}">
     <span class="bgca"><button type="button" class="iconbtn" data-cmv="-1" ${i === 0 ? 'disabled' : ''} aria-label="${esc(tr('Move up'))}" title="${esc(tr('Move up'))}">${ic('up', 's')}</button><button type="button" class="iconbtn" data-cmv="1" ${i === n - 1 ? 'disabled' : ''} aria-label="${esc(tr('Move down'))}" title="${esc(tr('Move down'))}">${ic('down', 's')}</button><button type="button" class="iconbtn danger" data-cdel aria-label="${esc(tr('Delete {0}', c.name))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></li>`;
@@ -212,7 +212,7 @@ function bg_catsModal() {
   const md = bg_modal(`<h3>${ic('tag', 's')} ${tr('Categories')}</h3>
     <div class="shint lhint keep">${tr('Monthly limit = what you plan to spend in a month. Without a limit the plan is the sum of the recurring entries of the category.')}</div>
     <div class="bgcwrap">${listHtml()}</div>
-    <div class="bgcnew"><input id="bg-cnew" maxlength="80" placeholder="${esc(tr('New category'))}" aria-label="${esc(tr('New category'))}"><select id="bg-cnk" aria-label="${esc(tr('Kind'))}"><option value="out">${tr('Expense')}</option><option value="in">${tr('Income')}</option></select><input id="bg-cnl" class="numin" inputmode="decimal" placeholder="${esc(tr('no limit'))}" aria-label="${esc(tr('Limit per month'))}"><button type="button" class="btn sm" data-cadd>${ic('plus', 's')}<span>${tr('Add')}</span></button></div>
+    <div class="bgcnew"><input id="bg-cnew" maxlength="60" placeholder="${esc(tr('New category'))}" aria-label="${esc(tr('New category'))}"><select id="bg-cnk" aria-label="${esc(tr('Kind'))}"><option value="out">${tr('Expense')}</option><option value="in">${tr('Income')}</option></select><input id="bg-cnl" class="numin" inputmode="decimal" placeholder="${esc(tr('no limit'))}" aria-label="${esc(tr('Limit per month'))}"><button type="button" class="btn sm" data-cadd>${ic('plus', 's')}<span>${tr('Add')}</span></button></div>
     <div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`, async () => {}, '#bg-cnew');
   const redraw = async () => { await bg_load(); const w = $('.bgcwrap', md); if (w) w.innerHTML = listHtml(); };
   const patch = async (id, body, before, label) => {
@@ -302,7 +302,7 @@ async function bg_recModal() {
       if (!await askConfirm(tr('Delete “{0}”?', r.title), tr('Entries booked from it stay.'), {ok: tr('Delete'), danger: true})) return;
       try { await api('DELETE', `/api/budget/recurring/${r.id}`); } catch { return; }
       let cur = r;
-      offerUndo(tr('Deleted: {0}', r.title), histAdd({label: tr('Recurring entry “{0}” deleted', r.title), undo: async () => { cur = await api('POST', `/api/budget/${lid}/recurring`, pickR(cur)); bg_after(); }, redo: async () => { await api('DELETE', `/api/budget/recurring/${cur.id}`); bg_after(); }}));
+      offerUndo(tr('Deleted: {0}', r.title), histAdd({label: tr('Recurring entry “{0}” deleted', r.title), undo: async () => { cur = await bg_recBack(lid, cur, pickR(cur)); bg_after(); }, redo: async () => { await api('DELETE', `/api/budget/recurring/${cur.id}`); bg_after(); }}));
       return refresh();
     }
     if (ev.target.closest('[data-rsave]')) {
@@ -328,6 +328,16 @@ async function bg_recModal() {
   });
   return md;
 }
+// undo of a deleted recurring entry: one taken over from a contract comes back through the contracts route (keeps its link), then its own values
+async function bg_recBack(lid, r, vals) {
+  if (r.contract_task_id) {
+    try {
+      const it = ((await api('POST', `/api/budget/${lid}/contracts`, {task_ids: [r.contract_task_id], ...(r.cat_id ? {cat_id: r.cat_id} : {})})).items || [])[0];
+      if (it) return await api('PATCH', `/api/budget/recurring/${it.id}`, vals);
+    } catch { /* the contract is gone or no longer visible: without the link */ }
+  }
+  return api('POST', `/api/budget/${lid}/recurring`, vals);
+}
 // take over contracts (module Contracts) as recurring entries
 async function bg_contractsModal() {
   const lid = BG.lid; let items;
@@ -341,11 +351,12 @@ async function bg_contractsModal() {
     ${body}${items.some(x => !x.taken && x.cost != null) ? lifeFoot(tr('Take over')) : `<div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`}`, async md => {
     const ids = $$('[data-ctid]:checked:not(:disabled)', md).map(x => +x.dataset.ctid);
     if (!ids.length) throw new Error(tr('Please choose at least one contract'));
-    const j = await api('POST', `/api/budget/${lid}/contracts`, {task_ids: ids, ...(+$('#bg-ctc', md)?.value ? {cat_id: +$('#bg-ctc', md).value} : {})});
+    const cat = +$('#bg-ctc', md)?.value || 0, req = {task_ids: ids, ...(cat ? {cat_id: cat} : {})};
+    const j = await api('POST', `/api/budget/${lid}/contracts`, req);
     let made = j.items || [];
     offerUndo(trn('{0} contract taken over', '{0} contracts taken over', j.created), histAdd({label: tr('Taken over from contracts'),
       undo: async () => { for (const r of made) await api('DELETE', `/api/budget/recurring/${r.id}`); bg_after(); },
-      redo: async () => { made = (await api('POST', `/api/budget/${lid}/contracts`, {task_ids: ids})).items || []; bg_after(); }}));
+      redo: async () => { made = (await api('POST', `/api/budget/${lid}/contracts`, req)).items || []; bg_after(); }}));
     md.remove(); bg_after();
   });
 }
@@ -353,7 +364,7 @@ async function bg_contractsModal() {
 // ---- CSV import: file -> columns -> preview -> commit
 function bg_readFile(f) {
   const rd = enc => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => no(r.error); r.readAsText(f, enc); });
-  return rd('utf-8').then(t => t.includes('�') ? rd('windows-1252') : t);
+  return f.text().then(t => t.includes('�') ? rd('windows-1252') : t);  // UTF-8 via Blob.text(); FileReader only for the windows-1252 fallback
 }
 function bg_csvModal() {
   const lid = BG.lid, st = {text: '', p: null, rows: null, mapping: null};
@@ -437,7 +448,9 @@ function bg_csvModal() {
 async function bg_create() {
   let j; try { j = await api('POST', '/api/budget/lists', {}); } catch { return; }
   await load(); BG.home = null; BG.lid = j.list_id; BG.data = null; BG.month = bg_month();
-  histAdd({label: tr('New budget'), undo: async () => { await api('DELETE', `/api/lists/${j.list_id}`); await load(); BG.lid = null; BG.home = null; BG.data = null; render(); }, redo: async () => { toast(tr('Create the budget again with “Create a budget”')); }});
+  // undo = archive (a list is only deleted from the archive), redo = out of the archive again
+  const arch = async v => { await api('PATCH', `/api/lists/${j.list_id}`, {archived: v}); await load(); BG.home = null; BG.data = null; BG.lid = v ? null : j.list_id; v ? render() : go(`budget/${j.list_id}`); };
+  histAdd({label: tr('New budget'), undo: () => arch(1), redo: () => arch(0)});
   go(`budget/${j.list_id}`);
 }
 
