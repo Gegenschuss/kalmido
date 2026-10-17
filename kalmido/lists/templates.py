@@ -186,7 +186,9 @@ def tpl_clean(kind, d):
             # 2.4.0 (#328 / #340): dates relative to the project start (rel), its length in days (span), the dependencies,
             # the list's ticket types + templates and "Move dependent tasks along"
             "rel": bool(d.get("rel")), "span": span(tasks), "deps": deps, "tickets": 1 if d.get("tickets") else 0,
-            "ticket_tpl": tt, "dep_shift": 1 if d.get("dep_shift") else 0,
+            # 2.67.0 B (#1865): a template without the setting: on for a project (like a new project list)
+            "ticket_tpl": tt, "dep_shift": (1 if d["dep_shift"] else 0) if "dep_shift" in d else
+            1 if (d.get("kind") if d.get("kind") in LIST_KINDS else "project" if d.get("fields") else "list") == "project" else 0,
             # 2.39.0 (#1168): the list's own Playbook (its text; the new list gets it as its first version, source template)
             "playbook": _tpl_playbook(d.get("playbook"))}
 
@@ -449,7 +451,8 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=
                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (name, d.get("color") or "" if color is None else color, folder, my_max_sort(c, uid) + 1, d.get("view") or "list",
                      iso(now_utc()), uid, lk, 1 if d.get("done_at_bottom") or d.get("kind") == "checklist" else 0, 1 if d.get("tickets") else 0,
-                     json.dumps(tt, ensure_ascii=False) if tt else "", 1 if d.get("dep_shift") else 0,
+                     json.dumps(tt, ensure_ascii=False) if tt else "",
+                     (1 if d["dep_shift"] else 0) if "dep_shift" in d else 1 if lk == "project" else 0,  # 2.67.0 B (#1865)
                      ws_default_org(c, uid, folder) if org_id == "auto" else org_id))  # 2.28.0 (#935): the workspace, before anyone joins
     secs = [insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, s, i))
             for i, s in enumerate(d.get("sections") or [])]
