@@ -880,6 +880,9 @@ fresh; run p266_b_ui node p266_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.66.0 part A: merging duplicate contacts (#1835): links, CardDAV, undo, rights
 fresh; run p266_a_api "$PY" p266_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p266_a_ui node p266_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.70.0 part B: tidy up contacts - an agent proposes duplicates, the person merges them (#1357)
+fresh; run p270_b_api "$PY" p270_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p270_b_ui node p270_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

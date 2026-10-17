@@ -298,6 +298,8 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   submit_proposal) or ask first; a person applies it.
 - A customer inquiry in the chat, an accepted quotation, or "set me up": send ONE proposal with propose_to_person
   (kind inquiry / setup, 2.51.0); the person applies it.
+- "Find duplicates" in the contacts (job_request kind merge, 2.70.0): propose groups of clear duplicates only
+  (same e-mail / phone, a name variant with a shared detail), ids from the input; the person merges them.
 - Set your status (set_status) while you work on something, and back to idle when done.
 - Before you answer a task event, read the whole task: description, properties and all comments (get_task).
 - Answer task events only with a comment on the task, never with a copy in your chat.

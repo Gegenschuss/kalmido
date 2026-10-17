@@ -125,6 +125,14 @@ come back with their links. Contacts of a synced external account cannot be merg
 of an organisation's address book only merge with contacts of the same organisation; personal address books only
 with books of the same owner (not into a book someone shared with you).
 
+**Finding duplicates with an agent** (2.70.0): in *Contacts › More › Find duplicates with an agent…* (or the command
+palette) pick an address book you may change and an agent. The dialog says exactly what the agent gets: name, company,
+e-mail addresses and phone numbers of that book's contacts, nothing else (no notes, addresses, birthdays). The agent
+proposes groups that belong together; you get a notification and review each group: the contacts side by side as they
+are now, the agent's reason, the contact that stays (switchable), each group with its own tick. *Merge* merges the ticked
+groups exactly like merging by hand; a group with a contact that was deleted or changed in the meantime is skipped. One
+undo step takes all merges of the proposal back. The agent never merges or deletes anything itself.
+
 ## Writing into subscribed calendars
 
 Calendars of other services that you subscribed to under **Settings › Calendars** are read-only at first. For a
