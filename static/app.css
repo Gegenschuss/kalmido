@@ -7232,3 +7232,16 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
   #ct-sbar .mbb .mbl{max-width:100%;overflow:hidden;text-overflow:ellipsis}
   .ctpicking .ctlistw{padding-bottom:6.5rem}
 }
+
+/* 2.81.0 B (#1834) correct an archived document: tax lines, client filter, history */
+.r81b-dlg .r81b-ln{display:flex;gap:.5rem;align-items:center;margin-bottom:.375rem}
+.r81b-dlg .r81b-ln .numin{flex:1;min-width:0;min-height:2.75rem}
+.r81b-dlg .r81b-ln select{flex:0 0 auto;min-height:2.75rem;max-width:55%}
+.r81b-dlg .r81b-ln .ib{min-width:2.75rem;min-height:2.75rem}
+.r81b-dlg .r81b-lbl{display:block;font-weight:600;margin-bottom:.25rem}
+.r81b-dlg .r81b-sum{margin:.375rem 0 0}
+.r81b-dlg .r81b-paid{min-height:2.75rem;display:flex;align-items:center;gap:.5rem}
+.r81b-dlg .r81b-hist summary{min-height:2.75rem;display:flex;align-items:center;cursor:pointer}
+.r81b-dlg .r81b-hist ul{list-style:none;margin:0;padding:0}
+.r81b-dlg .r81b-hist li{display:flex;flex-direction:column;padding:.375rem 0;border-top:1px solid var(--line, rgba(127,127,127,.2))}
+.r81b-clf select{min-height:2.75rem;max-width:100%}

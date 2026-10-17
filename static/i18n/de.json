@@ -9479,5 +9479,12 @@
   "A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).": "Eine Anmeldung beim OIDC-Anbieter passte über {1} zu {0}, wurde aber nicht verknüpft (Admin, zweiter Faktor oder keine passende bestätigte E-Mail).",
   "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Noch nicht auf Schadsoftware geprüft: Die Datei lässt sich öffnen, sobald der Virenscanner sie geprüft hat",
   "No clients in this area yet": "Noch keine Kunden in diesem Bereich",
-  "Add client": "Kunde anlegen"
+  "Add client": "Kunde anlegen",
+  "Correct archived document": "Archivbeleg korrigieren",
+  "Number and file stay unchanged.": "Nummer und Datei bleiben unverändert.",
+  "Add tax rate": "Steuersatz hinzufügen",
+  "gross, tax unknown": "brutto, Steuer unbekannt",
+  "Net {0} + VAT {1} = gross {2}": "Netto {0} + MwSt. {1} = Brutto {2}",
+  "{0}: {1} → {2}": "{0}: {1} → {2}",
+  "No changes yet.": "Noch keine Änderungen."
 }

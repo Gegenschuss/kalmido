@@ -9479,5 +9479,12 @@
   "A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).": "Een aanmelding bij de OIDC-provider kwam via {1} overeen met {0}, maar is niet gekoppeld (beheerder, tweede factor of geen overeenkomend geverifieerd e-mailadres).",
   "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Nog niet op malware gecontroleerd: het bestand kan worden geopend zodra de virusscanner het heeft gecontroleerd",
   "No clients in this area yet": "Nog geen klanten in deze omgeving",
-  "Add client": "Klant toevoegen"
+  "Add client": "Klant toevoegen",
+  "Correct archived document": "Gearchiveerd document corrigeren",
+  "Number and file stay unchanged.": "Nummer en bestand blijven ongewijzigd.",
+  "Add tax rate": "Btw-tarief toevoegen",
+  "gross, tax unknown": "bruto, btw onbekend",
+  "Net {0} + VAT {1} = gross {2}": "Netto {0} + btw {1} = bruto {2}",
+  "{0}: {1} → {2}": "{0}: {1} → {2}",
+  "No changes yet.": "Nog geen wijzigingen."
 }

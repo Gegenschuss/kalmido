@@ -53,6 +53,7 @@ TABLES = (
     "task_links",  # 2.71.0 B (#1459): a task shown in a further list (NULL = private lists, the app checks both lists)
     "list_rules",  # 2.71.0 A (#1457): rules of a list (org_id follows the list, NULL = a private list)
     "office_pack_installs",  # 2.76.0 A (#1023): packs installed from the catalogue per office area
+    "office_archive_log",  # 2.81.0 B (#1834): the history of an archived document (org_id like the entry)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"
