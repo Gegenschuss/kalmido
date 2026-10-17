@@ -31,6 +31,9 @@ def ov_list_patch(c, lid, role, b):
             return err(tr("Invalid value: {0}", "org_visibility"))
         if v == "org" and (not r["org_id"] or r["life"] or r["family"] or r["is_inbox"]):
             return err(tr("Only lists of an organisation can be visible to the whole organisation"), 409)
+        from ..collab.liste2e import le2e_mode
+        if v == "org" and le2e_mode(c, lid):  # 2.64.1 (#1817): nobody could hand the list key to people joining by themselves
+            return jsonify(error=tr("A list encrypted in the browser cannot be open to the whole organisation."), code="list_e2e_open_org"), 409
         c.execute("UPDATE lists SET org_visibility=? WHERE id=?", (v, lid))
     if "org_edit" in b:
         v = b["org_edit"]

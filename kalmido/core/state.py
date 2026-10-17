@@ -124,9 +124,12 @@ def visible_lists(c, uid):
     if ids:
         for f in c.execute(f"SELECT id, list_id FROM list_fields WHERE list_id IN ({','.join('?' * len(ids))})", ids):
             lfids.setdefault(f["list_id"], set()).add(f["id"])
+    from ..collab.liste2e import le2a_state
+    le2s = le2a_state(c, rows, uid)  # 2.64.1 (#1817): the lock per list (waiting list, my key of the current generation)
     out = []
     for r in rows:
         d = {k: r[k] for k in r.keys() if not k.startswith("m_")}
+        d.update(le2s.get(r["id"], {"e2e_pending": 0, "e2e_mine": False}))
         d["progress"] = prog.get(r["id"], {"done": 0, "total": 0, "overdue": 0, "next_due": None})
         d["status_by_name"] = snames.get(r["status_by"], "")
         if r["owner_id"] != uid:

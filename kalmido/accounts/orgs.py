@@ -778,7 +778,7 @@ def org_leave(c, oid, uid, heir):
     n = 0
     for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND org_id=? AND is_inbox=0", (uid, oid)).fetchall():
         if heir and heir != uid:
-            owner_transfer(c, lr, heir)
+            owner_transfer(c, lr, heir, force=True)  # 2.64.1 (#1817): a list with the lock too (the heir waits for its key)
             c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lr["id"], uid))
             n += 1
         else:

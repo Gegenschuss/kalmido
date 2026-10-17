@@ -24,7 +24,10 @@ def task_dict(r, tags, full_snips=False):
         d.pop("approval", None)
         d.pop("approver_id", None)
     fam_task_out(d)  # 2.19.0 (#653): fam / rotation as objects, only when set
-    if "snippets" in d:  # 2.35.0 (#1095): lists / state only the number (snippets_n, when > 0); the snippets themselves
+    from ..collab.liste2e import le2a_snip_cipher
+    if "snippets" in d and le2a_snip_cipher(d["snippets"]):  # 2.64.1 (#1817): a list with the lock: the ciphertext (the browser decrypts)
+        d["snippets"] = le2a_snip_cipher(d["snippets"])
+    elif "snippets" in d:  # 2.35.0 (#1095): lists / state only the number (snippets_n, when > 0); the snippets themselves
         from ..tasks.snippets import snip_out  # with full_snips (one task: GET /api/tasks/<id>, the answer of a change, API)
         sn = snip_out(d.pop("snippets"))
         if full_snips:
