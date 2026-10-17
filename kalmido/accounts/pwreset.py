@@ -82,8 +82,16 @@ def pw_forgot():
     if not who:
         return err(tr("Please enter your e-mail address or user name", lg=_accept_lang("en")))
     keys = _rate_keys(who, pre="pw:", lim=PW_LIMITS)
-    blocked = _rate_blocked(keys)
-    _rate_fail(keys)  # every request counts, found or not
+    # 2.86.0 (N1): the per-address ceiling ("pw:uall:", any sender) only raises an alarm: requests from many other addresses
+    # could otherwise block the owner's own request. Mails stay bounded by PW_GAP (one link per 5 min) and mail_budget.
+    blocked = _rate_blocked([k for k in keys if ":uall:" not in k[0]])
+    for k in _rate_fail(keys):  # every request counts, found or not
+        if ":uall:" in k:
+            from ..core.i18n import N_
+            from ..notify.alerts import aa_now
+            aa_now("security", "ratelimit:pw:uall",
+                   N_("Many password reset requests for one address from several senders (at most one link per {0} min goes out)."),
+                   [PW_GAP // 60])
     mails = []
     if not blocked and MAIL_OUT_ON:
         try:

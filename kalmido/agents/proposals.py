@@ -1256,7 +1256,8 @@ def v1_agent_chat_post(uid):
     text = r["body"] or " ".join(f"📎 {f['name']}" for f in chat_files_of(c, [r["id"]]).get(r["id"], []))
     c.execute("UPDATE agents SET typing_user=NULL, typing_until=0 WHERE user_id=? AND typing_user=?", (aid, uid))  # 2.4.1: answered
     s = collab_user(c, uid, None)
-    if s:
+    from ..agents.chat import h6e_agent_push_ok
+    if s and h6e_agent_push_ok(aid, uid):  # 2.86.0 (N31): daily push budget per agent and person
         name = user_names(c, [aid]).get(aid, "?")
         snippet = re.sub(r"\s+", " ", text)[:280]
         ch = json.loads(r["choices"]) if r["choices"] else {}

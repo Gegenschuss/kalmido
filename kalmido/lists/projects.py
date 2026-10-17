@@ -530,8 +530,9 @@ def list_file_upload(lid):
             name = unexec_name(name)
         rel = os.path.join(LIST_FILES_SUB, str(lid), f"{uuid.uuid4().hex[:12]}-{name}")
         full = os.path.join(ATT_DIR, rel)
+        from ..files.upsafe import h6d_save
         try:
-            f.save(full)
+            h6d_save(f, full)  # 2.86.0 (N22): stops right after MAX_FILE_MB (refused below)
         except OSError as e:
             aa_count("storage", "attachments", aa_oserr(e))
             c.rollback()
@@ -592,8 +593,10 @@ def list_file_get(fid):
     inline = a["mime"] in INLINE_TYPES and request.args.get("dl") != "1"
     resp = oc_send_file(db(), full, mimetype=a["mime"] if inline else "application/octet-stream",
                         as_attachment=not inline, download_name=a["name"], conditional=True, max_age=0)
-    if a["mime"] != "application/pdf":  # the browser pdf viewer does not run inside a sandboxed CSP
+    if a["mime"] != "application/pdf":  # the pdf viewer gets the plain sandbox below
         resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"
+    else:  # 2.86.0 (N23): a foreign PDF opened in a tab runs no script / form under the app origin (as the archive PDFs)
+        resp.headers["Content-Security-Policy"] = "sandbox"
     resp.headers["Cache-Control"] = "private, max-age=86400"
     return resp
 

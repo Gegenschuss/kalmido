@@ -63,6 +63,24 @@ def folder_orders(c, uid, lists):
     return out
 
 
+def h6a_kid_ids(c, uid, vl):
+    """2.86.0 (N9): the kid accounts among the people uid may see (organisations, connections) and the members of uid's
+    lists -- not every kid of the instance."""
+    from ..accounts.orgs import visible_people
+    kids = [r[0] for r in c.execute("SELECT id FROM users WHERE kid=1 AND disabled=0 ORDER BY id")]
+    seen = visible_people(c, uid)
+    if seen is None or not kids:
+        return kids
+    seen = seen | {m["user_id"] for li in vl for m in li.get("members") or []}
+    seen |= {r[0] for r in c.execute("SELECT kid_id FROM kid_parents WHERE parent_id=?", (uid,))}
+    if c.execute("SELECT 1 FROM users WHERE id=? AND is_admin=1", (uid,)).fetchone():
+        from ..core.pg import system_ctx
+        from ..family.family import H6A_ADMIN_KIDS
+        with system_ctx(c):  # membership structure (ids only), as family.kids_for
+            seen |= {r[0] for r in c.execute("SELECT id FROM users WHERE kid=1 AND " + H6A_ADMIN_KIDS, (uid,))}
+    return [k for k in kids if k in seen]
+
+
 def visible_lists(c, uid):
     """Lists the user sees, with role, sharing info and the user's own folder / sort / view."""
     from ..lists.lists import columns_out
@@ -320,7 +338,7 @@ def state():
         my_groups=grp_of_user(c, uid) if collab_all() else [],
         dayplan=dayplan_state(c, uid),  # 2.10.0 (#440): working hours, review card
         kids=kids_for(c, uid),  # 2.19.0 (#653): the kids I look after (or me, a kid) with stars + rewards
-        kid_ids=[r[0] for r in c.execute("SELECT id FROM users WHERE kid=1 AND disabled=0")],  # 2.19.0: who gets stars
+        kid_ids=h6a_kid_ids(c, uid, vl),  # 2.19.0: who gets stars; 2.86.0 (N9): only kids this person sees
         people_visibility=_vis_mode(c),  # 2.22.0 (#752): all | org | contacts
         instance_mode=_inst_mode(c),  # 2.23.0 (#799): organisation | shared | multi
         # 2.21.0 (#659 / #658): event calendars, a change marker of the events I see (the views refetch their range), the

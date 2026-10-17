@@ -228,8 +228,9 @@ def docs_upload():
     if not files:
         return err(tr("No file"))
     ids, errors = [], []
+    from ..files.upsafe import h6d_read
     for f in files[:50]:
-        data = f.read()
+        data = h6d_read(f)  # 2.86.0 (N22): at most MAX_FILE_MB + 1 bytes in memory (refused in fs_put)
         try:
             with c.savepoint():
                 nid = docs_ingest(c, uid, org, f.filename or "document", data, f.mimetype, "share" if request.form.get("source") == "share" else "upload")

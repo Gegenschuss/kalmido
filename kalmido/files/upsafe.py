@@ -17,6 +17,43 @@ class UploadRefused(ValueError):
     """The upload is refused (a virus find); the message is shown to the uploader as it is."""
 
 
+H6D_CHUNK = 1024 * 1024
+H6D_SLACK = 1024 * 1024  # form fields + multipart framing around one file
+
+
+def h6d_cap():
+    from ..core.config import MAX_FILE_MB
+    return MAX_FILE_MB * 1024 * 1024
+
+
+def h6d_one_file_request():
+    """2.86.0 (N22): a route taking ONE file refuses a longer body from its Content-Length before anything is read
+    (werkzeug answers 413, core/pages.py too_large; also counted while a body without a length streams in)."""
+    from flask import request
+    request.max_content_length = min(request.max_content_length or 1 << 62, h6d_cap() + H6D_SLACK)
+
+
+def h6d_read(f, cap=None):
+    """2.86.0 (N22): an uploaded file's bytes, at most cap + 1 (MAX_FILE_MB): the caller's size check refuses an
+    oversize file without its whole content in memory."""
+    return f.stream.read((h6d_cap() if cap is None else cap) + 1)
+
+
+def h6d_save(f, full, cap=None):
+    """2.86.0 (N22): f saved to full in pieces; stops after cap + 1 bytes (MAX_FILE_MB), so the caller's size check
+    (os.path.getsize) refuses an oversize file without writing all of it. Returns the bytes written."""
+    cap = h6d_cap() if cap is None else cap
+    n = 0
+    with open(full, "wb") as out:
+        while n <= cap:
+            b = f.stream.read(min(H6D_CHUNK, cap + 1 - n))
+            if not b:
+                break
+            out.write(b)
+            n += len(b)
+    return n
+
+
 def up_check(c, name, data, mime, uid=None, org_id=None, kind="att"):
     """The checks before the bytes are stored. Returns (data, mime, info): data maybe without photo metadata, mime maybe
     corrected from the content, info a dict for up_after_store (scan state, capture date ...). Raises UploadRefused."""

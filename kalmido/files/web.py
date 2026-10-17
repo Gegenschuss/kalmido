@@ -14,7 +14,8 @@ from ..core.db import bump, body, db, err, insert_id, iso
 from ..accounts.session import me
 from ..core.access import Denied, acx_of, collab_all
 from ..core.orgcrypt import oc_send_file
-from .store import (fs_chain, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_put, fs_read,
+from .upsafe import h6d_one_file_request, h6d_read
+from .store import (fs_chain, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_purge_files, fs_put, fs_read,
                     fs_height, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
 
@@ -223,7 +224,7 @@ def files_upload():
     out = []
     try:
         for f in files:
-            data = f.read()
+            data = h6d_read(f)  # 2.86.0 (N22): at most MAX_FILE_MB + 1 bytes in memory (_check_data refuses more)
             name = safe_fs_name(f.filename)
             same = _same_name_file(c, pid, owner, org, name) if replace else None
             if same and ROLE_RANK[fs_role(c, same, uid)] >= ROLE_RANK["edit"]:
@@ -331,6 +332,8 @@ def _send(c, n, version=None, dl=False):
                         download_name=name, conditional=True, max_age=0)
     if mime != "application/pdf":
         resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"
+    else:  # 2.86.0 (N23): a foreign PDF opened in a tab runs no script / form under the app origin (as the archive PDFs)
+        resp.headers["Content-Security-Policy"] = "sandbox"
     resp.headers["Cache-Control"] = "private, no-cache"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
@@ -354,11 +357,12 @@ def files_version_upload(nid):
     n = need_node(c, nid, write=True)
     if n["kind"] != "file":
         raise Denied(409, tr("Not a file"))
+    h6d_one_file_request()  # 2.86.0 (N22): one file -- a longer body is refused before it is read
     f = request.files.get("file")
     if not f:
         return err(tr("File missing"))
     try:
-        no = fs_new_version(c, nid, f.read(), f.mimetype)
+        no = fs_new_version(c, nid, h6d_read(f), f.mimetype)
     except ValueError as e:
         c.rollback()
         return err(str(e))
@@ -455,9 +459,10 @@ def files_node_delete(nid):
             return err(tr("Only what is in the trash can be deleted for good"), 409)
         if n["role"] != "owner":
             raise Denied(403)
-        fs_purge(c, nid)  # this node and what is below it (a node inside a deleted folder: only that one)
+        ids, paths = fs_purge(c, nid)  # this node and what is below it (a node inside a deleted folder: only that one)
         bump(c)
         c.commit()
+        fs_purge_files(ids, paths)  # 2.86.0 (N25): after the commit
         return jsonify(ok=True)
     n = need_node(c, nid, write=True)
     if n["parent_id"] is None and n["role"] != "owner":

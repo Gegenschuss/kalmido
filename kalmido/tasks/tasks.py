@@ -8,7 +8,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, inbox_default, iso, now_utc
 from ..accounts.session import me
 from ..core.access import (
-    Denied, list_people, list_role, my_inbox, need_collab, need_list, need_task, ov_role, task_visible,
+    Denied, list_people, list_role, my_inbox, need_collab, need_list, need_task, ov_open, ov_role, task_visible,
 )
 from ..core.serializers import attachment_files, load_tasks
 from ..lists.lists import LIST_FIELDS
@@ -45,7 +45,14 @@ def can_move(c, src, dst):
     """May the current user move a task from list src into dst? Always within a list and for the owner of
     src; an edit member only if nobody who sees the task now loses access (dst is seen by everyone who sees
     src) -- otherwise a member could pull a shared task (with subtasks and comments) away from the owner."""
-    return src == dst or list_role(c, src) == "owner" or list_people(c, src) <= list_people(c, dst)
+    if src == dst or list_role(c, src) == "owner":
+        return True
+    if not list_people(c, src) <= list_people(c, dst):  # group / folder shares are member rows (materialized): counted here
+        return False
+    # 2.86.0 (N21): readers through "Everyone in the organisation" are no member rows: dst must be open to the same organisation
+    q = "SELECT org_id, life, family, org_visibility FROM lists WHERE id=?"
+    rs, rd = c.execute(q, (src,)).fetchone(), c.execute(q, (dst,)).fetchone()
+    return not (rs and ov_open(rs)) or bool(rd and ov_open(rd) and rd["org_id"] == rs["org_id"])
 
 
 def check_move(c, src, dst):
@@ -186,11 +193,11 @@ def task_create():
     if not f.get("title"):
         return err(tr("Title missing"))
     c = db()
+    role = need_task(c, f["parent_id"]) if f.get("parent_id") else None  # 2.86.0 (N14): 404 / 403 before the parent checks
     e = check_parent(c, None, f.get("parent_id"))
     if e:
         return err(e)
     if f.get("parent_id"):  # subtasks live in their parent's list
-        role = need_task(c, f["parent_id"])
         f["list_id"] = c.execute("SELECT list_id FROM tasks WHERE id=?", (f["parent_id"],)).fetchone()[0]
     elif f.get("list_id"):
         role = list_role(c, f["list_id"])

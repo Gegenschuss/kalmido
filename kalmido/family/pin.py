@@ -18,7 +18,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, write_lock
 from ..accounts.session import _DUMMY_HASH, _token_hash, me
 from ..collab.comments import send_pushes, user_names
-from ..family.family import is_kid, kid_dict, kid_parents, kid_push, need_kid
+from ..family.family import h6a_admin_kid_ok, is_kid, kid_dict, kid_parents, kid_push, need_kid
 
 PIN_RE = re.compile(r"^[0-9]{4,6}$")  # 2.49.0 review L6: ASCII digits only (\d takes other scripts too)
 PIN_TRIES = 5      # wrong PINs in a row, then the lock
@@ -133,6 +133,7 @@ def pin_unlock():
     c.execute("UPDATE kid_pins SET fails=0, lock_until=? WHERE kid_id=?", (iso(now + timedelta(seconds=PIN_LOCK)), uid))
     who = user_names(c, [uid]).get(uid, "?")
     adm = [x[0] for x in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0")]
+    adm = [x for x in adm if h6a_admin_kid_ok(c, x, uid)]  # 2.86.0 (N8): only admins of the kid's own organisation
     g.pushes = []
     for p in dict.fromkeys(kid_parents(c, uid) or adm):
         kid_push(c, p, lambda lg: tr("{0} entered a wrong PIN {1} times", who, PIN_TRIES, lg=lg),

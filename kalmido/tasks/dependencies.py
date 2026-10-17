@@ -121,7 +121,8 @@ def dep_add():
         c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)",
                   (t, bl, me(), iso_ms(now_utc())))
         log_act(c, t, "dep_add", {"id": bl, "title": rows[bl]["title"][:200]})
-        log_act(c, bl, "blocks_add", {"id": t, "title": rows[t]["title"][:200]})
+        if task_visible(c, bl, me(), write=True):  # 2.86.0 (N13): a history line in the blocker only with write access to it
+            log_act(c, bl, "blocks_add", {"id": t, "title": rows[t]["title"][:200]})
         bump(c)
         c.commit()
     return jsonify(ok=True, task=one_task(c, t))
@@ -148,7 +149,8 @@ def dep_remove(t, bl):
         c.execute("DELETE FROM task_deps WHERE task_id=? AND blocker_id=?", (t, bl))
         title = c.execute("SELECT title FROM tasks WHERE id=?", (t,)).fetchone()[0]
         log_act(c, t, "dep_rm", {"id": bl, "title": r["title"][:200]})
-        log_act(c, bl, "blocks_rm", {"id": t, "title": title[:200]})
+        if task_visible(c, bl, me(), write=True):  # 2.86.0 (N13)
+            log_act(c, bl, "blocks_rm", {"id": t, "title": title[:200]})
     bump(c)
     c.commit()
     return jsonify(ok=True, task=one_task(c, t))

@@ -7,7 +7,7 @@ them) and the agent's direct answers to those (reply_to)."""
 from flask import jsonify
 
 from ..core.i18n import tr
-from ..core.db import body, err
+from ..core.db import body, err, like_escape
 from ..accounts.session import me
 from ..core.access import Denied
 from ..collab.comments import user_names
@@ -52,8 +52,9 @@ def jc_chat_rows(c, aid, jid, before, limit, after=0):
     pre = jc_prefixes(j)
     # review: my addressed messages only from the job's start on (a reused first name must not pull in an older job's)
     q = ("SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND (job_id=? OR (sender='user' AND created_at>=? AND ("
-         + " OR ".join("body ILIKE ?" for _p in pre) + ")))")
-    args = [aid, uid, jid, j["created_at"] or "", *[p + "%" for p in pre]]
+         + " OR ".join("body ILIKE ? ESCAPE '\\'" for _p in pre) + ")))")
+    # 2.86.0 (N28): a job name with % or _ is matched literally
+    args = [aid, uid, jid, j["created_at"] or "", *[like_escape(p) + "%" for p in pre]]
     if after:
         q += " AND id>?"
         args.append(after)

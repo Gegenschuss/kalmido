@@ -131,11 +131,12 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         if st and (not du or st > du):
             f["start"] = du
     if "parent_id" in f:
+        if f["parent_id"]:
+            need_task(c, f["parent_id"])  # 2.86.0 (N14): 404 / 403 before the parent checks (no existence / milestone oracle)
         e = check_parent(c, tid, f["parent_id"])
         if e:
             return e
         if f["parent_id"]:  # indent: follow the new parent's list / section
-            need_task(c, f["parent_id"])
             p = c.execute("SELECT list_id, section_id FROM tasks WHERE id=?", (f["parent_id"],)).fetchone()
             f["list_id"] = p["list_id"]
             f["section_id"] = p["section_id"]

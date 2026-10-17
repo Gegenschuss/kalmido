@@ -301,7 +301,8 @@ const approvalChip = t => t?.approval === 'pending' && collab() ? `<span class="
 const apName = id => (S.lists.flatMap(l => l.members || []).find(m => m.user_id === id)?.name) || (S.lists.find(l => l.owner_id === id)?.owner_name) || (id === S.me?.id ? S.me.display_name : '?');
 async function approvalRequest(id) {
   const t = taskById(id), l = t && listById(t.list_id); if (!t || !l) return;
-  const ppl = [{id: l.owner_id, name: l.owner_name}, ...(l.members || []).filter(m => !m.agent).map(m => ({id: m.user_id, name: m.name}))].filter((p, i, a) => p.id !== S.me?.id && a.findIndex(x => x.id === p.id) === i);
+  // 2.86.0 (N12): viewers cannot decide an approval, so they are not offered as approvers
+  const ppl = [{id: l.owner_id, name: l.owner_name}, ...(l.members || []).filter(m => !m.agent && m.role !== 'view').map(m => ({id: m.user_id, name: m.name}))].filter((p, i, a) => p.id !== S.me?.id && a.findIndex(x => x.id === p.id) === i);
   if (!ppl.length) { toast(tr('Share the list first: the approver must be a person of the list')); return; }
   const md = modal(`<h3>${tr('Ask for approval')}</h3><p class="muted">${esc(t.title)}</p>
     <div class="row"><label for="ap-who">${tr('Who approves?')}</label><select id="ap-who">${ppl.map(p => `<option value="${p.id}" ${p.id === t.approver_id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>
@@ -412,6 +413,7 @@ async function signinScreen(tok) {
     const res = await r.json().catch(() => ({}));
     if (r.ok && res.ok) { location.replace('/'); return; }
     if (res.twofa) { await authTwofa(el, `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`, res.methods || ['totp']); return; }
+    if (res.enrol) { await authEnrol(el, `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`); return; }  // 2.86.0 (N4): the admin's 2FA policy
     $('.card p', el).textContent = res.error || tr('Error {0}', r.status);
   } catch { $('.card p', el).textContent = tr('Server not reachable.'); }
   $('.card', el).insertAdjacentHTML('beforeend', `<button class="btn pri" type="button" data-au="login">${tr('To the login')}</button>`);

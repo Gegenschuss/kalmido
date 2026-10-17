@@ -43,6 +43,7 @@ SIG_LINK_HOUR = 20          # decision attempts per link and hour
 NAME_MAX, EMAIL_MAX, REASON_MAX, UA_MAX = 120, 200, 1000, 300
 SIG_KINDS = ("offer", "acceptance")
 LOG_TEXT = {"accepted": "signoff_accepted", "declined": "signoff_declined"}
+SIG_PDF_KEEP_DAYS = 30      # 2.86.0 (N17): a decided quotation's PDF stays downloadable this long when the link has no expiry
 SIG_NOTE = N_("Simple electronic signature: usually enough to accept a quotation or confirm an acceptance; not for contracts that the law requires in written form (they need a qualified signature). This is not legal advice.")  # noqa: E501
 
 
@@ -405,7 +406,9 @@ def sig_page(c, r, token, lg, error=None, code=200):
         h = tr("Accepted", lg=lg) if d["state"] == "accepted" else tr("Declined", lg=lg)
         when = d["signed_at"] or ""
         main = (f'<div class="msg"><h1>{e(h)}</h1><p>{e(r["title"])}</p><p>{e(tr("By {0} on {1} (UTC).", d["signer_name"] or "", when[:16].replace("T", " "), lg=lg))}</p>'
-                f'<p class="sub">{e(tr("Thank you. You can close this page.", lg=lg))}</p></div>')
+                + (f'<p><a class="pdf" href="{SIG_PREFIX}{e(token)}/pdf" download rel="nofollow">{e(tr("Download the quotation (PDF)", lg=lg))}</a></p>'
+                   if r["kind"] == "offer" and h6c_sig_pdf_ok(c, r) else "")  # 2.86.0 (N17)
+                + f'<p class="sub">{e(tr("Thank you. You can close this page.", lg=lg))}</p></div>')
         return pub_html(h, main, lg)
     head = sig_offer_html(c, r, lg, token) if r["kind"] == "offer" else sig_list_html(c, r, lg)
     acc = tr("I accept the quotation", lg=lg) if r["kind"] == "offer" else tr("I confirm the acceptance", lg=lg)
@@ -434,6 +437,20 @@ def sig_page_get(token):
     return sig_page(c, r, token, sig_lang(c, r))
 
 
+def h6c_sig_pdf_ok(c, r):
+    """2.86.0 (N17): after the decision the customer may still fetch the quotation as decided -- until the link's expiry
+    (without one: SIG_PDF_KEEP_DAYS after the decision) and only while the document is unchanged. Open links: sig_open."""
+    if r["state"] == "open":
+        return True
+    end = parse_iso(r["expires_at"]) if r["expires_at"] else (parse_iso(r["signed_at"]) + timedelta(days=SIG_PDF_KEEP_DAYS) if r["signed_at"] else None)
+    if not end or end <= now_utc():
+        return False
+    try:
+        return sig_doc_hash(c, r["org_id"], r["doc_id"])[0] == r["doc_hash"]
+    except Denied:  # the quotation is gone
+        return False
+
+
 @app.get("/s/q/<token>/pdf")
 def sig_pdf_get(token):
     from .pdfweb import _file_response, _render, _stored_or_missing, epdf_name
@@ -445,7 +462,7 @@ def sig_pdf_get(token):
     r, bad = sig_open(c, token)
     if bad:
         return bad
-    if r["kind"] != "offer":
+    if r["kind"] != "offer" or not h6c_sig_pdf_ok(c, r):
         return pub_gone()
     d = doc_row(c, r["org_id"], r["doc_id"])
     try:

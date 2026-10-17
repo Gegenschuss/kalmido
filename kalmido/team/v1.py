@@ -173,7 +173,8 @@ def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                              "capacity_h": {"type": "number"}, "absent_days": {"type": "number"}}}
     paths["/workload"] = {"get": op(
         "2.23.0 (module workload): planned hours per person of your organisation and week (open assigned tasks, weighed with their "
-        "duration as the estimate; by planned start, else due, else start; overdue in this week) against their capacity", W,
+        "duration as the estimate; by planned start, else due, else start; overdue in this week) against their capacity. 2.86.0: "
+        "an agent sees only the people who share a list with it", W,
         ok({"type": "object", "properties": {
             "weeks": {"type": "array", "items": {"type": "object", "properties": {"start": {"type": "string"}, "end": {"type": "string"}}}},
             "people": {"type": "array", "items": {"type": "object", "properties": {

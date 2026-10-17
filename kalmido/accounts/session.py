@@ -267,10 +267,32 @@ def _rate_keys(username, pre="", lim=(5, 20, 100)):
     return [(pre + "u:" + username + "@" + ip, lim[0]), (pre + "ip:" + ip, lim[1]), (pre + "uall:" + username, lim[2])]
 
 
+_known = {}       # 2.86.0 (N2): "<pre>uall:<name>" -> {address: time of the last successful login from there}
+KNOWN_DAYS = 30
+
+
 def _rate_reset(username, pre=""):
-    """A successful login clears the counter of the pair user name + this address."""
+    """A successful login clears the counter of the pair user name + this address and remembers the address as known."""
+    ip = client_ip()
     with _fail_lock:
-        _fails.pop(pre + "u:" + username + "@" + client_ip(), None)
+        _fails.pop(pre + "u:" + username + "@" + ip, None)
+        seen = _known.setdefault(pre + "uall:" + username, {})
+        seen[ip] = time.time()
+        if len(seen) > 20:  # a handful of addresses per account is enough (home, phone, office)
+            for old in sorted(seen, key=seen.get)[:len(seen) - 20]:
+                seen.pop(old, None)
+
+
+def h6a_uall_exempt(k, now):
+    """2.86.0 (N2): the per-name ceiling ("uall:", many addresses) does not lock out the account's owner: it is skipped
+    for an address this account logged in from successfully before (last KNOWN_DAYS days) and for a request that is
+    signed in as this account already (re-authentication). The pair and address limits still apply everywhere."""
+    if "uall:" not in k:
+        return False
+    if (now - _known.get(k, {}).get(client_ip(), 0)) < KNOWN_DAYS * 86400:
+        return True
+    u = getattr(g, "user", None)
+    return bool(u is not None and k == "uall:" + (u["username"] or ""))
 
 
 def _rate_blocked(keys):
@@ -279,7 +301,7 @@ def _rate_blocked(keys):
         for k, limit in keys:
             arr = [t for t in _fails.get(k, []) if now - t < FAIL_WINDOW]
             _fails[k] = arr
-            if len(arr) >= limit:
+            if len(arr) >= limit and not h6a_uall_exempt(k, now):
                 return True
     return False
 

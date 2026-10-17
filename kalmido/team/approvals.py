@@ -83,8 +83,8 @@ def approval_apply(c, tid, b):
             raise BadInput(tr("The approver must be a person of this list"))
         if ap == uid:
             raise BadInput(tr("Ask someone else for the approval"))
-        if not task_visible(c, tid, ap, full=True):
-            raise BadInput(tr("The approver must be a person of this list"))
+        if not task_visible(c, tid, ap, full=True) or list_role(c, t["list_id"], ap) == "view":
+            raise BadInput(tr("The approver must be a person of this list"))  # 2.86.0 (N12): a viewer cannot decide
         old = t["assignee_id"]
         ts = iso(now_utc())
         c.execute("""UPDATE tasks SET approval='pending', approver_id=?, assignee_id=?, assignee_group_id=NULL, assigned_by=?,
@@ -106,7 +106,7 @@ def approval_apply(c, tid, b):
         raise BadInput(tr("This task does not wait for an approval"))
     if t["approver_id"] != uid:
         raise Denied(403, tr("Only {0} can decide on this approval", _name(c, t["approver_id"])))
-    need_task(c, tid, write=False, full=True)
+    need_task(c, tid, full=True)  # 2.86.0 (N12): deciding completes / reassigns the task: write access like its neighbours
     asker = t["assigned_by"] if t["assigned_by"] and t["assigned_by"] != uid else t["created_by"]
     state = {"approve": "approved", "changes": "changes", "reject": "rejected"}[act]
     if state == "approved":  # 2.60.0 (#1512, review): a review gate of the list is checked before anything changes

@@ -298,8 +298,9 @@ def chat_save_files(c, m, files, saved):
             name = unexec_name(name)
         rel = os.path.join(sub, f"{uuid.uuid4().hex[:12]}-{name}")
         full = os.path.join(ATT_DIR, rel)
+        from ..files.upsafe import h6d_save
         try:
-            f.save(full)
+            h6d_save(f, full)  # 2.86.0 (N22): stops right after MAX_FILE_MB (refused below)
         except OSError as e:
             aa_count("storage", "attachments", aa_oserr(e))
             raise
@@ -413,6 +414,17 @@ APPROVAL_IDS, APPROVAL_TITLE_MAX, APPROVAL_WHAT_MAX = ("yes", "no"), 200, 1000
 # review M5: at most APPROVAL_OPEN_MAX open approval requests per agent and person (the next one: 409); the chat returns the
 # newest APPROVAL_PIN_MAX open ones; at most APPROVAL_PUSH_HOUR "Approval needed" pushes per agent and person an hour
 APPROVAL_OPEN_MAX, APPROVAL_PIN_MAX, APPROVAL_PUSH_HOUR = 10, 20, 5
+# 2.86.0 (N31): a daily push budget per agent and person (chat answers + jobs waiting for the person); past it the message
+# still arrives in the chat / Agents tab, only without a push -- a hijacked agent cannot flood someone's phone
+try:
+    AGENT_PUSH_DAY = max(1, int(os.environ.get("KALMIDO_AGENT_PUSH_DAY") or 500))
+except ValueError:
+    AGENT_PUSH_DAY = 500
+
+
+def h6e_agent_push_ok(aid, uid):
+    """2.86.0 (N31): False once agent aid pushed person uid AGENT_PUSH_DAY times within 24 hours (this push counted)."""
+    return not hit_limit(f"agentpush:{aid}:{uid}", AGENT_PUSH_DAY, 86400)
 
 
 def chat_approval_clean(v, expires_in=None):

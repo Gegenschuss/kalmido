@@ -71,7 +71,7 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=N
     """Store uploaded werkzeug files for a task (or one of its comments). Returns an error message or
     None (caller commits; on an error the caller rolls back and unlinks `saved`). `ids` (a list) gets the new row ids.
     sealed: browser-encrypted bytes (e2e) that skip the upload checks (2.61.0, files/upsafe.py)."""
-    from ..files.upsafe import up_check_path, up_after_store, UploadRefused
+    from ..files.upsafe import h6d_save, up_check_path, up_after_store, UploadRefused
     from ..notify.alerts import aa_count, aa_oserr
     from ..admin.hosting import quota_guard
     from ..collab.liste2efile import le2f_plain_guard
@@ -95,7 +95,7 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=N
         rel = os.path.join(str(tid), f"{uuid.uuid4().hex[:12]}-{name}")
         full = os.path.join(ATT_DIR, rel)
         try:
-            f.save(full)
+            h6d_save(f, full)  # 2.86.0 (N22): stops right after MAX_FILE_MB (refused below)
         except OSError as e:
             aa_count("storage", "attachments", aa_oserr(e))
             raise
@@ -248,8 +248,10 @@ def send_stored(a):
                         as_attachment=not inline, conditional=True, max_age=0,
                         # 2.64.2 B (#1817): a list file's name is a ciphertext (the real one is inside the file)
                         download_name="encrypted.kenc" if "enc" in a.keys() and a["enc"] == 2 else a["name"])
-    if a["mime"] != "application/pdf":  # the browser pdf viewer does not run inside a sandboxed CSP
+    if a["mime"] != "application/pdf":  # the pdf viewer gets the plain sandbox below
         resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"
+    else:  # 2.86.0 (N23): a foreign PDF opened in a tab runs no script / form under the app origin (as the archive PDFs)
+        resp.headers["Content-Security-Policy"] = "sandbox"
     # 2.13.0: the app asks with ?v=<size>: only that versioned address is cached for a day; anything else revalidates
     # (ETag), so a repaired file is never hidden behind a cached broken answer
     resp.headers["Cache-Control"] = "private, max-age=86400" if request.args.get("v") == str(a["size"]) else "private, no-cache"

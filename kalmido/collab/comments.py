@@ -39,18 +39,22 @@ def user_names(c, ids):
             for r in c.execute(f"SELECT id, username, display_name FROM users WHERE id IN ({q})", ids)}
 
 
-def task_people(c, lid):
+def task_people(c, lid, tid=None):
     """Enabled users who can see the tasks of a list (owner + members): the mention picker."""
     ids = list_people(c, lid)
     q = ",".join("?" * len(ids)) or "NULL"
-    return [{"id": r["id"], "name": r["display_name"] or r["username"]}
-            for r in c.execute(f"SELECT id, username, display_name FROM users WHERE id IN ({q}) AND disabled=0 ORDER BY id",
-                               list(ids))]
+    out = [{"id": r["id"], "name": r["display_name"] or r["username"]}
+           for r in c.execute(f"SELECT id, username, display_name FROM users WHERE id IN ({q}) AND disabled=0 ORDER BY id",
+                              list(ids))]
+    if tid and has_request_context() and list_role(c, lid) == "participant":
+        # 2.86.0 (N20): a participant sees only the people who share this task with them, not the whole member list
+        out = [p for p in out if p["id"] == me() or task_visible(c, tid, p["id"], full=True)]
+    return out
 
 
-def clean_mentions(c, lid, text):
+def clean_mentions(c, lid, text, tid=None):
     """Keeps <@id> tokens of people who see the list; any other token becomes plain '@name'."""
-    allowed = {p["id"] for p in task_people(c, lid)}
+    allowed = {p["id"] for p in task_people(c, lid, tid)}  # 2.86.0 (N20): tid narrows it for a participant
     names = user_names(c, [int(x) for x in MENTION_RE.findall(text)])
     found = []
 
@@ -143,7 +147,7 @@ def timeline(tid):
     for x in comments:
         if x["id"] in saved:
             x["saved_task_id"] = saved[x["id"]]
-    ppl = task_people(c, t["list_id"]) if collab_all() else []
+    ppl = task_people(c, t["list_id"], tid) if collab_all() else []  # 2.86.0 (N20)
     for p in ppl:
         if p["id"] in ag:
             p["agent"] = True
@@ -210,7 +214,7 @@ def comment_create(tid):
     if le2e_mode(c, t["list_id"]) or text.startswith("e2e1:"):  # 2.64.1 (#1817): ciphertext + mentions from the browser
         text, mentions = le2a_comment_in(c, t["list_id"], text)
     else:
-        text, mentions = clean_mentions(c, t["list_id"], text) if collab_all() else (text, [])
+        text, mentions = clean_mentions(c, t["list_id"], text, t["id"]) if collab_all() else (text, [])
     try:  # 2.33.0 (#1076): a reply to a comment of the same task (else 400)
         orig = reply_check(c, "c", comment_reply_in(), task_id=tid)
     except BadInput as e:
@@ -315,7 +319,7 @@ def comment_update(cid):
     if le2e_mode(c, t["list_id"]) or text.startswith("e2e1:"):  # 2.64.1 (#1817): ciphertext + mentions from the browser
         text, mentions = le2a_comment_in(c, t["list_id"], text)
     else:
-        text, mentions = clean_mentions(c, t["list_id"], text) if collab_all() else (text, [])
+        text, mentions = clean_mentions(c, t["list_id"], text, t["id"]) if collab_all() else (text, [])
     old = {int(x) for x in (r["mentions"] or "").split(",") if x}
     c.execute("UPDATE comments SET body=?, mentions=?, edited_at=? WHERE id=?",
               (text, ",".join(map(str, mentions)), iso(now_utc()), cid))

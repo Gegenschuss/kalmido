@@ -50,6 +50,10 @@ def wl_people(c, uid, org=None):
     if orgs:
         q += f" AND id IN (SELECT user_id FROM org_members WHERE org_id IN ({','.join(str(int(x)) for x in orgs)}))"
     rows = c.execute(q + " ORDER BY lower(display_name), id").fetchall()
+    if (u["kind"] or "user") == "agent":  # 2.86.0 (N34): an agent sees only the people who share a list with it, not the whole organisation
+        sh = {r[0] for r in c.execute(f"SELECT owner_id FROM lists WHERE id IN {vis_sql()} UNION "
+                                      f"SELECT user_id FROM list_members WHERE list_id IN {vis_sql()}", (uid, uid, uid, uid))}
+        rows = [r for r in rows if r["id"] in sh]
     return [r for r in rows if vis is None or r["id"] in vis], (orgs[0] if orgs else None)
 
 

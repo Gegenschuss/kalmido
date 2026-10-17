@@ -2,6 +2,9 @@
 Owner and list admins delete every entry of the list, other members only their own. Entries an invoice already bills stay
 (an invoice made from the time of a client's project covers the entry's day and carries the project's name). Running timers stay.
 Agent accounts: 403. Restore is the Undo step: the client sends back what the delete returned; the same rights apply."""
+import hashlib
+import hmac
+import json
 from datetime import datetime
 
 from flask import g, jsonify
@@ -14,6 +17,16 @@ from ..accounts.session import me
 from ..core.pg import insert_id
 
 TZ_MAX_RESTORE = 20000
+H6B_SIG_FIELDS = ("user_id", "task_id", "task_title", "start", "end", "seconds", "note", "source", "client_id", "pomo_id",
+                  "reminded", "auto_stopped", "created_at")
+
+
+def h6b_sig(c, lid, e):
+    """2.86.0 (N10): a keyed seal over an entry the delete returned (list id + its values). Restore brings back another person's
+    entry only with an intact seal, so an admin cannot create entries with free values for other members; own entries need none."""
+    from ..accounts.login import auth_key
+    msg = json.dumps([int(lid)] + [e.get(k) for k in H6B_SIG_FIELDS], ensure_ascii=False, sort_keys=True, default=str)
+    return hmac.new(auth_key(c), b"kalmido-timewipe-v1|" + msg.encode(), hashlib.sha256).hexdigest()[:40]
 
 
 def tz_no_agent():
@@ -109,6 +122,8 @@ def tz_delete_all(lid):
              "end": r["end"], "seconds": r["seconds"], "note": r["note"], "source": r["source"], "client_id": r["client_id"],
              "pomo_id": r["pomo_id"], "reminded": r["reminded"], "auto_stopped": r["auto_stopped"],
              "created_at": r["created_at"], "updated_at": r["updated_at"]} for r in rows]
+    for e in back:
+        e["sig"] = h6b_sig(c, lid, e)  # 2.86.0 (N10)
     return jsonify(ok=True, deleted=len(ids), seconds=prev["seconds"], billed=prev["billed"], entries=back)
 
 
@@ -129,6 +144,13 @@ def tz_restore(lid):
         owner = e.get("user_id")
         if not isinstance(owner, int) or (owner != uid and not admin):
             continue
+        if owner != uid:  # 2.86.0 (N10): someone else's entry only as the delete returned it, and only once
+            sig = e.get("sig")
+            if not isinstance(sig, str) or not hmac.compare_digest(sig, h6b_sig(c, lid, e)):
+                continue
+            if c.execute('SELECT 1 FROM time_entries WHERE user_id=? AND list_id=? AND start=? AND "end"=?',
+                         (owner, lid, str(e["start"])[:40], str(e["end"])[:40])).fetchone():
+                continue
         if not c.execute("SELECT 1 FROM users WHERE id=?", (owner,)).fetchone() or not list_role(c, lid, owner):
             continue  # review V1: only people of this list get entries back
         try:  # review V1: real times, end after start, seconds at most the span

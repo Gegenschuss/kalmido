@@ -572,10 +572,13 @@ def _due_flush(c):
 
 # ---------------------------------------------------------------- agents: read (API v1) + propose (kind "rule")
 def _v1_rules_list(c, lid):
+    """2.86.0 (N18): people read rules over the API like on the web (owner / list admin); an agent needs write access to the
+    list (it works there and proposes rules), a viewing or participating agent does not see them."""
+    from ..agents.core import is_agent
     role = list_role(c, lid)
     if not role:
         raise Denied(404)
-    if role == "participant":
+    if role not in (WRITE_ROLES if is_agent(g.user) else MANAGE_ROLES):
         raise Denied(403)
     return role
 

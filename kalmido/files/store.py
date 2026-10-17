@@ -469,8 +469,9 @@ def fs_subtree(c, nid):
 
 
 def fs_purge(c, nid):
-    """Remove node nid and its subtree for good: the hooks of fs_on_delete, the stored versions, the rows. The files are
-    unlinked after the rows are gone (the caller commits; a failed commit leaves orphan-free rows)."""
+    """Remove node nid and its subtree for good: the hooks of fs_on_delete, the stored versions, the rows. Returns
+    (ids, paths); the caller commits and only then calls fs_purge_files(ids, paths) -- 2.86.0 (N25): a failed commit
+    keeps the rows and their files."""
     ids = fs_subtree(c, nid)
     paths = []
     for i in ids:
@@ -478,6 +479,11 @@ def fs_purge(c, nid):
             f(c, i)
         paths += [r[0] for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (i,))]
     c.execute("DELETE FROM fs_nodes WHERE id=?", (int(nid),))  # ON DELETE CASCADE: children, versions, shares, log
+    return ids, paths
+
+
+def fs_purge_files(ids, paths):
+    """The stored files of an fs_purge, after the commit."""
     for p in paths:
         try:
             os.remove(os.path.join(ATT_DIR, p))
@@ -488,7 +494,6 @@ def fs_purge(c, nid):
             os.rmdir(os.path.join(ATT_DIR, FS_DIR, str(i)))
         except OSError:
             pass
-    return ids
 
 
 def fs_bytes_of(c, uids):

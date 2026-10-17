@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import html
+import os
 import re
 import secrets
 import threading
@@ -48,6 +49,24 @@ FRM_FILE_MAX = 10 * 1024 * 1024
 FRM_MIN_S, FRM_MAX_S = 3, 24 * 3600
 FRM_EMAIL_HOUR, FRM_MAIL_HOUR, FRM_LINKS_MAX = 5, 3, 5
 FRM_TTYPES = ("", "bug", "feature", "task")
+# 2.86.0 (N24): the file bytes anonymous visitors may send through ONE form per hour (20 full files); more = the report
+# is refused with a "try later" page (a link in the open cannot fill the disk); signed-in senders count on their quota.
+FRM_BYTES_HOUR = max(1, int(os.environ.get("KALMIDO_FORM_FILES_MB_HOUR", "200") or 200)) * 1024 * 1024
+_FRM_BYTES, _FRM_BYTES_LOCK = {}, threading.Lock()
+
+
+def h6d_form_bytes(form_id, n):
+    """2.86.0 (N24): True (= refuse) when n more bytes would exceed FRM_BYTES_HOUR of the form in the last hour; else
+    the bytes are counted."""
+    now = time.time()
+    with _FRM_BYTES_LOCK:
+        arr = [(t, b) for t, b in _FRM_BYTES.get(form_id, ()) if now - t < 3600]
+        if sum(b for _t, b in arr) + n > FRM_BYTES_HOUR:
+            _FRM_BYTES[form_id] = arr
+            return True
+        arr.append((now, n))
+        _FRM_BYTES[form_id] = arr
+    return False
 
 
 def forms_on(c, uid):
@@ -338,6 +357,9 @@ def form_send(token):
         return bad
     if hit_limit("forms:" + rate_ip(), FORM_SEND_RATE) or hit_limit(f"formh:{f['id']}", FORM_SEND_HOUR, 3600):
         return _msg(tr("Too many requests", lg=lg), tr("Please wait a minute and try again.", lg=lg), lg, 429)
+    # 2.86.0 (N22): a body longer than one file + the text fields is refused before it is read
+    if (request.content_length or 0) > (FRM_FILE_MAX if f["files"] else 0) + 256 * 1024:
+        return _msg(tr("File too large", lg=lg), tr("The file is too large (at most {0} MB).", FRM_FILE_MAX // (1024 * 1024), lg=lg), lg, 413)
     fv = request.form
     vals = {k: (fv.get(k) or "").strip() for k in ("subject", "text", "name", "email")}
     if fv.get("website"):  # the honeypot: a bot filled the hidden field -> pretend it worked
@@ -366,6 +388,8 @@ def form_send(token):
             data = fs.read(FRM_FILE_MAX + 1)
             if len(data) > FRM_FILE_MAX:
                 return _page(c, f, token, lg, vals, tr("The file is too large (at most {0} MB).", FRM_FILE_MAX // (1024 * 1024), lg=lg))
+            if data and anon and h6d_form_bytes(f["id"], len(data)):
+                return _msg(tr("Too many requests", lg=lg), tr("This form takes no more files right now. Please try again later or send your report without a file.", lg=lg), lg, 429)
             if data:
                 upload = (unexec_name(safe_name(fs.filename)), "", data)
     ehash = ""

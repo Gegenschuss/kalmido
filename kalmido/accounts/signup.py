@@ -287,9 +287,16 @@ def auth_link():
     r, u = hit
     c.execute("UPDATE user_invites SET used_at=? WHERE user_id=?", (iso(now_utc()), u["id"]))
     c.commit()
+    if u["is_admin"] or (u["kind"] or "user") == "agent":
+        # 2.86.0 (N4): checked again on use: the account may have become an admin after the link was made (the link is used up)
+        return err(tr("Admins sign in with their password"), 409)
     print("signed in with a sign-in link:", u["username"], "from", client_ip(), flush=True)
     if twofa_methods(c, u):
         tok = pend_new("2fa", u["id"], remember=True)
         return pend_cookie(jsonify(ok=False, twofa=True, methods=twofa_methods(c, u)), tok)
+    if gsetting(c, "twofa_required") == "1" and u["password_hash"]:
+        # 2.86.0 (N4): the admin policy as at the login; an account without a password (a kid) cannot enrol and signs in as before
+        tok = pend_new("enrol", u["id"], remember=True)
+        return pend_cookie(jsonify(ok=False, enrol=True, methods=["totp", "passkey"]), tok)
     return finish_login(c, u, True, "link")
 

@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 from flask import jsonify, redirect, request, Response, send_from_directory
 
-from ..core.config import app, APP_VERSION, ATT_DIR, ICAL_PREFIX, PUB_PREFIX, SEARCH_INDEX, MAX_FILE_MB, ntfy_attachment_url, NTFY_IN, safe_urlopen
+from ..core.config import app, APP_VERSION, ATT_DIR, ICAL_PREFIX, PUB_PREFIX, SEARCH_INDEX, MAX_FILE_MB, ntfy_attachment_url, NTFY_IN, PUBLIC_URL, safe_urlopen
 from .pg import insert_id
 from ..core.i18n import lang, N_, tr, trn
 from ..core.db import bump, connect, db, default_uid, err, gset, gsetting, iso, now_utc
@@ -275,16 +275,37 @@ def ntfy_inbox_loop():
         time.sleep(10)
 
 
+def h6a_share_origin_ok():
+    """2.86.0 (N7): POST /share comes from the installed app's share sheet (Sec-Fetch-Site none / same-origin). A page of
+    another origin (cross-site, or same-site such as another app under the same domain) is refused; a browser without
+    Sec-Fetch-Site must not send a foreign Origin (compared with this request's host and PUBLIC_URL)."""
+    sfs = request.headers.get("Sec-Fetch-Site", "")
+    if sfs:
+        return sfs in ("none", "same-origin")
+    o = (request.headers.get("Origin") or "").strip()
+    if not o or o == "null":
+        return True
+    host = (urllib.parse.urlsplit(o).netloc or "").lower()
+    return host in (request.host.lower(), (urllib.parse.urlsplit(PUBLIC_URL).netloc or "").lower())
+
+
 @app.post("/share")
 def share_post():
     """Android share sheet with files, when the service worker did not catch it (first launch):
     create the task in the inbox right away and open it."""
+    from flask import g
     from ..tasks.attachments import safe_name, save_attachments
+    if not h6a_share_origin_ok():  # 2.86.0 (N7): the only cookie-authenticated write outside /api/: no foreign page
+        print("share POST refused: Sec-Fetch-Site", repr(request.headers.get("Sec-Fetch-Site", "")[:20]), flush=True)
+        return Response(tr("not allowed") + "\n", 403, mimetype="text/plain")
+    if g.user["kid"]:  # 2.86.0 (N3): a child account writes only what family.KID_WRITE allows
+        return Response(tr("Not possible with a child account") + "\n", 403, mimetype="text/plain")
     c = db()
     files = [f for key in request.files for f in request.files.getlist(key) if f and f.filename]
+    # 2.86.0 (N7): the log names keys and lengths only, never the shared title / text / link
     print("share POST (server path): content_length", request.content_length, "form keys", list(request.form.keys()),
-          "file keys", list(request.files.keys()), {k: request.form.get(k) for k in ("title", "text", "url")},
-          [(f.filename, f.mimetype) for f in files], flush=True)
+          "file keys", list(request.files.keys()), {k: len(request.form.get(k) or "") for k in ("title", "text", "url")},
+          len(files), "files", flush=True)
     text, url = (request.form.get("text") or "").strip(), (request.form.get("url") or "").strip()
     m = None if url else URL_RE.search(text)  # most apps put the link into "text"
     if m:
@@ -307,7 +328,8 @@ def drop_user(c, auth):
     if not auth.startswith("Bearer "):
         return None
     got, hit = auth[7:].encode(), None
-    for r in c.execute("SELECT * FROM users WHERE drop_token IS NOT NULL AND drop_token!='' AND disabled=0"):
+    # 2.86.0 (N3): never a child account (its writes are limited to family.KID_WRITE; /api/me hides its token)
+    for r in c.execute("SELECT * FROM users WHERE drop_token IS NOT NULL AND drop_token!='' AND disabled=0 AND kid=0"):
         if secrets.compare_digest(got, r["drop_token"].encode()):
             hit = r
     return hit

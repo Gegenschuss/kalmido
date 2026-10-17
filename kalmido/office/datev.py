@@ -63,9 +63,15 @@ DX_HEADER_FIELDS = 31
 BELEG_RE = re.compile(r"[^A-Za-z0-9$&%*+\-/]")  # the characters DATEV allows in Belegfeld 1
 
 
-def _q(s):
-    """A text field: in double quotes, inner quotes doubled, no line breaks or semicolon trouble."""
-    return '"' + re.sub(r"[\x00-\x1f\x7f]+", " ", str(s or "")).replace('"', '""') + '"'  # 2.47.3 (review K1): every control character
+def _q(s, guard=True, mx=None):
+    """A text field: in double quotes, inner quotes doubled, no line breaks or semicolon trouble.
+    2.86.0 (N26): a text starting with = + - @ gets a leading apostrophe, so a spreadsheet opening the file shows it as text
+    (DATEV takes free text like Buchungstext / Erstellt von as it is; the apostrophe is an allowed character there).
+    guard=False for Belegfeld 1: its DATEV character set (BELEG_RE) has no apostrophe and no = @ ( ), so no formula fits."""
+    v = re.sub(r"[\x00-\x1f\x7f]+", " ", str(s or ""))  # 2.47.3 (review K1): every control character
+    if guard and v[:1] in ("=", "+", "-", "@"):
+        v = ("'" + v)[:mx] if mx else "'" + v
+    return '"' + v.replace('"', '""') + '"'
 
 
 def _amt(d):
@@ -282,7 +288,7 @@ def dx_extf(c, oid, d_from, d_to, by="", s=None, now=None):
     now = now or local_now()
     fy = dx_fiscal_year(date.fromisoformat(d_from), int(st["fy_start"]))[0]
     head = ['"EXTF"', "700", "21", '"Buchungsstapel"', "13", now.strftime("%Y%m%d%H%M%S") + f"{now.microsecond // 1000:03d}", "",
-            '"RE"', _q(by[:25]), '""', st["advisor_no"], st["client_no"], fy.strftime("%Y%m%d"), str(int(st["acct_len"])),
+            '"RE"', _q(by[:25], mx=25), '""', st["advisor_no"], st["client_no"], fy.strftime("%Y%m%d"), str(int(st["acct_len"])),
             d_from.replace("-", ""), d_to.replace("-", ""), _q("Kalmido " + d_from.replace("-", "") + "-" + d_to.replace("-", "")), '""', "1", "0", "0", '"EUR"',
             "", '""', "", "", '"' + st["chart"][3:] + '"', "", "", "", '""']
     assert len(head) == DX_HEADER_FIELDS
@@ -292,7 +298,7 @@ def dx_extf(c, oid, d_from, d_to, by="", s=None, now=None):
         vals = []
         for n in DX_COLUMNS:
             v = r.get(n, "")
-            vals.append(str(v) if n in numeric else (_q(v) if v != "" else ""))
+            vals.append(str(v) if n in numeric else (_q(v, guard=n != "Belegfeld 1", mx=60 if n == "Buchungstext" else None) if v != "" else ""))
         lines.append(";".join(vals))
     data = ("\r\n".join(lines) + "\r\n").encode("cp1252", errors="replace")
     return data, len(rows)

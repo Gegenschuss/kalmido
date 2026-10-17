@@ -279,7 +279,30 @@ def approval_approver(c, aid, list_id=None):
     return None
 
 
-def need_approval(c, title, args=(), list_id=None, task_id=None):
+def h6e_batch_detail(c, approver, lg, lids, data):
+    """2.86.0 (N30): the approval card of a batch names the changed fields and the lists with their task counts (names only
+    of lists the approver sees; the others as a count)."""
+    from ..core.access import list_role
+    parts = []
+    if data:
+        parts.append(tr("Fields", lg=lg) + ": " + ", ".join(sorted(data))[:120])
+    cnt = {}
+    for x in lids:
+        cnt[x] = cnt.get(x, 0) + 1
+    names, hidden = [], 0
+    for lid, n in sorted(cnt.items(), key=lambda kv: -kv[1]):
+        r = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
+        if r and approver and list_role(c, lid, approver) and len(names) < 4:
+            names.append(f"{r[0][:40]} ({n})")
+        else:
+            hidden += 1
+    if hidden:
+        names.append(tr("+{0} more", hidden, lg=lg))
+    parts.append(tr("Lists", lg=lg) + ": " + ", ".join(names))
+    return " · ".join(parts)
+
+
+def need_approval(c, title, args=(), list_id=None, task_id=None, detail=None):
     """Called by a route BEFORE it changes anything (and after its own permission checks): for an agent's token the
     request is stored as a waiting job and answered 202 (ApprovalPending); people and approved replays pass."""
     if g.get("auth_via") != "token" or not is_agent(g.user) or g.get("approved_job"):
@@ -301,9 +324,13 @@ def need_approval(c, title, args=(), list_id=None, task_id=None):
     lg = lang_of(usettings(c, approver)) if approver else None
     args = [tr(a[1], lg=lg) if isinstance(a, tuple) else a for a in args]  # ("tr", key): a word in the approver's language
     ts = iso(now_utc())
+    ttl = tr(title, *args, lg=lg)
+    if detail:  # 2.86.0 (N30): e.g. a batch names its fields and lists (detail(approver, lang) -> short text)
+        d = detail(approver, lg)
+        ttl = f"{ttl} · {d}" if d else ttl
     jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,approval,list_id)
                        VALUES(?,?,?,?,'waiting','',?,?,?,?)""",
-                    (aid, task_id, approver, tr(title, *args, lg=lg)[:300], ts, ts, json.dumps({**spec, "key": key}), list_id))
+                    (aid, task_id, approver, ttl[:300], ts, ts, json.dumps({**spec, "key": key}), list_id))
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
     job_notify(c, j, None)
     if approver and not task_id:  # job_notify only adds News for task jobs: the approver hears of it anyway
@@ -570,7 +597,7 @@ def v1_task_batch():
     if vis and len(vis) + recent >= APPROVAL_BATCH_MIN:
         lids = [r[0] for r in c.execute(f"SELECT list_id FROM tasks WHERE id IN ({','.join('?' * len(vis))})", vis)]
         top = max(set(lids), key=lids.count) if lids else None
-        need_approval(c, BATCH_TITLE[act], (len(vis),), list_id=top)
+        need_approval(c, BATCH_TITLE[act], (len(vis),), list_id=top, detail=lambda ap, lg: h6e_batch_detail(c, ap, lg, lids, data))
     if is_agent(g.user) and not g.get("approved_job") and vis:
         with _BATCH_LOCK:
             _BATCH_SEEN.setdefault(me(), []).append((time.time(), len(vis)))
@@ -933,9 +960,14 @@ def v1_member_set(lid, user_id):
     if role not in ROLES:
         raise BadInput(tr("Role must be admin, edit, participant or view"))
     u = c.execute("SELECT display_name, username, kind FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
+    from ..accounts.orgs import may_see, ws_member_problem
     if not u or uid == me() or personal_agent_foreign(c, uid, me()) or (role == "admin" and u["kind"] == "agent") \
-            or c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
+            or c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0] \
+            or not may_see(c, me(), uid):  # 2.86.0 (N29): no name of someone it cannot see
         raise Denied(404)  # checked before an approval, so a job never names or waits for someone it cannot share with
+    wsp = ws_member_problem(c, lid, uid)
+    if wsp:
+        raise Denied(409, wsp)  # 2.86.0 (N29): the workspace rule before the approval too (the web answers 409 as well)
     need_approval(c, N_("Share the list “{0}” with {1} ({2})"), (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0],
                                                                   u["display_name"] or u["username"], ("tr", ROLE_WORD[role])), list_id=lid)
     v1_call(member_set, lid, body={"user_id": uid, "role": b.get("role", "edit"), "bridge_ok": b.get("bridge_ok") is True})
@@ -952,6 +984,8 @@ def v1_member_remove(lid, user_id):
     need_list(c, lid, write=False)
     if uid != me():
         need_list(c, lid, write=False, manage=True)
+        if not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone():
+            raise Denied(404)  # 2.86.0 (N29): only a member's name goes into the job title (no name lookup for any id)
         need_approval(c, N_("Stop sharing the list “{0}” with {1}"), (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0],
                                                                      user_names(c, [uid]).get(uid, "?")), list_id=lid)
     v1_call(member_remove, lid, uid, body={})

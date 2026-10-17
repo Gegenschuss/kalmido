@@ -14,7 +14,7 @@ from ..tasks.tasks import one_task
 from ..collab.comments import user_names
 from ..personal.timetrack import BadInput
 from ..family.family import (
-    deadline_create, FAM_DL, FAM_NOTE_MAX, family_overview, ingredient_lines, kid_balance, kid_dict, kid_parents,
+    deadline_create, FAM_DL, h6a_admin_kid_ok, FAM_NOTE_MAX, family_overview, ingredient_lines, kid_balance, kid_dict, kid_parents,
     kid_push, KID_REWARDS_MAX, kids_for, need_kid, occ_create, packing_create, packing_templates, purpose_apply,
     REWARD_COST_MAX, reward_dict, shop_areas_add, to_shopping,
 )
@@ -250,6 +250,7 @@ def family_reward_request(rid):
     c.execute("UPDATE kid_rewards SET state='requested', requested_at=? WHERE id=?", (iso(now_utc()), rid))
     who = user_names(c, [me()]).get(me(), "?")
     adm = [x[0] for x in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0")]
+    adm = [x for x in adm if h6a_admin_kid_ok(c, x, me())]  # 2.86.0 (N8): only admins of the kid's own organisation
     for p in dict.fromkeys(kid_parents(c, me()) or adm):
         kid_push(c, p, lambda lg: tr("{0} would like a reward", who, lg=lg), lambda lg: f"{r['emoji'] + ' ' if r['emoji'] else ''}{r['title']} · {r['cost']} ★")
     bump(c)

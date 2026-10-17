@@ -464,9 +464,11 @@ def inv_from_time(c, oid, uid, b):
         raise BadInput(tr("Invalid value: {0}", "from/to"))
     pid = b.get("project_id")
     # the WHERE part first (a fragment: pg_prepare only checks the complete statement below)
+    from ..core.access import vis_sql
+    # 2.86.0 (N16): only the lists the person making the invoice sees (their hours, names)
     sql = ("FROM time_entries e JOIN lists l ON l.id=e.list_id "
-           "WHERE l.client_id=? AND l.org_id=? AND e.\"end\" IS NOT NULL AND e.start>=? AND e.start<?")
-    args = [cid, oid, d_from + "T00:00:00", (date.fromisoformat(d_to) + timedelta(days=1)).isoformat() + "T00:00:00"]
+           f"WHERE l.client_id=? AND l.org_id=? AND l.id IN {vis_sql()} AND e.\"end\" IS NOT NULL AND e.start>=? AND e.start<?")
+    args = [cid, oid, uid, uid, d_from + "T00:00:00", (date.fromisoformat(d_to) + timedelta(days=1)).isoformat() + "T00:00:00"]
     if pid not in (None, "", 0):
         try:
             pid = int(pid)
@@ -780,6 +782,7 @@ def inv_send(c, oid, uid, r, b):
     own = bool(text) and text[:5000] != _mail_text(r, lang, s).strip()
     if own:
         inv_own_text_quota(c, oid, uid)
+    h6c_send_budget(c, oid, uid, [to] + ([cc] if cc else []))  # 2.86.0 (N27)
     text = text[:5000] or _mail_text(r, lang, s)
     files = inv_files(c, oid, r["id"])
     u = g.user
@@ -809,6 +812,34 @@ def inv_own_text_quota(c, oid, uid):
                   (oid, since, '%"own_text": 1%')).fetchone()[0]
     if n >= INV_OWN_TEXT_DAY:
         raise Denied(429, tr("Your organisation sent {0} mails with an own text today; members can send more tomorrow or with the standard text", INV_OWN_TEXT_DAY))
+
+
+# 2.86.0 (N27): the day's budget of document mails (any text), generous so month-end billing never hits it
+H6C_SEND_DAY_ORG = 300     # per organisation and day (UTC)
+H6C_SEND_DAY_PERSON = 150  # per person and day
+H6C_SEND_DAY_RCPT = 20     # per organisation, receiving address and day
+
+
+def h6c_send_budget(c, oid, uid, rcpts):
+    """2.86.0 (N27): 429 once the organisation / the person sent their day's document mails or one address got its share;
+    counts the log's "send" entries since midnight UTC (user_id is plain, the detail may be encrypted) and per address a
+    mail_counts row (key o:<org>:<address>, cleared like the other mail limits). The DATEV copy never counts."""
+    write_lock(c, f"office_mail_{int(oid)}")
+    since = now_utc().strftime("%Y-%m-%dT00:00:00")
+    n_org, n_me = c.execute("SELECT COUNT(*), COUNT(*) FILTER (WHERE user_id=?) FROM office_doc_log WHERE org_id=? AND action='send' AND at>=?",
+                            (uid, oid, since)).fetchone()
+    if n_org >= H6C_SEND_DAY_ORG or n_me >= H6C_SEND_DAY_PERSON:
+        raise Denied(429, tr("The day's limit of document mails is reached ({0}); please try again tomorrow",
+                             H6C_SEND_DAY_PERSON if n_me >= H6C_SEND_DAY_PERSON else H6C_SEND_DAY_ORG))
+    day = since[:10]
+    keys = [f"o:{int(oid)}:{x.strip().lower()}"[:300] for x in rcpts if x]
+    for k in keys:
+        r = c.execute("SELECT n FROM mail_counts WHERE k=? AND day=?", (k, day)).fetchone()
+        if r and r[0] >= H6C_SEND_DAY_RCPT:
+            raise Denied(429, tr("This address already got {0} mails from your organisation today; please try again tomorrow", H6C_SEND_DAY_RCPT))
+    for k in keys:
+        c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET
+                     n=CASE WHEN mail_counts.day=excluded.day THEN mail_counts.n+1 ELSE 1 END, day=excluded.day""", (k, day))
 
 
 def inv_datev(c, oid, r, s=None, files=None):

@@ -425,7 +425,26 @@ def me_get():
     return jsonify({**user_public(u), "is_admin": bool(u["is_admin"]), "auth": g.auth_via,
                     "via": "proxy" if g.auth_via == "proxy" else session_via(c), "twofa": twofa_methods(c, u),
                     "has_password": bool(u["password_hash"]), "proxy_login": u["proxy_login"] or "",
-                    "drop_token": u["drop_token"] or "", "ntfy_topic": usettings(c, u["id"])["ntfy_topic"]})
+                    "drop_token": "" if u["kid"] else (u["drop_token"] or ""),  # 2.86.0 (N3): /drop takes no child account
+                    "ntfy_topic": usettings(c, u["id"])["ntfy_topic"]})
+
+
+FIRST_PW_FRESH = 600  # s: 2.86.0 (N5) a first local password needs a sign-in at most this long ago
+
+
+def h6a_first_password_check(c):
+    """2.86.0 (N5): an account without a local password (single sign-on) sets its first one only right after a fresh
+    sign-in of this session (a stolen, older session cannot add a second way in). Behind the login proxy there is no
+    session to judge: an admin sets the first password there (Settings > Users). An error response or None."""
+    from datetime import timedelta
+    from ..core.db import iso
+    if g.auth_via != "session":
+        return err(tr("An admin can set a first password for this account."), 403)
+    tok = request.cookies.get(COOKIE)
+    r = c.execute("SELECT created_at FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone() if tok else None
+    if not r or r[0] < iso(now_utc() - timedelta(seconds=FIRST_PW_FRESH)):
+        return err(tr("For a first password, please log out and sign in again (at most {0} minutes ago).", FIRST_PW_FRESH // 60), 403)
+    return None
 
 
 @app.patch("/api/me")
@@ -450,9 +469,17 @@ def me_update():
         if u["password_hash"] and not check_password_hash(u["password_hash"], b.get("current_password") or ""):
             _rate_fail(keys)
             return err(tr("Current password is wrong"), 403)
+        if not u["password_hash"]:
+            e = h6a_first_password_check(c)
+            if e:
+                return e
         pw = b["password"] or ""
         if len(pw) < MIN_PASSWORD:
             return err(tr("Password: at least {0} characters", MIN_PASSWORD))
+        if not u["password_hash"]:
+            from ..notify.alerts import aa_now
+            aa_now("security", f"pw-first:{u['username']}:{int(time.time())}",
+                   N_("{0} set a first local password (the account signed in by single sign-on before)."), [u["username"]])
         c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(pw), u["id"]))
         tok = request.cookies.get(COOKIE)  # other sessions end, this one stays
         c.execute("DELETE FROM sessions WHERE user_id=? AND token_hash IS DISTINCT FROM ?", (u["id"], _token_hash(tok) if tok else None))

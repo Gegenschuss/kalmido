@@ -307,8 +307,12 @@ def client_update(cid):
     c = db()
     uid = me()
     _gate(c)
-    need_client(c, cid, uid)
+    old = need_client(c, cid, uid)
     f = clean_client(c, uid, body())
+    if "org_id" in f and f["org_id"] == old["org_id"]:
+        f.pop("org_id")  # unchanged (the dialog sends it with every save)
+    if "org_id" in f:
+        h6c_client_move_ok(c, uid, old)
     if f:
         f["updated_at"] = iso(now_utc())
         c.execute(f"UPDATE clients SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), cid])
@@ -316,10 +320,23 @@ def client_update(cid):
             c.execute("UPDATE office_client_contacts SET org_id=? WHERE client_id=?", (f["org_id"], cid))
             from ..office.contacts_cl import ckl_unlink_client
             ckl_unlink_client(c, cid)  # 2.59.0 (#1735): the address books stay in the old workspace
+            if _org_boundary(c):  # 2.86.0 (N11): the lists of the old workspace stay there and lose the client
+                c.execute("UPDATE lists SET client_id=NULL WHERE client_id=? AND org_id IS DISTINCT FROM ?", (cid, f["org_id"]))
     _contacts_from_body(c, cid, need_client(c, cid, uid)["org_id"], body(), f)
     bump(c)
     c.commit()
     return jsonify(client_public(c, uid, need_client(c, cid, uid), stats=True))
+
+
+def h6c_client_move_ok(c, uid, r):
+    """2.86.0 (N11): moving a client into another workspace takes its creator or an admin of the workspace it is in now
+    (clean_client already allows only the mover's own organisations as the target)."""
+    if r["created_by"] == uid or (g.user["is_admin"] and not _org_boundary(c)):
+        return
+    from ..accounts.orgs import is_org_admin
+    if r["org_id"] and is_org_admin(c, uid, r["org_id"]):
+        return
+    raise Denied(403, tr("Only the person who created the client or an admin of its organisation can move it"))
 
 
 @app.delete("/api/clients/<int:cid>")
@@ -348,6 +365,10 @@ def list_client_set(c, lid, cid):
     if cid is not None:
         if not isinstance(cid, int) or isinstance(cid, bool):
             raise BadInput(tr("Invalid value: {0}", "client_id"))
-        need_client(c, cid)
+        cl = need_client(c, cid)
+        # 2.86.0 (N11): a client only hangs on lists of its own workspace (organisation boundary)
+        from ..accounts.orgs import list_org
+        if _org_boundary(c) and (cl["org_id"] or None) != (list_org(c, lid) or None):
+            raise Denied(409, tr("The client belongs to another workspace than this list"))
     c.execute("UPDATE lists SET client_id=? WHERE id=?", (cid, lid))
 

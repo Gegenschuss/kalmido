@@ -123,12 +123,29 @@ def kid_parents(c, kid):
                                        WHERE p.kid_id=? AND u.disabled=0 ORDER BY p.parent_id""", (kid,))]
 
 
+# 2.86.0 (N8, decided 17.10.): an instance admin looks after the kid accounts of their own organisation / family only:
+# kids sharing an organisation with the admin, plus kids nobody else can look after (no organisation, no enabled parent).
+# An instance without any organisation (a household) is one family: there the admin looks after every kid, as before.
+H6A_ADMIN_KIDS = """(NOT EXISTS (SELECT 1 FROM orgs WHERE personal_of IS NULL)
+    OR id IN (SELECT k.user_id FROM org_members k JOIN org_members a ON a.org_id=k.org_id WHERE a.user_id=?)
+    OR (id NOT IN (SELECT user_id FROM org_members)
+        AND id NOT IN (SELECT p.kid_id FROM kid_parents p JOIN users pu ON pu.id=p.parent_id WHERE pu.disabled=0)))"""
+
+
+def h6a_admin_kid_ok(c, uid, kid):
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # membership structure (the kid's organisations, also those the RLS context does not show)
+        return bool(c.execute("SELECT 1 FROM users WHERE id=? AND " + H6A_ADMIN_KIDS, (kid, uid)).fetchone())
+
+
 def parent_of(c, uid, kid):
-    """uid may look after kid: a parent of it, or an admin."""
+    """uid may look after kid: a parent of it, or an admin of the kid's organisation (N8)."""
     if not is_kid(c, kid) or uid == kid:
         return False
+    if uid in kid_parents(c, kid):
+        return True
     u = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
-    return bool(u and u[0]) or uid in kid_parents(c, kid)
+    return bool(u and u[0]) and h6a_admin_kid_ok(c, uid, kid)
 
 
 def need_kid(c, kid, parent=True):
@@ -794,7 +811,7 @@ PM_EXTRA_ALL = tuple(dict.fromkeys(x for v in PURPOSE_EXTRA.values() for x in v)
 # modules" turns on all of them, PURPOSE_MODS stays what the purpose package and the switch-off touch
 PM_FULL = ("cal", "timeline", "matrix", "habits", "pomo", "kanban", "collab", "stats", "time", "progress", "deps", "fields",
            "agents", "comments", "family", "events", "contacts", "contracts", "home", "care", "health", "review", "travel",
-           "reading", "clients", "workload", "forms", "office", "wiki", "files", "dispo")
+           "reading", "budget", "clients", "workload", "forms", "office", "wiki", "files", "dispo")
 
 
 def pma_full():
@@ -945,8 +962,13 @@ def kids_for(c, uid):
     if is_kid(c, uid):
         return [kid_dict(c, uid)]
     adm = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
-    q = "SELECT id FROM users WHERE kid=1 AND disabled=0" + ("" if adm and adm[0] else " AND id IN (SELECT kid_id FROM kid_parents WHERE parent_id=?)")
-    return [kid_dict(c, r[0]) for r in c.execute(q + " ORDER BY id", () if adm and adm[0] else (uid,))]
+    q = "SELECT id FROM users WHERE kid=1 AND disabled=0 AND (id IN (SELECT kid_id FROM kid_parents WHERE parent_id=?)"
+    if adm and adm[0]:  # 2.86.0 (N8): an admin: the kids of their own organisations, not every kid of the instance
+        from ..core.pg import system_ctx
+        with system_ctx(c):  # membership structure, as in h6a_admin_kid_ok
+            ids = [r[0] for r in c.execute(q + " OR " + H6A_ADMIN_KIDS + ") ORDER BY id", (uid, uid))]
+        return [kid_dict(c, k) for k in ids]
+    return [kid_dict(c, r[0]) for r in c.execute(q + ") ORDER BY id", (uid,))]
 
 
 def kid_push(c, uid, title_fn, msg_fn, click="#family"):

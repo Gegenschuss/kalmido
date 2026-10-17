@@ -1315,6 +1315,13 @@ def imp_run(c, uid, plan, opts, dry):
     own = {}
     for r in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND e2e IS NULL ORDER BY id", (uid,)):
         own.setdefault(r["name"], r["id"])  # 2.64.1 B (#1817): never into a list with the lock (a new list of that name instead)
+    from ..core.access import token_lists
+    tl = token_lists()
+    if tl is not None and not target:  # 2.86.0 (N19): a token limited to selected lists never creates lists, only fills allowed ones
+        for L in plan["lists"]:
+            lid = my_inbox(c, uid) if L["inbox"] else own.get(L["name"])
+            if not lid or lid not in tl:
+                raise Denied(403, tr("This token is limited to selected lists and cannot create new lists: choose one of them as the import target"))
     collab = collab_all()
     # a task's effective parent: same list, at most MAX_DEPTH levels (deeper ones hang below the deepest allowed level)
     where = {}

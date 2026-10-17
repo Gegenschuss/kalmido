@@ -128,6 +128,29 @@ def _agent_events_after(c, aid, since, n):
                            (aid, since, n - len(out))).fetchall()
 
 
+def h6e_events_visible(c, aid, envs):
+    """2.86.0 (N32): queued events of a list the agent no longer sees (removed, limited by list_ids, list deleted) or of a task
+    it can no longer see are left out when read (the cursor still moves past them)."""
+    from ..core.access import acx_task_ok, list_role
+    roles, out = {}, []
+    for env in envs:
+        d = env.get("data") if isinstance(env.get("data"), dict) else {}
+        tk = d.get("task") if isinstance(d.get("task"), dict) else {}
+        lid = d.get("list_id") or tk.get("list_id") or (d.get("list") if isinstance(d.get("list"), dict) else {}).get("id") \
+            or (d.get("room") if isinstance(d.get("room"), dict) else {}).get("list_id")
+        ids_only = env.get("event") == "unassigned" and set(tk) <= {"id", "list_id"}  # as in agent_emit: ids, no content
+        if isinstance(lid, int) and not ids_only:  # the ids-only "unassigned" lets the agent drop a task it lost with the list
+            if lid not in roles:
+                roles[lid] = bool(list_role(c, lid, aid))
+            if not roles[lid]:
+                continue
+        etid = tk.get("id") or d.get("task_id")
+        if isinstance(etid, int) and not ids_only and not acx_task_ok(c, etid, aid):
+            continue
+        out.append(env)
+    return out
+
+
 def _waiter(aid, on):
     with _AGENT_COND:
         if on:
@@ -193,7 +216,7 @@ def v1_agent_events():
             g.gate = True
     more = len(rows) > limit
     rows = rows[:limit]
-    data = [json.loads(r["payload"]) for r in rows]
+    data = h6e_events_visible(db(), aid, [json.loads(r["payload"]) for r in rows])  # 2.86.0 (N32)
     from ..agents.safety import access_events
     access_events(data)  # 2.30.0 (#919): the lists these events come from count as read in the access log
     mids = chat_event_mids(data)
@@ -303,6 +326,9 @@ def job_notify(c, j, old_state):
         lid = lr[0] if lr else None
         news_add(c, uid, "approval", task_id=j["task_id"], data={"title": (j["title"] or "")[:200]}, actor=j["agent_id"], s=s)
     if not notif_ok(c, uid, s, "approval", "push", lid):
+        return
+    from ..agents.chat import h6e_agent_push_ok
+    if not h6e_agent_push_ok(j["agent_id"], uid):  # 2.86.0 (N31): daily push budget per agent and person
         return
     lg = lang_of(s)
     name = user_names(c, [j["agent_id"]]).get(j["agent_id"], "?")

@@ -38,10 +38,26 @@ def office_settings_get():
         c.commit()
     s = office_settings(c, oid)
     pack = office_pack(s["pack"]) or office_pack("DE")
-    return jsonify(settings=s, company_fields=ofx_company(c, oid), org_id=oid, role=office_role(c, uid, oid), pack={"code": pack["code"], "name": pack["name"], "tax": pack["tax"],
+    role = office_role(c, uid, oid)
+    cf = ofx_company(c, oid)
+    if role != "admin":  # 2.86.0 (N15): members never get the bank lines and the DATEV master data (admins only)
+        s, cf = h6c_member_settings(s), {k: ("" if k in H6C_BANK_COLS else v) for k, v in cf.items()}
+    return jsonify(settings=s, company_fields=cf, org_id=oid, role=role, pack={"code": pack["code"], "name": pack["name"], "tax": pack["tax"],
                                                                                "formats": pack["formats"], "currency": pack["currency"]},
                    number_preview=office_number_next(c, oid, "offer", s["offer_scheme"], peek=True)[0],
                    industry=_industry(s), **pb_info(c, uid, oid))
+
+
+H6C_BANK_COLS = ("iban", "bic", "bank_name")
+
+
+def h6c_member_settings(s):
+    """2.86.0 (N15): the office settings as a member sees them: no bank lines, no DATEV booking export data (advisor / client
+    number, accounts). The documents still print them (rendered on the server); the settings page is the admins' anyway."""
+    s = dict(s)
+    s["company"] = {**(s.get("company") or {}), "bank_lines": []}
+    s["datev_extf"] = {}
+    return s
 
 
 def _industry(s):
@@ -199,7 +215,10 @@ def office_row_delete(kind, rid):
 @app.get("/api/office/export")
 def office_export_get():
     c, uid, oid = _ctx()
-    d = office_export(c, oid, office_role(c, uid, oid) == "admin")  # 2.47.0 (#1649)
+    adm = office_role(c, uid, oid) == "admin"
+    d = office_export(c, oid, adm)  # 2.47.0 (#1649)
+    if not adm:  # 2.86.0 (N15)
+        d["settings"] = h6c_member_settings(d["settings"])
     ofx_log(c, oid, "export", target="master_data")
     c.commit()
     data = json.dumps(d, ensure_ascii=False, indent=1)

@@ -30,7 +30,9 @@ def ct_too_large(e):
     """413 from the request limit on a vCard import: JSON with the reason (the app showed "Import failed: " without one)."""
     p = request.path
     if not (p.startswith(("/api/books/", "/api/v1/address-books/")) and p.endswith("/import")):
-        return e
+        # 2.86.0 (N22): this handler replaces core/pages.py too_large (same key: 413); the JSON answer stays for every other route
+        from ..core.pages import too_large
+        return too_large(e)
     return err(tr("The file is too large (at most {0} MB)", VCF_MAX // (1024 * 1024)), 413)
 
 

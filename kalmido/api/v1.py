@@ -1504,10 +1504,11 @@ def v1_list_group_set(lid, group_id):
     reject_unknown(b, ("role",))
     c = db()
     need_list(c, lid, write=False, manage=True)
-    gr = c.execute("SELECT name FROM groups WHERE id=?", (_v1_gid(group_id),)).fetchone()
+    from ..lists.groups import need_group
+    gr = need_group(c, _v1_gid(group_id))  # 2.86.0 (N29): 404 before the job title names a group the agent cannot see
     if gr:  # 2.15.0 (#479): sharing by an agent waits for a person's approval
         need_approval(c, N_("Share the list “{0}” with the group “{1}” ({2})"),
-                      (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], gr[0],
+                      (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], gr["name"],
                        ("tr", ROLE_WORD.get(str(b.get("role") or "edit"), "Member"))), list_id=lid)
     v1_call(list_group_set, lid, _v1_gid(group_id), body=b)
     return jsonify(data=v1_call(list_groups_get, lid)["groups"], next_cursor=None)
@@ -1520,7 +1521,8 @@ def v1_list_group_del(lid, group_id):
     v1_args(())
     c = db()
     need_list(c, lid, write=False, manage=True)
-    gr = c.execute("SELECT name FROM groups WHERE id=?", (_v1_gid(group_id),)).fetchone()
+    gr = c.execute("SELECT g.name FROM groups g JOIN group_shares s ON s.group_id=g.id WHERE g.id=? AND s.list_id=?",
+                   (_v1_gid(group_id), lid)).fetchone()  # 2.86.0 (N29): only a group the list is shared with
     if gr:
         need_approval(c, N_("Stop sharing the list “{0}” with the group “{1}”"), (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], gr[0]),
                       list_id=lid)
