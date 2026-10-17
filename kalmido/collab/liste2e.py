@@ -672,19 +672,10 @@ def _le2a_extra(c, lid, mode, gen, uid, limit):
     """2.64.2 A (#1817): the files (part B) and channel messages (part C) of the list still to convert ->
     (files, number of files, msgs, number of msgs); gen = the target generation, always lists.e2e_gen (on: older ones are
     re-encrypted to it), limit 0 = only the numbers."""
-    files, nf, msgs, nm = [], 0, [], 0
-    try:
-        from .liste2efile import le2f_left
-    except ImportError:  # FALLBACK until part B is merged
-        le2f_left = None
-    try:
-        from .liste2echan import le2c_left
-    except ImportError:  # FALLBACK until part C is merged
-        le2c_left = None
-    if le2f_left:
-        files, nf = le2f_left(c, lid, mode, gen, uid, min(limit, LE2A_FILES_MAX))
-    if le2c_left:
-        msgs, nm = le2c_left(c, lid, mode, gen, limit)
+    from .liste2echan import le2c_left
+    from .liste2efile import le2f_left
+    files, nf = le2f_left(c, lid, mode, gen, uid, min(limit, LE2A_FILES_MAX))
+    msgs, nm = le2c_left(c, lid, mode, gen, limit)
     return list(files or [])[:LE2A_FILES_MAX] if limit else [], int(nf or 0), list(msgs or [])[:limit] if limit else [], int(nm or 0)
 
 
@@ -1019,10 +1010,7 @@ def le2a_bulk(lid):
             else:
                 c.execute("UPDATE task_field_values SET value=? WHERE task_id=? AND field_id=?", (v, tid, fid))
         if groups["msgs"]:  # 2.64.2 A (#1817): channel messages of the list room (part C checks and writes them)
-            try:
-                from .liste2echan import le2c_bulk
-            except ImportError:  # FALLBACK until part C is merged
-                raise bad("msgs") from None
+            from .liste2echan import le2c_bulk
             try:
                 le2c_bulk(c, lid, mode, gen, groups["msgs"])
             except ValueError:

@@ -802,12 +802,12 @@ async function le2eMigrate(lid, onProgress) {
       }
       // 2.64.2 A (#1817): files are converted one by one through their own upload (part B), messages come back for bulk (part C)
       for (const row of todo.files || []) {
-        if (badF.has('f' + row.id) || typeof le2eFileConvert !== 'function') continue;
+        if (badF.has('f' + row.id)) continue;
         try { await le2eFileConvert(lid, row, mode); made++; } catch (e) { badF.add('f' + row.id); console.warn('le2e: file', row.id, e?.message); }
       }
       const msgs = [];
       for (const m of todo.msgs || []) {
-        if (badF.has('m' + m.id) || typeof le2eChanConvert !== 'function') continue;
+        if (badF.has('m' + m.id)) continue;
         try { const x = await le2eChanConvert(lid, m, mode); if (x) msgs.push(x); } catch (e) { badF.add('m' + m.id); console.warn('le2e: message', m.id, e?.message); }
       }
       if (msgs.length) out.msgs = msgs;
