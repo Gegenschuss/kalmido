@@ -8,7 +8,7 @@
 const PKC = {oid: null, q: '', kind: '', data: null, loading: false, seq: 0, packs: null, packsBusy: false, busy: '', err: {}, open: {}, t: null};
 const pkc_key = it => `${it.kind}/${it.code}`;
 const pkc_de = () => /^de/i.test(LOCALE());
-const pkc_nm = p => (pkc_de() ? p.name : p.name_en || p.name) || p.code;
+const pkc_nm = p => { const n = p.name && typeof p.name === 'object' ? (pkc_de() ? p.name.de : p.name.en) || p.name.en || p.name.de : pkc_de() ? p.name : p.name_en || p.name; return n || p.code; };  // (a pack file's name may be {de, en})
 const pkc_when = iso => iso ? (typeof ofdWhen === 'function' ? ofdWhen(iso) : iso) : '';
 OFC_II.packs = N_('Packs bring the tax rates, formats and texts of a country or the calculation of an industry. They are pure data, never program code. Finalised documents keep the pack version they were made with.');
 // a new office (workspace switch): forget the lists of the previous one
