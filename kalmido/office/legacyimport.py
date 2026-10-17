@@ -1789,7 +1789,8 @@ def fi_archive_get():
 @app.patch("/api/office/legacy/archive/<int:aid>")
 def fi_archive_patch(aid):
     """Members (2.81.0 #1834, before: org admins): only the bookkeeping notes of an archived document (client, amount or
-    tax_lines [{net, tax: 19|7|0|rc}], paid for invoices); the PDF and its number stay. Each change goes into its history."""
+    tax_lines [{net, tax: 19|7|0|rc}], paid for invoices); the PDF and its number stay. Each change goes into its history.
+    Audit B3 (#1968): members only the client; amount / tax_lines / paid an office admin (403), never negative (400)."""
     c, uid, oid = _ctx(admin=False)
     b = body() or {}
     from .archiveedit import r81b_archive_patch

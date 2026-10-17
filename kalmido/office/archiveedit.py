@@ -1,8 +1,9 @@
 """2.81.0 B (#1834): correct an archived document of the office (office_archive, legacyimport.py) afterwards: its client,
 its amount as net + tax lines (19 %, 7 %, 0 %, reverse charge; Kalmido adds the gross) and paid (invoices only). The PDF
-and its number never change. Everybody who reads the office archive of the organisation may correct it (members and
-admins; agents never reach the office routes, office_gate). Every change goes into the entry's history
-(office_archive_log: when, who, old and new value as JSON text), shown in the edit dialog.
+and its number never change. Everybody who reads the office archive of the organisation may assign its client (members
+and admins; agents never reach the office routes, office_gate); amount, tax lines and paid only an office admin
+(audit 2.86 B3, #1968: the bookkeeping sums hang on them) and never below zero. Every change goes into the entry's history
+(office_archive_log: when, who, in which role, old and new value as JSON text), shown in the edit dialog.
 office_archive.amount stays the gross sum (2.80.0 reads it unchanged); tax_lines NULL = only the gross is known."""
 import json
 from decimal import Decimal, ROUND_HALF_UP
@@ -10,14 +11,15 @@ from decimal import Decimal, ROUND_HALF_UP
 from flask import jsonify
 
 from ..core.config import app
+from ..core.access import Denied
 from ..core.i18n import tr
 from ..core.db import iso, now_utc
-from ..core.access import Denied
 from ..personal.timetrack import BadInput
-from .model import pb_cl_sql
+from .model import OFFICE_ADMIN_ONLY, office_role, pb_cl_sql
 
 R81B_RATES = {"19": 19, "7": 7, "0": 0, "rc": 0}  # rc = reverse charge: the client pays the tax, none on the document
 R81B_LINES_MAX = 10
+R81B_ADMIN_FIELDS = ("amount", "tax_lines", "paid")  # #1968: members only assign the client
 CENT = Decimal("0.01")
 
 
@@ -30,7 +32,7 @@ def r81b_tax_lines(v):
     for ln in v:
         net = _amount(ln.get("net")) if isinstance(ln, dict) else None
         tax = str(ln.get("tax")) if isinstance(ln, dict) else ""
-        if net is None or tax not in R81B_RATES:
+        if net is None or net < 0 or tax not in R81B_RATES:  # #1968: no negative net
             raise BadInput(tr("Invalid value: {0}", "tax_lines"))
         net = net.quantize(CENT, ROUND_HALF_UP)
         amt = (net * R81B_RATES[tax] / 100).quantize(CENT, ROUND_HALF_UP)
@@ -75,17 +77,23 @@ def _amount_val(gross, lines):
 
 def r81b_archive_patch(c, oid, uid, aid, b):
     """Apply {client_id?, tax_lines? | amount?, paid?} to entry aid of office area oid; one history row per changed field.
-    Returns the names of the changed fields. tax_lines win over amount; amount alone = gross only (tax unknown)."""
+    Returns the names of the changed fields. tax_lines win over amount; amount alone = gross only (tax unknown).
+    #1968: amount / tax_lines / paid only an office admin (403), a negative amount 400."""
     from .legacyimport import _archive_fields
     r = c.execute("SELECT * FROM office_archive WHERE id=? AND org_id=?", (aid, oid)).fetchone()
     if not r:
         raise Denied(404)
+    role = office_role(c, uid, oid)
+    if role != "admin" and any(k in b for k in R81B_ADMIN_FIELDS):
+        raise Denied(403, tr(OFFICE_ADMIN_ONLY))
     keep = ("client_id", "amount") + (("paid",) if r["kind"] == "invoice" else ())  # paid: invoices only (an offer ignores it)
     f = _archive_fields(c, oid, {k: v for k, v in b.items() if k in keep}, partial=True)
     if b.get("tax_lines") not in (None, []):
         lines, gross = r81b_tax_lines(b["tax_lines"])
         f["amount"], f["tax_lines"] = str(gross), json.dumps(lines)
     elif "amount" in f:
+        if f["amount"] is not None and Decimal(f["amount"]) < 0:
+            raise BadInput(tr("Invalid value: {0}", "amount"))
         f["tax_lines"] = None
     log, ts = [], iso(now_utc())
     if "client_id" in f and (f["client_id"] or None) != (r["client_id"] or None):
@@ -102,8 +110,9 @@ def r81b_archive_patch(c, oid, uid, aid, b):
         return []
     c.execute(f"UPDATE office_archive SET {', '.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), aid, oid])
     for field, old, new in log:
-        c.execute("INSERT INTO office_archive_log(org_id, archive_id, at, user_id, field, old, new) VALUES(?,?,?,?,?,?,?)",
-                  (oid, aid, ts, uid, field, json.dumps(old, ensure_ascii=False), json.dumps(new, ensure_ascii=False)))
+        c.execute("INSERT INTO office_archive_log(org_id, archive_id, at, user_id, field, old, new, role) VALUES(?,?,?,?,?,?,?,?)",
+                  (oid, aid, ts, uid, field, json.dumps(old, ensure_ascii=False), json.dumps(new, ensure_ascii=False),
+                   "" if role == "admin" else "member"))
     return [x[0] for x in log]
 
 
@@ -117,7 +126,8 @@ def r81b_history(c, oid, aid):
             old, new = json.loads(r["old"] or "null"), json.loads(r["new"] or "null")
         except ValueError:
             old = new = None
-        out.append({"id": r["id"], "at": r["at"], "user_name": users.get(r["user_id"], ""), "field": r["field"], "old": old, "new": new})
+        out.append({"id": r["id"], "at": r["at"], "user_name": users.get(r["user_id"], ""), "field": r["field"], "old": old, "new": new,
+                    "by_member": r["role"] == "member"})
     return out
 
 
@@ -132,4 +142,5 @@ def r81b_archive_get(aid):
     cl = _client(c, oid, r["client_id"])
     d = _archive_public(r, {r["client_id"]: cl["name"]} if cl else {})
     d["history"] = r81b_history(c, oid, aid)
+    d["admin"] = office_role(c, uid, oid) == "admin"  # #1968: only an admin edits amount / tax lines / paid
     return jsonify(d)

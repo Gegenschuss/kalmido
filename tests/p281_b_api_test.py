@@ -3,9 +3,11 @@
 invoice (#1867). Own container (start.sh), invented companies, people and numbers only.
  - #1834: a quotation archived without a client gets one afterwards -> listed under that client (?client_id=);
    net + tax lines 19 % + 7 % -> the gross is added up by the server (amount), tax and net in the answer; reverse charge
-   = no tax; the history of the entry has when, who, the old and the new value; a member may correct (decision
-   16.10.2026), a person of another organisation gets 404, an agent 403; number and file never change; paid only for
-   invoices; bad tax lines 400; an amount alone = gross, tax unknown (tax_lines null)
+   = no tax; the history of the entry has when, who, the old and the new value; a member may assign the client (decision
+   16.10.2026), amount / tax lines / paid only an admin (audit B3, decision 17.10.2026, #1968: member 403, nothing
+   changes, the member's history row is marked by_member); negative amounts / nets 400; a person of another organisation
+   gets 404, an agent 403; number and file never change; paid only for invoices; bad tax lines 400; an amount alone =
+   gross, tax unknown (tax_lines null)
  - #1867: an invoice locked under customer number 10042 stays on debtor 10042 in the DATEV export after the client's
    number changed to 10043; an invoice locked afterwards takes 10043; a snapshot without a customer number reads it live
 usage: p281_b_api_test.py <datadir>      (P281B_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
@@ -121,7 +123,7 @@ r = A.patch(B + L + f"/archive/{IV}", json={"tax_lines": [{"net": "1.000,00", "t
 j = r.json() if r.ok else {}
 check(r.ok and j["amount"] == 1297 and j["net"] == 1100 and j["tax"] == 197 and [x["tax"] for x in j["tax_lines"]] == ["19", "7"],
       "19 % + 7 %: gross 1297.00, net 1100, tax 197 " + r.text[:300])
-r = Bo.patch(B + L + f"/archive/{OF}", json={"tax_lines": [{"net": "500", "tax": "rc"}]})
+r = A.patch(B + L + f"/archive/{OF}", json={"tax_lines": [{"net": "500", "tax": "rc"}]})
 check(r.ok and r.json()["amount"] == 500 and r.json()["tax"] == 0, "reverse charge: gross = net " + r.text[:200])
 for bad in ([], [{"net": "abc", "tax": "19"}], [{"net": "10", "tax": "16"}], [{"net": "1", "tax": "19"}] * 11, "19", [["10", "19"]]):
     r = A.patch(B + L + f"/archive/{IV}", json={"tax_lines": bad})
@@ -144,6 +146,7 @@ if len(h) == 2:
 h = Bo.get(B + L + f"/archive/{OF}").json().get("history") or []
 check([x["field"] for x in h] == ["amount", "client"] and h[1]["old"] is None and h[1]["new"] == {"id": C1, "name": "Beispielkunde AG"}
       and h[1]["user_name"] == "Bob Member", "history of the quotation: the client set by Bob " + str(h)[:300])
+check(len(h) == 2 and h[1]["by_member"] is True and h[0]["by_member"] is False, "#1968: the member's row is marked by_member, the admin's not " + str(h)[:300])
 n = len(dbx("SELECT id FROM office_archive_log WHERE archive_id=?", (IV,)))
 A.patch(B + L + f"/archive/{IV}", json={"paid": 0, "client_id": None})
 check(len(dbx("SELECT id FROM office_archive_log WHERE archive_id=?", (IV,))) == n, "no change = no history row")
@@ -151,6 +154,30 @@ check(len(dbx("SELECT id FROM office_archive_log WHERE archive_id=?", (IV,))) ==
 # an amount alone = gross, tax unknown again
 r = A.patch(B + L + f"/archive/{IV}", json={"amount": "1.190,00"})
 check(r.ok and r.json()["amount"] == 1190 and r.json()["tax_lines"] is None, "an amount alone: gross, tax unknown " + r.text[:200])
+
+# audit B3 (#1968): a member only assigns the client; amount, tax lines and paid only an admin; never negative
+n = len(dbx("SELECT id FROM office_archive_log WHERE archive_id=?", (IV,)))
+for bad in ({"paid": 1}, {"amount": "5"}, {"amount": ""}, {"tax_lines": [{"net": "10", "tax": "19"}]}, {"tax_lines": []},
+            {"client_id": C1, "paid": 1}):
+    r = Bo.patch(B + L + f"/archive/{IV}", json=bad)
+    check(r.status_code == 403, f"#1968: a member cannot change {sorted(bad)} (403): {r.status_code}")
+row = dbx("SELECT amount, paid, client_id, tax_lines FROM office_archive WHERE id=?", (IV,))[0]
+check(float(row[0]) == 1190 and row[1] == 0 and row[2] is None and row[3] is None, f"#1968: nothing changed by the refused member requests: {row}")
+check(len(dbx("SELECT id FROM office_archive_log WHERE archive_id=?", (IV,))) == n, "#1968: refused requests write no history row")
+r = Bo.patch(B + L + f"/archive/{IV}", json={"client_id": C1})
+check(r.ok and r.json()["client_id"] == C1 and r.json()["amount"] == 1190, "#1968: a member still assigns the client " + r.text[:200])
+check(Bo.get(B + L + f"/archive/{IV}").json().get("admin") is False and A.get(B + L + f"/archive/{IV}").json().get("admin") is True,
+      "#1968: the entry tells the dialog whether amount and paid are editable (admin)")
+h = A.get(B + L + f"/archive/{IV}").json().get("history") or []
+check(h and h[0]["field"] == "client" and h[0]["by_member"] is True and h[0]["user_name"] == "Bob Member", "#1968: history: client by member " + str(h[:1]))
+for bad in ({"amount": "-100"}, {"amount": "-1.190,00"}, {"amount": -0.01}, {"tax_lines": [{"net": "-10", "tax": "19"}]},
+            {"tax_lines": [{"net": "100", "tax": "19"}, {"net": "-50", "tax": "7"}]}):
+    r = A.patch(B + L + f"/archive/{IV}", json=bad)
+    check(r.status_code == 400, f"#1968: a negative amount is refused (400): {bad!r} -> {r.status_code}")
+check(float(dbx("SELECT amount FROM office_archive WHERE id=?", (IV,))[0][0]) == 1190, "#1968: the amount stays after the refused negatives")
+r = A.patch(B + L + f"/archive/{IV}", json={"amount": "0"})
+check(r.ok and r.json()["amount"] == 0, "#1968: zero is fine " + r.text[:200])
+A.patch(B + L + f"/archive/{IV}", json={"amount": "1190", "client_id": None})
 
 # other organisation / agent
 check(Ca.patch(B + L + f"/archive/{IV}", json={"paid": 1}).status_code == 404, "tenant-matrix: another organisation cannot correct (404)")

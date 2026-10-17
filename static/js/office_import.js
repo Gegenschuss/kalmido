@@ -338,8 +338,9 @@ document.addEventListener('input', e => {
 });
 
 // ---- 2.81.0 (#1834): correct an archived document afterwards -- client, net + tax lines (Kalmido adds the gross), paid
-// (invoices); number and PDF stay. Everybody who reads the archive may (the server checks); each save is one undo step
-// and goes into the entry's history (shown folded in the dialog).
+// (invoices); number and PDF stay. Everybody who reads the archive may assign the client; amount and paid only an office
+// admin (#1968, the server checks; members see them read-only); each save is one undo step and goes into the entry's
+// history (shown folded in the dialog, a member's change marked "by member").
 const R81B_TAX = [['19', '19 %'], ['7', '7 %'], ['0', '0 %'], ['rc', N_('Reverse charge')]];
 const R81B_PCT = {19: 19, 7: 7, 0: 0, rc: 0};
 function r81b_clFilter() {
@@ -370,17 +371,21 @@ async function r81b_archEdit(id) {
   const cls = [...(OIM.clients || [])];
   if (d.client_id && !cls.some(c => c.id === d.client_id)) cls.push({id: d.client_id, name: d.client || '#' + d.client_id});
   let lines = d.tax_lines ? d.tax_lines.map(l => ({...l})) : [{net: '', tax: '19'}];
-  const inv = d.kind === 'invoice', lbl = {client: tr('Client'), amount: tr('Amount'), paid: tr('Paid')};
-  const hist = (d.history || []).map(h => `<li><small class="muted">${esc([ofdWhen(h.at), h.user_name].filter(Boolean).join(' · '))}</small><span>${esc(tr('{0}: {1} → {2}', lbl[h.field] || h.field, r81b_val(h.field, h.old), r81b_val(h.field, h.new)))}</span></li>`).join('');
+  const inv = d.kind === 'invoice', adm = d.admin !== false, lbl = {client: tr('Client'), amount: tr('Amount'), paid: tr('Paid')};
+  const hist = (d.history || []).map(h => `<li><small class="muted">${esc([ofdWhen(h.at), h.user_name, h.by_member ? tr('by member') : ''].filter(Boolean).join(' · '))}</small><span>${esc(tr('{0}: {1} → {2}', lbl[h.field] || h.field, r81b_val(h.field, h.old), r81b_val(h.field, h.new)))}</span></li>`).join('');
   const body = `<p class="muted ofchint">${esc([d.kind === 'offer' ? tr('Quotation') : tr('Invoice'), d.number || d.file_name, d.date ? fmtDateLoc(d.date) : ''].filter(Boolean).join(' · '))}. ${esc(tr('Number and file stay unchanged.'))}</p>
     <div class="row"><label for="r81b-cl">${esc(tr('Client'))}</label><select id="r81b-cl">${[['', tr('no client')], ...cls.map(c => [c.id, c.name])].map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(d.client_id ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
-    <div class="row"><span class="r81b-lbl">${esc(tr('Amount'))}</span>${!d.tax_lines && d.amount != null ? `<span class="muted ofchint">${esc(ofcMoney(d.amount) + ' (' + tr('gross, tax unknown') + ')')}</span>` : ''}
+    ${adm ? '' : `<div class="row"><span class="r81b-lbl">${esc(tr('Amount'))}</span><span>${esc(r81b_val('amount', {gross: d.amount, lines: d.tax_lines}))}</span></div>
+    ${inv ? `<div class="row"><span class="r81b-lbl">${esc(tr('Paid'))}</span><span>${esc(r81b_val('paid', d.paid))}</span></div>` : ''}
+    <p class="muted ofchint">${esc(tr('Only an admin of this organisation changes the amount and paid.'))}</p>`}
+    ${adm ? `<div class="row"><span class="r81b-lbl">${esc(tr('Amount'))}</span>${!d.tax_lines && d.amount != null ? `<span class="muted ofchint">${esc(ofcMoney(d.amount) + ' (' + tr('gross, tax unknown') + ')')}</span>` : ''}
       <div id="r81b-lines"></div><button type="button" class="btn sm ghost" data-r81b="add">${ic('plus', 's')} ${esc(tr('Add tax rate'))}</button><p class="muted r81b-sum" id="r81b-sum" aria-live="polite"></p></div>
-    ${inv ? `<label class="chkl r81b-paid"><input type="checkbox" id="r81b-paid" ${d.paid ? 'checked' : ''}> ${esc(tr('Paid'))}</label>` : ''}
+    ${inv ? `<label class="chkl r81b-paid"><input type="checkbox" id="r81b-paid" ${d.paid ? 'checked' : ''}> ${esc(tr('Paid'))}</label>` : ''}` : ''}
     <details class="r81b-hist"><summary>${esc(tr('History'))} (${(d.history || []).length})</summary>${hist ? `<ul role="list">${hist}</ul>` : `<p class="muted">${esc(tr('No changes yet.'))}</p>`}</details>`;
   const read = md => $$('.r81b-ln', md).map(el => ({net: $('[data-r81b="net"]', el).value, tax: $('[data-r81b="tax"]', el).value}));
   const paint = md => {
-    const box = $('#r81b-lines', md); box.innerHTML = lines.map((l, i) => r81b_lineHtml(l, i, lines.length)).join('');
+    const box = $('#r81b-lines', md); if (!box) return;  // a member: amount read-only
+    box.innerHTML = lines.map((l, i) => r81b_lineHtml(l, i, lines.length)).join('');
     sum(md);
   };
   const sum = md => {
@@ -395,15 +400,15 @@ async function r81b_archEdit(id) {
     const ls = read(m), b = {}, old = {};
     const cid = $('#r81b-cl', m).value ? +$('#r81b-cl', m).value : null;
     if (cid !== (d.client_id || null)) { b.client_id = cid; old.client_id = d.client_id || null; }
-    if (ls.some(l => String(l.net).trim())) {
-      if (ls.some(l => !String(l.net).trim() || Number.isNaN(r81b_num(l.net)))) throw new Error(tr('Invalid value: {0}', tr('Net')));
+    if (!adm) { /* a member: only the client (#1968) */ } else if (ls.some(l => String(l.net).trim())) {
+      if (ls.some(l => !String(l.net).trim() || Number.isNaN(r81b_num(l.net)) || r81b_num(l.net) < 0)) throw new Error(tr('Invalid value: {0}', tr('Net')));
       const nl = ls.map(l => ({net: r81b_num(l.net), tax: l.tax}));
       if (JSON.stringify(nl) !== JSON.stringify((d.tax_lines || []).map(l => ({net: +l.net, tax: l.tax})))) {
         b.tax_lines = nl;
         if (d.tax_lines) old.tax_lines = d.tax_lines.map(l => ({net: l.net, tax: l.tax})); else old.amount = d.amount ?? '';
       }
     } else if (d.tax_lines) { b.amount = ''; old.tax_lines = d.tax_lines.map(l => ({net: l.net, tax: l.tax})); }  // all lines emptied: no amount
-    if (inv && $('#r81b-paid', m).checked !== !!d.paid) { b.paid = $('#r81b-paid', m).checked ? 1 : 0; old.paid = d.paid ? 1 : 0; }
+    if (inv && adm && $('#r81b-paid', m).checked !== !!d.paid) { b.paid = $('#r81b-paid', m).checked ? 1 : 0; old.paid = d.paid ? 1 : 0; }
     if (!Object.keys(b).length) return;
     const url = `/api/office/legacy/archive/${id}`, after = () => { OIM.list = null; if (typeof ofdDraw === 'function') ofdDraw(); return {}; };
     await api('PATCH', url, b);

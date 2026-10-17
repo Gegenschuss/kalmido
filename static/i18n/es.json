@@ -9560,6 +9560,8 @@
   "Net {0} + VAT {1} = gross {2}": "Neto {0} + IVA {1} = bruto {2}",
   "{0}: {1} → {2}": "{0}: {1} → {2}",
   "No changes yet.": "Todavía no hay cambios.",
+  "by member": "por un miembro",
+  "Only an admin of this organisation changes the amount and paid.": "Solo un administrador de esta organización cambia el importe y el estado de pago.",
   "The linked contact no longer exists; link removed.": "El contacto vinculado ya no existe; vínculo eliminado.",
   "Share: not every file was added (too large, empty or refused by the upload check)": "Compartir: no se añadieron todos los archivos (demasiado grandes, vacíos o rechazados por la comprobación de subida)",
   "Sent as {0}": "Enviado como {0}",
