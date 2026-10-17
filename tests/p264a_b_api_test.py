@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """2.64.1 API tests (part B): the lock per list on the other ways out of the server (#1817, findings H2, M4, M5, M7, L6).
-A list is brought into the state "encrypted in the browser" straight in the database (lists.e2e = 'on', texts replaced by
-synthetic ciphertexts "e2e1:{v, g, iv, ct}"; the server never reads them) and the copies are removed with le2b_scrub (run in
-the app container, no test route in the app). Then:
+A list is switched on through part A's routes (start, todo / bulk with synthetic ciphertexts "e2e1:{v, g, iv, ct}" -- the
+server never reads them --, finish, which removes the copies with le2b_scrub). Then:
  - API v1 (token of a member): texts empty + encrypted: true (tasks, comments), any ciphertext empty; writes 403 (list_e2e)
  - agents: PUT /api/lists/{id}/agent 409, share-all skips the list, the agent's own token does not see the list
  - CalDAV: SUMMARY is the neutral word, no DESCRIPTION / URL, the due date stays; a text change from the calendar app is
@@ -15,6 +14,7 @@ the app container, no test route in the app). Then:
  - webhooks: the payload has ids + encrypted: true, no text
  - THE sweep (H2): marker words written everywhere before; after the switch no text or JSON column of any table holds one
 usage: p264a_b_api_test.py <datadir>"""
+import base64
 import json
 import os
 import re
@@ -155,21 +155,50 @@ check(r.status_code == 201, f"API token {r.text[:200]}")
 TA = Api(r.json()["token"])
 AG = Api(ATOK) if ATOK else None
 
-# ================================================================== the switch (stands in for part A's routes)
-for i, (tbl, col, where, args) in enumerate((("tasks", "title", "list_id=?", (L,)), ("tasks", "content", "list_id=?", (L,)),
-                                              ("tasks", "url", "list_id=?", (L,)), ("notes", "title", "list_id=?", (L,)),
-                                              ("notes", "body", "list_id=?", (L,)), ("sections", "name", "list_id=?", (L,)),
-                                              ("comments", "body", "task_id IN (SELECT id FROM tasks WHERE list_id=?)", (L,)))):
-    dbx(f"UPDATE {tbl} SET {col}=? WHERE {where}", (cipher(i),) + args, write=True)
-dbx("UPDATE lists SET e2e='on', e2e_gen=1 WHERE id=?", (L,), write=True)
-rc, out, er = py(f"from kalmido.collab.liste2eguard import le2b_scrub\nc=app.connect()\nn=le2b_scrub(c, {L})\nc.commit()\nimport json\nprint(json.dumps(n))")
-check(rc == 0, f"le2b_scrub runs {out} {er}")
-try:
-    n = json.loads(out.splitlines()[-1])
-except (ValueError, IndexError):
-    n = {}
-check(n.get("shop_memory") == 1 and n.get("mail_tokens") == 1 and n.get("webhook_queue", 0) >= 1 and n.get("activity", 0) >= 1,
-      f"scrub counts {n}")
+# ================================================================== the switch through part A's routes (start, todo / bulk, finish)
+def keys():
+    b64 = lambda n: base64.b64encode(os.urandom(n)).decode()  # noqa: E731
+    b64u = lambda n: base64.urlsafe_b64encode(os.urandom(n)).decode().rstrip("=")  # noqa: E731
+    return {"pub": {"kty": "EC", "crv": "P-256", "x": b64u(32), "y": b64u(32), "ext": True, "key_ops": []},
+            "bundle_pass": {"v": 1, "kdf": "pbkdf2-sha256", "iter": 600000, "salt": b64(16), "iv": b64(12), "ct": b64(200)},
+            "bundle_rec": {"v": 1, "kdf": "hkdf-sha256", "salt": b64(16), "iv": b64(12), "ct": b64(200)}}
+
+
+def wrapped():
+    return {"v": 1, "iv": base64.b64encode(os.urandom(12)).decode(), "ct": base64.b64encode(os.urandom(48)).decode()}
+
+
+for s_ in (A, Bo):
+    check(s_.put(B + "/api/e2e/keys", json=keys()).ok, "the person's own keys are set up")
+r = A.post(B + f"/api/lists/{L}/e2e/start", json={"keys": [{"user_id": 1, "wrapped": wrapped()}, {"user_id": BOB, "wrapped": wrapped()}]})
+check(r.ok, f"switch on (start) {r.status_code} {r.text[:300]}")
+k = [0]
+for _ in range(10):
+    todo = A.get(B + f"/api/lists/{L}/e2e/todo?limit=200").json()
+    out_ = {}
+    for kind in ("tasks", "comments", "notes", "sections"):
+        rows = []
+        for x in todo.get(kind) or []:
+            y = {"id": x["id"]}
+            for f, v in x.items():
+                if f != "id" and v is not None:
+                    k[0] += 1
+                    y[f] = cipher(k[0])
+            rows.append(y)
+        if rows:
+            out_[kind] = rows
+    if todo.get("fields"):
+        out_["fields"] = [{"task_id": x["task_id"], "field_id": x["field_id"], "value": cipher(1)} for x in todo["fields"]]
+    if not out_:
+        break
+    r = A.post(B + f"/api/lists/{L}/e2e/bulk", json=out_)
+    check(r.ok, f"bulk {r.status_code} {r.text[:300]}")
+r = A.post(B + f"/api/lists/{L}/e2e/finish")
+check(r.ok and dbx("SELECT e2e FROM lists WHERE id=?", (L,))[0][0] == "on", f"finish: the lock is on (le2b_scrub ran) {r.status_code} {r.text[:300]}")
+check(not dbx("SELECT 1 FROM shop_memory WHERE list_id=?", (L,)), "scrub: no shopping memory of the list")
+check(not dbx("SELECT 1 FROM webhook_queue WHERE payload LIKE ?", (f"%{MK}%",)), "scrub: no waiting webhook delivery with a text")
+TITLE = dbx("SELECT title FROM tasks WHERE id=?", (T,))[0][0]
+check(TITLE.startswith("e2e1:"), "the task's title is a ciphertext now")
 check(dbx("SELECT task_title FROM time_entries WHERE task_id=?", (T,))[0][0] == "", "time entry snapshot emptied")
 check(not dbx("SELECT 1 FROM mail_tokens WHERE list_id=?", (L,)), "the list's mail address is gone")
 
@@ -240,7 +269,7 @@ if href:
     gr = D.get(B + href)
     ics = gr.text.replace("SUMMARY:\U0001F512 Task", "SUMMARY:changed by the phone")
     pr = D.put(B + href, data=ics.encode(), headers={"Content-Type": "text/calendar", "If-Match": gr.headers.get("ETag", "*")})
-    check(pr.status_code in (200, 201, 204) and dbx("SELECT title FROM tasks WHERE id=?", (T,))[0][0] == cipher(0),
+    check(pr.status_code in (200, 201, 204) and dbx("SELECT title FROM tasks WHERE id=?", (T,))[0][0] == TITLE,
           f"CalDAV: a text change of the calendar app is ignored {pr.status_code} {pr.text[:200]}")
 new = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:new-264b\r\nSUMMARY:from the phone\r\nEND:VTODO\r\nEND:VCALENDAR\r\n"
 pr = D.put(B + f"/dav/calendars/alice/{L}/new-264b.ics", data=new.encode(), headers={"Content-Type": "text/calendar"})
