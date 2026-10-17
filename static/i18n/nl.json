@@ -8210,7 +8210,7 @@
   "The job reads it after its next step.": "De job leest het na zijn volgende stap.",
   "The agent does not get this message now (paused, or the job's list is not shared with it)": "De agent krijgt dit bericht nu niet (gepauzeerd, of de lijst van de taak is niet met hem gedeeld)",
   "Servers": "Servers",
-  "Show your accounts on other Kalmido servers here too, for example work and home: one sidebar, Today, Inbox, calendar and search for all of them. The data stays on its own server; nothing is copied or synchronised.": "Toon hier ook je accounts op andere Kalmido-servers, bijvoorbeeld werk en thuis: één zijbalk, Vandaag, Inbox, agenda en zoeken voor allemaal. De gegevens blijven op hun eigen server; er wordt niets gekopieerd of gesynchroniseerd.",
+  "Show your accounts on other Kalmido servers here too, for example work and home: one sidebar, Today, Basket, calendar and search for all of them. The data stays on its own server; nothing is copied or synchronised.": "Toon hier ook je accounts op andere Kalmido-servers, bijvoorbeeld werk en thuis: één zijbalk, Vandaag, Mand, agenda en zoeken voor allemaal. De gegevens blijven op hun eigen server; er wordt niets gekopieerd of gesynchroniseerd.",
   "Add server": "Server toevoegen",
   "Create a connection code for another server": "Koppelcode voor een andere server maken",
   "The server this app runs on": "De server waarop deze app draait",

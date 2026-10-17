@@ -473,7 +473,7 @@ def umz_preview(c, uid, man, data, can_invite):
                        "found": bool(hit), "found_name": (hit["display_name"] or hit["username"]) if hit else "",
                        "need_address": not _email(p.get("email"))})
     eid = man.get("export_id") if isinstance(man.get("export_id"), str) and UMZ_EID_RE.fullmatch(man.get("export_id")) else ""
-    again = bool(eid) and bool(c.execute("SELECT 1 FROM imports WHERE user_id=? AND source=? AND undone_at IS NULL AND report LIKE ?",
+    again = bool(eid) and bool(c.execute("SELECT 1 FROM imports WHERE user_id=? AND source=? AND undone_at IS NULL AND report ILIKE ?",
                                          (uid, UMZ_SOURCE, f'%"export_id": "{eid}"%')).fetchone())
     ce = man.get("client_encrypted") if isinstance(man.get("client_encrypted"), dict) else {}
     src = man.get("source") if isinstance(man.get("source"), dict) else {}
@@ -1337,7 +1337,7 @@ def umz_undo(c, uid, r):
     for i in range(0, len(ids), 500):  # tasks in lists that were there before (my inbox): only still writable ones
         part = ids[i:i + 500]
         q = ",".join("?" * len(part))
-        for t in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({q}) AND created_by=? AND tt_id LIKE 'kalmido:%'", part + [uid]).fetchall():
+        for t in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({q}) AND created_by=? AND tt_id ILIKE 'kalmido:%'", part + [uid]).fetchall():
             if t["list_id"] not in own_lists and list_role(c, t["list_id"], uid) in WRITE_ROLES:
                 c.execute("UPDATE tasks SET parent_id=NULL WHERE parent_id=?", (t["id"],))
                 n_tasks += c.execute("DELETE FROM tasks WHERE id=?", (t["id"],)).rowcount

@@ -17,7 +17,7 @@ async function msvReq(method, url, body) {
   catch (e) { throw new Error(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message); }
 }
 const msvHtml = () => `<h4 id="s-msv-h">${tr('Servers')}</h4>
-  <div class="shint keep">${tr('Show your accounts on other Kalmido servers here too, for example work and home: one sidebar, Today, Inbox, calendar and search for all of them. The data stays on its own server; nothing is copied or synchronised.')}</div>
+  <div class="shint keep">${tr('Show your accounts on other Kalmido servers here too, for example work and home: one sidebar, Today, Basket, calendar and search for all of them. The data stays on its own server; nothing is copied or synchronised.')}</div>
   <div class="members" id="s-msv"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="row msvbtns"><button class="btn sm pri" data-msva="add">${ic('plus', 's')} ${tr('Add server')}</button><button class="btn sm" data-msva="code">${ic('key', 's')} ${tr('Create a connection code for another server')}</button></div>`;
 async function msvDraw(md) {

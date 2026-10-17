@@ -8210,7 +8210,7 @@
   "The job reads it after its next step.": "Il job lo legge dopo il suo prossimo passo.",
   "The agent does not get this message now (paused, or the job's list is not shared with it)": "L'agente non riceve questo messaggio ora (in pausa, oppure la lista del lavoro non è condivisa con lui)",
   "Servers": "Server",
-  "Show your accounts on other Kalmido servers here too, for example work and home: one sidebar, Today, Inbox, calendar and search for all of them. The data stays on its own server; nothing is copied or synchronised.": "Mostra qui anche i tuoi account su altri server Kalmido, per esempio lavoro e casa: una barra laterale, Oggi, In arrivo, calendario e ricerca per tutti. I dati restano sul proprio server; niente viene copiato o sincronizzato.",
+  "Show your accounts on other Kalmido servers here too, for example work and home: one sidebar, Today, Basket, calendar and search for all of them. The data stays on its own server; nothing is copied or synchronised.": "Mostra qui anche i tuoi account su altri server Kalmido, per esempio lavoro e casa: una barra laterale, Oggi, Raccolta, calendario e ricerca per tutti. I dati restano sul proprio server; niente viene copiato o sincronizzato.",
   "Add server": "Aggiungi server",
   "Create a connection code for another server": "Crea un codice di collegamento per un altro server",
   "The server this app runs on": "Il server su cui gira questa app",

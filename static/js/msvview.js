@@ -246,7 +246,7 @@ function msvvDetailDraw(md, sid, t) {
   $('#msvvd-l', md).textContent = lst ? ' · ' + (lst.name || '') : '';
   $('#msvvd-b', md).innerHTML = `<form class="msvvdf" novalidate>
     <label class="sr" for="msvvd-t">${esc(tr('Title'))}</label><input id="msvvd-t" class="msvvdt" value="${esc(t.title || '')}" maxlength="500" ${ro ? 'readonly' : ''}>
-    <div class="msvvdrow"><label>${ic('cal', 's')}<span>${esc(tr('Date'))}</span><input type="date" id="msvvd-due" value="${esc(/^\d{4}-\d{2}-\d{2}$/.test(t.due || '') ? t.due : '')}" ${ro ? 'disabled' : ''}></label>
+    <div class="msvvdrow"><label>${ic('cal', 's')}<span>${esc(tr('Date'))}</span>${dateIn('msvvd-due', /^\d{4}-\d{2}-\d{2}$/.test(t.due || '') ? t.due : '', {ro, label: tr('Date')})}</label>
       <label>${ic('flag', 's')}<span>${esc(tr('Priority'))}</span><select id="msvvd-p" ${ro ? 'disabled' : ''}>${[[0, N_('None')], [1, N_('Low')], [3, N_('Medium')], [5, N_('High')]].map(([v, n]) => `<option value="${v}" ${v === p ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select></label></div>
     <label class="sr" for="msvvd-n">${esc(tr('Notes'))}</label><textarea id="msvvd-n" rows="5" placeholder="${esc(tr('Notes'))}" ${ro ? 'readonly' : ''}>${esc(t.notes || '')}</textarea>
     ${msvvArr(t.subtasks).length ? `<h4>${esc(tr('Subtasks'))}</h4><ul class="msvvsubs">${msvvArr(t.subtasks).map(s => `<li class="${+s.status ? 'done' : ''}">${ic(+s.status === 2 ? 'check' : 'sub', 's')}<span>${esc(s.title || '')}</span></li>`).join('')}</ul>` : ''}
