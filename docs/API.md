@@ -1164,6 +1164,24 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
 The answer comes as the event `job`. A proposal job can be replaced with `POST /agent/jobs/{id}/proposal` (scope `layouts`)
 while it is open. People decide with `POST /api/proposals/{id}/apply` (`{"select": ["0"], "use": true}`) or `.../discard`.
 
+## Rules of a list (2.71.0)
+
+Read only for tokens; agents propose (see docs/AGENTS.md *Rules of a list*). People manage rules in the app (list
+settings > Rules: `GET` / `POST /api/lists/{id}/rules`, `PATCH` / `DELETE /api/rules/{id}`, `POST /api/rules/{id}/restore`).
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" https://kalmido.example/api/v1/lists/12/rules
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"name": "Review", "trigger": {"kind": "section", "section_id": 40}, "action": {"kind": "assign", "user_id": 3},
+       "summary": "Everything in Review goes to the reviewer"}' \
+  https://kalmido.example/api/v1/lists/12/rules/proposals
+```
+
+| Route | Scope | |
+|---|---|---|
+| `GET /lists/{id}/rules` | read | `trigger` {kind section / done / reopen / ltag / due, section_id, tag_id}, `action` {kind assign / due / comment / move, user_id, days, text, list_id, section_id}, `names`, `active`, `paused_reason`, `created_by` |
+| `POST /lists/{id}/rules/proposals` | structure | agents only: `name`, `trigger`, `action`, `summary`, `title`, `user_id`; 201 = a ready proposal job (kind `rule`) |
+
 ## Pin board, time check and shoot planning for agents (2.51.0)
 
 New scope `pinboard` (write notepads on project pages; an agent changes only its own, at most 3 per project). Off for new agents and not part of the legacy `write`.

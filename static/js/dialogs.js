@@ -777,6 +777,7 @@ function listModal(id, folder = '', o = {}) {
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
     <div class="shint lhint">${tr('When a task is postponed, the tasks of this list it blocks that would now start too early move by the same number of days (also in the timeline). One undo takes the whole chain back.')}</div>` : ''}
     ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this list: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and list admins can change them')}</div>` : ''}
+    ${id ? rul_boxHtml(l) /* 2.71.0 A (#1457): rules of the list (rules.js) */ : ''}
     ${id && !l.is_inbox && (l.kind || 'list') === 'project' ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}
     </div>
     ${id ? `<div class="row lmtrow"><label>${tr('My tasks')}</label><label class="chkl"><input type="checkbox" id="l-inmine" ${mtShown(id) ? 'checked' : ''}> ${tr('Show in My tasks')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
@@ -946,6 +947,7 @@ function listModal(id, folder = '', o = {}) {
     sel?.focus();
   };
   const drawFields = () => { const box = $('#l-fields', md); if (box) box.innerHTML = fieldsBox(id); };
+  if (id) rul_mount(md, l);  // 2.71.0 A (#1457)
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.m === 'field-add') { fieldModal(id, null, drawFields); return; }  // 2.39.1 (#1217): no project needed any more

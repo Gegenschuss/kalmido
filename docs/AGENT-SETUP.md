@@ -157,6 +157,9 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    default) when the agent may suggest how the start page, Today or a shared project page could be arranged. It reads only
    block names and widths, never their content, and every proposal waits for the person's 👍 / 👎
    ([AGENTS.md](AGENTS.md#arrangements-of-views-2550)).
+8. Rules of a list (2.71.0): an agent with the permission *Structure* may propose a rule for a list shared with it; the
+   list's owner or an admin accepts it with 👍 and the rule then runs with their rights
+   ([AGENTS.md](AGENTS.md#rules-of-a-list-2710)).
 
 ### 2. A Linux user without sudo
 

@@ -204,6 +204,7 @@ ORDER = (
     "newsletter.web",  # 2.55.0 (#1455): the routes of the newsletter connection
     "receipts.suggest",  # 2.48.0 (#1356): receipts: project / category, agents suggest, people confirm
     "accounts.layouts_more",  # 2.55.0 (#1067): the new views' blocks for the agents' proposals (after agents.lyprop)
+    "lists.rules",  # 2.71.0 A (#1457): rules of a list (When ... then ...), after api.v1
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

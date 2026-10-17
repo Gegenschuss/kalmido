@@ -43,6 +43,7 @@ TABLES = (
     "task_bell",  # 2.53.0 C (#1424): the bell of one task per person (NULL = a private list's task)
     "nl_conns", "nl_segments", "nl_members", "nl_runs",  # 2.55.0 E (#1455): the newsletter connection (NULL = a person's own)
     "task_links",  # 2.71.0 B (#1459): a task shown in a further list (NULL = private lists, the app checks both lists)
+    "list_rules",  # 2.71.0 A (#1457): rules of a list (org_id follows the list, NULL = a private list)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

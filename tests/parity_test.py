@@ -362,6 +362,11 @@ APP_ONLY = [
     # 2.55.0 (#1455): the newsletter connection holds access data of an outside service and decides who gets mail: people only
     ("2.55.0 (#1455): the newsletter connection, segments, sync and the consent of contacts are set by people (admins / the "
      "person); agents read the consent with the contact (field newsletter), no new agent rights", ("* /api/newsletter",)),
+    # 2.71.0 A (#1457): rules of a list are set by its owner / admins; agents read (GET /lists/{id}/rules, MCP list_rules) and
+    # only propose (POST /lists/{id}/rules/proposals, MCP propose_rule)
+    ("2.71.0 (#1457): the rules of a list are managed by its owner / list admins in the app; agents read them and only propose "
+     "one (the person accepts it, it runs with their rights)",
+     ("* /api/lists/{}/rules", "* /api/rules/")),
 ]
 
 

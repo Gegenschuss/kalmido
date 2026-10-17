@@ -600,6 +600,9 @@ ROUTES = {
     # 2.71.0 B (#1459)
     "POST /api/tasks/{}/links": "tasklink", "DELETE /api/tasks/{}/links/{}": "tasklink", "PATCH /api/tasks/{}/links/{}": "tasklink",
     "POST /api/v1/tasks/{}/links": "tasklink", "DELETE /api/v1/tasks/{}/links/{}": "tasklink",
+    # 2.71.0 A (#1457): rules of a list (owner / list admins; agents read + propose) -- p271_a_api_test.py: other org 404
+    "GET /api/lists/{}/rules": "list", "POST /api/lists/{}/rules": "list", "PATCH /api/rules/{}": "list", "DELETE /api/rules/{}": "list",
+    "POST /api/rules/{}/restore": "list", "GET /api/v1/lists/{}/rules": "list", "POST /api/v1/lists/{}/rules/proposals": "list",
 }
 
 # ---- 1. every route is classified, nothing stale
