@@ -493,6 +493,8 @@ ROUTES = {
     "POST /api/users/{}/invite": "people", "POST /api/users/{}/approve": "people",
     "POST /api/users/{}/signin-link": "people", "GET /api/v1/admin/users": "people", "GET /api/users": "people",
     "POST /api/users": "people", "PATCH /api/users/{}": "people", "DELETE /api/users/{}": "people",
+    # 2.88.0 (#1980): the delete dialog's lists + candidates, several accounts at once (p288_b_api_test.py)
+    "GET /api/users/{}/delete-info": "people", "POST /api/users/bulk": "people",
     "GET /api/avatar/{}/{}.jpg": "people",
     # ---- public (15)
     "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/about": "public",

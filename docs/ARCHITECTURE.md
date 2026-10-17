@@ -134,6 +134,7 @@ The most used helpers:
 | `accounts/layouts.py` | 2.32.0: views built from blocks: the layout format, the project page arrangement (standard + own); people only, never agents. |
 | `accounts/onboarding.py` | Onboarding and the sample project. |
 | `accounts/users.py` | Users and the own account (admin user management, passwords, deletion). |
+| `accounts/useradmin.py` | 2.88.0 (#1980): the user management in pages (search, filter), several accounts at once, deleting an account with its lists handed over or deleted along. |
 | `lists/templates.py` | Task and list templates, built-in project types. |
 | `tasks/dependencies.py` | Dependencies between tasks ("blocked by"). |
 | `tasks/depchain.py` | The dependency chain moving along with a later due date, and "Pull the chain in" (2.67.0). |

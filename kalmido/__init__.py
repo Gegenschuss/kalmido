@@ -60,6 +60,7 @@ ORDER = (
     "accounts.orgs",
     "accounts.tenancy",
     "accounts.orglists",  # 2.35.0 (#1101)
+    "accounts.useradmin",  # 2.88.0 (#1980)
     "lists.templates",
     "tasks.dependencies",
     "tasks.depchain",  # 2.67.0 B (#1865)
