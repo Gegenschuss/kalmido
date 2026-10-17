@@ -437,7 +437,7 @@ async function patchTask(id, body, quiet) {
   const t = await api('PATCH', '/api/tasks/' + id, body);
   putTask(t); render(); if (S.sel === id) renderDetail();
   if (!quiet && before) {
-    if (t?.shifted?.length) shiftUndo(before, t, '');
+    if (t?.shifted?.length || t?.chain?.skipped?.length) shiftUndo(before, t, '');  // 2.67.0 B (#1865): + what stayed
     else histFields(histLabel(before, S.tasks.get(id) || t), [[before, snapTask(S.tasks.get(id) || t)]], {res: t});
   }
   return t;
@@ -448,7 +448,7 @@ function shiftUndo(before, t, msg) {
   const sh = t?.shifted || [];
   if (sh.length) load().then(() => render()).catch(() => {});
   const after = t && snapTask(S.tasks.get(t.id) || t), rev = before && after && reverseOf(before, after, HIST_FIELDS);
-  const m = [msg, sh.length ? trn('{0} dependent task moved', '{0} dependent tasks moved', sh.length) : ''].filter(Boolean).join(' · ');
+  const m = [msg, sh.length ? trn('{0} dependent task moved', '{0} dependent tasks moved', sh.length) : '', dch_skipText(t?.chain)].filter(Boolean).join(' · ');  // 2.67.0 B (#1865)
   if (!rev && !sh.length) { if (msg) toast(msg); return; }
   const pairs = [...(rev ? [[before, after, HIST_FIELDS]] : []), ...sh.map(x => [{id: x.id, start: x.prev_start, due: x.prev_due}, {id: x.id, start: x.start, due: x.due}, ['start', 'due']])];
   const e = histFields([before && after ? histLabel(before, after) : '', sh.length ? trn('{0} dependent task moved', '{0} dependent tasks moved', sh.length) : ''].filter(Boolean).join(' · '), pairs, {res: t});

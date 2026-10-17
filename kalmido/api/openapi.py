@@ -181,6 +181,18 @@ def openapi_spec():
                                                   "attachments": {"type": "array", "items": ref("Attachment")}}},
         "TaskCompleted": {"allOf": [ref("Task"), {"type": "object", "properties": {"next_due": nul("string", format="date", description="Recurring: the next date the task moved to")}}]},
         "TaskInput": {"type": "object", "additionalProperties": False, "properties": task_in},
+        # 2.67.0 B (#1865): a later due date moves the tasks waiting on it along (list setting); shift_chain false = not
+        "TaskUpdate": {"type": "object", "additionalProperties": False, "properties": {**task_in, "shift_chain": {
+            "type": "boolean", "default": True, "description": "false: the tasks waiting on this one stay where they are"}}},
+        "TaskChanged": {"allOf": [ref("Task"), {"type": "object", "properties": {"chain": ref("Chain")}}]},
+        "Chain": {"type": "object", "description": "Only when the change moved dependent tasks along (or left some in place)", "properties": {
+            "days": {"type": "integer", "description": "Days the chain moved (negative = earlier)"},
+            "moved": {"type": "array", "items": {"type": "object", "properties": {
+                "id": {"type": "integer"}, "title": {"type": "string"}, "start": nul("string", format="date"), "due": {"type": "string", "format": "date"},
+                "old_start": nul("string", format="date"), "old_due": {"type": "string", "format": "date"}}}},
+            "skipped": {"type": "array", "description": "Left in place; the chain behind them did not move either", "items": {"type": "object", "properties": {
+                "id": nul("integer", description="null for a task you cannot see"), "title": nul("string"), "hidden": {"type": "boolean"},
+                "reason": {"type": "string", "enum": ["done", "milestone", "no_date", "no_access", "limit", "error"]}}}}}},
         "Snippet": {"type": "object", "required": ["code"], "properties": {  # 2.35.0 (#1095)
             "id": {"type": "string", "description": "Set by the server (keep it when you send the list back)"},
             "lang": {"type": "string", "maxLength": 20, "description": "Language (py, js, ts, sh, sql, diff, json, …); empty = recognised by the app"},
@@ -540,8 +552,8 @@ def openapi_spec():
                    "post": op("Create a task (default list: your inbox)", T, ok(ref("Task"), "Created", "201") | errs("400", "403", "404"),
                               body=ref("TaskCreate"), scope="write")},
         "/tasks/{id}": {"get": op("One task", T, ok(ref("Task")) | errs("404"), [pid()]),
-                        "patch": op("Change a task (only the fields you send)", T, ok(ref("Task")) | errs("400", "403", "404"), [pid()],
-                                    body=ref("TaskInput"), scope="write"),
+                        "patch": op("Change a task (only the fields you send)", T, ok(ref("TaskChanged")) | errs("400", "403", "404"), [pid()],
+                                    body=ref("TaskUpdate"), scope="write"),
                         "delete": op("Move a task (with its subtasks) to the trash", T,
                                      {"204": {"description": "In the trash (restorable in the app)"}} | errs("403", "404"), [pid()], scope="write")},
         "/tasks/{id}/complete": {"post": op("Complete a task", T, ok(ref("TaskCompleted")) | errs("403", "404"), [pid()], scope="write",

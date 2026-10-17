@@ -136,6 +136,7 @@ The most used helpers:
 | `accounts/users.py` | Users and the own account (admin user management, passwords, deletion). |
 | `lists/templates.py` | Task and list templates, built-in project types. |
 | `tasks/dependencies.py` | Dependencies between tasks ("blocked by"). |
+| `tasks/depchain.py` | The dependency chain moving along with a later due date, and "Pull the chain in" (2.67.0). |
 | `lists/projects.py` | Project lists: status, progress, the overview (description, links, files), milestone reports. |
 | `lists/fields.py` | Custom fields of a list. |
 | `lists/playbook.py` | The Playbook of a list or folder (2.39.0): versions, rights, the agents' proposals, the playbook in agent events, the scheduled checks of a list. |
@@ -268,6 +269,7 @@ registering the ones of its area.
 | `calendar.js` | Kanban, the calendar events' data and what other views show of the calendar. |
 | `calview.js` | 2.65.0 (#1823): the calendar views month / week / day and Settings > Calendars. Loaded on demand (module `calendar`). |
 | `timeline.js` | The timeline (Gantt). |
+| `depchain.js` | The chain moving along: drag preview, the not-moved note, "Pull the chain in" (2.67.0). |
 | `roadmap.js` | The roadmap. |
 | `habits.js` | The Eisenhower matrix, habits and the pomodoro timer. |
 | `detail.js` | The detail panel of a task. |

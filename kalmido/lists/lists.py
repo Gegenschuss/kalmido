@@ -275,7 +275,8 @@ def list_create():
     # 2.2.1 (#359): dep_shift ("Move dependent tasks along") is taken at creation too (before, only PATCH set it)
     cur_id = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets,org_id,time_tracking) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
-                     clean_list_value("dep_shift", b.get("dep_shift")), clean_list_value("tickets", b.get("tickets")), oid,
+                     # 2.67.0 B (#1865): "Move dependent tasks along" is on by default in a new project list
+                     clean_list_value("dep_shift", b["dep_shift"] if "dep_shift" in b else kind == "project"), clean_list_value("tickets", b.get("tickets")), oid,
                      clean_list_value("time_tracking", b.get("time_tracking"))))
     list_created(c, uid, cur_id)  # 2.4.2 (#391) agents, 2.10.0 (#441) groups, 2.22.0 (#740) / 2.25.0 (#931) folder people
     bump(c)

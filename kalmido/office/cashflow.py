@@ -30,6 +30,8 @@ CF_STEP = {"monthly": 1, "quarterly": 3, "yearly": 12}
 MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MAX_FIXED = 500
+CF_VAT_RATES = (0, 7, 19)  # 2.67.0 (#1838)
+CF_BASES = ("gross", "net")
 
 
 def _ctx():
@@ -98,6 +100,21 @@ def rk_fixed_clean(b, cur=None):
         if rp not in CF_REPEATS:
             raise BadInput(tr("Invalid value: {0}", "repeat"))
         out["repeat"] = rp
+    # 2.67.0 (#1838): a free category (the list groups by it) and the VAT rate of the net amount (0 / 7 / 19; 0 before)
+    if "category" in b or not cur:
+        v = b.get("category")
+        out["category"] = re.sub(r"[\x00-\x1f\x7f]", "", v).strip()[:100] if isinstance(v, str) else ""
+    if "vat_rate" in b or not cur:
+        v = b.get("vat_rate", 0)
+        if isinstance(v, bool) or v in (None, ""):
+            v = 0
+        try:
+            v = int(v)
+        except (TypeError, ValueError):
+            raise BadInput(tr("Invalid value: {0}", "vat_rate")) from None
+        if v not in CF_VAT_RATES:
+            raise BadInput(tr("Invalid value: {0}", "vat_rate"))
+        out["vat_rate"] = v
     st, un = out.get("start", cur.get("start")), out.get("until", cur.get("until"))
     if st and un and un < st:
         raise BadInput(tr("The end is before the start"))
@@ -106,7 +123,15 @@ def rk_fixed_clean(b, cur=None):
 
 def _fixed_public(c, oid, r):
     d = oc_dec_fields(c, oid, "office_fixed_costs", r)
-    return {k: d.get(k) for k in ("id", "label", "amount", "start", "until", "repeat")}
+    out = {k: d.get(k) for k in ("id", "label", "amount", "start", "until", "repeat", "category", "vat_rate")}
+    out["category"], out["vat_rate"] = out["category"] or "", int(out["vat_rate"] or 0)  # 2.67.0 (#1838)
+    out["gross"] = dstr(fci_gross(out["amount"], out["vat_rate"]))
+    return out
+
+
+def fci_gross(amount, rate):
+    """2.67.0 (#1838): the gross of a net fixed cost (rounded to the cent)."""
+    return money(dec(amount) * (100 + int(rate or 0)) / 100)
 
 
 def rk_fixed(c, oid):
@@ -201,10 +226,14 @@ def rk_fixed_delete(fid):
 
 
 # ---------------------------------------------------------------- the cash flow
-def rk_cashflow(c, oid, first_month, months, today=None):
-    """{from, months, currency, today, rows: [{month, in: {actual, plan}, out: {actual, plan}, balance}], entries: [...]}.
+def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
+    """{from, months, currency, today, basis, rows: [{month, in: {actual, plan}, out: {actual, plan}, balance}], entries: [...]}.
     An entry: {month, dir in|out, state actual|plan, kind payment|invoice|offer|purchase|trip|fixed, date, amount, label,
-    number, doc_id | trip_id | fixed_id, overdue} (kind credit = a refund paid on a credit note, out)."""
+    number, doc_id | trip_id | fixed_id, overdue} (kind credit = a refund paid on a credit note, out).
+    2.67.0 (#1838): basis gross (default; the start page too) | net. Fixed costs are entered net with a VAT rate: gross adds
+    it. Documents (payments, open invoices, quotations, credit notes) are gross; net takes their share net / gross of the
+    document's totals. Purchases (purchase prices of quotations) and travel receipts have no rate here: the same amount on
+    both bases."""
     from .costs import ek_purchases
     from .invoices import inv_money_fields, inv_paid_map
     home = (office_settings(c, oid).get("currency") or "EUR").upper()
@@ -214,6 +243,15 @@ def rk_cashflow(c, oid, first_month, months, today=None):
     first, last = first_month + "-01", _add_months(last_month, 1) + "-01"  # last = exclusive
     ms = [_add_months(first_month, i) for i in range(months)]
     entries = []
+    net = basis == "net"
+
+    def nf(r):
+        """2.67.0 (#1838): the factor of a document's amounts on the chosen basis (net / gross of its totals)."""
+        if not net:
+            return dec(1)
+        t = _j(r["totals"])
+        g_, n_ = dec(t.get("gross") or 0), dec(t.get("net") or 0)
+        return n_ / g_ if g_ > 0 and n_ > 0 else dec(1)
 
     def put(day, dir_, state, kind, amount, label, **ref):
         amount = money(amount)
@@ -238,7 +276,7 @@ def rk_cashflow(c, oid, first_month, months, today=None):
         if r is None:
             continue
         cr = r["kind"] == "credit"  # a refund paid on a credit note goes out
-        put(p["date"], "out" if cr else "in", "actual", "credit" if cr else "payment", dec(p["amount"]) / _fx(r, home), r["project_title"] or "",
+        put(p["date"], "out" if cr else "in", "actual", "credit" if cr else "payment", dec(p["amount"]) / _fx(r, home) * nf(r), r["project_title"] or "",
             number=r["number"], doc_id=r["id"])
     # in: open rest of finalised invoices (plan, on the due day)
     for r in inv:
@@ -247,7 +285,7 @@ def rk_cashflow(c, oid, first_month, months, today=None):
             continue
         due = r["due_date"] or r["date"] or ""
         day = plan_day(due)
-        put(day, "in", "plan", "invoice", open_ / _fx(r, home), r["project_title"] or "", number=r["number"], doc_id=r["id"],
+        put(day, "in", "plan", "invoice", open_ / _fx(r, home) * nf(r), r["project_title"] or "", number=r["number"], doc_id=r["id"],
             overdue=bool(due and due < today))
     # in: accepted quotations, the rest not yet invoiced (plan)
     billed = {}
@@ -262,7 +300,7 @@ def rk_cashflow(c, oid, first_month, months, today=None):
         if rest <= 0:
             continue
         day = plan_day(r["service_to"] or r["service_from"] or r["date"] or "")
-        put(day, "in", "plan", "offer", rest, r["project_title"] or "", number=r["number"], doc_id=r["id"], partial=r["id"] in billed)
+        put(day, "in", "plan", "offer", rest * nf(r), r["project_title"] or "", number=r["number"], doc_id=r["id"], partial=r["id"] in billed)
     # out: purchases of accepted quotations
     for p in ek_purchases(c, oid, first, _add_months(last_month, 1) + "-00"):
         put(p["date"], "out", "actual" if p["date"] <= today else "plan", "purchase", dec(p["amount"]),
@@ -278,7 +316,8 @@ def rk_cashflow(c, oid, first_month, months, today=None):
     # out: fixed costs
     for f in rk_fixed(c, oid):
         for day in rk_fixed_days(f, first, _add_months(last_month, 1) + "-00"):
-            put(day, "out", "actual" if day <= today else "plan", "fixed", dec(f["amount"]), f["label"], fixed_id=f["id"], repeat=f["repeat"])
+            put(day, "out", "actual" if day <= today else "plan", "fixed", dec(f["amount"] if net else f["gross"]), f["label"], fixed_id=f["id"],
+                repeat=f["repeat"], category=f["category"], vat_rate=f["vat_rate"])
     entries.sort(key=lambda e: (e["month"], e["dir"], e["date"], e["kind"]))
     rows = []
     for mo in ms:
@@ -290,12 +329,13 @@ def rk_cashflow(c, oid, first_month, months, today=None):
         rows.append({"month": mo, "past": mo < cur_month, "current": mo == cur_month,
                      "in": {"actual": dstr(s[("in", "actual")]), "plan": dstr(s[("in", "plan")])},
                      "out": {"actual": dstr(s[("out", "actual")]), "plan": dstr(s[("out", "plan")])}, "balance": dstr(bal)})
-    return {"from": first_month, "months": months, "currency": home, "today": today, "rows": rows, "entries": entries}
+    return {"from": first_month, "months": months, "currency": home, "today": today, "basis": "net" if net else "gross", "rows": rows, "entries": entries}
 
 
 @app.get("/api/office/cashflow")
 def rk_cashflow_get():
-    """?from=YYYY-MM (default: this month)&months=1..12 (the view offers 3 or 6; default 3) -> rk_cashflow."""
+    """?from=YYYY-MM (default: this month)&months=1..12 (the view offers 3 or 6; default 3)&basis=gross|net (2.67.0, #1838;
+    default gross) -> rk_cashflow."""
     c, uid, oid = _ctx()
     fm = request.args.get("from") or local_now().date().isoformat()[:7]
     if not MONTH_RE.match(fm):
@@ -306,4 +346,7 @@ def rk_cashflow_get():
         raise BadInput(tr("Invalid value: {0}", "months"))
     if not 1 <= n <= 12:
         raise BadInput(tr("Invalid value: {0}", "months"))
-    return jsonify(rk_cashflow(c, oid, fm, n))
+    basis = request.args.get("basis") or "gross"
+    if basis not in CF_BASES:
+        raise BadInput(tr("Invalid value: {0}", "basis"))
+    return jsonify(rk_cashflow(c, oid, fm, n, basis=basis))

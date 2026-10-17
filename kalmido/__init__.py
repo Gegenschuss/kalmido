@@ -61,6 +61,7 @@ ORDER = (
     "accounts.orglists",  # 2.35.0 (#1101)
     "lists.templates",
     "tasks.dependencies",
+    "tasks.depchain",  # 2.67.0 B (#1865)
     "lists.projects",
     "lists.envs",  # 2.60.0 D (#1514)
     "lists.formula",  # 2.43.0 (#1328): the formula parser (no routes; used by lists.fields)
@@ -224,6 +225,7 @@ ORDER = (
     "accounts.layouts_more",  # 2.55.0 (#1067): the new views' blocks for the agents' proposals (after agents.lyprop)
     "tasks.related",  # 2.59.0 B (#1375): related tasks (text vectors from the optional embedding service, API v1, agent events)
     "lists.points",  # 2.60.0 B (#1511): story points velocity (after api.v1)
+    "office.fixedimport",  # 2.67.0 A (#1838): fixed costs from a spreadsheet + the monthly check task of the cash flow
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

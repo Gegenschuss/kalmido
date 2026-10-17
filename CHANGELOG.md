@@ -7,6 +7,27 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.68.0] - 2026-10-17
+
+### Added
+- Office > Cash flow: import fixed costs from a spreadsheet (.xlsx). A preview shows every row (amount, repeat, due month,
+  category, VAT rate); duplicates (same name, amount and repeat) are marked and unticked, rows without a name or amount are
+  shown with the reason and skipped; only "Import" writes. A template can be downloaded. Group rows become the category;
+  quarterly costs become four yearly rows (#1838).
+- Fixed costs have a category and a VAT rate (0 / 7 / 19 %). The list is grouped by category and shows net and gross; the
+  cash flow counts gross and its totals switch between net and gross. Existing fixed costs keep 0 %, so their values do not
+  change (#1838).
+- Optional monthly task "Cash flow: check the actual state" on the 1st for a chosen office admin - with a link, never with
+  amounts; switching it off ends the task (#1838).
+- Timeline: when a task becomes due later, every task waiting on it moves along by the same number of days, down the whole
+  chain, gaps kept - when dragging, in the task detail, through the API and for agents. A preview shows what moves while
+  dragging; "N dependent tasks moved along" comes with one undo. Completed tasks, milestones, tasks without a date and tasks
+  you cannot edit stay where they are and are named (#1865).
+- "Pull the chain in": a task that became earlier does not drag its chain back by itself; a button (bar menu, task detail,
+  the message) moves the chain up to right behind it (#1865).
+- "Move dependent tasks along" is on from the start in new project lists. API / MCP: field `chain` in the answer,
+  `shift_chain: false` turns it off for one change (#1865).
+
 ## [2.64.3] - 2026-10-17
 
 ### Added

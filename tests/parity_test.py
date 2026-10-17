@@ -392,6 +392,8 @@ APP_ONLY = [
     # 2.63.0 B (#1513): whether the reporter of a customer report gets mails is the team's (and the reporter's) decision
     ("2.63.0 (#1513): the mails to the reporter of a customer report are switched by people (the task's box) or the reporter "
      "(the link in every mail); agents answer customers with portal comments", ("=PATCH /api/tasks/{}/ticket",)),
+    ("2.67.0 (#1865): \"Pull the chain in\" is a person's button in the timeline / task panel; agents move the waiting tasks "
+     "with update_task (a later due date moves the chain along by itself)", ("=POST /api/tasks/{}/chain/pull",)),
 ]
 
 

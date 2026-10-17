@@ -398,7 +398,7 @@ function depsHtml(t) {
     : `<button class="btn sm dadd" data-act="dep-add" data-dir="${dir}" data-id="${t.id}">${ic('plus', 's')} ${tr('Blocking…')}</button>`;
   if (ro && !D.blocked_by.length && !D.blocking.length) return head + `<div class="muted mhint">${tr('No dependencies.')}</div>`;
   return head + `<div class="dgrp"><div class="dlab">${tr('Blocked by')}</div>${D.blocked_by.map(x => depItem(x, 'by', t, ro)).join('') || (ro ? '' : `<div class="muted dnone">${tr('nothing')}</div>`)}${add('by')}</div>
-    <div class="dgrp"><div class="dlab">${tr('Blocking')}</div>${D.blocking.map(x => depItem(x, 'blocking', t, ro)).join('')}${add('blocking')}</div>`;
+    <div class="dgrp"><div class="dlab">${tr('Blocking')}</div>${D.blocking.map(x => depItem(x, 'blocking', t, ro)).join('')}${add('blocking')}${dch_pullBtn(t, D)}</div>`;  // 2.67.0 B (#1865)
 }
 // 2.22.0 (#686): "Waiting on external" (a client's approval, an offer, a delivery) as a visible button in the task panel:
 // in the dependencies under "Waiting on…" (the tasks), else in its own small section; hidden while the task already

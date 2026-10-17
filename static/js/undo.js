@@ -292,7 +292,7 @@ async function patchUndoable(id, body, msg) {
   if (body?.list_id && typeof ln_moveHint === 'function') ln_moveHint(id, body.list_id);  // 2.48.0 (#1642): a locked note stays locked
   if (body?.list_id) msg = wsc_moveMsg(taskById(id)?.list_id, body.list_id, msg);  // 2.53.0 (#1474): Private -> organisation: who sees it now
   const t = await patchTask(id, body, true);
-  if (t?.shifted?.length) { shiftUndo(before, t, msg); return t; }
+  if (t?.shifted?.length || t?.chain?.skipped?.length) { shiftUndo(before, t, msg); return t; }  // 2.67.0 B (#1865)
   const after = snapTask(S.tasks.get(id) || t);
   const e = before && after && histFields(histLabel(before, after), [[before, after]], {res: t});
   if (e) offerUndo(msg, e);

@@ -320,6 +320,43 @@ Routes: `GET /api/office/deals` (`items`, `summary`, `stages`, `probabilities`, 
 `POST /api/office/deals/<id>/restore`, `POST /api/office/deals/<id>/offer`, `POST /api/office/deals/<id>/project`,
 `GET /api/office/deals/summary`, `GET /api/office/kpi`. Clients, lists and quotations of another area are refused.
 
+## Cash flow and fixed costs (2.67)
+
+The tab **Cash flow** (admins of the office area only) shows per month what comes in and goes out, actual and planned.
+**Fixed costs** (rent, subscriptions, insurances) are entered there: name, amount **net**, a free **category** (the list
+groups by it, without one last; the field suggests the categories already used), the **VAT rate** (0, 7 or 19 %), repeat
+(once, monthly, quarterly, yearly), first due date and end. Each row shows net and gross. Fixed costs from before 2.67
+have 0 % and keep their amounts.
+
+**Net | Gross** above the months switches the sums (gross by default; the choice is kept on the device). Gross adds the
+rate to the fixed costs; documents (payments, open invoices, accepted quotations, credit notes) are gross and take their
+net share on the net basis; purchases and travel receipts have no rate here and count the same on both. The start page
+figures use gross.
+
+**Import from Excel**: "Download template" gives an .xlsx with the header row and three example rows. The first sheet is
+read below its header row: `Name`, `Betrag (netto)` (also `Betrag`, `netto`, `Amount (net)`), `fällig Monat` (also
+`Monat`, `Due month`); optional `Kategorie`, `USt`, `Wiederholung`. A row with a name but no amount is a group row: its
+name is the category of the rows below. Month 0 = monthly from 1 January 2026, 1-12 = yearly in that month (on the 1st);
+a quarterly cost (the name says "vierteljährlich" / "Quartal", or the column `Wiederholung`) with a month X becomes four
+yearly rows (X, X+3, X+6, X+9); with month 0 the month wins (monthly). The VAT rate is 0 % for insurances, levies and
+contributions, else 19 %, and can be changed per row in the preview. Amounts like `1.200,50`, `12.500`, `1,200.50` and
+`29,90` are read. The preview marks every row new, duplicate (same name, amount and repeat as an existing cost or an
+earlier row of the file; not ticked) or error (no name, amount 0 or missing; never taken over). Nothing is stored before
+"Take over N rows"; then every row is checked again, all are written in one step (the undo removes them again), at most
+500 fixed costs per area. Files up to 2 MB and 500 rows; cells are read as text, formulas are never run.
+
+**Monthly check** (optional): a tick creates the task "Cash flow: check the actual state" for one admin of the area, due
+on the 1st of every month in that person's inbox, with only a link to the cash flow (never an amount). Another person
+ends the old task and creates a new one; switching it off ends the task (done, without a next date; not deleted). If the
+person later loses access to the cash flow, the tab says so; nobody else is picked automatically.
+
+Routes (office admins, people only; agents get 403): `GET /api/office/cashflow?from=YYYY-MM&months=1..12&basis=gross|net`,
+`GET/POST /api/office/fixed-costs`, `PATCH/DELETE /api/office/fixed-costs/<id>` (`category`, `vat_rate` 0/7/19; the answer
+adds `gross`), `POST /api/office/fixed-costs/import/preview` (multipart `file`), `POST /api/office/fixed-costs/import`
+(`{items: [{label, amount, repeat, start, until?, category?, vat_rate?}]}` -> `{created, ids}`),
+`POST /api/office/fixed-costs/delete` (`{ids}`: the undo of an import), `GET /api/office/fixed-costs/import/template`,
+`GET/PUT /api/office/cashflow/check` (`{on, user_id}` -> `{on, user_id, task_id, people, lost}`).
+
 ## Web API
 
 All routes require a signed-in person with the module on; they work in the office of the shown workspace (`400` with a
