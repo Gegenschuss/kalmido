@@ -80,6 +80,9 @@ async function dataPane(w) {
   check(!/carol@example\.com/.test(box().innerHTML), 'no address of another person in the preview');  // 2.73.0 (#1473): review M1
   ck.checked = true;
   click(w, box().querySelector('[data-umz="go"]'));
+  // 2.87.9 (#1940): the import first names where the account's data goes
+  check(await until(() => w.document.querySelector('.itc-dlg [data-cd="yes"]')), 'the import names its target first');
+  click(w, w.document.querySelector('.itc-dlg [data-cd="yes"]'));
   await until(() => md.querySelector('#s-umz-imp [data-umz="undo"]'), 100);
   check(/Import finished/.test(md.querySelector('#s-umz-imp').textContent) && /Shared/.test(md.querySelector('#s-umz-imp').textContent), 'the result with the shared person');
   const st = await call(CB, 'GET', '/api/state');

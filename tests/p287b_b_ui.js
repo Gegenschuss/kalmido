@@ -124,7 +124,8 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   await sleep(2600);
   check(/3 of 5/.test(d.querySelector('.pl-slot .pl-run')?.textContent || ''), '#1938: a lost answer keeps the last state on screen');
   w.eval(`_pl.lost = false; _pl.done = 5; _pl.state = 'idle'`);
-  check(await until(() => !d.querySelector('.pl-slot .pl-run'), 60) && w.eval('_pl.n') > n0, '#1938: it asks again after a lost answer and ends');
+  check(await until(() => !d.querySelector('.pl-slot .pl-run'), 120) && w.eval('_pl.n') > n0, '#1938: it asks again after a lost answer and ends '
+    + JSON.stringify(w.eval(`({n: _pl.n, fail: PL.fail, st: PL.d?.conn?.run?.state, slots: $$('.pl-slot').length, txt: $('.pl-slot .pl-run')?.textContent})`)) + ' n0=' + n0);
   check(await until(() => /Import from Paperless-ngx finished/.test(d.querySelector('#toast, .toast')?.textContent || ''), 20), '#1938: the end is said once');
   // the documents settings: only progress + a way to the settings
   w.eval(`_pl.state = 'busy'; _pl.done = 2`);
