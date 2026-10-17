@@ -7,6 +7,12 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+Live fix from the device test of 2.80.2.
+
+### Fixed
+- Bell: the panel lists what counts for you under *Needs you*, no longer under *For your information* (#1943).
+- Tests: robust after midnight and on Sundays, the test run is split into 11 parts.
+
 ## [2.80.2] - 2026-10-18
 
 Live fixes: the bell, document previews of imports, switching the workspace.
