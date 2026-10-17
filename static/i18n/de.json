@@ -8250,5 +8250,11 @@
   "“{0}” installed": "„{0}“ installiert",
   "“{0}” uninstalled": "„{0}“ deinstalliert",
   "“{0}” updated to v{1}": "„{0}“ auf v{1} aktualisiert",
-  "{0} entry of the catalogue was skipped (not valid)": ["{0} Katalog-Eintrag übersprungen (ungültig)", "{0} Katalog-Einträge übersprungen (ungültig)"]
+  "{0} entry of the catalogue was skipped (not valid)": ["{0} Katalog-Eintrag übersprungen (ungültig)", "{0} Katalog-Einträge übersprungen (ungültig)"],
+  "No catalogue is set up": "Kein Katalog eingerichtet",
+  "The catalogue could not be read": "Der Katalog konnte nicht gelesen werden",
+  "This pack is not in the catalogue": "Dieses Paket steht nicht im Katalog",
+  "This pack is not installed": "Dieses Paket ist nicht installiert",
+  "Built-in packs cannot be removed": "Eingebaute Pakete lassen sich nicht entfernen",
+  "Another version of this pack is installed": "Eine andere Version dieses Pakets ist installiert"
 }
