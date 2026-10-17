@@ -385,7 +385,7 @@ main() {
   if [ -n "$code" ]; then
     say "Open it now and create the first account (it becomes the admin) with this one-time setup code:"
     printf '\n    \033[1m%s\033[0m\n\n' "$code"
-    say "(It is also in the log: cd \"$DIR\" && docker compose logs kalmido. A restart prints a new one.)"
+    say "(It is also in the log of the running container: cd \"$DIR\" && docker compose logs kalmido. Only the newest Setup code line counts; a restart prints a new one.)"
   else
     say "Open it now and log in."
   fi
