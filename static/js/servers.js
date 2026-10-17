@@ -19,7 +19,7 @@ async function msvReq(method, url, body) {
 const msvHtml = () => `<h4 id="s-msv-h">${tr('Servers')}</h4>
   <div class="shint keep">${tr('Show your accounts on other Kalmido servers here too, for example work and home: one sidebar, Today, Inbox, calendar and search for all of them. The data stays on its own server; nothing is copied or synchronised.')}</div>
   <div class="members" id="s-msv"><div class="muted mhint">${tr('Loading…')}</div></div>
-  <div class="row msvbtns"><button class="btn sm pri" data-msv="add">${ic('plus', 's')} ${tr('Add server')}</button><button class="btn sm" data-msv="code">${ic('key', 's')} ${tr('Create a connection code for another server')}</button></div>`;
+  <div class="row msvbtns"><button class="btn sm pri" data-msva="add">${ic('plus', 's')} ${tr('Add server')}</button><button class="btn sm" data-msva="code">${ic('key', 's')} ${tr('Create a connection code for another server')}</button></div>`;
 async function msvDraw(md) {
   // the section stands in Settings > Account above "Advanced · for developers"
   let box = $('#s-msv', md);
@@ -32,8 +32,8 @@ async function msvDraw(md) {
   let j; try { j = await msvFetch(true); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j;
   const me = j.self || {}, links = j.links || [];
-  const selfRow = `<div class="mrow msvrow" data-msvid="self">${msvBadge(me.short, me.color)}<span class="n"><b>${esc(me.name || '')}</b><small class="muted">${tr('The server this app runs on')}${links.some(l => l.default_inbox) ? '' : ' · ' + tr('Quick add lands here')}</small></span><button class="iconbtn" data-msv="edit" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit {0}', me.name || ''))}">${ic('edit', 's')}</button></div>`;
-  box.innerHTML = selfRow + links.map(l => `<div class="mrow msvrow ${l.ok ? '' : 'off'}" data-msvid="${l.id}">${msvBadge(l.short, l.color)}<span class="n"><b>${esc(l.name)}</b><small class="muted">${esc(msvHost(l.base_url))}${l.remote_me?.name ? ' · ' + esc(l.remote_me.name) : ''}${l.default_inbox ? ' · ' + tr('Quick add lands here') : ''}</small><small class="msvst ${l.ok ? 'ok' : 'bad'}">${l.ok ? tr('Connected') : esc(l.err_text || tr('Not reachable'))}</small></span><button class="iconbtn" data-msv="edit" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit {0}', l.name))}">${ic('edit', 's')}</button><button class="iconbtn danger" data-msv="del" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove {0}', l.name))}">${ic('trash', 's')}</button></div>`).join('')
+  const selfRow = `<div class="mrow msvrow" data-msvid="self">${msvBadge(me.short, me.color)}<span class="n"><b>${esc(me.name || '')}</b><small class="muted">${tr('The server this app runs on')}${links.some(l => l.default_inbox) ? '' : ' · ' + tr('Quick add lands here')}</small></span><button class="iconbtn" data-msva="edit" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit {0}', me.name || ''))}">${ic('edit', 's')}</button></div>`;
+  box.innerHTML = selfRow + links.map(l => `<div class="mrow msvrow ${l.ok ? '' : 'off'}" data-msvid="${l.id}">${msvBadge(l.short, l.color)}<span class="n"><b>${esc(l.name)}</b><small class="muted">${esc(msvHost(l.base_url))}${l.remote_me?.name ? ' · ' + esc(l.remote_me.name) : ''}${l.default_inbox ? ' · ' + tr('Quick add lands here') : ''}</small><small class="msvst ${l.ok ? 'ok' : 'bad'}">${l.ok ? tr('Connected') : esc(l.err_text || tr('Not reachable'))}</small></span><button class="iconbtn" data-msva="edit" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit {0}', l.name))}">${ic('edit', 's')}</button><button class="iconbtn danger" data-msva="del" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove {0}', l.name))}">${ic('trash', 's')}</button></div>`).join('')
     + (links.length ? '' : `<div class="muted mhint">${tr('No other server connected yet.')}</div>`);
 }
 const msvColHtml = cur => `<div class="pfcol msvcol" role="group" aria-labelledby="msv-col-h">${AC_COLORS.map((c, i) => `<button type="button" data-msvcol="${c}" style="--acol:${c}" title="${esc(tr(AC_NAMES[i]))}" aria-label="${esc(tr(AC_NAMES[i]))}" aria-pressed="${cur === c}"></button>`).join('')}</div>`;
@@ -49,8 +49,8 @@ function msvWire(md) {
   if (md._msvWired) return;
   md._msvWired = true;
   md.addEventListener('click', async e => {
-    const b = e.target.closest('[data-msv]'); if (!b || !md.contains(b)) return;
-    const box = $('#s-msv', md), j = box?._j || {}, a = b.dataset.msv;
+    const b = e.target.closest('[data-msva]'); if (!b || !md.contains(b)) return;
+    const box = $('#s-msv', md), j = box?._j || {}, a = b.dataset.msva;
     if (a === 'add') { msvAddModal(md); return; }
     if (a === 'code') { msvCodeModal(); return; }
     const rid = b.closest('[data-msvid]')?.dataset.msvid; if (!rid) return;
