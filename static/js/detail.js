@@ -255,7 +255,7 @@ function crumbMenu(anchor, k, id) {  // 2.25.0 (UX-44)
   const t = taskById(S.sel), l = t && listById(t.list_id); if (!l) return;
   const sec = k === 'sec' && id ? S.sections.find(x => x.id === +id) : null;
   menu(anchor, [...(k === 'list' ? [{label: tr('Open {0}', lname(l)), icon: l.is_inbox ? 'inbox' : 'list', fn: () => crumbGo('list', l.id)}] : sec ? [{label: tr('Open {0}', sec.name), icon: 'columns', fn: () => crumbGo('sec', sec.id)}] : []), '-',
-    moveListItem(anchor, t.id), ...(!t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, t.id)}] : [])].filter((x, i, a) => x !== '-' || i > 0));
+    moveListItem(anchor, t.id), ...ml_menuItems(anchor, t), ...(!t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, t.id)}] : [])].filter((x, i, a) => x !== '-' || i > 0));
 }
 function crumbGo(k, id) {
   closePop();

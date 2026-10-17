@@ -32,13 +32,13 @@ function viewTasks() {
     return {...pick(t => t.assignee_group_id === gid, 'list'), done: []};
   }
   if (k === 'inbox' || k.startsWith('l:')) {
-    const lid = k === 'inbox' ? inbox().id : +k.slice(2), done = doneRecent.filter(t => t.list_id === lid);
+    const lid = k === 'inbox' ? inbox().id : +k.slice(2), inL = t => t.list_id === lid || ml_in(t, lid), done = doneRecent.filter(inL);  // 2.71.0 B (#1459): + the linked tasks
     // 2.36.2 (#1136): "Keep completed in their section": the completed tasks go into their sections (inSec), not into "Completed"
     if (dsxOn(listById(lid))) {  // (an open subtask of a shown completed task stays below it, not a second time at the top)
-      const p = pick(t => t.list_id === lid, 'section', {list: lid}), dn = showDone() ? done : [], dids = new Set(dn.map(t => t.id));
+      const p = pick(inL, 'section', {list: lid}), dn = showDone() ? done : [], dids = new Set(dn.map(t => t.id));
       return {...p, open: p.open.filter(t => !dids.has(t.parent_id)), done: [], inSec: dn, dsx: true};
     }
-    return {...pick(t => t.list_id === lid, 'section', {list: lid}), done};
+    return {...pick(inL, 'section', {list: lid}), done};
   }
   if (k === 'byme') return {...pick(dsxByMe, 'person'), done: []};  // 2.36.2 (#1138): "Assigned by me", by person
   if (k.startsWith('who:')) {  // 2.7.2 (#418): open tasks assigned to one person, in the lists I see
@@ -261,8 +261,9 @@ function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks
   if (v.group === 'section') {
     const secs = S.sections.filter(s => s.list_id === v.list), mk = p => dsxMerge(arr.filter(p), dn.filter(p));
     if (!secs.length) return [{id: 'all', name: '', tasks: mk(() => true)}];
-    const out = [{id: 's:0', name: tr('Unassigned'), tasks: mk(t => !t.section_id || !secs.some(s => s.id === t.section_id)), section: null}];
-    for (const s of secs) out.push({id: 's:' + s.id, name: s.name, tasks: mk(t => t.section_id === s.id), section: s.id});
+    const sc = t => ml_sec(t, v.list);  // 2.71.0 B (#1459): a linked task sits in the section of its link
+    const out = [{id: 's:0', name: tr('Unassigned'), tasks: mk(t => !sc(t) || !secs.some(s => s.id === sc(t))), section: null}];
+    for (const s of secs) out.push({id: 's:' + s.id, name: s.name, tasks: mk(t => sc(t) === s.id), section: s.id});
     return out.filter((g, i) => i > 0 || g.tasks.length);
   }
   if (v.group === 'person') {  // 2.36.2 (#1138): one group per assignee, by name

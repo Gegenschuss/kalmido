@@ -568,6 +568,8 @@ def watchdog_tick(c):
     from ..newsletter.sync import nwl_tick
     _wd_section(c, "newsletter", nwl_tick)  # 2.55.0 (#1455): the daily sync of connections with "auto" (own threads)
     from ..accounts.tenancy import boundary_tick
+    from ..lists.rules import rul_due_tick
+    _wd_section(c, "list rules", rul_due_tick)  # 2.71.0 A (#1457): rules "due date reached"
     _wd_section(c, "boundary check", boundary_tick)  # 2.30.0 (#1036): once a night, before the alerts go out
     from ..notify.sev import sev_scan
     _wd_section(c, "security watch", sev_scan)  # 2.36.2 (#1133): new admins / org admins / agents / agent tokens

@@ -180,6 +180,7 @@ function counts() {
     if (mineAssigned(t) && mtCounts(t, t0)) c.assigned++;  // 2.41.0 (#1365): not the hidden lists (except due today / overdue)
     if (dsxByMe(t)) c.byme++;  // 2.36.2 (#1138)
     c.lists[t.list_id] = (c.lists[t.list_id] || 0) + 1;
+    for (const x of t.also || []) c.lists[x.list_id] = (c.lists[x.list_id] || 0) + 1;  // 2.71.0 B (#1459): a further list counts it too (everything else once)
     for (const g of new Set([...t.tags, ...(t.ltags || [])])) c.tags[g] = (c.tags[g] || 0) + 1;
     if ((t.due && t.due <= t0 || dlToday(t) || planToday(t, t0)) && !(t.blocked && hideBlockedToday())) c.today++;  // 2.11.0: + planned for today
     else if (todayInbox() && isTodayInbox(t, t0)) c.today++;  // 2.22.0 (#681): the inbox counts in Today when it is shown there
@@ -945,9 +946,9 @@ function taskRow(t, opts = {}) {
   if (S.route.key === 'stale' && !opts.trash && staleOf(t) && rs('stale')) meta.push(staleChipHtml(t));  // 2.34.0 (#266)
   if (t.approval === 'pending' && t.status === 0 && !opts.trash) meta.push(approvalChip(t));  // 2.23.0 (#463)
   if (t.pinned && !opts.trash && rs('pin')) meta.push(`<span class="pinm">${ic('pin', 's')}</span>`);
+  if (t.also && !opts.trash && !opts.depth) { const m = ml_rowMark(t); if (m) meta.push(m); }  // 2.71.0 B (#1459): also in / from another list
   if (lst && !rs('list')) { /* 2.56.1 (#1799): the list is switched off */ }
-  else if (lst && moOwn() && !opts.depth) meta.unshift(moSubHtml(t));  // 2.40.0 (#1344): My tasks, own order: "List › Section"
-  else if (lst) meta.push(`<span class="lst${mc}" title="${esc(lst)}">${licMark(listById(t.list_id), 'lsm')}${esc(lst)}</span>`);  // 2.36.2 (#1135)
+  else if (lst && moOwn() && !opts.depth) meta.unshift(moSubHtml(t));  // 2.40.0 (#1344): My tasks, own order: "List › Section"  else if (lst) meta.push(`<span class="lst${mc}" title="${esc(lst)}">${licMark(listById(t.list_id), 'lsm')}${esc(lst)}</span>`);  // 2.36.2 (#1135)
   // 2.16.0 (#473): overdue is not only red: the alert icon + a word for screen readers
   // 2.31.0 (#1051): in Today a task due today carries no "Today" chip (the view says it), only its time
   const inDay = opts.inToday && t.due === today() && t.status === 0;

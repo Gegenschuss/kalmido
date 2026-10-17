@@ -98,6 +98,8 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     if e:
         return e
     cur = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()  # also the "before" of the activity log
+    from ..lists.rules import rul_fire, rul_snap
+    rb = rul_snap(c, tid)  # 2.71.0 A (#1457): list rules compare with this after the change
     from ..tasks.validation import lock_problem
     e = lock_problem(c, cur, f, b) if lock else None  # 2.36.0 (#1118): a locked task keeps its locked fields (app writes)
     if e:
@@ -266,6 +268,7 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         rvw_on_move(c, tid, cur)
     if f and "section_id" in f and not cur["parent_id"] and is_shop(c, lid):  # 2.19.0: the shop area of this item
         shop_remember(c, lid, f.get("title") or cur["title"], f["section_id"])
+    rul_fire(c, tid, rb)  # 2.71.0 A (#1457)
     return None
 
 
@@ -339,6 +342,8 @@ def do_complete(c, tid, status=2, undo=None):
         e = rvw_gate(c, tid)
         if e:
             raise Denied(409, e)
+    from ..lists.rules import rul_fire_done, rul_snap
+    rb = rul_snap(c, tid)  # 2.71.0 A (#1457)
     ts = iso(now_utc())
     who = (me() or None) if status != 0 else None  # 0 = public link: nobody's completion (statistics)
     cnt = rr_count(t["repeat"])
@@ -397,6 +402,7 @@ def do_complete(c, tid, status=2, undo=None):
             for d in descendants(c, tid):
                 c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=? AND status=0",
                           (status, ts, who, ts, d))
+    rul_fire_done(c, tid, cur_id if nxt else None, rb)  # 2.71.0 A (#1457): a recurring task: its completed copy
     return nxt
 
 
@@ -559,10 +565,13 @@ def task_reopen(tid):
     c = db()
     need_task(c, tid)
     old = c.execute("SELECT status, completed_at, completed_by FROM tasks WHERE id=?", (tid,)).fetchone()
+    from ..lists.rules import rul_fire, rul_snap
+    rb = rul_snap(c, tid)  # 2.71.0 A (#1457)
     if old["status"] != 0:
         log_act(c, tid, "reopen")
         stars_revoke(c, tid, at=old["completed_at"], kid=old["completed_by"])  # 2.19.0 (#653)
     c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=?", (iso(now_utc()), tid))
+    rul_fire(c, tid, rb)
     bump(c)
     c.commit()
     undo = {"op": "reopen", "status": old["status"], "completed_at": old["completed_at"], "completed_by": old["completed_by"]}

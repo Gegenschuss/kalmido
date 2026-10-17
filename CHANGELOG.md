@@ -7,6 +7,33 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.72.0] - 2026-10-17
+
+Project automation: lists that do the routine steps themselves, and one task that lives in several lists.
+
+### Added
+- **Rules in lists:** in the list settings the owner and the list admins set up rules in one sentence: *When* a task
+  comes into a column, is completed, is opened again, gets a list tag or its due date is reached, *then* assign it to a
+  person of the list, set or remove the due date, write a comment or move it to a column or another list of the same
+  workspace. A rule runs with the rights of the person who set it up and pauses itself (with the reason) when a right is
+  missing. A change made by a rule never starts another rule - no chains, no ping-pong. History and comments show
+  "Rule <name>". Health lists, the inbox and locked lists have no rules (#1457).
+- **A task in several lists:** "Show also in list…" in a task's menu puts it into a further list of the same workspace
+  without a copy - one task, every change everywhere, its own column and place in the further list (also on the board).
+  The row says "Also in <list>" / "From <list>"; "Remove from <list>" never deletes the task. Who sees it is decided by its
+  own list only: someone who sees only the further list does not see the task. Other organisations, health and locked
+  lists cannot be used. Statistics, search, calendar and exports count it once (#1459).
+
+### Agents
+- Rules: `GET /api/v1/lists/{id}/rules`, MCP `list_rules`; agents only propose a rule (proposal kind `rule`, MCP
+  `propose_rule`); the owner or a list admin accepts it and then owns it.
+- Tasks carry `also` (only the further lists the caller may see); `POST/DELETE /api/v1/tasks/{id}/links`, MCP
+  `link_task_to_list` / `unlink_task_from_list`.
+
+### Database
+- New tables only: `list_rules`, `list_rule_runs`, `task_links`; new column `comments.rule_name` (default empty).
+  Older versions ignore them.
+
 ## [2.71.0] - 2026-10-17
 
 Agent workflows: three everyday jobs an agent prepares and you decide. The agent only proposes; nothing is sent, merged or

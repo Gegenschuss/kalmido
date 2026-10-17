@@ -46,7 +46,10 @@ def log_act(c, tid, kind, data=None, uid=None):
     from ..integrations.webhooks import wh_note
     if uid is None and has_request_context() and getattr(g, "user", None):
         uid = g.user["id"] or None  # 0 = someone via a public link (no user)
-    via = act_via()
+    rr = g.get("rul_run") if has_request_context() else None
+    via = None if rr else act_via()
+    if rr:  # 2.71.0 A (#1457): a change made by a list rule: the history shows "Rule <name>"
+        data = {**(data or {}), "rule": rr}
     if via:  # package B: "via API" / "via the public link" in the history
         data = {**(data or {}), "via": via}
     if has_request_context():

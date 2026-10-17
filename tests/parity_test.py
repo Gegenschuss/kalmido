@@ -215,6 +215,9 @@ APP_TO_API = {
     # 2.60.0 (#343): sprints -- agents read the sprints of a shared list and put tasks into one (or back to the backlog)
     "GET /api/lists/{}/sprints": ["GET /lists/{}/sprints"], "GET /api/sprints/{}": ["GET /sprints/{}"],
     "POST /api/lists/{}/sprints/assign": ["POST /lists/{}/sprints/assign"],
+    # 2.71.0 (#1459): a task in several lists; the place in a further list = linking again with the section
+    "POST /api/tasks/{}/links": ["POST /tasks/{}/links"], "DELETE /api/tasks/{}/links/{}": ["DELETE /tasks/{}/links/{}"],
+    "PATCH /api/tasks/{}/links/{}": ["POST /tasks/{}/links"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
@@ -400,6 +403,11 @@ APP_ONLY = [
     ("2.70.0 (#1354): a person's photos of a meeting for a proposal request and the chat's cards of their ready proposals; "
      "proposals come only from people, the agent reads the photos with GET /chat-attachments/{id} and answers with "
      "POST /agent/jobs/{id}/proposal", ("=POST /api/agents/{}/meeting-images", "=GET /api/agents/{}/meeting-proposals")),
+    # 2.71.0 A (#1457): rules of a list are set by its owner / admins; agents read (GET /lists/{id}/rules, MCP list_rules) and
+    # only propose (POST /lists/{id}/rules/proposals, MCP propose_rule)
+    ("2.71.0 (#1457): the rules of a list are managed by its owner / list admins in the app; agents read them and only propose "
+     "one (the person accepts it, it runs with their rights)",
+     ("* /api/lists/{}/rules", "* /api/rules/")),
 ]
 
 

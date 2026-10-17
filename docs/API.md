@@ -262,6 +262,7 @@ had been made in the app. Webhooks fire too.
 | `PATCH /sections/{id}` `{wip_limit}` | structure | 2.60.0: the WIP limit of a kanban column (the most open tasks it should hold; `null` / `0` = none). A hint only: the app shows "2/3" in the column head and marks it above the limit, moving stays allowed. Sections carry `wip_limit`; `POST /lists/{id}/sections` takes it too |
 | `GET /lists/{id}/velocity` | read | 2.60.0: the completed story points (`points`) and tasks (`count`) of the list's last up to 6 closed sprints, oldest first, and their `average` (null = no closed sprint yet). Participants count only the tasks they see |
 | `POST /tasks/{id}/move` | tasks:write | 2.15.0: `{list_id?, section_id?, parent_id?, before_id? \| after_id? \| position?: top \| bottom}`: another list / section / parent and a place among the siblings; subtasks move along; the same rights as in the app (into a list you may edit, out of a shared list only as its owner) |
+| `POST /tasks/{id}/links` · `DELETE /tasks/{id}/links/{list_id}` | tasks:write | 2.71.0 (#1459): show a task also in another list `{list_id, section_id?}` (no copy) / remove it from that list (the task stays). Rights stay with the task's own list; edit rights on the task and the list, same workspace, no health / locked lists, top-level tasks, at most 10 further lists. Tasks carry `also: [{list_id, section_id, sort}]` = the further lists you see (absent when none) |
 | `POST /tasks/batch` | tasks:write (+ delete) | 2.15.0: `{ids (1-500), action: update \| complete \| reopen \| wont_do \| delete \| restore, changes? (update)}`: one transaction; tasks you may not change are skipped (`errors`). `delete` / `restore` also need `delete`. Agents: 10 or more tasks wait for approval (`202`) |
 | `POST /tasks/{id}/skip` | tasks:write | 2.15.0: skip this occurrence of a repeating task (next date, no completed copy) |
 | `GET /trash` · `DELETE /trash` | read · delete | 2.15.0: tasks in the trash (`list_id`, pages); empty it for good (lists you own; admins also shared lists they may edit; agents: approval) |
@@ -1259,6 +1260,18 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
                  {"label": "Liability insurance", "amount": "240,00", "repeat": "yearly", "start": "2026-03-01", "category": "Insurances", "vat_rate": 0},
                  {"label": "Software subscription", "amount": 29.9, "start": "2026-01-01", "vat_rate": 19}]}' \
   https://kalmido.example/api/v1/agent/proposals/import
+
+## Rules of a list (2.71.0)
+
+Read only for tokens; agents propose (see docs/AGENTS.md *Rules of a list*). People manage rules in the app (list
+settings > Rules: `GET` / `POST /api/lists/{id}/rules`, `PATCH` / `DELETE /api/rules/{id}`, `POST /api/rules/{id}/restore`).
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" https://kalmido.example/api/v1/lists/12/rules
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"name": "Review", "trigger": {"kind": "section", "section_id": 40}, "action": {"kind": "assign", "user_id": 3},
+       "summary": "Everything in Review goes to the reviewer"}' \
+  https://kalmido.example/api/v1/lists/12/rules/proposals
 ```
 
 | Route | Scope | |
@@ -1282,6 +1295,8 @@ groups, reason at most 300 characters; `{groups: []}` = none found). `GET /api/p
 (`key, target_id, reason, ok, contacts: [{id, fn, org, emails, phones, state: "" | changed | gone}]`, loaded fresh);
 `POST /api/proposals/{id}/apply {select: ["0", ...], edits: {"0": {target_id}}}` merges the ticked groups as the person
 (`merged`, `skipped`), `.../undo` and `.../redo` take all of them back / again.
+| `GET /lists/{id}/rules` | read | `trigger` {kind section / done / reopen / ltag / due, section_id, tag_id}, `action` {kind assign / due / comment / move, user_id, days, text, list_id, section_id}, `names`, `active`, `paused_reason`, `created_by` |
+| `POST /lists/{id}/rules/proposals` | structure | agents only: `name`, `trigger`, `action`, `summary`, `title`, `user_id`; 201 = a ready proposal job (kind `rule`) |
 
 ## Pin board, time check and shoot planning for agents (2.51.0)
 

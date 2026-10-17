@@ -50,6 +50,8 @@ TABLES = (
     "portal_tickets", "portal_logins",  # 2.63.0 (#1513): customer reports + portal sign-ins (NULL = a private list, the app checks owner_id)
     "merge_runs",  # 2.66.0 (#1835): merges of contacts / clients (NULL = a person's own book / office, the app checks)
     "pl_uploads",  # 2.69.0 A (#1846): an uploaded Paperless-ngx export (NULL = a person's own space)
+    "task_links",  # 2.71.0 B (#1459): a task shown in a further list (NULL = private lists, the app checks both lists)
+    "list_rules",  # 2.71.0 A (#1457): rules of a list (org_id follows the list, NULL = a private list)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

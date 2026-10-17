@@ -183,6 +183,7 @@ OX_AREAS = (
     ("lists/links.json", "list_links", f"list_id IN ({LSQ})"),
     ("lists/notepads.json", "list_notepads", f"list_id IN ({LSQ})"),  # 2.43.0 (#1346): notepads on the project page
     ("lists/milestones.json", "list_milestones", f"list_id IN ({LSQ})"),
+    ("lists/rules.json", "list_rules", f"list_id IN ({LSQ})"),  # 2.71.0 A (#1457)
     ("lists/history.json", "list_activity", f"list_id IN ({LSQ})"),
     ("lists/notes.json", "notes", f"list_id IN ({LSQ})"),
     ("lists/files.json", "list_files", f"list_id IN ({LSQ})"),

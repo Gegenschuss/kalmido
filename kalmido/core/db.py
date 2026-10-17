@@ -331,6 +331,8 @@ def init_db(guard=True, load=None):
         c.executescript(WIKI_E2E_TRIGGER)  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
         from ..tasks.delta import dl_setup
         dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
+        from ..tasks.multilist import ml_setup
+        ml_setup(c)  # 2.71.0 B (#1459): links never cross a workspace boundary
         for stmt in INDEXES.strip().split(";"):
             if stmt.strip():
                 c.execute(stmt)

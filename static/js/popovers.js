@@ -711,6 +711,7 @@ function taskMenu(anchor, id, o = {}) {
     {head: tr('Organize')},
     // where it lives
     ...(open ? [moveListItem(anchor, id)] : []),
+    ...(open ? ml_menuItems(anchor, t) : []),  // 2.71.0 B (#1459): show also in another list / remove from it
     ...(open && !t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, id)}] : []),
     ...(open ? spr_menuItems(t, anchor) : []),  // 2.60.0 (#343): Sprint… (lists with sprints on)
     // 2.16.0 (#473, WCAG 2.5.7): what dragging does, as menu items (also Alt+↑ / ↓)

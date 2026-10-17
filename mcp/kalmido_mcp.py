@@ -1053,6 +1053,17 @@ TOOLS += [
     ("move_task", "Move a task (with its subtasks): to another list / section / parent and to a place: before_id or after_id (a "
                   "sibling) or position top | bottom. Moving into another list needs edit rights there.",
      _obj({"task_id": S_ID, **TASK_PLACE}, ["task_id"]), t_move_task),
+    # 2.71.0 (#1459): a task in several lists without a copy
+    ("link_task_to_list", "Show a task also in another list (no copy: changes are the same everywhere). Rights stay with the task's "
+                          "own list: who sees only the other list does not see the task. Needs edit rights on the task and on the "
+                          "list; both lists in the same workspace (organisation or private), no health or locked lists, top-level "
+                          "tasks only, at most 10 further lists. section_id: a section of that list. The task's also = its further "
+                          "lists you see.",
+     _obj({"task_id": S_ID, "list_id": S_ID, "section_id": {"type": ["integer", "null"], "minimum": 1}}, ["task_id", "list_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/links", body=_without(a, "task_id"))),
+    ("unlink_task_from_list", "Remove a task from a further list (the task itself stays in its own list).",
+     _obj({"task_id": S_ID, "list_id": S_ID}, ["task_id", "list_id"]),
+     lambda api, a: api.call("DELETE", f"/tasks/{int(a['task_id'])}/links/{int(a['list_id'])}")),
     ("batch_tasks", "Change many tasks at once (1-500 ids): action update (changes = task fields as in update_task) | complete | "
                     "reopen | wont_do | delete | restore. Tasks you may not change are skipped (errors). An agent's batch with 10 or "
                     "more tasks waits for a person's approval (approval_required + job).",
@@ -1727,6 +1738,23 @@ TOOLS += [
      _obj({"task_id": S_ID, "text": {"type": "string", "minLength": 1, "maxLength": 300}}, ["task_id", "text"]),
      lambda api, a: api.call("POST", "/agent/proposals", body={"kind": "notice", **_pick(a, ("task_id", "text"))})),
 ]
+# 2.71.0 A (#1457): rules of a list (When ... then ...): read them, propose one (the owner / an admin accepts it)
+_RULE_TRIG = {"type": "object", "description": "{kind: section (a task comes into column section_id) | done | reopen | ltag (gets the list "
+                                               "tag tag_id) | due (its due day is today), section_id?, tag_id?}"}
+_RULE_ACT = {"type": "object", "description": "{kind: assign (user_id, a person of the list) | due (days from today 0..365, null = clear) | "
+                                              "comment (text, at most 2000 characters) | move (list_id and / or section_id)}"}
+TOOLS += [
+    ("list_rules", "2.71.0: the rules of a list (trigger, action, active, paused_reason, who set it up). A rule runs with the rights "
+                   "of the person who set it up; a change made by a rule never triggers another rule.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/rules")),
+    ("propose_rule", "2.71.0 (scope structure): PROPOSE ONE rule for a list shared with you (name, trigger, action, a short summary why). "
+                     "The list's owner (or user_id: an owner / admin of the list) accepts or declines it; accepted, it belongs to them and "
+                     "runs with their rights. You never create or change rules yourself. At most 20 per day; the answer comes as the event job.",
+     _obj({"list_id": S_ID, "name": {"type": "string", "maxLength": 80}, "trigger": _RULE_TRIG, "action": _RULE_ACT,
+           "summary": {"type": "string"}, "title": {"type": "string"}, "user_id": S_ID}, ["list_id", "name", "trigger", "action"]),
+     lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/rules/proposals",
+                             body=_pick(a, ("name", "trigger", "action", "summary", "title", "user_id")))),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -1735,7 +1763,7 @@ TOOL_SCOPES = {
               "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "chat_typing", "send_chat", "request_chat_approval", "withdraw_chat_choices", "pin_chat_message", "report_usage", "get_usage",
               "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
-                    "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
+                    "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "link_task_to_list", "unlink_task_from_list", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
                     "update_habit", "check_in_habit", "shift_list_dates", "request_approval"),
     "comments": ("comment_typing", "request_comment_approval", "withdraw_comment_choices", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "pin_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "request_integration_approval", "request_deploy_approval", "update_comment", "delete_comment", "mark_news_read",
@@ -1771,6 +1799,7 @@ TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layo
 TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
 TOOL_SCOPES["import"] = ("propose_import",)  # 2.68.0 (#1839)
 TOOL_SCOPES["agent"] += ("propose_contract_notice",)  # 2.70.0 C (#1359)
+TOOL_SCOPES["structure"] += ("propose_rule",)  # 2.71.0 A (#1457)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
               "private", "files:read", "files:write", "office", "pinboard", "layouts", "import")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts; 2.68.0 (#1839): + import

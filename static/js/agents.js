@@ -644,7 +644,7 @@ S.prop = null;
 function propKeys(v) {
   const p = v.proposal; if (!p) return [];
   if (pk2_is(v.kind)) return pk2_keys(v);  // 2.51.0 (#1351 #1358): propkinds2.js
-  if (lyp_is(v)) return ['0'];  // 2.55.0 (#1066): one arrangement (lyprop.js)
+  if (lyp_is(v) || rul_is(v)) return ['0'];  // 2.55.0 (#1066): one arrangement (lyprop.js); 2.71.0 A (#1457): one rule (rules.js)
   if (aim_is(v)) return aim_keys(v);  // 2.68.0 (#1839): the new rows of an import (importprop.js)
   if (dup_is(v)) return dup_keys(v);  // 2.70.0 B (#1357): the groups still mergeable (dupprop.js)
   if (ctr_is(v)) return ['0'];  // 2.70.0 C (#1359): one note (contractprop.js)
@@ -719,7 +719,7 @@ function propItemHtml(k, x, o = {}) {  // one entry: checkbox, title, date and t
 function propItemsHtml() {
   const {v} = S.prop, p = v.proposal, inp = v.input;
   if (pk2_is(v.kind)) return pk2_itemsHtml();  // 2.51.0 B (#1351 #1358): propkinds2.js
-  if (lyp_is(v)) return '';  // 2.55.0 (#1066): lyp_draw shows it
+  if (lyp_is(v) || rul_is(v)) return '';  // 2.55.0 (#1066): lyp_draw shows it; 2.71.0 A: rul_draw
   if (dup_is(v)) return '';  // 2.70.0 B (#1357): dup_draw shows it
   if (ctr_is(v)) return '';  // 2.70.0 C (#1359): ctr_draw shows it
   if (v.kind === 'dayplan') return propDayplanHtml();  // 2.10.0 (#440)
@@ -752,7 +752,7 @@ function propItemsHtml() {
 }
 function propCount() {
   const P = S.prop, n = P.sel.size, all = propKeys(P.v).length, b = $('[data-pp="apply"]', P.md);
-  if (lyp_is(P.v)) return;  // 2.55.0 (#1066): its own buttons
+  if (lyp_is(P.v) || rul_is(P.v)) return;  // 2.55.0 (#1066): its own buttons; 2.71.0 A (#1457)
   if (aim_is(P.v)) return aim_count();  // 2.68.0 (#1839)
   if (dup_is(P.v)) return dup_count(P);  // 2.70.0 B (#1357): groups to merge
   if (ctr_is(P.v)) return;  // 2.70.0 C (#1359): its own buttons
@@ -779,6 +779,7 @@ function propDraw() {
     if (aim_is(v)) ({main, foot} = aim_draw(v));  // 2.68.0 (#1839): the import preview (importprop.js)
     if (dup_is(v)) ({main, foot} = dup_draw(v));  // 2.70.0 B (#1357): one row per group (dupprop.js)
     if (ctr_is(v)) ({main, foot} = ctr_draw(v));  // 2.70.0 C (#1359): the contract, the sentence, note / remind me (contractprop.js)
+    if (rul_is(v)) ({main, foot} = rul_draw(v));  // 2.71.0 A (#1457): the rule in one sentence, 👍 / 👎 (rules.js)
   } else {
     main = `<div class="ppwait">${ic(st === 'applied' ? 'check' : 'x')}<p>${st === 'applied' ? (v.applied?.undone ? tr('Applied, then undone.') : tr('Applied.')) : tr('Discarded. {0} was told.', agent)}</p></div>`;
   }
@@ -809,7 +810,7 @@ async function propApply(b) {
     redo: async () => { const x = await api('POST', `/api/proposals/${jid}/redo`); ly(); return {skipped: x.skipped || [], none: !!x.none}; }});
   if (dup_is(v)) dup_hist(e);  // 2.70.0 B (#1357): the contacts view follows undo / redo
   if (ctr_is(v)) { histToast(ctr_toast(v, r), e); if (S.route.mod === 'agents') loadJobs(); return; }  // 2.70.0 C (#1359)
-  histToast(dup_is(v) ? dup_toast(r) : lyp_is(v) ? lyp_toast(v, r) : aim_is(v) ? aim_toast(r) : pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e, proj ? F8C_PROJ_TOAST_MS : undefined);
+  histToast(dup_is(v) ? dup_toast(r) : lyp_is(v) ? lyp_toast(v, r) : rul_is(v) ? rul_toast(v) : aim_is(v) ? aim_toast(r) : pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e, proj ? F8C_PROJ_TOAST_MS : undefined);
   if (proj) go('l/' + r.list_id);
   if (S.route.mod === 'agents') loadJobs();
 }

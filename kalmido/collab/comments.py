@@ -89,7 +89,8 @@ def comment_dict(r, atts):
             "attachments": atts.get(r["id"], []), "suggestion": json.loads(r["suggestion"]) if r["suggestion"] else None,
             "reply_to": r["reply_to"] if "reply_to" in r.keys() else None,  # 2.33.0 (#1076): + reply (with_replies)
             "ext_name": r["ext_name"] if "ext_name" in r.keys() else None,  # 2.50.0 (#329): written by a customer through the public link
-            "portal": bool(r["portal"]) if "portal" in r.keys() else False}  # 2.63.0 B (#1513): the customer sees it (answer / their own)
+            "portal": bool(r["portal"]) if "portal" in r.keys() else False,  # 2.63.0 B (#1513): the customer sees it (answer / their own)
+            "rule_name": r["rule_name"] if "rule_name" in r.keys() else None}  # 2.71.0 A (#1457): written by a list rule
 
 
 def need_live_comment(c, cid):
@@ -126,6 +127,8 @@ def timeline(tid):
             o = c.execute("SELECT list_id FROM tasks WHERE id=?", (a["data"]["id"],)).fetchone()
             if not o or o["list_id"] not in vis or not task_visible(c, a["data"]["id"], me()):
                 a["data"] = {"hidden": True}
+    from ..tasks.multilist import ml_acts
+    ml_acts(c, acts)  # 2.71.0 B (#1459): a further list's name only for who sees it
     comments = with_replies(c, "c", with_reactions(c, [comment_dict(r, atts) for r in rows]))
     from .cchoice import lv_with_choices
     lv_with_choices(c, tid, rows, comments)  # 2.41.0 (#1383): answer buttons / approval cards

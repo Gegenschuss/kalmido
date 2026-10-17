@@ -388,6 +388,12 @@ sentence in their language that says what cancelling saves or what staying costs
 pressure; never write that something was cancelled. The person takes it as a note on the contract (optionally with a reminder)
 or discards it (event `job`). You never cancel, send or change a contract yourself; health lists and the journal never reach you.
 
+### Rules of a list (2.71.0)
+`list_rules` shows the rules of a list shared with you ("When a task comes into column X, assign it to Y"). You never create
+or change rules; with the right `structure` you may PROPOSE one (`propose_rule`: name, trigger, action, `summary` = why),
+only when it clearly saves the people work or when they ask. The owner or an admin accepts it and the rule then runs with
+their rights. A change made by a rule never triggers another rule. After a decline never propose the same again unasked.
+
 <!-- kalmido-tool-index:start -->
 ## Events and tools (index)
 
@@ -452,18 +458,19 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`, `get_dependencies`,
 `get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_key_figures`,
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`,
-`get_playbook`, `get_project_overview`, `get_review`, `list_environments`, `set_deployment`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`,
-`get_time_gaps`, `get_timer`, `get_usage`, `get_velocity`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`,
-`import_vcards`, `ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`, `list_attachments`,
+`get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
+`get_usage`, `get_velocity`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
+`ingredients_to_shopping`, `link_contact`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_environments`,
+`set_deployment`,
 `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,
 `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,
 `list_jobs`, `list_kids`, `list_layout_blocks`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
 `list_notepads`, `list_notes`, `list_office_data`, `list_office_documents`, `list_packing_templates`,
-`list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_schedules`,
+`list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_rules`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_contract_notice`, `propose_import`, `propose_layout`, `propose_playbook`,
-`propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
+`propose_rule`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
 `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,
@@ -473,7 +480,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,
-`time_from_events`, `unlink_contact`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,
+`time_from_events`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,
 `unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
 `update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
 `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_notepad`,

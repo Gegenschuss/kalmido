@@ -110,6 +110,10 @@ KINDS = {
     # 2.59.0 B (#1375): related tasks -- candidates only among the tasks the asker sees
     "related": ("matrix", "p259_b_api_test.py: related tasks, the hint while adding, search semantic=1, API v1 and agent events never "
                           "name a task of another organisation, an unshared list or a private list; another organisation's task 404"),
+    # 2.71.0 B (#1459): a task shown in further lists (task_links); rights stay with the task's own list
+    "tasklink": ("matrix", "p271_b_api_test.py: linking into a list of another organisation / private <-> organisation refused, "
+                           "a reader of only the further list gets the task nowhere (state, search, feed, public link, agent), "
+                           "\"also\" names only visible lists"),
 }
 
 ROUTES = {
@@ -651,6 +655,12 @@ ROUTES = {
     "POST /api/paperless/zip/import": "paperless", "POST /api/paperless/zip/stop": "paperless", "DELETE /api/paperless/zip": "paperless",
     # 2.70.0 A (#1354): meeting photos into my own chat with an agent I may ask, the chat's cards = my own proposals (p270_a_api_test.py)
     "POST /api/agents/{}/meeting-images": "agent", "GET /api/agents/{}/meeting-proposals": "agent",
+    # 2.71.0 B (#1459)
+    "POST /api/tasks/{}/links": "tasklink", "DELETE /api/tasks/{}/links/{}": "tasklink", "PATCH /api/tasks/{}/links/{}": "tasklink",
+    "POST /api/v1/tasks/{}/links": "tasklink", "DELETE /api/v1/tasks/{}/links/{}": "tasklink",
+    # 2.71.0 A (#1457): rules of a list (owner / list admins; agents read + propose) -- p271_a_api_test.py: other org 404
+    "GET /api/lists/{}/rules": "list", "POST /api/lists/{}/rules": "list", "PATCH /api/rules/{}": "list", "DELETE /api/rules/{}": "list",
+    "POST /api/rules/{}/restore": "list", "GET /api/v1/lists/{}/rules": "list", "POST /api/v1/lists/{}/rules/proposals": "list",
 }
 
 # ---- 1. every route is classified, nothing stale

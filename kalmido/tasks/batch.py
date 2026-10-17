@@ -78,6 +78,8 @@ def task_reorder():
                 f["milestone_id"] = None  # 2.18.0 (#430): the milestone stays in its list
             f["updated_at"] = ts
             before = c.execute("SELECT * FROM tasks WHERE id=?", (it["id"],)).fetchone()
+            from ..lists.rules import rul_fire, rul_snap
+            rb = rul_snap(c, int(it["id"]))  # 2.71.0 A (#1457): dragging into a column / list starts its rules too
             c.execute(f"UPDATE tasks SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), it["id"]])
             log_changes(c, it["id"], before)
             if "list_id" in f:
@@ -88,6 +90,7 @@ def task_reorder():
                 ms_cleanup(c)  # 2.18.0 (#430): a moved milestone lets its tasks go, moved subtasks leave theirs
             if "due" in f and before["status"] == 0 and not before["deleted_at"]:  # dropped on a later day
                 shifted += dep_shift(c, int(it["id"]), before["due"], f["due"])
+            rul_fire(c, int(it["id"]), rb)
     bump(c)
     c.commit()
     return jsonify(ok=True, shifted=shifted)
@@ -196,8 +199,11 @@ def task_batch():
                 old = c.execute("SELECT status, completed_at, completed_by FROM tasks WHERE id=?", (tid,)).fetchone()
                 if old["status"] == 0:
                     continue
+                from ..lists.rules import rul_fire, rul_snap
+                rb = rul_snap(c, tid)  # 2.71.0 A (#1457)
                 c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=?", (ts, tid))
                 log_act(c, tid, "reopen")
+                rul_fire(c, tid, rb)
                 undo[str(tid)] = signed(tid, {"op": "reopen", "status": old["status"], "completed_at": old["completed_at"],
                                               "completed_by": old["completed_by"]})
             elif action == "delete":

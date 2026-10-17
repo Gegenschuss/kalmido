@@ -100,6 +100,7 @@ ORDER = (
     "lists.playbook",  # 2.39.0 (#1168)
     "tasks.attachtext",  # 2.34.0 (#368)
     "tasks.snippets",  # 2.35.0 (#1095)
+    "tasks.multilist",  # 2.71.0 B (#1459): a task in several lists without a copy (after api.v1)
     "agents.gates",  # 2.26.0 (#949)
     "agents.safety",  # 2.30.0 (#919)
     "agents.usage",
@@ -232,6 +233,7 @@ ORDER = (
     "agents.meetprop",  # 2.70.0 A (#1354): a meeting becomes tasks (extract with photos, the chat's cards)
     "agents.dupprop",  # 2.70.0 B (#1357): duplicate contacts as a proposal (no routes)
     "agents.contractprop",  # 2.70.0 C (#1359): contract_notice + the proposal kind notice (no routes of its own)
+    "lists.rules",  # 2.71.0 A (#1457): rules of a list (When ... then ...), after api.v1
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

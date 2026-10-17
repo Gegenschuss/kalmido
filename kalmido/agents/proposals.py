@@ -59,6 +59,7 @@ PROP_KINDS += ("layout",)  # 2.55.0 (#1066): the agent proposes how a view is ar
 PROP_KINDS += ("import",)  # 2.68.0 (#1839): the agent proposes old data for the office (agents/importprop.py), never on request
 PROP_KINDS += ("merge",)  # 2.70.0 B (#1357): duplicate contacts merged (agents/dupprop.py), on request
 PROP_KINDS += ("notice",)  # 2.70.0 C (#1359): a contract's notice deadline as a note (agents/contractprop.py), never on request
+PROP_KINDS += ("rule",)  # 2.71.0 A (#1457): the agent proposes a rule of a list (lists/rules.py), never on request
 PROP_MAX_ITEMS = 200                    # entries one proposal may create / change (tasks + subtasks)
 PROP_MAX_BYTES = 256 * 1024             # JSON body of a proposal
 PROP_TITLE_MAX, PROP_NOTES_MAX, PROP_NAME_MAX, PROP_SUMMARY_MAX = 300, 5000, 120, 2000
@@ -358,6 +359,9 @@ def prop_validate(kind, b, inp):
     elif kind == "notice":  # 2.70.0 C (#1359)
         from ..agents.contractprop import ctr_validate
         out.update(ctr_validate(b, inp))
+    elif kind == "rule":  # 2.71.0 A (#1457)
+        from ..lists.rules import rul_prop_validate
+        out.update(rul_prop_validate(b, inp))
     return out
 
 
@@ -454,7 +458,7 @@ def proposal_request():
     if kind == "cleanup":  # 2.39.0 (#1151): always the list's tidy agent, in packages (agents/cleanup.py)
         from ..agents.cleanup import cln_request
         return cln_request(c, uid, b)
-    if kind in PROP_KINDS_AGENT or kind in ("layout", "import"):  # 2.51.0 C: proposed by the agent itself, nothing to ask for; 2.55.0 (#1066); 2.68.0 (#1839)
+    if kind in PROP_KINDS_AGENT or kind in ("layout", "import", "rule"):  # 2.51.0 C: proposed by the agent itself, nothing to ask for; 2.55.0 (#1066); 2.68.0 (#1839); 2.71.0 A
         return err(tr("Invalid value: {0}", "kind"))
     if kind == "notice":  # 2.70.0 C (#1359): the agent proposes it after contract_notice, never on request
         return err(tr("Invalid value: {0}", "kind"))
@@ -518,6 +522,9 @@ def prop_view(c, j):
     if j["kind"] == "notice":  # 2.70.0 C (#1359): the contract as it is now
         from ..agents.contractprop import ctr_view_extra
         out.update(ctr_view_extra(c, j))
+    if j["kind"] == "rule":  # 2.71.0 A (#1457): the rule in names for the card
+        from ..lists.rules import rul_prop_extra
+        out.update(rul_prop_extra(c, j))
     return out
 
 
@@ -636,6 +643,10 @@ def prop_run(c, j, sel, ed, extra):
         from ..agents.contractprop import ctr_run
         return ctr_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": extra, "tasks": [], "sections": [],
                                               "changes": {}, "list": None, "undone": False})
+    if kind == "rule":  # 2.71.0 A (#1457): the rule is created as the person and belongs to them
+        from ..lists.rules import rul_prop_run
+        return rul_prop_run(c, j, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": extra, "tasks": [], "sections": [],
+                                   "changes": {}, "list": None, "undone": False})
     prop, inp = json.loads(j["proposal"]), json.loads(j["input"] or "{}")
     edits = {k: prop_edit(kind, k, v, inp, prop) for k, v in ed.items()}
     ts = iso(now_utc())
@@ -846,6 +857,8 @@ def proposal_apply(jid):
     if j["kind"] == "notice":  # 2.70.0 C (#1359): the comment, the reminder
         from ..agents.contractprop import ctr_result
         counts.update(ctr_result(rec))
+    if j["kind"] == "rule":  # 2.71.0 A (#1457)
+        counts.update(rule_id=rec.get("rule_id"))
     prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] in ("project", "cleanup") else None})
     c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data->>'job' = ?",
               (ts, me(), str(jid)))
@@ -906,6 +919,9 @@ def proposal_undo(jid):
     elif j["kind"] == "notice":  # 2.70.0 C (#1359): the comment goes, the reminder back
         from ..agents.contractprop import ctr_undo
         n, skipped = ctr_undo(c, j, rec)
+    elif j["kind"] == "rule":  # 2.71.0 A (#1457): the accepted rule goes to the trash
+        from ..lists.rules import rul_prop_undo
+        n, skipped = rul_prop_undo(c, j, rec)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -1009,6 +1025,10 @@ def proposal_redo(jid):
         from ..agents.contractprop import ctr_undo
         n, skipped = ctr_undo(c, j, rec, back=False)
         rec.update(undone=False)
+    elif j["kind"] == "rule":  # 2.71.0 A (#1457)
+        from ..lists.rules import rul_prop_undo
+        n, skipped = rul_prop_undo(c, j, rec, back=False)
+        rec.update(undone=False)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -1095,6 +1115,9 @@ def v1_agent_job_proposal(jid):
     if j["kind"] == "notice":  # 2.70.0 C (#1359): replacing checks the contract again
         from ..agents.contractprop import _need_contract
         _need_contract(c, aid, j["task_id"])
+    if j["kind"] == "rule":  # 2.71.0 A (#1457)
+        from ..api.scopes import need_scope
+        need_scope("structure")
     if j["prop_state"] not in ("requested", "ready") or j["state"] not in ("running", "waiting"):
         raise Denied(409, tr("This proposal was already applied or discarded"))
     if len(request.data or b"") > PROP_MAX_BYTES:
