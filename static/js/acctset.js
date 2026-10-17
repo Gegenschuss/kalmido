@@ -638,8 +638,10 @@ async function ua8_delete(u) {
     try { await api('DELETE', '/api/users/' + u.id); } catch { return false; }
     return true;
   }
-  const shared = j.lists.filter(l => l.shared).length, locked = j.lists.some(l => l.locked), cand = j.candidates, foreign = j.lists.some(l => l.foreign);
-  const lname = l => l.name != null ? esc(l.name) : esc(l.org ? tr('A list of {0}', l.org) : tr('A private list'));
+  const shared = j.lists.filter(l => l.shared).length, locked = j.lists.some(l => l.locked && !l.key_alone), cand = j.candidates, foreign = j.lists.some(l => l.foreign);
+  // 2.88.0 review: M2 nobody else holds the key of a locked list, M3 lists with receipts are only handed over, N2 no foreign organisation's name
+  const alone = j.lists.filter(l => l.key_alone).length, receipts = j.lists.some(l => l.receipts), nodel = foreign || receipts;
+  const lname = l => l.name != null ? esc(l.name) : esc(l.org ? tr('A list of {0}', l.org) : l.org_id ? tr('A list of another organisation') : tr('A private list'));
   const md = modal(`<h3>${esc(tr('Delete user “{0}”?', name))}</h3>
     <div class="shint keep">${esc(trn('{1} still owns {0} list. Choose what happens to it.', '{1} still owns {0} lists. Choose what happens to them.', j.lists.length, name))}</div>
     <div class="members ua8lists">${j.lists.map(l => `<div class="mrow"><span class="n">${l.locked ? ic('lock', 's') + ' ' : ''}${lname(l)} <span class="muted">${l.org && l.name != null ? esc(l.org) + ' · ' : ''}${l.shared ? esc(l.members.length ? tr('shared with {0}', l.members.join(', ') + (l.shared > l.members.length ? ' ' + tr('+{0}', l.shared - l.members.length) : '')) : trn('shared with {0} person', 'shared with {0} people', l.shared)) : esc(tr('not shared'))}</span></span></div>`).join('')}</div>
@@ -648,9 +650,11 @@ async function ua8_delete(u) {
       <select id="ua8-to" aria-label="${esc(tr('New owner'))}" ${cand.length ? '' : 'disabled'}>${cand.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
       ${cand.length ? '' : `<div class="shint keep">${tr('Nobody can take over every one of these lists (an organisation’s list stays in its organisation). Hand single lists over first or delete them along.')}</div>`}
       ${locked ? `<div class="shint keep">${ic('lock', 's')} ${tr('Lists with the lock: the new owner can read them once a member who holds the key opens them.')}</div>` : ''}
-      <label class="chkl"><input type="radio" name="ua8how" value="delete" ${foreign ? 'disabled' : cand.length ? '' : 'checked'}> ${tr('Delete them along')}</label>
+      ${alone ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('Nobody else has the key of {0} list with the lock: its content can no longer be read after the handover.', 'Nobody else has the key of {0} lists with the lock: their content can no longer be read after the handover.', alone))}</div>` : ''}
+      <label class="chkl"><input type="radio" name="ua8how" value="delete" ${nodel ? 'disabled' : cand.length ? '' : 'checked'}> ${tr('Delete them along')}</label>
       ${foreign ? `<div class="shint keep">${tr('Lists of an organisation you do not belong to cannot be deleted along: hand them over instead.')}</div>` : ''}
-      <div id="ua8-del" ${cand.length || foreign ? 'hidden' : ''}>
+      ${receipts ? `<div class="shint keep">${tr('Lists with receipts cannot be deleted along (receipts are kept): hand them over instead.')}</div>` : ''}
+      <div id="ua8-del" ${cand.length || nodel ? 'hidden' : ''}>
         ${shared ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('{0} of these lists is shared: the other people lose it too.', '{0} of these lists are shared: the other people lose them too.', shared))}</div>` : ''}
         <div class="row"><label for="ua8-conf">${esc(tr('Type {0} to confirm', j.username))}</label><input id="ua8-conf" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
       </div>

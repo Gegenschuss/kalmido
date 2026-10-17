@@ -295,9 +295,14 @@ workspace).
   they are shared, the lock) and asks what happens to them: **hand them over** to one person (the default; only people
   every one of the lists may go to are offered, an organisation's list stays in its organisation) or **delete them
   along** (type the user name to confirm; lists shared with others are pointed out). Either way it happens completely or
-  not at all. Invoices and filed documents do not hang on lists and stay. The security log notes the deletion.
+  not at all. Invoices and filed documents do not hang on lists and stay; a list with receipts in its budget can only be
+  handed over, never deleted along (receipts are kept). A list with the lock whose key nobody else holds is pointed out:
+  after a handover its content can no longer be read. Lists of an organisation you do not belong to show neither their
+  name nor the organisation's and can only be handed over. The security log notes the deletion.
 - **Organisation admins** (*Settings > Workspaces*) can delete the account of a member who belongs to their organisation
-  alone, is no server admin and has no private lists, handing the lists over the same way. For anyone else they remove
+  alone, is no server admin and whose private space is empty (no private lists, nothing in the basket, no private
+  calendars, address books, files, pages, mails, habits or time entries -- deleting the account would delete them too),
+  handing the lists over the same way. For anyone else they remove
   the person from the organisation and choose which member gets the person's lists of the organisation.
 
 API for scripts of the web app (session, not the REST API): `GET /api/users?all=1&limit=50&offset=0&q=&filter=people`
