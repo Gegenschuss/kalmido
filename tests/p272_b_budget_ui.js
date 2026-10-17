@@ -117,7 +117,8 @@ const DE = d => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
   click(w, dlg().querySelector('[data-m="close"]')); await until(() => !dlg());
   await call('POST', `/api/budget/${LID}/entries`, {day: DAY, amount: 60, kind: 'out', title: 'Cinema', cat_id: FUN.id});
   w.eval(`bg_after()`);
-  await until(() => [...d.querySelectorAll('.bgcat')].some(x => /Fun/.test(x.textContent) && x.querySelector('.bgbar i')));
+  // 2.72.0 (#1333): wait for the reloaded bar (the bar at 0 % is there before the reload)
+  await until(() => [...d.querySelectorAll('.bgcat')].some(x => /Fun/.test(x.textContent) && /width:\s*60%/.test(x.querySelector('.bgbar i')?.getAttribute('style') || '')));
   let fc = [...d.querySelectorAll('.bgcat')].find(x => /Fun/.test(x.textContent));
   check(fc && /width:\s*60%/.test(fc.querySelector('.bgbar i')?.getAttribute('style') || '') && !fc.classList.contains('over'), '#1333: the bar shows 60 of 100 ' + fc?.innerHTML.slice(0, 200));
   await call('POST', `/api/budget/${LID}/entries`, {day: DAY, amount: 50, kind: 'out', title: 'Concert', cat_id: FUN.id});
