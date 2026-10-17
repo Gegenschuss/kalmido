@@ -396,6 +396,7 @@ async function wsPaneDraw(md) {
   oxDraw(box);  // 2.42.0 (#833): the export sections of the organisations I administer
   ocDraw(box);  // 2.42.0 (#828): their encryption sections
   wsc_paneDraw(box);  // 2.53.0 (#1474): each organisation's colour (its admins choose)
+  pmeta_paneDraw(box);  // 2.61.0 B (#1819): whether photos lose their metadata on upload (its admins choose)
 }
 function wsPaneWire(md) {
   md.addEventListener('change', async e => {
@@ -1249,7 +1250,17 @@ function oidcWire(md) {
 }
 // ---- Settings > Users > Whole server > Backups
 // 2.13.0: "Check storage": files of tasks / projects that are missing, empty or cut off on disk (read-only)
-const stoHtml = () => `<h4 id="s-sto-h">${tr('Check storage')}</h4><div class="row"><button class="btn sm" data-m="sto-check">${ic('search', 's')} ${tr('Check storage')}</button></div><div id="s-sto" role="status" aria-live="polite"></div>`;
+const stoHtml = () => `<h4 id="s-sto-h">${tr('Check storage')}</h4><div class="row"><button class="btn sm" data-m="sto-check">${ic('search', 's')} ${tr('Check storage')}</button></div><div id="s-sto" role="status" aria-live="polite"></div><div id="s-scn"></div>`;  // 2.61.0 (#1818): + s-scn
+// 2.61.0 (#1818): the virus scanner's state below "Check storage" (one line; drawn once per opening)
+async function scnStatus(md) {
+  const box = $('#s-scn', md); if (!box || box.dataset.done) return;
+  box.dataset.done = '1';
+  let j; try { j = await api('GET', '/api/admin/upload-scan'); } catch { box.dataset.done = ''; return; }
+  const st = j.state === 'off' ? tr('Virus scanner: off (KALMIDO_CLAMD is not set). Uploads are not checked.')
+    : j.state === 'ok' ? tr('Virus scanner: active.') : tr('Virus scanner: not reachable. Uploads are taken and marked “Unchecked”; the check follows once it runs again.');
+  const n = [j.unchecked ? trn('{0} file waits for the check', '{0} files wait for the check', j.unchecked) : '', j.infected ? trn('{0} locked file (malware found)', '{0} locked files (malware found)', j.infected) : ''].filter(Boolean);
+  box.innerHTML = `<div class="shint${j.state === 'down' || j.infected ? ' cnote' : ''}">${esc(st)}${n.length ? ' ' + esc(n.join(' · ')) : ''}</div>`;
+}
 async function stoCheck(md) {
   const box = $('#s-sto', md); if (!box) return;
   box.innerHTML = `<div class="muted mhint">${tr('Loading…')}</div>`;
@@ -1263,6 +1274,7 @@ const BK_KIND = {auto: N_('automatic'), manual: N_('manual'), safety: N_('before
 const fmtBytes = n => n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round((n || 0) / 1e3)) + ' kB';
 async function bkDraw(md, j) {
   const box = $('#s-bk', md); if (!box) return;
+  scnStatus(md);  // 2.61.0 (#1818): the virus scanner's line (once)
   if (!j) { try { j = await api('GET', '/api/admin/backups'); } catch (x) { box.innerHTML = `<div class="muted mhint">${x.status === 404 ? esc(x.message) : tr('Only available online.')}</div>`; return; } }
   box._j = j;
   const hint = t => `<div class="shint">${t}</div>`;

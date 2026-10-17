@@ -577,6 +577,7 @@ ROUTES = {
     # 2.48.0 (#1207 / #1152 / #1356)
     "DELETE /api/files/nodes/{}": "file", "DELETE /api/files/shares/{}": "file", "DELETE /api/paperless": "paperless",
     "GET /api/docs/{}/receipt": "receipt", "GET /api/files": "file", "GET /api/files/folders": "file",
+    "GET /api/files/search": "file", "GET /api/v1/files/search": "file",  # 2.61.0 (#1820): names + recognised text, the boundary tested in p261_c_api_test.py
     "GET /api/files/nodes/{}": "file", "GET /api/files/nodes/{}/content": "file",
     "GET /api/files/nodes/{}/share-targets": "file", "GET /api/paperless": "paperless",
     "GET /api/paperless/preview": "paperless", "GET /api/v1/files": "file", "GET /api/v1/files/{}": "file",
@@ -614,6 +615,8 @@ ROUTES = {
     # 2.60.0 C (#1512): the review step (need_task / need_list of the task's list; p260_c_api_test.py: a stranger 404, a viewer 403)
     "POST /api/tasks/{}/review": "task", "POST /api/v1/tasks/{}/review": "task",
     "PUT /api/lists/{}/review": "list", "PUT /api/v1/lists/{}/review": "list",
+    # 2.61.0 (#1818): the virus scanner's state + counts for the server admin (no file, no content; p261_a_api_test.py: 403 for others)
+    "GET /api/admin/upload-scan": "admin",
 }
 
 # ---- 1. every route is classified, nothing stale

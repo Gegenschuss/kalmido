@@ -40,6 +40,7 @@ NEWS_KINDS = ("mention", "comment", "assign", "unassign", "take", "complete", "s
               "connreq", "connok",  # 2.49.0 (#1106): someone asks to connect / accepted my request (row "share", accounts/discover.py)
               "lytpl")  # 2.55.0 (#1068): someone sent me an arrangement as a template (row "share", accounts/layoutsets.py)
 NEWS_KINDS += ("review",)  # 2.60.0 C (#1512): a review asked of me / my task sent back (row "review", tasks/review.py)
+NEWS_KINDS += ("upscan",)  # 2.61.0 (#1818): the virus scanner found malware in a file I uploaded earlier (files/scan.py, no push)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -53,6 +54,8 @@ NEWS_FOR_ME += ("review",)  # 2.60.0 C (#1512)
 
 
 def news_to_me(kind, actor_id, data, agents):
+    if kind == "upscan":  # 2.61.0 (#1818): my own file was locked (no actor)
+        return True
     if actor_id in agents or not actor_id:
         return False
     if kind in NEWS_FOR_ME:
@@ -393,6 +396,10 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             except ValueError:
                 bk = None
             if not c.execute("SELECT 1 FROM hub_bookings WHERE id=? AND resource_kind='user' AND resource_id=? AND deleted_at IS NULL", (bk, uid)).fetchone():
+                continue
+        elif kind == "upscan":  # 2.61.0 (#1818): while my file stays locked
+            from ..files.scan import sc_news_live
+            if not sc_news_live(c, r["data"]):
                 continue
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):

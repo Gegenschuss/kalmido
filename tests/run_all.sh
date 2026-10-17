@@ -904,6 +904,15 @@ fresh; run p260_b_ui node p260_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.60.0 part A: sprints of project lists with burndown and review (#343)
 fresh; run p260_a_api "$PY" p260_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p260_a_ui node p260_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.61.0 part B: photo metadata (GPS, camera) removed on upload, the capture date of documents (#1819)
+fresh; run p261_b_api "$PY" p261_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p261_b_ui node p261_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.61.0 part A: virus scan of uploads with a fake clamd, unchecked marks, the later scan, the type from the content (#1818)
+fresh; run p261_a_api "$PY" p261_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p261_a_ui node p261_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.61.0 part C: text recognition of task, project and Ablage files in the background, search, catch-up (#1820)
+fresh; run p261_c_api "$PY" p261_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p261_c_ui node p261_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

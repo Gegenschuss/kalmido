@@ -63,7 +63,7 @@ def _plain_mentions(c, text):
 
 
 def _message(c, kind, mid, uid):
-    """(text, files [(name, mime, size, path)], where (the conversation), who (the author), created_at, link) of a message uid
+    """(text, files [(name, mime, size, path, (kind, id))], where (the conversation), who (the author), created_at, link) of a message uid
     may read, else Denied(404)."""
     from ..collab.comments import user_names
     if kind == "comment":
@@ -72,8 +72,8 @@ def _message(c, kind, mid, uid):
         m = c.execute("SELECT * FROM agent_chat WHERE id=?", (mid,)).fetchone()
         if not m or m["user_id"] != uid:  # only the person's own conversation with the agent
             raise Denied(404)
-        files = [(f["name"], f["mime"], f["size"], f["path"]) for f in c.execute(
-            "SELECT name, mime, size, path FROM chat_files WHERE message_id=? ORDER BY id", (mid,))]
+        files = [(f["name"], f["mime"], f["size"], f["path"], ("chat", f["id"])) for f in c.execute(
+            "SELECT id, name, mime, size, path FROM chat_files WHERE message_id=? ORDER BY id", (mid,))]
         where = user_names(c, [m["agent_id"]]).get(m["agent_id"], "?")
         who = where if m["sender"] == "agent" else user_names(c, [uid]).get(uid, "?")
         return m["body"] or "", files, tr("Chat with {0}", where), who, m["created_at"], f"#msg/a/{m['agent_id']}/{mid}"
@@ -102,8 +102,8 @@ def dl_comment_message(c, cid):
     if k["user_id"] not in agent_ids(c):
         raise Denied(400, tr("Only comments of agents can be saved as a task"))
     t = c.execute("SELECT id, title FROM tasks WHERE id=?", (k["task_id"],)).fetchone()
-    files = [(f["name"], f["mime"], f["size"], f["path"]) for f in c.execute(
-        "SELECT name, mime, size, path FROM attachments WHERE comment_id=? ORDER BY id", (cid,))]
+    files = [(f["name"], f["mime"], f["size"], f["path"], ("att", f["id"])) for f in c.execute(
+        "SELECT id, name, mime, size, path FROM attachments WHERE comment_id=? ORDER BY id", (cid,))]
     who = user_names(c, [k["user_id"]]).get(k["user_id"], "?")
     return k["body"] or "", files, tr("Comment on {0}", t["title"]), who, k["created_at"], f"#t/{t['id']}"
 
@@ -111,10 +111,14 @@ def dl_comment_message(c, cid):
 def _copy_files(c, tid, uid, files):
     """Copies the message's files to the task (the person's storage counts; what does not fit is skipped). -> skipped names."""
     from ..admin.hosting import quota_fits
+    from ..files.scan import sc_locked, sc_marks
+    from ..files.upsafe import up_after_store
+    from ..core.pg import insert_id
     skipped, ts = [], iso(now_utc())
-    for name, mime, size, path in files:
+    for name, mime, size, path, (kind, fid) in files:
         src = os.path.join(ATT_DIR, path)
-        if not os.path.isfile(src) or not quota_fits(c, uid, size or 0):
+        # 2.61.0 review (#1818): a file found infected is never copied; an unchecked one stays marked for the later scan
+        if not os.path.isfile(src) or not quota_fits(c, uid, size or 0) or sc_locked(c, kind, fid):
             skipped.append(name)
             continue
         rel = os.path.join(str(tid), f"{uuid.uuid4().hex[:12]}-{name}")
@@ -123,8 +127,11 @@ def _copy_files(c, tid, uid, files):
         from ..core.orgcrypt import oc_seal_path, oc_task_org
         oc_seal_path(c, oc_task_org(c, tid), os.path.join(ATT_DIR, rel))  # 2.42.0 (#828): sealed in an organisation's list
         g.chat_save_new = getattr(g, "chat_save_new", []) + [rel]
-        c.execute("INSERT INTO attachments(task_id,name,mime,size,path,created_at,user_id) VALUES(?,?,?,?,?,?,?)",
-                  (tid, name, mime, size, rel, ts, uid))
+        aid = insert_id(c, "INSERT INTO attachments(task_id,name,mime,size,path,created_at,user_id) VALUES(?,?,?,?,?,?,?)",
+                        (tid, name, mime, size, rel, ts, uid))
+        # the copy keeps an unchecked mark and gets its own text recognition (2.61.0 #1820)
+        up_after_store(c, "att", aid, oc_task_org(c, tid) or None,
+                       {"kind": "att", "scan": (sc_marks(c, kind, [fid]).get(fid) or {}).get("scan") or "clean"})
     return skipped
 
 

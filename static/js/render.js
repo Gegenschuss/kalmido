@@ -1621,7 +1621,7 @@ function viewSearch() {
 }
 function renderSearchRes() {
   if (!S.searchRes.length) return heronEmpty('empty', tr('No results.'), tr('Try fewer or other words.'));
-  return S.searchRes.map((t, i) => (typeof rt9_simHead === 'function' ? rt9_simHead(t, S.searchRes[i - 1]) : '') + taskRow(t, {showList: true, drag: false, tcols: {list: true}})).join('');  // 2.59.0 B (#1375): + heading of the similar hits
+  return S.searchRes.map((t, i) => (typeof rt9_simHead === 'function' ? rt9_simHead(t, S.searchRes[i - 1]) : '') + taskRow(t, {showList: true, drag: false, tcols: {list: true}}) + (typeof ftxtHitHtml === 'function' ? ftxtHitHtml(t) : '')).join('');  // 2.59.0 B (#1375): + heading of the similar hits  // 2.61.0 (#1820): "in file" note
 }
 let searchTimer;
 function snavMore(nav) {

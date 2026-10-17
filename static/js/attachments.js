@@ -21,7 +21,8 @@ function attHtml(a) {
   const del = (!canEdit(t) ? '' : `<button class="attdel" data-act="att-del" data-att="${a.id}" title="${tr('Remove')}">${ic('x', 's')}</button>`)
     + (!a.enc && typeof ab_linkBtn === 'function' ? ab_linkBtn('att', a.id, listById(t?.list_id)?.org_id, 'attdel attlink') : '');  // 2.48.0 (#1207): "Show in the file store"
   if (a.enc) return e2eAttHtml(a, del);  // 2.42.0 (#828): encrypted in the browser (e2e.js): only its uploader opens it
-  if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="att-view" data-att="${a.id}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${del}</div>`;
+  if (upLocked(a)) return scnLockedTile(a, del);  // 2.61.0 (#1818)
+  if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="att-view" data-att="${a.id}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${scnImgMark(a)}${del}</div>`;
   if (a.size === 0) return `<div class="att file broken"><span class="attx">${ic('file')}<span class="atxt"><span class="an">${esc(a.name)}</span><span class="as">${esc(tr('File damaged or missing'))}</span></span></span>${del}</div>`;  // 2.13.2 (#478 N6): an old 0-byte file says so
   return `<div class="att file">${attFileA(a)}${del}</div>`;  // 2.30.0 (#1035): text files open in the viewer
 }
@@ -49,7 +50,7 @@ async function uploadFiles(taskId, files) {
   } catch (e) { /* api() already showed the error / offline notice */ }
 }
 function attLightbox(id, list, url = attUrl) {  // 2.32.0 (#983): url = the address of a project file
-  const t = taskById(S.sel), imgs = list || (t?.attachments || []).filter(isImg);
+  const t = taskById(S.sel), imgs = (list || (t?.attachments || []).filter(isImg)).filter(a => !upLocked(a));  // 2.61.0 (#1818): never a locked file
   let i = Math.max(0, imgs.findIndex(a => a.id === id));
   const m = document.createElement('div');
   m.className = 'lightbox';
@@ -80,8 +81,27 @@ function attFileA(a) {
   const pdf = a.mime === 'application/pdf', tv = isTextFile(a) && a.size <= TV_MAX;
   const o = tv ? esc(JSON.stringify({url: attUrl(a, true), name: a.name, size: a.size, agent: a.agent || '', md: isMdFile(a), ext: attExt(a)})) : '';
   // 2.48.0 (#1367): a PDF opens in the preview (pdfview.js); Ctrl/Cmd-click still opens it in a new tab
-  return `<a href="${attUrl(a, !pdf)}" ${pdf ? 'target="_blank" rel="noopener"' + pv_attr({url: attUrl(a), name: a.name, size: a.size, dlUrl: attUrl(a, true)}) : 'download'}${tv ? ` data-tview="${o}"` : ''} title="${esc(a.name)}">${ic(pdf ? 'pdf' : 'file')}<span class="atxt"><span class="an">${esc(a.name)}</span><span class="as">${fmtSize(a.size)}${a.agent ? ` · <span class="attag">${esc(tr('Created by agent'))}</span>` : ''}</span></span></a>`;  // 2.31.0 (#1050): the name on its own line
+  return `<a href="${attUrl(a, !pdf)}" ${pdf ? 'target="_blank" rel="noopener"' + pv_attr({url: attUrl(a), name: a.name, size: a.size, dlUrl: attUrl(a, true)}) : 'download'}${tv ? ` data-tview="${o}"` : ''} title="${esc(a.name)}">${ic(pdf ? 'pdf' : 'file')}<span class="atxt"><span class="an">${esc(a.name)}</span><span class="as">${fmtSize(a.size)}${a.agent ? ` · <span class="attag">${esc(tr('Created by agent'))}</span>` : ''}${upMarkHtml(a.up)}</span></span></a>`;  // 2.31.0 (#1050): the name on its own line
 }
+// 2.61.0 (#1818): the marks of a stored file (server field up: scan 'unchecked' | 'infected' with sig, scan_why 'size').
+// scnMakers makes them; a further mark (e.g. the text recognition's up.text) pushes its own maker: up => html or ''.
+// A mark is a small label; a tap (or Enter) shows its explanation (no hover needed).
+const scnMark = (icon, label, why, cls = '') => `<span class="scnmark ${cls}" role="button" tabindex="0" data-scnwhy="${esc(why)}" title="${esc(why)}" aria-label="${esc(label + ': ' + why)}">${icon ? ic(icon, 's') : ''}<span>${esc(label)}</span></span>`;
+const scnMakers = [up => up.scan === 'infected' ? scnMark('lock', tr('Locked: malware found'), tr('The virus scanner found {0} in this file. Download and preview are blocked; the file can be deleted.', up.sig || '?'), 'scnbad')
+  : up.scan === 'unchecked' ? scnMark('shield', tr('Unchecked'), up.scan_why === 'size' ? tr('Too large for the virus scanner: this file was not checked.') : tr('The virus scanner was not reachable. The check follows automatically.')) : ''];
+const upMarkHtml = up => up ? scnMakers.map(f => f(up) || '').join('') : '';
+const upLocked = a => a?.up?.scan === 'infected';
+// a locked file: a tile without a link (no download, no preview); del = the buttons of its place (remove stays possible)
+const scnLockedTile = (a, del = '') => `<div class="att file scnlock"><span class="attx">${ic('file')}<span class="atxt"><span class="an">${esc(a.name)}</span><span class="as">${upMarkHtml(a.up)}</span></span></span>${del}</div>`;
+const scnImgMark = a => a?.up ? `<span class="scnover">${upMarkHtml(a.up)}</span>` : '';
+const scnWhy = e => {
+  const m = e.target.closest?.('.scnmark[data-scnwhy]'); if (!m) return;
+  if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault(); e.stopImmediatePropagation();  // nothing else opens (the text viewer listens on document too)
+  toast(m.dataset.scnwhy, null, 6000);  // long enough to read, with its close button
+};
+document.addEventListener('click', scnWhy, true);
+document.addEventListener('keydown', scnWhy, true);
 document.addEventListener('click', e => {
   const l = e.target.closest?.('a[data-tview]');
   if (!l || e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;  // a modifier: the browser's download

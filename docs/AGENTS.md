@@ -1474,6 +1474,7 @@ Scopes: `files:read` (list, read) and `files:write` (add files and folders, new 
 | A folder's children (`?parent_id=`) / one node with its children or versions | `GET /api/v1/files?parent_id=<id>`, `GET /api/v1/files/{id}` | `list_files` with `folder_id` |
 | A file's bytes (`?version=` an older one) | `GET /api/v1/files/{id}/content` | `read_file` with `as: "base64"` |
 | A file as text (UTF-8, PDF text layer) | `GET /api/v1/files/{id}/text` | `read_file` |
+| Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text`) | `GET /api/v1/files/search?q=` | `search_files` |
 | A new file / folder (`{parent_id?, name, content \| content_base64, mime?, kind?}`; without `parent_id`: your own folder) | `POST /api/v1/files` | `write_file`, `create_file_folder` |
 | A new version of a file (`{content \| content_base64}`, role edit; the older versions stay) | `POST /api/v1/files/{id}/versions` | `write_file` with `file_id` |
 
@@ -1511,6 +1512,11 @@ participant only its own tasks) and only of its own conversations; anything else
 `name`, `mime`, `size` and `base64`, at most `max_bytes` (default 5 MB, at most 20 MB); images also come as an MCP image
 item so the model can look at them. A damaged file on the server answers `410`.
 
+Virus scan (2.61.0): files an agent uploads go through the same scan as people's ([SELF-HOSTING.md](SELF-HOSTING.md#virus-scan-of-uploads)).
+A find refuses the upload with `400` and a message naming the signature. A file the scanner could not check yet carries
+`up: {scan: "unchecked"}` in the file lists (`list_attachments`, project files, chat `attachments`); a file found infected later
+has `up: {scan: "infected", sig}` and every way to read it answers `403` - do not retry, tell the person.
+
 **End-to-end encrypted content (2.42.0).** People can keep an encrypted note on a task, attach encrypted files and
 encrypt a direct message conversation; this is encrypted in their browser and only they hold the keys. An agent sees
 placeholders only: a task says `encrypted_note: true` (never the text), an encrypted file is listed with
@@ -1528,10 +1534,13 @@ kind, text, chars, truncated, message}`:
 - `kind: "pdf"`: the PDF's text layer, pages separated by a blank line, plus `pages` / `pages_read`. The server reads it
   in a separate, limited process (at most 20 MB, 1000 pages, 20 seconds, a memory limit); `text` stops at `max_chars`
   (default and at most 200000) with `truncated: true`. A scanned PDF without a text layer answers `no_text_layer: true`
-  and an empty `text` -- there is no text recognition (OCR); say so instead of guessing. A password-protected, damaged or
+  and an empty `text` -- unless the server recognised its text in the background (2.61.0, local OCR): then `text` holds
+  it and `source: "ocr"` (recognised text can contain reading errors). Without either, say so instead of guessing. A password-protected, damaged or
   too complex PDF answers `error` (`encrypted`, `unreadable`, `too_complex`) and a `message`.
 - `kind: "text"`: the text of a text file (Markdown, CSV, JSON, ...).
-- `kind: "image"`: no text, `url` points to the file; `read_attachment` returns the image itself (up to 5 MB).
+- `kind: "image"`: no text, `url` points to the file; `read_attachment` returns the image itself (up to 5 MB). 2.61.0: a
+  photo of a JPEG / PNG whose text the server recognised brings it as `text` with `source: "ocr"`. The same holds for
+  `GET /api/v1/files/{id}/text` (`read_file`).
 - `kind: "other"`: nothing to read (`message` says so).
 
 Results are cached per file content. `413` = larger than 20 MB, `503` = several PDFs are being read right now (wait for
@@ -2500,8 +2509,9 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
 `report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
 `request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
-`request_reward`, `restore_event`, `restore_task`, `review_task`, `search_contacts`, `search_messages`, `search_notes`, `search_tasks`,
-`send_chat`, `set_contact_care`, `set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`, `set_status`,
+`request_reward`, `restore_event`, `restore_task`, `review_task`, `search_contacts`, `search_files`, `search_messages`, `search_notes`,
+`search_tasks`, `send_chat`, `set_contact_care`, `set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`,
+`set_status`,
 `set_waiting`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
 `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unshare_address_book`, `unshare_event_calendar`,

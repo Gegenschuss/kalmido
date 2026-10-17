@@ -772,7 +772,8 @@ def v1_attachment_upload(tid):
     v1_call(attachment_upload, tid)
     new = [dict(r) for r in c.execute("SELECT id, name, mime, size FROM attachments WHERE task_id=? AND comment_id IS NULL ORDER BY id", (tid,))
            if r["id"] not in before]
-    return jsonify(data=new, next_cursor=None), 201
+    from ..files.scan import sc_up
+    return jsonify(data=sc_up(c, "att", new), next_cursor=None), 201  # 2.61.0 (#1818): + up (unchecked by the virus scanner)
 
 
 @app.post("/api/v1/tasks/<int:tid>/attachments/text")

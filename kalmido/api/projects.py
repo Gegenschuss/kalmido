@@ -137,7 +137,8 @@ def v1_list_files(lid):
     need_overview(c, lid)
     rows = c.execute("SELECT * FROM list_files WHERE list_id=? ORDER BY id DESC", (lid,)).fetchall()
     names = user_names(c, [r["user_id"] for r in rows])
-    return jsonify(data=[ov_file_dict(r, names) for r in rows], next_cursor=None)
+    from ..files.scan import sc_up
+    return jsonify(data=sc_up(c, "list", [ov_file_dict(r, names) for r in rows]), next_cursor=None)  # 2.61.0 (#1818): + up
 
 
 @app.post("/api/v1/lists/<int:lid>/files")

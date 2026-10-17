@@ -43,6 +43,8 @@ TABLES = (
     "task_bell",  # 2.53.0 C (#1424): the bell of one task per person (NULL = a private list's task)
     "nl_conns", "nl_segments", "nl_members", "nl_runs",  # 2.55.0 E (#1455): the newsletter connection (NULL = a person's own)
     "task_vectors",  # 2.59.0 B (#1375): the text vectors of related tasks (NULL = a private list's task)
+    "upload_scan",  # 2.61.0 A (#1818): unchecked / infected uploads (NULL = a private file; files/scan.py)
+    "file_text",  # 2.61.0 C (#1820): recognised text of stored files (NULL = a private file, the app checks the file)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

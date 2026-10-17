@@ -7,6 +7,33 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.61.0] - 2026-10-17
+
+**In short:** uploads get safe - every file is **checked for malware** (ClamAV) before it is stored, **photos lose their
+location and camera data**, and PDFs and pictures in tasks, projects and the file store become **searchable by their text**.
+
+### Added
+- **Virus scan of uploads** with ClamAV (task and comment files, file store, documents, mail intake, sharing, project and
+  chat files): a find refuses the file with a clear message. While the scanner is unavailable files are taken, marked
+  *Unchecked* and checked in the background; a later find locks the file (no download or preview, a note for the
+  uploader). New service `clamav` in docker-compose (about 1-1.5 GB RAM; `KALMIDO_CLAMD=` switches it off for small
+  servers, then nothing is marked). The scanner's state is shown in the server settings (#1818).
+- **Photo metadata removed on upload:** JPEG, PNG, WebP and HEIC lose GPS, camera and other EXIF/XMP/IPTC data on every
+  way in, the picture itself stays as it is (turned photos are set upright first). Setting *Remove location data from
+  photos* (on by default) per account and per organisation (#1819).
+- **Receipt photos keep their capture date:** read before the metadata goes, shown as *Taken on ...* and used as the
+  date when the text has none (#1819).
+- **Text recognition for normal files:** PDFs and pictures attached to tasks, in projects and in the file store are read
+  in the background (same local Tesseract and limits as documents), become searchable and show *Text recognised* /
+  *No text found*; existing files follow slowly (#1820).
+
+### Changed
+- The file type now comes from the content: a program or HTML page posing as a picture or PDF is only offered as a
+  download (#1818).
+
+### Fixed
+- A public list link never hands out browser-encrypted files.
+
 ## [2.60.0] - 2026-10-17
 
 **In short:** "Software team" - project lists can plan in **sprints** with a burndown and a review, kanban columns get

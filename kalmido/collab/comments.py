@@ -74,6 +74,9 @@ def att_dicts(c, where, args):
     out = {}
     for a in c.execute(f"SELECT id, comment_id, name, mime, size, created_at FROM attachments WHERE {where} ORDER BY id", args):
         out.setdefault(a["comment_id"], []).append({k: a[k] for k in ("id", "name", "mime", "size", "created_at")})
+    if out:  # 2.61.0 (#1818): + up (virus scan marks)
+        from ..files.scan import sc_up
+        sc_up(c, "att", [d for v in out.values() for d in v])
     return out
 
 

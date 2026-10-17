@@ -67,9 +67,11 @@ def attachment_upload(tid):
     return jsonify(one_task(c, tid))
 
 
-def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=None):
+def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=None, sealed=False):
     """Store uploaded werkzeug files for a task (or one of its comments). Returns an error message or
-    None (caller commits; on an error the caller rolls back and unlinks `saved`). `ids` (a list) gets the new row ids."""
+    None (caller commits; on an error the caller rolls back and unlinks `saved`). `ids` (a list) gets the new row ids.
+    sealed: browser-encrypted bytes (e2e) that skip the upload checks (2.61.0, files/upsafe.py)."""
+    from ..files.upsafe import up_check_path, up_after_store, UploadRefused
     from ..notify.alerts import aa_count, aa_oserr
     from ..admin.hosting import quota_guard
     if uid is None:  # the uploader: the signed-in person (/drop passes the token's owner)
@@ -106,13 +108,22 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=N
             saved.append(rel)
         if org is None:
             org = oc_task_org(c, tid) or 0
-        oc_seal_path(c, org, full)  # 2.42.0 (#828): a file of an organisation's list is sealed with its key at rest
         mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
+        info = None
+        if not sealed:  # 2.61.0 (#1818 #1819 #1820): scan + metadata before the file is sealed
+            try:
+                size, mime, info = up_check_path(c, full, name, mime, uid, org or None, "att")
+            except UploadRefused as e:
+                return str(e)
+        oc_seal_path(c, org, full)  # 2.42.0 (#828): a file of an organisation's list is sealed with its key at rest
         ins = ("INSERT INTO attachments(task_id,name,mime,size,path,created_at,comment_id,user_id) VALUES(?,?,?,?,?,?,?,?)",
                (tid, name, mime, size, rel, ts, comment_id, uid))
-        if ids is not None:
-            ids.append(insert_id(c, *ins))  # 2.42.0 (#828): the caller marks exactly its own rows
+        if ids is not None or info:
+            aid = insert_id(c, *ins)
+            if ids is not None:
+                ids.append(aid)  # 2.42.0 (#828): the caller marks exactly its own rows
+            up_after_store(c, "att", aid, org or None, info)
         else:
             c.execute(*ins)
     if comment_id is None:
@@ -199,6 +210,8 @@ def need_attachment(c, aid, write):
     if not write:  # 2.42.0 (#828): an encrypted file only for its uploader (never for agents)
         from ..collab.e2e import e2e_att_guard
         e2e_att_guard(a)
+        from ..files.scan import sc_guard
+        sc_guard(c, "att", aid)  # 2.61.0 (#1818): a file found infected later is locked (download, preview, text)
     if a["comment_id"] is None:
         need_task(c, a["task_id"], write, full=True)
         return a

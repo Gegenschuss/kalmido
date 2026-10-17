@@ -755,6 +755,9 @@ def process(c, nid):
     if m["doc_date"]:
         vals["doc_date"] = m["doc_date"]     # set by hand while it waited
     auto_all = meta_json(c, m, "auto", {})
+    if not vals["doc_date"] and m["taken_at"]:  # 2.61.0 B (#1819): no date in the text -> the day the photo was taken
+        vals["doc_date"] = str(m["taken_at"])[:10]
+        auto_all["date"] = "photo"
     if given.get("_asn"):
         auto_all["asn"] = "code"
     imported = {}                            # features the caller gave (an import): set as they are

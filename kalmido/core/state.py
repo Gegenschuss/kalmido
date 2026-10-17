@@ -410,13 +410,20 @@ def search_tasks(c, uid, raw, limit):
     from ..lists.fields import search_field_ids
     q = f"%{like_escape(raw)}%"  # 2.37.0 (#1150): the text literally (Postgres reads a backslash as an escape in LIKE)
     fids = sorted(search_field_ids(c, uid, raw))[:2000] if raw else []
+    from ..files.textscan import ts_task_hits
+    fhit = ts_task_hits(c, uid, raw)  # 2.61.0 (#1820): the recognised text of a task's files finds the task
+    fids = sorted(set(fids) | set(sorted(fhit)[:2000]))
     # participants: only their own tasks match (a context parent's notes / link / fields are not theirs to search)
-    return load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
+    rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
                          "AND (title ILIKE ? ESCAPE '\\' OR content ILIKE ? ESCAPE '\\' OR url ILIKE ? ESCAPE '\\' OR (snippets IS NOT NULL AND EXISTS (SELECT 1 FROM "
                          "jsonb_array_elements(CASE WHEN jsonb_typeof(snippets)='array' THEN snippets ELSE '[]'::jsonb END) j "
                          "WHERE (j->>'code') ILIKE ? ESCAPE '\\' OR (j->>'path') ILIKE ? ESCAPE '\\')) "
                          f"OR id IN ({','.join('?' * len(fids)) or 'NULL'})) "
                          "ORDER BY status, updated_at DESC LIMIT ?", (uid, uid, q, q, q, q, q, *fids, limit))
+    for t in rows:  # 2.61.0 (#1820): "in file <name>" when only a file's text matched
+        if t["id"] in fhit and not any(raw.casefold() in (t.get(k) or "").casefold() for k in ("title", "content", "url")):
+            t["file_hit"] = fhit[t["id"]]
+    return rows
 
 
 @app.get("/api/tasks/<int:tid>")

@@ -395,6 +395,7 @@ main() {
   say "Backups:    daily into data/backups/ (Settings > Users > Whole server > Backups); copy them to another disk too"
   if [ -n "$IMAGE" ]; then say "Image:      $IMAGE (prebuilt)"; else say "Image:      kalmido:local (built on this computer)"; fi
   say "Update:     \"$DIR/update.sh\"  (backs up the database first; admins also see new versions in Settings > Help)"
+  say "Virus scan: ClamAV checks every upload (about 1-1.5 GB RAM); small server: KALMIDO_CLAMD= in .env, see docs/SELF-HOSTING.md"  # 2.61.0
   say "Stop:       cd \"$DIR\" && docker compose down"
   say "Uninstall:  cd \"$DIR\" && docker compose down && docker image rm ${IMAGE:-kalmido:local}"
   say "            then delete the folder (this deletes your tasks)"

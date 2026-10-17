@@ -163,3 +163,21 @@ For software teams working on a board. Everything is off until you switch it on.
 - **Velocity**: with sprints and story points on, the project page offers the block *Velocity*: the completed points of
   the last (up to six) closed sprints as bars and their average as a planning aid for the next sprint.
 - Agents read and set the same through the API and MCP (`points`, `set_wip_limit`, `get_velocity`, see AGENTS.md).
+## Photo metadata on upload (2.61.0)
+
+Photos keep a lot about where and how they were taken: the place (GPS), the camera and its serial number, the capture
+time. Uploaded photos lose these metadata before they are stored, on every way in (file store, task and comment files,
+project files, chat, documents, mail and sharing into Kalmido); profile pictures and list icons were already stored without them.
+
+- JPEG, PNG, WebP and HEIC / HEIF, recognised from the content, not the file name. The picture itself stays as it was:
+  only the metadata blocks are cut out (JPEG keeps its colour profile; HEIC keeps its structure, its metadata blocks are
+  emptied). A photo stored turned (the camera's orientation mark) is turned upright first and saved again, so it shows the
+  right way round without the mark. Anything Kalmido cannot read is stored unchanged; the upload never fails because of it.
+- The switch *Remove location data from photos* (on by default) also removes camera details and capture time. For your
+  private files it sits in *Settings > Data > Photos*; files of an organisation follow the organisation's switch in
+  *Settings > Workspaces*, which only its admins change. Off: photos are stored exactly as uploaded.
+- Documents: the capture date is read before the metadata go (also with the switch off) and shown in the document's
+  detail (*Taken on …*). When the recognised text has no date, the document gets the day the photo was taken, marked
+  *automatic* like other recognised values. The place is never stored.
+- Browser-encrypted files (end-to-end) are not touched: the server cannot read them.
+- Agents cannot change either switch.

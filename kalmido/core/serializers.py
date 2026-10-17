@@ -81,6 +81,9 @@ def load_tasks(c, where, args=(), full_snips=False):
             if a["kind"] == "agent":
                 d["agent"] = a["display_name"] or a["username"]
             atts.setdefault(a["task_id"], []).append(d)
+    if atts:  # 2.61.0 (#1818): + up (not checked by the virus scanner yet / locked), only files with a mark
+        from ..files.scan import sc_up
+        sc_up(c, "att", [d for v in atts.values() for d in v])
     # comment count + unread (comments of others newer than the last one I have seen)
     from ..core.db import iso_ms, now_utc
     cms, uid = {}, (g.user["id"] if has_request_context() and getattr(g, "user", None) else None)

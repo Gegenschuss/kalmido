@@ -87,6 +87,7 @@ def doc_json(c, m, node, full=False, role=None):
     d = {"id": m["node_id"], "name": node["name"], "mime": node["mime"], "size": node["size"], "org_id": node["org_id"], "ws": ws,
          "state": m["state"], "error": err_key, "error_text": tr(S.ERRORS[err_key]) if err_key in S.ERRORS else "",
          "method": m["method"], "pages": m["pages"], "date": m["doc_date"], "due": m["due_date"],
+         "taken_at": m["taken_at"] or None,  # 2.61.0 B (#1819): the capture date of a photo (EXIF)
          "amount": S.doc_open(c, ws, "doc_meta.amount", m["amount"]) or None, "currency": m["currency"] or None,
          "sender": {"id": m["sender_id"], "name": S.label_name(c, ws, "sender", m["sender_id"])} if m["sender_id"] else None,
          "type": {"id": m["type_id"], "name": S.label_name(c, ws, "type", m["type_id"])} if m["type_id"] else None,
@@ -332,6 +333,12 @@ def doc_update(c, nid, d, uid, by=None):
             auto.pop("asn", None)
             S.meta_set_json(c, nid, ws, "auto", auto)
             _reindex(c, nid)
+        if "doc_date" in sets and by is None:  # 2.61.0 B (#1819): a date set by hand is no longer "from the photo"
+            m = S.meta_row(c, nid)
+            auto = S.meta_json(c, m, "auto", {})
+            if auto.pop("date", None):
+                S.meta_set_json(c, nid, ws, "auto", auto)
+        m = S.meta_row(c, nid)  # the feature part below reads auto / suggest as they are now
     changed = [f for f in FEATURE_NAMES if f in d]
     if not changed:
         return None
@@ -473,6 +480,8 @@ def docs_file(nid):
     v = fs_version_row(c, nid)
     if not v:
         raise Denied(404)
+    from ..files.scan import sc_guard
+    sc_guard(c, "fs", nid, v["no"])  # 2.61.0 (#1818): a version found infected later is locked
     fs_log_add(c, nid, "download" if request.args.get("dl") == "1" else "read")
     c.commit()
     return send_stored({"id": nid, "path": v["path"], "name": n["name"], "mime": v["mime"] or n["mime"], "size": v["size"]})

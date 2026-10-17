@@ -48,9 +48,12 @@ def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=Non
         if r:
             return r[0]
     folder = S.root_folder(c, uid, org_id)  # 2.48.0 review: the marked documents folder, members file in
-    nid = fs_put(c, uid, folder, name, data, mime, org_id)
+    up = {}  # 2.61.0 B (#1819): the upload checks' info -- the capture date of a photo (read before its metadata went)
+    nid = fs_put(c, uid, folder, name, data, mime, org_id, up=up)
     node = c.execute("SELECT org_id, owner_id FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     doc_add(c, nid, node["org_id"], node["owner_id"], uid, source, ext, meta)
+    if up.get("taken_at"):
+        c.execute("UPDATE doc_meta SET taken_at=? WHERE node_id=?", (str(up["taken_at"])[:40], nid))
     return nid
 
 

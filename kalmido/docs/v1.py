@@ -96,9 +96,10 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "state": {"type": "string", "enum": list(S.STATES), "description": "Recognition: wait, run, done, failed (error says why)"},
         "error": {"type": "string"}, "method": {"type": "string", "description": "pdf (text layer), ocr, text, import"},
         "date": {"type": ["string", "null"], "format": "date"}, "due": {"type": ["string", "null"], "format": "date"},
+        "taken_at": {"type": ["string", "null"], "description": "Capture time of a photo (from its EXIF, read before the metadata was removed)"},
         "amount": {"type": ["string", "null"], "description": "Decimal text, e.g. 119.00"}, "currency": {"type": ["string", "null"]},
         "sender": label, "type": label, "tags": {"type": "array", "items": {"type": "object"}}, "folder": label,
-        "auto": {"type": "object", "description": "Feature -> how it was set automatically: rule, learn, agent, import"},
+        "auto": {"type": "object", "description": "Feature -> how it was set automatically: rule, learn, agent, import, code, photo"},
         "suggest": {"type": "object", "description": "Feature -> a suggestion waiting for review"}, "review": {"type": "boolean"},
         "text": {"type": "string", "description": "The recognised text (single document only)"}, "url": {"type": "string"},
         "content_url": {"type": "string"}, "asn": {"type": ["integer", "null"], "description": "Archive serial number (unique per workspace)"}}}

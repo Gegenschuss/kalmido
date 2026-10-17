@@ -22,6 +22,7 @@ addresses and paths to your setup.
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
 - [Mail](#mail)
+- [Virus scan of uploads](#virus-scan-of-uploads)
 - [Documents: text recognition](#documents-text-recognition)
   - [Import from Paperless-ngx (2.48)](#import-from-paperless-ngx-248)
 - [Related tasks: the embedding service (2.59)](#related-tasks-the-embedding-service-259)
@@ -625,6 +626,34 @@ Trigger every alert once on purpose after setting it up, the dead man's switch t
   required: after the new password the second step follows, and all other sessions of the account end. App passwords
   (CalDAV) and API tokens stay valid; the page for the new password says so and points to *Settings > Account* (2.58).
 
+## Virus scan of uploads
+
+Since 2.61.0 every uploaded file (task and comment files, project files, the file store and documents, chat files, files from
+mail and the share sheet) goes to [ClamAV](https://www.clamav.net/) before it is stored. The `docker-compose.yml` brings the
+service `clamav` along; Kalmido talks to its daemon over the internal network (`KALMIDO_CLAMD=clamav:3310`, no port is
+published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the container keeps the signatures up to date
+(volume `clamav-db`). After a start it needs a few minutes to load them (`docker compose ps` shows *healthy* when it is ready).
+
+- **A find**: the upload is refused with the name of the signature ("file.pdf: malware found (...), not uploaded").
+- **Scanner not reachable** (still loading, stopped, crashed) or a file larger than `KALMIDO_CLAMD_MAX_MB`: the upload is
+  taken and marked *Unchecked* in the app. Once the scanner answers again, the server checks these files in the background
+  (up to 20 per minute). Clean: the mark goes. A find: the file is **locked** - it stays stored, but nobody can download or
+  preview it any more (403), and the person who uploaded it gets a News item. Deleting it is up to the people of the list.
+  *Settings > Users > Whole server* shows the scanner's state and how many files wait or are locked.
+- Files encrypted in the browser (end-to-end) cannot be read by the server and are not scanned.
+- Independent of the scanner, the server looks at the first bytes of every upload: a program or HTML page that claims to be a
+  picture or PDF is stored as a plain download (never shown inline).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KALMIDO_CLAMD` | `clamav:3310` in the compose file, else empty | `host:port` of clamd (TCP) or the path of its unix socket; empty = no scan |
+| `KALMIDO_CLAMD_MAX_MB` | `100` | larger files are not sent to the scanner (marked *Unchecked*); keep it at or below clamd's `StreamMaxLength` |
+| `KALMIDO_CLAMD_TIMEOUT` | `60` | seconds one scan may take |
+
+**Switch it off** on a small server (e.g. a Raspberry Pi with 1 GB): set `KALMIDO_CLAMD=` (empty) in `.env` and delete the
+`clamav:` block (and the `clamav-db` volume entry) from `docker-compose.yml`, then `docker compose up -d --remove-orphans`.
+Uploads are then taken without a scan and without a mark. An own ClamAV elsewhere: `KALMIDO_CLAMD=host:3310`.
+
 ## Documents: text recognition
 
 The area *Documents* (2.48.0) reads the text of uploaded PDFs and images: the text layer of a PDF, and for scans the
@@ -642,6 +671,18 @@ Each tool runs as a short-lived process with limits; tune them for small hosts:
 | `KALMIDO_OCR_MEM_MB` | `1024` | Memory of one tool |
 | `KALMIDO_OCR_LANGS` | `deu+eng` | Tesseract languages (installed ones only) |
 | `KALMIDO_DOCS_SCAN_S` | `60` | Seconds between two looks into the inbox folders "Dokumente/Eingang" |
+| `KALMIDO_FILE_OCR` | `on` | 2.61.0: `off` switches the text recognition of normal files off (below) |
+| `KALMIDO_FILE_OCR_BACKFILL` | `on` | 2.61.0: `off` switches only the catch-up of files stored before off |
+| `KALMIDO_FILE_OCR_BACKFILL_S` | `20` | Seconds between two files of the catch-up |
+| `KALMIDO_FILE_OCR_MAX_MB` | `50` | Larger files are not read |
+
+2.61.0: the same tools also read the text of normal files in the background -- task and comment files, project files and
+files in the file store (PDF, JPEG, PNG; HEIC cannot be read by them and gets no mark). The upload never waits for it;
+documents go first, and the same file content in a workspace is read only once. The text makes the file findable: a task
+by the text of its files (task search, "Found in the file ..."), a file by its text in the file store's search -- only
+for people who can open the file anyway. The file shows *Text recognised* or *No text found*. Files stored before 2.61.0
+are caught up slowly (one file every 20 seconds, only while nothing else waits, newest first; the position survives a
+restart). Browser-encrypted files and chat files are never read. The text is sealed like the documents' text below.
 
 The recognised text, amounts, sender names, rules and the learnt models are sealed with the workspace's key when
 `KALMIDO_SECRET_KEY` is set (see [Encryption of organisation data](#encryption-of-organisation-data)); the search uses
