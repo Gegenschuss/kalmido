@@ -696,7 +696,7 @@ Setting up listmonk (version 4 or newer) for Kalmido:
    the API user's name and the token.
 4. Mark the consent of your contacts (contact card > *Newsletter*), create a segment and press *Sync now*.
 
-### Built-in assistant (2.75.0)
+### Built-in assistant (2.75)
 
 Kalmido calls no language model itself -- except the built-in assistant, and only when you configure it. It talks to any
 OpenAI-compatible chat-completions endpoint (`POST <base>/chat/completions`): a local model (Ollama, vLLM, LocalAI) or a
