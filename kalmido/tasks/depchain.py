@@ -44,7 +44,8 @@ def dch_switch(c, tid):
 def dch_skip(c, uid, w, reason):
     if task_visible(c, w["id"], uid):
         return {"id": w["id"], "title": w["title"], "reason": reason, "hidden": False}
-    return {"id": None, "title": None, "reason": reason, "hidden": True}  # never a title / id of a task they cannot see
+    # never an id / title / state of a task they cannot see (done or a milestone would tell something about it)
+    return {"id": None, "title": None, "reason": "no_access", "hidden": True}
 
 
 def dch_plan(c, uid, roots, delta, seen, room=DCH_MAX):

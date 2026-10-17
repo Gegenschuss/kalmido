@@ -192,13 +192,16 @@ behind_bv = mk(A, P, "Alice after Bob", D(5))
 dep(Bo, bv, s2)
 dep(Bo, bh, s2)
 dep(A, behind_bv, bv)
+bhd = mk(Bo, BH, "Bob finished step", D(3))
+dep(Bo, bhd, s2)
+Bo.post(B + f"/api/tasks/{bhd}/complete")
 r = patch(A, s2, due=D(2))
 sk = r["chain"]["skipped"]
 vis = [x for x in sk if not x["hidden"]]
 hid = [x for x in sk if x["hidden"]]
 check(vis == [{"id": bv, "title": "Bob rigs", "reason": "no_access", "hidden": False}], f"view only: skipped with its title: {sk}")
-check(hid == [{"id": None, "title": None, "reason": "no_access", "hidden": True}] and "Bob private step" not in r.__repr__() + str(r),
-      f"invisible: skipped without id / title: {sk}")
+check(hid == [{"id": None, "title": None, "reason": "no_access", "hidden": True}] * 2 and "Bob private step" not in str(r) and "Bob finished" not in str(r),
+      f"invisible: skipped without id / title / state (also a completed one says no_access): {sk}")
 check(row(bv)["due"] == D(3) and row(bh)["due"] == D(3) and row(behind_bv)["due"] == D(5), "no write access: they and the chain behind stay")
 
 # ================================================================== the triggering list decides, shift_chain false
