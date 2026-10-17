@@ -119,8 +119,8 @@ check(Bo.put(B + f"/api/lists/{O1}/members", json={"user_id": uid["carol"], "rol
 check(Bo.put(B + f"/api/lists/{O2}/members", json={"user_id": uid["dave"], "role": "edit"}).ok, "setup: dave edits O2")
 check(Bo.put(B + f"/api/lists/{O2}/members", json={"user_id": uid["gina"], "role": "participant"}).ok, "setup: gina participant in O2")
 check(Bo.put(B + f"/api/lists/{O3}/members", json={"user_id": uid["carol"], "role": "view"}).ok, "setup: carol views O3")
-SEC1 = Bo.post(B + f"/api/lists/{O1}/sections", json={"name": "Own column"}).json()["id"]
-SEC2 = Bo.post(B + f"/api/lists/{O2}/sections", json={"name": "Doing"}).json()["id"]
+SEC1 = Bo.post(B + "/api/sections", json={"list_id": O1, "name": "Own column"}).json()["id"]
+SEC2 = Bo.post(B + "/api/sections", json={"list_id": O2, "name": "Doing"}).json()["id"]
 TITLE = "Quarterly offer zq7"
 T = Bo.post(B + "/api/tasks", json={"title": TITLE, "list_id": O1, "section_id": SEC1, "due": "2030-05-02"}).json()["id"]
 SUB = Bo.post(B + "/api/tasks", json={"title": "Step zq7", "list_id": O1, "parent_id": T}).json()["id"]

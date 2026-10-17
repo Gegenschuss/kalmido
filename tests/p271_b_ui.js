@@ -35,8 +35,8 @@ const FEAT = 'cal,comments,collab';
   const MKT = (await call('POST', '/api/lists', {name: 'Marketing', org_id: ORG})).id;
   const PRIV = (await call('POST', '/api/lists', {name: 'Private notes', org_id: null})).id;
   await call('PUT', `/api/lists/${MKT}/members`, {user_id: dave.id, role: 'edit'});
-  const S1 = (await call('POST', `/api/lists/${MKT}/sections`, {name: 'Ideas'})).id;
-  const S2 = (await call('POST', `/api/lists/${MKT}/sections`, {name: 'Doing'})).id;
+  const S1 = (await call('POST', '/api/sections', {list_id: MKT, name: 'Ideas'})).id;
+  const S2 = (await call('POST', '/api/sections', {list_id: MKT, name: 'Doing'})).id;
   const T = (await call('POST', '/api/tasks', {title: 'Launch flyer', list_id: SALES})).id;
 
   // ================= the task menu: "Show also in list…"
