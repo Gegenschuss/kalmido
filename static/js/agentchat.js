@@ -480,15 +480,20 @@ function chatModelHtml(a) {
 // 2.33.0 (#1045): the usage ring right of the name -- the agent's plan usage as its host reports it (PUT /api/v1/agent/quota).
 // Filled with the main window (the week); accent, from 75 % yellow, from its limit red + "paused until …" (under the name);
 // no report = no ring, a report older than 24 h = grey. Hover / focus / tap lists every window with % and reset time.
-const QUOTA_KEYS = {seven_day: N_('Week'), five_hour: N_('5 hours'), spend_limit: N_('Spend limit')};
+const QUOTA_KEYS = {seven_day: N_('Week'), five_hour: N_('5 hours'), spend_limit: N_('Spend limit'),
+  // 2.80.0 (#1841): further windows a host reports by key; an unknown key reads "Other quota" instead of the raw English key
+  seven_day_overage_included: N_('Week (incl. extra usage)'), seven_day_opus: N_('Week (Opus)'), seven_day_sonnet: N_('Week (Sonnet)')};
+// 2.80.0 (#1841): a further weekly window at 0 % that resets with the week tells nothing new -- left out of the list
+const quotaIdle = (q, w, i) => i !== q.main && w.key?.startsWith('seven_day_') && !(+w.percent) && !!w.resets_at
+  && q.windows.some(o => o.key === 'seven_day' && o.resets_at === w.resets_at);
 const quotaWhen = iso => { const d = new Date(iso); return d.toLocaleDateString(LOCALE(), {day: '2-digit', month: '2-digit', year: 'numeric'}) + ' ' + d.toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit'}); };
 const quotaPct = v => Math.round(+v || 0).toLocaleString(LOCALE()) + ' %';
 const quotaStale = q => q.stale || !q.at || Date.now() - new Date(q.at) > 864e5;
 function chatRingHtml(a) {
   const q = a.quota; if (!q?.windows?.length) return '';
   const stale = quotaStale(q), lv = stale ? 'stale' : q.level || 'ok', p = Math.max(0, Math.min(100, +q.percent || 0));
-  const lbl = w => w.key && QUOTA_KEYS[w.key] ? tr(QUOTA_KEYS[w.key]) : w.label;
-  const lines = q.windows.map((w, i) => `${lbl(w)}${i === q.main && q.windows.length > 1 ? ' (' + tr('in the ring') + ')' : ''}: ${quotaPct(w.percent)}` + (w.resets_at ? ' · ' + tr('resets {0}', quotaWhen(w.resets_at)) : w.reset_passed ? ' · ' + tr('has reset') : ''));
+  const lbl = w => !w.key ? w.label : tr(QUOTA_KEYS[w.key] || N_('Other quota'));
+  const lines = q.windows.map((w, i) => quotaIdle(q, w, i) ? '' : `${lbl(w)}${i === q.main && q.windows.length > 1 ? ' (' + tr('in the ring') + ')' : ''}: ${quotaPct(w.percent)}` + (w.resets_at ? ' · ' + tr('resets {0}', quotaWhen(w.resets_at)) : w.reset_passed ? ' · ' + tr('has reset') : '')).filter(Boolean);
   if (q.limit != null) lines.push(tr('Limit: {0}', quotaPct(q.limit)));
   if (q.paused_until) lines.push(tr('paused until {0}', quotaWhen(q.paused_until)));
   lines.push(stale ? tr('Outdated, last report {0}', quotaWhen(q.at)) : tr('Reported {0}', quotaWhen(q.at)));
