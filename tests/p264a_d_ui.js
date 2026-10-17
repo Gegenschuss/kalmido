@@ -91,10 +91,13 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
 
     // ---- list dialog, open list with blockers
     await stub({list_id: L, mode: null, gen: 0, rotate: 0, can_manage: true, keys: [], pending: [], members: people, agents: [],
-      blockers: [{code: 'agent', text: 'An agent is in this list.'}, {code: 'public_link', text: 'This list has a public link.'}, {code: 'org_open', text: 'Everyone in the organisation may join.'}, {code: 'participant', text: 'Bob is a participant.'}], left: {}});
+      blockers: [{code: 'agent', text: 'An agent is in this list.'}, {code: 'public_link', text: 'This list has a public link.'}, {code: 'org_open', text: 'Everyone in the organisation may join.'}, {code: 'participant', text: 'Bob is a participant.'},
+        // 2.64.1 review (L4, M2): the server's folder code and the owner's set-up have their way too
+        {code: 'folder_participant', text: 'A folder share reaches this list.'}, {code: 'owner_setup', text: 'The owner needs to set up encryption first.'}], left: {}});
     await ev(`(listModal(${L}), 1)`);
     const sec = await waitFor(`(() => { const b = document.querySelector('#l-e2e'); return b && b.querySelector('#l-e2e-sw') ? b.textContent : ''; })()`);
     check(sec && /Remove the agent first/.test(sec) && /Delete the public link first/.test(sec) && /Everyone in the organisation/.test(sec) && /Change the participant role first/.test(sec), '#1817: blockers with a clear text and the way ' + sec);
+    check(/Change the participant role of the folder first/.test(sec) && /The owner sets it up in Settings > Account/.test(sec), '2.64.1 review (L4/M2): folder_participant and owner_setup show their way ' + sec);
     check(await ev(`document.querySelector('#l-e2e-sw').disabled && /Encrypted in the browser/.test(document.querySelector('#l-e2e-h').textContent)`), '#1817: section "Encrypted in the browser", switch off while something blocks');
     check(!(await unnamed('#l-e2e button, #l-e2e input')).length, '#1817: the buttons of the lock section have names');
     await ev(`(document.querySelector('.lmodal [data-m="close"]')?.click(), 1)`); await sleep(300);
@@ -161,6 +164,10 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
     check(/Encrypted list: unlock/.test(await ev(`document.querySelector('#le2ubar')?.textContent || ''`)), '#1817: the bar offers to unlock');
     await ev(`(document.querySelector('#view .trow[data-id="${T}"] .le2uph').click(), 1)`);
     check(await waitFor(`__c.some(c => c[0] === 'unlock' && c[1] === ${L})`), '#1817: a click on the placeholder unlocks (le2eUnlock)');
+    // 2.64.1 review (L5): reachable with Tab, Enter unlocks
+    const nU = await ev(`__c.filter(c => c[0] === 'unlock').length`);
+    check(await ev(`(() => { const p = document.querySelector('#view .trow[data-id="${T}"] .le2uph'); if (!p || p.tabIndex !== 0) return false; p.focus(); p.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true})); return true; })()`)
+      && await waitFor(`__c.filter(c => c[0] === 'unlock').length > ${nU}`), '2.64.1 review (L5): the placeholder takes the focus and Enter unlocks');
     await shot('p264a-d-list.png');
     await ev(`(openDetail(${T}), 1)`);
     check(await waitFor(`!!document.querySelector('#detail .le2ud [data-le2u="unlock"]') && !document.querySelector('#detail #d-content') && document.querySelector('#detail .dtitle').hidden`), '#1817: the detail shows the unlock hint instead of title and description');
