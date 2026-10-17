@@ -1764,6 +1764,54 @@ shared with the agent (within its list limit) that is a project and that the per
 - Both proposals are made by the agent itself (`POST /api/proposals` with these kinds answers 400) and answered with the
   event `job` (approve / reject) like every proposal.
 
+## Importing old data into the office (2.68.0)
+
+An agent may read a person's old data (today: **fixed costs**; a spreadsheet, a PDF, a list in a mail, in any format)
+and PROPOSE it as ONE import in a fixed JSON shape; Kalmido never runs a model and never reads the old data itself. The
+agent writes nothing: the office routes stay closed to agent tokens (403) and the agent never sees the office (no rows, no
+duplicates, no totals). The scope `import` is off for new agents (and not part of the legacy `write`): an admin, or without
+an organisation the person itself, turns it on per agent (permission *Propose imports*). Whose office: a personal agent's
+owner, a team agent's person given as `user_id` (someone who may chat with it, in the agent's organisation); everyone else
+404. The office module must be on for that person (else 400).
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| Propose an import (kind `import`) | `POST /api/v1/agent/proposals/import` | `propose_import` | import |
+
+- **The format**: `{area, items, title?, summary?, note?, user_id?}`. `area` is `fixed_costs` (the only area so far,
+  the default; others answer 400). `items` = 1 to 500 rows, each
+  `{label, amount, repeat?, start, until?, category?, vat_rate?}` - the fields of the spreadsheet import (2.67):
+  - `label`: the name (up to 200 characters).
+  - `amount`: the **net** amount in euros, more than 0: best a JSON number (`1200.5`); a text is read like a spreadsheet
+    cell (`"1.200,50"`, `"1200.50"`, `"29,90"`, `"12.500"` = 12500).
+  - `repeat`: `monthly` (default), `quarterly`, `yearly` or `once`.
+  - `start`: `YYYY-MM-DD`, the first due date (yearly and once: its month is the due month); `until`: `YYYY-MM-DD` or
+    left out (no end).
+  - `category`: a free group such as "Insurances" (up to 100 characters).
+  - `vat_rate`: `0`, `7` or `19`; left out = 19, insurances, levies and contributions 0 (as the spreadsheet import).
+  Other fields of a row (an `id`, an `org_id`, `created_by`) are ignored. `note`: what you could not read or assumed.
+- **The card**: a ready proposal job (kind `import`): News + push "Proposal ready" per the person's settings and a card with
+  the preview of the spreadsheet import, judged against the office when the card is OPENED: every row new, already there
+  (same name, amount and repeat as an existing cost or an earlier row; not ticked) or with an error (greyed out with the
+  reason; never taken over). The person ticks rows, may change the VAT per row (net and gross shown) and takes them over
+  into the office they work in (their organisation or, without one, their personal office), shown on the card. An agent of
+  an organisation imports only into that organisation (another workspace: the card asks to switch, nothing is written).
+  Only an admin of that office can take it over (403 otherwise, nothing written); only the person the card is for can open
+  or decide it. Every row is checked again, all ticked rows are written in one step (at most 500 fixed costs per office),
+  the office log names the agent; undo removes exactly these rows again (not those changed since), redo makes them again.
+- **The answer** comes as the event `job` with `action` approve / reject and only counts (`proposal`: `state`, `created`,
+  `skipped`). Limits: at most 5 open import proposals per agent and 20 per person and day (429), a card expires after 14 days, the proposal body up to
+  256 KB, the agent's usage limit applies. A proposal job can be replaced with `POST /api/v1/agent/jobs/{id}/proposal`
+  (scope `import`) while it is open.
+
+```json
+{"area": "fixed_costs", "user_id": 3, "summary": "From the old spreadsheet 'Kosten 2025'",
+       "note": "Row 14 (phone) had no amount, left out",
+       "items": [{"label": "Office rent", "amount": 950, "repeat": "monthly", "start": "2026-01-01", "category": "Rooms"},
+                 {"label": "Liability insurance", "amount": "240,00", "repeat": "yearly", "start": "2026-03-01", "category": "Insurances", "vat_rate": 0},
+                 {"label": "Software subscription", "amount": 29.9, "start": "2026-01-01", "vat_rate": 19}]}
+```
+
 ## Behaviour rules template (2.13.1)
 
 `mcp/CLAUDE.template.md` ("Kalmido agent behaviour rules", English with a German note) is the rule block every agent's

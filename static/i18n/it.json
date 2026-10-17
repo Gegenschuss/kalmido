@@ -8865,5 +8865,19 @@
   "Nothing to pull in: the waiting tasks already follow right after it": "Niente da avvicinare: le attività in attesa seguono già subito dopo",
   "The waiting tasks stay where they are": "Le attività in attesa restano dove sono",
   "The tasks waiting on this one move up to the day after it is due (the gaps between them stay)": "Le attività che aspettano questa avanzano fino al giorno dopo la sua scadenza (le distanze tra loro restano)",
-  "This task has no date": "Questa attività non ha una data"
+  "This task has no date": "Questa attività non ha una data",
+  "Only fixed costs can be imported for now (area fixed_costs)": "Per ora si possono importare solo costi fissi (area fixed_costs)",
+  "This proposal can only be taken over into the office of “{0}”: switch your workspace there first": "Questa proposta può essere ripresa solo nell’ufficio di «{0}»: passa prima a quell’area di lavoro",
+  "Your personal office": "Il tuo ufficio personale",
+  "Switch your workspace to the office of this import first": "Passa prima all’area di lavoro con l’ufficio di questa importazione",
+  "{0} fixed costs changed since": "{0} costi fissi modificati nel frattempo",
+  "This person does not use the office: an import proposal is not possible": "Questa persona non usa l’ufficio: una proposta di importazione non è possibile",
+  "At most {0} open import proposals: wait until the person decided": "Al massimo {0} proposte di importazione aperte: aspetta che la persona decida",
+  "Import: {0} fixed costs": "Importazione: {0} costi fissi",
+  "Propose imports": "Proporre importazioni",
+  "Read your old data (for example fixed costs) and send it as an import proposal you check and take over into the office; never sees the office itself": "Legge i tuoi dati precedenti (per esempio i costi fissi) e li invia come proposta di importazione che controlli e riprendi nell’ufficio; non vede mai l’ufficio",
+  "Into: {0}": "In: {0}",
+  "Taking over creates the ticked fixed costs as you in this office; nothing else changes. One step, undo takes it back.": "Riprendendo si creano a tuo nome i costi fissi spuntati in questo ufficio; nient’altro cambia. Un passo, annulla lo ripristina.",
+  "At most {0} import proposals per person and day": "Al massimo {0} proposte di importazione per persona al giorno",
+  "The proposal changed meanwhile: open it again": "La proposta è cambiata nel frattempo: aprila di nuovo"
 }

@@ -692,6 +692,8 @@ def openapi_spec():
     atm_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 C (#1353)
     from ..agents.lyprop import lyp_spec
     lyp_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.55.0 B (#1066)
+    from ..agents.importprop import aim_spec
+    aim_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.68.0 A (#1839)
     from ..hub.agentdispo import adz_spec
     adz_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 C (#1355)
     from ..files.v1 import files_spec

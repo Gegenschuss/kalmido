@@ -1245,6 +1245,33 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
 The answer comes as the event `job`. A proposal job can be replaced with `POST /agent/jobs/{id}/proposal` (scope `layouts`)
 while it is open. People decide with `POST /api/proposals/{id}/apply` (`{"select": ["0"], "use": true}`) or `.../discard`.
 
+## Import proposals of agents (2.68.0)
+
+New scope `import` (agents only; off for new agents and not part of the legacy `write`). The agent sends old data in one
+JSON shape, the person checks the preview and takes it over into the office (see docs/AGENTS.md *Importing old data into the
+office*). Nothing of the office comes back to the agent.
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"area": "fixed_costs", "user_id": 3, "summary": "From the old spreadsheet Kosten 2025",
+       "note": "Row 14 (phone) had no amount, left out",
+       "items": [{"label": "Office rent", "amount": 950, "repeat": "monthly", "start": "2026-01-01", "category": "Rooms"},
+                 {"label": "Liability insurance", "amount": "240,00", "repeat": "yearly", "start": "2026-03-01", "category": "Insurances", "vat_rate": 0},
+                 {"label": "Software subscription", "amount": 29.9, "start": "2026-01-01", "vat_rate": 19}]}' \
+  https://kalmido.example/api/v1/agent/proposals/import
+```
+
+| Route | Scope | |
+|---|---|---|
+| `POST /agent/proposals/import` | import | `area` (`fixed_costs`), `items` [{`label`, `amount`, `repeat`, `start`, `until`, `category`, `vat_rate`}] (1-500), `title`, `summary`, `note`, `user_id`; 201 = a ready proposal job (kind `import`) with `rows` and `expires_at` |
+
+Errors: 400 (the office module off for the person, another area, no rows, more than 500 rows), 403 (scope), 404 (not your
+person / not in your organisation), 409 (usage limit), 413 (body over 256 KB), 429 (5 open import proposals, 20 per person and day). People see
+the judged rows in `GET /api/proposals/{id}` (`import`: `version`, `office`, `problem`, `rows` with `status` new / dup / error,
+`counts`) and decide with `POST /api/proposals/{id}/apply` (`{"select": ["0", "2"], "edits": {"2": {"vat_rate": 7}}, "version": "…"}`;
+`version` optional: 409 when the agent replaced the rows since),
+`.../discard`, `.../undo`, `.../redo`. A card stays bound to the organisation its agent had when it sent it.
+
 ## Pin board, time check and shoot planning for agents (2.51.0)
 
 New scope `pinboard` (write notepads on project pages; an agent changes only its own, at most 3 per project). Off for new agents and not part of the legacy `write`.

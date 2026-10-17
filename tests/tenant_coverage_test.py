@@ -644,6 +644,8 @@ ROUTES = {
     "GET /api/admin/upload-scan": "admin",
     # 2.67.0 (#1865): Pull the chain in: the task must be visible, each waiting task that moves needs write access
     "POST /api/tasks/{}/chain/pull": "task",
+    # 2.68.0 (#1839): an agent proposes old data for its person's office (only a card; p268_a_api_test.py: other person / org 404)
+    "POST /api/v1/agent/proposals/import": "agent",
 }
 
 # ---- 1. every route is classified, nothing stale

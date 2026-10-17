@@ -1700,6 +1700,21 @@ TOOLS += [
                      "average, a planning aid for the next sprint.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/velocity")),
 ]
+
+# 2.68.0 (#1839): old data for the office (scope import, off until a person turns it on): you read the old data yourself
+# (any format) and send it in this one shape; the person checks the preview and takes it over -- you never write the office
+_IMPORT_ROW = {"type": "object", "description": "{label, amount (net euros > 0: number or \"1.200,50\"), repeat monthly|quarterly|yearly|once "
+                                               "(default monthly), start YYYY-MM-DD, until? YYYY-MM-DD, category?, vat_rate? 0|7|19 "
+                                               "(left out: 19, insurances / contributions 0)}"}
+TOOLS += [
+    ("propose_import", "2.68.0 (scope import): ONE import proposal of old data for the person's office, today area fixed_costs (at most 500 "
+                       "rows). Read the old data yourself (spreadsheet, PDF, mail), one row per fixed cost; put rows you could not read "
+                       "into note. The person sees a preview (new / already there / error per row), ticks rows, may change the VAT and "
+                       "takes them over into their office; you never see the office. The answer comes as the event job (counts only).",
+     _obj({"area": {"type": "string", "enum": ["fixed_costs"]}, "items": {"type": "array", "items": _IMPORT_ROW, "maxItems": 500},
+           "title": {"type": "string"}, "summary": {"type": "string"}, "note": {"type": "string"}, "user_id": S_ID}, ["items"]),
+     lambda api, a: api.call("POST", "/agent/proposals/import", body=_pick(a, ("area", "items", "title", "summary", "note", "user_id")))),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -1742,9 +1757,10 @@ TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_
 TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2.51.0 (#1355)
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
 TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
+TOOL_SCOPES["import"] = ("propose_import",)  # 2.68.0 (#1839)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
-              "private", "files:read", "files:write", "office", "pinboard", "layouts")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts
+              "private", "files:read", "files:write", "office", "pinboard", "layouts", "import")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts; 2.68.0 (#1839): + import
 _ME = {"at": 0.0, "v": None}
 ME_TTL = 300  # s: a changed scope shows in tools/list within 5 minutes (a call is refused by the server at once anyway)
 

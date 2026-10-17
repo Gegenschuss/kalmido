@@ -83,6 +83,7 @@ SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("
                 "office": N_("Office drafts"),  # 2.51.0 A (#1348)
                 "pinboard": N_("Pin board"),  # 2.51.0 (#1352)
                 "layouts": N_("Propose arrangements"),  # 2.55.0 (#1066)
+                "import": N_("Propose imports"),  # 2.68.0 (#1839)
                 "write": N_("Everything (old token)")}
 SCOPE_HELP = {"read": N_("Lists, tasks, comments, time entries, habits, search"),
               "tasks:write": N_("Create, change, complete and move tasks; dependencies, habits"),
@@ -100,6 +101,7 @@ SCOPE_HELP = {"read": N_("Lists, tasks, comments, time entries, habits, search")
               "office": N_("Read clients, services and prices of the office; quotation, invoice and reminder drafts, payment suggestions"),
               "pinboard": N_("Write notepads on project pages (an agent changes only its own, e.g. a weekly status)"),  # 2.51.0 (#1352)
               "layouts": N_("See how your views are arranged (blocks only, never their content) and propose arrangements you accept or decline"),  # 2.55.0 (#1066)
+              "import": N_("Read your old data (for example fixed costs) and send it as an import proposal you check and take over into the office; never sees the office itself"),  # 2.68.0 (#1839)
               "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("Users and server status (admins only)")}
 ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Viewer")}
 BATCH_TITLE = {"update": N_("Change {0} tasks at once"), "complete": N_("Complete {0} tasks at once"), "reopen": N_("Reopen {0} tasks at once"),
@@ -202,7 +204,7 @@ def scopes_offer(c, u, agent=False):
     cap = set(scope_cap(c, "agents" if agent else "tokens"))
     out = []
     for s in SCOPES:
-        if (agent and s in SCOPES_AGENT_NEVER) or (s == "admin-read" and not u["is_admin"]) or (s in ("office", "layouts") and not agent):  # 2.51.0 A: office = agents only; 2.55.0 (#1066): layouts too
+        if (agent and s in SCOPES_AGENT_NEVER) or (s == "admin-read" and not u["is_admin"]) or (s in ("office", "layouts", "import") and not agent):  # 2.51.0 A: office = agents only; 2.55.0 (#1066): layouts too; 2.68.0 (#1839): import too
             continue
         out.append({"scope": s, "label": tr(SCOPE_LABELS[s]), "help": tr(SCOPE_HELP[s]), "allowed": s in cap})
     return out

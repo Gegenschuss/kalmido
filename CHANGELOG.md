@@ -7,7 +7,7 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-## [2.68.0] - 2026-10-17
+## [2.69.0] - 2026-10-17
 
 ### Added
 - Office > Cash flow: import fixed costs from a spreadsheet (.xlsx). A preview shows every row (amount, repeat, due month,

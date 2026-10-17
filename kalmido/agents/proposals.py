@@ -56,6 +56,7 @@ PROP_STATES = ("requested", "ready", "applied", "discarded")
 PROP_MODES = ("off", "shared", "all")
 PROP_KINDS += ("inquiry", "setup")  # 2.51.0 B (#1351 #1358): an inquiry becomes a project, the setup assistant (agents/propkinds2.py)
 PROP_KINDS += ("layout",)  # 2.55.0 (#1066): the agent proposes how a view is arranged (agents/lyprop.py), never on request
+PROP_KINDS += ("import",)  # 2.68.0 (#1839): the agent proposes old data for the office (agents/importprop.py), never on request
 PROP_MAX_ITEMS = 200                    # entries one proposal may create / change (tasks + subtasks)
 PROP_MAX_BYTES = 256 * 1024             # JSON body of a proposal
 PROP_TITLE_MAX, PROP_NOTES_MAX, PROP_NAME_MAX, PROP_SUMMARY_MAX = 300, 5000, 120, 2000
@@ -346,6 +347,9 @@ def prop_validate(kind, b, inp):
     elif kind == "layout":  # 2.55.0 (#1066)
         from ..agents.lyprop import lyp_validate
         out.update(lyp_validate(b, inp))
+    elif kind == "import":  # 2.68.0 (#1839)
+        from ..agents.importprop import aim_validate
+        out.update(aim_validate(b, inp))
     return out
 
 
@@ -448,7 +452,7 @@ def proposal_request():
     if kind == "cleanup":  # 2.39.0 (#1151): always the list's tidy agent, in packages (agents/cleanup.py)
         from ..agents.cleanup import cln_request
         return cln_request(c, uid, b)
-    if kind in PROP_KINDS_AGENT or kind == "layout":  # 2.51.0 C: proposed by the agent itself, nothing to ask for; 2.55.0 (#1066)
+    if kind in PROP_KINDS_AGENT or kind in ("layout", "import"):  # 2.51.0 C: proposed by the agent itself, nothing to ask for; 2.55.0 (#1066); 2.68.0 (#1839)
         return err(tr("Invalid value: {0}", "kind"))
     try:
         aid = int(b.get("agent_id") or 0)
@@ -482,9 +486,10 @@ def proposal_request():
     return jsonify(job_dict(c, j)), 201
 
 
-def need_prop(c, jid):
-    """A proposal job of the current person (only the person who asked: its input is theirs)."""
-    j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND kind IS NOT NULL", (jid,)).fetchone()
+def need_prop(c, jid, lock=False):
+    """A proposal job of the current person (only the person who asked: its input is theirs). lock: the row stays locked until
+    the commit - two parallel apply / undo / redo of one proposal run one after the other (2.68.0, #1839 review)."""
+    j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND kind IS NOT NULL" + (" FOR UPDATE" if lock else ""), (jid,)).fetchone()
     if not j or j["user_id"] != me() or is_agent(g.user):
         raise Denied(404)
     return j
@@ -500,6 +505,9 @@ def prop_view(c, j):
     if j["kind"] == "layout":  # 2.55.0 (#1066): before / after for the card
         from ..agents.lyprop import lyp_view_extra
         out.update(lyp_view_extra(c, j))
+    if j["kind"] == "import":  # 2.68.0 (#1839): the target office and the judged rows (the person only)
+        from ..agents.importprop import aim_view_extra
+        out.update(aim_view_extra(c, j))
     return out
 
 
@@ -547,15 +555,15 @@ def prop_edit(kind, key, e, inp, prop):
     return out
 
 
-def prop_sel(b):
+def prop_sel(b, mx=PROP_MAX_ITEMS):
     """{select: [keys], edits: {key: {...}}, name?, folder?, share_agent?, use?} of the apply request."""
-    _p_keys(b, "", ("select", "edits", "name", "folder", "share_agent", "use"))  # 2.55.0 (#1066): use (a layout at once)
+    _p_keys(b, "", ("select", "edits", "name", "folder", "share_agent", "use", "version"))  # 2.55.0 (#1066): use (a layout at once); 2.68.0 (#1839): version
     sel = b.get("select")
-    if not isinstance(sel, list) or not sel or len(sel) > PROP_MAX_ITEMS or \
+    if not isinstance(sel, list) or not sel or len(sel) > mx or \
             not all(isinstance(k, str) and re.fullmatch(r"\d{1,3}(\.\d{1,3})?", k) for k in sel):
         raise BadInput(tr("Select at least one entry"))
     ed = b.get("edits") or {}
-    if not isinstance(ed, dict) or len(ed) > PROP_MAX_ITEMS:
+    if not isinstance(ed, dict) or len(ed) > mx:
         raise BadInput(tr("Invalid value: {0}", "edits"))
     return list(dict.fromkeys(sel)), ed
 
@@ -602,6 +610,10 @@ def prop_run(c, j, sel, ed, extra):
         from ..agents.agenttime import atm_prop_run
         return atm_prop_run(c, j, sel, ed, {"at": iso(now_utc()), "sel": sel, "edits": ed, "extra": extra, "tasks": [], "sections": [],
                                             "changes": {}, "list": None, "undone": False})
+    if kind == "import":  # 2.68.0 (#1839): the ticked rows into the person's office (agents/importprop.py)
+        from ..agents.importprop import aim_run
+        return aim_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": ed, "extra": {}, "tasks": [], "sections": [],
+                                              "changes": {}, "list": None, "undone": False})
     if kind == "layout":  # 2.55.0 (#1066): a saved arrangement, used at once (agents/lyprop.py)
         from ..agents.lyprop import lyp_run
         return lyp_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": extra, "tasks": [], "sections": [],
@@ -778,12 +790,12 @@ def proposal_apply(jid):
     share_agent?} -> creates / changes the selected entries as the current person; one undo step (POST .../undo)."""
     need_collab()
     c = db()
-    j = need_prop(c, jid)
+    j = need_prop(c, jid, lock=True)
     if j["prop_state"] != "ready" or not j["proposal"]:
         return err(tr("There is no proposal to apply (anymore)"), 409)
     b = body()
-    sel, ed = prop_sel(b)
-    extra = {k: b[k] for k in ("name", "folder", "share_agent", "use") if k in b}  # 2.55.0 (#1066): use = a layout at once
+    sel, ed = prop_sel(b, 500 if j["kind"] == "import" else PROP_MAX_ITEMS)  # 2.68.0 (#1839): up to 500 rows of an import
+    extra = {k: b[k] for k in ("name", "folder", "share_agent", "use", "version") if k in b}  # 2.55.0 (#1066): use = a layout at once; 2.68.0 (#1839): version = the import card seen
     try:
         rec = prop_run(c, j, sel, ed, extra)
     except (BadInput, Denied):
@@ -804,6 +816,9 @@ def proposal_apply(jid):
     if j["kind"] == "layout":  # 2.55.0 (#1066): the saved arrangement, its view, used at once
         from ..agents.lyprop import lyp_result
         counts.update(lyp_result(rec))
+    if j["kind"] == "import":  # 2.68.0 (#1839): only counts go back to the agent, never the office's rows
+        from ..agents.importprop import aim_result
+        counts.update(aim_result(rec))
     prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] in ("project", "cleanup") else None})
     c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data->>'job' = ?",
               (ts, me(), str(jid)))
@@ -838,7 +853,7 @@ def proposal_undo(jid):
     """Takes an applied proposal back (one step): created tasks go to the trash (a new project list is removed when nobody
     added or changed anything in it), changes of the inbox items are reverted. What someone changed since stays (skipped)."""
     c = db()
-    j = need_prop(c, jid)
+    j = need_prop(c, jid, lock=True)
     rec = json.loads(j["applied"] or "null")
     if j["prop_state"] != "applied" or not rec or rec.get("undone"):
         return err(tr("Nothing to undo"), 409)
@@ -855,6 +870,9 @@ def proposal_undo(jid):
     elif j["kind"] == "layout":  # 2.55.0 (#1066): back to the previous arrangement
         from ..agents.lyprop import lyp_undo
         n, skipped = lyp_undo(c, j, rec)
+    elif j["kind"] == "import":  # 2.68.0 (#1839): the fixed costs it made go (unchanged since)
+        from ..agents.importprop import aim_undo
+        n, skipped = aim_undo(c, j, rec)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -903,7 +921,7 @@ def proposal_redo(jid):
     """The way forward again after an undo: trashed tasks come back; a removed project is created again; triage changes are
     applied again (what someone changed since stays)."""
     c = db()
-    j = need_prop(c, jid)
+    j = need_prop(c, jid, lock=True)
     rec = json.loads(j["applied"] or "null")
     if j["prop_state"] != "applied" or not rec or not rec.get("undone"):
         return err(tr("Nothing to redo"), 409)
@@ -934,6 +952,14 @@ def proposal_redo(jid):
         from ..agents.lyprop import lyp_undo
         try:
             n, skipped = lyp_undo(c, j, rec, back=False)
+        except (BadInput, Denied):
+            c.rollback()
+            raise
+        rec.update(undone=False)
+    elif j["kind"] == "import":  # 2.68.0 (#1839): the removed rows come again (all or nothing)
+        from ..agents.importprop import aim_undo
+        try:
+            n, skipped = aim_undo(c, j, rec, back=False)
         except (BadInput, Denied):
             c.rollback()
             raise
@@ -1018,6 +1044,9 @@ def v1_agent_job_proposal(jid):
     if j["kind"] == "layout":  # 2.55.0 (#1066)
         from ..api.scopes import need_scope
         need_scope("layouts")
+    if j["kind"] == "import":  # 2.68.0 (#1839)
+        from ..api.scopes import need_scope
+        need_scope("import")
     if j["prop_state"] not in ("requested", "ready") or j["state"] not in ("running", "waiting"):
         raise Denied(409, tr("This proposal was already applied or discarded"))
     if len(request.data or b"") > PROP_MAX_BYTES:
@@ -1042,6 +1071,8 @@ def prop_cleanup(c, force=False):
     _PROP_CLEAN["at"] = time.time()
     from ..agents.lyprop import lyp_expire
     lyp_expire(c)  # 2.55.0 (#1066): open layout proposals expire after 14 days
+    from ..agents.importprop import aim_expire
+    aim_expire(c)  # 2.68.0 (#1839): open import proposals too
     n = c.execute("DELETE FROM agent_jobs WHERE kind IS NOT NULL AND (updated_at<? OR user_id IS NULL)",
                   (iso(now_utc() - timedelta(days=PROP_KEEP_DAYS)),)).rowcount
     c.commit()

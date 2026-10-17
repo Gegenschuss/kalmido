@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v178';
+const CACHE = 'tasks-shell-v179';
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -19,7 +19,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/sbnav.js', '/static/js/notesall.js', '/static/js/favorites.js', '/static/js/favtiles.js', '/static/js/mineorder.js', '/static/js/tablecells.js', '/static/js/sheetgrid.js', '/static/js/formula.js', '/static/js/listadmin.js', '/static/js/orgexport.js', '/static/js/orgcrypt.js', '/static/js/cryptscope.js', '/static/js/sheetdrag.js',
   '/static/js/sheetmotion.js', '/static/js/miniwin.js', '/static/js/chatwin.js', '/static/js/chatwins.js', '/static/js/chatplus.js', '/static/js/taskbell.js', '/static/js/e2e.js', '/static/js/notelock.js', '/static/js/related.js', '/static/js/liste2e.js', '/static/js/liste2eui.js', '/static/js/liste2efile.js', '/static/js/liste2echan.js',
   '/static/js/wikie2e.js', '/static/js/orgvis.js', '/static/js/discover.js', '/static/js/ablage.js', '/static/js/listcolor.js', '/static/js/wscolor.js', '/static/js/rowsym.js', '/static/js/review.js', '/static/js/wip.js', '/static/js/points.js', '/static/js/photometa.js', '/static/js/filetext.js', '/static/js/depchain.js',
-  '/static/js/main.js'];
+  '/static/js/importprop.js', '/static/js/main.js'];
 // 2.53.0 (#1410): the modules loaded on demand (static/js/lazyload.js LD_MODS; no script tag in index.html, tools/check_layout.py
 // compares): cached right after the shell, so they open offline too; a failure there does not drop the install
 const LAZY = ['/static/js/acctset.js', '/static/js/settings.js', '/static/js/contacts.js', '/static/js/newsletter.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_import.js', '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/office_travel.js', '/static/js/office_cashflow.js', '/static/js/office_pipeline.js', '/static/js/office_kpi.js', '/static/js/office_datev.js', '/static/js/officeagents.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/pdfview.js', '/static/js/mindmap.js', '/static/js/wiki.js', '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js', '/static/js/docs.js', '/static/js/paperless.js', '/static/js/receipts.js', '/static/js/life.js', '/static/js/integrations.js', '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js'];

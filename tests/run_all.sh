@@ -976,6 +976,9 @@ fresh; run p267_a_ui node p267_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.67.0 part B: the dependency chain moves along, Pull the chain in (#1865)
 fresh; run p267_b_api "$PY" p267_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p267_b_ui node p267_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.68.0 part A: old data into the office with the person's own agent (import proposals, fixed costs; #1839)
+fresh; run p268_a_api "$PY" p268_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p268_a_ui node p268_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

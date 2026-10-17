@@ -8865,5 +8865,19 @@
   "Nothing to pull in: the waiting tasks already follow right after it": "Niets aan te trekken: de wachtende taken volgen er al direct op",
   "The waiting tasks stay where they are": "De wachtende taken blijven waar ze zijn",
   "The tasks waiting on this one move up to the day after it is due (the gaps between them stay)": "De taken die hierop wachten schuiven op tot de dag na deze vervaldatum (de afstanden ertussen blijven)",
-  "This task has no date": "Deze taak heeft geen datum"
+  "This task has no date": "Deze taak heeft geen datum",
+  "Only fixed costs can be imported for now (area fixed_costs)": "Voorlopig kunnen alleen vaste kosten worden geïmporteerd (area fixed_costs)",
+  "This proposal can only be taken over into the office of “{0}”: switch your workspace there first": "Dit voorstel kan alleen in het kantoor van ‘{0}’ worden overgenomen: wissel eerst je werkruimte daarheen",
+  "Your personal office": "Je persoonlijke kantoor",
+  "Switch your workspace to the office of this import first": "Wissel eerst naar de werkruimte met het kantoor van deze import",
+  "{0} fixed costs changed since": "{0} vaste kosten sindsdien gewijzigd",
+  "This person does not use the office: an import proposal is not possible": "Deze persoon gebruikt het kantoor niet: een importvoorstel is niet mogelijk",
+  "At most {0} open import proposals: wait until the person decided": "Hoogstens {0} open importvoorstellen: wacht tot de persoon heeft beslist",
+  "Import: {0} fixed costs": "Import: {0} vaste kosten",
+  "Propose imports": "Imports voorstellen",
+  "Read your old data (for example fixed costs) and send it as an import proposal you check and take over into the office; never sees the office itself": "Leest je oude gegevens (bijvoorbeeld vaste kosten) en stuurt ze als importvoorstel dat je controleert en in het kantoor overneemt; ziet het kantoor zelf nooit",
+  "Into: {0}": "Naar: {0}",
+  "Taking over creates the ticked fixed costs as you in this office; nothing else changes. One step, undo takes it back.": "Overnemen maakt de aangevinkte vaste kosten als jou aan in dit kantoor; verder verandert er niets. Eén stap, ongedaan maken draait het terug.",
+  "At most {0} import proposals per person and day": "Hoogstens {0} importvoorstellen per persoon per dag",
+  "The proposal changed meanwhile: open it again": "Het voorstel is intussen gewijzigd: open het opnieuw"
 }
