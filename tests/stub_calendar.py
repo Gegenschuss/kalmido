@@ -347,6 +347,8 @@ class H(BaseHTTPRequestHandler):
         if c and n:  # 2.52.0 B (#1128)
             if not self._authed():
                 return
+            if n == 'moved.ics':  # 2.58.0 (#1789): an alias of one.ics; PUT / DELETE there redirect
+                n = 'one.ics'
             if n not in RW[c]:
                 return self._send(404, 'nope', 'text/plain')
             return self._send(200, RW[c][n][1], extra={'ETag': RW[c][n][0]})
@@ -451,6 +453,8 @@ class H(BaseHTTPRequestHandler):
             return
         if c == 'ro':
             return self._send(403, 'read only', 'text/plain')
+        if name == 'moved.ics':  # 2.58.0 (#1789)
+            return self._send(307, b'', 'text/plain', {'Location': '/dav/calendars/alice/rw/one.ics'})
         with RW_LOCK:
             have = RW[c].get(name)
             if not self.headers.get('X-Stub-External'):
@@ -473,6 +477,8 @@ class H(BaseHTTPRequestHandler):
             return
         if c == 'ro':
             return self._send(403, 'read only', 'text/plain')
+        if name == 'moved.ics':  # 2.58.0 (#1789)
+            return self._send(307, b'', 'text/plain', {'Location': '/dav/calendars/alice/rw/one.ics'})
         with RW_LOCK:
             have = RW[c].get(name)
             if not have:

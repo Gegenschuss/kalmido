@@ -5,7 +5,7 @@ that survives a restart of the event runner (agent_run.py), reports to a Kalmido
 (with the files in its outbox) into the chat when it is done.
 
 usage (from inside a run; KALMIDO_URL / KALMIDO_TOKEN / KALMIDO_CHAT_USER are in the environment of the run):
-  agent_job.py start --title "Release 2.29" [--worktree] [--task ID] [--timeout-h 6] -    brief on stdin ("-") or a file
+  agent_job.py start --title "Release 2.29" [--name Clara] [--worktree] [--task ID] [--timeout-h 6] -    brief on stdin ("-") or a file
   agent_job.py list                         the jobs of this host (open ones first)
   agent_job.py status ID                    one job: state, pid, resumes, last progress line
   agent_job.py progress ID "text"           a milestone for the person (job log + status line)
@@ -373,11 +373,14 @@ def revive_lost(api=None):
 
 def cmd_start(argv):
     title, task, worktree, timeout_h, src = "", None, False, float(os.environ.get("KALMIDO_JOB_TIMEOUT_H") or 6), None
+    name = ""  # 2.58.0 (#1803): the job's own name (POST /agent/jobs {name}), shown on its badge; people address it with "Name: ..."
     i = 0
     while i < len(argv):
         a = argv[i]
         if a == "--title":
             title = argv[i + 1]; i += 2
+        elif a == "--name":
+            name = argv[i + 1]; i += 2
         elif a == "--task":
             task = int(argv[i + 1]); i += 2
         elif a == "--timeout-h":
@@ -387,7 +390,7 @@ def cmd_start(argv):
         else:
             src = a; i += 1
     if not title.strip() or not src:
-        print("usage: agent_job.py start --title TITLE [--worktree] [--task ID] [--timeout-h N] - (brief on stdin) | FILE")
+        print("usage: agent_job.py start --title TITLE [--name NAME] [--worktree] [--task ID] [--timeout-h N] - (brief on stdin) | FILE")
         return 2
     brief = sys.stdin.read() if src == "-" else open(os.path.expanduser(src), encoding="utf-8").read()
     if not brief.strip():
@@ -410,6 +413,8 @@ def cmd_start(argv):
         body["user_id"] = int(uid)
     if task:
         body["task_id"] = task
+    if name.strip():
+        body["name"] = " ".join(name.split())[:24]
     try:
         kj = api.req("POST", "/agent/jobs", body)
     except RuntimeError as e:

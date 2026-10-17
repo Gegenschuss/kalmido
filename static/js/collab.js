@@ -138,6 +138,7 @@ function bellPop(anchor) {
   anchor?.setAttribute?.('aria-expanded', 'true');
   const redraw = () => { if ($('#pop .bpop') && !$('#pop').classList.contains('hidden')) { const y = $('#pop .bplist')?.scrollTop || 0; p.innerHTML = bellPopHtml(); bellSize(p); if (!isMobile()) bellPlace(p, anchor); const l = $('#pop .bplist'); if (l) l.scrollTop = y; } };  // 2.12.2 (#451): the list keeps its place
   bellSize(p); bellPlace(p, anchor); bellResizeWire(p, anchor);
+  requestAnimationFrame(() => { if ($('#pop .bpop') && !$('#pop').classList.contains('hidden')) bellPlace(p, anchor); });  // 2.58.0 (#1760): once more after the header's redraw and the layout, so it never sticks out on the right
   const fresh = S.nf.sig === (S.news?.sig ?? '') && S.nf.f === S.nf.filter && !!S.nf.items;
   if (!fresh) loadNews().then(redraw);
   setTimeout(() => $('#pop .bpop [data-bp="all"]')?.focus({preventScroll: true}), 30);
@@ -157,6 +158,7 @@ function bellPop(anchor) {
 }
 // desktop: right-aligned under the bell (openPop places it at the anchor's left edge)
 function bellPlace(p, anchor) {
+  if (anchor && !anchor.isConnected) anchor = $('#top .bell') || anchor;  // 2.58.0 (#1760): the header was redrawn, the old button is gone
   if (isMobile() || !anchor?.getBoundingClientRect) return;
   const r = anchor.getBoundingClientRect(), w = p.offsetWidth;
   if (!w) return;

@@ -771,6 +771,7 @@ function propDraw() {
     <div class="calerr" role="alert" id="pp-err" hidden></div>${main}<div class="foot ${st === 'ready' ? 'ppfoot' : ''}">${foot}</div>`;
   if (st === 'ready') propCount();
 }
+const F8C_PROJ_TOAST_MS = 10000;  // 2.58.0 (#1810): the Undo toast after a proposal became a project stays longer
 async function propApply(b) {
   const P = S.prop; if (!P || !P.sel.size) return;
   const v = P.v, q = {select: [...P.sel], edits: Object.fromEntries(Object.entries(P.ed).filter(([k]) => P.sel.has(k)))};
@@ -782,11 +783,14 @@ async function propApply(b) {
   P.md.remove(); S.prop = null;
   await load().catch(() => {}); if (lyp_is(v)) await lyp_after(v); render();
   const name = v.agent.name, jid = P.jid, ly = lyp_is(v) ? () => load().then(() => lyp_after(v)).then(render).catch(() => {}) : () => {};  // 2.55.0 (#1066)
+  // 2.58.0 (#1810): a new project opens its list; Undo removes it again, so it goes back to the view before (when still on it)
+  const proj = (v.kind === 'project' || v.kind === 'inquiry') && r.list_id && listById(r.list_id), back = location.hash.slice(1) || LS.get('lastKey', START_KEY);
+  const f8c_back = () => { if (proj && location.hash === '#l/' + r.list_id) go(back); };
   const e = histAdd({label: tr('Applied the proposal of {0}', name), snaps: [], after: [], ids: [], lids: r.list_id ? [r.list_id] : [],
-    undo: async () => { const x = await api('POST', `/api/proposals/${jid}/undo`); ly(); return {skipped: x.skipped || [], none: !!x.none}; },
+    undo: async () => { const x = await api('POST', `/api/proposals/${jid}/undo`); ly(); f8c_back(); return {skipped: x.skipped || [], none: !!x.none}; },
     redo: async () => { const x = await api('POST', `/api/proposals/${jid}/redo`); ly(); return {skipped: x.skipped || [], none: !!x.none}; }});
-  histToast(lyp_is(v) ? lyp_toast(v, r) : pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e);
-  if ((v.kind === 'project' || v.kind === 'inquiry') && r.list_id && listById(r.list_id)) go('l/' + r.list_id);
+  histToast(lyp_is(v) ? lyp_toast(v, r) : pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e, proj ? F8C_PROJ_TOAST_MS : undefined);
+  if (proj) go('l/' + r.list_id);
   if (S.route.mod === 'agents') loadJobs();
 }
 async function propDiscard() {

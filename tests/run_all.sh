@@ -867,6 +867,20 @@ fresh; run p256_b_ui node p256_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.56.0 part A: a message to a job from its card, a job's own chat history (#1791 #1793)
 fresh; run p256_a_api "$PY" p256_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p256_a_ui node p256_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.56.1 part A: #1813 the archive import finds the recipient address on the whole first page
+fresh; run p2561_a_api "$PY" p2561_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.56.1 part B: symbols in the task row and the sidebar can be switched off (#1799)
+fresh; run p2561_b_ui node p2561_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.58.0 part A: password reset / sent requests / organisation clean-up and group pictures (#1792, #1724)
+fresh; run p258_a_api "$PY" p258_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.58.0 part C: an agent's list limit only for the people who manage it (#1761)
+fresh; run p258_c_api "$PY" p258_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.58.0 part B: imported address books refuse moves, birthday tasks on CardDAV delete / foreign lists, part lines to the cent (#1656, #1759)
+fresh; run p258_b_api "$PY" p258_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.58.0 part F: a job's own name, one news item per list edit, sealed list pictures (#1803, #1804, #1805)
+fresh; run p258_f_api "$PY" p258_f_api_test.py "$KALMIDO_TEST_DATA"
+# 2.58.0 part D: Office search focus, pill morph, Esc in number field, privacy switch order, Back closes dialogs (touch)
+fresh; run p258_d_ui node p258_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

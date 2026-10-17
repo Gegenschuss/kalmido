@@ -181,6 +181,15 @@ def _conflict(c, sid):
                    code="conflict"), 409
 
 
+def f8b_weak(match):
+    """2.58.0 (#1789): a weak ETag (W/"...") cannot guard a write (If-Match compares strongly, the server answers 412
+    forever): no write attempt, a clear message instead."""
+    if not str(match or "").strip().startswith("W/"):
+        return None
+    return jsonify(error=tr("This calendar server only sends weak version tags; Kalmido cannot save there safely."),
+                   code="weak_etag"), 409
+
+
 def _cal_fail(e):
     if e.code == "auth" and e.detail == "403":
         return jsonify(error=tr("This calendar does not allow writing"), code="read_only"), 409
@@ -410,6 +419,8 @@ def cdw_update(sid):
         match = res["etag"] or tag
         if not match:
             return _conflict(c, sid)
+        if f8b_weak(match):
+            return f8b_weak(match)
         try:
             ics, _ = cdw_patch_ics(data, res["uid"], f, occ or "")
         except ValueError as e:
@@ -449,6 +460,8 @@ def cdw_delete(sid):
         match = res["etag"] or tag
         if not match:
             return _conflict(c, sid)
+        if f8b_weak(match):
+            return f8b_weak(match)
         try:
             cal_http(res["href"], "DELETE", None, {"If-Match": match}, auth, allow)
         except CalError as e:

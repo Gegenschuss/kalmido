@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.58.0** (2026-10-17): a collection of **fixes** - Back on Android closes dialogs, invoices from quotations with parts
+  exact to the cent, share expiry on the chosen day, constant-time password reset, sealed list pictures in encrypted
+  organisations, **job names** for agents,
+  **fewer symbols** in task rows and the sidebar, and the archive import finds the **recipient's address** of old PDFs again.
 - **2.57.0** (2026-10-17): the sidebar's head (brand, workspace, search, favourites) **stays in place** while the rest
   scrolls, **anything in the sidebar can be a favourite** - icon tiles in your own order on all devices -, and **your own
   colour per workspace** tints the sidebar.

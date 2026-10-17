@@ -114,7 +114,11 @@ def fg_avatar_upload(gid):
     with open(tmp, "wb") as fh:
         fh.write(jpg)
     os.replace(tmp, fg_avatar_path(gid, tok))
-    return _fg_set(c, gid, "u:" + tok)
+    try:
+        return _fg_set(c, gid, "u:" + tok)
+    except Exception:  # 2.58.0 (#1724): the row did not take the new photo -> no orphaned file stays behind
+        fg_drop_file(gid, "u:" + tok)
+        raise
 
 
 @app.delete("/api/admin/groups/<int:gid>/avatar")

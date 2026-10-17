@@ -89,10 +89,10 @@ const FEAT = 'comments,collab,agents,stats,time';
     await ev(`(() => { listMenu(document.querySelector('#top h1'), ${L}); return 1; })()`); await sleep(500);
     let p = await rect(ev, '#pop.sheet');
     const sh = await ev(`(() => { const p = document.getElementById('pop'), x = p.querySelector('.tch-shx'); return {grip: getComputedStyle(p).backgroundImage, x: x ? x.getBoundingClientRect().width : -1}; })()`);
-    check(p && /gradient/.test(sh.grip) && sh.x >= 0 && sh.x <= 1, '#1181: the sheet has its grip, the X is out of sight on touch ' + JSON.stringify(sh));
+    check(p && /gradient/.test(sh.grip) && sh.x >= 44, '#1181: the sheet has its grip; 2.58.0 (#1757): the X stays visible, 44 px wide ' + JSON.stringify(sh));
     await shot('p2391m-390-sheet.png');
     if (p) {
-      await drag(195, p.top + 12, 0, -220, 'touch'); await sleep(400);
+      await drag(195, p.top + 12, 0, -Math.min(220, p.top + 6), 'touch'); await sleep(400);  // 2.58.0 (#1757): the visible X makes the sheet taller, stay inside the viewport
       const p2 = await rect(ev, '#pop.sheet');
       check(p2 && p2.h > p.h + 40, `#1181: dragged up, the sheet is taller (${p.h} -> ${p2 && p2.h})`);
       await shot('p2391m-390-sheet-tall.png');

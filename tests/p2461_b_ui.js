@@ -61,6 +61,16 @@ function consistent(d) {
   check(consistent(d).length === 0 && !d.querySelector('.smodal [data-feat="cal"]')?.checked, '#1591: the switches follow ' + consistent(d));
   await w.eval('histStep("undo")'); await until(async () => (await call('GET', '/api/state')).settings.mods_all === '1', 40);
   check((await call('GET', '/api/state')).settings.features.split(',').includes('kanban'), '#1591: one undo step brings the modules back');
+  // 2.56.1 (#1808): switch on again = every module, the counter says N of N, the hint stands under the title
+  const sw2 = d.querySelector('.smodal #s-modsall'); sw2.checked = true; sw2.dispatchEvent(new w.Event('change', {bubbles: true}));
+  await until(async () => (await call('GET', '/api/state')).settings.mods_all === '1', 40); await sleep(500);
+  const feats = (await call('GET', '/api/state')).settings.features.split(',');
+  const allKeys = w.eval('FEATS.map(x => x[0])');
+  check(allKeys.every(k => feats.includes(k)), '#1808: every module is on ' + allKeys.filter(k => !feats.includes(k)));
+  const tot = d.querySelector('#s-modtot').textContent.match(/(\d+) of (\d+)/);
+  check(tot && tot[1] === tot[2], '#1808: counter N of N ' + (tot && tot[0]));
+  const pb = d.querySelector('.smodal .pmsw b'), ps = d.querySelector('.smodal .pmsw small');
+  check(pb && ps && ps.getBoundingClientRect().top >= pb.getBoundingClientRect().bottom - 1, '#1808: hint below the title');
   w.close();
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

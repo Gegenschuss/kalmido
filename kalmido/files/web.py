@@ -515,15 +515,18 @@ def files_share_targets(nid):
     return jsonify(_share_targets(c, n))
 
 
-def _expiry(v):
+def _expiry(v, tz=None):
     if v in (None, ""):
         return None
     v = str(v).strip()
     import re
     from datetime import datetime, timezone
-    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
-        v += "T23:59:59"
+    from ..events.model import ev_zone, tz_ok
     try:  # stored in UTC with the same shape as iso(): the comparison with "now" is a text comparison
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+            # 2.58.0 (#1787): a plain date = the end of that day where the person is (else the instance's zone), not in UTC
+            d = datetime.fromisoformat(v + "T23:59:59")
+            return iso(d.replace(tzinfo=ev_zone(tz if tz_ok(tz) else "")).astimezone(timezone.utc))
         dt = datetime.fromisoformat(v.replace("Z", "+00:00"))
     except ValueError:
         raise Denied(400, tr("Invalid value: {0}", "expires_at")) from None
@@ -542,7 +545,7 @@ def files_share_add(nid):
     role = b.get("role") or "view"
     if role not in ("view", "edit"):
         return err(tr("Invalid value: {0}", "role"))
-    exp = _expiry(b.get("expires_at"))
+    exp = _expiry(b.get("expires_at"), b.get("tz"))  # 2.58.0 (#1787): tz = the person's zone
     t = _share_targets(c, n)
     key = next((k for k in ("user_id", "group_id", "agent_id") if b.get(k)), None)
     if not key:
@@ -591,7 +594,7 @@ def files_share_patch(sid):
     role = b.get("role", s["role"])
     if role not in ("view", "edit"):
         return err(tr("Invalid value: {0}", "role"))
-    exp = _expiry(b["expires_at"]) if "expires_at" in b else s["expires_at"]
+    exp = _expiry(b["expires_at"], b.get("tz")) if "expires_at" in b else s["expires_at"]
     c.execute("UPDATE fs_shares SET role=?, expires_at=? WHERE id=?", (role, exp, sid))
     fs_log_add(c, s["node_id"], "share_change", f"{sid}:{role}")
     bump(c)

@@ -242,7 +242,7 @@ async function ab_share(id) {
   draw();
   const add = async (target, role, exp) => {
     const [k, v] = target.split(':');
-    const r = await api('POST', `/api/files/nodes/${id}/shares`, {[k]: +v, role, expires_at: exp || null});
+    const r = await api('POST', `/api/files/nodes/${id}/shares`, {[k]: +v, role, expires_at: exp || null, tz: evTz()});
     shares = r.shares; draw(); ab_reload(); return r.id;
   };
   md.addEventListener('click', async e => {
@@ -262,7 +262,7 @@ async function ab_share(id) {
       let r; try { r = await api('DELETE', `/api/files/shares/${s.id}`); } catch { return; }
       shares = r.shares; draw(); ab_reload();
       const tg = s.user_id ? 'user_id:' + s.user_id : s.group_id ? 'group_id:' + s.group_id : 'agent_id:' + s.agent_id;
-      offerUndo(tr('No longer shared with {0}', s.name), histAdd({label: tr('Stop sharing “{0}”', n.name), undo: async () => { try { await add(tg, s.role, s.expires_at ? s.expires_at.slice(0, 10) : ''); } catch { /* shown */ } return {}; }, redo: () => ab_req('DELETE', `/api/files/shares/${(shares.find(q => (q.user_id || q.group_id || q.agent_id) === (s.user_id || s.group_id || s.agent_id)) || s).id}`)}));
+      offerUndo(tr('No longer shared with {0}', s.name), histAdd({label: tr('Stop sharing “{0}”', n.name), undo: async () => { try { await add(tg, s.role, s.expires_at || ''); } catch { /* shown */ } return {}; }, redo: () => ab_req('DELETE', `/api/files/shares/${(shares.find(q => (q.user_id || q.group_id || q.agent_id) === (s.user_id || s.group_id || s.agent_id)) || s).id}`)}));
     }
   });
   md.addEventListener('change', async e => {

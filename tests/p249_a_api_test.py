@@ -130,7 +130,8 @@ m0 = len(mails())
 r1, t1 = forgot("nobody@example.com")
 r2, t2 = forgot("bob@example.com", host="evil.example")  # a forged Host header must not reach the link
 check(r1.status_code == r2.status_code == 200 and r1.json() == r2.json() == {"ok": True}, "the same answer for an unknown and a known address")
-check(min(t1, t2) >= 0.4 and abs(t1 - t2) < 0.3, f"a similar answer time ({t1:.2f} s / {t2:.2f} s)")
+# 2.58.0 (#1792): the padding is a fixed total of about 0.9 s now
+check(min(t1, t2) >= 0.85 and abs(t1 - t2) < 0.3, f"a similar answer time ({t1:.2f} s / {t2:.2f} s)")
 ml = until(lambda: [x for x in mails()[m0:] if "bob@example.com" in x["to"]])
 check(len(ml) == 1, "bob gets one mail")
 msg, txt, mt = link_of(ml[0]) if ml else (None, "", [None, None, None])

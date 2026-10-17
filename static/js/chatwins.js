@@ -203,10 +203,13 @@ async function cw_aload(k) {
     const j = await api('GET', `/api/agents/${aid}/chat?` + (first ? `after=${first - 1}` : `limit=${CHAT_PAGE}`));
     if (first) { const lo = j.messages.length ? j.messages[0].id : Infinity; st.msgs = [...st.msgs.filter(m => m.id < lo), ...j.messages]; }
     else { st.msgs = j.messages; st.more = !!j.has_more; }
-    st.err = null; st.loaded = true; st.live = j.steps_live || []; st.apv = j.approvals_open || [];
+    st.err = null; st.loaded = true; st.live = j.steps_live || []; st.apv = j.approvals_open || []; st.f8c_wait = 0;
     if (j.now) st.off = Date.now() - Date.parse(j.now);
     const a = agentById(aid); if (a) { if (j.agent) Object.assign(a, j.agent); a.chat_unread = 0; }
-  } catch (e) { st.err = e instanceof Offline ? tr('Only available online.') : e.message; }
+  } catch (e) {
+    st.err = e instanceof Offline ? tr('Only available online.') : e.message;
+    st.f8c_wait = Math.min(2 * (st.f8c_wait || 7500), 300000); st.f8c_until = Date.now() + st.f8c_wait;  // 2.58.0 (#1773): pause, doubling up to 5 minutes
+  }
   finally { st.busyL = false; }
   cw_patch(k); renderTop();
 }
@@ -232,7 +235,7 @@ async function cw_tload(k, st) {
 function cw_live() {
   for (const w of S.cw.wins) {
     if (w.k[0] !== 'a' || cw_isLive(w.k)) continue;
-    if (!w.c && cw_unread(w.k)) cw_aload(w.k); else cw_headSync(w.k);
+    if (!w.c && cw_unread(w.k) && !(cw_stOf(w.k).f8c_until > Date.now())) cw_aload(w.k); else cw_headSync(w.k);  // 2.58.0 (#1773): not while pausing after an error
   }
 }
 // teamChanged() (someone wrote / read): the panel's team windows whose conversation has a newer message, and the team view's
@@ -244,7 +247,9 @@ async function cw_teamLive() {
     if (!w.c && r?.last && (!last || r.last.id !== last.id)) cw_tload(w.k); else cw_headSync(w.k);
   }
   const h = S.cw.home;
-  if (S.cw.lt && h?.rid && S.route.mod === 'team') { await cw_tload('t:' + h.rid, h); if (S.cw.lt && S.route.mod === 'team') renderView(); }
+  // 2.58.0 (#1773): only when its conversation has a newer message
+  const hr = h?.rid && (S.tc.rooms || []).find(x => x.id === h.rid), hl = h?.msgs?.[h.msgs.length - 1];
+  if (S.cw.lt && h?.rid && S.route.mod === 'team' && (!hr?.last || !hl || hr.last.id !== hl.id)) { await cw_tload('t:' + h.rid, h); if (S.cw.lt && S.route.mod === 'team') renderView(); }
 }
 // the team view draws its own conversation (viewTeam asks): while a panel window is live, from the kept state, without ids
 function cw_tcHome(fn) {
@@ -409,7 +414,12 @@ document.addEventListener('click', e => {
   if (s) {
     e.preventDefault(); e.stopPropagation();
     const k = s.dataset.cwsw;
-    if (s.dataset.rm) { S.cw.wins = S.cw.wins.filter(w => w.k !== k); delete S.cw.st[k]; S.cw.act = S.cw.wins[0]?.k || ''; cw_save(); cw_swSync(); return; }
+    if (s.dataset.rm) {  // 2.58.0 (#1771): the X at the active chat switches to the next open chat at once (the last one: closes it)
+      const i = S.cw.wins.findIndex(w => w.k === k); S.cw.wins = S.cw.wins.filter(w => w.k !== k); delete S.cw.st[k];
+      const nx = S.cw.wins[Math.max(0, i)] || S.cw.wins[i - 1]; S.cw.act = nx?.k || ''; cw_save();
+      if (nx) go((nx.k[0] === 'a' ? 'agents/' : 'team/') + cw_id(nx.k)); else if (k[0] === 'a') chatClose(); else go('team');
+      return;
+    }
     S.cw.act = k; cw_save(); go((k[0] === 'a' ? 'agents/' : 'team/') + cw_id(k));
     return;
   }

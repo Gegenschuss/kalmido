@@ -818,9 +818,36 @@ def need_chat_agent(c, aid):
 JC_NAME_RE = re.compile(r"^([A-ZÄÖÜ][a-zäöüß]{1,11}(?: [A-Z])?): ")
 
 
-def jc_job_name(title):
+# 2.58.0 (#1803): ordinary title words are no name ("Release: 2.56", "Fix: Login"); the title is only the fallback
+# for jobs without their own name (agent_jobs.name, POST /agent/jobs {name})
+F8F_NOT_NAMES = frozenset((
+    "release", "fix", "hotfix", "bugfix", "bug", "patch", "feature", "test", "tests", "build", "deploy", "update", "upgrade",
+    "review", "audit", "check", "task", "todo", "job", "note", "docs", "doc", "chore", "refactor", "migration", "import",
+    "export", "backup", "sync", "cleanup", "report", "plan", "draft", "idea", "issue", "error", "warning", "info", "status",
+    "fehler", "aufgabe", "bericht", "entwurf", "idee", "wartung", "prüfung", "hinweis", "notiz"))
+# 2.58.0 (#1803): a job name: letters, spaces, . ' - (no digits / colons, so it never reads like "Job 12:")
+F8F_NAME_RE = re.compile(r"^[^\W\d_](?:[^\W\d_]|[ .'-]){0,23}$")
+
+
+def f8f_job_name_in(v):
+    """The cleaned name of POST /agent/jobs {name}; None = none, ValueError = not a name."""
+    if v is None:
+        return None
+    if not isinstance(v, str):
+        raise ValueError
+    v = " ".join(v.split())
+    if not v:
+        return None
+    if not F8F_NAME_RE.match(v) or v.lower() in F8F_NOT_NAMES:
+        raise ValueError
+    return v
+
+
+def jc_job_name(title, name=None):
+    if name:
+        return name
     m = JC_NAME_RE.match(title or "")
-    return m.group(1) if m else None
+    return m.group(1) if m and m.group(1).split(" ")[0].lower() not in F8F_NOT_NAMES else None
 
 
 def job_dict(c, j, names=None):
@@ -833,7 +860,7 @@ def job_dict(c, j, names=None):
             "created_at": j["created_at"], "updated_at": j["updated_at"],
             "kind": j["kind"], "proposal_state": j["prop_state"] or None,  # 2.3.0: proposal jobs
             "approval": bool(j["approval"]) if "approval" in j.keys() else False,  # 2.15.0 (#479): a request waiting for approval
-            "name": jc_job_name(j["title"])}  # 2.56.0 (#1793): "Clara" of "Clara: Release 2.50" (null without)
+            "name": jc_job_name(j["title"], j["name"] if "name" in j.keys() else None)}  # 2.56.0 (#1793), 2.58.0 (#1803): own field first: "Clara" of "Clara: Release 2.50" (null without)
 
 
 def job_visible(c, j, uid):
@@ -905,7 +932,14 @@ def agent_public(c, a, uid=None):
             # 2.33.0 (#1045): its plan usage (the ring in the chat header; null = never reported)
             "quota": _quota(a),
             # 2.35.0 (#1103): open approval requests + permission questions to the viewer (the badge "1 approval open")
-            "approvals_open": _approvals_open(c, a["user_id"], uid)}
+            "approvals_open": _approvals_open(c, a["user_id"], uid),
+            # 2.58.0 (#1761): its list limit, only for the people who manage it (owner / admin); [] = all its lists
+            **({"list_ids": f8c_list_ids(a)} if uid and may_set_runtime(c, a, uid) else {})}
+
+
+def f8c_list_ids(a):
+    from ..agents.safety import list_ids_out
+    return list_ids_out(a["list_ids"] if "list_ids" in a.keys() else "")
 
 
 def _approvals_open(c, aid, uid):

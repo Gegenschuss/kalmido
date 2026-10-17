@@ -48,10 +48,40 @@ def _ol_log(c, oid, lr, action, to_id=None, detail=None):
               (oid, lr["id"], lr["name"], action, me(), lr["owner_id"], to_id, iso(now_utc())))
 
 
+# 2.58.0 (#1804): a rename / restyle of the same admin within this many seconds joins the person's unread item of the list
+# (the edit dialog sends a picture and the name as two requests) instead of a second one
+F8F_NEWS_JOIN_S = 120
+
+
+def f8f_news_join(c, uid, lid, action, data):
+    """True when an unread rename / restyle of lid by me (newer than F8F_NEWS_JOIN_S) took this change in."""
+    from datetime import timedelta
+    from ..core.db import iso_ms
+    r = c.execute("SELECT id, data FROM notifications WHERE user_id=? AND kind='orglist' AND list_id=? AND actor_id=? AND read_at IS NULL "
+                  "AND created_at>=? ORDER BY id DESC LIMIT 1", (uid, lid, me(), iso_ms(now_utc() - timedelta(seconds=F8F_NEWS_JOIN_S)))).fetchone()
+    try:
+        old = json.loads(r["data"] or "{}") if r else None
+    except ValueError:
+        old = None
+    if not isinstance(old, dict) or old.get("action") not in ("rename", "restyle"):
+        return False
+    new = {**old, **data, "action": "rename" if "rename" in (old["action"], action) else "restyle"}
+    if old.get("old"):
+        new["old"] = old["old"]  # the name before the first change
+    if new["action"] == "rename" and new.get("old") == new.get("name"):
+        new["action"] = "restyle"  # renamed back: only the look changed
+        new.pop("old", None)
+    c.execute("UPDATE notifications SET data=? WHERE id=?", (json.dumps(new, ensure_ascii=False), r["id"]))
+    return True
+
+
 def _ol_news(c, oid, lr, action, gone=False, to_name="", extra=None):
     from ..collab.news import news_add
     oname = (c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
     for uid in _ol_people(c, lr):
+        if action in ("rename", "restyle") and not gone and f8f_news_join(
+                c, uid, lr["id"], action, {"name": lr["name"], "org": oname, **(extra or {})}):
+            continue
         news_add(c, uid, "orglist", list_id=None if gone else lr["id"],
                  data={"action": action, "name": lr["name"], "org": oname, **({"to": to_name} if to_name else {}), **(extra or {})})
 

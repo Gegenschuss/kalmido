@@ -36,7 +36,7 @@ def jc_prefixes(j):
     """The lower-case starts of a person's message addressed to job j."""
     jid = int(j["id"])
     out = [f"job {jid}:", f"job #{jid}:", f"#{jid}:", f"@job {jid}:"]
-    name = jc_job_name(j["title"])
+    name = jc_job_name(j["title"], j["name"] if "name" in j.keys() else None)  # 2.58.0 (#1803)
     if name:
         out += [f"{name.lower()}:", f"@{name.lower()}:"]
     return out

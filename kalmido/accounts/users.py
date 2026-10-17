@@ -630,10 +630,9 @@ def list_icon_store(lid):
         return err(str(e))
     tok = secrets.token_urlsafe(12)
     os.makedirs(LIST_ICON_DIR, exist_ok=True)
-    tmp = list_icon_path(lid, tok) + ".tmp"
-    with open(tmp, "wb") as fh:
-        fh.write(png)
-    os.replace(tmp, list_icon_path(lid, tok))
+    from ..core.orgcrypt import oc_list_org, oc_write_file
+    c = db()  # 2.58.0 (#1805): an organisation list's picture is sealed with its key at rest (private lists plain, as attachments)
+    oc_write_file(c, oc_list_org(c, lid), list_icon_path(lid, tok), png)
     return "u:" + tok
 
 
@@ -656,6 +655,7 @@ def list_icon_get(lid, tok):
     p = list_icon_path(lid, tok)
     if not os.path.isfile(p):
         raise Denied(404)
-    rs = send_file(p, mimetype="image/png", max_age=31536000)
+    from ..core.orgcrypt import oc_send_file
+    rs = oc_send_file(c, p, mimetype="image/png", max_age=31536000)  # 2.58.0 (#1805): sealed -> decrypted, older plain ones as before
     rs.headers["Cache-Control"] = "private, max-age=31536000, immutable"
     return rs

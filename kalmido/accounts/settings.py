@@ -43,7 +43,12 @@ SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "tim
                   "person_colors",  # 2.47.1 (#1721): people in their account colour (0 = only agents coloured)
                   "list_color_dot",  # 2.53.0 (#1426): list colours only as the dot
                   "mods_all",  # 2.46.1 (#1591): "Switch on all modules" with the purpose
-                  "tbl_accept")  # 2.53.0 C (#1424): accept "Urgent" on a task set by someone else
+                  "tbl_accept",  # 2.53.0 C (#1424): accept "Urgent" on a task set by someone else
+                  "side_count", "side_dots", "side_share")  # 2.56.1 (#1799): sidebar counts / status dots / share marks
+# 2.56.1 (#1799): the task row's symbols (static/js/rowsym.js RSY_SYMS, same keys)
+ROW_ICON_LEVELS = ("all", "key", "calm", "custom")
+ROW_ICON_KEYS = ("due", "repeat", "remind", "deadline", "occ", "note", "attach", "link", "sub", "cmt", "code", "tracked", "plan",
+                 "ttype", "ms", "blocked", "wait", "stale", "pin", "list", "tags", "fields", "created", "num", "person", "turns")
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
@@ -220,6 +225,17 @@ def clean_setting(k, v):
         if sv not in ("line", "emoji", "dot"):
             raise bad
         return sv
+    if k == "row_icons":  # 2.56.1 (#1799)
+        if sv not in ROW_ICON_LEVELS:
+            raise bad
+        return sv
+    if k == "row_icons_custom":  # 2.56.1 (#1799): '' | 'none' | known keys, stored in the table's order
+        ks = [x.strip() for x in sv.split(",") if x.strip()]
+        if sv in ("", "none"):
+            return sv
+        if not ks or any(x not in ROW_ICON_KEYS for x in ks):
+            raise bad
+        return ",".join(x for x in ROW_ICON_KEYS if x in ks)
     if k == "prio_bg":  # 2.40.0 (#1416): priority as the row's background
         if sv not in ("", "soft", "strong"):
             raise bad

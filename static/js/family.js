@@ -490,7 +490,7 @@ async function purposeSet(p) {
   // 2.25.0 (UX-25): the dialog lists what changes (modules on / off, tabs that leave the tab bar)
   // 2.46.1 (#1591): with the switch "Switch on all modules" (on = every module, off = lists and tasks only)
   const all = pm_allOn(), want = pm_purposeOn(p, all), mname = k => tr(FEATS.find(x => x[0] === k)?.[1] || k);
-  const ton = [...PURPOSE_ALL, ...(PURPOSE_EXTRA[p] || [])].filter(k => want.has(k) && !feat(k)), toff = pm_touched(all).filter(k => !want.has(k) && feat(k));
+  const ton = [...new Set([...PURPOSE_ALL, ...(PURPOSE_EXTRA[p] || []), ...(all ? pma_full() : [])])].filter(k => want.has(k) && !feat(k)), toff = pm_touched(all).filter(k => !want.has(k) && feat(k));
   const tabs = tabIds().filter(id => id.startsWith('m:') && toff.includes(id.slice(2))).map(id => mname(id.slice(2)));
   const chg = `<ul class="cdlg-l">${ton.length ? `<li>${esc(tr('On: {0}', ton.map(mname).join(', ')))}</li>` : ''}${toff.length ? `<li>${esc(tr('Off: {0}', toff.map(mname).join(', ')))}</li>` : ''}${tabs.length ? `<li>${esc(tr('Leaves the tab bar: {0}', tabs.join(', ')))}</li>` : ''}${!ton.length && !toff.length ? `<li>${esc(tr('No module changes.'))}</li>` : ''}</ul>`;
   // 2.46.1 (#1615): Family brings the shopping list + the list "Family" (always, once); the switch adds example entries

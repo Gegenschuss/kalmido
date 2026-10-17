@@ -204,6 +204,12 @@ never at the portal-protected name.
 `127.0.0.1` (or the address the proxy connects from) and keep it closed in the firewall. Anyone else who reaches that
 port can claim to be any user.
 
+**Kid accounts and the parents' PIN behind a header login.** The PIN (Family > the kid's card > PIN) is entered into a
+Kalmido sign-in session. A kid who is signed in only through the proxy header has no such session and can never enter
+the PIN: with a PIN set, its settings, account and logout stay closed for good (ticking off and asking for rewards keep
+working). Way out: give the kid a Kalmido password and let it sign in on the Kalmido login page (no header for that
+account), or remove the PIN on the kid's card.
+
 **Sign-on portals: deny by default.** Before family or team members get accounts in your portal, set its default policy
 to *deny* and allow each app per group, so a new account does not open every app behind the portal.
 
@@ -434,7 +440,8 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
 - **What is encrypted:** the office's bank and tax data (IBAN, BIC, bank, tax number, VAT ID), the free company lines,
   the frozen sender of finalised documents, purchase prices of positions (and the costs / margin of a document), the
   special rates of framework contracts, office log entries that carry such values, and the stored files: attachments
-  of tasks in the organisation's lists (comments included), project files of its lists, stored invoices / credit notes
+  of tasks in the organisation's lists (comments included), project files of its lists, the lists' own pictures
+  (2.58.0; older ones are sealed by the encryption pass at the next start), stored invoices / credit notes
   (PDF/A-3 and e-invoice XML) and the archived PDFs of the legacy import. A stored PDF stays a PDF/A-3 without a
   password: it is sealed only on disk and served as the original (same checksum). Not encrypted: names, addresses,
   task texts, logos, profile pictures, files in agent chats and private lists, the search index. The cache of texts read
@@ -614,7 +621,8 @@ Trigger every alert once on purpose after setting it up, the dead man's switch t
   (never from the request's host). The page answers the same whether the account exists or not, at most one link per
   account in five minutes, rate limited per address and sender. Kid accounts, agents, disabled accounts and accounts
   without a password (single sign-on only) get no link: their parents or an admin reset them. Two-factor sign-in stays
-  required: after the new password the second step follows, and all other sessions of the account end.
+  required: after the new password the second step follows, and all other sessions of the account end. App passwords
+  (CalDAV) and API tokens stay valid; the page for the new password says so and points to *Settings > Account* (2.58).
 
 ## Documents: text recognition
 

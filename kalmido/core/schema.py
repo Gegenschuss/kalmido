@@ -1667,6 +1667,8 @@ MIGRATIONS = [
     ("view_layouts", "active", "ALTER TABLE view_layouts ADD COLUMN active BIGINT NOT NULL DEFAULT 0"),
     # 2.56.0 B (#1795): what an organisation admin changed in a list (JSON {field: [old, new]}; actions edit / icon), NULL before
     ("org_list_log", "detail", "ALTER TABLE org_list_log ADD COLUMN detail TEXT"),
+    # 2.58.0 F (#1803): the name an agent gives its job (POST /agent/jobs {name}); NULL = read from the title as before
+    ("agent_jobs", "name", "ALTER TABLE agent_jobs ADD COLUMN name TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -1818,6 +1820,9 @@ USER_DEFAULTS = {
     "list_color_dot": "0",      # 2.53.0 (#1426): 1 = list colours only as the dot in the sidebar (no accent, no card edge)
     "folder_colors": "{}",      # 2.53.0 (#1426): json {folder path: colour} of my folders; a new list in it takes the colour
     "side_progress": "1",       # 2.36.0 (#1117): progress bars of projects in the sidebar (0 = hidden)
+    # 2.56.1 (#1799): symbols in the task row: all | key (default for everyone) | calm | custom; custom = row_icons_custom
+    # (comma list of ROW_ICON_KEYS, '' = not chosen yet, 'none' = none); the sidebar's counts, status dots, share marks (0 = off)
+    "row_icons": "key", "row_icons_custom": "", "side_count": "1", "side_dots": "1", "side_share": "1",
     "cal_today": "1",           # "Events today" block on Today (external calendar subscriptions)
     "cal_tasks": "1",           # 2.36.1 (#1127): tasks with a date in the calendar views (0 = events only; Today, search, feeds unchanged)
     "cal_lists_hidden": "[]",   # 2.36.1 (#1127): json list of list ids whose tasks the calendar views leave out

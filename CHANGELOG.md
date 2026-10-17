@@ -7,6 +7,59 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.58.0] - 2026-10-17
+
+**In short:** a collection of fixes - Back on Android closes dialogs, invoices from quotations with parts are exact to the
+cent, a share's expiry date is the chosen day, the password reset answers in constant time, organisation list pictures
+are sealed in encrypted organisations, agents can give their jobs a name of their own, task rows and the sidebar
+show fewer symbols, and the archive import finds the recipient's address again.
+
+### Added
+- **Job names for agents:** `POST /api/v1/agent/jobs` takes an optional `name` (MCP `create_job`, `agent_job.py start --name`);
+  without it the name still comes from a title like "Clara: ...", but ordinary titles like "Release: 2.56" or "Fix: Login"
+  no longer count as a name (#1803).
+
+### Changed
+- **Phones:** the Back key / swipe closes the topmost dialog, sheet, menu or the search palette first; the close symbol of
+  dialogs is visible again with a full touch target (#1757, #1730).
+- **Password reset:** "Forgot password?" always answers after the same time; the "New password" page says that app
+  passwords (CalDAV) and API tokens stay valid (#1792).
+- **Organisation list pictures** in encrypted organisations are stored sealed like attachments; existing ones are sealed
+  on the next start (#1805). A picture and a new name set together give one news item (#1804).
+- **Office > Services:** the section is called "Drehpersonal" in German, like its dialog (#1765).
+- **Fewer symbols in the task row:** *Settings > Appearance > Task rows > Symbols in the row* with the levels *All*
+  (as before), *Important* (due date, reminder, deadline, person, approvals and locks), *Calm* (title, status circle,
+  due date) and *Custom* (boxes per group: dates, content, time, status, placement, people). The status circle, overdue
+  tasks and an agent waiting for your yes always show; the task itself shows everything. Per person, on every device.
+  **Default for every account: Important** (#1799).
+- **Sidebar:** task counts, the status dots of lists and the share marks (person / robot) can be switched off (#1799).
+
+### Fixed
+- **Invoice from a quotation with parts:** title page, summary and full positions match the quotation to the cent, also
+  with fractional part quantities and mixed tax rates (#1759).
+- **Subscribed CalDAV calendars:** a server with weak ETags gets a clear message instead of a lasting conflict; PUT and
+  DELETE follow no redirects (#1789).
+- **File store:** a share's expiry date lasts until the end of the chosen day in your time zone (#1787).
+- **Contacts:** a bulk action that stops halfway reports how many contacts are done; no move into imported address books
+  (also for agents); deleting a contact over CardDAV handles its birthday task like the app (#1656). Import and folder
+  details (#1657).
+- **Agents:** the agent card lists only lists within the agent's list limit (#1761); old API tokens show as "API token"
+  in the machine list (#1527); "Request becomes project" keeps its undo hint longer, Undo goes back, the quotation is only
+  named when there is one (#1810).
+- **Chats:** X on the active chat on phones switches to the next chat at once (#1771); small chat window fixes (#1773).
+- **Interface:** search fields keep the focus while typing (#1644), the "New message" pill stays (#1756), Esc in a detail
+  field restores the saved value (#1758), the bell menu stays inside the window (#1760), colour marks in the assign sheet
+  (#1772), a confirmed draft event's popup redraws (#1811), the office privacy switch stands above Save (#1812).
+- **Organisations:** "Join" is a full touch target on phones, member counts update at once, a failed group picture upload
+  leaves no file; a request to a deactivated account stays in "sent" (#1724, #1792).
+- **Archive import:** the recipient's address of a PDF is found on the whole first page, also behind long position
+  lists; the organisation's own sender block (a name on two lines, eGbR, the city in English, "/ Germany") no longer
+  slips into the address; US ("New York NY 10017") and UK ("EC1A 1BB London") addresses are read; a client in the own
+  street of another town and quantities like "10000 pieces" are told apart (#1813).
+- **Switch on all modules** switches on every module of *Settings > Modules* (also agents, knowledge pages, file store,
+  dispatch and the business modules); switching it off leaves only lists and tasks. Its explanation stands below the
+  title (#1808).
+
 ## [2.57.0] - 2026-10-17
 
 **In short:** the sidebar gets a **fixed head** - brand, workspace, search and your **favourites** stay while the rest

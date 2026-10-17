@@ -84,10 +84,20 @@ st = Bo.get(B + "/api/state").json()["settings"]
 check(st["mods_all"] == "0" and st["purpose"] == "office", "#1591: the switch is stored (mods_all)")
 r = Bo.post(B + "/api/me/purpose", json={"purpose": "me", "all_modules": True})
 fs = set(r.json()["features"].split(","))
-check(ALLM <= fs and not {"clients", "office"} & fs, f"#1591: switch on = every module (the business ones only with Office) {fs}")
+# 2.56.1 (#1808): "all on" = every module of Settings > Modules, whatever the purpose
+FULLM = ALLM | {"agents", "clients", "workload", "forms", "office", "wiki", "files", "dispo"}
+check(FULLM <= fs, f"#1591/#1808: switch on = every module, also agents, wiki, file store, business {FULLM - fs}")
 fs = set(Bo.post(B + "/api/me/purpose", json={"purpose": "office", "all_modules": True}).json()["features"].split(","))
 check(ALLM | {"clients", "workload", "forms", "office"} <= fs, "#1591: Office + switch on adds the business modules")
 check(Bo.get(B + "/api/state").json()["settings"]["mods_all"] == "1", "#1591: stored on")
+# 2.56.1 (#1808, review): the server's module list is the client's FEATS (a new module must go into both)
+import re as _re
+_feats = _re.findall(r"\['([a-z]+)', N_\(", open(os.path.join(N, "..", "static", "js", "core.js"), encoding="utf-8").read().split("const FEATS = [", 1)[1].split("];", 1)[0])
+_pmf = ast.literal_eval(open(os.path.join(N, "..", "kalmido", "family", "family.py"), encoding="utf-8").read().split("PM_FULL = ", 1)[1].split(")\n", 1)[0] + ")")
+check(_feats and list(_pmf) == _feats, f"#1808: PM_FULL (server) = FEATS (client) {set(_feats) ^ set(_pmf)}")
+# 2.56.1 (#1808): off after "all on" switches every module off again, also agents, wiki, file store, dispatch
+fs = set(Bo.post(B + "/api/me/purpose", json={"purpose": "office", "all_modules": False}).json()["features"].split(",")) - {""}
+check(not fs & FULLM, f"#1808: switch off after all on = lists and tasks only {fs & FULLM}")
 fs = set(Bo.post(B + "/api/me/purpose", json={"purpose": "me"}).json()["features"].split(","))
 check("cal" in fs and "kanban" not in fs, f"#1591: without the field the purpose's own set (as before) {fs}")
 check(Bo.post(B + "/api/me/purpose", json={"purpose": "me", "all_modules": "yes"}).status_code == 400, "#1591: all_modules must be a boolean")

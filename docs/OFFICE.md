@@ -385,7 +385,10 @@ editor marks it).
   page's direct positions, then per printed part a heading and its positions with quantity x part quantity, its producing /
   raw data / discount as positions; a part not printed stays one line), `title` (the title page; a part becomes a
   position with its amount, one per tax rate) or `summary` (one position per tax rate with a title, default
-  "Filmherstellung" / "Film production"). Net and gross equal the quotation's in every form. The preset is an office
+  "Filmherstellung" / "Film production"). Net and gross equal the quotation's in every form, to the cent: with a
+  fractional part quantity (1.5 shooting days) and mixed tax rates the part line is exactly rate x quantity, and the
+  rest cent of the rounded positions goes on the last position of that rate, which then shows as one amount with its
+  quantity x rate in the description (2.58.0). The preset is an office
   setting (`parts_invoice_mode`: `full` default, `title`, `summary`; `parts_summary_title_de`, `parts_summary_title_en`).
 - A quotation without parts computes, looks and prints exactly as before.
 

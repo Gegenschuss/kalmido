@@ -279,6 +279,12 @@ check(Dv.get(B + f"/api/files", params={"parent": SUB}).json().get("crumbs") == 
 # expiry with an offset is compared in UTC
 A.patch(B + f"/api/files/shares/{SH}", json={"expires_at": "2000-01-01T10:00+05:00"})
 check(dbx("SELECT expires_at FROM fs_shares WHERE id=?", (SH,))[0][0] == "2000-01-01T05:00:00+00:00", "expiry stored in UTC")
+# 2.58.0 (#1787): a plain date = the end of that day in the person's zone (tz), stored in UTC
+for tz, want in (("Europe/Berlin", "2999-01-15T22:59:59+00:00"), ("America/New_York", "2999-01-16T04:59:59+00:00")):
+    A.patch(B + f"/api/files/shares/{SH}", json={"expires_at": "2999-01-15", "tz": tz})
+    got = dbx("SELECT expires_at FROM fs_shares WHERE id=?", (SH,))[0][0]
+    check(got == want, f"plain date = end of the day in {tz} ({got})")
+check(A.patch(B + f"/api/files/shares/{SH}", json={"expires_at": "2999-01-15", "tz": "../bogus"}).ok, "a bad zone falls back to the instance's")
 A.patch(B + f"/api/files/shares/{SH}", json={"expires_at": None})
 pdf = tiny_pdf("Quarterly figures")
 r = AGS.post(B + "/api/v1/files", json={"parent_id": F1, "name": "q.pdf", "content_base64": base64.b64encode(pdf).decode(), "mime": "application/pdf"})

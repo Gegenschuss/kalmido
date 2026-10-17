@@ -46,6 +46,11 @@ the app has not yet been tested by people who use a screen reader every day (see
   sidebar lightly (also the phone drawer; never under *All workspaces*), the switch and its menu show a dot in front of
   each workspace (a ring when it has no colour), and your tone replaces the organisation's colour in the stripes and
   the header's sign. Text on the tinted sidebar keeps at least 4.5:1 in light and dark; every change is one Undo step.
+- **Calmer rows (2.56.1).** *Settings > Appearance > Task rows > Symbols in the row* sets how many small symbols a task
+  row shows: *All*, *Important* (the default: due date, reminder, person, approvals and locks), *Calm* (only the title,
+  the status circle and the due date) or *Custom* (a box per symbol, in groups). Overdue tasks, an agent waiting for
+  your yes and the status circle always show; the task itself still shows everything. *Settings > Appearance > Sidebar*
+  can hide the task counts, the status dots of lists and the share marks (person / robot). Per person, on every device.
 - **Dragging is never the only way.** Tasks: *Move up / Move down* in the task menu or Alt+↑ / Alt+↓, *Move to
   section…*, *Move to list* (m), the date picker; the panels and columns that can be resized by dragging have a grip
   that works with ← → and Enter (standard width) or a double-click. The divider between the chats of the split chat

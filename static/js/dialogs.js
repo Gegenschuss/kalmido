@@ -1110,8 +1110,8 @@ function lookHtml() {
   const seg = (k, opts) => `<div class="seg wrap" id="s-${k}" role="group">${opts.map(([v, n]) => `<button ${on(k, v)}>${tr(n)}</button>`).join('')}</div>`;
   return `<div class="lookpv" inert aria-hidden="true">
       <div class="lpv-head"><b>${tr('Today')}</b><span class="lpv-n">2</span></div>
-      <div class="trow pr5"><span class="chk p5"></span><div class="tmain"><div class="ttl">${tr('Call the plumber about the kitchen tap')}</div><div class="meta"><span class="dt today">${ic('cal', 's')}${tr('Today')} 09:30</span><span class="tag">#${tr('home')}</span></div></div></div>
-      <div class="trow pr1"><span class="chk p1"></span><div class="tmain"><div class="ttl">${tr('Renew the library books')}</div><div class="meta"><span class="dt">${ic('cal', 's')}${dayLabel(addDays(today(), 3))}</span><span class="subc">${ic('sub', 's')}1/3</span></div></div></div>
+      <div class="trow pr5"><span class="chk p5"></span><div class="tmain"><div class="ttl">${tr('Call the plumber about the kitchen tap')}</div><div class="meta">${rsy_pv(0) /* 2.56.1 (#1799) */}</div></div></div>
+      <div class="trow pr1"><span class="chk p1"></span><div class="tmain"><div class="ttl">${tr('Renew the library books')}</div><div class="meta">${rsy_pv(1)}</div></div></div>
       <div class="lpv-foot"><span class="btn sm pri">${ic('plus', 's')} ${tr('Add task')}</span><span class="lpv-link">${tr('Show completed')}</span><span class="lpv-prio flag-5">${ic('flag', 's')}${tr('high')}</span></div>
     </div>
     <h4>${tr('Color scheme')}<span class="devtag">${tr('This device')}</span></h4>

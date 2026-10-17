@@ -247,6 +247,25 @@ check("ro.ics" in store()["ro"] and "one.ics" in store()["rw"], "nothing was del
 r = A.post(B + f"/api/calendars/{RW}/refresh")
 check(r.ok, "refresh restores the real hrefs")
 
+# ---- 2.58.0 (#1789): a weak stored ETag -> no write attempt, a clear message; PUT / DELETE never follow a redirect
+et = q("SELECT etag FROM cal_dav_res WHERE sub_id=? AND uid='rw-1@stub'", (RW,))[0][0]
+q("UPDATE cal_dav_res SET etag=? WHERE sub_id=? AND uid='rw-1@stub'", ("W/" + et, RW))
+for m, p, b in (("patch", f"/api/calendars/{RW}/events", {"uid": "rw-1@stub", "title": "Weak"}), ("delete", f"/api/calendars/{RW}/events?uid=rw-1@stub", None)):
+    n0 = len(stub_log())
+    r = getattr(A, m)(B + p, json=b) if b is not None else getattr(A, m)(B + p)
+    check(r.status_code == 409 and r.json().get("code") == "weak_etag" and "weak" in r.json().get("error", ""),
+          f"weak ETag: {m} -> 409 weak_etag ({r.status_code} {r.text[:120]})")
+    check(not [x for x in stub_log()[n0:] if x["method"] in ("PUT", "DELETE")], f"weak ETag: {m} sent no write")
+q("UPDATE cal_dav_res SET etag=?, href=? WHERE sub_id=? AND uid='rw-1@stub'", (et, STUB + "/dav/calendars/alice/rw/moved.ics", RW))
+for m, p, b in (("patch", f"/api/calendars/{RW}/events", {"uid": "rw-1@stub", "title": "Redirected"}), ("delete", f"/api/calendars/{RW}/events?uid=rw-1@stub", None)):
+    n0 = len(stub_log())
+    r = getattr(A, m)(B + p, json=b) if b is not None else getattr(A, m)(B + p)
+    lg = stub_log()[n0:]
+    check(r.status_code == 502 and r.json().get("code") == "redirect", f"redirect on {m}: refused ({r.status_code} {r.text[:120]})")
+    check(not [x for x in lg if x["method"] in ("PUT", "DELETE") and x["path"].endswith("/one.ics")], f"redirect on {m}: not followed {[(x['method'], x['path']) for x in lg]}")
+check("one.ics" in store()["rw"] and "Redirected" not in store()["rw"]["one.ics"][1], "redirect: the resource is unchanged")
+check(A.post(B + f"/api/calendars/{RW}/refresh").ok, "refresh restores the real href")
+
 # ---- switching off
 r = A.post(B + f"/api/calendars/{RW}/write", json={"on": False})
 check(r.ok and r.json()["write"] is False, "switched off again")
