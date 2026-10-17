@@ -2,8 +2,9 @@
 and planned (expected), with the entries behind every value. Released 2026-10-15. No bank access.
 
 In:  payments of invoices on their day (actual); the open rest of finalised invoices on their due day (planned; overdue =
-     the current month); accepted quotations not yet invoiced in full, the rest on the end of the period of service (else its
-     start, else the day of the quotation; past = the current month; planned).
+     the current month); quotations (2.88.0, #1915: sent = an open quotation, and accepted ones; one version per chain, see
+     cf8_counting; a chain with a finalised invoice is left out) on the end of the period of service (else its start, else
+     the day of the quotation; past = the current month; planned).
 Out: purchases of accepted quotations (office_purchases, #1649), travel receipts (#1022) and fixed costs entered by hand
      (office_fixed_costs, once / monthly / quarterly / yearly) -- on or before today actual, later planned.
 Amounts in the office currency (documents in another currency through their rate), gross for documents. The artists'
@@ -226,10 +227,67 @@ def rk_fixed_delete(fid):
 
 
 # ---------------------------------------------------------------- the cash flow
+CF8_CHOICES = ("auto", "yes", "no")  # 2.88.0 (#1915): office_docs.cashflow of a quotation
+CF8_COUNTS = ("sent", "accepted")  # the statuses a quotation can count with
+
+
+def cf8_key(r):
+    """2.88.0 (#1915): the chain of quotation row r = (the chain's first quotation, the client). Duplicating sets version_of
+    (office/docs.py odoc_duplicate); a copy moved to another client is a quotation of its own, not a version."""
+    return (r["version_of"] or r["id"], r["client_id"])
+
+
+def cf8_invoiced(inv):
+    """The quotations with a finalised invoice (not a draft, not cancelled: the rows of rk_cashflow's inv) by source_doc_id."""
+    return {r["source_doc_id"] for r in inv if r["source_doc_id"]}
+
+
+def cf8_counting(docs, invoiced):
+    """2.88.0 (#1915): the ids of the quotations that count in the cash flow plan. Per chain (cf8_key):
+    - a chain with an invoice of any of its versions (invoiced) counts not at all (the invoice is in the plan instead);
+    - only sent and accepted versions can count (drafts and declined ones never);
+    - cashflow no: this version never counts;
+    - cashflow yes: when at least one version of the chain says yes, exactly the yes versions count (several are possible);
+    - else (all auto): only the newest version counts (the highest id, i.e. the last copy)."""
+    chains = {}
+    for r in docs:
+        if r["kind"] == "offer":
+            chains.setdefault(cf8_key(r), []).append(r)
+    out = set()
+    for rows in chains.values():
+        if any(r["id"] in invoiced for r in rows):
+            continue
+        cand = [r for r in rows if r["status"] in CF8_COUNTS and (r["cashflow"] or "auto") != "no"]
+        yes = [r["id"] for r in cand if r["cashflow"] == "yes"]
+        if yes:
+            out.update(yes)
+        elif cand:
+            out.add(max(r["id"] for r in cand))
+    return out
+
+
+def cf8_chain(c, oid, r):
+    """2.88.0 (#1915): the chain of quotation r for its editor: {cashflow, versions: [{id, number, status, cashflow, counts}]
+    (oldest first), counts (r itself), counting: [ids], invoiced (a version has an invoice)}."""
+    root = r["version_of"] or r["id"]
+    rows = c.execute("SELECT id, kind, number, status, cashflow, version_of, client_id FROM office_docs WHERE org_id=? AND kind='offer' "
+                     "AND (id=? OR version_of=?) ORDER BY id", (oid, root, root)).fetchall()
+    rows = [x for x in rows if cf8_key(x) == cf8_key(r)]
+    inv = c.execute("SELECT source_doc_id FROM office_docs WHERE org_id=? AND kind='invoice' AND locked_at IS NOT NULL AND locked_at<>'' "
+                    "AND status NOT IN ('draft', 'cancelled') AND source_doc_id IN (%s)" % ",".join("?" * len(rows)),
+                    (oid, *[x["id"] for x in rows])).fetchall() if rows else []
+    invoiced = {x["source_doc_id"] for x in inv}
+    counting = cf8_counting(rows, invoiced)
+    return {"cashflow": r["cashflow"] or "auto", "counts": r["id"] in counting, "counting": sorted(counting), "invoiced": bool(invoiced),
+            "versions": [{"id": x["id"], "number": x["number"], "status": x["status"], "cashflow": x["cashflow"] or "auto",
+                          "counts": x["id"] in counting} for x in rows]}
+
+
 def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
     """{from, months, currency, today, basis, rows: [{month, in: {actual, plan}, out: {actual, plan}, balance}], entries: [...]}.
     An entry: {month, dir in|out, state actual|plan, kind payment|invoice|offer|purchase|trip|fixed, date, amount, label,
-    number, doc_id | trip_id | fixed_id, overdue} (kind credit = a refund paid on a credit note, out).
+    number, doc_id | trip_id | fixed_id, overdue} (kind credit = a refund paid on a credit note, out; kind offer carries
+    open_offer: true for a sent quotation not yet accepted, 2.88.0, #1915).
     2.67.0 (#1838): basis gross (default; the start page too) | net. Fixed costs are entered net with a VAT rate: gross adds
     it. Documents (payments, open invoices, quotations, credit notes) are gross; net takes their share net / gross of the
     document's totals. Purchases (purchase prices of quotations) and travel receipts have no rate here: the same amount on
@@ -287,20 +345,16 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
         day = plan_day(due)
         put(day, "in", "plan", "invoice", open_ / _fx(r, home) * nf(r), r["project_title"] or "", number=r["number"], doc_id=r["id"],
             overdue=bool(due and due < today))
-    # in: accepted quotations, the rest not yet invoiced (plan)
-    billed = {}
-    for r in inv:
-        if r["source_doc_id"]:
-            billed[r["source_doc_id"]] = billed.get(r["source_doc_id"], dec(0)) + dec(_j(r["totals"]).get("gross") or 0) / _fx(r, home)
+    # in: quotations (plan). 2.88.0 (#1915): sent ones too (open quotation), one version per chain (cf8_counting); a chain with
+    # an invoice is left out as a whole (was: the rest after the invoiced part; the invoice is in the plan by itself)
+    counting = cf8_counting(docs, cf8_invoiced(inv))
     for r in docs:
-        if r["kind"] != "offer" or r["status"] != "accepted":
+        if r["id"] not in counting:
             continue
         gross = dec(_j(r["totals"]).get("gross") or 0) / _fx(r, home)
-        rest = gross - billed.get(r["id"], dec(0))
-        if rest <= 0:
-            continue
         day = plan_day(r["service_to"] or r["service_from"] or r["date"] or "")
-        put(day, "in", "plan", "offer", rest * nf(r), r["project_title"] or "", number=r["number"], doc_id=r["id"], partial=r["id"] in billed)
+        put(day, "in", "plan", "offer", gross * nf(r), r["project_title"] or "", number=r["number"], doc_id=r["id"],
+            open_offer=r["status"] == "sent")
     # out: purchases of accepted quotations
     for p in ek_purchases(c, oid, first, _add_months(last_month, 1) + "-00"):
         put(p["date"], "out", "actual" if p["date"] <= today else "plan", "purchase", dec(p["amount"]),
@@ -350,3 +404,29 @@ def rk_cashflow_get():
     if basis not in CF_BASES:
         raise BadInput(tr("Invalid value: {0}", "basis"))
     return jsonify(rk_cashflow(c, oid, fm, n, basis=basis))
+
+
+@app.post("/api/office/docs/<int:did>/cashflow")
+def cf8_doc_cashflow_post(did):
+    """2.88.0 (#1915): {cashflow: auto|yes|no} of a quotation -> {id, cashflow, cf_chain}. Planning, not the document's content
+    (not printed, not in the approval hash): the same right as editing the quotation (a member of the office area), also when
+    it is sent or finalised. Logged."""
+    from .docs import doc_row
+    from .ledger import ofx_log
+    c = db()
+    uid = office_gate(c)
+    oid = office_org(c, uid)
+    r = doc_row(c, oid, did)
+    if r["kind"] != "offer":
+        raise BadInput(tr("Invalid value: {0}", "kind"))
+    b = body()
+    v = (b if isinstance(b, dict) else {}).get("cashflow")
+    if v not in CF8_CHOICES:
+        raise BadInput(tr("Invalid value: {0}", "cashflow"))
+    before = r["cashflow"] or "auto"
+    if v != before:
+        c.execute("UPDATE office_docs SET cashflow=? WHERE id=? AND org_id=?", (v, did, oid))
+        ofx_log(c, oid, "cashflow", doc_id=did, detail={"before": {"cashflow": before}, "after": {"cashflow": v}})
+        bump(c)
+    c.commit()
+    return jsonify(id=did, cashflow=v, cf_chain=cf8_chain(c, oid, doc_row(c, oid, did)))

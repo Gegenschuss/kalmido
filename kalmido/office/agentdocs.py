@@ -475,11 +475,11 @@ def v1_office_offer_post():
 @v1_view
 def v1_office_offer_patch(did):
     """Only a draft this agent made, still a draft (no number change, no status): {client_id?, title?, intro?, items? (the
-    whole list), list_id?, notify?}."""
+    whole list), list_id?, cashflow? (2.88.0, #1915: auto | yes | no, its share in the cash flow plan once sent), notify?}."""
     from .docs import _put_items, _text, clean_doc, doc_row, recalc
     from .ledger import ofx_locked
     from .model import NAME_MAX, TEXT_MAX
-    b = _json(OFA_DATA_KEYS + ("notify",))
+    b = _json(OFA_DATA_KEYS + ("notify", "cashflow"))
     c = db()
     notify = _flag_notify(b)
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="offer")
@@ -498,6 +498,11 @@ def v1_office_offer_patch(did):
         f.update(clean_doc(c, oid, {"client_id": b["client_id"]}, r, False))
     if "list_id" in b:
         f["list_id"] = _list_ok(c, oid, uid, b.get("list_id"), aid)
+    if "cashflow" in b:  # 2.88.0 (#1915)
+        from .cashflow import CF8_CHOICES
+        if b["cashflow"] not in CF8_CHOICES:
+            raise BadInput(tr("Invalid value: {0}", "cashflow"))
+        f["cashflow"] = b["cashflow"]
     if f:
         f["updated_at"] = iso(now_utc())
         c.execute(f"UPDATE office_docs SET {','.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), did, oid])
@@ -759,6 +764,9 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "notify": {"type": "boolean", "description": "A card in the person's chat: sum, PDF preview, Open in the office"},
         "requested_by": {"type": "integer"}}}
     schemas["OfficeDraftInput"] = draft
+    # 2.88.0 (#1915): a change may also set the draft's share in the cash flow plan
+    schemas["OfficeDraftPatch"] = {"type": "object", "properties": {**draft["properties"], "cashflow": {
+        "type": "string", "enum": ["auto", "yes", "no"], "description": "In the cash flow plan once sent: auto (the newest version of the chain), yes, no"}}}
     rules = ("Both switches must be on: the agent's \"May draft office documents\" and the area's privacy switch \"Agents may read "
              "office data\". Drafts only: never a number, status, finalising, sending, deleting or booking. Every request is in the "
              "office log.")
@@ -776,7 +784,7 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
     paths["/office/offers"] = {"post": op("Create a quotation draft (2.51.0)", T, ok(o, "Created", "201") | errs("400", "403", "404"), body=ref("OfficeDraftInput"),
                                           scope="office", desc=rules + " Free positions, other prices and discounts are marked for the person.")}
     paths["/office/offers/{id}"] = {"patch": op("Change your own quotation draft (2.51.0)", T, ok(o) | errs("400", "403", "404", "409"), [pid("id", "Document id")],
-                                                body=ref("OfficeDraftInput"), scope="office", desc="items replaces the whole list. Only while it is a draft.")}
+                                                body=ref("OfficeDraftPatch"), scope="office", desc="items replaces the whole list. Only while it is a draft.")}
     paths["/office/offers/{id}/invoice"] = {"post": op("An invoice draft from an accepted quotation (2.51.0)", T, ok(o, "Created", "201") | errs("400", "403", "404", "409"),
                                                        [pid("id", "Quotation id")], body={"type": "object", "properties": {
                                                            "parts_mode": {"type": "string", "enum": ["full", "title", "summary"]}, "notify": {"type": "boolean"},
