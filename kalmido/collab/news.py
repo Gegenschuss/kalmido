@@ -67,7 +67,8 @@ def news_to_me(kind, actor_id, data, agents, s=None):
             return True
         if kind != "comment":
             return False
-        return bool((data or {}).get("reply")) or (s or {}).get("agent_comments", "all") != "replies"
+        d = data or {}
+        return bool(d.get("reply") or d.get("reach")) or (s or {}).get("agent_comments", "all") != "replies"
     if kind in NEWS_FOR_ME:
         return True
     return kind == "comment" and bool((data or {}).get("reply"))

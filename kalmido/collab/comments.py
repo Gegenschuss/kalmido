@@ -435,8 +435,8 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
             continue
         # 2.62.0 (#1854): an agent's comment with "only replies to me" (also against a list bell "All": the person chose it for
         # agents explicitly; only the task's "Urgent" still wants every comment)
-        if not asks and not bl9_agent_comment_ok(s, uid, author, ag, prev, replied, uid in notify_mentions) and \
-                tbl_level(c, uid, t["id"], s) != "urgent":
+        p61_ok = bl9_agent_comment_ok(s, uid, author, ag, prev, replied, uid in notify_mentions)
+        if not asks and not p61_ok and tbl_level(c, uid, t["id"], s) != "urgent":
             continue
         mentioned = uid in notify_mentions or uid == replied
         # 2.1.0 (#317): which event of the notification settings this comment is for uid (first match)
@@ -445,7 +445,8 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
         # 2.28.0 (#987): a reply to my comment (the one right before) is marked: it counts as "For you" in the News
         ment = uid in notify_mentions
         news_add(c, uid, "mention" if ment else "comment", task_id=t["id"], comment_id=cid, actor=author, row=row, s=s,
-                 data={"reply": 1} if not ment and (uid == prev or uid == replied) else None)
+                 data={"reply": 1} if not ment and (uid == prev or uid == replied) else
+                 {"reach": 1} if not ment and not p61_ok else None)  # 2.66.1 (#1943): an agent's ask / an "Urgent" task reached me past "only replies"
         lv = tbl_level(c, uid, t["id"], s)  # 2.53.0 C (#1424): the task's bell before the list's
         if lv == "mute":
             continue
