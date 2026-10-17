@@ -483,9 +483,10 @@ def proposal_request():
     return jsonify(job_dict(c, j)), 201
 
 
-def need_prop(c, jid):
-    """A proposal job of the current person (only the person who asked: its input is theirs)."""
-    j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND kind IS NOT NULL", (jid,)).fetchone()
+def need_prop(c, jid, lock=False):
+    """A proposal job of the current person (only the person who asked: its input is theirs). lock: the row stays locked until
+    the commit - two parallel apply / undo / redo of one proposal run one after the other (2.68.0, #1839 review)."""
+    j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND kind IS NOT NULL" + (" FOR UPDATE" if lock else ""), (jid,)).fetchone()
     if not j or j["user_id"] != me() or is_agent(g.user):
         raise Denied(404)
     return j
@@ -553,7 +554,7 @@ def prop_edit(kind, key, e, inp, prop):
 
 def prop_sel(b, mx=PROP_MAX_ITEMS):
     """{select: [keys], edits: {key: {...}}, name?, folder?, share_agent?, use?} of the apply request."""
-    _p_keys(b, "", ("select", "edits", "name", "folder", "share_agent", "use"))  # 2.55.0 (#1066): use (a layout at once)
+    _p_keys(b, "", ("select", "edits", "name", "folder", "share_agent", "use", "version"))  # 2.55.0 (#1066): use (a layout at once); 2.68.0 (#1839): version
     sel = b.get("select")
     if not isinstance(sel, list) or not sel or len(sel) > mx or \
             not all(isinstance(k, str) and re.fullmatch(r"\d{1,3}(\.\d{1,3})?", k) for k in sel):
@@ -783,12 +784,12 @@ def proposal_apply(jid):
     share_agent?} -> creates / changes the selected entries as the current person; one undo step (POST .../undo)."""
     need_collab()
     c = db()
-    j = need_prop(c, jid)
+    j = need_prop(c, jid, lock=True)
     if j["prop_state"] != "ready" or not j["proposal"]:
         return err(tr("There is no proposal to apply (anymore)"), 409)
     b = body()
     sel, ed = prop_sel(b, 500 if j["kind"] == "import" else PROP_MAX_ITEMS)  # 2.68.0 (#1839): up to 500 rows of an import
-    extra = {k: b[k] for k in ("name", "folder", "share_agent", "use") if k in b}  # 2.55.0 (#1066): use = a layout at once
+    extra = {k: b[k] for k in ("name", "folder", "share_agent", "use", "version") if k in b}  # 2.55.0 (#1066): use = a layout at once; 2.68.0 (#1839): version = the import card seen
     try:
         rec = prop_run(c, j, sel, ed, extra)
     except (BadInput, Denied):
@@ -846,7 +847,7 @@ def proposal_undo(jid):
     """Takes an applied proposal back (one step): created tasks go to the trash (a new project list is removed when nobody
     added or changed anything in it), changes of the inbox items are reverted. What someone changed since stays (skipped)."""
     c = db()
-    j = need_prop(c, jid)
+    j = need_prop(c, jid, lock=True)
     rec = json.loads(j["applied"] or "null")
     if j["prop_state"] != "applied" or not rec or rec.get("undone"):
         return err(tr("Nothing to undo"), 409)
@@ -914,7 +915,7 @@ def proposal_redo(jid):
     """The way forward again after an undo: trashed tasks come back; a removed project is created again; triage changes are
     applied again (what someone changed since stays)."""
     c = db()
-    j = need_prop(c, jid)
+    j = need_prop(c, jid, lock=True)
     rec = json.loads(j["applied"] or "null")
     if j["prop_state"] != "applied" or not rec or not rec.get("undone"):
         return err(tr("Nothing to redo"), 409)

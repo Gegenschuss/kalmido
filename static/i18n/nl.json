@@ -8274,5 +8274,6 @@
   "Read your old data (for example fixed costs) and send it as an import proposal you check and take over into the office; never sees the office itself": "Leest je oude gegevens (bijvoorbeeld vaste kosten) en stuurt ze als importvoorstel dat je controleert en in het kantoor overneemt; ziet het kantoor zelf nooit",
   "Into: {0}": "Naar: {0}",
   "Taking over creates the ticked fixed costs as you in this office; nothing else changes. One step, undo takes it back.": "Overnemen maakt de aangevinkte vaste kosten als jou aan in dit kantoor; verder verandert er niets. Eén stap, ongedaan maken draait het terug.",
-  "At most {0} import proposals per person and day": "Hoogstens {0} importvoorstellen per persoon per dag"
+  "At most {0} import proposals per person and day": "Hoogstens {0} importvoorstellen per persoon per dag",
+  "The proposal changed meanwhile: open it again": "Het voorstel is intussen gewijzigd: open het opnieuw"
 }

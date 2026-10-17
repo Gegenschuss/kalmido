@@ -8274,5 +8274,6 @@
   "Read your old data (for example fixed costs) and send it as an import proposal you check and take over into the office; never sees the office itself": "Liest deine Altdaten (zum Beispiel feste Kosten) und schickt sie als Import-Vorschlag, den du prüfst und ins Büro übernimmst; sieht das Büro selbst nie",
   "Into: {0}": "Nach: {0}",
   "Taking over creates the ticked fixed costs as you in this office; nothing else changes. One step, undo takes it back.": "Übernehmen legt die angehakten festen Kosten in deinem Namen in diesem Büro an; sonst ändert sich nichts. Ein Schritt, Rückgängig nimmt ihn zurück.",
-  "At most {0} import proposals per person and day": "Höchstens {0} Import-Vorschläge je Person und Tag"
+  "At most {0} import proposals per person and day": "Höchstens {0} Import-Vorschläge je Person und Tag",
+  "The proposal changed meanwhile: open it again": "Der Vorschlag hat sich inzwischen geändert: bitte neu öffnen"
 }

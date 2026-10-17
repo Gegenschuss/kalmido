@@ -653,6 +653,7 @@ async function propOpen(jid) {
   try { v = await rawFetch('GET', `/api/proposals/${jid}`); } catch (e) {  // 2.5.2 (K19): a readable reason instead of "unknown"
     toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.status === 404 ? tr('This proposal is not available: only the person who asked for it can open it, or it was removed.') : e.message); return;
   }
+  if (aim_is(v) && typeof ofcMoney !== 'function') await loadModule('office').catch(() => {});  // 2.68.0 (#1839, review): the preview uses the office module (lazy)
   $('.ppm')?.remove();
   const md = modal('');
   md.classList.add('ppm');
@@ -780,6 +781,7 @@ async function propApply(b) {
   const v = P.v, q = {select: [...P.sel], edits: Object.fromEntries(Object.entries(P.ed).filter(([k]) => P.sel.has(k)))};
   if (v.kind === 'project' || v.kind === 'inquiry') { q.name = $('#pp-name', P.md).value.trim() || v.proposal.name; q.folder = $('#pp-folder', P.md).value.trim(); q.share_agent = $('#pp-share', P.md).checked; }
   if (lyp_is(v)) q.use = $('#lyp-use', P.md)?.checked !== false;  // 2.55.0 (#1066)
+  if (aim_is(v)) q.version = v.import?.version;  // 2.68.0 (#1839, review): 409 when the agent replaced the rows meanwhile
   b.disabled = true;
   let r;
   try { r = await calReq('POST', `/api/proposals/${P.jid}/apply`, q); } catch (x) { const e = $('#pp-err', P.md); e.textContent = x.message; e.hidden = false; b.disabled = false; return; }

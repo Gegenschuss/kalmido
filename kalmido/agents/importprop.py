@@ -20,6 +20,7 @@ target is the office the person works in when ACCEPTING (office_org with the adm
 freelancer); an agent of an organisation only into that organisation. Only the person the card is for can open, accept,
 discard or undo it (proposals.need_prop). At most AIM_ROWS rows per card, AIM_OPEN_MAX open cards per agent, a card
 expires after AIM_DAYS days. Kalmido never runs a model itself."""
+import hashlib
 import json
 from datetime import timedelta
 
@@ -132,8 +133,14 @@ def aim_target(c, j):
     if not office_on(c, uid):
         raise Denied(403, tr(OFFICE_OFF))
     oid = office_org(c, uid, admin=True)
-    a = c.execute("SELECT org_id FROM agents WHERE user_id=?", (j["agent_id"],)).fetchone()
-    want = a["org_id"] if a else None
+    inp = json.loads(j["input"] or "{}")
+    if "org" in inp:  # 2.68.0 (#1839 review): the agent's organisation when it proposed - stays bound after the person left it
+        want = inp["org"]
+    else:
+        a = c.execute("SELECT org_id FROM agents WHERE user_id=?", (j["agent_id"],)).fetchone()
+        if not a:  # not visible (any more): never "free for every office"
+            raise Denied(409, tr("There is no proposal to apply (anymore)"))
+        want = a["org_id"]
     name = (c.execute("SELECT name FROM orgs WHERE id=?", (want or oid,)).fetchone() or [""])[0]
     if want and want != oid:
         raise Denied(409, tr("This proposal can only be taken over into the office of “{0}”: switch your workspace there first", name or "?"))
@@ -157,9 +164,14 @@ def aim_view_extra(c, j):
     except (BadInput, Denied) as x:
         problem = x.text() if isinstance(x, Denied) else str(x.args[0] if x.args else x)
     rows = aim_rows(c, oid, p.get("items") or [])
-    return {"import": {"area": p.get("area"), "office": office, "problem": problem, "rows": rows,
+    return {"import": {"version": aim_version(j), "area": p.get("area"), "office": office, "problem": problem, "rows": rows,
                        "counts": {s: sum(1 for r in rows if r["status"] == s) for s in ("new", "dup", "error")},
                        "expires_at": iso(parse_iso(j["created_at"]) + timedelta(days=AIM_DAYS)) if j["created_at"] else None}}
+
+
+def aim_version(j):
+    """The rows the card shows (2.68.0, #1839 review): the person accepts exactly these, not rows the agent sent meanwhile."""
+    return hashlib.sha256((j["proposal"] or "").encode()).hexdigest()[:16]
 
 
 def aim_run(c, j, sel, ed, extra, rec):
@@ -169,6 +181,8 @@ def aim_run(c, j, sel, ed, extra, rec):
     from ..agents.proposals import _p_keys
     if _expired(j):
         raise Denied(409, tr("This proposal has expired"))
+    if "version" in (extra or {}) and extra["version"] != aim_version(j):  # 2.68.0 (#1839 review): the agent replaced the rows meanwhile
+        raise Denied(409, tr("The proposal changed meanwhile: open it again"))
     items = (json.loads(j["proposal"]) or {}).get("items") or []
     oid = aim_target(c, j)[0]
     keys = sorted({int(k) for k in sel if k.isdigit() and int(k) < len(items)})
@@ -209,7 +223,7 @@ def aim_undo(c, j, rec, back=True):
         if not rows:
             return 0, []
         ids = fci_write(c, me(), oid, rows, detail={"agent": j["agent_id"], "job": j["id"], "redo": 1})
-        rec.update(made=(rec.get("kept") or []) + ids, removed=[], written_at=iso(now_utc()))
+        rec.update(made=ids, removed=[], written_at=iso(now_utc()))  # 2.68.0 (#1839 review): rows kept at the undo stay out
         return len(ids), []
     made = [int(x) for x in rec.get("made") or []]
     q = ",".join("?" * len(made)) or "NULL"
@@ -269,12 +283,13 @@ def v1_aim_propose():
     if c.execute("SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND user_id=? AND kind=? AND created_at>=?",
                  (aid, pid, AIM_KIND, iso(now_utc() - timedelta(days=1)))).fetchone()[0] >= AIM_DAY_MAX:
         return v1_err(429, tr("At most {0} import proposals per person and day", AIM_DAY_MAX))
+    a = c.execute("SELECT org_id FROM agents WHERE user_id=?", (aid,)).fetchone()
     ts = iso(now_utc())
     n = len(p["items"])
     title = _p_str(b.get("title"), "title", 120) or tr("Import: {0} fixed costs", n)
     jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id,proposal)
                        VALUES(?,NULL,?,?,'waiting','',?,?,?,?,'ready',NULL,?)""",
-                    (aid, pid, title[:JOB_TITLE_MAX], ts, ts, AIM_KIND, json.dumps({"user_id": pid, "area": p["area"]}),
+                    (aid, pid, title[:JOB_TITLE_MAX], ts, ts, AIM_KIND, json.dumps({"user_id": pid, "area": p["area"], **({"org": a["org_id"]} if a else {})}),
                      json.dumps(p, ensure_ascii=False)))
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
     prop_ready_notify(c, j)

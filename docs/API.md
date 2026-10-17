@@ -1185,7 +1185,7 @@ office*). Nothing of the office comes back to the agent.
 
 ```bash
 curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"area": "fixed_costs", "user_id": 3, "summary": "From the old spreadsheet 'Kosten 2025'",
+  -d '{"area": "fixed_costs", "user_id": 3, "summary": "From the old spreadsheet Kosten 2025",
        "note": "Row 14 (phone) had no amount, left out",
        "items": [{"label": "Office rent", "amount": 950, "repeat": "monthly", "start": "2026-01-01", "category": "Rooms"},
                  {"label": "Liability insurance", "amount": "240,00", "repeat": "yearly", "start": "2026-03-01", "category": "Insurances", "vat_rate": 0},
@@ -1199,9 +1199,10 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
 
 Errors: 400 (the office module off for the person, another area, no rows, more than 500 rows), 403 (scope), 404 (not your
 person / not in your organisation), 409 (usage limit), 413 (body over 256 KB), 429 (5 open import proposals, 20 per person and day). People see
-the judged rows in `GET /api/proposals/{id}` (`import`: `office`, `problem`, `rows` with `status` new / dup / error,
-`counts`) and decide with `POST /api/proposals/{id}/apply` (`{"select": ["0", "2"], "edits": {"2": {"vat_rate": 7}}}`),
-`.../discard`, `.../undo`, `.../redo`.
+the judged rows in `GET /api/proposals/{id}` (`import`: `version`, `office`, `problem`, `rows` with `status` new / dup / error,
+`counts`) and decide with `POST /api/proposals/{id}/apply` (`{"select": ["0", "2"], "edits": {"2": {"vat_rate": 7}}, "version": "…"}`;
+`version` optional: 409 when the agent replaced the rows since),
+`.../discard`, `.../undo`, `.../redo`. A card stays bound to the organisation its agent had when it sent it.
 
 ## Pin board, time check and shoot planning for agents (2.51.0)
 

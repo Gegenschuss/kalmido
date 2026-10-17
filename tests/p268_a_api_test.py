@@ -21,6 +21,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 
 import dbx as dbxm
@@ -233,6 +234,11 @@ check(len(left) == n0 + 1 and NEW_IDS[0] in left and not (set(NEW_IDS[1:]) & lef
 r = A.post(B + f"/api/proposals/{J1}/redo")
 check(r.ok and r.json().get("redone") == 2, f"redo makes them again ({r.text[:200]})")
 check(len(fixed(A)) == n0 + 3, "three again after redo")
+# 2.68.0 (#1839 review N1): undo / redo / undo keeps the row changed before the first undo
+r = A.post(B + f"/api/proposals/{J1}/undo")
+left = {x["id"] for x in fixed(A)}
+check(r.ok and r.json().get("undone") == 2 and NEW_IDS[0] in left and len(left) == n0 + 1, f"undo again: the changed row stays ({r.text[:200]})")
+check(A.post(B + f"/api/proposals/{J1}/redo").ok and len(fixed(A)) == n0 + 3, "redo again")
 
 # ---- a member is no office admin; another workspace; discard
 r = AGS.post(IMP, json={"items": [ITEMS[1]], "user_id": BOB})
@@ -268,6 +274,36 @@ check((v.get("office") or {}).get("personal") is True, f"the personal office {v.
 r = Er.post(B + f"/api/proposals/{JE}/apply", json={"select": ["0"]})
 check(r.ok and r.json().get("created") == 1 and [x["label"] for x in fixed(Er)] == ["Coworking desk"], f"in erin's personal office ({r.text[:120]})")
 check("Coworking desk" not in [x["label"] for x in fixed(A)], "not in alice's office")
+
+# ---- review (#1839): the card seen = the card taken over; two parallel accepts write once; bound to the agent's organisation
+r = AGS.post(IMP, json={"items": [{"label": "Phone line", "amount": 40, "start": "2026-01-01"}], "user_id": ALICE})
+JV = r.json()["id"]
+ver = (A.get(B + f"/api/proposals/{JV}").json().get("import") or {}).get("version")
+check(bool(ver), "the card carries the version of its rows")
+check(AGS.post(V + f"/agent/jobs/{JV}/proposal", json={"kind": "import", "items": [{"label": "Consulting", "amount": 99999, "start": "2026-01-01"}]}).status_code == 201,
+      "setup: the agent replaces the rows")
+nv = len(fixed(A))
+r = A.post(B + f"/api/proposals/{JV}/apply", json={"select": ["0"], "version": ver})
+check(r.status_code == 409 and len(fixed(A)) == nv, f"rows replaced after the person saw them: 409, nothing written ({r.status_code})")
+ver = (A.get(B + f"/api/proposals/{JV}").json().get("import") or {}).get("version")
+A2 = sess("alice")
+res = []
+th = [threading.Thread(target=lambda s=s: res.append(s.post(B + f"/api/proposals/{JV}/apply", json={"select": ["0"], "version": ver}).status_code)) for s in (A, A2)]
+for t in th:
+    t.start()
+for t in th:
+    t.join()
+cons = [x for x in fixed(A) if x["label"] == "Consulting"]
+check(sorted(res) == [200, 409] and len(cons) == 1, f"two accepts at once: one writes, one 409 {res} {len(cons)}")
+LB, LBS = agent("leavebot", ["read", "comments", "import"], org=ORG, owner=DAVE)
+r = LBS.post(IMP, json={"items": [{"label": "Old desk", "amount": 15, "start": "2026-01-01"}], "user_id": DAVE})
+check(r.status_code == 201, "a card for dave " + r.text[:120])
+JL = r.json()["id"]
+check(json.loads(dbx("SELECT input FROM agent_jobs WHERE id=?", (JL,))[0][0]).get("org") == ORG, "the card keeps the agent's organisation")
+dbx("DELETE FROM org_members WHERE org_id=? AND user_id=?", (ORG, DAVE), write=True)
+Da.patch(B + "/api/settings", json={"workspace": "private"})
+r = Da.post(B + f"/api/proposals/{JL}/apply", json={"select": ["0"]})
+check(r.status_code in (404, 409) and not fixed(Da), f"dave left Alpha: nothing into the personal office ({r.status_code} {r.text[:120]})")
 
 # ---- limits
 open_n = len(dbx("SELECT id FROM agent_jobs WHERE agent_id=? AND kind='import' AND prop_state='ready'", (AG,)))
