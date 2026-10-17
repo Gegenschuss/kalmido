@@ -171,6 +171,16 @@ const M = 'ZQXmark';  // every plain text of a locked list carries it: no storag
     await call('DELETE', `/api/tasks/${TS}`);
     const fx = await ev(`le2eFix('/api/tasks/${T}', {list_id: ${L2}, le2e_move: {tasks: [], comments: [], fields: []}}, {tasks: [${TS}], comments: [], fields: []}).then(b => b && b.le2e_move.tasks.find(x => x.id === ${TS})?.title, e => 'ERR ' + e.message)`);
     check(fx === `${M} trashed sub`, 'M8: a missing subtask (trash) is fetched and sent in the target format ' + fx);
+    // 2.64.1 review 2 (M2): a text that does not open with the list key held here is counted (the UI says so), not silently kept
+    const m2 = await ev(`(async () => { const k = await crypto.subtle.generateKey({name: 'AES-GCM', length: 256}, false, ['encrypt', 'decrypt']);
+      const b = await e2eSeal(k, le2ePad(e2eTEnc().encode('x')), le2eAad(${L}, listById(${L}).e2e_gen, 'title')), c = 'e2e1:' + JSON.stringify({v: 1, g: listById(${L}).e2e_gen, iv: b.iv, ct: b.ct});
+      le2eWait(c, ${L}, ['title']); await le2eDrain(); return le2eUnreadable(${L}); })()`);
+    check(m2 === 1, 'review 2 (M2): a swapped / foreign cipher is counted as unreadable ' + m2);
+    // 2.64.1 review 2 (L5): a typed "e2e1:..." is a text: encrypted in a locked list, a clear message in an open one (never sent)
+    const l5 = await ev(`(async () => { const c = await le2eEnc(${L}, 'title', 'e2e1: not a cipher'); let msg = '';
+      try { await le2eOut('PATCH', '/api/tasks/${T2}', {title: 'e2e1: typed'}); } catch (e) { msg = e.code; }
+      return {enc: c !== 'e2e1: not a cipher' && !!le2eParse(c), msg}; })()`);
+    check(l5.enc && l5.msg === 'list_e2e_prefix', 'review 2 (L5): "e2e1:" typed by a person ' + JSON.stringify(l5));
     // no key: no text leaves
     const lk = await ev(`(async () => { const k = LE2E.keys[${L}]; LE2E.keys[${L}] = {}; LE2E.tried[${L}] = '1'; try { await le2eOut('PATCH', '/api/tasks/${T}', {title: 'x'}); return 'sent'; } catch (e) { return e.code; } finally { LE2E.keys[${L}] = k; } })()`);
     check(lk === 'list_e2e_locked', 'without the list key a text is refused ("unlock first") ' + lk);
