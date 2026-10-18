@@ -4,8 +4,10 @@ per deal) and an expected date. A deal can get a quotation (made with the office
 over) and a project (a list of the client); a quotation set to accepted -- by hand or by the client's sign-off -- moves its
 deal to won (pl2_offer_status, called from docs.odoc_status and part C's signoff). A declined quotation leaves the deal
 where it is (the view shows a note; the admin sets "lost").
+2.94.0 A (#1930): a stage lead before inquiry (office/leads.py: convert, CSV import, agents) with source, next step,
+follow-up day and the lead's contact data; leads are never counted in the sums or the forecast.
 Every route: office_gate + office_org with the admin of the office area (a personal office: its owner). Agents: none (the
-office is for people only). value / contact / note / lost_reason encrypted at rest (orgcrypt)."""
+office is for people only). value / contact / note / lost_reason (+ next_step / email / phone / company) encrypted at rest (orgcrypt)."""
 import re
 from datetime import date
 
@@ -21,13 +23,17 @@ from ..personal.timetrack import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings, pb_cl_sql, pb_owner
 
-PL2_STAGES = ("inquiry", "offer", "won", "lost")
-PL2_PROB = {"inquiry": 20, "offer": 50, "won": 100, "lost": 0}  # the preset probability of a stage (%)
-PL2_OPEN = ("inquiry", "offer")
+PL2_STAGES = ("lead", "inquiry", "offer", "won", "lost")  # 2.94.0 A (#1930): + lead before inquiry (office/leads.py)
+PL2_PROB = {"lead": 10, "inquiry": 20, "offer": 50, "won": 100, "lost": 0}  # the preset probability of a stage (%)
+PL2_OPEN = ("inquiry", "offer")  # the sums and the forecast; leads are open too but never counted there (2.94.0 A, #1930)
+# 2.94.0 A (#1930): where a lead came from (a key, the client translates it; "" = not given)
+LEAD_SOURCES = ("website", "referral", "event", "social", "booking", "import", "agent", "other")
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MAX_DEALS = 2000
 PL2_FIELDS = ("id", "title", "client_id", "contact", "value", "stage", "probability", "expected_date", "offer_id", "list_id",
-              "lost_reason", "note", "sort", "created_at", "updated_at")
+              "lost_reason", "note", "sort", "created_at", "updated_at",
+              "source", "next_step", "follow_up", "email", "phone", "company")  # 2.94.0 A (#1930): the lead fields
 
 
 def _ctx():
@@ -64,6 +70,18 @@ def _ref(c, oid, b, k, ok):
     return v
 
 
+def _day(v, name):
+    v = v or ""
+    if v:
+        if not isinstance(v, str) or not DATE_RE.match(v):
+            raise BadInput(tr("Invalid value: {0}", name))
+        try:
+            date.fromisoformat(v)
+        except ValueError:
+            raise BadInput(tr("Invalid value: {0}", name)) from None
+    return v
+
+
 def pl2_clean(c, oid, b, cur=None):
     """The checked columns of body b (a new deal: cur None; else only the keys given)."""
     new = cur is None
@@ -73,9 +91,20 @@ def pl2_clean(c, oid, b, cur=None):
         out["title"] = _txt(b.get("title"), "title", 200)
         if not out["title"]:
             raise BadInput(tr("Please enter a name"))
-    for k, n in (("contact", 200), ("note", 4000), ("lost_reason", 500)):
+    for k, n in (("contact", 200), ("note", 4000), ("lost_reason", 500), ("next_step", 300), ("company", 200), ("phone", 60)):
         if k in b:
             out[k] = _txt(b.get(k), k, n)
+    if "email" in b:  # 2.94.0 A (#1930): the lead's contact data
+        out["email"] = _txt(b.get("email"), "email", 200)
+        if out["email"] and not EMAIL_RE.match(out["email"]):
+            raise BadInput(tr("Invalid value: {0}", "email"))
+    if "source" in b:
+        v = b.get("source") or ""
+        if v not in LEAD_SOURCES + ("",):
+            raise BadInput(tr("Invalid value: {0}", "source"))
+        out["source"] = v
+    if "follow_up" in b:
+        out["follow_up"] = _day(b.get("follow_up"), "follow_up")
     if "client_id" in b:
         out["client_id"] = _ref(c, oid, b, "client_id", _client_ok)
     if "list_id" in b:
@@ -106,15 +135,7 @@ def pl2_clean(c, oid, b, cur=None):
         if new or out["stage"] in ("won", "lost") or old == PL2_PROB.get(cur.get("stage")):
             out["probability"] = PL2_PROB[out["stage"]]
     if "expected_date" in b:
-        v = b.get("expected_date") or ""
-        if v:
-            if not isinstance(v, str) or not DATE_RE.match(v):
-                raise BadInput(tr("Invalid value: {0}", "expected_date"))
-            try:
-                date.fromisoformat(v)
-            except ValueError:
-                raise BadInput(tr("Invalid value: {0}", "expected_date")) from None
-        out["expected_date"] = v
+        out["expected_date"] = _day(b.get("expected_date"), "expected_date")
     if "sort" in b:
         s = b.get("sort")
         if isinstance(s, bool) or not isinstance(s, (int, float)) or abs(s) > 1e12:
@@ -161,7 +182,11 @@ def pl2_summary(items, today=None, months=6):
     ms = [_add_months(cur, i) for i in range(months)]
     fc = {m: dec(0) for m in ms}
     tot, wt, won, undated, n = dec(0), dec(0), dec(0), dec(0), 0
+    leads = due = 0  # 2.94.0 A (#1930): leads only counted (never in the sums / the forecast)
     for d in items:
+        if d["stage"] == "lead":
+            leads += 1
+            due += bool(d.get("follow_up")) and d["follow_up"] <= today
         if d["stage"] == "won":
             won += dec(d["value"] or 0)
         if d["stage"] not in PL2_OPEN:
@@ -179,7 +204,7 @@ def pl2_summary(items, today=None, months=6):
             fc[mo] += w
     nxt = _add_months(cur, 1)
     return {"open": dstr(money(tot)), "weighted": dstr(money(wt)), "count_open": n, "won": dstr(money(won)), "undated": dstr(money(undated)),
-            "forecast": [{"month": m, "weighted": dstr(money(fc[m])), "next": m == nxt, "current": m == cur} for m in ms]}
+            "leads": leads, "leads_due": due, "forecast": [{"month": m, "weighted": dstr(money(fc[m])), "next": m == nxt, "current": m == cur} for m in ms]}
 
 
 def pl2_list(c, oid, deleted=False):
@@ -232,11 +257,11 @@ def pl2_offer_status(c, oid, doc_id, status):
 # ---------------------------------------------------------------- routes
 @app.get("/api/office/deals")
 def pl2_get():
-    """{items: [...], summary: pl2_summary, stages: [...], probabilities: {stage: %}, currency}."""
+    """{items: [...], summary: pl2_summary, stages: [...], probabilities: {stage: %}, sources: [...], currency}."""
     c, uid, oid = _ctx()
     items = pl2_list(c, oid)
     return jsonify(items=items, summary=pl2_summary(items), stages=list(PL2_STAGES), probabilities=PL2_PROB,
-                   currency=(office_settings(c, oid).get("currency") or "EUR").upper())
+                   sources=list(LEAD_SOURCES), currency=(office_settings(c, oid).get("currency") or "EUR").upper())
 
 
 @app.post("/api/office/deals")
@@ -321,7 +346,7 @@ def pl2_make_offer(did):
     r = doc_row(c, oid, nid)
     ofx_log(c, oid, "create", doc_id=nid, detail={"number": r["number"], "items": 0, "deal_id": did})
     row = {"offer_id": nid}
-    if cur["stage"] == "inquiry":
+    if cur["stage"] in ("lead", "inquiry"):  # 2.94.0 A (#1930): a lead with a quotation moves on too
         row.update(pl2_clean(c, oid, {"stage": "offer"}, cur))
     _update(c, oid, did, row)
     bump(c)

@@ -26,3 +26,29 @@
   .cpal.inline{grid-template-columns:repeat(5,1.5rem)}
 }
 .evghost{position:absolute;left:2px;right:2px;background:var(--accent-soft);border:1px dashed var(--accent);border-radius:.3125rem;font:var(--fs-xs) var(--mono);padding:1px .25rem;z-index:2;pointer-events:none}
+/* 2.94.0 B (#1929): appointment booking (prefix apb-) */
+.apb-dlg .card{width:min(42rem,100%)}
+.apb-dlg h4{margin:1.25rem 0 .5rem;font-size:var(--fs-m)}
+.apb-onrow{display:flex;align-items:flex-start;gap:.75rem;min-height:2.75rem;cursor:pointer}
+.apb-onrow small{display:block;margin-top:.125rem}
+.apb-warn{margin:0 0 .75rem;padding:.5rem .75rem;border-radius:.5rem;background:var(--accent-soft);font-size:var(--fs-s)}
+.apb-link{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.75rem 0}
+.apb-link code{flex:1 1 100%;min-width:0;overflow-wrap:anywhere;font-size:var(--fs-s);color:var(--text2)}
+.apb-slug{flex:1;display:flex;align-items:center;gap:.25rem;min-width:0}
+.apb-slug input{flex:1;min-width:0}
+.apb-hours{display:flex;flex-direction:column;gap:.375rem}
+.apb-day{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;min-height:2.75rem}
+.apb-day .chkl{display:flex;align-items:center;gap:.5rem;min-width:7.5rem}
+.apb-day.off .apb-hm,.apb-day.off .iconbtn{opacity:.4;pointer-events:none}
+.apb-hm{display:inline-flex;align-items:center;gap:.25rem}
+.apb-hm input{width:8.25rem}
+.apb-dlg .row textarea{flex:1;min-width:0;width:100%}
+.apb-save{display:flex;justify-content:flex-end;margin-top:.75rem}
+.apb-list{list-style:none;margin:0;padding:0}
+.apb-list li{display:flex;align-items:center;gap:.5rem;border-bottom:1px solid var(--line);min-height:3rem;padding:.25rem 0}
+.apb-list li.off .apb-main,.apb-books li.cancelled .apb-main{opacity:.55}
+.apb-main{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;background:none;border:0;padding:.25rem 0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.apb-books .apb-main{cursor:default}
+.apb-main span{overflow-wrap:anywhere}
+.apb-st{font-size:var(--fs-xs);color:var(--accent)}
+@media (max-width:40rem){.apb-hm input{width:7.5rem}.apb-day .chkl{min-width:100%}}
