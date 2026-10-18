@@ -28,6 +28,11 @@ per diem spreadsheet.
 - An unclosed phone block in the office stylesheet (since 2.91) made the later office styles (invoice series, equipment
   value, travel expenses) apply on phones only (#1932).
 
+## [2.94.1] - 2026-10-18
+
+### Fixed
+- Booking page settings: the opening hours use the app's own time picker instead of the browser's time field; CI fixes of 2.94.0 (#1929).
+
 ## [2.94.0] - 2026-10-18
 
 Appointment booking for customers, leads before the sales pipeline, Enter in the chats makes a new line.

@@ -23,7 +23,8 @@ async function apbOpen() {
 function apbReload() { return apbLoad().then(apbDraw).catch(() => {}); }
 
 const apbWhen = iso => { const d = new Date(iso); return `${WDL[d.getDay()]}, ${d.toLocaleDateString(LOCALE())} ${d.toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit'})}`; };
-const apbHM = (v, n) => `<input type="time" step="900" data-apbhm="${n}" value="${esc(v || '')}" aria-label="${esc(n.endsWith('a') ? tr('From') : tr('To'))}">`;
+// 2.94.1 (#1929): the app's own time picker (ux1: no native time inputs); the hidden input keeps data-apbhm
+const apbHM = (v, n) => timeIn('apb-hm-' + n, v || '', {label: n.endsWith('a') ? tr('From') : tr('To'), empty: '--:--', attrs: `data-apbhm="${n}"`});
 function apbDayHtml(d, rows) {
   const on = rows.length > 0, r1 = rows[0] || ['09:00', '17:00'], r2 = rows[1];
   const name = WDL[(APB_DAYS.indexOf(d) + 1) % 7];
@@ -119,7 +120,7 @@ async function apbClick(e) {
     if (a === 'add2' || a === 'rm2') {
       const row = $(`.apb-day[data-day="${b.dataset.d}"]`, md), two = $('.apb-hm2', row);
       two.classList.toggle('hidden', a === 'rm2');
-      if (a === 'add2' && !$(`[data-apbhm="${b.dataset.d}2a"]`, md).value) { $(`[data-apbhm="${b.dataset.d}2a"]`, md).value = '14:00'; $(`[data-apbhm="${b.dataset.d}2b"]`, md).value = '17:00'; }
+      if (a === 'add2' && !$(`[data-apbhm="${b.dataset.d}2a"]`, md).value) { dpSet($(`[data-apbhm="${b.dataset.d}2a"]`, md), '14:00'); dpSet($(`[data-apbhm="${b.dataset.d}2b"]`, md), '17:00'); }
       b.dataset.apb = a === 'add2' ? 'rm2' : 'add2'; b.innerHTML = ic(a === 'add2' ? 'x' : 'plus', 's');
       const lbl = a === 'add2' ? tr('Remove the second time') : tr('Add a second time'); b.setAttribute('aria-label', lbl); b.title = lbl;
       return;
