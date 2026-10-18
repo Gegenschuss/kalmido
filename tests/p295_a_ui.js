@@ -56,7 +56,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     // edit days: breakfast + lunch on the full day
     await ev(`(() => { document.querySelector('[data-rkv="days"]').click(); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.modal .rkv-day').length === 3`), 'the days dialog lists the three days');
-    check(await ev(`[...document.querySelectorAll('.modal .rkv-meal')].every(l => l.getBoundingClientRect().height >= 43)`), 'large tap targets for the meals');
+    check(await ev(`[...document.querySelectorAll('.modal .rkv-meal')].every(l => l.getBoundingClientRect().height >= 43)`), 'large tap targets for the meals ' + await ev(`[...document.querySelectorAll('.modal .rkv-meal')].map(l => Math.round(l.getBoundingClientRect().height)).join(',')`));
     await ev(`(() => { const d = document.querySelectorAll('.modal .rkv-day')[1]; d.querySelector('[data-meal="b"]').click(); d.querySelector('[data-meal="l"]').click(); document.querySelector('.modal [data-m="save"]').click(); return 1; })()`);
     check(await ready(ev, `${getTrip(trip.id)}.then(t => t.vma.amount === '39.20' && t.vma_days.length === 1 && t.vma_days[0].date === '2025-03-11')`), 'meals provided cut the rate (39.20)');
     check(await ready(ev, `!document.querySelector('.modal') && /78\\.40/.test(document.querySelector('.rkv-card')?.textContent || '')`), 'the card follows (2 × 39.20)');
@@ -76,6 +76,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(`(() => { document.querySelector('#toast button').click(); return 1; })()`);
     check(await ready(ev, `${getTrip(trip.id)}.then(t => t.country === '' && t.vma.amount === '56.00')`), 'the undo of the dialog restores the country');
     // a new single-day trip with times
+    await ready(ev, `!!document.querySelector('[data-rk="back"]')`);
     await ev(`(() => { document.querySelector('[data-rk="back"]').click(); return 1; })()`);
     await ready(ev, `!!document.querySelector('[data-rk="new"]')`);
     await ev(`(() => { document.querySelector('[data-rk="new"]').click(); return 1; })()`);
@@ -89,7 +90,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `fetch('/api/office/trips?year=2025', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.trips.some(t => t.dest === 'Lübeck' && t.t_start === '08:00' && t.vma.amount === '14.00'))`),
       'a single day of 9.5 hours gets 14');
     // the evaluation
-    await ev(`(() => { document.querySelector('[data-rk="back"]')?.click(); return 1; })()`);
+    await ready(ev, `!!document.querySelector('[data-rk="back"]') && !document.querySelector('.modal')`);
+    await ev(`(() => { document.querySelector('[data-rk="back"]').click(); return 1; })()`);
     await ready(ev, `!!document.querySelector('[data-rk="view"][data-v="report"]')`);
     await ev(`(() => { document.querySelector('[data-rk="view"][data-v="report"]').click(); return 1; })()`);
     check(await ready(ev, `/Per diem allowances 2025/.test(document.querySelector('.rkv-rep')?.textContent || '') && document.querySelectorAll('.rkv-people > li').length === 2`, 60),
