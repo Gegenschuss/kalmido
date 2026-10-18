@@ -50,6 +50,13 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   check(md.classList.contains('clamp') && d.querySelector('[data-act="md-more"]')?.textContent === 'Show more', 'long description folded after ~8 lines, "Show more"');
   d.querySelector('[data-act="md-more"]').click(); await sleep(100);
   check(!md.classList.contains('clamp') && d.querySelector('[data-act="md-more"]').textContent === 'Show less', 'Show more unfolds it');
+  // 2.101.0 (#2157): the setting holds for every task; "Show less" folds all again
+  const TL3 = (await call('alice', 'POST', '/api/tasks', {title: 'Sound mix', list_id: L, section_id: S1, content: long})).id;
+  w.eval(`closeDetail(); openDetail(${TL3})`); await sleep(900);
+  check(!d.querySelector('#d-md').classList.contains('clamp') && d.querySelector('[data-act="md-more"]').textContent === 'Show less', 'next task is unfolded too');
+  d.querySelector('[data-act="md-more"]').click(); await sleep(100);
+  w.eval(`closeDetail(); openDetail(${T1})`); await sleep(900);
+  check(d.querySelector('#d-md').classList.contains('clamp') && d.querySelector('[data-act="md-more"]').textContent === 'Show more' && d.querySelector('[data-act="md-more"]').getAttribute('aria-expanded') === 'false', 'Show less folds it for all tasks');
   w.eval(`closeDetail(); openDetail(${T2})`); await sleep(900);
   check(!d.querySelector('[data-act="md-more"]'), 'short description: no "Show more"');
   w.eval('closeDetail()'); await sleep(300);
