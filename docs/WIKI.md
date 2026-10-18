@@ -60,6 +60,19 @@ organisation.
 
 See *Exporting encrypted content* in the self-hosting guide for backups, moving servers and lost keys.
 
+## Moving pages to another workspace (2.96.0)
+
+A page, or its folder with everything below it, moves between the private space and an organisation (both ways): page menu
+*Move to another workspace…* / *Move folder to another workspace…* (only when there is another workspace: a person without an
+organisation never sees it). The dialog names source and target, lets you pick a folder in the target and first shows what
+the check found: a name that is already taken there (then nothing moves; `409` with the names), links between a moved page
+and one that stays (they stay as text: `[[links]]` only work inside one space), pages that link files of the file store (the
+files stay where they are). Links between pages that move together follow their new paths. Out of an organisation only the
+person who created the pages or an admin of the organisation may move them. Undo moves them back to the old place in one step;
+below the page both sides see the last move (from, to, when, who). A space with the lock cannot move pages yet (the server
+cannot re-encrypt them for the other space): remove the lock or copy the text. Agents never move data between workspaces;
+the person does that in the app. Route: `POST /api/wiki/move-space {pages: [id] | folder, space, to, dest, dry}`.
+
 ## Mind map (2.49.0)
 
 Every list (not the inbox) can be shown as a **Mind map**, next to List, Kanban and Timeline (the view switch in the list
