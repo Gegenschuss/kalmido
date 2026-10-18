@@ -425,6 +425,10 @@ docker compose up -d kalmido
       bind:
         create_host_path: false
   ```
+- **Leftover file versions (2.97.0).** Once a night the server compares the file store folders (`attachments/files/<id>/`)
+  with the versions in the database and removes stored files no version names and that are older than a day (left behind
+  when the server stopped in the middle of a move between workspaces); at most 200 folders per watchdog tick, the server log
+  names the number (`files cleanup: N stored file(s) without a version removed`).
 - **After a move, check the attachments.** Compare the number and the total size of the files in the data folder's
   `attachments/` with the old server, not only the database (a copy that stopped half-way still starts fine).
 - **Encryption at rest.** Put the data disk on LUKS (or your platform's disk encryption) and keep the key off the
@@ -686,10 +690,11 @@ Other people's addresses never leave the server in plain text: `email_hash` is t
 you may see on the new server. Your own address in `manifest.json` stays readable. Files of 2.73 test builds with a plain
 `email` field are still read.
 
-**A whole organisation** (2.73, stage 1): upload its organisation export (see above) the same way, as an admin of an
-organisation on the new server, and enter the organisation's recovery key of the old server. The archive is opened on
-the server (a wrong key is refused, ten attempts per upload), checked and shown as a preview; it goes into an
-organisation you administer, never into a private space. Lists with sections, fields, tags, status updates, links,
+**A whole organisation** (2.73, stage 1): upload its organisation export (see above) the same way and enter the organisation's
+recovery key of the old server. The archive is opened on the server (a wrong key is refused, ten attempts per upload),
+checked and shown as a preview; it goes into an organisation you administer or (2.96) into your private space. Into the
+private space nobody joins an organisation: ticked people only get the lists shared, the organisation's own address
+books become your own ones. Lists with sections, fields, tags, status updates, links,
 milestones and project files, tasks with subtasks, dependencies and field values, comments, attachments (sealed with the
 new organisation's key), the organisation's calendars with events and its address books with contacts move along; the
 lists belong to you as the importing admin. Members are matched by e-mail address: a ticked person joins the
@@ -1025,6 +1030,8 @@ the security model: [PACKS.md](PACKS.md)). Without a catalogue Kalmido makes no 
 
 - `KALMIDO_PACKS_CATALOG=https://example.com/kalmido-packs/index.json` - the index file; empty (default) = only the
   shipped packs.
+- `KALMIDO_BOOKMARK_ALLOW_HOSTS=wiki.example.com:8080` (2.97.0) - internal hosts the bookmark preview may fetch (empty =
+  public addresses only; the calendar allow-list does not apply to bookmarks).
 - `KALMIDO_PACKS_ALLOW_HOSTS=mirror.example.com:8080` - hosts that may be internal addresses and may use `http://` (an
   own mirror); every other host: `https://` and a public address only.
 - Installations are stored per office area in the database (table `office_pack_installs`) and travel with backups;

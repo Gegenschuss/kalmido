@@ -327,14 +327,19 @@ r = A.post(B + "/api/life/karakeep/sync")
 check(r.ok and r.json()["added"] == 4, "sync: 4 bookmarks over two pages (not the archived one) " + r.text[:200])
 RL = r.json()["list_id"]
 rt = {t["title"]: t for t in A.get(B + "/api/state").json()["tasks"] if t["list_id"] == RL}
-check(rt["A long read"]["url"] == "https://example.org/long" and "From the page" in rt and rt["A note"]["url"] is None
-      and rt["A long read"]["fam"] == {"kind": "bookmark", "src": "karakeep", "bid": "bm_1"}, "titles, links, a note without a link")
+# 2.97.0 (#1950): links come in as bookmarks (life/bookmarks.py), a note without a link stays a task of the reading list
+bms = {b["url"]: b for b in A.get(B + "/api/bookmarks").json()["items"]}
+check(sorted(bms) == ["https://example.org/b", "https://example.org/l", "https://example.org/long"] and bms["https://example.org/long"]["title"] == "A long read"
+      and bms["https://example.org/b"]["title"] == "From the page" and all(b["src"] == "karakeep" and b["space"] == "private" for b in bms.values())
+      and list(rt) == ["A note"] and rt["A note"]["url"] is None and rt["A note"]["fam"] == {"kind": "bookmark", "src": "karakeep", "bid": "bm_3"},
+      "links as bookmarks (titles), a note without a link as a task " + str(list(bms)) + str(list(rt)))
 check(A.post(B + "/api/life/karakeep/sync").json()["added"] == 0, "a second sync adds nothing")
 A.delete(B + f"/api/tasks/{rt['A note']['id']}")
-check(A.post(B + "/api/life/karakeep/sync").json()["added"] == 0, "a deleted bookmark task does not come back")
-A.post(B + f"/api/tasks/{rt['A long read']['id']}/complete")
+A.delete(B + f"/api/bookmarks/{bms['https://example.org/b']['id']}")
+check(A.post(B + "/api/life/karakeep/sync").json()["added"] == 0, "a deleted bookmark task / bookmark does not come back")
+A.patch(B + f"/api/bookmarks/{bms['https://example.org/long']['id']}", json={"state": "archived"})
 r = A.post(B + "/api/life/karakeep/sync").json()
-check(r["archived"] == 1 and next(m for m in json.load(open(os.path.join(DATA, "kk.json"))) if m["id"] == "bm_1")["archived"], "ticked = archived in Karakeep")
+check(r["archived"] == 1 and next(m for m in json.load(open(os.path.join(DATA, "kk.json"))) if m["id"] == "bm_1")["archived"], "archived bookmark = archived in Karakeep")
 check(A.post(B + "/api/life/karakeep/sync").json()["archived"] == 0, "… once")
 log = [json.loads(x) for x in open(os.path.join(DATA, "kk.log"))]
 check(all(x["auth"] for x in log) and any("cursor=2" in x["p"] for x in log), "every request with the key, the second page followed")

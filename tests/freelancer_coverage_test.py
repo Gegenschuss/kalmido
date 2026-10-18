@@ -41,6 +41,7 @@ KINDS = {
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature"),
     "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private space of a "
                          "person without an organisation and with that person's own agent; rows to tasks / quotation drafts"),
+    "bookmarks": ("matrix", "p297_a_api_test.py: bookmarks (2.97.0) in the private space of a person without an organisation"),  # 2.97.0 A (#1950)
     "own": ("matrix", SUITE + ": the own settings, profile, tokens, app passwords, push, account export / import"),
     # ---- nothing to check without an organisation (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account: the same for every person, before any workspace"),
@@ -84,6 +85,12 @@ ROUTES = {
     "DELETE /api/my/agents/{}/machines/{}": "agents", "DELETE /api/v1/agent/quota": "agents", "GET /api/agents": "agents",
     "GET /api/agents/jobs": "agents", "GET /api/agents/jobs/{}/steps": "agents", "GET /api/agents/usage": "agents",
     "GET /api/agents/{}/bridges": "agents", "GET /api/agents/{}/chat": "agents",
+    # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
+    "GET /api/bookmarks": "bookmarks", "POST /api/bookmarks": "bookmarks", "GET /api/bookmarks/{}": "bookmarks",
+    "PATCH /api/bookmarks/{}": "bookmarks", "DELETE /api/bookmarks/{}": "bookmarks",
+    "POST /api/bookmarks/{}/restore": "bookmarks", "POST /api/bookmarks/{}/refresh": "bookmarks",
+    "GET /api/bookmarks/{}/image": "bookmarks", "POST /api/bookmarks/move-space": "bookmarks",
+    # 2.96.0 C (#2015): job cards in the agent chat
     "GET /api/agents/{}/meeting-proposals": "agents", "GET /api/agents/{}/schedules": "agents",
     "GET /api/agents/{}/share": "agents", "GET /api/assistant": "agents", "GET /api/assistant/log": "agents",
     "GET /api/my/agents": "agents", "GET /api/my/agents/{}/machines": "agents", "GET /api/proposals/agents": "agents",
@@ -132,6 +139,8 @@ ROUTES = {
     "GET /api/v1/files/{}": "files", "GET /api/v1/files/{}/content": "files", "GET /api/v1/files/{}/text": "files",
     "PATCH /api/docs/labels/{}/{}": "files", "PATCH /api/docs/rules/{}": "files", "PATCH /api/docs/{}": "files",
     "PATCH /api/files/nodes/{}": "files", "PATCH /api/files/shares/{}": "files", "PATCH /api/v1/documents/{}": "files",
+    # 2.96.0 A (#1941): files / folders / documents to the other workspace
+    "POST /api/files/move-space": "files",
     "POST /api/docs": "files", "POST /api/docs/labels/{}": "files", "POST /api/docs/mail": "files",
     "POST /api/docs/rules": "files", "POST /api/docs/{}/accept": "files", "POST /api/docs/{}/redo": "files",
     "POST /api/docs/{}/review": "files", "POST /api/docs/{}/task": "files", "POST /api/files/folders": "files",
@@ -347,6 +356,8 @@ ROUTES = {
     "PATCH /api/me/webhooks/{}": "own", "PATCH /api/settings": "own", "PATCH /api/v1/me/notifications": "own",
     "POST /api/account/export": "own", "POST /api/account/import": "own", "POST /api/account/import/{}/key": "own",
     "POST /api/account/import/{}/run": "own", "POST /api/me/app-passwords": "own", "POST /api/me/avatar": "own",
+    # 2.97.0 B (#1951): customers (p297_b_api_test.py) - routes below this line
+    # 2.96.0 D (#1941 / #1918): an organisation export into the private space
     "POST /api/me/drop-token": "own", "POST /api/me/mail/test": "own", "POST /api/me/mail/token": "own",
     "POST /api/me/pin/lock": "own", "POST /api/me/pin/unlock": "own", "POST /api/me/purpose": "own",
     "POST /api/me/tokens": "own", "POST /api/me/webhooks": "own", "POST /api/me/webhooks/{}/secret": "own",
@@ -521,6 +532,10 @@ ROUTES = {
     "GET /api/sheets/{}/export.csv": "sheets", "GET /api/sheets/{}/export.xlsx": "sheets",
     "GET /api/sheets/{}/links": "sheets", "GET /api/sheets/{}/vars": "sheets", "GET /api/v1/sheets": "sheets",
     "GET /api/v1/sheets/{}": "sheets", "GET /api/v1/sheets/{}/vars": "sheets", "PATCH /api/sheets/{}": "sheets",
+    # 2.97.0 C (#2049): office moves (p297_c_api_test.py) - routes below this line
+    "POST /api/office/move-space": "office",
+    # 2.96.0 B (#1941): a table to the other workspace
+    "POST /api/sheets/{}/move-space": "sheets",
     "PATCH /api/sheets/{}/columns/{}": "sheets", "PATCH /api/v1/sheets/{}": "sheets", "POST /api/sheets": "sheets",
     "POST /api/sheets/{}/batches/{}/undo": "sheets", "POST /api/sheets/{}/cells/{}/freeze": "sheets",
     "POST /api/sheets/{}/cells/{}/name": "sheets", "POST /api/sheets/{}/columns": "sheets",
@@ -565,7 +580,10 @@ ROUTES = {
     "POST /api/wiki/e2e/bulk": "wiki", "POST /api/wiki/e2e/finish": "wiki", "POST /api/wiki/e2e/keys": "wiki",
     "POST /api/wiki/e2e/rotate": "wiki", "POST /api/wiki/e2e/start": "wiki", "POST /api/wiki/e2e/stop": "wiki",
     "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki", "POST /api/wiki/pages": "wiki",
+    # 2.96.0 B (#1941): wiki pages / folders to the other workspace
+    "POST /api/wiki/move-space": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
+    # 2.97.0 D (#2050 #2051): locked spaces / clean-up (p297_d_api_test.py) - routes below this line
     # 2.90.0 - 2.92.0: bookkeeping, bank, tax dates, invoice series, subscriptions, agreements, equipment, file preview
     "DELETE /api/office/agreements/{}": "office", "DELETE /api/office/series/{}": "office",
     "GET /api/attachments/{}/agents": "tasks", "GET /api/attachments/{}/preview": "tasks",

@@ -52,6 +52,26 @@ settings, master data, files and the private clients go with it; "Private" is a 
 Only where organisations can be created (an instance admin, not in the mode `shared`). Moving into an existing
 organisation is not offered yet. `POST /api/office/move` `{name, confirm: true}` -> `{org_id, name, clients}`.
 
+**Moving office data into another workspace** (2.97.0, both ways between the personal office and an organisation's office,
+or between two organisations): **Move to another workspace…** in a client's menu (Office > Clients, also for several
+selected clients), in the menu of a draft quotation / invoice, in the dialog of a trip and of a document template. The
+dialog names what moves and what stays before anything changes:
+- a client takes its contact persons and its drafts along (their links to the address book end; the address books stay);
+- drafts lose their number - the target numbers them in its own range when they are issued; links into the old office end
+  (framework contract, project, catalogue service of a position); a draft moved alone keeps the address but not the client;
+- trips move with their receipts as long as none is ticked "in DATEV" or billed; templates move, documents made from them
+  stay with their text;
+- **issued documents never move** (retention): invoices, credit notes, reminders, sent quotations, number ranges and the
+  archive stay where they were issued. A client that issued documents (or projects, trips, deals) still point to stays
+  archived in the old office and is created anew in the target. The tick box *Take issued documents along as a read-only
+  copy* files a copy of each of them into the target's archive: view and PDF only, no number of its own, never edited,
+  and not part of the target's bookkeeping, EÜR, VAT, DATEV export or archive sums (marked "Read-only copy from …").
+Rights: the right to work in both offices (travel expenses and templates: the admin of both); out of an organisation only
+its office admin or who created the client / draft - a plain member takes only own drafts along and no copies. Agents
+never move office data. Undo takes the whole move back in one step (copies and a newly created client go again, unless the
+target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates, ids, to:
+"private"|"org:<id>", dry, copy_issued}` -> `{notes, block, count, move_id}`; `{undo: move_id}` takes it back.
+
 **Small business (section 19 UStG)**: the setting `small_business` (Settings tab, "Invoices"; a setting of every office
 area, also of an organisation): new quotations and invoices are made without VAT and with the note "Gemäß § 19 UStG
 wird keine Umsatzsteuer berechnet." (`vat_mode` `novat`, `vat_note` `small`); the e-invoice gets the tax category `E`
@@ -706,6 +726,21 @@ marked `extern` on the same sheet; its quantity does not count; an invoice made 
 amount. When a quotation becomes "accepted" its purchase is stored for the cash flow (`office_purchases`: one row per
 position with a purchase and per part, amount encrypted at rest, dated at the start of the period of service, else the
 day of acceptance), stored anew when the accepted quotation changes and removed when it leaves that status.
+
+## Recipient and client names (2.97.0)
+
+- A client has its name (printed on quotations, invoices, the e-invoice) and an optional **display name** for the pickers
+  and lists ("Foo Switzerland" / "Foo Germany"). Without one, two clients of one workspace with the same name show the
+  city in brackets, the country when the city is the same too. The client search finds both names.
+- The address is kept in fixed fields only: street, address extra (c/o, building), postcode, city, country. The old free
+  "Address" text left the form; where it was the only address, street / postcode / city were filled from it once (the
+  text stays in the database, nothing is overwritten).
+- A quotation or invoice with a client shows the recipient read-only next to the client (name, attn., street, extra line,
+  postcode city, the country when it is foreign) with "Edit client"; a missing street / postcode / city shows "Address
+  missing - add it at the client". A document without a client offers "Add client" (name + address), which then becomes
+  its client. Drafts always read the client's current address; finalising (or sending) freezes it, later changes at the
+  client leave issued documents alone. Old documents with free address lines keep them. With the clients module off the
+  free recipient fields stay.
 
 ## Finalising
 

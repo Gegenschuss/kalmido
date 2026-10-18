@@ -1197,7 +1197,7 @@ characters, no digits or colons, no plain words such as `Release` or `Fix` (else
 ```
 GET  /api/v1/agent/chats?since=<message id>   -> {data: [{id, user: {id, name}, from: "user" | "agent", body, task_id, created_at}], cursor}
 GET  /api/v1/agent/chats?user_id=<person>    -> the same for one conversation, plus pins (2.82.0; MCP list_chats user_id)
-POST /api/v1/agent/chats/{user_id}           {"body": "…", "task_id": 51, "job_id": 42 (2.32.0: the job whose result this is), "job_parent": 40 (2.47.3, optional)}
+POST /api/v1/agent/chats/{user_id}           {"body": "…", "task_id": 51, "job_id": 42 (2.32.0: the job whose result this is), "job_parent": 40 (2.47.3, optional), "job_msg": "result" (2.96.0, optional)}
 ```
 
 In a chat, the agent can create tasks and comments, but only in lists where it has the rights to do so.
@@ -1232,6 +1232,15 @@ colour comes from the name (the same name, e.g. a follow-up `Clara (continued): 
 name from the number; a part job takes the colour of its leader, a little lighter. Give your jobs a name at the start of
 the title (`Alma: Release 2.29`, part jobs `Alma B: …`); the reference starter does it for you (`agent_job.py start --name`
 or a name of its own, `--parent ID` for a part job).
+
+2.96.0 (#2015): **one card per job.** The app groups the messages of a job (`job_id`, or the `Job #N` start) into one card
+in the chat: name, version (from the title, e.g. `2.96`), state (running / waiting / done / failed, from the job) and the
+first line of the newest message; a tap shows the whole history of the job under it. Approval and permission questions,
+errors and the end result stay visible below the card. Tell the app what a job message is with `job_msg` (only together
+with `job_id`, else `400`; another value `400`): `say` (an interim message), `question`, `result` (the end result) or
+`error`. It comes back in the message as `job_msg` (`null` without). Without it the app reads the text: a leading ✅ =
+result, ⚠️ ⏰ ⏹ = error, else an interim message. Older servers answer `400` for the unknown field: send it again
+without. The reference starter sends `result` / `error` with a job's result (`agent_job.py`).
 
 **What the person sees in the chat header (2.4.1).** Under the agent's name: typing dots while it writes to this person,
 then its state in words: *working on #51* (the status task, a link), *working*, *waiting for you*, *ready* (idle),
@@ -1523,6 +1532,8 @@ assigning) have no agent route yet.
 
 A name that is taken gets " (2)"; an agent's executable ending gets ".txt" (#380). Renaming, moving, the trash and shares
 stay with people. Without a share the answer is 404 (the file does not exist for you); a view share answers 403 on writes.
+2.96.0 (#1941): agents never move data between workspaces (private space <-> organisation); the person does that in the
+app (`POST /api/files/move-space` answers an agent 403, there is no v1 route and no MCP tool).
 
 ## Files in the chat and on tasks (2.13.1)
 

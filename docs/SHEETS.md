@@ -151,3 +151,14 @@ for example "put everyone with a birthday in the next 4 weeks into a table". It 
 shared with it and the ones it created (a personal agent creates them in your private space). Each of its calls is one
 step you can take back with one click; a cell using a project it does not see shows it "No access"
 ([AGENTS.md](AGENTS.md#tables-2890)).
+
+## Moving a table to another workspace (2.96.0)
+
+Table menu (the open table or the overview) *Move to another workspace…*: between the private space and an organisation, both
+ways, only when there is another workspace. The check first names what does not come along: the attachment to a list of the
+old workspace ends (the table would otherwise open to the whole target space), rows carried over to tasks of the old workspace
+lose their link, quotations made from the table stay where they are, and formulas that use lists or clients of the old
+workspace show "No access" there. Out of an organisation only the person who created the table or an admin of the organisation
+may move it; a private table only its owner. Undo moves it back in one step and brings back the list attachment and the
+carried-over links that fit again. The last move shows in the side panel. Agents never move tables between workspaces.
+Route: `POST /api/sheets/{id}/move-space {to, dry, undo}`.

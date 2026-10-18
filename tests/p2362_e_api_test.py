@@ -110,7 +110,8 @@ r = A.post(B + "/api/clients", json={"name": "Beispielkunde AG", "address": "Mar
 check(r.status_code == 201, "client with billing fields " + r.text[:200])
 CL = r.json()["id"]
 cl = A.get(B + f"/api/clients/{CL}").json()
-check(cl.get("billing") == {"street": "Marktstraße 5", "zip": "50667", "city": "Köln", "country": "DE", "vat_id": "DE123456789", "customer_no": "K-1001",
+# 2.97.0 B (#1951): billing carries the extra address line (address_extra) too
+check(cl.get("billing") == {"street": "Marktstraße 5", "address_extra": "", "zip": "50667", "city": "Köln", "country": "DE", "vat_id": "DE123456789", "customer_no": "K-1001",
                             "buyer_reference": "991-12345-67", "email_invoice": "rechnung@beispielkunde.example", "payment_terms_days": 14},
       f"client billing fields stored and normalised: {cl.get('billing')}")
 check(A.patch(B + f"/api/clients/{CL}", json={"country": "Deutschland"}).status_code == 400, "client: country must be ISO-2")

@@ -141,7 +141,8 @@
   zuerst die Tests an"). Send it as a step with `report_progress` (a chat run: `chat_user_id`; a job: `job_id`), at most
   one every 2 seconds; a host that reads your stream (the launcher's event mode) sends these sentences for you. **Prose
   only**: never tool output, file contents, logs, data rows or secrets. Only the person you work for sees them. Send a
-  job's result with `send_chat` and its `job_id`, so its history shows under it.
+  job's result with `send_chat` and its `job_id`, so its history shows under it, and `job_msg` (`result`, or `error` when
+  it failed; `say` / `question` for messages in between), so the app shows it under the job's card.
 - Every larger piece of work gets **one job** (`create_job`), created at the **start**, not at the end, with short
   progress lines (`update_job` with `append_log`); set it to done / failed at the end, or waiting when you need a
   person. The last log line is the result in plain words.
