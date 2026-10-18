@@ -58,12 +58,12 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(tabs() === 'life*,family', 'Home: Home & life and Family ' + tabs());
   w.eval(`go('contacts')`); await until(() => w.eval('S.route.mod') === 'contacts');
   // 2.87.9 (#1917): the area Office has its menu with four groups; without the office module: Clients and Contacts under Sell
-  const ofm = () => [...d.querySelectorAll('#view .ofmenu [data-ofm]')].map(b => b.dataset.go + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join();
-  check(ofm() === 'clients,contacts*' && /Sell/.test(d.querySelector('#view .ofmenu .ofmgh')?.textContent || ''), 'Office (office module off): Clients and Contacts in the group Sell ' + ofm());
+  const ofm = () => [...d.querySelectorAll('#view .ofrail [data-ofm]')].map(b => b.dataset.go + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join();
+  check(ofm() === 'clients,contacts*' && /Sell/.test(d.querySelector('#view .ofrail .ofrh')?.textContent || ''), 'Office (office module off): Clients and Contacts in the group Sell ' + ofm());  // 2.98.0 (#2180): the office rail
   // ================= old links
   for (const [h, mod, area] of [['stats', 'stats', 'review'], ['family', 'family', 'life'], ['clients', 'clients', 'office'], ['pomo', 'pomo', 'time']]) {
     w.eval(`location.hash = '#${h}'`); await until(() => w.eval('S.route.mod') === mod);
-    check(w.eval('S.route.mod') === mod && d.querySelector(`#side [data-mgside="${area}"].on`) && d.querySelector(area === 'office' ? `#view .ofmenu [data-go="${mod}"][aria-current="page"]` : `#view .mgtabs [data-go="${mod}"][aria-selected="true"]`), `#${h}: the area ${area} on its tab`);  // 2.87.9 (#1917): the office menu
+    check(w.eval('S.route.mod') === mod && d.querySelector(`#side [data-mgside="${area}"].on`) && d.querySelector(area === 'office' ? `#view .ofrail [data-go="${mod}"][aria-current="page"]` : `#view .mgtabs [data-go="${mod}"][aria-selected="true"]`), `#${h}: the area ${area} on its tab`);  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail
   }
   check(!errs.length, 'no script errors ' + errs.join(' | ')); errs.splice(0);
   w.close();
