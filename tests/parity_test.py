@@ -465,6 +465,10 @@ APP_ONLY = [
      "(each one undo step); agents work inside a sheet through the table tools and create tasks / office drafts their own ways",
      ("=GET /api/sheets/{}/links", "=POST /api/sheets/{}/to-tasks", "=POST /api/sheets/{}/to-offer", "=POST /api/sheets/{}/rows-from-list",
       "=POST /api/sheets/{}/links/{}/undo", "=POST /api/sheets/{}/links/{}/redo")),
+    # 2.98.0 A (#1953): scheduling polls are for people in 2.98.0 (voters use the public link; agent access is its own step)
+    ("2.98.0 A (#1953): scheduling polls (create, results, choose the time, move) are only for people in 2.98.0; the voters use "
+     "the public link without an account, agents never vote; agent access via REST v1 / MCP comes as its own step of the agents list",
+     ("* /api/polls",)),
     ("2.94.0 B (#1929): the appointment booking page (settings, appointment types, the bookings and cancelling one) is a person's "
      "own page; customers book on the public page without an account, agents get no access (no agent API in 2.94)",
      ("* /api/appt/",)),
