@@ -67,7 +67,7 @@ KINDS = {
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
     # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
     # personal office (a hidden area only its owner reaches). No /api/v1, no MCP in stage 1
-    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list)"),
+    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list)"),
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share"),
@@ -244,6 +244,10 @@ ROUTES = {
     "GET /api/office/{}": "office", "POST /api/office/{}": "office", "GET /api/office/{}/{}": "office", "PATCH /api/office/{}/{}": "office",
     "DELETE /api/office/{}/{}": "office", "GET /api/office/export": "office", "POST /api/office/import": "office",
     "POST /api/office/move": "office",  # 2.47.3 (#1360): the personal office becomes an organisation (p2473_a_api_test.py)
+    # 2.90.0 B (#1921): bank reconciliation, office admins (p290_b_api_test.py)
+    "POST /api/office/bank/import/preview": "office", "POST /api/office/bank/import": "office", "GET /api/office/bank/imports": "office",
+    "POST /api/office/bank/imports/{}/undo": "office", "POST /api/office/bank/imports/{}/restore": "office", "GET /api/office/bank/tx": "office",
+    "GET /api/office/bank/tx/{}/candidates": "office", "POST /api/office/bank/tx/{}/match": "office", "POST /api/office/bank/tx/{}/unmatch": "office",
     # 2.47.3 (#1022, #1652): travel expenses and the cash flow, admins of the office area only (p2473_b_api_test.py: other org 404, member 403)
     "GET /api/office/trips": "office", "POST /api/office/trips": "office", "PATCH /api/office/trips/{}": "office", "DELETE /api/office/trips/{}": "office",
     "POST /api/office/trips/{}/items": "office", "PATCH /api/office/trips/{}/items/{}": "office", "DELETE /api/office/trips/{}/items/{}": "office",
@@ -254,6 +258,8 @@ ROUTES = {
     "POST /api/office/fixed-costs/import/preview": "office", "POST /api/office/fixed-costs/import": "office", "GET /api/office/fixed-costs/import/template": "office",
     "POST /api/office/fixed-costs/delete": "office", "GET /api/office/cashflow/check": "office", "PUT /api/office/cashflow/check": "office",
     "POST /api/office/docs/{}/cashflow": "office",  # 2.88.0 (#1915)
+    # 2.90.0 C (#1922): tax dates as tasks, office admins (p290_c_api_test.py)
+    "GET /api/office/tax-dates": "office", "PUT /api/office/tax-dates": "office",
     # 2.92.0 A (#1925): business contracts and insurances (office admins; p292_a_api_test.py)
     "GET /api/office/agreements": "office", "POST /api/office/agreements": "office", "GET /api/office/agreements/{}": "office",
     "PATCH /api/office/agreements/{}": "office", "DELETE /api/office/agreements/{}": "office", "POST /api/office/agreements/{}/restore": "office",
@@ -274,6 +280,9 @@ ROUTES = {
     "POST /api/v1/office/offers": "office", "PATCH /api/v1/office/offers/{}": "office", "POST /api/v1/office/offers/{}/invoice": "office",
     "POST /api/v1/office/reminders": "office", "GET /api/v1/office/payment-suggestions": "office", "POST /api/v1/office/payment-suggestions": "office",
     "GET /api/office/datev/extf": "office",  # 2.47.3 (#1460): DATEV booking batch, admin only (p2473_e_api_test.py)
+    # 2.90.0 A (#1921): bookkeeping light, office admins (p290_a_api_test.py)
+    "GET /api/office/books": "office", "GET /api/office/books/euer": "office", "GET /api/office/books/ustva": "office",
+    "GET /api/office/books/euer.csv": "office", "GET /api/office/books/euer.pdf": "office",
     # ---- office (C, 2.36.1 #1021): quotations of an organisation (10)
     "GET /api/office/docs": "office", "POST /api/office/docs": "office", "GET /api/office/docs/{}": "office",
     "PATCH /api/office/docs/{}": "office", "DELETE /api/office/docs/{}": "office", "PUT /api/office/docs/{}/items": "office",

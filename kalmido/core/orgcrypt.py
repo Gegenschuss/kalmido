@@ -67,6 +67,7 @@ FIELDS = {
     "office_trips": ("people", "note"),  # 2.47.3 (#1022): participants and note of a trip
     "office_trip_items": ("amount", "amount_home"),  # 2.47.3 (#1022): the amounts of a travel receipt
     "office_fixed_costs": ("amount",),  # 2.47.3 (#1652): fixed costs of the cash flow
+    "office_bank_tx": ("amount", "counterpart", "purpose", "iban"),  # 2.90.0 B (#1921): imported bank bookings
     "office_deals": ("value", "contact", "note", "lost_reason"),  # 2.50.0 (#1196): the sales pipeline
     "hub_absences": ("kind", "note"),  # 2.50.0 (#1195): the kind of an absence (sick leave = health data) and its note
     # 2.72.0 (#1333): the household budget -- per row with the key of its list's space (column sid, life/budget.py bud_enc;
@@ -93,6 +94,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  # 2.47.3 (#1022, #1652): travel expenses (participants, amounts) and fixed costs
                  "office_trips": N_("Travel expenses"), "office_trip_items": N_("Travel expenses"), "office_fixed_costs": N_("Fixed costs"),
                  "office_deals": N_("Sales pipeline"),  # 2.50.0 (#1196)
+                 "office_bank_tx": N_("Bank statements"),  # 2.90.0 B (#1921)
                  "hub_absences": N_("Kind and note of absences"),  # 2.50.0 (#1195)
                  # 2.72.0 (#1333): amounts, texts and limits of the household budget, its receipts
                  "budget_entries": N_("Household budget"), "budget_recurring": N_("Household budget"), "budget_cats": N_("Household budget"),

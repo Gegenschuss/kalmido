@@ -63,7 +63,12 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "agents_read": 0,
                      # 2.67.0 A (#1838): the monthly task "Cash flow: check the actual state" (set only by its own route,
                      # office/fixedimport.py): on, the person it goes to, the id of the task
-                     "cf_check": 0, "cf_check_user": None, "cf_check_task": None}
+                     "cf_check": 0, "cf_check_user": None, "cf_check_task": None,
+                     # 2.90.0 A (#1921): bookkeeping light: tax reserve in percent of the net income received (0 = off), VAT
+                     # on payment received ("ist") or on invoicing ("soll") for the VAT return figures
+                     "tax_reserve_pct": 0, "vat_basis": "ist",
+                     # 2.90.0 C (#1922): tax dates as tasks (set only by its own route, office/taxdates.py)
+                     "tax_dates": {}}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -325,6 +330,12 @@ def office_settings_clean(c, oid, b, cur):
         elif k == "datev_extf":  # 2.47.3 (#1460)
             from .datev import dx_settings_clean
             out[k] = dx_settings_clean(v, out.get(k) or {})
+        elif k == "tax_reserve_pct":  # 2.90.0 A (#1921): whole percent 0..60
+            out[k] = int(round(_num(v, k, 0, 60)))
+        elif k == "vat_basis":  # 2.90.0 A (#1921)
+            if v not in ("ist", "soll"):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
         elif k == "offer_number_at":
             if v not in ("create", "finalize"):
                 raise BadInput(tr("Invalid value: {0}", k))

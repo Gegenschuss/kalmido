@@ -79,6 +79,9 @@ with this exemption reason.
   The first call of the module copies the country pack's catalogue into the organisation's text blocks.
 - **Framework contracts** - one per agency or client: date, raw data included, default rights (three catalogue entries),
   rights note, closing text, special rates per service. A document can pick a contract and deviate from it.
+- **Bookkeeping** (admins, 2.90) - income/expense statement, VAT return figures, tax reserve, receipt photo and tax
+  dates, see below.
+- **Bank** (admins, 2.90) - bank reconciliation, see below.
 - **Settings** - company name and address lines, contact / register / bank lines (printed in the footer), logo,
   brand colour (accent in the print only), document language (de / en), currency (EUR / USD + rate), number scheme with
   a live preview, producing quotient and rate, raw data factor, days a quotation stays valid, default text blocks,
@@ -452,6 +455,60 @@ adds `gross`), `POST /api/office/fixed-costs/import/preview` (multipart `file`),
 (`{items: [{label, amount, repeat, start, until?, category?, vat_rate?}]}` -> `{created, ids}`),
 `POST /api/office/fixed-costs/delete` (`{ids}`: the undo of an import), `GET /api/office/fixed-costs/import/template`,
 `GET/PUT /api/office/cashflow/check` (`{on, user_id}` -> `{on, user_id, task_id, people, lost}`).
+
+## Bookkeeping (2.90)
+
+The tab **Bookkeeping** (admins of the office; without an organisation your personal office) covers the running bookkeeping
+of a self-employed person. **Photograph receipt** opens the camera on a phone (the file dialog on a desktop, PDF too): the
+receipt goes into your documents, amount and date are recognised in the background, and you add the category and the VAT
+rate (19 / 7 / 0 % or unknown). The **income/expense statement** of a year counts payments received on your invoices
+(cash principle, split by VAT rate) against your receipts and travel expenses, with export as CSV or PDF. The **VAT return**
+section lists the figures (fields 81, 86, 21, 45, 66, 83) for a month or quarter to type into ELSTER, on cash or accrual basis;
+small businesses get no return. A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
+as "Tax reserve" and "Freely available". No tax advice; figures without guarantee. Kalmido sends nothing to the tax office.
+
+## Bank reconciliation (2.90)
+
+The tab **Bank** (admins of the office area; in a personal office its owner) matches the bookings of your account with
+invoices and receipts. Kalmido has no bank access: you import the file you download from your bank yourself.
+
+- **Import bank statement**: a CSV export (German and English formats: `1.234,56` or `1,234.56`, `DD.MM.YYYY`,
+  `YYYY-MM-DD` …; account lines above the header are skipped) or a CAMT.052 / CAMT.053 XML file. For a CSV you confirm
+  which column holds the date, the amount (one column with a minus for money out, or income and expense apart), the
+  purpose and the counterpart; Kalmido guesses them as in the household budget. A CAMT file goes straight to the
+  preview (booking day, amount with credit / debit, counterpart and IBAN, purpose, the bank's reference). XML files with
+  a DOCTYPE or ENTITY are refused. At most 2 MB and 3000 rows per file.
+- **Duplicates**: a booking already imported into this office area (same day, amount, counterpart, purpose, reference)
+  is skipped and counted; two equal bookings in one file stay two.
+- **Matching**: every open booking shows the best suggestion with its reason. Money in -> open invoices (same amount as
+  open, invoice number in the purpose, customer name); money out -> receipts of the office's documents (same amount,
+  date within 14 days, name). **Match** records a payment on the invoice (day and amount of the booking, transfer; a
+  smaller amount = partly paid) or sets the receipt's payment day (used by the bookkeeping's cash principle). **Other …**
+  searches all open invoices / receipts; **Private** and **Ignore** only mark the booking. **Undo match** removes the
+  payment again; deleting the payment on the invoice opens the booking too. Every step can be undone.
+- **Imports**: the list of imported files; **Take back** removes its bookings (refused while one of them is matched -
+  undo those matches first); its undo brings them back.
+- Amounts, counterparts, purposes and IBANs are encrypted at rest when the encryption of the organisation is on. The
+  DATEV export is unchanged. Agents have no access to the bank reconciliation.
+
+Routes (office admins only; members 403, other areas 404, agents 403): `POST /api/office/bank/import/preview`,
+`POST /api/office/bank/import`, `GET /api/office/bank/imports`, `POST /api/office/bank/imports/<id>/undo|restore`,
+`GET /api/office/bank/tx?state=open|matched|all&from&to`, `GET /api/office/bank/tx/<id>/candidates?q=`,
+`POST /api/office/bank/tx/<id>/match` `{kind: invoice|receipt|private|ignored, id?}`, `POST /api/office/bank/tx/<id>/unmatch`.
+Tables `office_bank_imports`, `office_bank_tx` (see Database).
+
+## Tax dates as tasks (2.90)
+
+At the bottom of **Bookkeeping**, **Tax dates** keeps the usual German deadlines in view: the VAT return (none, monthly
+or quarterly, optionally with the permanent extension), the income tax prepayments (10 March, June, September, December)
+and the trade tax prepayments (15 February, May, August, November). Each kind switched on becomes ONE recurring task in
+the basket of the person chosen (an admin of the office; in a personal office its owner), due on the deadline minus the
+lead time (default 3 days); the title names the real deadline, the VAT task links to the VAT return figures.
+Switching a kind off or changing it ends the old task (done, never deleted) and creates a new one when needed; a task
+completed or deleted by hand comes back on the next save. A deadline on a weekend or holiday moves to the next working
+day (Kalmido does not shift it). No tax advice; figures without guarantee.
+
+Routes (office admins only): `GET /api/office/tax-dates`, `PUT /api/office/tax-dates`.
 
 ## Contracts and insurance (2.92.0)
 
@@ -886,6 +943,9 @@ back to an older release run `python -m kalmido.admin.orgcrypt_cli decrypt-all`.
 Since 2.45.1 also the column `name_en` of `office_equipment` (text, default empty); 2.45.0 runs on with it.
 Since 2.50.0 also `office_deals` (the sales pipeline; under row-level security, `value`, `contact`, `note` and
 `lost_reason` encrypted at rest, `deleted_at` = deleted and restorable); 2.49.0 runs on with it.
+Since 2.90.0 also `office_bank_imports` and `office_bank_tx` (the bank reconciliation; under row-level security,
+`amount`, `counterpart`, `purpose` and `iban` encrypted at rest, `deleted_at` = taken back and restorable) and the nullable
+columns `vat_pct` and `paid_at` of `rc_receipts` (VAT rate and payment day of a receipt); 2.87.0 runs on with them.
 
 ## E-invoices (ZUGFeRD / XRechnung) and PDF/A-3
 

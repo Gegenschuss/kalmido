@@ -1096,6 +1096,15 @@ fresh; run p286_e_api "$PY" p286_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2661_b_ui node p2661_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.87.0 (#1983 #1984): organisation boundary of event invitations and list hand-overs (audit T3 H1 + H2)
 fresh; run p287_a_api "$PY" p287_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.90.0 part A (#1921): bookkeeping light (EUeR, VAT return figures, tax reserve, receipt photo)
+fresh; run p290_a_api "$PY" p290_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p290_a_ui node p290_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.90.0 part B (#1921): bank reconciliation (CSV / CAMT import, matching)
+fresh; run p290_b_api "$PY" p290_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p290_b_ui node p290_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.90.0 part C (#1922): tax dates as recurring tasks
+fresh; run p290_c_api "$PY" p290_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p290_c_ui node p290_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

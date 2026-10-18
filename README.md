@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.90.0** (2026-10-18): bookkeeping light in the office - income/expense statement with CSV / PDF, VAT return
+  figures, receipt photo, tax reserve in the cash flow, bank reconciliation (CSV / CAMT) and tax dates as recurring tasks;
+  also without an organisation.
 - **2.89.0** (2026-10-18): Tables - simple spreadsheets whose cells can hold live Kalmido values (project time,
   open tasks, client rates), stored by id and computed with each viewer's rights; selection columns with colours,
   import/export CSV and Excel, agents build whole sheets; rows to tasks, sheet to quotation, list as rows.

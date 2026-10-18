@@ -41,11 +41,14 @@ function rk_cashflowHtml() {
       <span class="rkcfbal ${+r.balance < 0 ? 'neg' : ''}">${tr('Balance')} ${ofcMoney(r.balance)}</span></header>${bars(r)}
       <table class="rkcftab"><thead><tr><th></th><th class="num">${tr('Actual')}</th><th class="num">${tr('Planned')}</th></tr></thead><tbody>
       <tr><th>${tr('In|cashflow')}</th><td class="num">${val(r.month, 'in', 'actual', r.in.actual)}</td><td class="num">${val(r.month, 'in', 'plan', r.in.plan, 'plan')}</td></tr>
-      <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr></tbody></table>
+      <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr>${bk_cfReserveRows(r)}</tbody></table>
       ${rk_cfOpenHtml(r.month)}${k ? rk_cfEntries(k) : ''}</section>`;
   }).join('');
   return bar + `<div class="rkcfms">${cards}</div><p class="muted ofchint">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, sent and accepted quotations without an invoice at the end of their period of service, one version per quotation).')} ${d.basis === 'net' ? tr('Net: documents and fixed costs without VAT; purchases and travel receipts as entered.') : tr('Gross: documents and fixed costs incl. VAT; purchases and travel receipts as entered.')}</p>` + rk_fixedHtml() + fci_checkHtml();
 }
+// 2.90.0 A (#1921): with a tax reserve (Bookkeeping, tax_reserve_pct > 0): the month's reserve and what is free after all reserves so far
+const bk_cfReserveRows = r => r.reserve == null ? '' : `<tr class="bk-cfres"><th>${tr('Tax reserve')}</th><td class="num" colspan="2">${ofcMoney(r.reserve)}</td></tr>
+      <tr class="bk-cffree"><th>${tr('Freely available')}</th><td class="num ${+r.free < 0 ? 'neg' : ''}" colspan="2">${ofcMoney(r.free)}</td></tr>`;
 function rk_cfEntries(k) {
   const [mo, dir, st] = k.split('|');
   const es = (RKF.data.entries || []).filter(e => e.month === mo && e.dir === dir && e.state === st);
