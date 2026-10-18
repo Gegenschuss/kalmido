@@ -45,8 +45,9 @@ const FEAT = 'cal,comments,collab,clients';
   check(w.eval(`PURPOSES.some(p => p[0] === 'office' && /Office & finance/.test(p[2])) && PURPOSE_EXTRA.office.includes('office')`), 'the purpose "Office & finance" exists and switches the module on');
   if (sw) { sw.click(); await until(() => w.eval(`feat('office')`)); }
   check(w.eval(`feat('office')`), 'the switch turns the module on');
-  d.querySelector('.smodal')?.remove(); w.eval('render()'); await sleep(400);
-  check(!!d.querySelector('#side [data-go="office"]'), 'on: sidebar entry');
+  d.querySelector('.smodal')?.remove(); w.eval('render()');
+  // 2.93.1: poll instead of a fixed 400 ms (CI shard twice too slow for the sidebar after render)
+  check(await until(() => !!d.querySelector('#side [data-go="office"]')), 'on: sidebar entry');
 
   // ================= the view (admin)
   w.eval(`go('office/services')`); await until(() => d.querySelector('.office[data-ofctab="services"] .ofcbar'), 60);

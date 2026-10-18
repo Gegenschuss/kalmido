@@ -100,12 +100,13 @@ const lc = (w, id) => w.eval(`listById(${id})?.color || ''`);
   const T = (await call('POST', '/api/tasks', {list_id: L, title: 'Water the roses'})).id;
   await call('PATCH', '/api/tasks/' + T, {ltags: ['urgent']});
   w.__sDelay = 0; await w.eval(`load()`); w.__sDelay = 4000;
+  await sleep(1500);  // 2.93.1: late answers of the steps above settle first (CI shard red twice, Mac green)
   st1 = w.__st;
   w.eval(`optWrite(ltagPut(${L}, 'urgent', 'soon'), () => api('PATCH', '/api/list-tags/${TG}', {name: 'soon'}))`);
   await sleep(250);
   check(w.eval(`listTags(${L}).map(t => t.name).join()`) === 'soon', '#1501: a list tag rename shows at once');
   check(w.eval(`(S.tasks.get(${T})?.ltags || []).join()`) === 'soon', '#1501: the task carries the new tag name at once: ' + w.eval(`(S.tasks.get(${T})?.ltags || []).join()`));
-  check(w.__st === st1, '#1501: list tags without GET /api/state');
+  check(w.__st === st1, '#1501: list tags without GET /api/state' + (w.__st === st1 ? '' : ' (from ' + w.__stk + ')'));
 
   // ================= the list view switches locally
   await sleep(1500);  // 2.80.3: late answers of the steps above settle first (slow CI)
