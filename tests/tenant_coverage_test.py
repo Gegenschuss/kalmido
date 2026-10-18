@@ -167,6 +167,7 @@ ROUTES = {
     # 2.98.0 A (#1953): scheduling polls (p298_a_api_test.py) - routes below this line
     # (2.98.0 spacer A)
     # 2.98.0 B (#1954): questionnaires (p298_b_api_test.py) - routes below this line
+    "GET /api/forms/{}/entries": "form", "GET /api/forms/{}/entries.csv": "form",
     # (2.98.0 spacer B)
     # 2.98.0 C (#2180 #2181): office menu, tables (p298_c_ui.js) - routes below this line
     # (2.98.0 spacer C)
