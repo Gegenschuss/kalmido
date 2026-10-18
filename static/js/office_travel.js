@@ -35,11 +35,13 @@ function rk_travelHtml() {
   if (RK.err) return `<div class="empty">${esc(RK.err)}</div>`;
   if (!RK.data) { if (!RK.loading) setTimeout(rk_load, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (RK.open && rk_trip(RK.open)) return rk_tripHtml(rk_trip(RK.open));
+  const views = `<div class="seg" role="group" aria-label="${esc(tr('View'))}">${[['trips', tr('Trips')], ['logbook', tr('Logbook')], ['report', tr('Evaluation')]].map(([k, n]) => `<button type="button" data-rk="view" data-v="${k}" class="${RK.view === k ? 'on' : ''}" aria-pressed="${RK.view === k}">${n}</button>`).join('')}</div>`;  // 2.93.0 B (#1928): the logbook
+  if (RK.view === 'logbook') return `<div class="ofcbar rkbar">${views}</div>` + lbHtml();
   const y0 = new Date().getFullYear(), years = [y0 + 1, y0, y0 - 1, y0 - 2, y0 - 3].map(String);
   const miss = RK.data.missing || 0;
   const bar = `<div class="ofcbar rkbar"><select id="rk-year" aria-label="${esc(tr('Year'))}"><option value="">${tr('All years')}</option>${years.map(y => `<option ${y === RK.year ? 'selected' : ''}>${y}</option>`).join('')}</select>
     <div class="seg" role="group" aria-label="${esc(tr('Show'))}"><button type="button" data-rk="filter" data-v="all" class="${RK.filter === 'all' ? 'on' : ''}" aria-pressed="${RK.filter === 'all'}">${tr('All')}</button><button type="button" data-rk="filter" data-v="missing" class="${RK.filter === 'missing' ? 'on' : ''}" aria-pressed="${RK.filter === 'missing'}">${tr('Not in DATEV')}${miss ? ` <span class="rkbadge">${miss}</span>` : ''}</button></div>
-    <div class="seg" role="group" aria-label="${esc(tr('View'))}"><button type="button" data-rk="view" data-v="trips" class="${RK.view === 'trips' ? 'on' : ''}" aria-pressed="${RK.view === 'trips'}">${tr('Trips')}</button><button type="button" data-rk="view" data-v="report" class="${RK.view === 'report' ? 'on' : ''}" aria-pressed="${RK.view === 'report'}">${tr('Evaluation')}</button></div>
+    ${views}
     <span class="spacer"></span><button class="btn sm pri" data-rk="new">${ic('plus', 's')}<span>${tr('New trip')}</span></button></div>`;
   return bar + (RK.view === 'report' ? rk_reportHtml() : rk_listHtml());
 }
