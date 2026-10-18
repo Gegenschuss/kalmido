@@ -38,6 +38,7 @@ const WS_VIEWS = {
   'static/js/core.js': 'draw',                // also: the new state reloads the workload tabs (absences, disposition)
   'static/js/chat.js': 'draw',                // team chats of the workspace
   'static/js/agents.js': 'draw',              // agents of the workspace (p2280_ui)
+  'static/js/bookmarks.js': 'draw',           // 2.97.0 (#1950): bookmarks load the shown workspace (bm_sp) unless one is picked in the view
   'static/js/agentchat.js': 'helper',         // the default workspace of a new agent
   'static/js/palette.js': 'draw',
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
