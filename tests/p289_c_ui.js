@@ -88,7 +88,7 @@ const item = (d, re) => [...d.querySelectorAll('[role="menuitem"]')].find(b => r
   check(pt.list_id === L && pt.title === 'Plan', 'imported into the list ' + JSON.stringify([pt.list_id, pt.title]));
   w.close();
 
-  check(!errs().length, 'no script errors ' + errs().slice(0, 3).join(' | '));
+  check(!errs.length, 'no script errors ' + errs.slice(0, 3).join(' | '));
   console.log(`p289_c_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
