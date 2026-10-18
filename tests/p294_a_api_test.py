@@ -260,9 +260,10 @@ r = A.post(B + "/api/admin/agents", json={"username": "teambot", "display_name":
 TB, TH = r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
 A.patch(B + f"/api/admin/agents/{TB}", json={"org_id": ORG})
 A.patch(B + f"{O}/agents/{TB}", json={"office_drafts": True})
-for who in (A, Bo):  # the team agent works for people who share a list with it
-    lid = who.post(B + "/api/lists", json={"name": "Shared with the team bot", "org_id": ORG}).json()["id"]
-    r = who.put(B + f"/api/lists/{lid}/members", json={"user_id": TB, "role": "edit"})
+# the team agent works for people who share a list with it: one list of Alice and Bob, shared with it
+lid = A.post(B + "/api/lists", json={"name": "Shared with the team bot", "org_id": ORG}).json()["id"]
+for u, role in ((BOB, "admin"), (TB, "edit")):  # Bob a list admin: the list is open to his agents
+    r = A.put(B + f"/api/lists/{lid}/members", json={"user_id": u, "role": role})
     assert r.ok, r.text
 r = ag("GET", "/leads", h=TH, params={"requested_by": BOB})
 check(r.status_code == 403 and "admins" in r.text, f"#1930: a team agent acting for a member of the office: 403 (leads are for admins) {r.status_code} {r.text[:200]}")
