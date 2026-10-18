@@ -38,7 +38,7 @@ def p61a_thumb_fill(c):
     below = int(st.get("below") or 2 ** 62)
     rows = c.execute("""SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
                         WHERE d.node_id < ? AND d.state='done' AND COALESCE(d.thumb, '')='' AND n.deleted_at IS NULL
-                          AND (LOWER(n.mime)='application/pdf' OR LOWER(n.mime) LIKE 'image/%' OR LOWER(n.name) LIKE '%.pdf')
+                          AND (LOWER(n.mime)='application/pdf' OR LOWER(n.mime) LIKE 'image/%' OR LOWER(n.name) LIKE '%.pdf')  -- pg-ok: LOWER() on the column
                         ORDER BY d.node_id DESC LIMIT ?""", (below, FILL_N)).fetchall()  # pg-ok: LOWER() on the column only
     if not rows:
         gset(c, FILL_KEY, json.dumps({"done": 1}))
