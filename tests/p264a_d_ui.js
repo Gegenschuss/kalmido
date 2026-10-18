@@ -54,18 +54,26 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
     '#1817: the encryption overview gets "Encrypted in the browser (lists with a lock)" ' + JSON.stringify(sc));
 
   await firefox(async ({cmd, ev: ev0, nav, ctx, shot}) => {
+    const UP = `typeof E2E === 'object' && typeof S === 'object' && !!S.booted`;
     // 2.87.0: the slow CI runner sometimes reloads the page between two steps: a ReferenceError (E2E / S not yet defined) waits for the boot and retries
     const ev = async expr => { for (let i = 0; ; i++) { try { return await ev0(expr); } catch (e) {
       if (i >= 2 || !/ReferenceError: \w+ is not defined/.test(e.message)) throw e;
-      for (let k = 0; k < 75 && !(await ev0(`typeof E2E === 'object' && !!(window.S && S.booted)`).catch(() => false)); k++) await sleep(200); } } };
+      for (let k = 0; k < 75 && !(await ev0(UP).catch(() => false)); k++) await sleep(200); } } };
     const waitFor = async (expr, n = 80) => { for (let i = 0; i < n; i++) { const v = await ev(expr).catch(() => null); if (v) return v; await sleep(250); } return null; };
-    const boot = async hash => { await nav(B + 'static/icon.svg'); await nav(B + hash); await waitFor('!!(window.S && S.booted)'); await sleep(500); };
+    // 2.88.1 (CI): the second boot sometimes ends on a page without the app (E2E never defined, also after 45 s of waiting) - the
+    // app is up only when its globals are there (S is a const: window.S never exists); otherwise say where the page is and load again
+    const boot = async hash => {
+      for (let a = 0; a < 3; a++) {
+        await nav(B + 'static/icon.svg'); await nav(B + hash);
+        if (await waitFor(UP, 60)) { await sleep(500); return; }
+        console.log('p264a_d_ui: no app after loading ' + hash + ' (try ' + (a + 1) + '): ' + await ev0(`[location.href, document.readyState, document.title, document.scripts.length, typeof S, typeof E2E].join(' | ')`).catch(e => e.message));
+      }
+    };
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); return 1; })()`);
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 800, height: 760}});
     await boot('#l/' + L);
-    for (let i = 0; i < 75 && !(await ev(`typeof E2E === 'object'`).catch(() => false)); i++) await sleep(200);  // 2.80.3: e2e.js is an on-demand module (slow CI)
     // every visible button / switch inside el has a name (aria-label, text or title)
     const unnamed = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(b => b.offsetParent && !(b.getAttribute('aria-label') || b.textContent.trim() || b.title || b.labels?.[0]?.textContent.trim())).map(b => b.outerHTML.slice(0, 120))`);
     // the stubs of the data layer (part C) and of the person's keys (e2e.js): recorded calls in window.__c
@@ -164,7 +172,6 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
 
     // ---- display: marks, placeholder, detail, the bar
     await boot('#l/' + L);
-    for (let i = 0; i < 75 && !(await ev(`typeof E2E === 'object'`).catch(() => false)); i++) await sleep(200);  // 2.87.0: as after the first boot (CI: E2E is not defined)
     await stub({list_id: L, mode: 'on', gen: 1, rotate: 0, can_manage: true, keys: [{gen: 1}], members: people, pending: [], agents: [], blockers: [], left: {}});
     await setList({e2e: 'on', e2e_gen: 1, e2e_rotate: 0, e2e_pending: 0, e2e_mine: true});
     check(await waitFor(`!!document.querySelector('#side [data-list="${L}"] .le2um, #side .srow[data-list="${L}"] .le2um')`), '#1817: the lock at the list name in the sidebar');
