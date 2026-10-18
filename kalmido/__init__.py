@@ -58,6 +58,7 @@ ORDER = (
     "accounts.onboarding",
     "accounts.users",
     "accounts.orgs",
+    "accounts.spacemove",  # 2.96.0 (#1941): the shared rules of moving data between the private space and an organisation (no routes)
     "accounts.tenancy",
     "accounts.orglists",  # 2.35.0 (#1101)
     "accounts.useradmin",  # 2.88.0 (#1980)
@@ -125,6 +126,7 @@ ORDER = (
     "sheets.core",  # 2.89.0 (#1916): sheets, columns, rows, cells, agent batches (no routes; used by sheets.web and part C/D)
     "sheets.web",  # 2.89.0 (#1916): the routes of the tables area (/api/sheets)
     "sheets.step2",  # 2.89.0 (#1916, D): step 2 -- rows to tasks / quotation, a list as rows (by button)
+    "sheets.shmove",  # 2.96.0 B (#1941): a table to the other workspace (private <-> organisation)
     "collab.teamchat",
     "collab.msgsearch",  # 2.33.0 (#1080)
     "collab.chatsave",  # 2.37.0 (#1159)
@@ -138,9 +140,11 @@ ORDER = (
     "collab.liste2efile",  # 2.64.2 B (#1817): files of lists with the lock, encrypted with the list key
     "collab.liste2echan",  # 2.64.2 C (#1817): the list channel (team chat of a list) with the lock
     "wiki.wikie2e",  # 2.64.3 (#1817): the lock per knowledge space (path + text encrypted in the browser)
+    "wiki.wkmove",  # 2.96.0 B (#1941): wiki pages and folders to the other workspace (private <-> organisation)
     "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
+    "files.fsmove",  # 2.96.0 A (#1941): files, folders and documents to the other workspace (private <-> organisation)
     "files.v1",  # 2.48.0 (#1207): the file store in the REST API (files:read / files:write)
     "files.photometa",  # 2.61.0 B (#1819): photo metadata (GPS, camera) removed on upload (no routes; files/upsafe.py)
     "files.upsafe",  # 2.61.0 (#1818 #1819 #1820): the shared upload path - scan, metadata, text recognition (no routes)

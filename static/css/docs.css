@@ -97,3 +97,10 @@
   border-radius: .5rem; background: var(--accent-soft); margin-bottom: .5rem; }
 .rc-acts { display: flex; gap: .4rem; }
 .rc-acts .btn { min-height: 2.5rem; }
+/* 2.96.0 A (#1941): choosing documents (to move them into the other workspace) */
+.dc-card>button{position:relative}
+.dc-card.dc-on>button{border-color:var(--accent);box-shadow:inset 0 0 0 .125rem var(--accent)}
+.dc-selmark{position:absolute;top:.5rem;left:.5rem;z-index:1;display:flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border:.125rem solid var(--accent);border-radius:50%;background:var(--bg)}
+.dc-on .dc-selmark{background:var(--accent);color:var(--accent-ink)}
+.dc-selbar{position:sticky;bottom:.75rem;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.75rem;padding:.5rem .75rem;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--bg2);box-shadow:0 .25rem 1rem rgba(0,0,0,.12)}
+.dc-selbar .btn,.dc-selbar .iconbtn{min-height:2.75rem}

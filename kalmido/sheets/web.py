@@ -65,6 +65,8 @@ def sheets_get(sid):
     c = db()
     r = sh_need(c, sid)
     d = sh_dict(c, r)
+    from .shmove import shm_last  # 2.96.0 B (#1941): the last move between workspaces (both sides see it)
+    d["moved"] = shm_last(c, sid)
     c.commit()  # sheet_lastvals of the viewer
     return jsonify(d)
 

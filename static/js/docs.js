@@ -53,6 +53,7 @@ function dc_filterGo(k, v) {
 function p61b_dcReset() {
   DC.seq++; clearTimeout(DC.poll);
   Object.assign(DC, {docs: null, total: 0, review: 0, waiting: 0, facets: null, set: null, err: null, loading: false, ws: null, atWs: null, more: false,
+    sel: new Map(), selOn: false,  // 2.96.0 A (#1941): a choice of the old workspace goes
     f: {sender: '', type: '', tag: '', from: '', to: '', review: false}});
   const md = $('.dc-md');
   if (md && DC.doc && !wsObjIn(DC.doc)) { if (dc_hashId()) history.replaceState(null, '', '#docs'); md.remove(); }
@@ -87,7 +88,7 @@ function viewDocs() {
       <div class="seg dc-seg" role="tablist"><button type="button" role="tab" data-dc="all" aria-selected="${!DC.f.review}">${tr('All')}</button><button type="button" role="tab" data-dc="review" aria-selected="${DC.f.review}">${tr('To review')}${DC.review ? ` <span class="dc-count">${DC.review}</span>` : ''}</button></div>
       <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${DC.more || active}">${ic('search', 's')} ${tr('Filter')}</button>
       <span class="dc-acts2"><label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt" hidden></label>
-      <button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
+      ${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
     </div>
     ${DC.more || active ? `<div class="dc-filters">${sel('sender', fc.senders, N_('Sender'))}${sel('type', fc.types, N_('Document type'))}${sel('tag', fc.tags, N_('Tag'))}
       <span class="dc-range">${tr('from')} ${dateIn('dc-ffrom', DC.f.from, {label: tr('from'), attrs: 'data-dcf="from"'})}</span><span class="dc-range">${tr('to')} ${dateIn('dc-fto', DC.f.to, {label: tr('to'), attrs: 'data-dcf="to"'})}</span>
@@ -97,14 +98,14 @@ function viewDocs() {
   if (DC.err) body = `<div class="empty">${ic('alert')}<span>${esc(DC.err)}</span></div>`;
   else if (!DC.docs) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
   else if (!DC.docs.length) body = `<div class="empty nempty dc-empty">${ic('file')}<span>${DC.q || active || DC.f.review ? tr('No documents found') : tr('Drop PDFs or photos of letters here, or add them with the button. Kalmido reads the text, finds date and amount and sorts them.')}</span></div>`;
-  else body = `<ul class="dc-grid" aria-label="${esc(tr('Documents'))}">${DC.docs.map(dc_card).join('')}</ul>${DC.total > DC.docs.length ? `<p class="muted">${esc(tr('{0} of {1} shown, narrow the search', DC.docs.length, DC.total))}</p>` : ''}`;
+  else body = `<ul class="dc-grid" aria-label="${esc(tr('Documents'))}">${DC.docs.map(dc_card).join('')}</ul>${DC.total > DC.docs.length ? `<p class="muted">${esc(tr('{0} of {1} shown, narrow the search', DC.docs.length, DC.total))}</p>` : ''}${dc_smvBar()}`;
   return `<div class="dc-view">${head}${body}<div class="dc-drop" aria-hidden="true"><span>${ic('plus')} ${tr('Drop to add as documents')}</span></div></div>`;
 }
 function dc_card(d) {
   const thumb = d.thumb ? `<img src="/api/docs/${d.id}/thumb?v=${esc(d.updated_at || '')}" alt="" loading="lazy">` : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`;
   const st = d.state === 'done' ? '' : `<span class="dc-st ${esc(d.state)}">${esc(tr(DC_STATE[d.state] || d.state))}</span>`;
   const meta = [d.date ? dc_day(d.date) : '', d.type?.name || '', d.asn ? `${DC.set?.asn_prefix || 'ASN'} ${d.asn}` : ''].filter(Boolean).map(esc).join(' · ');
-  return `<li class="dc-card${d.review ? ' rev' : ''}"><button type="button" data-dco="${d.id}" aria-label="${esc(d.name)}">
+  return `<li class="dc-card${d.review ? ' rev' : ''}${DC.selOn && DC.sel.has(d.id) ? ' dc-on' : ''}"><button type="button" data-dco="${d.id}" aria-label="${esc(d.name)}"${DC.selOn ? ` aria-pressed="${DC.sel.has(d.id)}"` : ''}>${DC.selOn ? `<span class="dc-selmark" aria-hidden="true">${DC.sel.has(d.id) ? ic('check', 's') : ''}</span>` : ''}
     <span class="dc-th">${thumb}</span><span class="dc-ct"><b class="dc-nm">${esc(d.sender?.name || d.name)}</b>
     <span class="dc-mt">${meta}${d.amount ? ` · ${esc(dc_money(d.amount, d.currency))}` : ''}</span>
     ${d.tags.length ? `<span class="dc-tags">${d.tags.map(t => `<span class="dc-tag">${esc(t.name)}</span>`).join('')}</span>` : ''}
@@ -179,6 +180,7 @@ function dc_mdDraw(md) {
         <button type="button" class="btn sm" data-dc="view">${ic('eye', 's')} ${tr('Show')}</button>
         <a class="btn sm" href="${dc_fileUrl(d, true)}" download>${ic('archive', 's')} ${tr('Download')}</a>
         ${d.parent_id ? `<a class="btn sm" href="#ablage/${d.parent_id}" data-dc="close">${ic('folder', 's')} ${tr('Show in the file store')}</a>` : ''}
+        ${w && smv_can(d.org_id) ? `<button type="button" class="btn sm" data-dc="space">${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''}
         ${w ? `<button type="button" class="btn sm danger" data-dc="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}
       </div></div>
     <p class="dc-state ${esc(d.state)}" role="status">${esc(tr(DC_STATE[d.state] || d.state))}${d.state === 'failed' && d.error_text ? `: ${esc(d.error_text)}` : ''}${d.method === 'ocr' ? ` · ${tr('text recognition')}` : ''}
@@ -243,6 +245,7 @@ async function dc_mdClick(e) {
   const b = e.target.closest('[data-dc]'); if (!b || !DC.doc) return;
   const d = DC.doc, a = b.dataset.dc, md = b.closest('.dc-md');
   if (a === 'close') { md.remove(); return; }
+  if (a === 'space') { if (await dc_smvMove(new Map([[d.id, d.org_id || null]]), `“${d.name}”`)) md.remove(); return; }  // 2.96.0 A (#1941)
   if (a === 'view') {
     if (dc_isPdf(d) && typeof pdfView === 'function') pdfView({url: dc_fileUrl(d), name: d.name, size: d.size, dlUrl: dc_fileUrl(d, true)});
     else if (/^image\//.test(d.mime) && typeof attLightbox === 'function') window.open(dc_fileUrl(d), '_blank', 'noopener');
@@ -419,6 +422,7 @@ let dc_qTimer = null;
 document.addEventListener('click', e => {
   const v = e.target.closest('.dc-view'); if (!v) return;
   const o = e.target.closest('[data-dco]');
+  if (o && DC.selOn) { dc_smvToggle(+o.dataset.dco); return; }  // 2.96.0 A (#1941): choosing, not opening
   if (o) { history.replaceState(null, '', `#docs/${o.dataset.dco}`); dc_open(+o.dataset.dco); return; }
   const b = e.target.closest('[data-dc]'); if (!b) return;
   const a = b.dataset.dc;
@@ -449,3 +453,60 @@ document.addEventListener('drop', e => {
   dc_upload(e.dataTransfer.files);
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && DC.waiting) dc_pollSet(); });
+
+// ---- 2.96.0 A (#1941): choose documents (one, several, or every one the filters find) and move them into the other workspace
+// (private <-> organisation): into the documents folder there, with sender, type and tags. ONE undo step (back to the old folders).
+DC.sel = new Map();  // id -> org_id of the chosen documents (also those beyond the shown page: "Select all")
+DC.selOn = false;
+const DC_SMV_MAX = 2000;  // the server's limit per move (accounts/spacemove.py SMV_MAX)
+const dc_smvBtn = () => DC.docs?.length ? `<button type="button" class="btn sm ${DC.selOn ? 'on' : ''}" data-dcsel="mode" aria-pressed="${DC.selOn}">${ic('check', 's')} <span>${tr('Select')}</span></button>` : '';
+function dc_smvToggle(id) {
+  const d = (DC.docs || []).find(x => x.id === id); if (!d) return;
+  if (DC.sel.has(id)) DC.sel.delete(id); else DC.sel.set(id, d.org_id || null);
+  dc_draw();
+}
+function dc_smvBar() {
+  if (!DC.selOn) return '';
+  const n = DC.sel.size, orgs = new Set(DC.sel.values()), from = orgs.size === 1 ? [...orgs][0] : null;
+  return `<div class="dc-selbar" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="dc-seln" aria-live="polite">${esc(tr('{0} selected', n))}</span>
+    ${n < DC.total ? `<button type="button" class="linkbtn" data-dcsel="all">${esc(tr('Select all {0}', DC.total))}</button>` : `<button type="button" class="linkbtn" data-dcsel="none">${tr('Select none')}</button>`}<span class="spacer"></span>
+    ${orgs.size <= 1 && smv_can(from) ? `<button type="button" class="btn sm" data-dcsel="space" ${n ? '' : 'disabled'}>${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''}
+    <button type="button" class="iconbtn" data-dcsel="off" aria-label="${esc(tr('Cancel'))}" title="${esc(tr('Cancel'))}">${ic('x')}</button></div>`;
+}
+async function dc_smvAll() {  // every document the search and the filters find (page by page, at most DC_SMV_MAX)
+  const p = dc_params(), out = new Map();
+  p.set('facets', '0'); p.set('limit', '200');
+  for (let off = 0; off < DC_SMV_MAX; off += 200) {
+    p.set('offset', String(off));
+    let j; try { j = await api('GET', '/api/docs?' + p); } catch { return; }
+    for (const d of j.docs || []) out.set(d.id, d.org_id || null);
+    if ((j.docs || []).length < 200) break;
+  }
+  if (DC.total > DC_SMV_MAX) toast(tr('Too many at once: at most {0}', DC_SMV_MAX));
+  DC.sel = out; dc_draw();
+}
+async function dc_smvMove(sel, what) {
+  const orgs = new Set(sel.values());
+  if (orgs.size !== 1) { toast(tr('Choose items of one workspace')); return null; }
+  const ids = [...sel.keys()], from = [...orgs][0];
+  let last = null;
+  const r = await smv_open({what, from,
+    check: async to => { try { return await rawFetch('POST', '/api/files/move-space', {ids, to: smv_ws(to), parent: 'docs', dry: 1}); } catch (x) { return {block: x.message || tr('The check failed. Please try again.')}; } },
+    run: to => { last = {ids, to: smv_ws(to), parent: 'docs'}; return api('POST', '/api/files/move-space', last); }});
+  if (!r?.moved || !last) return null;
+  DC.sel = new Map(); DC.selOn = false; DC.facets = null;
+  dc_load();
+  const req = async b => { try { await api('POST', '/api/files/move-space', b); } catch { /* shown */ } DC.facets = null; dc_load(); return {}; };
+  const back = {items: r.moved.map(m => ({id: m.id, parent: m.parent_was, name: m.name_was})), to: smv_ws(r.org_was)}, again = last;
+  offerUndo(tr('Moved to {0}', wsName(r.to)), histAdd({label: tr('Move to another workspace'), undo: () => req(back), redo: () => req(again)}));
+  return r;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-dcsel]'); if (!b || !b.closest('.dc-view')) return;
+  const a = b.dataset.dcsel;
+  if (a === 'mode') { DC.selOn = !DC.selOn; DC.sel = new Map(); dc_draw(); }
+  else if (a === 'off') { DC.selOn = false; DC.sel = new Map(); dc_draw(); }
+  else if (a === 'all') dc_smvAll();
+  else if (a === 'none') { DC.sel = new Map(); dc_draw(); }
+  else if (a === 'space') dc_smvMove(DC.sel, trn('{0} document', '{0} documents', DC.sel.size));
+});

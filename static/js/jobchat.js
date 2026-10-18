@@ -154,3 +154,133 @@ document.addEventListener('toggle', e => {
   const j = (S.jobs?.items || []).find(x => x.id === +d.dataset.jid);
   if (d.open && j) { const t = S.jth[j.id]; if (!t || !t.msgs) jth_load(j); else { d.outerHTML = jth_html(j); } }
 }, true);
+
+// ---- 2.96.0 C (#2015): one card per job in the agent chat. The messages of a job (job_id, the "Job #N" start, or the
+// agent's answer to a message of mine addressed to the job) become ONE card at the place of the job's newest message: name
+// (a part job "Leader / Name"), version (from the title), state (from the job: S.jc.jobs, filled by the chat answer's
+// jobs), the first line of the newest message, its time. A tap unfolds the job's messages under it (open / closed kept
+// per device). Always visible: approval / permission questions (any message with buttons stays its own row), the end
+// result and errors (under the card, 5 lines + "Show more"). The kind of a message: job_msg of the server, else read from
+// the text (a leading ✅ = result, ⚠️ ⏰ ⏹ = error). A filter above the messages: All / Only me and <agent> / Jobs
+// (kept per device; on a phone a menu). The folded rows stay in the page (hidden), so search and reply quotes find them
+// (jcd_reveal unfolds). Without a single job: no filter, the chat as before. A job's own history (?job=) has no cards.
+S.jcd = {map: new Map(), n: 0, more: new Set()};
+const JCD_KINDS = ['say', 'question', 'result', 'error'];
+const JCD_SHOW = new Set(['result', 'error']);
+const JCD_RES_RE = /^\s*✅/, JCD_ERR_RE = /^\s*(?:⚠|⏰|⏹)/;
+const JCD_VER_RE = /\d+\.\d+(?:\.\d+)?[a-z]?/;
+const JCD_ST = {running: N_('running'), waiting: N_('waiting'), done: N_('finished'), failed: N_('Error'), stopped: N_('stopped')};
+const JCD_ADDR_RE = /^\s*@?(?:job\s*#?|#)(\d+)\s*:/i;
+function jcd_kind(m) {
+  if (JCD_KINDS.includes(m.job_msg)) return m.job_msg;
+  const b = m.body || '';
+  return JCD_RES_RE.test(b) ? 'result' : JCD_ERR_RE.test(b) ? 'error' : 'say';
+}
+// the jobs of the chat answer ({id: {...}}) into the known jobs, without losing what the job list knows of them
+function jcd_put(jobs) { for (const x of Object.values(jobs || {})) if (x && x.id) S.jc.jobs[x.id] = {...S.jc.jobs[x.id], ...x}; }
+// the job a message of mine is addressed to ("Job 82: …", "#82: …", "Clara: …"; the way the agent's service reads it)
+function jcd_addr(body) {
+  const b = String(body || ''), x = JCD_ADDR_RE.exec(b); if (x) return +x[1];
+  const low = b.trimStart().toLowerCase().replace(/^@/, '');
+  let best = 0;
+  for (const j of Object.values(S.jc.jobs)) if (j.name && j.id > best && (!S.chat.aid || !j.agent_id || +j.agent_id === +S.chat.aid) && low.startsWith(j.name.toLowerCase() + ':')) best = +j.id;
+  return best;
+}
+// the job card a message belongs to (0 = a row of its own)
+function jcd_jobOf(m, byId) {
+  if (m.from !== 'agent' || m.kind === 'notice' || m.choices) return 0;
+  const jb = ux_jobOf(m); if (jb) return jb.no;
+  const q = m.reply_to && byId.get(m.reply_to);
+  return q && q.from !== 'agent' ? jcd_addr(q.body) : 0;
+}
+const jcd_filter = () => S.chat.job || !S.jcd.n ? 'all' : LS.get('jcdFilt', 'all');
+const jcd_open = no => !!LS.get('jcdOpen', {})[no];
+function jcd_setOpen(no, on) {
+  const o = LS.get('jcdOpen', {}); if (on) o[no] = 1; else delete o[no];
+  const ks = Object.keys(o); if (ks.length > 200) ks.sort((a, b) => a - b).slice(0, ks.length - 200).forEach(k => delete o[k]);
+  LS.set('jcdOpen', o);
+}
+// chatMsgs(): the rows (row = the html of one message) with the job messages gathered into cards and the filter applied
+function jcd_rows(a, row) {
+  const ms = S.chat.msgs;
+  if (S.chat.job) { S.jcd.map = new Map(); return ms.map(row); }
+  const byId = new Map(ms.map(m => [m.id, m])), of = new Map(), per = new Map(), last = new Map();
+  ms.forEach((m, i) => {
+    const no = jcd_jobOf(m, byId); if (!no) return;
+    of.set(m.id, no); if (!per.has(no)) per.set(no, []); per.get(no).push(m); last.set(no, i);
+  });
+  S.jcd.map = of; S.jcd.n = per.size;
+  if (!per.size) return ms.map(row);
+  const f = jcd_filter(), out = [];
+  ms.forEach((m, i) => {
+    const no = of.get(m.id);
+    if (no) { if (f !== 'me' && last.get(no) === i) out.push(jcd_cardHtml(no, per.get(no), row)); return; }
+    if (f === 'all' || m.choices || (f === 'me' ? true : m.from !== 'agent' && m.kind !== 'notice' && jcd_addr(m.body))) out.push(row(m));
+  });
+  if (!out.length) out.push(`<div class="muted cmempty" data-k="jcdempty">${esc(tr('No messages yet.'))}</div>`);
+  return out;
+}
+function jcd_line(body) {
+  const l = String(body || '').split('\n').map(x => x.replace(/^[\s#>*_`-]+/, '').replace(/[*_`]+/g, '').trim()).find(Boolean) || '';
+  return l.length > 160 ? l.slice(0, 159) + '…' : l;
+}
+function jcd_cardHtml(no, list, row) {
+  const j = S.jc.jobs[no] || {}; if (!S.jc.jobs[no]) jc_need(no);
+  const src = list.map(ux_jobOf).find(x => x && x.no === no) || {};
+  const name = j.name || src.name || '', pj = +j.parent_id || src.parent || 0;
+  const pname = pj ? j.parent_name || S.jc.jobs[pj]?.name || src.pname || '' : '';
+  const jb = {no, parent: pj, name, pname};
+  const hid = list.filter(m => !JCD_SHOW.has(jcd_kind(m))), vis = list.filter(m => JCD_SHOW.has(jcd_kind(m)));
+  const lm = list[list.length - 1], lk = jcd_kind(lm);
+  const st = j.state || (lk === 'result' ? 'done' : lk === 'error' ? 'failed' : '');
+  const ver = j.version ?? (JCD_VER_RE.exec(j.title || '') || [''])[0];
+  const label = (pname && !name.toLowerCase().startsWith(pname.toLowerCase()) ? pname + ' / ' : '') + (name || tr('Job #{0}', no));
+  const open = hid.length > 0 && jcd_open(no), hd = `<span class="jcdt"><i class="jcddot" aria-hidden="true"></i><b>${esc(label)}</b>${ver ? `<span class="jcdv">${esc(ver)}</span>` : ''}${st ? `<span class="jcdst st-${esc(st)}">${esc(tr(JCD_ST[st] || st))}</span>` : ''}<time>${esc(fmtWhen(lm.created_at))}</time>${hid.length ? ic('chev', 's') : ''}</span><span class="jcdl">${esc(jcd_line(lm.body))}</span>`;
+  const head = hid.length
+    ? `<button type="button" class="jcdh" data-jca="tog" data-jcd="${no}" aria-expanded="${open}" aria-controls="jcdh-${no}" title="${esc(tr(open ? 'Show less' : 'Show more'))}">${hd}</button>`
+    : `<div class="jcdh">${hd}</div>`;
+  return `<div class="jcd${open ? ' open' : ''}${jn9_part(jb) ? ' jpart' : ''}${st === 'failed' || st === 'stopped' ? ' jcderr' : ''}" data-k="jcd${no}" data-jcd="${no}" style="--jcol:${jn9_jobColor(jb)}">${head}${hid.length ? `<div class="jcdhist" id="jcdh-${no}"${open ? '' : ' hidden'}>${hid.map(row).join('')}</div>` : ''}${vis.map(m => jcd_resHtml(m, row)).join('')}</div>`;
+}
+// the end result / an error under the card: 5 lines, "Show more" for longer ones
+function jcd_resHtml(m, row) {
+  const b = String(m.body || ''), long = b.split('\n').length > 5 || b.length > 400, more = S.jcd.more.has(m.id);
+  return `<div class="jcdres${long && !more ? ' jcdclamp' : ''}${jcd_kind(m) === 'error' ? ' jcdx' : ''}">${row(m)}${long ? `<button type="button" class="linkbtn jcdmore" data-jca="more" data-jm="${m.id}" aria-expanded="${more}">${esc(tr(more ? 'Show less' : 'Show more'))}</button>` : ''}</div>`;
+}
+function jcd_filtHtml() {
+  if (S.chat.job || !S.jcd.n) return '<div class="jcdfilt" id="jcd-filt" hidden></div>';
+  const f = jcd_filter(), a = agentById(S.chat.aid), t = tr('Filter');
+  const opts = [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['jobs', tr('Jobs')]];
+  return `<div class="jcdfilt" id="jcd-filt"><div class="jcdseg" role="group" aria-label="${esc(t)}">${opts.map(([k, l]) => `<button type="button" data-jca="filt" data-f="${k}" aria-pressed="${f === k}">${esc(l)}</button>`).join('')}</div><select class="jcdsel" data-jca="filtsel" aria-label="${esc(t)}">${opts.map(([k, l]) => `<option value="${k}"${f === k ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
+}
+// after every chat patch (agentchat.js chatPatch): the filter follows (shown once a job is in the chat)
+function jcd_patch() {
+  const b = $('#jcd-filt'), h = jcd_filtHtml(); if (b && b.outerHTML !== h) b.outerHTML = h;
+}
+function jcd_setFilter(f) {
+  if (!['all', 'me', 'jobs'].includes(f)) return;
+  LS.set('jcdFilt', f); chatPatch({bottom: true}); jcd_patch();
+}
+// search hits / reply quotes / pins (collab.js msgJump): a message in a folded card or hidden by the filter comes into view
+function jcd_reveal(id) {
+  const no = S.jcd.map.get(+id), m = S.chat.msgs.find(x => x.id === +id);
+  let ch = false;
+  if (jcd_filter() !== 'all' && m) { const r = document.querySelector(`#chat-msgs [data-mid="a:${+id}"]`); if (!r) { LS.set('jcdFilt', 'all'); ch = true; } }
+  if (no && m && !JCD_SHOW.has(jcd_kind(m)) && !jcd_open(no)) { jcd_setOpen(no, true); ch = true; }
+  if (ch) { chatPatch({keep: true}); jcd_patch(); }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-jca]'); if (!b || b.tagName === 'SELECT' || !b.closest('#chat-msgs, #jcd-filt')) return;
+  const box = $('#chat-msgs');
+  if (b.dataset.jca === 'filt') return jcd_setFilter(b.dataset.f);
+  // unfold / fold / more: the tapped card stays where it is on the screen (no jump to the bottom)
+  const k = b.dataset.jca === 'tog' ? `.jcdh[data-jcd="${b.dataset.jcd}"]` : `.jcdmore[data-jm="${b.dataset.jm}"]`, y0 = b.getBoundingClientRect().top;
+  if (b.dataset.jca === 'tog') jcd_setOpen(+b.dataset.jcd, !jcd_open(+b.dataset.jcd));
+  else if (b.dataset.jca === 'more') { const id = +b.dataset.jm; if (S.jcd.more.has(id)) S.jcd.more.delete(id); else S.jcd.more.add(id); }
+  else return;
+  const top = box ? box.scrollTop : 0;
+  chatPatch({keep: true});
+  const n = box && box.querySelector(k);
+  if (box) { box.scrollTop = top + (n ? n.getBoundingClientRect().top - y0 : 0); S.chat.pin = chatNear(box); }
+  n?.focus({preventScroll: true});
+});
+document.addEventListener('change', e => { if (e.target.matches?.('select[data-jca="filtsel"]')) jcd_setFilter(e.target.value); });
