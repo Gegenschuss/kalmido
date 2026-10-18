@@ -283,8 +283,12 @@ r = A.delete(B + f"/api/lists/{P}")
 check(r.ok, "project deleted " + r.text[:200])
 d = get(A, SID)
 check(cell(d, "H1")["error"] == "deleted" and cell(d, "H1")["last_value"] == "2", "alice: deleted + her last value " + json.dumps(cell(d, "H1"))[:300])
-bf = cell(get(Bo, SID), "H1")
-check(bf["error"] == "deleted" and bf["last_value"] is None, "bob: deleted, no last value (he never saw it)")
+db_ = get(Bo, SID)
+bf = cell(db_, "H1")
+# 2.89.0 (#1916): review 7 - who never saw the value gets "No access" (as for a hidden source), not "Source deleted"
+check(bf["error"] == "denied" and bf["last_value"] is None, "bob: denied, no last value (he never saw it) " + json.dumps(bf)[:200])
+check(not any(x.get("deleted") for x in db_["sources"]) and not any(x.get("deleted") for x in bf["sources"]),
+      "review 7: bob's source overview does not say 'deleted' either")
 
 # ---- a table attached to a list follows the list
 W = A.post(B + "/api/lists", json={"name": "Garden", "org_id": ORG}).json()["id"]
