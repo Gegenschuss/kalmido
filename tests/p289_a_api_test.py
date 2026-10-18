@@ -397,5 +397,17 @@ d = A.get(B + f"/api/sheets/{RR}")
 check(d.ok and _time.time() - _t0 < 10, f"review 3: GET answers quickly ({_time.time() - _t0:.1f} s)")
 check((cell(d.json(), "A3") or {}).get("value") == 20100, "review 3: the sum of a range is still right " + json.dumps(cell(d.json(), "A3"))[:200])
 
+# ---- 2.89.0 (#1916): review 4 - deep nesting is a formula error (400), never a 500
+RN = A.post(B + "/api/sheets", json={"title": "Review nesting", "space": "private"}).json()["id"]
+for raw, what in (("=" + "(" * 300 + "1" + ")" * 300, "300 brackets"), ("=" + "-" * 2000 + "1", "2000 minus signs"),
+                  ("=" + "+".join(["1"] * 400), "400 terms in a chain"), ("=" + "SUMME(" * 100 + "1" + ")" * 100, "100 functions")):
+    r = setv(A, RN, "A1", raw)
+    check(r.status_code == 400 and "error" in r.json(), f"review 4: {what}: 400 " + str(r.status_code) + " " + r.text[:120])
+r = setv(A, RN, "A2", "=" + "(" * 40 + "2" + ")" * 40 + "+" + "+".join(["1"] * 100))
+check(r.ok and (cell(get(A, RN), "A2") or {}).get("value") == 102, "review 4: 40 brackets and 100 terms still work " + r.text[:200])
+_csv = ("Formel\r\n=" + "(" * 300 + "1" + ")" * 300 + "\r\n").encode()
+r = A.post(B + "/api/sheets/import", data={"space": "private"}, files={"file": ("deep.csv", _csv)})
+check(r.status_code in (201, 400), "review 4: importing a deep formula: no 500 " + str(r.status_code))
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
