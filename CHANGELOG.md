@@ -7,7 +7,7 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-## [2.89.1] - 2026-10-18
+## [2.89.2] - 2026-10-18
 
 Freelancer parity, an office menu in four groups, import targets you confirm, Paperless-ngx in the settings and a round of polish.
 
@@ -44,6 +44,13 @@ Freelancer parity, an office menu in four groups, import targets you confirm, Pa
 ### Fixed
 - The Paperless-ngx import progress no longer stops when the settings are closed and opened again; it asks again after a lost
   answer and reports when it is done (#1938).
+
+## [2.89.1] - 2026-10-18
+
+CI fixes of 2.89.0.
+
+### Fixed
+- Tests: the workspace guard and the route scan know the tables; a task-detail UI test waits for the loaded state (#1916).
 
 ## [2.89.0] - 2026-10-18
 

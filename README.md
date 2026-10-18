@@ -20,7 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
-- **2.89.1** (2026-10-18): before every import Kalmido names the target and asks (*Rather to private*), Paperless-ngx in the
+- **2.89.2** (2026-10-18): before every import Kalmido names the target and asks (*Rather to private*), Paperless-ngx in the
   settings, an office menu in four groups, organisation pictures, smoother dragging everywhere, freelancer parity guard.
 - **2.89.0** (2026-10-18): Tables - simple spreadsheets whose cells can hold live Kalmido values (project time,
   open tasks, client rates), stored by id and computed with each viewer's rights; selection columns with colours,
