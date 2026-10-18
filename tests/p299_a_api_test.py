@@ -263,10 +263,12 @@ check(r.ok and Ca.get(B + f"/api/wiki/files/{some}").ok, "#2182: Redo of the imp
 r = Ca.post(B + "/api/wiki/e2e/start", json={"space": SP2, "keys": []})
 check(r.status_code == 409 and "have files" in r.json().get("error", ""), "#2182: a space with files cannot be locked yet " + r.text[:200])
 # review M2: files in the trash do not block the lock (they are deleted for good when it is switched on)
-r = Ca.post(B + "/api/wiki/trash", json={"files": U["files"]})
+allf = [f["id"] for p in Ca.get(B + "/api/wiki", params={"space": SP2}).json()["pages"]
+        for f in Ca.get(B + f"/api/wiki/pages/{p['id']}").json().get("files", [])]
+r = Ca.post(B + "/api/wiki/trash", json={"ids": [], "files": allf})
 r2 = Ca.post(B + "/api/wiki/e2e/start", json={"space": SP2, "keys": []})
-check(r.ok and r2.status_code == 409 and "have files" not in r2.json().get("error", ""), "#2182: trashed files do not block the lock " + r2.text[:200])
-Ca.post(B + "/api/wiki/restore", json={"files": U["files"]})
+check(r.ok and allf and r2.status_code == 409 and "have files" not in r2.json().get("error", ""), "#2182: trashed files do not block the lock " + r2.text[:200])
+Ca.post(B + "/api/wiki/restore", json={"ids": [], "files": allf})
 cpages = {p["path"]: p["id"] for p in Ca.get(B + "/api/wiki", params={"space": SP2}).json()["pages"]}
 sql("INSERT INTO wiki_spaces(org_id, e2e, e2e_gen) VALUES(?, 'on', 1)", (ORG2,), write=True)
 r = Ca.post(B + f"/api/wiki/pages/{cpages['Projekte/Plan']}/files", files={"file": ("x.pdf", PDF, "application/pdf")})
