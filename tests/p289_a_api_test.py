@@ -367,5 +367,21 @@ xs, xc = _rows("sheets"), _rows("sheet_cells")
 check(isinstance(xs, list) and {x.get("id") for x in xs} == {DS} and isinstance(xc, list) and len(xc) >= 3,
       f"account export: dave's private table with its cells ({st.get('state')}, {xs if xs is None else len(xs)})")
 
+# ---- 2.89.0 (#1916): review 1 - "&" chains cannot blow text up (each doubling cell would double the text)
+RS = A.post(B + "/api/sheets", json={"title": "Review texts", "space": "private"}).json()["id"]
+A.post(B + f"/api/sheets/{RS}/rows", json={"count": 14})
+_t0 = _time.time()
+r = put(A, RS, [{"cell": "A1", "raw": "x" * 10000}] + [{"cell": f"A{i}", "raw": f"=A{i - 1}&A{i - 1}"} for i in range(2, 23)])
+check(r.ok, "review 1: the doubling chain is saved " + r.text[:200])
+_t0 = _time.time()
+d = A.get(B + f"/api/sheets/{RS}")
+check(d.ok and _time.time() - _t0 < 10, f"review 1: GET answers quickly ({_time.time() - _t0:.1f} s)")
+a2, a22 = cell(d.json(), "A2") or {}, cell(d.json(), "A22") or {}
+check(a2.get("error") == "type" and a2.get("value") is None and "10000" in (a2.get("error_text") or "").replace(".", "").replace(",", ""),
+      "review 1: the cell over the limit shows 'text too long' " + json.dumps(a2)[:200])
+check(a22.get("error") == "type" and a22.get("value") is None, "review 1: ... and the cells built on it an error " + json.dumps(a22)[:200])
+check(len(d.text) < 2_000_000, f"review 1: the answer stays small ({len(d.text)} bytes)")
+check(setv(A, RS, "B1", "=1+1").ok, "review 1: saving afterwards works")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
