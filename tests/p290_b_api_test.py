@@ -218,6 +218,11 @@ rows = j.get("rows") or []
 check(r.ok and j["fmt"] == "camt" and j["count"] == 2 and j["skipped"] == 1 and rows[0]["amount"] == "1000.00" and rows[0]["counterpart"] == "Kunde Eins GmbH"
       and rows[0]["iban"] == "DE89370400440532013000" and rows[0]["ref"] == "REF-0001" and rows[1]["amount"] == "-59.50" and rows[1]["counterpart"] == "Druckerei Beispiel"
       and rows[1]["purpose"] == "Flyer Auftrag 77" and rows[2]["error"], "camt: credit / debit, counterpart, IBAN, reference, another currency refused " + r.text[:400])
+# 2.90.0 (#1921, review): a declared ISO-8859-1 encoding does not garble umlauts (the client sends text); 0.004 is no amount
+L1 = CAMT.replace('encoding="UTF-8"', 'encoding="ISO-8859-1"').replace("Kunde Eins GmbH", "Müller Größe").replace(">59.50<", ">0.004<")
+j = A.post(B + K + "/import/preview", json={"text": L1, "filename": "latin.xml"}).json()
+rows = j.get("rows") or []
+check(rows and rows[0]["counterpart"] == "Müller Größe" and rows[1]["error"], f"camt: declared ISO-8859-1 keeps umlauts, 0.004 refused {str(rows)[:300]}")
 BAD = '<?xml version="1.0"?><!DOCTYPE x [<!ENTITY e "boom">]><Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08"><Ntry>&e;</Ntry></Document>'
 check(A.post(B + K + "/import/preview", json={"text": BAD}).status_code == 400 and A.post(B + K + "/import", json={"text": BAD}).status_code == 400, "camt: DOCTYPE / ENTITY refused")
 check(A.post(B + K + "/import/preview", json={"text": '<Document xmlns="urn:camt.053"><Ntry'}).status_code == 400, "camt: broken XML is 400")
@@ -306,6 +311,15 @@ check(Do.post(B + f"{K}/tx/{pout['id']}/match", json={"kind": "invoice", "id": I
 check(Er.get(B + K + "/tx?state=all").json()["items"] == [] and Er.post(B + f"{K}/tx/{pout['id']}/match", json={"kind": "private"}).status_code == 404
       and Er.post(B + f"{K}/tx/{pin['id']}/unmatch").status_code == 404, "personal office: another person sees and reaches nothing (404)")
 check(not any(t["id"] in (pin["id"], pout["id"]) for t in A.get(B + K + "/tx?state=all").json()["items"]), "personal office: not in an organisation's list")
+
+# 2.90.0 (#1921, review): a booking dated tomorrow cannot pay an invoice yet (409 with its own reason, not a date error)
+import datetime as _dt
+TOM = (_dt.date.today() + _dt.timedelta(days=1)).isoformat()
+FUT = CAMT.replace(DAY[4], TOM).replace("REF-0001", "REF-FUT1").replace("Teilzahlung", "Vorgemerkt")
+Do.post(B + K + "/import", json={"text": FUT, "filename": "future.xml"})
+ft = next((t for t in Do.get(B + K + "/tx").json()["items"] if t["day"] == TOM and float(t["amount"]) > 0), None)
+r = Do.post(B + f"{K}/tx/{ft['id']}/match", json={"kind": "invoice", "id": PI["id"]}) if ft else None
+check(ft and r.status_code == 409 and ("future" in r.text or "Zukunft" in r.text), f"future booking: match refused with its own reason {r.text[:200] if r is not None else ft}")
 
 if SKIPS:
     print("skipped:", "; ".join(SKIPS))
