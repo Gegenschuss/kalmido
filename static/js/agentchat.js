@@ -144,7 +144,7 @@ function chatNoticeHtml(m) {
 // shows the earlier versions (time + text). Not fetched by the agent yet: the text is simply replaced; fetched or answered:
 // the agent gets the event message_edited and answers it as a correction.
 function chatEditHtml(m) {
-  return `<div class="cbub tcedit"><textarea class="ach-edit" aria-label="${esc(tr('Edit message'))}" rows="2">${esc(m.body || '')}</textarea><div class="tcebtn"><button type="button" class="btn sm" data-act="chat-ed-cancel">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-act="chat-ed-save" data-mid="${m.id}">${tr('Save')}</button></div></div>`;
+  return `<div class="cbub tcedit"><textarea class="ach-edit" enterkeyhint="enter" aria-label="${esc(tr('Edit message'))}" rows="2">${esc(m.body || '')}</textarea><div class="tcebtn"><button type="button" class="btn sm" data-act="chat-ed-cancel">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-act="chat-ed-save" data-mid="${m.id}">${tr('Save')}</button></div></div>`;
 }
 function chatEditedHtml(m) {
   const n = (m.edits || []).length;
@@ -184,7 +184,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if (!e.target.classList?.contains('ach-edit')) return;
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); chatEditSave(S.chat.edit); }
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) { e.preventDefault(); chatEditSave(S.chat.edit); }  // 2.94.0 (#2024)
   else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); chatEditEnd(); }
 }, true);
 document.addEventListener('input', e => { if (e.target.classList?.contains('ach-edit')) autosize(e.target); });
@@ -634,7 +634,7 @@ function chatInner(aid) {
     ${chatStepsLiveHtml()}
     <div class="mtgcards" id="chat-mtg">${mtg_cardsHtml(a.id)}</div>
     <div class="cfiles chfiles" id="chat-files">${chatFilesHtml(a.id)}</div>
-    ${replyBarHtml('a:' + a.id)}<div class="chcomp"><button type="button" class="iconbtn chclip" data-act="chat-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}" ${a.enabled ? '' : 'disabled'}>${ic('clip')}</button>${mtg_btnHtml(a)}<input type="file" id="chat-file" multiple hidden><textarea id="chat-in" rows="1" placeholder="${esc(jc_ph(a))}" aria-label="${esc(jc_ph(a))}" ${a.enabled && !jc_ended() ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><button class="btn sm pri" data-act="chat-send" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button></div>`;
+    ${replyBarHtml('a:' + a.id)}<div class="chcomp"><button type="button" class="iconbtn chclip" data-act="chat-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}" ${a.enabled ? '' : 'disabled'}>${ic('clip')}</button>${mtg_btnHtml(a)}<input type="file" id="chat-file" multiple hidden><textarea id="chat-in" rows="1" enterkeyhint="enter" placeholder="${esc(jc_ph(a))}" aria-label="${esc(jc_ph(a))}" ${a.enabled && !jc_ended() ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><button class="btn sm pri" data-act="chat-send" title="${esc(chatKeyHint())}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button></div>`;
 }
 function chatViewHtml(aid) {
   if (S.chat.aid !== +aid) { S.chat = {aid: +aid, msgs: [], err: null}; setTimeout(chatLoad, 0); }
@@ -741,7 +741,7 @@ async function chatSend() {
 for (const ev of ['pointerdown', 'mousedown']) document.addEventListener(ev, e => { if (document.activeElement?.id === 'chat-in' && e.target.closest?.('#chat-new, [data-act="chat-send"], .chclip')) e.preventDefault(); });
 document.addEventListener('keydown', e => {
   if (e.target.id !== 'chat-in') return;
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); chatSend(); }
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) { e.preventDefault(); chatSend(); }  // 2.94.0 (#2024)
   if (e.key === 'Escape' && !isMobile()) { e.preventDefault(); chatClose(); }
 }, true);
 document.addEventListener('input', e => { if (e.target.id === 'chat-in') { S.drafts['chat:' + S.chat.aid] = e.target.value; autosize(e.target); } });

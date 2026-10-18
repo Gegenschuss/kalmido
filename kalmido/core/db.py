@@ -777,7 +777,7 @@ LV_AREAS = (
     ("agentchat", re.compile(r"^/api/(agents/\d+/chat|v1/agent/chats|v1/agents/\d+/chat)")),
     ("team", re.compile(r"^/api/(v1/)?team")),
     ("office", re.compile(r"^/api/(v1/)?(office|clients)")),
-    ("calendar", re.compile(r"^/api/(v1/)?(events|evcals|cal/|calendars)")),
+    ("calendar", re.compile(r"^/api/(v1/)?(events|evcals|cal/|calendars|appt/)")),  # 2.94.0 B (#1929): + the booking page settings
     ("news", re.compile(r"^/api/(v1/)?news")),
     ("tasks", re.compile(r"^/api/(v1/)?(tasks|lists|sections|folders|batch|projects|tags)")),
     ("budget", re.compile(r"^/api/budget")),  # 2.72.0 (#1333): the household budget (the open budget view reloads)

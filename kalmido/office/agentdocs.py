@@ -38,7 +38,7 @@ OFA_ITEM_KEYS = ("kind", "service_id", "text", "detail", "qty", "unit", "price",
 OFA_DATA_KEYS = ("client_id", "title", "intro", "items", "list_id")
 OFA_CONF = ("high", "medium", "low")
 OFA_MASTER = ("services", "texts", "contracts")
-OFA_LOG_TARGETS = ("office", "services", "texts", "contracts", "clients", "docs", "doc", "pdf", "offer", "invoice", "reminder", "payment")
+OFA_LOG_TARGETS = ("office", "services", "texts", "contracts", "clients", "docs", "doc", "pdf", "offer", "invoice", "reminder", "payment", "leads")  # 2.94.0 A (#1930): + leads
 # link buttons in the chat (agents/chat.py): only the office document view, a list, and a document's PDF preview -- no other
 # app route (some do something when opened), no outside address
 NOTIFY_HREF_RE = re.compile(r"^(#office/offers/\d{1,12}|#l/\d{1,12}|/api/office/docs/\d{1,12}/pdf\?inline=1)$")

@@ -509,3 +509,19 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
   .lgb-list .lgb-row{align-items:flex-start;padding:.625rem .75rem}
   .lgb-bar select{max-width:100%;flex:1 1 8rem}
 }
+/* 2.94.0 A (#1930): leads (prefix lead-) */
+.pipcols{grid-template-columns:repeat(5,minmax(0,1fr))}
+.lead-card .lead-next{display:flex;gap:.25rem;align-items:flex-start;font-size:.875rem;overflow-wrap:anywhere}
+.lead-card .lead-next svg{flex:none;margin-top:.125rem}
+.lead-fu{display:inline-flex;gap:.25rem;align-items:center;color:var(--muted)}
+.lead-fu.due,.lead-duen{color:var(--accent);font-weight:600}
+.ppcard.lead-due{border-left:.1875rem solid var(--accent)}
+.lead-cnt{font-size:.875rem;align-self:center}
+.lead-pv{max-height:50vh;overflow:auto;list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.25rem}
+.lead-pv li{display:flex;flex-direction:column;padding:.375rem .5rem;border:1px solid var(--line2);border-radius:var(--radius)}
+.lead-pv li.lead-dup,.lead-pv li.lead-err{opacity:.6}
+.lead-pv .lead-why{color:var(--muted)}
+.lead-pv li.lead-err .lead-why{color:var(--danger,#c0392b)}
+.lead-match{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.375rem}
+.lead-mbtn{width:100%;justify-content:flex-start;min-height:2.75rem;text-align:left}
+@media (max-width:899px){.pipcols{grid-template-columns:1fr}.ofcbar .lead-tb{min-height:2.75rem}}

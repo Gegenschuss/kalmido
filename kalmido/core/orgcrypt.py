@@ -71,7 +71,8 @@ FIELDS = {
     "office_doc_templates": ("body",), "office_gen_docs": ("body",),  # 2.93.0 A (#1927): document templates, documents
     "office_vehicles": ("plate",), "office_drives": ("start_place", "dest", "purpose"),  # 2.93.0 B (#1928): the logbook
     "office_drive_log": ("prev",),  # 2.93.0 B (#1928): the change log of the logbook
-    "office_deals": ("value", "contact", "note", "lost_reason"),  # 2.50.0 (#1196): the sales pipeline
+    "office_deals": ("value", "contact", "note", "lost_reason",
+                     "next_step", "email", "phone", "company"),  # 2.50.0 (#1196): the sales pipeline; 2.94.0 A (#1930): leads
     "hub_absences": ("kind", "note"),  # 2.50.0 (#1195): the kind of an absence (sick leave = health data) and its note
     # 2.72.0 (#1333): the household budget -- per row with the key of its list's space (column sid, life/budget.py bud_enc;
     # the passes of admin/orgcrypt_cli.py call life/budget.py bud_settle, not fields_pass: these tables have no org_id)

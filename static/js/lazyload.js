@@ -12,14 +12,15 @@ const LD_MODS = {
     'office_pipeline', 'office_kpi', 'office_datev', 'officeagents', 'office_packs',
     'office_books', 'office_bank', 'office_taxdates',  // 2.90.0 (#1921, #1922)
     'office_recurring', 'office_subs',  // 2.91.0 (#1923, #1924)
-    'office_agreements', 'office_assets'],  // 2.92.0 (#1925, #1931)  // 2.76.0 A (#1023): office_packs
+    'office_agreements', 'office_assets',  // 2.92.0 (#1925, #1931)
+    'office_leads'],  // 2.94.0 A (#1930)  // 2.76.0 A (#1023): office_packs
   // 2.65.0 (#1823): more areas load on first use (the start loads about a third less)
   agentchat: ['agentchat', 'agentsetup'],
   pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview
   mindmap: ['mindmap'],
   wiki: ['wiki'],
   stats: ['stats'],
-  calendar: ['calview', 'caldrag'],
+  calendar: ['calview', 'caldrag', 'apptbook'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings
   docs: ['docs', 'paperless', 'receipts'],
   life: ['life'],
   integrations: ['integrations'],
@@ -38,7 +39,7 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   // 2.65.0 (#1823)
   agentchat: ['chatOpen', 'chatClose', 'chatPop', 'chatDock', 'chatFloatMin', 'apvJump', 'chatChoice', 'shareDest', 'chatFileRm', 'chatReact',
     'chatModeMenu', 'stepsAlways', 'stepsLive', 'chatEditStart', 'chatOlder', 'chatSend', 'chatBottom', 'chatDraw', 'agModal', 'agDraw', 'aiuLoad', 'ains_setupModal'],
-  pdf: ['pdfView', 'dpvOpen', 'dpvSumMount'], calendar: ['calColorPop', 'cg_commit'], docs: ['dc_shareFiles', 'dc_filterGo', 'pl_importActive', 'pl_openSettings'],  // 2.87.9 (#1934)
+  pdf: ['pdfView', 'dpvOpen', 'dpvSumMount'], calendar: ['calColorPop', 'cg_commit', 'apbOpen'], docs: ['dc_shareFiles', 'dc_filterGo', 'pl_importActive', 'pl_openSettings'],  // 2.87.9 (#1934); 2.94.0 B (#1929): apbOpen
   life: ['contractModal', 'deviceModal', 'upkeepModal', 'healthModal', 'tripModal'], integrations: ['pubWire'],
   playbook: ['pbMount', 'pbOpen', 'pbNewsOpen'], timeline: ['rmSet']};
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
