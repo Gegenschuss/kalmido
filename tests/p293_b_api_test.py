@@ -222,8 +222,8 @@ check([v["id"] for v in Ca.get(B + V).json()["vehicles"]] == [VX], "another orga
 check(Ca.get(B + DR + f"?vehicle_id={VP}&year=2026").status_code == 404 and Ca.get(B + DR + "?year=2026").json()["drives"] == [], "another organisation: no drives, a foreign vehicle 404")
 for m, p in (("patch", f"{V}/{VP}"), ("patch", f"{DR}/{D1}"), ("delete", f"{DR}/{D1}"), ("post", f"{DR}/{D3}/restore"), ("get", f"{DR}/{D1}/log"), ("post", f"{DR}/{D1}/trip")):
     check(getattr(Ca, m)(B + p, json={} if m != "get" else None).status_code == 404, f"another organisation: {m} {p} 404")
-check(Ca.get(B + LB + "/report?year=2026").json()["vehicles"] == [] and not any(x["key"] == "km" for x in Ca.get(B + "/api/office/books/euer?year=2026").json()["expenses"]),
-      "another organisation: an empty report, no EUeR line")
+check([v["id"] for v in Ca.get(B + LB + "/report?year=2026").json()["vehicles"]] == [VX] and not any(x["key"] == "km" for x in Ca.get(B + "/api/office/books/euer?year=2026").json()["expenses"]),
+      "another organisation: only its own vehicle in the report, no EUeR line")
 for path in (f"{DR}/{D1}/log", f"{V}"):
     check(requests.get(B + path, headers=AGH).status_code == 403, f"agent: 403 on {path} (with data)")
 
