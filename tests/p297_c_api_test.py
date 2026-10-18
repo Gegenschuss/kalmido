@@ -204,6 +204,12 @@ check(mv(Bo, what="clients", ids=[OC], to="private", dry=1).status_code == 403, 
 r = Bo.post(B + "/api/clients", json={"name": "Bobs Kunde", "org_id": ORG})
 BC = r.json()["id"]
 check(mv(Bo, what="clients", ids=[BC], to="private", dry=1).ok, "a plain member may move a client of their own")
+r = A.post(B + D, json={"project_title": "Fremder Entwurf", "client_id": BC})
+assert r.status_code == 201, r.text
+r = mv(Bo, what="clients", ids=[BC], to="private", dry=1, copy_issued=1)
+j = r.json()
+check(r.ok and j["count"]["drafts"] == 0 and j["count"]["copied"] == 1 and any("somebody else" in n for n in j["notes"]) and any("Only an admin" in n for n in j["notes"]),
+      "a plain member: the drafts of others stay with the client (it is created anew), no copies " + r.text[:300])
 check(mv(A, what="clients", ids=[P1], to=f"org:{BETA}", dry=1).status_code == 409, "another organisation (not a member): 409")
 check(mv(Fr, what="clients", ids=[P1], to=f"org:{BETA}", dry=1).status_code == 404, "somebody else's client: 404")
 check(requests.post(B + MV, json={"what": "clients", "ids": [OC], "to": "private"}, headers=AGH).status_code == 403, "an agent: 403")
