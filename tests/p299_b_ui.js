@@ -67,7 +67,7 @@ const FEAT = 'cal,comments,collab,agents,wiki';
     await wait(ev, `!!document.querySelector('#pop:not(.hidden) [role="menuitem"]')`);
     const items = await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim())`);
     check(items && ['Export as ZIP', 'Import ZIP…'].every(t => items.some(x => x.includes(t))), '1440: #2183 the header menu has export and import ' + JSON.stringify(items));
-    check(await ev(`(document.querySelector('#pop').textContent || '').includes('Area')`), '1440: #2183 under the heading "Area"');
+    check(await ev(`(document.querySelector('#pop').textContent || '').includes('Space')`), '1440: #2183 under the heading "Space"');
     await shot('p299-b-1440-wiki-menu.png');
     await ev(`(() => { closePop(); return 1; })()`);
     // the page menu: hidden until the title row is hovered or focused (desktop)

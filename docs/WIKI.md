@@ -20,7 +20,7 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
 - **Templates.** Pages under `Templates/` are offered as the start of a new page.
 - **Saving** is automatic. When someone else saved the page in between, you choose which version stays.
 - **Undo.** Creating, renaming, deleting and importing are one step each (the arrow on top, Ctrl/Cmd+Z, the toast).
-- **Export / import.** The "…" menu in the header (section *Area*) exports a space as a ZIP of `.md` files in folders (the format of
+- **Export / import.** The "…" menu in the header (section *Space*) exports a space as a ZIP of `.md` files in folders (the format of
   SilverBullet and similar tools) and imports such a ZIP: only Markdown files, at most 2000 files, 1 MB each and 30 MB
   in total; pages with an existing name are skipped unless you replace them. Paths with `..` are refused.
 - **Mind maps in pages.** A fenced block with the language `mindmap` draws its Markdown list as a mind map:
