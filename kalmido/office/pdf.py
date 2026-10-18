@@ -309,6 +309,24 @@ class _Page:
         self.ops.append(f"q {w:.2f} 0 0 {h:.2f} {x:.2f} {A4_H - y - h:.2f} cm /{name} Do Q")
 
 
+def qac_sig_block_h(rows):
+    """2.99.0 C (#2195): the height of the signature box of qac_sig_block for rows."""
+    return 16 + 14 + len(rows) * 12 + 18
+
+
+def qac_sig_block(p, y, rows, head, foot, accent):
+    """2.99.0 C (#2195): the box of a simple electronic signature at y (the signed document of office.doctpl, the
+    quotation accepted online): head in the accent colour, rows [(label, value)], a closing line."""
+    p.rect(PDF_L, y, PDF_CW, qac_sig_block_h(rows), C_RULE, stroke=True, lw=0.6)
+    p.text(PDF_L + 10, y + 9, head.upper(), 7.4, True, accent, spacing=0.8)
+    yy = y + 26
+    for a, b in rows:
+        p.text(PDF_L + 10, yy, a, 8.4, False, C_INK2)
+        p.text(PDF_L + 120, yy, b, 8 if len(b) > 40 else 8.6, True, C_INK)
+        yy += 12
+    p.text(PDF_L + 10, yy + 2, foot, 7.6, False, C_INK2)
+
+
 def pdf_image_object(raw):
     """Logo bytes (PNG / JPEG / WebP / GIF / BMP) -> (width px, height px, stream dict entries, stream data) for an
     image XObject: RGB 8 bit, transparency composed on white, FlateDecode. None when Pillow cannot read it."""
@@ -976,7 +994,11 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         sg = str(m["signature"])
         sl = [sg, ""] + [str(x) for x in (m.get("signature_name"), co.get("name")) if x]
         block(len(sl) * lh + 14, lambda p, y, sl=sl: [p.text(PDF_L, y + 10 + i * lh, s, body, bold=(i == 2)) for i, s in enumerate(sl)])
-    if (m.get("kind") or "offer") == "offer":
+    acc = m.get("accepted") if isinstance(m.get("accepted"), dict) else None
+    if (m.get("kind") or "offer") == "offer" and acc:  # 2.99.0 C (#2195): accepted online -> the signature box instead of the empty lines
+        acc_rows = [(str(x[0]), str(x[1])) for x in acc.get("rows") or [] if isinstance(x, (list, tuple)) and len(x) >= 2]
+        block(8 + qac_sig_block_h(acc_rows), lambda p, y: qac_sig_block(p, y + 8, acc_rows, str(acc.get("head") or ""), str(acc.get("foot") or ""), accent))
+    elif (m.get("kind") or "offer") == "offer":
         half = (PDF_CW - 28) / 2
 
         def draw_accept(p, y):

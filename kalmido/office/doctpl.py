@@ -479,17 +479,10 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     if signed:
         rows = [(tr("Signed by", lg=lang), signed.get("name") or ""), (tr("Time (UTC)", lg=lang), (signed.get("at") or "")[:19].replace("T", " ")),
                 (tr("SHA-256 of the text", lg=lang), signed.get("hash") or "")]
-        bh = 16 + 14 + len(rows) * 12 + 18
+        bh = P.qac_sig_block_h(rows)
         room(bh + 8)
         y += 8
-        page.rect(P.PDF_L, y, P.PDF_CW, bh, P.C_RULE, stroke=True, lw=0.6)
-        page.text(P.PDF_L + 10, y + 9, tr("Simple electronic signature", lg=lang).upper(), 7.4, True, accent, spacing=0.8)
-        yy = y + 26
-        for a, b in rows:
-            page.text(P.PDF_L + 10, yy, a, 8.4, False, P.C_INK2)
-            page.text(P.PDF_L + 120, yy, b, 8 if len(b) > 40 else 8.6, True, P.C_INK)
-            yy += 12
-        page.text(P.PDF_L + 10, yy + 2, tr("Signed through a customer link of {0}.", co.get("name") or "", lg=lang), 7.6, False, P.C_INK2)
+        P.qac_sig_block(page, y, rows, tr("Simple electronic signature", lg=lang), tr("Signed through a customer link of {0}.", co.get("name") or "", lg=lang), accent)  # 2.99.0 C (#2195): shared with accepted quotations
         y += bh
     total = len(pages)
     foot = " · ".join(str(x) for x in [co.get("name") or ""] + list(co.get("lines") or []) + list(co.get("contact_lines") or []) if str(x).strip())
