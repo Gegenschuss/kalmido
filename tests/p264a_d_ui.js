@@ -160,6 +160,7 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
 
     // ---- display: marks, placeholder, detail, the bar
     await boot('#l/' + L);
+    for (let i = 0; i < 75 && !(await ev(`typeof E2E === 'object'`).catch(() => false)); i++) await sleep(200);  // 2.87.0: as after the first boot (CI: E2E is not defined)
     await stub({list_id: L, mode: 'on', gen: 1, rotate: 0, can_manage: true, keys: [{gen: 1}], members: people, pending: [], agents: [], blockers: [], left: {}});
     await setList({e2e: 'on', e2e_gen: 1, e2e_rotate: 0, e2e_pending: 0, e2e_mine: true});
     check(await waitFor(`!!document.querySelector('#side [data-list="${L}"] .le2um, #side .srow[data-list="${L}"] .le2um')`), '#1817: the lock at the list name in the sidebar');
