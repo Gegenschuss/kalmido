@@ -131,8 +131,8 @@ const post = async (url, name, data, type, extra = {}) => {
     const hasC = () => call('GET', `/api/tasks/${T}/timeline`).then(j => (j.items || j.comments || j.timeline || []).filter(x => (x.body || '').includes(`<@${ag.id}>`) && !x.deleted_at && (x.body || '').includes('plan.docx')).length);
     let n = 0; for (let i = 0; i < 40 && !n; i++) { n = await hasC(); if (!n) await sleep(250); }
     check(n === 1, '#1926: the comment mentions the agent and names the file');
-    check(await ready(ev, `!!document.querySelector('.toast') && /Claude/.test(document.querySelector('.toast').textContent)`), '#1926: a toast with undo');
-    await ev(`(() => { const b = [...document.querySelectorAll('.toast button')].find(x => /undo/i.test(x.textContent)); b?.click(); return !!b; })()`);
+    check(await ready(ev, `/Claude/.test(document.querySelector('#toast')?.textContent || '')`), '#1926: a toast with undo');
+    await ev(`(() => { const b = [...document.querySelectorAll('#toast button')].find(x => /undo/i.test(x.textContent)); b?.click(); return !!b; })()`);
     let gone = false; for (let i = 0; i < 40 && !gone; i++) { gone = (await hasC()) === 0; if (!gone) await sleep(250); }
     check(gone, '#1926: undo removes the comment again');
     // ---- Ablage
