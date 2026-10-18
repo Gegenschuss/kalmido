@@ -364,7 +364,9 @@ def sh2_links(c, sheet, uid):
         if r["kind"] == "task":
             t = c.execute("SELECT title, deleted_at, list_id FROM tasks WHERE id=?", (r["target_id"],)).fetchone()
             if not t or t["deleted_at"]:
-                d["deleted"] = True
+                # 2.89.0 (#1916): "deleted" only for whom the task's list is visible (or who made the link), else as denied
+                seen = r["created_by"] == uid or (t and sh_list_ok(c, sheet, uid, t["list_id"]) not in (None, "deleted"))
+                d["deleted" if seen else "denied"] = True
             elif not task_visible(c, r["target_id"], uid) or sh_list_ok(c, sheet, uid, t["list_id"]) in (None, "deleted"):
                 d["denied"] = True
             else:
@@ -372,7 +374,7 @@ def sh2_links(c, sheet, uid):
         else:
             o = c.execute("SELECT number, project_title, org_id FROM office_docs WHERE id=?", (r["target_id"],)).fetchone()
             if not o:
-                d["deleted"] = True
+                d["deleted" if oid or r["created_by"] == uid else "denied"] = True  # 2.89.0 (#1916): no hint without the office
             elif not oid or o["org_id"] != oid:
                 d["denied"] = True
             else:

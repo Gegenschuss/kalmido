@@ -7139,6 +7139,8 @@
   "Tasks your parents give you are here, under the name of their list. Messages come in behind the bell at the top.": "Les tâches que tes parents te donnent sont ici, sous le nom de leur liste. Les messages arrivent sous la cloche en haut.",
   "Tasks your parents give you are here, under the name of their list.": "Les tâches que tes parents te donnent sont ici, sous le nom de leur liste.",
   "Knowledge pages": "Pages de connaissances",
+  "The formula is nested too deeply": "La formule est trop imbriquée",
+  "Too many filled cells (at most {0})": "Trop de cellules remplies (au maximum {0})",
   "Export as CSV": "Exporter en CSV",
   "Export as Excel (.xlsx)": "Exporter en Excel (.xlsx)",
   "Import CSV or Excel…": "Importer CSV ou Excel…",

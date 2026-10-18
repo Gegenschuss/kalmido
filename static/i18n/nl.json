@@ -7139,6 +7139,8 @@
   "Tasks your parents give you are here, under the name of their list. Messages come in behind the bell at the top.": "Taken die je ouders je geven staan hier, onder de naam van hun lijst. Berichten komen binnen bij het belletje bovenaan.",
   "Tasks your parents give you are here, under the name of their list.": "Taken die je ouders je geven staan hier, onder de naam van hun lijst.",
   "Knowledge pages": "Kennispagina's",
+  "The formula is nested too deeply": "De formule is te diep genest",
+  "Too many filled cells (at most {0})": "Te veel gevulde cellen (hoogstens {0})",
   "Export as CSV": "Exporteren als CSV",
   "Export as Excel (.xlsx)": "Exporteren als Excel (.xlsx)",
   "Import CSV or Excel…": "CSV of Excel importeren…",
