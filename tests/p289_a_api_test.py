@@ -200,6 +200,9 @@ check(any(x["option"] == opts[0]["id"] and x["display"] == "Open" for x in sc), 
 sel_addr = next(x["addr"] for x in sc if x["option"] == opts[1]["id"])
 setv(A, SID, "C7", f'=WENN({sel_addr}="Agreed";1;0)')
 check(cell(get(A, SID), "C7")["value"] == 1, "WENN on a select cell's label")
+r = A.patch(B + f"/api/sheets/{SID}/columns/{SEL}", json={"kind": "text"})
+check(r.ok and any(x["raw"] == "Agreed" and x["option"] is None for x in get(A, SID)["cells"] if x["col_id"] == SEL), "select -> text: the labels come back as text")
+check(cell(get(A, SID), "C7")["value"] == 1, "... the formula still counts")
 r = A.post(B + f"/api/sheets/{SID}/columns", json={"title": "Price", "kind": "currency"})
 CUR = r.json()["column"]["id"]
 check(r.json()["column"]["letter"] == "G", "currency column G")
@@ -304,7 +307,8 @@ FL = Fr.post(B + "/api/lists", json={"name": "Beta plans", "org_id": BETA}).json
 check(A.post(B + "/api/sheets", json={"title": "x", "space": f"org:{ORG}", "list_id": FL}).status_code == 404, "attaching another organisation's list: 404")
 PRIV = A.post(B + "/api/lists", json={"name": "Private list", "org_id": None}).json()["id"]
 check(A.post(B + "/api/sheets", json={"title": "x", "space": f"org:{ORG}", "list_id": PRIV}).status_code == 400, "a private list on an organisation's table: 400")
-check(Bo.patch(B + f"/api/sheets/{LS}", json={"list_id": FL}).status_code == 404, "re-attaching to a list one does not see: 404")
+check(Bo.patch(B + f"/api/sheets/{LS}", json={"list_id": None}).status_code == 403, "a member who edits may not detach (that opens it to the space)")
+check(Bo.patch(B + f"/api/sheets/{LS}", json={"title": "Garden plan"}).ok, "... but rename it")
 
 # ---- a private table: its owner only
 r = A.post(B + "/api/sheets", json={"title": "Mine", "space": "private"})

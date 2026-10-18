@@ -149,6 +149,10 @@ CHECKS = {
     "hub_mail_ref": ("SELECT m.id, m.owner_id FROM hub_mails m LEFT JOIN clients cl ON cl.id=m.client_id LEFT JOIN lists l ON l.id=m.list_id "
                      "WHERE m.deleted_at IS NULL AND ((cl.id IS NOT NULL AND cl.org_id IS DISTINCT FROM m.org_id) OR "
                      "(l.id IS NOT NULL AND l.org_id IS DISTINCT FROM m.org_id))"),
+    # 2.89.0 (#1916): a table attached to a list of another workspace (the read layer ignores the attachment: sheets/core.py
+    # sh_list_ok) -- (sheet, who created it; counted only)
+    "sheet_list": ("SELECT s.id, s.created_by FROM sheets s JOIN lists l ON l.id=s.list_id WHERE s.deleted_at IS NULL "
+                   "AND l.org_id IS DISTINCT FROM s.org_id"),
     "hub_token_person": ("SELECT m.org_id, m.user_id FROM hub_tokens m JOIN users u ON u.id=m.user_id WHERE m.org_id IS NOT NULL AND "
                          + _PERSON.format(o="m", m="m")),
 }

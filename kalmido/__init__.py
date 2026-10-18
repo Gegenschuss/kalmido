@@ -119,6 +119,10 @@ ORDER = (
     "collab.notes",
     "wiki.pages",  # 2.49.0 C (#1199): knowledge pages
     "wiki.outline",  # 2.49.0 C (#1201): outline import of the mind map (no storage)
+    "sheets.formula",  # 2.89.0 (#1916): tables -- the formula engine (no routes)
+    "sheets.vars",  # 2.89.0 (#1916): Kalmido variables of formulas, evaluated per viewer (no routes)
+    "sheets.core",  # 2.89.0 (#1916): sheets, columns, rows, cells, agent batches (no routes; used by sheets.web and part C/D)
+    "sheets.web",  # 2.89.0 (#1916): the routes of the tables area (/api/sheets)
     "collab.teamchat",
     "collab.msgsearch",  # 2.33.0 (#1080)
     "collab.chatsave",  # 2.37.0 (#1159)
