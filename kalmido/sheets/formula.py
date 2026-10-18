@@ -25,11 +25,11 @@ SH_FUNCS = {"summe": "sum", "sum": "sum", "mittelwert": "avg", "average": "avg",
 SH_FUNC_NAMES = ("SUMME", "MITTELWERT", "MIN", "MAX", "ANZAHL", "WENN", "RUNDEN", "HEUTE", "TAGE")  # what the completion offers
 SH_BOOLS = {"wahr": True, "true": True, "falsch": False, "false": False}
 SH_VAR_PREFIX = {"projekt": "p", "liste": "l", "kunde": "k"}
-SH_RESERVED = set(SH_FUNCS) | set(SH_BOOLS) | set(SH_VAR_PREFIX) | {"hier"}
+SH_RESERVED = set(SH_FUNCS) | set(SH_BOOLS) | set(SH_VAR_PREFIX) | {"hier", "aufgabe"}  # 2.89.0 (#1916, D): + aufgabe.<id>.<field>
 SH_MAX_DEPTH = 200  # nested references (a longer chain is reported as a cycle rather than overflowing the stack)
 
 _A1 = re.compile(r"\$?([A-Za-z]{1,3})\$?(\d{1,6})(?![\w.$])")
-_IDREF = re.compile(r"\{(c|col|p|l|k):(\d{1,18})\}((?:\.\w+)?)")
+_IDREF = re.compile(r"\{(c|col|p|l|k|t):(\d{1,18})\}((?:\.\w+)?)")
 _IDENT = re.compile(r"[^\W\d]\w*(?:\.\w+)*")
 _NUM = re.compile(r"\d+(?:[.,]\d+)?(?:[eE][+-]?\d+)?|[.,]\d+")
 _DATE_DE = re.compile(r"(\d{1,2})\.(\d{1,2})\.(\d{4})")

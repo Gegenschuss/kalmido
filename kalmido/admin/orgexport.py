@@ -263,6 +263,7 @@ OX_AREAS = (
     ("sheets/columns.json", "sheet_columns", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
     ("sheets/rows.json", "sheet_rows", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
     ("sheets/cells.json", "sheet_cells", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
+    ("sheets/links.json", "sheet_links", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),  # 2.89.0 (#1916, D): carried over by button
     # 2.48.0 (#1111): documents (recognised text, amounts, sender names and rules decrypted); not the learnt models, not the
     # keyed word index (both are rebuilt from the documents), not the forwarding addresses (their token is a secret)
     ("documents/meta.json", "doc_meta", "org_id=?"),

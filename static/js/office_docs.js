@@ -286,7 +286,7 @@ const OFD_ACTIONS = {create: N_('created'), update: N_('changed'), items: N_('po
   finalize: N_('finalised'), duplicate: N_('created as a copy'), cashflow: N_('cash flow choice changed'), delete: N_('deleted'), open: N_('opened'), pdf: N_('PDF opened'), render: N_('preview opened'),
   export: N_('exported'), import: N_('imported'), archive: N_('archived'), upload: N_('uploaded'),
   payment: N_('payment recorded'), payment_delete: N_('payment removed'), send: N_('sent by e-mail'), datev: N_('sent to the DATEV inbox'), undo: N_('import undone'), reminder_fee: N_('reminder fee waived / paid / open again'), recovery_key: N_('recovery key shown'),
-  agent_read: N_('read (agent)'), agent_write: N_('drafted (agent)')};  // 2.51.0 A (#1348)  // 2.42.0 (#828): + recovery_key  // 2.39.1 (#1182): + undo; 2.40.0 (#1368): + reminder_fee
+  agent_read: N_('read (agent)'), agent_write: N_('drafted (agent)'), from_sheet: N_('created from a table')};  // 2.89.0 (#1916, D): + from_sheet  // 2.51.0 A (#1348)  // 2.42.0 (#828): + recovery_key  // 2.39.1 (#1182): + undo; 2.40.0 (#1368): + reminder_fee
 const ofdActText = a => tr(OFD_ACTIONS[a] || a);
 const ofdWhen = iso => { try { return new Date(iso).toLocaleString(LOCALE(), {dateStyle: 'short', timeStyle: 'short'}); } catch { return iso || ''; } };
 function ofdLogHtml(d) {

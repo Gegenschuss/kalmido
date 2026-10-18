@@ -103,7 +103,7 @@ def sh_may(c, uid, r, write=False):
             return not write or role in WRITE_ROLES
         if r["created_by"] != uid:
             return False
-        return (r["owner_id"] == uid) if r["org_id"] is None else acx_org_ok(c, uid, r["org_id"])
+        return (r["owner_id"] == sh_agent_owner(c, uid)) if r["org_id"] is None else acx_org_ok(c, uid, r["org_id"])
     if l is not None:
         role = list_role(c, l["id"], uid)
         return bool(role) and (not write or role in WRITE_ROLES)
@@ -111,6 +111,13 @@ def sh_may(c, uid, r, write=False):
         return r["owner_id"] == uid
     from ..accounts.orgs import user_orgs
     return r["org_id"] in user_orgs(c, uid) and acx_org_ok(c, uid, r["org_id"])
+
+
+def sh_agent_owner(c, uid):
+    """The person a private sheet of agent uid belongs to: a personal agent's owner (they see what it creates for them),
+    else the agent itself. 2.89.0 C (#1916)"""
+    a = c.execute("SELECT owner_id FROM agents WHERE user_id=?", (uid,)).fetchone()
+    return a["owner_id"] if a and a["owner_id"] else uid
 
 
 def sh_need(c, sid, write=False, deleted=False):
@@ -301,8 +308,8 @@ def _ident_internal(c, sheet_row, book, names, val, uid):
     if low in book.slug_col:
         return "{col:%d}" % book.slug_col[low]
     parts = low.split(".")
-    if parts[0] in ("projekt", "liste", "kunde"):
-        typ = {"projekt": "p", "liste": "l", "kunde": "k"}[parts[0]]
+    if parts[0] in ("projekt", "liste", "kunde", "aufgabe"):  # 2.89.0 (#1916, D): + aufgabe.<id>.<field>
+        typ = {"projekt": "p", "liste": "l", "kunde": "k", "aufgabe": "t"}[parts[0]]
         if len(parts) != 3:
             raise BadInput(tr("Unknown name: {0}", val))
         if parts[2] not in sh_fields_of(typ):
@@ -1007,7 +1014,7 @@ def sh_create(c, uid, space, title, list_id=None, columns=None, rows=None, agent
     t = sh_clean_title(title) or tr("Table")
     ts = iso_ms(now_utc())
     sid = insert_id(c, "INSERT INTO sheets(org_id,owner_id,title,list_id,created_by,created_at,updated_at,updated_by,agent_id,agent_batch) "
-                       "VALUES(?,?,?,?,?,?,?,?,?,?)", (oid, None if oid else uid, t, lid, uid, ts, ts, uid, agent_id, batch))
+                       "VALUES(?,?,?,?,?,?,?,?,?,?)", (oid, None if oid else (sh_agent_owner(c, uid) if sh_is_agent(c, uid) else uid), t, lid, uid, ts, ts, uid, agent_id, batch))
     sh_change(c, sid, batch, agent_id, "create")
     cols = columns if columns is not None else [{"title": "", "kind": "text"} for _ in range(SH_START_COLS)]
     if not isinstance(cols, list) or len(cols) > SH_COLS_MAX:
@@ -1150,6 +1157,8 @@ SH_FN_HELP = {"SUMME": N_("Sum of the values (SUM)"), "MITTELWERT": N_("Average 
 
 def sh_index(c, uid, space=None, list_id=None):
     """The sheets uid may read: of a space ("private" | "org:N" | "all") or attached to a list."""
+    agent = sh_is_agent(c, uid)
+    owner = sh_agent_owner(c, uid) if agent else uid  # 2.89.0 C (#1916): a personal agent's private sheets belong to its owner
     if list_id is not None:
         if not list_role(c, list_id, uid):
             raise Denied(404)
@@ -1157,13 +1166,17 @@ def sh_index(c, uid, space=None, list_id=None):
                          (list_id,)).fetchall()
     elif space in (None, "", "all"):
         from ..accounts.orgs import user_orgs
-        orgs = ",".join(str(int(x)) for x in user_orgs(c, uid))
+        if agent:  # 2.89.0 C (#1916): an agent only in its own workspace
+            a = c.execute("SELECT org_id FROM agents WHERE user_id=?", (uid,)).fetchone()
+            orgs = str(int(a[0])) if a and a[0] else ""
+        else:
+            orgs = ",".join(str(int(x)) for x in user_orgs(c, uid))
         lids = [r[0] for r in c.execute("SELECT DISTINCT list_id FROM sheets WHERE deleted_at IS NULL AND list_id IS NOT NULL").fetchall()
                 if list_role(c, r[0], uid)]
         cond = "(org_id IS NULL AND owner_id=?)" + (f" OR org_id IN ({orgs})" if orgs else "")
         if lids:
             cond += f" OR list_id IN ({','.join(str(int(x)) for x in lids)})"
-        rows = c.execute(f"SELECT * FROM sheets WHERE deleted_at IS NULL AND ({cond}) ORDER BY updated_at DESC, id LIMIT 2000", (uid,)).fetchall()
+        rows = c.execute(f"SELECT * FROM sheets WHERE deleted_at IS NULL AND ({cond}) ORDER BY updated_at DESC, id LIMIT 2000", (owner,)).fetchall()
     else:
         oid = sh_space(c, uid, space)
         if oid is None:
@@ -1171,7 +1184,7 @@ def sh_index(c, uid, space=None, list_id=None):
                                             "AND list_id IS NOT NULL").fetchall() if list_role(c, r[0], uid)]
             cond = "owner_id=?" + (f" OR list_id IN ({','.join(str(int(x)) for x in lids)})" if lids else "")
             rows = c.execute(f"SELECT * FROM sheets WHERE deleted_at IS NULL AND org_id IS NULL AND ({cond}) "
-                             f"ORDER BY lower(title), id LIMIT 2000", (uid,)).fetchall()
+                             f"ORDER BY lower(title), id LIMIT 2000", (owner,)).fetchall()
         else:
             rows = c.execute("SELECT * FROM sheets WHERE deleted_at IS NULL AND org_id=? ORDER BY lower(title), id LIMIT 2000",
                              (oid,)).fetchall()

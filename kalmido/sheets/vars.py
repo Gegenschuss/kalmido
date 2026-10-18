@@ -22,11 +22,16 @@ SH_CLIENT_FIELDS = ("satz", "budget_h", "budget_betrag", "zeit_gesamt")
 SH_FIELD_HELP = {"zeit_gesamt": N_("Tracked time in hours"), "aufgaben": N_("Number of tasks"), "offen": N_("Open tasks"),
                  "erledigt": N_("Completed tasks"), "budget_h": N_("Budget in hours"), "satz": N_("Hourly rate"),
                  "budget_betrag": N_("Budget amount")}
-SH_VAR_WORD = {"p": "projekt", "l": "liste", "k": "kunde"}
+SH_VAR_WORD = {"p": "projekt", "l": "liste", "k": "kunde", "t": "aufgabe"}
+# 2.89.0 (#1916, D): aufgabe.<id>.<field> = one task (the rows "list as rows" puts into a sheet); its name is the id (task
+# titles are not unique), the viewer must see the task (participants: only their own) in a list of the sheet's space
+SH_TASK_FIELDS = ("titel", "status", "faellig", "zeit", "zustaendig")
+SH_FIELD_HELP.update({"titel": N_("Title"), "status": N_("Status"), "faellig": N_("Due"), "zeit": N_("Tracked time in hours"),
+                      "zustaendig": N_("Assignee")})
 
 
 def sh_fields_of(typ):
-    return SH_CLIENT_FIELDS if typ == "k" else SH_LIST_FIELDS
+    return SH_CLIENT_FIELDS if typ == "k" else SH_TASK_FIELDS if typ == "t" else SH_LIST_FIELDS
 
 
 def _is_agent(c, uid):
@@ -106,8 +111,58 @@ def sh_client_ok(c, sheet, uid, cid, cache=None):
     return out
 
 
+def sh_task_ok(c, sheet, uid, tid, cache=None):
+    """2.89.0 (#1916, D): the task row (title AS name) when uid may use task tid in this sheet, None (denied) or "deleted"
+    (gone or in the trash)."""
+    from ..core.access import task_visible
+    cache = _cache(c, uid) if cache is None else cache
+    key = ("T", tid, sheet["org_id"])
+    if key in cache:
+        return cache[key]
+    r = c.execute("SELECT id, title AS name, list_id, status, due, assignee_id, assignee_group_id, deleted_at FROM tasks WHERE id=?",
+                  (tid,)).fetchone()
+    if not r:
+        out = "deleted"
+    elif sh_list_ok(c, sheet, uid, r["list_id"], cache) in (None, "deleted") or not task_visible(c, tid, uid):
+        out = None
+    elif r["deleted_at"]:
+        out = "deleted"
+    else:
+        out = r
+    cache[key] = out
+    return out
+
+
+def sh_task_field(c, uid, r, field):
+    """The value of a task's field for viewer uid: text, a date, hours (float) or None."""
+    from ..core.i18n import tr
+    from .formula import sh_parse_date
+    if field == "titel":
+        return r["name"] or ""
+    if field == "status":
+        return tr({0: "Open|report", 2: "Completed", -1: "Won't do"}.get(r["status"], "Open|report"))
+    if field == "faellig":
+        return sh_parse_date(str(r["due"])[:10]) if r["due"] else None
+    if field == "zeit":
+        from ..personal.timetrack import evis, th_sql
+        s = c.execute(f'SELECT COALESCE(SUM(seconds), 0) FROM time_entries WHERE "end" IS NOT NULL AND task_id=? '
+                      f'AND {evis(c, uid, "")} AND {th_sql("")}', (r["id"],)).fetchone()[0]
+        return round((s or 0) / 3600, 2)
+    if field == "zustaendig":
+        if r["assignee_id"]:
+            from ..collab.comments import user_names
+            return user_names(c, [r["assignee_id"]]).get(r["assignee_id"]) or ""
+        if r["assignee_group_id"]:
+            g_ = c.execute("SELECT name FROM groups WHERE id=?", (r["assignee_group_id"],)).fetchone()
+            return g_[0] if g_ else ""
+        return ""
+    raise ShErr("ref")
+
+
 def sh_source(c, sheet, uid, typ, sid):
     """The source row the viewer may use, None (denied) or "deleted"."""
+    if typ == "t":
+        return sh_task_ok(c, sheet, uid, sid)
     if typ == "k":
         return sh_client_ok(c, sheet, uid, sid)
     return sh_list_ok(c, sheet, uid, sid)  # a project that became a list keeps its values (the id decides)
@@ -140,11 +195,15 @@ def sh_sources(c, sheet, uid, typ):
 
 
 def sh_slug_of(c, sheet, uid, typ, sid):
+    if typ == "t":  # 2.89.0 (#1916, D): a task is named by its id (only for a viewer who may use it)
+        return str(sid) if sh_task_ok(c, sheet, uid, sid) not in (None, "deleted") else None
     return next((s for i, s, _ in sh_sources(c, sheet, uid, typ) if i == sid), None)
 
 
 def sh_id_of(c, sheet, uid, typ, slug):
     slug = slug.lower()
+    if typ == "t":
+        return int(slug) if slug.isdigit() and len(slug) < 19 and sh_task_ok(c, sheet, uid, int(slug)) not in (None, "deleted") else None
     return next((i for i, s, _ in sh_sources(c, sheet, uid, typ) if s == slug), None)
 
 
@@ -232,6 +291,8 @@ def sh_var_value(c, sheet, uid, typ, sid, field):
         raise ShErr("denied")
     if typ == "k":
         return sh_client_field(c, sheet, uid, r, field)
+    if typ == "t":
+        return sh_task_field(c, uid, r, field)
     return sh_list_field(c, uid, sid, field)
 
 
