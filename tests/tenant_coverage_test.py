@@ -164,6 +164,14 @@ ROUTES = {
     "GET /api/agents/jobs": "agent", "POST /api/agents/jobs/{}/action": "agent",
     "POST /api/agents/{}/chat/{}/choice": "agent", "PUT /api/agents/{}/permission-mode": "agent",
     "GET /api/agents/{}/chat": "agent", "POST /api/agents/{}/chat": "agent",
+    # 2.98.0 A (#1953): scheduling polls (p298_a_api_test.py) - routes below this line
+    # (2.98.0 spacer A)
+    # 2.98.0 B (#1954): questionnaires (p298_b_api_test.py) - routes below this line
+    # (2.98.0 spacer B)
+    # 2.98.0 C (#2180 #2181): office menu, tables (p298_c_ui.js) - routes below this line
+    # (2.98.0 spacer C)
+    # 2.98.0 D (#2163 #2178 #2184): polish (p298_d_api_test.py) - routes below this line
+    # (2.98.0 spacer D)
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     "GET /api/bookmarks": "bookmark", "POST /api/bookmarks": "bookmark", "GET /api/bookmarks/{}": "bookmark",
     "PATCH /api/bookmarks/{}": "bookmark", "DELETE /api/bookmarks/{}": "bookmark", "POST /api/bookmarks/{}/restore": "bookmark",

@@ -85,6 +85,14 @@ ROUTES = {
     "DELETE /api/my/agents/{}/machines/{}": "agents", "DELETE /api/v1/agent/quota": "agents", "GET /api/agents": "agents",
     "GET /api/agents/jobs": "agents", "GET /api/agents/jobs/{}/steps": "agents", "GET /api/agents/usage": "agents",
     "GET /api/agents/{}/bridges": "agents", "GET /api/agents/{}/chat": "agents",
+    # 2.98.0 A (#1953): scheduling polls (p298_a_api_test.py) - routes below this line
+    # (2.98.0 spacer A)
+    # 2.98.0 B (#1954): questionnaires (p298_b_api_test.py) - routes below this line
+    # (2.98.0 spacer B)
+    # 2.98.0 C (#2180 #2181): office menu, tables (p298_c_ui.js) - routes below this line
+    # (2.98.0 spacer C)
+    # 2.98.0 D (#2163 #2178 #2184): polish (p298_d_api_test.py) - routes below this line
+    # (2.98.0 spacer D)
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     "GET /api/bookmarks": "bookmarks", "POST /api/bookmarks": "bookmarks", "GET /api/bookmarks/{}": "bookmarks",
     "PATCH /api/bookmarks/{}": "bookmarks", "DELETE /api/bookmarks/{}": "bookmarks",
