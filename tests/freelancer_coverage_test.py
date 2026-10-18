@@ -26,7 +26,7 @@ KINDS = {
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
                         "and import in the private space; every GET of the area as the freelancer (no 403 / 5xx)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
-    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py: the personal office (the freelancer is its admin): settings, company "
+    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p295_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless"),
     "files": ("matrix", SUITE + ": the own file store (folders, upload, content, versions) and documents; every GET"),
     "wiki": ("matrix", SUITE + ": knowledge pages in the private space (create, change, search, export, trash)"),
@@ -310,6 +310,7 @@ ROUTES = {
     "POST /api/office/packs/installed/{}/{}/restore": "office", "POST /api/office/packs/validate": "office",
     "POST /api/office/pay-props/{}": "office", "POST /api/office/signoffs/{}/revoke": "office",
     "POST /api/office/trips": "office", "POST /api/office/trips/bill": "office", "POST /api/office/trips/unbill": "office",
+    "POST /api/office/trips/delete": "office", "POST /api/office/trips/import": "office", "POST /api/office/trips/import/preview": "office",  # 2.95.0 B (#1932)
     "POST /api/office/trips/{}/items": "office", "POST /api/office/{}": "office", "POST /api/paperless/import": "office",
     "POST /api/paperless/stop": "office", "POST /api/paperless/zip": "office", "POST /api/paperless/zip/import": "office",
     "POST /api/paperless/zip/part": "office", "POST /api/paperless/zip/stop": "office",

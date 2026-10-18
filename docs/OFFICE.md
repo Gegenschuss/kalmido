@@ -382,6 +382,31 @@ e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addre
 - **Search**: subject, sender and text (a hashed word index, no plain index).
 - **Agents** have no access to filed mails in 2.84 (no API route, no MCP tool).
 
+## Travel expenses: taking over a per diem spreadsheet (2.95)
+
+Office -> On the road -> Travel expenses -> **Take over from Excel** (shown while the trip list is empty and in the
+evaluation) reads a per diem spreadsheet you kept so far (.xlsx, up to 2 MB, at most 30 sheets with 500 rows each).
+Nothing is stored before you confirm.
+
+- **One sheet = one person.** The name comes from the title above the header ("... Arbeitsliste <name> - <year>") or the
+  sheet's name. A person of the office with the same name is taken over as that person, otherwise as a free name; you can
+  change it per sheet in the preview.
+- **One row = one trip.** Columns (German or English headers): `Vom` / `bis` (Excel dates or DD.MM.YYYY), `Start` /
+  `Ende` (times, needed for single days), `Ort` (place; a country in brackets, e.g. "Example town (Netherlands)", sets the
+  country), `Anlass` ("Recherche/Akquise", "Akquise" or "Recherche" = acquisition / research, anything else = a job with
+  the text as project) and `MVA` (the per diem of the row, only compared). A row "Summe" is the sheet's sum.
+- **Cell comments** become the trip's note. A comment with lines like `Czechia: 1 × 21 € + 3 × 32 € = 117 €` (one line
+  per country, "Inland" = Germany) sets the country of every day: the partial-day rates on the first and last day, the full
+  days of the countries in the order of the lines in between. These lines are not copied into the note.
+- **Preview:** every row is recalculated with the BMF rates of its year and compared with the spreadsheet. Status *new*,
+  *hint* (the amount differs, start / end time of a single day missing, no rates for that year), *already there* (same
+  person, same dates, same place; not ticked) or *error* (date not readable). Each sheet shows its sum from the
+  spreadsheet next to the calculated one.
+- **Take over N trips** creates the ticked trips in one step; the toast's **Undo** removes them again (trips whose receipts
+  were billed on to a client meanwhile stay).
+- Hints in comments (e.g. meals paid by the company, an unknown change of country) are never applied automatically: they
+  stay in the note, set meals or days per trip yourself.
+
 ## Subscriptions and tools (2.91)
 
 The office tab "Subscriptions & tools" (office admins; in a personal office its owner) shows every fixed cost marked as a
