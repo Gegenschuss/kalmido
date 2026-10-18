@@ -37,3 +37,54 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
   shows who works where. Changes made by an agent are marked and can be taken back per call in the panel.
 - **Undo.** Every action (a cell, a paste, sorting, a column, a row, creating, renaming, deleting) is one step back (the
   arrow on top, Ctrl/Cmd+Z, the toast). Deleted tables, columns and rows can be restored.
+
+## Formulas, functions and Kalmido variables
+
+A cell holds text, a number, a date - or a formula. A formula starts with `=`.
+
+**Arithmetic:** `+ - * /`, brackets, `19%` (= 0.19), text in `"quotes"` joined with `&`, comparisons `= <> < > <= >=`
+(for `WENN`). Numbers may be typed as `1,5` or `1.5`, dates as `31.12.2026` or `2026-12-31`. A date plus a number is a date
+that many days later; a date minus a date is the number of days.
+
+**Functions** (German names as in German Excel, the English names work too; arguments are split by `;`, a `,` is accepted):
+
+| Function | English | What it does |
+|---|---|---|
+| `SUMME(...)` | `SUM` | sum of the numbers (text and empty cells in a range are left out) |
+| `MITTELWERT(...)` | `AVERAGE` | average |
+| `MIN(...)`, `MAX(...)` | | smallest / largest number |
+| `ANZAHL(...)` | `COUNT` | how many numbers / dates |
+| `WENN(condition; then; else)` | `IF` | e.g. `=WENN(B2="Agreed"; C2; 0)` |
+| `RUNDEN(value; digits)` | `ROUND` | rounds half up |
+| `HEUTE()` | `TODAY` | today's date |
+| `TAGE(end; start)` | `DAYS` | days between two dates |
+
+**References:** `A1`, a range `A1:B5`, a cell's own name (give a cell a name such as `dayrate` and write `=dayrate*8`), and a
+column's name: `=SUMME(amount)` adds every cell of the column "Amount" except the formula's own cell. Formulas are stored
+with internal ids, not with names or addresses: renaming a cell name, a column, a project or a client, or sorting the rows,
+never breaks a formula - it simply shows the new name or address.
+
+**Kalmido variables** bring live numbers from Kalmido into a cell:
+
+| Variable | Fields |
+|---|---|
+| `projekt.<name>.<field>` | `zeit_gesamt` (tracked hours), `aufgaben` (tasks), `offen` (open), `erledigt` (done), `budget_h` (the "Budget h" field) |
+| `liste.<name>.<field>` | the same fields for any list |
+| `kunde.<name>.<field>` | `satz` (hourly rate), `budget_h`, `budget_betrag` (budget amount), `zeit_gesamt` (hours of the client's lists) |
+| `hier.<field>` | the project / list the table is attached to |
+
+`<name>` is the name in lower case with `_` for spaces (`Shoot Berlin` -> `projekt.shoot_berlin`); two equal names get `_2`,
+`_3`. Typing `=` offers every cell name, column, project, list, client and function you may use here, with its current value.
+A cell with a Kalmido variable is marked as such; "Freeze value" keeps the current value as a fixed number (a deliberate
+copy) until you thaw it.
+
+**Who sees what (workspace boundary):** a table lives in an organisation (every member reads and writes it) or in your
+private space (only you). A table attached to a project or list follows that list: whoever sees the list reads the table,
+whoever may change the list edits it. Kalmido variables are calculated **for each viewer**: a colleague who does not see
+the project gets "No access" in that cell - without the project's name and without its value. When you write a formula
+you can only pick sources you see yourself and that belong to the table's workspace (an organisation's table: only that
+organisation's projects, lists and clients). If a source is deleted, the cell shows "Source deleted" and the last value
+*you* saw. Agents see a table only when it is shared with them through a list they are in.
+
+Errors in a cell: "Circular reference" (cells that depend on each other), "Division by zero", "Reference not found" (a
+deleted row / column - Undo brings it back), "Wrong type of value", "Formula error" (a typo; the formula is not saved).
