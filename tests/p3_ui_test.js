@@ -67,8 +67,9 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   st = await call('GET', '/api/state');
   const FB = st.fields.find(f => f.name === 'Budget'), FD = st.fields.find(f => f.name === 'Due to client'), FC = st.fields.find(f => f.name === 'Approved'), FP = st.fields.find(f => f.name === 'Reviewer'), FT = st.fields.find(f => f.name === 'Client');
   check(FB?.options.unit === '€' && FB.pinned === 1 && FD && FC && FP && FT, 'number (unit, pinned), date, checkbox, person, text fields created');
-  // third pin refused with a message
-  md.querySelector(`[data-fpin="${FT.id}"]`).click(); await sleep(500);
+  // third pin refused with a message (2.88.1, CI: the slow runner draws the new field rows later than the fixed waits above)
+  await until(() => md.querySelector(`[data-fpin="${FT.id}"]`) && md.querySelector(`[data-fup="${FB.id}"]`), 8000);
+  md.querySelector(`[data-fpin="${FT.id}"]`).click(); await until(() => /At most 2 fields/.test(d.querySelector('#toast').textContent), 3000);
   check(/At most 2 fields/.test(d.querySelector('#toast').textContent), 'pinning a third field: message');
   // reorder: move Budget up
   md.querySelector(`[data-fup="${FB.id}"]`).click(); await sleep(700);
