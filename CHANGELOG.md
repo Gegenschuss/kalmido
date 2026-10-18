@@ -7,6 +7,11 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.94.1] - 2026-10-18
+
+### Fixed
+- Booking page settings: the opening hours use the app's own time picker instead of the browser's time field; CI fixes of 2.94.0 (#1929).
+
 ## [2.94.0] - 2026-10-18
 
 Appointment booking for customers, leads before the sales pipeline, Enter in the chats makes a new line.
