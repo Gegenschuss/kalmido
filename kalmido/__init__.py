@@ -138,6 +138,7 @@ ORDER = (
     "collab.liste2efile",  # 2.64.2 B (#1817): files of lists with the lock, encrypted with the list key
     "collab.liste2echan",  # 2.64.2 C (#1817): the list channel (team chat of a list) with the lock
     "wiki.wikie2e",  # 2.64.3 (#1817): the lock per knowledge space (path + text encrypted in the browser)
+    "wiki.wikiatt",  # 2.99.0 A (#2182): files of knowledge pages (upload, ZIP import / export)
     "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app

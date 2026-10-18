@@ -20,6 +20,17 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 .wkback{border-top:1px solid var(--line);padding-top:.5rem}
 .wkback h4{display:flex;align-items:center;gap:.375rem;margin:0 0 .25rem;font-size:var(--fs-s);color:var(--muted)}
 .wkback ul{margin:0;padding-left:1.25rem}
+.wkfiles{border-top:1px solid var(--line);padding-top:.5rem}
+.wkfiles h4{display:flex;align-items:center;gap:.375rem;margin:0 0 .375rem;font-size:var(--fs-s);color:var(--muted)}
+.wkfiles ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.25rem}
+.wkfiles li{display:flex;align-items:center;gap:.25rem;min-height:2.75rem}
+.wkfile{flex:1;min-width:0;display:flex;align-items:center;gap:.5rem;padding:.25rem .375rem;border-radius:var(--r-s);color:var(--text);text-decoration:none}
+.wkfile:hover{background:var(--bg3)}
+.wkfile img{flex:none;width:2.5rem;height:2.5rem;object-fit:cover;border-radius:var(--r-s);background:var(--bg3)}
+.wkfile .an{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wkfile .as{flex:none;font-size:var(--fs-s);color:var(--muted)}
+.wkmd img.wkimg{max-width:100%;height:auto;border-radius:var(--r-s)}
+.wkrep ul{max-height:50vh;overflow:auto;margin:.25rem 0 0;padding-left:1.25rem;font-size:var(--fs-s)}
 .wkedwrap{position:relative}
 .wkac{position:absolute;left:.5rem;right:.5rem;bottom:.5rem;z-index:5;display:flex;flex-direction:column;max-height:16rem;overflow:auto;background:var(--bg);border:1px solid var(--line2);border-radius:var(--radius);box-shadow:var(--shadow)}
 .wkac button{display:flex;align-items:center;gap:.375rem;min-height:2.5rem;padding:0 .75rem;border:0;background:none;color:var(--text);text-align:left;cursor:pointer}

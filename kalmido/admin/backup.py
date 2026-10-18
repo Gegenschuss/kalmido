@@ -1204,7 +1204,10 @@ def storage_check():
                                     "JOIN agent_chat m ON m.id=f.message_id LEFT JOIN users u ON u.id=m.agent_id"),
                       # 2.72.0 (#1333): receipts of the household budget (where = the budget list's name)
                       ("budget_file", "SELECT f.id, f.list_id AS owner, f.name, f.size, f.path, l.name AS where_ FROM budget_files f "
-                                      "LEFT JOIN lists l ON l.id=f.list_id")):
+                                      "LEFT JOIN lists l ON l.id=f.list_id"),
+                      # 2.99.0 A (#2182): files of knowledge pages (where = the page's name; a locked space's name is a ciphertext)
+                      ("wiki_file", "SELECT f.id, f.page_id AS owner, f.name, f.size, f.path, CASE WHEN p.path LIKE 'e2e1:%' THEN '' "
+                                    "ELSE p.path END AS where_ FROM wiki_files f LEFT JOIN wiki_pages p ON p.id=f.page_id")):
         for r in c.execute(sql):
             n += 1
             full = os.path.join(ATT_DIR, r["path"] or "")

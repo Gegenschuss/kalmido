@@ -5,17 +5,16 @@ a space: an organisation (org_id; every member reads and writes it, like the org
 of one person (org_id NULL, owner_id; nobody else sees it). [[Path]] links another page of the same space, #123 a task
 (the app shows it only to whoever may see the task: the server never answers a task's title from here). The frontmatter
 (a leading "---" block of "key: value" lines) is kept in the text and cached as attrs. Pages under "Templates/" are the
-templates of "New page". Export / import: a ZIP of .md files in folders (compatible with SilverBullet).
+templates of "New page". Export / import: a ZIP of .md files in folders (compatible with SilverBullet); 2.99.0 A (#2182):
+with the pages' PDFs and pictures (wikiatt.py).
 Nothing here is tied to the wiki view: a page is found by its id and space alone (a file tree can show it later).
 Agents have no access yet (no v1 routes): the session routes are for people only (session.py refuses agents).
 """
-import io
 import json
 import re
 import unicodedata
-import zipfile
 
-from flask import jsonify, request, send_file
+from flask import jsonify, request
 
 from ..core.config import app
 from ..core.pg import IntegrityError, insert_id
@@ -213,6 +212,8 @@ def wiki_get(pid):
     d = wiki_dict(r, names=user_names(c, [r["updated_by"]]))
     from .wikie2e import wke_page_mode  # 2.64.3 A (#1817): a locked space finds its backlinks in the browser
     d["backlinks"] = [] if wke_page_mode(c, r) else [{"id": x["id"], "path": x["path"]} for x in back]
+    from .wikiatt import wka_list
+    d["files"] = wka_list(c, r)  # 2.99.0 A (#2182): the page's PDFs and pictures
     return jsonify(d)
 
 
@@ -347,23 +348,29 @@ def wiki_delete(pid):
 
 @app.post("/api/wiki/trash")
 def wiki_trash_many():
-    """{ids} -- several pages to the trash (Undo of an import); pages one may not change are left out."""
+    """{ids, files?} -- several pages (and page files, 2.99.0 A #2182) to the trash (Undo of an import); what one may not
+    change is left out."""
     return wiki_bulk(True)
 
 
 @app.post("/api/wiki/restore")
 def wiki_restore_many():
-    """{ids} -- back from the trash; a page whose name was taken in the meantime stays there (skipped)."""
+    """{ids, files?} -- back from the trash; a page whose name was taken in the meantime stays there (skipped)."""
     return wiki_bulk(False)
 
 
 def wiki_bulk(trash):
     c = db()
     uid = me()
-    ids = body().get("ids")
+    b = body()
+    ids, fids = b.get("ids"), b.get("files", [])
     if not isinstance(ids, list) or len(ids) > WIKI_ZIP_FILES or any(isinstance(x, bool) or not isinstance(x, int) for x in ids):
         raise BadInput(tr("Invalid value: {0}", "ids"))
+    if not isinstance(fids, list) or len(fids) > WIKI_ZIP_FILES or any(isinstance(x, bool) or not isinstance(x, int) for x in fids):
+        raise BadInput(tr("Invalid value: {0}", "files"))
     done, skipped, ts = [], [], iso_ms(now_utc())
+    from .wikiatt import wka_bulk  # 2.99.0 A (#2182): files to the trash before their pages, back after them
+    fdone, fskip = wka_bulk(c, uid, fids, True) if trash else ([], [])
     for pid in ids:
         try:
             r = wiki_need(c, pid, write=True, deleted=not trash)
@@ -377,10 +384,12 @@ def wiki_bulk(trash):
             done.append(pid)
         except IntegrityError:
             skipped.append(pid)
-    if done:
+    if not trash:
+        fdone, fskip = wka_bulk(c, uid, fids, False)
+    if done or fdone:
         bump(c)
         c.commit()
-    return jsonify(ok=True, ids=done, skipped=skipped)
+    return jsonify(ok=True, ids=done, skipped=skipped, files=fdone, files_skipped=fskip)
 
 
 @app.get("/api/wiki/search")
@@ -427,72 +436,29 @@ def wiki_mentions():
 
 @app.get("/api/wiki/export")
 def wiki_export():
-    """?space= -- every page of the space as a ZIP of .md files in folders (the path = folders + file name)."""
+    """?space= -- every page of the space as a ZIP of .md files in folders (the path = folders + file name); 2.99.0 A (#2182):
+    with the pages' files under _attachments/<page>/ (wikiatt.wka_export_zip)."""
     c = db()
     uid = me()
     oid = wiki_space(c, uid, request.args.get("space"))
     from .wikie2e import wke_guard  # 2.64.3 A (#1817): a locked space exports in the browser (decrypted ZIP)
     wke_guard(c, oid, uid, kind="export")
-    w, a = wiki_space_sql(oid, uid)
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for r in c.execute(f"SELECT path, body, updated_at FROM wiki_pages WHERE deleted_at IS NULL AND {w} ORDER BY path", a):
-            z.writestr(r["path"] + ".md", r["body"] or "")
-    buf.seek(0)
-    return send_file(buf, mimetype="application/zip", as_attachment=True, download_name="wiki.zip")
+    from .wikiatt import wka_export_zip
+    return wka_export_zip(c, oid, uid)
 
 
 @app.post("/api/wiki/import")
 def wiki_import():
-    """multipart file = a ZIP of .md files (?space=, ?replace=1 overwrites pages of the same name). Only Markdown files;
-    at most WIKI_ZIP_FILES files / WIKI_ZIP_FILE_MAX bytes each / WIKI_ZIP_TOTAL bytes; paths cleaned ("../" and absolute
-    paths lose their dangerous parts). Answers the new page ids (Undo moves them to the trash) and the skipped names."""
+    """multipart file = a ZIP of .md files (?space=, ?replace=1 overwrites pages of the same name); 2.99.0 A (#2182): with
+    PDFs and pictures (wikiatt: checked by their content, attached to the page that links them, the links rewritten; the
+    others on a page "Imported files" of their folder). At most WIKI_ZIP_FILES files, 1 MB per page, 25 MB per file, 500 MB
+    in all; paths cleaned ("../" and absolute paths lose their dangerous parts). Answers the new page ids (Undo moves them
+    to the trash), the new file ids, the skipped names (skipped) and the reasons (skipped_detail: [{name, reason}])."""
+    from .wikiatt import WKA_ZIP_TOTAL, wka_import_zip
+    request.max_content_length = WKA_ZIP_TOTAL + 1024 * 1024  # this route only (the app's limit is lower); + form framing
     c = db()
     uid = me()
     oid = wiki_space(c, uid, request.args.get("space"), write=True)
     from .wikie2e import wke_guard  # 2.64.3 A (#1817): a locked space imports in the browser
     wke_guard(c, oid, uid, kind="import")
-    replace = request.args.get("replace") == "1"
-    f = request.files.get("file")
-    if not f:
-        raise BadInput(tr("No file"))
-    try:
-        z = zipfile.ZipFile(io.BytesIO(f.read(WIKI_ZIP_TOTAL + 1)))
-        infos = [i for i in z.infolist() if not i.is_dir()]
-    except (zipfile.BadZipFile, ValueError, OSError):
-        raise BadInput(tr("This is not a ZIP file"))
-    if len(infos) > WIKI_ZIP_FILES:
-        raise BadInput(tr("Too many files (at most {0})", WIKI_ZIP_FILES))
-    if sum(i.file_size for i in infos) > WIKI_ZIP_TOTAL:
-        raise BadInput(tr("The archive is too large"))
-    w, a = wiki_space_sql(oid, uid)
-    created, updated, skipped, ts = [], [], [], iso_ms(now_utc())
-    for i in infos:
-        name = i.filename
-        if not name.lower().endswith(".md") or i.file_size > WIKI_ZIP_FILE_MAX or "__MACOSX" in name:
-            skipped.append(name[:200])
-            continue
-        try:
-            path = wiki_clean_path(name)
-            text = z.read(i)[:WIKI_ZIP_FILE_MAX].decode("utf-8-sig", "replace")
-            if text.startswith("e2e1:"):  # 2.64.3 (#1817, review M1): no ciphertext-like text in an open space
-                raise BadInput(name)
-        except (BadInput, zipfile.BadZipFile, OSError, RuntimeError, NotImplementedError):
-            skipped.append(name[:200])
-            continue
-        pid = wiki_insert(c, oid, uid, path, text, ts)
-        if pid:
-            created.append(pid)
-            continue
-        old = c.execute(f"SELECT id FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND lower(path)=?", [*a, path.lower()]).fetchone()
-        if replace and old:
-            c.execute("UPDATE wiki_pages SET body=?, attrs=?, updated_by=?, updated_at=? WHERE id=?",
-                      (text, json.dumps(wiki_frontmatter(text), ensure_ascii=False), uid, ts, old["id"]))
-            wiki_set_links(c, old["id"], text)
-            updated.append(old["id"])
-        else:
-            skipped.append(name[:200])
-    if created or updated:
-        bump(c)
-        c.commit()
-    return jsonify(ok=True, created=created, updated=updated, skipped=skipped[:200])
+    return jsonify(wka_import_zip(c, uid, oid, request.args.get("replace") == "1"))

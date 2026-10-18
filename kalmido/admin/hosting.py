@@ -65,7 +65,8 @@ def _user_bytes(c, uids):
     from ..files.store import fs_bytes_of
     e = fs_bytes_of(c, uids)  # 2.48.0 (#1207): every version in the file store counts for its uploader
     g = c.execute(f"SELECT COALESCE(SUM(size),0) FROM budget_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.72.0 (#1333): receipts
-    return int(a + b + d + e + g)
+    h = c.execute(f"SELECT COALESCE(SUM(size),0) FROM wiki_files WHERE created_by IN ({q})", uids).fetchone()[0]  # 2.99.0 A (#2182)
+    return int(a + b + d + e + g + h)
 
 
 def quota_info(c, uid):

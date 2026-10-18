@@ -667,6 +667,8 @@ def org_delete(oid):
         if n:
             return err(tr("This organisation still has {0} folders and files in its file store: delete them first", n), 409)
         fs_files = fs_org_purge(c, oid)
+        from ..wiki.wikiatt import wka_org_files
+        fs_files += wka_org_files(c, oid)  # 2.99.0 A (#2182): files of its knowledge pages (the rows go with the organisation)
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))  # 2.52.0 C (#1438): its own books -> the managers'

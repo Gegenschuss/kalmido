@@ -334,6 +334,9 @@ def wke_start():
         return jsonify(wke_info(c, oid, uid))
     if sp and sp["e2e"]:
         return err(tr("The space is already encrypted in the browser."), 409)
+    from .wikiatt import wka_space_has_files  # 2.99.0 A (#2182): page files cannot be encrypted in the browser yet
+    if wka_space_has_files(c, oid, uid):
+        return err(tr("The pages of this space have files. Files cannot be encrypted in the browser yet: delete them first."), 409)
     mine = e2e_keys_of(c, uid)
     if not mine:
         return err(tr("Set up end-to-end encryption first (Settings > Account)."), 409)
