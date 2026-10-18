@@ -98,6 +98,8 @@ KINDS = {
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
     "sheet": ("matrix", "p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
                         "trash, presence, completion); a formula's source of another workspace cannot be chosen and shows no value"),
+    # 2.97.0 A (#1950): bookmarks belong to one organisation (every member reads, the owner / its admins change) or one person
+    "bookmark": ("matrix", "p297_a_api_test.py: a bookmark of another organisation / person: 404 (read, change, delete, picture, move)"),
     # ---- not relevant for the boundary between organisations (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account (before a session or about the session's own person)"),
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
@@ -163,6 +165,10 @@ ROUTES = {
     "POST /api/agents/{}/chat/{}/choice": "agent", "PUT /api/agents/{}/permission-mode": "agent",
     "GET /api/agents/{}/chat": "agent", "POST /api/agents/{}/chat": "agent",
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
+    "GET /api/bookmarks": "bookmark", "POST /api/bookmarks": "bookmark", "GET /api/bookmarks/{}": "bookmark",
+    "PATCH /api/bookmarks/{}": "bookmark", "DELETE /api/bookmarks/{}": "bookmark", "POST /api/bookmarks/{}/restore": "bookmark",
+    "POST /api/bookmarks/{}/refresh": "bookmark", "GET /api/bookmarks/{}/image": "bookmark",
+    "POST /api/bookmarks/move-space": "bookmark",
     # 2.96.0 C (#2015): job cards in the agent chat (p296_c_api_test.py)
     "POST /api/agents/{}/chat/{}/reactions": "agent", "POST /api/agents/{}/wake": "agent",
     "GET /api/proposals/agents": "agent", "POST /api/proposals": "agent", "GET /api/proposals/{}": "agent",
