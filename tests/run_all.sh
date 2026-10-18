@@ -1130,6 +1130,8 @@ fresh; run p296_c_api "$PY" p296_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p296_c_ui node p296_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.96.0 part D (#1941 / #1918): an organisation's export into the private space, the own absence area in "Private"
 fresh; run p296_d_api "$PY" p296_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.96.0 part E (#1941, Moritz 18.10.): the separation after a move between private and organisation; moved documents are learned by the target
+fresh; run p296_e_api "$PY" p296_e_api_test.py "$KALMIDO_TEST_DATA"
 # 2.87.9 part E (#1914 #1920 #1909 #1933 #1937 #1952 #1963): polish
 fresh; run p287b_e_ui node p287b_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.90.0 part A (#1921): bookkeeping light (EUeR, VAT return figures, tax reserve, receipt photo)
