@@ -1100,6 +1100,12 @@ fresh; run p294_a_ui node p294_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p294_b_api "$PY" p294_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p294_b_ui node p294_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p294_c_ui node p294_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.99.0 part A: wiki ZIP import keeps PDFs and images as page attachments (#2182)
+fresh; run p299_a_api "$PY" p299_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.99.0 part B: one ... menu on wiki pages, chat composer icons aligned (#2183 #2185)
+fresh; run p299_b_ui node p299_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.99.0 part C: the quotation PDF after the online acceptance carries the acceptance note (#2195)
+fresh; run p299_c_api "$PY" p299_c_api_test.py "$KALMIDO_TEST_DATA"
 # 2.86.0 (#1896): hardening from audit #476 part 1, groups A-E
 fresh; run p286_a_api "$PY" p286_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"
