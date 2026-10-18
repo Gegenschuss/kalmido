@@ -11,10 +11,11 @@ const LD_MODS = {
   office: ['office', 'office_docs', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow',
     'office_pipeline', 'office_kpi', 'office_datev', 'officeagents', 'office_packs',
     'office_books', 'office_bank', 'office_taxdates',  // 2.90.0 (#1921, #1922)
-    'office_recurring', 'office_subs'],  // 2.91.0 (#1923, #1924)  // 2.76.0 A (#1023): office_packs
+    'office_recurring', 'office_subs',  // 2.91.0 (#1923, #1924)
+    'office_agreements', 'office_assets'],  // 2.92.0 (#1925, #1931)  // 2.76.0 A (#1023): office_packs
   // 2.65.0 (#1823): more areas load on first use (the start loads about a third less)
   agentchat: ['agentchat', 'agentsetup'],
-  pdf: ['pdfview'],
+  pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview
   mindmap: ['mindmap'],
   wiki: ['wiki'],
   stats: ['stats'],
@@ -37,7 +38,7 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   // 2.65.0 (#1823)
   agentchat: ['chatOpen', 'chatClose', 'chatPop', 'chatDock', 'chatFloatMin', 'apvJump', 'chatChoice', 'shareDest', 'chatFileRm', 'chatReact',
     'chatModeMenu', 'stepsAlways', 'stepsLive', 'chatEditStart', 'chatOlder', 'chatSend', 'chatBottom', 'chatDraw', 'agModal', 'agDraw', 'aiuLoad', 'ains_setupModal'],
-  pdf: ['pdfView'], calendar: ['calColorPop', 'cg_commit'], docs: ['dc_shareFiles'],
+  pdf: ['pdfView', 'dpvOpen', 'dpvSumMount'], calendar: ['calColorPop', 'cg_commit'], docs: ['dc_shareFiles'],
   life: ['contractModal', 'deviceModal', 'upkeepModal', 'healthModal', 'tripModal'], integrations: ['pubWire'],
   playbook: ['pbMount', 'pbOpen', 'pbNewsOpen'], timeline: ['rmSet']};
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
@@ -212,6 +213,17 @@ function tlReaches(from, target) {  // does `from` (transitively) wait on `targe
   return false;
 }
 const pv_attr = o => ` data-pview="${esc(JSON.stringify(o))}"`;
+// 2.92.0 C (#1926): a Word / Excel file opens in the document preview (docpreview.js, module pdf) like a PDF:
+// <a href="…" data-dview='{"url": preview route, "name", "size", "dlUrl", "aid"?}'>; a modifier key keeps the download
+const dv_is = a => !!a && !a.enc && (/\.(docx|xlsx)$/i.test(String(a.name || '')) || /officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet)$/.test(a.mime || ''));
+const dv_attr = o => ` data-dview="${esc(JSON.stringify(o))}"`;
+document.addEventListener('click', e => {
+  const l = e.target.closest?.('a[data-dview],button[data-dview]');
+  if (!l || e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+  let o; try { o = JSON.parse(l.dataset.dview); } catch { return; }
+  e.preventDefault(); e.stopPropagation();
+  dpvOpen(o);
+}, true);
 // the settings dialog is opened most often: loaded in the background once the app has started and is idle
 // 2.65.0 (#1823): then, one per idle moment, the areas this person has switched on (not all modules: no office, contacts,
 // statistics, PDF, playbooks), so their first click stays quick without slowing the start

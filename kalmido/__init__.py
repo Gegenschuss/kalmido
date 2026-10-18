@@ -208,6 +208,9 @@ ORDER = (
     "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
     "office.taxdates",  # 2.90.0 C (#1922): tax dates as recurring tasks (VAT return, income tax prepayments, trade tax)
     "office.agentdocs",  # 2.51.0 A (#1348, #1350): agents in the office: drafts, payment suggestions, the switches (API v1 + routes)
+    "office.agreements",  # 2.92.0 A (#1925): business contracts and insurances (term, notice, contribution, cash flow, deadline task)
+    "office.assets",  # 2.92.0 B (#1931): equipment value: purchase, depreciation, current value, insurance list
+    "files.officeprev",  # 2.92.0 C (#1926): preview + text of .docx / .xlsx (limited worker), who can summarise a file
     "team.approvals",
     "tasks.review",  # 2.60.0 C (#1512): review step (reviewer, gate, list setting, API v1)
     "team.forms",

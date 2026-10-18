@@ -229,13 +229,27 @@ def bk_euer(c, oid, year):
             x = inc.setdefault(k, [Decimal(0)] * 3)
             x[0], x[1], x[2] = x[0] + net, x[1] + vat, x[2] + gross
     exp, missing = {}, 0
+    # 2.92.0 (#1931): equipment with a purchase price is depreciated (office/assets.py ast_afa_year): the year's depreciation
+    # is an expense of its own, the device's receipt counts only with its input tax (else the purchase would count twice).
+    # A small business keeps the receipt as it is (its depreciation basis would be the gross price, assets.py works net)
+    afa = {"rows": [], "receipt_ids": set()}
+    if not small:
+        from .assets import ast_afa_year
+        afa = ast_afa_year(c, oid, year)
     for rc in bk_receipts(c, oid, y0, y1):
         k = "c:" + rc["category"].casefold() if rc["category"] else "c:"
         x = exp.setdefault(k, {"label": rc["category"] or tr("Other"), "v": [Decimal(0)] * 3, "count": 0})
-        x["v"] = [x["v"][0] + rc["net"], x["v"][1] + rc["vat"], x["v"][2] + rc["amount"]]
+        if rc["node_id"] in afa["receipt_ids"]:
+            x["v"] = [x["v"][0], x["v"][1] + rc["vat"], x["v"][2] + rc["vat"]]
+        else:
+            x["v"] = [x["v"][0] + rc["net"], x["v"][1] + rc["vat"], x["v"][2] + rc["amount"]]
         x["count"] += 1
         if rc["vat_pct"] is None:
             missing += 1
+    for a_ in afa["rows"]:
+        x = exp.setdefault("a:", {"label": tr("Depreciation"), "v": [Decimal(0)] * 3, "count": 0})
+        x["v"] = [x["v"][0] + a_["amount"], x["v"][1], x["v"][2] + a_["amount"]]
+        x["count"] += 1
     for t in rk_trips(c, oid, year=str(year)):
         for it in t["items"]:
             day = it["date"] or t["date_from"] or ""

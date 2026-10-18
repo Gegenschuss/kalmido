@@ -158,7 +158,11 @@ def office_rows_get(kind):
     c, uid, oid = _ctx()
     a = request.args
     adm = office_role(c, uid, oid) == "admin"  # 2.47.0 (#1649): members never get purchase prices / markups
-    return jsonify(items=[sr_public(kind, r, adm) for r in office_rows(c, oid, kind, archived=a.get("archived") == "1", q=a.get("q") or "")])
+    rows = [sr_public(kind, r, adm) for r in office_rows(c, oid, kind, archived=a.get("archived") == "1", q=a.get("q") or "")]
+    if kind == "equipment" and adm:  # 2.92.0 B (#1931): + depreciation, book / new / current value (admins only)
+        from .assets import ast_enrich
+        ast_enrich(c, oid, rows)
+    return jsonify(items=rows)
 
 
 @app.post("/api/office/<kind>")
@@ -178,7 +182,12 @@ def office_row_post(kind):
 def office_row_get(kind, rid):
     _kind(kind)
     c, uid, oid = _ctx()
-    return jsonify(sr_public(kind, office_row(c, oid, kind, rid), office_role(c, uid, oid) == "admin"))  # 2.47.0 (#1649)
+    adm = office_role(c, uid, oid) == "admin"
+    r = sr_public(kind, office_row(c, oid, kind, rid), adm)  # 2.47.0 (#1649)
+    if kind == "equipment" and adm:  # 2.92.0 B (#1931)
+        from .assets import ast_enrich
+        ast_enrich(c, oid, [r])
+    return jsonify(r)
 
 
 @app.patch("/api/office/<kind>/<int:rid>")

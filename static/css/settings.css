@@ -168,3 +168,7 @@
   .ua8chk{width:1.5rem;height:1.5rem}
   .ua8pg .iconbtn{min-width:2.75rem;min-height:2.75rem}
 }
+/* 2.92.0 D (#2010): on the phone the selection bar is fixed above the tab bar, so the first tick no longer pushes the list down */
+@media (max-width:899px) {
+  .ua8sel{position:fixed;left:.5rem;right:.5rem;bottom:calc(var(--tabs-h) + var(--safe-b) + .5rem);z-index:45;margin:0;background:var(--bg3);border:1px solid var(--accent);box-shadow:var(--shadow)}
+}

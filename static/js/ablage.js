@@ -83,6 +83,7 @@ const ab_item = id => (AB.data?.items || []).find(x => x.id === +id) || (AB.data
 function ab_openFile(n) {
   if (upLocked(n)) { toast(tr('Locked: malware was found in this file ({0})', n.up.sig || '?')); return; }  // 2.61.0 (#1818)
   if (ab_isImg(n)) { const imgs = (AB.data?.items || []).filter(x => ab_isImg(x) && !upLocked(x)); attLightbox(n.id, imgs, (a, dl) => ab_url(a, dl)); return; }
+  if (n.kind === 'file' && dv_is(n)) { dpvOpen({url: `/api/files/nodes/${encodeURIComponent(n.id)}/preview`, name: n.name, size: n.size, dlUrl: ab_url(n, true)}); return; }  // 2.92.0 C (#1926)
   if (ab_isPdf(n)) { if (typeof pdfView === 'function') pdfView({url: ab_url(n), name: n.name, size: n.size, dlUrl: ab_url(n, true)}); else window.open(ab_url(n), '_blank', 'noopener'); return; }
   if (isTextFile(n) && (n.size || 0) <= TV_MAX) { textView({url: ab_url(n, true), name: n.name, size: n.size, md: isMdFile(n), ext: attExt(n)}); return; }
   const a = document.createElement('a'); a.href = ab_url(n, true); a.download = n.name; document.body.appendChild(a); a.click(); a.remove();
