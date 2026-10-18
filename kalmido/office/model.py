@@ -68,7 +68,12 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # on payment received ("ist") or on invoicing ("soll") for the VAT return figures
                      "tax_reserve_pct": 0, "vat_basis": "ist",
                      # 2.90.0 C (#1922): tax dates as tasks (set only by its own route, office/taxdates.py)
-                     "tax_dates": {}}
+                     "tax_dates": {},
+                     # 2.93.0 B (#1928): the mileage allowance per business km of the logbook (set only by its own route,
+                     # office/logbook.py)
+                     "km_rate": "0.30",
+                     # 2.93.0 B (#1928 review): the rate per year {"2026": "0.30"}; km_rate stays the default of years without one
+                     "km_rates": {}}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
