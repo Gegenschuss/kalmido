@@ -31,8 +31,8 @@ const M = 'QXZmark';  // every plain text of the moved pages carries it
   const ORG = (await call('POST', '/api/admin/orgs', {name: 'Alpha', admin_id: ME})).j.id;
   const SP = 'org:' + ORG;
   const mk = async (p, body) => (await call('POST', '/api/wiki/pages', {space: 'private', path: p, body})).j.id;
-  const P1 = await mk('Vault/Plan', `${M} plan, see [[Vault/Other]]`);
-  const P2 = await mk('Vault/Other', `${M} other`);
+  const P1 = await mk('Box/Plan', `${M} plan, see [[Box/Other]]`);
+  const P2 = await mk('Box/Other', `${M} other`);
   check(P1 > 0 && P2 > 0, 'setup: two private pages in a folder');
 
   const session = (user, fn) => firefox(async ({cmd, ev, nav, ctx, shot}) => {
@@ -70,14 +70,14 @@ const M = 'QXZmark';  // every plain text of the moved pages carries it
     check(/no longer end-to-end encrypted/.test(ask || ''), 'a second question names the warning ' + (ask || '').slice(0, 120));
     await ev(`(document.querySelector('.cdlg [data-cd="yes"]')?.click(), 1)`);
     const moved = await until(async () => { const g = (await call('GET', '/api/wiki/pages/' + P1)).j; return g.space === SP && g; });
-    check(moved && moved.path === 'Plan' && moved.body === `${M} plan, see [[Vault/Other]]`, 'the page is plain and readable in the organisation ' + JSON.stringify(moved).slice(0, 200));
+    check(moved && moved.path === 'Plan' && moved.body === `${M} plan, see [[Box/Other]]`, 'the page is plain and readable in the organisation ' + JSON.stringify(moved).slice(0, 200));
 
     // ---- Undo: encrypted again for the private space, the old name
     await ev(`histStep('undo')`);
     const back = await until(async () => { const g = (await call('GET', '/api/wiki/pages/' + P1)).j; return g.space === 'private' && g; });
     check(back && back.path.startsWith('e2e1:') && back.body.startsWith('e2e1:') && !JSON.stringify(back).includes(M), 'Undo: back in the private space as ciphers');
     const op = await ev(`(async () => { const p = await wkePage(await rawFetch('GET', '/api/wiki/pages/${P1}')); return {path: p.path, body: p.body, locked: !!p._wke}; })()`);
-    check(op && op.path === 'Vault/Plan' && op.body === `${M} plan, see [[Vault/Other]]` && !op.locked, 'Undo: the old name and text open with the key ' + JSON.stringify(op));
+    check(op && op.path === 'Box/Plan' && op.body === `${M} plan, see [[Box/Other]]` && !op.locked, 'Undo: the old name and text open with the key ' + JSON.stringify(op));
 
     // ---- lock -> lock: the folder re-encrypted for the organisation, the link follows
     const so = await ev(`wkeStart(${JSON.stringify(SP)}).then(r => ({r, mode: wkeMode(${JSON.stringify(SP)})})).catch(e => ({err: e.message}))`);
