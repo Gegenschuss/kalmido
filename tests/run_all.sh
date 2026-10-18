@@ -432,6 +432,7 @@ shard 8  # ---------------------------------------------------------------- shar
 # (#1035 / #380), agent hardening (#919 bridges, list limits, access log, #920 Use safely) and the phone fixes
 # (#1033 #1042 #1043 #1044)
        run tenant_coverage "$PY" tenant_coverage_test.py
+       run freelancer_coverage "$PY" freelancer_coverage_test.py  # 2.87.9 (#1919): the freelancer parity guard (static)
 fresh; run p2300_tenant "$PY" p2300_tenant_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2300_chat_api "$PY" p2300_chat_api_test.py "$KALMIDO_TEST_DATA"
        run p2300_chat_ui node p2300_chat_ui.js "$KALMIDO_TEST_DATA"
@@ -1063,6 +1064,8 @@ fresh; run testclock "$PY" testclock_test.py
 # 2.85.0 part B: feeds (#1162) - follow, RSS/Atom/RDF, SSRF guard, DTD refused, read later, OPML, rights; the view (fake feed server in the container)
 fresh; run p285_b_api "$PY" p285_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p285_b_ui node p285_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.87.9 part C: the office menu with four groups (#1917), computer + phone
+fresh; run p287b_c_ui node p287b_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.88.0 part A: offers (quotes) with versions in the cash flow plan (#1915)
 fresh; run p288_a_api "$PY" p288_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p288_a_ui node p288_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1102,6 +1105,17 @@ fresh; run p286_e_api "$PY" p286_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2661_b_ui node p2661_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.87.0 (#1983 #1984): organisation boundary of event invitations and list hand-overs (audit T3 H1 + H2)
 fresh; run p287_a_api "$PY" p287_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.87.9 part D (#1965): drags run once per frame, stored on release
+fresh; run p287b_d_ui node p287b_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.87.9 part A (#1919 / #1918): every area as a person without an organisation (the freelancer parity sweep)
+fresh; run p287b_a_freelancer_api "$PY" p287b_a_freelancer_api_test.py "$KALMIDO_TEST_DATA"
+# 2.87.9 part A (#1913): an organisation's own picture as its symbol (admins set it, members get it, sealed)
+fresh; run p287b_a_api "$PY" p287b_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.87.9 part B (#1940 #1938 #1936 #1935 #1934): import target confirmation, Paperless in the settings, search
+fresh; run p287b_b_api "$PY" p287b_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p287b_b_ui node p287b_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.87.9 part E (#1914 #1920 #1909 #1933 #1937 #1952 #1963): polish
+fresh; run p287b_e_ui node p287b_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.90.0 part A (#1921): bookkeeping light (EUeR, VAT return figures, tax reserve, receipt photo)
 fresh; run p290_a_api "$PY" p290_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p290_a_ui node p290_a_ui.js "$KALMIDO_TEST_DATA"

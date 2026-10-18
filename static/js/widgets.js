@@ -208,7 +208,8 @@ document.addEventListener('pointermove', e => {
   if (!t || wgGrid(t) !== mv.grid || t === mv.el) { mv.to = null; mv.line.hidden = true; return; }
   const r = t.getBoundingClientRect(), wide = r.width > mv.grid.clientWidth * .75 || wgCols(mv.grid), after = wide ? e.clientY > r.top + r.height / 2 : e.clientX > r.left + r.width / 2;
   mv.to = t.dataset.lyk; mv.after = after; mv.line.hidden = false;
-  mv.line.style.cssText = wide ? `left:${r.left}px;width:${r.width}px;top:${(after ? r.bottom : r.top) - 2}px;height:3px` : `top:${r.top}px;height:${r.height}px;left:${(after ? r.right : r.left) - 2}px;width:3px`;
+  const css = wide ? `left:${r.left}px;width:${r.width}px;top:${(after ? r.bottom : r.top) - 2}px;height:3px` : `top:${r.top}px;height:${r.height}px;left:${(after ? r.right : r.left) - 2}px;width:3px`;
+  if (css !== mv.css) { mv.css = css; mv.line.style.cssText = css; }  // 2.87.9 (#1965): moved only when the place changes
 });
 function wgPointerEnd(cancel) {
   const rs = WG.rs; WG.rs = null;

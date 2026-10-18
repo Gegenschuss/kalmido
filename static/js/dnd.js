@@ -15,18 +15,24 @@ document.addEventListener('dragend', () => { dragId = null; DSE.v = 0; document.
 const DROP_SEL = '.trow, .kcol, .quad, .cal .cell, .srow[data-drop], .wcol, .wad, .wh, #view .ghead[data-section], #view .sdrop, #view .sprh[data-sprdrop]';  // 2.60.0 (#343): + the sprint header
 // lower half of a row = drop after it (so the end of a block / list is reachable)
 const dropAfter = (row, y) => { const r = row.getBoundingClientRect(); return y != null && r.height > 0 && y > r.top + r.height / 2; };
+// 2.87.9 (#1965): the highlight changes only when the target or its half changes (dragover fires on every mouse move; the
+// search for the old highlights and the restyle ran each time). A highlight someone else took away is set again.
+let mdLast = null;
 function markDrop(el, id, y) {
+  const tgt = el && el.closest(DROP_SEL), row = tgt && tgt.classList.contains('trow');
+  const ok = !!tgt && !tgt.closest('#detail') && !(row && +tgt.dataset.id === id);
+  const cls = !ok ? null : row ? (dropAfter(tgt, y) ? 'dropafter' : 'dropbefore') : 'drop', col = row ? tgt.closest('.kcol,.quad') : null;
+  if (cls && mdLast && mdLast.tgt === tgt && mdLast.cls === cls && tgt.classList.contains(cls) && (!col || col.classList.contains('drop'))) return true;
+  mdLast = null;
   $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
-  const tgt = el && el.closest(DROP_SEL);
-  if (!tgt || tgt.closest('#detail')) return false;
-  if (tgt.classList.contains('trow') && +tgt.dataset.id === id) return false;
-  if (tgt.classList.contains('trow')) { if (+tgt.dataset.id !== id) tgt.classList.add(dropAfter(tgt, y) ? 'dropafter' : 'dropbefore'); const c = tgt.closest('.kcol,.quad'); if (c) c.classList.add('drop'); }
-  else tgt.classList.add('drop');
+  if (!cls) return false;
+  tgt.classList.add(cls); if (col) col.classList.add('drop');
+  mdLast = {tgt, cls};
   return true;
 }
 document.addEventListener('dragover', e => {
   if (!dragId) return;
-  if (dgOver(e, dragId)) { e.preventDefault(); dsEdge(e.clientY); return; }  // 2.43.0 (#1330, #1003): Alt = dependency, a selection, the panel's drop fields
+  if (dgOver(e, dragId)) { mdLast = null; e.preventDefault(); dsEdge(e.clientY); return; }  // 2.43.0 (#1330, #1003): Alt = dependency, a selection, the panel's drop fields
   if (markDrop(e.target, dragId, e.clientY)) e.preventDefault();
   dsEdge(e.clientY);
 });
@@ -386,17 +392,23 @@ function tdScroller(el) {
   }
   return document.scrollingElement || document.documentElement;
 }
-function tdScroll(x, y) {
+function tdScroll(x, y, at = document.elementFromPoint(x, y)) {
   if (!lp || !lp.active) return;
   // over the drawer / sidebar its list scrolls (lists further down are reachable), elsewhere the view
-  const side = document.elementFromPoint(x, y)?.closest('#side');
-  const sc = side ? (lp.ssc || (lp.ssc = tdScroller(document.elementFromPoint(x, y)))) : (lp.sc || (lp.sc = tdScroller(lp.r.isConnected ? lp.r : $('#view'))));
+  const side = at?.closest('#side');
+  const sc = side ? (lp.ssc || (lp.ssc = tdScroller(at))) : (lp.sc || (lp.sc = tdScroller(lp.r.isConnected ? lp.r : $('#view'))));
   if (lp.cur && lp.cur !== sc) { tdScrollEnd(lp); }
   lp.cur = sc;
-  const r = sc === document.scrollingElement || sc === document.documentElement ? {top: 0, bottom: innerHeight} : sc.getBoundingClientRect();
+  // 2.87.9 (#1965): the view's box and the fixed bars are measured once per drag (the drawer's box each frame: it slides in)
+  const page = sc === document.scrollingElement || sc === document.documentElement;
+  const r = page ? {top: 0, bottom: innerHeight} : side ? sc.getBoundingClientRect() : (lp.scR?.sc === sc ? lp.scR.r : (lp.scR = {sc, r: sc.getBoundingClientRect()}).r);
   // the tab bar / docked add box cover the list's bottom (fixed: no offsetParent, so measured)
-  const tb = Math.min(innerHeight, ...['#tabs', '#view .qdock', '#fab'].map(q => $(q)).filter(e => e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0 && e.getBoundingClientRect().top > innerHeight / 2).map(e => e.getBoundingClientRect().top));
-  const top = side ? r.top : Math.max(r.top, $('#top')?.getBoundingClientRect().bottom || 0), bot = side ? Math.min(r.bottom, innerHeight) : Math.min(r.bottom, tb, (visualViewport?.height || innerHeight));
+  if (lp.tb == null) {
+    lp.tb = Math.min(innerHeight, ...['#tabs', '#view .qdock', '#fab'].map(q => $(q)).filter(e => e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0 && e.getBoundingClientRect().top > innerHeight / 2).map(e => e.getBoundingClientRect().top));
+    lp.topB = $('#top')?.getBoundingClientRect().bottom || 0;
+  }
+  const tb = lp.tb;
+  const top = side ? r.top : Math.max(r.top, lp.topB), bot = side ? Math.min(r.bottom, innerHeight) : Math.min(r.bottom, tb, (visualViewport?.height || innerHeight));
   const v = y < top + TD_EDGE ? -TD_MAX * Math.min(1, (top + TD_EDGE - y) / TD_EDGE) : y > bot - TD_EDGE ? TD_MAX * Math.min(1, (y - (bot - TD_EDGE)) / TD_EDGE) : 0;
   lp.sv = v; lp.sx = x; lp.sy = y;
   if (v && !lp.sraf) {
@@ -453,21 +465,28 @@ function tdMove(e) {
   const t = e.touches[0];
   if (!lp.active) { if (Math.hypot(t.clientX - lp.x, t.clientY - lp.y) > 8) { clearTimeout(lp.timer); lp = null; } return; }
   e.preventDefault();
-  lp.ghost.style.top = (t.clientY - lp.dy) + 'px';
-  lp.ghost.style.left = (t.clientX - lp.dx0) + 'px';
   lp.lx = t.clientX; lp.ly = t.clientY;
-  const mv = $('#tdmove'), onMv = !!mv && (() => { const b = mv.getBoundingClientRect(); return t.clientX >= b.left - 8 && t.clientX <= b.right + 8 && t.clientY >= b.top - 8 && t.clientY <= b.bottom + 8; })();
-  if (mv) mv.classList.toggle('on', onMv);
-  if (onMv) $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
-  else markDrop(document.elementFromPoint(t.clientX, t.clientY), lp.id, t.clientY);
-  // hold at the left edge: open the list drawer so the task can be dropped on another list
-  if (isMobile() && t.clientX < 26 && !$('#side').classList.contains('open')) {
-    if (!lp.edge) lp.edge = setTimeout(() => { $('#side').classList.add('open'); if (S.sel) $('#detail').style.visibility = 'hidden'; lp && (lp.opened = true); }, 450);
-  } else if (lp.edge && t.clientX >= 26) { clearTimeout(lp.edge); lp.edge = null; }
-  if (!onMv) tdScroll(t.clientX, t.clientY); else lp.sv = 0;
-  kbEdge(t.clientX, t.clientY);
-  const wb = $('#wbody'); if (wb) { const r = wb.getBoundingClientRect(); if (t.clientY < r.top + 40) wb.scrollBy(0, -12); else if (t.clientY > r.bottom - 40) wb.scrollBy(0, 12); }
+  tdFrame(t.clientX, t.clientY);
 }
+// 2.87.9 (#1965): the rest once per frame (a phone sends a touchmove per 8 ms on 120 Hz screens): the ghost slides by
+// transform, the fixed places (the "Move to list" bar, the week body) are measured once per drag, one hit test per frame
+const tdFrame = rafThrottle((x, y) => {
+  if (!lp || !lp.active || !lp.ghost) return;
+  lp.ghost.style.transform = `translate(${x - lp.x}px, ${y - lp.y}px)`;
+  const mv = $('#tdmove'), b = mv && (lp.mvR || (lp.mvR = mv.getBoundingClientRect()));
+  const onMv = !!b && x >= b.left - 8 && x <= b.right + 8 && y >= b.top - 8 && y <= b.bottom + 8;
+  if (mv) mv.classList.toggle('on', onMv);
+  const at = document.elementFromPoint(x, y);
+  if (onMv) { mdLast = null; $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop')); }
+  else markDrop(at, lp.id, y);
+  // hold at the left edge: open the list drawer so the task can be dropped on another list
+  if (isMobile() && x < 26 && !$('#side').classList.contains('open')) {
+    if (!lp.edge) lp.edge = setTimeout(() => { $('#side').classList.add('open'); if (S.sel) $('#detail').style.visibility = 'hidden'; lp && (lp.opened = true); }, 450);
+  } else if (lp.edge && x >= 26) { clearTimeout(lp.edge); lp.edge = null; }
+  if (!onMv) tdScroll(x, y, at); else lp.sv = 0;
+  kbEdge(x, y);
+  const wb = $('#wbody'); if (wb) { const r = lp.wbR || (lp.wbR = wb.getBoundingClientRect()); if (y < r.top + 40) wb.scrollBy(0, -12); else if (y > r.bottom - 40) wb.scrollBy(0, 12); }
+});
 document.addEventListener('touchmove', tdMove, {passive: false});
 // 2.13.0 (#453 A4): Kanban by touch: near the left / right edge the board scrolls smoothly, the deeper in the edge zone the
 // faster (at most ~1 column per second), with snapping off while dragging; it used to jump a column per touchmove (the
@@ -499,6 +518,7 @@ function kbColAt(x) {
 }
 function endTouchDrag(e) {
   if (e) { if (e._td) return; e._td = 1; }
+  if (lp?.active && !(e && e.touches && e.touches.length)) tdFrame.flush();  // 2.87.9 (#1965): the last move counts
   if (lp && lp.tgt) { lp.tgt.removeEventListener('touchmove', tdMove); lp.tgt.removeEventListener('touchend', endTouchDrag); lp.tgt.removeEventListener('touchcancel', endTouchDrag); }
   if (!lp) { if ($('.ghost-drag:not(.side-ghost)')) tdKill(); return; }
   if (e && e.touches && e.touches.length && lp.active) return;  // another finger lifted: the drag goes on

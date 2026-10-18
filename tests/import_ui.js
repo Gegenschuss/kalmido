@@ -64,7 +64,10 @@ async function dataPane(w) {
   check(/existing list/.test(box().textContent) && !md.querySelector('#s-imp-name'), 'target: existing list');
   set(w, md.querySelector('#s-imp-target'), 'new'); await sleep(1500);
   set(w, md.querySelector('#s-imp-name'), 'Zuhause'); await sleep(200);
+  // 2.87.9 (#1940): the import first asks where the tasks go (the suite's dialog bridge answers it)
+  w.eval(`window.__itc = []; const _itc0 = importTargetConfirm; importTargetConfirm = o => { __itc.push(o); return _itc0(o); }`);
   click(w, box().querySelector('[data-imp="go"]')); await sleep(2000);
+  check(w.eval(`__itc.length === 1 && __itc[0].what === '12 tasks' && __itc[0].ws === 'private'`), 'the import names its target before it starts: ' + w.eval('JSON.stringify(__itc)'));
   check(/Imported: 12 tasks/.test(box().textContent) && box().querySelector('[data-imp="undo"]'), 'import report with Undo');
   check(w.eval(`S.lists.some(l => l.name === 'Zuhause') && [...S.tasks.values()].some(t => t.title === 'Müll rausbringen')`), 'imported into a list with the chosen name');
   check(w.eval(`[...S.tasks.values()].find(t => t.title === 'Müll rausbringen').priority`) === 5, 'priority scale 4 = p1 applied');
@@ -98,7 +101,7 @@ async function dataPane(w) {
   check(/To Do/.test(out().textContent) && /Doing/.test(out().textContent) && md.querySelector('#s-imp-mode').value === 'lists', 'Trello: lists mode preview');
   set(w, md.querySelector('#s-imp-archived'), 'done'); await sleep(1500);
   check(/Preview: 9 tasks/.test(out().textContent), 'Trello: archived as done');
-  click(w, out().querySelector('[data-imp="go"]')); await sleep(2000);
+  click(w, out().querySelector('[data-imp="go"]')); await sleep(2000);  // 2.87.9 (#1940): the dialog bridge answers the target question
   check(w.eval(`S.lists.filter(l => l.folder === 'Website Relaunch').length`) === 3, 'Trello lists mode: three lists in a folder');
   click(w, out().querySelector('[data-imp="undo"]')); await sleep(1800);
   check(w.eval(`S.lists.filter(l => l.folder === 'Website Relaunch').length`) === 0, 'undo from the report removes the new lists');
@@ -112,7 +115,7 @@ async function dataPane(w) {
   set(w, md.querySelector('#s-imp-src'), 'ticktick'); await sleep(50);
   const tt = '"Folder Name","List Name","Title","Kind","Tags","Content","Is Check list","Start Date","Due Date","Reminder","Repeat","Priority","Status","Created Time","Completed Time","Order","Timezone","Is All Day","Is Floating","Column Name","Column Order","View Mode","taskId","parentId"\n'
     + '"","TT list","From TickTick","TEXT","","","N","","","","","0","0","2026-09-01T10:00:00+0000","","1","Europe/Berlin","","false","","","list","tt1",""\n';
-  pick(w, md.querySelector('#s-import'), 'tt.csv', tt); await sleep(1500);
+  pick(w, md.querySelector('#s-import'), 'tt.csv', tt); await sleep(1500);  // 2.87.9 (#1940): the dialog bridge answers the target question
   check(!out().querySelector('.impbox') && w.eval(`[...S.tasks.values()].some(t => t.title === 'From TickTick')`), 'TickTick: imported directly');
   w.close();
 

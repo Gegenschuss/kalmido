@@ -106,7 +106,7 @@ const CONTRAST = `(() => {
   check(!d.querySelector('#top .hdot') && d.querySelector('#top .achip .abot'), 'no duplicate agent dots in the header while the band shows (the robot stays)');
   check(d.querySelector(`.trow[data-id="${T.dots}"] .chk.work`), 'row of the task an agent works on: working glyph');
   const ap = d.querySelector('#view .agband [data-act="job-do"][data-a="approve"]');
-  check(ap && d.querySelector('#view .agband [data-act="job-do"][data-a="reject"]') && /👍/.test(ap.textContent), '👍 / ✕ on the waiting job');
+  check(ap && d.querySelector('#view .agband [data-act="job-do"][data-a="reject"]') && ap.querySelector('.thumb svg'), '👍 / ✕ on the waiting job');
   click(w, ap);
   check(await until(async () => (await tcall('GET', '/agent/jobs', KOL.tok)).data.find(j => j.id === J)?.state === 'running'), '👍 approves the job (running)');
   click(w, d.querySelector('#view .agband .agb-tog')); await sleep(200);

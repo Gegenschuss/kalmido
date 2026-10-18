@@ -70,6 +70,7 @@ def cell(sh, addr):
 
 
 # ---- a private table of a person without an organisation (P4)
+# freelancer-matrix: sheets
 r = Da.post(B + "/api/sheets", json={"title": "Equipment", "space": "private"})
 check(r.ok, "dave (no organisation) creates a private table " + r.text[:200])
 S = r.json()

@@ -1083,21 +1083,14 @@ def chat_react(c, m, uid, emoji, on):
         return res  # only the person of the conversation reacting to the agent's message counts
     ch = _jload(m["choices"])
     perm = bool(ch and (ch.get("permission") or ch.get("approval")))  # 2.35.0 (#1103): approval requests answer the same way
-    if emoji in ("up", "down") and (chat_asks(m["body"]) or perm):  # 2.13.0 (#453 A2): only on a question
+    # 2.87.9 (#1963): a thumb never decides an approval / permission card - only its buttons Yes / No (Allow / Deny) do; the thumb
+    # stays a plain reaction there. On any other question a 👍 / 👎 still counts (2.13.0, #453 A2)
+    if emoji in ("up", "down") and not perm and chat_asks(m["body"]):
         res["approval"] = "approved" if emoji == "up" else "rejected"
-    stale = False
-    if perm and res["approval"] and choice_state(m, ch, _jload(m["choice"])) != "open":
-        res["approval"] = None  # 2.30.0 (#1041): an answered / expired permission question takes no go-ahead any more
-        stale = True
-    elif perm and res["approval"]:  # 👍 / 👎 = the buttons Allow / Deny (the answer shows the same way; chat_choice too)
-        yes, no = ("yes", "no") if ch.get("approval") else ("allow", "deny")
-        chat_choice_answer(c, m, ch, [yes if emoji == "up" else no], uid, "reaction")
     who = {"id": uid, "name": user_names(c, [uid]).get(uid, "")}
     data = {"chat_message": {"id": m["id"], "text": m["body"][:AGENT_EVENT_COMMENT_CHARS], "from": m["sender"], "created_at": m["created_at"],
                              "task_id": m["task_id"]},
             "reaction": {"emoji": emoji, "user": who}, "approval": res["approval"], "user": who}
-    if stale:
-        data["stale"] = True  # a 👍 on a closed permission question: hosts must read "approval", never the emoji
     if m["task_id"] and task_visible(c, m["task_id"], m["agent_id"], full=True):
         data.update(agent_task_data(c, m["task_id"], m["agent_id"]))
     agent_emit(c, m["agent_id"], "reaction", data)

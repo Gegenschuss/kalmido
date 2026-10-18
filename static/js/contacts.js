@@ -393,7 +393,19 @@ function ctImport(bookId) {
   const run = async bid => {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = '.vcf,text/vcard,text/x-vcard';
-    inp.onchange = () => { const f = inp.files[0]; if (f) ctImpRun(bid, f); };
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      // 2.87.9 (#1940): where the contacts go, in words; from an organisation's book also into an own private book
+      const b = (S.books || []).find(x => x.id === bid);
+      const to = await importTargetConfirm({what: tr('the contacts'), ws: wsOf(b), place: b?.name || '', privOk: true});
+      if (!to) return;
+      if (to === 'private') {
+        let pb = (S.books || []).find(x => !x.org_id && x.role === 'owner');
+        if (!pb) { try { pb = await api('POST', '/api/books', {name: tr('Contacts'), org_id: null}); await load(); } catch { return; } }
+        bid = pb.id;
+      }
+      ctImpRun(bid, f);
+    };
     inp.click();
   };
   if (bookId) { run(bookId); return; }

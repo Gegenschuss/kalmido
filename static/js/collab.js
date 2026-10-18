@@ -92,13 +92,18 @@ function bellResizeWire(p, anchor) {
     const x0 = e.clientX, y0 = e.clientY, w0 = p.offsetWidth, h0 = pop().offsetHeight;
     let moved = false, last = [w0, h0];
     try { (grip || grab).setPointerCapture(e.pointerId); } catch { /* old browsers */ }
+    // 2.87.9 (#1965): the size follows once per frame
+    const show = rafThrottle((x, y) => {
+      if (grip) last = apply(w0 - (x - x0), h0 + (y - y0));
+      else { const h = Math.max(BELL_MIN.h * remPx() * .5, Math.min(innerHeight - 8, h0 - (y - y0))); pop().style.height = h + 'px'; pop().style.maxHeight = 'none'; last = [0, h]; }
+    });
     const mv = ev => {
       if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) > 4) moved = true;
-      if (grip) last = apply(w0 - (ev.clientX - x0), h0 + (ev.clientY - y0));
-      else { const h = Math.max(BELL_MIN.h * remPx() * .5, Math.min(innerHeight - 8, h0 - (ev.clientY - y0))); pop().style.height = h + 'px'; pop().style.maxHeight = 'none'; last = [0, h]; }
+      show(ev.clientX, ev.clientY);
     };
     const up = () => {
       removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+      show.flush();
       if (grip) { if (moved) save(...last); return; }
       const r = remPx(), full = innerHeight - 8;
       if (!moved) { const was = +LS.get('bellSheetH', 0); if (was * r >= full - 2) LS.del('bellSheetH'); else LS.set('bellSheetH', Math.round(full / r * 100) / 100); bellSize(p); return; }

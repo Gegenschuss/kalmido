@@ -236,6 +236,8 @@ async function oimImport() {
   const cl = (p.clients || []).map(c => ({row: c.row, name: c.name, contact: c.contact, street: c.street, zip: c.zip, city: c.city, country: (c.country || '').toUpperCase(), address: c.address,
     action: c.action, merge_id: (c.action === 'merge' || c.action === 'contact') && c.dup?.kind === 'existing' ? c.dup.id : undefined,
     contact_row: c.action === 'contact' && c.dup?.kind === 'file' ? c.dup.row : undefined}));
+  // 2.87.9 (#1940): where the data goes, in words (the office of the shown workspace)
+  if (!await importTargetConfirm({what: tr('the data of the file'), ws: ofcWs(), place: tr('Office')})) return;
   OIM.busy = true; ofcDraw();
   try {
     const areas = bk_areasOn(p), pick = k => areas.includes(k) ? (k === 'clients' ? cl : p[k] || []) : [];

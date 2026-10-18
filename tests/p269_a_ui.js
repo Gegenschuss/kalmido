@@ -53,11 +53,10 @@ with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en'});
 
-  // ================= the two ways in the documents settings
+  // ================= the two ways (2.87.9 #1936: in Settings > Integrations)
   const w = await boot({user: 'alice', hash: 'docs'}), d = w.document;
-  await until(() => d.querySelector('[data-dc="settings"]'));
-  d.querySelector('[data-dc="settings"]').click();
-  const slot = () => d.querySelector('.dc-smd .pl-slot');
+  w.eval(`settingsModal('paperless')`);
+  const slot = () => d.querySelector('.smodal .pl-slot');
   await until(() => slot()?.querySelector('[data-pl="zip-pick"]'));
   const tx = slot()?.textContent || '';
   check(/Connect by address/.test(tx) && /From a Paperless-ngx export \(ZIP\)/.test(tx) && /document_exporter/.test(tx), 'settings: both ways, with how to make the export');
@@ -76,6 +75,9 @@ with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
   const drop = rows.find(li => /Drop/.test(li.textContent));
   if (drop) { const s = drop.querySelector('select'); s.value = 'skip'; s.dispatchEvent(new w.Event('change', {bubbles: true})); }
   pm?.querySelector('[data-plp="start"]').click();
+  // 2.87.9 (#1940): the import first names its target
+  await until(() => d.querySelector('.itc-dlg [data-cd="yes"]'));
+  d.querySelector('.itc-dlg [data-cd="yes"]')?.click();
   await until(() => /Last import from a ZIP: 2 new/.test(slot()?.textContent || ''), 150);
   check(/Last import from a ZIP: 2 new/.test(slot()?.textContent || ''), 'the result line ' + (slot()?.textContent || '').slice(0, 300));
   const docs = (await call('GET', '/api/docs?ws=private')).docs || [];
@@ -87,9 +89,8 @@ with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
 
   // ================= phone width
   const m = await boot({user: 'alice', hash: 'docs', mobile: true}), f = m.document;
-  await until(() => f.querySelector('[data-dc="settings"]'));
-  f.querySelector('[data-dc="settings"]').click();
-  check(await until(() => f.querySelector('.dc-smd .pl-slot [data-pl="zip-pick"]')), 'phone: the ZIP way is there');
+  m.eval(`settingsModal('paperless')`);  // 2.87.9 (#1936): Settings > Integrations
+  check(await until(() => f.querySelector('.smodal .pl-slot [data-pl="zip-pick"]')), 'phone: the ZIP way is there');
   m.close();
 
   console.log(`p269_a_ui: ${ok} ok, ${F.length} failed`);

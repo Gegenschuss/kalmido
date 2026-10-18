@@ -7,6 +7,54 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.92.2] - 2026-10-18
+
+Freelancer parity, an office menu in four groups, import targets you confirm, Paperless-ngx in the settings and a round of polish.
+
+### Added
+- Before every import (Paperless-ngx connection and ZIP, tasks from Todoist / Trello / Asana / Microsoft To Do / TickTick / ICS,
+  contacts, calendars, budget CSV, office data, wiki pages, account move, feeds) Kalmido says in words where the data goes - an
+  organisation (and who sees it) or your private space - and asks first; from an organisation, *Rather to private* imports into
+  your own space instead (#1940).
+- Organisations can use their own picture as their symbol instead of an emoji: set by their admins, shown to members only,
+  sealed with the organisation's key (#1913).
+- The office has one menu in four groups - Sell, Money, On the road, Administration - instead of two tab rows; on the phone a
+  start page with four tiles and the key figures; the path shows only on detail pages (#1917). Bookkeeping, bank and
+  subscriptions & tools sit under Money, contracts & insurance under Administration.
+- Search (Mod+K) finds the Paperless-ngx import, the sub-points of every area, the senders, document types and tags of your
+  documents and the top folders of your files (#1934).
+- Document rows in the office (quotations, invoices, credit notes, reminders) have their own menu: dots button, right click or a
+  long press - open, duplicate, preview, e-invoice XML, DATEV, delete (#1920).
+- New test guard `freelancer_coverage`: every route is checked for a person without an organisation or carries a reason; the
+  live update refuses a release when it is red (#1919). The sweep found no function that needs an organisation (#1918).
+
+### Changed
+- Paperless-ngx moved to *Settings > Integrations* (per workspace); the documents' settings keep the progress of a running import
+  and a jump there. The progress says it runs in the background - and to keep the window open while a file uploads (#1936, #1935).
+- The list column *Date* is called *Due*; an empty cell shows a dash (#1914).
+- Pinned chat messages stand one below the other; from three on the area scrolls on its own (#1909).
+- Sidebar: search and workspace in one line, the workspace as a round button - also without an organisation (#1933).
+- Every dialog with a header can be moved; the background behind a dialog darkens less (#1937).
+- One font size and field height in all forms (16 px on touch screens, against the zoom on iOS); dates and numbers in the normal
+  font with even digits (#1952).
+- Approval cards: the app's own thumbs instead of emoji; while a card is open, the reactions below it show no thumbs, and a
+  thumb no longer decides an approval or permission card - only its Yes / No buttons do (#1963).
+- Dragging is smooth everywhere: panel and column widths, chat windows and dividers, dialogs, tasks in lists and boards (mouse
+  and touch), calendar, mind map, timeline and the smaller drag places update once per frame and store on release (#1965).
+
+### Fixed
+- The Paperless-ngx import progress no longer stops when the settings are closed and opened again; it asks again after a lost
+  answer and reports when it is done (#1938).
+
+## [2.92.1] - 2026-10-18
+
+CI fixes of 2.92.0 (and 2.91.0).
+
+### Fixed
+- Tests: the office view counts every tab of its tab list (bookkeeping, bank, subscriptions, contracts joined); the pdf
+  module lists the Word / Excel preview; a task-detail UI test waits until the client state exists (#1925, #1926).
+- French, Italian and Dutch name the Basket in the tax dates hint (#1922).
+
 ## [2.92.0] - 2026-10-18
 
 Contracts and insurance in the office, equipment value, Word and Excel preview, fixes from the 2.88 device tests.

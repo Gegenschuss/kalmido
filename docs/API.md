@@ -558,6 +558,7 @@ in `file` and these optional fields:
 | `completed` | `import` (default), `skip` | Completed tasks |
 | `list_name` | text | Name of the new list when the file has only one |
 | `priority_scale` | `auto` (default), `1`, `4` | Todoist CSV: which `PRIORITY` value means p1 |
+| `space` | `private`, `org:<id>` | 2.87.9: workspace of the new lists (an own organisation only, else 400); a list of the same name is reused only inside it. Without it: the default workspace of a new list |
 
 ```sh
 # preview, then import

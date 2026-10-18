@@ -168,7 +168,10 @@ const DE = d => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
   const sal = rows.find(x => /Gehalt/.test(x.textContent));
   check(sal && sal.querySelector('.bgamt.in') && /2[.,]?500/.test(sal.textContent), '#1333: a plus amount is income (2.500,00)');
   check(/Take over 2 entries/.test(dlg().querySelector('[data-cs="next"]')?.textContent || ''), '#1333: "Take over 2 entries" ' + dlg().querySelector('[data-cs="next"]')?.textContent);
-  click(w, dlg().querySelector('[data-cs="next"]')); await until(() => !dlg());
+  click(w, dlg().querySelector('[data-cs="next"]'));
+  // 2.87.9 (#1940): the import first names the budget list it goes into
+  check(await until(() => w.document.querySelector('.itc-dlg [data-cd="yes"]')), '#1940: the import names its target first');
+  click(w, w.document.querySelector('.itc-dlg [data-cd="yes"]')); await until(() => !dlg());
   const B1 = await call('GET', `/api/budget/${LID}?month=${MONTH}`);
   check(B1.entries?.filter(x => x.title === 'Bakery').length === 1, '#1333: the duplicate is not imported twice');
   const sup = B1.entries?.find(x => x.title === 'Supermarkt');

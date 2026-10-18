@@ -121,11 +121,12 @@ const V = B + 'api/v1';
   const pq = await say('May I run `npm test`?', {permission: true, expires_in: 600});
   await w.eval('chatLoad()'); await until(() => cm(d, pq.id)?.querySelector('.cperm'));
   const pb = [...cm(d, pq.id).querySelectorAll('.cperm .cchb')];
-  check(pb.length === 2 && pb[0].querySelector('.thumb[aria-hidden="true"]')?.textContent === '\u{1F44D}' && /Allow/.test(pb[0].textContent)
-    && pb[1].querySelector('.thumb[aria-hidden="true"]')?.textContent === '\u{1F44E}' && /Deny/.test(pb[1].textContent) && !pb[0].querySelector('svg'),
+  check(pb.length === 2 && pb[0].querySelector('.thumb[aria-hidden="true"] svg')  // 2.87.9 (#1963): the app's thumb icons, no emoji
+     && /Allow/.test(pb[0].textContent)
+    && pb[1].querySelector('.thumb[aria-hidden="true"] svg') && /Deny/.test(pb[1].textContent) && !/\u{1F44D}/u.test(pb[0].textContent),
     '#1082: Allow 👍 / Deny 👎, the emoji hidden from screen readers');
   click(w, pb[0]); await until(() => cm(d, pq.id)?.querySelector('.cpermst.ok'));
-  check(cm(d, pq.id).querySelector('.cpermst.ok .thumb')?.textContent === '\u{1F44D}' && /Allowed/.test(cm(d, pq.id).querySelector('.cpermst').textContent), '#1082: "👍 Allowed HH:MM"');
+  check(cm(d, pq.id).querySelector('.cpermst.ok .thumb svg') && /Allowed/.test(cm(d, pq.id).querySelector('.cpermst').textContent), '#1082: "👍 Allowed HH:MM"');
   // #1062 the smiley: desktop only on hover (jsdom: the class and the rule exist)
   const ag1 = cm(d, hello.id);
   check(ag1.querySelector('.rxrow .rxtog'), '#1062: the agent message keeps its smiley (shown on hover / long press)');
@@ -142,7 +143,7 @@ const V = B + 'api/v1';
   check(d.querySelectorAll('.jobs details.jobv[open] .jvh').length === 3, '#1081: ... opens with the grouped lines');
   const wr = [...d.querySelectorAll('.jobs .job')].find(j => /Needs an OK/.test(j.textContent));
   const jb = wr ? [...wr.querySelectorAll('[data-act="job-do"]')] : [];
-  check(jb.length >= 2 && jb[0].querySelector('.thumb')?.textContent === '\u{1F44D}' && jb[1].querySelector('.thumb')?.textContent === '\u{1F44E}', '#1082: the job buttons Approve 👍 / Reject 👎');
+  check(jb.length >= 2 && jb[0].querySelector('.thumb svg') && jb[1].querySelector('.thumb svg'), '#1082: the job buttons Approve 👍 / Reject 👎');
   w.close();
   const BCK = await login('bob');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, BCK);

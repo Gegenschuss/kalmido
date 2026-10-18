@@ -43,6 +43,11 @@ async function dc_load() {
   dc_draw();
   dc_pollSet();
 }
+// 2.87.9 (#1934): a hit of the search (palette.js palSubItems): the documents filtered by one sender / type / tag
+function dc_filterGo(k, v) {
+  DC.f = {...DC.f, sender: '', type: '', tag: '', review: false, [k]: v}; DC.more = true; DC.at = 0;
+  if (S.route.mod === 'docs') dc_load(); else go('docs');
+}
 // 2.66.1 (#1945): the workspace switch (here, or on another device) drops the list, the counters, the filters (their values
 // are ids of the old workspace) and an open document of the old workspace; viewDocs then loads the new one at once
 function p61b_dcReset() {

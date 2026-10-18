@@ -438,6 +438,11 @@ function evImport(c, done) {
   inp.type = 'file'; inp.accept = '.ics,text/calendar';
   inp.onchange = async () => {
     const f = inp.files[0]; if (!f) return;
+    // 2.87.9 (#1940): where the events go, in words; from an organisation's calendar also into an own private calendar
+    const pc = (S.evcals || []).find(x => !x.org_id && x.role === 'owner');
+    const to = await importTargetConfirm({what: tr('the events'), ws: wsOf(c), place: c.name, privOk: !!pc});
+    if (!to) return;
+    if (to === 'private') c = pc;
     const fd = new FormData(); fd.append('file', f);
     try {
       const r = await fetch(`/api/evcals/${c.id}/import`, {method: 'POST', body: fd, headers: {'X-Requested-With': 'kalmido'}, credentials: 'same-origin'});

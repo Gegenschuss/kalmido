@@ -59,9 +59,10 @@ const FEAT = 'cal,comments,collab,clients,office';
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
-  const tabs = `(() => { const bar = document.querySelector('.office .ofctabs'); if (!bar) return null; const b = bar.getBoundingClientRect(); const ts = [...bar.querySelectorAll('[role=tab]')].map(x => x.getBoundingClientRect());
+  // 2.87.9 (#1917): the office menu (computer: four groups; phone: the group's points) replaces the tab row; the same rules
+  const tabs = `(() => { const bar = document.querySelector('#view .ofmenu, #view .ofmbar'); if (!bar) return null; const b = bar.getBoundingClientRect(); const bs = [...bar.querySelectorAll('[data-ofm]')], ts = bs.map(x => x.getBoundingClientRect());
     const k = document.querySelector('.office .ofdkinds'); const kb = k && k.getBoundingClientRect();
-    return JSON.stringify({n: ts.length, inside: ts.every(r => r.left >= b.left - 1 && r.right <= b.right + 1 && r.width > 0), wrap: getComputedStyle(bar).flexWrap, ox: getComputedStyle(bar).overflowX, scroll: bar.scrollWidth > bar.clientWidth + 1,
+    return JSON.stringify({n: ts.length, inside: ts.every(r => r.left >= b.left - 1 && r.right <= b.right + 1 && r.width > 0), wrap: bs.length && getComputedStyle(bs[0].parentElement).flexWrap, ox: getComputedStyle(bar).overflowX, scroll: bar.scrollWidth > bar.clientWidth + 1 || bs.some(x => x.parentElement.scrollWidth > x.parentElement.clientWidth + 1),
       rows: new Set(ts.map(r => Math.round(r.top))).size, kinds: kb ? [...k.querySelectorAll('button')].every(x => { const r = x.getBoundingClientRect(); return r.right <= kb.right + 1 && r.width > 0; }) : true,
       over: document.documentElement.scrollWidth > window.innerWidth + 1}); })()`;
   await firefox(async o => {
@@ -70,12 +71,11 @@ const FEAT = 'cal,comments,collab,clients,office';
     for (const [wd, tag] of [[1345, '1345'], [760, '760-chat'], [390, '390']]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: wd, height: 850}});
       await o.nav(B + '#office/offers');
-      await until(() => ev(`!!document.querySelector('.office .ofctabs')`).catch(() => false), 60); await sleep(900);
+      await until(() => ev(`!!document.querySelector('#view .ofmenu, #view .ofmbar')`).catch(() => false), 60); await sleep(900);
       const g = JSON.parse(await ev(tabs));
-      check(g && g.n >= 6 && g.inside, `#1830 ${tag}: all tabs lie inside the tab bar ` + JSON.stringify(g));
+      check(g && g.n >= (wd < 900 ? 2 : 6) && g.inside, `#1830 ${tag}: all tabs lie inside the tab bar ` + JSON.stringify(g));
       check(g && g.wrap === 'wrap' && !g.scroll, `#1830 ${tag}: the bar wraps and does not scroll ` + JSON.stringify(g));
       check(g && g.kinds && !g.over, `#1830 ${tag}: the kind switches fit, no horizontal overflow ` + JSON.stringify(g));
-      if (wd === 390) check(g && g.rows >= 2, '#1830 390: the tabs need more than one row on a phone ' + JSON.stringify(g));
       await shot(`p260d-office-${tag}.png`);
     }
   }, undefined);

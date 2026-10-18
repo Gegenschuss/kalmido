@@ -45,10 +45,10 @@ const RXN = {up: N_('thumbs up'), down: N_('thumbs down'), heart: N_('heart')};
 // 2.23.0 (#823, owner decision): no reactions on one's own message (own: only the reactions of others, read-only); the quick
 // reactions of other people's messages sit behind a smiley button again (key: the open row, S.rxOpen), except keep (👍 / 👎
 // on an open question of an agent: the approval stays one tap away)
-function rxRow(rs, {mid, act, dis = false, name = null, extra = '', own = false, key = null, keep = []}) {
+function rxRow(rs, {mid, act, dis = false, name = null, extra = '', own = false, key = null, keep = [], hide = []}) {
   const meIn = r => !!r && (r.users || []).some(u => S.me && u.id === S.me.id), cnt = r => r ? r.count ?? (r.users || []).length : 0;
   if (own) dis = true;
-  const items = RX.map(([k, em, n]) => { const o = name ? name(k, n) : n; return {k, em, n, o: o !== n ? o : '', r: rs.find(r => r.emoji === k)}; }).filter(x => !dis || cnt(x.r));
+  const items = RX.filter(x => !hide.includes(x[0])).map(([k, em, n]) => { const o = name ? name(k, n) : n; return {k, em, n, o: o !== n ? o : '', r: rs.find(r => r.emoji === k)}; }).filter(x => !dis || cnt(x.r));
   for (const r of rs) if (!RX.some(x => x[0] === r.emoji) && cnt(r)) items.push({k: r.emoji, em: rxEmoji(r.emoji), n: '', r});
   if (!items.length && !extra) return '';
   const fi = Math.max(0, items.findIndex(x => meIn(x.r)));

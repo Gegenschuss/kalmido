@@ -176,8 +176,11 @@ document.addEventListener('click', e => {
 // ---- dragging a tile with the mouse (desktop, Fold): drop on another tile = in front of it / behind it (right half)
 const fv2_after = (t, x) => { const r = t.getBoundingClientRect(); return x > r.left + r.width / 2; };
 function fv2_mark(t, x) {
+  // 2.87.9 (#1965): the mark changes only when the tile or its half changes
+  const cls = t && t.dataset.fv2 !== FV2.drag ? (fv2_after(t, x) ? 'fv2-after' : 'fv2-before') : null;
+  if (cls && FV2.mk === t && t.classList.contains(cls)) return;
   $$('#side .fv2-tile.fv2-before, #side .fv2-tile.fv2-after').forEach(b => b.classList.remove('fv2-before', 'fv2-after'));
-  if (t && t.dataset.fv2 !== FV2.drag) t.classList.add(fv2_after(t, x) ? 'fv2-after' : 'fv2-before');
+  FV2.mk = cls ? t : null; if (cls) t.classList.add(cls);
 }
 // the tile under (or in the grid, nearest to) the pointer
 function fv2_target(x, y) {

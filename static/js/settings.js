@@ -210,7 +210,8 @@ const MOD_DESC = {office: N_('Quotations with a calculator, services and rates, 
 function integrCardsHtml() {
   const C = [['cal', N_('Calendar on your phone'), N_('Your tasks with a date in the phone’s calendar app'), S.caldav?.enabled && S.me ? '#s-dav-h' : '#s-ical-h'],
     ['phone', N_('Share from your phone'), N_('Text, links and pictures from other apps into Kalmido'), '#s-share-h'],
-    ['send', N_('Send by e-mail'), N_('Forward an e-mail and it becomes a task'), '#s-mail-h']];
+    ['send', N_('Send by e-mail'), N_('Forward an e-mail and it becomes a task'), '#s-mail-h'],
+    ...(feat('docs') && typeof pl_setHtml === 'function' ? [['file', N_('Documents from Paperless-ngx'), N_('Bring the documents of your Paperless-ngx server into Kalmido'), '#s-pl-h']] : [])];  // 2.87.9 (#1936)
   return `<div class="icards">${C.map(([i, n, d, to]) => `<button type="button" class="icard" data-jump="${to}">${ic(i, 's')}<span><b>${tr(n)}</b><small>${tr(d)}</small></span>${ic('chev', 's fcar')}</button>`).join('')}</div>`;
 }
 function modulesHtml(hint) {
@@ -625,6 +626,7 @@ function settingsModal(focus) {
         <li>${tr('<b>Only reachable at home or over a VPN?</b> Google Calendar, iCloud and Outlook.com fetch the feed from their own servers and then cannot reach it. Use an app that fetches on the device instead: on Android ICSx⁵ (the calendar then shows up in every calendar app), on a Mac the location “On My Mac” instead of iCloud, or Thunderbird.')}</li></ul></details>
       ${hintK(tr('Anyone who knows the link sees these tasks. If it got out, create a new link: the old one stops working at once.'))}
       ${caldavHtml(hint)}
+      ${feat('docs') && typeof pl_setHtml === 'function' ? pl_setHtml() : ''}
       <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
       ${shareHtml(hint)}
       <ul class="slist">
@@ -681,7 +683,7 @@ function settingsModal(focus) {
   pane.help += asst_helpHtml();  // 2.75.0 (#1411)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'users' : 'ai', agentpolicy: 'users', server: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'users' : 'ai', agentpolicy: 'users', server: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', paperless: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" name="kalmido-settings-search" data-1p-ignore data-lpignore="true" data-bwignore readonly placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
@@ -1032,6 +1034,7 @@ function impInit(md) {
       : trn('Imported: {0} task', 'Imported: {0} tasks', n) + (j.skipped ? ' · ' + trn('{0} skipped (already there)', '{0} skipped (already there)', j.skipped) : '');
     const ls = j.lists.map(l => `<div class="mrow"><span class="n">${esc(l.name)}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}${l.skipped ? ' · ' + tr('{0} skipped', l.skipped) : ''}${l.sections ? ' · ' + trn('{0} new section', '{0} new sections', l.sections) : ''} · ${l.existing ? tr('existing list') : tr('new list')}</span></div>`).join('');
     const opts = j.dry_run ? sel('s-imp-target', tr('Into'), [['new', tr('New lists (an own list with the same name is reused)')], ...lists().map(l => [String(l.id), lname(l)])], I.opts.target || 'new')
+      + (wsOn() && !(I.opts.target && I.opts.target !== 'new') ? sel('s-imp-space', tr('Workspace'), wsOptions().filter(w => w !== 'all').map(w => [w, wsName(w)]), I.opts.space) : '')  // 2.87.9 (#1940)
       + (I.src === 'trello' ? sel('s-imp-mode', tr('Trello lists'), [['sections', tr('as sections of one list')], ['lists', tr('as separate lists (in a folder)')]], I.opts.mode || 'sections')
         + sel('s-imp-archived', tr('Archived cards'), [['skip', tr('skip')], ['done', tr('import as completed')]], I.opts.archived || 'skip') : '')
       + sel('s-imp-completed', tr('Completed tasks'), [['import', tr('import as completed')], ['skip', tr('skip')]], I.opts.completed || 'import')
@@ -1063,12 +1066,16 @@ function impInit(md) {
   inp.addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
     if (I.src === 'ticktick') {
+      // 2.87.9 (#1940): TickTick's lists always become private lists of the person
+      if (!await importTargetConfirm({what: tr('the tasks'), ws: 'private'})) { inp.value = ''; const fn = $('#s-import-name', md); if (fn) fn.textContent = tr('No file chosen'); return; }
       const fd = new FormData(); fd.append('file', f);
       const j = await api('POST', '/api/import/ticktick', fd);
       toast(tr('Import: {0} tasks, {1} new lists', j.tasks, j.lists) + (j.skipped ? tr(', {0} already there', j.skipped) : ''));
       inp.value = ''; await load(); render(); return;
     }
-    I.file = f; I.opts = {}; await preview();
+    // 2.87.9 (#1940): new lists go into the workspace shown in the sidebar ("All": the default of a new list, the first organisation)
+    const cur = wsCur(), firstOrg = (S.me?.workspaces || [])[0];
+    I.file = f; I.opts = {space: cur !== 'all' ? cur : firstOrg ? 'org:' + firstOrg.id : 'private'}; await preview();
   });
   out.addEventListener('change', e => {
     const k = e.target.dataset.io; if (!k) return;
@@ -1088,6 +1095,11 @@ function impInit(md) {
     if (a === 'cancel') { out.innerHTML = ''; I.file = null; inp.value = ''; return; }
     if (a === 'undo') { await undo(+b.dataset.id); return; }
     if (a === 'go') {
+      // 2.87.9 (#1940): where the tasks go, in words; new lists from an organisation can go into the private space instead
+      const tl = I.opts.target && I.opts.target !== 'new' ? listById(+I.opts.target) : null, n = I.last?.created?.tasks;
+      const to = await importTargetConfirm({what: n ? trn('{0} task', '{0} tasks', n) : tr('the tasks'), ws: tl ? wsOf(tl) : I.opts.space || 'private', place: tl ? lname(tl) : '', privOk: !tl});
+      if (!to) return;
+      if (to === 'private') I.opts.space = 'private';
       b.disabled = true;
       try {
         const j = await api('POST', `/api/import/${I.src}`, form(false));

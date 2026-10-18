@@ -6,6 +6,10 @@
 .ofcgrp .c{font-weight:400;text-transform:none;letter-spacing:0}
 .ofclist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
 .ofcrow{display:flex;align-items:center;gap:.625rem;width:100%;text-align:left;min-height:2.75rem;padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);color:var(--text)}
+.ofdli{position:relative;display:flex;align-items:stretch;gap:.25rem}
+.ofdli>.ofdrow{flex:1;min-width:0}
+.ofdrmore{flex:none;width:2.75rem;min-height:2.75rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);color:var(--muted);display:inline-flex;align-items:center;justify-content:center}
+.ofdrmore:hover,.ofdrmore:focus-visible{border-color:var(--accent);color:var(--text)}
 .ofcrow:hover,.ofcrow:focus-visible{border-color:var(--accent)}
 .ofcrow.arch{opacity:.6}
 .ofcrow .ofcn{flex:1;min-width:0;display:flex;flex-direction:column}

@@ -51,7 +51,10 @@ const FEAT = 'cal,comments,collab,office,clients';
     const PNG = '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360606060000000050001a5f645400000000049454e44ae426082';
     await ev(`(async () => { const b = new Uint8Array('${PNG}'.match(/../g).map(h => parseInt(h, 16))); await ofcLogoUpload(new File([b], 'logo.png', {type: 'image/png'})); return 1; })()`);
     check(await ready(ev, `!!OFC.info?.settings?.logo && __t.includes(tr('Logo saved'))`), '#1378: the logo upload of the page works ' + JSON.stringify(await ev('__t')));
-    await ev(`(async () => { const t = await (await fetch('/api/office/export')).text(); await ofcImport(new File([t], 'office.json', {type: 'application/json'}), false); return 1; })()`);
+    // 2.87.9 (#1940): the import first names the office it goes into (confirmed here)
+    await ev(`(async () => { const t = await (await fetch('/api/office/export')).text(); ofcImport(new File([t], 'office.json', {type: 'application/json'}), false); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.itc-dlg [data-cd="yes"]')`), '#1940: the import names its target first');
+    await ev(`(() => { document.querySelector('.itc-dlg [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, `__t.some(x => /^Imported/.test(x))`), '#1378: the settings import of the page works ' + JSON.stringify(await ev('__t')));
     check(!(await ev(`__t.some(x => /X-Requested-With/.test(x))`)), '#1378: no "header missing"');
 

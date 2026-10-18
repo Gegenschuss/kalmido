@@ -216,7 +216,7 @@ IMPORT_UNDO_HOURS = 24
 IMPORT_RATE = _imp_env("KALMIDO_IMPORT_RATE", 30)  # imports + previews per user and 10 minutes
 IMPORT_KEEP = 20                          # import records (undo) kept per user
 IMPORT_SOURCES = {"todoist": "Todoist", "trello": "Trello", "asana": "Asana", "mstodo": "Microsoft To Do", "ics": "ICS"}
-IMPORT_OPTS = ("dry_run", "target", "mode", "archived", "completed", "list_name", "priority_scale")
+IMPORT_OPTS = ("dry_run", "target", "mode", "archived", "completed", "list_name", "priority_scale", "space")
 IMPORT_SAMPLES = 8
 csv.field_size_limit(max(csv.field_size_limit(), 4 * CONTENT_MAX))
 _IMP_CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069]")
@@ -1312,9 +1312,10 @@ def imp_run(c, uid, plan, opts, dry):
     stats = {"tasks": 0, "subtasks": 0, "done": 0, "skipped": 0, "lists": 0, "sections": 0, "assigned": 0}
     s_all = usettings(c, uid)
     base_t = s_all.get("allday_time") or "09:00"
-    own = {}
-    for r in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND e2e IS NULL ORDER BY id", (uid,)):
-        own.setdefault(r["name"], r["id"])  # 2.64.1 B (#1817): never into a list with the lock (a new list of that name instead)
+    own, space = {}, opts.get("space", False)
+    for r in c.execute("SELECT id, name, org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND e2e IS NULL ORDER BY id", (uid,)):
+        if space is False or r["org_id"] == space:  # 2.87.9 (#1940): a chosen workspace reuses only its own lists
+            own.setdefault(r["name"], r["id"])  # 2.64.1 B (#1817): never into a list with the lock (a new list of that name instead)
     from ..core.access import token_lists
     tl = token_lists()
     if tl is not None and not target:  # 2.86.0 (N19): a token limited to selected lists never creates lists, only fills allowed ones
@@ -1359,8 +1360,13 @@ def imp_run(c, uid, plan, opts, dry):
                 lid = insert_id(c, "INSERT INTO lists(name,folder,sort,view,created_at,owner_id) VALUES(?,?,?,?,?,?)",
                                 (L["name"] or tr("Import", lg=lg), L["folder"], sort_l, L["view"], ts, uid))
                 from ..accounts.orgs import ws_apply_default
-                ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
+                if space is False:
+                    ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
+                elif space:  # 2.87.9 (#1940): the workspace the person confirmed (checked in imp_opts: an organisation of theirs)
+                    c.execute("UPDATE lists SET org_id=? WHERE id=?", (space, lid))
                 list_created(c, uid, lid)  # 2.25.0 (#931)
+                if space is not False:  # 2.87.9 (#1940): a folder's default workspace never overrides the confirmed one
+                    c.execute("UPDATE lists SET org_id=? WHERE id=?", (space, lid))
                 own[L["name"]] = lid
                 created["lists"].append(lid)
                 stats["lists"] += 1
@@ -1484,6 +1490,18 @@ def imp_opts(form, uid):
             o[k] = v
     if form.get("list_name"):
         o["list_name"] = str(form["list_name"])[:LIST_NAME_MAX]
+    # 2.87.9 (#1940): the workspace of the NEW lists ('private' | 'org:<id>' of an organisation of the person); without it the
+    # default of a new list (ws_default_org) as before. A list of the same name is reused only inside that workspace.
+    sp = str(form.get("space") or "").strip()
+    if sp:
+        if sp == "private":
+            o["space"] = None
+        else:
+            from ..accounts.orgs import user_orgs
+            m = re.fullmatch(r"org:(\d+)", sp)
+            if not m or int(m.group(1)) not in user_orgs(db(), uid):
+                raise BadInput(tr("Invalid value: {0}", "space"))
+            o["space"] = int(m.group(1))
     return o
 
 
