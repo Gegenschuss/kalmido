@@ -278,6 +278,8 @@ ROUTES = {
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
     "GET /api/office/deals/summary": "office", "GET /api/office/kpi": "office",
+    # 2.94.0 A (#1930): leads before the pipeline (office admins; agents with the office switch via v1; p294_a_api_test.py)
+    # 2.94.0 B (#1929): appointment booking settings and bookings of the person (p294_b_api_test.py)
     # 2.51.0 (#1348, #1350): agents in the office (drafts only) and the switches / payment suggestions of people (p251_a_api_test.py)
     "GET /api/office/agents/{}": "office", "PATCH /api/office/agents/{}": "office", "GET /api/office/pay-props": "office",
     "POST /api/office/pay-props/{}": "office", "GET /api/v1/office": "office", "GET /api/v1/office/{}": "office",
