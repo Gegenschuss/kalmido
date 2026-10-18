@@ -195,7 +195,9 @@ check(A.patch(B + f"{AG}/{INS['id']}", json={"task": 1, "list_id": CL_LIST}).sta
 # 2.92.0 review: a list of another organisation (even one the admin may write) never takes the contract's deadline task
 XL = A.post(B + "/api/lists", json={"name": "Fremde Org"}).json()["id"]
 sql("UPDATE lists SET org_id=? WHERE id=?", (ORG2, XL))
-check(A.patch(B + f"{AG}/{INS['id']}", json={"task": 1, "list_id": XL}).status_code == 400, "#1925 review: a list of another organisation is refused")
+r = A.patch(B + f"{AG}/{INS['id']}", json={"task": 1, "list_id": XL})
+check(r.status_code in (400, 403, 404) and not sql("SELECT 1 FROM tasks WHERE list_id=?", (XL,)),
+      f"#1925 review: a list of another organisation is refused {r.status_code} {r.text[:160]}")
 check(all(x["id"] != XL for x in A.get(B + AG).json().get("lists", [])), "#1925 review: lists of another organisation are not offered")
 PLAIN = A.post(B + "/api/tasks", json={"title": "Fremde Aufgabe", "list_id": INBOX, "due": D(3)}).json()["id"]
 sql("UPDATE office_agreements SET task_id=? WHERE id=?", (PLAIN, RENT["id"]))
