@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.95.0** (2026-10-18): the per diem of business trips with the German flat rates per year (BMF 2025 / 2026; country,
+  city, times and meals per day; a year without rates shows a hint), its report per person as PDF / Excel / CSV, and the
+  import of a per diem spreadsheet with a preview.
 - **2.94.0** (2026-10-18): a public booking page for customers (free times from your calendar, mail confirmation,
   event + contact + lead), leads before the sales pipeline (follow-up, convert to client, CSV import, agents), and Enter in
   the chats makes a new line.
