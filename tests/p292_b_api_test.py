@@ -160,6 +160,9 @@ check(c1["book_value"] == f"{exp_book:.2f}" and c1["current_value_eff"] == c1["b
 enc = sql("SELECT purchase_net, serial_no, new_value, vendor FROM office_equipment WHERE id=?", (CAM,))[0]
 check(str(enc[0]).startswith("kenc1:") and str(enc[1]).startswith("kenc1:") and enc[2] == "" and enc[3] == "Fotohaus Beispiel",
       f"price and serial number encrypted at rest {str(enc[0])[:10]} {str(enc[1])[:10]}")
+# 2.92.0 review: the office log of the equipment row carries the price too -> encrypted like the column
+logs = [str(x[0]) for x in sql("SELECT detail FROM office_doc_log WHERE detail LIKE ? OR detail LIKE ?", ("%purchase_net%", "%serial_no%"))]
+check(not logs, f"no office log entry holds the equipment price in plain text {logs[:1]}")
 
 r = A.post(B + E, json={"name": "Funkmikrofon", "category": "Ton", "purchase_date": "2025-06-01", "purchase_net": "650"})
 MIC = r.json()["id"]

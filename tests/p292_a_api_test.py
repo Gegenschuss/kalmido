@@ -192,6 +192,11 @@ check(r.ok and T3 and T3 != T2 and task(T3)["status"] == 0 and task(T3)["list_id
 # a list the person may not write: refused; a stored task id never reaches another task
 CL_LIST = Ca.post(B + "/api/lists", json={"name": "Carols Liste"}).json()["id"]
 check(A.patch(B + f"{AG}/{INS['id']}", json={"task": 1, "list_id": CL_LIST}).status_code in (403, 404), "#1925: a list of another person is refused")
+# 2.92.0 review: a list of another organisation (even one the admin may write) never takes the contract's deadline task
+XL = A.post(B + "/api/lists", json={"name": "Fremde Org"}).json()["id"]
+sql("UPDATE lists SET org_id=? WHERE id=?", (ORG2, XL))
+check(A.patch(B + f"{AG}/{INS['id']}", json={"task": 1, "list_id": XL}).status_code == 400, "#1925 review: a list of another organisation is refused")
+check(all(x["id"] != XL for x in A.get(B + AG).json().get("lists", [])), "#1925 review: lists of another organisation are not offered")
 PLAIN = A.post(B + "/api/tasks", json={"title": "Fremde Aufgabe", "list_id": INBOX, "due": D(3)}).json()["id"]
 sql("UPDATE office_agreements SET task_id=? WHERE id=?", (PLAIN, RENT["id"]))
 r = A.patch(B + f"{AG}/{RENT['id']}", json={"name": "Büromiete Hauptsitz"})
