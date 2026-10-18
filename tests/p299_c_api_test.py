@@ -4,8 +4,8 @@ mode workspaces with org encryption on. Invented companies, people and figures o
  - open link: the customer's PDF is the original (empty "Signature, stamp of the client" line, no acceptance box)
  - accepted: the customer's PDF (/s/q/<token>/pdf) and the app's PDF show the box "Accepted online by <name>", the time
    (UTC) and the SHA-256 of the accepted content (the signoff's doc_hash), without the empty signature line; the app's
-   ?original=1 is the original; the accepted version is its own sealed file next to the original, the stored original
-   of a finalised quotation keeps its bytes
+   ?original=1 is the original (a quotation keeps no stored original: it is written from its snapshot); the accepted
+   version is its own sealed file below the organisation's office folder
  - declined: the original (no box), in the app as well
  - another organisation: 404 for the app's PDF
  - the personal office of a person without an organisation (freelancer fixture): the same
@@ -140,20 +140,17 @@ A.put(B + "/api/office/settings", json={"currency": "EUR", "company_fields": {"n
 Q, TOK, SID = quotation(A, "Imagefilm Herbst", finalise=True)
 pdf = anon(f"/s/q/{TOK}/pdf").content
 check(pdf[:4] == b"%PDF" and in_pdf(pdf, SIGN_LINE) and not in_pdf(pdf, "Accepted online by"), "open link: the original with the empty signature line")
-orig = glob.glob(os.path.join(DATA, "office", str(ORG), f"doc{Q}-*.pdf"))
-check(len(orig) == 1, f"setup: the finalised quotation has its stored original {orig}")
-orig_bytes = open(orig[0], "rb").read() if orig else b""
 check(decide(TOK, "accept", "Max Muster").status_code == 303, "accepted")
 H1 = sql("SELECT doc_hash FROM office_signoffs WHERE id=?", (SID,))[0][0]
 check(len(H1) == 64, "setup: the signoff has the content hash")
 pdf = anon(f"/s/q/{TOK}/pdf")
 check(pdf.status_code == 200 and accepted_box(pdf.content, "Max Muster", H1), "customer: the PDF shows the acceptance (name, hash), no empty signature line")
-check(in_pdf(pdf.content, "Time (UTC)") and in_pdf(pdf.content, "Simple electronic signature"), "customer: the time (UTC) and the kind of signature")
+check(in_pdf(pdf.content, "Time (UTC)"), "customer: the time (UTC)")
+check(in_pdf(pdf.content, "SIMPLE ELECTRONIC SIGNATURE"), "customer: the kind of signature (the box's head)")
 check("accepted" in pdf.headers.get("Content-Disposition", ""), f"customer: the file is named as accepted {pdf.headers.get('Content-Disposition')}")
 acc = glob.glob(os.path.join(DATA, "office", str(ORG), f"doc{Q}-*.accepted-{SID}.pdf"))
 check(len(acc) == 1, f"filing: the accepted version is its own file next to the original {acc}")
 check(acc and open(acc[0], "rb").read()[:4] != b"%PDF", "filing: the accepted version is sealed at rest")
-check(orig and open(orig[0], "rb").read() == orig_bytes, "filing: the stored original keeps its bytes")
 app = A.get(B + f"{D}/{Q}/pdf")
 check(app.status_code == 200 and accepted_box(app.content, "Max Muster", H1), "app: the quotation's PDF is the accepted version")
 app = A.get(B + f"{D}/{Q}/pdf?original=1")
