@@ -1014,6 +1014,14 @@ it again); unknown, expired, stopped and voided links get the same `404`; decisi
 per link; the form carries a check value bound to the link. Name, e-mail, reason, address and user agent are encrypted at
 rest in organisations with encryption.
 
+**The accepted PDF** (2.99.0): once the customer accepts, the quotation's PDF shows a box *Accepted online by <name>*, the
+time (UTC) and the SHA-256 of the accepted content (`doc_hash`) instead of the empty *Order confirmation* lines. The
+accepted version is written right after the acceptance as its own file next to the original
+(`doc<id>-<number>.accepted-<signoff id>.pdf` below the organisation's office folder, sealed like the original); the stored
+original of a finalised quotation is never changed. The customer's download `/s/q/<token>/pdf` and the app's
+`GET /api/office/docs/<id>/pdf` serve the accepted version while the quotation's content is still the accepted one;
+`?original=1` returns the original as sent. Open and declined quotations keep the original.
+
 This is a **simple electronic signature**: usually enough to accept a quotation or confirm an acceptance; not for contracts
 that the law requires in written form (they need a qualified signature). Kalmido gives no legal advice and builds no
 advanced or qualified signature. The same flow confirms the **acceptance** of a project, a section or a milestone from the
