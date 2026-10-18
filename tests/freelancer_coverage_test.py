@@ -26,11 +26,11 @@ KINDS = {
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
                         "and import in the private space; every GET of the area as the freelancer (no 403 / 5xx)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
-    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py: the personal office (the freelancer is its admin): settings, company "
+    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p294_a_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless"),
     "files": ("matrix", SUITE + ": the own file store (folders, upload, content, versions) and documents; every GET"),
     "wiki": ("matrix", SUITE + ": knowledge pages in the private space (create, change, search, export, trash)"),
-    "pim": ("matrix", SUITE + ": own calendars, events, address books, contacts; CalDAV / CardDAV with an app password"),
+    "pim": ("matrix", SUITE + ", p294_b_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password"),
     "time": ("matrix", SUITE + ": time entries, the timer, habits"),
     "agents": ("matrix", SUITE + ": the freelancer's own agent (my agents, its token, chat, jobs, share of a private list) and "
                          "the agent API with that agent's token"),
@@ -51,7 +51,7 @@ KINDS = {
                         "admins; without an organisation there is nothing to manage (the personal office is reached under "
                         "office, the private space under every other area)"),
     "link": ("n/a", "pages opened by an unguessable link (public list link, customer status page / portal, approval link, "
-                    "calendar feed): the same for the link of a private list or document as for an organisation's"),
+                    "calendar feed, the booking page of a person (2.94.0)): the same for the link of a private list or document as for an organisation's"),
     "token": ("n/a", "inbound hooks addressed by the secret of one list / environment / repository: no person, no workspace"),
     "pure": ("n/a", "a pure transformation of the request body (an outline file into a tree): no stored data"),
 }
@@ -586,6 +586,16 @@ ROUTES = {
     "POST /api/office/bank/tx/{}/unmatch": "office", "POST /api/office/series": "office",
     "POST /api/office/series/{}/restore": "office", "POST /api/office/series/{}/run": "office",
     "PUT /api/office/tax-dates": "office",
+    # 2.94.0 (#1930): leads (personal office, p294_a_api_test.py); (#1929): the booking page (own calendar, p294_b_api_test.py),
+    # its public pages (a customer without an account, the same for a freelancer's page: p294_b_api_test.py books on one)
+    "DELETE /api/appt/types/{}": "pim", "GET /api/appt/bookings": "pim", "GET /api/appt/page": "pim", "GET /api/appt/types": "pim",
+    "GET /api/office/deals/{}/convert": "office", "GET /api/v1/office/leads": "office", "GET /s/b/c/{}": "link",
+    "GET /s/b/x/{}": "link", "GET /s/b/{}": "link", "GET /s/b/{}/{}": "link", "GET /s/b/{}/{}/{}": "link",
+    "PATCH /api/appt/types/{}": "pim", "PATCH /api/v1/office/leads/{}": "office", "POST /api/appt/bookings/{}/cancel": "pim",
+    "POST /api/appt/types": "pim", "POST /api/appt/types/{}/restore": "pim", "POST /api/office/deals/{}/convert": "office",
+    "POST /api/office/deals/{}/unconvert": "office", "POST /api/office/leads/import": "office",
+    "POST /api/office/leads/import/undo": "office", "POST /api/v1/office/leads": "office", "POST /s/b/c/{}": "link",
+    "POST /s/b/x/{}": "link", "POST /s/b/{}/{}/{}": "link", "PUT /api/appt/page": "pim",
 }
 
 

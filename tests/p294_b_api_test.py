@@ -14,7 +14,7 @@
    unknown and switched-off pages and tokens, the rate limit per client address
  - a freelancer without an organisation: own calendar, own contacts, the lead in the personal office
 tenant-matrix: calendar
-freelancer-matrix: calendar
+freelancer-matrix: pim
 usage: p294_b_api_test.py <datadir>"""
 import email as _em
 import json
