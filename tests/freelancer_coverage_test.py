@@ -565,6 +565,27 @@ ROUTES = {
     "POST /api/wiki/e2e/rotate": "wiki", "POST /api/wiki/e2e/start": "wiki", "POST /api/wiki/e2e/stop": "wiki",
     "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki", "POST /api/wiki/pages": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
+    # 2.90.0 - 2.92.0: bookkeeping, bank, tax dates, invoice series, subscriptions, agreements, equipment, file preview
+    "DELETE /api/office/agreements/{}": "office", "DELETE /api/office/series/{}": "office",
+    "GET /api/attachments/{}/agents": "tasks", "GET /api/attachments/{}/preview": "tasks",
+    "GET /api/files/nodes/{}/preview": "files", "GET /api/list-files/{}/preview": "lists",
+    "GET /api/office/agreements": "office", "GET /api/office/agreements/{}": "office",
+    "GET /api/office/bank/imports": "office", "GET /api/office/bank/tx": "office",
+    "GET /api/office/bank/tx/{}/candidates": "office", "GET /api/office/books": "office",
+    "GET /api/office/books/euer": "office", "GET /api/office/books/euer.csv": "office",
+    "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/ustva": "office",
+    "GET /api/office/equipment/policies": "office", "GET /api/office/equipment/receipts": "office",
+    "GET /api/office/equipment/receipts/{}": "office", "GET /api/office/equipment/value": "office",
+    "GET /api/office/equipment/value.csv": "office", "GET /api/office/equipment/value.pdf": "office",
+    "GET /api/office/series": "office", "GET /api/office/subs": "office", "GET /api/office/subs.csv": "office",
+    "GET /api/office/tax-dates": "office", "PATCH /api/office/agreements/{}": "office",
+    "PATCH /api/office/series/{}": "office", "POST /api/office/agreements": "office",
+    "POST /api/office/agreements/{}/restore": "office", "POST /api/office/bank/import": "office",
+    "POST /api/office/bank/import/preview": "office", "POST /api/office/bank/imports/{}/restore": "office",
+    "POST /api/office/bank/imports/{}/undo": "office", "POST /api/office/bank/tx/{}/match": "office",
+    "POST /api/office/bank/tx/{}/unmatch": "office", "POST /api/office/series": "office",
+    "POST /api/office/series/{}/restore": "office", "POST /api/office/series/{}/run": "office",
+    "PUT /api/office/tax-dates": "office",
 }
 
 

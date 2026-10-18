@@ -60,7 +60,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients';
     check(await ev(`[...document.querySelectorAll('#view .ofmenu .ofmg')].map(g => g.dataset.ofmg).join() === 'sell,money,road,admin'`), '#1917: four groups in order (P4: all of them for a person without an organisation)');
     check(await ev(`[...document.querySelectorAll('#view .ofmenu .ofmgh')].map(g => g.textContent.trim()).join('|') === 'Sell|Money|On the road|Administration'`), '#1917: the group names');
     const pts = await ev(`[...document.querySelectorAll('#view .ofmenu [data-ofmg]')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('[data-ofm]')].map(b => b.dataset.ofm).join('+')).join(' ')`);
-    check(pts === 'sell:pipeline+offers+clients+contacts money:cashflow+kpi road:travel admin:services+equipment+contracts+texts+settings', '#1917: the points of each group ' + pts);
+    check(pts === 'sell:pipeline+offers+clients+contacts money:cashflow+kpi+subs+books+bank road:travel admin:services+equipment+contracts+texts+settings+agreements', '#1917: the points of each group ' + pts);  // 2.92.1: + the tabs of 2.90-2.92
     check(await ev(`!document.querySelector('.ofctabs') && !document.querySelector('#view .mgtabs')`), '#1917: no old tab rows');
     check(await ev(`getComputedStyle(document.querySelector('#view .ofmenu')).position === 'sticky'`), '#1917: the menu stays on top (sticky)');
     check(await ev(`(() => { const on = document.querySelector('#view .ofmenu [aria-current="page"]'), off = document.querySelector('#view .ofmenu [data-ofm="services"]'); return on?.dataset.ofm === 'offers' && on.classList.contains('on') && getComputedStyle(on).color !== getComputedStyle(off).color; })()`), '#1917: the point shown in the accent');
@@ -87,7 +87,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients';
     await shot('p287b-c-start-phone.png');
     await click(ev, '#view .ofmtile [data-ofm="cashflow"]');
     check(await ready(ev, `location.hash === '#office/cashflow' && !!document.querySelector('#view .ofmbar')`, 60), '#1917 phone: a tile point opens its page');
-    check(await ev(`/Office\\s*›\\s*Money/.test(document.querySelector('#view .ofmbar .ofmpath').textContent) && [...document.querySelectorAll('#view .ofmbar [data-ofm]')].map(b => b.dataset.ofm).join() === 'cashflow,kpi'`), '#1917 phone: path Office › Money and the points of the group');
+    check(await ev(`/Office\\s*›\\s*Money/.test(document.querySelector('#view .ofmbar .ofmpath').textContent) && [...document.querySelectorAll('#view .ofmbar [data-ofm]')].map(b => b.dataset.ofm).join() === 'cashflow,kpi,subs,books,bank'`), '#1917 phone: path Office › Money and the points of the group');
     check(await ev(`getComputedStyle(document.querySelector('#view .ofmbar')).position === 'sticky' && document.querySelector('#view .ofmbar .ofmhome').getBoundingClientRect().height >= 43`), '#1917 phone: the bar stays on top, the way back is large enough');
     check(await ev(noSide), '#1917 phone: nothing sticks out to the side (cash flow)');
     await shot('p287b-c-cashflow-phone.png');
