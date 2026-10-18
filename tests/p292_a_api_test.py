@@ -262,9 +262,10 @@ check(requests.get(B + AG, headers=WH).status_code == 403 and requests.post(B + 
 # ---------------------------------------------------------------- contracts in view (#1359): the event for an office contract
 r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "quiet", "display_name": "Quiet"})
 QH = {"Authorization": "Bearer " + r.json()["token"]}
-sql("UPDATE agents SET org_id=NULL WHERE user_id IN (?, ?)", (WAT, r.json()["id"]))
+sql("UPDATE agents SET org_id=? WHERE user_id IN (?, ?)", (ORG, WAT, r.json()["id"]))  # agents of Alpha (the list belongs to Alpha)
 VLIST = A.post(B + "/api/lists", json={"name": "Fristen"}).json()["id"]
-check(A.put(B + f"/api/lists/{VLIST}/members", json={"user_id": WAT, "role": "edit"}).ok, "setup: the list shared with the agent")
+r = A.put(B + f"/api/lists/{VLIST}/members", json={"user_id": WAT, "role": "edit"})
+check(r.ok, "setup: the list shared with the agent " + r.text[:200])
 r = A.post(B + AG, json={"kind": "service", "name": "Wartungsvertrag Server", "provider": "Beispiel IT", "cost": 50, "per": "month", "ends": D(20), "notice": 0,
                          "renew_months": 12, "lead_days": 30, "list_id": VLIST})
 SRV = r.json()
@@ -287,9 +288,9 @@ check(len(events(WH)) == 1, "#1925/#1359: once")
 check(Do.get(B + O + "/settings").json().get("role") == "admin", "#1925: a person without organisation is admin of their own office")
 j = Do.get(B + AG).json()
 check(j["items"] == [] and j["doc_ws"] == "private", f"#1925: personal office: empty, documents space private {j.get('doc_ws')}")
-r = Do.post(B + AG, json={"kind": "insurance", "name": "Berufshaftpflicht", "cost": 30, "per": "month", "ends": D(90), "notice": 3, "notice_unit": "m", "lead_days": 14})
+r = Do.post(B + AG, json={"kind": "insurance", "name": "Berufshaftpflicht", "cost": 30, "per": "month", "ends": D(120), "notice": 3, "notice_unit": "m", "lead_days": 14})
 PD = r.json()
-check(r.status_code == 201 and PD["task"] and PD["deadline"]["cancel_by"] == months_add(T0 + timedelta(days=90), -3).isoformat(), "#1925: personal office: a contract with a task " + r.text[:200])
+check(r.status_code == 201 and PD["task"] and PD["deadline"]["cancel_by"] == months_add(T0 + timedelta(days=120), -3).isoformat(), "#1925: personal office: a contract with a task " + r.text[:200])
 r = Do.post(B + "/api/docs", data={"ws": "private"}, files=[("files", ("bhv.txt", b"Police Dora", "text/plain"))])
 DD = r.json()["ids"][0] if r.ok and r.json().get("ids") else 0
 check((Do.patch(B + f"{AG}/{PD['id']}", json={"doc_node_id": DD}).json().get("doc") or {}).get("id") == DD, "#1925: personal office: a private document is the office's")
