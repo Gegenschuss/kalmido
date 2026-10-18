@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.89.0** (2026-10-18): Tables - simple spreadsheets whose cells can hold live Kalmido values (project time,
+  open tasks, client rates), stored by id and computed with each viewer's rights; selection columns with colours,
+  import/export CSV and Excel, agents build whole sheets; rows to tasks, sheet to quotation, list as rows.
 - **2.88.0** (2026-10-18): sent quotations count in the cash flow plan as open quotations, one version per quotation
   with a per-quotation switch; user administration with search, filters, pages and bulk actions, deleting an account
   hands its lists to another person or deletes them along.
