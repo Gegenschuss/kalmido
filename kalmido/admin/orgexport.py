@@ -254,6 +254,7 @@ OX_AREAS = (
     ("office/trip_items.json", "office_trip_items", "org_id=?"),
     ("office/fixed_costs.json", "office_fixed_costs", "org_id=?"),  # 2.47.3 (#1652): fixed costs of the cash flow
     ("office/sub_reminders.json", "office_sub_reminders", "org_id=?"),  # 2.91.0 B (#1924): reminder tasks before a subscription renews
+    ("office/agreements.json", "office_agreements", "org_id=?"),  # 2.92.0 A (#1925): business contracts and insurances
     ("office/deals.json", "office_deals", "org_id=?"),  # 2.50.0 (#1196): the sales pipeline
     ("office/archive.json", "office_archive", "org_id=?"),
     ("office/archive-log.json", "office_archive_log", "org_id=?"),  # 2.81.0 B (#1834): the history of the archived documents

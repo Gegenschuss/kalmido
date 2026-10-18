@@ -72,7 +72,8 @@ def ctr_data(c, t, pid):
     return {"task_id": d["task_id"], "list_id": d["list_id"], "name": d["name"], "provider": d["provider"], "cost": d["cost"],
             "per": d["per"], "monthly": d["monthly"], "yearly": d["yearly"], "notice": d["notice"], "notice_unit": d["notice_unit"],
             "due": d["due"], "ends": d["ends"], "renew_months": d["renew_months"], "days": d["days"],
-            "user": {"id": pid, "name": user_names(c, [pid]).get(pid, "")}, "lang": lang(c, pid)}
+            "user": {"id": pid, "name": user_names(c, [pid]).get(pid, "")}, "lang": lang(c, pid),
+            "office": bool(_fam(t).get("office_agreement"))}  # 2.92.0 A (#1925): a business contract of the office (else Home & life)
 
 
 def _agent_sees(c, a, t):
@@ -111,6 +112,7 @@ def ctr_tick(c, now=None):
     from ..core.config import WATCHDOG_INTERVAL
     from ..agents.core import agent_active, agent_emit, agent_ids, agent_row
     from ..life.model import feat_on
+    from ..office.model import office_on
     if time.monotonic() - _CTR_LAST["at"] < CTR_EVERY_TICKS * WATCHDOG_INTERVAL:
         return
     _CTR_LAST["at"] = time.monotonic()
@@ -126,7 +128,8 @@ def ctr_tick(c, now=None):
             if not _agent_sees(c, a, t):
                 continue
             pid = pid or ctr_person(c, t)
-            if not pid or not feat_on(c, pid, "contracts"):
+            # 2.92.0 A (#1925): a business contract's deadline task (fam office_agreement) needs the office, not "At home"
+            if not pid or not (feat_on(c, pid, "contracts") or (_fam(t).get("office_agreement") and office_on(c, pid))):
                 break  # nobody's contract (any more) / the module is off: no agent hears of it
             if agent_emit(c, a["user_id"], CTR_EVENT, {**ctr_data(c, t, pid), "hint": CTR_HINT}, actor=None) is None:
                 continue  # not delivered (filtered): no marker, so no proposal for an event the agent never got

@@ -34,6 +34,12 @@ function toastPlace(el) {
   el.classList.remove('totop');
   if (sr && sr.top >= innerHeight * .3) top = Math.min(top, sr.top);
   el.style.bottom = top < innerHeight ? Math.round(innerHeight - top + 12) + 'px' : '';
+  // 2.92.0 D (#2009): on the phone the message never covers the quotation editor's "In the cash flow" choice: it goes to the top
+  const cf = $('.cf8sec .seg');
+  if (cf && cf.offsetWidth && (isMobile() || isTouch())) {
+    const a = el.getBoundingClientRect(), b = cf.getBoundingClientRect();
+    if (a.bottom > b.top && a.top < b.bottom) { el.classList.add('totop'); el.style.bottom = ''; }
+  }
 }
 // 2.16.0 (#473): status messages for screen readers (WCAG 4.1.3): one polite live region (#srlive in index.html); the
 // text is set a moment after clearing it, so the same message twice is read twice

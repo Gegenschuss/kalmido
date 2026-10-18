@@ -152,6 +152,7 @@ async function pdfView(o) {
 
   document.body.appendChild(m);
   $('[data-pv="x"]', m)?.focus();
+  if (o.aid) dpvSumMount(m, o);  // 2.92.0 C (#1926): "Summarise" by an agent (docpreview.js, same module)
   const my = gen;
   try {
     if (!navigator.onLine) throw new TypeError('offline');

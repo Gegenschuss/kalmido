@@ -57,6 +57,7 @@ function ftxtOpenLf(f) {
   const url = `/api/list-files/${f.id}`;
   if (f.mime === 'application/pdf' && typeof pdfView === 'function') { pdfView({url, name: f.name, size: f.size, dlUrl: url + '?dl=1'}); return; }
   if (/^image\//.test(f.mime || '')) { window.open(url, '_blank', 'noopener'); return; }
+  if (dv_is(f)) { dpvOpen({url: url + '/preview', name: f.name, size: f.size, dlUrl: url + '?dl=1'}); return; }  // 2.92.0 C (#1926)
   const a = document.createElement('a'); a.href = url + '?dl=1'; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
 }
 document.addEventListener('input', e => { if (e.target.id === 'ftxt-q') ftxtSet(e.target.value); });

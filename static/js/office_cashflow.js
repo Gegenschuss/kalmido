@@ -2,9 +2,9 @@
 // in and goes out, actual (paid / past) and planned (expected) apart, 3 or 6 months ahead; a tap on a value lists the entries
 // behind it (invoice, quotation, purchase, trip, fixed cost) with a jump to them. Fixed costs (rent, software) are entered
 // here, with a repeat. Server: kalmido/office/cashflow.py. No bank access.
-const RKF = {data: null, q: '', months: 3, from: '', open: null, fixed: null, err: null, oid: null, basis: LS.get('cfBasis', 'gross') === 'net' ? 'net' : 'gross', check: null};  // 2.67.0 (#1838): basis, check
+const RKF = {data: null, q: '', months: 3, from: '', open: null, fixed: null, agr: null, err: null, oid: null, basis: LS.get('cfBasis', 'gross') === 'net' ? 'net' : 'gross', check: null};  // 2.67.0 (#1838): basis, check
 const RK_CF_KINDS = {payment: N_('Payment'), credit: N_('Refund on a credit note'), invoice: N_('Invoice'), offer: N_('Quotation, not yet invoiced'),
-  purchase: N_('Purchase'), trip: N_('Travel expenses'), fixed: N_('Fixed cost'), series: N_('Invoice series|cashflow')};  // 2.91.0 A (#1923): series
+  purchase: N_('Purchase'), trip: N_('Travel expenses'), fixed: N_('Fixed cost'), series: N_('Invoice series|cashflow'), agreement: N_('Contract or insurance')};  // 2.91.0 A (#1923): series; 2.92.0 A (#1925): agreement
 const RK_CF_REPEATS = [['monthly', N_('monthly')], ['quarterly', N_('quarterly')], ['yearly', N_('yearly')], ['once', N_('once')]];
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['cashflow', 'trend', N_('Cash flow'), 1, () => rk_cashflowHtml()]);  // admins only
 
@@ -14,7 +14,7 @@ async function rk_cfLoad() {
   const q = rk_cfQ(); RKF.q = q;
   try { const j = await api('GET', '/api/office/cashflow?' + q); if (RKF.q === q) { RKF.data = j; RKF.err = null; } }
   catch (x) { RKF.err = x.message || tr('unknown'); }
-  try { RKF.fixed = (await api('GET', '/api/office/fixed-costs')).items || []; } catch (x) { RKF.fixed = []; }
+  try { const fj = await api('GET', '/api/office/fixed-costs'); RKF.fixed = fj.items || []; RKF.agr = fj.agreements || []; } catch (x) { RKF.fixed = []; RKF.agr = []; }  // 2.92.0 A (#1925): agr
   try { RKF.check = await api('GET', '/api/office/cashflow/check'); } catch (x) { RKF.check = null; }  // 2.67.0 (#1838)
   ofcDraw();
 }
@@ -52,7 +52,7 @@ const bk_cfReserveRows = r => r.reserve == null ? '' : `<tr class="bk-cfres"><th
 function rk_cfEntries(k) {
   const [mo, dir, st] = k.split('|');
   const es = (RKF.data.entries || []).filter(e => e.month === mo && e.dir === dir && e.state === st);
-  const go = e => e.doc_id ? `href="#office/offers/${e.doc_id}"` : e.series_id ? `href="#office/offers" data-rin-go="${e.series_id}"` : e.trip_id ? `href="#office/travel" data-rkf="trip" data-id="${e.trip_id}"` : e.fixed_id ? `href="#" data-rkf="fixed" data-id="${e.fixed_id}"` : '';
+  const go = e => e.doc_id ? `href="#office/offers/${e.doc_id}"` : e.series_id ? `href="#office/offers" data-rin-go="${e.series_id}"` : e.trip_id ? `href="#office/travel" data-rkf="trip" data-id="${e.trip_id}"` : e.fixed_id ? `href="#" data-rkf="fixed" data-id="${e.fixed_id}"` : e.agreement_id ? `href="#office/agreements/${e.agreement_id}"` : '';  // 2.92.0 A (#1925)
   // 2.88.0 (#1915): a sent quotation = an open quotation (dashed, lighter); a chain with an invoice no longer shows a rest
   return `<ul class="ofclist rkcfents" role="list">${es.map(e => `<li${e.open_offer ? ' class="rkcfopen"' : ''}><a class="ofcrow" ${go(e)}><span class="ofcn"><b>${esc(e.open_offer ? tr('Open quotation|cashflow') : tr(RK_CF_KINDS[e.kind] || e.kind))}${e.number ? ` ${esc(e.number)}` : ''}</b>
     <small class="muted">${esc([fmtDateLoc(e.date), e.label, e.overdue ? tr('Overdue') : ''].filter(Boolean).join(' · '))}</small></span><span class="rksum">${ofcMoney(e.amount)}</span>${ic('chev', 's')}</a></li>`).join('')}</ul>`;
@@ -96,7 +96,13 @@ function rk_fixedHtml() {
   const row = f => `<li><button type="button" class="ofcrow" data-rkf="fixed" data-id="${f.id}"><span class="ofcn"><b>${esc(f.label)}${f.sub ? ` <span class="abo-tag">${tr('Subscription')}</span>` : ''}</b><small class="muted">${esc([rp(f.repeat), tr('from {0}', fmtDateLoc(f.start)), f.until ? tr('until {0}', fmtDateLoc(f.until)) : '', tr('VAT {0} %', f.vat_rate || 0)].filter(Boolean).join(' · '))}</small></span><span class="rksum fcisum"><span>${ofcMoney(f.amount)} <small class="muted">${tr('net')}</small></span><small class="muted">${ofcMoney(f.gross ?? f.amount)} ${tr('gross')}</small></span>${ic('chev', 's')}</button></li>`;
   return `<div class="ofcbar fcibar"><h3 class="ofcgrp">${tr('Fixed costs')}</h3><span class="spacer"></span>${fx.some(f => f.sub) ? `<a class="btn sm ghost" href="#office/subs" data-abo="go">${ic('repeat', 's')}<span>${tr('Subscriptions & tools')}</span></a>` : ''}<a class="btn sm ghost" href="/api/office/fixed-costs/import/template" download>${ic('download', 's')}<span>${tr('Download template')}</span></a><button class="btn sm" data-rkf="fimp">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button><button class="btn sm pri" data-rkf="fnew">${ic('plus', 's')}<span>${tr('New fixed cost')}</span></button></div>`
     + (fx.length ? cats.map(k => `${cats.length > 1 || k ? `<h4 class="fcicat">${esc(k || tr('Without category'))}</h4>` : ''}<ul class="ofclist" role="list">${fx.filter(f => (f.category || '') === k).map(row).join('')}</ul>`).join('')
-      : `<p class="muted lempty">${tr('No fixed costs yet, e.g. rent or software subscriptions.')}</p>`);
+      : `<p class="muted lempty">${tr('No fixed costs yet, e.g. rent or software subscriptions.')}</p>`) + rk_agrFixedHtml();
+}
+// 2.92.0 A (#1925): the contributions of business contracts and insurances, read-only here (edited in Contracts & insurance)
+function rk_agrFixedHtml() {
+  const ag = RKF.agr || [], rp = k => tr(RK_CF_REPEATS.find(x => x[0] === k)?.[1] || k);
+  if (!ag.length) return '';
+  return `<h4 class="fcicat">${tr('From contracts')}</h4><ul class="ofclist agr-fixed" role="list">${ag.map(f => `<li><a class="ofcrow" href="#office/agreements/${f.id}"><span class="ofcn"><b>${esc(f.label)}</b><small class="muted">${esc([rp(f.repeat), tr('from {0}', fmtDateLoc(f.start)), f.until ? tr('until {0}', fmtDateLoc(f.until)) : '', f.vat_rate ? tr('VAT {0} %', f.vat_rate) : ''].filter(Boolean).join(' · '))}</small></span><span class="rksum fcisum"><span>${ofcMoney(f.amount)}${f.vat_rate ? ` <small class="muted">${tr('net')}</small>` : ''}</span>${f.vat_rate ? `<small class="muted">${ofcMoney(f.gross)} ${tr('gross')}</small>` : ''}</span>${ic('chev', 's')}</a></li>`).join('')}</ul>`;
 }
 function rk_fixedModal(f) {
   const md = modal(`<h3>${f ? tr('Edit fixed cost') : tr('New fixed cost')}</h3>

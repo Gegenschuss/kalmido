@@ -76,6 +76,8 @@ FIELDS = {
     "budget_recurring": ("title", "amount"),
     "budget_cats": ("lim",),
     "hub_mails": ("from_addr", "from_name", "to_addrs", "subject", "body"),  # 2.84.0 A (#1198): filed e-mails
+    "office_agreements": ("cost", "number", "note"),  # 2.92.0 A (#1925): business contracts and insurances
+    "office_equipment": ("purchase_net", "new_value", "current_value", "serial_no"),  # 2.92.0 B (#1931): the value of equipment
 }
 JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"): ("costs", "margin"),
              ("office_doc_parts", "totals"): ("costs", "margin")}  # 2.47.0 (#1215)
@@ -98,7 +100,9 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "hub_absences": N_("Kind and note of absences"),  # 2.50.0 (#1195)
                  # 2.72.0 (#1333): amounts, texts and limits of the household budget, its receipts
                  "budget_entries": N_("Household budget"), "budget_recurring": N_("Household budget"), "budget_cats": N_("Household budget"),
-                 "hub_mails": N_("E-mails filed with clients and projects")}  # 2.84.0 A (#1198)
+                 "hub_mails": N_("E-mails filed with clients and projects"),  # 2.84.0 A (#1198)
+                 "office_agreements": N_("Business contracts and insurances"),  # 2.92.0 A (#1925)
+                 "office_equipment": N_("Purchase prices and margins")}  # 2.92.0 B (#1931): purchase price, new and current value
 PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))
 # 2.64.1 (#1817): what the browser encrypts in lists with a lock (collab/liste2e.py LE2E_FIELDS); the plain list holds them apart
 PM_CRYPT_BROWSER = (N_("Titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets of lists with a lock"),)
@@ -419,7 +423,8 @@ def oc_json_store(c, org_id, table, col, j):
 # keys whose presence in an office log entry (office_doc_log.detail, JSON text) makes the whole entry encrypted: company
 # fields, purchase prices, contract rates. Other entries stay plain (the daily count of own-text mails reads them)
 LOG_MARKERS = ('"iban"', '"bic"', '"bank_name"', '"tax_number"', '"vat_id"', '"cost"', '"costs"', '"margin"', '"rates"', '"company"', '"bank_lines"',
-               '"cost_day"', '"cost_hour"', '"markup_pct"')  # 2.47.0 (#1649): the roles' purchase prices / markup
+               '"cost_day"', '"cost_hour"', '"markup_pct"',  # 2.47.0 (#1649): the roles' purchase prices / markup
+               '"purchase_net"', '"new_value"', '"current_value"', '"serial_no"')  # 2.92.0 review (#1931): equipment value
 
 
 def oc_log_detail(c, org_id, text):

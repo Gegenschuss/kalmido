@@ -399,3 +399,39 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 @media (max-width:600px) {
   .rin-acts{width:100%;justify-content:flex-end}
 }
+/* 2.92.0 A (#1925) */
+.agr-li{display:flex;align-items:center;gap:.25rem}
+.agr-li .ofcrow{flex:1;min-width:0}
+.agr-li.agr-arch .ofcrow{opacity:.6}
+.agr-doc{flex:none;min-width:2.75rem;min-height:2.75rem}
+.agr-dl{display:block}
+.agr-late{color:var(--danger);font-weight:500}
+.agr-sum{display:flex;flex-direction:column;align-items:flex-end;text-align:right}
+.agr-bar .chkl{margin:0 .5rem 0 0}
+.agr-cost,.agr-notice{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem}
+.agr-cost .numin{max-width:8rem}
+.agr-notice input{max-width:5rem}
+.agr-docv{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem}
+.agr-docname{display:inline-flex;align-items:center;gap:.25rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agr-cov{margin:.25rem 0}
+.agr-docs{max-height:50vh;overflow:auto}
+/* 2.92.0 B (#1931) */
+.ast-sum{margin:0 0 .75rem}
+.ast-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
+.ast-tile{display:flex;flex-direction:column;gap:.125rem;padding:.5rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);min-width:0}
+.ast-tile b{font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ast-exp{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem}
+.ast-exp select{min-height:2.75rem;max-width:100%}
+.ast-note{margin:.375rem 0 0;font-size:.85em}
+.ast-sec{margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--line2)}
+.ast-sec>summary{min-height:2.75rem;display:flex;align-items:center;font-weight:500;cursor:pointer}
+.ast-rc{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ast-hint:empty{display:none}
+.ast-hint{margin:.25rem 0;font-size:.85em}
+.ast-plan{width:100%;border-collapse:collapse;margin:.5rem 0;font-variant-numeric:tabular-nums}
+.ast-plan caption{text-align:left;font-size:.85em;color:var(--muted);padding-bottom:.25rem}
+.ast-plan th,.ast-plan td{padding:.25rem .375rem;text-align:right;border-bottom:1px solid var(--line2)}
+.ast-plan th:first-child,.ast-plan td:first-child{text-align:left}
+.ast-plan tr.cur td{color:var(--accent);font-weight:500}
+.ast-rcl{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.375rem;max-height:60vh;overflow:auto}
+@media (max-width:30rem){.ast-tiles{grid-template-columns:1fr 1fr}.ast-tiles .ast-tile:last-child{grid-column:1/-1}}
