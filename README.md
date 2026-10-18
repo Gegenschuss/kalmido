@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.88.1** (2026-10-18): before every import Kalmido names the target and asks (*Rather to private*), Paperless-ngx in the
+  settings, an office menu in four groups, organisation pictures, smoother dragging everywhere, freelancer parity guard.
 - **2.88.0** (2026-10-18): sent quotations count in the cash flow plan as open quotations, one version per quotation
   with a per-quotation switch; user administration with search, filters, pages and bulk actions, deleting an account
   hands its lists to another person or deletes them along.
