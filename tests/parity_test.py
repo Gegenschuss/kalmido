@@ -433,6 +433,11 @@ APP_ONLY = [
     # 2.85.0 B (#1162): feeds are a person's own reading in the app
     ("2.85.0 (#1162): Feeds are only for people in 2.85.0 (a person's own feeds, never shared, never an agent's; no REST v1 / MCP)",
      ("* /api/feeds",)),
+    # 2.89.0 (#1916, D): tables step 2 -- only a person by button (no approval pattern for agents in the agent API)
+    ("2.89.0 (#1916, D): carrying table rows over into tasks / a quotation draft and a list as rows are a person's button press "
+     "(each one undo step); agents work inside a sheet through the table tools and create tasks / office drafts their own ways",
+     ("=GET /api/sheets/{}/links", "=POST /api/sheets/{}/to-tasks", "=POST /api/sheets/{}/to-offer", "=POST /api/sheets/{}/rows-from-list",
+      "=POST /api/sheets/{}/links/{}/undo", "=POST /api/sheets/{}/links/{}/redo")),
 ]
 
 
