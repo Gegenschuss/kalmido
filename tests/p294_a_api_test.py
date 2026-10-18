@@ -256,6 +256,12 @@ r = ag("GET", "/leads", params={"due": "1"})
 check(r.ok and L1["id"] in [x["id"] for x in r.json()["data"]] and L2["id"] not in [x["id"] for x in r.json()["data"]], "#1930: agent: due = the follow-up day has come")
 check(ag("GET", "/leads", h=PH).status_code == 403, "#1930: agent without the scope office: 403")
 check(ag("GET", "/leads", params={"requested_by": BOB}).status_code in (403, 404), "#1930: agent acting for a member: refused")
+r = A.post(B + "/api/admin/agents", json={"username": "teambot", "display_name": "Team Bot", "scopes": ["read", "office"]})
+TB, TH = r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
+A.patch(B + f"/api/admin/agents/{TB}", json={"org_id": ORG})
+A.patch(B + f"{O}/agents/{TB}", json={"office_drafts": True})
+check(ag("GET", "/leads", h=TH, params={"requested_by": BOB}).status_code == 403, "#1930: a team agent acting for a member of the office: 403 (leads are for admins)")
+check(ag("GET", "/leads", h=TH, params={"requested_by": ALICE}).ok, "#1930: the team agent acting for the admin: 200")
 r = ag("POST", "/leads", json={"contact": "Hanna Hinweis", "company": "Hinweis GmbH", "email": "hanna@example.com", "next_step": "Ask for a date"})
 check(r.status_code == 201 and r.json()["source"] == "agent" and r.json()["title"] == "Hinweis GmbH", f"#1930: agent adds a lead (source agent) {r.text[:200]}")
 AL = r.json()["id"]
