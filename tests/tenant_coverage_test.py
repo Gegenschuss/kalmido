@@ -52,7 +52,7 @@ KINDS = {
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
     "org": ("matrix", "p2280_api_test.py: organisations, their members and admins"),
-    "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3)"),
+    "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3); p294_b_api_test.py (the booking page: types / bookings of another person 404, the public pages)"),
     "event": ("matrix", "p2300_tenant_test.py: events by id, ranges, invitations"),
     "book": ("matrix", "p2300_tenant_test.py: address books by id, sharing (B2), workspace (B3)"),
     "contact": ("matrix", "p2300_tenant_test.py: contacts by id, links to tasks"),
@@ -283,6 +283,11 @@ ROUTES = {
     "POST /api/office/leads/import": "office", "POST /api/office/leads/import/undo": "office",
     "GET /api/v1/office/leads": "office", "POST /api/v1/office/leads": "office", "PATCH /api/v1/office/leads/{}": "office",
     # 2.94.0 B (#1929): appointment booking settings and bookings of the person (p294_b_api_test.py)
+    "GET /api/appt/page": "calendar", "PUT /api/appt/page": "calendar", "GET /api/appt/types": "calendar", "POST /api/appt/types": "calendar",
+    "PATCH /api/appt/types/{}": "calendar", "DELETE /api/appt/types/{}": "calendar", "POST /api/appt/types/{}/restore": "calendar",
+    "GET /api/appt/bookings": "calendar", "POST /api/appt/bookings/{}/cancel": "calendar",
+    "GET /s/b/{}": "calendar", "GET /s/b/{}/{}": "calendar", "GET /s/b/{}/{}/{}": "calendar", "POST /s/b/{}/{}/{}": "calendar",
+    "GET /s/b/c/{}": "calendar", "POST /s/b/c/{}": "calendar", "GET /s/b/x/{}": "calendar", "POST /s/b/x/{}": "calendar",
     # 2.51.0 (#1348, #1350): agents in the office (drafts only) and the switches / payment suggestions of people (p251_a_api_test.py)
     "GET /api/office/agents/{}": "office", "PATCH /api/office/agents/{}": "office", "GET /api/office/pay-props": "office",
     "POST /api/office/pay-props/{}": "office", "GET /api/v1/office": "office", "GET /api/v1/office/{}": "office",

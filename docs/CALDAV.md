@@ -167,6 +167,42 @@ Your password for the calendar stays encrypted on the server, every request goes
 you subscribed to (the same address checks as for reading), and only you can write into your subscriptions; agents
 have no access to them.
 
+## Booking page: customers book an appointment (2.94.0)
+
+Customers can book a time with you on a public page without an account. Open **Calendar › Calendars › Booking page…**:
+
+- **Address:** your page is `/s/b/<address>` (3 to 40 lower-case letters, digits and hyphens). *Copy link* / *Open*
+  appear after the first save. The switch **Customers can book appointments** turns the page on and off; it needs
+  outgoing mail on the server (every booking is confirmed by e-mail) and public links turned on by the admin.
+- **Title and text** are shown on top of the page. **Calendar:** where confirmed bookings go (your first calendar if you
+  choose none). **Leads in:** with Office & finance on, every confirmed booking also becomes a lead in your personal
+  office or an organisation's office where you are an admin (or none).
+- **Opening hours:** per weekday on / off with a time from-to and an optional second time (for example a lunch break),
+  in the page's time zone.
+- **Appointment types:** name, duration, a buffer before and after, how early (hours ahead) and how far ahead (days)
+  it can be booked, a location and a note. Customers first choose a type, then a time.
+
+Free times are the opening hours minus everything that blocks you: events of your calendars that you show (only those
+marked busy, repeating events included), events you accepted, subscribed calendars you show (timed events), your
+absences, and open bookings. The buffer of the type keeps a gap to all of them. Customers only see free times, never a
+title or anything else of your calendars.
+
+The customer chooses a time and types name, e-mail and optionally a phone number and a message. Kalmido sends a mail with
+a confirmation link and holds the time for 30 minutes. Only the button on the confirmation page books it (a link that a
+mail scanner opens confirms nothing). Then Kalmido makes the event (the customer as invitee, the details in the notes), a
+contact in your address book (an existing contact with the same e-mail is used), the lead (if chosen), and sends a second
+mail with a link to cancel. You get a push like for an invitation.
+
+Your bookings are listed in the same window. **Call off…** cancels a booking: the event is deleted (restorable from the
+calendar's deleted events) and the customer gets a mail with your reason. A customer can cancel with the link in the mail
+until the appointment starts; you get a push.
+
+Protection: unknown and switched-off pages look the same (no guessing of addresses), the links in the mails are random
+(256 bits, only their hash is stored), a hidden field catches simple bots, posts from other sites and too many requests
+from one address are refused, one e-mail address can have at most 3 unconfirmed bookings, a page at most 20, and the
+server's daily limit of mails per recipient applies. Unconfirmed bookings are deleted a week after they expired. The
+booking page is separate from the disposition (bookings of people and equipment in the office).
+
 ## For admins
 
 ### Settings
