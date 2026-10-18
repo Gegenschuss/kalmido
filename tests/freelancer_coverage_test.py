@@ -30,7 +30,8 @@ KINDS = {
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0)"),
     "files": ("matrix", SUITE + ": the own file store (folders, upload, content, versions) and documents; every GET"),
-    "wiki": ("matrix", SUITE + ": knowledge pages in the private space (create, change, search, export, trash)"),
+    "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
+                       "2.99.0: page files, ZIP import with PDFs / pictures)"),
     "pim": ("matrix", SUITE + ", p294_b_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password"),
     "time": ("matrix", SUITE + ": time entries, the timer, habits"),
     "agents": ("matrix", SUITE + ": the freelancer's own agent (my agents, its token, chat, jobs, share of a private list) and "
@@ -561,7 +562,7 @@ ROUTES = {
     "POST /api/v1/time/timer": "time",
     # ---- token (3)
     "POST /api/hooks/deploy/{}/{}": "token", "POST /api/hooks/git/{}": "token", "POST /api/hooks/issues/{}/{}": "token",
-    # ---- wiki (20)
+    # ---- wiki (24)
     "DELETE /api/wiki/pages/{}": "wiki", "GET /api/wiki": "wiki", "GET /api/wiki/e2e": "wiki",
     "GET /api/wiki/e2e/todo": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki",
     "GET /api/wiki/pages/{}": "wiki", "GET /api/wiki/search": "wiki", "PATCH /api/wiki/pages/{}": "wiki",
@@ -569,6 +570,9 @@ ROUTES = {
     "POST /api/wiki/e2e/rotate": "wiki", "POST /api/wiki/e2e/start": "wiki", "POST /api/wiki/e2e/stop": "wiki",
     "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki", "POST /api/wiki/pages": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
+    # 2.99.0 A (#2182): files of knowledge pages (p299_a_api_test.py: import, upload, read, delete in the private space)
+    "GET /api/wiki/files/{}": "wiki", "GET /api/wiki/files/{}/{}": "wiki", "DELETE /api/wiki/files/{}": "wiki",
+    "POST /api/wiki/pages/{}/files": "wiki",
     # 2.90.0 - 2.92.0: bookkeeping, bank, tax dates, invoice series, subscriptions, agreements, equipment, file preview
     "DELETE /api/office/agreements/{}": "office", "DELETE /api/office/series/{}": "office",
     "GET /api/attachments/{}/agents": "tasks", "GET /api/attachments/{}/preview": "tasks",
