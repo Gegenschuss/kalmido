@@ -243,6 +243,11 @@ async function firefox(fn) {
       if (W < 900) { await nav(B + '#agents/' + ag.id); await sleep(2500); }
       else { await ev(`chatOpen(${ag.id})`); await sleep(1200); }
       for (let i = 0; i < 60 && !(await ev(`!!document.querySelector('${W < 900 ? '#view .chath' : '#achat .chath'}')`).catch(() => false)); i++) await sleep(250);  // 2.80.3: slow CI
+      if (!(await ev(`!!document.querySelector('${W < 900 ? '#view .chath' : '#achat .chath'}')`).catch(() => false))) {  // 2.87.0: CI - open the chat once more, then say what the page shows
+        console.log('p241: chat header missing, again:', await ev(`JSON.stringify({hash: location.hash, key: S.route && S.route.key, chat: typeof chatOpen, view: (document.querySelector('#view')?.textContent || '').replace(/\\s+/g, ' ').slice(0, 160)})`).catch(e => String(e)));
+        if (W < 900) await nav(B + '#agents/' + ag.id); else await ev(`chatOpen(${ag.id})`);
+        for (let i = 0; i < 120 && !(await ev(`!!document.querySelector('${W < 900 ? '#view .chath' : '#achat .chath'}')`).catch(() => false)); i++) await sleep(250);
+      }
       const m3 = await fit(W < 900 ? '#view .chath' : '#achat .chath');
       check(good(m3), `${W}px: chat header with "working on #id" fits ${JSON.stringify(m3)}`);
       const one = await ev(`(() => { const s = document.querySelector('#chat-st').getBoundingClientRect(); return s.height < 40 && /working on #/.test(document.querySelector('#chat-st').textContent); })()`);
