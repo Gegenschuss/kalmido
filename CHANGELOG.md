@@ -7,6 +7,15 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.92.1] - 2026-10-18
+
+CI fixes of 2.92.0 (and 2.91.0).
+
+### Fixed
+- Tests: the office view counts every tab of its tab list (bookkeeping, bank, subscriptions, contracts joined); the pdf
+  module lists the Word / Excel preview; a task-detail UI test waits until the client state exists (#1925, #1926).
+- French, Italian and Dutch name the Basket in the tax dates hint (#1922).
+
 ## [2.92.0] - 2026-10-18
 
 Contracts and insurance in the office, equipment value, Word and Excel preview, fixes from the 2.88 device tests.
