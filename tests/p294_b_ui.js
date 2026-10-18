@@ -33,9 +33,13 @@ if (!process.env.P294B_NOSTART) {
     await nav(B + '#cal');
     check(await ready(ev, `!!document.querySelector('#view .calbar [data-act="ev-cals"]')`, 80), 'the calendar with its Calendars button');
     await ev(`(() => { document.querySelector('[data-act="ev-cals"]').click(); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('.evcmodal [data-evc="booking"]')`), 'the Calendars dialog offers "Booking page…"');
+    check(await ready(ev, `!!document.querySelector('.evcmodal [data-evc="booking"]') && !!document.querySelector('.evcmodal #evc-body .cvxgrp')`), 'the Calendars dialog offers "Booking page…"');
     await ev(`(() => { document.querySelector('[data-evc="booking"]').click(); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('.apb-dlg #apb-slug')`, 60), 'the booking page settings open (lazy module)');
+    if (!await ready(ev, `!!document.querySelector('.apb-dlg #apb-slug')`, 60)) {
+      check(false, 'the booking page settings open (lazy module): ' + await ev(`Promise.all(['/api/appt/page', '/api/appt/types', '/api/appt/bookings'].map(u => fetch(u, {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.status + ' ' + u)))
+        .then(a => a.join(', ') + ' | ' + typeof apbOpen + ' | ' + [...document.querySelectorAll('.modal')].map(m => m.className).join(';'))`));
+      return;
+    }
     check(await ev(`!document.querySelector('.apb-dlg .apb-link') && /^[a-z0-9-]{3,40}$/.test(document.querySelector('#apb-slug').value) && document.querySelectorAll('.apb-day').length === 7`),
       'before the first save: a suggested address, seven days, no link yet');
     check(await ev(`document.querySelectorAll('.apb-day:not(.off)').length === 5`), 'Monday to Friday are on by default');

@@ -214,7 +214,9 @@ check(f"{K}T1400" in S1, "an event marked free does not block")
 check(f"{K}T0800" in S1 and f"{K}T1730" in S1 and f"{K}T1800" not in S1 and f"{K}T0730" not in S1, "the weekly hours bound the times")
 check("Geheim" not in r.text and "Frei markiert" not in r.text, "no title of the calendar leaves the server")
 check("Europe/Berlin" in r.text, "the time zone is named")
-check(pub.get(f"{B}/s/b/alice-termine/{T2}").status_code == 200, "an active second type")
+check(pub.get(f"{B}/s/b/alice-termine/{T2}").status_code == 404, "an inactive type: 404")
+A.patch(B + f"{AP}/types/{T2}", json={"active": True})
+check(pub.get(f"{B}/s/b/alice-termine/{T2}").status_code == 200, "active again: its times")
 check(pub.get(f"{B}/s/b/no-such-page").status_code == 404 and pub.get(f"{B}/s/b/no-such-page").text == pub.get(f"{B}/s/b/alice-termine-x").text,
       "unknown pages: the same 404")
 CT1 = Ca.post(B + AP + "/types", json={"name": "Carol Typ"}).json()["id"]
@@ -224,6 +226,7 @@ check(pub.get(f"{B}/s/b/alice-termine/{T1}/{K}T1005").status_code == 409, "a tim
 
 # ================================================================== booking
 M1 = "kunde.eins@example.com"
+PRE = pub.get(f"{B}/s/b/alice-termine/{T1}/{K}T1000")  # a second customer has the same form open
 r = book("alice-termine", T1, f"{K}T1000", "Kunde Eins", M1)
 check(r.status_code == 200 and "check your e-mail" in r.text, "booked: check your e-mail " + str(r.status_code))
 bk = dbx("SELECT id, status, name, email, confirm_hash, cancel_hash, event_id FROM appt_bookings WHERE email=?", (M1,))
@@ -233,8 +236,8 @@ ms = wait_mail(M1, 1)
 check(len(ms) == 1 and "Please confirm your booking" in body_of(ms[0])[1], "one mail to confirm " + str([body_of(m)[1] for m in ms]))
 TOK1 = link_in(ms[0], "c") if ms else None
 check(TOK1 and TOK1 not in json.dumps(dbx("SELECT * FROM appt_bookings WHERE id=?", (B1,)), default=str), "the token is only in the mail")
-r = book("alice-termine", T1, f"{K}T1000", "Kunde Zwei", "kunde.zwei@example.com")
-check(r.status_code == 409, "the held time cannot be booked a second time " + str(r.status_code))
+r = pub.post(f"{B}/s/b/alice-termine/{T1}/{K}T1000", data={"f": fkey(PRE.text), "name": "Kunde Zwei", "email": "kunde.zwei@example.com"}, allow_redirects=False)
+check(r.status_code == 409 and not dbx("SELECT 1 FROM appt_bookings WHERE email='kunde.zwei@example.com'"), "the held time cannot be booked a second time " + str(r.status_code))
 check(f"{K}T1000" not in slots(pub.get(f"{B}/s/b/alice-termine/{T1}?w={MON}").text, "alice-termine", T1), "a pending booking holds the time")
 r = book("alice-termine", T1, f"{K}T0800", "Bot", "bot@example.com", {"website": "http://spam.example.com"})
 check(r.status_code == 200 and not dbx("SELECT 1 FROM appt_bookings WHERE email='bot@example.com'"), "honeypot: the same answer, nothing stored")
