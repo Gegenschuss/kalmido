@@ -52,6 +52,26 @@ settings, master data, files and the private clients go with it; "Private" is a 
 Only where organisations can be created (an instance admin, not in the mode `shared`). Moving into an existing
 organisation is not offered yet. `POST /api/office/move` `{name, confirm: true}` -> `{org_id, name, clients}`.
 
+**Moving office data into another workspace** (2.97.0, both ways between the personal office and an organisation's office,
+or between two organisations): **Move to another workspace…** in a client's menu (Office > Clients, also for several
+selected clients), in the menu of a draft quotation / invoice, in the dialog of a trip and of a document template. The
+dialog names what moves and what stays before anything changes:
+- a client takes its contact persons and its drafts along (their links to the address book end; the address books stay);
+- drafts lose their number - the target numbers them in its own range when they are issued; links into the old office end
+  (framework contract, project, catalogue service of a position); a draft moved alone keeps the address but not the client;
+- trips move with their receipts as long as none is ticked "in DATEV" or billed; templates move, documents made from them
+  stay with their text;
+- **issued documents never move** (retention): invoices, credit notes, reminders, sent quotations, number ranges and the
+  archive stay where they were issued. A client that issued documents (or projects, trips, deals) still point to stays
+  archived in the old office and is created anew in the target. The tick box *Take issued documents along as a read-only
+  copy* files a copy of each of them into the target's archive: view and PDF only, no number of its own, never edited,
+  and not part of the target's bookkeeping, EÜR, VAT, DATEV export or archive sums (marked "Read-only copy from …").
+Rights: the right to work in both offices (travel expenses and templates: the admin of both); out of an organisation only
+its office admin or who created the client / draft - a plain member takes only own drafts along and no copies. Agents
+never move office data. Undo takes the whole move back in one step (copies and a newly created client go again, unless the
+target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates, ids, to:
+"private"|"org:<id>", dry, copy_issued}` -> `{notes, block, count, move_id}`; `{undo: move_id}` takes it back.
+
 **Small business (section 19 UStG)**: the setting `small_business` (Settings tab, "Invoices"; a setting of every office
 area, also of an organisation): new quotations and invoices are made without VAT and with the note "Gemäß § 19 UStG
 wird keine Umsatzsteuer berechnet." (`vat_mode` `novat`, `vat_note` `small`); the e-invoice gets the tax category `E`
