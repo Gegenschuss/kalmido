@@ -56,7 +56,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     check(await ready(ev, `!document.querySelector('.modal') && document.querySelectorAll('.dtp-list .ofcrow').length === 1`), 'use sample: the contract is an own template');
     await ev(`(() => { document.querySelector('[data-dt="tnew"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal #dt-tbody') && document.querySelectorAll('.modal .dtp-vars .btn').length === 10`), 'the template dialog with the variable bar');
-    await ev(`(() => { const m = document.querySelector('.modal'); m.querySelector('#dt-tname').value = 'Kurzvertrag'; const t = m.querySelector('#dt-tbody'); t.value = '# Kurzvertrag\\n\\nFür  und {{unbekannt}}.'; t.focus(); t.setSelectionRange(16, 16); m.querySelector('[data-dt="var"][data-k="client.name"]').click(); return 1; })()`);
+    await ev(`(() => { const m = document.querySelector('.modal'); m.querySelector('#dt-tname').value = 'Kurzvertrag'; const t = m.querySelector('#dt-tbody'); t.value = '# Kurzvertrag\\n\\nFür  und {{unbekannt}}.'; t.focus(); t.setSelectionRange(19, 19); m.querySelector('[data-dt="var"][data-k="client.name"]').click(); return 1; })()`);
     check(await ev(`document.querySelector('.modal #dt-tbody').value === '# Kurzvertrag\\n\\nFür {{client.name}} und {{unbekannt}}.'`), 'a variable inserted at the cursor ' + await ev(`JSON.stringify(document.querySelector('.modal #dt-tbody')?.value)`));
     await shot('p293-a-template.png');
     await ev(`(() => { document.querySelector('.modal [data-m="save"]').click(); return 1; })()`);
