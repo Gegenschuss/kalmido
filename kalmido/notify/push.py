@@ -585,6 +585,8 @@ def watchdog_tick(c):
     _wd_section(c, "security watch", sev_scan)  # 2.36.2 (#1133): new admins / org admins / agents / agent tokens
     from ..files.scan import sc_tick
     _wd_section(c, "virus scan", sc_tick)  # 2.61.0 (#1818): the uploads the scanner could not check yet
+    from ..wiki.wikiatt import wka_tick
+    _wd_section(c, "wiki files", wka_tick)  # 2.99.0 (#2182): files in the trash for good after 30 days
     _wd_section(c, "admin alerts", aa_tick)
 
 

@@ -374,8 +374,12 @@ def wke_start():
     for p in people:
         if p["user_id"] not in given:
             c.execute("INSERT INTO wiki_key_pending(space_id,user_id,since) VALUES(?,?,?) ON CONFLICT DO NOTHING", (sp["id"], p["user_id"], ts))
+    from .wikiatt import wka_drop_trashed
+    from ..core.serializers import unlink_files
+    gone = wka_drop_trashed(c, oid, uid)  # 2.99.0 (#2182, review M2): no plain file in the trash of an encrypted space
     bump(c)
     c.commit()
+    unlink_files(gone)
     return jsonify(wke_info(c, oid, uid))
 
 

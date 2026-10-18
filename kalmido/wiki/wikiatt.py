@@ -47,7 +47,8 @@ WKA_URL_RE = re.compile(r"(!?)\[([^\[\]\n]*)\]\(/api/wiki/files/(\d{1,15})(?:/[^
 WKA_WIKILINK_RE = re.compile(r"(!?)\[\[([^\[\]|\n]{1,250}?)(?:\|([^\[\]\n]*))?\]\]")
 WKA_MDLINK_RE = re.compile(r"(!?)\[([^\[\]\n]*)\]\(\s*(<[^<>\n]{1,500}>|[^\s()<>]{1,500}(?:\([^\s()]*\)[^\s()<>]*)*)"
                            r"(?:\s+(?:\"[^\"\n]*\"|'[^'\n]*'))?\s*\)")
-WKA_TMP = os.path.join(ATT_DIR, ".wikitmp")
+WKA_TMP = os.path.join(ATT_DIR, ".wikitmp")  # the export ZIP while it is written (the backup skips this folder)
+WKA_TRASH_DAYS = 30  # review M1: a file in the trash (undo possible) is deleted for good after this
 
 
 def wka_space(r):
@@ -119,8 +120,7 @@ def wka_svg_clean(data):
     """An SVG without scripts, event attributes, foreign content and references outside itself (only #ids and embedded
     pictures stay); no DOCTYPE / ENTITY at all. BadInput when it cannot be cleaned."""
     bad = BadInput(tr("The SVG picture could not be cleaned"))
-    low = data[:WKA_FILE_MAX].lower()
-    if b"<!doctype" in low or b"<!entity" in low:
+    if b"\x00" in data[:64] or re.search(rb"<!\s*(?:doctype|entity)", data, re.I):  # review L3: also UTF-16 / 32 (no DTD at all)
         raise bad
     try:
         root = ET.fromstring(data)
@@ -243,7 +243,7 @@ def wka_upload(pid):
                 c.rollback()
                 unlink_files(saved)
                 return err(f"{name}: {e}")
-    except QuotaExceeded:
+    except BaseException:  # review L1: QuotaExceeded and any other error -- no stored file without its row
         c.rollback()
         unlink_files(saved)
         raise
@@ -286,9 +286,23 @@ def wka_bulk(c, uid, ids, trash):
 
 
 def wka_space_has_files(c, oid, uid):
-    """A file (also of a page in the trash) in the space: the lock cannot be switched on (wikie2e.wke_start)."""
+    """A file (not in the trash) in the space: the lock cannot be switched on (wikie2e.wke_start; the trashed ones go then)."""
     w, a = wiki_space_sql(oid, uid)
     return bool(c.execute(f"SELECT 1 FROM wiki_files WHERE deleted_at IS NULL AND {w} LIMIT 1", a).fetchone())
+
+
+def wka_drop_trashed(c, oid, uid):
+    """Review M2: switching the lock on deletes the space's files in the trash for good (no plain file stays behind in an
+    encrypted space); -> their paths, unlinked by the caller after the commit."""
+    w, a = wiki_space_sql(oid, uid)
+    rows = c.execute(f"SELECT id, path FROM wiki_files WHERE deleted_at IS NOT NULL AND {w}", a).fetchall()
+    if rows:
+        ids = [r["id"] for r in rows]
+        q = ",".join("?" * len(ids))
+        c.execute(f"DELETE FROM upload_scan WHERE kind='wiki' AND ref_id IN ({q})", ids)
+        c.execute(f"DELETE FROM file_text WHERE kind='wiki' AND ref_id IN ({q})", ids)
+        c.execute(f"DELETE FROM wiki_files WHERE id IN ({q})", ids)
+    return [r["path"] for r in rows]
 
 
 def wka_user_files(c, uid):
@@ -299,6 +313,27 @@ def wka_user_files(c, uid):
 def wka_org_files(c, oid):
     """The stored files of an organisation's pages (orgs.org_delete unlinks them; the rows go with the organisation)."""
     return [r[0] for r in c.execute("SELECT path FROM wiki_files WHERE org_id=?", (oid,))]
+
+
+def wka_tick(c):
+    """Watchdog (review M1, rule "deleting = really gone"): a file deleted on its own (its page is not in the trash) is removed
+    for good after WKA_TRASH_DAYS -- row, scan / text marks, the stored file after the commit. Files of a page in the trash
+    stay with it (undo of the page); they go with the final deletion of pages (wka_page_files)."""
+    from datetime import timedelta
+    from ..core.pg import system_ctx
+    cut = iso_ms(now_utc() - timedelta(days=WKA_TRASH_DAYS))
+    with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
+        rows = c.execute("SELECT f.id, f.path FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE f.deleted_at IS NOT NULL "
+                         "AND f.deleted_at<? AND p.deleted_at IS NULL ORDER BY f.id LIMIT 500", (cut,)).fetchall()
+        if not rows:
+            return
+        ids = [r["id"] for r in rows]
+        q = ",".join("?" * len(ids))
+        c.execute(f"DELETE FROM upload_scan WHERE kind='wiki' AND ref_id IN ({q})", ids)
+        c.execute(f"DELETE FROM file_text WHERE kind='wiki' AND ref_id IN ({q})", ids)
+        c.execute(f"DELETE FROM wiki_files WHERE id IN ({q})", ids)
+    c.commit()
+    unlink_files([r["path"] for r in rows])
 
 
 def wka_page_files(c, page_ids):
@@ -338,27 +373,19 @@ def _wka_target(raw):
 
 
 def wka_import_zip(c, uid, oid, replace):
-    """POST /api/wiki/import (pages.wiki_import checked the space and its lock): the upload streamed into a temporary file in
-    the data folder, read as a ZIP, removed at the end."""
+    """POST /api/wiki/import (pages.wiki_import checked the space and its lock): the upload as werkzeug spooled it (memory or
+    its temporary file), read as a ZIP."""
     f = request.files.get("file")
     if not f:
         raise BadInput(tr("No file"))
-    os.makedirs(WKA_TMP, mode=0o700, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(prefix="import-", suffix=".zip", dir=WKA_TMP)
-    saved = []
+    saved, st = [], f.stream  # review L2: werkzeug spooled the upload already (no second copy on disk)
     try:
-        n = 0
-        with os.fdopen(fd, "wb") as out:
-            while True:
-                b = f.stream.read(1 << 20)
-                if not b:
-                    break
-                n += len(b)
-                if n > WKA_ZIP_TOTAL:
-                    raise BadInput(tr("The archive is too large"))
-                out.write(b)
+        st.seek(0, os.SEEK_END)
+        if st.tell() > WKA_ZIP_TOTAL:
+            raise BadInput(tr("The archive is too large"))
+        st.seek(0)
         try:
-            z = zipfile.ZipFile(tmp)
+            z = zipfile.ZipFile(st)
             infos = [i for i in z.infolist() if not i.is_dir()]
         except (zipfile.BadZipFile, ValueError, OSError):
             raise BadInput(tr("This is not a ZIP file"))
@@ -368,11 +395,6 @@ def wka_import_zip(c, uid, oid, replace):
         c.rollback()
         unlink_files(saved)
         raise
-    finally:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
 
 
 def _wka_import(c, uid, oid, replace, z, infos, saved):

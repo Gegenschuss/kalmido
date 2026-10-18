@@ -16,7 +16,7 @@
 const WKE = {st: {}, info: {}, infoP: {}, keys: {}, tried: {}, memo: new Map(), locked: {}, busy: {}, prog: {}, rot: {}, unread: {}, probe: null};
 const WKE_PRE = 'e2e1:';
 const WKE_TPL = /^(templates|vorlagen)\//i;
-const WKE_ZIP = {files: 2000, file: 1000000, total: 30000000, zip: 524288000};  // the server's limits of an import (wiki/pages.py WIKI_ZIP_*, wikiatt.py WKA_ZIP_TOTAL)
+const WKE_ZIP = {files: 2000, file: 1000000, total: 30000000, zip: 30000000};  // the server's limits of an import (wiki/pages.py WIKI_ZIP_*); 2.99.0 review L5: a locked space takes no files, so the ZIP stays at 30 MB
 const wkeIs = v => typeof v === 'string' && v.startsWith(WKE_PRE);
 function wkeOn(sp) { return !!WKE.st[sp]?.mode; }
 function wkeMode(sp) { return WKE.st[sp]?.mode || null; }

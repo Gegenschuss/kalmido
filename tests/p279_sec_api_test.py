@@ -177,11 +177,15 @@ check(r.ok and "Knee therapy" in r.text, f"M6: with private the entry is there {
 check("Knee therapy" in A.get(B + "/api/time/entries", params=q).text, "M6: the app (session) shows it as before")
 
 # ============================================================ M8: the backup takes all kinds of stored files along
-for rel in ("attachments/chat/7-1/probe-chat.txt", "attachments/budget/9/probe-receipt.txt", "attachments/docthumbs/5-probe.jpg"):
+for rel in ("attachments/chat/7-1/probe-chat.txt", "attachments/budget/9/probe-receipt.txt", "attachments/docthumbs/5-probe.jpg",
+            "attachments/wiki/3/probe-wiki.pdf"):  # 2.99.0 (#2182, review H1): the files of knowledge pages
     p = os.path.join(DATA, rel)
     os.makedirs(os.path.dirname(p), exist_ok=True)
     with open(p, "w") as f:
         f.write("probe")
+os.makedirs(os.path.join(DATA, "attachments", ".wikitmp"), exist_ok=True)  # 2.99.0 (#2182): a wiki export being written
+with open(os.path.join(DATA, "attachments", ".wikitmp", "export-probe.zip"), "w") as f:
+    f.write("probe")
 n0 = len(A.get(B + "/api/admin/backups").json().get("items", []))
 r = A.post(B + "/api/admin/backups")
 check(r.status_code == 202, f"M8: a backup is started {r.status_code} {r.text[:200]}")
@@ -201,7 +205,9 @@ if name and os.path.isfile(path):
         man = json.loads(z.read("manifest.json"))
 check(bool(names), f"M8: the archive is there ({name}, {st.get('last_error')})")
 check(man.get("skipped_files") == 0, f"M8: nothing skipped ({man.get('skipped_files')})")
-for rel in ("attachments/chat/7-1/probe-chat.txt", "attachments/budget/9/probe-receipt.txt", "attachments/docthumbs/5-probe.jpg"):
+check(not any(".wikitmp" in x for x in names), "2.99.0 (#2182): the temporary wiki export stays out of the archive")
+for rel in ("attachments/chat/7-1/probe-chat.txt", "attachments/budget/9/probe-receipt.txt", "attachments/docthumbs/5-probe.jpg",
+            "attachments/wiki/3/probe-wiki.pdf"):  # 2.99.0 (#2182, review H1): the files of knowledge pages
     check(rel in names, f"M8: {rel} is in the archive")
 
 # ============================================================ M9: the default of the trusted proxies
