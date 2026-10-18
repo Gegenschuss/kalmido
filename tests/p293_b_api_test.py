@@ -165,12 +165,15 @@ check(A.delete(B + f"{DR}/{D4}").ok, "a business drive deleted (must not count)"
 # ---------------------------------------------------------------- take over into the travel expenses
 r = A.post(B + f"{DR}/{D1}/trip")
 t = r.json().get("trip") or {}
-check(r.status_code == 201 and t.get("date_from") == "2026-03-02" and t.get("dest") == "Hamburg – Lübeck" and t.get("purpose") == "job" and t.get("client_id") == CL
-      and t.get("project") == "Imagefilm" and t.get("km") == "130.00" and t.get("items") == [] and t.get("note") == "Dreh Imagefilm Tag 1",
-      "take over: a trip with day, route, client, project, km, no receipt " + r.text[:300])
+check(r.status_code == 201 and t.get("date_from") == "2026-03-02" and t.get("dest") == "Lübeck" and t.get("purpose") == "job" and t.get("client_id") == CL
+      and t.get("project") == "Imagefilm" and t.get("km") == "130.00" and t.get("items") == [] and t.get("note") == "Dreh Imagefilm Tag 1\nStart: Hamburg",
+      "take over: a trip with day, destination, client, project, km, no receipt; start + purpose in the note " + r.text[:300])
+# 2.93.0 B (#1928 review): office_trips.dest is plain text -> only the destination there, start / purpose only in the encrypted note
+tr_ = sql("SELECT dest, note FROM office_trips WHERE id=?", (t.get("id"),))[0]
+check(tr_[0] == "Lübeck" and enc(tr_[1]), f"take over: no start / purpose in plain text {tr_}")
 r2 = A.post(B + f"{DR}/{D1}/trip")
 check(r2.status_code == 200 and r2.json()["existing"] and r2.json()["trip"]["id"] == t.get("id"), "take over again: the same trip " + r2.text[:120])
-check(sum(1 for x in A.get(B + O + "/trips?year=2026").json()["trips"] if x["dest"] == "Hamburg – Lübeck") == 1, "exactly one trip")
+check(sum(1 for x in A.get(B + O + "/trips?year=2026").json()["trips"] if x["dest"] == "Lübeck") == 1, "exactly one trip")
 check(next(d for d in A.get(B + DR + f"?vehicle_id={VP}&year=2026").json()["drives"] if d["id"] == D1)["trip_id"] == t.get("id"), "the drive knows its trip")
 check(A.post(B + f"{DR}/{D2}/trip").status_code == 400, "a private drive is not taken over")
 
