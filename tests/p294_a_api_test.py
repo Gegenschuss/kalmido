@@ -260,8 +260,14 @@ r = A.post(B + "/api/admin/agents", json={"username": "teambot", "display_name":
 TB, TH = r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
 A.patch(B + f"/api/admin/agents/{TB}", json={"org_id": ORG})
 A.patch(B + f"{O}/agents/{TB}", json={"office_drafts": True})
-check(ag("GET", "/leads", h=TH, params={"requested_by": BOB}).status_code == 403, "#1930: a team agent acting for a member of the office: 403 (leads are for admins)")
-check(ag("GET", "/leads", h=TH, params={"requested_by": ALICE}).ok, "#1930: the team agent acting for the admin: 200")
+for who in (A, Bo):  # the team agent works for people who share a list with it
+    lid = who.post(B + "/api/lists", json={"name": "Shared with the team bot", "org_id": ORG}).json()["id"]
+    r = who.put(B + f"/api/lists/{lid}/members", json={"user_id": TB, "role": "edit"})
+    assert r.ok, r.text
+r = ag("GET", "/leads", h=TH, params={"requested_by": BOB})
+check(r.status_code == 403 and "admins" in r.text, f"#1930: a team agent acting for a member of the office: 403 (leads are for admins) {r.status_code} {r.text[:200]}")
+r = ag("GET", "/leads", h=TH, params={"requested_by": ALICE})
+check(r.ok, f"#1930: the team agent acting for the admin: 200 ({r.status_code} {r.text[:200]})")
 r = ag("POST", "/leads", json={"contact": "Hanna Hinweis", "company": "Hinweis GmbH", "email": "hanna@example.com", "next_step": "Ask for a date"})
 check(r.status_code == 201 and r.json()["source"] == "agent" and r.json()["title"] == "Hinweis GmbH", f"#1930: agent adds a lead (source agent) {r.text[:200]}")
 AL = r.json()["id"]

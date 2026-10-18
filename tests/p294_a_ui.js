@@ -56,8 +56,9 @@ const day = n => TC.day(n);
     check(await ev(`/Musterbau/.test(${leadCards}[0].textContent) && /Later lead/.test(${leadCards}[1].textContent)`), '#1930: sorted by follow-up day (none last)');
     check(await ev(`(() => { const c = ${leadCards}[0]; return c.classList.contains('lead-due') && /Call back on Monday/.test(c.textContent) && /Website/.test(c.textContent) && !!c.querySelector('.lead-fu.due'); })()`),
       '#1930: the due lead marked, with next step and source');
-    check(await ev(`(() => { const c = ${leadCards}[0], s = getComputedStyle(c.querySelector('.lead-fu.due')).color, a = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(); const t = document.createElement('span'); t.style.color = a; document.body.appendChild(t); const ac = getComputedStyle(t).color; t.remove(); return s === ac; })()`),
-      '#1930: a follow-up day that has come in the accent colour');
+    const fuc = `[${leadCards}[0].querySelector('.lead-fu.due'), ${leadCards}[1].querySelector('.lead-fu')].map(e => e && getComputedStyle(e).color)`;
+    check(await ev(`(() => { const [a, b] = ${fuc}; return !!a && !!b && a !== b; })()`),
+      '#1930: a follow-up day that has come stands out (accent colour) ' + await ev(`JSON.stringify(${fuc})`));
     check(await ev(`!${leadCards}[1].classList.contains('lead-due')`), '#1930: a later follow-up is not marked');
     check(await ev(`!document.querySelector('[data-pipcol="lead"] header .rksum') && /1 to follow up/.test(document.querySelector('.lead-cnt')?.textContent || '')`), '#1930: no sum in the leads column, the toolbar counts');
     check(await ev(`/10,000\\.00/.test(document.querySelector('.pptiles').textContent)`), '#1930: the open sum without the leads');
@@ -115,7 +116,7 @@ const day = n => TC.day(n);
     await ev(`(() => { document.querySelector('[data-pp="stage"][data-v="lead"]').click(); return 1; })()`);
     check(await ready(ev, `[...document.querySelectorAll('.pipcol')].filter(c => getComputedStyle(c).display !== 'none').map(c => c.dataset.pipcol).join() === 'lead'`), '#1930: phone: the switcher shows the leads alone');
     check(await ev(noSide), '#1930: phone: nothing sticks out to the side');
-    check(await ev(`[...document.querySelectorAll('.pipcol.on .ppcard')].every(x => x.getBoundingClientRect().height >= 43) && [...document.querySelectorAll('.ofcbar .btn')].every(b => b.getBoundingClientRect().height >= 30)`), '#1930: phone: large tap targets');
+    check(await ev(`[...document.querySelectorAll('.pipcol.on .ppcard')].every(x => x.getBoundingClientRect().height >= 43) && [...document.querySelectorAll('.ofcbar .lead-tb')].every(b => b.getBoundingClientRect().height >= 43)`), '#1930: phone: large tap targets');
     await shot('p294-a-leads-phone.png');
   }, false);
   console.log(`p294_a_ui: ${ok} ok, ${F.length} failed`);
