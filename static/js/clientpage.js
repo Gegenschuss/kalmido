@@ -21,6 +21,20 @@ async function ms_clInvLoad() {
   MSC.invLoading = false;
   ms_clDraw();
 }
+// 2.93.0 A (#1927): the client's documents made from templates (office/doctpl.py; admins of the office only, else no section)
+function ms_clGdHtml(c) {
+  if (typeof officeOn !== 'function' || !officeOn()) return '';
+  if (MSC.gd?.id !== c.id) { if (!MSC.gdLoading) setTimeout(() => ms_clGdLoad(c.id), 0); return ''; }
+  const ds = MSC.gd.docs; if (!ds) return '';
+  const st = {draft: tr('Draft'), final: tr('Finished'), signed: tr('Signed'), declined: tr('Declined')};
+  return `<div class="ctsec"><h4>${tr('Documents')}</h4>${ds.length ? `<ul class="ctlinks">${ds.map(x => `<li><a class="linkbtn" href="#office/gendocs/${x.id}">${ic('file', 's')} ${esc(x.title || x.kind_label)}</a><span class="muted"> · ${esc([x.list_name, st[x.status] || x.status].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No documents yet.')}</p>`}<a class="btn sm" href="#office/gendocs">${ic('plus', 's')} ${tr('New document')}</a></div>`;
+}
+async function ms_clGdLoad(id) {
+  MSC.gdLoading = true;
+  try { MSC.gd = {id, docs: (await rawFetch('GET', `/api/office/gen-docs?client_id=${id}&brief=1`)).docs || []}; } catch { MSC.gd = {id, docs: null}; }  // quiet: members (403) see no section
+  MSC.gdLoading = false;
+  ms_clDraw();
+}
 function ms_clDraw() { if (S.route.mod === 'clients') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); } }
 const ms_clDirty = () => { MSC.items = null; MSC.inv = null; };
 const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived) && (!MSC.q.trim() || [c.name, c.contact, c.email, c.phone, c.note, c.billing?.customer_no]
@@ -82,6 +96,7 @@ function ms_clCard(c) {
       persons: ks.length ? `<div class="ctsec"><h4>${tr('Contact persons')}</h4><ul class="ctlinks msclks">${ks.map(k => `<li>${ic('user', 's')} ${k.contact_id && feat('contacts') ? `<a href="#contacts/${k.contact_id}" title="${esc(tr('Open contact'))}"><b>${esc(k.name)}</b></a>` : `<b>${esc(k.name)}</b>`}${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default && ks.length > 1 ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone.replace(/[^\d+]/g, ''))}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul></div>` : '',
       invoices: typeof officeOn === 'function' && officeOn() && MSC.inv !== null ? `<div class="ctsec"><h4>${tr('Open invoices')}</h4>${inv.length ? `<ul class="ctlinks">${inv.map(x => `<li><a class="linkbtn" href="#office/offers/${x.id}">${ic('receipt', 's')} ${esc(x.number || tr('Draft'))}</a><span class="muted"> · ${esc(x.date ? fmtDateLoc(x.date) : '')} · ${esc(x.open_text || '')} · ${esc(x.status_text || '')}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No open invoices.')}</p>`}</div>` : '',
       tickets: typeof ptl_clientHtml === 'function' ? ptl_clientHtml(c) : '',  // 2.63.0 B (#1513): the client's reports
+      gendocs: ms_clGdHtml(c),  // 2.93.0 A (#1927): the documents made from templates (office admins)
       ...clientDetailParts(c)})}${clm_histHtml(c)}${typeof hbm_clientHtml === 'function' ? hbm_clientHtml(c) : ''}</div>
   </article>`;
 }

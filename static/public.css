@@ -14,6 +14,7 @@ header{margin:0 0 1rem}
 h1{font-size:1.375rem;font-weight:600;margin:0 0 .25rem;overflow-wrap:anywhere}
 h2{font-size:.8125rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:1.25rem 0 .25rem}
 .sub{margin:0;color:var(--muted);font-size:.8125rem}
+.sub code{overflow-wrap:anywhere;word-break:break-all}
 ul.tasks,ul.tasks ul{list-style:none;margin:0;padding:0}
 ul.tasks ul{padding-left:1.75rem}
 li.t{display:grid;grid-template-columns:auto 1fr;column-gap:.75rem;align-items:start;padding:.5rem 0;border-bottom:1px solid var(--line)}

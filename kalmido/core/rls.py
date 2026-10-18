@@ -31,6 +31,8 @@ TABLES = (
     "office_trips", "office_trip_items", "office_fixed_costs",  # 2.47.3 (#1022, #1652, part B)
     "office_bank_imports", "office_bank_tx",  # 2.90.0 B (#1921): bank reconciliation
     "office_inv_series", "office_sub_reminders",  # 2.91.0 A (#1923), B (#1924)
+    "office_doc_templates", "office_gen_docs",  # 2.93.0 A (#1927): document templates and the documents made from them
+    "office_vehicles", "office_drives", "office_drive_log",  # 2.93.0 B (#1928): the logbook
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
     "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)
