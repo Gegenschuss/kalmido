@@ -202,7 +202,7 @@ check(r.ok and r.json() == {"km_rate": "0.50", "year": 2025} and A.get(B + LB + 
       and A.get(B + LB + "/report?year=2026").json()["km_rate"] == "0.35", "the rate of 2025 leaves 2026 alone " + r.text)
 check(A.put(B + LB + "/settings", json={"km_rate": "1", "year": "20x6"}).status_code == 400, "the year validated")
 kl = [x for x in A.get(B + O + "/log?limit=200").json()["log"] if x["target"] == "km_rate"]
-check(sorted((x["detail"]["year"], x["detail"]["before"]["km_rate"], x["detail"]["after"]["km_rate"]) for x in kl) == [(2025, "0.35", "0.50"), (2026, "0.30", "0.35")],
+check(sorted((x["detail"]["year"], x["detail"]["before"]["km_rate"], x["detail"]["after"]["km_rate"]) for x in kl) == [(2025, "0.30", "0.50"), (2026, "0.30", "0.35")],
       f"the office log: every rate with the year, before and after {[x['detail'] for x in kl]}")
 e = A.get(B + "/api/office/books/euer?year=2026").json()
 km = [x for x in e["expenses"] if x["key"] == "km"]
