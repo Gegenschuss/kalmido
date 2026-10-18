@@ -60,10 +60,13 @@ const FEAT = 'cal,comments,collab,clients,office';
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   // 2.87.9 (#1917): the office menu (computer: four groups; phone: the group's points) replaces the tab row; the same rules
-  const tabs = `(() => { const bar = document.querySelector('#view .ofmenu, #view .ofmbar'); if (!bar) return null; const b = bar.getBoundingClientRect(); const bs = [...bar.querySelectorAll('[data-ofm]')], ts = bs.map(x => x.getBoundingClientRect());
+  // 2.98.0 (#2180): computer = the office rail (one point per line, nothing cut off); phone = ONE row of tabs that scrolls
+  // sideways instead of wrapping (Moritz' choice of variant A, 18.10.2026), the active tab in sight
+  const tabs = `(() => { const bar = document.querySelector('#view .ofrail, #view .ofpb'); if (!bar) return null; const b = bar.getBoundingClientRect(); const bs = [...bar.querySelectorAll('[data-ofm]')], ts = bs.map(x => x.getBoundingClientRect());
+    const row = bar.querySelector('.ofpts'), rb = row && row.getBoundingClientRect(), on = bar.querySelector('[data-ofm].on'), ob = on && on.getBoundingClientRect();
     const k = document.querySelector('.office .ofdkinds'); const kb = k && k.getBoundingClientRect();
-    return JSON.stringify({n: ts.length, inside: ts.every(r => r.left >= b.left - 1 && r.right <= b.right + 1 && r.width > 0), wrap: bs.length && getComputedStyle(bs[0].parentElement).flexWrap, ox: getComputedStyle(bar).overflowX, scroll: bar.scrollWidth > bar.clientWidth + 1 || bs.some(x => x.parentElement.scrollWidth > x.parentElement.clientWidth + 1),
-      rows: new Set(ts.map(r => Math.round(r.top))).size, kinds: kb ? [...k.querySelectorAll('button')].every(x => { const r = x.getBoundingClientRect(); return r.right <= kb.right + 1 && r.width > 0; }) : true,
+    return JSON.stringify({rail: bar.classList.contains('ofrail'), n: ts.length, inside: ts.every(r => r.left >= b.left - 1 && r.right <= b.right + 1 && r.width > 0), wrap: row ? getComputedStyle(row).flexWrap : '', ox: row ? getComputedStyle(row).overflowX : '',
+      rows: new Set(ts.map(r => Math.round(r.top))).size, onSeen: !!ob && (!rb || ob.left >= rb.left - 1 && ob.right <= rb.right + 1), kinds: kb ? [...k.querySelectorAll('button')].every(x => { const r = x.getBoundingClientRect(); return r.right <= kb.right + 1 && r.width > 0; }) : true,
       over: document.documentElement.scrollWidth > window.innerWidth + 1}); })()`;
   await firefox(async o => {
     const {cmd, ev, ctx, shot} = o;
@@ -71,10 +74,10 @@ const FEAT = 'cal,comments,collab,clients,office';
     for (const [wd, tag] of [[1345, '1345'], [760, '760-chat'], [390, '390']]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: wd, height: 850}});
       await o.nav(B + '#office/offers');
-      await until(() => ev(`!!document.querySelector('#view .ofmenu, #view .ofmbar')`).catch(() => false), 60); await sleep(900);
+      await until(() => ev(`!!document.querySelector('#view .ofrail, #view .ofpb')`).catch(() => false), 60); await sleep(900);
       const g = JSON.parse(await ev(tabs));
-      check(g && g.n >= (wd < 900 ? 2 : 6) && g.inside, `#1830 ${tag}: all tabs lie inside the tab bar ` + JSON.stringify(g));
-      check(g && g.wrap === 'wrap' && !g.scroll, `#1830 ${tag}: the bar wraps and does not scroll ` + JSON.stringify(g));
+      check(g && g.n >= (wd < 900 ? 2 : 6) && g.onSeen, `#1830 ${tag}: the points are there, the active one in sight ` + JSON.stringify(g));
+      check(g && (wd < 900 ? !g.rail && g.wrap === 'nowrap' && g.ox === 'auto' && g.rows === 1 : g.rail && g.inside && g.rows === g.n), `#1830 ${tag}: ${wd < 900 ? 'one row that scrolls sideways' : 'the rail, one point per line'} ` + JSON.stringify(g));
       check(g && g.kinds && !g.over, `#1830 ${tag}: the kind switches fit, no horizontal overflow ` + JSON.stringify(g));
       await shot(`p260d-office-${tag}.png`);
     }

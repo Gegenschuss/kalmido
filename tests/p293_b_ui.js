@@ -99,8 +99,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
     // 2.93.0 (#1928): the office menu of 2.92.2 (#1917) replaces the tab row .ofctabs
-    check(await ready(ev, `!!document.querySelector('#view .ofmenu [data-ofm="offers"]')`, 80), 'the office (member)');
-    check(await ev(`!document.querySelector('#view .ofmenu [data-ofm="travel"]')`), 'a member does not see the travel expenses / logbook');
+    check(await ready(ev, `!!document.querySelector('#view .ofrail [data-ofm="offers"]')`, 80), 'the office (member)');  // 2.98.0 (#2180): the office rail
+    check(await ev(`!document.querySelector('#view .ofrail [data-ofm="travel"]')`), 'a member does not see the travel expenses / logbook');  // 2.98.0 (#2180): the office rail
   }, false);
 
   console.log(`p293_b_ui: ${ok} ok, ${F.length} failed`);
