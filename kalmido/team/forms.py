@@ -311,7 +311,7 @@ def r81c_stamp_once(c, v):
     marks, the day = the stamp's last valid day, mail_budget's daily sweep drops them after). False = used before."""
     t, _, sig = (v or "").partition(".")  # sig = the random part + the signature, unique per page
     last = time.strftime("%Y-%m-%d", time.gmtime(int(t) + FRM_MAX_S))
-    c.execute("DELETE FROM mail_counts WHERE k LIKE 'fs:%' AND day<?", (now_utc().strftime("%Y-%m-%d"),))
+    c.execute("DELETE FROM mail_counts WHERE k LIKE 'fs:%' AND day<?", (now_utc().strftime("%Y-%m-%d"),))  # pg-ok: the app writes the prefix itself
     return c.execute("INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO NOTHING", (f"fs:{sig}", last)).rowcount == 1
 
 

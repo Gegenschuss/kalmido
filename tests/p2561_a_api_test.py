@@ -88,7 +88,7 @@ TAIL = ["Angebot Nr.: X-001", "Projekttitel: Beispielfilm"]
 
 def addr(pdf):
     r = A.post(B + L + "/archive/address", files={"file": ("a.pdf", pdf, "application/pdf")}, data={"client_id": ""})
-    j = r.json() if r.ok else {}
+    j = r.json() if r.ok else {"http": r.status_code, "body": r.text[:200]}  # 2.86.0: the reason in the message
     return j.get("status"), j.get("address") or {}, j
 
 
