@@ -16,7 +16,7 @@
 const WKE = {st: {}, info: {}, infoP: {}, keys: {}, tried: {}, memo: new Map(), locked: {}, busy: {}, prog: {}, rot: {}, unread: {}, probe: null};
 const WKE_PRE = 'e2e1:';
 const WKE_TPL = /^(templates|vorlagen)\//i;
-const WKE_ZIP = {files: 2000, file: 1000000, total: 30000000};  // the server's limits of an import (wiki/pages.py WIKI_ZIP_*)
+const WKE_ZIP = {files: 2000, file: 1000000, total: 30000000, zip: 524288000};  // the server's limits of an import (wiki/pages.py WIKI_ZIP_*, wikiatt.py WKA_ZIP_TOTAL)
 const wkeIs = v => typeof v === 'string' && v.startsWith(WKE_PRE);
 function wkeOn(sp) { return !!WKE.st[sp]?.mode; }
 function wkeMode(sp) { return WKE.st[sp]?.mode || null; }
@@ -457,16 +457,20 @@ async function wkeExport(sp) {
 async function wkeImport(sp, file) {
   if (!wkeReady(sp)) { if (!await e2eEnsure()) return {created: [], skipped: []}; await wkeKeys(sp, true); }
   if (!wkeReady(sp)) throw wkeErrLocked();
-  if (file.size > WKE_ZIP.total + 1) throw wkeErr(tr('The archive is too large'), 'bad');
+  if (file.size > WKE_ZIP.zip + 1) throw wkeErr(tr('The archive is too large'), 'bad');  // 2.99.0 A (#2182): ZIPs with files (they stay out)
   const ents = wkeUnzip(new Uint8Array(await file.arrayBuffer()));
   if (!ents) throw wkeErr(tr('This is not a ZIP file'), 'bad');
   const files = ents.filter(x => !x.name.endsWith('/'));
   if (files.length > WKE_ZIP.files) throw wkeErr(tr('Too many files (at most {0})', WKE_ZIP.files), 'bad');
-  if (files.reduce((a, x) => a + x.usize, 0) > WKE_ZIP.total) throw wkeErr(tr('The archive is too large'), 'bad');
-  const created = [], skipped = [], seen = new Set(), td = new TextDecoder('utf-8');
+  if (files.filter(x => x.name.toLowerCase().endsWith('.md')).reduce((a, x) => a + x.usize, 0) > WKE_ZIP.total) throw wkeErr(tr('The archive is too large'), 'bad');
+  const created = [], skipped = [], detail = [], seen = new Set(), td = new TextDecoder('utf-8');
   for (const x of files) {
     const nm = x.name.slice(0, 200);
-    if (!x.name.toLowerCase().endsWith('.md') || x.usize > WKE_ZIP.file || x.csize > WKE_ZIP.file + 4096 || x.name.includes('__MACOSX') || (x.flags & 1) || ![0, 8].includes(x.method)) { skipped.push(nm); continue; }
+    if (!x.name.toLowerCase().endsWith('.md')) {  // 2.99.0 A (#2182): the files of a locked space are not taken over yet (decision 2.99)
+      skipped.push(nm); detail.push({name: nm, reason: /\.(pdf|png|jpe?g|gif|webp|svg)$/i.test(x.name) ? tr('Encrypted space: files are not taken over yet') : tr('Only PDF files and pictures (PNG, JPEG, GIF, WebP, SVG)')});
+      continue;
+    }
+    if (x.usize > WKE_ZIP.file || x.csize > WKE_ZIP.file + 4096 || x.name.includes('__MACOSX') || (x.flags & 1) || ![0, 8].includes(x.method)) { skipped.push(nm); continue; }
     let path, text;
     try {
       path = wkeClean(x.name);
@@ -486,7 +490,8 @@ async function wkeImport(sp, file) {
       }
     }
   }
-  return {ok: true, created, updated: [], skipped: skipped.slice(0, 200)};
+  return {ok: true, created, updated: [], files: [], files_n: 0, skipped: skipped.slice(0, 200), skipped_n: skipped.length,
+    skipped_detail: [...detail, ...skipped.filter(n => !detail.some(d => d.name === n)).map(name => ({name, reason: ''}))].slice(0, 200)};
 }
 
 // ------------------------------------------------------------------ switching on / off, re-encryption (todo / bulk / finish)
