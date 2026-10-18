@@ -227,7 +227,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   w = await boot({user: 'alice', hash: 'l/' + TEAM}); d = w.document;
   check(!/type="(date|time)"/.test(src), 'no native date / time inputs in the app');
   // 2.89.1 (#1916): wait for the loaded state and the list route (the bigger client of 2.89 made opening before it a race)
-  await until(() => w.eval(`!!S.tasks.get(${plan}) && S.route.key === 'l:${TEAM}'`));
+  // 2.91.0: S may not exist yet right after boot (the bigger client of 2.91 loads later) - typeof guard instead of a ReferenceError
+  await until(() => w.eval(`typeof S !== 'undefined' && !!S.tasks && !!S.tasks.get(${plan}) && S.route.key === 'l:${TEAM}'`));
   w.eval(`openDetail(${plan})`); await sleep(200);
   w.eval(`datePop(document.querySelector('#detail [data-act="date"]'), ${plan})`); await sleep(100);
   click(w, d.querySelector('#pop [data-dpfor="p-start"]')); await sleep(80);
