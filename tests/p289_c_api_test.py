@@ -322,5 +322,16 @@ tok = A.post(B + "/api/me/tokens", json={"name": "bday", "scopes": ["read", "con
 r = bearer(tok or "x").get(V + "/contacts")
 check(r.ok and any(x.get("bday") == "1990-11-02" for x in r.json().get("data", [])), "GET /api/v1/contacts has bday " + r.text[:200])
 
+# ================================================================== 2.89.0 (#1916): review 2 - v1 PATCH list_id follows the web rule
+r = Bo.post(B + "/api/sheets", json={"title": "Bound by bob", "space": f"org:{ORG}", "list_id": W})
+RB = r.json()["id"]
+check(ta.get(V + f"/sheets/{RB}").ok, "review 2: the team agent sees bob's table on the shared list")
+check(ta.patch(V + f"/sheets/{RB}", json={"list_id": None}).status_code == 403, "review 2: the agent cannot detach a table it did not create")
+check(Bo.get(B + f"/api/sheets/{RB}").json()["list_id"] == W, "review 2: ... the table stays attached")
+check(ta.patch(V + f"/sheets/{RB}", json={"title": "Renamed by agent"}).ok, "review 2: renaming stays allowed")
+r = ta.post(V + "/sheets", json={"title": "Own bound", "space": f"org:{ORG}", "list_id": W})
+check(r.status_code == 201 and ta.patch(V + f"/sheets/{r.json()['id']}", json={"list_id": None}).ok,
+      "review 2: the agent detaches a table it created itself")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
