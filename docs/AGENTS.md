@@ -1523,6 +1523,8 @@ assigning) have no agent route yet.
 
 A name that is taken gets " (2)"; an agent's executable ending gets ".txt" (#380). Renaming, moving, the trash and shares
 stay with people. Without a share the answer is 404 (the file does not exist for you); a view share answers 403 on writes.
+2.96.0 (#1941): agents never move data between workspaces (private space <-> organisation); the person does that in the
+app (`POST /api/files/move-space` answers an agent 403, there is no v1 route and no MCP tool).
 
 ## Files in the chat and on tasks (2.13.1)
 
