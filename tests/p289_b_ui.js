@@ -148,9 +148,9 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await get()).rows[0].id === R[0]), 'undo: the old order');
   w.eval(`shvFilterPop(${C[0]}, document.querySelector('[data-shv="col"][data-c="${C[0]}"]'))`); await sleep(100);
-  const fmin = d.querySelector('#pop [data-shvf="min"]'); fmin.value = '6'; fmin.dispatchEvent(new w.Event('input', {bubbles: true}));
+  const fq = d.querySelector('#pop [data-shvf="q"]'); fq.value = '7'; fq.dispatchEvent(new w.Event('input', {bubbles: true}));  // column A is a text column: "contains"
   await sleep(200);
-  check(d.querySelectorAll('#shv-scroll tbody tr').length === 1 && d.querySelector('[data-shv="unfilter"]'), 'filter A >= 6: one row shown, a reset button');
+  check(d.querySelectorAll('#shv-scroll tbody tr').length === 1 && d.querySelector('[data-shv="unfilter"]'), 'filter A contains 7: one row shown, a reset button');
   check((await get()).rows.length === 10, 'the filter changes nothing on the server');
   w.eval('closePop()'); click(w, d.querySelector('[data-shv="unfilter"]')); await sleep(200);
   check(d.querySelectorAll('#shv-scroll tbody tr').length === 10, 'filters reset: all rows');
