@@ -5,7 +5,7 @@
 // - a new document for a client: the draft with its preview (variables filled, an unknown one marked), finish (the
 //   document is final, the text frozen), create the signature link (the link is shown)
 // - the client page lists the client's documents; on a phone nothing sticks out to the side
-// - a member does not see the tab
+// - a member does not get the tab (the hint instead)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -46,7 +46,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     await signIn(ev, 'alice');
     // ================= templates
     await nav(B + '#office/gendocs');
-    check(await ready(ev, `!!document.querySelector('.ofctabs [data-go="office/gendocs"]') && !!document.querySelector('[data-dt="new"]')`, 80), 'the tab "Documents" for the admin');
+    check(await ready(ev, `!!document.querySelector('[data-dt="new"]')`, 80), 'the tab "Documents" for the admin');
     await ev(`(() => { document.querySelector('[data-dt="view"][data-v="templates"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('[data-dt="starters"]')`), 'the templates view');
     await ev(`(() => { document.querySelector('[data-dt="starters"]').click(); return 1; })()`);
@@ -93,9 +93,9 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     // ================= member
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
-    await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('.ofctabs [data-go="office/offers"]')`, 80), 'the office (member)');
-    check(await ev(`!document.querySelector('.ofctabs [data-go="office/gendocs"]')`), 'a member does not see the tab');
+    await nav(B + '#office/gendocs');  // (the tab row becomes a group menu in 2.92.1: no check on it, the route opens the tab)
+    check(await ready(ev, `/Only the admins of the office see documents/.test(document.querySelector('#view')?.textContent || '')`, 80), 'a member gets the hint instead of the documents');
+    check(await ev(`!document.querySelector('[data-dt="new"]') && !document.querySelector('[data-go="office/gendocs"], [data-ofm="gendocs"]')`), 'a member has neither the tab nor its buttons');
   }, false);
 
   console.log(`p293_a_ui: ${ok} ok, ${F.length} failed`);
