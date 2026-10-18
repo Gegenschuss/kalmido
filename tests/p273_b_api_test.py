@@ -386,11 +386,11 @@ check(A.post(B + f"/api/account/import/{iid}/key", json={"recovery_key": RK}).st
 j = wait(A, iid)
 pv = j.get("preview") or {}
 check(j.get("state") == "preview" and pv.get("kind") == "org", f"opened: preview {j.get('state')} {j.get('error')}")
-check("private" not in [t["id"] for t in pv.get("targets", [])] and GAMMA in [t["id"] for t in pv.get("targets", [])], "targets: organisations only")
+# 2.96.0 (#1941): an organisation export may go into the private space too (p296_d_api_test.py runs it)
+check("private" in [t["id"] for t in pv.get("targets", [])] and GAMMA in [t["id"] for t in pv.get("targets", [])], "targets: private + organisations")
 check(any(x["key"] == EH("bob@example.com") and x["found"] for x in pv.get("people", [])) and
       not any(x["key"] == EH("alice@example.com") for x in pv.get("people", [])) and not any("email" in x for x in pv.get("people", [])),
       "the members: bob found, alice herself not listed, no address in the preview")
-check(A.post(B + f"/api/account/import/{iid}/run", json={"target": "private"}).status_code == 400, "not into the private space")
 j = run(A, iid, target=GAMMA, people={"bob@example.com": {"share": True}})  # a plain address as key (older client) still works
 check(j.get("state") == "done", f"organisation import done {j.get('error')}")
 gl = dbx("SELECT id, owner_id FROM lists WHERE org_id=? AND name='Alpha Orgliste'", (GAMMA,))

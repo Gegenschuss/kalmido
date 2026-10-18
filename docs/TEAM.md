@@ -8,6 +8,9 @@ Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.
 - Everybody enters their own absences: **Absences > Enter an absence** - vacation, sick leave, day off or other,
   one day or a period, optionally half a day (morning / afternoon) and a note. There is no approval: entering is enough.
 - The admins of an organisation can also enter absences for its members.
+- **Which area:** the workspace switch decides (2.96): on an organisation its absences, on **Private** your own
+  personal area (also as a member of organisations), on **All** the first organisation. The picker at the top switches
+  between them.
 - **Who sees what:** the team sees *that* somebody is away and when. The kind (above all sick leave) and the note
   only the person and the organisation's admins see. Kind and note are stored encrypted when the server's
   encryption at rest is on.
