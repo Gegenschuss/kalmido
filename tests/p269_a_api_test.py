@@ -376,7 +376,7 @@ zr = [{k: v for k, v in x.items() if k != "id"} for x in Bo.get(B + f"/api/docs/
 check({"kind": "exact", "match": "utility", "case": True, "sender": "Example Utility"} in zr
       and {"kind": "any", "match": "tax office", "tags": ["Taxes"]} in zr, f"ZIP import: the rules with the mapped targets ({zr})")
 check(sh(f"test -e /data/paperless-zip/{zid} && echo yes") == "", "the upload is gone after the run")
-ds = until(lambda: (lambda x: x if len([d for d in x if d["name"] in ("Power bill May.pdf", "Tax notice.pdf")]) == 2 else None)(docs(Bo, OWS)), 30) or []
+ds = until(lambda: (lambda x: x if len([d for d in x if d["name"] in ("Power bill May.pdf", "Tax notice.pdf") and d["state"] in ("done", "failed")]) == 2 else None)(docs(Bo, OWS)), 60) or []  # 2.80.3: recognised (an import makes its preview since 2.80.2)
 by = {d["name"]: d for d in ds}
 pb, tn = by.get("Power bill May.pdf"), by.get("Tax notice.pdf")
 check(pb and tn, f"two documents, named after the title ({sorted(by)})")

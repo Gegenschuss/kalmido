@@ -203,7 +203,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   p = w.eval(`listDeleteForGood(${WORK})`);  // 2.50.2: wait for the dialog (100 ms were too short on slow CI)
   for (let i = 0; i < 40 && !d.querySelector('.modal.cdlg [data-cd="yes"]'); i++) await sleep(100);
   click(w, d.querySelector('.modal.cdlg [data-cd="yes"]'));
-  check(await p === true && !(await st()).lists.some(l => l.id === WORK), 'confirmed: deleted for good');
+  const gone = await p === true && await until(async () => !(await st()).lists.some(l => l.id === WORK), 10000);  // 2.80.2: the delete runs behind the screen (#1659)
+  check(gone, 'confirmed: deleted for good');
   // other confirms: the own dialog, never window.confirm; undoable things ask nothing
   const S1 = (await call('POST', '/api/lists', {name: 'Scratch'})).id;
   const s1 = await mk('Throwaway', S1), s2 = await mk('Second', S1);

@@ -242,6 +242,7 @@ async function firefox(fn) {
       await ev(`document.querySelector('.modal').remove()`);
       if (W < 900) { await nav(B + '#agents/' + ag.id); await sleep(2500); }
       else { await ev(`chatOpen(${ag.id})`); await sleep(1200); }
+      for (let i = 0; i < 60 && !(await ev(`!!document.querySelector('${W < 900 ? '#view .chath' : '#achat .chath'}')`).catch(() => false)); i++) await sleep(250);  // 2.80.3: slow CI
       const m3 = await fit(W < 900 ? '#view .chath' : '#achat .chath');
       check(good(m3), `${W}px: chat header with "working on #id" fits ${JSON.stringify(m3)}`);
       const one = await ev(`(() => { const s = document.querySelector('#chat-st').getBoundingClientRect(); return s.height < 40 && /working on #/.test(document.querySelector('#chat-st').textContent); })()`);

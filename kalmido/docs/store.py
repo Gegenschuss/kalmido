@@ -736,7 +736,8 @@ def process(c, nid):
         c.execute("UPDATE doc_meta SET state='failed', error='missing', updated_at=? WHERE node_id=?", (_now(), nid))
         return "failed"
     if given.get("text"):
-        res = {"text": str(given["text"])[:200_000], "method": "import"}
+        from ..tasks.attachtext import file_kind  # 2.66.1 (#1944): the kind all the same -> preview + QR code of an import
+        res = {"text": str(given["text"])[:200_000], "method": "import", "kind": file_kind(node["name"], node["mime"], data[:2048])}
     else:
         res = doc_text(node["name"], node["mime"], data)
     if res.get("error") == "busy":

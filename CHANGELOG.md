@@ -148,6 +148,36 @@ Remaining fixes: office, import, clients, uploads. Contains security fixes.
   covers recognised file texts; a long text recognition is resumed after 45 instead of 30 minutes (#1856).
 - Self-hosting: concurrent first requests print one setup code; the backup warning counts from re-enabling; the install
   scripts point to the newest setup code in the log (#1627).
+## [2.80.3] - 2026-10-18
+
+Live fix from the device test of 2.80.2.
+
+### Fixed
+- Bell: the panel lists what counts for you under *Needs you*, no longer under *For your information* (#1943).
+- Tests: robust after midnight and on Sundays, the test run is split into 11 parts.
+
+## [2.80.2] - 2026-10-18
+
+Live fixes: the bell, document previews of imports, switching the workspace.
+
+### Fixed
+- Bell: comments of agents that reach you count at the bell again - with *only replies to me* their replies, mentions and
+  approval cards, with *all comments* every agent comment; other agent actions (completing, status, new tasks) stay
+  Activity without a number. A bundle of comments counts as soon as one of them is for you (#1943).
+- Documents: imports that bring their own text (Paperless, ZIP archive) get a preview image and the QR / archive number check
+  again; documents imported earlier get their missing preview once in the background after the update, a few at a time
+  (`KALMIDO_DOCS_THUMB_FILL=off` turns it off) (#1944).
+- Documents: switching the workspace (organisation <-> private) reloads the list, the *To check* count and the filters at once
+  and closes a document of the other workspace; an answer that arrives late for the old workspace is dropped. An open wiki
+  page closes on the switch too. A new guard test switches every view tied to a workspace in both directions (#1945).
+
+## [2.80.1] - 2026-10-17
+
+CI fixes for the 2.80 bundle.
+
+- Browser demo: the evening review card in Today no longer stops the demo after the end of the working day (the demo's
+  review answer had no *tomorrow* part).
+- Office catalog: the control character filter is written with escapes instead of raw bidirectional characters (bandit B613).
 
 ## [2.80.0] - 2026-10-17
 
@@ -166,6 +196,10 @@ Small fixes: import, clients, contacts.
   wraps instead of scrolling sideways (#1897).
 - Agent chat usage ring: further quota windows are named (week incl. extra usage, Opus, Sonnet), unknown ones read
   *Other quota* instead of the raw English key, and an idle weekly window at 0 % is left out (#1841).
+- Bundle G3 + G4 + 2.78-2.80 (live in one step): the list name in the task rows (Today, matrix, folders) was gone after a
+  merge and is back; *Switch on all modules* includes the household budget; `DELETE /api/v1/tasks/{id}/links/{list_id}`
+  matches its OpenAPI entry; the cash flow's monthly check task text says *Basket* in every language; two case checks in
+  queries follow PostgreSQL (`ILIKE`). Tests: the newest suites are spread over five shards (shard 10 ran past the limit).
 
 ## [2.79.0] - 2026-10-17
 
@@ -5649,7 +5683,9 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.41.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.80.3...HEAD
+[2.80.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.80.3
+[2.80.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.80.1
 [2.41.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.2
 [2.41.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.1
 [2.41.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.0

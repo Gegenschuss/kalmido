@@ -20,7 +20,7 @@ function shim(w) {
   w.__st = 0; w.__sDelay = 4000; w.__fail = null; w.__pDelay = 0;
   w.fetch = async (u, o = {}) => {
     const url = String(u), m = (o.method || 'GET').toUpperCase();
-    if (m === 'GET' && /\/api\/state/.test(url)) { w.__st++; await sleep(w.__sDelay); }
+    if (m === 'GET' && /\/api\/state/.test(url)) { w.__st++; w.__stk = (new Error().stack || '').split('\n').slice(2, 6).join(' < '); await sleep(w.__sDelay); }
     if (m !== 'GET' && w.__pDelay) await sleep(w.__pDelay);
     if (m !== 'GET' && w.__fail && w.__fail.test(url)) return new Response(JSON.stringify({error: 'Test error'}), {status: 500, headers: {'Content-Type': 'application/json'}});
     return of(u, o);
@@ -108,11 +108,12 @@ const lc = (w, id) => w.eval(`listById(${id})?.color || ''`);
   check(w.__st === st1, '#1501: list tags without GET /api/state');
 
   // ================= the list view switches locally
+  await sleep(1500);  // 2.80.3: late answers of the steps above settle first (slow CI)
   st1 = w.__st;
   w.eval(`setListView(listById(${L}), 'kanban')`);
   await sleep(250);
   check(w.eval(`listById(${L}).view`) === 'kanban', '#1501: the list view switches at once');
-  check(w.__st === st1, '#1501: the view switch without GET /api/state');
+  check(w.__st === st1, '#1501: the view switch without GET /api/state' + (w.__st === st1 ? '' : ' (from ' + w.__stk + ')'));
 
   w.close(); w2.close();
   console.log(`p2412_ui: ${ok} ok, ${F.length} failed`);

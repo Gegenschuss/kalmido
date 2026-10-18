@@ -93,6 +93,10 @@ answers one of your comments (reply), comes right after your comment on that tas
 - Approval cards, questions with buttons and suggestions of an agent always arrive: they wait for your answer.
 - A list bell **All** and a task marked **Urgent** for you still bring every comment of that list / task.
 - Pushes about other things agents do (new tasks, completions) keep their own switch.
+- **The bell (2.66.1)**: the agent comments that reach you count in the bell's number and under *For you* - with "only
+  replies" its replies and mentions plus what reaches you anyway (approval cards and questions waiting for you, comments on
+  a task marked **Urgent** for you), with **All** every agent comment. Other things agents do (completions, status,
+  new tasks, assignments) stay under *Activity* without a number.
 
 ## Address books of the organisation (2.52.0)
 
