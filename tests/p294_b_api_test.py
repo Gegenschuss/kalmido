@@ -265,11 +265,10 @@ check(ev[0] == "Erstgespräch: Kunde Eins" and ev[1] == ACAL and ev[2] == "Video
 check([tuple(x) for x in dbx("SELECT email, name FROM event_attendees WHERE event_id=?", (row[1],))] == [(M1, "Kunde Eins")], "the customer is the attendee")
 ct = dbx("SELECT c.fn, c.emails, b.owner_id FROM contacts c JOIN books b ON b.id=c.book_id WHERE c.id=?", (row[2],))[0]
 check(ct[0] == "Kunde Eins" and M1 in ct[1] and ct[2] == ALICE, "a contact in alice's address book " + str(ct))
-if row[3]:  # part A merged: the lead in the office area of the page
-    dl = dbx("SELECT org_id, stage FROM office_deals WHERE id=?", (row[3],))[0]
-    check(tuple(dl) == (ORG, "lead"), "the lead in the organisation's office " + str(dl))
-else:
-    print("note: no lead (part A not merged yet)", flush=True)
+check(bool(row[3]), "the booking made a lead (office/leads.py lead_from_booking)")
+if row[3]:
+    dl = dbx("SELECT org_id, stage, source, follow_up FROM office_deals WHERE id=?", (row[3],))[0]
+    check(tuple(dl[:3]) == (ORG, "lead", "booking") and dl[3] == K[:4] + "-" + K[4:6] + "-" + K[6:8], "the lead in the organisation's office, follow-up = the day " + str(dl))
 check("Booking confirmed" in pub.get(f"{B}/s/b/c/{TOK1}").text, "the confirmation link shows the state afterwards")
 ms = wait_mail(M1, 2)
 check(len(ms) == 2 and "Your appointment is booked" in body_of(ms[1])[1] and "Videoanruf" in body_of(ms[1])[0], "the mail with the details")
@@ -355,8 +354,7 @@ row = dbx("SELECT status, event_id, contact_id, deal_id FROM appt_bookings WHERE
 DORA = dbx("SELECT id FROM users WHERE username='dora'")[0][0]
 check(row[0] == "confirmed" and dbx("SELECT k.owner_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?", (row[1],))[0][0] == DORA
       and dbx("SELECT b.owner_id FROM contacts c JOIN books b ON b.id=c.book_id WHERE c.id=?", (row[2],))[0][0] == DORA, "the freelancer's booking: own calendar + contacts " + str(row))
-if row[3]:
-    check(dbx("SELECT org_id, stage FROM office_deals WHERE id=?", (row[3],))[0][0] == DPO, "the lead in her personal office")
+check(bool(row[3]) and dbx("SELECT org_id FROM office_deals WHERE id=?", (row[3] or 0,))[0][0] == DPO, "the lead in her personal office")
 check(not any(b["email"] == MD for b in A.get(B + AP + "/bookings").json()["bookings"]), "alice does not see dora's bookings")
 check(Do.post(B + f"{AP}/bookings/{B2}/cancel", json={}).status_code == 404, "dora cannot reach alice's booking")
 
