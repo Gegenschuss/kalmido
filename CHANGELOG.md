@@ -7,6 +7,8 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.93.1] - 2026-10-18
+
 ### Fixed
 - Customer signing page: the checksum of the document wraps on phones instead of running out sideways (#1927).
 
