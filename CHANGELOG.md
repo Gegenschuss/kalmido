@@ -7,6 +7,37 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.97.0] - 2026-10-19
+
+Bookmarks, a display name for customers, office data and locked wiki spaces between your private space and an organisation.
+
+### Added
+- Bookmarks (Home & life, module "Read later"): save links with a preview (title, description, picture), tags, a note and
+  read / archived; cards or a list, search over everything including the page's reading text. Save from the share target,
+  by pasting, or with a browser button that asks before saving. Karakeep links arrive as bookmarks. Bookmarks move between
+  the private space and an organisation. No screenshots, no whole pages, no automatic tags (#1950).
+- Customers: an optional display name for pickers and lists (e.g. "Foo Switzerland" / "Foo Germany"); customers with the
+  same name show their city automatically. Invoices and e-invoices keep the legal name. New field "Address line 2" (#1951).
+- Office data moves between the personal office and an organisation: customers with their contact persons and drafts,
+  travel-expense drafts and document templates. Issued invoices, closed receipts, number ranges and the archive always stay
+  where they are; on request a read-only copy goes along ("copy from …", not counted in the target's figures). The target
+  numbers drafts in its own range. One step undoes it (#2049).
+- Wiki spaces with a lock: pages move between the private space and an organisation; your browser re-encrypts them for the
+  target (a warning comes before they go into an open space). One step undoes it (#2050).
+
+### Changed
+- Quotations and invoices take the recipient from the customer (name, attn., street, address line 2, postcode, city,
+  country): the document head shows it read-only with "Edit customer" and "Address missing"; without a customer you create
+  one right there. The address is frozen when a document is finalised; older documents stay as they are. The free-text
+  address of a customer is no longer in the form; where the fixed fields were empty it was taken over once (#1951).
+- "Moved out of …" under a page or table names a workspace only to its members, others see a neutral word (#2051).
+
+### Fixed
+- Files left behind by an interrupted move between workspaces are cleaned up at night (#2051).
+
+### Security
+- Security fix: link previews and moves between workspaces (organisation boundary).
+
 ## [2.96.0] - 2026-10-18
 
 Moving data between your private space and an organisation, and one card per job in the agent chat.
