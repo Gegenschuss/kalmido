@@ -685,6 +685,21 @@ amount. When a quotation becomes "accepted" its purchase is stored for the cash 
 position with a purchase and per part, amount encrypted at rest, dated at the start of the period of service, else the
 day of acceptance), stored anew when the accepted quotation changes and removed when it leaves that status.
 
+## Recipient and client names (2.97.0)
+
+- A client has its name (printed on quotations, invoices, the e-invoice) and an optional **display name** for the pickers
+  and lists ("Foo Switzerland" / "Foo Germany"). Without one, two clients of one workspace with the same name show the
+  city in brackets, the country when the city is the same too. The client search finds both names.
+- The address is kept in fixed fields only: street, address extra (c/o, building), postcode, city, country. The old free
+  "Address" text left the form; where it was the only address, street / postcode / city were filled from it once (the
+  text stays in the database, nothing is overwritten).
+- A quotation or invoice with a client shows the recipient read-only next to the client (name, attn., street, extra line,
+  postcode city, the country when it is foreign) with "Edit client"; a missing street / postcode / city shows "Address
+  missing - add it at the client". A document without a client offers "Add client" (name + address), which then becomes
+  its client. Drafts always read the client's current address; finalising (or sending) freezes it, later changes at the
+  client leave issued documents alone. Old documents with free address lines keep them. With the clients module off the
+  free recipient fields stay.
+
 ## Finalising
 
 A document can be finalised (button "Finalise" in the editor, after a confirmation; any member of the organisation).
