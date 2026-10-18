@@ -801,7 +801,7 @@ def vma_trip(trip):
         kinds[0] = kinds[-1] = "partial"
     if all(k == "none" for k in kinds):
         out["hints"].append({"key": "short"})
-    years = sorted({int(d[:4]) for d in ds})
+    years = sorted({int(d[:4]) for d, k in zip(ds, kinds) if k != "none"})  # a day without a rate needs no table (review)
     missing = [y for y in years if y not in VMA_TABLES]
     if missing:
         out["hints"] += [{"key": "year", "year": y} for y in missing]
@@ -812,6 +812,10 @@ def vma_trip(trip):
     for d, k in zip(ds, kinds):
         o = over.get(d) or {}
         code = (o.get("country") or base).upper()
+        if k == "none" and int(d[:4]) not in VMA_TABLES:
+            out["days"].append({"date": d, "country": code, "rate_country": code, "place": "", "kind": k, "rate": "0.00",
+                                "cut": "0.00", "amount": "0.00", "meals": []})
+            continue
         r = vma_rate(int(d[:4]), code, o.get("place") or (trip.get("place") if code == base else "") or "")
         full, part, used, place, how = r
         if how:
