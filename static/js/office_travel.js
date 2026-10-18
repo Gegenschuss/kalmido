@@ -284,6 +284,7 @@ function rk_vmaDlgWire(md, t) {
     if (!md.isConnected) return;
     const ps = $('#rk-place', md), o = rk_vmaPlaceOpts(r, $('#rk-cty', md).value, ps.dataset.touched ? '' : ps.value);
     ps.innerHTML = o || '<option value="" selected></option>';
+    ps.dataset.none = o ? '' : '1';  // 2.95.0 (#1932 review): the country has no cities (only then the city is cleared)
     $('.rkv-pl', md).hidden = !o || $('#rk-voff', md).checked;
   });
   md.addEventListener('change', e => {
@@ -293,7 +294,7 @@ function rk_vmaDlgWire(md, t) {
   sync();
 }
 function rk_vmaDlgBody(md) {
-  const c = $('#rk-cty', md)?.value || 'DE', pl = $('.rkv-pl', md)?.hidden ? '' : $('#rk-place', md)?.value || '';
+  const c = $('#rk-cty', md)?.value || 'DE', pl = $('#rk-place', md)?.dataset.none === '1' ? '' : $('#rk-place', md)?.value || '';  // review: kept while the cities load / with no per diem
   return {country: c === 'DE' ? '' : c, place: pl, t_start: $('#rk-ts', md)?.value || '', t_end: $('#rk-te', md)?.value || '', vma_off: $('#rk-voff', md)?.checked ? 1 : 0};
 }
 function rk_vmaHint(h) {
@@ -338,7 +339,7 @@ async function rk_vmaDaysModal(t) {  // per day: country (+ city) and the meals 
       <div class="rkv-dsel"><select data-vc aria-label="${esc(tr('Country'))}">${rk_vmaCtyOpts(r, c, `<option value="" ${c ? '' : 'selected'}>${esc(tr('As the trip ({0})', rk_vmaCty(base)))}</option>`)}</select>
       <select data-vp aria-label="${esc(tr('City'))}" ${pl ? '' : 'hidden'}>${pl}</select></div>
       <div class="rkv-meals" role="group" aria-label="${esc(tr('Meals provided'))}">${meal(d, 'b', tr('Breakfast'))}${meal(d, 'l', tr('Lunch'))}${meal(d, 'd', tr('Dinner'))}</div></li>`; }).join('');
-  const md = modal(`<h3>${tr('Edit days')}</h3><p class="muted">${esc(tr('Country = where you are before midnight. Tick the meals that were provided: breakfast cuts 20 %, lunch and dinner 40 % each of the full rate.'))}</p>
+  const md = modal(`<h3>${tr('Edit days')}</h3><p class="muted">${esc(tr('Country = where you are before midnight; on the day you travel home, the last place abroad where you worked. Tick the meals that were provided: breakfast cuts 20 %, lunch and dinner 40 % each of the full rate.'))}</p>
     <ul class="rkv-days" role="list">${rows}</ul><div class="aerr" role="alert"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('ofcdlg');

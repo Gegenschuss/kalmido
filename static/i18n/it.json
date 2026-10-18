@@ -4907,7 +4907,7 @@
   "As the trip ({0})": "Come il viaggio ({0})",
   "Breakdown": "Dettaglio",
   "Breakfast": "Colazione",
-  "Country = where you are before midnight. Tick the meals that were provided: breakfast cuts 20 %, lunch and dinner 40 % each of the full rate.": "Paese = dove ti trovi prima di mezzanotte. Spunta i pasti offerti: la colazione riduce del 20 %, pranzo e cena del 40 % ciascuno della tariffa piena.",
+  "Country = where you are before midnight; on the day you travel home, the last place abroad where you worked. Tick the meals that were provided: breakfast cuts 20 %, lunch and dinner 40 % each of the full rate.": "Paese = dove ti trovi prima di mezzanotte; nel giorno del rientro, l'ultimo luogo all'estero in cui hai lavorato. Spunta i pasti forniti: la colazione riduce del 20 %, pranzo e cena del 40 % ciascuno della tariffa giornaliera piena.",
   "Dinner": "Cena",
   "Edit days": "Modifica giorni",
   "Flat rates for additional meal expenses per participant. Kalmido does not replace tax advice.": "Forfait per spese aggiuntive di vitto per partecipante. Kalmido non sostituisce la consulenza fiscale.",

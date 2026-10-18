@@ -13,6 +13,7 @@ compared with the spreadsheet's amount (status warn when they differ or there is
 hint of the spreadsheet (meals paid, an unknown change of country) stays a note."""
 import io
 import json
+import lzma
 import re
 import zipfile
 import zlib
@@ -131,7 +132,9 @@ def vmi_xlsx(raw):
             out.append({"name": (sh.get("name") or "").strip(), "grid": _sheet(z, path, strings, budget),
                         "comments": vmi_comments(z, path, names, budget)})
         return out
-    except (ET.ParseError, KeyError, ValueError, zipfile.BadZipFile, zlib.error, EOFError):  # broken file -> 400, not 500
+    # 2.95.0 (review): an encrypted / exotically packed zip (RuntimeError, NotImplementedError, OSError, LZMAError) -> 400 too
+    except (ET.ParseError, KeyError, ValueError, zipfile.BadZipFile, zlib.error, EOFError, RuntimeError, NotImplementedError, OSError,
+            lzma.LZMAError):  # broken file -> 400, not 500
         raise BadInput(bad) from None
 
 
@@ -230,7 +233,7 @@ def vmi_block(text):
     block (and its heading line) are taken out, every other line stays."""
     entries, rest = [], []
     for ln in str(text or "").split("\n"):
-        m = VMI_BLOCK_RE.match(ln)
+        m = VMI_BLOCK_RE.match(" ".join(ln.split())[:400])  # review: single spaces, a short line -> no long backtracking
         if m:
             cp = vmi_country(m.group("name"))
             entries.append({"name": m.group("name").strip(), "code": cp[0] if cp else None, "place": cp[1] if cp else "",

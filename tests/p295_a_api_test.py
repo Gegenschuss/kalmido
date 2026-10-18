@@ -108,6 +108,13 @@ t3 = trip(A, date_from="2025-06-03", dest="Kiel", people=[{"id": ALICE}])
 check(t3["vma"]["amount"] is None and t3["vma"]["total"] is None and {"key": "times"} in t3["vma"]["hints"], f"a single day without times: no amount, hint {t3['vma']}")
 t4 = trip(A, date_from="2025-06-04", dest="Bremen", t_start="08:00", t_end="15:00", people=[{"id": ALICE}])
 check(t4["vma"]["amount"] == "0.00" and {"key": "short"} in t4["vma"]["hints"], f"8 hours or less: 0 and hint {t4['vma']}")
+# 2.95.0 (#1932 review): two days without an overnight stay: the hours together, on the day with the most of them
+t9 = trip(A, date_from="2026-12-31", date_to="2027-01-01", dest="Nachtfahrt", t_start="14:00", t_end="02:00", people=[{"id": ALICE}])
+check(t9["vma"]["amount"] == "14.00" and t9["vma"]["days"][0]["kind"] == "partial", f"10 h on 31.12. + 2 h: 14 on the first day (2026 table) {t9['vma']}")
+t10 = trip(A, date_from="2025-06-05", date_to="2025-06-06", dest="Ohne Zeiten", people=[{"id": ALICE}])
+check(t10["vma"]["amount"] is None and {"key": "times"} in t10["vma"]["hints"], f"two days without a stay and without times: hint {t10['vma']}")
+for x in (t9, t10):
+    check(A.delete(B + f"{T}/{x['id']}").ok, "cleanup")
 # abroad, the last two days in another country
 t5 = trip(A, date_from="2025-05-01", date_to="2025-05-04", dest="Thessaloniki - Prag", overnight=True, country="GR", people=[{"name": "Externe Person"}],
           purpose="acquisition", vma_days=[{"date": "2025-05-03", "country": "CZ"}, {"date": "2025-05-04", "country": "CZ"}])

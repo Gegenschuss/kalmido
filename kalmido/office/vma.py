@@ -13,8 +13,9 @@ The country of a day: where one is before midnight (the letter's rule for days o
 of a trip has country + place (a city of the table, '' = "im Uebrigen" / the whole country). Meals provided cut the rate
 of that day by 20 % (breakfast) / 40 % (lunch) / 40 % (dinner) of the FULL day's rate of that day's country, never below 0.
 A single-day trip needs its start and end time (more than 8 hours = the partial rate, else nothing); a trip over two days
-without an overnight stay (overnight = 0, both times given) counts its hours together and gets at most one partial rate,
-on the second day.
+without an overnight stay (overnight = 0) needs both times too, counts its hours together and gets at most one partial
+rate, on the day with the most hours (section 9 (4a) sentence 3 no. 3 EStG). On the day of the return the rate of the last
+place of work abroad applies (the default of a trip abroad does that; a day set to Germany gets the German rate).
 
 Pure functions only (no database, no Flask): travel.py stores the trip's fields and calls vma_trip; the report and the
 import use the same function."""
@@ -788,9 +789,14 @@ def vma_trip(trip):
             out["hints"].append({"key": "times"})
             return out
         kinds = ["partial" if b - a > 8 * 60 else "none"]
-    elif n == 2 and not trip.get("overnight") and _mins(trip.get("t_start")) is not None and _mins(trip.get("t_end")) is not None:
-        span = 24 * 60 - _mins(trip.get("t_start")) + _mins(trip.get("t_end"))  # over midnight without a stay: the hours count together
-        kinds = ["none", "partial" if span > 8 * 60 else "none"]
+    elif n == 2 and not trip.get("overnight"):
+        a, b = _mins(trip.get("t_start")), _mins(trip.get("t_end"))
+        if a is None or b is None:  # review: like a single day, the hours are needed
+            out["hints"].append({"key": "times"})
+            return out
+        d1, d2 = 24 * 60 - a, b  # over midnight without a stay: the hours count together, on the day with the most of them
+        k = "partial" if d1 + d2 > 8 * 60 else "none"
+        kinds = [k, "none"] if d1 > d2 else ["none", k]
     else:
         kinds[0] = kinds[-1] = "partial"
     if all(k == "none" for k in kinds):
