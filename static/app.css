@@ -5799,7 +5799,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 /* 2.46.1 E (#1622) inline title edit: the field is a block on the circle's line (no inline baseline / strut offset), the frame
    ends before the columns, row-mode rows centre it instead of baseline-aligning to the meta */
 .trow.iedit .ttl{display:block;line-height:1.45;min-height:calc(var(--row-fs) * 1.45)}
-.trow.iedit .ttlin{display:block;height:calc(var(--row-fs) * 1.45);line-height:inherit;margin:0;vertical-align:top}
+.trow.iedit .ttlin{display:block;height:calc(var(--row-fs) * 1.45);min-height:0;line-height:inherit;margin:0;vertical-align:top}  /* 2.92.3: the #1952 field height is not for the inline title (#1622) */
 @media (min-width:600px){
   .trow.hascols.iedit:not(.haslc) .tmain{align-items:center}
   .trow.hascols.iedit .ttl{flex:1 1 auto;min-width:0}
