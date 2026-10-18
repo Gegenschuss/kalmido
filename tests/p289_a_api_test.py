@@ -348,5 +348,24 @@ check(Da.post(B + "/api/sheets", json={"title": "x", "space": f"org:{ORG}"}).sta
 check(A.get(B + f"/api/sheets/{DS}").status_code == 404, "the admin does not read dave's private table")
 check(Da.post(B + f"/api/sheets/{DS}/columns", json={"title": "Note", "kind": "text"}).status_code == 201, "dave adds a column")
 
+# ---- 2.89.0 (#1916, leader): the account export carries a person's private tables, never an organisation's
+import io, json as _json, time as _time, zipfile  # noqa: E402
+Da.post(B + "/api/account/export")
+st = {}
+for _ in range(240):
+    st = Da.get(B + "/api/account/export").json()
+    if st.get("state") != "running":
+        break
+    _time.sleep(0.25)
+zf = zipfile.ZipFile(io.BytesIO(Da.get(B + "/api/account/export/file").content)) if st.get("state") == "done" else None
+def _rows(name):
+    if not zf or f"data/{name}.json" not in zf.namelist():
+        return None
+    d = _json.loads(zf.read(f"data/{name}.json"))
+    return d.get("rows", d) if isinstance(d, dict) else d
+xs, xc = _rows("sheets"), _rows("sheet_cells")
+check(isinstance(xs, list) and {x.get("id") for x in xs} == {DS} and isinstance(xc, list) and len(xc) >= 3,
+      f"account export: dave's private table with its cells ({st.get('state')}, {xs if xs is None else len(xs)})")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
