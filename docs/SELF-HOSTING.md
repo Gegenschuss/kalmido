@@ -1030,6 +1030,8 @@ the security model: [PACKS.md](PACKS.md)). Without a catalogue Kalmido makes no 
 
 - `KALMIDO_PACKS_CATALOG=https://example.com/kalmido-packs/index.json` - the index file; empty (default) = only the
   shipped packs.
+- `KALMIDO_BOOKMARK_ALLOW_HOSTS=wiki.example.com:8080` (2.97.0) - internal hosts the bookmark preview may fetch (empty =
+  public addresses only; the calendar allow-list does not apply to bookmarks).
 - `KALMIDO_PACKS_ALLOW_HOSTS=mirror.example.com:8080` - hosts that may be internal addresses and may use `http://` (an
   own mirror); every other host: `https://` and a public address only.
 - Installations are stored per office area in the database (table `office_pack_installs`) and travel with backups;

@@ -101,7 +101,7 @@ def lst(s, **q):
 
 
 if not os.environ.get("P297A_NOSTART"):
-    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_CALENDAR_ALLOW_HOSTS=127.0.0.1:8098")
+    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_BOOKMARK_ALLOW_HOSTS=127.0.0.1:8098")
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
 shutil.copy(os.path.join(N, "fake_feeds.py"), DATA)
@@ -218,6 +218,11 @@ check([x["id"] for x in lst(Bo, q="weekend carol")["items"]] == [P1], "search in
 check([x["id"] for x in lst(Bo, q="page.html")["items"]] == [P1], "search in the link")
 check([x["id"] for x in lst(Bo, tag="news")["items"]] == [P1] and lst(Bo, tag="new")["items"] == [], "the tag filter (whole tags only)")
 check({"tag": "news", "n": 1} in lst(Bo)["tags"], "the tags with their counts")
+# 2.97.0 review (L3, L1): a tag with umlauts is found; a port that is no number is refused (400, no 500)
+r = add(Bo, FS + "/plain.html?umlaut=1", tags=["Bücher"])
+check(r.status_code == 201 and [x["id"] for x in lst(Bo, tag="Bücher")["items"]] == [r.json()["bookmark"]["id"]], "a tag with umlauts filters")
+check(add(Bo, "https://example.com:abc/x").status_code == 400, "a port that is no number: 400")
+Bo.delete(B + f"/api/bookmarks/{r.json()['bookmark']['id']}")  # out of the way of the counts below
 check(lst(Bo, q="100%_")["items"] == [], "search: % and _ are plain characters")
 r = Bo.patch(B + f"/api/bookmarks/{P1}", json={"state": "archived"})
 check(r.ok and r.json()["state"] == "archived", "archived")

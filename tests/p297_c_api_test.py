@@ -241,6 +241,26 @@ tl = A.get(B + O + "/doc-templates").json()
 items = tl.get("templates") or tl.get("items") or []
 check(any(x["id"] == TPL and "Hallo" in (x.get("body") or "") for x in items), "the template is readable in the target " + str(tl)[:200])
 
+# ---------------------------------------------------------------- 2.97.0 review (H1): no undo once the target issued a moved draft
+ws(A, "private")
+r = A.post(B + "/api/clients", json={"name": "Nordwind KG", "org_id": None, "street": "Hafen 1", "zip": "20457", "city": "Hamburg", "country": "DE"})
+P4 = r.json()["id"]
+r = A.post(B + D, json={"project_title": "Messe", "client_id": P4, "service_from": f"{YEAR}-02-02", "service_to": f"{YEAR}-02-03"})
+OFF4 = r.json()["id"]
+A.put(B + f"{D}/{OFF4}/items", json={"items": [{"title": "Kamera", "qty": 1, "rate": 800}]})
+r = mv(A, what="clients", ids=[P4], to=SP)
+check(r.ok, "H1: the client with its draft moves " + r.text[:200])
+M4 = r.json().get("move_id")
+ws(A, SP)
+r = A.post(B + f"{D}/{OFF4}/invoice")
+INV4 = r.json().get("id") if r.status_code == 201 else None
+r = A.post(B + f"{D}/{INV4}/finalize") if INV4 else r
+check(bool(INV4) and r.ok, "H1: the target invoices and issues the moved quotation " + r.text[:200])
+A.post(B + f"{D}/{OFF4}/finalize")
+r = mv(A, undo=M4)
+check(r.status_code == 409, "H1: undo after the target issued a document: 409 " + r.text[:200])
+check(A.get(B + f"/api/clients/{P4}").json().get("org_id") == ORG, "H1: the client stays in the organisation")
+
 # ---------------------------------------------------------------- a freelancer: no other workspace
 FID, Fi = freelancer(B, A, "fiona")
 r = Fi.post(B + "/api/clients", json={"name": "Solo Kunde"})

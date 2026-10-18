@@ -20,8 +20,9 @@ the module **Read later** (*Settings > Modules > Home > Read later*, off by defa
   (OpenGraph / Twitter tags, else the page title), and the main text of the page as plain text (*Reading text* in the
   details), so the link stays readable later. *Reload preview* in the details fetches it again; a title you changed stays.
 - When the page cannot be fetched, the bookmark stays with its link as the title and the details say why.
-- Safety: the server only fetches public addresses (an admin can allow internal hosts under *Settings > Administration >
-  Advanced*, like for calendar subscriptions; redirects are checked the same way), at most 1 MB of HTML, only web pages.
+- Safety: the server only fetches public addresses (redirects are checked the same way; internal hosts only through the
+  server's own setting `KALMIDO_BOOKMARK_ALLOW_HOSTS`, not the calendar allow-list), at most 1 MB of HTML, only web pages.
+  Previews are fetched one after the other and per person at a limited rate; beyond it they follow a little later.
   The picture is stored as the app's own copy (PNG, JPEG, WebP or GIF up to 1 MB, never SVG), sealed like attachments;
   your browser never loads anything from the bookmarked site. No scripts or HTML of the page are kept.
 
