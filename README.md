@@ -1222,6 +1222,14 @@ stored encrypted. Self-hosters can import an existing Paperless-ngx instance (#1
 (#1642): the lock in a task's note encrypts it with your own password in your own, unshared lists; without the
 password and the recovery code it cannot be recovered, not even by the operator.
 
+**Word and Excel preview** (2.92.0, #1926): a .docx or .xlsx file at a task, a comment, in the project files or the file
+store opens like a PDF - Word with headings, bold / italic, lists and tables, Excel one tab per sheet with column letters and
+row numbers (at most 5 sheets x 500 rows x 50 columns). The server reads the file in a sandboxed process; no macros run,
+formulas show their stored result; old .doc / .xls and password-protected files: download only. Their text is searchable
+and readable for agents. **Summarize**: in the preview of a task's file, when a connected agent may see the task, the button
+(with a confirmation naming the agent) posts a comment in your name that mentions the agent; the agent reads the file and
+answers with the summary. Kalmido calls no language model itself; undo removes the comment.
+
 ## Notes
 
 Every list and project has **notes**: Markdown documents next to the tasks for meeting notes, briefings and decisions
