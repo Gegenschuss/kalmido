@@ -87,6 +87,11 @@ KINDS = {
     # 2.50.0 (#329, #1200): files / logo of a customer view, approval links of quotations and lists (and their customer pages)
     "signoff": ("matrix", "p250_c_api_test.py: approval links of another organisation's quotation / another person's list by id, "
                           "files of other lists through a link"),
+    # 2.89.0 C (#1916): tables through the REST API and as files: an agent sees only tables attached to a list shared with it
+    # and its own; values of Kalmido variables with its visibility; export / import only of / into a table one may read / write
+    "sheet_v1": ("matrix", "p289_c_api_test.py: a table of another organisation / person 404 for the stranger and the stranger's agent "
+                           "(list, read, export, cells, rows, columns, undo), an agent without a shared list sees nothing, a variable "
+                           "of a list not shared with the agent is denied, an import into another workspace 404"),
     # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
     "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions)"),
     # 2.89.0 (#1916): tables belong to one organisation (every member) or one person (org_id NULL, owner_id); attached to a list
@@ -608,6 +613,12 @@ ROUTES = {
     "GET /agent-setup.sh": "public", "GET /agent-setup.ps1": "public",
     # 2.49.0 (#1531, #1199, #1201): Forgot your password?, knowledge pages, outline import
     "POST /api/auth/forgot": "auth", "POST /api/outline/parse": "pure",
+    # 2.89.0 C (#1916): tables as files and for agents
+    "GET /api/sheets/{}/export.csv": "sheet_v1", "GET /api/sheets/{}/export.xlsx": "sheet_v1", "POST /api/sheets/import": "sheet_v1",
+    "GET /api/v1/sheets": "sheet_v1", "POST /api/v1/sheets": "sheet_v1", "GET /api/v1/sheets/{}": "sheet_v1",
+    "PATCH /api/v1/sheets/{}": "sheet_v1", "PUT /api/v1/sheets/{}/cells": "sheet_v1", "POST /api/v1/sheets/{}/rows": "sheet_v1",
+    "POST /api/v1/sheets/{}/columns": "sheet_v1", "GET /api/v1/sheets/{}/vars": "sheet_v1",
+    "POST /api/v1/sheets/{}/batches/{}/undo": "sheet_v1",
     "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
