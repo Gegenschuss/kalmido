@@ -6,6 +6,9 @@
 // routes lead there); the small caps readable in the light theme (4.5:1). Phone 402 px: the start page lists the groups in
 // one column, a sub page has the way back "< Office · group" first and the group's points as ONE row of tabs (no wrap,
 // the active one in sight, left / right). A person without an organisation (her own admin, P4) is the main person here.
+// #2181 tables: the frame's grip (drag, keys, double click = automatic), the size per table after reloading, empty
+// columns / rows fill the frame and typing into one adds it (one undo step), "Open in its own window" (no sidebar, a change
+// there shows in the main window), full screen; a phone shows none of it.
 // P298C_NOSTART=1 = the server already runs.
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -139,6 +142,85 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     check(await key(ev, 'ArrowRight') === 'travel' && await key(ev, 'ArrowLeft') === 'subs' && await key(ev, 'Home') === 'cashflow', '#2180 phone: left / right / Home in the tab row');
     await click(ev, '#view .ofpb .ofpback');
     check(await ready(ev, `location.hash === '#office/start' && document.querySelectorAll('#view .oflg').length === 3`, 60), '#2180 phone: the way back leads to the start list');
+  }, false);
+
+  // ================= #2181 tables: the frame can be dragged (also empty), the size stays, empty cells fill it, typing into
+  // one adds the column (one undo step), its own window (no sidebar, live into the main window), full screen; phone: none
+  const E = await call(CC, 'POST', '/api/sheets', {title: 'Empty sheet', space: 'private'});
+  const FS = await call(CC, 'POST', '/api/sheets', {title: 'Full sheet', space: 'private'});
+  check(E.id > 0 && FS.id > 0 && (E.columns || []).length === 3 && (E.rows || []).length === 10, '#2181: two tables (3 columns, 10 rows)');
+  const fcells = []; (FS.rows || []).forEach((r, i) => (FS.columns || []).forEach((c, j) => fcells.push({row_id: r.id, col_id: c.id, raw: String(i * 10 + j + 1)})));
+  check((await call(CC, 'PUT', `/api/sheets/${FS.id}/cells`, {cells: fcells})).http === 200, '#2181: the full table filled');
+  await firefox(async ({cmd, ev, ctx, nav, shot, drag}) => {
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
+    await nav(B + 'static/icon.svg');
+    await ev(`(() => { localStorage.clear(); sessionStorage.clear(); return 1; })()`); await theme(ev, 'light');
+    check(await signIn(ev, 'carol') === 200, '#2181: carol signs in');
+    const open = async id => { await nav(B + '#sheets/' + id); const r = await ready(ev, `!!document.querySelector('#shv-scroll td.shvc') && SHV.sh?.id === ${id}`, 80); await sleep(900); return r; };
+    const box = id => ev(`(() => { const b = document.querySelector('.shvsheet .shzbox'), r = b.getBoundingClientRect(), g = document.querySelector('#shz-grip')?.getBoundingClientRect();
+      return JSON.stringify({w: Math.round(r.width), h: Math.round(r.height), set: !!b.dataset.shzset, gx: g ? g.left + g.width / 2 : 0, gy: g ? g.top + g.height / 2 : 0, gin: !!g && g.right <= r.right + 1 && g.bottom <= r.bottom + 1 && g.right >= r.right - 24 && g.bottom >= r.bottom - 24,
+        pc: document.querySelectorAll('#shv-scroll thead th.shzph').length, pr: document.querySelectorAll('#shv-scroll tbody.shzrows tr').length, real: document.querySelectorAll('#shv-scroll td.shvc').length, ls: (LS.get('shzSize', {}) || {})[${id}] || null,
+        side: document.querySelector('.shvside')?.getBoundingClientRect().width || 0}); })()`).then(JSON.parse);
+    check(await open(E.id), '#2181: the empty table opens');
+    const a = await box(E.id);
+    check(a.gin && a.real === 30 && a.pc > 0 && !a.set, '#2181: the grip at the frame\'s corner, empty columns fill the frame (nothing created) ' + JSON.stringify(a));
+    check(await ev(`!!document.querySelector('.shvtop [data-shz="win"]') && !!document.querySelector('.shvtop [data-shz="full"]') && document.querySelector('.shvtop [data-shv="deps"]').nextElementSibling?.dataset.shz === 'win'`), '#2181: both buttons next to "Dependencies"');
+    await drag(a.gx, a.gy, -160, 160); await sleep(900);
+    const b = await box(E.id);
+    check(b.set && Math.abs(b.w - (a.w - 160)) <= 4 && Math.abs(b.h - (a.h + 160)) <= 4, '#2181: the empty table\'s frame dragged smaller and higher ' + JSON.stringify([a, b]));
+    check(b.pr > 0 && b.real === 30, '#2181: empty rows fill the higher frame, no data created ' + JSON.stringify(b));
+    check(b.ls && Math.abs(b.ls.w * 16 - b.w) <= 6 && Math.abs(b.ls.h * 16 - b.h) <= 6, '#2181: the size is kept for this table on this device ' + JSON.stringify(b.ls));
+    check((await call(CC, 'GET', `/api/sheets/${E.id}`)).columns.length === 3, '#2181: still 3 columns on the server');
+    await shot('p298c-sheet-empty-dragged.png');
+    check(await open(E.id), '#2181: reopened');
+    const c = await box(E.id);
+    check(c.set && Math.abs(c.w - b.w) <= 2 && Math.abs(c.h - b.h) <= 2, '#2181: the size after reloading ' + JSON.stringify([b, c]));
+    // keys on the grip: right = 1 rem wider, Home = automatic again
+    await ev(`(() => { const g = document.querySelector('#shz-grip'); g.focus(); g.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true, cancelable: true})); return 1; })()`); await sleep(700);
+    const d = await box(E.id);
+    check(Math.abs(d.w - (c.w + 16)) <= 2 && Math.abs(d.h - c.h) <= 2, '#2181: ArrowRight on the grip = 1 rem wider ' + JSON.stringify([c.w, d.w]));
+    await ev(`(() => { document.querySelector('#shz-grip').dispatchEvent(new MouseEvent('dblclick', {bubbles: true, cancelable: true})); return 1; })()`); await sleep(700);
+    const e0 = await box(E.id);
+    check(!e0.set && !e0.ls, '#2181: a double click on the grip = the automatic size ' + JSON.stringify(e0));
+    // typing into an empty column adds it (and only it), one undo step
+    await ev(`(() => { const td = document.querySelector('#shv-scroll tbody:not(.shzrows) td.shzph[data-shzc="0"]'); td.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, cancelable: true, button: 0, pointerType: 'mouse'})); return 1; })()`); await sleep(200);
+    await ev(`(() => { document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'x', bubbles: true, cancelable: true})); return 1; })()`); await sleep(200);
+    check(await ev(`document.activeElement?.id === 'shz-ed' && document.activeElement.value === 'x'`), '#2181: typing into an empty cell opens its field');
+    await ev(`(() => { const i = document.getElementById('shz-ed'); i.value = 'Extra'; i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true})); return 1; })()`);
+    let s1 = null; for (let i = 0; i < 40; i++) { s1 = await call(CC, 'GET', `/api/sheets/${E.id}`); if ((s1.columns || []).length === 4) break; await sleep(250); }
+    const d4 = s1.columns[3];
+    check(s1.columns.length === 4 && (s1.cells || []).some(x => x.col_id === d4.id && x.raw === 'Extra' && x.row_id === s1.rows[0].id) && s1.rows.length === 10, '#2181: the column D was added with the value in row 1 ' + JSON.stringify({cols: s1.columns.length, rows: s1.rows.length}));
+    check(await ready(ev, `[...document.querySelectorAll('#shv-scroll td.shvc')].some(td => /Extra/.test(td.textContent))`, 40), '#2181: the value shows in the grid');
+    await ev(`histStep('undo')`);
+    let s2 = null; for (let i = 0; i < 40; i++) { s2 = await call(CC, 'GET', `/api/sheets/${E.id}`); if ((s2.columns || []).length === 3) break; await sleep(250); }
+    check(s2.columns.length === 3, '#2181: ONE undo step takes the column back');
+    // the full table: the frame drags the same way
+    check(await open(FS.id), '#2181: the full table opens ' + await ev(`JSON.stringify({h: location.hash, sh: SHV.sh?.id, err: SHV.err, v: (document.querySelector('#view')?.textContent || '').slice(0, 160)})`));
+    const f = await box(FS.id);
+    await drag(f.gx, f.gy, -120, 120); await sleep(900);
+    const g = await box(FS.id);
+    check(g.set && Math.abs(g.w - (f.w - 120)) <= 4 && Math.abs(g.h - (f.h + 120)) <= 4 && g.real === 30, '#2181: the full table\'s frame dragged ' + JSON.stringify([f, g]));
+    check(await ev(`/^1$/.test(document.querySelector('#shv-scroll td.shvc')?.textContent.trim() || '')`), '#2181: the values stay');
+    await shot('p298c-sheet-full.png');
+    // its own window: /?mini=1#sheets/<id> without the sidebar, a change there shows in the main window
+    const ctx2 = (await cmd('browsingContext.create', {type: 'window'})).context;
+    const ev2 = async expr => { const r = await cmd('script.evaluate', {expression: expr, target: {context: ctx2}, awaitPromise: true, resultOwnership: 'none'}); return r.result?.value; };
+    await cmd('browsingContext.navigate', {context: ctx2, url: B + '?mini=1#sheets/' + FS.id, wait: 'complete'});
+    let solo = false; for (let i = 0; i < 80 && !solo; i++) { solo = await ev2(`!!document.querySelector('#shv-scroll td.shvc') && typeof SHV === 'object' && SHV.sh?.id === ${FS.id}`).catch(() => false); if (!solo) await sleep(250); }
+    check(solo, '#2181: the table in its own window');
+    check(await ev2(`document.documentElement.classList.contains('mini-sheet') && !document.querySelector('#side')?.getClientRects().length && !document.querySelector('[data-shz="win"]') && !document.querySelector('#shz-grip')`), '#2181: own window without sidebar, no window button, no grip');
+    await ev2(`(() => { const r = SHV.sh.rows[0].id, c = SHV.sh.columns[1].id; return shvPut([{row_id: r, col_id: c, raw: 'From the window'}], 'x').then(() => 1); })()`);
+    check(await ready(ev, `[...document.querySelectorAll('#shv-scroll td.shvc')].some(td => /From the window/.test(td.textContent))`, 160), '#2181: the change in the own window shows in the main window');
+    await cmd('browsingContext.close', {context: ctx2}).catch(() => {});
+    // full screen on and off
+    await click(ev, '.shvtop [data-shz="full"]'); await sleep(500);
+    check(await ev(`document.documentElement.classList.contains('shzfull') && !document.querySelector('#side').getClientRects().length && document.querySelector('.shvtop [data-shz="full"]').getAttribute('aria-pressed') === 'true'`), '#2181: full screen hides the sidebar');
+    await click(ev, '.shvtop [data-shz="full"]'); await sleep(500);
+    check(await ev(`!document.documentElement.classList.contains('shzfull') && !!document.querySelector('#side').getClientRects().length`), '#2181: and back');
+    // phone: no buttons, no grip, no empty cells
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 402, height: 874}});
+    check(await open(FS.id), '#2181 phone: the table opens');
+    check(await ev(`!document.querySelector('[data-shz]') && !document.querySelector('#shz-grip') && !document.querySelector('#shv-scroll .shzph') && document.querySelectorAll('#shv-scroll td.shvc').length === 30`), '#2181 phone: no window / full screen buttons, no grip, the grid as before');
   }, false);
 
   console.log(`p298_c_ui: ${ok} ok, ${F.length} failed`);
