@@ -446,7 +446,7 @@ extra = [(p, m) for p, ms in spec["paths"].items() for m in ms if m not in v1r.g
 check(v1r and not missing and not extra, f"every route documented: missing {missing}, extra {extra}")
 SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "account",
           "admin-read", "agent", "calendar", "contacts", "private", "files:read", "files:write",
-          "pinboard", "office", "layouts", "import")  # 2.68.0 (#1839): import; 2.55.0 (#1066): layouts; 2.15.0 (#479): fine scopes; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0 (#1207): files; 2.51.0 (#1352): pinboard; 2.51.0 (#1348): office
+          "pinboard", "office", "layouts", "import", "sheets:read", "sheets:write")  # 2.89.0 (#1916): sheets; 2.68.0 (#1839): import; 2.55.0 (#1066): layouts; 2.15.0 (#479): fine scopes; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0 (#1207): files; 2.51.0 (#1352): pinboard; 2.51.0 (#1348): office
 check(all(op.get("x-kalmido-scope") in SCOPES for ms in spec["paths"].values() for op in ms.values()), "spec: scope per operation")
 
 # ---- per-token rate limit (KALMIDO_API_RATE=200 in this container)

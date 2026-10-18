@@ -219,6 +219,7 @@ def ua8_private_left(c, uid):
             "SELECT 1 FROM books b JOIN contacts x ON x.book_id=b.id WHERE b.owner_id=? AND b.org_id IS NULL LIMIT 1",
             "SELECT 1 FROM fs_nodes WHERE owner_id=? AND org_id IS NULL AND kind!='folder' LIMIT 1",
             "SELECT 1 FROM wiki_pages WHERE owner_id=? AND org_id IS NULL LIMIT 1",
+            "SELECT 1 FROM sheets WHERE owner_id=? AND org_id IS NULL LIMIT 1",  # 2.89.0 (#1916): private tables
             "SELECT 1 FROM hub_mails WHERE owner_id=? AND org_id IS NULL LIMIT 1",
             "SELECT 1 FROM habits WHERE user_id=? LIMIT 1",
             "SELECT 1 FROM time_entries t LEFT JOIN lists l ON l.id=t.list_id WHERE t.user_id=? AND l.org_id IS NULL LIMIT 1"))

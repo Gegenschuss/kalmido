@@ -87,8 +87,17 @@ KINDS = {
     # 2.50.0 (#329, #1200): files / logo of a customer view, approval links of quotations and lists (and their customer pages)
     "signoff": ("matrix", "p250_c_api_test.py: approval links of another organisation's quotation / another person's list by id, "
                           "files of other lists through a link"),
+    # 2.89.0 C (#1916): tables through the REST API and as files: an agent sees only tables attached to a list shared with it
+    # and its own; values of Kalmido variables with its visibility; export / import only of / into a table one may read / write
+    "sheet_v1": ("matrix", "p289_c_api_test.py: a table of another organisation / person 404 for the stranger and the stranger's agent "
+                           "(list, read, export, cells, rows, columns, undo), an agent without a shared list sees nothing, a variable "
+                           "of a list not shared with the agent is denied, an import into another workspace 404"),
     # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
     "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions)"),
+    # 2.89.0 (#1916): tables belong to one organisation (every member) or one person (org_id NULL, owner_id); attached to a list
+    # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
+    "sheet": ("matrix", "p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
+                        "trash, presence, completion); a formula's source of another workspace cannot be chosen and shows no value"),
     # ---- not relevant for the boundary between organisations (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account (before a session or about the session's own person)"),
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
@@ -613,6 +622,12 @@ ROUTES = {
     "GET /agent-setup.sh": "public", "GET /agent-setup.ps1": "public",
     # 2.49.0 (#1531, #1199, #1201): Forgot your password?, knowledge pages, outline import
     "POST /api/auth/forgot": "auth", "POST /api/outline/parse": "pure",
+    # 2.89.0 C (#1916): tables as files and for agents
+    "GET /api/sheets/{}/export.csv": "sheet_v1", "GET /api/sheets/{}/export.xlsx": "sheet_v1", "POST /api/sheets/import": "sheet_v1",
+    "GET /api/v1/sheets": "sheet_v1", "POST /api/v1/sheets": "sheet_v1", "GET /api/v1/sheets/{}": "sheet_v1",
+    "PATCH /api/v1/sheets/{}": "sheet_v1", "PUT /api/v1/sheets/{}/cells": "sheet_v1", "POST /api/v1/sheets/{}/rows": "sheet_v1",
+    "POST /api/v1/sheets/{}/columns": "sheet_v1", "GET /api/v1/sheets/{}/vars": "sheet_v1",
+    "POST /api/v1/sheets/{}/batches/{}/undo": "sheet_v1",
     "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
@@ -621,6 +636,14 @@ ROUTES = {
     "GET /api/wiki/e2e": "wiki", "POST /api/wiki/e2e/start": "wiki", "GET /api/wiki/e2e/todo": "wiki",
     "POST /api/wiki/e2e/bulk": "wiki", "POST /api/wiki/e2e/finish": "wiki", "POST /api/wiki/e2e/stop": "wiki",
     "POST /api/wiki/e2e/keys": "wiki", "POST /api/wiki/e2e/rotate": "wiki",
+    # 2.89.0 (#1916): tables (sheets/web.py; p289_a_api_test.py)
+    "GET /api/sheets": "sheet", "POST /api/sheets": "sheet", "GET /api/sheets/{}": "sheet", "PATCH /api/sheets/{}": "sheet",
+    "DELETE /api/sheets/{}": "sheet", "POST /api/sheets/{}/restore": "sheet", "PUT /api/sheets/{}/cells": "sheet",
+    "POST /api/sheets/{}/cells/{}/freeze": "sheet", "POST /api/sheets/{}/cells/{}/name": "sheet",
+    "POST /api/sheets/{}/columns": "sheet", "PATCH /api/sheets/{}/columns/{}": "sheet", "DELETE /api/sheets/{}/columns/{}": "sheet",
+    "POST /api/sheets/{}/columns/{}/restore": "sheet", "POST /api/sheets/{}/rows": "sheet", "DELETE /api/sheets/{}/rows/{}": "sheet",
+    "POST /api/sheets/{}/rows/{}/restore": "sheet", "POST /api/sheets/{}/rows/order": "sheet", "POST /api/sheets/{}/presence": "sheet",
+    "GET /api/sheets/{}/vars": "sheet", "POST /api/sheets/{}/batches/{}/undo": "sheet",
     # 2.49.0 (#1106): find people by e-mail, connection requests, blocks
     "GET /api/disc": "discover", "PUT /api/disc": "discover", "POST /api/disc/confirm": "discover", "POST /api/disc/find": "discover",
     "POST /api/disc/check": "discover", "POST /api/disc/requests": "discover", "POST /api/disc/requests/{}/{}": "discover",
@@ -727,6 +750,10 @@ ROUTES = {
     "GET /api/feeds": "own", "POST /api/feeds": "own", "DELETE /api/feeds/{}": "own", "POST /api/feeds/{}/restore": "own",
     "GET /api/feeds/items": "own", "POST /api/feeds/read": "own", "POST /api/feeds/items/{}/later": "own",
     "GET /api/feeds/opml": "own", "POST /api/feeds/opml": "own",
+    # 2.89.0 (#1916, D): tables step 2 -- carrying rows over by button (sheets/step2.py: the sheet writable, the target list / office
+    # of the same space, people only; p289_d_api_test.py)
+    "GET /api/sheets/{}/links": "sheet", "POST /api/sheets/{}/to-tasks": "sheet", "POST /api/sheets/{}/to-offer": "sheet",
+    "POST /api/sheets/{}/rows-from-list": "sheet", "POST /api/sheets/{}/links/{}/undo": "sheet", "POST /api/sheets/{}/links/{}/redo": "sheet",
 }
 
 # ---- 1. every route is classified, nothing stale
