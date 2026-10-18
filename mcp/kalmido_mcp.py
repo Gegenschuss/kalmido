@@ -1483,7 +1483,8 @@ TOOLS += [
      _obj({}), lambda api, a: api.call("POST", "/life/karakeep/sync")),
 ]
 # 2.23.0 (#463): package "Team, family, clients": clients, workload, approvals, forms
-_CLIENT = {"name": {"type": "string"}, "icon": {"type": "string"}, "color": {"type": "string"}, "contact": {"type": "string"},
+_CLIENT = {"name": {"type": "string"}, "display_name": {"type": "string", "description": "2.97.0: the name pickers and lists show (documents keep name)"},
+           "icon": {"type": "string"}, "color": {"type": "string"}, "contact": {"type": "string"},
            "email": {"type": "string"}, "phone": {"type": "string"}, "address": {"type": "string"}, "note": {"type": "string"},
            "rate": {"type": "number"}, "budget_h": {"type": "number"}, "budget_amount": {"type": "number"}, "org_id": {"type": "integer"},
            "archived": {"type": "boolean"},

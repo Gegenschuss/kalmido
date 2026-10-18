@@ -935,6 +935,17 @@ never a private book; another contact `400`. In `PATCH` a missing `contact_id` k
 needs the scope `contacts`. Name, e-mail and phone stay a copy (documents read it). Deleting the contact or its address book
 drops only the link; a client moved into another workspace loses its links. `GET /contacts/{id}` adds `clients`
 (`client_id`, `name`, `icon`, `role`, `contact_person_id`) for people who may open those clients.
+2.97.0 (#1951): `display_name` (up to 80 characters, empty = none) is the name pickers and lists show; documents, the
+letterhead and the e-invoice always use `name`. Every client answer (and `clients` in `/state`) carries `label`: the
+display name, else the name, and for two clients of one workspace with the same name and no display name `name (city)`
+(`name (country)` when the cities are the same too). The free `address` is no longer shown in the app: written alone (all
+of `street`, `zip`, `city` empty) it is split into those fields once; filled fields are never overwritten, the text stays.
+`address_extra` (in `billing`, people only) is a second address line under the street. Office documents with a client read
+their recipient from the client (name, attn. line, street, `address_extra`, postcode + city, the country when it is not the
+company's) until they are finalised or sent; a `recipient` sent for such a draft is ignored (the answer shows the client's)
+and `recipient_missing` is `true` while street, postcode or city is missing. A document without a client keeps the
+`recipient` it is given. Finalising freezes the recipient with the fixed fields; the e-invoice takes them directly
+(`address_extra` = LineTwo), older documents with free lines only are parsed as before.
 A list's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is the time report of its lists:
 `GET /time/entries?lists=1,2&from=&to=` (web) or `/api/time/export.csv`.
 
