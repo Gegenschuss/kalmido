@@ -507,6 +507,35 @@ day (Kalmido does not shift it). No tax advice; figures without guarantee.
 
 Routes (office admins only): `GET /api/office/tax-dates`, `PUT /api/office/tax-dates`.
 
+## Logbook (2.93)
+
+The tab **Travel expenses** has a third view **Logbook** (admins of the office area; without an organisation your
+personal office). First add a **vehicle**: name, plate, kind (**private car used for business** -> mileage allowance, or
+**company car** -> its costs come through receipts) and the odometer at the start. Vehicles are archived, never deleted.
+
+- **Drives** of a vehicle and year, newest first (cards on a phone): date, start, destination, purpose, kilometres or
+  the odometer at start and end (km is computed; the start is prefilled with the last end of the vehicle), kind
+  business / private / home - workplace, client and project (as in the travel expenses), driver (default: you). The end
+  below the start is refused; a gap or an overlap to the odometer of the previous drive is shown as a warning and saved.
+- **Change log**: every create, change, delete and restore is recorded with the values before, who and when ("History"
+  in the drive). Deleting only hides the drive (undo restores it); nothing is deleted for real.
+- **Take over into travel expenses** (business drives): creates a trip with day, route, purpose "job", client, project
+  and km - without a receipt, so nothing counts twice. Once taken over, the button opens that trip.
+- **Year report** per vehicle: km total / business / private / home - workplace, the business share and the **mileage
+  allowance** (business km of private cars x the rate per km, default 0.30, changeable in the report). Export as CSV
+  (semicolon, decimal comma) or PDF, both with the change log of the year.
+- The mileage allowance goes into the **income/expense statement** as its own expense line "Mileage allowance" (no input
+  tax); travel receipts of the category car stay as they are. Drives without a vehicle, private drives, drives with a
+  company car and deleted drives do not count.
+- The tax office only accepts a logbook kept promptly and without gaps; Kalmido logs later changes but does not make a
+  logbook "tamper-proof" in the legal sense. No tax advice; figures without guarantee.
+
+Routes (office admins only; members 403, other areas 404, agents 403): `GET|POST /api/office/vehicles`,
+`PATCH /api/office/vehicles/<id>` (also `archived`), `GET /api/office/drives?vehicle_id=&year=`, `POST /api/office/drives`,
+`PATCH|DELETE /api/office/drives/<id>`, `POST /api/office/drives/<id>/restore`, `GET /api/office/drives/<id>/log`,
+`POST /api/office/drives/<id>/trip`, `GET /api/office/logbook/report?year=&vehicle_id=`,
+`GET /api/office/logbook.csv|pdf?year=&vehicle_id=`, `PUT /api/office/logbook/settings` `{km_rate}`.
+
 ## Web API
 
 All routes require a signed-in person with the module on; they work in the office of the shown workspace (`400` with a
@@ -882,6 +911,9 @@ Since 2.50.0 also `office_deals` (the sales pipeline; under row-level security, 
 Since 2.90.0 also `office_bank_imports` and `office_bank_tx` (the bank reconciliation; under row-level security,
 `amount`, `counterpart`, `purpose` and `iban` encrypted at rest, `deleted_at` = taken back and restorable) and the nullable
 columns `vat_pct` and `paid_at` of `rc_receipts` (VAT rate and payment day of a receipt); 2.87.0 runs on with them.
+Since 2.93.0 also `office_vehicles`, `office_drives` and `office_drive_log` (the logbook; under row-level security, the
+plate, start / destination / purpose and the logged values encrypted at rest, `deleted_at` = deleted and restorable) and
+the settings key `km_rate`; 2.92 runs on with them.
 
 ## E-invoices (ZUGFeRD / XRechnung) and PDF/A-3
 
