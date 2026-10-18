@@ -38,6 +38,8 @@ KINDS = {
                        "an organisation, nothing of another workspace)"),
     "hub": ("matrix", SUITE + ": absences, bookings and hub mail in the personal area (the freelancer is its own admin)"),
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature"),
+    "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private space of a "
+                         "person without an organisation and with that person's own agent; rows to tasks / quotation drafts"),
     "own": ("matrix", SUITE + ": the own settings, profile, tokens, app passwords, push, account export / import"),
     # ---- nothing to check without an organisation (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account: the same for every person, before any workspace"),
@@ -512,6 +514,23 @@ ROUTES = {
     # 2.87.9 after the merge of 2.88.0 (#1980): the instance admin's account administration (an organisation admin only
     # deletes inside the own organisation)
     "GET /api/users/{}/delete-info": "admin", "POST /api/users/bulk": "admin",
+    # 2.89.1 after the merge of 2.89.0 (#1916): tables, app and agent routes
+    "DELETE /api/sheets/{}": "sheets", "DELETE /api/sheets/{}/columns/{}": "sheets",
+    "DELETE /api/sheets/{}/rows/{}": "sheets", "GET /api/sheets": "sheets", "GET /api/sheets/{}": "sheets",
+    "GET /api/sheets/{}/export.csv": "sheets", "GET /api/sheets/{}/export.xlsx": "sheets",
+    "GET /api/sheets/{}/links": "sheets", "GET /api/sheets/{}/vars": "sheets", "GET /api/v1/sheets": "sheets",
+    "GET /api/v1/sheets/{}": "sheets", "GET /api/v1/sheets/{}/vars": "sheets", "PATCH /api/sheets/{}": "sheets",
+    "PATCH /api/sheets/{}/columns/{}": "sheets", "PATCH /api/v1/sheets/{}": "sheets", "POST /api/sheets": "sheets",
+    "POST /api/sheets/{}/batches/{}/undo": "sheets", "POST /api/sheets/{}/cells/{}/freeze": "sheets",
+    "POST /api/sheets/{}/cells/{}/name": "sheets", "POST /api/sheets/{}/columns": "sheets",
+    "POST /api/sheets/{}/columns/{}/restore": "sheets", "POST /api/sheets/import": "sheets",
+    "POST /api/sheets/{}/links/{}/redo": "sheets", "POST /api/sheets/{}/links/{}/undo": "sheets",
+    "POST /api/sheets/{}/presence": "sheets", "POST /api/sheets/{}/restore": "sheets",
+    "POST /api/sheets/{}/rows": "sheets", "POST /api/sheets/{}/rows-from-list": "sheets",
+    "POST /api/sheets/{}/rows/order": "sheets", "POST /api/sheets/{}/rows/{}/restore": "sheets",
+    "POST /api/sheets/{}/to-offer": "sheets", "POST /api/sheets/{}/to-tasks": "sheets", "POST /api/v1/sheets": "sheets",
+    "POST /api/v1/sheets/{}/batches/{}/undo": "sheets", "POST /api/v1/sheets/{}/columns": "sheets",
+    "POST /api/v1/sheets/{}/rows": "sheets", "PUT /api/sheets/{}/cells": "sheets", "PUT /api/v1/sheets/{}/cells": "sheets",
     "DELETE /api/v1/team/messages/{}": "team", "GET /api/avatar/{}/{}.jpg": "team", "GET /api/disc": "team",
     "GET /api/e2e/keys": "team", "GET /api/e2e/pub/{}": "team", "GET /api/team": "team",
     "GET /api/team/rooms/{}/messages": "team", "GET /api/users": "team", "GET /api/v1/team/rooms": "team",

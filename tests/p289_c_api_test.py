@@ -221,6 +221,7 @@ for path in (f"/api/sheets/{SID}/export.csv", f"/api/sheets/{SID}/export.xlsx", 
 check(Ca.get(B + f"/api/sheets/{S5}/export.xlsx").status_code == 404, "a colleague: another person's private table 404")
 
 # a person without an organisation and his own agent
+# freelancer-matrix: sheets
 r = da.post(V + "/sheets", json={"title": "Dave list", "columns": [{"title": "Name"}], "rows": [["Ann"]]})
 S6 = r.json().get("id")
 check(r.status_code == 201 and r.json()["space"] == "private", "dave's agent creates in dave's private space " + r.text[:200])
