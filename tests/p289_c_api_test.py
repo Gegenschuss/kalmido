@@ -333,5 +333,35 @@ r = ta.post(V + "/sheets", json={"title": "Own bound", "space": f"org:{ORG}", "l
 check(r.status_code == 201 and ta.patch(V + f"/sheets/{r.json()['id']}", json={"list_id": None}).ok,
       "review 2: the agent detaches a table it created itself")
 
+# ================================================================== 2.89.0 (#1916): review 5 - an xlsx import counts its cells while reading
+_big = io.BytesIO()
+with zipfile.ZipFile(io.BytesIO(XL)) as zin, zipfile.ZipFile(_big, "w", zipfile.ZIP_DEFLATED) as zout:
+    for n in zin.namelist():
+        if n == "xl/worksheets/sheet1.xml":
+            rows_x = "".join(f'<row r="{r}">' + "".join(f'<c r="{chr(64 + k // 26) if k >= 26 else ""}{chr(65 + k % 26)}{r}"><v>{k}</v></c>'
+                                                         for k in range(200)) + "</row>" for r in range(1, 262))
+            zout.writestr(n, '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                             f"<sheetData>{rows_x}</sheetData></worksheet>")
+        else:
+            zout.writestr(n, zin.read(n))
+r = A.post(B + "/api/sheets/import", data={"space": "private"}, files={"file": ("big.xlsx", _big.getvalue())})
+check(r.status_code == 400 and "cells" in r.text.lower(), "review 5: 52 200 filled cells: 400 with a clear message " + str(r.status_code) + r.text[:150])
+
+# ================================================================== 2.89.0 (#1916): review 6 - control characters do not break the xlsx
+S9 = Bo.post(B + "/api/sheets", json={"title": "Ctl", "space": "private"}).json()["id"]
+Bo.put(B + f"/api/sheets/{S9}/cells", json={"cells": [{"cell": "A1", "raw": "a\x01b\x1fc"}, {"cell": "A2", "raw": '="x\x02"&A1'}]})
+r = Bo.get(B + f"/api/sheets/{S9}/export.xlsx")
+ok6 = r.ok
+if ok6:
+    z9 = zipfile.ZipFile(io.BytesIO(r.content))
+    for n in z9.namelist():
+        if n.endswith((".xml", ".rels", ".vml")):
+            try:
+                ET.fromstring(z9.read(n))
+            except ET.ParseError as e:
+                ok6 = False
+                check(False, f"review 6: xlsx part {n} is well-formed: {e}")
+check(ok6, "review 6: a cell with \\x01: the export is well-formed XML " + str(r.status_code))
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
