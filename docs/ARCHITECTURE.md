@@ -149,6 +149,7 @@ The most used helpers:
 | `notify/alerts.py` | Admin alerts via ntfy (recording, sending, settings). |
 | `notify/caps.py` | 2.33.0 (#927): the owner's notification template of a list / shared folder (read, work, all, custom; per person), a ceiling for pushes checked in `notif_ok`; the one-time question to owners of lists shared before. |
 | `calendars/subscriptions.py` | External calendars (read-only subscriptions): SSRF guard, ICS / CalDAV sync, API. |
+| `calendars/polls.py` | 2.98.0: scheduling polls -- proposed times, the public vote page `/s/v/<token>`, the chosen time becomes an event. |
 | `admin/backup.py` | Backups and restore (admins). |
 | `api/v1.py` | REST API /api/v1 with personal access tokens: token management, authentication, the routes, errors, groups. |
 | `tasks/dayplan.py` | Day planning ("Plan my day") and the evening review. |

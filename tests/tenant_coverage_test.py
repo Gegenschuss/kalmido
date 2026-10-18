@@ -100,6 +100,9 @@ KINDS = {
                         "trash, presence, completion); a formula's source of another workspace cannot be chosen and shows no value"),
     # 2.97.0 A (#1950): bookmarks belong to one organisation (every member reads, the owner / its admins change) or one person
     "bookmark": ("matrix", "p297_a_api_test.py: a bookmark of another organisation / person: 404 (read, change, delete, picture, move)"),
+    # 2.98.0 A (#1953): scheduling polls belong to one organisation (every member reads, the owner / its admins change) or one person
+    "poll": ("matrix", "p298_a_api_test.py: a poll of another organisation / person: 404 (read, change, delete, choose, move, list); "
+                       "the public link reads inside the poll's organisation only"),
     # ---- not relevant for the boundary between organisations (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account (before a session or about the session's own person)"),
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
@@ -165,6 +168,10 @@ ROUTES = {
     "POST /api/agents/{}/chat/{}/choice": "agent", "PUT /api/agents/{}/permission-mode": "agent",
     "GET /api/agents/{}/chat": "agent", "POST /api/agents/{}/chat": "agent",
     # 2.98.0 A (#1953): scheduling polls (p298_a_api_test.py) - routes below this line
+    "GET /api/polls": "poll", "POST /api/polls": "poll", "GET /api/polls/{}": "poll", "PATCH /api/polls/{}": "poll",
+    "DELETE /api/polls/{}": "poll", "POST /api/polls/{}/restore": "poll", "POST /api/polls/{}/decide": "poll",
+    "POST /api/polls/{}/reopen": "poll", "POST /api/polls/{}/move-space": "poll", "GET /s/v/{}": "poll", "POST /s/v/{}": "poll",
+    "GET /s/v/time.js": "public",
     # (2.98.0 spacer A)
     # 2.98.0 B (#1954): questionnaires (p298_b_api_test.py) - routes below this line
     "GET /api/forms/{}/entries": "form", "GET /api/forms/{}/entries.csv": "form",
