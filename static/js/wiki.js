@@ -108,7 +108,7 @@ function wk_pageHtml(p) {
     ${edit ? `<div class="wkedwrap"><textarea id="wk-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Markdown: # heading, - list, [[Page]] links a page, #123 a task'))}">${esc(p.body)}</textarea><div id="wk-ac" class="wkac hidden" role="listbox" aria-label="${esc(tr('Pages'))}"></div></div>`
       : `${wk_attrsHtml(p.attrs)}<div class="md ntmd wkmd" id="wk-md">${wk_bodyStrip(p.body).trim() ? wk_render(p) : `<p class="muted">${may ? tr('Empty page. Switch to Edit to write.') : tr('Empty page.')}</p>`}</div>`}
     ${p.backlinks?.length ? `<section class="wkback" aria-label="${esc(tr('Linked from'))}"><h4>${ic('link', 's')}${tr('Linked from')}</h4><ul>${p.backlinks.map(b => `<li><a href="#wiki/${b.id}">${esc(b.path)}</a></li>`).join('')}</ul></section>` : ''}
-    <div class="ntfoot muted"><span id="wk-saved" role="status" aria-live="polite"></span><span class="spacer"></span><span>${esc(tr('Changed {0}', fmtWhen(p.updated_at)))}${p.updated_by_name ? ' · ' + esc(p.updated_by_name) : ''}</span></div>`;
+    <div class="ntfoot muted"><span id="wk-saved" role="status" aria-live="polite"></span><span class="spacer"></span><span>${esc(tr('Changed {0}', fmtWhen(p.updated_at)))}${p.updated_by_name ? ' · ' + esc(p.updated_by_name) : ''}</span></div>${wk_smvLine(p.moved)}`;
 }
 const wk_unesc = h => { const d = document.createElement('textarea'); d.innerHTML = h; return d.value; };
 const wk_bodyStrip = b => String(b || '').replace(/^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, '');
@@ -259,6 +259,7 @@ document.addEventListener('click', async e => {
     ...(typeof wkeDlg === 'function' && S.me?.kind !== 'agent' && globalThis.crypto?.subtle ? ['-', {label: tr('Encryption…'), icon: 'lock', fn: () => wkeDlg(wk_cur())}] : [])]);  // 2.64.3 B (#1817)
   else if (k === 'pmenu' && p) menu(a, [{label: tr('Rename…'), icon: 'edit', fn: () => wk_rename(p)},
     ...(p.path.includes('/') ? [{label: tr('Rename folder…'), icon: 'folder', fn: () => wk_moveFolder(p)}] : []),
+    ...wk_smvItems(p),  // 2.96.0 B (#1941)
     {label: tr('Copy link'), icon: 'link', fn: () => { navigator.clipboard?.writeText(`${location.origin}${location.pathname}#wiki/${p.id}`).then(() => toast(tr('Link copied'))); }},
     {label: tr('Copy as [[link]]'), icon: 'copy', fn: () => { navigator.clipboard?.writeText(`[[${p.path}]]`).then(() => toast(tr('Link copied'))); }},
     '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => wk_delete(p)}]);
@@ -319,3 +320,43 @@ if (typeof p61b_wsOn === 'function') p61b_wsOn('wiki', after => {
   if (after || ws === 'all' || S.route.mod !== 'wiki' || !WK.pg || WK.pg.space === ws) return;
   WK.pg = null; S.route.wid = null; go('wiki');
 });
+// ---- 2.96.0 B (#1941): a page, or its folder with everything below it, to the other workspace (private <-> organisation).
+// The shared dialog (spacemove.js) names the source, lets the person pick the target space and a folder there and shows the
+// server's dry run (names taken, links that point to the other space, linked files that stay); the move back is ONE undo
+// step. A space with the lock refuses (the server cannot re-encrypt for the other space), so the item is not offered there.
+const wk_smvOrg = sp => sp && sp !== 'private' ? +sp.slice(4) : null;
+function wk_smvItems(p) {
+  if (S.me?.kind === 'agent' || !smv_can(wk_smvOrg(p.space)) || wk_e2e(p.space)) return [];
+  const it = [{label: tr('Move to another workspace…'), icon: 'brief', fn: () => wk_smvMove(p, false)}];
+  if (p.path.includes('/')) it.push({label: tr('Move folder to another workspace…'), icon: 'folder', fn: () => wk_smvMove(p, true)});
+  return it;
+}
+async function wk_smvFolders(sp) {  // the folders of a space (from the paths of its pages)
+  await wk_load(sp);
+  const fs = new Set();
+  for (const x of wk_pages(sp)) { const ps = x.path.split('/'); for (let i = 1; i < ps.length; i++) fs.add(ps.slice(0, i).join('/')); }
+  return [...fs].sort((a, b) => a.localeCompare(b)).map(f => ({id: f, label: f}));
+}
+async function wk_smvMove(p, folder) {
+  await wk_flush();
+  const from = p.space, fpath = folder ? p.path.split('/').slice(0, -1).join('/') : '';
+  const what = folder ? tr('Folder {0}', qn(fpath)) : qn(wk_base(p.path));
+  const req = (to, dest, dry) => rawFetch('POST', '/api/wiki/move-space', {...(folder ? {folder: fpath} : {pages: [p.id]}), space: from, to: smv_ws(to), dest, dry: dry ? 1 : 0});
+  let dest = '';
+  const r = await smv_open({what, from: wk_smvOrg(from), places: to => wk_smvFolders(smv_ws(to)),
+    check: (to, d) => req(to, d, true), run: async (to, d) => { try { dest = d; return await req(to, d, false); } catch (e) { toast(e.message); throw e; } }});
+  if (!r || !r.moved) return;
+  const to = r.space, oldDest = (folder ? fpath : p.path).split('/').slice(0, -1).join('/'), moved = r.moved;
+  const newFolder = folder ? (dest ? dest + '/' : '') + fpath.split('/').pop() : null;
+  const back = async (src, dst, dest, fd) => { const x = await rawFetch('POST', '/api/wiki/move-space', {...(fd ? {folder: fd} : {pages: moved.map(m => m.id)}), space: src, to: dst, dest}); wk_after(src); wk_after(dst); return x; };
+  wk_after(from); wk_after(to); WK.space = to;
+  if (WK.pg?.id === p.id) { WK.pg = null; go('wiki/' + p.id); }
+  const e = histAdd({label: tr('Moved {0}', what), ids: [], snaps: [], lids: [], wsp: to,
+    undo: async () => { await back(to, from, oldDest, newFolder); return {skipped: []}; },
+    redo: async () => { await back(from, to, dest, folder ? fpath : null); return {skipped: []}; }});
+  histToast(trn('{0} page moved', '{0} pages moved', moved.length), e);
+}
+function wk_smvLine(m) {  // the last move between workspaces (both sides see it below the page)
+  if (!m) return '';
+  return `<p class="muted wksmv">${ic('brief', 's')} ${esc(tr('Moved from {0} to {1}', wk_spaceName(m.from), wk_spaceName(m.to)))} · ${esc(fmtWhen(m.at))}${m.by_name ? ' · ' + esc(m.by_name) : ''}</p>`;
+}

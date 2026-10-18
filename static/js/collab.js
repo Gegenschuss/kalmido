@@ -791,7 +791,7 @@ document.addEventListener('keydown', e => {
     if ((e.key === 'Enter' || e.key === 'Tab') && !e.isComposing) { e.preventDefault(); e.stopImmediatePropagation(); mentionPick(S.mp.i); return; }
     if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); mentionClose(); return; }
   }
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (t.id === 'c-input' || t.classList.contains('c-edit-input'))) {  // 2.94.0 (#2024): the team chat boxes handle Ctrl+Enter in chat.js
     e.preventDefault(); e.stopImmediatePropagation();
     if (t.id === 'c-input') sendComment(); else $(`[data-act="c-edit-save"][data-cid="${t.dataset.cid}"]`)?.click();
   }
@@ -840,6 +840,7 @@ async function msgJump(o = {}) {
   for (let n = 0; n < 60 && !S.chat.msgs.some(m => m.id === id) && S.chat.more && S.chat.msgs[0].id > id; n++) { await chatOlder(); if (S.chat.aid !== aid) return false; }
   if (!S.chat.msgs.some(m => m.id === id)) return msgMissing();
   S.chat.pin = false;
+  if (typeof jcd_reveal === 'function') jcd_reveal(id);  // 2.96.0 C (#2015): unfold its job card / leave the filter
   return msgHit(await msgWait(() => $('#chat-msgs ' + sel), 3000)) || msgMissing();
 }
 window.msgJump = msgJump;

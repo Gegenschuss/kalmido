@@ -20,6 +20,15 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.96.0** (2026-10-18): files, folders, documents, wiki pages and tables move between your private space and an
+  organisation, both ways (sealed again, shares that do not hold end, one undo); an organisation export can go into the
+  private space; one card per background job in the agent chat with a filter.
+- **2.95.0** (2026-10-18): the per diem of business trips with the German flat rates per year (BMF 2025 / 2026; country,
+  city, times and meals per day; a year without rates shows a hint), its report per person as PDF / Excel / CSV, and the
+  import of a per diem spreadsheet with a preview.
+- **2.94.0** (2026-10-18): a public booking page for customers (free times from your calendar, mail confirmation,
+  event + contact + lead), leads before the sales pipeline (follow-up, convert to client, CSV import, agents), and Enter in
+  the chats makes a new line.
 - **2.93.0** (2026-10-18): documents from your own templates (contracts, order confirmations, NDAs) with variables
   from client, project and quotation, as PDF in the client's folder and signed by the customer through a link; a
   logbook in the travel expenses with change log, year report and the mileage allowance in the income/expense statement.

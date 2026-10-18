@@ -1222,6 +1222,9 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 | `POST /office/reminders` | office | `{invoice_ids, level?: 1-3, notify?}` -> `201 {doc}` a reminder draft over open invoices of one client |
 | `POST /office/payment-suggestions` | office | `{invoice_id, amount, date?, reference?, confidence?: high\|medium\|low, note?}` -> `201` an open suggestion (`exceeds_open` when above the open amount) |
 | `GET /office/payment-suggestions` | office | `?state=open` (default) `\| accepted \| rejected \| all`: the agent's own suggestions |
+| `GET /office/leads` | office | 2.94.0: the leads of the area by follow-up day (`?due=1` = the day has come) -> `{data: [{id, title, contact, company, email, phone, source, next_step, follow_up, note, app_url}]}`; the person (`requested_by`) must be an admin of the office |
+| `POST /office/leads` | office | 2.94.0: `{title?, contact?, company?, email?, phone?, source?, next_step?, follow_up?, note?}` -> `201` a lead (stage lead; `source` default `agent`) |
+| `PATCH /office/leads/{id}` | office | 2.94.0: `{next_step?, follow_up?, note?}` only, only while it is a lead (`409` once converted). Agents never convert, delete or set another stage |
 
 The people's side (web app, signed in): `GET` / `PATCH /api/office/agents/{id}` (`{office_drafts: bool}`, an admin of the
 agent's office area), `GET /api/office/pay-props`, `POST /api/office/pay-props/{id}` `{action: accept|reject}` (admins;

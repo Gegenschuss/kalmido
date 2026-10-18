@@ -83,6 +83,9 @@ _CHAT = "a team chat room (room_id -> tchat_rooms: a list's room or a direct cha
 _AGENT = "the agent's own rows (agent_id -> agents.org_id; its lists through list_members)"
 _FAM = "the household of a family (Family module): private by definition, never an organisation's"
 TENANT_EXEMPT = {
+    "appt_pages": "2.94.0 B (#1929): a person's own public booking page (like ev_cals: owned by the person, no workspace; the lead goes to office_org_id, checked by the app)",
+    "appt_types": "2.94.0 B (#1929): the appointment types of a person's own booking page (user_id = the owner)",
+    "appt_bookings": "2.94.0 B (#1929): bookings on a person's own booking page (user_id = the owner; event / contact / lead are checked rows of their own areas)",
     "orgs": "2.47.3 (#1360): personal_of = the owner of a personal office (a hidden orgs row; its own policy: only the owner's app.org_ids reach it)",
     "agent_setup_codes": "2.44.0 (#1517): a one-time setup code of one agent, issued by its owner / an instance admin and redeemed without an account (the agent row carries the workspace)",
     "task_tags": _TASK, "attachments": _TASK, "comments": _TASK, "activity": _TASK, "task_seen": _TASK, "task_push": _TASK,
@@ -110,6 +113,7 @@ TENANT_EXEMPT = {
     "sheet_cells": "2.89.0 (#1916): a cell of a table (bound through sheet_id -> sheets.org_id)",
     "sheet_changes": "2.89.0 (#1916): the trail of an agent call on a table (bound through sheet_id -> sheets.org_id)",
     "sheet_lastvals": "2.89.0 (#1916): the last value of a cell one person saw (their own rows, bound through the cell's sheet)",
+    "space_moves": "2.96.0 (#1941): a page / table moved between workspaces (both sides; read only through the object's visibility: wiki/wkmove.py, sheets/shmove.py)",
     "folder_people": "the owner's folder shared with people: every list share goes through the workspace rule (_folder_member_add)",
     "folder_agents": "2.41.0 (#1420): the agents of an owner's folder; every list share goes through the workspace rule (folder_apply / list_agent_set)",
     "folder_notif": _OWN + " (2.33.0 #927: the owner's notification template of a folder; it only limits pushes of people already in its lists)",

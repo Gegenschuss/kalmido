@@ -1700,6 +1700,22 @@ TOOLS += [
      _obj({"state": {"type": "string", "enum": ["open", "accepted", "rejected", "all"]}, **_RB}),
      lambda api, a: api.call("GET", "/office/payment-suggestions", _pick(a, ("state", "requested_by")))),
 ]
+# 2.94.0 (#1930): leads before the sales pipeline (the stage lead): list, add, change the next step / follow-up day / note.
+# The person you act for must be an admin of the office. Never convert, delete or set another stage (a person does that).
+_LEAD = {"title": {"type": "string", "maxLength": 200, "description": "Default: the company, else the person"}, "contact": {"type": "string", "maxLength": 200},
+         "company": {"type": "string", "maxLength": 200}, "email": {"type": "string", "maxLength": 200}, "phone": {"type": "string", "maxLength": 60},
+         "source": {"type": "string", "enum": ["website", "referral", "event", "social", "booking", "import", "agent", "other"], "description": "Default: agent"},
+         "next_step": {"type": "string", "maxLength": 300}, "follow_up": D, "note": {"type": "string", "maxLength": 4000}, **_RB}
+TOOLS += [
+    ("list_office_leads", "2.94.0: the leads of the office (people who might become clients) by follow-up day: contact data, source, next step, "
+                          "follow-up day, note. due = only those whose follow-up day has come.",
+     _obj({"due": {"type": "boolean"}, **_RB}), lambda api, a: api.call("GET", "/office/leads", {**_pick(a, ("requested_by",)), **({"due": "1"} if a.get("due") else {})})),
+    ("create_office_lead", "2.94.0: add a lead (stage lead; at least a title, person, company or e-mail). A person converts it into a client later.",
+     _obj(_LEAD), lambda api, a: api.call("POST", "/office/leads", body=_pick(a, tuple(_LEAD)))),
+    ("update_office_lead", "2.94.0: change the next step, the follow-up day or the note of a lead (only while it is a lead).",
+     _obj({"lead_id": S_ID, **{k: _LEAD[k] for k in ("next_step", "follow_up", "note", "requested_by")}}, ["lead_id"]),
+     lambda api, a: api.call("PATCH", f"/office/leads/{int(a['lead_id'])}", body=_pick(a, ("next_step", "follow_up", "note", "requested_by")))),
+]
 
 # 2.51.0 C (#1352 #1353 #1355): the pin board (own notepads, the weekly status), checking time, shoot planning
 _PAD = {"title": {"type": "string", "maxLength": 200}, "body": {"type": "string", "maxLength": 20000, "description": "Markdown"}}
@@ -1857,7 +1873,8 @@ TOOL_SCOPES = {
     "files:read": ("list_files", "read_file", "search_files", "suggest_receipt", "list_receipt_suggestions"),  # 2.48.0 (#1207, #1356)
     "files:write": ("write_file", "create_file_folder"),
     "office": ("get_office", "list_office_data", "list_office_documents", "get_office_document", "create_offer_draft", "update_offer_draft",
-               "draft_invoice_from_offer", "draft_reminder", "suggest_payment", "list_payment_suggestions"),  # 2.51.0 (#1348, #1350)
+               "draft_invoice_from_offer", "draft_reminder", "suggest_payment", "list_payment_suggestions",
+               "list_office_leads", "create_office_lead", "update_office_lead"),  # 2.51.0 (#1348, #1350); 2.94.0 (#1930): leads
     "pinboard": ("create_notepad", "update_notepad", "delete_notepad", "write_status_pad"),  # 2.51.0 (#1352)
 }
 TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_entries")  # 2.51.0 (#1353)

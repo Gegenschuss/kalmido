@@ -95,7 +95,8 @@ CL2 = Ca.post(B + "/api/clients", json={"name": "Fremdkunde AG"}).json()["id"]
 
 # ---------------------------------------------------------------- #1196 deals
 j = A.get(B + P).json()
-check(j["items"] == [] and j["stages"] == ["inquiry", "offer", "won", "lost"] and j["probabilities"] == {"inquiry": 20, "offer": 50, "won": 100, "lost": 0}
+# 2.94.0 (#1930): the stage lead (10 %) before inquiry
+check(j["items"] == [] and j["stages"] == ["lead", "inquiry", "offer", "won", "lost"] and j["probabilities"] == {"lead": 10, "inquiry": 20, "offer": 50, "won": 100, "lost": 0}
       and j["summary"]["open"] == "0.00", f"#1196: the empty pipeline with its stages {j}")
 r = A.post(B + P, json={"title": "Imagefilm Frühjahr", "client_id": CL, "value": "10000", "expected_date": M1 + "-10", "note": "Erstes Gespräch"})
 check(r.status_code == 201 and r.json()["stage"] == "inquiry" and r.json()["probability"] == 20 and r.json()["client_name"] == "Kunde Eins GmbH" and r.json()["weighted"] == "2000.00",

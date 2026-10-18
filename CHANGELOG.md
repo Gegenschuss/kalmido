@@ -7,6 +7,81 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.96.0] - 2026-10-18
+
+Moving data between your private space and an organisation, and one card per job in the agent chat.
+
+### Added
+- Files, folders with everything in them and documents move between the private space and an organisation, both ways
+  ("Move to another workspace…"). Sender, document type, tags, recognised text and the Paperless-ngx origin go along; the
+  files are sealed again with the target's key. Shares that do not hold in the target end - the dialog names them, and
+  duplicates, first. One step undoes it; a moved document is learned by the target's suggestions at once (#1941).
+- The file store and Documents have a multiple selection ("Select"); Documents can select all hits of a search or filter
+  (up to 2,000) in one go (#1941).
+- Wiki pages and whole folders with their sub-pages move between the private space and an organisation; links between pages
+  that move together follow, links into the other workspace are named before. Spaces with a lock cannot move yet (clear
+  message) (#1941).
+- Tables move between the private space and an organisation; a binding to a list of the old workspace ends and comes back
+  with the undo. The last move shows under a page and in a table's side panel (#1941).
+- An organisation export can be imported into your own private space: nobody joins an organisation, lists are shared only
+  with the people you tick (#1941, #1918).
+- Agent chat: every background job shows as one card with name, version, state and its last line; tapping it shows the whole
+  history. The final result, errors and approvals stay visible, long results are cut to five lines with "Show more". A
+  filter in the chat head: All / Only me and the agent / Jobs (#2015).
+- Agent API: optional `job_msg` (say | question | result | error) on job messages; the chat answer carries `jobs` with state
+  and version. MCP `send_chat` and the reference starter send it (#2015).
+
+### Changed
+- Absences follow the workspace switch "Private": your own area instead of the first organisation (#1941, #1918).
+- Agents never move data between workspaces; that stays with people in the app.
+
+## [2.95.0] - 2026-10-18
+
+The per diem of business trips with the German flat rates per year, its report as PDF / Excel / CSV and the import of a
+per diem spreadsheet.
+
+### Added
+- Travel expenses compute the per diem (*Verpflegungsmehraufwand*) of every trip per participant: Germany 28 / 14 EUR,
+  abroad the rates of the BMF letter of the year (2025: 2 December 2024, 2026: 5 December 2025, taken over line by line),
+  country and city per day (where you are before midnight), start and end time for single days (more than 8 hours), meals
+  provided per day (breakfast 20 %, lunch / dinner 40 % of the full rate). A year without a table shows a hint, never an
+  estimate (#1932).
+- The evaluation shows *Per diem allowances <year>* per person with the breakdown "country: n x rate", as PDF (a section per
+  person), Excel (one sheet per person) and CSV (#1932).
+- *Take over from Excel* imports a per diem spreadsheet: one sheet = one person, one row = one trip, cell comments become
+  the note and set the countries of the days; a preview compares every row with the spreadsheet before anything is stored,
+  undo removes the import again (#1932).
+
+### Fixed
+- An unclosed phone block in the office stylesheet (since 2.91) made the later office styles (invoice series, equipment
+  value, travel expenses) apply on phones only (#1932).
+
+## [2.94.1] - 2026-10-18
+
+### Fixed
+- Booking page settings: the opening hours use the app's own time picker instead of the browser's time field; CI fixes of 2.94.0 (#1929).
+
+## [2.94.0] - 2026-10-18
+
+Appointment booking for customers, leads before the sales pipeline, Enter in the chats makes a new line.
+
+### Added
+- Booking page (Calendar > Calendars > Booking page...): customers book a time with you on a public page without an
+  account. Appointment types with duration, buffer, notice and days ahead; free times are your opening hours minus busy
+  events, accepted invitations, subscriptions, absences and open bookings, customers never see anything of your calendars.
+  The customer confirms by mail, then Kalmido makes the event, a contact and (if chosen) a lead in the office; cancel links
+  for the customer and a list with *Call off...* for you. Spam protection without outside services: mail confirmation,
+  rate limits, a hidden field, at most 3 open bookings per address. Works without an organisation; separate from the
+  disposition (#1929).
+- Leads before the sales pipeline: a first column *Leads* with source, next step and follow-up day (due ones marked),
+  *Convert to client* (a matching client is suggested, undo possible) and a CSV import with preview and duplicate check by
+  e-mail. Leads stay out of the sums and the forecast. Agents with the office switch list, add and update leads (next step,
+  follow-up, note) through `/api/v1/office/leads` and three MCP tools, never convert or delete (#1930).
+
+### Changed
+- Team chat and agent chat (also editing a message): Enter makes a new line, Ctrl+Enter or Cmd+Enter sends, like the
+  comments; the phone keyboard shows a return key, the send button names the shortcut (#2024).
+
 ## [2.93.1] - 2026-10-18
 
 ### Fixed

@@ -131,3 +131,13 @@ ul.ptall .ptst{margin:0;flex:0 0 auto}
 .ptout{margin-top:1.5rem}
 .ptout button{background:transparent;color:var(--text);border:1px solid var(--line2);border-radius:.5rem;padding:.5rem 1rem;font:inherit;min-height:2.75rem;cursor:pointer}
 main>.ok{color:var(--accent);margin:.5rem 0}
+/* 2.94.0 B (#1929): the booking page (/s/b/<address>): appointment types, free times per day (large targets), week navigation */
+.apb-types .apb-note{color:var(--text2);font-size:.8125rem;white-space:pre-wrap}
+.apb-nav{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin:1rem 0}
+.apb-nav a{display:inline-flex;align-items:center;min-height:2.75rem;padding:0 .75rem;border:1px solid var(--line2);border-radius:.5rem;color:var(--text);text-decoration:none}
+.apb-day h2{font-size:.9375rem;margin:1.25rem 0 .5rem}
+.apb-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(5.5rem,1fr));gap:.5rem}
+.apb-slots a{display:flex;align-items:center;justify-content:center;min-height:2.75rem;border:1px solid var(--accent);border-radius:.5rem;color:var(--text);text-decoration:none;font-variant-numeric:tabular-nums}
+.apb-slots a:hover,.apb-slots a:focus-visible{background:var(--accent);color:var(--ink);outline:none}
+.apb-when{font-size:1.0625rem;margin:.5rem 0}
+.apb-tz{margin-top:1.5rem}

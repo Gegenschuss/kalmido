@@ -53,8 +53,10 @@ function ab2_view() {
   const hl = (d.holidays || []).map(h => `<li class="muted">${esc(fmtDayAbs(h.date))} · ${esc(h.name)}</li>`).join('');
   const stSel = d.admin ? `<label class="ab2st"><span class="muted">${tr('Public holidays')}</span><select id="ab2-state" aria-label="${esc(tr('Public holidays'))}"><option value="">${tr('None')}</option>${Object.entries(d.states).map(([k, v]) => `<option value="${k}" ${k === d.state ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>`
     : d.state ? `<span class="muted ab2st">${esc(tr('Public holidays: {0}', d.states[d.state] || d.state))}</span>` : '';
+  // 2.96.0 D (#1941): the own personal area next to the organisations (the workspace switch on "Private" opens it)
+  const areas = [...(d.personal ? [{id: d.personal, name: tr('Private|workspace')}] : []), ...d.orgs];
   return `<div class="dash wload ab2">${ab2_tabs('abs')}<div class="clhead"><h3 class="ab2mon">${esc(mon)}</h3><span class="spacer"></span>
-      ${d.orgs.length > 1 ? `<select id="ab2-org" aria-label="${esc(tr('Organisation'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
+      ${areas.length > 1 ? `<select id="ab2-org" aria-label="${esc(tr('Organisation'))}">${areas.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       <button class="iconbtn" data-act="ab2-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="ab2-move" data-d="0">${tr('This month')}</button><button class="iconbtn" data-act="ab2-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
       <button class="btn sm pri" data-act="ab2-new">${ic('plus', 's')} ${tr('Enter an absence')}</button></div>
     <p class="muted">${tr('The team sees who is away and when. The reason (for example sick leave) and the note only the person and the admins of the organisation see.')}</p>
