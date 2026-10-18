@@ -605,6 +605,10 @@ personal office). First add a **vehicle**: name, plate, kind (**private car used
 - **Year report** per vehicle: km total / business / private / home - workplace, the business share and the **mileage
   allowance** (business km of private cars x the rate per km, default 0.30, changeable in the report). Export as CSV
   (semicolon, decimal comma) or PDF, both with the change log of the year.
+- The **rate per business km is kept per year**: changing it for one year never changes the allowance of earlier years.
+  Every new or changed vehicle and every rate change is written to the office log and listed in the change log of the
+  CSV / PDF of the year. Taking a drive over into the travel expenses is logged too (only the destination goes into the
+  trip, start and purpose into its encrypted note); the trip keeps its km when the drive changes later, the drive shows a hint.
 - The mileage allowance goes into the **income/expense statement** as its own expense line "Mileage allowance" (no input
   tax); travel receipts of the category car stay as they are. Drives without a vehicle, private drives, drives with a
   company car and deleted drives do not count.
@@ -615,7 +619,7 @@ Routes (office admins only; members 403, other areas 404, agents 403): `GET|POST
 `PATCH /api/office/vehicles/<id>` (also `archived`), `GET /api/office/drives?vehicle_id=&year=`, `POST /api/office/drives`,
 `PATCH|DELETE /api/office/drives/<id>`, `POST /api/office/drives/<id>/restore`, `GET /api/office/drives/<id>/log`,
 `POST /api/office/drives/<id>/trip`, `GET /api/office/logbook/report?year=&vehicle_id=`,
-`GET /api/office/logbook.csv|pdf?year=&vehicle_id=`, `PUT /api/office/logbook/settings` `{km_rate}`.
+`GET /api/office/logbook.csv|pdf?year=&vehicle_id=`, `PUT /api/office/logbook/settings` `{km_rate, year}`.
 
 ## Web API
 
@@ -1065,7 +1069,7 @@ Since 2.93.0 also `office_doc_templates` and `office_gen_docs` (document templat
 texts encrypted at rest, archived = removed and restorable), the column `gen_doc_id` of `office_signoffs` (a signature
 link of such a document), and `office_vehicles`, `office_drives` and `office_drive_log` (the logbook; under row-level security, the
 plate, start / destination / purpose and the logged values encrypted at rest, `deleted_at` = deleted and restorable) and
-the settings key `km_rate`; 2.92 runs on with them.
+the settings keys `km_rate` / `km_rates` (rate per year); 2.92 runs on with them.
 
 ## E-invoices (ZUGFeRD / XRechnung) and PDF/A-3
 
