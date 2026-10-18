@@ -87,6 +87,9 @@ AGH = {"Authorization": "Bearer " + r.json()["token"], **H}
 
 # ---------------------------------------------------------------- the private office of alice
 ws(A, "private")
+r = A.put(B + O + "/settings", json={"company_fields": {"name": "Nordlicht Film", "street": "Hafenweg 1", "zip": "20457", "city": "Hamburg",
+                                                     "country": "DE", "tax_number": "12/345/67890", "iban": "DE02120300000000202051"}})
+assert r.ok, r.text
 r = A.post(B + "/api/clients", json={"name": "Nordwind GmbH", "org_id": None, "street": "Hafenweg 1", "zip": "20457", "city": "Hamburg", "country": "DE",
                                      "contacts": [{"name": "Erika Beispiel", "role": "Einkauf", "email": "erika@example.com", "is_default": 1}]})
 assert r.status_code == 201, r.text
@@ -98,7 +101,7 @@ A.put(B + f"{D}/{D1}/items", json={"items": [{"title": "Dreh", "qty": 2, "rate":
 D1NUM = A.get(B + f"{D}/{D1}").json()["number"]
 check(bool(D1NUM), "setup: the private quotation has its number " + repr(D1NUM))
 
-r = A.post(B + "/api/clients", json={"name": "Suedlicht AG", "org_id": None, "city": "Koeln", "country": "DE"})
+r = A.post(B + "/api/clients", json={"name": "Suedlicht AG", "org_id": None, "street": "Domplatz 2", "zip": "50667", "city": "Koeln", "country": "DE"})
 P2 = r.json()["id"]
 r = A.post(B + D, json={"project_title": "Werbespot", "client_id": P2, "service_from": f"{YEAR}-01-02", "service_to": f"{YEAR}-01-03"})
 OFF2 = r.json()["id"]

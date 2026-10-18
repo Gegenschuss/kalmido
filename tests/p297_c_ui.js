@@ -30,7 +30,7 @@ const FEAT = 'clients,office';
   const C = await call('POST', '/api/clients', {name: 'Nordwind GmbH', org_id: null, contacts: [{name: 'Erika Beispiel', is_default: 1}]});
   check(C.status === 201 && C.org_id == null, 'a private client');
   const Q = await call('POST', '/api/office/docs', {project_title: 'Imagefilm', client_id: C.id});
-  check(Q.status === 201, 'a draft quotation for it');
+  check(Q.id > 0 && Q.number !== undefined, 'a draft quotation for it ' + JSON.stringify(Q).slice(0, 200));
 
   // ================= the client card: the item, the dialog with the tick box, Move, Undo
   let w = await boot({user: 'alice', hash: 'client/' + C.id}), d = w.document;
@@ -50,7 +50,7 @@ const FEAT = 'clients,office';
   check(await until(async () => (await call('GET', '/api/clients/' + C.id)).org_id === ORG), 'the client moved into the organisation');
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await call('GET', '/api/clients/' + C.id)).org_id == null), 'Undo: the client is private again');
-  check((await call('GET', '/api/office/docs/' + Q.id)).status === 200, 'Undo: the draft is back in the personal office');
+  check(await until(async () => (await call('GET', '/api/office/docs/' + Q.id)).id === Q.id), 'Undo: the draft is back in the personal office');
   w.close();
 
   // ================= the quotation's menu: a draft alone
