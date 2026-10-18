@@ -52,7 +52,8 @@ const FEAT = 'cal,comments,collab,clients';
   w.eval(`go('office/services')`); await until(() => d.querySelector('.office[data-ofctab="services"] .ofcbar'), 60);
   // 2.47.3 (#1022, #1652): travel expenses and cash flow are two more tabs (admins only)
   // 2.50.0 (#1196, #1197): pipeline and figures are two more tabs (admins only)
-  check(d.querySelectorAll('.office .ofctabs [role=tab]').length === 10, 'the view has ten tabs (admin)');
+  // 2.92.0 (#1925): bookkeeping, bank (2.90), subscriptions (2.91) and contracts (2.92) joined - an admin sees every tab of OFC_TABS
+  check(d.querySelectorAll('.office .ofctabs [role=tab]').length === w.eval('OFC_TABS.length') && w.eval('OFC_TABS.length') >= 14, 'the view has every tab (admin)');
   check(d.querySelector('.office .ofctabs [role=tab][aria-selected="true"]')?.dataset.go === 'office/services', 'tab Services selected');
   check(!!d.querySelector('.office [data-ofc="new"][data-kind="services"]'), 'admin: "New service"');
   check(/Nothing here yet/.test(d.querySelector('.office .ofcbody')?.textContent || ''), 'empty hint');

@@ -39,8 +39,11 @@ BACKFILL = ON and os.environ.get("KALMIDO_FILE_OCR_BACKFILL", "on").strip().lowe
 BACKFILL_S = max(1, int(os.environ.get("KALMIDO_FILE_OCR_BACKFILL_S", "20") or 20))  # s between two files of the catch-up
 MAX_MB = max(1, int(os.environ.get("KALMIDO_FILE_OCR_MAX_MB", "50") or 50))  # larger files are not read
 REHOME_S = max(1, int(os.environ.get("KALMIDO_FILE_OCR_REHOME_S", "300") or 300))  # s between two workspace sweeps
-MIMES = ("application/pdf", "image/jpeg", "image/png", "image/heic", "image/heif")
-EXTS = (".pdf", ".jpg", ".jpeg", ".png", ".heic", ".heif")
+# 2.92.0 C (#1926): + Word / Excel (.docx / .xlsx: their text through the limited worker of files/officeprev.py, no OCR)
+MIMES = ("application/pdf", "image/jpeg", "image/png", "image/heic", "image/heif",
+         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+EXTS = (".pdf", ".jpg", ".jpeg", ".png", ".heic", ".heif", ".docx", ".xlsx")
 IDLE = 5             # s the queue sleeps when there is nothing to do
 # min after which a cut-off run is taken up again. 2.81.0 (#1856): longer than the longest recognition (pages x time per
 # page, docs/ocr.py: 30 x 60 s by default) plus a margin, so a slow scan is never recognised twice at the same time
@@ -300,8 +303,10 @@ def _process(c, row):
         data = _read(c, kind, ref_id, ref)
     except Exception:  # noqa: BLE001 -- a missing / damaged file or a key that cannot open it
         return _set(c, fid, "error", "unreadable")
-    mime = _sniff(data)
-    if mime not in ("application/pdf", "image/jpeg", "image/png"):
+    from .officeprev import dpv_kind
+    office = dpv_kind(ref["name"], ref["mime"], data[:16])
+    mime = "office" if office in ("docx", "xlsx") else _sniff(data)
+    if mime not in ("application/pdf", "image/jpeg", "image/png", "office"):
         # HEIC: neither Tesseract nor Pillow in the image read it -- no mark ("not readable" is no "no text found")
         return _set(c, fid, "skip", "heic" if mime == "image/heic" else "type")
     sha = hashlib.sha256(data).hexdigest()
@@ -313,7 +318,12 @@ def _process(c, row):
         c.execute("INSERT INTO file_words(ft_id, h) SELECT ?, h FROM file_words WHERE ft_id=? ON CONFLICT DO NOTHING", (fid, same["id"]))
         return
     from ..docs.ocr import TEXT_CAP, doc_text
-    r = doc_text(ref["name"], mime, data)
+    if mime == "office":  # 2.92.0 C (#1926): the text of the preview model (the same limits as a PDF)
+        from .officeprev import dpv_model
+        r = dpv_model(data, office)
+        r = {"error": r["error"]} if r.get("error") else {"text": r.get("text") or "", "method": "office", "pages": 0}
+    else:
+        r = doc_text(ref["name"], mime, data)
     if r.get("error") == "busy":
         c.execute("UPDATE file_text SET state='wait', tries=GREATEST(tries-1, 0), updated_at=? WHERE id=?", (_now(), fid))
         return

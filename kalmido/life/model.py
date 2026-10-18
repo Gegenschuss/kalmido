@@ -108,7 +108,7 @@ def life_clean_fam(v):
     """{kind: contract | device | upkeep | health | bookmark, ...} from a client -> the stored JSON text."""
     k = v.get("kind")
     bad = BadInput(tr("Invalid value: {0}", "family"))
-    allowed = {"contract": {"kind", "name", "provider", "cost", "per", "notice", "nu", "start", "account", "lead"},
+    allowed = {"contract": {"kind", "name", "provider", "cost", "per", "notice", "nu", "start", "account", "lead", "office_agreement"},
                "device": {"kind", "name", "model", "bought", "warranty", "lead"},
                "upkeep": {"kind", "item", "lead"},
                "health": {"kind", "type", "who", "lead"},
@@ -135,6 +135,8 @@ def life_clean_fam(v):
             out["start"] = _date(v["start"], "start")
         if v.get("account"):
             out["account"] = _name(v["account"], "account")
+        if v.get("office_agreement") not in (None, ""):  # 2.92.0 A (#1925): the business contract this deadline task belongs to
+            out["office_agreement"] = as_int(v["office_agreement"], "office_agreement", 1)
     elif k == "device":
         out["name"] = _name(v.get("name"))
         for f in ("model",):

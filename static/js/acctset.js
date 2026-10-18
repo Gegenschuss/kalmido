@@ -647,7 +647,7 @@ async function ua8_delete(u) {
     <div class="members ua8lists">${j.lists.map(l => `<div class="mrow"><span class="n">${l.locked ? ic('lock', 's') + ' ' : ''}${lname(l)} <span class="muted">${l.org && l.name != null ? esc(l.org) + ' · ' : ''}${l.shared ? esc(l.members.length ? tr('shared with {0}', l.members.join(', ') + (l.shared > l.members.length ? ' ' + tr('+{0}', l.shared - l.members.length) : '')) : trn('shared with {0} person', 'shared with {0} people', l.shared)) : esc(tr('not shared'))}</span></span></div>`).join('')}</div>
     <fieldset class="ua8how"><legend>${tr('The lists')}</legend>
       <label class="chkl"><input type="radio" name="ua8how" value="transfer" ${cand.length ? 'checked' : 'disabled'}> ${tr('Hand them over to')}</label>
-      <select id="ua8-to" aria-label="${esc(tr('New owner'))}" ${cand.length ? '' : 'disabled'}>${cand.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+      <select id="ua8-to" aria-label="${esc(tr('New owner'))}" ${cand.length ? '' : 'disabled'}>${cand.some(p => p.id === S.me.id) ? '' : `<option value="">${esc(tr('Choose'))}</option>`}${cand.map(p => `<option value="${p.id}" ${p.id === S.me.id ? 'selected' : ''}>${esc(p.name)}${p.invited ? ' · ' + esc(tr('Invited')) : ''}</option>`).join('')}</select>
       ${cand.length ? '' : `<div class="shint keep">${tr('Nobody can take over every one of these lists (an organisation’s list stays in its organisation). Hand single lists over first or delete them along.')}</div>`}
       ${locked ? `<div class="shint keep">${ic('lock', 's')} ${tr('Lists with the lock: the new owner can read them once a member who holds the key opens them.')}</div>` : ''}
       ${alone ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('Nobody else has the key of {0} list with the lock: its content can no longer be read after the handover.', 'Nobody else has the key of {0} lists with the lock: their content can no longer be read after the handover.', alone))}</div>` : ''}
@@ -662,7 +662,7 @@ async function ua8_delete(u) {
     <div class="shint">${tr('Invoices and filed documents do not belong to a list: they stay.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" data-m="go">${tr('Delete user')}</button></div>`);
   const how = () => $('[name="ua8how"]:checked', md)?.value;
-  const sync = () => { $('#ua8-del', md).hidden = how() !== 'delete'; $('#ua8-to', md).disabled = how() !== 'transfer'; $('[data-m="go"]', md).disabled = how() === 'delete' ? $('#ua8-conf', md).value.trim() !== j.username : !how(); };
+  const sync = () => { $('#ua8-del', md).hidden = how() !== 'delete'; $('#ua8-to', md).disabled = how() !== 'transfer'; $('[data-m="go"]', md).disabled = how() === 'delete' ? $('#ua8-conf', md).value.trim() !== j.username : !how() || !+$('#ua8-to', md).value; };
   md.addEventListener('change', sync); md.addEventListener('input', sync); sync();
   return new Promise(res => {
     onRemove(md, () => res(false));

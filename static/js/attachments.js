@@ -81,9 +81,11 @@ const isTextFile = a => !!a && !isImg(a) && a.mime !== 'application/pdf' && (TV_
 // the file tile's link (task, comment and chat files): text files carry what the viewer needs (data-tview)
 function attFileA(a) {
   const pdf = a.mime === 'application/pdf', tv = isTextFile(a) && a.size <= TV_MAX;
-  const o = tv ? esc(JSON.stringify({url: attUrl(a, true), name: a.name, size: a.size, agent: a.agent || '', md: isMdFile(a), ext: attExt(a)})) : '';
+  // 2.92.0 C (#1926): a task / comment file (not a chat file: a.url) carries its id for "Summarise"; Word / Excel open in the preview
+  const aid = a.url ? undefined : a.id, dv = !a.url && dv_is(a);
+  const o = tv ? esc(JSON.stringify({url: attUrl(a, true), name: a.name, size: a.size, agent: a.agent || '', md: isMdFile(a), ext: attExt(a), aid})) : '';
   // 2.48.0 (#1367): a PDF opens in the preview (pdfview.js); Ctrl/Cmd-click still opens it in a new tab
-  return `<a href="${attUrl(a, !pdf)}" ${pdf ? 'target="_blank" rel="noopener"' + pv_attr({url: attUrl(a), name: a.name, size: a.size, dlUrl: attUrl(a, true)}) : 'download'}${tv ? ` data-tview="${o}"` : ''} title="${esc(a.name)}">${ic(pdf ? 'pdf' : 'file')}<span class="atxt"><span class="an">${esc(a.name)}</span><span class="as">${fmtSize(a.size)}${a.agent ? ` · <span class="attag">${esc(tr('Created by agent'))}</span>` : ''}${upMarkHtml(a.up)}</span></span></a>`;  // 2.31.0 (#1050): the name on its own line
+  return `<a href="${attUrl(a, !pdf)}" ${pdf ? 'target="_blank" rel="noopener"' + pv_attr({url: attUrl(a), name: a.name, size: a.size, dlUrl: attUrl(a, true), aid}) : 'download'}${tv ? ` data-tview="${o}"` : ''}${dv ? dv_attr({url: `/api/attachments/${encodeURIComponent(a.id)}/preview`, name: a.name, size: a.size, dlUrl: attUrl(a, true), aid}) : ''} title="${esc(a.name)}">${ic(pdf ? 'pdf' : 'file')}<span class="atxt"><span class="an">${esc(a.name)}</span><span class="as">${fmtSize(a.size)}${a.agent ? ` · <span class="attag">${esc(tr('Created by agent'))}</span>` : ''}${upMarkHtml(a.up)}</span></span></a>`;  // 2.31.0 (#1050): the name on its own line
 }
 // 2.61.0 (#1818): the marks of a stored file (server field up: scan 'unchecked' | 'infected' with sig, scan_why 'size').
 // scnMakers makes them; a further mark (e.g. the text recognition's up.text) pushes its own maker: up => html or ''.
@@ -129,6 +131,7 @@ async function textView(o) {
       <button type="button" class="iconbtn" data-tv="x" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
       ${o.agent ? `<div class="tvnote">${ic('bot', 's')}<span>${esc(tr('Created by agent {0}. Check it before you run anything from it.', o.agent))}</span></div>` : ''}
       <div class="tvbody">${body()}</div></div>`;
+    if (o.aid) dpvSumMount(m, o);  // 2.92.0 C (#1926): "Summarise" by an agent (docpreview.js)
   };
   draw();
   m.addEventListener('click', e => {

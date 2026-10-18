@@ -194,6 +194,10 @@ def file_kind(name, mime, head):
         return "pdf"
     if mime.startswith("image/"):
         return "image"
+    from ..files.officeprev import dpv_kind
+    ok = dpv_kind(name, mime, head[:16])  # 2.92.0 C (#1926): Word / Excel (before "text": an .xlsx is no xml file)
+    if ok in ("docx", "xlsx"):
+        return ok
     if mime.startswith("text/") or mime in ("application/json", "application/xml", "application/yaml") or file_ext(name or "") in TEXT_EXT:
         return "text" if b"\x00" not in head[:4096] else "other"
     return "other"
@@ -223,6 +227,16 @@ def text_of_bytes(name, mime, data, max_chars=TEXT_CAP, owner=None):
         if out["no_text_layer"]:
             out.update(text="", message=tr("Scanned PDF without a text layer: it cannot be read without text recognition (OCR)."))
             return out
+    elif kind in ("docx", "xlsx"):  # 2.92.0 C (#1926): the text of the preview model (files/officeprev.py, limited worker)
+        from ..files.officeprev import DPV_ERR, dpv_model
+        r = dpv_model(data, kind, owner)
+        if r.get("error"):
+            out.update(error=r["error"], message=tr(DPV_ERR.get(r["error"], DPV_ERR["unreadable"])))
+            return out
+        text = r.get("text") or ""
+        out["truncated"] = bool(r.get("truncated"))
+        if kind == "xlsx":
+            out.update(sheets=len(r.get("sheets") or []), sheets_total=r.get("sheets_total"))
     elif kind == "text":
         text = _decode(data)
     elif kind == "image":
@@ -240,7 +254,8 @@ def text_of_bytes(name, mime, data, max_chars=TEXT_CAP, owner=None):
 @app.get("/api/v1/attachments/<int:aid>/text")
 @v1_view
 def v1_attachment_text_get(aid):
-    """2.34.0 (#368): the text of a task / comment attachment (PDF text layer, text files); images point to the file.
+    """2.34.0 (#368): the text of a task / comment attachment (PDF text layer, text files; 2.92.0 C (#1926): Word .docx and
+    Excel .xlsx); images point to the file.
     Same rights as GET /attachments/{id} (agents: only lists shared with them), else 404."""
     a = v1_args(("max_chars",))
     max_chars = as_int(a.get("max_chars", TEXT_CAP), "max_chars", 1, TEXT_CAP)

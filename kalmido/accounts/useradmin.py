@@ -168,7 +168,10 @@ def ua8_candidates(c, lists, uid):
     vis = visible_people(c, me())
     if vis is not None and common:
         common &= vis
-    return [{"id": i, "name": names[i]} for i in sorted(common or (), key=lambda i: names[i].lower())]
+    ids = list(common or ())
+    # 2.92.0 D (#2008): invited accounts that never logged in (open invitation) go to the back
+    inv = {r[0] for r in c.execute(f"SELECT user_id FROM user_invites WHERE kind='invite' AND used_at IS NULL AND user_id IN ({','.join('?' * len(ids))})", ids)} if ids else set()
+    return [{"id": i, "name": names[i], "invited": i in inv} for i in sorted(ids, key=lambda i: (i in inv, names[i].lower()))]
 
 
 def ua8_list_info(c, lists, by):

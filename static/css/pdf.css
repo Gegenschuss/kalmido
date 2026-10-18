@@ -21,3 +21,38 @@
   .pvbar .pvnav,.pvbar .pvzoom{flex:1 1 auto;justify-content:center}
   .pvbody{padding:.5rem .5rem calc(.5rem + var(--safe-b))}
 }
+/* 2.92.0 C (#1926): the Word / Excel preview (docpreview.js) and "Summarise" */
+.dpvbox{width:min(60rem,100%);height:100%}
+.dpvbody{background:var(--bg2);overscroll-behavior:contain}
+.dpvdoc{max-width:46rem;margin:0 auto;line-height:1.55;overflow-wrap:anywhere}
+.dpvdoc p{margin:0 0 .75rem}
+.dpvdoc .dpvh{margin:1.25rem 0 .5rem;line-height:1.3}
+.dpvdoc .dpvh:first-child{margin-top:0}
+.dpvlist{margin:0 0 .75rem;padding-inline-start:1.5rem}
+.dpvlist li{margin:.125rem 0}
+.dpvtwrap{overflow:auto;margin:0 0 .75rem;border:1px solid var(--line);border-radius:var(--r-s,.375rem)}
+.dpvtbl{border-collapse:collapse;font-size:var(--fs-s);min-width:100%}
+.dpvtbl td,.dpvtbl th{border:1px solid var(--line);padding:.375rem .5rem;text-align:start;vertical-align:top;white-space:pre-wrap;max-width:24rem}
+.dpvsheet td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:16rem}
+.dpvsheet td.dpvnum{text-align:end;font-variant-numeric:tabular-nums}
+.dpvsheet thead th{position:sticky;top:0;background:var(--bg3);color:var(--text2);font-weight:500;text-align:center;z-index:1}
+.dpvsheet th.dpvrn{position:sticky;left:0;background:var(--bg3);color:var(--text2);font-weight:400;text-align:end;min-width:2.5rem;font-variant-numeric:tabular-nums}
+.dpvsheet thead th.dpvrn{z-index:2}
+.dpvgrid{max-height:100%}
+.dpvtabs{display:flex;gap:.25rem;padding:.375rem .5rem;border-bottom:1px solid var(--line);overflow-x:auto;flex:none;align-items:center}
+.dpvtabs[hidden]{display:none}
+.dpvtab{flex:none;border:0;background:none;color:var(--text2);padding:.5rem .75rem;border-radius:.375rem;cursor:pointer;font:inherit;min-height:2.5rem}
+.dpvtab.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.dpvmore{font-size:var(--fs-s);padding:0 .5rem;white-space:nowrap}
+.dpvcut{font-size:var(--fs-s);text-align:center;margin:.75rem 0 0}
+.dpvsum{display:inline-flex;align-items:center;gap:.375rem;flex:none}
+.dpvfoot{display:flex;align-items:center;gap:.5rem;padding:.5rem 1rem;border-top:1px solid var(--line);font-size:var(--fs-s);color:var(--text2);flex:none}
+.dpvfoot[hidden]{display:none}
+.dpvpick{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0}
+.dpvag{display:flex;align-items:center;gap:.5rem;padding:.5rem;border-radius:.375rem;cursor:pointer;min-height:2.75rem}
+.dpvag:has(input:checked){background:var(--accent-soft)}
+@media (max-width:899px) {
+  .dpvbox{height:100%}
+  .dpvsum span{display:none}
+  .dpvbody{padding:.75rem .75rem calc(.75rem + var(--safe-b))}
+}

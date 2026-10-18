@@ -484,9 +484,16 @@ MD = {
                           "raw_fee": ("int01", False, None), "producing": ("int01", False, None), "intext": ("choice", False, INTEXT),
                           "role": ("str", False, 80), "tax": ("choice", False, TAXES), "archived": ("int01", False, None),
                           "role_id": ("role", False, "freelancer")}},  # 2.47.0 (#1649): the freelancer role (purchase price)
-    "equipment": {"table": "office_equipment", "order": "lower(category), lower(name), id", "label": "name",
+    # 2.92.0 B (#1931): purchase, receipt, useful life, new / current value and the policy (assets.py); admins only, the
+    # money columns and the serial number encrypted at rest ("crypt": the orgcrypt FIELDS of the table)
+    "equipment": {"table": "office_equipment", "order": "lower(category), lower(name), id", "label": "name", "crypt": "office_equipment",
+                  "admin_cols": ("purchase_date", "purchase_net", "serial_no", "vendor", "receipt_node_id", "life_months", "new_value",
+                                 "current_value", "agreement_id"),
                   "cols": {"name": ("str", True, NAME_MAX), "name_en": ("str", False, NAME_MAX), "category": ("str", False, 80),  # 2.45.1 (#1556): name_en
-                           "daily_rate": ("num0", False, None), "archived": ("int01", False, None)}},
+                           "daily_rate": ("num0", False, None), "archived": ("int01", False, None),
+                           "purchase_date": ("date", False, None), "purchase_net": ("money", False, None), "serial_no": ("str", False, 120),
+                           "vendor": ("str", False, 120), "receipt_node_id": ("receipt", False, None), "life_months": ("months", False, None),
+                           "new_value": ("money", False, None), "current_value": ("money", False, None), "agreement_id": ("agreement", False, None)}},
     "sets": {"table": "office_sets", "order": "lower(name), id", "label": "name",
              "cols": {"name": ("str", True, NAME_MAX), "discount_pct": ("num", False, None), "items": ("items", False, None),
                       "archived": ("int01", False, None)}},
@@ -520,6 +527,9 @@ def _row_dict(kind, r, c=None, oid=None):
     if c is not None and kind == "contracts":  # 2.42.0 (#828): the special rates are encrypted at rest
         from ..core.orgcrypt import oc_dec_fields
         r = oc_dec_fields(c, oid, "office_contracts", r)
+    if c is not None and MD.get(kind, {}).get("crypt"):  # 2.92.0 B (#1931): the equipment's prices / values
+        from ..core.orgcrypt import oc_dec_fields
+        r = oc_dec_fields(c, oid, MD[kind]["crypt"], r)
     if c is not None and MD.get(kind, {}).get("table") == "office_roles":  # 2.47.0 (#1649): costs -> cost_day / cost_hour
         from ..core.orgcrypt import oc_dec_fields
         r = oc_dec_fields(c, oid, "office_roles", r)
@@ -637,6 +647,29 @@ def _clean_col(c, oid, kind, k, v):
         if not c.execute("SELECT 1 FROM office_roles WHERE id=? AND org_id=? AND kind=?", (i, oid, spec)).fetchone():
             raise BadInput(tr("Invalid value: {0}", k))
         return i
+    if typ == "money":  # 2.92.0 B (#1931): an amount kept as text "1234.50" ('' = none; encrypted by _md_crypt)
+        if v in (None, ""):
+            return ""
+        from .calc import dstr
+        return dstr(_num(v, k, 0, 1e9))
+    if typ == "months":  # 2.92.0 B (#1931): a useful life in months (None = the suggestion)
+        if v in (None, "", 0, "0"):
+            return None
+        return int(_num(v, k, 1, 600))
+    if typ == "receipt":  # 2.92.0 B (#1931): a document of the office's document space
+        from .assets import ast_receipt_check
+        return ast_receipt_check(c, oid, v)
+    if typ == "agreement":  # 2.92.0 B (#1931): a live contract of the office (#1925)
+        if v in (None, "", 0, "0"):
+            return None
+        try:
+            i = int(v)
+        except (TypeError, ValueError):
+            raise BadInput(tr("Invalid value: {0}", k))
+        from .assets import ast_agreement_ok
+        if not ast_agreement_ok(c, oid, i):
+            raise BadInput(tr("Invalid value: {0}", k))
+        return i
     if typ == "date":
         if v in (None, ""):
             return ""
@@ -695,6 +728,7 @@ def office_create(c, oid, kind, b):
     if m.get("kind"):  # 2.47.0 (#1649)
         _sr_costs(c, oid, cols, vals, {})
         cols.append("kind"), vals.append(m["kind"])
+    _md_crypt(c, oid, kind, cols, vals)
     if kind == "texts" and not b.get("key"):
         cols.append("key"), vals.append("")
     ts = iso(now_utc())
@@ -712,10 +746,13 @@ def office_update(c, oid, kind, rid, b):
     for k, v in b.items():
         if k not in m["cols"]:
             continue
+        if m["cols"][k][0] in ("agreement", "receipt") and v not in (None, "") and str(v) == str(r.get(k)):
+            continue  # 2.92.0 B (#1931): an unchanged link stays even when its policy is archived by now
         sets.append(k)
         vals.append(_clean_col(c, oid, kind, k, v))
     if m.get("kind"):  # 2.47.0 (#1649)
         _sr_costs(c, oid, sets, vals, {f: r.get(f) for f in SR_COSTS})
+    _md_crypt(c, oid, kind, sets, vals)
     sets = [f"{k}=?" for k in sets]
     if sets:
         if "updated_at" in _cols(c, m["table"]):
@@ -743,6 +780,16 @@ def _sr_costs(c, oid, cols, vals, cur):
     from ..core.orgcrypt import oc_enc_fields
     cols.append("costs")
     vals.append(oc_enc_fields(c, oid, "office_roles", {"costs": json.dumps(j)})["costs"])
+
+
+def _md_crypt(c, oid, kind, cols, vals):
+    """2.92.0 B (#1931): the protected columns of a master with "crypt" encrypted in place (orgcrypt FIELDS)."""
+    t = MD[kind].get("crypt")
+    if not t:
+        return
+    from ..core.orgcrypt import oc_enc_fields
+    enc = oc_enc_fields(c, oid, t, dict(zip(cols, vals)))
+    vals[:] = [enc[k] for k in cols]
 
 
 def sr_public(kind, row, admin):
@@ -915,6 +962,8 @@ def office_import(c, oid, d, overwrite=False):
                     if b.get(f) is not None:
                         b[f] = mapped("texts", b[f], where, f)
                 b.pop("client_id", None)  # clients are not part of the master data file
+            if kind == "equipment":  # 2.92.0 B (#1931): receipt and policy are ids of the source office, never taken over
+                b.pop("receipt_node_id", None), b.pop("agreement_id", None)
             if kind == "services" and b.get("role_id") is not None:  # 2.47.0 (#1649)
                 b["role_id"] = mapped("roles", b["role_id"], where, "role_id")
             k = key_of(kind, b)

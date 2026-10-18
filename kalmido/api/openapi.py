@@ -220,13 +220,17 @@ def openapi_spec():
         "AttachmentText": {"type": "object", "properties": {  # 2.34.0 (#368)
             "id": {"type": "integer"}, "task_id": {"type": "integer"}, "comment_id": nul("integer"), "name": {"type": "string"},
             "mime": {"type": "string"}, "size": {"type": "integer"}, "url": {"type": "string", "description": "/api/v1/attachments/{id} (the file itself)"},
-            "kind": {"type": "string", "enum": ["pdf", "text", "image", "other"]},
-            "text": nul("string", description="The text (PDF: the text layer, pages separated by a blank line); null for images, other files and errors"),
+            "kind": {"type": "string", "enum": ["pdf", "text", "image", "docx", "xlsx", "other"]},  # 2.92.0 C (#1926): + docx, xlsx
+            "text": nul("string", description="The text (PDF: the text layer, pages separated by a blank line; docx: paragraphs, '# ' headings, "
+                                              "'- ' list items, table rows as 'a | b'; xlsx: '## <sheet>' then one line per row, cells as 'a | b'); "
+                                              "null for images, other files and errors"),
             "chars": {"type": "integer"}, "truncated": {"type": "boolean", "description": "true = cut at max_chars (at most 200000) or after 1000 pages"},
             "pages": {"type": "integer", "description": "PDF: number of pages"}, "pages_read": {"type": "integer"},
             "no_text_layer": {"type": "boolean", "description": "PDF: a scanned PDF without a text layer: text is empty unless source is ocr"},
             "source": {"type": "string", "enum": ["ocr"], "description": "2.61.0: the text was recognised in the background (scanned PDF, photo)"},
-            "error": {"type": "string", "enum": ["encrypted", "unreadable", "too_complex"], "description": "PDF: why it could not be read"},
+            "error": {"type": "string", "enum": ["encrypted", "unreadable", "too_complex", "too_large", "unsafe", "busy"],
+                      "description": "PDF / docx / xlsx: why it could not be read (2.92.0: too_large = the archive unpacks too big, unsafe = DOCTYPE / entities)"},
+            "sheets": {"type": "integer", "description": "2.92.0 xlsx: sheets read (at most 5)"}, "sheets_total": {"type": "integer"},
             "message": nul("string", description="A hint in the user's language (scanned PDF, image, error)")}},
         "Progress": {"type": "object", "properties": {"done": {"type": "integer"}, "total": {"type": "integer"}, "overdue": {"type": "integer"},
                                                       "next_due": nul("string", format="date")}},
@@ -590,7 +594,7 @@ def openapi_spec():
                                         "?dl=1 always a download). 410 = damaged on the server", C,
                                         {"200": {"description": "The file", "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}}
                                         | errs("403", "404", "410"), [pid("id", "Attachment id"), q("dl", "1 = download"), q("v", "Cache key (the size)")])},
-        "/attachments/{id}/text": {"get": op("Read a task / comment file as text (2.34.0): PDF text layer, text files", C,
+        "/attachments/{id}/text": {"get": op("Read a task / comment file as text (2.34.0): PDF text layer, text files, 2.92.0: Word .docx / Excel .xlsx", C,
                                              ok(ref("AttachmentText")) | errs("400", "403", "404", "413", "503"),
                                              [pid("id", "Attachment id"), q("max_chars", "At most this many characters (1-200000, default 200000)", {"type": "integer"})],
                                              desc="Same rights as GET /attachments/{id}: agents only see files of lists shared with them (else 404). "

@@ -172,8 +172,10 @@ def rk_fixed_days(f, first, last):
 
 @app.get("/api/office/fixed-costs")
 def rk_fixed_get():
+    """{items, agreements (2.92.0 A, #1925: the contributions of business contracts in the cash flow, read-only here)}."""
+    from .agreements import agr_cashflow_items
     c, uid, oid = _ctx()
-    return jsonify(items=rk_fixed(c, oid))
+    return jsonify(items=rk_fixed(c, oid), agreements=agr_cashflow_items(c, oid))
 
 
 @app.post("/api/office/fixed-costs")
@@ -289,8 +291,8 @@ def cf8_chain(c, oid, r):
 
 def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
     """{from, months, currency, today, basis, rows: [{month, in: {actual, plan}, out: {actual, plan}, balance}], entries: [...]}.
-    An entry: {month, dir in|out, state actual|plan, kind payment|invoice|offer|series|purchase|trip|fixed, date, amount, label,
-    number, doc_id | trip_id | fixed_id, overdue} (kind credit = a refund paid on a credit note, out; kind offer carries
+    An entry: {month, dir in|out, state actual|plan, kind payment|invoice|offer|series|purchase|trip|fixed|agreement, date, amount,
+    label, number, doc_id | trip_id | fixed_id | agreement_id (2.92.0 A, #1925), overdue} (kind credit = a refund paid on a credit note, out; kind offer carries
     open_offer: true for a sent quotation not yet accepted, 2.88.0, #1915).
     2.67.0 (#1838): basis gross (default; the start page too) | net. Fixed costs are entered net with a VAT rate: gross adds
     it. Documents (payments, open invoices, quotations, credit notes) are gross; net takes their share net / gross of the
@@ -389,6 +391,12 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
                 repeat=f["repeat"], category=f["category"], vat_rate=f["vat_rate"])
     from .recurring import rin_cashflow
     rin_cashflow(c, oid, put, first, _add_months(last_month, 1) + "-00", today, nf)  # 2.91.0 A (#1923): in: the coming periods of invoice series (plan)
+    # out: 2.92.0 A (#1925): contributions of business contracts and insurances (cashflow on) -- like a fixed cost, never copied
+    from .agreements import agr_cashflow_items
+    for f in agr_cashflow_items(c, oid, today):
+        for day in rk_fixed_days(f, first, _add_months(last_month, 1) + "-00"):
+            put(day, "out", "actual" if day <= today else "plan", "agreement", dec(f["amount"] if net else f["gross"]), f["label"],
+                agreement_id=f["id"], repeat=f["repeat"], vat_rate=f["vat_rate"])
     entries.sort(key=lambda e: (e["month"], e["dir"], e["date"], e["kind"]))
     rows = []
     cum_bal = cum_res = dec(0)
