@@ -7,6 +7,10 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+### Fixed
+- User administration (#1980): the tick boxes of the user list have a 44 px touch target on phones; the delete text uses
+  the basket's current name in every language.
+
 ## [2.88.0] - 2026-10-18
 
 Quotations in the cash flow plan, user administration for hundreds of accounts.
