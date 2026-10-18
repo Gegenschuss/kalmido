@@ -252,6 +252,8 @@ r = mv(A, what="clients", ids=[P4], to=SP)
 check(r.ok, "H1: the client with its draft moves " + r.text[:200])
 M4 = r.json().get("move_id")
 ws(A, SP)
+A.put(B + O + "/settings", json={"company_fields": {"name": "Team Film", "street": "Kai 3", "zip": "20457", "city": "Hamburg",
+                                                  "country": "DE", "tax_number": "12/345/67891", "iban": "DE02120300000000202051"}})
 r = A.post(B + f"{D}/{OFF4}/invoice")
 INV4 = r.json().get("id") if r.status_code == 201 else None
 r = A.post(B + f"{D}/{INV4}/finalize") if INV4 else r
