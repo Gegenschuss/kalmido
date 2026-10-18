@@ -266,6 +266,14 @@ check((sg.get("vat_pct") == 19 and sg.get("net") == "1000.00") or (sg.get("vat_p
 r = A.post(B + E, json={"name": "Objektiv 50mm", "category": "Objektiv", "receipt_node_id": RC, "purchase_date": sg["date"], "purchase_net": "1000"})
 check(r.status_code == 201 and row(A, r.json()["id"])["receipt_node_id"] == RC, "a device with its receipt " + r.text[:120])
 OBJ = r.json()["id"]
+# 2.92.0 (#1931 -> #1921): the profit statement counts the year's depreciation, the device's receipt only with its input tax
+A.put(B + f"/api/docs/{RC}/receipt", json={"category": "Technik", "vat_pct": "19", "keep": True})
+eu = A.get(B + "/api/office/books/euer?year=2025").json()
+afa25 = next((p["afa"] for p in row(A, OBJ)["afa_plan"] if p["year"] == 2025), None)
+dep = next((x for x in eu.get("expenses", []) if x["label"] == "Depreciation"), None)
+tech = next((x for x in eu.get("expenses", []) if x["label"] == "Technik"), None)
+check(dep and afa25 and dep["net"] == afa25 and tech and tech["net"] == "0.00" and tech["vat"] == "190.00",
+      f"EUeR: depreciation {afa25} instead of the receipt, input tax stays {dep} {tech}")
 OWN = upload(A, "privat.pdf", "Privatbeleg 10,00", "private", "10.00", "2025-01-01")
 check(A.get(B + f"{E}/receipts/{OWN}").status_code == 404, "a private document is no receipt of the organisation (404)")
 check(OWN not in [x["id"] for x in A.get(B + E + "/receipts").json()["items"]], "and is not offered")
