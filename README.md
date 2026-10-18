@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.91.0** (2026-10-18): recurring invoices (monthly, quarterly, yearly; drafts or sent automatically, in the cash
+  flow) and an office overview of subscriptions and tools with sums, notice periods, users, renewal reminders and a
+  *hardly used* mark.
 - **2.88.0** (2026-10-18): sent quotations count in the cash flow plan as open quotations, one version per quotation
   with a per-quotation switch; user administration with search, filters, pages and bulk actions, deleting an account
   hands its lists to another person or deletes them along.
