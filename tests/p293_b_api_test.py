@@ -187,6 +187,14 @@ r = A.put(B + LB + "/settings", json={"km_rate": "0,35"})
 check(r.ok and r.json()["km_rate"] == "0.35" and A.get(B + V).json()["km_rate"] == "0.35", "the rate with a decimal comma " + r.text)
 A.put(B + O + "/settings", json={"tax_reserve_pct": 0})
 check(A.get(B + V).json()["km_rate"] == "0.35", "the office settings keep the rate")
+# 2.93.0 B (#1928 review): the rate per year (a new rate never changes earlier years), every change in the office log
+r = A.put(B + LB + "/settings", json={"km_rate": "0.50", "year": 2025})
+check(r.ok and r.json() == {"km_rate": "0.50", "year": 2025} and A.get(B + LB + "/report?year=2025").json()["km_rate"] == "0.50"
+      and A.get(B + LB + "/report?year=2026").json()["km_rate"] == "0.35", "the rate of 2025 leaves 2026 alone " + r.text)
+check(A.put(B + LB + "/settings", json={"km_rate": "1", "year": "20x6"}).status_code == 400, "the year validated")
+kl = [x for x in A.get(B + O + "/log?limit=200").json()["log"] if x["target"] == "km_rate"]
+check(sorted((x["detail"]["year"], x["detail"]["before"]["km_rate"], x["detail"]["after"]["km_rate"]) for x in kl) == [(2025, "0.35", "0.50"), (2026, "0.30", "0.35")],
+      f"the office log: every rate with the year, before and after {[x['detail'] for x in kl]}")
 e = A.get(B + "/api/office/books/euer?year=2026").json()
 km = [x for x in e["expenses"] if x["key"] == "km"]
 check(len(km) == 1 and km[0]["gross"] == "45.50" and km[0]["net"] == "45.50" and km[0]["vat"] == "0.00" and km[0]["count"] == 1 and km[0]["label"] == "Mileage allowance",
@@ -198,6 +206,11 @@ check(any(r_[:4] == ["Mileage allowance", "45,50", "0,00", "45,50"] for r_ in ro
 
 # ---------------------------------------------------------------- CSV / PDF
 A.patch(B + f"{DR}/{D2}", json={"purpose": "=HYPERLINK(1)"})
+r = A.patch(B + f"{V}/{VP}", json={"kind": "company"})  # 2.93.0 B (#1928 review): a kind change is logged, shown in the export
+check(r.ok and A.get(B + LB + "/report?year=2026").json()["allowance"] == "0.00", "a company car has no allowance")
+vl = [x for x in A.get(B + O + "/log?limit=200").json()["log"] if x["target"] == "vehicle" and x["detail"].get("vehicle_id") == VP]
+check([x["action"] for x in vl] == ["update", "create"] and vl[0]["detail"]["before"] == {"kind": "private"} and vl[0]["detail"]["after"] == {"kind": "company"},
+      f"the office log: the vehicle created and its kind changed {[x['detail'] for x in vl]}")
 r = A.get(B + LB + ".csv?year=2026")
 check(r.ok and r.headers.get("Content-Type", "").startswith("text/csv") and "logbook-2026.csv" in r.headers.get("Content-Disposition", ""), "CSV: download")
 rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=";"))
@@ -208,6 +221,10 @@ check(not any(r_[:1] == ["2026-03-07"] for r_ in rows), "CSV: the deleted drive 
 i = next(n for n, r_ in enumerate(rows) if r_[:1] == ["Change log"])
 lg = [r_ for r_ in rows[i + 2:] if len(r_) == 5]
 check(any(r_[2] == "Deleted" for r_ in lg) and any(r_[2] == "Changed" and "Purpose" in r_[4] for r_ in lg), f"CSV: the change log with the deleted drive {rows[i:i + 4]}")
+check(any(r_[2] == "Changed" and r_[4] == "Vehicle Kombi: Kind: Private car used for business -> Company car" for r_ in lg)
+      and any(r_[4] == "Mileage allowance per business km 2026: 0,30 -> 0,35" for r_ in lg) and not any("2025" in r_[4] for r_ in lg)
+      and any(r_[2] == "Created" and r_[4].startswith("Vehicle Kombi: Name: Kombi") for r_ in lg), f"CSV: the vehicle and rate changes of the year in the log {lg}")
+check(A.patch(B + f"{V}/{VP}", json={"kind": "private"}).ok, "the kind back")
 r = A.get(B + LB + ".pdf?year=2026")
 check(r.ok and r.headers.get("Content-Type") == "application/pdf" and r.content[:5] == b"%PDF-", "PDF: content type + PDF bytes")
 check(A.get(B + LB + f".pdf?year=2026&vehicle_id={VX}").status_code == 404, "PDF: a vehicle of another organisation 404")
