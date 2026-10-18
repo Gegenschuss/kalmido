@@ -84,6 +84,7 @@ ROUTES = {
     "DELETE /api/my/agents/{}/machines/{}": "agents", "DELETE /api/v1/agent/quota": "agents", "GET /api/agents": "agents",
     "GET /api/agents/jobs": "agents", "GET /api/agents/jobs/{}/steps": "agents", "GET /api/agents/usage": "agents",
     "GET /api/agents/{}/bridges": "agents", "GET /api/agents/{}/chat": "agents",
+    # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     # 2.96.0 C (#2015): job cards in the agent chat
     "GET /api/agents/{}/meeting-proposals": "agents", "GET /api/agents/{}/schedules": "agents",
     "GET /api/agents/{}/share": "agents", "GET /api/assistant": "agents", "GET /api/assistant/log": "agents",
@@ -350,6 +351,7 @@ ROUTES = {
     "PATCH /api/me/webhooks/{}": "own", "PATCH /api/settings": "own", "PATCH /api/v1/me/notifications": "own",
     "POST /api/account/export": "own", "POST /api/account/import": "own", "POST /api/account/import/{}/key": "own",
     "POST /api/account/import/{}/run": "own", "POST /api/me/app-passwords": "own", "POST /api/me/avatar": "own",
+    # 2.97.0 B (#1951): customers (p297_b_api_test.py) - routes below this line
     # 2.96.0 D (#1941 / #1918): an organisation export into the private space
     "POST /api/me/drop-token": "own", "POST /api/me/mail/test": "own", "POST /api/me/mail/token": "own",
     "POST /api/me/pin/lock": "own", "POST /api/me/pin/unlock": "own", "POST /api/me/purpose": "own",
@@ -525,6 +527,7 @@ ROUTES = {
     "GET /api/sheets/{}/export.csv": "sheets", "GET /api/sheets/{}/export.xlsx": "sheets",
     "GET /api/sheets/{}/links": "sheets", "GET /api/sheets/{}/vars": "sheets", "GET /api/v1/sheets": "sheets",
     "GET /api/v1/sheets/{}": "sheets", "GET /api/v1/sheets/{}/vars": "sheets", "PATCH /api/sheets/{}": "sheets",
+    # 2.97.0 C (#2049): office moves (p297_c_api_test.py) - routes below this line
     # 2.96.0 B (#1941): a table to the other workspace
     "POST /api/sheets/{}/move-space": "sheets",
     "PATCH /api/sheets/{}/columns/{}": "sheets", "PATCH /api/v1/sheets/{}": "sheets", "POST /api/sheets": "sheets",
@@ -574,6 +577,7 @@ ROUTES = {
     # 2.96.0 B (#1941): wiki pages / folders to the other workspace
     "POST /api/wiki/move-space": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
+    # 2.97.0 D (#2050 #2051): locked spaces / clean-up (p297_d_api_test.py) - routes below this line
     # 2.90.0 - 2.92.0: bookkeeping, bank, tax dates, invoice series, subscriptions, agreements, equipment, file preview
     "DELETE /api/office/agreements/{}": "office", "DELETE /api/office/series/{}": "office",
     "GET /api/attachments/{}/agents": "tasks", "GET /api/attachments/{}/preview": "tasks",

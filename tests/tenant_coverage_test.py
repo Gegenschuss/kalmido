@@ -162,6 +162,7 @@ ROUTES = {
     "GET /api/agents/jobs": "agent", "POST /api/agents/jobs/{}/action": "agent",
     "POST /api/agents/{}/chat/{}/choice": "agent", "PUT /api/agents/{}/permission-mode": "agent",
     "GET /api/agents/{}/chat": "agent", "POST /api/agents/{}/chat": "agent",
+    # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     # 2.96.0 C (#2015): job cards in the agent chat (p296_c_api_test.py)
     "POST /api/agents/{}/chat/{}/reactions": "agent", "POST /api/agents/{}/wake": "agent",
     "GET /api/proposals/agents": "agent", "POST /api/proposals": "agent", "GET /api/proposals/{}": "agent",
@@ -376,6 +377,7 @@ ROUTES = {
     "POST /api/family/kids/{}/rewards": "family", "PATCH /api/family/rewards/{}": "family",
     "DELETE /api/family/rewards/{}": "family", "POST /api/family/rewards/{}/request": "family",
     "POST /api/family/rewards/{}/decide": "family",
+    # 2.97.0 B (#1951): customers (p297_b_api_test.py) - routes below this line
     # 2.49.0 (#1551): the parents' PIN of a child account (set / removed by its parents, opened by the child for its session)
     "PUT /api/family/kids/{}/pin": "family", "DELETE /api/family/kids/{}/pin": "family",
     "POST /api/me/pin/unlock": "family", "POST /api/me/pin/lock": "family",
@@ -598,6 +600,7 @@ ROUTES = {
     "POST /api/lists/{}/e2e/bulk": "list", "POST /api/lists/{}/e2e/finish": "list", "POST /api/lists/{}/e2e/stop": "list",
     "POST /api/lists/{}/e2e/keys": "list",
     "POST /api/lists/{}/e2e/rotate": "list",  # 2.64.2 A (#1817): key change of a list with the lock
+    # 2.97.0 C (#2049): office moves (p297_c_api_test.py) - routes below this line
     # 2.64.2 B (#1817): list files -- need_task (+ own comment) / need_list, people in the app only (p264b_b_api_test.py)
     "POST /api/tasks/{}/list-attachments": "attachment", "POST /api/lists/{}/e2e/files/{}": "list",
     "GET /api/tasks/{}/note-lock": "task", "PUT /api/tasks/{}/note-lock": "task", "DELETE /api/tasks/{}/note-lock": "task", "GET /api/v1/team/rooms": "team", "POST /api/v1/team/dm": "team",
@@ -730,6 +733,7 @@ ROUTES = {
     # 2.59.0 B (#1375): related tasks (tasks/related.py)
     "GET /api/tasks/{}/related": "related", "GET /api/v1/tasks/{}/related": "related", "POST /api/tasks/similar": "related",
     "GET /api/related/config": "public", "GET /api/admin/related": "admin", "PUT /api/admin/related": "admin",
+    # 2.97.0 D (#2050 #2051): locked spaces / clean-up (p297_d_api_test.py) - routes below this line
     # 2.60.0 B (#1511): the velocity of a list (need_list read; p260_b_api_test.py: a stranger / another organisation's agent 404)
     "GET /api/lists/{}/velocity": "list", "GET /api/v1/lists/{}/velocity": "list",
     # 2.60.0 C (#1512): the review step (need_task / need_list of the task's list; p260_c_api_test.py: a stranger 404, a viewer 403)
