@@ -298,8 +298,8 @@ def ua8_lists_settle(c, u, by):
         ok = {x["id"] for x in ua8_candidates(c, lists, uid)}
         if to not in ok:
             from ..lists.ownership import owner_candidates
-            with system_ctx(c):
-                bad = [lr for lr in lists if to not in {x["id"] for x in owner_candidates(c, lr["id"], uid)}]
+            with system_ctx(c):  # which of the account's lists the target cannot take (only list ids leave this route)
+                bad =[lr for lr in lists if to not in {x["id"] for x in owner_candidates(c, lr["id"], uid)}]
             return (jsonify(error=tr("{0} cannot take over every list (an organisation’s list stays in its organisation). Nothing was changed.",
                                      t["display_name"] or t["username"]), lists=[x["id"] for x in bad]), 409), None
         with system_ctx(c):  # lists in organisations the instance admin is not in (checked above: the target fits every list)
