@@ -7,6 +7,29 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.90.0] - 2026-10-18
+
+Bookkeeping light and tax dates in *Office & finance* (#1921, #1922): the running bookkeeping of a self-employed person
+without a second tool. Works the same in a personal office without an organisation. No tax advice; Kalmido sends nothing
+to the tax office (no ELSTER, no payroll).
+
+### Added
+- **Bookkeeping** tab: the income/expense statement of a year (payments received by VAT rate against receipts and travel
+  expenses, by category) with CSV and PDF export, and the VAT return figures (fields 81, 86, 21, 45, 66, 83) per month or
+  quarter to type into ELSTER, on cash or accrual basis.
+- **Photograph receipt**: the phone camera puts a receipt straight into the office's documents; amount and date come from
+  the existing text recognition, category and VAT rate (new: 19 / 7 / 0 % or unknown, also in the document's receipt slot)
+  are added in one sheet.
+- **Tax reserve**: a percentage of the net money received, shown per month in the cash flow with "freely available".
+- **Bank** tab: import a bank statement (CSV or CAMT.052 / .053), duplicates skipped, every booking with suggestions -
+  money in to open invoices (records the payment, partly paid too), money out to receipts; private / ignore, undo,
+  take back an import. Amounts and counterparts are encrypted at rest.
+- **Tax dates**: VAT return (monthly / quarterly, permanent extension), income tax and trade tax prepayments as one
+  recurring task each, with lead time, linked to the VAT return figures.
+
+### Fixed
+- Documents: the text recognition no longer overwrites an amount typed in while it was still running.
+
 ## [2.86.0] - 2026-10-17
 
 Hardening from the security audit, part 1 (low findings, #1896). No new features; normal use stays the same.
