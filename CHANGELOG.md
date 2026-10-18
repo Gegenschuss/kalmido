@@ -19,7 +19,8 @@ Freelancer parity, an office menu in four groups, import targets you confirm, Pa
 - Organisations can use their own picture as their symbol instead of an emoji: set by their admins, shown to members only,
   sealed with the organisation's key (#1913).
 - The office has one menu in four groups - Sell, Money, On the road, Administration - instead of two tab rows; on the phone a
-  start page with four tiles and the key figures; the path shows only on detail pages (#1917).
+  start page with four tiles and the key figures; the path shows only on detail pages (#1917). Bookkeeping, bank and
+  subscriptions & tools sit under Money, contracts & insurance under Administration.
 - Search (Mod+K) finds the Paperless-ngx import, the sub-points of every area, the senders, document types and tags of your
   documents and the top folders of your files (#1934).
 - Document rows in the office (quotations, invoices, credit notes, reminders) have their own menu: dots button, right click or a
