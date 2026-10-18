@@ -327,6 +327,20 @@ FK7 = form_key(anon("/s/q/" + T7).text)
 check(A.delete(B + f"{GD}/{G7}").ok, "archive with an open link")
 r = post(T7, f=FK7, name="Max Muster", ok="1", do="accept")
 check(r.status_code == 404 and r.text == UNKNOWN.text and A.get(B + f"{GD}/{G7}").json()["status"] == "final", "archived through the app: decision void, status stays")
+# 2.93.0 (#1927) review: titles are one line; quotes / line breaks never break the file name header
+G8 = A.post(B + GD, json={"template_id": TC, "client_id": CL, "title": 'Vertrag "A"\r\nX-Evil: 1'}).json()
+check("\n" not in G8["title"] and "\r" not in G8["title"] and G8["title"] == 'Vertrag "A" X-Evil: 1', f"title: line breaks out {G8['title']!r}")
+r = A.patch(B + f"{GD}/{G8['id']}", json={"title": "Zeile 1\nZeile 2"})
+check(r.ok and r.json()["title"] == "Zeile 1 Zeile 2", "PATCH title: line breaks out")
+A.post(B + f"{GD}/{G8['id']}/final")
+sql("UPDATE office_gen_docs SET title=? WHERE id=?", ('Alt "x"\nY: 1 – €', G8["id"]), write=True)  # an older row with a raw title
+r = A.get(B + f"{GD}/{G8['id']}/pdf")
+cd = r.headers.get("Content-Disposition", "")
+check(r.ok and cd.startswith("attachment; filename*=UTF-8''") and '"' not in cd and "\n" not in cd and "Y" not in r.headers, f"admin PDF: clean file name {cd!r}")
+T8 = A.post(B + f"{GD}/{G8['id']}/signoff", json={}).json()["url"].split("/s/q/")[1]
+r = anon(f"/s/q/{T8}/pdf")
+cd = r.headers.get("Content-Disposition", "")
+check(r.status_code == 200 and cd.startswith("attachment; filename*=UTF-8''") and '"' not in cd and "\n" not in cd, f"customer PDF: clean file name {r.status_code} {cd!r}")
 sql("UPDATE office_gen_docs SET body_hash=? WHERE id=?", ("0" * 64, G2), write=True)  # (decided already: no effect on the page)
 check(anon("/s/q/" + T3).status_code == 200, "a decided link keeps its confirmation page")
 
