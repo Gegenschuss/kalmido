@@ -202,6 +202,10 @@ check(pv["blocks"][0] == ["h1", "Vereinbarung Kunde Eins GmbH"] and ["h2", "Proj
 pv2 = A.post(B + GD + "/preview", json={"body": "{{offer.number}}|{{project.title}}|{{client.name}}", "client_id": CLB}).json()
 check(pv2["text"] == "{{offer.number}}|{{project.title}}|Kunde Zwei AG" and pv2["missing"] == ["offer.number", "project.title"], f"preview: empty values marked {pv2}")
 check(A.post(B + GD + "/preview", json={"body": "x", "client_id": CL2}).status_code == 404, "preview with another organisation's client: 404")
+# 2.93.0 (#1927) review: a value at the start of a line never becomes a heading / list item
+CLM = A.post(B + "/api/clients", json={"name": "# Kopf - GmbH"}).json()["id"]
+pv3 = A.post(B + GD + "/preview", json={"body": "{{client.name}}\n\nText", "client_id": CLM}).json()
+check(pv3["blocks"][0][0] == "p" and pv3["blocks"][0][1] == "#\u00a0Kopf - GmbH", f"a value with markup stays text {pv3['blocks'][:1]}")
 check(A.post(B + GD + "/preview", json={"body": "{{client.name}}", "client_id": CL, "doc_id": OF2}).status_code == 404, "preview with another organisation's quotation: 404")
 check(A.post(B + GD + "/preview", json={"body": "x {{client.name.__class__}} {{7*7}}"}).json()["text"] == "x {{client.name.__class__}} {{7*7}}",
       "nothing is evaluated (unknown names stay as they are, no expressions)")
