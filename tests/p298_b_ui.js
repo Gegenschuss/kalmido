@@ -114,11 +114,11 @@ const FEAT = 'cal,comments,collab,agents,clients,workload,forms';
     await sleep(600);
     await ev(`(async () => { listModal(${P}); await new Promise(r => setTimeout(r, 300)); document.querySelector('.modal [data-act="forms-open"]').click(); await new Promise(r => setTimeout(r, 700));
       [...document.querySelectorAll('.modal')].pop().querySelector('[data-fm="edit"]').click(); await new Promise(r => setTimeout(r, 400)); return 1; })()`);
-    const g = await ev(`(() => { const rs = [...document.querySelectorAll('#fq-list .fqe')]; rs[2].scrollIntoView({block: 'center'}); const a = rs[2].querySelector('.fqe-grip').getBoundingClientRect(), b = rs[0].getBoundingClientRect();
-      return {x: a.x + a.width / 2, y: a.y + a.height / 2, top: b.y + 4}; })()`);
-    await drag(g.x, g.y, 0, g.top - g.y - 6, 'touch'); await sleep(300);
+    const g = await ev(`(() => { const rs = [...document.querySelectorAll('#fq-list .fqe')]; rs[1].scrollIntoView({block: 'center'}); const a = rs[2].querySelector('.fqe-grip').getBoundingClientRect(), b = rs[0].getBoundingClientRect();
+      return {x: a.x + a.width / 2, y: a.y + a.height / 2, top: b.y + 4, h: innerHeight}; })()`);
+    await drag(g.x, g.y, 0, Math.max(4, g.top) - g.y, 'touch'); await sleep(300);
     const order = await ev(`[...document.querySelectorAll('#fq-list .fqe-label')].map(x => x.value).join('|')`);
-    check(order === 'Company|Agree?|Budget', 'phone: a finger on the grip drags the question to the top ' + order);
+    check(order === 'Company|Agree?|Budget', 'phone: a finger on the grip drags the question to the top ' + order + ' ' + JSON.stringify(g));
     await shot('p298b-380-drag.png');
   }, true);
 

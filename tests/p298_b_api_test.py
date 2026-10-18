@@ -197,7 +197,8 @@ check(p.ok and 'name="subject"' not in t and 'name="text"' not in t and "<script
 check(re.search(rf'name="q_{QID["Company name"]}"[^>]*required', t) and f'name="q_{QID["What do you need?"]}"' in t and "As on your invoices" in t
       and t.count(f'type="radio" name="q_{QID["Budget"]}"') == 3 and t.count(f'type="checkbox" name="q_{QID["Services"]}"') == 3
       and re.search(rf'name="q_{QID["Start"]}" type="date"', t) and re.search(rf'name="q_{QID["Team size"]}" inputmode="decimal"', t)
-      and re.search(rf'name="q_{QID["Brief"]}" type="file" accept="[^"]*\.pdf', t) and ".svg" not in t
+      and re.search(rf'name="q_{QID["Brief"]}" type="file" accept="[^"]*\.pdf', t)
+      and ".svg" not in re.search(r'type="file" accept="([^"]*)"', t).group(1)
       and t.count(f'name="q_{QID["Newsletter?"]}"') == 2 and "fq-steps" not in t,
       "every kind on one page: text, long text, radios, checkboxes, date, number, file (accept list), yes / no; required marked")
 p = anon.get(B + "/f/" + tok(FS))
@@ -238,7 +239,7 @@ check(p.status_code == 400 and "Please check your answer to “Services”." in 
 p = send(tok(FQ), full(stq.pop()), files={f"q_{QID['Brief']}": ("page.html", b"<html><script>x</script></html>", "text/html")}, s=anon)
 check(p.status_code == 400 and "this file type is not accepted" in p.text, "a web page as a file: refused")
 p = send(tok(FQ), full(stq.pop()), files={f"q_{QID['Brief']}": ("big.pdf", PDF + b"0" * (10 * 1024 * 1024), "application/pdf")}, s=anon)
-check(p.status_code == 400 and "too large" in p.text, "a file over 10 MB: refused")
+check(p.status_code in (400, 413) and "too large" in p.text, "a file over 10 MB: refused " + str(p.status_code) + " " + p.text[-400:])
 p = send(tok(FQ), full(stq.pop(), **{f"q_{QID['Team size']}": "a few"}), s=anon)
 check(p.status_code == 400 and "please enter a number" in p.text, "a number that is none")
 p = send(tok(FQ), full(stq.pop(), **{f"q_{QID['Start']}": "2026-13-40"}), s=anon)

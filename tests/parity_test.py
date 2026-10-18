@@ -243,6 +243,10 @@ APP_ONLY = [
       "=POST /api/sheets/{}/columns/{}/restore", "=DELETE /api/sheets/{}/rows/{}", "=POST /api/sheets/{}/rows/{}/restore",
       "=POST /api/sheets/{}/rows/order", "=POST /api/sheets/{}/cells/{}/freeze", "=POST /api/sheets/{}/cells/{}/name",
       "=POST /api/sheets/{}/presence")),
+    ("2.98.0 B (#1954): the evaluation of a questionnaire (all submissions with the senders' names, addresses and answers, "
+     "their CSV) stays with the people who manage the form in the app; an agent gets each submission as its task (task_added, "
+     "the answers in the description) and sets the questions through the form's fields",
+     ("=GET /api/forms/{}/entries", "=GET /api/forms/{}/entries.csv")),
     # 2.70.0 (#1357): agents propose contact merges as a proposal (kind merge); the person applies them, the routes stay with people
     ("2.66.0 (#1835): merging duplicate contacts / clients and its undo stay with people; agents propose contact merges "
      "(proposal kind merge, #1357), the person applies them",
