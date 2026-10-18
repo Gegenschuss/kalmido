@@ -18,7 +18,7 @@ if (!process.env.P294B_NOSTART) {
 
 (async () => {
   await sleep(600);
-  const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice Beispiel', password: 'password123', wizard: true, lang: 'en'})});
+  const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice Beispiel', password: 'password123'})});
   check(r.ok, 'setup');
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
@@ -29,6 +29,7 @@ if (!process.env.P294B_NOSTART) {
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     await signIn(ev, 'alice');
+    await ev(`fetch('/api/admin/setup', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({lang: 'en', collab_all: true, modules: ['cal', 'comments']})}).then(r => r.status)`);
     await ev(`fetch('/api/settings', {method: 'PATCH', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({lang: 'en', tour: 'done', features: 'cal,comments,events,contacts'})}).then(r => r.status)`);
     await nav(B + '#cal');
     check(await ready(ev, `!!document.querySelector('#view .calbar [data-act="ev-cals"]')`, 80), 'the calendar with its Calendars button');
