@@ -73,12 +73,18 @@ def layer_lists(uid, write=False):
     code = ("import json\nfrom kalmido.core.access import acx_lists_sql\n"
             "from kalmido.core.db import connect\nc = connect()  # 2.37.0: Postgres (DATABASE_URL in the container)\n"
             f"print(json.dumps(sorted(r[0] for r in c.execute('SELECT id FROM lists WHERE id IN ' + acx_lists_sql(write={write}, req=False), ({uid}, {uid})))))")
-    p = subprocess.run(["docker", "exec", CONTAINER, "python", "-c", code], capture_output=True, text=True, timeout=60)
-    try:
-        return set(json.loads(p.stdout.strip().splitlines()[-1]))
-    except (ValueError, IndexError):
-        print("layer_lists:", p.stdout[-300:], p.stderr[-600:], flush=True)
-        return None
+    # 2.94.1: importing kalmido runs init_db (schema, triggers, row-level security) next to the running server; on the
+    # slow CI runner that can deadlock with a request (DeadlockDetected, CI 2.94.0) - the same call again then passes
+    for _ in range(3):
+        p = subprocess.run(["docker", "exec", CONTAINER, "python", "-c", code], capture_output=True, text=True, timeout=60)
+        try:
+            return set(json.loads(p.stdout.strip().splitlines()[-1]))
+        except (ValueError, IndexError):
+            print("layer_lists:", p.stdout[-300:], p.stderr[-600:], flush=True)
+            if "DeadlockDetected" not in p.stderr:
+                return None
+            time.sleep(1)
+    return None
 
 
 subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL)
