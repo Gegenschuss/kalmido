@@ -972,7 +972,7 @@ async function sh_smvMove(x) {
   histToast(tr('Moved to {0}', shvSpaceName(r.space)), e);
 }
 SHV_HOOKS.menu.push(sh => sh_smvItems(sh));
-(SHV_HOOKS.side = SHV_HOOKS.side || []).push(sh => {  // the last move between workspaces (both sides see it)
+(SHV_HOOKS.side = SHV_HOOKS.side || []).push(sh => {  // the last move between workspaces (both sides see it; 2.97.0 D #2051: names from the server)
   const m = sh.moved; if (!m) return '';
-  return `<section class="shvsec shvsmv"><p class="muted">${ic('brief', 's')} ${esc(tr('Moved from {0} to {1}', shvSpaceName(m.from), shvSpaceName(m.to)))} · ${esc(fmtWhen(m.at))}${m.by_name ? ' · ' + esc(m.by_name) : ''}</p></section>`;
+  return `<section class="shvsec shvsmv"><p class="muted">${ic('brief', 's')} ${esc(tr('Moved out of {0}', m.from_name || (m.from ? shvSpaceName(m.from) : tr('Organisation'))))} · ${esc(fmtWhen(m.at))}${m.by_name ? ' · ' + esc(m.by_name) : ''}</p></section>`;
 });

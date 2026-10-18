@@ -60,8 +60,10 @@ function bootDone() {
     // default); the files + text then wait in that agent's chat box, ready to send
     const ags = agentsOn() ? (S.agents || []).filter(a => a.enabled) : [];
     const docs = files.length && typeof dc_shareOk === 'function' && dc_shareOk();  // 2.48.0 (#1111): "File as document"
-    const dest = (ags.length || docs) && (files.length || meta.text || meta.url || meta.title) ? await shareDest(ags, docs) : 'task';
+    const bmU = !files.length && feat('reading') ? shareLink(meta.text, meta.url)[0] : '';  // 2.97.0 A (#1950): a shared link -> "Save as bookmark"
+    const dest = (ags.length || docs || bmU) && (files.length || meta.text || meta.url || meta.title) ? await shareDest(ags, docs, !!bmU) : 'task';
     if (dest === 'doc') await dc_shareFiles(files);
+    else if (dest === 'bookmark') await bm_shareSave(bmU, meta.title);
     else if (dest !== 'task') {
       const txt = [meta.title, meta.text, meta.url && !(meta.text || '').includes(meta.url) ? meta.url : ''].map(x => (x || '').trim()).filter(Boolean).join('\n');
       if (txt) S.drafts['chat:' + dest] = txt;
@@ -79,7 +81,11 @@ function bootDone() {
     history.replaceState(null, '', '/#inbox');
     await route();
     const [u, rest] = shareLink(text, (q.get('url') || '').trim());
-    openQuickSheet((q.get('title') || '').trim() || rest || (u ? urlTitle(u) : ''), {url: u, list_id: inbox().id, ...(S.me ? {assignee_id: S.me.id} : {})});  // 2.27.0 (#1001): yours
+    // 2.97.0 A (#1950): the bookmark button of the browser (?bm=1) saves a bookmark; a shared link offers "Save as bookmark"
+    const bmU = /^https?:\/\//i.test(u) ? u.slice(0, 2000) : '';
+    if (bmU && q.get('bm') === '1') bm_confirmSave(bmU, (q.get('title') || '').trim().slice(0, 300));
+    else if (bmU && feat('reading') && await shareDest([], false, true) === 'bookmark') await bm_shareSave(bmU, (q.get('title') || '').trim());
+    else openQuickSheet((q.get('title') || '').trim() || rest || (u ? urlTitle(u) : ''), {url: u, list_id: inbox().id, ...(S.me ? {assignee_id: S.me.id} : {})});  // 2.27.0 (#1001): yours
   } else if (new URLSearchParams(location.search).get('action') === 'new') {  // app shortcut "New task"
     history.replaceState(null, '', '/' + (location.hash || ''));
     await route();

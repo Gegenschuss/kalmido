@@ -13,6 +13,11 @@ const formsOn = () => feat('forms');
 const CLV = {data: null, id: null, loading: false, seq: 0, month: null};
 const WLV = {data: null, start: null, weeks: 4, org: null, loading: false, seq: 0, tab: 'wl'};  // 2.50.0 (#1195, #1194): tab wl | abs | dispo
 const clientById = id => (S.clients || []).find(c => c.id === id);
+// 2.97.0 B (#1951): the name a client shows in pickers and lists: its display name, else its name ("name (city)" when two
+// clients of one workspace share it, see team/clients.cdn_labels); documents keep the name. cdn_name: by id from S.clients
+const cdn_label = c => !c ? '' : c.label || clientById(c.id)?.label || c.display_name || c.name || '';
+const cdn_name = (id, name) => (id && clientById(id)?.label) || name || '';
+const cdn_addrLine = c => { const b = c?.billing || {}; return [b.street, b.address_extra, [b.zip, b.city].filter(Boolean).join(' '), b.country].filter(Boolean).join(', '); };
 const clientOfList = l => l && l.client_id ? clientById(l.client_id) : null;
 const clientIco = c => c.icon ? `<span class="sic semo" aria-hidden="true">${esc(c.icon)}</span>` : `<span class="sic" aria-hidden="true"><span class="sw" style="${cssColor(c.color) ? 'background:' + cssColor(c.color) : ''}"></span></span>`;
 const BUDGET_TXT = {ok: N_('within budget'), warn: N_('80 % of the budget used'), over: N_('over budget')};
@@ -24,7 +29,7 @@ function clientsSideHtml(onTasks) {
   if (!clientsOn()) return '';
   const cs = (S.clients || []).filter(c => !c.archived);
   const on = S.route.mod === 'clients';
-  const rows = cs.map(c => `<button class="srow scl ${on && S.route.client === c.id ? 'on' : ''}" data-go="client/${c.id}">${clientIco(c)}<span class="n">${esc(c.name)}</span><span class="c">${c.lists.length || ''}</span></button>`).join('');
+  const rows = cs.map(c => `<button class="srow scl ${on && S.route.client === c.id ? 'on' : ''}" data-go="client/${c.id}">${clientIco(c)}<span class="n">${esc(cdn_label(c))}</span><span class="c">${c.lists.length || ''}</span></button>`).join('');
   const head = `<div class="shead sgh ${sideOpen('clients') ? '' : 'closed'}"><button class="sgt" data-act="side-group" data-g="clients" aria-expanded="${sideOpen('clients')}">${ic('chev', 's fcar')}<span>${esc(tr('Clients'))}</span>${!sideOpen('clients') && cs.length ? `<span class="c">${cs.length}</span>` : ''}</button><span class="spacer"></span><button data-go="clients" class="${on && !S.route.client ? 'on' : ''}" title="${esc(tr('All clients'))}" aria-label="${esc(tr('All clients'))}">${ic('brief', 's')}</button><button data-act="client-new" title="${esc(tr('New client'))}" aria-label="${esc(tr('New client'))}">${ic('plus', 's')}</button></div>`;
   return `<div class="sgroup sg-clients">${head}${sideOpen('clients') ? rows || `<button class="srow" data-act="client-new">${ic('plus')}<span class="n">${tr('Add your first client')}</span></button>` : ''}</div>`;
 }
@@ -81,9 +86,9 @@ function clientDetailHtml(c, inCard) {  // 2.47.3 (#1734): inCard = the lower pa
   const pt = clientDetailParts(c);
   const addr = [c.contact, c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '', c.phone ? `<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : ''].filter(Boolean);
   return `<div class="${inCard ? 'msclstats' : 'dash clients'} cldetail">
-    ${inCard ? '' : `<div class="clhead">${clientIco(c)}<h2>${esc(c.name)}</h2>${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}<span class="spacer"></span>
+    ${inCard ? '' : `<div class="clhead">${clientIco(c)}<h2>${esc(cdn_label(c))}</h2>${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}<span class="spacer"></span>
       <button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button></div>`}
-    ${!inCard && (addr.length || c.address) ? `<p class="clsub">${addr.join(' · ')}${c.address ? `<br><span class="muted cladr">${esc(c.address)}</span>` : ''}</p>` : ''}
+    ${!inCard && (addr.length || cdn_addrLine(c)) ? `<p class="clsub">${addr.join(' · ')}${cdn_addrLine(c) ? `<br><span class="muted cladr">${esc(cdn_addrLine(c))}</span>` : ''}</p>` : ''}
     ${!inCard && (c.contacts || []).length > 1 ? `<ul class="clklist" role="list" aria-label="${esc(tr('Contact persons'))}">${c.contacts.map(k => `<li><b>${esc(k.name)}</b>${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone)}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul>` : ''}
     ${pt.month}
     ${pt.lists}
@@ -106,17 +111,19 @@ function clientSheet(c) {  // the time view of the client's month, then its prin
 function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's area, null = private), o.stay (no jump to the client)
   const md = modal(`<h3>${c ? tr('Edit client') : tr('New client')}</h3>
     <div class="row"><label for="cl-name">${tr('Name')}</label><input id="cl-name" maxlength="80" value="${esc(c?.name || '')}" autocomplete="organization"></div>
-    <div class="row"><label for="cl-icon">${tr('Symbol')}</label><input id="cl-icon" maxlength="8" class="numin" value="${esc(c?.icon || '')}" placeholder="🏢"></div>
+    ${o.quick ? '' : `<div class="row"><label for="cl-dname">${tr('Display name (optional)')}</label><input id="cl-dname" maxlength="80" value="${esc(c?.display_name || '')}" autocomplete="off" aria-describedby="cl-dname-h"></div>
+    <div class="shint lhint keep" id="cl-dname-h">${tr('Shown in pickers and lists, not on the invoice.')}</div>`}
+    ${o.quick ? cdn_addrHtml({}) : `<div class="row"><label for="cl-icon">${tr('Symbol')}</label><input id="cl-icon" maxlength="8" class="numin" value="${esc(c?.icon || '')}" placeholder="🏢"></div>
     <div class="row clkrow"><label>${tr('Contact persons')}</label><div class="clk" id="cl-contacts"></div></div>
     <div class="row"><label for="cl-email">${tr('E-mail')}</label><input id="cl-email" type="email" maxlength="200" value="${esc(c?.email || '')}" autocomplete="email"></div>
     <div class="row"><label for="cl-phone">${tr('Phone')}</label><input id="cl-phone" type="tel" maxlength="60" value="${esc(c?.phone || '')}" autocomplete="tel"></div>
-    <div class="row"><label for="cl-addr">${tr('Address')}</label><textarea id="cl-addr" rows="2" maxlength="500">${esc(c?.address || '')}</textarea></div>
+    ${cdn_addrHtml(c?.billing || {})}`}${o.quick ? '' : `
     ${timeOn() ? `<div class="row"><label for="cl-rate">${tr('Hourly rate')}</label><input id="cl-rate" inputmode="decimal" class="numin" value="${c?.rate != null ? esc(fmtNum(c.rate, 2)) : ''}" placeholder="${esc(tr('optional'))}"><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('for lists without their own rate')}</span></div>
     <div class="row"><label for="cl-bh">${tr('Budget')}</label><span class="lacts"><input id="cl-bh" inputmode="decimal" class="numin" value="${c?.budget_h != null ? esc(fmtNum(c.budget_h, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget in hours'))}"><span class="muted">h</span><input id="cl-ba" inputmode="decimal" class="numin" value="${c?.budget_amount != null ? esc(fmtNum(c.budget_amount, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget as an amount'))}"><span class="muted">${esc(S.settings.time_currency || '€')}</span></span></div>
     <div class="shint lhint keep">${tr('At 80 % of the budget the bar turns amber, over 100 % red.')}</div>` : ''}
     <div class="row"><label for="cl-note">${tr('Note')}</label><textarea id="cl-note" rows="3" maxlength="4000">${esc(c?.note || '')}</textarea></div>
     ${typeof officeOn === 'function' && officeOn() ? ofxClientBillingHtml(c?.billing || {}) : ''}
-    ${c ? `<div class="row"><label>${tr('Archive')}</label><label class="chkl"><input type="checkbox" id="cl-arch" ${c.archived ? 'checked' : ''}> ${tr('Archived (hidden from the sidebar)')}</label></div>` : ''}
+    ${c ? `<div class="row"><label>${tr('Archive')}</label><label class="chkl"><input type="checkbox" id="cl-arch" ${c.archived ? 'checked' : ''}> ${tr('Archived (hidden from the sidebar)')}</label></div>` : ''}`}
     <div class="aerr" role="alert"></div>
     <div class="foot">${c?.can_delete ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${c ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('cldlg');
@@ -131,8 +138,9 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
         if (!await askConfirm(tr('Delete the client “{0}”?', c.name), tr('Its lists stay; they only lose the client.'), {ok: tr('Delete'), danger: true})) return;
         await api('DELETE', `/api/clients/${c.id}`); md.remove(); await load(); if (S.route.client === c.id) go('clients'); else render(); clReload(); return;
       }
-      const body = {name: $('#cl-name', md).value, icon: $('#cl-icon', md).value, contacts: clkValue(md), email: $('#cl-email', md).value,
-        phone: $('#cl-phone', md).value, address: $('#cl-addr', md).value, note: $('#cl-note', md).value};
+      const v = s => $(s, md)?.value ?? '';  // 2.97.0 B (#1951): the quick dialog (a document's "Add client") has name + address only
+      const body = o.quick ? {name: v('#cl-name')} : {name: v('#cl-name'), icon: v('#cl-icon'), contacts: clkValue(md), email: v('#cl-email'),
+        phone: v('#cl-phone'), display_name: v('#cl-dname'), note: v('#cl-note')};
       if (!c && 'org_id' in o) body.org_id = o.org_id;
       if ($('#cl-rate', md)) Object.assign(body, {rate: num($('#cl-rate', md).value), budget_h: num($('#cl-bh', md).value), budget_amount: num($('#cl-ba', md).value)});
       if ($('#cl-arch', md)) body.archived = $('#cl-arch', md).checked;
@@ -149,6 +157,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
       md.remove(); await load(); render(); clReload();
       toast(gone ? tr('The linked contact no longer exists; link removed.') : c ? tr('Saved') : tr('Added: {0}', r.name));
       if (!c && !o.stay) go('client/' + r.id);
+      if (o.done) await o.done(r);
     } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
   setTimeout(() => { if (!isTouch()) $('#cl-name', md)?.focus(); }, 50);
@@ -238,7 +247,7 @@ function listDlgTeamHtml(l, id) {
   const mng = ['owner', 'admin'].includes(l.role || 'owner');
   const cs = (S.clients || []).filter(c => !c.archived || c.id === l.client_id);
   let h = '';
-  if (clientsOn() && (mng || l.client_id)) h += `<div class="row"><label for="l-client">${tr('Client')}</label><select id="l-client" data-lid="${id}" ${mng ? '' : 'disabled'}><option value="">${tr('None')}</option>${cs.map(c => `<option value="${c.id}" ${c.id === l.client_id ? 'selected' : ''}>${esc((c.icon ? c.icon + ' ' : '') + c.name)}</option>`).join('')}</select>${mng ? `<button type="button" class="btn sm" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>` : ''}</div>`;
+  if (clientsOn() && (mng || l.client_id)) h += `<div class="row"><label for="l-client">${tr('Client')}</label><select id="l-client" data-lid="${id}" ${mng ? '' : 'disabled'}><option value="">${tr('None')}</option>${cs.map(c => `<option value="${c.id}" ${c.id === l.client_id ? 'selected' : ''}>${esc((c.icon ? c.icon + ' ' : '') + cdn_label(c))}</option>`).join('')}</select>${mng ? `<button type="button" class="btn sm" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>` : ''}</div>`;
   if (formsOn() && mng) h += `<div class="row"><label>${tr('Forms')}</label><button type="button" class="btn sm" data-act="forms-open" data-lid="${id}">${ic('file', 's')} ${tr('Forms…')}</button><span class="muted">${tr('a link that creates tasks here')}</span></div>`;
   return h;
 }
@@ -450,12 +459,18 @@ document.addEventListener('change', e => { if (e.target.id === 'wl-org') { WLV.o
 
 // 2.36.2 (#1021, E): billing details of a client for office & finance (structured address, VAT ID, customer number, buyer
 // reference, invoice e-mail, payment terms); folded away, the free address above stays
-const OFX_CL_FIELDS = [['street', N_('Street'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country'), 2],
+const OFX_CL_FIELDS = [['street', N_('Street'), 200], ['address_extra', N_('Address extra'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country'), 2],
   ['vat_id', N_('VAT ID'), 20], ['customer_no', N_('Customer number'), 40], ['buyer_reference', N_('Buyer reference (e.g. routing ID)'), 60],
   ['email_invoice', N_('E-mail for invoices'), 200], ['payment_terms_days', N_('Payment terms (days)'), 3]];
+// 2.97.0 B (#1951): the address (street, extra line, postcode, city, country) stands in the form itself, the rest of the
+// billing details below it; the free "Address" text is gone (the server keeps it in its column)
+const CDN_ADDR = ['street', 'address_extra', 'zip', 'city', 'country'];
+const cdn_fieldHtml = b => ([k, n, mx]) => (k === 'country' ? `<div class="row"><label for="clb-country-q">${esc(tr(n))}</label>${ctyField('clb-country', b.country, {attrs: 'data-clb="country"', label: tr(n)})}</div>` : `<div class="row"><label for="clb-${k}">${esc(tr(n))}</label><input id="clb-${k}" data-clb="${k}" maxlength="${mx}" value="${esc(b[k] ?? '')}" ${k === 'payment_terms_days' ? 'inputmode="numeric" class="numin"' : k === 'country' ? 'class="numin" autocapitalize="characters"' : k === 'email_invoice' ? 'type="email" autocomplete="off"' : ''}></div>`) + (typeof ofcII === 'function' ? ofcII('cl_' + k) : '');  // 2.40.0 (#1382): (i) of the terms
+const cdn_addrHtml = b => `<div class="cdnaddr">${OFX_CL_FIELDS.filter(([k]) => CDN_ADDR.includes(k)).map(cdn_fieldHtml(b)).join('')}</div>`;
 function ofxClientBillingHtml(b) {
-  const filled = OFX_CL_FIELDS.some(([k]) => b[k] != null && b[k] !== '');
-  return `<details class="clbill" ${filled ? 'open' : ''}><summary>${tr('Billing details')}</summary>${OFX_CL_FIELDS.map(([k, n, mx]) => (k === 'country' ? `<div class="row"><label for="clb-country-q">${esc(tr(n))}</label>${ctyField('clb-country', b.country, {attrs: 'data-clb="country"', label: tr(n)})}</div>` : `<div class="row"><label for="clb-${k}">${esc(tr(n))}</label><input id="clb-${k}" data-clb="${k}" maxlength="${mx}" value="${esc(b[k] ?? '')}" ${k === 'payment_terms_days' ? 'inputmode="numeric" class="numin"' : k === 'country' ? 'class="numin" autocapitalize="characters"' : k === 'email_invoice' ? 'type="email" autocomplete="off"' : ''}></div>`) + (typeof ofcII === 'function' ? ofcII('cl_' + k) : '')).join('')}</details>`;  // 2.40.0 (#1382): (i) of the terms
+  const rest = OFX_CL_FIELDS.filter(([k]) => !CDN_ADDR.includes(k));
+  const filled = rest.some(([k]) => b[k] != null && b[k] !== '');
+  return `<details class="clbill" ${filled ? 'open' : ''}><summary>${tr('Billing details')}</summary>${rest.map(cdn_fieldHtml(b)).join('')}</details>`;
 }
 
 // 2.66.0 B (#1835): the merges into a client (its detail / card): "Merged with X, Y - date, person" and Undo (30 days)

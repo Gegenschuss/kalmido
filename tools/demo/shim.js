@@ -836,7 +836,8 @@
     if (kind === 'offer' && s.offer_number_at !== 'finalize') d.number = nextNumber('offer', d.date);
     OF().docs.push(d); return d;
   }
-  const recipientOf = cl => ({name: cl.name, lines: [cl.name, ...(cl.contacts || []).filter(k => k.is_default).map(k => k.name), cl.street || '', [cl.zip, cl.city].filter(Boolean).join(' '), ...String(cl.address || '').split('\n')].map(x => String(x || '').trim()).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i)});
+  // 2.97.0 B (#1951): the fixed address fields only (as the server)
+  const recipientOf = cl => ({name: cl.name, lines: [cl.name, ...(cl.contacts || []).filter(k => k.is_default).map(k => k.name), cl.street || '', cl.address_extra || '', [cl.zip, cl.city].filter(Boolean).join(' ')].map(x => String(x || '').trim()).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i)});
   const DOC_FIELDS = ['lang', 'currency', 'fx_rate', 'vat_mode', 'vat_note', 'project_title', 'project_ref', 'date', 'valid_until', 'contract_id', 'raw_mode', 'raw_factor', 'prod_quotient', 'producing_rate',
     'producing_on', 'discount_pct', 'intro', 'closing', 'rights', 'fields', 'service_from', 'service_to', 'order_ref', 'due_date', 'payment_days', 'einvoice_format', 'contact_id'];
   function patchDoc(d, b) {
@@ -844,7 +845,7 @@
     for (const k of DOC_FIELDS) if (k in b) d[k] = b[k];
     if ('recipient' in b) d.recipient = {name: String(b.recipient?.name || ''), lines: (b.recipient?.lines || []).map(String)};
     if ('client_id' in b) { d.client_id = b.client_id ? +b.client_id : null; const cl = CL().find(c => c.id === d.client_id);
-      if (cl && b.recipient_from_client) d.recipient = recipientOf(cl); if (cl && d.kind === 'invoice' && cl.payment_terms_days != null) d.payment_days = +cl.payment_terms_days; }
+      if (cl) d.recipient = recipientOf(cl); if (cl && d.kind === 'invoice' && cl.payment_terms_days != null) d.payment_days = +cl.payment_terms_days; }
     d.updated_at = iso();
   }
   const svcRate = (s, unit) => unit === 'hour' ? s.hourly_rate : s.daily_rate ?? s.hourly_rate;
@@ -861,14 +862,14 @@
     d.updated_at = iso();
   }
   // ---- clients (module clients)
-  const CL_BILL = ['street', 'zip', 'city', 'country', 'vat_id', 'customer_no', 'buyer_reference', 'email_invoice', 'payment_terms_days'];
+  const CL_BILL = ['street', 'address_extra', 'zip', 'city', 'country', 'vat_id', 'customer_no', 'buyer_reference', 'email_invoice', 'payment_terms_days'];
   const clientOut = c => ({...clone(c), archived: !!c.archived, org_name: '', lists: DB.lists.filter(l => l.client_id === c.id).map(l => l.id), can_delete: true,
     billing: Object.fromEntries(CL_BILL.map(k => [k, c[k] ?? null])),
     stats: {seconds: 0, rounded: 0, amount: 0, month: today().slice(0, 7), month_seconds: 0, month_amount: 0, estimate_min: 0, estimated: 0, open: 0, done: 0}, budget: {pct_h: null, pct_amount: null, level: 'none'}});
-  const clientBrief = c => ({id: c.id, name: c.name, icon: c.icon || '', color: c.color || '', org_id: null, archived: !!c.archived, lists: DB.lists.filter(l => l.client_id === c.id).map(l => l.id)});
+  const clientBrief = c => ({id: c.id, name: c.name, display_name: c.display_name || '', icon: c.icon || '', color: c.color || '', org_id: null, archived: !!c.archived, lists: DB.lists.filter(l => l.client_id === c.id).map(l => l.id)});
   function clientSet(c, b) {
     if ('name' in b) { if (!String(b.name || '').trim()) bad(tx('Name missing')); c.name = String(b.name).trim(); }
-    for (const k of ['icon', 'color', 'email', 'phone', 'address', 'note', 'rate', 'budget_h', 'budget_amount', ...CL_BILL]) if (k in b) c[k] = b[k];
+    for (const k of ['display_name', 'icon', 'color', 'email', 'phone', 'address', 'note', 'rate', 'budget_h', 'budget_amount', ...CL_BILL]) if (k in b) c[k] = b[k];
     if ('archived' in b) c.archived = b.archived ? 1 : 0;
     if (Array.isArray(b.contacts)) c.contacts = b.contacts.filter(k => String(k.name || '').trim()).map((k, i) => ({id: k.id || nid('clcontact'), name: String(k.name).trim(), role: k.role || '', email: k.email || '', phone: k.phone || '', is_default: !!k.is_default || (i === 0 && !b.contacts.some(x => x.is_default))}));
     c.contact = (c.contacts || []).find(k => k.is_default)?.name || ''; c.updated_at = iso();

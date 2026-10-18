@@ -417,3 +417,54 @@ def files_move_space():
         raise
     _rm(old_paths)
     return jsonify(moved=out, org_was=src, to=fsm_ws(to), count=len(plan["moved"]), shares=plan["shares"])
+
+
+# 2.97.0 D (#2051): a move removes the old sealed versions only after its commit; a crash in between leaves files without a
+# row in fs_versions. The watchdog compares <ATT_DIR>/files/<node>/ with fs_versions once a night (a round of at most
+# FSM_GC_BATCH node folders per tick until every folder was seen) and removes what no row names and is older than a day
+# (an upload writes its file before its row). Only regular files directly inside such a folder below the data directory.
+FSM_GC_BATCH = 200
+FSM_GC_AGE = 86400
+FSM_GC = {"at": 0.0, "after": -1}
+
+
+def fsm_orphans_gc(c):
+    import time
+    from ..core.pg import system_ctx
+    every = float(os.environ.get("KALMIDO_FS_GC_EVERY") or 86400)
+    if FSM_GC["after"] < 0:
+        if time.time() - FSM_GC["at"] < every:
+            return 0
+        FSM_GC["at"], FSM_GC["after"] = time.time(), 0
+    root = os.path.realpath(os.path.join(ATT_DIR, FS_DIR))
+    if not os.path.isdir(root):
+        FSM_GC["after"] = -1
+        return 0
+    nids = sorted(int(d) for d in os.listdir(root) if d.isdigit() and int(d) > FSM_GC["after"])[:FSM_GC_BATCH]
+    FSM_GC["after"] = nids[-1] if len(nids) == FSM_GC_BATCH else -1  # -1: the round is done
+    n, old = 0, time.time() - FSM_GC_AGE
+    for nid in nids:
+        d = os.path.join(root, str(nid))
+        if os.path.islink(d) or not os.path.isdir(d):
+            continue
+        with system_ctx(c):  # the stored paths of a node of any workspace (paths only, no content is read)
+            known = {r[0] for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (nid,))}
+        for fn in os.listdir(d):
+            full = os.path.join(d, fn)
+            rel = os.path.join(FS_DIR, str(nid), fn)
+            if (rel in known or os.path.islink(full) or not os.path.isfile(full) or os.path.getmtime(full) > old
+                    or os.path.dirname(os.path.realpath(full)) != d):
+                continue
+            with system_ctx(c):  # another table naming the same stored file (paths only)
+                if c.execute("SELECT 1 FROM attachments WHERE path=? UNION ALL SELECT 1 FROM list_files WHERE path=? "
+                             "UNION ALL SELECT 1 FROM fs_versions WHERE path=? LIMIT 1", (rel, rel, rel)).fetchone():
+                    continue
+            try:
+                os.remove(full)
+                n += 1
+            except OSError:
+                pass
+    c.rollback()
+    if n:
+        print(f"files cleanup: {n} stored file(s) without a version removed", flush=True)
+    return n

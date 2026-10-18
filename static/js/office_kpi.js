@@ -48,7 +48,7 @@ function kp_html() {
   const hrs = (v, b) => b ? tr('{0} of {1} h', fmtNum(v, 1), fmtNum(b, 1)) : tr('{0} h', fmtNum(v, 1));
   const cl = d.clients.length ? `<ul class="ofclist kpcl" role="list">${d.clients.map(c => {
     const lvl = c.level === 'over' ? 'over' : c.level === 'warn' ? 'warn' : '';
-    return `<li class="kpclient"><div class="kpch"><b>${esc(c.name)}</b><span class="spacer"></span><span class="rksum">${tr('Margin')} ${ofcMoney(c.margin)}${c.margin_pct != null ? ` <small class="muted">(${c.margin_pct} %)</small>` : ''}</span></div>
+    return `<li class="kpclient"><div class="kpch"><b>${esc(cdn_label(c))}</b><span class="spacer"></span><span class="rksum">${tr('Margin')} ${ofcMoney(c.margin)}${c.margin_pct != null ? ` <small class="muted">(${c.margin_pct} %)</small>` : ''}</span></div>
       <div class="kprow"><span class="muted">${tr('Hours')}</span><span>${hrs(c.hours, c.budget_h)}</span>${pct(c.pct_h, lvl)}</div>
       ${c.budget_amount ? `<div class="kprow"><span class="muted">${tr('Budget')}</span><span>${tr('{0} of {1}', ofcMoney(c.amount), ofcMoney(c.budget_amount))}</span>${pct(c.pct_amount, lvl)}</div>` : ''}
       <div class="kprow"><span class="muted">${tr('Invoiced {0}', y)}</span><span class="rksum">${ofcMoney(c.invoiced)}</span><span class="muted">${tr('Costs')} ${ofcMoney(c.costs)}</span></div>

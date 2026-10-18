@@ -72,7 +72,7 @@ function dtDocsHtml(seg) {
     <span class="spacer"></span><button class="btn sm pri" data-dt="new">${ic('plus', 's')}<span>${tr('New document')}</span></button></div>`;
   if (!docs.length) return bar + `<div class="empty nempty eact">${ic('file')}<span>${(d.docs || []).length ? tr('No documents match the filter.') : (d.templates || []).length ? tr('No documents yet. Create one from a template for a client.') : tr('No documents yet. Start with a template: take over a sample under Templates.')}</span>${!(d.templates || []).length ? `<button class="btn" data-dt="view" data-v="templates">${tr('Templates')}</button>` : ''}</div>`;
   return bar + `<ul class="ofclist dtp-list" role="list">${docs.map(x => `<li><button type="button" class="ofcrow" data-dt="open" data-id="${x.id}"><span class="ofcn"><b>${esc(x.title || x.kind_label)}</b>
-    <small class="muted">${esc([x.client_name, x.list_name, x.kind_label, fmtDateLoc((x.final_at || x.created_at || '').slice(0, 10))].filter(Boolean).join(' · '))}</small></span>${dtStTag(x)}${ic('chev', 's')}</button></li>`).join('')}</ul>`;
+    <small class="muted">${esc([cdn_name(x.client_id, x.client_name), x.list_name, x.kind_label, fmtDateLoc((x.final_at || x.created_at || '').slice(0, 10))].filter(Boolean).join(' · '))}</small></span>${dtStTag(x)}${ic('chev', 's')}</button></li>`).join('')}</ul>`;
 }
 function dtTplsHtml(seg) {
   const ts = DT.data.templates || [];
@@ -85,7 +85,7 @@ function dtDocHtml(d) {
   const draft = d.status === 'draft', back = `<button class="btn sm ghost" data-dt="back">${ic('back', 's')}<span>${tr('All documents')}</span></button>`;
   const pdf = `/api/office/gen-docs/${d.id}/pdf`, spdf = pdf + '?signed=1';
   const pdfBtn = (u, label) => `<a class="btn sm" href="${u}" download data-dt="pdf"${typeof pv_attr === 'function' ? pv_attr({url: u, name: (d.title || 'document') + '.pdf', dlUrl: u}) : ''}>${ic('pdf', 's')}<span>${esc(label)}</span></a>`;
-  const meta = [d.client_name ? `${ic('brief', 's')} <a href="#client/${d.client_id}">${esc(d.client_name)}</a>` : '', d.list_id ? `${ic('list', 's')} <a href="#l/${d.list_id}">${esc(d.list_name || tr('Project'))}</a>` : '',
+  const meta = [d.client_name ? `${ic('brief', 's')} <a href="#client/${d.client_id}">${esc(cdn_name(d.client_id, d.client_name))}</a>` : '', d.list_id ? `${ic('list', 's')} <a href="#l/${d.list_id}">${esc(d.list_name || tr('Project'))}</a>` : '',
     d.doc_id ? `${ic('receipt', 's')} <a href="#office/offers/${d.doc_id}">${esc(d.offer_number || tr('Quotation'))}</a>` : '', esc(d.kind_label)].filter(Boolean).join('<span class="muted"> · </span>');
   const head = `<div class="ofcbar">${back}<span class="spacer"></span>${draft ? '' : pdfBtn(pdf, 'PDF')}${d.status === 'signed' ? pdfBtn(spdf, tr('Signed PDF')) : ''}<button class="iconbtn" data-dt="more" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>
     <div class="dtp-head"><h3>${esc(d.title || d.kind_label)} ${dtStTag(d)}</h3><p class="dtp-meta">${meta}</p></div>`;
@@ -109,7 +109,7 @@ function dtDocHtml(d) {
 }
 function dtRefsHtml(cid, lid, did) {
   const d = DT.data, offers = (d.offers || []).filter(o => o.client_id === +cid);
-  return `${ofcRowF('dt-client', tr('Client'), ofcSel('dt-client', cid || '', (d.clients || []).map(c => [c.id, c.name]), tr('Choose a client')))}
+  return `${ofcRowF('dt-client', tr('Client'), ofcSel('dt-client', cid || '', (d.clients || []).map(c => [c.id, cdn_label(c)]), tr('Choose a client')))}
     ${ofcRowF('dt-list', tr('Project'), ofcSel('dt-list', lid || '', (d.lists || []).map(l => [l.id, l.name]), tr('none')))}
     ${ofcRowF('dt-offer', tr('Quotation'), ofcSel('dt-offer', did || '', offers.map(o => [o.id, [o.number || tr('Draft'), o.project_title].filter(Boolean).join(' · ')]), tr('none')))}`;
 }
@@ -192,13 +192,17 @@ function dtTplModal(t) {
     <label for="dt-tbody" class="dtp-lab">${tr('Text')}</label>${dtVarBar('dt-tbody')}<textarea id="dt-tbody" class="dtp-ta" rows="14" maxlength="60000">${esc(t?.body || '')}</textarea>${dtHint()}
     <p class="muted ofchint">${esc(d.note || tr('Sample text, no legal advice.'))}</p>
     <div class="aerr" role="alert"></div>
-    <div class="foot">${t ? `<button class="btn danger" data-m="del">${tr('Archive')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${t ? `<button class="btn danger" data-m="del">${tr('Archive')}</button>` : ''}${t && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? `<button class="btn" data-m="move">${ic('brief', 's')} ${tr('Move to another workspace…')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg', 'dtp-dlg');
   const close = fgModal(md);
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
     try {
+      if (b.dataset.m === 'move') {  // 2.97.0 C (#2049)
+        md.remove(); ofm_move({what: 'templates', ids: [t.id], from: ofm_officeFrom(), label: qn(t.name), after: async () => dtReload()});
+        return;
+      }
       if (b.dataset.m === 'del') {
         await api('DELETE', `/api/office/doc-templates/${t.id}`); md.remove(); dtReload();
         toast(tr('Archived'), async () => { await api('POST', `/api/office/doc-templates/${t.id}/restore`); dtReload(); });

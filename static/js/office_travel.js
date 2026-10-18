@@ -11,7 +11,7 @@ const rk_home = () => RK.data?.currency || ofcCur();
 const rk_amt = (n, cur) => !cur || cur === rk_home() ? ofcMoney(n) : `${fmtNum(+n, 2)} ${esc(cur)}`;
 const rk_trip = id => (RK.data?.trips || []).find(t => t.id === id);
 const rk_span = t => t.date_to && t.date_to !== t.date_from ? `${fmtDateLoc(t.date_from)} – ${fmtDateLoc(t.date_to)}` : fmtDateLoc(t.date_from);
-const rk_client = id => (RK.data?.clients || []).find(c => c.id === id)?.name || '';
+const rk_client = id => cdn_label((RK.data?.clients || []).find(c => c.id === id));  // 2.97.0 B (#1951)
 const rk_purpose = t => [t.purpose === 'acquisition' ? tr('Acquisition / research') : '', rk_client(t.client_id), t.project].filter(Boolean).join(' · ');
 
 async function rk_load() {
@@ -95,19 +95,21 @@ function rk_tripModal(t) {
     <div class="row"><span class="rklab">${tr('Participants')}</span><div class="rkppl">${(d.people || []).map(p => `<label class="chkl"><input type="checkbox" data-pid="${p.id}" ${ppl.has(p.id) ? 'checked' : ''}> ${esc(p.name)}</label>`).join('')}</div></div>
     ${ofcRowF('rk-free', tr('Other people'), ofcIn('rk-free', free, {max: 600, ph: tr('Names, separated by commas')}))}
     ${ofcRowF('rk-purpose', tr('Purpose'), ofcSel('rk-purpose', t?.purpose || 'job', [['job', tr('Job for a client / project')], ['acquisition', tr('Acquisition / research')]]))}
-    ${ofcRowF('rk-client', tr('Client'), ofcSel('rk-client', t?.client_id || '', (d.clients || []).map(c => [c.id, c.name]), tr('none')))}
+    ${ofcRowF('rk-client', tr('Client'), ofcSel('rk-client', t?.client_id || '', (d.clients || []).map(c => [c.id, cdn_label(c)]), tr('none')))}
     ${ofcRowF('rk-project', tr('Project'), ofcIn('rk-project', t?.project, {list: 'rk-projs'}))}<datalist id="rk-projs">${(d.projects || []).map(p => `<option value="${esc(p)}">`).join('')}</datalist>
     ${ofcRowF('rk-km', tr('Kilometres'), ofcIn('rk-km', t?.km != null ? fmtNum(+t.km, 0) : '', {num: true, ph: tr('optional')}))}
     <div class="row"><label for="rk-note">${tr('Note')}</label><textarea id="rk-note" rows="2" maxlength="2000">${esc(t?.note || '')}</textarea></div>
     <div class="aerr" role="alert"></div>
     <div class="foot">${t ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');
+  if (t && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom())) $('.foot .spacer', md)?.insertAdjacentHTML('beforebegin', `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>`);  // 2.97.0 C (#2049)
   const close = fgModal(md);
   rk_vmaDlgWire(md, t);  // 2.95.0 A (#1932)
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
     try {
+      if (b.dataset.m === 'move') { md.remove(); ofm_move({what: 'travel', ids: [t.id], from: ofm_officeFrom(), label: qn(t.dest || rk_span(t)), after: async () => { RK.open = null; rk_reload(); }}); return; }  // 2.97.0 C (#2049)
       if (b.dataset.m === 'del') {
         if (!await askConfirm(tr('Delete the trip “{0}” with its receipts?', t.dest || rk_span(t)), '', {ok: tr('Delete'), danger: true})) return;
         const j = await api('DELETE', `/api/office/trips/${t.id}`); md.remove(); RK.open = null; rk_reload();

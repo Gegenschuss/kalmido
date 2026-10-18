@@ -7383,6 +7383,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .smv .smv-notes ul{margin:0;padding-left:1.125rem}
 .smv .smv-notes li{margin:.125rem 0}
 .smv .smv-block{display:flex;gap:.375rem;align-items:flex-start;color:var(--danger, #c0392b);margin:0 0 .375rem}
+/* 2.97.0 C (#2049): the tick box of a move (copies of issued documents) */
+.smv .smv-opt{min-height:2.75rem;gap:.5rem;cursor:pointer}
 /* 2.96.0 A (#1941): choosing rows in the file store (to move them, also into the other workspace) */
 .absel{display:flex;align-items:center;justify-content:center;flex:0 0 2.75rem;min-height:2.75rem;cursor:pointer}
 .absel input{width:1.25rem;height:1.25rem;accent-color:var(--accent)}

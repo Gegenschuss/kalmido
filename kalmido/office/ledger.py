@@ -318,13 +318,18 @@ def ofx_finalize(c, oid, uid, did):
     fields = ofx_company(c, oid)
     sender = {"company": ofx_company_print(fields, s.get("company") or {}, lang, pack), "fields": fields, "color": color,
               "logo": logo, "logo_sha256": sha, "pack": pack.get("code") or s["pack"]}
-    rec = _j(r["recipient"], {})
+    from .docs import cdn_doc_recipient
+    rec = cdn_doc_recipient(c, oid, r)  # 2.97.0 B (#1951): the client's address as it is now, frozen below
+    if r["client_id"] and rec.get("lines") is not None:
+        c.execute("UPDATE office_docs SET recipient=? WHERE id=? AND org_id=?",
+                  (json.dumps({k: v for k, v in rec.items() if k != "missing"}, ensure_ascii=False), did, oid))
     rsnap = {"name": rec.get("name") or "", "lines": rec.get("lines") or []}
     if r["client_id"]:
         cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone()
         if cl:
             for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days"):
                 rsnap[k] = cl[k] if k in cl.keys() else None
+            rsnap["extra"] = cl["address_extra"] if "address_extra" in cl.keys() else ""  # 2.97.0 B (#1951)
             from .docs import fk_doc_contact
             k = fk_doc_contact(c, r["client_id"], r["contact_id"] if "contact_id" in r.keys() else None)  # 2.40.0 (#1380)
             rsnap["contact"] = {"name": k["name"], "email": k["email"], "phone": k["phone"]} if k else None

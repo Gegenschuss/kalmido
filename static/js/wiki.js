@@ -323,10 +323,10 @@ if (typeof p61b_wsOn === 'function') p61b_wsOn('wiki', after => {
 // ---- 2.96.0 B (#1941): a page, or its folder with everything below it, to the other workspace (private <-> organisation).
 // The shared dialog (spacemove.js) names the source, lets the person pick the target space and a folder there and shows the
 // server's dry run (names taken, links that point to the other space, linked files that stay); the move back is ONE undo
-// step. A space with the lock refuses (the server cannot re-encrypt for the other space), so the item is not offered there.
+// step. 2.97.0 D (#2050): with the lock on either side this browser re-encrypts the pages (wikie2e.js wkr_run).
 const wk_smvOrg = sp => sp && sp !== 'private' ? +sp.slice(4) : null;
 function wk_smvItems(p) {
-  if (S.me?.kind === 'agent' || !smv_can(wk_smvOrg(p.space)) || wk_e2e(p.space)) return [];
+  if (S.me?.kind === 'agent' || !smv_can(wk_smvOrg(p.space)) || p._wke || (wk_e2e(p.space) && typeof wkr_run !== 'function')) return [];
   const it = [{label: tr('Move to another workspace…'), icon: 'brief', fn: () => wk_smvMove(p, false)}];
   if (p.path.includes('/')) it.push({label: tr('Move folder to another workspace…'), icon: 'folder', fn: () => wk_smvMove(p, true)});
   return it;
@@ -342,21 +342,40 @@ async function wk_smvMove(p, folder) {
   const from = p.space, fpath = folder ? p.path.split('/').slice(0, -1).join('/') : '';
   const what = folder ? tr('Folder {0}', qn(fpath)) : qn(wk_base(p.path));
   const req = (to, dest, dry) => rawFetch('POST', '/api/wiki/move-space', {...(folder ? {folder: fpath} : {pages: [p.id]}), space: from, to: smv_ws(to), dest, dry: dry ? 1 : 0});
-  let dest = '';
+  // 2.97.0 D (#2050): the lock on a side -> the pages and their new names are worked out here (the server sees no names)
+  const locked = async to => { await wk_load(smv_ws(to)); return wk_e2e(from) || wk_e2e(smv_ws(to)); };
+  const plan = d => {
+    const fl = fpath.toLowerCase(), cut = folder ? fpath.length - wk_base(fpath).length : 0;
+    const ps = folder ? wk_pages(from).filter(x => x.path.toLowerCase().startsWith(fl + '/')) : [p];
+    return ps.map(x => { const rest = folder ? x.path.slice(cut) : wk_base(x.path); return {id: x.id, path: wkeClean(d ? d + '/' + rest : rest)}; });
+  };
+  let dest = '', lk = false;
   const r = await smv_open({what, from: wk_smvOrg(from), places: to => wk_smvFolders(smv_ws(to)),
-    check: (to, d) => req(to, d, true), run: async (to, d) => { try { dest = d; return await req(to, d, false); } catch (e) { toast(e.message); throw e; } }});
+    check: async (to, d) => await locked(to) ? wkr_check(from, smv_ws(to), plan(d)) : req(to, d, true),
+    run: async (to, d) => {
+      try {
+        dest = d; lk = await locked(to);
+        if (!lk) return await req(to, d, false);
+        if (wk_e2e(from) && !wk_e2e(smv_ws(to)) && !await askConfirm(tr('Move to another workspace'), tr('The pages are no longer end-to-end encrypted in the target.'), {ok: tr('Move'), danger: true})) return null;
+        return await wkr_run(from, smv_ws(to), plan(d));
+      } catch (e) { toast(e.message); throw e; }
+    }});
   if (!r || !r.moved) return;
   const to = r.space, oldDest = (folder ? fpath : p.path).split('/').slice(0, -1).join('/'), moved = r.moved;
   const newFolder = folder ? (dest ? dest + '/' : '') + fpath.split('/').pop() : null;
-  const back = async (src, dst, dest, fd) => { const x = await rawFetch('POST', '/api/wiki/move-space', {...(fd ? {folder: fd} : {pages: moved.map(m => m.id)}), space: src, to: dst, dest}); wk_after(src); wk_after(dst); return x; };
+  const back = async (src, dst, dest, fd, fwd) => {
+    const x = lk ? await wkr_run(src, dst, moved.map(m => ({id: m.id, path: fwd ? m.to : m.from})))  // 2.97.0 D (#2050): re-encrypted again
+      : await rawFetch('POST', '/api/wiki/move-space', {...(fd ? {folder: fd} : {pages: moved.map(m => m.id)}), space: src, to: dst, dest});
+    wk_after(src); wk_after(dst); return x;
+  };
   wk_after(from); wk_after(to); WK.space = to;
   if (WK.pg?.id === p.id) { WK.pg = null; go('wiki/' + p.id); }
   const e = histAdd({label: tr('Moved {0}', what), ids: [], snaps: [], lids: [], wsp: to,
-    undo: async () => { await back(to, from, oldDest, newFolder); return {skipped: []}; },
-    redo: async () => { await back(from, to, dest, folder ? fpath : null); return {skipped: []}; }});
+    undo: async () => { await back(to, from, oldDest, newFolder, false); return {skipped: []}; },
+    redo: async () => { await back(from, to, dest, folder ? fpath : null, true); return {skipped: []}; }});
   histToast(trn('{0} page moved', '{0} pages moved', moved.length), e);
 }
-function wk_smvLine(m) {  // the last move between workspaces (both sides see it below the page)
+function wk_smvLine(m) {  // the last move between workspaces (both sides see it below the page; 2.97.0 D #2051: names from the server)
   if (!m) return '';
-  return `<p class="muted wksmv">${ic('brief', 's')} ${esc(tr('Moved from {0} to {1}', wk_spaceName(m.from), wk_spaceName(m.to)))} · ${esc(fmtWhen(m.at))}${m.by_name ? ' · ' + esc(m.by_name) : ''}</p>`;
+  return `<p class="muted wksmv">${ic('brief', 's')} ${esc(tr('Moved out of {0}', m.from_name || (m.from ? wk_spaceName(m.from) : tr('Organisation'))))} · ${esc(fmtWhen(m.at))}${m.by_name ? ' · ' + esc(m.by_name) : ''}</p>`;
 }

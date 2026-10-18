@@ -14,7 +14,8 @@ const MG_AREAS = [
   ['review', 'journal', N_('Review|area'), [['review', 'journal', N_('Review & journal'), () => feat('review'), () => ['review']], ['stats', 'chart', N_('Statistics'), () => feat('stats'), () => ['stats']]]],
   ['life', 'home', N_('Home|area'), [['life', 'home', N_('Home & life'), () => lifeOn(), () => LIFE_MODS], ['family', 'family', N_('Family'), () => famOn(), () => ['family']],
     ['budget', 'wallet', N_('Budget'), () => feat('budget'), () => ['budget']],  // 2.72.0 (#1333): the household budget (budget.js)
-    ['feeds', 'news', N_('Feeds'), () => feat('feeds'), () => ['feeds']]]],  // 2.85.0 B (#1162): feeds (feeds.js)
+    ['feeds', 'news', N_('Feeds'), () => feat('feeds'), () => ['feeds']],  // 2.85.0 B (#1162): feeds (feeds.js)
+    ['bookmarks', 'bookmark', N_('Bookmarks'), () => feat('reading'), () => ['reading']]]],  // 2.97.0 A (#1950): bookmarks (bookmarks.js, module reading)
   // 2.48.0 (#1207, #1111): the file store with its parts files (ablage.js) and documents (docs.js)
   ['ablage', 'folder', N_('File store|area'), [['ablage', 'folder', N_('Files'), () => ab_on(), () => ['files']],
     ['docs', 'file', N_('Documents'), () => typeof viewDocs === 'function' && feat('docs'), () => ['docs']]]]];

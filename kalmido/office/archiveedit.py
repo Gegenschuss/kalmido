@@ -83,6 +83,9 @@ def r81b_archive_patch(c, oid, uid, aid, b):
     r = c.execute("SELECT * FROM office_archive WHERE id=? AND org_id=?", (aid, oid)).fetchone()
     if not r:
         raise Denied(404)
+    if "copy_of" in r.keys() and r["copy_of"]:  # 2.97.0 C (#2049): a copy taken along by a move is view / PDF only
+        from .officemove import OFM_RO
+        raise Denied(409, tr(OFM_RO))
     role = office_role(c, uid, oid)
     if role != "admin" and any(k in b for k in R81B_ADMIN_FIELDS):
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))

@@ -47,7 +47,7 @@ def shm_foreign_formulas(c, sid, to):
     if not to:
         return 0
     n, cache = 0, {}
-    for r in c.execute("SELECT raw FROM sheet_cells WHERE sheet_id=? AND raw LIKE '%{%:%}%'", (sid,)).fetchall():
+    for r in c.execute("SELECT raw FROM sheet_cells WHERE sheet_id=? AND raw ILIKE '%{%:%}%'", (sid,)).fetchall():
         if any(shm_ref_org(c, m.group(1), int(m.group(2)), cache) not in (False, to) for m in SHM_REF_RE.finditer(r["raw"] or "")):
             n += 1
     return n
@@ -137,5 +137,5 @@ def shm_last(c, sid):
     if not r:
         return None
     from ..collab.comments import user_names
-    return {"from": sh_space_key(r["from_org"]), "to": sh_space_key(r["to_org"]), "at": r["at"],
-            "by_name": user_names(c, [r["by_id"]]).get(r["by_id"], "")}
+    from ..wiki.wkmove import wkr_line  # 2.97.0 D (#2051): workspaces by name, only those of the viewer
+    return wkr_line(c, r, user_names(c, [r["by_id"]]).get(r["by_id"], ""))

@@ -19,7 +19,7 @@ const lyo_ch = d => (typeof d.choices === 'function' ? d.choices() : d.choices |
 const lyo_tags = () => [...new Set([...S.tasks.values()].flatMap(t => t.tags || []))].filter(t => t.length <= 40).sort((a, b) => a.localeCompare(b, LOCALE()));
 // the targets one can pick: only what this person sees right now
 function lyo_src(d) {
-  if (d.type === 'client') return (S.clients || []).map(c => [c.id, c.name]);
+  if (d.type === 'client') return (S.clients || []).map(c => [c.id, cdn_label(c)]);  // 2.97.0 B (#1951)
   if (d.type === 'person') return [...(S.me ? [[S.me.id, tr('Me')]] : []), ...teamPeople().map(p => [p.id, p.name])];
   if (d.type === 'tag') return lyo_tags().map(t => [t, '#' + t]);
   if (d.type === 'list') {
