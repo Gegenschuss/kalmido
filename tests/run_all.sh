@@ -1105,6 +1105,12 @@ fresh; run p290_b_ui node p290_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.90.0 part C (#1922): tax dates as recurring tasks
 fresh; run p290_c_api "$PY" p290_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p290_c_ui node p290_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.91.0 part A (#1923): invoice series (recurring invoices, drafts or sent, cash flow)
+fresh; run p291_a_api "$PY" p291_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p291_a_ui node p291_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.91.0 part B (#1924): subscriptions and tools (notice period, users, renewal reminder, hardly used)
+fresh; run p291_b_api "$PY" p291_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p291_b_ui node p291_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

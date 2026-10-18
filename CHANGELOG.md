@@ -7,6 +7,31 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.91.0] - 2026-10-18
+
+Recurring invoices, an overview of subscriptions and tools.
+
+### Added
+- Invoice series: any invoice can be repeated monthly, quarterly or yearly (start, optional last period). Every period
+  makes a normal invoice from the template with its period of service; placeholders `{period}`, `{month}`, `{quarter}`,
+  `{year}` are filled in the texts. By default a draft waits for you (a task in your inbox links to it); *Send
+  automatically* finalises and mails it, with the next number and the e-invoice as always. Series are listed above the
+  invoices (pause, make now, edit, delete with undo) (#1923).
+- Cash flow: the expected income of invoice series shows as *Invoice series* until the invoice exists (#1923).
+- Office tab *Subscriptions & tools*: every fixed cost marked as a subscription with price, next renewal, last day to
+  cancel, users and a *hardly used* switch; sums per month and per year and what the hardly used ones cost; suggestions
+  for fixed costs that look like a subscription; CSV export. Subscriptions are ordinary fixed costs, the cash flow counts
+  them once (#1924).
+- A reminder before the last day to cancel a subscription as a task in the chosen admin's inbox (never an amount); the
+  fixed costs import reads the optional columns *Abo* and *Kündigungsfrist* (#1924).
+
+### Changed
+- Agent API: invoices made by a series carry `series_id` and `series_period` (#1923).
+
+### Notes
+- Database: new tables `office_inv_series`, `office_sub_reminders` and new columns on `office_docs` / `office_fixed_costs`,
+  all additive. Going back to the previous version works; there, duplicating an invoice made by a series fails until you
+  update again.
 ## [2.90.0] - 2026-10-18
 
 Bookkeeping light and tax dates in *Office & finance* (#1921, #1922): the running bookkeeping of a self-employed person

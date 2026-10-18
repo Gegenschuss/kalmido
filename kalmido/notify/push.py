@@ -573,6 +573,10 @@ def watchdog_tick(c):
     _wd_section(c, "feeds", _wd_feeds, users, S, LG, now)  # 2.85.0 B (#1162): fetch due feeds, drop articles after 30 days
     from ..newsletter.sync import nwl_tick
     _wd_section(c, "newsletter", nwl_tick)  # 2.55.0 (#1455): the daily sync of connections with "auto" (own threads)
+    from ..office.recurring import rin_tick
+    _wd_section(c, "invoice series", rin_tick, now)  # 2.91.0 A (#1923): the due periods of invoice series -> drafts / sent invoices
+    from ..office.subs import abo_tick
+    _wd_section(c, "subscription reminders", abo_tick, now)  # 2.91.0 B (#1924): reminder tasks before a subscription renews
     from ..accounts.tenancy import boundary_tick
     from ..lists.rules import rul_due_tick
     _wd_section(c, "list rules", rul_due_tick)  # 2.71.0 A (#1457): rules "due date reached"

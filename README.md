@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.91.0** (2026-10-18): recurring invoices (monthly, quarterly, yearly; drafts or sent automatically, in the cash
+  flow) and an office overview of subscriptions and tools with sums, notice periods, users, renewal reminders and a
+  *hardly used* mark.
 - **2.90.0** (2026-10-18): bookkeeping light in the office - income/expense statement with CSV / PDF, VAT return
   figures, receipt photo, tax reserve in the cash flow, bank reconciliation (CSV / CAMT) and tax dates as recurring tasks;
   also without an organisation.
