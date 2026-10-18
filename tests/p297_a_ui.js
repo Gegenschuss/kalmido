@@ -15,7 +15,7 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 const CT = process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test';
 const FS = 'http://127.0.0.1:8098';
-if (!process.env.P297A_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, EXTRA: (process.env.EXTRA || '') + ' -e KALMIDO_CALENDAR_ALLOW_HOSTS=127.0.0.1:8098'}});
+if (!process.env.P297A_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, EXTRA: (process.env.EXTRA || '') + ' -e KALMIDO_BOOKMARK_ALLOW_HOSTS=127.0.0.1:8098'}});
 fs.copyFileSync(path.join(__dirname, 'fake_feeds.py'), path.join(DATA, 'fake_feeds.py'));
 fs.mkdirSync(path.join(DATA, 'feeds'), {recursive: true});
 const page = (title, word) => `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><meta property="og:site_name" content="Example Site">
