@@ -254,6 +254,9 @@ ROUTES = {
     "POST /api/office/fixed-costs/import/preview": "office", "POST /api/office/fixed-costs/import": "office", "GET /api/office/fixed-costs/import/template": "office",
     "POST /api/office/fixed-costs/delete": "office", "GET /api/office/cashflow/check": "office", "PUT /api/office/cashflow/check": "office",
     "POST /api/office/docs/{}/cashflow": "office",  # 2.88.0 (#1915)
+    # 2.92.0 A (#1925): business contracts and insurances (office admins; p292_a_api_test.py)
+    # 2.92.0 B (#1931): equipment value, depreciation, insurance list (office admins; p292_b_api_test.py)
+    # 2.92.0 C (#1926): file preview / text of docx and xlsx, summarise by an agent (p292_c_api_test.py)
     # 2.50.0 (#1196, #1197): the sales pipeline and the business figures, admins of the office area only (p250_b_api_test.py: other org 404, member 403)
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
