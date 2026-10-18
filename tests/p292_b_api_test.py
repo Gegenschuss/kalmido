@@ -269,7 +269,8 @@ OBJ = r.json()["id"]
 # 2.92.0 (#1931 -> #1921): the profit statement counts the year's depreciation, the device's receipt only with its input tax
 A.put(B + f"/api/docs/{RC}/receipt", json={"category": "Technik", "vat_pct": "19", "keep": True})
 eu = A.get(B + "/api/office/books/euer?year=2025").json()
-afa25 = next((p["afa"] for p in row(A, OBJ)["afa_plan"] if p["year"] == 2025), None)
+afa25 = sum((Decimal(p["afa"]) for x in A.get(B + E + "?archived=1").json()["items"] for p in (x.get("afa_plan") or []) if p["year"] == 2025), Decimal(0))
+afa25 = f"{afa25:.2f}"  # every device of the office written off in 2025, the lens among them
 dep = next((x for x in eu.get("expenses", []) if x["label"] == "Depreciation"), None)
 tech = next((x for x in eu.get("expenses", []) if x["label"] == "Technik"), None)
 check(dep and afa25 and dep["net"] == afa25 and tech and tech["net"] == "0.00" and tech["vat"] == "190.00",
