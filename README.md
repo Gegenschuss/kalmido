@@ -20,6 +20,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.92.0** (2026-10-18): contracts and insurance in the office (notice deadlines as tasks, contributions in the cash
+  flow), equipment value with depreciation and an insurance list, Word and Excel preview with *Summarize* by a connected
+  agent, and three phone fixes from the 2.88 device tests.
+- **2.91.0** (2026-10-18): recurring invoices (monthly, quarterly, yearly; drafts or sent automatically, in the cash
+  flow) and an office overview of subscriptions and tools with sums, notice periods, users, renewal reminders and a
+  *hardly used* mark.
 - **2.90.0** (2026-10-18): bookkeeping light in the office - income/expense statement with CSV / PDF, VAT return
   figures, receipt photo, tax reserve in the cash flow, bank reconciliation (CSV / CAMT) and tax dates as recurring tasks;
   also without an organisation.
@@ -1224,6 +1230,14 @@ stored encrypted. Self-hosters can import an existing Paperless-ngx instance (#1
 **PDF preview** (#1367): PDFs open inside Kalmido (pages, zoom, swipe), also in the Android app. **Lock a note**
 (#1642): the lock in a task's note encrypts it with your own password in your own, unshared lists; without the
 password and the recovery code it cannot be recovered, not even by the operator.
+
+**Word and Excel preview** (2.92.0, #1926): a .docx or .xlsx file at a task, a comment, in the project files or the file
+store opens like a PDF - Word with headings, bold / italic, lists and tables, Excel one tab per sheet with column letters and
+row numbers (at most 5 sheets x 500 rows x 50 columns). The server reads the file in a sandboxed process; no macros run,
+formulas show their stored result; old .doc / .xls and password-protected files: download only. Their text is searchable
+and readable for agents. **Summarize**: in the preview of a task's file, when a connected agent may see the task, the button
+(with a confirmation naming the agent) posts a comment in your name that mentions the agent; the agent reads the file and
+answers with the summary. Kalmido calls no language model itself; undo removes the comment.
 
 ## Notes
 

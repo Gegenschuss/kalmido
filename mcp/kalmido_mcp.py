@@ -733,7 +733,7 @@ TOOLS = [
      _obj({"attachment_id": S_ID, "source": {"type": "string", "enum": ["task", "chat", "project"]}, "list_id": S_ID,
            "max_bytes": {"type": "integer", "minimum": 1, "maximum": ATT_CAP_MAX}}, ["attachment_id"]), t_get_attachment),
     ("read_attachment", "Read a task / comment file as text (2.34.0): a PDF's text layer (read on the server; pages separated by "
-                        "a blank line) or a text file, at most max_chars characters (default and maximum 200000; truncated: true when "
+                        "a blank line), a Word .docx / Excel .xlsx file (2.92.0: headings '# ', rows 'a | b', '## <sheet>') or a text file, at most max_chars characters (default and maximum 200000; truncated: true when "
                         "cut). A scanned PDF without a text layer answers no_text_layer: true -- since 2.61.0 with the text the server recognised "
                         "in the background (source: ocr; may contain reading errors) when it has one, else say so, do not guess its content; "
                         "an image is returned as an image you can look at. Ids from list_attachments, get_task or comment events. Use it "
@@ -1593,7 +1593,7 @@ TOOLS += [
     ("list_files", "2.48.0: the file store (\"Ablage\"): without folder_id the folders / files people shared with you plus your own result "
                    "folder; with folder_id that folder's children. role = what you may do (view / edit). Every access is shown to the owner.",
      _obj({"folder_id": S_ID}), t_list_files),
-    ("read_file", "2.48.0: read a file of the file store: as text (default; PDFs: the text layer) or as base64 (as \"base64\", "
+    ("read_file", "2.48.0: read a file of the file store: as text (default; PDFs: the text layer, 2.92.0: Word / Excel as text) or as base64 (as \"base64\", "
                   "version = an older version, max_bytes).",
      _obj({"file_id": S_ID, "as": {"type": "string", "enum": ["text", "base64"]}, "version": {"type": "integer", "minimum": 1},
            "max_bytes": {"type": "integer", "minimum": 1}}, ["file_id"]), t_read_file),

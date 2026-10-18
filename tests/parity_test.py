@@ -211,6 +211,9 @@ APP_TO_API = {
     "GET /api/files": ["GET /files"], "GET /api/files/nodes/{}": ["GET /files/{}"], "GET /api/files/nodes/{}/content": ["GET /files/{}/content"],
     "POST /api/files/folders": ["POST /files"], "POST /api/files/upload": ["POST /files"], "POST /api/files/nodes/{}/versions": ["POST /files/{}/versions"],
     "GET /api/files/search": ["GET /files/search"],  # 2.61.0 (#1820): names + recognised text
+    # 2.92.0 C (#1926): the Word / Excel preview model of the web client; agents read the same files as text
+    "GET /api/attachments/{}/preview": ["GET /attachments/{}/text"], "GET /api/files/nodes/{}/preview": ["GET /files/{}/text"],
+    "GET /api/list-files/{}/preview": ["GET /lists/{}/files/{}"],
     # 2.48.0 (#1111): documents (agents read / set the fields of documents shared with them)
     "GET /api/docs": ["GET /documents"], "GET /api/docs/{}": ["GET /documents/{}"], "PATCH /api/docs/{}": ["PATCH /documents/{}"],
     # 2.60.0 (#343): sprints -- agents read the sprints of a shared list and put tasks into one (or back to the backlog)
@@ -277,6 +280,8 @@ APP_ONLY = [
      ("=GET /api/state/delta",)),
     ("2.34.0 (#368): the briefing field reads a PDF the person picks (nothing stored); agents read stored files with GET /attachments/{id}/text",
      ("=POST /api/pdf-text",)),
+    ("2.92.0 C (#1926): which agents a person may ask for a summary of a file (the preview's button); the request is a comment that mentions the agent",
+     ("=GET /api/attachments/{}/agents",)),
     ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "=PATCH /api/me", "=GET /api/me")),
     ("credentials and keys of the account: tokens, webhooks, upload token, avatar, phone shortcut", (
         "* /api/me/tokens", "* /api/me/webhooks", "POST /api/me/drop-token", "* /api/me/avatar", "GET /api/me/share/")),

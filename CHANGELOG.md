@@ -7,6 +7,55 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.92.0] - 2026-10-18
+
+Contracts and insurance in the office, equipment value, Word and Excel preview, fixes from the 2.88 device tests.
+
+### Added
+- Office > Contracts & insurance (admins; a person without organisation in the personal office): insurances, rent,
+  leasing, service providers with term, notice period, contribution and document; the last day to cancel becomes a task
+  in a list you pick (agents that see it can remind you, `contract_notice` with `office: true`), contributions flow into
+  the cash flow and show read-only under the fixed costs (#1925).
+- Equipment: purchase date, net price, serial number, vendor and receipt (taken over from a receipt); depreciation with a
+  suggested useful life (GWG up to 800 EUR at once, else linear by the month) and the book value per year; new and current
+  value for the insurance, sums, insurance list as CSV / PDF, the policy that covers a device. Prices and values are
+  encrypted and reach only admins; the year's depreciation counts in the income/expense statement (2.90), the
+  device's receipt there only with its input tax. No tax advice (#1931).
+- Word (.docx) and Excel (.xlsx) preview for task files, comments, project files and the file store, read in a sandboxed
+  process; their text is searchable and readable for agents. *Summarize* in the preview of a task file asks a connected
+  agent that may see the task (a comment that mentions it); Kalmido calls no language model itself (#1926).
+
+### Fixed
+- Delete account: the deleting admin is preselected as the new owner of the lists, else nobody (the button waits for a
+  choice); invited accounts that never signed in come last (#2008).
+- Quotation on the phone: the "Saved / Undo" message no longer covers the "In the cash flow" choice (#2009).
+- User list on the phone: the selection bar sits at the bottom, the list no longer jumps on the first tick (#2010).
+
+## [2.91.0] - 2026-10-18
+
+Recurring invoices, an overview of subscriptions and tools.
+
+### Added
+- Invoice series: any invoice can be repeated monthly, quarterly or yearly (start, optional last period). Every period
+  makes a normal invoice from the template with its period of service; placeholders `{period}`, `{month}`, `{quarter}`,
+  `{year}` are filled in the texts. By default a draft waits for you (a task in your inbox links to it); *Send
+  automatically* finalises and mails it, with the next number and the e-invoice as always. Series are listed above the
+  invoices (pause, make now, edit, delete with undo) (#1923).
+- Cash flow: the expected income of invoice series shows as *Invoice series* until the invoice exists (#1923).
+- Office tab *Subscriptions & tools*: every fixed cost marked as a subscription with price, next renewal, last day to
+  cancel, users and a *hardly used* switch; sums per month and per year and what the hardly used ones cost; suggestions
+  for fixed costs that look like a subscription; CSV export. Subscriptions are ordinary fixed costs, the cash flow counts
+  them once (#1924).
+- A reminder before the last day to cancel a subscription as a task in the chosen admin's inbox (never an amount); the
+  fixed costs import reads the optional columns *Abo* and *Kündigungsfrist* (#1924).
+
+### Changed
+- Agent API: invoices made by a series carry `series_id` and `series_period` (#1923).
+
+### Notes
+- Database: new tables `office_inv_series`, `office_sub_reminders` and new columns on `office_docs` / `office_fixed_costs`,
+  all additive. Going back to the previous version works; there, duplicating an invoice made by a series fails until you
+  update again.
 ## [2.90.0] - 2026-10-18
 
 Bookkeeping light and tax dates in *Office & finance* (#1921, #1922): the running bookkeeping of a self-employed person

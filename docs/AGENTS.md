@@ -702,7 +702,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `sprint_started` | 2.60.0 (#343): a sprint of a project list shared with the agent started (switched on, started by hand, or the next one after closing) | `list_id`, `list`, `sprint` (id, num, title, start, end, goal, state, progress) |
 | `sprint_closed` | 2.60.0 (#343): a sprint was closed (by a person or after its last day); `sprint.review` holds the done / moved / added task ids, counts and points | `list_id`, `list`, `sprint` (with `review`), `next_sprint_id` |
 | `chat_pinned` | 2.62.0 (#1848): the person pinned or unpinned a message of the agent's chat (see [Pinned chat messages](#pinned-chat-messages-2620)); information only, nothing to answer (the reference launcher starts no run) | `message` (the chat message, with `pinned_at` / `pinned_by`), `pinned` (true / false), `user` `{id, name}` |
-| `contract_notice` | 2.70.0 (#1359): the last day to cancel a contract (Home & life) in a list shared with the agent is near: from the contract's own lead (else 30 days) before it; once per contract, deadline and agent; never from a health list; only while the person has the module *Contracts* on. Answer with ONE `propose_contract_notice` (see [Contracts and notice deadlines](#contracts-and-notice-deadlines-2700)) | `task_id`, `list_id`, `name`, `provider`, `cost`, `per`, `monthly`, `yearly`, `notice`, `notice_unit`, `due` (cancel by), `ends`, `renew_months`, `days`, `user` `{id, name}`, `lang`, `hint` |
+| `contract_notice` | 2.70.0 (#1359): the last day to cancel a contract (Home & life) in a list shared with the agent is near: from the contract's own lead (else 30 days) before it; once per contract, deadline and agent; never from a health list; only while the person has the module *Contracts* on. 2.92.0 (#1925): also a business contract of the office (Office > Contracts & insurance, its deadline task carries `fam.office_agreement`; `office` true; the person needs the office module instead). Answer with ONE `propose_contract_notice` (see [Contracts and notice deadlines](#contracts-and-notice-deadlines-2700)) | `task_id`, `list_id`, `name`, `provider`, `cost`, `per`, `monthly`, `yearly`, `notice`, `notice_unit`, `due` (cancel by), `ends`, `renew_months`, `days`, `user` `{id, name}`, `lang`, `office` (2.92.0), `hint` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1513,7 +1513,7 @@ Scopes: `files:read` (list, read) and `files:write` (add files and folders, new 
 | The top: what is shared with you + your own folder | `GET /api/v1/files` | `list_files` |
 | A folder's children (`?parent_id=`) / one node with its children or versions | `GET /api/v1/files?parent_id=<id>`, `GET /api/v1/files/{id}` | `list_files` with `folder_id` |
 | A file's bytes (`?version=` an older one) | `GET /api/v1/files/{id}/content` | `read_file` with `as: "base64"` |
-| A file as text (UTF-8, PDF text layer) | `GET /api/v1/files/{id}/text` | `read_file` |
+| A file as text (UTF-8, PDF text layer, 2.92.0: Word / Excel) | `GET /api/v1/files/{id}/text` | `read_file` |
 | Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text`) | `GET /api/v1/files/search?q=` | `search_files` |
 | A new file / folder (`{parent_id?, name, content \| content_base64, mime?, kind?}`; without `parent_id`: your own folder) | `POST /api/v1/files` | `write_file`, `create_file_folder` |
 | A new version of a file (`{content \| content_base64}`, role edit; the older versions stay) | `POST /api/v1/files/{id}/versions` | `write_file` with `file_id` |
@@ -1594,6 +1594,12 @@ kind, text, chars, truncated, message}`:
   it and `source: "ocr"` (recognised text can contain reading errors). Without either, say so instead of guessing. A password-protected, damaged or
   too complex PDF answers `error` (`encrypted`, `unreadable`, `too_complex`) and a `message`.
 - `kind: "text"`: the text of a text file (Markdown, CSV, JSON, ...).
+- `kind: "docx"` / `kind: "xlsx"` (2.92.0): the text of a Word / Excel file, read on the server in the same kind of limited
+  process (stdlib only, no macros run, formulas are not evaluated). Word: one paragraph per line, headings as `# `, list
+  items as `- ` / `1. `, table rows as `a | b`. Excel: `## <sheet name>` and one line per row (`a | b`; numbers, dates
+  `YYYY-MM-DD` and percentages as text, a formula as its stored result), at most 5 sheets x 500 rows x 50 columns
+  (`sheets` / `sheets_total`, `truncated`). A file that unpacks too large answers `error: "too_large"`, one with a
+  DOCTYPE / entities `error: "unsafe"`, a broken one `unreadable`; old `.doc` / `.xls` are `kind: "other"`.
 - `kind: "image"`: no text, `url` points to the file; `read_attachment` returns the image itself (up to 5 MB). 2.61.0: a
   photo of a JPEG / PNG whose text the server recognised brings it as `text` with `source: "ocr"`. The same holds for
   `GET /api/v1/files/{id}/text` (`read_file`).
@@ -1601,6 +1607,14 @@ kind, text, chars, truncated, message}`:
 
 Results are cached per file content. `413` = larger than 20 MB, `503` = several PDFs are being read right now (wait for
 `Retry-After`). Typical use: a briefing PDF on a task -> `read_attachment` -> a note or a proposal of tasks.
+
+**"Summarize" (2.92.0).** In the app's file preview a person can ask an agent that sees the task for a summary of a task /
+comment file. Kalmido does not call a language model itself and sends no new event kind: the person's app writes a normal
+comment that mentions you (event `mention`), e.g. `@Claude Please summarize the attachment "offer.docx" (attachment_id 123)
+and post the summary as a comment.` (in the person's language). Read the file with `read_attachment` (the number after
+`attachment_id`) and answer with the summary as a comment on that task (`add_comment`, reply to the request). The button is
+only shown for active agents that see the task with its files (not for files of health / budget lists, lists with the
+browser lock, files encrypted in the browser, or outside your list limit / organisation).
 
 **Text files from agents (2.30.0).** Reports, reviews, Markdown notes, HTML / CSS / JS snippets, JSON / CSV and code go
 onto a task with `create_text_file` (name with its ending + UTF-8 content, at most 1 MB) -- only on tasks the agent may
@@ -2619,7 +2633,7 @@ with the scope it needs). The tools:
   `duplicate_list` (2.78.0: a copy of a list with its tasks, dates and notepads, without members),
   `list_filters`, `create_filter`, `update_filter`, `delete_filter`
 - comments and reactions: `add_comment`, `update_comment`, `delete_comment`, `react`
-- files: `list_attachments`, `get_attachment` (task, chat or project files), `read_attachment` (2.34.0: PDF / text as text), `upload_attachment`, `create_text_file` (2.30.0), `delete_attachment`,
+- files: `list_attachments`, `get_attachment` (task, chat or project files), `read_attachment` (2.34.0: PDF / text as text; 2.92.0: Word / Excel too), `upload_attachment`, `create_text_file` (2.30.0), `delete_attachment`,
   `delete_chat_attachment`
 - projects: `get_project_overview`, `set_project_overview`, `set_project_status`, `add_project_link`,
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
@@ -2840,6 +2854,9 @@ Home & life keeps a contract as a task (the last day to cancel is its due date, 
 phrases anything: once per contract and deadline the agents that see the contract's list get the event `contract_notice`
 (the contract's own lead before the last day to cancel, else 30 days; never from a health list, never across the agent's
 organisation or its list limit). The agent answers with ONE sentence; the person decides.
+Since 2.92.0 (#1925) business contracts and insurances of the office (Office > Contracts & insurance) come the same way: the
+option "Deadline as a task" keeps one such task in a list the office admin picks (`fam.office_agreement` = the contract's id,
+the event says `office: true`).
 
 | What | Endpoint | MCP | Scope |
 |---|---|---|---|

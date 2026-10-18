@@ -41,13 +41,18 @@ FCI_HEAD = {  # normalised header (letters / digits only) -> field
     "kategorie": "category", "category": "category", "gruppe": "category",
     "ust": "vat_rate", "ustsatz": "vat_rate", "mwst": "vat_rate", "mwstsatz": "vat_rate", "vat": "vat_rate", "vatrate": "vat_rate",
     "wiederholung": "repeat", "rhythmus": "repeat", "turnus": "repeat", "repeat": "repeat",
+    # 2.91.0 B (#1924): optional: a subscription / tool (ja / x / 1) and its notice period in days
+    "abo": "sub", "abotool": "sub", "subscription": "sub", "kündigungsfrist": "notice_days", "kuendigungsfrist": "notice_days",
+    "kündigungsfristtage": "notice_days", "kuendigungsfristtage": "notice_days", "noticedays": "notice_days", "noticeperiod": "notice_days",
 }
+FCI_YES_RE = re.compile(r"^(ja|j|yes|y|x|1|true|abo|oui|sí|si|sì|wahr)$", re.I)  # 2.91.0 B (#1924)
 FCI_QUARTER_RE = re.compile(r"viertelj|quartal|\bq[1-4]\b|quarter", re.I)
 FCI_NOVAT_RE = re.compile(r"versicherung|abgabe|beitrag|kammer|berufsgenossenschaft|rundfunk|insurance|contribution|levy", re.I)
 FCI_REPEATS = (("once", re.compile(r"einmal|once", re.I)), ("quarterly", FCI_QUARTER_RE),
                ("yearly", re.compile(r"jährl|jaehrl|jahr|year|annual", re.I)), ("monthly", re.compile(r"monatl|month", re.I)))
 FCI_REASONS = {"name": N_("No name"), "amount": N_("Amount missing or not readable"), "zero": N_("Amount is 0"),
-               "month": N_("Due month must be 0 to 12"), "vat": N_("VAT rate must be 0, 7 or 19")}
+               "month": N_("Due month must be 0 to 12"), "vat": N_("VAT rate must be 0, 7 or 19"),
+               "notice": N_("Notice period must be 0 to 730 days")}  # 2.91.0 B (#1924)
 FCI_TASK_TITLE = N_("Cash flow: check the actual state")
 
 
@@ -140,7 +145,8 @@ def fci_preview(c, oid, raw):
         label, amt_s, mon_s = _clean_text(cell(r, "label"), 200), cell(r, "amount"), cell(r, "month")
         cat = _clean_text(cell(r, "category"), 100)
         base = {"row": no, "label": label, "amount": "", "gross": "", "repeat": "", "start": "", "month": mon_s[:10],
-                "category": cat or group, "vat_rate": 0, "status": "error", "reason": "", "sel": False, "part": ""}
+                "category": cat or group, "vat_rate": 0, "status": "error", "reason": "", "sel": False, "part": "",
+                "sub": 1 if FCI_YES_RE.match(cell(r, "sub")) else 0, "notice_days": 0}  # 2.91.0 B (#1924)
         if label and not amt_s and not mon_s:
             group = cat or label  # a group row: the category of the rows below
             continue
@@ -166,6 +172,12 @@ def fci_preview(c, oid, raw):
             continue
         if vr is None:
             vr = 0 if FCI_NOVAT_RE.search(label) or FCI_NOVAT_RE.search(base["category"]) else 19
+        nd_s = cell(r, "notice_days")  # 2.91.0 B (#1924): whole days, empty = 0
+        nd = fci_num(nd_s) if nd_s else dec(0)
+        if nd is None or nd != int(nd) or not 0 <= nd <= 730:
+            out.append({**base, "reason": tr(FCI_REASONS["notice"])})
+            continue
+        base["notice_days"] = int(nd)
         rp_s = cell(r, "repeat")
         rp = next((k for k, rx in FCI_REPEATS if rx.search(rp_s)), None) if rp_s else None
         if rp is None:  # the month decides; the name only marks quarterly costs of a month 1..12
@@ -210,7 +222,7 @@ def fci_clean_rows(items):
         if not isinstance(it, dict):
             raise BadInput(tr("Invalid data"))
         try:
-            rows.append(rk_fixed_clean({k: it.get(k) for k in ("label", "amount", "repeat", "start", "until", "category", "vat_rate")}))
+            rows.append(rk_fixed_clean({k: it.get(k) for k in ("label", "amount", "repeat", "start", "until", "category", "vat_rate", "sub", "notice_days")}))  # 2.91.0 B (#1924): + sub, notice_days
         except BadInput as x:
             raise BadInput(tr("Row {0}: {1}", i + 1, str(x.args[0] if x.args else x))) from None
     return rows

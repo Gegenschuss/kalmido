@@ -1078,6 +1078,14 @@ fresh; run p289_c_api "$PY" p289_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p289_c_ui node p289_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p289_d_api "$PY" p289_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p289_d_ui node p289_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.92.0 (#1925 #1926 #1931 #2008-#2010): business contracts, file preview, equipment value, fixes from 2.88
+fresh; run p292_a_api "$PY" p292_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p292_a_ui node p292_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p292_b_api "$PY" p292_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p292_b_ui node p292_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p292_c_api "$PY" p292_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p292_c_ui node p292_c_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p292_d_ui node p292_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.86.0 (#1896): hardening from audit #476 part 1, groups A-E
 fresh; run p286_a_api "$PY" p286_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"
@@ -1097,6 +1105,12 @@ fresh; run p290_b_ui node p290_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.90.0 part C (#1922): tax dates as recurring tasks
 fresh; run p290_c_api "$PY" p290_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p290_c_ui node p290_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.91.0 part A (#1923): invoice series (recurring invoices, drafts or sent, cash flow)
+fresh; run p291_a_api "$PY" p291_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p291_a_ui node p291_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.91.0 part B (#1924): subscriptions and tools (notice period, users, renewal reminder, hardly used)
+fresh; run p291_b_api "$PY" p291_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p291_b_ui node p291_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.93.0 (#1927 #1928): document templates with signature, logbook
 fresh; run p293_a_api "$PY" p293_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p293_a_ui node p293_a_ui.js "$KALMIDO_TEST_DATA"
