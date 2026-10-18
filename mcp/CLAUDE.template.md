@@ -380,6 +380,14 @@ vat_rate? 0|7|19}`, at most 500 rows; put what you could not read or assumed int
 `summary`. Never invent amounts or dates. You never write or see the office: the person checks the preview (new / already
 there / error), ticks rows and takes them over. The answer comes as the event `job` with counts only.
 
+### Tables (2.89.0)
+With `sheets:read` / `sheets:write` (off until a person turns them on) you read and fill tables: `sheets_list`, `sheet_read`,
+`sheet_vars` (what formulas may use, with the current value), `sheet_create` (title, space, list_id?, columns with choices and
+colours, rows with inputs and formulas - all in ONE call), `sheet_update`, `sheet_set_cells` (`[{cell: "B4", raw}]`),
+`sheet_append_rows`, `sheet_add_column`, `sheet_undo_batch`. You see only tables attached to a list shared with you and those
+you created. Every write call is one batch the person can take back; a cell with error `denied` is a source not shared with
+you: never guess its value. Formulas: `=SUMME(B2:B9)`, `=stunden*satz`, `=projekt.<name>.zeit_gesamt` (arguments with `;`).
+
 ### Contracts and notice deadlines (2.70.0)
 The event `contract_notice` comes once per contract and deadline when the last day to cancel a contract in a list shared
 with you is near (the contract's own lead, else 30 days): `name`, `provider`, `cost` / `per`, `monthly`, `due` (cancel by),
@@ -477,7 +485,8 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,
 `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`, `review_task`, `search_contacts`,
-`search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`, `set_list_columns`, `set_list_review`,
+`search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `sheet_add_column`, `sheet_append_rows`,
+`sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_list_columns`, `set_list_review`,
 `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,

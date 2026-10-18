@@ -1,0 +1,135 @@
+/* Kalmido web client: the styles of the module "sheets" (2.89.0, #1916 part B: tables), loaded with it (static/js/lazyload.js
+   LD_CSS). One accent: Kalmido values in the accent, formulas in the second text colour, frozen values grey, errors red. */
+.shvwrap{display:flex;flex-direction:column;gap:.5rem;min-height:0;padding-bottom:1rem}
+.shvtop{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-height:2.25rem}
+.shvh{margin:0;font-size:1.125rem;font-weight:650;min-width:0;overflow-wrap:anywhere}
+.shvtitle{font:inherit;color:inherit;text-align:left;padding:.125rem .25rem;border-radius:var(--r-s)}
+.shvtitle:not([disabled]):hover{background:var(--bg3)}
+.shvro{display:inline-flex;align-items:center;gap:.25rem;font-size:var(--fs-s);color:var(--muted)}
+.shvtop .btn.on{border-color:var(--accent);color:var(--accent)}
+/* the overview */
+.shvgrp h3{margin:.75rem 0 .375rem;font-size:var(--fs-s);font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.shvcards{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(16rem,1fr));gap:.5rem}
+.shvcard{display:flex;align-items:center;gap:.25rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);transition:transform .15s ease,opacity .15s ease}
+.shvcard:hover{border-color:var(--bg4)}
+.shvcl{flex:1;min-width:0;display:flex;align-items:center;gap:.625rem;padding:.75rem;color:var(--text);text-decoration:none}
+.shvcl > svg.i{color:var(--accent)}
+.shvct{display:flex;flex-direction:column;min-width:0}
+.shvct b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shvct .muted{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shvnsp{display:flex;flex-direction:column;gap:.25rem;margin-bottom:.5rem}
+/* the formula bar */
+.shvbar{display:flex;align-items:center;gap:.375rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);padding:.25rem .375rem}
+.shvaddr{min-width:3.5rem;max-width:9rem;padding:0 .375rem;font:var(--fs-m) var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shvfx{font:italic 600 var(--fs-s) var(--mono);color:var(--faint)}
+#shv-in{flex:1;border:0;background:none;padding:.25rem;font-family:var(--mono);font-size:var(--fs-m)}
+.shvpres{display:flex;align-items:center;gap:.375rem;font-size:var(--fs-s);color:var(--muted)}
+/* grid + panel */
+.shvbody{display:grid;grid-template-columns:minmax(0,1fr) 17.5rem;gap:.75rem;min-height:0}
+.shvgridw{min-width:0;display:flex;flex-direction:column;gap:.375rem}
+.shvscroll{position:relative;overflow:auto;max-height:calc(100dvh - 15rem);border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg);outline:0}
+.shvscroll:focus-visible{box-shadow:0 0 0 .125rem var(--accent-soft)}
+.shvgrid{border-collapse:separate;border-spacing:0;table-layout:fixed;width:max-content;font-size:var(--fs-m)}
+.shvgrid th,.shvgrid td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);height:2rem;padding:0 .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shvgrid thead th{position:sticky;top:0;z-index:3;background:var(--bg2);font-weight:500;text-align:left;padding:0}
+.shvrhc{width:2.75rem}.shvaddcc{width:2.5rem}
+.shvcorner,.shvrh{position:sticky;left:0;z-index:2;background:var(--bg2)}
+.shvgrid thead .shvcorner{z-index:4}
+.shvrh{padding:0!important;text-align:center}
+.shvrh button{width:100%;height:100%;min-height:2rem;font:var(--fs-s) var(--mono);color:var(--muted)}
+.shvrh button:hover{color:var(--text);background:var(--bg3)}
+.shvch{position:relative}
+.shvchb{display:flex;align-items:center;gap:.375rem;width:100%;height:2rem;padding:0 .5rem;text-align:left;color:var(--text)}
+.shvchb:hover{background:var(--bg3)}
+.shvlet{font:var(--fs-xs) var(--mono);color:var(--faint);flex:none}
+.shvchb .shvct{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.shvchb svg.i{color:var(--accent)}
+.shvrsz{position:absolute;top:0;right:-.1875rem;width:.375rem;height:100%;cursor:col-resize;z-index:2}
+.shvrsz:hover{background:var(--accent);opacity:.5}
+.shvaddc{text-align:center}
+.shvpad{border-right:0!important}
+.shvc{position:relative;cursor:cell;user-select:none;background:var(--bg)}
+.shvc.num{text-align:right;font-variant-numeric:tabular-nums}
+.shvc.k-date{font-variant-numeric:tabular-nums}
+/* where a value comes from: own = normal, formula = quiet, Kalmido = the accent, frozen = grey */
+.shvc.o-formula{color:var(--text2)}
+.shvc.o-kalmido{color:var(--accent);font-weight:500}
+.shvc.o-frozen{color:var(--muted);background:repeating-linear-gradient(135deg,transparent 0 .375rem,var(--bg2) .375rem .75rem)}
+.shvc.o-frozen svg.i{margin-right:.25rem;vertical-align:-.125rem}
+.shvc.err{color:var(--danger)}
+.shverr{display:inline-flex;align-items:center;gap:.25rem;color:var(--danger)}
+.shvlast{margin-left:.375rem;color:var(--muted);text-decoration:line-through}
+.shvc.ag{box-shadow:inset 0 0 0 .0625rem color-mix(in srgb,var(--st-work) 70%,transparent)}
+.shvc.shvpc{box-shadow:inset 0 0 0 .125rem var(--st-wait)}
+/* selection colours: a filled label in the cell (ink picked for contrast), the cell or the whole row tinted */
+.shvopt{display:inline-block;max-width:100%;padding:.0625rem .5rem;border-radius:1rem;background:var(--bg3);overflow:hidden;text-overflow:ellipsis;vertical-align:middle;font-size:var(--fs-s)}
+.shvopt.fill{background:var(--fc);color:var(--fct,#111);font-weight:500}
+.shvc.shvcc{background:color-mix(in srgb,var(--shc) 16%,var(--bg))}
+.shvrc > td.shvc{background:color-mix(in srgb,var(--shr) 16%,var(--bg))}
+.shvdd{position:absolute;right:.25rem;top:50%;transform:translateY(-50%);color:var(--faint);opacity:0;transition:opacity .15s ease;pointer-events:none}
+.shvc.k-select{padding-right:1.5rem}
+.shvc.cur .shvdd,.shvc:hover .shvdd{opacity:1}
+.shvgrid .shvc.sel{background:var(--accent-soft)}
+.shvc.cur{box-shadow:inset 0 0 0 .125rem var(--accent);z-index:1}
+.shvc.editing{padding:0;overflow:visible;z-index:5}
+.shvin{position:absolute;inset:0;width:max(100%,14rem);height:100%;border-radius:0;border:.125rem solid var(--accent);background:var(--bg);padding:0 .4375rem;font-family:var(--mono);font-size:var(--fs-m);color:var(--text);box-shadow:var(--shadow)}
+.shvfoot{display:flex;align-items:center;gap:.75rem;font-size:var(--fs-s)}
+/* dependency arrows above the grid */
+.shvdeps{position:absolute;pointer-events:none;z-index:2;overflow:visible}
+.shvdeps path{fill:none;stroke:var(--accent);stroke-width:1.5;opacity:.85}
+.shvdeps marker path,.shvdeps circle{fill:var(--accent);stroke:none}
+/* the panel */
+.shvside{display:flex;flex-direction:column;gap:.75rem;min-width:0;max-height:calc(100dvh - 12rem);overflow:auto}
+.shvsec{border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);padding:.625rem .75rem;display:flex;flex-direction:column;gap:.375rem}
+.shvsec h4{margin:0;font-size:var(--fs-m);font-weight:600}
+.shvsec h5{margin:.375rem 0 0;font-size:var(--fs-s);font-weight:600;color:var(--muted)}
+.shvrow2{display:flex;flex-direction:column;gap:.25rem;font-size:var(--fs-s);color:var(--muted)}
+.shvrow2 input{font-family:var(--mono);color:var(--text)}
+.shvkv{display:flex;gap:.5rem;align-items:baseline;font-size:var(--fs-s)}
+.shvkv > span:first-child{min-width:4.5rem;color:var(--muted)}
+.shvval{font-weight:600;overflow-wrap:anywhere}
+.shvval.o-kalmido,.shvorg.o-kalmido{color:var(--accent)}
+.shvval.o-frozen,.shvorg.o-frozen{color:var(--muted)}
+.shvcode{font:var(--fs-s) var(--mono);background:var(--bg3);border-radius:var(--r-s);padding:.125rem .375rem;overflow-wrap:anywhere;white-space:pre-wrap}
+.shvrefs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.25rem;font-size:var(--fs-s)}
+.shvrefs li{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;min-height:1.75rem}
+.shvsrc{display:inline-flex;align-items:center;gap:.25rem;color:var(--accent);text-decoration:none}
+.shvbat.undone{opacity:.6}
+.shvbat > span{flex:1;min-width:0}
+/* suggestions after "=" */
+.shvac{position:fixed;z-index:80;display:flex;flex-direction:column;min-width:16rem;max-width:min(28rem,calc(100vw - 1rem));max-height:16rem;overflow:auto;background:var(--bg);border:1px solid var(--line2);border-radius:var(--radius);box-shadow:var(--shadow)}
+.shvac button{display:flex;align-items:center;gap:.5rem;min-height:2.25rem;padding:0 .625rem;text-align:left;color:var(--text)}
+.shvac button.on,.shvac button:hover{background:var(--accent-soft)}
+.shvac code{font:var(--fs-s) var(--mono);color:var(--accent)}
+.shvacl{flex:1;min-width:0;font-size:var(--fs-s);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shvacv{font:var(--fs-s) var(--mono);color:var(--text2)}
+/* filter popover, long-press tip, column dialog */
+.shvfpop,.shvtip{display:flex;flex-direction:column;gap:.5rem;padding:.5rem;min-width:15rem}
+.shvfpop .foot,.shvtip .foot{display:flex;gap:.5rem}
+.shvfo{display:flex;flex-direction:column;gap:.25rem}
+.shvfr{display:flex;gap:.5rem}
+.shvfr label,.shvfq{display:flex;flex-direction:column;gap:.25rem;font-size:var(--fs-s);color:var(--muted);flex:1}
+.shvmode{border:0;padding:0;margin:.5rem 0 0;display:flex;flex-direction:column;gap:.25rem}
+.shvmode legend{font-size:var(--fs-s);color:var(--muted);padding:0;margin-bottom:.25rem}
+/* touch: larger targets, the panel under the grid */
+@media (hover: none){
+  .shvgrid th,.shvgrid td{height:2.75rem}
+  .shvchb{height:2.75rem}
+  .shvrh button{min-height:2.75rem}
+  .shvdd{opacity:1}
+}
+@media (max-width:899px){
+  .shvbody{grid-template-columns:minmax(0,1fr)}
+  .shvscroll{max-height:60dvh}
+  .shvside{max-height:none;overflow:visible}
+  .shvbk{display:none}
+  .shvcards{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion: reduce){ .shvcard,.shvdd{transition:none} }
+/* 2.89.0 (#1916, D): step 2 -- the mark of a row carried over into a task, the fields of the carry-over dialogs */
+.shvrh .sh2mark{display:inline-flex;margin-left:.125rem;color:var(--accent);vertical-align:middle}
+.sh2f{display:flex;flex-direction:column;gap:.25rem;margin:0 0 .625rem}
+.sh2f span{font-size:var(--fs-s);color:var(--muted)}
+.sh2f select{min-height:2.75rem}
+.sh2rows{border:0;padding:0;margin:.25rem 0 .5rem;display:flex;flex-direction:column;gap:.375rem}
+.sh2rows label{display:flex;align-items:center;gap:.5rem;min-height:2.75rem}

@@ -35,7 +35,8 @@ PK2_SHOOT_KEY, PK2_OFFER_KEY, PK2_LIST_KEY, PK2_PROJECT_KEY = 300, 400, 100, 200
 # the modules a setup proposal may switch (the keys of the client's FEATS, static/js/core.js)
 PK2_MODS = ("cal", "timeline", "matrix", "habits", "pomo", "kanban", "collab", "stats", "time", "progress", "deps", "fields",
             "agents", "comments", "family", "events", "contacts", "contracts", "home", "care", "health", "review", "travel",
-            "reading", "clients", "workload", "forms", "office", "wiki", "files", "dispo")
+            "reading", "clients", "workload", "forms", "office", "wiki", "files", "dispo",
+            "sheets")  # 2.89.0 (#1916)
 PK2_OPEN_MAX = 10   # open (ready, undecided) inquiry / setup proposals an agent made on its own per person
 PK2_OPEN_AGENT_MAX = 50   # 2.51.0 (#1351) review: ... and per agent in all
 

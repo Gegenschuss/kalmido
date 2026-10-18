@@ -2858,6 +2858,50 @@ organisation or its list limit). The agent answers with ONE sentence; the person
 - Nothing is ever cancelled, sent or deleted. Health lists and the journal never reach an agent (no event, no read, no
   scope `private` for agents), also when a person tries to share a health list with it.
 
+## Tables (2.89.0)
+
+Tables are "Excel in simple": lists and formulas whose cells may fetch Kalmido numbers (`projekt.<name>.zeit_gesamt`,
+`kunde.<name>.satz`, `hier.offen` ...). Two scopes, both off for new agents and not part of the legacy `write`:
+`sheets:read` and `sheets:write` (permissions *Read tables* / *Write tables*).
+
+**What an agent sees.** Only what is shared with it: tables attached to a project / list it sees (its list limit applies,
+never a list with the lock) and the tables it created itself. A personal agent creates in the space `private` for its owner
+(the person sees the table in the app), a team agent in `org:<id>` of its own workspace (another workspace: 404).
+Every value is calculated with the agent's visibility: a project / list / client not shared with it gives the cell error
+`denied` without value and without name - never guess such a value.
+
+**One call = one batch.** Every write call of an agent is one batch (its id comes back as `batch`); the cells carry the
+agent and the batch, the people see "changed by <agent>" and take the whole call back with one click (or the agent with
+`sheet_undo_batch`): cells get their former input unless someone changed them since, added rows / columns go to the trash,
+a table the call created too. A wrong formula changes nothing (400 with the reason).
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| Tables you may read | `GET /api/v1/sheets` | `sheets_list` | sheets:read |
+| One table (columns, rows, cells with input, value, error) | `GET /api/v1/sheets/{id}` | `sheet_read` | sheets:read |
+| What formulas of a table may use | `GET /api/v1/sheets/{id}/vars` | `sheet_vars` | sheets:read |
+| Create a table in one step | `POST /api/v1/sheets` | `sheet_create` | sheets:write |
+| Rename / attach to a list | `PATCH /api/v1/sheets/{id}` | `sheet_update` | sheets:write |
+| Set cells | `PUT /api/v1/sheets/{id}/cells` | `sheet_set_cells` | sheets:write |
+| Append rows | `POST /api/v1/sheets/{id}/rows` | `sheet_append_rows` | sheets:write |
+| Add a column | `POST /api/v1/sheets/{id}/columns` | `sheet_add_column` | sheets:write |
+| Take back one of your calls | `POST /api/v1/sheets/{id}/batches/{batch}/undo` | `sheet_undo_batch` | sheets:write |
+
+- **Inputs**: numbers `1,5` or `1.5`, dates `DD.MM.YYYY` or `YYYY-MM-DD`, a select cell its label (a new label becomes a
+  new choice). Formulas start with `=`: `A1`, ranges `B2:B9`, cell names, column names (all cells of the column but the
+  formula's own), `+ - * /`, `&`, `19%`, comparisons, `SUMME`/`SUM`, `MITTELWERT`/`AVERAGE`, `MIN`, `MAX`, `ANZAHL`/`COUNT`,
+  `WENN`/`IF`, `RUNDEN`/`ROUND`, `HEUTE`/`TODAY`, `TAGE`/`DAYS`; arguments with `;` (`,` works too).
+- **Columns** (`sheet_create`, `sheet_add_column`): `{title, kind text|number|currency|percent|date|select, options?:
+  [{label, color?: "#rrggbb"}], color_mode?: cell|row}`. Colours: best the app's palette (the colours of list fields).
+- **Kalmido variables**: `projekt.<name>.<field>`, `liste.<name>.<field>` (fields `zeit_gesamt` hours, `aufgaben`, `offen`,
+  `erledigt`, `budget_h`), `kunde.<name>.<field>` (`satz`, `budget_h`, `budget_betrag`, `zeit_gesamt`), `hier.<field>`
+  (the attached project / list). `<name>` is the lower-case name with `_` for spaces; `sheet_vars` lists them with their
+  current value. Only sources of the table's space count (an organisation's table: that organisation's).
+- **Example - birthdays in the next 4 weeks**: `search_contacts` (scope `contacts`; each contact has `bday` as
+  `YYYY-MM-DD` or `--MM-DD` without a year), keep the people whose birthday falls into the next 28 days, then ONE
+  `sheet_create` with columns `Name` (text), `Geburtstag` (date), `Alter` (number, empty without a year) and one row per
+  person, sorted by day. Say in your answer where the table is; the person can take it back as a whole.
+
 ## Built-in assistant vs. your own agents (2.75.0)
 
 Since 2.75.0 an operator can configure a **built-in assistant** ([ASSISTANT.md](ASSISTANT.md)): Kalmido then calls one

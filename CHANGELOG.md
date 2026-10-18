@@ -7,7 +7,7 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-## [2.88.2] - 2026-10-18
+## [2.89.1] - 2026-10-18
 
 Freelancer parity, an office menu in four groups, import targets you confirm, Paperless-ngx in the settings and a round of polish.
 
@@ -44,6 +44,34 @@ Freelancer parity, an office menu in four groups, import targets you confirm, Pa
 ### Fixed
 - The Paperless-ngx import progress no longer stops when the settings are closed and opened again; it asks again after a lost
   answer and reports when it is done (#1938).
+
+## [2.89.0] - 2026-10-18
+
+Tables: Excel made simple, with Kalmido values in the cells.
+
+### Added
+- Tables (module *Tables*, off by default): own area in the sidebar, private or per organisation, optionally attached
+  to a project or list (then `hier.zeit_gesamt` and friends know its data). Grid with keyboard like a spreadsheet,
+  copy and paste of ranges, sorting and filters, every action one undo step (#1916).
+- Formulas: `+ - * /`, `%`, text with `&`, comparisons, SUMME, MITTELWERT, MIN, MAX, ANZAHL, WENN, RUNDEN, HEUTE, TAGE
+  (English names work too), date + days, own cell names (`tagessatz` instead of `B4`), column names as ranges and
+  completion after `=` (#1916).
+- Kalmido variables: `projekt.<name>.zeit_gesamt`, `liste.<name>.offen`, `kunde.<name>.satz`, `aufgabe.<id>.status` …,
+  stored by id, so renaming a project, list, client, cell or column updates every formula; a deleted source shows
+  *Source deleted* with the last value you saw; every value is computed with the viewer's own rights (#1916).
+- Transparency: cells coloured by origin (own number, formula, Kalmido value in the accent colour, frozen grey),
+  *Comes from / Goes into* in the side panel, dependency arrows, the sources of a sheet, *Freeze value* per cell (#1916).
+- Selection columns with own options and one colour each, for the cell or the whole row; filter and sort by them (#1916).
+- Import and export as CSV and Excel (.xlsx with formulas, number formats, drop-down validation and colours) (#1916).
+- Team: saving per cell, *X is editing* and automatic refresh every few seconds (#1916).
+- Step 2: *Create tasks from rows*, *Turn into a quotation* (draft in Office) and *List as rows* (live task values),
+  only by button, with a trace in both directions and undo (#1916).
+- Agent API and MCP: list, read, create a whole sheet in one call (columns, selection options with colours, rows,
+  formulas), set cells, append rows, add columns, undo a batch; scopes `sheets:read` / `sheets:write`; every agent
+  change is marked and can be taken back, a created sheet as a whole (#1916).
+
+### Changed
+- The account export carries the person's private tables, the organisation export the organisation's (#1916).
 
 ## [2.88.1] - 2026-10-18
 

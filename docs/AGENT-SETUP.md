@@ -164,7 +164,11 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    when the agent may read old fixed costs (a spreadsheet, a PDF, any format) and send them as ONE import proposal in the
    JSON shape of [AGENTS.md](AGENTS.md#importing-old-data-into-the-office-2680). The person checks the preview (new /
    already there / error per row) and takes the rows over into their office; the agent never sees or writes the office.
-9. Rules of a list (2.71.0): an agent with the permission *Structure* may propose a rule for a list shared with it; the
+9. Optional, **Tables** (2.89.0): turn on *Read tables* / *Write tables* (scopes `sheets:read` / `sheets:write`, off by
+   default) when the agent may read or fill tables, e.g. "put everyone with a birthday in the next 4 weeks into a table".
+   It sees only tables attached to a list shared with it and those it created; every write call can be taken back as a
+   whole ([AGENTS.md](AGENTS.md#tables-2890)).
+10. Rules of a list (2.71.0): an agent with the permission *Structure* may propose a rule for a list shared with it; the
    list's owner or an admin accepts it with 👍 and the rule then runs with their rights
    ([AGENTS.md](AGENTS.md#rules-of-a-list-2710)).
 
