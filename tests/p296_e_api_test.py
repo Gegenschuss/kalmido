@@ -228,8 +228,8 @@ for s in (A, Bo, Ca, Da, Er):
 # ================================================================ 1. files + document: Alpha -> private (tenant-matrix: file)
 WORD_F, WORD_D = "Kirschbaumholz", "Sonnenblumenfeld"
 AKTE = folder(Ca, "Akte", space=SP)
-FTXT = f"Akte {WORD_F} Notiz {os.urandom(4).hex()}".encode()
-FILE = upload(Ca, "akte.txt", FTXT, parent=AKTE)
+FTXT = text_pdf([f"Akte {WORD_F} Notiz", os.urandom(4).hex()])  # a PDF: plain text files are no recognition type
+FILE = upload(Ca, "akte.pdf", FTXT, parent=AKTE)
 DOC = doc_up(Ca, "rechnung.pdf", ["Gaertnerei Beispiel", f"Rechnung {WORD_D} 2026", "Rosen Tulpen"], SP)
 d = done(Ca, DOC)
 check(d and d["state"] == "done", f"setup: the document is recognised ({d and d['state']})")
@@ -330,12 +330,13 @@ check(any(x["action"] == "moved_space" for x in log) and LOG_BEFORE <= {(x["acti
 
 # ================================================================ 2. files + document: private -> Alpha (not Beta)
 PRIV = folder(Ca, "Privatordner")
-PF = upload(Ca, "plan.txt", b"Plan Holunderbluete " + os.urandom(4).hex().encode(), parent=PRIV)
+PF = upload(Ca, "plan.pdf", text_pdf(["Plan Holunderbluete", os.urandom(4).hex()]), parent=PRIV)
 PD = doc_up(Ca, "beleg.pdf", ["Baumarkt Beispiel", "Beleg Holunderbluete Schrauben"])
 done(Ca, PD)
 Ca.patch(B + f"/api/docs/{PD}", json={"sender": "Baumarkt Beispiel", "tags": ["Werkzeug"]})
-settled("fs", PF)
-check(Ca.post(B + f"/api/files/nodes/{PRIV}/shares", json={"user_id": DAVE, "role": "view"}).status_code == 201, "setup: shared with dave (Beta)")
+check(settled("fs", PF) == "found", "setup: the text of the private file is recognised")
+# a share with someone outside Alpha (the app offers only people one may see; the row as an older share left it)
+dbx("INSERT INTO fs_shares(node_id, user_id, role, created_by, created_at) VALUES(?,?,?,?,?)", (PRIV, DAVE, "view", CAROL, ts))
 check(Ca.post(B + f"/api/files/nodes/{PRIV}/shares", json={"user_id": ERIN, "role": "view"}).status_code == 201, "setup: shared with erin (Alpha)")
 check(Da.get(B + f"/api/files/nodes/{PF}/content").ok, "before: dave reads the file")
 OLD_V = versions(PF) + versions(PD)
@@ -429,52 +430,55 @@ check(list(dbx("SELECT org_id, owner_id, list_id FROM sheets WHERE id=?", (SID,)
 check(Ca.get(B + f"/api/sheets/{SID}").json().get("space") == "private", "carol opens it in her private space")
 
 # ================================================================ 5. a list with task, comment and file (existing move: PATCH org_id)
-L = Ca.post(B + "/api/lists", json={"name": "Teamliste Apfel", "org_id": ORG}).json()["id"]
-check(Ca.patch(B + f"/api/lists/{L}", json={"org_visibility": "org"}).ok, "setup: open to everyone in Alpha")
-T = Ca.post(B + "/api/tasks", json={"title": "Apfelernte planen", "list_id": L}).json()["id"]
-check(Ca.post(B + f"/api/tasks/{T}/comments", json={"body": "Kommentar Birnenmus"}).ok, "setup: a comment")
-ATXT = b"Anhang Quittengelee " + os.urandom(4).hex().encode()
-check(Ca.post(B + f"/api/tasks/{T}/attachments", files={"file": ("liste.txt", ATXT, "text/plain")}).ok, "setup: a file on the task")
+# bob owns the list (and Alpha's agent); carol and erin are colleagues who see it only through "everyone in the organisation"
+L = Bo.post(B + "/api/lists", json={"name": "Teamliste Apfel", "org_id": ORG}).json()["id"]
+check(Bo.patch(B + f"/api/lists/{L}", json={"org_visibility": "org"}).ok, "setup: open to everyone in Alpha")
+T = Bo.post(B + "/api/tasks", json={"title": "Apfelernte planen", "list_id": L}).json()["id"]
+check(Bo.post(B + f"/api/tasks/{T}/comments", json={"body": "Kommentar Birnenmus"}).ok, "setup: a comment")
+ATXT = text_pdf(["Anhang Quittengelee", os.urandom(4).hex()])
+check(Bo.post(B + f"/api/tasks/{T}/attachments", files={"file": ("liste.pdf", ATXT, "application/pdf")}).ok, "setup: a file on the task")
 AID = one("SELECT id FROM attachments WHERE task_id=? ORDER BY id DESC LIMIT 1", (T,))
 APATH = one("SELECT path FROM attachments WHERE id=?", (AID,))
-settled("att", AID)
+check(settled("att", AID) == "found", "setup: the file's text is recognised")
 check(until(lambda: head_space(APATH) == ORG, 30), f"before: the file is sealed for Alpha ({head_space(APATH)})")
-r = Bo.post(B + "/api/files/links", json={"ref_kind": "att", "ref_id": AID, "space": SP})
+r = Ca.post(B + "/api/files/links", json={"ref_kind": "att", "ref_id": AID, "space": SP})
 LINK = r.json().get("id") if r.status_code == 201 else None
-check(LINK, f"setup: bob links the file in Alpha's file store ({r.status_code} {r.text[:200]})")
-check(Ca.put(B + f"/api/lists/{L}/members", json={"user_id": AGID, "role": "edit"}).ok, "setup: Alpha's agent joins the list")
-check(lst(Bo, L) and T in task_ids(Bo) and Bo.get(B + f"/api/attachments/{AID}").ok, "before: bob sees list, task and file")
+check(LINK, f"setup: carol links the file in Alpha's file store ({r.status_code} {r.text[:200]})")
+r = Bo.put(B + f"/api/lists/{L}/members", json={"user_id": AGID, "role": "edit", "bridge_ok": True})
+check(r.ok, f"setup: Alpha's agent joins the list ({r.status_code} {r.text[:200]})")
+check(lst(Ca, L) and T in task_ids(Ca) and Ca.get(B + f"/api/attachments/{AID}").ok, "before: carol sees list, task and file")
+check(Ca.get(B + f"/api/files/nodes/{LINK}/content").ok if LINK else False, "before: carol's link opens the file")
 check(v1(AGT, f"/lists/{L}").ok and v1(AGT, f"/tasks/{T}").ok, "before: the agent sees list and task")
-r = Ca.patch(B + f"/api/lists/{L}", json={"org_id": None})
+r = Bo.patch(B + f"/api/lists/{L}", json={"org_id": None})
 check(r.status_code == 409 and one("SELECT org_id FROM lists WHERE id=?", (L,)) == ORG, f"an agent of Alpha in the list blocks the move ({r.status_code})")
-check(Ca.delete(B + f"/api/lists/{L}/members/{AGID}").ok, "carol takes the agent out")
-r = Ca.patch(B + f"/api/lists/{L}", json={"org_id": None})
-check(r.ok and one("SELECT org_id FROM lists WHERE id=?", (L,)) is None, f"carol takes the list into her private space ({r.status_code} {r.text[:200]})")
-check(lst(Bo, L) is None and T not in task_ids(Bo), "after: bob's state shows neither list nor task")
-check(gone(Bo.get(B + f"/api/tasks/{T}")) and gone(Bo.get(B + f"/api/tasks/{T}/timeline")), "after: bob gets 404 on the task and its comments")
-check(gone(Bo.get(B + f"/api/attachments/{AID}")), "after: bob gets 404 on the file")
-sr = Bo.get(B + "/api/tasks", params={"scope": "search", "q": "Apfelernte"})
-check(T not in [t["id"] for t in sr.json().get("tasks", [])] if sr.ok else True, "after: bob's task search finds nothing")
-check(LINK and Bo.get(B + f"/api/files/nodes/{LINK}/content").status_code != 200, "after: bob's link in Alpha's file store no longer opens the file")
-lj = Bo.get(B + f"/api/files/nodes/{LINK}").json() if LINK else {}
-check(not lj or lj.get("no_access") or lj.get("ref_kind") is None or "Quittengelee" not in json.dumps(lj), "after: the link shows nothing of the file")
-check(Er.get(B + f"/api/tasks/{T}").status_code in (403, 404) and lst(Er, L) is None, "after: erin (Alpha, not a list member) sees nothing")
+check(Bo.delete(B + f"/api/lists/{L}/members/{AGID}").ok, "bob takes the agent out")
+r = Bo.patch(B + f"/api/lists/{L}", json={"org_id": None})
+check(r.ok and one("SELECT org_id FROM lists WHERE id=?", (L,)) is None, f"bob takes the list into his private space ({r.status_code} {r.text[:200]})")
+for who, s in (("carol", Ca), ("erin", Er)):
+    check(lst(s, L) is None and T not in task_ids(s), f"after: {who}'s state shows neither list nor task")
+    check(gone(s.get(B + f"/api/tasks/{T}")) and gone(s.get(B + f"/api/tasks/{T}/timeline")), f"after: {who} gets 404 on the task and its comments")
+    check(gone(s.get(B + f"/api/attachments/{AID}")), f"after: {who} gets 404 on the file")
+    sr = s.get(B + "/api/tasks", params={"scope": "search", "q": "Apfelernte"})
+    check(not sr.ok or T not in [t["id"] for t in sr.json().get("tasks", [])], f"after: {who}'s task search finds nothing")
+    check(AID not in [x.get("id") for x in (s.get(B + "/api/files/search", params={"q": "quittengelee"}).json() or {}).get("items", [])],
+          f"after: {who}'s file search finds nothing of the file")
+check(LINK and Ca.get(B + f"/api/files/nodes/{LINK}/content").status_code != 200, "after: carol's link in Alpha's file store no longer opens the file")
 for p in (f"/lists/{L}", f"/tasks/{T}", f"/tasks/{T}/comments", f"/tasks/{T}/attachments"):
     check(gone(v1(AGT, p)), f"after: the agent gets 404 on {p}")
 check(L not in [x["id"] for x in v1(AGT, "/lists").json().get("data") or []], "after: the agent's lists no longer show it")
-check(one("SELECT COUNT(*) FROM list_members WHERE list_id=? AND user_id=?", (L, AGID)) == 0 and
-      one("SELECT COUNT(*) FROM group_shares WHERE list_id=?", (L,)) == 0, "db: no agent / group share left")
-check(until(lambda: head_space(APATH) == -CAROL, 60), f"disk: the settle pass sealed the file for carol's account ({head_space(APATH)})")
-check(Ca.get(B + f"/api/attachments/{AID}").content == ATXT, "carol reads the file")
-tl = Ca.get(B + f"/api/tasks/{T}/timeline").json()
-check(any("Birnenmus" in (c.get("body") or "") for c in tl.get("comments", [])), "carol reads the comment")
-if dbx("SELECT 1 FROM file_text WHERE kind='att' AND ref_id=?", (AID,)):
-    check(until(lambda: one("SELECT ws FROM file_text WHERE kind='att' AND ref_id=?", (AID,)) == f"u{CAROL}", 60),
-          "db: the file's recognised text belongs to carol's workspace (sweep)")
-# private -> organisation with someone of another organisation in the list: refused
-PL = Ca.post(B + "/api/lists", json={"name": "Mit Dave", "org_id": None}).json()["id"]
-check(Ca.put(B + f"/api/lists/{PL}/members", json={"user_id": DAVE, "role": "edit"}).ok, "setup: carol shares a private list with dave")
-r = Ca.patch(B + f"/api/lists/{PL}", json={"org_id": ORG})
+check(one("SELECT COUNT(*) FROM list_members WHERE list_id=?", (L,)) == 0 and
+      one("SELECT COUNT(*) FROM group_shares WHERE list_id=?", (L,)) == 0, "db: no member / group share left")
+check(until(lambda: head_space(APATH) == -BOB, 60), f"disk: the settle pass sealed the file for bob's account ({head_space(APATH)})")
+check(Bo.get(B + f"/api/attachments/{AID}").content == ATXT, "bob reads the file")
+tl = Bo.get(B + f"/api/tasks/{T}/timeline").json()
+check(any("Birnenmus" in (c.get("body") or "") for c in tl.get("comments", [])), "bob reads the comment")
+check(until(lambda: one("SELECT ws FROM file_text WHERE kind='att' AND ref_id=?", (AID,)) == f"u{BOB}", 60) and
+      one("SELECT org_id FROM file_text WHERE kind='att' AND ref_id=?", (AID,)) is None,
+      f"db: the file's recognised text belongs to bob's workspace (sweep) ({one('SELECT ws FROM file_text WHERE kind=? AND ref_id=?', ('att', AID))})")
+# private -> organisation with someone of another organisation in the list: refused (the row as an older share left it)
+PL = Bo.post(B + "/api/lists", json={"name": "Mit Dave", "org_id": None}).json()["id"]
+dbx("INSERT INTO list_members(list_id, user_id, role, added_at) VALUES(?,?,?,?)", (PL, DAVE, "edit", ts))
+r = Bo.patch(B + f"/api/lists/{PL}", json={"org_id": ORG})
 check(r.status_code == 409 and one("SELECT org_id FROM lists WHERE id=?", (PL,)) is None, f"dave (Beta) in it: no move into Alpha ({r.status_code})")
 
 # ================================================================ 6. learning: the source forgets, the target knows (#1941, 21:20)
@@ -483,7 +487,6 @@ TRAIN = [("vers1.pdf", ["Versicherung Beispiel AG", "Police Haftpflicht Beitrag"
          ("stadt1.pdf", ["Stadtwerke Musterstadt", "Abschlag Strom Kilowattstunden", "Zaehlerstand Verbrauch"], "Stadtwerke Musterstadt", "Abschlag"),
          ("stadt2.pdf", ["Stadtwerke Musterstadt", "Jahresabrechnung Strom Verbrauch", "Kilowattstunden Zaehlerstand"], "Stadtwerke Musterstadt", "Abschlag")]
 PROBE = ["Versicherung Beispiel AG", "Police Haftpflicht Beitrag Hausrat", "Beitragsrechnung"]
-EU = f"u{ERIN}"
 tids = []
 for name, lines, sender, typ in TRAIN:
     nid = doc_up(Er, name, lines)
