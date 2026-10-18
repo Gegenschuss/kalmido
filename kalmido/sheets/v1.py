@@ -20,7 +20,7 @@ from ..core.i18n import tr
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields, v1_args, v1_json, v1_view
 from .core import (SH_KINDS, sh_add_col, sh_add_rows, sh_brief, sh_check_list, sh_clean_title, sh_create, sh_dict, sh_index,
-                   sh_need, sh_reload, sh_set_cells, sh_touch, sh_undo_batch, sh_vars)
+                   sh_may_rebind, sh_need, sh_reload, sh_set_cells, sh_touch, sh_undo_batch, sh_vars)
 
 SHX_CREATE_FIELDS = ("title", "space", "list_id", "columns", "rows")
 
@@ -129,7 +129,11 @@ def v1_sheet_patch(sid):
     if "title" in b:
         f["title"] = sh_clean_title(b["title"]) or r["title"]
     if "list_id" in b:
-        f["list_id"] = sh_check_list(c, r["org_id"], _int_or_none(b["list_id"], "list_id"), me())
+        lid = _int_or_none(b["list_id"], "list_id")
+        if lid != r["list_id"]:
+            if not sh_may_rebind(c, me(), r):
+                raise Denied(403)  # 2.89.0 (#1916): review 2, the rule of the web route; agents only on their own sheets
+            f["list_id"] = sh_check_list(c, r["org_id"], lid, me())
     if f:
         c.execute(f"UPDATE sheets SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), sid])
         sh_touch(c, sid, me())

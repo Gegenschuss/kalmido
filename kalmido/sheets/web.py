@@ -4,13 +4,13 @@ right to write it and the module "sheets" switched on (409 like the other module
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.access import MANAGE_ROLES, Denied, list_role, need_feat
+from ..core.access import Denied, need_feat
 from ..core.db import body, db, iso_ms, now_utc
 from ..core.i18n import tr
 from ..accounts.session import me
 from ..personal.timetrack import BadInput
 from .core import (SH_ROWS_MAX, ShBook, sh_add_col, sh_add_rows, sh_brief, sh_check_list, sh_clean_col, sh_clean_title,
-                   sh_col_dict, sh_create, sh_dict, sh_freeze, sh_index, sh_list_bound, sh_need, sh_need_cell, sh_options, sh_presence_set, sh_reload,
+                   sh_col_dict, sh_create, sh_dict, sh_freeze, sh_index, sh_list_bound, sh_may_rebind, sh_need, sh_need_cell, sh_options, sh_presence_set, sh_reload,
                    sh_set_cells, sh_set_name, sh_touch, sh_undo_batch, sh_vars)
 
 
@@ -80,7 +80,7 @@ def sheets_patch(sid):
     if "title" in b:
         f["title"] = sh_clean_title(b["title"]) or r["title"]
     if "list_id" in b and b["list_id"] != r["list_id"]:
-        if sh_list_bound(c, r) is not None and r["created_by"] != uid and list_role(c, r["list_id"], uid) not in MANAGE_ROLES:
+        if not sh_may_rebind(c, uid, r):
             raise Denied(403)  # detaching opens the table to the whole space: its creator or the list's owner / admins only
         f["list_id"] = sh_check_list(c, r["org_id"], b["list_id"], uid)
     if f:

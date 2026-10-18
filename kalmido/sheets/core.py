@@ -10,6 +10,7 @@ can bring them back; formulas pointing at them show "ref" meanwhile.
 The public functions (sh_*) are the interface of the web routes (sheets/web.py) and of the other parts (import / export,
 agent API, MCP, tasks / quotations from a sheet). Every result is evaluated for one viewer (Kalmido variables: sheets/vars.py).
 """
+import bisect
 import json
 import re
 import threading
@@ -17,14 +18,14 @@ import time
 
 from flask import g, has_request_context
 
-from ..core.access import Denied, WRITE_ROLES, acx_org_ok, list_role
+from ..core.access import MANAGE_ROLES, Denied, WRITE_ROLES, acx_org_ok, list_role
 from ..core.db import bump, iso_ms, now_utc
 from ..core.i18n import N_, lang, tr
 from ..core.pg import insert_id
 from ..accounts.session import me
 from ..collab.comments import user_names
 from ..personal.timetrack import BadInput
-from .formula import (SH_FUNCS, SH_RAW_MAX, ShErr, ShEval, sh_col_index, sh_col_letter, sh_fmt, sh_freeze_dump, sh_freeze_load,
+from .formula import (SH_FUNCS, SH_RAW_MAX, SH_TEXT_BUDGET, ShErr, ShEval, sh_col_index, sh_col_letter, sh_fmt, sh_freeze_dump, sh_freeze_load,
                       sh_json_value, sh_name_ok, sh_parse, sh_parse_date, sh_plain_value, sh_slug, sh_today, sh_tokens, sh_vtype)
 from .vars import SH_VAR_WORD, sh_fields_of, sh_here_value, sh_slug_of, sh_id_of, sh_source, sh_var_value
 
@@ -113,6 +114,15 @@ def sh_may(c, uid, r, write=False):
     return r["org_id"] in user_orgs(c, uid) and acx_org_ok(c, uid, r["org_id"])
 
 
+def sh_may_rebind(c, uid, r):
+    """May uid change (or remove) the list sheet r is attached to? Detaching opens the table to the whole space: a person
+    needs to be its creator or the list's owner / admin; an agent may rebind only the sheets it created itself.
+    2.89.0 (#1916): review 2 (the web and the v1 route share this rule)"""
+    if sh_is_agent(c, uid):
+        return r["created_by"] == uid
+    return sh_list_bound(c, r) is None or r["created_by"] == uid or list_role(c, r["list_id"], uid) in MANAGE_ROLES
+
+
 def sh_agent_owner(c, uid):
     """The person a private sheet of agent uid belongs to: a personal agent's owner (they see what it creates for them),
     else the agent itself. 2.89.0 C (#1916)"""
@@ -155,6 +165,7 @@ class ShBook:
         self.row_idx = {r["id"]: i for i, r in enumerate(self.rows)}
         self.col_by = {r["id"]: r for r in self.cols}
         self.cells, self.at = {}, {}
+        self._grid, self._rng, self._colc = None, {}, {}
         for x in c.execute("SELECT * FROM sheet_cells WHERE sheet_id=?", (sid,)).fetchall():
             self._add(dict(x))
         self.col_slug, self.slug_col = {}, {}
@@ -168,6 +179,39 @@ class ShBook:
     def _add(self, x):
         self.cells[x["id"]] = x
         self.at[(x["row_id"], x["col_id"])] = x
+        self._grid, self._rng, self._colc = None, {}, {}
+
+    def rect(self, r1, r2, c1, c2):
+        """The live cells inside rows r1..r2 / columns c1..c2 (indexes), row by row: only the cells that exist are visited,
+        never every position of the rectangle (A1:GR5000 = 1 million). 2.89.0 (#1916): review 3"""
+        key = (r1, r2, c1, c2)
+        if key in self._rng:
+            return self._rng[key]
+        if self._grid is None:
+            rows = {}
+            for x in self.cells.values():
+                if self.live(x):
+                    rows.setdefault(self.row_idx[x["row_id"]], []).append((self.col_idx[x["col_id"]], x["id"], x))
+            for v in rows.values():
+                v.sort(key=lambda t: t[:2])
+            self._grid = (sorted(rows), rows)
+        keys, rows = self._grid
+        out = []
+        for ri in keys[bisect.bisect_left(keys, r1):bisect.bisect_right(keys, r2)]:
+            line = rows[ri]
+            lo = bisect.bisect_left(line, c1, key=lambda t: t[0])
+            hi = bisect.bisect_right(line, c2, key=lambda t: t[0])
+            out.extend(t[2] for t in line[lo:hi])
+        self._rng[key] = out
+        return out
+
+    def col_cells(self, col_id):
+        """The cells of a live column in row order (cached; review 3)."""
+        out = self._colc.get(col_id)
+        if out is None:
+            out = [x for x in (self.at.get((r["id"], col_id)) for r in self.rows) if x] if col_id in self.col_idx else []
+            self._colc[col_id] = out
+        return out
 
     def live(self, x):
         return x is not None and x["row_id"] in self.row_idx and x["col_id"] in self.col_idx
@@ -239,6 +283,8 @@ def sh_clean_options(v):
 
 # ---------------------------------------------------------------- names <-> ids
 def _bad_formula(detail):
+    if detail == "deep":  # 2.89.0 (#1916): review 4
+        return BadInput(tr("The formula is nested too deeply"))
     return BadInput(tr("Formula error: {0}", detail) if detail else tr("Formula error"))
 
 
@@ -298,6 +344,8 @@ def sh_to_internal(c, sheet_row, text, uid, book=None, keep=""):
         sh_parse(raw[1:], lambda t: _node(t, book, sheet_row))
     except ShErr as e:
         raise _bad_formula(e.detail) from None
+    except RecursionError:  # review 4: never a 500, whatever the nesting
+        raise _bad_formula("deep") from None
     return raw
 
 
@@ -391,7 +439,11 @@ def sh_to_display(c, sheet_row, raw, book=None, uid=None):
 # ---------------------------------------------------------------- evaluation
 def _err_res(kind, detail=""):
     t = tr(SH_ERR_TEXT[kind])
-    if kind == "syntax" and detail and detail not in ("empty", "end"):
+    if kind == "type" and detail == "long":  # 2.89.0 (#1916): review 1
+        t = tr("The text is too long (at most {0} characters)", SH_RAW_MAX)
+    elif kind == "syntax" and detail == "deep":
+        t = tr("The formula is nested too deeply")
+    elif kind == "syntax" and detail and detail not in ("empty", "end"):
         t = tr("Formula error: {0}", detail)
     return {"value": None, "vtype": "empty", "display": tr(SH_ERR_TEXT[kind]), "error": kind, "error_text": t}
 
@@ -407,11 +459,9 @@ def _tree_refs(node, book, self_id, out_cells, out_vars):
         for x in _range_cells(book, node[1], node[2]):
             out_cells.add(x["id"])
     elif k == "col":
-        if node[1] in book.col_idx:
-            for r in book.rows:
-                x = book.at.get((r["id"], node[1]))
-                if x and x["id"] != self_id:
-                    out_cells.add(x["id"])
+        for x in book.col_cells(node[1]):
+            if x["id"] != self_id:
+                out_cells.add(x["id"])
     elif k == "var":
         out_vars.append(("v", node[1], node[2], node[3]))
     elif k == "here":
@@ -433,13 +483,7 @@ def _range_cells(book, a, b):
         return []
     r1, r2 = sorted((book.row_idx[xa["row_id"]], book.row_idx[xb["row_id"]]))
     c1, c2 = sorted((book.col_idx[xa["col_id"]], book.col_idx[xb["col_id"]]))
-    out = []
-    for ri in range(r1, r2 + 1):
-        for ci in range(c1, c2 + 1):
-            x = book.at.get((book.rows[ri]["id"], book.cols[ci]["id"]))
-            if x:
-                out.append(x)
-    return out
+    return book.rect(r1, r2, c1, c2)
 
 
 class _Env:
@@ -459,12 +503,13 @@ class _Env:
         book = self.ev.book
         if col_id not in book.col_idx:
             raise ShErr("ref")
-        out = []
-        for r in book.rows:
-            x = book.at.get((r["id"], col_id))
-            if x and x["id"] != self.cell_row["id"]:
-                out.append(self.ev.value_of(x["id"]))
-        return out
+        return [self.ev.value_of(x["id"]) for x in book.col_cells(col_id) if x["id"] != self.cell_row["id"]]
+
+    def spend(self, n):
+        """Text "&" built: over the budget of this evaluation = an error instead of filling the memory (review 1)."""
+        self.ev.text_left -= n
+        if self.ev.text_left < 0:
+            raise ShErr("type", "long")
 
     def var(self, typ, xid, field):
         return sh_var_value(self.ev.c, self.ev.book.sheet, self.ev.uid, typ, xid, field)
@@ -484,6 +529,7 @@ class ShEvaluator:
         self.c, self.book, self.uid, self.lg = c, book, uid, lang()
         self.currency = sh_currency(c, book.sheet)
         self.res, self.trees, self.deps, self.vars = {}, {}, {}, {}
+        self.text_left = SH_TEXT_BUDGET
 
     def value_of(self, cid):
         x = self.book.cells.get(cid)
@@ -531,13 +577,16 @@ class ShEvaluator:
             if raw.startswith("=") and not x["frozen"]:
                 formulas.append(x)
         for x in formulas:
+            cells, vs = set(), []
             try:
                 tree = sh_parse(x["raw"][1:], lambda t, _b=book: _node(t, _b, _b.sheet))
+                _tree_refs(tree, book, x["id"], cells, vs)
             except ShErr as e:
                 self.res[x["id"]] = dict(_err_res(e.kind, e.detail), origin="formula", _v=None)
                 continue
-            cells, vs = set(), []
-            _tree_refs(tree, book, x["id"], cells, vs)
+            except RecursionError:  # review 4: a stored formula from before the depth limit
+                self.res[x["id"]] = dict(_err_res("syntax", "deep"), origin="formula", _v=None)
+                continue
             self.trees[x["id"]], self.deps[x["id"]], self.vars[x["id"]] = tree, cells, vs
         # Kahn: formulas whose formula inputs are all done go first; what is left belongs to (or hangs on) a cycle
         indeg, users = {}, {}
@@ -575,6 +624,8 @@ class ShEvaluator:
             r = dict(_err_res(e.kind, e.detail), origin=origin, _v=None)
         except (OverflowError, ValueError, ZeroDivisionError):
             r = dict(_err_res("type"), origin=origin, _v=None)
+        except RecursionError:  # review 4
+            r = dict(_err_res("syntax", "deep"), origin=origin, _v=None)
         self.res[cid] = r
 
 
@@ -626,7 +677,32 @@ def sh_eval(c, sheet_row, book=None, uid=None):
                               "DO UPDATE SET value=excluded.value, at=excluded.at", (cid, uid, r["display"], ts))
             elif r["error"] == "deleted":
                 r["last_value"] = last.get(cid)
+    _hide_unknown_deleted(res, ev.deps, last)
     return res
+
+
+def _hide_unknown_deleted(res, deps, last):
+    """2.89.0 (#1916): review 7 - "Source deleted" only for a viewer who once saw the value (has a last value of a cell that
+    read it, or reads such a cell); anyone else gets "No access", exactly as for a source that exists but is hidden, so the
+    difference does not tell whether an id exists."""
+    known = {cid for cid, r in res.items() if r["error"] == "deleted" and r["origin"] == "kalmido" and cid in last}
+    todo = [cid for cid, r in res.items() if r["error"] == "deleted" and cid not in known]
+    grew = True
+    while grew and todo:
+        grew = False
+        for cid in list(todo):
+            if deps.get(cid, set()) & known:
+                known.add(cid)
+                todo.remove(cid)
+                grew = True
+    seen_src = {(x["type"], x["id"]) for cid in known for x in res[cid]["sources"] if x["deleted"]}
+    for cid in todo:
+        r = res[cid]
+        r.update({k: v for k, v in _err_res("denied").items() if k != "value"}, last_value=None)
+    for r in res.values():
+        for x in r["sources"]:
+            if x["deleted"] and (x["type"], x["id"]) not in seen_src:
+                x["deleted"], x["denied"] = False, True
 
 
 def _sources_of(c, sheet, uid, vs):

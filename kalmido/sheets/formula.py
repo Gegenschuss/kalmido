@@ -26,7 +26,9 @@ SH_FUNC_NAMES = ("SUMME", "MITTELWERT", "MIN", "MAX", "ANZAHL", "WENN", "RUNDEN"
 SH_BOOLS = {"wahr": True, "true": True, "falsch": False, "false": False}
 SH_VAR_PREFIX = {"projekt": "p", "liste": "l", "kunde": "k"}
 SH_RESERVED = set(SH_FUNCS) | set(SH_BOOLS) | set(SH_VAR_PREFIX) | {"hier", "aufgabe"}  # 2.89.0 (#1916, D): + aufgabe.<id>.<field>
-SH_MAX_DEPTH = 200  # nested references (a longer chain is reported as a cycle rather than overflowing the stack)
+SH_TEXT_BUDGET = 2_000_000  # 2.89.0 (#1916): review 1, characters "&" may build in one evaluation of a whole sheet
+SH_MAX_DEPTH = 200  # 2.89.0 (#1916): review 4, the depth of a formula's tree (=1+1+...+1 nests to the left) -> syntax "deep"
+SH_MAX_NEST = 64  # brackets / functions / signs inside each other (Excel allows 64) -> syntax "deep"
 
 _A1 = re.compile(r"\$?([A-Za-z]{1,3})\$?(\d{1,6})(?![\w.$])")
 _IDREF = re.compile(r"\{(c|col|p|l|k|t):(\d{1,18})\}((?:\.\w+)?)")
@@ -153,7 +155,12 @@ class _Parser:
     nodes the resolver returns: ("cell", id) ("range", id1, id2) ("col", id) ("var", type, id, field) ("here", field)."""
 
     def __init__(self, toks, resolve):
-        self.t, self.i, self.resolve = toks, 0, resolve
+        self.t, self.i, self.resolve, self.nest = toks, 0, resolve, 0
+
+    def deeper(self):
+        self.nest += 1
+        if self.nest > SH_MAX_NEST:
+            raise ShErr("syntax", "deep")
 
     def peek(self):
         return self.t[self.i] if self.i < len(self.t) else (None, None, 0, 0)
@@ -167,11 +174,13 @@ class _Parser:
         return node
 
     def cmp(self):
+        self.deeper()
         a = self.concat()
         if self.peek()[0] == "cmp":
             op = self.peek()[1]
             self.i += 1
             a = ("cmp", op, a, self.concat())
+        self.nest -= 1
         return a
 
     def concat(self):
@@ -201,7 +210,9 @@ class _Parser:
         k, v = self.peek()[:2]
         if k == "op" and v in "+-":
             self.i += 1
+            self.deeper()
             a = self.unary()
+            self.nest -= 1
             return ("neg", a) if v == "-" else a
         a = self.prim()
         while self.peek()[0] == "%":
@@ -272,7 +283,18 @@ class _Parser:
 
 def sh_parse(text, resolve):
     """The tree of a formula (text without "="); resolve(token) -> reference node (raises ShErr)."""
-    return _Parser(sh_tokens(text), resolve).parse()
+    tree = _Parser(sh_tokens(text), resolve).parse()
+    stack = [(tree, 1)]  # review 4: a deep tree would overflow the evaluation's stack; checked without recursion
+    while stack:
+        n, d = stack.pop()
+        if d > SH_MAX_DEPTH:
+            raise ShErr("syntax", "deep")
+        if isinstance(n, tuple):
+            stack.extend((a, d + 1) for a in n[1:] if isinstance(a, tuple))
+            for a in n[1:]:
+                if isinstance(a, list):
+                    stack.extend((x, d + 1) for x in a if isinstance(x, tuple))
+    return tree
 
 
 # ---------------------------------------------------------------- plain values
@@ -580,7 +602,13 @@ class ShEval:
             return _num(self.scalar(n[1])) / 100
         if k == "&":
             lg = self.env.lg
-            return _text(self.scalar(n[1]), lg) + _text(self.scalar(n[2]), lg)
+            a, b = _text(self.scalar(n[1]), lg), _text(self.scalar(n[2]), lg)
+            if len(a) + len(b) > SH_RAW_MAX:  # review 1: A2=A1&A1, A3=A2&A2 ... would double without end
+                raise ShErr("type", "long")
+            spend = getattr(self.env, "spend", None)
+            if spend:
+                spend(len(a) + len(b))
+            return a + b
         if k == "cmp":
             return _cmp(n[1], self.scalar(n[2]), self.scalar(n[3]))
         if k in "+-*/":

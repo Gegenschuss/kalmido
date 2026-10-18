@@ -22,7 +22,7 @@ import zipfile
 import zlib
 from datetime import date, timedelta
 from xml.etree import ElementTree as ET
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape as _sax_escape
 
 from flask import Response, jsonify, request
 
@@ -205,6 +205,14 @@ def shx_xl_formula(book, raw, self_cell, last_row):
 def _sheet_name(title):
     s = re.sub(r"[\[\]:*?/\\]", " ", title or "").strip().strip("'")[:31].strip()
     return s or "Sheet1"
+
+
+_XML_BAD = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff\ud800-\udfff]")
+
+
+def escape(s, entities=None):
+    """XML text: characters XML 1.0 cannot carry are dropped (a pasted \\x01 would make the file unreadable). 2.89.0 (#1916): review 6"""
+    return _sax_escape(_XML_BAD.sub("", s), entities or {})
 
 
 def _q(s):
@@ -431,6 +439,11 @@ class ShxGrid:
         self.rows, self.lists, self.colors, self.row_mode, self.names = [], {}, {}, set(), {}
 
 
+def _shx_too_many():
+    """2.89.0 (#1916): review 5, counted while reading (the header row may come on top)."""
+    return BadInput(tr("Too many filled cells (at most {0})", SHX_CELLS_MAX))
+
+
 def shx_read_csv(raw):
     """A CSV file (UTF-8 with or without BOM, else Windows-1252) -> ShxGrid."""
     try:
@@ -444,10 +457,14 @@ def shx_read_csv(raw):
     if not any(first.count(d) for d in (";", ",", "\t")):
         delim = ";"
     g = ShxGrid()
+    full = 0
     try:
         for i, row in enumerate(csv.reader(io.StringIO(text), delimiter=delim)):
             if i > SH_ROWS_MAX + 1:
                 raise BadInput(tr("Too many rows (at most {0})", SH_ROWS_MAX))
+            full += sum(1 for x in row[:SH_COLS_MAX + 1] if x != "")
+            if full > SHX_CELLS_MAX + SH_COLS_MAX:
+                raise _shx_too_many()
             g.rows.append([{"v": x, "f": None, "fmt": None} for x in row[:SH_COLS_MAX + 1]])
     except csv.Error:
         raise BadInput(tr("This file could not be read")) from None
@@ -560,7 +577,7 @@ def _read_xlsx(z, names, budget):
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
     sname, path, _h = visible[0]
     g = ShxGrid()
-    cells, shared = {}, {}
+    cells, shared, full = {}, {}, 0
     root = _budget_xml(z, path, budget)
     dvs, cfs = [], []
     for el in root:
@@ -620,6 +637,10 @@ def _read_xlsx(z, names, budget):
                     v = (_EPOCH + timedelta(days=int(float(v)))).isoformat()
                 except (OverflowError, ValueError):
                     pass
+            if v or f:
+                full += 1
+                if full > SHX_CELLS_MAX + SH_COLS_MAX:
+                    raise _shx_too_many()
             cells[(r, ci)] = {"v": v or "", "f": f, "fmt": fmt, "num": t in (None, "n") and bool(v)}
     if cells:
         h = max(k[0] for k in cells)
