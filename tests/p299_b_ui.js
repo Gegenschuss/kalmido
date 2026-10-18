@@ -72,9 +72,10 @@ const FEAT = 'cal,comments,collab,agents,wiki';
     await ev(`(() => { closePop(); return 1; })()`);
     // the page menu: hidden until the title row is hovered or focused (desktop)
     const op0 = await ev(`getComputedStyle(document.querySelector('.wkpage [data-wk="pmenu"]')).opacity`);
-    await ev(`(() => { document.querySelector('.wkpage [data-wk="pmenu"]').focus(); return 1; })()`); await sleep(400);
+    const hp = await ev(`(() => { const r = document.querySelector('.wkpage .wktitle h2').getBoundingClientRect(); return {x: Math.round(r.left + 10), y: Math.round(r.top + r.height / 2)}; })()`);
+    await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: hp.x, y: hp.y}]}]}); await sleep(500);
     const op1 = await ev(`getComputedStyle(document.querySelector('.wkpage [data-wk="pmenu"]')).opacity`);
-    check(+op0 === 0 && +op1 === 1, `1440: #2183 the page menu shows with keyboard focus only (${op0} -> ${op1})`);
+    check(+op0 === 0 && +op1 === 1, `1440: #2183 the page menu shows when the title row is hovered (${op0} -> ${op1})`);
   }, false);
   await firefox(async o => {  // a touch screen: the page menu is always there
     const {cmd, ev, ctx, shot} = o;
