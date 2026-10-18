@@ -246,6 +246,7 @@ ROUTES = {
     "POST /api/office/fixed-costs/delete": "office", "GET /api/office/cashflow/check": "office", "PUT /api/office/cashflow/check": "office",
     # 2.91.0 A (#1923): invoice series, office admins (p291_a_api_test.py)
     # 2.91.0 B (#1924): subscriptions and tools, office admins (p291_b_api_test.py)
+    "GET /api/office/subs": "office", "GET /api/office/subs.csv": "office",
     "POST /api/office/docs/{}/cashflow": "office",  # 2.88.0 (#1915)
     # 2.50.0 (#1196, #1197): the sales pipeline and the business figures, admins of the office area only (p250_b_api_test.py: other org 404, member 403)
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
