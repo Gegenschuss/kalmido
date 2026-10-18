@@ -121,3 +121,33 @@ Like every Kalmido variable, `aufgabe.<id>.<field>` is evaluated for the person 
 
 These buttons are for people only; agents work inside a table with the table tools and create tasks or office drafts in
 their own ways.
+
+## Tables as files: export and import
+
+**Export.** A table's menu (the three dots at the top right) has *Export as CSV* and *Export as Excel (.xlsx)*.
+
+- **CSV** holds the values only (a formula as its result), the column titles in the first row. In German, French, Spanish,
+  Italian and Dutch with `;` and the decimal comma, otherwise with `,` and the point - the way Excel opens it directly.
+  Text a spreadsheet would run as a formula (starting with `+`, `-`, `@` ...) gets a `'` in front.
+- **Excel (.xlsx)** holds values AND formulas where Excel has the same thing: addresses, ranges, column names, `SUMME`,
+  `MITTELWERT`, `MIN`, `MAX`, `ANZAHL`, `WENN`, `RUNDEN`, `HEUTE`, `TAGE` (as SUM, AVERAGE ...). A formula with a Kalmido
+  variable (`projekt.…`, `liste.…`, `kunde.…`, `hier.…`) goes in as its value, with a note on the cell showing the Kalmido
+  formula. Column kinds become number formats (currency, percent, date), a selection column a drop-down list with the colour
+  of each option (the cell or the whole row), cell names Excel names. The file opens in Excel, LibreOffice and Numbers.
+- Values are calculated with what you may see: the file never holds a value you could not see in Kalmido.
+
+**Import.** In the tables overview (the three dots next to *New table*) choose *Import CSV or Excel…*: the file becomes a
+new table in the space shown (in the tables of a project: attached to it) and opens at once.
+
+- A first row of text becomes the column titles; Kalmido recognises the column kind (number, currency, percent, date,
+  text) from the values and number formats, and an Excel drop-down list becomes a selection column (with its colours).
+- Simple Excel formulas are taken over (with the German names); what Kalmido cannot calculate (other sheets, whole
+  columns like `A:A`, unknown functions) comes in as its value - the message says how many.
+- A `=` at the start of a CSV value stays text, never a formula. At most 10 MB, 5000 rows, 200 columns.
+- Undo takes back the whole import (the table goes to the trash).
+
+**Agents.** With the permissions *Read tables* / *Write tables* (off for new agents) an agent reads and fills tables,
+for example "put everyone with a birthday in the next 4 weeks into a table". It sees only tables attached to a list
+shared with it and the ones it created (a personal agent creates them in your private space). Each of its calls is one
+step you can take back with one click; a cell using a project it does not see shows it "No access"
+([AGENTS.md](AGENTS.md#tables-2890)).
