@@ -233,6 +233,9 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.96.0 (#1941): moving data between the private space and an organisation stays with people in the app -- an agent belongs "
+     "to ONE workspace and never moves data across its boundary (the routes answer 403 to agents)",
+     ("=POST /api/files/move-space", "=POST /api/sheets/{}/move-space", "=POST /api/wiki/move-space")),
     ("2.89.0 C (#1916): arranging a table stays with people in the app -- trash / restore, removing / restoring / sorting rows and "
      "columns, changing a column, naming and freezing cells, the cursor of others; an agent creates tables with their columns "
      "in one step, writes cells, appends rows / columns and takes back its own calls",
