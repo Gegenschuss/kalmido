@@ -7,6 +7,8 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.88.1] - 2026-10-18
+
 ### Fixed
 - User administration (#1980): the tick boxes of the user list have a 44 px touch target on phones; the delete text uses
   the basket's current name in every language.
@@ -5726,7 +5728,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.80.3...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.88.1...HEAD
+[2.88.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.88.1
 [2.80.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.80.3
 [2.80.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.80.1
 [2.41.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.2
