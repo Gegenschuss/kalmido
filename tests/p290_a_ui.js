@@ -34,6 +34,8 @@ const today = TC.today();
   const org = await call(CA, 'POST', '/api/admin/orgs', {name: 'Alpha', admin_id: me.id});
   await call(CA, 'PUT', `/api/orgs/${org.id}/members`, {email: 'bob@example.com', role: 'member'});
   for (const ck of [CA, CB]) await call(ck, 'PATCH', '/api/settings', {workspace: `org:${org.id}`});
+  await call(CA, 'PUT', '/api/office/settings', {company_fields: {name: 'Studio Beispiel GmbH', street: 'Teststraße 1', zip: '20000', city: 'Hamburg', country: 'DE',
+    tax_number: '12/345/67890', iban: 'DE02120300000000202051', bic: 'BYLADEM1001', bank_name: 'Beispielbank'}});
   const cl = await call(CA, 'POST', '/api/clients', {name: 'Kunde Eins GmbH', street: 'Weg 1', zip: '10000', city: 'Berlin', country: 'DE'});
   const inv = await call(CA, 'POST', '/api/office/docs', {kind: 'invoice', client_id: cl.id, service_from: today, service_to: today, items: [{title: 'Schnitt', qty: 1, rate: 1000}]});
   check(inv.http === 201, 'an invoice ' + inv.http);

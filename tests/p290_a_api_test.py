@@ -121,7 +121,9 @@ for s, o in ((A, ORG), (Bo, ORG), (Ca, ORG2)):
 ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"}).json()
 AGH = {"Authorization": "Bearer " + ag["token"], "X-Requested-With": "kalmido"}
 A.put(B + O + "/settings", json={"company": {"name": "Studio Beispiel GmbH"}, "currency": "EUR",
-                                 "company_fields": {"name": "Studio Beispiel GmbH", "street": "Teststraße 1", "zip": "20000", "city": "Hamburg", "country": "DE"}})
+                                 "company_fields": {"name": "Studio Beispiel GmbH", "street": "Teststraße 1", "zip": "20000", "city": "Hamburg", "country": "DE",
+                                                    "tax_number": "12/345/67890", "vat_id": "DE999999999", "iban": "DE02120300000000202051", "bic": "BYLADEM1001",
+                                                    "bank_name": "Beispielbank"}})
 
 # ---------------------------------------------------------------- rights first (empty office)
 for path in (BK, BK + "/euer?year=2026", BK + "/ustva?year=2026&period=q1", BK + "/euer.csv?year=2026", BK + "/euer.pdf?year=2026"):
@@ -280,7 +282,8 @@ check(ee["income"] == [] and ee["expenses"] == [], "another person (personal off
 
 # ---------------------------------------------------------------- a person without organisation: the personal office, small business
 check(Do.get(B + O + "/settings").json().get("role") == "admin", "personal office: Dora is its admin")
-Do.put(B + O + "/settings", json={"small_business": 1, "company_fields": {"name": "Dora Film", "street": "Musterweg 2", "zip": "12345", "city": "Musterstadt", "country": "DE"}})
+Do.put(B + O + "/settings", json={"small_business": 1, "company_fields": {"name": "Dora Film", "street": "Musterweg 2", "zip": "12345", "city": "Musterstadt", "country": "DE",
+                                                                          "tax_number": "12/345/67891", "iban": "DE02120300000000202051", "bic": "BYLADEM1001", "bank_name": "Beispielbank"}})
 CP = Do.post(B + "/api/clients", json={"name": "Privatkunde Eins", "street": "Weg 1", "zip": "10000", "city": "Berlin", "country": "DE"}).json()["id"]
 r = Do.post(B + D, json={"kind": "invoice", "client_id": CP, "service_from": "2026-03-01", "service_to": "2026-03-10", "items": [{"title": "Kamera", "qty": 1, "rate": 300}]})
 assert r.status_code == 201, r.text
