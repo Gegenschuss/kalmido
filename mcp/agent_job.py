@@ -262,8 +262,9 @@ def outbox_files(outbox):
     return [p for p in fs if os.path.isfile(p) and 0 < os.path.getsize(p) <= cap][:10]
 
 
-def post_result(api, j, text, files):
-    """The result into the chat of the person: the text in parts, the files with the first part (job_id links it to the job)."""
+def post_result(api, j, text, files, kind="result"):
+    """The result into the chat of the person: the text in parts, the files with the first part (job_id links it to the job).
+    2.96.0 (#2015): kind = result | error goes along as job_msg (kalmido-capability: job_msg), the app shows it under the job's card."""
     uid = j.get("chat_user")
     if not uid:
         return False
@@ -276,6 +277,7 @@ def post_result(api, j, text, files):
             body["job_id"] = j["kalmido_job"]
             if j.get("parent"):  # 2.59.0 (#1827): a part job names its leader (the job keeps it; colour of the leader)
                 body["job_parent"] = j["parent"]
+            body["job_msg"] = kind
         try:
             if i == 0 and files:
                 raw, ct = multipart({k: str(v) for k, v in body.items()}, [("file", p) for p in files])
@@ -284,7 +286,8 @@ def post_result(api, j, text, files):
                 api.req("POST", f"/agent/chats/{int(uid)}", body, timeout=60)
         except Exception as e:
             log(f"result part {i + 1} not posted: {str(e)[:150]}")
-            if body.pop("job_parent", None):  # an older server or a leader it does not accept: the same without it
+            # an older server or a leader it does not accept: the same without them (2.96.0: job_msg too)
+            if [body.pop(k) for k in ("job_parent", "job_msg") if k in body]:
                 try:
                     api.req("POST", f"/agent/chats/{int(uid)}", body, timeout=60)
                     continue
@@ -755,7 +758,7 @@ def cmd_run(argv):
         text = f"Job #{j['id']} \"{j['title']}\" ended without a result. See its history in the Agents tab."
     elif j.get("worktree"):
         text += f"\n\n(Working copy: branch {j['worktree']['branch']} in {j['worktree']['path']}.)"
-    posted = post_result(api, j, text, outbox_files(outbox))
+    posted = post_result(api, j, text, outbox_files(outbox), "result" if ok and not timed_out else "error")
     api.soft("PATCH", f"/agent/jobs/{int(j['id'])}", {"state": "done" if ok and not timed_out else "failed",
                                                       "append_log": f"{time.strftime('%H:%M')} {'done' if ok and not timed_out else 'ended'}"})
     j.update(state="done" if ok and not timed_out else "failed", ended=time.time())

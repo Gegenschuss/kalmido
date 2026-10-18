@@ -290,10 +290,10 @@ def t_send_chat(api, a):
             except ValueError:
                 raise ApiError(400, f"files: {f['name']} is not valid base64") from None
             files.append((f["name"], f.get("mime") or "application/octet-stream", data))
-        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to", "offer_save", "kind")), files))  # approval: see request_chat_approval
+        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "job_msg", "reply_to", "offer_save", "kind")), files))  # approval: see request_chat_approval
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
-    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to", "offer_save", "kind")))
+    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "job_msg", "reply_to", "offer_save", "kind")))
 
 
 def t_request_chat_approval(api, a):
@@ -694,6 +694,10 @@ TOOLS = [
            "job_id": {**S_ID, "description": "2.32.0: this message is the result of your job for this person (its history shows under it)"},
            "job_parent": {**S_ID, "description": "2.47.3: with job_id: the leading job of this part job (another job of yours); the app colours a message "
                                                  "'Job #N: ...' by its job and gives a part job the colour of its leader; 2.59.0: the job keeps it (parent_id)"},
+           "job_msg": {"type": "string", "enum": ["say", "question", "result", "error"],
+                       "description": "2.96.0: with job_id: what this job message is -- say (an interim message), question, result (the job's end "
+                                      "result) or error; the app groups a job's messages into one card and shows result / error under it. "
+                                      "Without it the app reads the text (a leading ✅ = result, ⚠️ ⏰ ⏹ = error). Older servers answer 400 -- then send it without"},
            "permission": {"type": "boolean"}, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800},
            "choices": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {
                "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
