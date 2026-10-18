@@ -31,6 +31,14 @@ Appointment booking for customers, leads before the sales pipeline, Enter in the
 ### Fixed
 - Office: parts of the layout added since 2.91 (subscriptions, contracts, equipment) applied on phones only (a missing
   closing brace in office.css).
+## [2.92.3] - 2026-10-18
+
+### Fixed
+- Opening the equipment page directly no longer stops with an error while the office is still loading (2.92.2).
+- The inline title field in a task row keeps its height again; the common field height of 2.92.2 (#1952) is only for forms (#1622).
+
+### Changed
+- Start-up budget raised by about one percent for the office menu and the field sizes of 2.92.2 (tools/perf_budget.json).
 
 ## [2.92.2] - 2026-10-18
 
