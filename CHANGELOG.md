@@ -7,6 +7,27 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.95.0] - 2026-10-18
+
+The per diem of business trips with the German flat rates per year, its report as PDF / Excel / CSV and the import of a
+per diem spreadsheet.
+
+### Added
+- Travel expenses compute the per diem (*Verpflegungsmehraufwand*) of every trip per participant: Germany 28 / 14 EUR,
+  abroad the rates of the BMF letter of the year (2025: 2 December 2024, 2026: 5 December 2025, taken over line by line),
+  country and city per day (where you are before midnight), start and end time for single days (more than 8 hours), meals
+  provided per day (breakfast 20 %, lunch / dinner 40 % of the full rate). A year without a table shows a hint, never an
+  estimate (#1932).
+- The evaluation shows *Per diem allowances <year>* per person with the breakdown "country: n x rate", as PDF (a section per
+  person), Excel (one sheet per person) and CSV (#1932).
+- *Take over from Excel* imports a per diem spreadsheet: one sheet = one person, one row = one trip, cell comments become
+  the note and set the countries of the days; a preview compares every row with the spreadsheet before anything is stored,
+  undo removes the import again (#1932).
+
+### Fixed
+- An unclosed phone block in the office stylesheet (since 2.91) made the later office styles (invoice series, equipment
+  value, travel expenses) apply on phones only (#1932).
+
 ## [2.94.0] - 2026-10-18
 
 Appointment booking for customers, leads before the sales pipeline, Enter in the chats makes a new line.
