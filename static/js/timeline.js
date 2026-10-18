@@ -331,7 +331,8 @@ document.addEventListener('pointerdown', e => {
   const d0 = ndDay(tr_, e.clientX);
   tlNd = {tr: tr_, id: +tr_.dataset.nd, d0, d1: d0, el: null}; ndShow(tlNd); e.preventDefault();
 });
-document.addEventListener('pointermove', e => { if (tlNd && !tlNd.touch) { tlNd.d1 = ndDay(tlNd.tr, e.clientX); ndShow(tlNd); } });
+// 2.87.9 (#1965): drawn again only when the day under the pointer changes (no measuring right after a write)
+document.addEventListener('pointermove', e => { if (tlNd && !tlNd.touch) { const d1 = ndDay(tlNd.tr, e.clientX); if (d1 !== tlNd.d1) { tlNd.d1 = d1; ndShow(tlNd); } } });
 document.addEventListener('pointerup', () => { if (!tlNd || tlNd.touch) return; const d = tlNd; tlNd = null; tlDraw(d.id, d.d0, d.d1); });
 // touch: a tap sets the day; hold ~0.3 s, then drag for a range
 document.addEventListener('touchstart', e => {
@@ -344,7 +345,7 @@ document.addEventListener('touchmove', e => {
   if (!tlNd?.touch) return;
   const p = e.touches[0];
   if (!tlNd.active) { if (Math.hypot(p.clientX - tlNd.x, p.clientY - tlNd.y) > 8) { clearTimeout(tlNd.timer); tlNd = null; } return; }
-  e.preventDefault(); tlNd.moved = true; tlNd.d1 = ndDay(tlNd.tr, p.clientX); ndShow(tlNd);
+  e.preventDefault(); tlNd.moved = true; const d1 = ndDay(tlNd.tr, p.clientX); if (d1 !== tlNd.d1) { tlNd.d1 = d1; ndShow(tlNd); }
 }, {passive: false});
 document.addEventListener('touchend', e => {
   if (!tlNd?.touch) return;
@@ -440,7 +441,8 @@ document.addEventListener('pointerdown', e => {
 document.addEventListener('pointermove', e => {
   if (!tlCr || tlCr.touch) return;
   if (!tlCr.el && Math.abs(e.clientX - tlCr.x) < 4) return;
-  tlCr.d1 = ndDay(tlCr.tr, e.clientX); crShow(tlCr);
+  const d1 = ndDay(tlCr.tr, e.clientX); if (tlCr.el && d1 === tlCr.d1) return;  // 2.87.9 (#1965): only on a new day
+  tlCr.d1 = d1; crShow(tlCr);
 });
 document.addEventListener('pointerup', () => {
   if (!tlCr || tlCr.touch) return;
@@ -483,7 +485,8 @@ function tlCrTouchMove(e) {
     const r = sc.getBoundingClientRect(), nw = tlCr.tr.previousElementSibling?.offsetWidth || 0, mv = p.clientX - tlCr.x;
     if (mv > 16 && p.clientX > r.right - 28) sc.scrollLeft += 10; else if (mv < -16 && p.clientX < r.left + nw + 28) sc.scrollLeft -= 10;
   }
-  tlCrLive(); tlCr.d1 = ndDay(tlCr.tr, p.clientX); crShow(tlCr);
+  tlCrLive(); const d1 = ndDay(tlCr.tr, p.clientX); if (tlCr.el && d1 === tlCr.d1) return;  // 2.87.9 (#1965): only on a new day
+  tlCr.d1 = d1; crShow(tlCr);
 }
 function tlCrTouchEnd(e) {
   if (!tlCr?.touch) return;
@@ -574,7 +577,8 @@ function tlLinkEnd(e, cancel) {
 let tlDrag = null, tlDragged = false;
 function tlApply(d, clientX) {
   const DW = tlDW(), n = Math.round((clientX - d.x) / DW), {b, mode, left, width} = d;
-  d.days = n;
+  if (d.n1 === n) return;  // 2.87.9 (#1965): the bar snaps to days: nothing to do until the pointer reaches another day
+  d.n1 = n; d.days = n;
   if (mode === 'm') b.style.left = left + n * DW + 'px';
   if (mode === 'r') b.style.width = Math.max(DW - 4, width + n * DW) + 'px';
   if (mode === 'l') { const w = Math.max(DW - 4, width - n * DW); b.style.left = left + (width - w) + 'px'; b.style.width = w + 'px'; }
@@ -658,15 +662,17 @@ document.addEventListener('pointerdown', e => {
   tlDrag = {b, t, mode: e.target.classList.contains('l') ? 'l' : e.target.classList.contains('r') ? 'r' : 'm', x: e.clientX, left: b.offsetLeft || parseFloat(b.style.left) || 0, width: b.offsetWidth || parseFloat(b.style.width) || 0, days: 0};
   b.setPointerCapture?.(e.pointerId); b.classList.add('drag'); e.preventDefault();
 });
-document.addEventListener('pointermove', e => { if (tlLink) tlLinkMove(e); else if (tlDrag) tlApply(tlDrag, e.clientX); });
+// 2.87.9 (#1965): the connecting line follows once per frame
+const tlLinkF = rafThrottle(e => tlLinkMove(e));
+document.addEventListener('pointermove', e => { if (tlLink) tlLinkF({clientX: e.clientX, clientY: e.clientY, target: e.target}); else if (tlDrag) tlApply(tlDrag, e.clientX); });
 document.addEventListener('pointerup', e => {
-  if (tlLink) { tlLinkEnd(e); return; }
+  if (tlLink) { tlLinkF.flush(); tlLinkEnd(e); return; }
   if (!tlDrag) return; const d = tlDrag; tlDrag = null;
   const nd = document.elementFromPoint?.(e.clientX, e.clientY)?.closest?.('.tl-ndhead, .tl-nd');
   if (nd && d.t.due) { d.b.classList.remove('drag', 'mode-l', 'mode-r', 'mode-m'); dch_clear(d); tlDragged = true; setTimeout(() => { tlDragged = false; }, 400); tlUndate(d.t.id); return; }
   tlCommit(d);
 });
-document.addEventListener('pointercancel', () => { if (tlLink) tlLinkEnd(null, true); });
+document.addEventListener('pointercancel', () => { if (tlLink) { tlLinkF.cancel(); tlLinkEnd(null, true); } });
 document.addEventListener('contextmenu', e => {
   const sl = e.target.closest?.('#side .srow[data-list]');
   if ((sd || sdHeld) && e.target.closest?.('#side')) { e.preventDefault(); return; }  // the touch drag handles it

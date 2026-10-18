@@ -18,10 +18,12 @@ import io
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import time
 import zipfile
+import zlib
 
 import requests
 
@@ -174,6 +176,11 @@ j = A.get(B + P).json()
 check(j.get("enabled") is True and j.get("state") == "none", f"state before: {j}")
 
 # ---------------------------------------------------------------- the export
+# 2.87.9 (#1913): an organisation picture as the symbol - the archive has no picture file, so no "u:<token>" in it
+_ch = lambda t, d: struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+_png = b"\x89PNG\r\n\x1a\n" + _ch(b"IHDR", struct.pack(">IIBBBBB", 8, 8, 8, 2, 0, 0, 0)) + _ch(b"IDAT", zlib.compress(b"".join(b"\x00" + b"\xff\x00\x00" * 8 for _ in range(8)))) + _ch(b"IEND", b"")
+r = A.post(B + f"/api/orgs/{ORG}/icon", files={"file": ("icon.png", _png, "image/png")})
+check(r.ok and r.json().get("icon_url"), f"#1913: the organisation has a picture before the export {r.status_code} {r.text[:200]}")
 r = A.post(B + P)
 check(r.status_code == 202 and r.json()["state"] in ("running", "done"), "export started " + r.text[:160])
 j = wait_done(A, ORG)
@@ -196,6 +203,9 @@ RK = recovery_key(A, ORG)
 ZIP = os.path.join(TMP, "org.zip")
 r = tool([ARC, "-o", ZIP], stdin=RK + "\n")
 check(r.returncode == 0 and os.path.isfile(ZIP) and "entries checked" in r.stdout, "tool opens the archive with the recovery key (stdin) " + r.stdout + r.stderr)
+with zipfile.ZipFile(ZIP) as _z:
+    _org = json.loads(_z.read("organisation.json"))[0] if "organisation.json" in _z.namelist() else {}
+check(_org.get("name") and not str(_org.get("icon") or "").startswith("u:"), f"#1913: organisation.json carries no picture token {_org.get('icon')!r}")
 KF = os.path.join(TMP, "key.txt")
 with open(KF, "w") as f:
     f.write(RK.lower().replace("-", " "))

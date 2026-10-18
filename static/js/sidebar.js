@@ -624,17 +624,23 @@ document.addEventListener('touchmove', e => {
   if (!sd.active) { if (Math.hypot(p.clientX - sd.x, p.clientY - sd.y) > 8) { clearTimeout(sd.timer); sd = null; } return; }  // scrolling
   e.preventDefault();
   sd.moved = true; sd.lx = p.clientX; sd.ly = p.clientY;
-  sd.ghost.style.top = (p.clientY - sd.dy) + 'px';
-  const t = sideDropTarget(document.elementFromPoint(p.clientX, p.clientY), sd.folder != null, p.clientY);
-  sideMark(t, sd, p.clientY);
+  sdFrame(p.clientX, p.clientY);
+}, {passive: false});
+// 2.87.9 (#1965): once per frame: the ghost slides by transform, then one hit test (no layout forced by the move itself)
+const sdFrame = rafThrottle((x, y) => {
+  if (!sd?.active || !sd.ghost) return;
+  sd.ghost.style.transform = `translateY(${y - sd.y}px)`;
+  const t = sideDropTarget(document.elementFromPoint(x, y), sd.folder != null, y);
+  sideMark(t, sd, y);
   const side = $('#side'), r = side.getBoundingClientRect();
-  if (r.height && side.scrollBy) { if (p.clientY < r.top + 48) side.scrollBy(0, -12); else if (p.clientY > r.bottom - 48) side.scrollBy(0, 12); }
+  if (r.height && side.scrollBy) { if (y < r.top + 48) side.scrollBy(0, -12); else if (y > r.bottom - 48) side.scrollBy(0, 12); }
   // hovering a closed folder for a moment opens it
   const fh = t && sd.list && t.classList.contains('fhead') && t.classList.contains('closed') ? t.dataset.folder : null;
   if (fh !== sd.hover) { clearTimeout(sd.open); sd.hover = fh; if (fh) sd.open = setTimeout(() => { if (sd && sd.hover === fh) { foldSet(fh, false); renderSide(); } }, 600); }
-}, {passive: false});
+});
 function sdEnd(e) {
   if (!sd) return;
+  if (sd.active) sdFrame.flush();
   clearTimeout(sd.timer); clearTimeout(sd.open);
   const st = sd; sd = null;
   if (!st.active) return;  // a tap: the row's own click (opens the list)

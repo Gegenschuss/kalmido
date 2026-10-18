@@ -2,6 +2,20 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
+// ------------------------------------------------------------------ drags (2.87.9, #1965)
+// A drag follows the pointer once per frame: the moves of one frame collapse into the last one, so a fast mouse (or a
+// 120 Hz touch screen) costs one layout per frame, not one per event. f.flush() runs a pending move at once (on release),
+// f.cancel() drops it. DRAGSTAT counts the frames that ran (a test hook).
+const DRAGSTAT = {frames: 0};
+function rafThrottle(fn) {
+  let id = 0, args = null;
+  const run = () => { id = 0; const a = args; args = null; if (a) { DRAGSTAT.frames++; fn(...a); } };
+  const f = (...a) => { args = a; if (!id) id = requestAnimationFrame(run); };
+  f.flush = () => { if (id) cancelAnimationFrame(id); run(); };
+  f.cancel = () => { if (id) cancelAnimationFrame(id); id = 0; args = null; };
+  return f;
+}
+
 // ------------------------------------------------------------------ dates
 const pad = n => String(n).padStart(2, '0');
 const ds = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -500,7 +514,7 @@ function flushSoon() { if (flushSoon.t) return; flushSoon.t = setTimeout(() => {
 
 // ------------------------------------------------------------------ conflicts (edited here and elsewhere)
 S.conflicts = LS.get('conflicts', []);
-const FIELD_NAMES = {ttype: N_('Type'), title: N_('Title'), content: N_('Description'), due: N_('Date'), due_time: N_('Time'), priority: N_('Priority'), list_id: N_('List'), tags: N_('Tags'), reminders: N_('Reminder'), repeat: N_('Repeat'), repeat_from: N_('Repeat from'), start: N_('Start|date'), section_id: N_('Section'), parent_id: N_('Parent task'), pinned: N_('Pinned'), duration: N_('Duration'), url: N_('Link'), deadline: N_('Deadline'), nag: N_('Repeat reminder'), ms: N_('Milestone'), milestone_id: N_('Milestone')};
+const FIELD_NAMES = {ttype: N_('Type'), title: N_('Title'), content: N_('Description'), due: N_('Due'), due_time: N_('Time'), priority: N_('Priority'), list_id: N_('List'), tags: N_('Tags'), reminders: N_('Reminder'), repeat: N_('Repeat'), repeat_from: N_('Repeat from'), start: N_('Start|date'), section_id: N_('Section'), parent_id: N_('Parent task'), pinned: N_('Pinned'), duration: N_('Duration'), url: N_('Link'), deadline: N_('Deadline'), nag: N_('Repeat reminder'), ms: N_('Milestone'), milestone_id: N_('Milestone')};
 function addConflicts(tid, list, title) {
   for (const c of list) {
     S.conflicts = S.conflicts.filter(x => !(x.tid === tid && x.field === c.field));

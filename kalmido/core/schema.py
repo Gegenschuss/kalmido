@@ -2189,6 +2189,10 @@ MIGRATIONS = [
     # 2.86 audit B3 (#1968): the office role of the person behind a history row of an archived document ('member' = shown
     # "by member"; '' = admin or a row of before)
     ("office_archive_log", "role", "ALTER TABLE office_archive_log ADD COLUMN role TEXT NOT NULL DEFAULT ''"),
+    # 2.87.9 (#1940): the workspace the running Paperless import files into ('' = the connection's / upload's own; else the
+    # starter's private space: "Rather into private" from an organisation's connection or export)
+    ("pl_sources", "run_ws", "ALTER TABLE pl_sources ADD COLUMN run_ws TEXT NOT NULL DEFAULT ''"),
+    ("pl_uploads", "run_ws", "ALTER TABLE pl_uploads ADD COLUMN run_ws TEXT NOT NULL DEFAULT ''"),
     # 2.88.0 (#1915): a quotation's chain of versions (version_of = the id of the chain's first quotation, set by duplicating;
     # NULL = the first one / not a copy) and its share in the cash flow plan (auto | yes | no, office/cashflow.py cf8_*);
     # 2.87.0 ignores both

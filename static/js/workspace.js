@@ -15,7 +15,10 @@ const inWs = (l, ws = wsCur()) => ws === 'all' || !l || !!l.is_inbox || wsOf(l) 
 const wsHidden = t => wsCur() !== 'all' && !!t && !inWs(listById(t.list_id));
 const wsOrg = id => (S.me?.workspaces || []).find(w => w.id === +id);
 const wsName = ws => ws === 'all' ? tr('All workspaces') : ws === 'private' ? tr('Private|workspace') : (wsOrg(ws.slice(4))?.name || tr('Organisation'));
-const wsIcon = ws => ws === 'private' ? ic('home', 's') : ws === 'all' ? ic('grid', 's') : (wsOrg(ws.slice(4))?.icon ? `<span class="wsemo" aria-hidden="true">${esc(wsOrg(ws.slice(4)).icon)}</span>` : ic('brief', 's'));
+// 2.87.9 (#1913): an organisation's symbol -- its own picture, else its emoji, else fb (the workspace switch, Settings, the admin list)
+const orgIconHtml = (o, fb = ic('brief', 's')) => o?.icon_url ? `<img class="orgic" src="${esc(o.icon_url)}" alt="" loading="lazy" decoding="async">`
+  : o?.icon ? `<span class="wsemo" aria-hidden="true">${esc(o.icon)}</span>` : fb;
+const wsIcon = ws => ws === 'private' ? ic('home', 's') : ws === 'all' ? ic('grid', 's') : orgIconHtml(wsOrg(ws.slice(4)));
 const wsOptions = () => ['private', ...(S.me?.workspaces || []).map(w => 'org:' + w.id), 'all'];
 const wsObjIn = (o, ws = wsCur()) => ws === 'all' || !o || wsOf(o) === ws;
 const wsAgentIn = (a, ws = wsCur()) => ws === 'all' || !a || (ws === 'private' ? !a.org_id : 'org:' + a.org_id === ws);
@@ -61,9 +64,9 @@ function wsBadge(l) {
 // the switch in the sidebar (under the brand): one button naming the shown workspace (a long organisation name fits), the
 // menu offers Private | <organisations> | All workspaces
 function wsBarHtml() {
-  if (!wsOn()) return '';
-  const cur = wsCur();
-  return `<button type="button" class="wsbar ${cur === 'all' ? '' : 'on'}" data-act="ws-menu" aria-haspopup="menu" aria-label="${esc(tr('Workspace') + ': ' + wsName(cur))}" title="${esc(tr('Workspace') + ' · ' + tr('Only this workspace is shown'))}"${wsp_attr(cur) /* 2.53.0 (#1474), 2.57.0 B (#1807) */}>${wsIcon(cur)}${cur === 'all' ? '' : wsp_dot(cur)}<span class="wsn">${esc(wsName(cur))}</span>${ic('chev', 's')}</button>`;
+  // 2.87.9 (#1933, P4): without an organisation the button stays and shows the private space (its menu has only that)
+  const cur = wsOn() ? wsCur() : 'private';
+  return `<button type="button" class="wsbar ${cur === 'all' ? '' : 'on'}" data-act="ws-menu" aria-haspopup="menu" aria-label="${esc(tr('Workspace') + ': ' + wsName(cur))}" title="${esc(tr('Workspace') + ' · ' + tr('Only this workspace is shown'))}"${wsp_attr(cur) /* 2.53.0 (#1474), 2.57.0 B (#1807) */}>${ic('brief', 's') /* 2.87.9 (#1933): a round icon button beside the search, the dot marks the shown workspace */}${cur === 'all' ? '' : wsp_dot(cur)}<span class="sr">${esc(wsName(cur))}</span></button>`;
 }
 // the chip in the header while one workspace is shown (a click opens the switch as a menu)
 function wsChip() {
@@ -72,8 +75,8 @@ function wsChip() {
   return `<button type="button" class="wschip" data-act="ws-menu" aria-haspopup="menu" title="${esc(tr('Workspace: {0}', wsName(cur)) + ' · ' + tr('Only this workspace is shown'))}" aria-label="${esc(tr('Workspace: {0}', wsName(cur)))}"${wsp_attr(cur) /* 2.53.0 (#1474), 2.57.0 B (#1807) */}>${wsIcon(cur)}<span>${esc(wsName(cur))}</span></button>`;
 }
 function wsMenu(anchor) {
-  const cur = wsCur();
-  const opts = wsOptions();
+  const cur = wsOn() ? wsCur() : 'private';
+  const opts = wsOn() ? wsOptions() : ['private'];
   const p = menu(anchor, opts.map(ws => ({label: wsName(ws), icon: ws === 'private' ? 'home' : ws === 'all' ? 'grid' : 'brief', on: ws === cur, fn: () => wsSet(ws)})));
   // 2.57.0 B (#1807): a colour dot in front of each workspace's name (my colour or its default; neutral = a ring)
   opts.forEach((ws, i) => { if (ws !== 'all') p?.querySelector(`[role="menuitem"][data-i="${i}"] .ml`)?.insertAdjacentHTML('beforebegin', wsp_dot(ws)); });
@@ -115,3 +118,23 @@ const botBadge = () => `<i class="abot-b" title="${esc(tr('Agent'))}" role="img"
 const bellCount = () => (S.news?.unread_me || 0) + (S.team?.dm_unread || 0) + (typeof msvvUnread === 'function' ? msvvUnread() : 0);  // 2.73.0 C (#661): + other servers
 const newsForMe = it => !!it.to_me;
 const newsInWs = it => wsCur() === 'all' || !it.list_id || inWs(listById(it.list_id));
+// 2.87.9 (#1940): every importer asks before it starts where the data goes, in words: ws = 'private' | 'org:<id>' (the
+// space the import files into), what = the things, translated and counted where known ("182 documents"), place = the
+// container inside it (a list, a calendar, an address book), privOk = the importer can go into the private space instead
+// ("Rather into private", only with an organisation as the target). Resolves 'same' | 'private' | null (cancelled).
+function importTargetConfirm({what, ws = 'private', place = '', privOk = false}) {
+  const org = String(ws || '').startsWith('org:'), name = org ? wsName(ws) : '';
+  let priv = false;
+  const body = org
+    ? (place ? tr('Import {0} into “{1}” of the organisation {2}. Members of the organisation with access to it can see them.', what, place, name)
+      : tr('Import {0} into the organisation {1}. Members of the organisation with access to it can see them.', what, name))
+    : (place ? tr('Import {0} into “{1}” in your private space.', what, place) : tr('Import {0} into your private space.', what));
+  return askDialog({title: org ? tr('Import into the organisation {0}?', name) : tr('Import into your private space?'), body, ok: tr('Import'),
+    after: md => {
+      md.classList.add('itc-dlg');
+      if (!org || !privOk) return;
+      const f = $('.foot', md);
+      f.insertAdjacentHTML('afterbegin', `<button type="button" class="btn" data-itc="private">${ic('home', 's')} ${esc(tr('Rather into private'))}</button>`);
+      $('[data-itc]', md).addEventListener('click', () => { priv = true; $('form', md).requestSubmit(); });
+    }}).then(ok => ok ? (priv ? 'private' : 'same') : null);
+}

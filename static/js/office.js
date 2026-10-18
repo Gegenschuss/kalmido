@@ -12,7 +12,9 @@ const OFC_TEXT_KINDS = [['rights_time', N_('Rights: duration')], ['rights_territ
 // 2.53.0 (#1410): officeOn lives in lazyload.js (asked at start, before the office is loaded)
 const ofcAdmin = () => OFC.info?.role === 'admin';
 const pb_clOrg = () => OFC.info?.personal ? null : (OFC.info?.org_id || null);  // 2.47.3 (#1360): a personal office's clients are the private ones
-const ofcTab = () => OFC_TABS.some(t => t[0] === S.route.tab) ? S.route.tab : S.route.tab === 'import' ? 'settings' : 'offers';  // 2.39.1 (#1182): the import page sits under Settings
+const ofcWs = () => pb_clOrg() ? 'org:' + pb_clOrg() : 'private';  // 2.87.9 (#1940): the workspace of the shown office (importTargetConfirm)
+const ofcTab = () => OFC_TABS.some(t => t[0] === S.route.tab) ? S.route.tab : S.route.tab === 'import' ? 'settings'
+  : S.route.tab === 'start' || (!S.route.tab && isMobile()) ? 'start' : 'offers';  // 2.39.1 (#1182): the import page sits under Settings; 2.87.9 (#1917): the start page (phone without a tab)
 // money / numbers of the master data: in the person's locale, the organisation's currency
 const ofcCur = () => OFC.info?.settings?.currency || 'EUR';
 const ofcMoney = n => n == null || n === '' ? '' : `${(+n).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${ofcCur() === 'USD' ? '$' : '€'}`;
@@ -65,16 +67,18 @@ function viewOffice() {
   if (OFC.tab !== tab) { OFC.tab = tab; OFC.q = ''; }  // the search belongs to one tab
   pb_wsFollow();
   if (!OFC.info && !OFC.infoErr && !OFC.infoLoading) setTimeout(ofcInfo, 0);
-  const tabs = `<div class="seg ofctabs wrap" role="tablist" aria-label="${esc(tr('Office & finance'))}">${OFC_TABS.filter(t => !t[3] || ofcAdmin()).map(([k, i, n]) => `<button type="button" role="tab" data-go="office/${k}" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>`;
+  // 2.87.9 (#1917): no tab row any more -- the office menu (areas.js ofm_menuHtml, via mg_wrap) leads to every tab
+  if (OFC.info) ofm_admSeen(OFC.info.role === 'admin');
   let body;
   if (OFC.infoErr) body = `<div class="empty nempty eact">${ic('building')}<span>${esc(OFC.infoErr)}</span><a class="btn" href="#settings">${tr('Settings')}</a></div>`;
   else if (!OFC.info) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
+  else if (tab === 'start') body = (pb_hintHtml() || '') + ofm_startHtml();  // 2.87.9 (#1917)
   else if (pb_hintHtml()) body = pb_hintHtml() + (tab === 'offers' ? '<div class="pboffers"></div>' : tab === 'settings' ? (S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : ofcSettingsHtml()) : typeof OFC_TABS.find(t => t[0] === tab)?.[4] === 'function' ? OFC_TABS.find(t => t[0] === tab)[4]() : ofcListHtml(tab));  // 2.47.3 (#1360); 2.92.0 A (#1925): tabs of their own module here too
   else if (tab === 'offers') body = typeof ofdOffersTab === 'function' ? '' : `<div class="empty">${ic('receipt')}<span>${tr('Quotations arrive with the next step of this module.')}</span></div>`;
   else if (tab === 'settings') body = S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : ofcSettingsHtml();  // 2.39.1 (#1182): office/import
   else if (typeof OFC_TABS.find(t => t[0] === tab)?.[4] === 'function') body = OFC_TABS.find(t => t[0] === tab)[4]();  // 2.47.3 (B, #1022 #1652): tabs of their own module, [3] = admins only
   else body = ofcListHtml(tab);
-  const html = `<div class="dash office" data-ofctab="${tab}"><div class="ofchead">${OFC.info ? `<span class="muted ofcorg">${esc(OFC.info.settings?.company?.name || (OFC.info.personal ? tr('Private|workspace') : orgLabelOf(OFC.info.org_id)))}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ''}</span>` : ''}</div>${tabs}<div class="ofcbody"${tab === 'offers' && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
+  const html = `<div class="dash office" data-ofctab="${tab}"><div class="ofchead">${OFC.info ? `<span class="muted ofcorg">${esc(OFC.info.settings?.company?.name || (OFC.info.personal ? tr('Private|workspace') : orgLabelOf(OFC.info.org_id)))}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ''}</span>` : ''}</div><div class="ofcbody"${tab === 'offers' && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
   if (tab === 'offers' && OFC.info && typeof ofdOffersTab === 'function') setTimeout(() => { const el = $('.office .ofcbody .pboffers') || $('.office .ofcbody'); if (el && ofcTab() === 'offers') ofdOffersTab(el); }, 0);  // 2.47.3 (#1360): below the hint
   return html;
 }
@@ -491,6 +495,7 @@ async function ofcLogoUpload(file) {
 }
 async function ofcImport(file, overwrite) {
   if (!file) return;
+  if (!await importTargetConfirm({what: tr('the master data'), ws: ofcWs(), place: tr('Office')})) return;  // 2.87.9 (#1940)
   try {
     const j = await ofcUpload(`/api/office/import${overwrite ? '?overwrite=1' : ''}`, file);
     const c = j.counts || {}, n = Object.values(c).reduce((a, x) => a + (x && typeof x === 'object' ? (x.added || 0) + (x.updated || 0) : 0), 0);

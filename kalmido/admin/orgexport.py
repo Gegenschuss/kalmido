@@ -347,7 +347,10 @@ def ox_build(c, oid, out, by=None):
     have = {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
     org = c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone()
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
-        _put_json(zf, man, "organisation.json", [_clean(c, oid, "orgs", org)])
+        o = _clean(c, oid, "orgs", org)
+        if str(o.get("icon") or "").startswith("u:"):  # 2.87.9 (#1913): the picture file is not in the ZIP -> no dead link
+            o["icon"] = ""
+        _put_json(zf, man, "organisation.json", [o])
         members = c.execute("""SELECT u.id, u.username, u.display_name, u.email, COALESCE(u.kind,'user') AS kind, u.disabled, u.color, m.role
                                FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY u.id""", (oid,)).fetchall()
         from ..accounts.orgs import org_role

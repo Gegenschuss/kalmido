@@ -354,8 +354,8 @@ document.addEventListener('pointerdown', e => {
   const pr = cw_sepPair(sep); if (!pr) return;
   e.preventDefault(); sep.setPointerCapture?.(e.pointerId); sep.classList.add('on');
   const y0 = e.clientY, rs = cw_resizer(pr[0], pr[1]);
-  const mv = ev => rs(ev.clientY - y0);
-  const up = () => { sep.removeEventListener('pointermove', mv); sep.removeEventListener('pointerup', up); sep.removeEventListener('pointercancel', up); sep.classList.remove('on'); cw_save(); };
+  const rsf = rafThrottle(rs), mv = ev => rsf(ev.clientY - y0);  // 2.87.9 (#1965): once per frame
+  const up = () => { sep.removeEventListener('pointermove', mv); sep.removeEventListener('pointerup', up); sep.removeEventListener('pointercancel', up); rsf.flush(); sep.classList.remove('on'); cw_save(); };
   sep.addEventListener('pointermove', mv); sep.addEventListener('pointerup', up); sep.addEventListener('pointercancel', up);
 });
 document.addEventListener('dblclick', e => { if (e.target.closest?.('#achat .cwsep')) { e.preventDefault(); cw_even(); } });
@@ -383,15 +383,17 @@ document.addEventListener('pointerdown', e => {
     const r = sec.getBoundingClientRect(), mid = r.top + r.height / 2;
     return [...$('#achat').querySelectorAll('.cwin')].filter(s => s !== sec).filter(s => { const q = s.getBoundingClientRect(); return q.top + q.height / 2 < mid; }).length;
   };
+  const slide = rafThrottle(dy => { sec.style.transform = `translateY(${dy}px)`; });  // 2.87.9 (#1965): once per frame
   const mv = ev => {
     const dy = ev.clientY - y0;
     if (!on && Math.abs(dy) < 6) return;
     if (!on) { on = true; sec.classList.add('cwdrag'); }
-    sec.style.transform = `translateY(${dy}px)`;
+    slide(dy);
   };
   const up = () => {
     removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
     if (!on) return;
+    slide.flush();
     const k = sec.dataset.cw, W = S.cw.wins, i = W.findIndex(w => w.k === k), j = tgt();
     sec.style.transform = ''; sec.classList.remove('cwdrag');
     if (j !== i) { const [w] = W.splice(i, 1); W.splice(j, 0, w); cw_save(); cw_draw(); }

@@ -688,7 +688,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it); 2.46.1: in a list where the agent listens in, every message of a person in its channel, without an @mention (`mentioned` false; never a message of an agent) | `room` `{id, kind, list_id}`, `mentioned`, `listening` (2.46.1), `message` `{id, text, user_id, task_id, created_at, reply_to, reply}`, `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message-2330)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
 | `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}`; 2.39.0 kind `cleanup` ([Tidy up a list](#tidy-up-a-list-2390)): + `list_id` (and the list's `playbook`); 2.70.0 kind `extract`: `input.images` = photos of the meeting ([A meeting becomes tasks](#a-meeting-becomes-tasks-2700)) |
 | `task_added` | 2.23.0 (#795): a top-level task was created in, or moved into, a list shared with the agent (not for its own tasks); 2.30.0: only when the agent [listens in](#agent-listens-in-2300) there | `task`, `list`, `how`: `created` or `moved`, `moved_from` `{id, name}` (only when the agent sees that list), `source`: `form`, `mail`, `errors`, `proposal` (when not made in the app); 2.63.0: a form's report also carries `ttype` (when the form sets one) and `portal: true` (the sender has a status link and sees only the answers meant for them, never internal comments) |
-| `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction`; 2.35.0 approval requests (`request_chat_approval`): `approval`, `approval_request` `{title, what}`, `via` |
+| `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question (2.87.9: no longer, only the buttons) | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction`; 2.35.0 approval requests (`request_chat_approval`): `approval`, `approval_request` `{title, what}`, `via` |
 | `followup_due` | 2.1.0: the follow-up day of a task *waiting on someone* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
 | `stale_tasks` | 2.34.0 (#266): once a day (from 09:00 server time), the [tasks lying idle](#tasks-lying-idle-2340) of the lists shared with the agent that have *Agent follows up* on (off by default); one bundled event per agent and day, at most 30 tasks | `tasks` `[{id, title, list_id, list_name, idle_days, reason, since, due, assignee_id, wait_note}]`, `count`, `default_days`, `lists` `[{id, name}]`, `hint` |
 | `scheduled_job` | 2.34.0 (#272): a [planned job](#planned-jobs-2340) of a person is due (once per due time; after an outage only the one missed run, `late: true`), or the person pressed *Run now* (`manual: true`). Answer in your chat with `by.id` | `schedule_id`, `title`, `prompt` (the person's words: what to do), `list_id` + `list` (or `null`), `by` / `user` `{id, name}`, `chat_with` (= `by.id`), `rhythm` `{freq, days, time, tz}`, `due_at`, `late`, `manual`, `manual_by` (`{id, name}` when a manager of the agent pressed *Run now* on another person's plan, else `null`; you still answer `by.id`), `hint`; 2.39.0: a [scheduled check of a list](#playbook-2390) adds `list_check: true`, `open_task_ids`, `open_tasks_more` (and the `playbook`) |
@@ -981,7 +981,7 @@ approval request (`request_chat_approval`, the card *Approval needed* with Yes /
 
 Reactions are available to everyone: 👍 (`up`), 👎 (`down`), ❤️ (`heart`), or any other single emoji via "+" (stored as the emoji itself). Only 👍 / 👎 carry a meaning for agents (approval, see below). Hover over a reaction, or tap its count, to see who reacted.
 
-A 👍 or 👎 on a comment **written by the agent** is an approval or a rejection when it comes from an **approver**. Approvers are people (never agents) who can see the task and are one of the following:
+A 👍 or 👎 on a comment **written by the agent** is an approval or a rejection when it comes from an **approver**. (Exception since 2.87.9: under an approval card, open or answered, a thumb is a plain reaction - only its Yes / No buttons decide.) Approvers are people (never agents) who can see the task and are one of the following:
 
 - the list owner
 - a list admin
@@ -1296,11 +1296,11 @@ come (it does not expire with them, nor does it make other buttons expire). Afte
 The person's decision arrives in **both** shapes, so a host that listens for 👍 / 👎 keeps working:
 
 - the event `chat_choice` with `choice_ids: ["allow"]` or `["deny"]`, `permission: true`, `approval` (`approved` /
-  `rejected`) and `via` (`button` or `reaction`);
+  `rejected`) and `via` (`button`; `reaction` only from hosts of 2.86 and older);
 - the event `reaction` with `approval`, as a 👍 / 👎 sends it (`via: "button"` when a button was pressed).
 
-A 👍 / 👎 on the open question answers it like the buttons (`via: "reaction"`); on an answered or expired one it is a plain
-reaction (`approval: null`). Act **once per `message_id`**. When the host decided another way (an answer in words, its
+Since 2.87.9 a 👍 / 👎 does **not** answer a permission question or an approval card at all: it is a plain reaction
+(`approval: null`), on an open card and afterwards; the app hides the thumbs under an open card, only the buttons decide. Act **once per `message_id`**. When the host decided another way (an answer in words, its
 own time limit), it closes the question with `{"outcome": "allowed" | "denied" | "expired"}` on `…/withdraw`; the app
 then shows that outcome instead of the buttons.
 
@@ -1335,8 +1335,7 @@ request: only the person approves). At most **10 open approval requests** per ag
 shows *Closed by the agent*.
 
 The answer arrives as the event **`chat_choice`** with `choice_ids: ["yes"]` or `["no"]`, `approval` (`approved` /
-`rejected`), `approval_request` `{title, what}` and `via` (`button`, or `reaction` for a 👍 / 👎 on the open card; then
-the event `reaction` comes as well). Only the person of the chat can answer, never an agent. **No answer is never a
+`rejected`), `approval_request` `{title, what}` and `via` (`button`; since 2.87.9 a 👍 / 👎 on the card decides nothing). Only the person of the chat can answer, never an agent. **No answer is never a
 yes**: without a `chat_choice` event the action stays undone; remind the person once if it is still needed, and close
 requests that are no longer current with `withdraw_chat_choices`. Afterwards the card shows *Approved by … at …* or
 *Rejected by … at …*. The person gets a push *Approval needed: <agent>* unless they switched off the row *An agent waits
@@ -1451,7 +1450,7 @@ Since 2.13.0 this holds only for a message that **asks** something: a question m
 links (`asks: true` on the message); a 👍 on a status report is a plain reaction with `"approval": null`. So end a
 question that needs a go-ahead with a question mark. The app keeps 👍 / 👎 one tap away on the newest open question and
 tells the person "Counted as approval" afterwards (2.30.0: without a "👍 = approval" hint; a permission question has
-its own buttons, see *Answer buttons*). That
+its own buttons, see *Answer buttons*; since 2.87.9 a 👍 / 👎 never decides a permission question or an approval card). That
 person is the one the conversation belongs to, so a 👍 on a question in the chat is a go-ahead from them (still check
 `user.id` against the people who may instruct you). Reactions by agents never count and never send events; taking a
 reaction back sends nothing.

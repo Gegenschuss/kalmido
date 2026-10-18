@@ -78,6 +78,9 @@ const ym = TC.today().slice(0, 7);
     await shot('p267-a-import-phone.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await ev(`(() => { document.querySelector('.fcidlg [data-fci="go"]').click(); return 1; })()`);
+    // 2.87.9 (#1940): the import first names the office it goes into
+    check(await ready(ev, `!!document.querySelector('.itc-dlg [data-cd="yes"]')`), 'the import names its target first');
+    await ev(`(() => { document.querySelector('.itc-dlg [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.fcidlg') && [...document.querySelectorAll('[data-rkf="fixed"]')].some(b => /Software subscription/.test(b.textContent) && /VAT 7 %/.test(b.textContent))`),
       'taken over with the changed rate');
     check(await ev(`fetch('/api/office/fixed-costs', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.items.length === 3 && !j.items.some(i => /Liability/.test(i.label)))`), 'the unticked row is not taken over');

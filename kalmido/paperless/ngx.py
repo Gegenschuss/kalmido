@@ -168,6 +168,8 @@ def pl_token(c, r):
 
 
 def pl_mapping(c, r):
+    if isinstance(r, dict) and "_map" in r:  # 2.87.9 (#1940): a run into another space keeps the mapping of its source
+        return r["_map"]
     m = S._jopen(c, r["ws"], "pl_sources.mapping", r["mapping"], {}) if r and r["mapping"] else {}
     out = {k: (m.get(k) if isinstance(m.get(k), dict) else {}) for k in ("tags", "senders", "types")}
     out["rules"] = m.get("rules", True) is not False  # 2.69.0 B (#1847): take over Paperless' matching rules
@@ -462,6 +464,34 @@ def plh_store(c, r, uid, src, doc, data, mime, fname, labels, text):
 
 
 # ---- the run ------------------------------------------------------------------------------------------------------------
+def pl_target(c, r):
+    """2.87.9 (#1940): the row the documents of r's current run are filed with: r itself, or -- run_ws = the starter's own
+    private space ("Rather into private" from an organisation's connection / export) -- a copy with that workspace (no
+    organisation) and r's mapping opened with r's key. None when run_ws is anything else (never someone else's space)."""
+    tw = r["run_ws"] or ""
+    if not tw or tw == r["ws"]:
+        return r
+    if not r["run_by"] or tw != S.doc_ws(None, r["run_by"]):
+        return None
+    t = dict(r)
+    t.update(ws=tw, org_id=None, _map=pl_mapping(c, r))
+    return t
+
+
+def pl_run_target(c, uid, org, ws, raw):
+    """2.87.9 (#1940): the run_ws an import start asks for: '' (the workspace itself) or, from an organisation, the starter's
+    own private space (target 'private'). Anything else is refused: an import only ever goes into the workspace it belongs
+    to or into the starter's own space."""
+    from ..core.access import Denied
+    if raw in (None, "", "same") or raw == ws:
+        return ""
+    if raw == "private" and org:
+        return S.doc_ws(None, uid)
+    if raw == "private":
+        return ""
+    raise Denied(400, tr("Invalid value: {0}", "target"))
+
+
 def pl_may_import(c, uid, org_id):
     """May uid (still) import into this workspace: an organisation's admin / the person themself."""
     u = c.execute("SELECT disabled FROM users WHERE id=?", (uid,)).fetchone() if uid else None
@@ -516,6 +546,11 @@ def pl_run(c, sid):
         c.commit()
         return
     tok = pl_token(c, r)
+    t = pl_target(c, r)  # 2.87.9 (#1940): where the documents go (the connection's workspace or the starter's private space)
+    if t is None:
+        _set(c, sid, run_state="", run_error="owner", run_ws="")
+        c.commit()
+        return
     own = [r["run_beat"]]  # 2.81.0 (#1875): the claim's beat; every later write checks it is still this run's
     counts = {"new": 0, "skip": 0, "dup": 0, "fail": 0, "done": 0}
     since, full = _now(), None  # 2.69.0 B (#1847): learn.py takes the documents of this run at its end
@@ -543,7 +578,7 @@ def pl_run(c, sid):
                 c.commit()
                 try:
                     with c.savepoint():
-                        res = pl_import_doc(c, r, uid, tok, doc, labels, fields)
+                        res = pl_import_doc(c, t, uid, tok, doc, labels, fields)
                 except PlError as e:
                     if e.code in ("auth", "network", "key", "blocked", "version"):
                         raise
@@ -579,7 +614,7 @@ def pl_run(c, sid):
             return
     if full is not None:  # 2.69.0 B (#1847): rules + learning once per run, also after a stop / a full storage
         from .learn import pll_finish
-        res = pll_finish(c, r["ws"], r["org_id"], uid, pl_src(r["url"]), since, full, pl_mapping(c, r))
+        res = pll_finish(c, t["ws"], t["org_id"], uid, pl_src(r["url"]), since, full, pl_mapping(c, t))
         if r["run_kind"] == "all":  # the app shows the summary of a full import; a follow-up run keeps it
             from .learn import pll_stored
             _set(c, sid, run_learn=pll_stored(res))
@@ -600,7 +635,7 @@ def pl_claim(c):
         last = parse_iso(r["synced_at"]) if r["synced_at"] else None
         if not last or now_utc() - last >= timedelta(minutes=int(r["every_min"] or 15)):
             c.execute("UPDATE pl_sources SET run_state='queued', run_kind='new', run_by=?, run_total=0, run_done=0, run_new=0, run_skip=0, "
-                      "run_fail=0, run_error='', run_beat=? WHERE id=? AND run_state=''", (r["created_by"], _now(), r["id"]))
+                      "run_fail=0, run_error='', run_ws='', run_beat=? WHERE id=? AND run_state=''", (r["created_by"], _now(), r["id"]))
     plh_sweep(c, stale)
     c.commit()
     write_lock(c, "paperless-queue")

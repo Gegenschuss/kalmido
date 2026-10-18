@@ -54,7 +54,7 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     await signIn(ev, 'alice');
     await nav(B + '#office/bank');
     check(await ready(ev, `document.querySelectorAll('.bnklist .bnkrow').length === 3`, 80), 'the bank tab lists three open bookings');
-    check(await ev(`!!document.querySelector('.ofctabs [data-go="office/bank"]')`), 'the tab "Bank" for the admin');
+    check(await ev(`!!document.querySelector('#view .ofmenu [data-ofm="bank"]')`), 'the tab "Bank" for the admin');
     const row = `[...document.querySelectorAll('.bnkrow')].find(e => /Kunde Eins/.test(e.textContent))`;
     check(await ev(`(() => { const r = ${row}; return !!r && /\\+/.test(r.querySelector('.bnkamt').textContent) && r.querySelector('.bnkamt').classList.contains('in') && /${fin.number}/.test(r.querySelector('.bnksug')?.textContent || ''); })()`),
       'money in shows a plus and the invoice as suggestion ' + await ev(`${row}?.textContent`));
@@ -104,8 +104,8 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('.ofctabs [data-go="office/offers"]')`, 80), 'the office (member)');
-    check(await ev(`!document.querySelector('.ofctabs [data-go="office/bank"]')`), 'a member sees no tab "Bank"');
+    check(await ready(ev, `!!document.querySelector('#view .ofmenu [data-ofm="offers"]')`, 80), 'the office (member)');
+    check(await ev(`!document.querySelector('#view .ofmenu [data-ofm="bank"]')`), 'a member sees no tab "Bank"');
   }, false);
 
   console.log(`p290_b_ui: ${ok} ok, ${F.length} failed`);

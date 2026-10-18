@@ -417,7 +417,9 @@ def openapi_spec():
             "archived": {"type": "string", "enum": ["skip", "done"], "description": "Trello: archived cards / lists skipped (default) or imported as done"},
             "completed": {"type": "string", "enum": ["import", "skip"], "description": "Completed tasks imported as done (default) or skipped"},
             "list_name": {"type": "string", "maxLength": LIST_NAME_MAX, "description": "Name of the new list (only when the file has one list)"},
-            "priority_scale": {"type": "string", "enum": ["auto", "1", "4"], "description": "Todoist CSV: which PRIORITY value is p1 (auto = detected)"}}},
+            "priority_scale": {"type": "string", "enum": ["auto", "1", "4"], "description": "Todoist CSV: which PRIORITY value is p1 (auto = detected)"},
+            # 2.87.9 (#1940)
+            "space": {"type": "string", "description": "Workspace of the new lists: private or org:<id> of an own organisation (default: the default workspace of a new list); a list of the same name is reused only inside it"}}},
         "ImportReport": {"type": "object", "properties": {
             "source": {"type": "string"}, "dry_run": {"type": "boolean"}, "import_id": nul("integer", description="For the undo; null for a dry run"),
             "undo_until": nul("string", format="date-time"),

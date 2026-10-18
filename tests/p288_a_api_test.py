@@ -183,6 +183,7 @@ r = setcf(A, d4["id"], "no")
 check(r.ok and A.get(B + f"{D}/{d4['id']}").json()["status"] == "sent", "#1915: a sent quotation takes the choice")
 
 # ---------------------------------------------------------------- a personal office (no organisation)
+# freelancer-matrix: office
 Do.put(B + O + "/settings", json={"company_fields": {**COMPANY, "name": "Dora Film"}})
 CLP = Do.post(B + "/api/clients", json={"name": "Privatkunde Eins"}).json()["id"]
 P1 = quote(Do, "Privatfilm", CLP, 500)

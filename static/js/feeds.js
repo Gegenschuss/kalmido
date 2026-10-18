@@ -128,6 +128,7 @@ async function rss_later(id) {
     redo: async () => { tid = (await api('POST', `/api/feeds/items/${id}/later`, {})).task_id; x.task_id = tid; rss_draw(); }}));
 }
 async function rss_opml(file) {
+  if (!await importTargetConfirm({what: tr('the feeds'), ws: 'private'})) return;  // 2.87.9 (#1940): feeds are always private
   const fd = new FormData(); fd.append('file', file, file.name);
   try {
     const j = await api('POST', '/api/feeds/opml', fd);

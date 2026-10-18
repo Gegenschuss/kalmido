@@ -209,7 +209,17 @@ def f8f_icon_files(c, oid=None):
         rows = c.execute("SELECT id, icon, org_id FROM lists WHERE icon LIKE 'u:%'" + ("" if oid is None else " AND org_id=?"),  # pg-ok: prefix marker u: is case-exact
                          () if oid is None else (oid,)).fetchall()
     from ..lists.listhead import o3c_head_files
-    return {list_icon_path(r[0], r[1][2:]): r[2] for r in rows if re.fullmatch(r"u:[A-Za-z0-9_-]{8,40}", r[1])} | o3c_head_files(c, oid)  # 2.83.0 C (#1427): + header pictures
+    return ({list_icon_path(r[0], r[1][2:]): r[2] for r in rows if re.fullmatch(r"u:[A-Za-z0-9_-]{8,40}", r[1])} | o3c_head_files(c, oid)  # 2.83.0 C (#1427): + header pictures
+            | f8f_org_icon_files(c, oid))
+
+
+def f8f_org_icon_files(c, oid=None):
+    """2.87.9 (#1913): {path: org id} of the organisations' own symbol pictures (all, or only that of organisation oid)."""
+    from ..accounts.pictures import org_icon_path, org_icon_tok
+    with system_ctx(c):  # orgcrypt: server-side bulk work on stored files, never content handed to a person
+        rows = c.execute("SELECT id, icon FROM orgs WHERE icon LIKE 'u:%'" + ("" if oid is None else " AND id=?"),  # pg-ok: prefix marker u: is case-exact
+                         () if oid is None else (oid,)).fetchall()
+    return {org_icon_path(r[0], org_icon_tok(r[1])): r[0] for r in rows if org_icon_tok(r[1])}
 
 
 def org_files(c, oid):

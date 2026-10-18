@@ -232,7 +232,12 @@ const dgZone = (row, y) => { const r = row.getBoundingClientRect(), f = r.height
 function dgClear() { $$('.dgdep,.dgonto,.dgno').forEach(x => { x.classList.remove('dgdep', 'dgonto', 'dgno'); delete x.dataset.dg; }); $$('.dgzone.drop').forEach(x => x.classList.remove('drop')); }
 function dgMark(el, cls, text) { el.classList.add(cls); el.dataset.dg = text; }
 // true = handled here (the caller then allows the drop)
+// 2.87.9 (#1965): moving a selection over the same third of the same row changes nothing (no search, no restyle)
+let dgLast = null;
 function dgOver(e, id) {
+  const lr = dgLast && !e.altKey && DG.ids && !e.target.closest?.('.dgzone') && e.target.closest?.('#view .trow');
+  if (lr && lr === dgLast.row && lr.isConnected && dgZone(lr, e.clientY) === dgLast.zn && lr.classList.contains(dgLast.cls)) return true;
+  dgLast = null;
   dgClear();
   const z = e.target.closest?.('.dgzone');
   if (z) { $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop')); if (z.classList.contains('dgoff')) return false; z.classList.add('drop'); e.dataTransfer.dropEffect = 'link'; return true; }
@@ -254,6 +259,7 @@ function dgOver(e, id) {
   const zn = dgZone(row, e.clientY);
   if (zn === 'onto') dgMark(row, 'dgonto', trn('{0} task becomes its subtask', '{0} tasks become its subtasks', dgRoots(ids).length));
   else row.classList.add(zn === 'after' ? 'dropafter' : 'dropbefore');
+  dgLast = {row, zn, cls: zn === 'onto' ? 'dgonto' : zn === 'after' ? 'dropafter' : 'dropbefore'};
   return true;
 }
 // true = handled here (dnd.js does nothing more)

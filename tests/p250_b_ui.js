@@ -53,7 +53,7 @@ const today = TC.today();
     // ================= #1196
     await nav(B + '#office/pipeline');
     check(await ready(ev, `document.querySelectorAll('.pipcols .pipcol').length === 4`, 80), '#1196: the pipeline with four columns');
-    check(await ev(`!!document.querySelector('.ofctabs [data-go="office/pipeline"]') && !!document.querySelector('.ofctabs [data-go="office/kpi"]')`), '#1196 #1197: both tabs for the admin');
+    check(await ev(`!!document.querySelector('.ofmenu [data-go="office/pipeline"]') && !!document.querySelector('.ofmenu [data-go="office/kpi"]')`), '#1196 #1197: both tabs for the admin');  // 2.87.9 (#1917): the office menu
     check(await ev(`/14,000\\.00/.test(document.querySelector('.pptiles').textContent) && /4,000\\.00/.test(document.querySelector('.pptiles').textContent)`),
       '#1196: open sum and weighted sum on top ' + await ev(`document.querySelector('.pptiles')?.textContent`));
     check(await ev(`document.querySelectorAll('.ppfcl li').length === 6 && document.querySelectorAll('.ppfcl li.next').length === 1`), '#1196: the months ahead with the next one marked');
@@ -116,8 +116,8 @@ const today = TC.today();
     check(await ev(`!document.querySelector('.dc-kpi')`), '#1197: no block "Figures" for a member');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('.ofctabs [data-go="office/offers"]')`, 80), 'the office (member)');
-    check(await ev(`!document.querySelector('.ofctabs [data-go="office/pipeline"]') && !document.querySelector('.ofctabs [data-go="office/kpi"]')`), '#1196 #1197: a member sees neither tab');
+    check(await ready(ev, `!!document.querySelector('.ofmenu [data-go="office/offers"]') && !!OFC.info`, 80), 'the office (member)');  // 2.87.9 (#1917): the office menu (the role known)
+    check(await ev(`!document.querySelector('.ofmenu [data-go="office/pipeline"]') && !document.querySelector('.ofmenu [data-go="office/kpi"]')`), '#1196 #1197: a member sees neither tab');
   }, false);
 
   console.log(`p250_b_ui: ${ok} ok, ${F.length} failed`);

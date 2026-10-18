@@ -4,33 +4,96 @@
 // in the background with progress + Stop, and optionally new documents every few minutes. Kalmido only reads there.
 // 2.69.0 A (#1846): also on a hosted server (public HTTPS only), the place in the server's queue, the storage quota, and the
 // second way: an export ZIP of document_exporter, uploaded in parts (plh_*), then the same preview + run.
-const PL = {ws: null, d: null, prev: null, poll: 0, seq: 0, up: null};
+const PL = {ws: null, d: null, prev: null, poll: 0, seq: 0, up: null, at: 0, fail: 0};
 const PL_EVERY_TXT = {15: N_('every 15 minutes'), 30: N_('every 30 minutes'), 60: N_('every hour'), 240: N_('every 4 hours'), 1440: N_('once a day')};
+const PLH_ACTIVE = ['queued', 'busy', 'stop'];
+const pl_running = d => PLH_ACTIVE.includes(d?.conn?.run?.state) || PLH_ACTIVE.includes(d?.zip?.run?.state) || (d?.zip?.state === 'check' && !!d.zip.mine);
 
-// the slot in the documents settings (docs.js dc_sDraw): drawn from the cached state, loaded once per workspace
-function pl_slot(s) {
-  if (PL.ws !== s.ws) { PL.ws = s.ws; PL.d = null; pl_load(); }
-  return `<div class="pl-slot">${pl_html()}</div>`;
+// the slot: mode 'full' = Settings > Integrations (connection, import, ZIP), 'docs' = the documents settings (docs.js dc_sDraw:
+// only the progress of a running import and a way to the import / to the settings). 2.87.9 (#1936)
+// 2.87.9 (#1938): a slot drawn again (a settings dialog opened again) loads afresh unless the state is from just now: before,
+// it drew the cached state of the last poll ("104 of 182") and never asked again while the import ran on
+function pl_slot(s, mode = 'docs') {
+  if (PL.ws !== s.ws) { PL.ws = s.ws; PL.d = null; PL.fail = 0; }
+  if (!PL.d || Date.now() - PL.at > 1500) pl_load();
+  // the answer may come before the dialog is on screen (no slot to poll for yet): once it is, a running import polls on
+  setTimeout(() => { if ($('.pl-slot') && !PL.up && pl_running(PL.d)) pl_draw(); }, 0);
+  return `<div class="pl-slot" data-plmode="${mode}">${pl_html(mode)}</div>`;
+}
+// Settings > Integrations (settings.js): the workspace shown in the sidebar (or the private one with "All")
+function pl_setHtml() {
+  const cur = typeof wsCur === 'function' ? wsCur() : 'private';
+  return pl_slot({ws: PL.ws && PL.up ? PL.ws : cur.startsWith('org:') ? cur : 'private'}, 'full');
 }
 async function pl_load() {
   const ws = PL.ws, seq = ++PL.seq;
-  let d = null; try { d = await rawFetch('GET', `/api/paperless?ws=${encodeURIComponent(ws)}`); } catch { d = null; }
+  let d = null, lost = false;
+  try { d = await rawFetch('GET', `/api/paperless?ws=${encodeURIComponent(ws)}`); }
+  catch (x) { lost = !x?.status || x.status >= 500 || x.status === 429; d = null; }
   if (seq !== PL.seq) return;
+  // 2.87.9 (#1938): a lost answer (offline, the server busy) keeps the last state and asks again, a little later each time
+  if (lost && PL.d) { PL.fail++; pl_draw(); return; }
+  const was = PL.d?.ws === ws && pl_running(PL.d) && !PL.up;
+  PL.fail = 0; PL.at = Date.now();
   PL.d = d || {available: false};
+  if (was && !pl_running(PL.d)) toast(tr('Import from Paperless-ngx finished'));  // 2.87.9 (#1938): done = said once
   pl_draw();
   // 2.81.0 (#1874): the server checks an uploaded export in the background; once it is ready the preview opens as before
   if (PL.zopen === ws && PL.d?.zip?.state !== 'check') { PL.zopen = null; if (PL.d?.zip?.state === 'ready' && PL.d.zip.mine) pl_preview(true); }
 }
 function pl_draw() {
-  const el = $('.pl-slot'); if (el) el.innerHTML = pl_html();
+  const els = $$('.pl-slot');
+  els.forEach(el => { el.innerHTML = pl_html(el.dataset.plmode); });
   clearTimeout(PL.poll);
-  const st = PL.d?.conn?.run?.state, zs = PL.d?.zip?.run?.state;
-  if (el && !PL.up && (['queued', 'busy', 'stop'].includes(st) || ['queued', 'busy', 'stop'].includes(zs) || PL.d?.zip?.state === 'check')) PL.poll = setTimeout(pl_load, 2000);
+  // 2.87.9 (#1938): polls while a run goes on and a slot shows it; a slot drawn later loads again (pl_slot)
+  if (els.length && !PL.up && pl_running(PL.d)) PL.poll = setTimeout(pl_load, Math.min(10000, 2000 * (PL.fail + 1)));
+  pl_jumpNow();
 }
-function pl_html() {
+function pl_jumpNow() {  // 2.87.9 (#1936): the jump from the search / the documents settings lands on the section
+  const h = PL.jump && $('#s-pl-h'); if (!h) return;
+  PL.jump = false; h.scrollIntoView?.({block: 'start'}); h.classList.add('flash'); setTimeout(() => h.classList.remove('flash'), 1600);
+}
+// 2.87.9 (#1940): where a run files the documents, in words
+function pl_toText(r) {
+  if (r?.target === 'private') return r.mine ? tr('your private space') : tr('the private space of the person who started it');
+  return PL.ws === 'private' ? tr('your private space') : tr('the organisation {0}', wsName(PL.ws));
+}
+// a running import: bar, count, target (#1940), Stop and the line that it runs on without the window (#1935)
+function pl_runHtml(r, stop) {
+  const pct = r.total ? Math.min(100, Math.round(r.done * 100 / r.total)) : 0;
+  return `<div class="pl-run" role="status"><div class="pl-bar"><i style="transform:scaleX(${r.total ? pct / 100 : 0.05})"></i></div>
+      <span>${r.state === 'stop' ? tr('Stopping…') : r.state === 'queued' ? (r.place ? tr('Waiting, place {0} in the queue', r.place) : tr('Import starts…')) : r.total ? tr('{0} of {1} documents', r.done, r.total) : tr('Import starts…')}</span>
+      ${stop && r.state !== 'stop' ? `<button type="button" class="btn sm" data-pl="${stop}">${tr('Stop')}</button>` : ''}</div>
+    <p class="muted pl-to">${esc(tr('Into {0}', pl_toText(r)))}</p>
+    ${r.state === 'stop' ? '' : `<p class="muted pl-bg">${tr('Runs on in the background. You can close the window.')}</p>`}`;
+}
+// the upload of an export ZIP (the browser sends it: the window has to stay open)
+function plh_upHtml(up) {
+  const pct = up.total ? Math.min(100, Math.round(up.done * 100 / up.total)) : 0;
+  return `<div class="pl-run" role="status"><div class="pl-bar"><i style="transform:scaleX(${pct / 100})"></i></div>
+      <span>${up.check ? tr('Checking the export…') : tr('Uploading: {0} of {1}', fmtBytes(up.done), fmtBytes(up.total))}</span>
+      ${up.check ? '' : `<button type="button" class="btn sm" data-pl="zip-cancel">${tr('Cancel')}</button>`}</div>
+    ${up.check ? '' : `<p class="muted pl-bg">${tr('Keep the window open until the upload is done.')}</p>`}`;
+}
+// 2.87.9 (#1936): the documents settings only show a running import and the way to the import / to the settings
+function pl_docsHtml(d) {
+  const r = d.conn?.run, z = d.zip, can = d.can_manage;
+  let h = `<h4>${tr('Paperless-ngx')}</h4>`, busy = false;
+  if (PL.up) { h += plh_upHtml(PL.up); busy = true; }
+  if (r && PLH_ACTIVE.includes(r.state)) { h += pl_runHtml(r, can && 'stop'); busy = true; }
+  if (z?.run && PLH_ACTIVE.includes(z.run.state)) { h += pl_runHtml(z.run, can && 'zip-stop'); busy = true; }
+  else if (z?.state === 'check' && z.mine) { h += `<div class="pl-run" role="status"><div class="pl-bar"><i style="transform:scaleX(1)"></i></div><span>${tr('Checking the export…')}</span></div><p class="muted pl-bg">${tr('Runs on in the background. You can close the window.')}</p>`; busy = true; }
+  if (!busy && can && d.conn) h += `<p class="pl-docs"><button type="button" class="btn sm" data-pl="preview">${tr('Import from Paperless-ngx…')}</button></p>`;
+  h += `<p class="pl-docs"><button type="button" class="linkbtn" data-pl="goset">${d.conn || !can ? tr('Paperless-ngx in the settings') : tr('Connect in the settings')}</button></p>`;
+  return h;
+}
+function pl_html(mode) {
   const d = PL.d; if (!d || !d.available) return '';
+  if (mode !== 'full') return pl_docsHtml(d);
   const c = d.conn, can = d.can_manage;
-  let h = `<h4>${tr('Paperless-ngx')}</h4><p class="muted">${tr('Bring the documents of your Paperless-ngx server into Kalmido: files, text, date, tags, correspondents and document types. Kalmido only reads there and never changes anything.')}</p>`;
+  // 2.87.9 (#1936): one connection per workspace: the section names it and switches between them (not during an upload)
+  const wss = typeof wsOn === 'function' && wsOn() ? ['private', ...(S.me.workspaces || []).map(w => 'org:' + w.id)] : [];
+  let h = `<h4 id="s-pl-h">${tr('Paperless-ngx')}</h4>${wss.length ? `<div class="row"><label for="pl-ws">${tr('Workspace')}</label><select id="pl-ws" data-pl="ws" ${PL.up ? 'disabled' : ''}>${wss.map(w => `<option value="${esc(w)}" ${w === PL.ws ? 'selected' : ''}>${esc(wsName(w))}</option>`).join('')}</select></div>` : ''}<p class="muted">${tr('Bring the documents of your Paperless-ngx server into Kalmido: files, text, date, tags, correspondents and document types. Kalmido only reads there and never changes anything.')}</p>`;
   if (!c) {
     if (!can) return h + `<p class="muted">${tr('Not connected.')}</p>` + plh_html(d);
     return h + `<h5 class="plh-way">${tr('Connect by address')}</h5>${d.hosted ? `<p class="muted">${tr('Only public HTTPS addresses work here. Is your Paperless-ngx only reachable in your own network? Use an export ZIP below.')}</p>` : ''}
@@ -44,10 +107,7 @@ function pl_html() {
   if (c.error_text) h += `<p class="pl-err" role="alert">${esc(c.error_text)}</p>`;
   else if (c.synced_at && !running) h += `<p class="muted">${tr('Last looked: {0}', fmtWhen(c.synced_at))}</p>`;
   if (running) {
-    const pct = r.total ? Math.min(100, Math.round(r.done * 100 / r.total)) : 0;
-    h += `<div class="pl-run" role="status"><div class="pl-bar"><i style="transform:scaleX(${r.total ? pct / 100 : 0.05})"></i></div>
-      <span>${r.state === 'stop' ? tr('Stopping…') : r.state === 'queued' && r.place ? tr('Waiting, place {0} in the queue', r.place) : r.total ? tr('{0} of {1} documents', r.done, r.total) : tr('Import starts…')}</span>
-      ${can && r.state !== 'stop' ? `<button type="button" class="btn sm" data-pl="stop">${tr('Stop')}</button>` : ''}</div>`;
+    h += pl_runHtml(r, can && 'stop');  // 2.87.9 (#1935, #1940)
   } else if (r.kind === 'all' && r.done) {
     h += `<p class="muted">${tr('Last import: {0} new, {1} already there, {2} failed', r.new, r.skipped, r.failed)}</p>`;
     h += pll_line(r.learn);  // 2.69.0 B (#1847)
@@ -97,7 +157,10 @@ async function pl_preview(zip) {
       else mapping[k][id] = s.value === 'skip' ? '' : name;
     });
     b.disabled = true;
-    try { PL.d = await api('POST', `${base}/import`, {ws: PL.ws, mapping}); } catch { b.disabled = false; return; }
+    // 2.87.9 (#1940): where the documents go, in words; from an organisation also "Rather into private"
+    const to = await importTargetConfirm({what: trn('{0} document', '{0} documents', left), ws: PL.ws, privOk: true});
+    if (!to) { b.disabled = false; return; }
+    try { PL.d = await api('POST', `${base}/import`, {ws: PL.ws, mapping, ...(to === 'private' ? {target: 'private'} : {})}); } catch { b.disabled = false; return; }
     md.remove(); pl_draw(); toast(tr('Import started: it runs in the background'));
   });
 }
@@ -108,7 +171,9 @@ document.addEventListener('click', async e => {
     const url = $('#pl-url', root)?.value.trim() || PL.d?.conn?.url || '', token = $('#pl-tok', root)?.value.trim() || '', er = $('.pl-err', root);
     b.disabled = true;
     try { await rawFetch('PUT', '/api/paperless', {ws: PL.ws, url, token}).then(j => { PL.d = j; pl_draw(); toast(tr('Connected with Paperless-ngx')); }); }
-    catch (x) { if (er) er.textContent = x?.message || tr('Paperless-ngx could not be reached'); b.disabled = false; }
+    catch (x) {  // 2.87.9 (#1936): the slot may have been drawn again meanwhile: the error goes into the one on screen
+      const e2 = er?.isConnected ? er : $('.pl-slot[data-plmode="full"] .pl-err') || er;
+      if (e2) e2.textContent = x?.message || tr('Paperless-ngx could not be reached'); b.disabled = false; }
     return;
   }
   if (a === 'edit') { const keep = PL.d; PL.d = {...keep, conn: null}; pl_draw(); const u = $('#pl-url'); if (u) { u.value = keep.conn.url; u.focus(); } return; }
@@ -118,6 +183,7 @@ document.addEventListener('click', async e => {
   }
   if (a === 'stop') { PL.d = await api('POST', '/api/paperless/stop', {ws: PL.ws}).catch(() => PL.d); pl_draw(); return; }
   if (a === 'preview') pl_preview();
+  if (a === 'goset') { b.closest('.dc-smd')?.remove(); pl_openSettings(); return; }  // 2.87.9 (#1936)
   if (a === 'zip-pick' || a === 'zip-go') $('#plh-file', root)?.click();
   if (a === 'zip-preview') pl_preview(true);
   if (a === 'zip-cancel') { if (PL.up) PL.up.abort = true; }
@@ -130,6 +196,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', async e => {
   if (e.target.id === 'plh-file' && e.target.closest('.pl-slot')) { const f = e.target.files?.[0]; e.target.value = ''; if (f) plh_upload(f); return; }
   const el = e.target.closest('.pl-slot [data-pl]'); if (!el) return;
+  if (el.dataset.pl === 'ws') { PL.ws = el.value; PL.d = null; PL.fail = 0; pl_draw(); pl_load(); return; }  // 2.87.9 (#1936)
   if (el.dataset.pl === 'follow') {
     const to = el.checked, set = v => async () => { await pl_put({follow: v}); return {}; };
     try { await set(to)(); } catch { el.checked = !to; return; }
@@ -167,27 +234,16 @@ function pll_line(l) {
   return parts.length ? `<p class="muted pll-line">${esc(parts.join(' · '))}</p>` : '';
 }
 // ---- 2.69.0 A (#1846): an export ZIP of Paperless-ngx (document_exporter), for a server Kalmido cannot reach
-const PLH_ACTIVE = ['queued', 'busy', 'stop'];
 function plh_html(d) {
   if (!d?.can_manage) return '';
   const z = d.zip, up = PL.up, r = z?.run;
   let h = `<div class="plh-zip"><h5 class="plh-way">${tr('From a Paperless-ngx export (ZIP)')}</h5>`;
   const intro = `<p class="muted">${tr('For a Paperless-ngx that is only reachable in your own network: create an export on its server with {0} and upload the ZIP here. No connection needed.', '<code>document_exporter ../export --zip</code>')}</p>`;
   const pick = (label, pri) => `<input type="file" id="plh-file" accept=".zip,application/zip" hidden><button type="button" class="btn sm${pri ? ' pri' : ''}" data-pl="zip-pick">${label}</button>`;
-  if (up) {
-    const pct = up.total ? Math.min(100, Math.round(up.done * 100 / up.total)) : 0;
-    return h + `<div class="pl-run" role="status"><div class="pl-bar"><i style="transform:scaleX(${pct / 100})"></i></div>
-      <span>${up.check ? tr('Checking the export…') : tr('Uploading: {0} of {1}', fmtBytes(up.done), fmtBytes(up.total))}</span>
-      ${up.check ? '' : `<button type="button" class="btn sm" data-pl="zip-cancel">${tr('Cancel')}</button>`}</div></div>`;
-  }
-  if (r && PLH_ACTIVE.includes(r.state)) {
-    const pct = r.total ? Math.min(100, Math.round(r.done * 100 / r.total)) : 0;
-    return h + `<div class="pl-run" role="status"><div class="pl-bar"><i style="transform:scaleX(${r.total ? pct / 100 : 0.05})"></i></div>
-      <span>${r.state === 'stop' ? tr('Stopping…') : r.state === 'queued' ? (r.place ? tr('Waiting, place {0} in the queue', r.place) : tr('Import starts…')) : r.total ? tr('{0} of {1} documents', r.done, r.total) : tr('Import starts…')}</span>
-      ${r.state !== 'stop' ? `<button type="button" class="btn sm" data-pl="zip-stop">${tr('Stop')}</button>` : ''}</div></div>`;
-  }
+  if (up) return h + plh_upHtml(up) + '</div>';  // 2.87.9 (#1935): the upload needs the window open
+  if (r && PLH_ACTIVE.includes(r.state)) return h + pl_runHtml(r, 'zip-stop') + '</div>';  // 2.87.9 (#1935, #1940)
   if (z?.state === 'check' && z.mine) {  // 2.81.0 (#1874): the server checks the export in the background
-    return h + `<div class="pl-run" role="status"><div class="pl-bar"><i style="transform:scaleX(1)"></i></div><span>${tr('Checking the export…')}</span></div></div>`;
+    return h + `<div class="pl-run" role="status"><div class="pl-bar"><i style="transform:scaleX(1)"></i></div><span>${tr('Checking the export…')}</span></div><p class="muted pl-bg">${tr('Runs on in the background. You can close the window.')}</p></div>`;
   }
   if (z?.state === 'ready' && z.mine) {
     return h + `<p>${tr('Uploaded: {0}', esc(z.name || 'ZIP'))} <span class="muted">${fmtBytes(z.size)}</span></p>
@@ -242,4 +298,15 @@ async function plh_upload(f) {
   if (PL.d?.zip?.state === 'check') PL.zopen = ws;  // 2.81.0 (#1874): pl_load opens the preview once the check is done
   pl_draw();
   if (PL.d?.zip?.state === 'ready') pl_preview(true);
+}
+
+// 2.87.9 (#1936, #1934): Settings > Integrations > Paperless-ngx (the search, the documents settings jump there)
+function pl_openSettings() { PL.jump = true; Promise.resolve(settingsModal('paperless')).then(() => setTimeout(pl_jumpNow, 50)); }
+// 2.87.9 (#1934): the search's "Import from Paperless-ngx…": the import of the shown workspace; without a connection the
+// settings, where it is set up
+async function pl_importActive() {
+  const cur = typeof wsCur === 'function' ? wsCur() : 'private', ws = cur.startsWith('org:') ? cur : 'private';
+  if (PL.ws !== ws || !PL.d) { PL.ws = ws; PL.d = null; await pl_load(); }
+  if (PL.d?.conn && PL.d.can_manage && !pl_running(PL.d)) return pl_preview();
+  pl_openSettings();
 }

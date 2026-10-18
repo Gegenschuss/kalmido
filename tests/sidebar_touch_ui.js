@@ -42,7 +42,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   // ---- reorder: Car before Home
   touch(w, row(L3), 'touchstart'); await sleep(420);
   check(d.querySelector('.side-ghost') && row(L3).classList.contains('dragging'), 'long-press: the row lifts (ghost)');
-  under = row(L1); const mv = touch(w, row(L3), 'touchmove', 60);
+  under = row(L1); const mv = touch(w, row(L3), 'touchmove', 60); await sleep(60);  // 2.87.9 (#1965): the drag draws in the next frame
   check(mv.defaultPrevented && row(L1).classList.contains('dropbefore'), 'dragging over a list: insert mark (the drawer does not scroll)');
   calls.length = 0;
   const te = touch(w, row(L3), 'touchend', 60); under = null;
@@ -67,7 +67,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   // ---- folders: Hobby before Admin
   await call('PATCH', `/api/lists/${L5}`, {folder: 'Hobby'}); await w.eval('load().then(() => render())'); await sleep(200);
   touch(w, fold('Hobby'), 'touchstart'); await sleep(420);
-  under = fold('Admin'); touch(w, fold('Hobby'), 'touchmove', 60);
+  under = fold('Admin'); touch(w, fold('Hobby'), 'touchmove', 60); await sleep(60);  // 2.87.9 (#1965): the drag draws in the next frame
   check(fold('Admin').classList.contains('dropbefore'), 'folder drag: insert mark on the other folder');
   touch(w, fold('Hobby'), 'touchend', 60); under = null;
   check(await until(async () => JSON.parse((await st()).settings.folders)[0] === 'Hobby'), 'folders reordered');
@@ -79,7 +79,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(!fold('Admin').classList.contains('closed'), 'hovering a closed folder opens it');
   // auto-scroll near the bottom edge
   let scrolled = 0; const sideEl = d.querySelector('#side'); sideEl.scrollBy = (x, y) => { scrolled += y; }; sideEl.getBoundingClientRect = () => ({top: 0, bottom: 800, left: 0, right: 300, width: 300, height: 800});
-  under = null; touch(w, row(L2), 'touchmove', 5000);
+  under = null; touch(w, row(L2), 'touchmove', 5000); await sleep(60);  // 2.87.9 (#1965): the drag draws in the next frame
   check(scrolled > 0, 'near the bottom edge the drawer scrolls');
   touch(w, row(L2), 'touchcancel'); await sleep(100);
   check(!d.querySelector('.side-ghost'), 'cancel: nothing moved, ghost gone');

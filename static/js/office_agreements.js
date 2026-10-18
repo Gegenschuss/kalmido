@@ -10,7 +10,7 @@ const AGR_KIND1 = {insurance: N_('Insurance'), rent: N_('Rent|office'), leasing:
 const AGR_PERS = [['month', N_('per month')], ['quarter', N_('per quarter')], ['year', N_('per year')]];
 const AGR_UNITS = [['d', N_('days')], ['w', N_('weeks')], ['m', N_('months')]];
 const AGR_RENEW = [0, 1, 3, 6, 12, 24, 36, 60];
-OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['agreements', 'shield', N_('Contracts & insurance'), 1, () => agrHtml()]);  // admins only
+OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['agreements', 'shield', N_('Contracts & insurance'), 1, () => agrHtml(), 'admin']);  // admins only; 2.92.1 (#1917): in the menu group Administration
 
 async function agrLoad() {
   const seq = ++AGR.seq;

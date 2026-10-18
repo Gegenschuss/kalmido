@@ -339,15 +339,20 @@ window.addEventListener('pointerdown', e => {
   if (c.k === 'title' && !e.shiftKey) return;  // the title opens the task as before
   if (e.shiftKey && SG.a) { e.preventDefault(); SG.f = c; SG.click = Date.now(); sgPaint(); sgEl(c.tid, c.k)?.focus({preventScroll: true}); return; }
   SG.a = SG.f = c; SG.drag = {x: e.clientX, y: e.clientY, on: false};
+  // 2.87.9 (#1965): the cell under the pointer is looked up once per frame
+  const pick = rafThrottle((x, y) => {
+    if (!SG.drag) return;
+    const o = sgCellOf(document.elementFromPoint(x, y));
+    if (o && (o.tid !== SG.f.tid || o.k !== SG.f.k) && o.k !== 'title') { SG.f = o; sgPaint(); }
+  });
   const mv = ev => {
     const d = SG.drag; if (!d) return;
     if (!d.on && Math.abs(ev.clientX - d.x) + Math.abs(ev.clientY - d.y) < 8) return;
     d.on = true;
-    const o = sgCellOf(document.elementFromPoint(ev.clientX, ev.clientY));
-    if (o && (o.tid !== SG.f.tid || o.k !== SG.f.k) && o.k !== 'title') { SG.f = o; sgPaint(); }
+    pick(ev.clientX, ev.clientY);
   };
   const up = () => {
-    document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
+    document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); pick.flush();
     if (SG.drag?.on) { SG.click = Date.now(); window.getSelection?.()?.removeAllRanges?.(); sgEl(SG.f.tid, SG.f.k)?.focus({preventScroll: true}); }
     SG.drag = null; sgPaint();
   };
@@ -380,9 +385,11 @@ function sgFillDown() {
 function sgFillDrag(e) {
   e.preventDefault(); e.stopPropagation();
   const from = SG.f; SG.a = from;
-  const mv = ev => { const o = sgCellOf(document.elementFromPoint(ev.clientX, ev.clientY)); if (o) { const p = sgPos(o); if (p) { SG.f = {tid: o.tid, k: from.k}; sgPaint(); } } };
+  // 2.87.9 (#1965): once per frame, painted only when the row changes
+  const pick = rafThrottle((x, y) => { const o = sgCellOf(document.elementFromPoint(x, y)); if (o && o.tid !== SG.f?.tid) { const p = sgPos(o); if (p) { SG.f = {tid: o.tid, k: from.k}; sgPaint(); } } });
+  const mv = ev => pick(ev.clientX, ev.clientY);
   const up = () => {
-    document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
+    document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); pick.flush();
     SG.click = Date.now();
     const p = sgPos(SG.f), q = sgPos(from);
     if (p && q && p.r > q.r) sgFillDown();

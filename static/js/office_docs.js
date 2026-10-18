@@ -31,7 +31,7 @@ async function ofdLoadList(force) {
   if (OFD.list && !force) return;
   if (OFD.kind === 'archive') { if (typeof OIM !== 'undefined') OIM.list = null; OFD.list = []; ofdDraw(); return; }  // 2.39.1 (#1182): office_import.js loads it
   OFD.loading = true;
-  try { const j = await api('GET', `/api/office/docs?kind=${OFD.kind}${OFD.status ? '&status=' + OFD.status : ''}`); OFD.list = j.docs || []; OFD.err = ''; }
+  try { const j = await api('GET', `/api/office/docs?kind=${OFD.kind}${OFD.status ? '&status=' + OFD.status : ''}`); OFD.list = j.docs || []; OFD.role = j.role; OFD.err = ''; }
   catch (x) { OFD.list = []; OFD.err = x.message || tr('unknown'); }
   OFD.loading = false;
   ofdDraw();
@@ -73,7 +73,7 @@ function ofdOffersTab(el) {
     if (!OFC.data.contracts && !OFC.loading.contracts) setTimeout(() => ofcLoad('contracts'), 0);
   } else if (!OFD.list && !OFD.loading) setTimeout(ofdLoadList, 0);
   keepFocus(el, () => fl_set(el, id ? ofdEditorHtml() : ofdListHtml()));  // 2.46.2 (#1718): morphed
-  if (!el._ofd) { el._ofd = true; el.addEventListener('click', ofdClick); el.addEventListener('change', ofdChange); el.addEventListener('input', ofdInput); el.addEventListener('keydown', ofdKey); }
+  if (!el._ofd) { el._ofd = true; el.addEventListener('contextmenu', ofdCtx); if (typeof ms_longPress === 'function') OFD.lp = ms_longPress('#view .ofdrow', () => false, r => ofdRowMenu(r.dataset.id, r)); el.addEventListener('click', ofdClick); el.addEventListener('change', ofdChange); el.addEventListener('input', ofdInput); el.addEventListener('keydown', ofdKey); }
 }
 
 // ---- the list
@@ -101,9 +101,9 @@ function ofdListHtml() {
   const grp = k === 'reminder' && list.some(r => r.settled) && list.some(r => !r.settled);
   if (k === 'reminder') list.sort((a, b) => (a.settled ? 1 : 0) - (b.settled ? 1 : 0));
   const feeTxt = r => +r.fee_open > 0 ? `<small class="ofdfee">${esc(k === 'reminder' ? tr('fee open: {0}', r.fee_open_text || r.fee_open) : tr('reminder fee open: {0}', r.fee_open_text || r.fee_open))}</small>` : '';
-  return bar + (k === 'invoice' && typeof oa_ppBox === 'function' ? oa_ppBox() : '') + (k === 'invoice' && typeof rinListHtml === 'function' ? rinListHtml() : '') /* 2.91.0 A (#1923) */ + `<ul class="ofclist ofdlist" role="list">${list.map((r, i) => `${grp && r.settled && !list[i - 1]?.settled ? `<li class="ofdgrp muted" role="presentation">${tr('Settled')}</li>` : ''}<li><button type="button" class="ofcrow ofdrow st-${r.state || r.status}" data-ofd="open" data-id="${r.id}">
+  return bar + (k === 'invoice' && typeof oa_ppBox === 'function' ? oa_ppBox() : '') + (k === 'invoice' && typeof rinListHtml === 'function' ? rinListHtml() : '') /* 2.91.0 A (#1923) */ + `<ul class="ofclist ofdlist" role="list">${list.map((r, i) => `${grp && r.settled && !list[i - 1]?.settled ? `<li class="ofdgrp muted" role="presentation">${tr('Settled')}</li>` : ''}<li class="ofdli"><button type="button" class="ofcrow ofdrow st-${r.state || r.status}" data-ofd="open" data-id="${r.id}">
     <span class="ofcn"><b>${r.locked ? `<span class="ofdlk" title="${esc(tr('Finalised'))}">${ic('lock', 's')}</span>` : ''}${esc(r.number || tr('(no number)'))}${r.recipient_name ? ` · ${esc(r.recipient_name)}` : ''}</b><small class="muted">${esc([r.project_title, r.date ? fmtDateLoc(r.date) : '', inv && r.due_date && !['paid', 'cancelled'].includes(r.state) ? tr('due {0}', fmtDateLoc(r.due_date)) : ''].filter(Boolean).join(' · '))}</small>${k === 'invoice' && typeof rinRowTag === 'function' ? rinRowTag(r) : ''}</span>
-    <span class="ofdsum"><b>${esc(inv ? r.gross_text : r.net_text)}</b>${inv && r.open && !['draft', 'paid', 'cancelled'].includes(r.state) && r.open !== r.gross ? `<small class="muted">${esc(tr('open: {0}', r.open_text || r.open))}</small>` : ''}${feeTxt(r)}<small class="rotag st-${r.state || r.status}">${esc(r.status_text)}</small></span>${ic('chev', 's')}</button></li>`).join('')}</ul>`;
+    <span class="ofdsum"><b>${esc(inv ? r.gross_text : r.net_text)}</b>${inv && r.open && !['draft', 'paid', 'cancelled'].includes(r.state) && r.open !== r.gross ? `<small class="muted">${esc(tr('open: {0}', r.open_text || r.open))}</small>` : ''}${feeTxt(r)}<small class="rotag st-${r.state || r.status}">${esc(r.status_text)}</small></span></button><button type="button" class="iconbtn ofdrmore" data-ofd="rowmore" data-id="${r.id}" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button></li>`).join('')}</ul>`;
 }
 
 // ---- the editor
@@ -371,6 +371,27 @@ async function ofdChange(e) {
   if (['fx_rate', 'raw_factor', 'prod_quotient', 'producing_rate', 'discount_pct', 'payment_days', 'reminder_level', 'reminder_fee', 'reminder_deadline_days'].includes(f)) { const v = ofcNum(t.value); await ofdPatch({[f]: v}); return; }
   await ofdPatch({[f]: t.value});
 }
+// 2.87.9 (#1920): the "More" menu of a document - one list for the editor and for the rows of the list (d = the document or a list row)
+function ofdMoreItems(d, inList) {
+  const gone = () => { OFD.doc = null; OFD.list = null; if (inList) ofdLoadList(true); else go('office/offers'); };
+  const items = [
+      {label: tr('Duplicate'), icon: 'copy', fn: async () => { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } }},
+      {label: tr('Preview (PDF)'), icon: 'eye', fn: () => typeof pdfView === 'function' ? pdfView({url: ofdPdfUrl(d.id, true), name: (d.number || tr('Document')) + '.pdf', dlUrl: ofdPdfUrl(d.id)}) : window.open(ofdPdfUrl(d.id, true), '_blank', 'noopener')},  // 2.40.0 (#1364): the PDF, not the JSON print model
+      ofdIsInv(d) && d.kind !== 'reminder' && d.locked ? {label: tr('E-invoice XML'), icon: 'download', fn: () => window.open(`/api/office/docs/${d.id}/xml`, '_blank', 'noopener')} : null,
+      ofdIsInv(d) && d.kind !== 'reminder' && d.locked ? {label: tr('Send to the DATEV inbox'), icon: 'send', fn: async () => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/datev`); if (j) toast(tr('Sent to the DATEV inbox')); }} : null,
+      d.can_delete ? '-' : null,
+      d.can_delete ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
+        if (!await askConfirm(tr('Delete {0}?', d.number || ofdKindName(d.kind, true)), tr('Its number stays used.'), {ok: tr('Delete'), danger: true})) return;
+        try { await api('DELETE', `/api/office/docs/${d.id}`); gone(); toast(tr('Deleted')); } catch (x) { toast(x.message || tr('unknown')); }
+      }} : null];
+  return inList ? [{label: tr('Open'), icon: 'edit', fn: () => go(`office/offers/${d.id}`)}, ...items] : items;
+}
+// 2.87.9 (#1920): right click / long press on a row opens the same menu as the dots button
+function ofdRowMenu(id, anchor) {
+  const r = (OFD.list || []).find(x => String(x.id) === String(id)); if (!r) return;
+  menu(anchor, ofdMoreItems({...r, can_delete: OFD.role === 'admin' && !r.locked && r.status !== 'sent'}, true));
+}
+function ofdCtx(e) { const b = e.target.closest('.ofdrow'); if (!b) return; e.preventDefault(); ofdRowMenu(b.dataset.id, b); }
 async function ofdClick(e) {
   const b = e.target.closest('[data-ofd]'); if (!b) return;
   const a = b.dataset.ofd, d = typeof tpCur === 'function' ? tpCur() : OFD.doc;  // 2.47.0 (#1215): an open part's positions
@@ -380,7 +401,8 @@ async function ofdClick(e) {
     try { const j = await rawFetch('POST', '/api/office/docs', {}); OFD.doc = j; OFD.list = null; go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); }
     return;
   }
-  if (a === 'open') { go(`office/offers/${b.dataset.id}`); return; }
+  if (a === 'open') { if (typeof ms_lpRecent === 'function' && OFD.lp && ms_lpRecent(OFD.lp)) return; go(`office/offers/${b.dataset.id}`); return; }
+  if (a === 'rowmore') { ofdRowMenu(b.dataset.id, b); return; }
   if (a === 'back') { OFD.doc = null; OFD.list = null; go('office/offers'); return; }
   if (a === 'kind') { OFD.kind = b.dataset.kind; OFD.status = ''; OFD.list = null; ofdLoadList(true); return; }
   if (a === 'new-inv') {
@@ -413,19 +435,7 @@ async function ofdClick(e) {
     return;
   }
   if (a === 'dup') { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } return; }
-  if (a === 'more') {
-    menu(b, [
-      {label: tr('Duplicate'), icon: 'copy', fn: async () => { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } }},
-      {label: tr('Preview (PDF)'), icon: 'eye', fn: () => typeof pdfView === 'function' ? pdfView({url: ofdPdfUrl(d.id, true), name: (d.number || tr('Document')) + '.pdf', dlUrl: ofdPdfUrl(d.id)}) : window.open(ofdPdfUrl(d.id, true), '_blank', 'noopener')},  // 2.40.0 (#1364): the PDF, not the JSON print model
-      ofdIsInv(d) && d.kind !== 'reminder' && d.locked ? {label: tr('E-invoice XML'), icon: 'download', fn: () => window.open(`/api/office/docs/${d.id}/xml`, '_blank', 'noopener')} : null,
-      ofdIsInv(d) && d.kind !== 'reminder' && d.locked ? {label: tr('Send to the DATEV inbox'), icon: 'send', fn: async () => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/datev`); if (j) toast(tr('Sent to the DATEV inbox')); }} : null,
-      d.can_delete ? '-' : null,
-      d.can_delete ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
-        if (!await askConfirm(tr('Delete {0}?', d.number || ofdKindName(d.kind, true)), tr('Its number stays used.'), {ok: tr('Delete'), danger: true})) return;
-        try { await api('DELETE', `/api/office/docs/${d.id}`); OFD.doc = null; OFD.list = null; toast(tr('Deleted')); go('office/offers'); } catch (x) { toast(x.message || tr('unknown')); }
-      }} : null]);
-    return;
-  }
+  if (a === 'more') { menu(b, ofdMoreItems(d)); return; }
   if (a === 'it-svc') { ofdServicePicker(); return; }
   if (a === 'it-head') { d.items.push({kind: 'heading', title: '', detail: '', qty: 1, unit: 'day', rate: 0, tax: 'standard', raw_fee: 0, producing: 0, intext: 'intern', cost: 0, discountable: 1}); await ofdPutItems(); $(`.ofdits [data-i="${d.items.length - 1}"][data-k="title"]`)?.focus(); return; }
   if (a === 'it-text') {

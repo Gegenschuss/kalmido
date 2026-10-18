@@ -581,14 +581,14 @@ function lydragBegin(el, x, y) {
   g.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${Math.min(r.height, 240)}px;z-index:96;pointer-events:none`;
   document.body.appendChild(g);
   el.classList.add('lyplace');
-  lyDg = {...lyDg, el, cv, v: cv.dataset.lycanvas, g, dx: x - r.left, dy: y - r.top, active: true, start: $$('.lyedb', cv).map(n => n.dataset.lyk), sc: lydragScroller(cv)};
+  lyDg = {...lyDg, el, cv, v: cv.dataset.lycanvas, g, dx: x - r.left, dy: y - r.top, gl: r.left, gt: r.top, active: true, start: $$('.lyedb', cv).map(n => n.dataset.lyk), sc: lydragScroller(cv)};
   document.body.classList.add('lydragging');
   if (navigator.vibrate) navigator.vibrate(12);
 }
 function lydragMove(x, y) {
   const st = lyDg; if (!st?.active) return;
   st.x = x; st.y = y;
-  st.g.style.left = (x - st.dx) + 'px'; st.g.style.top = (y - st.dy) + 'px';
+  st.g.style.transform = `translate(${x - st.dx - st.gl}px, ${y - st.dy - st.gt}px)`;  // 2.87.9 (#1965): by transform
   const t = document.elementFromPoint(x, y)?.closest?.('.lycanvas .lyedb');
   if (t && t !== st.el && t.parentElement === st.cv) {
     const r = t.getBoundingClientRect(), wide = r.width > st.cv.clientWidth * .75;
@@ -601,7 +601,10 @@ function lydragMove(x, y) {
   const vh = innerHeight, edge = 56, dir = y < edge ? -1 : y > vh - edge ? 1 : 0;
   if (dir) st.auto = setInterval(() => { st.sc?.scrollBy(0, dir * 14); lydragMove(st.x, st.y); }, 30);
 }
+// 2.87.9 (#1965): pointer / touch moves once per frame (the edge scroll keeps its own timer)
+const lydragMoveF = rafThrottle(lydragMove);
 function lydragEnd(cancel) {
+  if (cancel) lydragMoveF.cancel(); else lydragMoveF.flush();
   const st = lyDg; lyDg = null;
   if (!st) return;
   clearTimeout(st.timer); clearInterval(st.auto);
@@ -621,7 +624,7 @@ document.addEventListener('pointerdown', e => {
 document.addEventListener('pointermove', e => {
   if (!lyDg?.mouse) return;
   if (!lyDg.active) { if (Math.hypot(e.clientX - lyDg.x0, e.clientY - lyDg.y0) < 5) return; lydragBegin(lyDg.el, lyDg.x0, lyDg.y0); }
-  e.preventDefault(); lydragMove(e.clientX, e.clientY);
+  e.preventDefault(); lydragMoveF(e.clientX, e.clientY);
 });
 document.addEventListener('pointerup', () => { if (lyDg?.mouse) lydragEnd(false); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && lyDg?.active) { e.preventDefault(); e.stopPropagation(); lydragEnd(true); } }, true);
@@ -635,7 +638,7 @@ document.addEventListener('touchmove', e => {
   if (!lyDg?.touch) return;
   const p = e.touches[0];
   if (!lyDg.active) { if (Math.hypot(p.clientX - lyDg.x0, p.clientY - lyDg.y0) > 8) { clearTimeout(lyDg.timer); lyDg = null; } return; }  // a scroll / swipe
-  e.preventDefault(); lydragMove(p.clientX, p.clientY);
+  e.preventDefault(); lydragMoveF(p.clientX, p.clientY);
 }, {passive: false});
 document.addEventListener('touchend', e => { if (lyDg?.touch) { if (lyDg.active && e.cancelable) e.preventDefault(); lydragEnd(false); } });
 document.addEventListener('touchcancel', () => { if (lyDg?.touch) lydragEnd(true); });

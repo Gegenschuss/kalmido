@@ -57,6 +57,24 @@ area, also of an organisation): new quotations and invoices are made without VAT
 wird keine Umsatzsteuer berechnet." (`vat_mode` `novat`, `vat_note` `small`); the e-invoice gets the tax category `E`
 with this exemption reason.
 
+## The office menu (2.87.9)
+
+The area Office (office, clients, contacts) has one menu with four groups instead of tab rows:
+
+- **Sell** - Pipeline, Quotes & invoices, Clients, Contacts
+- **Money** - Cash flow, Figures
+- **On the road** - Travel expenses
+- **Administration** - Services, Equipment, Framework contracts, Text blocks, Settings
+
+On a computer the groups stand side by side above the page and stay there while scrolling; the point shown is in the
+accent colour. On a phone `#office` (or `#office/start`) opens a start page with a tile per group and, for admins of the
+office, the key figures; every other page shows the path "Office › group" (a tap goes back to the tiles) and the points of
+its group. Points for admins only (pipeline, cash flow, figures, travel expenses) and groups without a point are hidden;
+a person without an organisation is the admin of the personal office and sees all of them. Detail pages show a grey path
+("Clients › Example Ltd"), text only. Every old address keeps working (`#office/offers`, `#office/import` under Settings,
+`#clients`, `#client/<id>`, `#contacts` …). A new part of the office joins a group with an entry in `OFM_ITEMS`
+(`static/js/areas.js`, field `group`); an office tab without one appears under Administration.
+
 ## Tabs
 
 - **Quotations** - the documents (number, recipient, project, date, net total, status) and the editor.

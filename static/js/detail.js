@@ -108,7 +108,9 @@ function panelSet(k, v, quiet) {
   if (x == null || x === PW[k][0]) LS.del('pw.' + k); else LS.set('pw.' + k, x);
   panelVars(); if (!quiet) fitLayout(); placeGrips();
 }
+let gripDrag = null;  // 2.87.9 (#1965): the panel whose grip is being dragged (placed on release, not per frame)
 function placeGrips() {
+  if (gripDrag) return;
   if (typeof gripWatch === 'function') gripWatch();
   const want = {det: !isMobile() && $('#app')?.classList.contains('detail-open') && !$('#detail').classList.contains('hidden'),
     chat: !isMobile() && innerWidth >= 1000 && document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && !!$('#achat:not(.hidden)'),
@@ -145,12 +147,23 @@ function gripWire(g) {
   g.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
     e.preventDefault(); g.setPointerCapture?.(e.pointerId); g.classList.add('drag'); document.body.classList.add('pgdrag');
+    // 2.87.9 (#1965): measured once at the start; a move sets only this panel's width variable, once per frame (no
+    // localStorage, no measuring of the other grips, no aria per move); the grip slides along by transform; storing,
+    // the layout check and placing the grips happen on release
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const box = gripEl(k).getBoundingClientRect(), right = box.right, left = box.left;
-    const mv = ev => { panelSet(k, (k === 'side' ? ev.clientX - left : right - ev.clientX) / rem, true); };
+    const box = gripEl(k).getBoundingClientRect(), right = box.right, left = box.left, max = panelMax(k), w0 = panelRem(k);
+    const cap = k === 'chat' ? innerWidth * .4 : Infinity, px = w => Math.min(w * rem, cap), px0 = px(w0);
+    let w = w0; gripDrag = k;
+    const mv = rafThrottle(x => {
+      w = Math.round(Math.max(PW[k][1], Math.min(max, (k === 'side' ? x - left : right - x) / rem)) * 4) / 4;
+      document.documentElement.style.setProperty({det: '--detW', chat: '--chatW', side: '--sideW'}[k], w + 'rem');
+      g.style.transform = `translateX(${(k === 'side' ? 1 : -1) * (px(w) - px0)}px)`;
+    });
     let moved = false; const x0 = e.clientX;
-    const mv2 = ev => { if (Math.abs(ev.clientX - x0) > 3) moved = true; if (moved) mv(ev); };
-    const up = () => { g.removeEventListener('pointermove', mv2); g.classList.remove('drag'); document.body.classList.remove('pgdrag'); fitLayout(); placeGrips();
+    const mv2 = ev => { if (Math.abs(ev.clientX - x0) > 3) moved = true; if (moved) mv(ev.clientX); };
+    const up = () => { g.removeEventListener('pointermove', mv2); mv.flush(); gripDrag = null; g.style.transform = '';
+      g.classList.remove('drag'); document.body.classList.remove('pgdrag');
+      if (moved) panelSet(k, w, true); fitLayout(); placeGrips();
       // a tap without dragging: a small menu (the way without dragging, WCAG 2.5.7); a double-click resets instead
       if (!moved) { clearTimeout(g._mt); g._mt = setTimeout(() => { if (Date.now() - (g._dbl || 0) < 400) return; menu(g, [{label: tr('Wider'), icon: k === 'side' ? 'right' : 'left', fn: () => panelSet(k, panelRem(k) + 4)}, {label: tr('Narrower'), icon: k === 'side' ? 'left' : 'right', fn: () => panelSet(k, panelRem(k) - 4)}, {label: tr('Standard width'), icon: 'undo', fn: () => panelSet(k, null)}]); }, 320); } };
     g.addEventListener('pointermove', mv2); g.addEventListener('pointerup', up, {once: true}); g.addEventListener('pointercancel', up, {once: true});
@@ -358,15 +371,19 @@ document.addEventListener('pointerdown', e => {
   const y0 = e.clientY; let v = dsTop(), moved = false;
   try { g.setPointerCapture(e.pointerId); } catch { /* old browsers */ }
   g.classList.add('drag');
+  const show = rafThrottle(dsApply);  // 2.87.9 (#1965): once per frame, only when the share changes
   const mv = ev => {
     if (!moved && Math.abs(ev.clientY - y0) < 3) return;
-    if (!moved && dsFold()) dsPend = {...dsPend, detail_cm_fold: '0'};
+    const first = !moved;
+    if (first && dsFold()) dsPend = {...dsPend, detail_cm_fold: '0'};
     moved = true;
+    const was = v;
     v = Math.max(CSPL_MIN, Math.min(CSPL_MAX, Math.round((ev.clientY - top) / Math.max(1, end - top) * 100)));
-    dsApply(v);
+    if (first || v !== was) show(v);
   };
   const up = () => {
     g.removeEventListener('pointermove', mv); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up);
+    show.flush();
     g.classList.remove('drag');
     if (moved) dsSave({detail_split: v, detail_cm_fold: '0'});
   };

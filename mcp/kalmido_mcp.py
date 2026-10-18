@@ -708,7 +708,7 @@ TOOLS = [
                               "'Approval needed' with the buttons yes / no, pinned at the top of the chat and counted at your name until "
                               "answered. title = what is to be approved, what = what happens on yes; yes_label / no_label optional. "
                               "Use it whenever you need a go-ahead, never only a question in the text. The answer arrives as the event "
-                              "chat_choice with approval approved | rejected (also from a 👍 / 👎 on the card); no answer is never a yes. "
+                              "chat_choice with approval approved | rejected (only from its Yes / No buttons; a 👍 / 👎 on the card decides nothing); no answer is never a yes. "
                               "expires_in = seconds it stays open; close it with withdraw_chat_choices (outcome denied / expired, never allowed) "
                               "when it is no longer needed. At most 10 open requests per person (the next one: 409).",
      _obj({"user_id": S_ID, "title": {"type": "string", "maxLength": 200}, "what": {"type": "string", "maxLength": 1000},

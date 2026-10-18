@@ -4,7 +4,7 @@
 // (its payment day), or private / ignore. Every step has its undo; an import can be taken back while none of it is matched.
 // Server: kalmido/office/bank.py. No bank access.
 const BNK = {oid: null, state: 'open', data: null, q: '', err: null, imports: null, showImp: false, other: null, cand: null, candQ: '', busy: false};
-OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['bank', 'bank', N_('Bank'), 1, () => bnkHtml()]);  // admins only
+OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['bank', 'bank', N_('Bank'), 1, () => bnkHtml(), 'money']);  // admins only; 2.92.1 (#1917): in the menu group Money
 const BNK_KIND = {invoice: N_('Invoice'), receipt: N_('Receipt'), private: N_('Private'), ignored: N_('Ignored')};
 
 async function bnkLoad() {
