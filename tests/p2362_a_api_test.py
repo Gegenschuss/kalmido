@@ -313,7 +313,10 @@ for meth, path in routes:
 SCAN_EXCEPT = {"GET /api/v1/agent/jobs/<int:jid>", "GET /api/v1/attachments/<int:aid>", "GET /api/v1/attachments/<int:aid>/text",
                "GET /api/v1/lists/<int:lid>/files/<file_id>",
                # 2.51.0 (#1348): the office draft routes check the token's "Office" permission before any lookup
-               "GET /api/v1/office/docs/<int:did>", "GET /api/v1/office/docs/<int:did>/pdf"}
+               "GET /api/v1/office/docs/<int:did>", "GET /api/v1/office/docs/<int:did>/pdf",
+               # 2.88.0 (#1980): the delete dialog's info answers 403 to anyone who is no admin anywhere (role check before
+               # any lookup, the same for every id); an organisation admin outside gets 404
+               "GET /api/users/<int:uid>/delete-info"}
 bad = [b for b in bad if " ".join(b.split(" ")[:2]) not in SCAN_EXCEPT]
 check(not bad, f"route scan: every id route refuses a person outside ({len(bad)} of {len(routes)}):\n  " + "\n  ".join(bad[:80]))
 check(S["alice"].get(B + f"/api/tasks/{TA}").ok and MARK in S["alice"].get(B + f"/api/tasks/{TA}").text, "route scan: alice's data is untouched")
