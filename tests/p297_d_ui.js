@@ -56,7 +56,8 @@ const M = 'QXZmark';  // every plain text of the moved pages carries it
 
     // ---- the page menu, the dialog with the warning, the second question, the move
     await boot('#wiki/' + P1);
-    await ev(`(async () => { await wk_load('private', true); WK.pg = null; renderView(); return 1; })()`);
+    check(await unlock(), 'unlocked again after the reload');
+    await ev(`(async () => { await wkeUnlock('private'); await wk_load('private', true); WK.pg = null; await wk_loadPage(${P1}, true); renderView(); return 1; })()`);
     check(await waitFor(`!!document.querySelector('#view [data-wk="pmenu"]')`), 'the page menu button');
     await ev(`(document.querySelector('#view [data-wk="pmenu"]')?.click(), 1)`);
     const sel = `[...document.querySelectorAll('#pop [role="menuitem"], .menu-list [role="menuitem"]')]`;

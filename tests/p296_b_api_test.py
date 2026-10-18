@@ -130,8 +130,9 @@ check(op.get("Moved/Plan/One") == ONE and op.get("Moved/Plan/Two") == TWO, "a me
 check("Plan/One" not in paths(Bo, "private") and "Other" in paths(Bo, "private"), "gone from the private space, Other stays")
 g = A.get(B + f"/api/wiki/pages/{ONE}").json()
 check(g["body"] == "See [[Moved/Plan/Two]] and [[Other]]", "the link between the moved pages follows, the other stays as text: " + g["body"])
-check(g.get("moved") and g["moved"]["from"] == "private" and g["moved"]["to"] == SP and g["moved"]["by_name"] == "Bob",
-      "the page shows its last move " + str(g.get("moved")))
+# 2.97.0 (#2051): alice reads it -- bob's private space shows without key or person, her organisation by name
+check(g.get("moved") and g["moved"]["from"] is None and g["moved"]["from_name"] == "private space" and g["moved"]["to"] == SP
+      and g["moved"]["to_name"] == "Alpha" and g["moved"]["by_name"] == "Bob", "the page shows its last move " + str(g.get("moved")))
 check(Ca.get(B + f"/api/wiki/pages/{ONE}").ok, "another member reads it")
 check(Fr.get(B + f"/api/wiki/pages/{ONE}").status_code == 404, "another organisation: 404")
 
