@@ -7892,7 +7892,6 @@
   "{0} trip imported": ["{0} viaggio ripreso", "{0} viaggi ripresi"],
   "Date missing or not readable": "Data mancante o non leggibile",
   "Start and end time missing: no per diem": "Mancano ora di inizio e di fine: nessuna diaria",
-  "No per diem rates for {0}": "Nessuna tariffa di diaria per il {0}",
   "Differs from the spreadsheet": "Diverso dal foglio di calcolo",
   "The days in the comment do not match the period": "I giorni nel commento non corrispondono al periodo",
   "Country not recognised: {0}": "Paese non riconosciuto: {0}",

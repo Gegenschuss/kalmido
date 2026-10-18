@@ -7892,7 +7892,6 @@
   "{0} trip imported": ["{0} reis overgenomen", "{0} reizen overgenomen"],
   "Date missing or not readable": "Datum ontbreekt of is niet leesbaar",
   "Start and end time missing: no per diem": "Begin- en eindtijd ontbreken: geen vergoeding",
-  "No per diem rates for {0}": "Geen vergoedingstarieven voor {0}",
   "Differs from the spreadsheet": "Wijkt af van het spreadsheet",
   "The days in the comment do not match the period": "De dagen in de opmerking passen niet bij de periode",
   "Country not recognised: {0}": "Land niet herkend: {0}",

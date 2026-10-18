@@ -7892,7 +7892,6 @@
   "{0} trip imported": ["{0} Reise übernommen", "{0} Reisen übernommen"],
   "Date missing or not readable": "Datum fehlt oder ist nicht lesbar",
   "Start and end time missing: no per diem": "Start- und Endzeit fehlen: keine Pauschale",
-  "No per diem rates for {0}": "Keine Pauschalen für {0} hinterlegt",
   "Differs from the spreadsheet": "Weicht von der Excel ab",
   "The days in the comment do not match the period": "Die Tage im Kommentar passen nicht zum Zeitraum",
   "Country not recognised: {0}": "Land nicht erkannt: {0}",
