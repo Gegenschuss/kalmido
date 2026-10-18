@@ -27,9 +27,12 @@ function cg_canDrag(e) {
 }
 const cg_at = (col, y) => Math.max(0, Math.min(1440, cg_snap((y - col.getBoundingClientRect().top) / weekH() * 60)));
 const cg_cols = () => $$('#view .week .wcol');
-function cg_colAt(x) {  // the day column under x (the nearest one beside the grid)
+function cg_colAt(x, st) {  // the day column under x (the nearest one beside the grid)
+  // 2.87.9 (#1965): during a drag the columns' left / right are measured once (the hours scroll only up and down)
+  let cx = st?.cx;
+  if (!cx || cx.some(([c]) => !c.isConnected)) { cx = cg_cols().map(c => { const r = c.getBoundingClientRect(); return [c, r.left, r.right]; }); if (st) st.cx = cx; }
   let best = null, bd = Infinity;
-  for (const c of cg_cols()) { const r = c.getBoundingClientRect(), d = x < r.left ? r.left - x : x > r.right ? x - r.right : 0; if (d < bd) { bd = d; best = c; } }
+  for (const [c, l, rt] of cx) { const d = x < l ? l - x : x > rt ? x - rt : 0; if (d < bd) { bd = d; best = c; } }
   return best;
 }
 const cg_dayEl = (sel, x, y) => document.elementFromPoint(x, y)?.closest?.(sel) || null;
@@ -141,7 +144,7 @@ function cg_move() {
     st.ghost.style.top = s / 60 * H + 'px'; st.ghost.style.height = (en - s) / 60 * H + 'px';
     st.ghost.textContent = `${cg_lab(s)}–${cg_lab(en)}`;
   } else if (st.kind === 'move') {
-    const col = cg_colAt(st.x) || st.col, dd = diffDays(st.day, col.dataset.day);
+    const col = cg_colAt(st.x, st) || st.col, dd = diffDays(st.day, col.dataset.day);
     let dm = cg_snap((st.y - st.y0 + ($('#wbody')?.scrollTop || 0) - st.sc0) / H * 60);  // the hours may have scrolled along
     if (!st.multi) dm = Math.max(-st.s, Math.min(1440 - st.e, dm));  // a one-day event stays inside its day
     Object.assign(st, {dd, dm});
@@ -159,12 +162,12 @@ function cg_move() {
     const el = cg_dayEl(st.sel, st.x, st.y);
     if (el?.dataset.day) st.d1 = el.dataset.day;
     const dd = diffDays(st.d0, st.d1), lo = addDays(st.ev.d0, dd), hi = addDays(st.ev.d1, dd);
-    $$(st.sel).forEach(c => c.classList.toggle('cgsel', c.dataset.day >= lo && c.dataset.day <= hi));
+    if (st.selK !== lo + hi || !document.querySelector('#view .cgsel')) { st.selK = lo + hi; $$(st.sel).forEach(c => c.classList.toggle('cgsel', c.dataset.day >= lo && c.dataset.day <= hi)); }  // 2.87.9 (#1965): on a change
   } else {
     const el = cg_dayEl(st.kind === 'aday' ? '#view .week .wad' : '#view .cal .cell', st.x, st.y);
     if (el?.dataset.day) st.d1 = el.dataset.day;
     const lo = st.d0 < st.d1 ? st.d0 : st.d1, hi = st.d0 < st.d1 ? st.d1 : st.d0;
-    $$(st.kind === 'aday' ? '#view .week .wad' : '#view .cal .cell').forEach(c => c.classList.toggle('cgsel', c.dataset.day >= lo && c.dataset.day <= hi));
+    if (st.selK !== lo + hi || !document.querySelector('#view .cgsel')) { st.selK = lo + hi; $$(st.kind === 'aday' ? '#view .week .wad' : '#view .cal .cell').forEach(c => c.classList.toggle('cgsel', c.dataset.day >= lo && c.dataset.day <= hi)); }
   }
   cg_edge();
 }
@@ -184,12 +187,16 @@ function cg_clear(st) {
   $$('#view .cgsel').forEach(c => c.classList.remove('cgsel'));
   st.el?.classList.remove('cgsrc');
 }
+// 2.87.9 (#1965): pointer / touch moves draw once per frame (the edge scroll draws in its own frames)
+const cg_moveF = rafThrottle(() => cg_move());
 function cg_cancel() {  // Esc / lost: everything back where it was
+  cg_moveF.cancel();
   const st = CG.st; CG.st = null; if (!st) return;
   cg_clear(st); st.ghost?.remove();
   if (st.active) CG.swallow = Date.now();
 }
 async function cg_end(e) {
+  if (CG.st?.active) cg_moveF.flush(); else cg_moveF.cancel();
   const st = CG.st; if (!st) return;
   CG.st = null;
   cg_clear(st);
@@ -333,7 +340,7 @@ document.addEventListener('pointermove', e => {
     cg_start();
   }
   e.preventDefault();
-  cg_move();
+  cg_moveF();
 });
 document.addEventListener('pointerup', e => { const st = CG.st; if (!st || (st.touch && cg_TEV && st.active)) return; if (st.pid != null && e.pointerId !== st.pid) return; cg_end(e); });
 document.addEventListener('pointercancel', e => {
@@ -346,7 +353,7 @@ document.addEventListener('touchmove', e => {
   const st = CG.st; if (!st?.touch || !st.active) return;
   if (e.cancelable) e.preventDefault();
   const p = e.touches[0]; if (!p) return;
-  st.x = p.clientX; st.y = p.clientY; cg_move();
+  st.x = p.clientX; st.y = p.clientY; cg_moveF();
 }, {passive: false});
 document.addEventListener('touchend', e => { const st = CG.st; if (st?.touch && st.active) cg_end(e); });
 document.addEventListener('touchcancel', () => { const st = CG.st; if (st?.touch && st.active) cg_cancel(); });

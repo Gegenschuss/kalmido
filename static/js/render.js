@@ -423,8 +423,7 @@ function renderSide() {
   $('#side').innerHTML = `
     <div class="sbfix">${'' /* 2.57.0 (#1798): the fixed head (brand, workspace, search, favourites) stays while the rest scrolls */}
     <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span class="sbtxt"><span>${esc(APP_NAME)}</span></span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${kbFoldAllBtn()}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
-    ${wsBarHtml()}
-    <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
+    <div class="sbsrch">${'' /* 2.87.9 (#1933): search and workspace in one line */}<button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>${wsBarHtml()}</div>
     ${favSideHtml(lists, listRow, head)}</div>
     ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('')}
     <div class="sgroup sfoot">
@@ -1144,7 +1143,7 @@ const fieldCols = lid => td_colsWide() && !!LS.get('fcols.' + lid, false) && fie
 // default layout (date, assignee, time as before; fields as chips). Narrow widths show the first two columns, the rest
 // moves into the second line (classes o2 … o10: the cell's index needs at least that many columns of room).
 const PRIO_NAMES = {1: N_('Low'), 3: N_('Medium'), 5: N_('High')};
-const COLS = [['due', N_('Date')], ['prio', N_('Priority')], ['who', N_('Assignee')], ['tags', N_('Tags')], ['time', N_('Tracked time')],
+const COLS = [['due', N_('Due')], ['prio', N_('Priority')], ['who', N_('Assignee')], ['tags', N_('Tags')], ['time', N_('Tracked time')],
   ['progress', N_('Subtasks')], ['deps', N_('Blocked by')], ['created', N_('Created')]];
 const COL_ICON = {due: 'cal', prio: 'flag', who: 'user', tags: 'tag', time: 'clock', progress: 'sub', deps: 'deps', created: 'plus'};
 function colChoices(l) {  // [key, name] of the columns this list can show (the task number separately)
@@ -1168,7 +1167,7 @@ const colName = (l, k) => k === 'id' ? tr('Task number') : (colChoices(l).find(x
 const colShort = (l, k) => k === 'time' ? tr('Time') : colName(l, k);  // the title row's label (narrow columns)
 function lcCell(k, t, x) {
   switch (k) {
-    case 'due': return t.due && !x.checklist ? `<span class="dt ${dueClass(t)}" title="${esc(dueLabel(t))}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ''}${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(dueLabel(t, false))}</span></span>` : '';
+    case 'due': return t.due && !x.checklist ? `<span class="dt ${dueClass(t)}" title="${esc(dueLabel(t))}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ''}${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(dueLabel(t, false))}</span></span>` : '<span class="lcnil" aria-hidden="true">\u2013</span>';  // 2.87.9 (#1914): dim dash for an empty cell
     case 'prio': return t.priority && !x.checklist && PRIO_NAMES[t.priority] ? `<span class="lcp flag-${t.priority}" title="${esc(tr(PRIO_NAMES[t.priority]))}">${ic('flag', 's')}<span class="lbl">${esc(tr(PRIO_NAMES[t.priority]))}</span></span>` : '';
     case 'who': return t.id > 0 && collab() ? whoCell(t) : '';
     case 'tags': return [...(t.ltags || []).map(g => ltagChip(g, t.list_id)), ...t.tags.map(g => ptagChip(g, t.list_id))].join('');
@@ -1330,9 +1329,8 @@ function lcGuide(el, line, x) {
   return line;
 }
 const lcwGet = lid => LS.get('lcw.' + lid, {}) || {};
-function lcwApply(lid) {
+function lcwApply(lid, w = lcwGet(lid)) {  // 2.87.9 (#1965): w = the widths shown while a grip is dragged (stored on release)
   let st = $('#lcw-style'); if (!st) { st = document.createElement('style'); st.id = 'lcw-style'; document.head.appendChild(st); }
-  const w = lcwGet(lid);
   st.textContent = Object.entries(w).filter(([, v]) => v > 0).map(([k, v]) => `#view .lc[data-k="${window.CSS?.escape ? CSS.escape(k) : k.replace(/["\\]/g, '')}"]{width:${+v}rem;max-width:none}`).join('\n');
 }
 function lcwSet(lid, k, v) {
@@ -1351,10 +1349,14 @@ document.addEventListener('pointerdown', e => {
   const sp = g.closest('.lchead').querySelector('.spacer'), room = sp ? Math.max(0, sp.getBoundingClientRect().width / rem - LC_TITLE_MIN) : LCW_MAX;
   const wMax = w0 + room, guide = lcGuide(g);
   g.setPointerCapture?.(e.pointerId); document.body.classList.add('pgdrag'); g.classList.add('drag');
-  const mv = ev => { lcwSet(lid, k, Math.min(wMax, w0 - (ev.clientX - x0) / rem)); lcGuide(g, guide); };
+  // 2.87.9 (#1965): once per frame and only shown; stored (localStorage) on release
+  let cur = null;
+  const show = rafThrottle(x => { cur = Math.round(Math.max(LCW_MIN, Math.min(LCW_MAX, wMax, w0 - (x - x0) / rem)) * 100) / 100; lcwApply(lid, {...lcwGet(lid), [k]: cur}); lcGuide(g, guide); });
+  const mv = ev => show(ev.clientX);
   const up = () => {
     if (td_lcDrag?.g === g) td_lcDrag = null;
     ['pointermove', 'pointerup', 'pointercancel', 'lostpointercapture'].forEach((n, i) => g.removeEventListener(n, i ? up : mv));
+    show.flush(); if (cur != null) { lcwSet(lid, k, cur); cur = null; }
     document.body.classList.remove('pgdrag'); g.classList.remove('drag'); guide.remove();
   };
   // 2.40.0 (#1430): a render that replaces the grip loses the capture: lostpointercapture (and the sweep after a render) ends it

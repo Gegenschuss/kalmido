@@ -472,9 +472,13 @@ def plh_zip_run(c, rid):
     own = [r["run_beat"]]  # 2.81.0 (#1875): the claim's beat (ngx.pl_beat): a run cut off ends instead of running twice
     beat = lambda **kw: P.pl_beat(c, "pl_uploads", rid, own, **kw)  # noqa: E731
     counts = {"new": 0, "skip": 0, "dup": 0, "fail": 0, "done": 0}
-    error, scan = "", None
+    error, scan, t = "", None, r
     try:
         if not P.pl_may_import(c, uid, r["org_id"]):
+            raise PlhError("owner")
+        t = P.pl_target(c, r)  # 2.87.9 (#1940): the upload's workspace or the starter's private space
+        if t is None:
+            t = r
             raise PlhError("owner")
         with _open_zip(c, r) as zf:
             scan = plh_scan(zf)
@@ -492,13 +496,13 @@ def plh_zip_run(c, rid):
                         sha = hashlib.sha256(data).hexdigest()
                         # 2.81.0 (#1875): the same file under the same id also from an import of before (the shared key)
                         if c.execute("SELECT 1 FROM pl_imported WHERE ws=? AND src IN (?,?) AND pl_id=? AND sha256=?",
-                                     (r["ws"], _src(r), PLH_SRC, d["id"], sha)).fetchone():
+                                     (t["ws"], _src(r), PLH_SRC, d["id"], sha)).fetchone():
                             res = "skip"
                         else:
                             beat()  # 2.81.0 (#1875): right before the filing (committed: a rollback keeps this beat)
                             c.commit()
                             with c.savepoint():
-                                res = P.plh_store(c, r, uid, _src(r), d, data, d["mime"] or None, d["original_file_name"], labels,
+                                res = P.plh_store(c, t, uid, _src(r), d, data, d["mime"] or None, d["original_file_name"], labels,
                                                   lambda d=d: P._doc_text(d, d["notes"], scan["fields"]))
                 except PlhError as e:
                     if e.code == "zip_gone":  # the parts are gone: nothing more can come; a damaged member only fails its document
@@ -524,7 +528,7 @@ def plh_zip_run(c, rid):
         c.rollback()
         print("paperless: zip run", rid, type(e).__name__, e, flush=True)
         error = "failed"
-    learn = _learn(c, r, uid, since, scan["labels"]) if scan else {}
+    learn = _learn(c, t, uid, since, scan["labels"]) if scan else {}
     from .learn import pll_stored
     try:
         beat(run_state="", state="done", run_error=error, run_learn=pll_stored(learn), updated_at=_now())
@@ -569,7 +573,7 @@ def plh_public(c, ws, uid):
     if not r:
         return None
     from .web import _run_public
-    run = _run_public(c, "pl_uploads", r, "all")
+    run = _run_public(c, "pl_uploads", r, "all", uid)
     return {"id": r["id"], "state": r["state"], "name": r["name"], "size": r["size"], "got": r["got"], "chunk": r["chunk"] or PLH_CHUNK,
             "next": r["parts"], "mine": r["created_by"] == uid, "error": r["error"], "error_text": P.pl_err_text(r["error"]), "run": run}
 
@@ -730,6 +734,7 @@ def plh_zip_start():
     uid, org, ws, r = _mine(c, d.get("ws"), "ready")
     if _running(r):
         return err(tr("An import is already running"), 409)
+    run_ws = P.pl_run_target(c, uid, org, ws, d.get("target"))  # 2.87.9 (#1940): "Rather into private"
     _count, _already, need = _left(c, r, _info(c, r))
     sp = plh_space(c, uid, need, True)
     if sp["fits"] == "no":
@@ -738,7 +743,7 @@ def plh_zip_start():
         # sealed in the context ngx.pl_mapping opens (the mapping has the same shape for both ways)
         c.execute("UPDATE pl_uploads SET mapping=? WHERE id=?", (S._jseal(c, ws, "pl_sources.mapping", P.pl_clean_mapping(d["mapping"])), r["id"]))
     c.execute("UPDATE pl_uploads SET run_state='queued', run_by=?, run_total=0, run_done=0, run_new=0, run_skip=0, run_fail=0, "
-              "run_error='', run_learn='', run_beat=?, updated_at=? WHERE id=?", (uid, _now(), _now(), r["id"]))
+              "run_error='', run_learn='', run_ws=?, run_beat=?, updated_at=? WHERE id=?", (uid, run_ws, _now(), _now(), r["id"]))
     c.commit()
     P.pl_kick()
     return _answer(c, ws, uid, org)

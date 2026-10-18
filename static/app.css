@@ -62,8 +62,14 @@ button{cursor:pointer;background:none;border:0;padding:0}
 input,select,textarea{background:var(--bg3);border:1px solid var(--line2);border-radius:var(--radius);padding:.375rem .5625rem;outline:0;min-width:0}
 input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 input::placeholder,textarea::placeholder{color:var(--muted)}
-input[type=date],input[type=time]{color-scheme:var(--cs,dark);font-family:var(--mono);font-size:var(--fs-m)}
-input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* 2.87.9 (#1952): one size and height for the fields of every form (the special fields - quick add, search, chat input, inline titles - have their own class rules and keep them); touch screens 16 px against the iOS zoom */
+:root{--fld-fs:var(--fs-b);--fld-h:2.25rem}
+@media (pointer:coarse){ :root{--fld-fs:max(1rem,16px);--fld-h:2.75rem} }
+input:where(:not([type=checkbox],[type=radio],[type=range],[type=color],[type=file],[type=hidden])),select,textarea{font-size:var(--fld-fs)}
+input:where(:not([type=checkbox],[type=radio],[type=range],[type=color],[type=file],[type=hidden])),select{min-height:var(--fld-h);box-sizing:border-box}
+.modal .row .btn:not(.sm){height:var(--fld-h)}
+input[type=date],input[type=time]{color-scheme:var(--cs,dark);font-variant-numeric:tabular-nums}
+input[type=number]{font-variant-numeric:tabular-nums}
 input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 input:focus-visible,select:focus-visible,textarea:focus-visible{outline:0}
@@ -281,7 +287,7 @@ body:is(.prbg-soft,.prbg-strong) .trow:is(.pr5,.pr3,.pr1):not(.sel):not(.msel):n
 /* ---------- popover / sheet ---------- */
 #pop{position:fixed;z-index:63;background:var(--bg2);border-radius:var(--r-l);box-shadow:var(--shadow);padding:.375rem;width:18.75rem;max-height:80dvh;overflow-y:auto}
 /* 2.27.0 (#963 #976): menus and popovers above the agent chat panel (60), the width grips (61) and a pinned composer (62) */
-#scrim{position:fixed;inset:0;background:rgba(4,6,9,.55);z-index:50}
+#scrim{position:fixed;inset:0;background:rgba(4,6,9,.4);z-index:50}
 #scrim.clear{background:transparent}
 #scrim.overmodal{z-index:74}#pop.overmodal{z-index:76}  /* #318: a menu opened inside a dialog shows above it */
 .menu-list{display:flex;flex-direction:column;min-width:11.25rem}
@@ -324,7 +330,7 @@ a.btn{color:inherit;text-decoration:none}
 .btn kbd{margin-left:.25rem;background:transparent;border-color:currentColor;opacity:.6;color:inherit}
 
 /* ---------- modal ---------- */
-.modal{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:rgba(4,6,9,.6);padding:calc(var(--vvt,0px) + 1rem) 1rem calc(var(--vvb,0px) + 1rem);box-sizing:border-box}
+.modal{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:rgba(4,6,9,.4);padding:calc(var(--vvt,0px) + 1rem) 1rem calc(var(--vvb,0px) + 1rem);box-sizing:border-box}
 body>.modal{position:fixed;inset:0;max-height:none;max-width:none;margin:0}  /* 2.39.1 (#1220): an extra class on a dialog never shrinks its backdrop */
 .modal .card{background:var(--bg2);border-radius:var(--r-l);box-shadow:var(--shadow);width:min(32.5rem,100%);max-height:min(90dvh,calc(var(--vvh,100dvh) - 2rem));overflow-y:auto;padding:1.25rem}
 .modal h3{margin:0 0 .875rem;font-size:var(--fs-l);font-weight:600;letter-spacing:-.01em}
@@ -508,7 +514,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
   .pstats{grid-template-columns:repeat(2,1fr)}
   .hstats{grid-template-columns:repeat(2,1fr)}
   .ghead .gact{opacity:1}
-  input,select,textarea{font-size:max(1rem,16px)}  /* no iOS zoom on focus (2.38.0 #1173: also with the small text size) */
+  /* 2.87.9 (#1952): the 16 px floor against the iOS zoom (#1173) moved to --fld-fs in @media (pointer:coarse) */
 }
 @media (hover:none){.trow:hover{background:var(--bg)}.kcards .trow:hover{background:var(--bg)}}
 
@@ -744,8 +750,8 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 :root[data-theme="light"] .cal .cell.out{background:rgba(0,0,0,.025)}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"] .cal .cell.out{background:rgba(0,0,0,.025)} }
 :root[data-theme="light"] #side.open,:root[data-theme="light"] .ghost-drag{box-shadow:0 .75rem 1.875rem rgba(0,0,0,.16)}
-:root[data-theme="light"] #scrim,:root[data-theme="light"] .modal{background:rgba(20,26,32,.32)}
-@media (prefers-color-scheme: light){ :root[data-theme="auto"] #scrim,:root[data-theme="auto"] .modal{background:rgba(20,26,32,.32)} }
+:root[data-theme="light"] #scrim,:root[data-theme="light"] .modal{background:rgba(20,26,32,.2)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] #scrim,:root[data-theme="auto"] .modal{background:rgba(20,26,32,.2)} }
 
 /* ---------- conflicts ---------- */
 .cfpill{display:inline-flex;align-items:center;gap:.3125rem;padding:.1875rem .5625rem;border-radius:var(--r-s);font-family:var(--mono);background:color-mix(in srgb,var(--p3) 18%,transparent);color:var(--p3);font-size:.8125rem;font-weight:600}
@@ -3397,6 +3403,7 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 .lc-due{width:7.5rem;justify-content:flex-end}
 .lc-due .dt{display:inline-flex;align-items:center;gap:.25rem}
 .lc-due .rngi{flex:none;width:.75rem;height:.75rem;opacity:.7}
+.lcnil{opacity:.35}
 .lc .over{color:var(--p5)}
 .lc .today{color:var(--accent)}
 .lc-prio{width:5.5rem}
@@ -3635,7 +3642,10 @@ body.pop-open .pgrip,body.modal-open .pgrip,body.pop-open .lchead .lcg,body.moda
 .pgrip:focus{outline:none}
 .pgrip:focus-visible::after{background:var(--accent);width:.1875rem}
 .pgrip:focus-visible{outline:2px solid var(--accent);outline-offset:-1px;border-radius:2px}
-body.pgdrag,body.pgdrag *{cursor:col-resize!important;user-select:none!important}
+/* 2.87.9 (#1965): one sheet over the page carries the drag cursor (and keeps hover effects still) instead of a rule on every
+   element, which restyled the whole app when a drag started and ended */
+body.pgdrag{cursor:col-resize!important;user-select:none!important;-webkit-user-select:none!important}
+body.pgdrag::after{content:"";position:fixed;inset:0;z-index:59;cursor:col-resize}
 @media (max-width:899px){ .pgrip{display:none} }
 /* 2.16.0 (#634): column width grips in the column titles */
 .lchead .lc{position:relative;overflow:visible}
@@ -3682,13 +3692,16 @@ body.lcmoving,body.lcmoving *{cursor:grabbing!important;user-select:none!importa
 :root[data-sdensity="comfortable"] #side{--srow-h:2.25rem}
 :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sgroup{margin-top:.5rem}
 :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbrand{padding-bottom:.5rem}
-:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .scmd{height:2rem;margin-bottom:.25rem}
+:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .scmd{height:2rem}
+:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbsrch{margin-bottom:.25rem}
+:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:2rem;min-height:2rem}
 :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .shead{min-height:1.375rem}
 :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sfoot{margin-top:.625rem;padding-top:.375rem}
 @media (pointer:coarse){
   :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sgroup{margin-top:.125rem}
   :root[data-sdensity="compact"] #side .srow,:root[data-sdensity="compact"] #side .fhead{min-height:2.75rem}
   :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .scmd{height:2.75rem}
+  :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:2.75rem;min-height:2.75rem}
   :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .shead button,:root:is([data-sdensity="compact"],[data-sbase="compact"]) .sgh .sgt{min-height:2.25rem}
   :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .shead{min-height:2.25rem}
   :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sfoot{margin-top:.25rem;padding-top:.125rem}
@@ -4709,13 +4722,15 @@ body.msel #view .qdock{visibility:hidden}
 .tcempty .btn{display:inline-flex;align-items:center;gap:.375rem}
 
 /* ---- 2.28.0 (#935): workspaces -- the switch in the sidebar, the chip in the header, the list dialog */
-.wsbar{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.25rem;margin:0 0 .5rem;padding:0 .75rem;border:1px solid var(--line2);border-radius:1.125rem;background:var(--bg);color:var(--text2);font-size:var(--fs-m);text-align:left;cursor:pointer}
-.wsbar .wsn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sbsrch{display:flex;align-items:stretch;gap:.375rem;margin:0 0 .5rem}
+.sbsrch .scmd{flex:1;min-width:0;width:auto;margin:0}
+.wsbar{position:relative;display:flex;align-items:center;justify-content:center;flex:none;width:2.25rem;min-height:2.25rem;margin:0;padding:0;border:1px solid var(--line2);border-radius:1.125rem;background:var(--bg);color:var(--text2);font-size:var(--fs-m);text-align:left;cursor:pointer}
+.wsbar .wsp-dot{position:absolute;right:.25rem;bottom:.25rem;width:.5rem;height:.5rem;box-shadow:0 0 0 .125rem var(--bg),inset 0 0 0 .09375rem var(--muted)}
+.wsbar .wsp-dot[data-wsc]{box-shadow:0 0 0 .125rem var(--bg)}
 .wsbar.on{border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--text)}
 .wsbar:hover{border-color:color-mix(in srgb,var(--accent) 60%,transparent)}
 .wsbar .wsemo{font-size:.875rem;line-height:1}
-.wsbar svg.i:last-child{color:var(--muted);transform:rotate(90deg)}
-@media (pointer:coarse){ .wsbar{min-height:2.75rem} }
+@media (pointer:coarse){ .wsbar{min-height:2.75rem;width:2.75rem} }
 .wschip{display:inline-flex;align-items:center;gap:.3125rem;padding:.25rem .625rem;border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--text);font-size:.8125rem;border:1px solid transparent;cursor:pointer;flex:none;white-space:nowrap;max-width:12rem}
 .wschip span{overflow:hidden;text-overflow:ellipsis}
 .wschip:hover{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
@@ -4764,6 +4779,7 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .cperm .cchb:not(.st-primary){border-color:var(--line2);color:var(--text2)}
 .cpermst{display:inline-flex;align-items:center;gap:.3rem;margin:.375rem 0 .125rem;font-size:var(--fs-xs);color:var(--muted)}
 .cpermst.ok svg{color:var(--accent)}
+.cpermst.no svg{color:var(--text2)}  /* 2.87.9 (#1963) */
 /* 2.29.0 (#1030 / #929): folder settings dialog, "from the folder" in the list dialog */
 .fsapply{border:1px solid var(--line);border-radius:var(--r-s);padding:.375rem .75rem .5rem;margin:.5rem 0;display:flex;flex-direction:column;gap:.25rem}
 .fsapply legend{font-size:var(--fs-s);color:var(--text2);padding:0 .25rem}
@@ -4901,7 +4917,7 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .repofold .rst{color:var(--muted)}
 .repofold .btn{flex:none}
 .rpnot{margin:.25rem 0 .5rem;padding-left:1.25rem;font-size:var(--fs-s)}
-.thumb{display:inline-block;line-height:1;font-style:normal}
+.thumb{display:inline-flex;align-items:center;line-height:1;font-style:normal}
 @media (hover:hover) and (pointer:fine){ #chat-msgs .cmsg:not(:hover):not(:focus-within):not(.rxshow) .rx.rxtog:not([aria-expanded="true"]){opacity:0} }
 @media (hover:none),(pointer:coarse){
   #chat-msgs .cmsg:not(.rxshow):not(:focus-within) .rxrow .rx.rxtog{position:absolute;width:1px;height:1px;min-width:0;min-height:0;margin:0;padding:0;overflow:hidden;clip-path:inset(50%)}
@@ -5635,6 +5651,33 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .mgtabs .recdot{margin-left:.125rem}
 .modrow.mgarea .mgparts>.modlist{margin:.375rem 0 0 .75rem;padding-left:.75rem;border-left:2px solid var(--line2)}
 @media (max-width:640px){.mgtabs{margin:.25rem 0 .75rem}.mgtabs button{min-height:2.75rem;padding:.25rem .5rem}}
+/* 2.87.9 (#1917): the office menu -- computer: the four groups side by side, each with its points (sticky, the point shown
+   in the accent); phone: the path "Office › group" (back to the start tiles) and the group's points (they wrap, never
+   scroll: #1830); the start page tiles;
+   the path of a detail page as grey text */
+.ofmenu{position:sticky;top:0;z-index:3;display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;max-width:72rem;margin:0 auto .875rem;padding:.5rem 0;background:var(--bg);border-bottom:1px solid var(--line)}
+.ofmg{display:flex;flex-direction:column;gap:.125rem;min-width:0}
+.ofmgh{display:flex;align-items:center;gap:.375rem;padding:0 .625rem;font-size:var(--fs-xs);font-weight:600;color:var(--muted)}
+.ofmgi,.ofmsib{display:flex;flex-wrap:wrap;gap:.125rem}
+.ofmi{display:inline-flex;align-items:center;gap:.375rem;min-height:2.25rem;padding:.25rem .625rem;border:0;border-radius:var(--r-s);background:none;color:var(--text2);font:inherit;white-space:nowrap;cursor:pointer}
+.ofmi:hover{background:var(--bg3);color:var(--text)}
+.ofmi.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.ofmbar{position:sticky;top:0;z-index:3;display:flex;flex-direction:column;gap:.25rem;margin:0 0 .75rem;padding:.375rem 0 .5rem;background:var(--bg);border-bottom:1px solid var(--line)}
+.ofmpath,.ofmcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem;font-size:var(--fs-s);color:var(--muted);min-width:0}
+.ofmhome{border:0;background:none;padding:.25rem 0;min-height:2.75rem;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}
+.ofmsib .ofmi{min-height:2.75rem;flex:none}
+.ofmcrumb{max-width:72rem;margin:-.375rem auto .625rem}
+.ofmcrumb span:last-child{color:var(--text2)}
+.ofmstart{display:flex;flex-direction:column;gap:.875rem;max-width:72rem;margin:0 auto}
+.ofmtiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:.75rem}
+.ofmtile{display:flex;flex-direction:column;gap:.25rem;padding:.75rem;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-l)}
+.ofmtile h3{display:flex;align-items:center;gap:.5rem;margin:0 0 .25rem;font-size:var(--fs-m)}
+.ofmtile h3 svg{color:var(--accent)}
+.ofmti{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;padding:.25rem .5rem;border:0;border-radius:var(--r-s);background:none;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.ofmti:hover{background:var(--bg3)}
+.ofmti svg{color:var(--muted)}
+.ofmfig{padding:.75rem;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-l)}
+@media (max-width:899px){.ofmtiles{grid-template-columns:1fr 1fr;gap:.5rem}.ofmtile{padding:.625rem .5rem}}
 /* 2.45.0 D (#1504): the start page -- one sentence on top, Today with a box to add, compact News, slim empty cards, two
    columns (wide main, narrow side; every column stacks on its own), the app font everywhere, links without underline */
 .hpsum{margin:-.5rem 0 1.125rem;color:var(--text2);font-size:var(--fs-b)}
@@ -6794,8 +6837,12 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .cmsg.csdpend .cmeta{opacity:.8}
 
 /* 2.62.0 A (#1848) pinned chat messages: one quiet bar above the messages (the newest pin, an arrow through the others) */
-.cpnbar{display:flex;align-items:center;gap:.375rem;padding:.125rem .5rem .125rem .75rem;border-bottom:.0625rem solid var(--line);background:color-mix(in srgb,var(--accent) 6%,var(--bg2));color:var(--accent);flex:0 0 auto}
+.cpnbar{display:flex;align-items:flex-start;gap:.375rem;padding:.125rem .5rem .125rem .75rem;border-bottom:.0625rem solid var(--line);background:color-mix(in srgb,var(--accent) 6%,var(--bg2));color:var(--accent);flex:0 0 auto}
+.cpnbar>.i{margin-top:.875rem;flex:none}
 .cpnbar[hidden]{display:none}
+.cpnlist{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+.cpnlist.scr{max-height:5.5rem;overflow-y:auto;overscroll-behavior:contain;scroll-snap-type:y mandatory}
+.cpnrow{display:flex;align-items:center;gap:.25rem;flex:none;min-height:2.75rem;scroll-snap-align:start}
 .cpngo{display:flex;flex-direction:column;align-items:flex-start;flex:1 1 auto;min-width:0;min-height:2.75rem;justify-content:center;padding:0 .25rem;border:0;border-left:.1875rem solid var(--accent);background:none;color:var(--text);font:inherit;font-size:.8125rem;line-height:1.3;text-align:left;cursor:pointer}
 .cpngo b{color:var(--accent);font-size:var(--fs-xs);white-space:nowrap}
 .cpngo span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

@@ -202,10 +202,15 @@ async function wk_delete(p) {
 function wk_export() { if (wk_e2e(wk_cur())) { wkeExport(wk_cur()).catch(e => toast(e.message)); return; }  // 2.64.3 B (#1817): the ZIP is made in the browser
   const a = document.createElement('a'); a.href = '/api/wiki/export?space=' + encodeURIComponent(wk_cur()); a.download = 'wiki.zip'; document.body.append(a); a.click(); a.remove(); }
 function wk_import() {
-  const sp = wk_cur(), inp = document.createElement('input');
+  let sp = wk_cur();
+  const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = '.zip,application/zip';
   inp.onchange = async () => {
     const f = inp.files?.[0]; if (!f) return;
+    // 2.87.9 (#1940): where the pages go, in words; from an organisation's knowledge also into the private one
+    const to = await importTargetConfirm({what: tr('the pages'), ws: sp, place: tr('Knowledge pages'), privOk: true});
+    if (!to) return;
+    if (to === 'private') sp = 'private';
     const fd = new FormData(); fd.append('file', f);
     let r; try { r = wk_e2e(sp) ? await wkeImport(sp, f) : await rawFetch('POST', '/api/wiki/import?space=' + encodeURIComponent(sp), fd); } catch (e) { toast(e.message); return; }  // 2.64.3 B (#1817): read and encrypted in the browser
     wk_after(sp);

@@ -288,6 +288,16 @@ function palAll() {
   for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus timer')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Project status')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')], ['life', 'home', N_('Home & life')], ['review', 'journal', N_('Review & journal')], ['clients', 'brief', N_('Clients')], ['workload', 'chart', N_('Workload')], ['office', 'receipt', N_('Office & finance')]])
     if (modOn(m) && !o3a_hid(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab
   for (const id of MG_IDS) if (mg_on(id) && !o3a_hid(id)) add('v:a-' + id, 'view', tr(mg_area(id)[2]), mg_area(id)[1], () => go(mg_target(id)));  // 2.44.0 (#1187): the areas
+  // 2.87.9 (#1934): the parts of the areas (Documents, Budget, Feeds …) with the area below, and what their views list (palSub)
+  for (const [aid, , aname, parts] of MG_AREAS) {
+    if (!mg_on(aid) || o3a_hid(aid)) continue;
+    for (const [route, icon, name, on] of parts) if (on() && !o3a_hid(route) && !it.some(x => x.id === 'v:' + route)) add('v:' + route, 'view', tr(name), icon, () => go(route), {sub: tr(aname)});
+  }
+  palSubItems(add);
+  if (feat('docs') && !S.me?.kid) {  // 2.87.9 (#1934): Paperless-ngx (paperless.js, loaded with the documents)
+    add('a:plimp', 'action', tr('Import from Paperless-ngx…'), 'download', () => pl_importActive(), {qonly: true, sub: tr('Documents')});
+    add('a:plset', 'action', tr('Connect Paperless-ngx'), 'link', () => pl_openSettings(), {qonly: true, sub: tr('Settings: {0}', tr('Integrations'))});
+  }
   // 2.8.0 (#434): the command bar also opens the timeline, the agents and their chats ("ask an agent")
   if (feat('timeline')) add('v:timeline', 'view', tr('Timeline'), 'timeline', () => { S.rmScrollReset = true; Promise.resolve(rmSet({v: 'timeline'}, 'none')).then(() => go('all')); });  // 2.65.0 (#1823): rmSet may load the timeline first
   if (agentsTab()) {
@@ -313,6 +323,31 @@ function palAll() {
   for (const x of S.tasks.values()) if (x.status === 0 && x.id > 0 && !archivedTask(x)) add('t:' + x.id, 'tasks', x.title, typeof le2eOn === 'function' && le2eOn(x.list_id) ? 'lock' : 'check', () => { const r = $(`#view .trow[data-id="${x.id}"]`); if (!r && x.list_id) go(x.list_id === inbox()?.id ? 'inbox' : 'l/' + x.list_id); setTimeout(() => openDetail(x.id), 30); },
     {sub: [lname(listById(x.list_id)), x.due ? dayLabel(x.due) : ''].filter(Boolean).join('  ·  ')});
   return it;
+}
+// 2.87.9 (#1934): what the views of the areas list on their side, as search hits: the senders, document types and tags of the
+// documents, the top folders of the file store. Fetched (quietly) when the search opens, for the shown workspace, at most
+// once a minute; only what the server lists for the person (the same lists the views show)
+const PALX = {ws: '', at: 0, docs: null, folders: []};
+function palSubLoad() {
+  const ws = wsCur();
+  if (PALX.ws === ws && Date.now() - PALX.at < 60000) return;
+  PALX.ws = ws; PALX.at = Date.now(); PALX.docs = null; PALX.folders = [];
+  const redraw = () => { if (PALX.ws === ws && $('.palette') && PAL.q.trim()) palDraw(); };
+  if (feat('docs') && !S.me?.kid) rawFetch('GET', `/api/docs?ws=${encodeURIComponent(ws)}&limit=1`).then(j => { if (PALX.ws === ws) { PALX.docs = j.facets || null; redraw(); } }).catch(() => {});
+  if (typeof ab_on === 'function' && ab_on()) {
+    const sps = ws === 'all' || !wsOn() ? ['private', ...(wsOn() ? (S.me?.workspaces || []).map(w => 'org:' + w.id) : [])] : [ws];
+    for (const sp of sps) rawFetch('GET', `/api/files?space=${encodeURIComponent(sp)}`).then(j => {
+      if (PALX.ws !== ws) return;
+      for (const n of (j.items || []).filter(x => x.kind === 'folder')) PALX.folders.push({id: n.id, name: n.name, sp, many: sps.length > 1});
+      redraw();
+    }).catch(() => {});
+  }
+}
+function palSubItems(add) {
+  const f = PALX.ws === wsCur() ? PALX.docs : null;
+  if (f) for (const [k, key, icon, kn] of [['sender', 'senders', 'user', N_('Sender')], ['type', 'types', 'file', N_('Document type')], ['tag', 'tags', 'tag', N_('Tag')]])
+    for (const x of f[key] || []) add(`dcf:${k}:${x.ids.join(',')}`, 'view', x.name, icon, () => dc_filterGo(k, x.ids.join(',')), {qonly: true, sub: `${tr('Documents')} · ${tr(kn)}`});
+  if (PALX.ws === wsCur()) for (const n of PALX.folders) add('abf:' + n.id, 'view', n.name, 'folder', () => go('ablage/' + n.id), {qonly: true, sub: tr('Files') + (n.many ? ' · ' + ab_spaceName(n.sp) : '')});
 }
 const PAL_KIND = {note: N_('note|palette kind'), folder: N_('folder|palette kind'), action: N_('action'), task: N_('task|palette kind'), view: N_('view'), list: N_('list|palette kind'), filter: N_('filter'), tag: N_('tag'), setting: N_('setting'), tasks: N_('task|palette kind')};
 function palItems() {
@@ -389,6 +424,7 @@ function openPalette(mode = null) {
   const ret = document.activeElement && document.activeElement !== document.body && !document.activeElement.closest?.('.palette') ? document.activeElement : PAL.ret;
   closePalette(); closePop(); PAL.ret = ret;
   PAL.q = ''; PAL.i = 0; PAL.mode = mode;
+  if (!mode) palSubLoad();  // 2.87.9 (#1934)
   const t = curTask();
   const md = document.createElement('div');
   md.className = 'modal palette';

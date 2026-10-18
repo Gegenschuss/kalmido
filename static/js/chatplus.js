@@ -31,7 +31,7 @@ window.addEventListener('online', () => setTimeout(csdWake, 300));
 // others when there are several, a tap on the text jumps to the message (msgJump also loads older pages), the x unpins.
 // At most 5 per conversation (the server says so). One Undo step per pin / unpin. The pins come with every load of the
 // conversation (also when older than the loaded page): S.tc.pins / S.chat.pins.
-const CPN = {idx: {}};
+const CPN = {};
 const cpnPins = k => k[0] === 't' ? (S.tc?.rid === +k.slice(2) ? S.tc.pins || [] : []) : (S.chat?.aid === +k.slice(2) ? S.chat.pins || [] : []);
 function cpnText(m, art) {
   let body = m.body || '';
@@ -53,8 +53,10 @@ function cpnUndoDrop() {
 function cpnBarHtml(k) {
   const pins = cpnPins(k), art = k[0];
   if (!pins.length) return `<div class="cpnbar" data-cpn="${k}" hidden></div>`;
-  const i = (CPN.idx[k] || 0) % pins.length, m = pins[i], n = pins.length;
-  return `<div class="cpnbar" data-cpn="${k}" role="region" aria-label="${esc(tr('Pinned messages'))}">${ic('pin', 's')}<button type="button" class="cpngo" data-act="cpn-go" data-art="${art}" data-id="${m.id}" title="${esc(tr('Show the message'))}"><b>${n > 1 ? esc(tr('Pinned {0}/{1}', i + 1, n)) : esc(tr('Pinned'))}</b><span>${esc(cpnText(m, art))}</span></button>${n > 1 ? `<button type="button" class="iconbtn cpnnext" data-act="cpn-next" data-k="${k}" title="${esc(tr('Next pinned message'))}" aria-label="${esc(tr('Next pinned message'))}">${ic('chev', 's')}</button>` : ''}<button type="button" class="iconbtn cpnx" data-act="cpn-x" data-art="${art}" data-id="${m.id}" title="${esc(tr('Unpin'))}" aria-label="${esc(tr('Unpin'))}">${ic('x', 's')}</button></div>`;
+  // 2.87.9 (#1909): every pin in its own line (sender + text), 1-2 as they are, from 3 on the bar stays two lines high and scrolls
+  const who = m => art === 't' ? uname(m.user_id, S.tc.users || {}) : m.from === 'agent' ? agentById(S.chat?.aid)?.name || tr('Agent') : tr('You');
+  const row = m => `<div class="cpnrow"><button type="button" class="cpngo" data-act="cpn-go" data-art="${art}" data-id="${m.id}" title="${esc(tr('Show the message'))}"><b>${esc(who(m))}</b><span>${esc(cpnText(m, art))}</span></button><button type="button" class="iconbtn cpnx" data-act="cpn-x" data-art="${art}" data-id="${m.id}" title="${esc(tr('Unpin'))}" aria-label="${esc(tr('Unpin'))}">${ic('x', 's')}</button></div>`;
+  return `<div class="cpnbar" data-cpn="${k}" role="region" aria-label="${esc(tr('Pinned messages'))}">${ic('pin', 's')}<div class="cpnlist ${pins.length > 2 ? 'scr' : ''}">${pins.map(row).join('')}</div></div>`;
 }
 // the bars on the screen follow the state (called by tcPatch / chatPatch and after a pin)
 function cpnSync() {
@@ -81,15 +83,13 @@ async function cpnSet(art, place, id, on) {
 async function cpnToggle(art, id, on) {
   const place = art === 't' ? S.tc.rid : S.chat.aid, k = art + ':' + place;
   try { await cpnSet(art, place, id, on); } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); return; }
-  if (on) CPN.idx[k] = 0;  // the new pin shows first
   const e = histAdd({label: on ? tr('Message pinned') : tr('Message unpinned'), undo: () => cpnSet(art, place, id, !on), redo: () => cpnSet(art, place, id, on)});
   offerUndo(on ? tr('Message pinned') : tr('Message unpinned'), e);
   CPN.undoK = k; CPN.undoE = e;
 }
 document.addEventListener('click', e => {
-  const a = e.target.closest?.('[data-act="cpn-go"],[data-act="cpn-next"],[data-act="cpn-x"]'); if (!a) return;
+  const a = e.target.closest?.('[data-act="cpn-go"],[data-act="cpn-x"]'); if (!a) return;
   e.preventDefault(); e.stopPropagation();
-  if (a.dataset.act === 'cpn-next') { const k = a.dataset.k; CPN.idx[k] = ((CPN.idx[k] || 0) + 1) % Math.max(1, cpnPins(k).length); cpnSync(); $(`[data-cpn="${k}"] .cpnnext`)?.focus({preventScroll: true}); return; }
   const art = a.dataset.art, id = +a.dataset.id;
   if (a.dataset.act === 'cpn-x') { cpnToggle(art, id, false); return; }
   msgJump({art, id, chat: art === 't' ? S.tc.rid : null, agent: art === 'a' ? S.chat.aid : null});

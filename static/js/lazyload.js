@@ -30,15 +30,15 @@ const LD_MODS = {
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
-// uses the token dialogs, a knowledge page embeds mind maps
-const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook'], agentchat: ['integrations'], wiki: ['mindmap']};
+// uses the token dialogs, a knowledge page embeds mind maps; 2.87.9 (#1936): Paperless-ngx (paperless.js) is in Integrations
+const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs'], agentchat: ['integrations'], wiki: ['mindmap']};
 // functions of a module that code loaded at start calls: a stand-in loads the module and then calls the real one (the
 // module's own function declaration replaces the stand-in on window)
 const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved'], contacts: ['ctRoute', 'ctEditor'],
   // 2.65.0 (#1823)
   agentchat: ['chatOpen', 'chatClose', 'chatPop', 'chatDock', 'chatFloatMin', 'apvJump', 'chatChoice', 'shareDest', 'chatFileRm', 'chatReact',
     'chatModeMenu', 'stepsAlways', 'stepsLive', 'chatEditStart', 'chatOlder', 'chatSend', 'chatBottom', 'chatDraw', 'agModal', 'agDraw', 'aiuLoad', 'ains_setupModal'],
-  pdf: ['pdfView', 'dpvOpen', 'dpvSumMount'], calendar: ['calColorPop', 'cg_commit'], docs: ['dc_shareFiles'],
+  pdf: ['pdfView', 'dpvOpen', 'dpvSumMount'], calendar: ['calColorPop', 'cg_commit'], docs: ['dc_shareFiles', 'dc_filterGo', 'pl_importActive', 'pl_openSettings'],  // 2.87.9 (#1934)
   life: ['contractModal', 'deviceModal', 'upkeepModal', 'healthModal', 'tripModal'], integrations: ['pubWire'],
   playbook: ['pbMount', 'pbOpen', 'pbNewsOpen'], timeline: ['rmSet']};
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)

@@ -88,7 +88,10 @@ def react(c, k, uid, emoji, on):
         return res
     t = c.execute("SELECT * FROM tasks WHERE id=?", (k["task_id"],)).fetchone()
     author = c.execute("SELECT * FROM users WHERE id=?", (k["user_id"],)).fetchone() if k["user_id"] else None
-    if is_agent(author) and emoji in ("up", "down") and uid != author["id"] and is_approver(c, t, uid):
+    from .cchoice import lv_jload
+    card = lv_jload(k["choices"]) if "choices" in k.keys() else None  # 2.87.9 (#1963): a thumb never decides an approval card
+    if is_agent(author) and emoji in ("up", "down") and uid != author["id"] and is_approver(c, t, uid) \
+            and not (isinstance(card, dict) and (card.get("approval") or card.get("permission"))):
         res["approval"] = "approved" if emoji == "up" else "rejected"
         log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": emoji == "up"})
     sug = json.loads(k["suggestion"]) if k["suggestion"] else None

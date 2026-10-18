@@ -7,7 +7,7 @@
 // kalmido/office/books.py. No tax advice: every part carries the same short note.
 const BK = {oid: null, year: new Date().getFullYear(), info: null, euer: null, ustva: null, mode: null, period: null, err: null, seq: 0, jumped: false};
 const BK_VATS = [['19', '19 %'], ['7', '7 %'], ['0', '0 %']];
-OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['books', 'book', N_('Bookkeeping'), 1, () => bkTabHtml()]);  // admins only
+OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['books', 'book', N_('Bookkeeping'), 1, () => bkTabHtml(), 'money']);  // admins only; 2.92.1 (#1917): in the menu group Money
 
 const bkSub = () => (location.hash.split('/')[2] || '');
 const bkNote = () => `<p class="muted bk-note">${esc(tr('No tax advice; figures without guarantee.'))}</p>`;

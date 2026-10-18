@@ -64,7 +64,7 @@ function kp_tile(card) {
   if (KPT.data === undefined || (KPT.data && Date.now() - KPT.at > 60000 && !KPT.loading)) {  // fresh after a minute
     if (!KPT.loading) {
       KPT.loading = true;
-      rawFetch('GET', '/api/office/kpi').then(j => { KPT.data = j; KPT.at = Date.now(); }, () => { KPT.data = null; }).finally(() => { KPT.loading = false; if (S.route.mod === 'home') renderView(); });
+      rawFetch('GET', '/api/office/kpi').then(j => { KPT.data = j; KPT.at = Date.now(); }, () => { KPT.data = null; }).finally(() => { KPT.loading = false; if (S.route.mod === 'home') renderView(); else if (S.route.mod === 'office' && ofcTab() === 'start') ofcDraw(); });  // 2.87.9 (#1917): the office start page
     }
     if (KPT.data === undefined) return '';
   }

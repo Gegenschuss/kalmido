@@ -415,6 +415,8 @@ function bg_csvModal() {
       if (st.rows) {
         const rows = st.rows.map((r, i) => [r, i]).filter(([, i]) => $(`[data-csr="${i}"]`, md)?.checked).map(([r, i]) => ({day: r.day, amount: r.amount, kind: r.kind, title: r.title, counterpart: r.counterpart || '', cat_id: +$(`[data-cscat="${i}"]`, md)?.value || null, ...(r.recurring_id && $(`[data-csrec="${i}"]`, md)?.checked ? {recurring_id: r.recurring_id} : {})}));
         if (!rows.length) { err(tr('Nothing chosen')); return; }
+        const bl = listById(lid);  // 2.87.9 (#1940): where the entries go, in words (the budget's list decides the workspace)
+        if (!await importTargetConfirm({what: trn('{0} entry', '{0} entries', rows.length), ws: wsOf(bl), place: bl ? lname(bl) : ''})) return;
         const j = await api('POST', `/api/budget/${lid}/import/commit`, {rows, mapping: st.mapping, columns: st.p.columns});  // columns: the server remembers the mapping for this header
         md.remove(); await bg_after();
         toast(trn('{0} entry imported', '{0} entries imported', j.created) + (j.skipped_dup ? ' · ' + trn('{0} already there', '{0} already there', j.skipped_dup) : ''));

@@ -387,6 +387,11 @@ document.addEventListener('pointerdown', e => {
 document.addEventListener('pointermove', e => {
   if (!MM.ptr.has(e.pointerId)) return;
   MM.ptr.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  mm_moveF(e.clientX, e.clientY, e.pointerType);
+});
+// 2.87.9 (#1965): moving, pinching and the drop search run once per frame (the last pointer position)
+const mm_moveF = rafThrottle((x, y, pointerType) => {
+  const e = {clientX: x, clientY: y, pointerType};
   const st = $('.mmstage'); if (!st) return;
   if (MM.pinch && MM.ptr.size >= 2) {
     const [a, b] = [...MM.ptr.values()], p = MM.pinch, r = st.getBoundingClientRect();
@@ -407,6 +412,7 @@ document.addEventListener('pointermove', e => {
 });
 function mm_up(e) {
   if (!MM.ptr.has(e.pointerId)) return;
+  mm_moveF.flush();
   MM.ptr.delete(e.pointerId);
   if (MM.pinch) { if (MM.ptr.size < 2) MM.pinch = null; MM.drag = null; return; }
   const d = MM.drag; MM.drag = null; if (!d) return;

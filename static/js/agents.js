@@ -133,8 +133,8 @@ async function waitJobsFresh() {
   try { S.bandJobs.items = (await api('GET', '/api/agents/jobs?state=open')).jobs || []; S.bandJobs.v = S.v; } catch { /* offline: what we have */ }
   return waitJobs();
 }
-// 2.32.0 (#1082): approvals say 👍 / 👎 (the emoji is decoration, the button's text names it)
-const thumbIc = up => `<span class="thumb" aria-hidden="true">${up ? '\u{1F44D}' : '\u{1F44E}'}</span>`;
+// 2.32.0 (#1082): approvals show a thumb (decoration, the button's text names it); 2.87.9 (#1963): the app's own thumb icons, no emoji
+const thumbIc = up => `<span class="thumb" aria-hidden="true">${ic(up ? 'thumbup' : 'thumbdown', 's')}</span>`;
 const waitJobBtns = j => j.kind ? `<button class="btn sm pri" data-act="prop-open" data-jid="${j.id}">${tr('Review the proposal')}</button>`
   : `<button class="btn sm pri" data-act="job-do" data-jid="${j.id}" data-a="approve">${thumbIc(true)} ${tr('Approve')}</button><button class="btn sm" data-act="job-do" data-jid="${j.id}" data-a="reject">${thumbIc(false)} ${tr('Reject')}</button>`;
 function waitCard() {
@@ -208,13 +208,15 @@ const rxEmoji = k => (RX.find(x => x[0] === k) || [])[1] || k;
 const rxName = k => { const x = RX.find(y => y[0] === k); return x ? tr(x[2]) : k; };
 function reactHtml(c, ro) {
   if (!cmSocial(taskById(S.tl.id))) return '';  // #315: reactions are for people working together
-  const rs = c.reactions || [];
+  // 2.87.9 (#1963): while an approval card of the comment is open, no thumbs under it (only Yes / No decide); afterwards the full bar
+  const apvOpen = !!(c.choices?.approval || c.choices?.permission) && typeof ccCmtState === 'function' && ccCmtState(c) === 'open';
+  const rs = (c.reactions || []).filter(r => !(apvOpen && (r.emoji === 'up' || r.emoji === 'down')));
   if (S.me && c.user_id === S.me.id) ro = true;  // 2.23.0 (#823): no reactions on my own comment (the others' stay visible)
   const pill = r => {
     const mine = r.users.some(u => S.me && u.id === S.me.id), names = r.users.map(u => u.name).join(', ');
     return `<button class="rx ${mine ? 'on' : ''}" data-act="c-react" data-cid="${c.id}" data-e="${esc(r.emoji)}" title="${esc(`${names} · ${rxName(r.emoji)}`)}" aria-label="${esc(rxName(r.emoji) + ': ' + names)}" aria-pressed="${mine}" ${ro ? 'disabled' : ''}>${esc(rxEmoji(r.emoji))}<span class="rxn" data-act="c-react-who" data-cid="${c.id}" data-e="${esc(r.emoji)}">${r.count}</span></button>`;
   };
-  const quick = ro ? [] : RX.slice(0, 2).filter(([k]) => !rs.some(r => r.emoji === k)).map(([k, em, name]) =>
+  const quick = ro ? [] : RX.slice(0, 2).filter(([k]) => !apvOpen && !rs.some(r => r.emoji === k)).map(([k, em, name]) =>
     `<button class="rx add" data-act="c-react" data-cid="${c.id}" data-e="${k}" title="${esc(tr(name))}" aria-label="${esc(tr(name))}">${em}</button>`);
   const more = ro ? '' : `<button class="rx add rxplus" data-act="c-react-more" data-cid="${c.id}" title="${esc(tr('React with an emoji'))}" aria-label="${esc(tr('React with an emoji'))}">${ic('plus', 's')}</button>`;
   // 2.13.2 (#478 F5): like the chat: given reactions stay as pills, the quick 👍 👎 + appear on hover / keyboard focus

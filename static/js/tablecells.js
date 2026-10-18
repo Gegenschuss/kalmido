@@ -11,21 +11,28 @@ document.addEventListener('pointerdown', e => {
   const cell = b.closest('.lc'), k = cell.dataset.k, x0 = e.clientX, y0 = e.clientY;
   let on = false, guide = null, to = null;
   const cells = () => [...head.querySelectorAll('.lc[data-k]')].filter(c => c.getClientRects().length);
-  const mv = ev => {
-    if (!on) { if (Math.abs(ev.clientX - x0) < 6 && Math.abs(ev.clientY - y0) < 6) return; on = true; cell.classList.add('lcmove'); document.body.classList.add('lcmoving'); }
-    // the gap nearest to the pointer: before cell i (i = cells.length: after the last)
-    const cs = cells(), xs = cs.map(c => c.getBoundingClientRect());
+  // 2.87.9 (#1965): the cells are measured once (again after a scroll), the guide moves once per frame
+  let geo = null;
+  const reset = () => { geo = null; };
+  const show = rafThrottle(cx => {
+    if (!geo) { const cs = cells(); geo = {cs, xs: cs.map(c => c.getBoundingClientRect())}; }
+    const {cs, xs} = geo; if (!cs.length) return;
     let best = 0, bd = Infinity;
     for (let i = 0; i <= cs.length; i++) {
-      const x = i < cs.length ? xs[i].left - 6 : xs[cs.length - 1].right + 6, d = Math.abs(ev.clientX - x);
+      const x = i < cs.length ? xs[i].left - 6 : xs[cs.length - 1].right + 6, d = Math.abs(cx - x);
       if (d < bd) { bd = d; best = i; }
     }
     to = best < cs.length ? cs[best].dataset.k : null;
     const gx = best < cs.length ? xs[best].left - 6 : xs[cs.length - 1].right + 6;
     guide = lcGuide(cell, guide, gx);
+  });
+  const mv = ev => {
+    if (!on) { if (Math.abs(ev.clientX - x0) < 6 && Math.abs(ev.clientY - y0) < 6) return; on = true; cell.classList.add('lcmove'); document.body.classList.add('lcmoving'); document.addEventListener('scroll', reset, true); }
+    show(ev.clientX);
   };
   const up = () => {
     document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
+    document.removeEventListener('scroll', reset, true); show.flush();
     guide?.remove(); cell.classList.remove('lcmove'); document.body.classList.remove('lcmoving');
     if (!on) return;
     tcMoved = Date.now();

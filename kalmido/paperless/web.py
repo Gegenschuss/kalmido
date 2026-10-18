@@ -38,18 +38,20 @@ def _public(c, ws, uid, org):
     if not r:
         out["conn"] = None
         return out
-    run = _run_public(c, "pl_sources", r, r["run_kind"])
+    run = _run_public(c, "pl_sources", r, r["run_kind"], uid)
     out["conn"] = {"url": r["url"], "token_set": bool(r["token"]), "follow": bool(r["follow"]), "every_min": r["every_min"],
                    "synced_at": r["synced_at"], "error": r["error"], "error_text": P.pl_err_text(r["error"]), "run": run}
     return out
 
 
-def _run_public(c, table, r, kind):
+def _run_public(c, table, r, kind, uid=None):
     """2.69.0 A (#1846): the state of a run (URL or ZIP): + its place in the server's queue, the storage-full stop with how far
-    it came, learn (part B's summary, {} without)."""
+    it came, learn (part B's summary, {} without). 2.87.9 (#1940): + target ('ws' = this workspace, 'private' = the private
+    space of the person who started it) and mine (uid started it)."""
     run = {"state": r["run_state"] or "idle", "kind": kind, "total": r["run_total"], "done": r["run_done"], "new": r["run_new"],
            "skipped": r["run_skip"], "failed": r["run_fail"], "error": r["run_error"], "error_text": P.pl_err_text(r["run_error"]),
-           "place": P.plh_queue_place(c, table, r["id"]) if r["run_state"] == "queued" else None}
+           "place": P.plh_queue_place(c, table, r["id"]) if r["run_state"] == "queued" else None,
+           "target": "private" if (r.get("run_ws") or "") not in ("", r["ws"]) else "ws", "mine": bool(uid and r["run_by"] == uid)}
     if str(r["run_error"]).partition(":")[0] == "quota" and r["run_total"]:
         run["error_text"] = tr("The storage space is full: the import stopped after {0} of {1} documents", r["run_done"], r["run_total"])
     try:
@@ -162,12 +164,14 @@ def pl_preview_get():
 
 @app.post("/api/paperless/import")
 def pl_import_start():
-    """{ws, mapping?} -- saves the mapping and starts the import of all documents in the background (409 while one runs)."""
+    """{ws, mapping?, target?} -- saves the mapping and starts the import of all documents in the background (409 while one
+    runs). 2.87.9 (#1940): target 'private' = from an organisation's connection into the starter's own private space."""
     _gate()
     c = db()
     d = body()
     uid, _org, ws = _ws(c, d.get("ws"))
     r = _need_conn(c, ws)
+    run_ws = P.pl_run_target(c, uid, _org, ws, d.get("target"))
     if r["run_state"] in ("queued", "busy", "stop"):
         return err(tr("An import is already running"), 409)
     from ..admin.hosting import QuotaExceeded, quota_info
@@ -177,7 +181,7 @@ def pl_import_start():
     if "mapping" in d:
         c.execute("UPDATE pl_sources SET mapping=? WHERE id=?", (S._jseal(c, ws, "pl_sources.mapping", P.pl_clean_mapping(d["mapping"])), r["id"]))
     c.execute("UPDATE pl_sources SET run_state='queued', run_kind='all', run_by=?, run_total=0, run_done=0, run_new=0, run_skip=0, "
-              "run_fail=0, run_error='', run_beat=? WHERE id=?", (uid, P._now(), r["id"]))
+              "run_fail=0, run_error='', run_ws=?, run_beat=? WHERE id=?", (uid, run_ws, P._now(), r["id"]))
     c.commit()
     P.pl_kick()
     return jsonify(_public(c, ws, uid, _org))

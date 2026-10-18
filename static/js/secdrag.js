@@ -49,12 +49,17 @@ function sb_secTouchMove(e) {
   const st = sb_sd, p = e.touches[0]; if (!st || !p) return;
   if (!st.moved && Math.hypot(p.clientX - st.x, p.clientY - st.y) < 6) return;
   e.preventDefault(); st.moved = true; st.lx = p.clientX; st.ly = p.clientY;
-  st.g.style.top = (p.clientY - st.dy) + 'px'; st.g.style.left = (p.clientX - st.dx) + 'px';
-  const sp = sb_secSpot(p.clientX, p.clientY);
+  sb_secFrame(p.clientX, p.clientY);
+}
+// 2.87.9 (#1965): once per frame; the ghost slides by transform
+const sb_secFrame = rafThrottle((x, y) => {
+  const st = sb_sd; if (!st) return;
+  st.g.style.transform = `translate(${x - st.x}px, ${y - st.y}px)`;
+  const sp = sb_secSpot(x, y);
   sb_secMark(sp && sb_secOrder(st.sid, sp) ? sp : null);
   const sc = st.sc, r = sc === document.scrollingElement || sc === document.documentElement ? {top: 0, bottom: innerHeight} : sc.getBoundingClientRect();
-  if (p.clientY < r.top + 56) sc.scrollBy(0, -14); else if (p.clientY > Math.min(r.bottom, innerHeight) - 56) sc.scrollBy(0, 14);
-}
+  if (y < r.top + 56) sc.scrollBy(0, -14); else if (y > Math.min(r.bottom, innerHeight) - 56) sc.scrollBy(0, 14);
+});
 function sb_secTouchEnd(e) {
   const st = sb_sd; if (!st) return;
   const o = st.moved && sb_secOrder(st.sid, sb_secSpot(st.lx, st.ly));  // measured while the section is still folded
@@ -65,6 +70,7 @@ function sb_secTouchEnd(e) {
   if (o) saveSectionOrder(o.lid, o.ids);
 }
 function sb_secTouchStop() {
+  sb_secFrame.cancel();
   const st = sb_sd; sb_sd = null;
   $$('.sb-secghost').forEach(x => x.remove());
   $$('#view .dropbefore, #view .dropafter').forEach(x => x.classList.remove('dropbefore', 'dropafter'));

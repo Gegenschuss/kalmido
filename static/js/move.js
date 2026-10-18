@@ -148,7 +148,11 @@ function umzInit(md) {
           }
           people[k] = {...people[k], [x.dataset.k]: true, ...(em ? {email: em} : {})};
         }
-        const t = $('#s-umz-tgt', md)?.value || 'private';
+        let t = $('#s-umz-tgt', md)?.value || 'private';
+        // 2.87.9 (#1940): where the account's data goes, in words; from an organisation also into the private space
+        const to = await importTargetConfirm({what: tr('the data of the account'), ws: t === 'private' ? 'private' : 'org:' + t, privOk: true});
+        if (!to) return;
+        if (to === 'private') t = 'private';
         b.disabled = true;
         return umzImpDraw(md, await api('POST', `/api/account/import/${UMZ.cur.id}/run`, {target: t === 'private' ? 'private' : +t, people}));
       }

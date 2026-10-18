@@ -43,7 +43,7 @@ function ms_clView() {
   const card = !id ? (mob ? '' : `<div class="ctcard ctnone muted">${ic('brief')}${tr('Choose a client')}</div>`)
     : !d ? `<div class="ctcard ctnone muted">${tr('Loading…')}</div>`
     : d.error ? `<div class="ctcard ctnone muted">${ic('brief')}${tr('This client does not exist or you cannot see it.')}${mob ? `<a class="btn" href="#clients">${tr('All clients')}</a>` : ''}</div>` : ms_clCard(d);
-  const head = `<h2 class="msclh">${ic('receipt', 's')}<span class="muted">${tr('Office|area')}</span><span class="muted" aria-hidden="true">›</span><span>${tr('Clients')}</span></h2>`;
+  const head = '';  // 2.87.9 (#1917): no "Office › Clients" heading (it looked like a way back); the office menu shows the place, the path only on a client
   const bar = `<div class="ctbar"><div class="ctsearch">${ic('search', 's')}<input id="mscl-q" type="search" value="${esc(MSC.q)}" placeholder="${esc(tr('Search clients'))}" aria-label="${esc(tr('Search clients'))}" autocomplete="off" enterkeyhint="search"></div>
     <label class="chkl"><input type="checkbox" id="mscl-arch" ${MSC.arch ? 'checked' : ''}> ${tr('Archived')}</label><span class="spacer"></span>${typeof hbm_hubBtn === 'function' ? hbm_hubBtn() : ''}
     ${(MSC.items || []).length ? `<button class="iconbtn ${MSC.pick ? 'on' : ''}" data-mscl="pick" aria-pressed="${!!MSC.pick}" aria-label="${esc(tr(MSC.pick ? 'End selection' : 'Select'))}" title="${esc(tr(MSC.pick ? 'End selection' : 'Select'))}">${ic('select')}</button>` : ''}

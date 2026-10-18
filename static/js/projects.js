@@ -564,14 +564,15 @@ function fieldModal(lid, f, done) {
     const ls = $('.optlist', md), row = h.closest('.optrow'), from = +row.dataset.i;
     if (st.pal != null) { st.pal = null; ls.querySelector('.lrpal')?.remove(); }
     row.classList.add('drag');
-    const mv = ev => {
+    const mv = rafThrottle(ev => {  // 2.87.9 (#1965): once per frame
       const rows = [...ls.querySelectorAll('.optrow')];
       const over = rows.find(r => { const bx = r.getBoundingClientRect(); return r !== row && ev.clientY >= bx.top && ev.clientY < bx.bottom; });
       if (!over) return;
       ls.insertBefore(row, rows.indexOf(over) > rows.indexOf(row) ? over.nextSibling : over);
-    };
+    });
     const up = () => {
       document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
+      mv.flush();
       const to = [...ls.querySelectorAll('.optrow')].indexOf(row);
       if (to !== from) optMove(from, to); else { row.classList.remove('drag'); }
     };
