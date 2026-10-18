@@ -997,7 +997,8 @@ while one is off its routes answer 409. `GET /life` returns the switched-on part
 sums and `due` = the last day to cancel, devices + upkeep, contacts to get in touch with, health with the scope
 `private`, trips, the reading list). Create: `POST /life/contracts`, `/life/devices`, `/life/upkeep`, `/life/health`
 (`private`), `/life/trips` (`structure`); `GET /life/review?period=day|week&date=` (the journal only with `private`),
-`PUT /life/journal/{day}` (`private`), `PUT /contacts/{id}/care` (`contacts`), `POST /life/karakeep/sync`. Lists carry
+`PUT /life/journal/{day}` (`private`), `PUT /contacts/{id}/care` (`contacts`), `POST /life/karakeep/sync` (2.97.0: links come in
+as bookmarks of the app, notes stay tasks; bookmarks themselves have no REST API, docs/BOOKMARKS.md). Lists carry
 `life` (`contracts | home | health | travel | reading`) and `trip` (`{from, to, where}`). The Karakeep connection itself
 (its API key) is set up in the app only.
 
