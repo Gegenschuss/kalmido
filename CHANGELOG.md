@@ -29,6 +29,13 @@ to the tax office (no ELSTER, no payroll).
 
 ### Fixed
 - Documents: the text recognition no longer overwrites an amount typed in while it was still running.
+## [2.89.1] - 2026-10-18
+
+CI fixes of 2.89.0.
+
+### Fixed
+- Tests: the workspace guard and the route scan know the tables; a task-detail UI test waits for the loaded state (#1916).
+
 ## [2.89.0] - 2026-10-18
 
 Tables: Excel made simple, with Kalmido values in the cells.
