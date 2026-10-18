@@ -261,6 +261,8 @@ ROUTES = {
     "GET /api/office/equipment/value": "office", "GET /api/office/equipment/value.csv": "office", "GET /api/office/equipment/value.pdf": "office",
     "GET /api/office/equipment/policies": "office", "GET /api/office/equipment/receipts": "office", "GET /api/office/equipment/receipts/{}": "office",
     # 2.92.0 C (#1926): file preview / text of docx and xlsx, summarise by an agent (p292_c_api_test.py)
+    "GET /api/attachments/{}/preview": "attachment", "GET /api/attachments/{}/agents": "attachment",
+    "GET /api/list-files/{}/preview": "attachment", "GET /api/files/nodes/{}/preview": "file",
     # 2.50.0 (#1196, #1197): the sales pipeline and the business figures, admins of the office area only (p250_b_api_test.py: other org 404, member 403)
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
