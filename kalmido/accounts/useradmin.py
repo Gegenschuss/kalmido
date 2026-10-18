@@ -23,9 +23,9 @@ def ua8_where(q, flt):
     """SQL condition + args of the user management's search (name, user name, e-mail) and filter."""
     cond, args = [], []
     if q:
-        p = "%" + like_escape(q.strip().lower()) + "%"
-        cond.append("(lower(username) LIKE ? ESCAPE '\\' OR lower(COALESCE(display_name,'')) LIKE ? ESCAPE '\\' "
-                    "OR lower(COALESCE(email,'')) LIKE ? ESCAPE '\\')")
+        p = "%" + like_escape(q.strip()) + "%"
+        cond.append("(username ILIKE ? ESCAPE '\\' OR COALESCE(display_name,'') ILIKE ? ESCAPE '\\' "
+                    "OR COALESCE(email,'') ILIKE ? ESCAPE '\\')")
         args += [p, p, p]
     if flt != "agents" and flt != "all":
         cond.append("COALESCE(kind,'user')!='agent'")
