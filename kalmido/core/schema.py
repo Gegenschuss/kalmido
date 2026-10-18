@@ -1982,6 +1982,15 @@ MIGRATIONS = [
     ("office_docs", "payment_days", "ALTER TABLE office_docs ADD COLUMN payment_days BIGINT"),
     ("office_docs", "cancels_id", "ALTER TABLE office_docs ADD COLUMN cancels_id BIGINT"),
     ("office_docs", "ref_doc_ids", "ALTER TABLE office_docs ADD COLUMN ref_doc_ids TEXT"),
+    # 2.95.0 (#1932): the per diem of a trip (office/vma.py): main country (ISO, '' = Germany) and city of the BMF table, start / end
+    # time (single-day trips: more than 8 hours), the days with another country / meals provided [{date, country, place, b, l, d}],
+    # vma_off = no per diem for this trip. Additive; 2.94 runs on with them. (Placed here, not at the list's end: fewer merge conflicts.)
+    ("office_trips", "country", "ALTER TABLE office_trips ADD COLUMN country TEXT NOT NULL DEFAULT ''"),
+    ("office_trips", "place", "ALTER TABLE office_trips ADD COLUMN place TEXT NOT NULL DEFAULT ''"),
+    ("office_trips", "t_start", "ALTER TABLE office_trips ADD COLUMN t_start TEXT NOT NULL DEFAULT ''"),
+    ("office_trips", "t_end", "ALTER TABLE office_trips ADD COLUMN t_end TEXT NOT NULL DEFAULT ''"),
+    ("office_trips", "vma_days", "ALTER TABLE office_trips ADD COLUMN vma_days TEXT NOT NULL DEFAULT '[]'"),
+    ("office_trips", "vma_off", "ALTER TABLE office_trips ADD COLUMN vma_off BIGINT NOT NULL DEFAULT 0"),
     ("office_docs", "reminder_level", "ALTER TABLE office_docs ADD COLUMN reminder_level BIGINT"),
     ("office_docs", "reminder_fee", "ALTER TABLE office_docs ADD COLUMN reminder_fee NUMERIC(14,4)"),
     ("office_docs", "reminder_deadline_days", "ALTER TABLE office_docs ADD COLUMN reminder_deadline_days BIGINT"),

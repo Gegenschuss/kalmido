@@ -254,6 +254,8 @@ ROUTES = {
     "GET /api/office/trips/report": "office", "GET /api/office/trips/bill-docs": "office", "POST /api/office/trips/bill": "office",
     "POST /api/office/trips/unbill": "office", "GET /api/office/cashflow": "office", "GET /api/office/fixed-costs": "office",
     # 2.95.0 A (#1932): the per diem report and the rates, office admins (p295_a_api_test.py)
+    "GET /api/office/trips/vma-rates": "office", "GET /api/office/trips/vma": "office", "GET /api/office/trips/vma.pdf": "office",
+    "GET /api/office/trips/vma.xlsx": "office", "GET /api/office/trips/vma.csv": "office",
     # 2.95.0 B (#1932): the import of a per diem spreadsheet, office admins (p295_b_api_test.py)
     "POST /api/office/trips/import/preview": "office", "POST /api/office/trips/import": "office", "POST /api/office/trips/delete": "office",
     "POST /api/office/fixed-costs": "office", "PATCH /api/office/fixed-costs/{}": "office", "DELETE /api/office/fixed-costs/{}": "office",

@@ -275,6 +275,8 @@ ROUTES = {
     "GET /api/office/mail-status": "office", "GET /api/office/number-preview": "office", "GET /api/office/packs": "office",
     "GET /api/office/packs/{}": "office", "GET /api/office/pay-props": "office", "GET /api/office/settings": "office",
     "GET /api/office/trips": "office", "GET /api/office/trips/bill-docs": "office", "GET /api/office/trips/report": "office",
+    "GET /api/office/trips/vma": "office", "GET /api/office/trips/vma-rates": "office", "GET /api/office/trips/vma.csv": "office",  # 2.95.0 A (#1932)
+    "GET /api/office/trips/vma.pdf": "office", "GET /api/office/trips/vma.xlsx": "office",
     "GET /api/office/{}": "office", "GET /api/office/{}/{}": "office", "GET /api/paperless": "office",
     "GET /api/paperless/preview": "office", "GET /api/paperless/zip/preview": "office", "GET /api/v1/clients": "office",
     "GET /api/v1/clients/{}": "office", "GET /api/v1/office": "office", "GET /api/v1/office/docs": "office",

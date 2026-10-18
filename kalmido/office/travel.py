@@ -1,8 +1,9 @@
 """Office & finance (2.47.3, #1022, part B): travel expenses. Trips (office_trips) with their receipts (office_trip_items),
 the list of receipts not yet ticked "in DATEV", an evaluation by month / year / person / project / client / category (also
 as CSV) and billing receipts on to a client (positions of a quotation / invoice with purchase = amount, marked so nothing is
-billed twice). Kalmido keeps no receipt images: they live in DATEV (decision of 2026-10-08, variant A); no tax allowances
-(per diem, mileage) -- to be clarified with the tax adviser.
+billed twice). Kalmido keeps no receipt images: they live in DATEV (decision of 2026-10-08, variant A). 2.95.0 (#1932): the
+per diem (Verpflegungsmehraufwand) of every trip with the BMF rates of the year (office/vma.py), its report as PDF / Excel /
+CSV and the import of a per diem spreadsheet (office/vmaimport.py).
 
 Every route: office_gate + office_org with the admin of the office area (like purchases; members get 403). Amounts are
 decimal strings; participants, note and amounts encrypted at rest (orgcrypt). Never reached by agents."""
@@ -24,6 +25,7 @@ from ..personal.timetrack import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings
 from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
+from .vma import vma_trip
 
 RK_CATS = (("car", N_("Car / fuel")), ("train", N_("Train")), ("flight", N_("Flight")), ("rental_car", N_("Rental car")),
            ("taxi", N_("Taxi / public transport")), ("parking", N_("Parking")), ("hotel", N_("Hotel")), ("meals", N_("Meals")),
@@ -178,7 +180,74 @@ def rk_trip_clean(c, oid, uid, b, cur=None):
         out["km"] = float(km) if km is not None else None
     if "note" in b or not cur:
         out["note"] = _text(b.get("note"), "note", 2000)
+    out.update(rk_vma_clean(b, cur))  # 2.95.0 (#1932)
     return out
+
+
+TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def _country(v, name="country"):
+    """'' (Germany) or an ISO 3166-1 alpha-2 code (office/countries.py)."""
+    from .countries import fk_country_code
+    code = fk_country_code(v if isinstance(v, str) or v is None else "?")
+    if code is None:
+        raise BadInput(tr("Invalid value: {0}", name))
+    return "" if code == "DE" else code
+
+
+def rk_vma_clean(b, cur=None):
+    """2.95.0 (#1932): the per diem fields of a trip from body b: country (ISO, '' = Germany), place (a city of the BMF table,
+    '' = the whole country), t_start / t_end (HH:MM or ''), vma_days [{date, country, place, b, l, d}] (only days with another
+    country or meals provided are kept, at most one per date), vma_off (no per diem)."""
+    cur = cur or {}
+    out = {}
+    if "country" in b or not cur:
+        out["country"] = _country(b.get("country"))
+    if "place" in b or not cur:
+        out["place"] = _text(b.get("place"), "place", 120)
+    for k in ("t_start", "t_end"):
+        if k in b or not cur:
+            v = b.get(k) or ""
+            if v and (not isinstance(v, str) or not TIME_RE.match(v.strip())):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v.strip() if v else ""
+    if "vma_days" in b or not cur:
+        v = b.get("vma_days")
+        if v in (None, ""):
+            v = []
+        if not isinstance(v, list) or len(v) > 400:
+            raise BadInput(tr("Invalid value: {0}", "vma_days"))
+        days = {}
+        for x in v:
+            if not isinstance(x, dict):
+                raise BadInput(tr("Invalid value: {0}", "vma_days"))
+            d = _date(x.get("date"), "vma_days", required=True)
+            row = {"date": d}
+            if x.get("country") not in (None, ""):
+                row["country"] = _country(x.get("country"), "vma_days") or "DE"
+            if x.get("place"):
+                row["place"] = _text(x.get("place"), "vma_days", 120)
+            for m in ("b", "l", "d"):
+                if x.get(m):
+                    row[m] = 1
+            if len(row) > 1:
+                days[d] = row
+        out["vma_days"] = json.dumps([days[k] for k in sorted(days)], ensure_ascii=False)
+    if "vma_off" in b or not cur:
+        out["vma_off"] = 1 if b.get("vma_off") else 0
+    return out
+
+
+def rk_vma_fields(d):
+    """The per diem fields of a stored (decrypted) trip row -> the dict office/vma.vma_trip reads."""
+    try:
+        days = json.loads(d.get("vma_days") or "[]")
+    except ValueError:
+        days = []
+    return {"date_from": d.get("date_from") or "", "date_to": d.get("date_to") or "", "country": d.get("country") or "",
+            "place": d.get("place") or "", "t_start": d.get("t_start") or "", "t_end": d.get("t_end") or "",
+            "overnight": d.get("overnight") or 0, "vma_days": days if isinstance(days, list) else [], "vma_off": d.get("vma_off") or 0}
 
 
 def rk_item_clean(c, oid, b, cur=None, home=None):
@@ -255,10 +324,17 @@ def rk_trip_public(c, oid, t, items, docs=None):
         people = []
     its = [_item_public(c, oid, r, docs) for r in items]
     total = sum((dec(x["amount_home"]) for x in its), dec(0))
+    vf = rk_vma_fields(d)  # 2.95.0 (#1932): the per diem for ONE participant (vma.amount) and for all of them (vma.total)
+    vma = vma_trip(vf)
+    npp = max(1, len(people) if isinstance(people, list) else 0)
+    vma["persons"] = npp
+    vma["total"] = dstr(money(dec(vma["amount"]) * npp)) if vma["amount"] is not None else None
     return {"id": d["id"], "date_from": d["date_from"], "date_to": d["date_to"], "dest": d["dest"], "overnight": d["overnight"],
             "people": people if isinstance(people, list) else [], "purpose": d["purpose"], "client_id": d["client_id"], "project": d["project"],
             "km": dstr(dec(d["km"])) if d.get("km") is not None else None, "note": d.get("note") or "", "items": its,
-            "total": dstr(money(total)), "missing": sum(1 for x in its if not x["datev"]), "unbilled": sum(1 for x in its if not x["billed"])}
+            "total": dstr(money(total)), "missing": sum(1 for x in its if not x["datev"]), "unbilled": sum(1 for x in its if not x["billed"]),
+            "country": vf["country"], "place": vf["place"], "t_start": vf["t_start"], "t_end": vf["t_end"], "vma_days": vf["vma_days"],
+            "vma_off": vf["vma_off"], "vma": vma}
 
 
 def rk_trips(c, oid, year=None, trip_id=None):
