@@ -41,7 +41,7 @@
 .apb-day .chkl{display:flex;align-items:center;gap:.5rem;min-width:7.5rem}
 .apb-day.off .apb-hm,.apb-day.off .iconbtn{opacity:.4;pointer-events:none}
 .apb-hm{display:inline-flex;align-items:center;gap:.25rem}
-.apb-hm input{width:8.25rem}
+.apb-hm .dpbtn{min-width:6.5rem}
 .apb-dlg .row textarea{flex:1;min-width:0;width:100%}
 .apb-save{display:flex;justify-content:flex-end;margin-top:.75rem}
 .apb-list{list-style:none;margin:0;padding:0}
@@ -51,4 +51,4 @@
 .apb-books .apb-main{cursor:default}
 .apb-main span{overflow-wrap:anywhere}
 .apb-st{font-size:var(--fs-xs);color:var(--accent)}
-@media (max-width:40rem){.apb-hm input{width:7.5rem}.apb-day .chkl{min-width:100%}}
+@media (max-width:40rem){.apb-hm .dpbtn{min-width:5.5rem}.apb-day .chkl{min-width:100%}}
