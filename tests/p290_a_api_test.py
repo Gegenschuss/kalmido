@@ -194,7 +194,7 @@ r = A.put(B + f"/api/docs/{R3}/receipt", json={"category": ""})
 check(r.ok and not r.json()["receipt"]["is_receipt"], "receipt: all empty without keep = no receipt any more")
 A.put(B + f"/api/docs/{R3}/receipt", json={"category": "", "keep": True})
 check(A.get(B + f"/api/docs/{R3}/receipt").json()["receipt"]["is_receipt"], "receipt: keep = a receipt without category and rate")
-check(requests.put(B + f"/api/docs/{R2}/receipt", headers=AGH, json={"vat_pct": "19"}).status_code in (403, 404), "agent: cannot set the VAT rate")
+check(requests.put(B + f"/api/docs/{R2}/receipt", headers=AGH, json={"vat_pct": "19"}).status_code in (401, 403, 404), "agent: cannot set the VAT rate")
 check(Ca.put(B + f"/api/docs/{R2}/receipt", json={"vat_pct": "19"}).status_code == 404 and Ca.get(B + f"/api/docs/{R2}/receipt").status_code == 404,
       "another organisation reaches no receipt of Alpha (404)")
 R5 = receipt(A, WSO, "injektion.pdf", "10.00", "2025-05-02", "=cmd|calc", "19")
@@ -248,6 +248,8 @@ check(not any(x["label"] == "Software" for x in e["expenses"]), "paid_at: the re
 check(any(x["label"] == "Software" for x in A.get(B + BK + "/euer?year=2025").json()["expenses"]), "paid_at: and lands in 2025")
 check(A.get(B + BK + "/ustva?year=2026&period=q1").json()["kz"]["66"] == "26.00", "paid_at: the input tax stays by the document date")
 dbx("UPDATE rc_receipts SET paid_at=NULL WHERE node_id=?", (R1,), write=True)
+e = A.get(B + BK + "/euer?year=2026").json()
+check(any(x["label"] == "Software" for x in e["expenses"]), f"paid_at removed: back in 2026 {dbx('SELECT paid_at FROM rc_receipts WHERE node_id=?', (R1,))} {e['expenses']}")
 
 # ---------------------------------------------------------------- CSV + PDF
 log0 = dbx("SELECT COUNT(*) FROM office_doc_log WHERE org_id=? AND action='export' AND target='books'", (ORG,))[0][0]
@@ -268,7 +270,7 @@ check(all("reserve" not in x and "free" not in x for x in cf0["rows"]), "cash fl
 r = A.put(B + O + "/settings", json={"tax_reserve_pct": "30"})
 check(r.ok and r.json()["settings"]["tax_reserve_pct"] == 30, "tax reserve 30 % " + r.text[:160])
 e = A.get(B + BK + "/euer?year=2026").json()
-check(F(e["tax_reserve"]) == 1011 and e["tax_reserve_pct"] == 30, f"EUeR: reserve of the year = 30 % of the profit {e['tax_reserve']}")
+check(F(e["tax_reserve"]) == 1011 and e["tax_reserve_pct"] == 30, f"EUeR: reserve of the year = 30 % of the profit {e['tax_reserve']} {e['profit']} {e['income_total']} {e['expenses']}")
 cf = A.get(B + O + "/cashflow?from=2026-03&months=2").json()["rows"]
 check(F(cf[0]["reserve"]) == 1080 and F(cf[0]["free"]) == F(cf[0]["balance"]) - 1080, f"cash flow March: 30 % of 3600 net received; free = balance - reserve {cf[0]}")
 check(F(cf[1]["reserve"]) == 15 and abs(F(cf[1]["free"]) - (F(cf[0]["balance"]) + F(cf[1]["balance"]) - 1095)) < 0.005, f"cash flow April: cumulative {cf[1]}")
