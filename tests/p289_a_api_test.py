@@ -383,5 +383,19 @@ check(a22.get("error") == "type" and a22.get("value") is None, "review 1: ... an
 check(len(d.text) < 2_000_000, f"review 1: the answer stays small ({len(d.text)} bytes)")
 check(setv(A, RS, "B1", "=1+1").ok, "review 1: saving afterwards works")
 
+# ---- 2.89.0 (#1916): review 3 - a range over the whole sheet visits the cells that exist, not every position
+_csv = (";".join(f"c{i}" for i in range(1, 201)) + "\r\n" + ";".join(str(i) for i in range(1, 201)) + "\r\n").encode()
+r = A.post(B + "/api/sheets/import", data={"space": "private", "title": "Review range"}, files={"file": ("wide.csv", _csv)})
+check(r.status_code == 201, "review 3: a table with 200 columns " + r.text[:200])
+RR = r.json()["sheet"]["id"]
+check(A.post(B + f"/api/sheets/{RR}/rows", json={"count": 4999}).ok, "review 3: ... and 5000 rows")
+_t0 = _time.time()
+r = put(A, RR, [{"cell": f"B{i}", "raw": "=SUMME(A1:GR5000)"} for i in range(2, 42)] + [{"cell": "A3", "raw": "=SUMME(A1:GR1)"}])
+check(r.ok and _time.time() - _t0 < 15, f"review 3: 40 formulas over A1:GR5000 saved quickly ({_time.time() - _t0:.1f} s) " + r.text[:200])
+_t0 = _time.time()
+d = A.get(B + f"/api/sheets/{RR}")
+check(d.ok and _time.time() - _t0 < 10, f"review 3: GET answers quickly ({_time.time() - _t0:.1f} s)")
+check((cell(d.json(), "A3") or {}).get("value") == 20100, "review 3: the sum of a range is still right " + json.dumps(cell(d.json(), "A3"))[:200])
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
