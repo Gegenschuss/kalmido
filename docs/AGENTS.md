@@ -1693,6 +1693,8 @@ area's clients, documents or lists answer `404`.
 | An invoice draft from an accepted quotation | `POST /api/v1/office/offers/{id}/invoice` | `draft_invoice_from_offer` |
 | A reminder draft over open invoices of one client | `POST /api/v1/office/reminders` | `draft_reminder` |
 | Suggest an incoming payment / your suggestions | `POST` / `GET /api/v1/office/payment-suggestions` | `suggest_payment` / `list_payment_suggestions` |
+| 2.94.0: the leads (stage lead, by follow-up day; `due=1` = the day has come) / add a lead (source `agent` by default) | `GET` / `POST /api/v1/office/leads` | `list_office_leads` / `create_office_lead` |
+| 2.94.0: change a lead's next step, follow-up day or note (only while it is a lead; `409` once converted) | `PATCH /api/v1/office/leads/{id}` | `update_office_lead` |
 
 Positions: `{service_id, qty}` takes title, unit and price from the catalogue (or the client's framework contract); `text`
 + `price` without a service is a **free** position, a `price` other than the catalogue's is marked **price changed**, a
@@ -2665,7 +2667,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`,
 `create_address_book`, `create_client`, `create_contact`, `create_event`, `create_event_calendar`, `create_field`,
 `create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_job`, `create_list`, `create_list_tag`,
-`create_note`, `create_offer_draft`, `create_packing_list`, `create_section`, `create_task`, `create_template`,
+`create_note`, `create_offer_draft`, `create_office_lead`, `create_packing_list`, `create_section`, `create_task`, `create_template`,
 `create_text_file`, `create_trip`, `decide_reward`, `delete_address_book`, `delete_attachment`,
 `delete_chat_attachment`, `delete_client`, `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`,
 `delete_field`, `delete_filter`, `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`,
@@ -2681,7 +2683,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`, `list_events`, `list_fields`,
 `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_jobs`, `list_kids`,
 `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,
-`list_office_documents`, `list_packing_templates`, `list_payment_suggestions`, `list_project_files`,
+`list_office_documents`, `list_office_leads`, `list_packing_templates`, `list_payment_suggestions`, `list_project_files`,
 `list_receipt_suggestions`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,
 `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
 `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`,
@@ -2698,7 +2700,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`,
 `unshare_list`, `unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
 `update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
-`update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_offer_draft`,
+`update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_offer_draft`, `update_office_lead`,
 `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`, `upload_attachment`,
 `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`,
 `write_journal`
