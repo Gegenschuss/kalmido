@@ -152,6 +152,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   w.close();
 
   // ================= Firefox: the fixed head, tile size, dragging
+  await call('PATCH', '/api/settings', {fav_only: '0'});  // 2.80.3: the two quick "Only favourites" clicks above may land in either order
   let extra = 0; for (let i = 0; i < 40; i++) if ((await call('POST', '/api/lists', {name: 'Extra list ' + (i + 1)})).id) extra++;  // 2.57.0 (#1798): 40, with 26 the sidebar of a fresh run was only 2 px taller than a 900 px window
   const layout = async (o, tag, vw, vh, touch) => {
     const {cmd, ev, ctx, shot, nav} = o;

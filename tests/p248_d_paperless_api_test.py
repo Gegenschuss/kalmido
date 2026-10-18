@@ -307,7 +307,8 @@ check(r.ok and r.json()["conn"]["follow"] is True, f"old server: connected again
 acc = [x.get("accept") or "" for x in pl_log() if x.get("auth")]
 check(any(a.endswith("version=5") for a in acc), f"old server: falls back to API version 5 ({acc[:4]})")
 dbx("UPDATE pl_sources SET synced_at='2000-01-01T00:00:00+00:00' WHERE ws LIKE 'u%'", write=True)
-check(until(lambda: any(d["name"] == "New letter.pdf" for d in docs(A)), 40), "following: the new document came in by itself")
+check(until(lambda: any(d["name"] == "New letter.pdf" and d["state"] in ("done", "failed") for d in docs(A)), 60),
+      "following: the new document came in by itself")  # 2.80.3: and is recognised (an import makes its preview since 2.80.2)
 nl = next((d for d in docs(A) if d["name"] == "New letter.pdf"), None)
 if nl:
     t3 = A.get(B + f"/api/docs/{nl['id']}").json().get("text") or ""

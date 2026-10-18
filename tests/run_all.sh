@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=11
+SHARDS_DEFINED=12
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -949,7 +949,7 @@ fresh; run p266_b_ui node p266_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.66.0 part A: merging duplicate contacts (#1835): links, CardDAV, undo, rights
 fresh; run p266_a_api "$PY" p266_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p266_a_ui node p266_a_ui.js "$KALMIDO_TEST_DATA"
-shard 4  # 2.80.0: the 2.64.1-2.64.3 suites run in shard 4 (shard 10 full)
+shard 12  # 2.80.3: the 2.64.1-2.64.3 suites run in shard 12 (2.80.0: shard 4; shard 4 took 38 min on CI with them)
 # 2.64.1 part C: #1817 lock per list - client data layer
 fresh; run p264a_c_ui node p264a_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.64.1 part D: #1817 lock per list - dialogs and display, #1518
