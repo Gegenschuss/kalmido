@@ -1,11 +1,11 @@
 {
   "_note": "2.65.0 (#1822): start-up budget, measured by tools/perf_budget.py from static/index.html. Baseline 2.56.3 (17.10.2026): 113 scripts incl. i18n.js, js 3.147.832 / 1.041.977 gzip, css 611.460 / 139.076 gzip. Values = 2.65.0 after lazy loading (100 scripts, js 2.532.821 / 852.795 gzip, css 529.860 / 123.430 gzip) plus about 5 percent. Raise a value only on purpose (say why in the commit).",
-  "start_js_bytes": 3120000,
-  "start_js_gzip": 1050000,
-  "start_css_bytes": 591000,
-  "start_css_gzip": 137000,
+  "start_js_bytes": 3160000,
+  "start_js_gzip": 1065000,
+  "start_css_bytes": 600000,
+  "start_css_gzip": 139000,
   "start_scripts": 134,
   "start_ms": 6000,
   "_start_ms_note": "17.10.2026: provisional (4000 ms minimum); checked by tests/perf_ui.js in the browser (list visible), not by perf_budget.py. Set to measured CI value x 2 once a CI log with 'start ms' exists.",
-  "_raise_note": "17.10.2026 vorint (G4): raised on purpose so CI stays green after merging the parked releases; the start grew by their new start scripts (measured 131 scripts, js 3058798 / 1028727 gzip). Follow-up: move rarely used modules to on-demand loading and lower the values again."
+  "_raise_note": "17.10.2026 vorint (G4): raised on purpose so CI stays green after merging the parked releases; the start grew by their new start scripts (measured 131 scripts, js 3058798 / 1028727 gzip). Follow-up: move rarely used modules to on-demand loading and lower the values again. 18.10.2026 2.92.3 (package 2.87b, office menu #1917, field sizes #1952, guards): raised on purpose about 1 percent (measured js 3129146 / 1053058 gzip, css 593955 / 137536 gzip); same follow-up."
 }

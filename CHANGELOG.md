@@ -30,6 +30,15 @@ Documents from templates with a customer signature, and a logbook in the office.
 ### Fixed
 - Office: the styles after the subscriptions block applied on phones only (a bracket missing since 2.91.0).
 
+## [2.92.3] - 2026-10-18
+
+### Fixed
+- Opening the equipment page directly no longer stops with an error while the office is still loading (2.92.2).
+- The inline title field in a task row keeps its height again; the common field height of 2.92.2 (#1952) is only for forms (#1622).
+
+### Changed
+- Start-up budget raised by about one percent for the office menu and the field sizes of 2.92.2 (tools/perf_budget.json).
+
 ## [2.92.2] - 2026-10-18
 
 Freelancer parity, an office menu in four groups, import targets you confirm, Paperless-ngx in the settings and a round of polish.
