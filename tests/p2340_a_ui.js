@@ -91,7 +91,10 @@ const day = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv', {t
     // ================= #265 the status report on the project page
     await nav(B + '#l/' + P); await ready(ev);
     await ev(`(() => { setListView(listById(${P}), 'overview'); return 1; })()`); await sleep(1800);
-    for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('[data-rpt="open"]')`)); i++) await sleep(200);  // 2.66.1: on-demand modules (2.65), slow CI
+    for (let i = 0; i < 75 && !(await ev(`!!document.querySelector('[data-rpt="open"]')`)); i++) {
+      await sleep(200);
+      if (i % 20 === 19) await ev(`(() => { if (location.hash !== '#l/${P}') go('l/${P}'); setListView(listById(${P}), 'overview'); return 1; })()`).catch(() => 0);  // 2.80.2: ask for the overview again (CI)
+    }  // 2.66.1: on-demand modules (2.65), slow CI (2.80.1: up to 15 s); 2.87.0: 2.80.2's retry back after the merge of 2.81-2.86
     const btn = await ev(`(() => { const b = document.querySelector('[data-rpt="open"]'); return b ? {t: b.textContent.trim(), h: b.getBoundingClientRect().height} : null; })()`);
     // 2.86.0 tests: what the page shows when the button is missing (red in the 2.86.0 full run, no app log)
     const dbg = btn ? '' : await ev(`(() => { try { const l = listById(${P}); return JSON.stringify({hash: location.hash, key: S.route.key, l: !!l, pov: l ? povOn(l) : null, el: !!document.querySelector('.pov'), ly: S.ly && S.ly.view, hm: new Date().toTimeString().slice(0, 5), txt: (document.querySelector('main') || document.body).textContent.replace(/\\s+/g, ' ').slice(0, 300)}); } catch (e) { return 'dbg error ' + e; } })()`).catch(e => 'ev error ' + e);

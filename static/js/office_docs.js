@@ -187,7 +187,7 @@ function ofdEditorHtml() {
   const logSec = adm ? ofdSec('log', tr('History'), ofdLogHtml(d)) : '';
   const ln = OFD.langNotes && OFD.langNotes.id === d.id && !lk ? OFD.langNotes.notes : [];  // 2.40.0 (#1381): what the language switch left as it was
   const langNote = ln.length ? `<div class="ofdlnote" role="status">${ic('info', 's')}<span>${tr('Language changed. Standard texts were translated; these stayed as they were:')}<br>${ln.map(esc).join('<br>')}</span><button type="button" class="ib" data-ofd="ln-x" aria-label="${esc(tr('Close'))}">${ic('x', 's')}</button></div>` : '';
-  return `${head}${banner}${typeof oa_docBanner === 'function' ? oa_docBanner(d) : ''}${langNote}${typeof sg_box === 'function' ? sg_box(d) : ''}<div class="ofdeditor" data-fg="ofd:${d.id}" data-fg-live><fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${headSec}${kind === 'offer' && typeof tpOpenId === 'function' && tpPart(d, tpOpenId(d)) ? `<section class="ofdsec open tpsec"><h3>${esc(tr('Part'))}</h3>${tpPartEditorHtml(d, adm)}</section>` /* 2.47.0 (#1215): an open part */ : `<section class="ofdsec open"><h3>${kind === 'reminder' ? tr('Reminded invoices') : tr('Positions')}</h3>${items}${auto}${totals}</section>${typeof tpPartsHtml === 'function' ? tpPartsHtml(d, adm) : ''}`}${kind === 'reminder' ? '' : rightsSec}${textsSec}${kind === 'reminder' ? '' : fieldsSec}</fieldset>${ofdFeeHtml(d, adm)}${paySec}${logSec}</div>`;  // 2.50.0 (#1200): sg_box = the approval link of a sent quotation
+  return `${head}${banner}${typeof oa_docBanner === 'function' ? oa_docBanner(d) : ''}${langNote}${typeof sg_box === 'function' ? sg_box(d) : ''}<div class="ofdeditor" data-fg="ofd:${d.id}" data-fg-live><fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${headSec}${kind === 'offer' && typeof tpOpenId === 'function' && tpPart(d, tpOpenId(d)) ? `<section class="ofdsec open tpsec"><h3>${esc(tr('Part'))}</h3>${tpPartEditorHtml(d, adm)}</section>` /* 2.47.0 (#1215): an open part */ : `<section class="ofdsec open"><h3>${kind === 'reminder' ? tr('Reminded invoices') : tr('Positions')}</h3>${items}${auto}${totals}</section>${typeof tpPartsHtml === 'function' ? tpPartsHtml(d, adm) : ''}`}${kind === 'reminder' ? '' : rightsSec}${textsSec}${kind === 'reminder' ? '' : fieldsSec}</fieldset>${kind === 'offer' && typeof cf8_box === 'function' ? cf8_box(d) : '' /* 2.88.0 (#1915) */}${ofdFeeHtml(d, adm)}${paySec}${logSec}</div>`;  // 2.50.0 (#1200): sg_box = the approval link of a sent quotation
 }
 // 2.38.0 (#1021, F1): the invoices a reminder lists (read-only rows), the payments of an invoice
 function ofdRefsHtml(d, t) {
@@ -283,7 +283,7 @@ const ekPctHtml = (it, i, line, d) => `<input data-i="${i}" data-k="rate" inputm
 
 // ---- the history (organisation admins; office log of this document)
 const OFD_ACTIONS = {create: N_('created'), update: N_('changed'), items: N_('positions changed'), number: N_('number set'), status: N_('status changed'),
-  finalize: N_('finalised'), duplicate: N_('created as a copy'), delete: N_('deleted'), open: N_('opened'), pdf: N_('PDF opened'), render: N_('preview opened'),
+  finalize: N_('finalised'), duplicate: N_('created as a copy'), cashflow: N_('cash flow choice changed'), delete: N_('deleted'), open: N_('opened'), pdf: N_('PDF opened'), render: N_('preview opened'),
   export: N_('exported'), import: N_('imported'), archive: N_('archived'), upload: N_('uploaded'),
   payment: N_('payment recorded'), payment_delete: N_('payment removed'), send: N_('sent by e-mail'), datev: N_('sent to the DATEV inbox'), undo: N_('import undone'), reminder_fee: N_('reminder fee waived / paid / open again'), recovery_key: N_('recovery key shown'),
   agent_read: N_('read (agent)'), agent_write: N_('drafted (agent)')};  // 2.51.0 A (#1348)  // 2.42.0 (#828): + recovery_key  // 2.39.1 (#1182): + undo; 2.40.0 (#1368): + reminder_fee
@@ -354,7 +354,7 @@ async function ofdChange(e) {
   const f = t.dataset.f; if (!f) return;
   if (f === 'status') {
     if (ofdIsInv(d) && t.value === 'paid' && !await askConfirm(tr('Mark as paid without a payment?'), tr('Record a payment to keep the amounts; this only sets the status.'), {ok: tr('Mark as paid')})) { ofdDraw(); return; }
-    const j = await ofdSave('POST', `/api/office/docs/${d.id}/status`, {status: t.value}); if (j) { d.status = j.status; d.state = j.state; d.status_text = j.status_text; d.sent_at = j.sent_at; d.paid_at = j.paid_at; d.can_edit = j.can_edit; ofdDraw(); } return;
+    const j = await ofdSave('POST', `/api/office/docs/${d.id}/status`, {status: t.value}); if (j) { d.status = j.status; d.state = j.state; d.status_text = j.status_text; d.sent_at = j.sent_at; d.paid_at = j.paid_at; d.can_edit = j.can_edit; if (j.cf_chain) d.cf_chain = j.cf_chain; ofdDraw(); } return;  // 2.88.0 (#1915): cf_chain
   }
   if (f.startsWith('r-')) {
     const k = f.slice(2);

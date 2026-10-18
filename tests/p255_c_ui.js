@@ -40,6 +40,9 @@ const opts = async key => { const s = (await call('GET', '/api/state')).settings
   // ---- time tracking: the gear only in Customize, a block with one client only
   let w = await boot({user: 'alice', hash: 'time'}), d = w.document;
   const tvl = () => d.querySelectorAll('#view .ttable tr.tvl').length;
+  // 2.80.2: yesterday + today instead of "This week" - shortly after midnight at the start of a week the entries (2-3 h ago) are last week's
+  // (2.87.0: back after the merge of 2.81-2.86)
+  w.eval(`S.tv.period = 'custom'; S.tv.from = addDays(today(), -1); S.tv.to = today(); S.tv.key = ''; renderView()`);
   await until(() => tvl() === 2);
   check(tvl() === 2, '#1065: the report shows both lists');
   check(!d.querySelector('#view .lyo-gear'), '#1065: no gear outside Customize');

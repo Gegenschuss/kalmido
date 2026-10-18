@@ -416,9 +416,25 @@ groups by it, without one last; the field suggests the categories already used),
 have 0 % and keep their amounts.
 
 **Net | Gross** above the months switches the sums (gross by default; the choice is kept on the device). Gross adds the
-rate to the fixed costs; documents (payments, open invoices, accepted quotations, credit notes) are gross and take their
+rate to the fixed costs; documents (payments, open invoices, quotations, credit notes) are gross and take their
 net share on the net basis; purchases and travel receipts have no rate here and count the same on both. The start page
 figures use gross.
+
+**Quotations in the plan** (2.88): sent and accepted quotations count as planned income on the end of their period of
+service (else its start, else their date); a sent one is marked **open quotation** (a dashed entry, the month shows its
+share apart). "Duplicate" on a quotation makes the copy its next **version** (`version_of` = the first quotation of the
+chain; a copy given to another client is a quotation of its own). Per chain one version counts:
+
+- **Automatic** (default): the newest sent or accepted version; drafts and declined versions never count.
+- **Yes**: when a version of the chain says yes, exactly the yes versions count (several are possible).
+- **No**: this version never counts.
+- Once a finalised invoice exists for any version of the chain, the whole chain is left out (the invoice is in the plan
+  itself); a draft invoice does not take it out yet. Before 2.88 only the invoiced part was taken off.
+
+The choice **In the cash flow** sits in the quotation (also when it is sent or finalised: it is planning, not printed and
+not part of the approval) with a line which version counts; everyone who may edit the area's quotations may change it, one
+undo step takes it back, the office log records it. Freelancers without an organisation have the same in their personal
+office.
 
 **Import from Excel**: "Download template" gives an .xlsx with the header row and three example rows. The first sheet is
 read below its header row: `Name`, `Betrag (netto)` (also `Betrag`, `netto`, `Amount (net)`), `fällig Monat` (also

@@ -244,6 +244,7 @@ ROUTES = {
     # 2.67.0 (#1838): the import of fixed costs, its template, the undo of an import, the monthly check task (office admins)
     "POST /api/office/fixed-costs/import/preview": "office", "POST /api/office/fixed-costs/import": "office", "GET /api/office/fixed-costs/import/template": "office",
     "POST /api/office/fixed-costs/delete": "office", "GET /api/office/cashflow/check": "office", "PUT /api/office/cashflow/check": "office",
+    "POST /api/office/docs/{}/cashflow": "office",  # 2.88.0 (#1915)
     # 2.50.0 (#1196, #1197): the sales pipeline and the business figures, admins of the office area only (p250_b_api_test.py: other org 404, member 403)
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
@@ -492,6 +493,8 @@ ROUTES = {
     "POST /api/users/{}/invite": "people", "POST /api/users/{}/approve": "people",
     "POST /api/users/{}/signin-link": "people", "GET /api/v1/admin/users": "people", "GET /api/users": "people",
     "POST /api/users": "people", "PATCH /api/users/{}": "people", "DELETE /api/users/{}": "people",
+    # 2.88.0 (#1980): the delete dialog's lists + candidates, several accounts at once (p288_b_api_test.py)
+    "GET /api/users/{}/delete-info": "people", "POST /api/users/bulk": "people",
     "GET /api/avatar/{}/{}.jpg": "people",
     # ---- public (15)
     "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/about": "public",

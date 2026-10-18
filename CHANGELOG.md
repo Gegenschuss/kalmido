@@ -7,6 +7,27 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.88.0] - 2026-10-18
+
+Quotations in the cash flow plan, user administration for hundreds of accounts.
+
+### Added
+- Cash flow: sent quotations now count as *open quotation* (dashed), accepted ones as before; of several versions of a
+  quotation only the newest counts (#1915).
+- Quotations: *Duplicate* creates a new version of the quotation; the switch *In the cash flow* (Automatic / Yes / No)
+  decides which version counts, also on sent or finalised quotations (#1915).
+- User administration: search, filters (active, disabled, admins, invited, awaiting approval, agents) and pages of 50 with
+  the total; select several accounts to disable, enable or add them to an organisation (#1980).
+- Deleting an account that owns lists: hand all lists to one person (default) or delete them along after typing the user
+  name; lists with receipts are only handed over, a warning shows when nobody else holds the key of a locked list.
+  Organisation admins delete only accounts that belong to their organisation alone and have an empty private space,
+  otherwise they remove the person from the organisation and choose who gets its lists (#1980).
+
+### Changed
+- Cash flow: once an invoice for any version of a quotation is finalised, the whole quotation leaves the plan (before:
+  only the invoiced part was taken off) (#1915).
+- Agent API: quotations carry `version_of` and `cashflow`; `cashflow` can be set in the PATCH of an agent's own draft (#1915).
+
 ## [2.87.0] - 2026-10-18
 
 Hardening from the security audit, part 3 (two high findings at the organisation boundary) and a calmer agent chat header.

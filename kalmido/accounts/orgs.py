@@ -3,7 +3,7 @@ workspace (private / an organisation) a list and an agent belong to, the organis
 import os
 import re
 
-from flask import g, jsonify
+from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, like_escape, system_ctx
@@ -943,7 +943,7 @@ def org_leave(c, oid, uid, heir):
 def org_member_remove(oid, uid):
     """2.28.0 (#935): an organisation admin removes a member (or a member leaves: uid = self). The person's lists of this
     workspace go to the admin who removes them (leaving: to the organisation's first other admin), the person leaves every
-    list of the organisation. The last admin cannot leave."""
+    list of the organisation. The last admin cannot leave. 2.88.0 (#1980): ?to=<id> = another active member gets the lists."""
     c = db()
     if uid != me():
         _need_org_admin(c, oid)
@@ -956,6 +956,15 @@ def org_member_remove(oid, uid):
     if uid != me() and org_role(c, uid, oid) == "admin" and _admins(c, oid) <= 1:
         return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)
     heir = me() if uid != me() else (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (oid, uid)).fetchone() or [None])[0]
+    if uid != me() and request.args.get("to"):  # 2.88.0 (#1980): the admin hands the person's lists to another active member
+        try:
+            to = int(request.args["to"])
+        except ValueError:
+            to = 0
+        if to != me() and not c.execute("""SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id=?
+                                           AND m.user_id!=? AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'""", (oid, to, uid)).fetchone():
+            return err(tr("The lists can only go to another active person of the organisation"), 400)
+        heir = to
     operator = None
     if heir is None:  # the only admin leaves: the operator (an instance admin) takes the organisation over and is told
         operator = (c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' AND id!=? ORDER BY id LIMIT 1", (uid,)).fetchone() or [None])[0]

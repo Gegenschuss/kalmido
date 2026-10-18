@@ -1066,6 +1066,12 @@ fresh; run p285_b_api "$PY" p285_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p285_b_ui node p285_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.87.9 part C: the office menu with four groups (#1917), computer + phone
 fresh; run p287b_c_ui node p287b_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.88.0 part A: offers (quotes) with versions in the cash flow plan (#1915)
+fresh; run p288_a_api "$PY" p288_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p288_a_ui node p288_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.88.0 part B: user admin for hundreds of accounts, delete with list hand-over (#1980)
+fresh; run p288_b_api "$PY" p288_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p288_b_ui node p288_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.86.0 (#1896): hardening from audit #476 part 1, groups A-E
 fresh; run p286_a_api "$PY" p286_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"

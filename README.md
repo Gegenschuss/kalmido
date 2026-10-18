@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.88.0** (2026-10-18): sent quotations count in the cash flow plan as open quotations, one version per quotation
+  with a per-quotation switch; user administration with search, filters, pages and bulk actions, deleting an account
+  hands its lists to another person or deletes them along.
 - **2.87.0** (2026-10-18): hardening from the security audit, part 3 - people who leave an organisation drop out of its
   appointments, lists are handed over only to visible people; the agent chat header without info button.
 - **2.86.0** (2026-10-17): hardening from the security audit - sign-in floods no longer lock owners out, child
