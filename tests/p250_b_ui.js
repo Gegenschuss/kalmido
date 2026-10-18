@@ -52,7 +52,8 @@ const today = TC.today();
     await signIn(ev, 'alice');
     // ================= #1196
     await nav(B + '#office/pipeline');
-    check(await ready(ev, `document.querySelectorAll('.pipcols .pipcol').length === 4`, 80), '#1196: the pipeline with four columns');
+    // 2.94.0 (#1930): + the column "Leads" first
+    check(await ready(ev, `document.querySelectorAll('.pipcols .pipcol').length === 5`, 80), '#1196: the pipeline with five columns (leads first)');
     check(await ev(`!!document.querySelector('.ofctabs [data-go="office/pipeline"]') && !!document.querySelector('.ofctabs [data-go="office/kpi"]')`), '#1196 #1197: both tabs for the admin');
     check(await ev(`/14,000\\.00/.test(document.querySelector('.pptiles').textContent) && /4,000\\.00/.test(document.querySelector('.pptiles').textContent)`),
       '#1196: open sum and weighted sum on top ' + await ev(`document.querySelector('.pptiles')?.textContent`));
