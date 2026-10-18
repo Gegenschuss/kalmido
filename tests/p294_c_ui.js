@@ -20,12 +20,16 @@ const V = B + 'api/v1';
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {org_name: 'Kalmido', lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'comments']});
+  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['comments', 'agents']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
-  const BOB = (await call('POST', '/api/users', {orgs: [1], username: 'bob', display_name: 'Bob Baker', password: 'password123'})).id;
+  const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob Baker', password: 'password123'})).id;
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'claude', display_name: 'Claude'});
   const AG = ag.id;
+  const LST = (await call('POST', '/api/lists', {name: 'Website'})).id;
+  await call('PUT', `/api/lists/${LST}/members`, {user_id: BOB, role: 'edit'});  // a DM needs a shared list
+  await call('PUT', `/api/lists/${LST}/agent`, {agent_id: AG});
   const dm = await call('POST', '/api/team/dm', {user_id: BOB}), room = {id: dm.id || dm.room?.id};
+  if (!room.id) console.log('dm failed', JSON.stringify(dm));
   const key = (w, el, k, o = {}) => { const ev = new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}); el.dispatchEvent(ev); return ev; };
   const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', {bubbles: true})); };
   const msgs = async () => (await call('GET', `/api/team/rooms/${room.id}/messages`)).messages || [];
@@ -33,7 +37,6 @@ const V = B + 'api/v1';
   // ================= #2024 team chat
   let w = await boot({user: 'alice', hash: 'team/' + room.id}), d = w.document;
   const tin = await until(() => d.querySelector('#tc-in') && w.eval('!!S.tc.room') && d.querySelector('#tc-in'));
-  console.log('team room', room.id, !!tin);
   check(tin.getAttribute('enterkeyhint') === 'enter', 'team: enterkeyhint=enter');
   check(!!d.querySelector('[data-act="tc-send"]').title, 'team: the Send button has a title');
   type(w, tin, 'line one');
@@ -60,7 +63,7 @@ const V = B + 'api/v1';
   check(await until(async () => (await msgs()).find(m => m.id === sent.id)?.body === 'edited text'), 'team edit: Ctrl+Enter saves');
 
   // ================= #2024 agent chat
-  w = await boot({user: 'alice', hash: 'today'}); d = w.document;
+  w = await boot({user: 'alice', hash: 'l/' + LST}); d = w.document;
   w.eval(`chatOpen(${AG})`); const cin = await until(() => d.querySelector('#chat-in'));
   check(cin.getAttribute('enterkeyhint') === 'enter', 'agent chat: enterkeyhint=enter');
   check(!!d.querySelector('[data-act="chat-send"]').title, 'agent chat: the Send button has a title');
@@ -68,7 +71,7 @@ const V = B + 'api/v1';
   ev = key(w, cin, 'Enter'); await sleep(500);
   check(!ev.defaultPrevented && cin.value === 'hello agent' && !d.querySelector('#chat-msgs .cmsg.me'), 'agent chat: plain Enter sends nothing');
   key(w, cin, 'Enter', {ctrlKey: true});
-  const mm = await until(() => d.querySelector('#chat-msgs .cmsg.me'));
+  const mm = await until(() => d.querySelector('#chat-msgs .cmsg.me[data-mid]'));
   check(mm && /hello agent/.test(mm.textContent), 'agent chat: Ctrl+Enter sends');
   w.eval(`chatEditStart(${+mm.dataset.mid.split(':')[1]})`);
   const ae = await until(() => d.querySelector('#chat-msgs textarea.ach-edit'));
