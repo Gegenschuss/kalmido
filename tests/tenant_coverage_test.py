@@ -257,6 +257,8 @@ ROUTES = {
     # 2.92.0 A (#1925): business contracts and insurances (office admins; p292_a_api_test.py)
     # 2.92.0 B (#1931): equipment value, depreciation, insurance list (office admins; p292_b_api_test.py)
     # 2.92.0 C (#1926): file preview / text of docx and xlsx, summarise by an agent (p292_c_api_test.py)
+    "GET /api/attachments/{}/preview": "attachment", "GET /api/attachments/{}/agents": "attachment",
+    "GET /api/list-files/{}/preview": "attachment", "GET /api/files/nodes/{}/preview": "file",
     # 2.50.0 (#1196, #1197): the sales pipeline and the business figures, admins of the office area only (p250_b_api_test.py: other org 404, member 403)
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
