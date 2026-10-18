@@ -755,6 +755,8 @@ def process(c, nid):
             "amount": str(given.get("amount") or ex["amount"] or ""), "currency": str(given.get("currency") or ex["currency"] or "")[:8]}
     if m["doc_date"]:
         vals["doc_date"] = m["doc_date"]     # set by hand while it waited
+    if m["amount"] and not m["method"]:      # 2.90.0 A (#1921): an amount typed in before the first run (receipt photo) stays
+        vals["amount"] = doc_open(c, ws, "doc_meta.amount", m["amount"]) or vals["amount"]
     auto_all = meta_json(c, m, "auto", {})
     if not vals["doc_date"] and m["taken_at"]:  # 2.61.0 B (#1819): no date in the text -> the day the photo was taken
         vals["doc_date"] = str(m["taken_at"])[:10]
@@ -781,7 +783,11 @@ def process(c, nid):
     m2 = meta_row(c, nid)
     review = 1 if sug or not (m2["sender_id"] or m2["type_id"]) else 0
     state = "failed" if res.get("error") else "done"
-    c.execute("""UPDATE doc_meta SET state=?, error=?, method=?, pages=?, text=?, doc_date=?, due_date=?, amount=?, currency=?,
+    # 2.90.0 A (#1921): a date / an amount typed in while the run was busy wins (the columns' values at the time of the
+    # write, not those read at the start of the run: the receipt sheet saves while the recognition still runs)
+    c.execute("""UPDATE doc_meta SET state=?, error=?, method=?, pages=?, text=?,
+                 doc_date=CASE WHEN doc_date IS NOT NULL AND doc_date<>'' THEN doc_date ELSE ? END, due_date=?,
+                 amount=CASE WHEN amount<>'' AND method='' THEN amount ELSE ? END, currency=?,
                  auto=?, suggest=?, review=?, version=?, done_at=?, updated_at=? WHERE node_id=?""",
               (state, res.get("error") or "", res.get("method") or "", int(res.get("pages") or 0), doc_seal(c, ws, "doc_meta.text", text),
                vals["doc_date"], vals["due_date"], doc_seal(c, ws, "doc_meta.amount", vals["amount"]), vals["currency"],

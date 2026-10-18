@@ -62,7 +62,8 @@ const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix',
   ['wiki', N_('Knowledge pages')],
   ['files', N_('File store')],  // 2.48.0 (#1207): folders and files with shares (ablage.js), on for everyone
   // 2.50.0 (#1194): resources and disposition (a tab of the workload view), off by default
-  ['dispo', N_('Disposition')]];
+  ['dispo', N_('Disposition')],
+  ['sheets', N_('Tables')]];  // 2.89.0 (#1916): tables with Kalmido variables (sheets.js), off by default
 const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and linking in the timeline, what is stuck in the project status, a notice when a task is unblocked'),
   fields: N_('Own fields per list (text, number, selection, date, person, link), as columns and in the task details'),collab: N_('Comments, activity history, @mentions, News, sharing lists and assigning tasks'), stats: N_('Completed tasks, on-time rate, overdue trend, focus time and habit streaks'),
   time: N_('Timer on tasks, manual entries, reports per list and task, CSV export and a printable timesheet'),
@@ -73,6 +74,7 @@ const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and li
   agents: N_('A tab with the agents (AI assistants, bots) you share lists with: their status, jobs to approve and the chat'),
   office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents - your own or your organisation\'s'),
   wiki: N_('Pages in Markdown for processes, checklists and know-how of your organisation (or only for you), with links between them and to tasks'),  // 2.49.0 (#1199)
+  sheets: N_('Simple tables with formulas like a spreadsheet; every cell can fetch figures from Kalmido (hours booked, budget, open tasks), for quotations, budgets and lists'),  // 2.89.0 (#1916)
   progress: N_('Progress bar in the list header and the project status (“Where is it stuck?”); with collaboration also a status per list')};
 const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f);
 // collaboration off (own switch, or the admin's switch for the whole server): no comments / activity / mentions /
@@ -121,7 +123,7 @@ document.addEventListener('scroll', e => {
   if (e.target !== v || QS.top == null || Date.now() - QS.at > 400 || document.activeElement?.id !== 'qinput') return;
   if (Math.abs(v.scrollTop - QS.top) > 1) v.scrollTop = QS.top;
 }, true);
-const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts', 'life', 'review', 'clients', 'workload', 'office', 'ablage', 'docs', 'wiki', 'tags', 'budget', 'msv', 'feeds'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
+const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts', 'life', 'review', 'clients', 'workload', 'office', 'ablage', 'docs', 'wiki', 'tags', 'budget', 'msv', 'feeds', 'sheets'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
 // package 3: progress bar / overview (switch "progress"), project status (+ collaboration), custom fields, dependencies
 // 2.13.0 (#453, Fold screenshots): the round + only on phones; tablets / an unfolded Fold add with the docked "Add task"
 // bar or, in views without it (calendar, Kanban, timeline), the header's "New task" button
@@ -905,6 +907,7 @@ function parseHash() {
   if (a === 'client' && +b) return {mod: 'clients', key: 'clients', client: +b};  // 2.23.0 (#463)
   if (a === 'mailhub') return {mod: 'clients', key: 'clients', client: 'mailhub'};  // 2.84.0 A (#1198): the hub's e-mail inbox (hubmail.js)
   if (a === 'wiki') return {mod: 'wiki', key: 'wiki', wid: +b || null};  // 2.49.0 (#1199): wiki/<page id>
+  if (a === 'sheets') return {mod: 'sheets', key: 'sheets', sh: b === 'l' ? null : +b || null, shl: b === 'l' ? +(h.split('/')[2]) || null : null};  // 2.89.0 (#1916): sheets/<id>, sheets/l/<list id>
   if (a === 'ablage') return {mod: 'ablage', key: 'ablage', nid: +b || null};  // 2.48.0 (#1207): ablage/<folder or file id>
   if (a === 'docs') return {mod: 'docs', key: 'docs', id: +b || null};  // 2.48.0 (#1111): documents (docs.js)
   if (a === 'office') return {mod: 'office', key: 'office', tab: b || '', id: +(h.split('/')[2]) || null};  // 2.36.1 (#1021): office/<tab>/<id>
@@ -926,7 +929,7 @@ async function route() {
   if (r.key.startsWith('f:') && !S.filters.some(f => f.id === +r.key.slice(2))) r.key = START_KEY;
   if (r.mod === 'tasks' && wsOn()) wsFollow(r.key);  // 2.49.0 (#1770): a list of another workspace switches the filter along
   if (!r.task) S.bellBack = false;
-  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid} : r.mod === 'docs' ? {id: r.id} : {}), ...(r.mod === 'wiki' ? {wid: r.wid} : {}), ...(r.mod === 'msv' ? {sid: r.sid, lid: r.lid} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>
+  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid} : r.mod === 'docs' ? {id: r.id} : {}), ...(r.mod === 'wiki' ? {wid: r.wid} : {}), ...(r.mod === 'sheets' ? {sh: r.sh, shl: r.shl} : {}), ...(r.mod === 'msv' ? {sid: r.sid, lid: r.lid} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>
   if (r.mod === 'team') teamRoute(r.rid || null); else if (S.tc.rid) teamRoute(null);  // 2.17.0
   if (r.mod === 'notes') noteRoute(r.lid, r.nid || null); else if (S.nt.id) { noteFlush(); S.nt.id = null; }
   if (r.noteMissing) setTimeout(() => toast(tr('This note does not exist or you cannot see it.')), 0);  // 2.10.0: review = #today/review

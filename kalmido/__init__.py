@@ -119,6 +119,11 @@ ORDER = (
     "collab.notes",
     "wiki.pages",  # 2.49.0 C (#1199): knowledge pages
     "wiki.outline",  # 2.49.0 C (#1201): outline import of the mind map (no storage)
+    "sheets.formula",  # 2.89.0 (#1916): tables -- the formula engine (no routes)
+    "sheets.vars",  # 2.89.0 (#1916): Kalmido variables of formulas, evaluated per viewer (no routes)
+    "sheets.core",  # 2.89.0 (#1916): sheets, columns, rows, cells, agent batches (no routes; used by sheets.web and part C/D)
+    "sheets.web",  # 2.89.0 (#1916): the routes of the tables area (/api/sheets)
+    "sheets.step2",  # 2.89.0 (#1916, D): step 2 -- rows to tasks / quotation, a list as rows (by button)
     "collab.teamchat",
     "collab.msgsearch",  # 2.33.0 (#1080)
     "collab.chatsave",  # 2.37.0 (#1159)
@@ -199,6 +204,9 @@ ORDER = (
     "office.pipeline",  # 2.50.0 B (#1196): the sales pipeline
     "office.kpi",  # 2.50.0 B (#1197): the business figures
     "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
+    "office.books",  # 2.90.0 A (#1921): bookkeeping light: income/expense statement (EUeR), VAT return figures, tax reserve, receipt photo
+    "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
+    "office.taxdates",  # 2.90.0 C (#1922): tax dates as recurring tasks (VAT return, income tax prepayments, trade tax)
     "office.agentdocs",  # 2.51.0 A (#1348, #1350): agents in the office: drafts, payment suggestions, the switches (API v1 + routes)
     "team.approvals",
     "tasks.review",  # 2.60.0 C (#1512): review step (reviewer, gate, list setting, API v1)
@@ -229,6 +237,8 @@ ORDER = (
     "files.textscan",  # 2.61.0 C (#1820): text recognition of normal stored files (queue, search, Ablage search route)
     "docs.web",  # 2.48.0 (#1111): the routes of the documents area
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
+    "sheets.io",  # 2.89.0 C (#1916): tables to / from CSV and .xlsx (export, import as a new sheet)
+    "sheets.v1",  # 2.89.0 C (#1916): tables for agents (API v1 + OpenAPI)
     "paperless.ngx",  # 2.48.0 (#1152): Paperless-ngx connection + import into the documents (self-hosted only)
     "paperless.web",  # 2.48.0 (#1152): the routes of the Paperless-ngx connection (self-hosted only)
     "paperless.learn",  # 2.69.0 B (#1847): rules + learning from an import (URL and ZIP)

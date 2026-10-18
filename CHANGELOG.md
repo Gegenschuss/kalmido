@@ -32,6 +32,68 @@ Recurring invoices, an overview of subscriptions and tools.
 - Database: new tables `office_inv_series`, `office_sub_reminders` and new columns on `office_docs` / `office_fixed_costs`,
   all additive. Going back to the previous version works; there, duplicating an invoice made by a series fails until you
   update again.
+## [2.90.0] - 2026-10-18
+
+Bookkeeping light and tax dates in *Office & finance* (#1921, #1922): the running bookkeeping of a self-employed person
+without a second tool. Works the same in a personal office without an organisation. No tax advice; Kalmido sends nothing
+to the tax office (no ELSTER, no payroll).
+
+### Added
+- **Bookkeeping** tab: the income/expense statement of a year (payments received by VAT rate against receipts and travel
+  expenses, by category) with CSV and PDF export, and the VAT return figures (fields 81, 86, 21, 45, 66, 83) per month or
+  quarter to type into ELSTER, on cash or accrual basis.
+- **Photograph receipt**: the phone camera puts a receipt straight into the office's documents; amount and date come from
+  the existing text recognition, category and VAT rate (new: 19 / 7 / 0 % or unknown, also in the document's receipt slot)
+  are added in one sheet.
+- **Tax reserve**: a percentage of the net money received, shown per month in the cash flow with "freely available".
+- **Bank** tab: import a bank statement (CSV or CAMT.052 / .053), duplicates skipped, every booking with suggestions -
+  money in to open invoices (records the payment, partly paid too), money out to receipts; private / ignore, undo,
+  take back an import. Amounts and counterparts are encrypted at rest.
+- **Tax dates**: VAT return (monthly / quarterly, permanent extension), income tax and trade tax prepayments as one
+  recurring task each, with lead time, linked to the VAT return figures.
+
+### Fixed
+- Documents: the text recognition no longer overwrites an amount typed in while it was still running.
+## [2.89.1] - 2026-10-18
+
+CI fixes of 2.89.0.
+
+### Fixed
+- Tests: the workspace guard and the route scan know the tables; a task-detail UI test waits for the loaded state (#1916).
+
+## [2.89.0] - 2026-10-18
+
+Tables: Excel made simple, with Kalmido values in the cells.
+
+### Added
+- Tables (module *Tables*, off by default): own area in the sidebar, private or per organisation, optionally attached
+  to a project or list (then `hier.zeit_gesamt` and friends know its data). Grid with keyboard like a spreadsheet,
+  copy and paste of ranges, sorting and filters, every action one undo step (#1916).
+- Formulas: `+ - * /`, `%`, text with `&`, comparisons, SUMME, MITTELWERT, MIN, MAX, ANZAHL, WENN, RUNDEN, HEUTE, TAGE
+  (English names work too), date + days, own cell names (`tagessatz` instead of `B4`), column names as ranges and
+  completion after `=` (#1916).
+- Kalmido variables: `projekt.<name>.zeit_gesamt`, `liste.<name>.offen`, `kunde.<name>.satz`, `aufgabe.<id>.status` …,
+  stored by id, so renaming a project, list, client, cell or column updates every formula; a deleted source shows
+  *Source deleted* with the last value you saw; every value is computed with the viewer's own rights (#1916).
+- Transparency: cells coloured by origin (own number, formula, Kalmido value in the accent colour, frozen grey),
+  *Comes from / Goes into* in the side panel, dependency arrows, the sources of a sheet, *Freeze value* per cell (#1916).
+- Selection columns with own options and one colour each, for the cell or the whole row; filter and sort by them (#1916).
+- Import and export as CSV and Excel (.xlsx with formulas, number formats, drop-down validation and colours) (#1916).
+- Team: saving per cell, *X is editing* and automatic refresh every few seconds (#1916).
+- Step 2: *Create tasks from rows*, *Turn into a quotation* (draft in Office) and *List as rows* (live task values),
+  only by button, with a trace in both directions and undo (#1916).
+- Agent API and MCP: list, read, create a whole sheet in one call (columns, selection options with colours, rows,
+  formulas), set cells, append rows, add columns, undo a batch; scopes `sheets:read` / `sheets:write`; every agent
+  change is marked and can be taken back, a created sheet as a whole (#1916).
+
+### Changed
+- The account export carries the person's private tables, the organisation export the organisation's (#1916).
+
+## [2.88.1] - 2026-10-18
+
+### Fixed
+- User administration (#1980): the tick boxes of the user list have a 44 px touch target on phones; the delete text uses
+  the basket's current name in every language.
 
 ## [2.88.0] - 2026-10-18
 
@@ -5748,7 +5810,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.80.3...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.88.1...HEAD
+[2.88.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.88.1
 [2.80.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.80.3
 [2.80.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.80.1
 [2.41.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.2

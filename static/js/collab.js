@@ -445,6 +445,7 @@ function actText0(a, U) {
   const due = () => q((d.start && d.start < d.due ? fmtDayAbs(d.start) + ' – ' : '') + fmtDayAbs(d.due) + (d.time ? ', ' + d.time : ''));
   switch (a.kind) {
     case 'created': if (d.report) return tr('Created from an error report ({0})', q(d.report === 'sentry' ? 'Sentry' : tr('webhook')));  // 2.18.0 (#408)
+      if (d.sheet) return tr('{0} carried the task over from a table', who) + ` <a href="#sheets/${+d.sheet}">${esc(tr('Open table'))}</a>`;  // 2.89.0 (#1916, D): no table name (the list may be shared wider)
       return d.proposal ? tr('{0} created the task from a proposal by {1}', who, q(uname(d.agent, U))) : tr('{0} created the task', who);
     case 'proposal': return tr('{0} applied a proposal by {1}', who, q(uname(d.agent, U)));  // 2.3.0 (#262)
     case 'event': return tr('The task became an event; the people who came along are invited to it');  // 2.21.0 (#659)

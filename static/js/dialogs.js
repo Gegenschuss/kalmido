@@ -360,6 +360,7 @@ function listMenuItems(id, anchor) {
   // 2.17.0 (#442 #419): the list's notes and (shared) its team chat
   if (notesOn(l) && !l.archived) { const n = notesOf(id).length; items.push({label: n ? tr('Notes ({0})', n) : tr('Notes'), icon: 'edit', fn: () => go('notes/' + id)}); }
   if (teamOn() && l.shared && !l.archived && l.role !== 'participant') items.push({label: tr('Team chat'), icon: 'comment', fn: () => listChat(id)});
+  if (feat('sheets') && !l.is_inbox && !l.archived && !l.e2e) items.push({label: tr('Tables'), icon: 'sheet', cls: 'msheets', fn: () => go('sheets/l/' + id)});  // 2.89.0 (#1916): the tables attached to it
   if (!l.archived && typeof mw_ok === 'function' && mw_ok()) items.push({label: tr('Open in its own window'), icon: 'panel', cls: 'mminiwin', fn: () => mw_open(id)});  // 2.39.1 (#1294): desktop, miniwin.js
   if (!l.is_inbox && !l.archived) items.push({label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(at(), id)});
   if (dupOk(l)) items.push({label: tr('Duplicate list…'), icon: 'copy', cls: 'mdup', fn: () => listDuplicate(id)});  // 2.78.0 (#1881, templates.js)

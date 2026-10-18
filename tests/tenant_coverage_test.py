@@ -67,7 +67,7 @@ KINDS = {
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
     # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
     # personal office (a hidden area only its owner reaches). No /api/v1, no MCP in stage 1
-    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools)"),
+    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools)"),
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share"),
@@ -87,8 +87,17 @@ KINDS = {
     # 2.50.0 (#329, #1200): files / logo of a customer view, approval links of quotations and lists (and their customer pages)
     "signoff": ("matrix", "p250_c_api_test.py: approval links of another organisation's quotation / another person's list by id, "
                           "files of other lists through a link"),
+    # 2.89.0 C (#1916): tables through the REST API and as files: an agent sees only tables attached to a list shared with it
+    # and its own; values of Kalmido variables with its visibility; export / import only of / into a table one may read / write
+    "sheet_v1": ("matrix", "p289_c_api_test.py: a table of another organisation / person 404 for the stranger and the stranger's agent "
+                           "(list, read, export, cells, rows, columns, undo), an agent without a shared list sees nothing, a variable "
+                           "of a list not shared with the agent is denied, an import into another workspace 404"),
     # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
     "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions)"),
+    # 2.89.0 (#1916): tables belong to one organisation (every member) or one person (org_id NULL, owner_id); attached to a list
+    # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
+    "sheet": ("matrix", "p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
+                        "trash, presence, completion); a formula's source of another workspace cannot be chosen and shows no value"),
     # ---- not relevant for the boundary between organisations (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account (before a session or about the session's own person)"),
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
@@ -235,6 +244,10 @@ ROUTES = {
     "GET /api/office/{}": "office", "POST /api/office/{}": "office", "GET /api/office/{}/{}": "office", "PATCH /api/office/{}/{}": "office",
     "DELETE /api/office/{}/{}": "office", "GET /api/office/export": "office", "POST /api/office/import": "office",
     "POST /api/office/move": "office",  # 2.47.3 (#1360): the personal office becomes an organisation (p2473_a_api_test.py)
+    # 2.90.0 B (#1921): bank reconciliation, office admins (p290_b_api_test.py)
+    "POST /api/office/bank/import/preview": "office", "POST /api/office/bank/import": "office", "GET /api/office/bank/imports": "office",
+    "POST /api/office/bank/imports/{}/undo": "office", "POST /api/office/bank/imports/{}/restore": "office", "GET /api/office/bank/tx": "office",
+    "GET /api/office/bank/tx/{}/candidates": "office", "POST /api/office/bank/tx/{}/match": "office", "POST /api/office/bank/tx/{}/unmatch": "office",
     # 2.47.3 (#1022, #1652): travel expenses and the cash flow, admins of the office area only (p2473_b_api_test.py: other org 404, member 403)
     "GET /api/office/trips": "office", "POST /api/office/trips": "office", "PATCH /api/office/trips/{}": "office", "DELETE /api/office/trips/{}": "office",
     "POST /api/office/trips/{}/items": "office", "PATCH /api/office/trips/{}/items/{}": "office", "DELETE /api/office/trips/{}/items/{}": "office",
@@ -250,6 +263,8 @@ ROUTES = {
     # 2.91.0 B (#1924): subscriptions and tools, office admins (p291_b_api_test.py)
     "GET /api/office/subs": "office", "GET /api/office/subs.csv": "office",
     "POST /api/office/docs/{}/cashflow": "office",  # 2.88.0 (#1915)
+    # 2.90.0 C (#1922): tax dates as tasks, office admins (p290_c_api_test.py)
+    "GET /api/office/tax-dates": "office", "PUT /api/office/tax-dates": "office",
     # 2.50.0 (#1196, #1197): the sales pipeline and the business figures, admins of the office area only (p250_b_api_test.py: other org 404, member 403)
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
@@ -261,6 +276,9 @@ ROUTES = {
     "POST /api/v1/office/offers": "office", "PATCH /api/v1/office/offers/{}": "office", "POST /api/v1/office/offers/{}/invoice": "office",
     "POST /api/v1/office/reminders": "office", "GET /api/v1/office/payment-suggestions": "office", "POST /api/v1/office/payment-suggestions": "office",
     "GET /api/office/datev/extf": "office",  # 2.47.3 (#1460): DATEV booking batch, admin only (p2473_e_api_test.py)
+    # 2.90.0 A (#1921): bookkeeping light, office admins (p290_a_api_test.py)
+    "GET /api/office/books": "office", "GET /api/office/books/euer": "office", "GET /api/office/books/ustva": "office",
+    "GET /api/office/books/euer.csv": "office", "GET /api/office/books/euer.pdf": "office",
     # ---- office (C, 2.36.1 #1021): quotations of an organisation (10)
     "GET /api/office/docs": "office", "POST /api/office/docs": "office", "GET /api/office/docs/{}": "office",
     "PATCH /api/office/docs/{}": "office", "DELETE /api/office/docs/{}": "office", "PUT /api/office/docs/{}/items": "office",
@@ -609,6 +627,12 @@ ROUTES = {
     "GET /agent-setup.sh": "public", "GET /agent-setup.ps1": "public",
     # 2.49.0 (#1531, #1199, #1201): Forgot your password?, knowledge pages, outline import
     "POST /api/auth/forgot": "auth", "POST /api/outline/parse": "pure",
+    # 2.89.0 C (#1916): tables as files and for agents
+    "GET /api/sheets/{}/export.csv": "sheet_v1", "GET /api/sheets/{}/export.xlsx": "sheet_v1", "POST /api/sheets/import": "sheet_v1",
+    "GET /api/v1/sheets": "sheet_v1", "POST /api/v1/sheets": "sheet_v1", "GET /api/v1/sheets/{}": "sheet_v1",
+    "PATCH /api/v1/sheets/{}": "sheet_v1", "PUT /api/v1/sheets/{}/cells": "sheet_v1", "POST /api/v1/sheets/{}/rows": "sheet_v1",
+    "POST /api/v1/sheets/{}/columns": "sheet_v1", "GET /api/v1/sheets/{}/vars": "sheet_v1",
+    "POST /api/v1/sheets/{}/batches/{}/undo": "sheet_v1",
     "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
@@ -617,6 +641,14 @@ ROUTES = {
     "GET /api/wiki/e2e": "wiki", "POST /api/wiki/e2e/start": "wiki", "GET /api/wiki/e2e/todo": "wiki",
     "POST /api/wiki/e2e/bulk": "wiki", "POST /api/wiki/e2e/finish": "wiki", "POST /api/wiki/e2e/stop": "wiki",
     "POST /api/wiki/e2e/keys": "wiki", "POST /api/wiki/e2e/rotate": "wiki",
+    # 2.89.0 (#1916): tables (sheets/web.py; p289_a_api_test.py)
+    "GET /api/sheets": "sheet", "POST /api/sheets": "sheet", "GET /api/sheets/{}": "sheet", "PATCH /api/sheets/{}": "sheet",
+    "DELETE /api/sheets/{}": "sheet", "POST /api/sheets/{}/restore": "sheet", "PUT /api/sheets/{}/cells": "sheet",
+    "POST /api/sheets/{}/cells/{}/freeze": "sheet", "POST /api/sheets/{}/cells/{}/name": "sheet",
+    "POST /api/sheets/{}/columns": "sheet", "PATCH /api/sheets/{}/columns/{}": "sheet", "DELETE /api/sheets/{}/columns/{}": "sheet",
+    "POST /api/sheets/{}/columns/{}/restore": "sheet", "POST /api/sheets/{}/rows": "sheet", "DELETE /api/sheets/{}/rows/{}": "sheet",
+    "POST /api/sheets/{}/rows/{}/restore": "sheet", "POST /api/sheets/{}/rows/order": "sheet", "POST /api/sheets/{}/presence": "sheet",
+    "GET /api/sheets/{}/vars": "sheet", "POST /api/sheets/{}/batches/{}/undo": "sheet",
     # 2.49.0 (#1106): find people by e-mail, connection requests, blocks
     "GET /api/disc": "discover", "PUT /api/disc": "discover", "POST /api/disc/confirm": "discover", "POST /api/disc/find": "discover",
     "POST /api/disc/check": "discover", "POST /api/disc/requests": "discover", "POST /api/disc/requests/{}/{}": "discover",
@@ -723,6 +755,10 @@ ROUTES = {
     "GET /api/feeds": "own", "POST /api/feeds": "own", "DELETE /api/feeds/{}": "own", "POST /api/feeds/{}/restore": "own",
     "GET /api/feeds/items": "own", "POST /api/feeds/read": "own", "POST /api/feeds/items/{}/later": "own",
     "GET /api/feeds/opml": "own", "POST /api/feeds/opml": "own",
+    # 2.89.0 (#1916, D): tables step 2 -- carrying rows over by button (sheets/step2.py: the sheet writable, the target list / office
+    # of the same space, people only; p289_d_api_test.py)
+    "GET /api/sheets/{}/links": "sheet", "POST /api/sheets/{}/to-tasks": "sheet", "POST /api/sheets/{}/to-offer": "sheet",
+    "POST /api/sheets/{}/rows-from-list": "sheet", "POST /api/sheets/{}/links/{}/undo": "sheet", "POST /api/sheets/{}/links/{}/redo": "sheet",
 }
 
 # ---- 1. every route is classified, nothing stale

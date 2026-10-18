@@ -107,6 +107,7 @@ const P = {
   lock: icPath('M4.5 9H15.5V17H4.5ZM7 9V6.5A3 3 0 0 1 13 6.5V9') + icDot(10, 13, 1.6),
   pulse: icPath('M2 10H5.5L8 4L12 16L14.5 10H15') + icDot(17.5, 10, 1.6),
   columns: icPath('M3 3H17V17H3ZM8 3V17M12.5 3V17'),
+  sheet: icPath('M3 3H17V17H3ZM3 7.5H17M3 12.25H17M8 3V17') + icDot(12.5, 14.6),  // 2.89.0 (#1916): tables
   deps: icPath('M5 7.5V9A3 3 0 0 0 8 12H15.5M12.5 9L15.5 12L12.5 15') + icDot(5, 4.5),
   collapse: icPath('M6 17L10 13L14 17M6 3L10 7L14 3'),
   grip: icFill(7.5, 5) + icFill(12.5, 5) + icFill(7.5, 10) + icFill(12.5, 10) + icFill(7.5, 15) + icFill(12.5, 15),

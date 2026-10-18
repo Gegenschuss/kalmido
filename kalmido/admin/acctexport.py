@@ -261,6 +261,7 @@ def umz_people(c, uid):
 def umz_extra_queries(uid):
     own = "(SELECT id FROM lists WHERE owner_id=?)"
     shared = "(SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.owner_id!=?)"
+    sheets = "org_id IS NULL AND owner_id=?"
     return {
         "list_tags": (f"SELECT * FROM list_tags WHERE list_id IN {own}", (uid,)),
         "task_list_tags": (f"SELECT * FROM task_list_tags WHERE task_id IN (SELECT id FROM tasks WHERE list_id IN {own})", (uid,)),
@@ -274,6 +275,11 @@ def umz_extra_queries(uid):
         # 2.84.0 (#1903): my own private filed e-mails (organisation mails, also the not assigned ones, are in the organisation export)
         "hub_mails": ("""SELECT id, client_id, list_id, message_id, from_addr, from_name, to_addrs, subject, sent_at, body, created_at
                          FROM hub_mails WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL""", (uid,)),
+        # 2.89.0 (#1916): my private tables (organisation tables are in the organisation export)
+        "sheets": (f"SELECT * FROM sheets WHERE {sheets} AND deleted_at IS NULL", (uid,)),
+        "sheet_columns": (f"SELECT * FROM sheet_columns WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
+        "sheet_rows": (f"SELECT * FROM sheet_rows WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
+        "sheet_cells": (f"SELECT * FROM sheet_cells WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
     }
 
 

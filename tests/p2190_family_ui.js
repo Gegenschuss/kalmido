@@ -24,7 +24,15 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 // 2.87.0: a request the slow CI runner drops (TypeError: fetch failed) is sent once more
-const fetchR = async (u, o) => { for (let i = 0; ; i++) { try { return await fetch(u, o); } catch (e) { if (i >= 2 || !/fetch failed/.test(e.message)) throw e; await new Promise(r => setTimeout(r, 1500)); } } };
+// 2.88.1: on CI the test server was unreachable for longer (ECONNREFUSED, twice in a row): wait up to 30 s, and if it stays
+// away say why (container state + the end of its log) instead of only "fetch failed"
+const srvDiag = (pre = 'FAIL: server: ') => { const n = process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test'; const sh = c => { try { return execFileSync('bash', ['-c', c], {encoding: 'utf8'}).trim(); } catch (x) { return String(x.message).slice(0, 200); } };
+  return [sh(`docker ps -a --filter name=^${n}$ --format '{{.Status}}'`), ...sh(`docker logs --tail 25 ${n} 2>&1`).split('\n')].map(l => pre + l).join('\n'); };
+const fetchR = async (u, o) => { for (let i = 0; ; i++) { try { const r = await fetch(u, o); if (i > 2) console.log(srvDiag('Error (server back after ' + i + ' tries): ')); return r; } catch (e) {
+  if (!/fetch failed/.test(e.message)) throw e;
+  if (i >= 15) { console.log(srvDiag()); throw e; }
+  if (i === 2) console.log('p2190_family_ui: server not reachable (' + (e.cause?.code || e.message) + '), waiting');
+  await new Promise(r => setTimeout(r, i < 2 ? 1500 : 2000)); } } };
 const call = async (method, url, body, ck = CK) => { const r = await fetchR(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));

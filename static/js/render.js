@@ -108,6 +108,7 @@ function tabItem(id) {
   if (id === 'team') return teamOn() ? {id, go: 'team', icon: ic('comment', 'l'), label: tr('Team chat'), mod: 'team', n: S.team?.unread || 0} : null;  // 2.17.0 (#419)
   if (id === 'office') return officeOn() ? {id, go: 'office', icon: ic('receipt', 'l'), label: tr('Office & finance'), mod: 'office'} : null;  // 2.36.2 (#1146): in "More" like the other modules
   if (id === 'wiki') return feat('wiki') ? {id, go: 'wiki', icon: ic('book', 'l'), label: tr('Knowledge pages'), mod: 'wiki'} : null;  // 2.49.0 (#1199)
+  if (id === 'sheets') return feat('sheets') ? {id, go: 'sheets', icon: ic('sheet', 'l'), label: tr('Tables'), mod: 'sheets'} : null;  // 2.89.0 (#1916)
   if (id === 'home') return {id, go: 'home', icon: ic('home', 'l'), label: tr('Start|home'), mod: 'home'};  // 2.17.0 (#475)
   if (id === 'search') return {id, act: 'palette', icon: ic('search', 'l'), label: tr('Search'), key: 'search'};  // 2.31.0 (#1057): opens the search at once (with the keyboard)
   if (id === 'lists') return {id, act: 'side', icon: ic('list', 'l'), label: tr('Lists')};  // 2.24.0 (UX-36): opens the drawer
@@ -210,11 +211,11 @@ const SIDE_FOLDED = ['views', 'areas', 'tags', 'more'];  // 2.39.1 (#1185): "Are
 const SIDE_GROUPS = ['focus', 'lists', 'views', 'areas', 'filters', 'tags', 'team', 'more'];
 const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Lists'), filters: N_('Filters'), tags: N_('Tags'), views: N_('Views'), areas: N_('Areas|nav'), team: N_('Conversations|nav'), more: N_('More')};
 const SIDE_VIEW_KEYS = ['cal', 'timeline', 'matrix', 'overview', 'workload', 'notes'];  // 2.45.0 (#1516): + the notes of all lists
-const SIDE_AREA_KEYS = ['office', 'ablage', 'wiki', 'time', 'habits', 'review', 'life', 'agents'];  // 2.48.0 (#1207): + the file store  // 2.44.0 (#1187): office, time, review, life = areas (areas.js)
+const SIDE_AREA_KEYS = ['office', 'ablage', 'wiki', 'sheets', 'time', 'habits', 'review', 'life', 'agents'];  // 2.48.0 (#1207): + the file store  // 2.44.0 (#1187): office, time, review, life = areas (areas.js)
 const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['stale', N_('Lying idle')], ['assigned', N_('My tasks')], ['byme', N_('Assigned by me')]];
 const sideModEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
   ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
-  ['workload', N_('Workload'), workloadOn()], ['office', N_('Office & finance'), officeOn()], ['wiki', N_('Knowledge pages'), feat('wiki')], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()], ['notes', N_('Notes'), sb_notesShown()]].filter(x => x[2]);
+  ['workload', N_('Workload'), workloadOn()], ['office', N_('Office & finance'), officeOn()], ['wiki', N_('Knowledge pages'), feat('wiki')], ['sheets', N_('Tables'), feat('sheets')], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()], ['notes', N_('Notes'), sb_notesShown()]].filter(x => x[2]);
 const sideViewEntries = () => SIDE_VIEW_KEYS.map(k => sideModEntries().find(x => x[0] === k)).filter(Boolean);
 const sideAreaEntries = () => SIDE_AREA_KEYS.map(k => MG_IDS.includes(k) ? mg_sideEntry(k) : sideModEntries().find(x => x[0] === k)).filter(Boolean);
 function sidePref() {
@@ -379,6 +380,7 @@ function renderSide() {
     workloadOn() ? mrow('workload', 'chart', tr('Workload')) : '',  // 2.23.0 (#463)
     officeOn() ? mrow('office', 'receipt', tr('Office & finance')) : '',  // 2.36.1 (#1021)
     feat('wiki') ? mrow('wiki', 'book', tr('Knowledge pages')) : '',  // 2.49.0 (#1199)
+    feat('sheets') ? mrow('sheets', 'sheet', tr('Tables')) : '',  // 2.89.0 (#1916)
     feat('review') ? mrow('review', 'journal', tr('Review & journal')) : '',
     famOn() ? mrow('family', 'family', tr('Family'), (S.kids || []).some(k => (k.requests || 0) > 0) ? `<span class="c nunread">${(S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)}</span>` : '') : '',
     overviewOn() ? mrow('overview', 'pulse', tr('Project status'), `<span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span>`, `title="${esc(tr('Where is it stuck?'))}"`) : '',
@@ -459,7 +461,7 @@ $('#skip')?.addEventListener('click', skipToContent);
 function renderTop() { return keepFocus($('#top'), renderTop0); }
 function renderTop0() {
   const m = S.route.mod, k = S.route.key;
-  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload'), wiki: N_('Knowledge pages'), tags: N_('Tags')};  // 2.49.0 (#1199): + wiki
+  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload'), wiki: N_('Knowledge pages'), tags: N_('Tags'), sheets: N_('Tables')};  // 2.49.0 (#1199): + wiki
   let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? (S.nt.lid ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : tr('Notes')) : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
   if (!title && m === 'budget') title = tr('Budget');  // 2.72.0 (#1333)
@@ -895,6 +897,7 @@ function renderView0() {
   else if (m === 'tags') setHtml(el, viewTags());  // 2.53.0 (#446)
   else if (m === 'office') setHtml(el, mg_wrap(m, viewOffice()));  // 2.36.1 (#1021)
   else if (m === 'wiki') setHtml(el, viewWiki());  // 2.49.0 (#1199)
+  else if (m === 'sheets') setHtml(el, viewSheets());  // 2.89.0 (#1916)
   else if (m === 'ablage') setHtml(el, mg_wrap(m, viewAblage()));  // 2.48.0 (#1207)
   else if (m === 'docs') setHtml(el, mg_wrap(m, typeof viewDocs === 'function' ? viewDocs() : ''));  // 2.48.0 (#1111): docs.js
   else if (m === 'msv') setHtml(el, msvvViewList());  // 2.73.0 C (#661): a list on another server

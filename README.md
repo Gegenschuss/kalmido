@@ -23,6 +23,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **2.91.0** (2026-10-18): recurring invoices (monthly, quarterly, yearly; drafts or sent automatically, in the cash
   flow) and an office overview of subscriptions and tools with sums, notice periods, users, renewal reminders and a
   *hardly used* mark.
+- **2.90.0** (2026-10-18): bookkeeping light in the office - income/expense statement with CSV / PDF, VAT return
+  figures, receipt photo, tax reserve in the cash flow, bank reconciliation (CSV / CAMT) and tax dates as recurring tasks;
+  also without an organisation.
+- **2.89.0** (2026-10-18): Tables - simple spreadsheets whose cells can hold live Kalmido values (project time,
+  open tasks, client rates), stored by id and computed with each viewer's rights; selection columns with colours,
+  import/export CSV and Excel, agents build whole sheets; rows to tasks, sheet to quotation, list as rows.
 - **2.88.0** (2026-10-18): sent quotations count in the cash flow plan as open quotations, one version per quotation
   with a per-quotation switch; user administration with search, filters, pages and bulk actions, deleting an account
   hands its lists to another person or deletes them along.

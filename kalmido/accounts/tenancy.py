@@ -97,6 +97,11 @@ CHECKS = {
     # bind the owner's private lists, org_id NULL), a payment suggestion on a document of another area
     "doc_list": ("SELECT d.id, d.created_by FROM office_docs d JOIN orgs o ON o.id=d.org_id JOIN lists l ON l.id=d.list_id "
                  "WHERE l.org_id IS DISTINCT FROM d.org_id AND NOT (l.org_id IS NULL AND o.personal_of=l.owner_id)"),
+    # 2.90.0 B (#1921): a bank booking whose import, matched invoice or booked payment lies in another office area
+    "bank_tx": ("SELECT t.id, t.import_id FROM office_bank_tx t LEFT JOIN office_bank_imports i ON i.id=t.import_id "
+                "LEFT JOIN office_docs d ON t.match_kind='invoice' AND d.id=t.match_id LEFT JOIN office_payments p ON p.id=t.payment_id "
+                "WHERE t.deleted_at IS NULL AND ((i.id IS NOT NULL AND i.org_id IS DISTINCT FROM t.org_id) OR "
+                "(d.id IS NOT NULL AND d.org_id IS DISTINCT FROM t.org_id) OR (p.id IS NOT NULL AND p.org_id IS DISTINCT FROM t.org_id))"),
     "pay_prop": ("SELECT p.id, p.agent_id FROM office_pay_props p JOIN office_docs d ON d.id=p.doc_id WHERE d.org_id IS DISTINCT FROM p.org_id"),
     # an agent of an organisation that is gone, or a personal agent working in an organisation its owner is not in
     "agent": ("SELECT a.user_id, a.owner_id FROM agents a WHERE a.org_id IS NOT NULL AND (NOT EXISTS (SELECT 1 FROM orgs o WHERE o.id=a.org_id) "
@@ -149,6 +154,14 @@ CHECKS = {
     "hub_mail_ref": ("SELECT m.id, m.owner_id FROM hub_mails m LEFT JOIN clients cl ON cl.id=m.client_id LEFT JOIN lists l ON l.id=m.list_id "
                      "WHERE m.deleted_at IS NULL AND ((cl.id IS NOT NULL AND cl.org_id IS DISTINCT FROM m.org_id) OR "
                      "(l.id IS NOT NULL AND l.org_id IS DISTINCT FROM m.org_id))"),
+    # 2.89.0 (#1916): a table attached to a list of another workspace (the read layer ignores the attachment: sheets/core.py
+    # sh_list_ok) -- (sheet, who created it; counted only)
+    "sheet_list": ("SELECT s.id, s.created_by FROM sheets s JOIN lists l ON l.id=s.list_id WHERE s.deleted_at IS NULL "
+                   "AND l.org_id IS DISTINCT FROM s.org_id"),
+    # 2.89.0 (#1916, D): a row carried over into a task / taken from a task of another workspace than the table's (the buttons
+    # refuse it; the formulas show "No access" then) -- (sheet, who pressed the button; counted only)
+    "sheet_link": ("SELECT s.id, k.created_by FROM sheet_links k JOIN sheets s ON s.id=k.sheet_id JOIN tasks t ON t.id=k.target_id "
+                   "JOIN lists l ON l.id=t.list_id WHERE k.kind IN ('task', 'row') AND k.undone_at IS NULL AND l.org_id IS DISTINCT FROM s.org_id"),
     "hub_token_person": ("SELECT m.org_id, m.user_id FROM hub_tokens m JOIN users u ON u.id=m.user_id WHERE m.org_id IS NOT NULL AND "
                          + _PERSON.format(o="m", m="m")),
 }

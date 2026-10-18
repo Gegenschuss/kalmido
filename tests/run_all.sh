@@ -1069,6 +1069,15 @@ fresh; run p288_a_ui node p288_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.88.0 part B: user admin for hundreds of accounts, delete with list hand-over (#1980)
 fresh; run p288_b_api "$PY" p288_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p288_b_ui node p288_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.89.0 (#1916): Tabellen - A engine/API, B screen, C import/export + agent tools, D step 2
+fresh; run p289_a_api "$PY" p289_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p289_a_ui node p289_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p289_b_api "$PY" p289_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p289_b_ui node p289_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p289_c_api "$PY" p289_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p289_c_ui node p289_c_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p289_d_api "$PY" p289_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p289_d_ui node p289_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.86.0 (#1896): hardening from audit #476 part 1, groups A-E
 fresh; run p286_a_api "$PY" p286_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"
@@ -1079,6 +1088,15 @@ fresh; run p286_e_api "$PY" p286_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2661_b_ui node p2661_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.87.0 (#1983 #1984): organisation boundary of event invitations and list hand-overs (audit T3 H1 + H2)
 fresh; run p287_a_api "$PY" p287_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.90.0 part A (#1921): bookkeeping light (EUeR, VAT return figures, tax reserve, receipt photo)
+fresh; run p290_a_api "$PY" p290_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p290_a_ui node p290_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.90.0 part B (#1921): bank reconciliation (CSV / CAMT import, matching)
+fresh; run p290_b_api "$PY" p290_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p290_b_ui node p290_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.90.0 part C (#1922): tax dates as recurring tasks
+fresh; run p290_c_api "$PY" p290_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p290_c_ui node p290_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.91.0 part A (#1923): invoice series (recurring invoices, drafts or sent, cash flow)
 fresh; run p291_a_api "$PY" p291_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p291_a_ui node p291_a_ui.js "$KALMIDO_TEST_DATA"

@@ -106,6 +106,10 @@ TENANT_EXEMPT = {
     "user_invites": "an invitation / password link of one account (admins only)", "folder_props": _OWN + " (the defaults of a folder; each list keeps its org_id)",
     "folder_heads": _OWN + " (2.83.0 #1427: the header strip style of an owner's folder; no content)",
     "rss_feeds": _OWN + " (2.85.0 #1162: a person's feeds, never shared, never an agent's)", "rss_items": _OWN + " (2.85.0 #1162: the articles of the own feeds)",
+    # 2.89.0 (#1916): parts of a table (sheets carries org_id; every route checks the sheet first: sheets/core.py sh_need)
+    "sheet_cells": "2.89.0 (#1916): a cell of a table (bound through sheet_id -> sheets.org_id)",
+    "sheet_changes": "2.89.0 (#1916): the trail of an agent call on a table (bound through sheet_id -> sheets.org_id)",
+    "sheet_lastvals": "2.89.0 (#1916): the last value of a cell one person saw (their own rows, bound through the cell's sheet)",
     "folder_people": "the owner's folder shared with people: every list share goes through the workspace rule (_folder_member_add)",
     "folder_agents": "2.41.0 (#1420): the agents of an owner's folder; every list share goes through the workspace rule (folder_apply / list_agent_set)",
     "folder_notif": _OWN + " (2.33.0 #927: the owner's notification template of a folder; it only limits pushes of people already in its lists)",

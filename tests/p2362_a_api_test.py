@@ -283,8 +283,9 @@ check(len(routes) > 200, f"route scan: routes found ({len(routes)})")
 # ids that exist and belong to alice / Alpha (lists, tasks, comments, calendars, events, books, contacts ...): the first rows
 FOREIGN = {"lid": LA, "tid": TA, "cid": CTA, "eid": EA, "bid": BA, "aid": AA or 1}
 Z = S["zed"]
+# 2.89.1 (#1916): sheets:read too, so the tables routes get past the scope check and are scanned
 # 2.48.0 (#1207, #1111): files:read too, so the file store / documents routes get past the scope check and are scanned
-tok = Z.post(B + "/api/me/tokens", json={"name": "scan", "scopes": ["read", "tasks:write", "comments", "calendar", "contacts", "export", "files:read"]})
+tok = Z.post(B + "/api/me/tokens", json={"name": "scan", "scopes": ["read", "tasks:write", "comments", "calendar", "contacts", "export", "files:read", "sheets:read"]})
 ZH = {"Authorization": "Bearer " + tok.json().get("token", "")} if tok.ok else None
 # routes whose answer is not about a stored object (public pages with their own token, admin / instance routes answering 403 for
 # everybody but admins, the caller's own resources looked up by position): a refusal other than 404 is fine there
@@ -313,7 +314,10 @@ for meth, path in routes:
 SCAN_EXCEPT = {"GET /api/v1/agent/jobs/<int:jid>", "GET /api/v1/attachments/<int:aid>", "GET /api/v1/attachments/<int:aid>/text",
                "GET /api/v1/lists/<int:lid>/files/<file_id>",
                # 2.51.0 (#1348): the office draft routes check the token's "Office" permission before any lookup
-               "GET /api/v1/office/docs/<int:did>", "GET /api/v1/office/docs/<int:did>/pdf"}
+               "GET /api/v1/office/docs/<int:did>", "GET /api/v1/office/docs/<int:did>/pdf",
+               # 2.88.0 (#1980): the delete dialog's info answers 403 to anyone who is no admin anywhere (role check before
+               # any lookup, the same for every id); an organisation admin outside gets 404
+               "GET /api/users/<int:uid>/delete-info"}
 bad = [b for b in bad if " ".join(b.split(" ")[:2]) not in SCAN_EXCEPT]
 check(not bad, f"route scan: every id route refuses a person outside ({len(bad)} of {len(routes)}):\n  " + "\n  ".join(bad[:80]))
 check(S["alice"].get(B + f"/api/tasks/{TA}").ok and MARK in S["alice"].get(B + f"/api/tasks/{TA}").text, "route scan: alice's data is untouched")

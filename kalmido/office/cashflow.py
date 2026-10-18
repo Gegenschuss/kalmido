@@ -294,7 +294,10 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
     both bases."""
     from .costs import ek_purchases
     from .invoices import inv_money_fields, inv_paid_map
-    home = (office_settings(c, oid).get("currency") or "EUR").upper()
+    st = office_settings(c, oid)
+    home = (st.get("currency") or "EUR").upper()
+    reserve_pct = int(st.get("tax_reserve_pct") or 0)  # 2.90.0 A (#1921): tax reserve on the net money coming in
+    res_in = {}
     today = today or local_now().date().isoformat()
     cur_month = today[:7]
     last_month = _add_months(first_month, months - 1)
@@ -311,7 +314,7 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
         g_, n_ = dec(t.get("gross") or 0), dec(t.get("net") or 0)
         return n_ / g_ if g_ > 0 and n_ > 0 else dec(1)
 
-    def put(day, dir_, state, kind, amount, label, **ref):
+    def put(day, dir_, state, kind, amount, label, res=None, **ref):
         amount = money(amount)
         if amount <= 0:
             return
@@ -319,6 +322,14 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
         if mo not in ms:
             return
         entries.append(dict(month=mo, dir=dir_, state=state, kind=kind, date=day, amount=dstr(amount), label=label, **ref))
+        if res is not None:  # 2.90.0 A (#1921): the net part of money coming in, for the tax reserve
+            res_in[mo] = res_in.get(mo, dec(0)) + res
+
+    def netf(r):
+        """2.90.0 A (#1921): net / gross of a document, whatever the basis shown."""
+        t = _j(r["totals"])
+        g_, n_ = dec(t.get("gross") or 0), dec(t.get("net") or 0)
+        return n_ / g_ if g_ > 0 and n_ > 0 else dec(1)
 
     def plan_day(day):
         """A planned day in the past = expected now (the current month)."""
@@ -335,7 +346,7 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
             continue
         cr = r["kind"] == "credit"  # a refund paid on a credit note goes out
         put(p["date"], "out" if cr else "in", "actual", "credit" if cr else "payment", dec(p["amount"]) / _fx(r, home) * nf(r), r["project_title"] or "",
-            number=r["number"], doc_id=r["id"])
+            res=(-1 if cr else 1) * dec(p["amount"]) / _fx(r, home) * netf(r), number=r["number"], doc_id=r["id"])
     # in: open rest of finalised invoices (plan, on the due day)
     for r in inv:
         open_ = dec(inv_money_fields(r, pm)["open"])
@@ -343,8 +354,8 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
             continue
         due = r["due_date"] or r["date"] or ""
         day = plan_day(due)
-        put(day, "in", "plan", "invoice", open_ / _fx(r, home) * nf(r), r["project_title"] or "", number=r["number"], doc_id=r["id"],
-            overdue=bool(due and due < today))
+        put(day, "in", "plan", "invoice", open_ / _fx(r, home) * nf(r), r["project_title"] or "", res=open_ / _fx(r, home) * netf(r),
+            number=r["number"], doc_id=r["id"], overdue=bool(due and due < today))
     # in: quotations (plan). 2.88.0 (#1915): sent ones too (open quotation), one version per chain (cf8_counting); a chain with
     # an invoice is left out as a whole (was: the rest after the invoiced part; the invoice is in the plan by itself)
     counting = cf8_counting(docs, cf8_invoiced(inv))
@@ -353,7 +364,7 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
             continue
         gross = dec(_j(r["totals"]).get("gross") or 0) / _fx(r, home)
         day = plan_day(r["service_to"] or r["service_from"] or r["date"] or "")
-        put(day, "in", "plan", "offer", gross * nf(r), r["project_title"] or "", number=r["number"], doc_id=r["id"],
+        put(day, "in", "plan", "offer", gross * nf(r), r["project_title"] or "", res=gross * netf(r), number=r["number"], doc_id=r["id"],
             open_offer=r["status"] == "sent")
     # out: purchases of accepted quotations
     for p in ek_purchases(c, oid, first, _add_months(last_month, 1) + "-00"):
@@ -374,6 +385,7 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
                 repeat=f["repeat"], category=f["category"], vat_rate=f["vat_rate"])
     entries.sort(key=lambda e: (e["month"], e["dir"], e["date"], e["kind"]))
     rows = []
+    cum_bal = cum_res = dec(0)
     for mo in ms:
         s = {("in", "actual"): dec(0), ("in", "plan"): dec(0), ("out", "actual"): dec(0), ("out", "plan"): dec(0)}
         for e in entries:
@@ -383,7 +395,12 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
         rows.append({"month": mo, "past": mo < cur_month, "current": mo == cur_month,
                      "in": {"actual": dstr(s[("in", "actual")]), "plan": dstr(s[("in", "plan")])},
                      "out": {"actual": dstr(s[("out", "actual")]), "plan": dstr(s[("out", "plan")])}, "balance": dstr(bal)})
-    return {"from": first_month, "months": months, "currency": home, "today": today, "basis": "net" if net else "gross", "rows": rows, "entries": entries}
+        if reserve_pct:  # 2.90.0 A (#1921): reserve = pct x net money in (actual + planned); free = balance so far minus reserve so far
+            res = money(max(res_in.get(mo, dec(0)), dec(0)) * reserve_pct / 100)
+            cum_bal, cum_res = cum_bal + bal, cum_res + res
+            rows[-1].update(reserve=dstr(res), free=dstr(money(cum_bal - cum_res)))
+    return {"from": first_month, "months": months, "currency": home, "today": today, "basis": "net" if net else "gross", "rows": rows, "entries": entries,
+            "tax_reserve_pct": reserve_pct}
 
 
 @app.get("/api/office/cashflow")

@@ -77,7 +77,8 @@ FEAT_OFF = {"pomo": N_("The focus timer is turned off in your settings"), "habit
             "office": N_("Office & finance is turned off in your settings"),  # 2.36.1 (#1021)
             "dispo": N_("The disposition is turned off in your settings"),  # 2.50.0 (#1194)
             "budget": N_("The household budget is turned off in your settings"),  # 2.72.0 (#1333)
-            "feeds": N_("Feeds are turned off in your settings")}  # 2.85.0 B (#1162)
+            "feeds": N_("Feeds are turned off in your settings"),  # 2.85.0 B (#1162)
+            "sheets": N_("Tables are turned off in your settings")}  # 2.89.0 (#1916)
 
 
 # 2.22.0 (#663): health lists (lists.life 'health') are private. An agent never sees them (whatever list it is a member

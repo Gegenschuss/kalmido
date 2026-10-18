@@ -964,18 +964,28 @@ def inv_payments_get(did):
 @app.post("/api/office/docs/<int:did>/payments")
 def inv_payment_post(did):
     """{date, amount, method?: transfer|cash|card|other, note?} on a finalised invoice; covers the gross -> paid. 201 the document."""
-    from .docs import _date, doc_row
+    from .docs import doc_row
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
     if office_role(c, uid, oid) != "admin":  # 2.39.1 (#1210 N3, decided 12.10.): only the organisation's admins book payments
         raise Denied(403, tr("Only an admin of this organisation can record payments"))
+    b = body()
+    if not isinstance(b, dict):
+        return err(tr("Invalid data"))
+    inv_pay_add(c, oid, uid, did, b)
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid, did, 201)
+
+
+def inv_pay_add(c, oid, uid, did, b):
+    """2.90.0 B (#1921): records payment b {date, amount, method?, note?} on invoice did of area oid (the caller checked the
+    admin role) and refreshes its state; returns the payment's id. Also used by the bank reconciliation (office/bank.py)."""
+    from .docs import _date, doc_row
     write_lock(c, f"office_pay_{did}")  # 2.38.0 review: check and write of one invoice's payments in one go
     r = doc_row(c, oid, did)
     if r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid"):
         raise Denied(409, tr("Payments go on finalised, open invoices only"))
-    b = body()
-    if not isinstance(b, dict):
-        return err(tr("Invalid data"))
     amt = dec(b.get("amount"), "NaN") if b.get("amount") not in (None, "") else Decimal("NaN")
     if amt.is_nan() or amt <= 0 or amt > Decimal("100000000"):
         raise BadInput(tr("Invalid value: {0}", "amount"))
@@ -992,9 +1002,7 @@ def inv_payment_post(did):
                     (oid, did, d, float(money(amt)), method, note, uid, iso(now_utc())))
     inv_refresh_paid(c, oid, did)
     ofx_log(c, oid, "payment", doc_id=did, detail={"id": pid, "date": d, "amount": dstr(amt), "method": method})
-    bump(c)
-    c.commit()
-    return _answer(c, oid, uid, did, 201)
+    return pid
 
 
 @app.delete("/api/office/docs/<int:did>/payments/<int:pid>")
@@ -1005,6 +1013,15 @@ def inv_payment_delete(did, pid):
     doc_row(c, oid, did)
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this organisation can do this"))
+    inv_pay_del(c, oid, did, pid)
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid, did)
+
+
+def inv_pay_del(c, oid, did, pid):
+    """2.90.0 B (#1921): removes payment pid of invoice did (404 when not there) and refreshes the state; also used by the
+    bank reconciliation's undo."""
     write_lock(c, f"office_pay_{did}")
     p = c.execute("SELECT * FROM office_payments WHERE id=? AND doc_id=? AND org_id=?", (pid, did, oid)).fetchone()
     if p is None:
@@ -1012,9 +1029,9 @@ def inv_payment_delete(did, pid):
     c.execute("DELETE FROM office_payments WHERE id=? AND org_id=?", (pid, oid))
     inv_refresh_paid(c, oid, did)
     ofx_log(c, oid, "payment_delete", doc_id=did, detail={"id": pid, "date": p["date"], "amount": dstr(p["amount"])})
-    bump(c)
-    c.commit()
-    return _answer(c, oid, uid, did)
+    # a bank booking matched by this payment is open again
+    c.execute("UPDATE office_bank_tx SET match_kind=NULL, match_id=NULL, payment_id=NULL, matched_by=NULL, matched_at=NULL "
+              "WHERE org_id=? AND payment_id=?", (oid, pid))
 
 
 @app.post("/api/office/docs/<int:did>/send")

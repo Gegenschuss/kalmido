@@ -154,7 +154,9 @@
 .ua8bar select{flex:0 1 auto;max-width:42%}
 .ua8sel{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem;margin-bottom:.5rem;border-radius:.5rem;background:var(--accent-soft)}
 .ua8sel .n{font-weight:600;margin-right:auto}
-.ua8chk{width:1.125rem;height:1.125rem;flex:none;margin:0 .25rem 0 0;accent-color:var(--accent)}
+/* 2.88.0 (#1980): the label around the tick box is the touch target (44 x 44 on touch) */
+.ua8hit{display:inline-flex;align-items:center;justify-content:center;flex:none;margin:0 .25rem 0 0;cursor:pointer}
+.ua8chk{width:1.125rem;height:1.125rem;flex:none;margin:0;accent-color:var(--accent)}
 .ua8pg{display:flex;align-items:center;justify-content:center;gap:.75rem;margin-top:.5rem}
 .ua8pg:empty{display:none}
 .ua8lists{max-height:14rem;overflow:auto}
@@ -162,6 +164,7 @@
 .ua8how legend{font-weight:600;padding:0;margin-bottom:.25rem}
 .ua8how select{max-width:100%}
 @media (pointer:coarse) {
+  .ua8hit{min-width:2.75rem;min-height:2.75rem;margin:-.25rem 0 -.25rem -.5rem}
   .ua8chk{width:1.5rem;height:1.5rem}
   .ua8pg .iconbtn{min-width:2.75rem;min-height:2.75rem}
 }

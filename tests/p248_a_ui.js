@@ -110,11 +110,10 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(lb && /^att:\d+:$/.test(lb.dataset.ablink), 'a task file has "Show in the file store" ' + (lb?.dataset.ablink || ''));
   if (lb) {
     lb.click();
-    await sleep(700);
-    const top = await call('GET', '/api/files?space=private');
-    const link = (top.items || []).find(x => x.kind === 'link' && x.name === 'brief.txt');
+    // 2.88.1 (CI): the slow runner needs longer than a fixed 700 ms for the link and its undo step - wait for both
+    const link = await until(async () => ((await call('GET', '/api/files?space=private')).items || []).find(x => x.kind === 'link' && x.name === 'brief.txt'), 60);
     check(link, 'the link is at the top of My files');
-    check(w.eval(`/brief\.txt/.test(HIST.undo[HIST.undo.length - 1].label)`), 'one undo step');
+    check(await until(() => w.eval(`!!HIST.undo.length && /brief\.txt/.test(HIST.undo[HIST.undo.length - 1].label)`), 60), 'one undo step');
   }
   w.close();
 

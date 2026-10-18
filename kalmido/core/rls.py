@@ -29,6 +29,7 @@ TABLES = (
     "office_client_contacts",  # 2.40.0 (#1380): contact persons of a client (org_id like the client)
     "office_roles", "office_doc_parts", "office_purchases",  # 2.47.0 (#1649, #1215, #1216)
     "office_trips", "office_trip_items", "office_fixed_costs",  # 2.47.3 (#1022, #1652, part B)
+    "office_bank_imports", "office_bank_tx",  # 2.90.0 B (#1921): bank reconciliation
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
     "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)
@@ -55,6 +56,7 @@ TABLES = (
     "office_pack_installs",  # 2.76.0 A (#1023): packs installed from the catalogue per office area
     "hub_tokens", "hub_mails",  # 2.84.0 A (#1198): hub mail addresses + filed mails (NULL = private, the app checks owner / client / list)
     "office_archive_log",  # 2.81.0 B (#1834): the history of an archived document (org_id like the entry)
+    "sheets",  # 2.89.0 (#1916): tables (NULL = private, the app checks owner_id; parts hang on sheet_id)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"
