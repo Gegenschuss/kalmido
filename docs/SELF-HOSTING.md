@@ -686,10 +686,11 @@ Other people's addresses never leave the server in plain text: `email_hash` is t
 you may see on the new server. Your own address in `manifest.json` stays readable. Files of 2.73 test builds with a plain
 `email` field are still read.
 
-**A whole organisation** (2.73, stage 1): upload its organisation export (see above) the same way, as an admin of an
-organisation on the new server, and enter the organisation's recovery key of the old server. The archive is opened on
-the server (a wrong key is refused, ten attempts per upload), checked and shown as a preview; it goes into an
-organisation you administer, never into a private space. Lists with sections, fields, tags, status updates, links,
+**A whole organisation** (2.73, stage 1): upload its organisation export (see above) the same way and enter the organisation's
+recovery key of the old server. The archive is opened on the server (a wrong key is refused, ten attempts per upload),
+checked and shown as a preview; it goes into an organisation you administer or (2.96) into your private space. Into the
+private space nobody joins an organisation: ticked people only get the lists shared, the organisation's own address
+books become your own ones. Lists with sections, fields, tags, status updates, links,
 milestones and project files, tasks with subtasks, dependencies and field values, comments, attachments (sealed with the
 new organisation's key), the organisation's calendars with events and its address books with contacts move along; the
 lists belong to you as the importing admin. Members are matched by e-mail address: a ticked person joins the
