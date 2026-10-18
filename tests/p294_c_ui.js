@@ -25,16 +25,15 @@ const V = B + 'api/v1';
   const BOB = (await call('POST', '/api/users', {orgs: [1], username: 'bob', display_name: 'Bob Baker', password: 'password123'})).id;
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'claude', display_name: 'Claude'});
   const AG = ag.id;
-  const room = await call('POST', '/api/team/dm', {user_id: BOB});
+  const dm = await call('POST', '/api/team/dm', {user_id: BOB}), room = {id: dm.id || dm.room?.id};
   const key = (w, el, k, o = {}) => { const ev = new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}); el.dispatchEvent(ev); return ev; };
   const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', {bubbles: true})); };
   const msgs = async () => (await call('GET', `/api/team/rooms/${room.id}/messages`)).messages || [];
 
   // ================= #2024 team chat
-  let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
-  w.eval(`go('team')`); await until(() => d.querySelector('.tclist'));
-  w.eval(`S.tc.rid = null; teamRoute(${room.id})`); await until(() => d.querySelector('#tc-in') && w.eval('!!S.tc.room'));
-  const tin = d.querySelector('#tc-in');
+  let w = await boot({user: 'alice', hash: 'team/' + room.id}), d = w.document;
+  const tin = await until(() => d.querySelector('#tc-in') && w.eval('!!S.tc.room') && d.querySelector('#tc-in'));
+  console.log('team room', room.id, !!tin);
   check(tin.getAttribute('enterkeyhint') === 'enter', 'team: enterkeyhint=enter');
   check(!!d.querySelector('[data-act="tc-send"]').title, 'team: the Send button has a title');
   type(w, tin, 'line one');
