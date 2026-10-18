@@ -607,6 +607,34 @@ API (office admins; members 403, another office area 404): the fields go through
 `life_suggest`, `life_eff`, `agreement_name`. `GET /api/office/equipment/value` (sums and rows), `value.csv`, `value.pdf`
 (`?agreement_id=`, 0 = not insured), `GET /api/office/equipment/policies`, `GET /api/office/equipment/receipts[/<id>]`.
 
+## Travel expenses: per diem (2.95)
+
+Every trip computes the German per diem (*Verpflegungsmehraufwand*) per participant with the flat rates of its year:
+Germany 28 EUR for a full day and 14 EUR for the day of arrival / departure (or a single day of more than 8 hours), abroad
+the rates of the BMF letter of that year (2025: BMF letter of 2 December 2024, 2026: BMF letter of 5 December 2025). A
+year without a table gives **no amount but a hint** -- Kalmido never estimates or extends rates.
+
+- **Trip dialog**, section *Per diem*: the country (Germany first, then the countries of the year's table) and, where the
+  table names cities (e.g. Athens), the city or *Other places*; start and end time for a single day (and for two days
+  without an overnight stay); *No per diem* switches it off for that trip.
+- **Trip view**, card *Per diem*: the amount per person x participants, the breakdown like a spreadsheet
+  ("Greece: 1 x 24 EUR + 1 x 36 EUR = 60 EUR"), hints (times missing, 8 hours or less, no rates for that year, the rate of
+  another country used) and the source. **Edit days**: per day the country (where you are before midnight) and the meals
+  provided -- breakfast cuts 20 %, lunch and dinner 40 % each of that day's full rate. Only days that differ are stored;
+  every change is one undo step.
+- **Trip list**: the per diem of all participants next to the receipts.
+- **Evaluation**: *Per diem allowances <year>* (with "All years": the current year) with the sum per person (a trip
+  without participants under "No person"), unfolding to the trips and their breakdown; trips without an amount are listed
+  but not summed, trips with *No per diem* are left out. A trip over the turn of the year counts its days per year.
+  Downloads: **PDF** (a section per person), **Excel** (one sheet per person: From, to, Start, End, Destination,
+  Occasion, Per diem, Breakdown, with a total) and **CSV** (semicolon, decimal comma). Each download is written to the
+  office log.
+
+Routes (admins of the office area; a person without an organisation in the personal office): `GET
+/api/office/trips/vma-rates?year=` (countries, cities and rates of a year), `GET /api/office/trips/vma?year=&person=`
+(the report as JSON), `GET /api/office/trips/vma.pdf|vma.xlsx|vma.csv` (same parameters). Agents do not reach travel
+expenses. Kalmido does not replace tax advice.
+
 ## Web API
 
 All routes require a signed-in person with the module on; they work in the office of the shown workspace (`400` with a
