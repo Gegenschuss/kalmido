@@ -97,6 +97,11 @@ CHECKS = {
     # bind the owner's private lists, org_id NULL), a payment suggestion on a document of another area
     "doc_list": ("SELECT d.id, d.created_by FROM office_docs d JOIN orgs o ON o.id=d.org_id JOIN lists l ON l.id=d.list_id "
                  "WHERE l.org_id IS DISTINCT FROM d.org_id AND NOT (l.org_id IS NULL AND o.personal_of=l.owner_id)"),
+    # 2.90.0 B (#1921): a bank booking whose import, matched invoice or booked payment lies in another office area
+    "bank_tx": ("SELECT t.id, t.import_id FROM office_bank_tx t LEFT JOIN office_bank_imports i ON i.id=t.import_id "
+                "LEFT JOIN office_docs d ON t.match_kind='invoice' AND d.id=t.match_id LEFT JOIN office_payments p ON p.id=t.payment_id "
+                "WHERE t.deleted_at IS NULL AND ((i.id IS NOT NULL AND i.org_id IS DISTINCT FROM t.org_id) OR "
+                "(d.id IS NOT NULL AND d.org_id IS DISTINCT FROM t.org_id) OR (p.id IS NOT NULL AND p.org_id IS DISTINCT FROM t.org_id))"),
     "pay_prop": ("SELECT p.id, p.agent_id FROM office_pay_props p JOIN office_docs d ON d.id=p.doc_id WHERE d.org_id IS DISTINCT FROM p.org_id"),
     # an agent of an organisation that is gone, or a personal agent working in an organisation its owner is not in
     "agent": ("SELECT a.user_id, a.owner_id FROM agents a WHERE a.org_id IS NOT NULL AND (NOT EXISTS (SELECT 1 FROM orgs o WHERE o.id=a.org_id) "

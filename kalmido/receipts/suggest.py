@@ -22,6 +22,8 @@ from ..docs import store as S
 RC_CAT_MAX = 60
 RC_NOTE_MAX = 500
 RC_OPEN_MAX = 5          # open suggestions of one document (one per agent; the oldest go)
+RC_VAT = ("19", "7", "0")  # 2.90.0 A (#1921): the VAT rates of a receipt (None = unknown)
+_KEEP = object()
 
 
 def _now():
@@ -109,17 +111,31 @@ def rc_review(c, nid):
     c.execute("UPDATE doc_meta SET review=? WHERE node_id=?", (review, nid))
 
 
-def rc_set(c, node, ws, lid, cat, uid):
-    """Write the assignment of a receipt (people only); returns the previous (list_id, category)."""
-    old = c.execute("SELECT list_id, category FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone()
+def rc_vat_clean(v):
+    """2.90.0 A (#1921): "19" | "7" | "0" | None from a body value; raises BadInput."""
+    if v in (None, ""):
+        return None
+    v = str(v) if isinstance(v, (int, str)) and not isinstance(v, bool) else ""
+    if v not in RC_VAT:
+        raise BadInput(tr("Invalid value: {0}", "vat_pct"))
+    return v
+
+
+def rc_set(c, node, ws, lid, cat, uid, vat=_KEEP, keep=False):
+    """Write the assignment of a receipt (people only); returns the previous (list_id, category). 2.90.0 A (#1921): vat =
+    the VAT rate (left as it is when not given); the row stays while a VAT rate or a payment day is set, or with keep (the
+    bookkeeping's receipt sheet: a receipt without category and rate is still a receipt)."""
+    old = c.execute("SELECT list_id, category, vat_pct, paid_at FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone()
     prev = (old["list_id"], old["category"]) if old else (None, "")
-    if not lid and not cat:
+    vat = (old["vat_pct"] if old else None) if vat is _KEEP else vat
+    if not keep and not lid and not cat and vat is None and not (old and old["paid_at"]):
         c.execute("DELETE FROM rc_receipts WHERE node_id=?", (node["id"],))
     elif old:
-        c.execute("UPDATE rc_receipts SET list_id=?, category=?, set_by=?, set_at=? WHERE node_id=?", (lid, cat, uid, _now(), node["id"]))
+        c.execute("UPDATE rc_receipts SET list_id=?, category=?, vat_pct=?, set_by=?, set_at=? WHERE node_id=?",
+                  (lid, cat, vat, uid, _now(), node["id"]))
     else:
-        c.execute("INSERT INTO rc_receipts(node_id, org_id, ws, list_id, category, set_by, set_at) VALUES(?,?,?,?,?,?,?)",
-                  (node["id"], node["org_id"], ws, lid, cat, uid, _now()))
+        c.execute("INSERT INTO rc_receipts(node_id, org_id, ws, list_id, category, vat_pct, set_by, set_at) VALUES(?,?,?,?,?,?,?,?)",
+                  (node["id"], node["org_id"], ws, lid, cat, vat, uid, _now()))
     return prev
 
 
@@ -127,7 +143,8 @@ def rc_state(c, node, m, uid):
     r = c.execute("SELECT * FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone()
     lid = r["list_id"] if r else None
     cur = {"project": {"id": lid, "name": _list_name(c, lid) if list_role(c, lid, uid) else None} if lid else None,
-           "category": (r["category"] or None) if r else None, "set_by": _who(c, r["set_by"]) if r else None}
+           "category": (r["category"] or None) if r else None, "set_by": _who(c, r["set_by"]) if r else None,
+           "vat_pct": r["vat_pct"] if r else None, "paid_at": r["paid_at"] if r else None, "is_receipt": bool(r)}  # 2.90.0 A (#1921)
     sugs = [rc_sug_json(c, s, uid) for s in c.execute("SELECT * FROM rc_suggest WHERE node_id=? AND state='open' ORDER BY id", (node["id"],))]
     projects = [{"id": x["id"], "name": x["name"]} for x in c.execute(
         "SELECT id, name FROM lists WHERE kind='project' AND archived=0 AND org_id IS NOT DISTINCT FROM ? ORDER BY lower(name)",
@@ -153,22 +170,24 @@ def rc_get(nid):
 
 @app.put("/api/docs/<int:nid>/receipt")
 def rc_put(nid):
-    """{project_id: id|null, category: text} -- a person sets the assignment (role edit); both empty = none."""
+    """{project_id: id|null, category: text, vat_pct?: "19"|"7"|"0"|null, keep?: bool} -- a person sets the assignment (role
+    edit); all empty = none. 2.90.0 A (#1921): vat_pct (left as it is when missing); keep = it stays a receipt when empty."""
     _person()
     c = db()
     uid = me()
     n, m = rc_doc(c, nid, write=True)
     b = body()
-    extra = sorted(set(b) - {"project_id", "category"})
+    extra = sorted(set(b) - {"project_id", "category", "vat_pct", "keep"})
     if extra:
         return err(tr("Unknown field: {0}", ", ".join(extra)[:200]))
     try:
         lid, cat = rc_clean(b)
+        vat = rc_vat_clean(b["vat_pct"]) if "vat_pct" in b else _KEEP
     except BadInput as e:
         return err(str(e))
     if lid and not rc_project_ok(c, lid, n, uid):
         return err(tr("Choose a project of this workspace"))
-    rc_set(c, n, m["ws"], lid, cat, uid)
+    rc_set(c, n, m["ws"], lid, cat, uid, vat, keep=b.get("keep") is True)
     fs_log_add(c, nid, "receipt")
     bump(c)
     c.commit()

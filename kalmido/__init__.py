@@ -204,6 +204,9 @@ ORDER = (
     "office.pipeline",  # 2.50.0 B (#1196): the sales pipeline
     "office.kpi",  # 2.50.0 B (#1197): the business figures
     "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
+    "office.books",  # 2.90.0 A (#1921): bookkeeping light: income/expense statement (EUeR), VAT return figures, tax reserve, receipt photo
+    "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
+    "office.taxdates",  # 2.90.0 C (#1922): tax dates as recurring tasks (VAT return, income tax prepayments, trade tax)
     "office.agentdocs",  # 2.51.0 A (#1348, #1350): agents in the office: drafts, payment suggestions, the switches (API v1 + routes)
     "team.approvals",
     "tasks.review",  # 2.60.0 C (#1512): review step (reviewer, gate, list setting, API v1)

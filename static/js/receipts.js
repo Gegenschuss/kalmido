@@ -24,9 +24,10 @@ function rc_html() {
     + (r.project && !d.projects.some(p => p.id === r.project.id) ? `<option value="${r.project.id}" selected>${esc(r.project.name || tr('Project #{0}', r.project.id))}</option>` : '');
   return `<h4 class="rc-h">${tr('Receipt')}</h4>${sug}
     <div class="row"><label for="rc-proj">${tr('Project')}</label><select id="rc-proj" data-rcf="project" ${w ? '' : 'disabled'}>${projOpts}</select></div>
-    <div class="row"><label for="rc-cat">${tr('Category')}</label><input id="rc-cat" data-rcf="category" value="${esc(r.category || '')}" maxlength="60" list="rc-cl" autocomplete="off" placeholder="${esc(tr('e.g. Travel, Material, Software'))}" ${w ? '' : 'disabled'}><datalist id="rc-cl">${d.categories.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>`;
+    <div class="row"><label for="rc-cat">${tr('Category')}</label><input id="rc-cat" data-rcf="category" value="${esc(r.category || '')}" maxlength="60" list="rc-cl" autocomplete="off" placeholder="${esc(tr('e.g. Travel, Material, Software'))}" ${w ? '' : 'disabled'}><datalist id="rc-cl">${d.categories.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
+    <div class="row"><label for="rc-vat">${tr('VAT rate')}</label><select id="rc-vat" data-rcf="vat" ${w ? '' : 'disabled'}><option value="">${tr('unknown')}</option>${['19', '7', '0'].map(v => `<option value="${v}" ${r.vat_pct === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></div>`;  // 2.90.0 A (#1921)
 }
-const rc_cur = () => ({project_id: RC.d?.receipt?.project?.id || null, category: RC.d?.receipt?.category || ''});
+const rc_cur = () => ({project_id: RC.d?.receipt?.project?.id || null, category: RC.d?.receipt?.category || '', vat_pct: RC.d?.receipt?.vat_pct ?? null});  // 2.90.0 A (#1921): + VAT rate
 async function rc_put(id, v) {
   const j = await api('PUT', `/api/docs/${id}/receipt`, v);
   if (RC.id === id) { RC.d = j; rc_draw(); }
@@ -41,6 +42,7 @@ document.addEventListener('change', async e => {
   const f = e.target.closest('.rc-slot [data-rcf]'); if (!f || !RC.d) return;
   const id = RC.id, from = rc_cur(), to = {...from};
   if (f.dataset.rcf === 'project') to.project_id = f.value ? +f.value : null;
+  else if (f.dataset.rcf === 'vat') to.vat_pct = f.value || null;
   else to.category = f.value.trim();
   try { await rc_put(id, to); } catch { rc_draw(); return; }
   const label = tr('Changed receipt');

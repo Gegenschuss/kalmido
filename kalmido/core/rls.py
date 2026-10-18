@@ -29,6 +29,7 @@ TABLES = (
     "office_client_contacts",  # 2.40.0 (#1380): contact persons of a client (org_id like the client)
     "office_roles", "office_doc_parts", "office_purchases",  # 2.47.0 (#1649, #1215, #1216)
     "office_trips", "office_trip_items", "office_fixed_costs",  # 2.47.3 (#1022, #1652, part B)
+    "office_bank_imports", "office_bank_tx",  # 2.90.0 B (#1921): bank reconciliation
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
     "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)
