@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.96.0** (2026-10-18): files, folders, documents, wiki pages and tables move between your private space and an
+  organisation, both ways (sealed again, shares that do not hold end, one undo); an organisation export can go into the
+  private space; one card per background job in the agent chat with a filter.
 - **2.95.0** (2026-10-18): the per diem of business trips with the German flat rates per year (BMF 2025 / 2026; country,
   city, times and meals per day; a year without rates shows a hint), its report per person as PDF / Excel / CSV, and the
   import of a per diem spreadsheet with a preview.
