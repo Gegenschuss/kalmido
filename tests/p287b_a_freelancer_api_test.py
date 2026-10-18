@@ -204,7 +204,8 @@ ok(F.post(B + "/api/account/export", json={}), "own: an account export", (200, 2
 tk = ok(F.post(B + "/api/me/tokens", json={"name": "all", "scopes": [x for x in ("read", "write", "comments", "structure", "delete",
                                                                                   "attachments:read", "attachments:write", "time", "export",
                                                                                   "calendar", "contacts", "private", "account", "files:read",
-                                                                                  "files:write", "office", "pinboard", "layouts", "import")]}),
+                                                                                  "files:write", "office", "pinboard", "layouts", "import",
+                                                                                  "sheets:read")]}),  # 2.89.1: tables of 2.89.0
         "own: a personal API token", (200, 201))
 PT = {"Authorization": "Bearer " + tk.get("token", "")}
 
