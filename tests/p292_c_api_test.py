@@ -124,7 +124,7 @@ DOCX_BODY = (para(run("Projektauftrag Leuchtturm"), "berschrift1")
              + para(run("Kosten"), "berschrift2")
              + f'<w:tbl><w:tr><w:tc>{para(run("Posten"))}</w:tc><w:tc>{para(run("Betrag"))}</w:tc></w:tr>'
                f'<w:tr><w:tc>{para(run("Laterne"))}</w:tc><w:tc>{para(run("120"))}</w:tc></w:tr></w:tbl>'
-             + para(run("<script>alert(1)</script> bleibt Text")))
+             + para(run("&lt;script&gt;alert(1)&lt;/script&gt; bleibt Text")))
 DOCX = make_docx(DOCX_BODY)
 SERIAL = 46000
 DAY = (date(1899, 12, 30) + timedelta(days=SERIAL)).isoformat()
@@ -181,7 +181,7 @@ def agent(name, scopes, **kw):
     return r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
 
 
-L = Bo.post(B + "/api/lists", json={"name": "Lighthouse"}).json()["id"]
+L = Bo.post(B + "/api/lists", json={"name": "Lighthouse", "kind": "project"}).json()["id"]
 T = Bo.post(B + "/api/tasks", json={"title": "Order", "list_id": L}).json()["id"]
 
 
