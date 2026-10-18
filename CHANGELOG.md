@@ -28,6 +28,11 @@ Appointment booking for customers, leads before the sales pipeline, Enter in the
 - Team chat and agent chat (also editing a message): Enter makes a new line, Ctrl+Enter or Cmd+Enter sends, like the
   comments; the phone keyboard shows a return key, the send button names the shortcut (#2024).
 
+## [2.93.1] - 2026-10-18
+
+### Fixed
+- Customer signing page: the checksum of the document wraps on phones instead of running out sideways (#1927).
+
 ## [2.93.0] - 2026-10-18
 
 Documents from templates with a customer signature, and a logbook in the office.

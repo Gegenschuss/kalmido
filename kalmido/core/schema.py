@@ -1216,7 +1216,7 @@ CREATE TABLE IF NOT EXISTS office_vehicles (
   name TEXT NOT NULL DEFAULT '', plate TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL DEFAULT 'private', odo_start NUMERIC(14,1),
   archived BIGINT NOT NULL DEFAULT 0, created_by BIGINT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS office_vehicles_org ON office_vehicles(org_id);
--- 2.93.0 B (#1928): drives: day, start / destination / purpose (encrypted), km, odometer at start / end, kind business |
+-- 2.93.0 B (#1928): drives: day, start / destination / purpose (encrypted), km, odometer at start and at finish, kind business |
 -- private | commute, client / project, driver (user_id), trip_id = taken over into the travel expenses (office_trips.km);
 -- deleted_at = removed (the row stays for the change log, as the tax office expects).
 CREATE TABLE IF NOT EXISTS office_drives (
