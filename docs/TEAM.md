@@ -224,6 +224,20 @@ project files, chat, documents, mail and sharing into Kalmido); profile pictures
   *automatic* like other recognised values. The place is never stored.
 - Browser-encrypted files (end-to-end) are not touched: the server cannot read them.
 - Agents cannot change either switch.
+## Files and documents into the other workspace (2.96.0)
+
+Files, folders (with everything in them) and documents move between the private space and an organisation, both ways:
+**Move to another workspace…** in a row's menu of the file store, or **Select** (check boxes, also on the phone) and the bar
+*n selected · Move to… · Move to another workspace…*. In *Documents*, **Select** chooses cards (or *Select all* of what the
+search and the filters find) and moves them into the documents folder of the other workspace; a single document has the
+button in its sheet. The dialog names source and target and says beforehand what happens: how many files, duplicates
+already there, shares and openings to the whole organisation that end, what stays (links to task files, agent folders,
+the trash). Sender, type, tags, the archive number (when it is free there), the recognised text and a Paperless origin go
+along; the files are sealed again with the target's key. One undo step moves everything back.
+
+Out of an organisation only the owner (or who uploaded it) or an organisation admin moves something; a person without an
+organisation has no other workspace and does not see the action. Agents never move data between workspaces.
+
 ## Pinned chat messages (2.62.0)
 
 Important messages stay in view: in the team chat and in the chat with an agent, *Pin* in the menu of a message (on a
