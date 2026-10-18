@@ -20,7 +20,7 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
 - **Templates.** Pages under `Templates/` are offered as the start of a new page.
 - **Saving** is automatic. When someone else saved the page in between, you choose which version stays.
 - **Undo.** Creating, renaming, deleting and importing are one step each (the arrow on top, Ctrl/Cmd+Z, the toast).
-- **Export / import.** The menu of the page list exports a space as a ZIP of `.md` files in folders (the format of
+- **Export / import.** The "…" menu in the header (section *Area*) exports a space as a ZIP of `.md` files in folders (the format of
   SilverBullet and similar tools) and imports such a ZIP: only Markdown files, at most 2000 files, 1 MB each and 30 MB
   in total; pages with an existing name are skipped unless you replace them. Paths with `..` are refused.
 - **Mind maps in pages.** A fenced block with the language `mindmap` draws its Markdown list as a mind map:
@@ -52,7 +52,7 @@ organisation.
   leaves, the key changes and older pages are encrypted again in the background as soon as an admin opens the knowledge pages
   with their encryption unlocked (for a key seen there for the first time, by a button).
 - **In use.** Search, backlinks, "mentioned in", page links, templates, and moving a folder (every page is renamed) work in the browser over the decrypted pages. A locked space shows a placeholder until you unlock.
-- **Export and import** of such a space are done by the browser: the menu entry to export it as a ZIP gives plain Markdown files;
+- **Export and import** of such a space are done by the browser: the entry *Export as ZIP* in the header menu gives plain Markdown files;
   import reads a ZIP and encrypts the pages. The server answers its own export and import with an error there.
 - **Not available:** access for agents or the API, templates copied by the server, and the server's own search.
 - **Limits.** A changed script delivered by the server could capture the passphrase; page names are encrypted but the number of pages,
