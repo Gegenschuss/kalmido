@@ -8,8 +8,8 @@ the module **Read later** (*Settings > Modules > Home > Read later*, off by defa
 - Open **Bookmarks** and paste a link (`https://…`; a bare `example.com/page` gets `https://`), then tap **Save**.
 - **From another app (phone):** share a link to Kalmido and choose **Save as bookmark** (next to *New task*).
 - **From the browser (computer):** menu **…** > *Bookmark button for the browser* gives you a button to drag to your
-  bookmarks bar. On any page it opens a small Kalmido window that saves the page and shows it for tags and a note. It uses
-  your normal sign-in and runs no code of ours on the page.
+  bookmarks bar. On any page it opens a small Kalmido window with the page; **Save** keeps it and shows it for tags and a
+  note. It uses your normal sign-in and runs no code of ours on the page.
 - The same link is not saved twice: saving it again (also with tracking parameters such as `utm_source`) shows the one you
   already have.
 - With organisations: a bookmark is saved in the workspace you are looking at (in *All workspaces*: your private space).

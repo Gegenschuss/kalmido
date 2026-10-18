@@ -2,7 +2,7 @@
 // #1950 bookmarks: a part of the area Home (module "reading"); the view saves a pasted link (one undo step), the card shows the
 //       preview once the server fetched it (title, site, picture of the app, link with noopener), search, the tag filter,
 //       cards / list, archive (+ undo), the details with the reading text as plain text; the share target /share?url=
-//       offers "Save as bookmark", the bookmark button of the browser (/share?bm=1) saves at once and opens the details.
+//       offers "Save as bookmark", the bookmark button of the browser (/share?bm=1) shows the page, Save keeps it (details).
 // Firefox 390 touch: the view has no horizontal scrolling, the buttons are >= 40 px, screenshot.
 const {execFileSync} = require('child_process');
 const fs = require('fs');
@@ -117,8 +117,13 @@ const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click'
   check(all.some(x => x.url === FS + '/two.html'), '#1950: the shared link is a bookmark');
   w.close();
   w = await boot({user: 'alice', path: 'share?bm=1&title=' + encodeURIComponent('Saved with the button') + '&url=' + encodeURIComponent(FS + '/three.html')}); d = w.document;
-  await until(() => d.querySelector('.modal.bmdlg'));
-  check(d.querySelector('.modal.bmdlg') && !d.querySelector('[data-sd]'), '#1950: the bookmark button saves at once (no question) and opens the details');
+  await until(() => d.querySelector('.modal.bmconfdlg'));
+  check(d.querySelector('.modal.bmconfdlg') && /Saved with the button/.test(d.querySelector('.bmconfdlg').textContent) && !d.querySelector('[data-sd]'),
+    '#1950: the bookmark button shows the page first (nothing saved without Save)');
+  check(!((await call('GET', '/api/bookmarks')).items || []).some(x => x.url === FS + '/three.html'), '#1950: … not saved yet');
+  d.querySelector('.bmconfdlg form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
+  await until(() => d.querySelector('.modal.bmdlg:not(.bmconfdlg)'));
+  check(d.querySelector('.modal.bmdlg:not(.bmconfdlg)'), '#1950: Save keeps it and opens the details');
   all = (await call('GET', '/api/bookmarks')).items || [];
   check(all.some(x => x.url === FS + '/three.html' && x.title === 'Saved with the button'), '#1950: … with the page title');
   check(/javascript:/.test(w.eval(`bm_bookmarklet()`)) && /\/share/.test(w.eval(`bm_bookmarklet()`)) && /bm=1/.test(w.eval(`bm_bookmarklet()`)), '#1950: the bookmarklet opens /share?bm=1');
