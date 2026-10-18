@@ -217,6 +217,7 @@ GX = A.post(B + GD, json={"template_id": TT, "client_id": CL, "doc_id": OF}).jso
 r = A.patch(B + f"{GD}/{GX}", json={"client_id": CLB})
 check(r.ok and r.json()["client_id"] == CLB and r.json()["doc_id"] is None, f"PATCH client: the old quotation dropped ({r.status_code} {r.text[:160]})")
 check(A.patch(B + f"{GD}/{GX}", json={"client_id": CL, "doc_id": OFB}).status_code == 404, "PATCH client + a quotation of another client: still 404")
+A.delete(B + f"{GD}/{GX}")  # out of the list checks below
 check(Bo.patch(B + f"{GD}/{G}", json={"title": "x"}).status_code == 403 and Ca.patch(B + f"{GD}/{G}", json={"title": "x"}).status_code == 404, "member 403, other 404")
 check(Ca.get(B + f"{GD}/{G}").status_code == 404 and Ca.post(B + f"{GD}/{G}/final").status_code == 404 and Ca.get(B + f"{GD}/{G}/pdf").status_code == 404,
       "another organisation reaches no document (404)")
