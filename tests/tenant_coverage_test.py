@@ -261,6 +261,12 @@ ROUTES = {
     # 2.90.0 C (#1922): tax dates as tasks, office admins (p290_c_api_test.py)
     "GET /api/office/tax-dates": "office", "PUT /api/office/tax-dates": "office",
     # 2.93.0 A (#1927): document templates and documents with signature, office admins (p293_a_api_test.py)
+    "GET /api/office/doc-templates": "office", "POST /api/office/doc-templates": "office", "PATCH /api/office/doc-templates/{}": "office",
+    "DELETE /api/office/doc-templates/{}": "office", "POST /api/office/doc-templates/{}/restore": "office", "GET /api/office/doc-templates/starters": "office",
+    "GET /api/office/gen-docs": "office", "POST /api/office/gen-docs": "office", "GET /api/office/gen-docs/{}": "office", "PATCH /api/office/gen-docs/{}": "office",
+    "DELETE /api/office/gen-docs/{}": "office", "POST /api/office/gen-docs/{}/restore": "office", "POST /api/office/gen-docs/preview": "office",
+    "POST /api/office/gen-docs/{}/final": "office", "GET /api/office/gen-docs/{}/pdf": "office", "POST /api/office/gen-docs/{}/signoff": "office",
+    "GET /api/office/gen-docs/{}/signoffs": "office",
 
     # 2.93.0 B (#1928): the logbook, office admins (p293_b_api_test.py)
     # 2.50.0 (#1196, #1197): the sales pipeline and the business figures, admins of the office area only (p250_b_api_test.py: other org 404, member 403)
