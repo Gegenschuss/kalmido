@@ -26,8 +26,9 @@ KINDS = {
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
                         "and import in the private space; every GET of the area as the freelancer (no 403 / 5xx)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
-    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py: the personal office (the freelancer is its admin): settings, company "
-                         "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless"),
+    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
+                         "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
+                         "templates with signature, logbook (2.93.0)"),
     "files": ("matrix", SUITE + ": the own file store (folders, upload, content, versions) and documents; every GET"),
     "wiki": ("matrix", SUITE + ": knowledge pages in the private space (create, change, search, export, trash)"),
     "pim": ("matrix", SUITE + ": own calendars, events, address books, contacts; CalDAV / CardDAV with an app password"),
@@ -586,6 +587,19 @@ ROUTES = {
     "POST /api/office/bank/tx/{}/unmatch": "office", "POST /api/office/series": "office",
     "POST /api/office/series/{}/restore": "office", "POST /api/office/series/{}/run": "office",
     "PUT /api/office/tax-dates": "office",
+    # 2.93.0 A (#1927): document templates and documents with signature, the personal office of a freelancer in p293_a_api_test.py
+    "GET /api/office/doc-templates": "office", "POST /api/office/doc-templates": "office", "PATCH /api/office/doc-templates/{}": "office",
+    "DELETE /api/office/doc-templates/{}": "office", "POST /api/office/doc-templates/{}/restore": "office", "GET /api/office/doc-templates/starters": "office",
+    "GET /api/office/gen-docs": "office", "POST /api/office/gen-docs": "office", "GET /api/office/gen-docs/{}": "office", "PATCH /api/office/gen-docs/{}": "office",
+    "DELETE /api/office/gen-docs/{}": "office", "POST /api/office/gen-docs/{}/restore": "office", "POST /api/office/gen-docs/preview": "office",
+    "POST /api/office/gen-docs/{}/final": "office", "GET /api/office/gen-docs/{}/pdf": "office", "POST /api/office/gen-docs/{}/signoff": "office",
+    "GET /api/office/gen-docs/{}/signoffs": "office",
+    # 2.93.0 B (#1928): the logbook, the personal office of a freelancer in p293_b_api_test.py
+    "GET /api/office/vehicles": "office", "POST /api/office/vehicles": "office", "PATCH /api/office/vehicles/{}": "office",
+    "GET /api/office/drives": "office", "POST /api/office/drives": "office", "PATCH /api/office/drives/{}": "office", "DELETE /api/office/drives/{}": "office",
+    "POST /api/office/drives/{}/restore": "office", "GET /api/office/drives/{}/log": "office", "POST /api/office/drives/{}/trip": "office",
+    "GET /api/office/logbook/report": "office", "GET /api/office/logbook.csv": "office", "GET /api/office/logbook.pdf": "office",
+    "PUT /api/office/logbook/settings": "office",
 }
 
 

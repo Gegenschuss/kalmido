@@ -253,7 +253,7 @@ check([v["id"] for v in Ca.get(B + LB + "/report?year=2026").json()["vehicles"]]
 for path in (f"{DR}/{D1}/log", f"{V}"):
     check(requests.get(B + path, headers=AGH).status_code == 403, f"agent: 403 on {path} (with data)")
 
-# ---------------------------------------------------------------- personal office (person without organisation)
+# ---------------------------------------------------------------- personal office (person without organisation)  # freelancer-matrix: office
 check(Do.get(B + O + "/settings").json().get("role") == "admin", "a person without organisation is admin of their own office")
 CLP = Do.post(B + "/api/clients", json={"name": "Privatkunde"}).json()["id"]
 r = Do.post(B + V, json={"name": "Eigenes Auto", "plate": "B-XY 42", "odo_start": 5000})

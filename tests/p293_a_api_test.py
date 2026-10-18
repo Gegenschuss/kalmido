@@ -366,7 +366,7 @@ check(pg.status_code == 200 and "Imagefilm" in pg.text, "the quotation page as b
 check(post(TQ, f=form_key(pg.text), name="Max Muster", ok="1", do="accept").status_code == 303 and A.get(B + f"{O}/docs/{OF}").json()["status"] == "accepted",
       "the quotation accepted as before")
 
-# ---------------------------------------------------------------- a person without organisation (personal office)
+# ---------------------------------------------------------------- a person without organisation (personal office)  # freelancer-matrix: office
 check(Do.get(B + O + "/settings").json().get("role") == "admin", "personal office: Dora is its admin")
 Do.put(B + O + "/settings", json={"lang": "en", "company_fields": {"name": "Dora Film", "street": "Weg 2", "zip": "12345", "city": "Musterstadt", "country": "DE"}})
 CP = Do.post(B + "/api/clients", json={"name": "Privatkunde Eins", "street": "Weg 1", "zip": "10000", "city": "Berlin", "country": "DE"}).json()["id"]
