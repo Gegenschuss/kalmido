@@ -41,6 +41,7 @@ KINDS = {
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature"),
     "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private space of a "
                          "person without an organisation and with that person's own agent; rows to tasks / quotation drafts"),
+    "bookmarks": ("matrix", "p297_a_api_test.py: bookmarks (2.97.0) in the private space of a person without an organisation"),  # 2.97.0 A (#1950)
     "own": ("matrix", SUITE + ": the own settings, profile, tokens, app passwords, push, account export / import"),
     # ---- nothing to check without an organisation (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account: the same for every person, before any workspace"),
@@ -85,6 +86,10 @@ ROUTES = {
     "GET /api/agents/jobs": "agents", "GET /api/agents/jobs/{}/steps": "agents", "GET /api/agents/usage": "agents",
     "GET /api/agents/{}/bridges": "agents", "GET /api/agents/{}/chat": "agents",
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
+    "GET /api/bookmarks": "bookmarks", "POST /api/bookmarks": "bookmarks", "GET /api/bookmarks/{}": "bookmarks",
+    "PATCH /api/bookmarks/{}": "bookmarks", "DELETE /api/bookmarks/{}": "bookmarks",
+    "POST /api/bookmarks/{}/restore": "bookmarks", "POST /api/bookmarks/{}/refresh": "bookmarks",
+    "GET /api/bookmarks/{}/image": "bookmarks", "POST /api/bookmarks/move-space": "bookmarks",
     # 2.96.0 C (#2015): job cards in the agent chat
     "GET /api/agents/{}/meeting-proposals": "agents", "GET /api/agents/{}/schedules": "agents",
     "GET /api/agents/{}/share": "agents", "GET /api/assistant": "agents", "GET /api/assistant/log": "agents",
