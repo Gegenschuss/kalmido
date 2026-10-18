@@ -911,6 +911,59 @@ TOOLS += [
     ("unlink_contact", "2.21.0: remove a contact's link to a task (needs tasks:write too).", _obj({"task_id": S_ID, "contact_id": S_ID}, ["task_id", "contact_id"]),
      lambda api, a: api.call("DELETE", f"/tasks/{int(a['task_id'])}/contacts/{int(a['contact_id'])}")),
 ]
+# 2.89.0 C (#1916): tables ("Excel in simple"): lists and formulas whose cells can fetch Kalmido numbers. You see only tables
+# shared with you (attached to a list you see) and those you created; every write call is ONE batch a person can take back
+_SH_COL = {"type": "object", "description": "{title (also its name in formulas), kind text|number|currency|percent|date|select, options?: "
+                                            "[{label, color?: #rrggbb}] (select), color_mode?: cell|row (select: colour the cell or the row), width?}"}
+_SH_ROWS = {"type": "array", "items": {"type": "array"}, "description": "Rows of inputs in the order of the columns: numbers (1,5 or 1.5), "
+                                                                      "dates DD.MM.YYYY or YYYY-MM-DD, a select cell its label, formulas start with "
+                                                                      "= (A1, B2:B9, cell / column names, SUMME, MITTELWERT, MIN, MAX, ANZAHL, WENN, "
+                                                                      "RUNDEN, HEUTE, TAGE, projekt.<name>.<field>, liste.<name>.<field>, "
+                                                                      "kunde.<name>.<field>, hier.<field>; arguments with ;)"}
+TOOLS += [
+    ("sheets_list", "2.89.0 (scope sheets:read): the tables you may read (id, title, space, attached list). space private | org:<id> | all, "
+                    "or list_id = the tables attached to that project / list.",
+     _obj({"space": {"type": "string"}, "list_id": S_ID}), lambda api, a: api.call("GET", "/sheets", _pick(a, ("space", "list_id")))),
+    ("sheet_read", "2.89.0 (scope sheets:read): one table: columns (id, letter, title, kind, options), rows, cells (addr, raw input with "
+                   "names, value, display, error). Values are calculated with YOUR visibility: a project / list / client not shared with "
+                   "you gives error denied (never guess it). batches = agent calls on it.",
+     _obj({"sheet_id": S_ID}, ["sheet_id"]), lambda api, a: api.call("GET", f"/sheets/{_id(a, 'sheet_id')}")),
+    ("sheet_create", "2.89.0 (scope sheets:write): create a table in ONE call: title, space (private = the person you work for, or "
+                     "org:<id> of your workspace), list_id? (attach to a project / list shared with you, same space), columns (with "
+                     "choices and colours), rows (inputs and formulas). The answer has the table and its batch; the person can take the "
+                     "whole call back (the table goes to the trash). Example: birthdays in the next 4 weeks -> search_contacts, then one "
+                     "sheet_create with columns Name, Geburtstag (date), Alter (number) and one row per person.",
+     _obj({"title": {"type": "string", "maxLength": 200}, "space": {"type": "string"}, "list_id": S_ID,
+           "columns": {"type": "array", "items": _SH_COL, "maxItems": 200}, "rows": _SH_ROWS}, ["title"]),
+     lambda api, a: api.call("POST", "/sheets", body=_pick(a, ("title", "space", "list_id", "columns", "rows")))),
+    ("sheet_update", "2.89.0 (scope sheets:write): rename a table or attach it to a project / list (list_id null = detach).",
+     _obj({"sheet_id": S_ID, "title": {"type": "string"}, "list_id": {"type": ["integer", "null"]}}, ["sheet_id"]),
+     lambda api, a: api.call("PATCH", f"/sheets/{_id(a, 'sheet_id')}", body=_pick(a, ("title", "list_id")))),
+    ("sheet_set_cells", "2.89.0 (scope sheets:write): set cells: [{cell: \"B4\" or a cell name, raw}] (raw \"\" empties it; a formula "
+                        "starts with =). One call = one batch; a wrong formula changes nothing (the error says why). The answer has the "
+                        "changed cells and those depending on them.",
+     _obj({"sheet_id": S_ID, "cells": {"type": "array", "maxItems": 5000, "items": {"type": "object", "description": "{cell, raw} or {row_id, col_id, raw}"}}},
+          ["sheet_id", "cells"]),
+     lambda api, a: api.call("PUT", f"/sheets/{_id(a, 'sheet_id')}/cells", body={"cells": a.get("cells") or []})),
+    ("sheet_append_rows", "2.89.0 (scope sheets:write): append rows (inputs in the order of the columns) at the end or after_row_id. "
+                          "One call = one batch.",
+     _obj({"sheet_id": S_ID, "rows": _SH_ROWS, "after_row_id": S_ID}, ["sheet_id", "rows"]),
+     lambda api, a: api.call("POST", f"/sheets/{_id(a, 'sheet_id')}/rows", body=_pick(a, ("rows", "after_row_id")))),
+    ("sheet_add_column", "2.89.0 (scope sheets:write): add a column (title, kind, options, color_mode) at the end or after after_col_id.",
+     _obj({"sheet_id": S_ID, "title": {"type": "string", "maxLength": 80}, "kind": {"type": "string", "enum": ["text", "number", "currency", "percent", "date", "select"]},
+           "options": {"type": "array", "items": {"type": "object"}}, "color_mode": {"type": "string", "enum": ["cell", "row"]}, "after_col_id": S_ID},
+          ["sheet_id", "title"]),
+     lambda api, a: api.call("POST", f"/sheets/{_id(a, 'sheet_id')}/columns", body=_pick(a, ("title", "kind", "options", "color_mode", "after_col_id")))),
+    ("sheet_vars", "2.89.0 (scope sheets:read): what a formula of this table may use (cell / column names, projekt.<name>.<field>, "
+                   "liste..., kunde..., hier..., functions) with the current value; only what you see and what lies in the table's space.",
+     _obj({"sheet_id": S_ID, "q": {"type": "string"}}, ["sheet_id"]),
+     lambda api, a: api.call("GET", f"/sheets/{_id(a, 'sheet_id')}/vars", _pick(a, ("q",)))),
+    ("sheet_undo_batch", "2.89.0 (scope sheets:write): take back one of YOUR calls on a table (its batch from the answer): cells get "
+                         "their former input unless someone changed them since, added rows / columns go to the trash, a table the call "
+                         "created too.",
+     _obj({"sheet_id": S_ID, "batch": {"type": "string"}}, ["sheet_id", "batch"]),
+     lambda api, a: api.call("POST", f"/sheets/{_id(a, 'sheet_id')}/batches/{_q(a['batch'])}/undo")),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -1809,9 +1862,11 @@ TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
 TOOL_SCOPES["import"] = ("propose_import",)  # 2.68.0 (#1839)
 TOOL_SCOPES["agent"] += ("propose_contract_notice",)  # 2.70.0 C (#1359)
 TOOL_SCOPES["structure"] += ("propose_rule",)  # 2.71.0 A (#1457)
+TOOL_SCOPES["sheets:read"] = ("sheets_list", "sheet_read", "sheet_vars")  # 2.89.0 C (#1916)
+TOOL_SCOPES["sheets:write"] = ("sheet_create", "sheet_update", "sheet_set_cells", "sheet_append_rows", "sheet_add_column", "sheet_undo_batch")
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
-              "private", "files:read", "files:write", "office", "pinboard", "layouts", "import")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts; 2.68.0 (#1839): + import
+              "private", "files:read", "files:write", "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts; 2.68.0 (#1839): + import; 2.89.0 C (#1916): + sheets
 _ME = {"at": 0.0, "v": None}
 ME_TTL = 300  # s: a changed scope shows in tools/list within 5 minutes (a call is refused by the server at once anyway)
 

@@ -219,9 +219,24 @@ APP_TO_API = {
     # 2.71.0 (#1459): a task in several lists; the place in a further list = linking again with the section
     "POST /api/tasks/{}/links": ["POST /tasks/{}/links"], "DELETE /api/tasks/{}/links/{}": ["DELETE /tasks/{}/links/{}"],
     "PATCH /api/tasks/{}/links/{}": ["POST /tasks/{}/links"],
+    # 2.89.0 C (#1916): tables -- agents read, create in one step, set cells, append rows / columns and take back their calls;
+    # the files of export / import are the same data as reading / creating
+    "GET /api/sheets": ["GET /sheets"], "POST /api/sheets": ["POST /sheets"], "GET /api/sheets/{}": ["GET /sheets/{}"],
+    "PATCH /api/sheets/{}": ["PATCH /sheets/{}"], "PUT /api/sheets/{}/cells": ["PUT /sheets/{}/cells"],
+    "POST /api/sheets/{}/rows": ["POST /sheets/{}/rows"], "POST /api/sheets/{}/columns": ["POST /sheets/{}/columns"],
+    "GET /api/sheets/{}/vars": ["GET /sheets/{}/vars"], "POST /api/sheets/{}/batches/{}/undo": ["POST /sheets/{}/batches/{}/undo"],
+    "GET /api/sheets/{}/export.csv": ["GET /sheets/{}"], "GET /api/sheets/{}/export.xlsx": ["GET /sheets/{}"],
+    "POST /api/sheets/import": ["POST /sheets"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.89.0 C (#1916): arranging a table stays with people in the app -- trash / restore, removing / restoring / sorting rows and "
+     "columns, changing a column, naming and freezing cells, the cursor of others; an agent creates tables with their columns "
+     "in one step, writes cells, appends rows / columns and takes back its own calls",
+     ("=DELETE /api/sheets/{}", "=POST /api/sheets/{}/restore", "=PATCH /api/sheets/{}/columns/{}", "=DELETE /api/sheets/{}/columns/{}",
+      "=POST /api/sheets/{}/columns/{}/restore", "=DELETE /api/sheets/{}/rows/{}", "=POST /api/sheets/{}/rows/{}/restore",
+      "=POST /api/sheets/{}/rows/order", "=POST /api/sheets/{}/cells/{}/freeze", "=POST /api/sheets/{}/cells/{}/name",
+      "=POST /api/sheets/{}/presence")),
     # 2.70.0 (#1357): agents propose contact merges as a proposal (kind merge); the person applies them, the routes stay with people
     ("2.66.0 (#1835): merging duplicate contacts / clients and its undo stay with people; agents propose contact merges "
      "(proposal kind merge, #1357), the person applies them",

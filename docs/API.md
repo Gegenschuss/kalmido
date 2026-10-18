@@ -1274,6 +1274,27 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
                  {"label": "Software subscription", "amount": 29.9, "start": "2026-01-01", "vat_rate": 19}]}' \
   https://kalmido.example/api/v1/agent/proposals/import
 
+## Tables (2.89.0)
+
+New scopes `sheets:read` and `sheets:write` (off for new agents, not part of the legacy `write`; a personal token also needs
+the module *Tables* switched on to write). Routes: `GET /api/v1/sheets` (`?space=private|org:<id>|all`, `?list_id=`),
+`POST /api/v1/sheets` (a whole table in one call), `GET` / `PATCH /api/v1/sheets/{id}`, `PUT /api/v1/sheets/{id}/cells`,
+`POST /api/v1/sheets/{id}/rows`, `POST /api/v1/sheets/{id}/columns`, `GET /api/v1/sheets/{id}/vars`,
+`POST /api/v1/sheets/{id}/batches/{batch}/undo`. Formulas are stored with ids and shown with the current names; every
+value is calculated with the token's visibility (`error: "denied"` for a source it does not see). An agent's write call is
+one batch (`batch` in the answer) a person can take back. The app also exports a table as CSV / .xlsx and imports both
+(`GET /api/sheets/{id}/export.csv|xlsx`, `POST /api/sheets/import`, session only).
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"title": "Angebot Dreh", "space": "private",
+       "columns": [{"title": "Posten"}, {"title": "Stunden", "kind": "number"}, {"title": "Satz", "kind": "currency"},
+                   {"title": "Betrag", "kind": "currency"},
+                   {"title": "Status", "kind": "select", "options": [{"label": "Offen", "color": "#f5b041"}, {"label": "Fix", "color": "#58d68d"}]}],
+       "rows": [["Kamera", 10, 95, "=B1*C1", "Offen"], ["Schnitt", 16, 80, "=B2*C2", "Fix"], ["Summe", "", "", "=SUMME(D1:D2)", ""]]}' \
+  https://kalmido.example/api/v1/sheets
+```
+
 ## Rules of a list (2.71.0)
 
 Read only for tokens; agents propose (see docs/AGENTS.md *Rules of a list*). People manage rules in the app (list
