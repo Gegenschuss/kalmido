@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.94.0** (2026-10-18): a public booking page for customers (free times from your calendar, mail confirmation,
+  event + contact + lead), leads before the sales pipeline (follow-up, convert to client, CSV import, agents), and Enter in
+  the chats makes a new line.
 - **2.92.2** (2026-10-18): before every import Kalmido names the target and asks (*Rather to private*), Paperless-ngx in the
   settings, an office menu in four groups, organisation pictures, smoother dragging everywhere, freelancer parity guard.
 - **2.92.0** (2026-10-18): contracts and insurance in the office (notice deadlines as tasks, contributions in the cash

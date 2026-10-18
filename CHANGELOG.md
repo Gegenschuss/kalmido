@@ -7,6 +7,31 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.94.0] - 2026-10-18
+
+Appointment booking for customers, leads before the sales pipeline, Enter in the chats makes a new line.
+
+### Added
+- Booking page (Calendar > Calendars > Booking page...): customers book a time with you on a public page without an
+  account. Appointment types with duration, buffer, notice and days ahead; free times are your opening hours minus busy
+  events, accepted invitations, subscriptions, absences and open bookings, customers never see anything of your calendars.
+  The customer confirms by mail, then Kalmido makes the event, a contact and (if chosen) a lead in the office; cancel links
+  for the customer and a list with *Call off...* for you. Spam protection without outside services: mail confirmation,
+  rate limits, a hidden field, at most 3 open bookings per address. Works without an organisation; separate from the
+  disposition (#1929).
+- Leads before the sales pipeline: a first column *Leads* with source, next step and follow-up day (due ones marked),
+  *Convert to client* (a matching client is suggested, undo possible) and a CSV import with preview and duplicate check by
+  e-mail. Leads stay out of the sums and the forecast. Agents with the office switch list, add and update leads (next step,
+  follow-up, note) through `/api/v1/office/leads` and three MCP tools, never convert or delete (#1930).
+
+### Changed
+- Team chat and agent chat (also editing a message): Enter makes a new line, Ctrl+Enter or Cmd+Enter sends, like the
+  comments; the phone keyboard shows a return key, the send button names the shortcut (#2024).
+
+### Fixed
+- Office: parts of the layout added since 2.91 (subscriptions, contracts, equipment) applied on phones only (a missing
+  closing brace in office.css).
+
 ## [2.92.2] - 2026-10-18
 
 Freelancer parity, an office menu in four groups, import targets you confirm, Paperless-ngx in the settings and a round of polish.
