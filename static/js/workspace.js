@@ -23,16 +23,26 @@ const wsOptions = () => ['private', ...(S.me?.workspaces || []).map(w => 'org:' 
 const wsObjIn = (o, ws = wsCur()) => ws === 'all' || !o || wsOf(o) === ws;
 const wsAgentIn = (a, ws = wsCur()) => ws === 'all' || !a || (ws === 'private' ? !a.org_id : 'org:' + a.org_id === ws);
 const wsLabel = (org_id) => org_id ? (wsOrg(org_id)?.name || tr('Organisation')) : tr('Private|workspace');
+// 2.66.1 (#1945): views that keep data of ONE workspace which they cannot check themselves when drawing (the server picks the
+// area from the saved setting) register here: wsSet() calls fn(false) before it draws again and fn(true) once the server
+// knows the new workspace. Views that compare their own workspace when drawing (docs, files, office, clients) or load again
+// with the new state (absences, disposition: core.js) need no entry.
+// The guard test p2661_b_ui lists every view with a workspace link.
+const p61b_WS = {};
+const p61b_wsOn = (name, fn) => { p61b_WS[name] = fn; };
+const p61b_wsRun = after => { for (const [n, fn] of Object.entries(p61b_WS)) { try { fn(after); } catch (x) { console.error('workspace switch', n, x); } } };
 async function wsSet(ws) {
   if (!wsOptions().includes(ws)) ws = 'all';
   S.settings.workspace = ws; LS.set('ws', ws);
   closeSide?.();
   if (typeof pb_wsChanged === 'function') pb_wsChanged(true);  // 2.47.3 (#1360): the office follows once the server knows it
+  p61b_wsRun(false);  // 2.66.1 (#1945)
   // 2.49.0 (#1770): the open list does not stay when it is not part of the new workspace -> that workspace's inbox
   const ol = S.route?.mod === 'tasks' && String(S.route.key || '').startsWith('l:') ? listById(+S.route.key.slice(2)) : null;
   if (ol && !inWs(ol, wsCur())) go(keyToHash(START_KEY)); else render();
   try { await api('PATCH', '/api/settings', {workspace: ws}); } catch { /* api() said it */ }
   if (typeof pb_wsChanged === 'function') pb_wsChanged(false);
+  p61b_wsRun(true);  // 2.66.1 (#1945)
 }
 // 2.49.0 (#1770): a list of another workspace opened directly (link, search, notification): the filter follows it
 function wsFollow(key) {

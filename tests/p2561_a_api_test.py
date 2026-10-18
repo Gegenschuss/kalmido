@@ -68,6 +68,14 @@ A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 A.patch(B + "/api/settings", json={"lang": "en", "features": "cal,comments,collab,office,clients,time", "tour": "done", "workspace": f"org:{ORG}"})
 L = "/api/office/legacy"
+# 2.87.0: a second admin of the organisation reads half of the PDFs - 11 address reads are over the PDF budget of one
+# account (#1463: 10 in 10 minutes, 429)
+r = A.post(B + "/api/users", json={"orgs": [ORG], "username": "bert", "display_name": "Bert", "password": "password123", "email": "bert@example.com"})
+assert r.ok, r.text
+assert A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": r.json()["id"], "role": "admin"}).ok
+A2 = sess("bert")
+A2.patch(B + "/api/settings", json={"lang": "en", "features": "cal,comments,collab,office,clients,time", "tour": "done", "workspace": f"org:{ORG}"})
+NREAD = [0]
 OWN = {"name": "MUSTERWERK Probe, Beispiel & Muster GbR", "street": "Beispielstraße 12", "zip": "12345", "city": "Musterstadt", "country": "DE"}
 r = A.put(B + "/api/office/settings", json={"company": {"name": OWN["name"]}, "lang": "de", "currency": "EUR", "company_fields": OWN, "payment_days": 14})
 check(r.ok, "office settings " + r.text[:160])
@@ -87,8 +95,9 @@ TAIL = ["Angebot Nr.: X-001", "Projekttitel: Beispielfilm"]
 
 
 def addr(pdf):
-    r = A.post(B + L + "/archive/address", files={"file": ("a.pdf", pdf, "application/pdf")}, data={"client_id": ""})
-    j = r.json() if r.ok else {}
+    NREAD[0] += 1
+    r = (A if NREAD[0] <= 6 else A2).post(B + L + "/archive/address", files={"file": ("a.pdf", pdf, "application/pdf")}, data={"client_id": ""})
+    j = r.json() if r.ok else {"http": r.status_code, "body": r.text[:200]}  # 2.86.0: the reason in the message
     return j.get("status"), j.get("address") or {}, j
 
 

@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.87.0** (2026-10-18): hardening from the security audit, part 3 - people who leave an organisation drop out of its
+  appointments, lists are handed over only to visible people; the agent chat header without info button.
 - **2.86.0** (2026-10-17): hardening from the security audit - sign-in floods no longer lock owners out, child
   accounts and instance admins kept to their organisation, stricter rights for approvals, list rules and office data,
   upload limits, sandboxed PDFs, push and mail day limits, agents see only what is shared with them.
@@ -37,6 +39,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   **portal users sign in once again**); office archive entries can be corrected after the import (client, net amounts
   per tax rate, paid, with history); DATEV keeps the customer number of locked invoices; the Paperless ZIP check runs in
   the background.
+- **2.80.2** (2026-10-18): patch - agent replies count at the bell, previews for imported documents, switching the
+  workspace reloads documents.
 - **2.80.0** (2026-10-17): small fixes - import amounts with thousands separators, new clients at once in the import and
   in quotations / invoices (with *Add client* when there is none), undo of a contact merge across workspaces, larger
   Undo button and a wrapping selection bar on the phone, all quota windows named in the agent chat.

@@ -42,6 +42,13 @@ CHECKS = {
                   "WHERE COALESCE(a.org_id,0)!=COALESCE(k.org_id,0)"),
     "cal_owner": ("SELECT k.id, k.owner_id FROM ev_cals k JOIN users u ON u.id=k.owner_id WHERE k.org_id IS NOT NULL AND u.kind!='agent' "
                   "AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=k.org_id AND om.user_id=k.owner_id)"),
+    # 2.87.0 (#1983): a person invited to an event of an organisation's calendar who is not (any more) its member (the read
+    # layer ignores the invitation: events/model.py ev_att_ok; boundary_repair takes it out), an agent of another workspace
+    # invited there (counted only, like cal_agent)
+    "att_person": ("SELECT a.event_id, a.user_id FROM event_attendees a JOIN events e ON e.id=a.event_id JOIN ev_cals k ON k.id=e.cal_id "
+                   "JOIN users u ON u.id=a.user_id WHERE k.org_id IS NOT NULL AND e.deleted_at IS NULL AND " + _PERSON.format(o="k", m="a")),
+    "att_agent": ("SELECT a.event_id, a.user_id FROM event_attendees a JOIN events e ON e.id=a.event_id JOIN ev_cals k ON k.id=e.cal_id "
+                  "JOIN agents g ON g.user_id=a.user_id WHERE k.org_id IS NOT NULL AND e.deleted_at IS NULL AND g.org_id IS DISTINCT FROM k.org_id"),
     "book_person": ("SELECT m.book_id, m.user_id FROM book_members m JOIN books b ON b.id=m.book_id JOIN users u ON u.id=m.user_id "
                     "WHERE b.org_id IS NOT NULL AND " + _PERSON.format(o="b", m="m")),
     "book_agent": ("SELECT m.book_id, m.user_id FROM book_members m JOIN books b ON b.id=m.book_id JOIN agents a ON a.user_id=m.user_id "
@@ -169,6 +176,7 @@ def boundary_check(c):
 # and agents whose owner left stay counted as before.
 REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", "list_id"),
           "cal_person": ("ev_cal_members", "cal_id"), "book_person": ("book_members", "book_id"),
+          "att_person": ("event_attendees", "event_id"),  # 2.87.0 (#1983)
           "file_person": ("fs_shares", "node_id"),  # 2.48.0 (#1207)
           "doc_mail_person": ("doc_mail", "org_id"),  # 2.48.0 (#1111)
           "task_bell_person": ("task_bell", "task_id"),  # 2.53.0 C (#1424)
@@ -254,7 +262,8 @@ def boundary_tick(c):
 
 # 2.46.0 (#1563): what each finding is, for the administration (kind prefix -> (type, table of the object))
 OA_OBJ = {"list": ("list", "lists"), "group": ("list", "lists"), "cal": ("calendar", "ev_cals"), "book": ("book", "books"),
-          "client": ("client", "clients")}  # 2.59.0 A (#1735)
+          "client": ("client", "clients"),  # 2.59.0 A (#1735)
+          "att": ("event", "events")}  # 2.87.0 (#1983): an invitation to an organisation's event
 OA_DETAIL_MAX = 100
 
 
@@ -269,7 +278,7 @@ def oa_details(c, limit=OA_DETAIL_MAX):
         for r in c.execute(sql + " ORDER BY 1, 2").fetchall()[:limit - len(out)]:
             oid_, uid = r[0], r[1]
             if table:
-                row = c.execute(f"SELECT name FROM {table} WHERE id=?", (oid_,)).fetchone()
+                row = c.execute(f"SELECT {'title' if table == 'events' else 'name'} FROM {table} WHERE id=?", (oid_,)).fetchone()
                 name, who, ag = (row[0] if row else ""), uid, "agent" in k
             else:  # an agent of an organisation that is gone / whose owner left: (agent, owner)
                 row = c.execute("SELECT display_name FROM users WHERE id=?", (oid_,)).fetchone()

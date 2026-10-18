@@ -14,7 +14,7 @@
    in the chat, at @, in the state and in /api/agents; the administration lists it restricted (name, owner, kill switch) and
    refuses every other change (403)
  - #970 / #1011 POST /api/admin/agents with owner_id creates a personal agent; the user list carries kind
- - #987 News items say to_me (people's mentions, assignments, replies, decisions; never agents), unread_me at the bell,
+ - #987 News items say to_me (people's mentions, assignments, replies, decisions; 2.66.1: agents' comments too), unread_me at the bell,
    dm_unread; an agent's comment pushes only with the setting agent_push
  - #1005 chat answer buttons: choices (+ multi, styles) on an agent's message, the person's answer once, the event
    chat_choice, only the chat's person answers, validation
@@ -190,6 +190,7 @@ us = A.get(B + "/api/users").json()["users"]
 check(all("kind" in u for u in us) and sum(1 for u in us if u["kind"] == "agent") == 2, "#1011: the user list carries kind (the app shows people only)")
 
 # ================================================================== #987 News: For you / Activity
+A.patch(B + "/api/settings", json={"news_kinds": "mention,assign,comment,unblock,share,status,complete"})  # 2.66.1 (#1943): agent comments are "For you" now -> bob's completion is the Activity
 TB = Bo.post(B + "/api/tasks", json={"title": "Bob's task", "list_id": W["id"]}).json()["id"]
 Bo.post(B + f"/api/tasks/{TB}/comments", json={"body": "<@1> can you look?"})
 Bo.patch(B + f"/api/tasks/{TB}", json={"assignee_id": 1})
@@ -206,8 +207,9 @@ check(all(x["to_me"] for x in by.get(("mention", BOB), [])) and by.get(("mention
 check(all(x["to_me"] for x in by.get(("assign", BOB), [])) and by.get(("assign", BOB)), "#987: bob's assignment is for me")
 reply = [x for x in by.get(("comment", BOB), []) if x["data"].get("reply")]
 check(reply and all(x["to_me"] for x in reply), "#987: bob's reply to my comment is for me " + str([(x["data"], x["to_me"]) for x in by.get(("comment", BOB), [])]))
-check(by.get(("mention", CL)) and not any(x["to_me"] for x in by[("mention", CL)]), "#987: an agent's mention is activity")
-check(by.get(("comment", CL)) and not any(x["to_me"] for x in by[("comment", CL)]), "#987: an agent's comment is activity")
+# 2.66.1 (#1943): an agent's mention and (with agent_comments = all, the default) its comments are "For you" now
+check(by.get(("mention", CL)) and all(x["to_me"] for x in by[("mention", CL)]), "#1943: an agent's mention is for me")
+check(by.get(("comment", CL)) and all(x["to_me"] for x in by[("comment", CL)]), "#1943: an agent's comment (setting 'all') is for me")
 check(not any(x["to_me"] for x in by.get(("complete", BOB), [])), "#987: a completion is activity")
 me_n = sum(1 for it in nj["items"] if it["to_me"] and not it["read"])
 check(nj["unread_me"] == me_n and me_n >= 3 and nj["unread"] > nj["unread_me"], f"#987: unread_me {nj['unread_me']} < unread {nj['unread']}")

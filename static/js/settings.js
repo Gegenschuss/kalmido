@@ -384,7 +384,7 @@ function agSetupWire(md) {
       if (k === 'perm') {  // 2.15.0 (#479): what my agent may do (within the admin's limit) and from where
         const pmd = permModal(tr('Permissions of {0}', a.name), box._j.scopes || [], a.scopes, a.allowed_ips, async (scopes, ips, pm) => {
           await calReq('PATCH', `/api/my/agents/${a.id}`, {scopes, allowed_ips: ips, list_ids: listCapVal(pm, 'pm-lcap')}); toast(tr('Saved')); agSetupDraw(md);  // 2.30.0 (#919)
-        }, `<div class="row"><label>${tr('Lists')}</label>${listCapHtml(a.list_ids, a.lists, 'pm-lcap')}</div>${bridgesHtml(a)}<div class="shint keep">${tr('Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists, folders and sharing always wait for your approval.')}</div>${typeof oa_switchRowHtml === 'function' ? oa_switchRowHtml(a.id) : ''}`);
+        }, `<div class="row"><label>${tr('Lists')}</label>${listCapHtml(a.list_ids, a.lists, 'pm-lcap')}</div>${bridgesHtml(a)}<div class="shint keep">${tr('Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists, folders and sharing always wait for your approval.')}</div><div class="shint keep">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the lists shared with it.', esc(a.name))}</div>${typeof oa_switchRowHtml === 'function' ? oa_switchRowHtml(a.id) : ''}`);
         if (typeof oa_switchLoad === 'function') oa_switchLoad(pmd);  // 2.51.0 A (#1348): the office switch of my agent (saved at once)
         return;
       }
@@ -737,6 +737,7 @@ function settingsModal(focus) {
     if (v === undefined) { settingsSync(); return; }  // not a valid value: back to what is saved
     if (d[2] === 'time' && el.id === 's-allday' && !v) return;
     await setApply({[d[0]]: v}, tr(d[1]));
+    if (d[0] === 'agent_comments') loadNews().then(render).catch(() => {});  // 2.66.1 (#1943): the bell's number depends on it
   };
   const saveName = async () => {
     const el = $('#a-name', md); if (!el || !S.me) return;

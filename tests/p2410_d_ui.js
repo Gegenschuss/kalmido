@@ -31,7 +31,7 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,time,comments,deps,timeline,progress'});
   const st0 = await call('GET', '/api/state'), ME = st0.me;
   const bob = await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'});
-  const day = n => { const x = new Date(Date.now() + n * 864e5); return x.toLocaleDateString('sv'); };
+  const day = n => { const x = new Date(); x.setDate(x.getDate() + n); return  /* 2.80.1: calendar days (clock change) */ x.toLocaleDateString('sv'); };
   const TEAM = (await call('POST', '/api/lists', {name: 'Team'})).id;
   await call('PUT', `/api/lists/${TEAM}/members`, {user_id: bob.id, role: 'edit'});
   const INS = (await call('POST', '/api/lists', {name: 'Insurance'})).id;

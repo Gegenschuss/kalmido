@@ -17,7 +17,8 @@ function newsGroups(items) {
     const g = groups.get(key);
     // 2.25.0 (UX-45): a comment that names me (@me) needs me too, like a mention
     const toMe = it.kind === 'comment' && S.me && (it.excerpt || '').includes(`<@${S.me.id}>`);
-    g.items.push([it, i]); if (NEWS_NEEDS.includes(it.kind) || toMe) g.needs = true; if (!it.read) g.unread++;
+    // 2.66.1 (#1943): what the server marks "For you" (the bell's number: replies to me, an agent's comments that reach me) needs me too
+    g.items.push([it, i]); if (NEWS_NEEDS.includes(it.kind) || toMe || it.to_me) g.needs = true; if (!it.read) g.unread++;
   }
   return [...groups.values()];
 }

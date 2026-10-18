@@ -152,7 +152,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   w.close();
 
   // ================= Firefox: the fixed head, tile size, dragging
-  for (let i = 0; i < 40; i++) await call('POST', '/api/lists', {name: 'Extra list ' + (i + 1)});  // 2.57.0 (#1798): 40, with 26 the sidebar of a fresh run was only 2 px taller than a 900 px window
+  await call('PATCH', '/api/settings', {fav_only: '0'});  // 2.80.3: the two quick "Only favourites" clicks above may land in either order
+  let extra = 0; for (let i = 0; i < 40; i++) if ((await call('POST', '/api/lists', {name: 'Extra list ' + (i + 1)})).id) extra++;  // 2.57.0 (#1798): 40, with 26 the sidebar of a fresh run was only 2 px taller than a 900 px window
   const layout = async (o, tag, vw, vh, touch) => {
     const {cmd, ev, ctx, shot, nav} = o;
     await nav(B + 'static/icon.svg');
@@ -160,7 +161,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
     check(st === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + '#today');
-    for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#side .fv2-tile') && document.querySelectorAll('#side .srow[data-list]').length > 25 && document.querySelector('#side').scrollHeight - document.querySelector('#side').clientHeight > 300`).catch(() => false)); i++) await sleep(300);  // the extra lists drawn and the sidebar really scrolls
+    for (let i = 0; i < 100 && !(await ev(`!!document.querySelector('#side .fv2-tile') && document.querySelectorAll('#side .srow[data-list]').length > 25 && document.querySelector('#side').scrollHeight - document.querySelector('#side').clientHeight > 300`).catch(() => false)); i++) await sleep(300);  // the extra lists drawn and the sidebar really scrolls
     await sleep(600);
     if (touch) { await ev(`(() => { sideOpenDrawer(); return 1; })()`); await sleep(600); }
     const m = await ev(`(() => { const s = document.querySelector('#side'), f = document.querySelector('#side .sbfix'), t = document.querySelector('#side .fv2-tile'); if (!f || !t) return null;
@@ -169,7 +170,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
         res({scroll: s.scrollTop, sh: s.scrollHeight, ch: s.clientHeight, rows: document.querySelectorAll('#side .srow').length, top0, top1, h: f.getBoundingClientRect().height, vh: innerHeight, w: r.width, th: r.height, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), front: !!ft && !!ft.closest('.sbfix')}); })); })()`);
     check(m, tag + ': head and tiles drawn');
     if (m) {
-      check(m.scroll > 100, tag + ': the sidebar scrolls ' + JSON.stringify(m));
+      check(m.scroll > 100, tag + ': the sidebar scrolls ' + JSON.stringify({...m, extra}));
       check(Math.abs(m.top1 - m.top0) < 2 && m.top1 >= -1 && m.front, tag + ': the head stays in place while the sidebar scrolls ' + JSON.stringify(m));
       check(Math.abs(m.w - m.th) < 2 && m.w >= 2.75 * m.rem - 1, tag + ': tiles square, at least 2.75 rem ' + JSON.stringify(m));
       check(m.h < m.vh * 0.6, tag + ': the head stays below 60 % of the height ' + JSON.stringify(m));

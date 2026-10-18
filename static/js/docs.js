@@ -32,16 +32,25 @@ function dc_params() {
   return p;
 }
 async function dc_load() {
-  const seq = ++DC.seq;
-  DC.loading = true;
+  const seq = ++DC.seq, ws = dc_ws();  // 2.66.1 (#1945): the workspace of this load, held from its start
+  DC.loading = true; DC.ws = ws;
   try {
     const j = await api('GET', '/api/docs?' + dc_params());
-    if (seq !== DC.seq) return;
+    if (seq !== DC.seq || ws !== dc_ws()) return;  // 2.66.1 (#1945): an answer for a workspace no longer shown is dropped
     Object.assign(DC, {docs: j.docs, total: j.total, review: j.review, waiting: j.waiting, facets: j.facets || DC.facets, err: null});
-  } catch (x) { if (seq === DC.seq) DC.err = x.message || tr('unknown'); }
-  DC.loading = false; DC.at = Date.now(); DC.atWs = dc_ws();  // 2.62.0 (#1844)
+  } catch (x) { if (seq !== DC.seq || ws !== dc_ws()) return; DC.err = x.message || tr('unknown'); }
+  DC.loading = false; DC.at = Date.now(); DC.atWs = ws;  // 2.62.0 (#1844)
   dc_draw();
   dc_pollSet();
+}
+// 2.66.1 (#1945): the workspace switch (here, or on another device) drops the list, the counters, the filters (their values
+// are ids of the old workspace) and an open document of the old workspace; viewDocs then loads the new one at once
+function p61b_dcReset() {
+  DC.seq++; clearTimeout(DC.poll);
+  Object.assign(DC, {docs: null, total: 0, review: 0, waiting: 0, facets: null, set: null, err: null, loading: false, ws: null, atWs: null, more: false,
+    f: {sender: '', type: '', tag: '', from: '', to: '', review: false}});
+  const md = $('.dc-md');
+  if (md && DC.doc && !wsObjIn(DC.doc)) { if (dc_hashId()) history.replaceState(null, '', '#docs'); md.remove(); }
 }
 function dc_pollSet() {  // while documents are being recognised, look again every few seconds
   clearTimeout(DC.poll);
@@ -59,6 +68,7 @@ function viewDocs() {
   // changed workspace, an earlier error); the old list stays until the new one is there, redraws within 3 s do not reload
   // (review: only when the tab is opened anew - a redraw of the open tab never reloads; an error waits for the next opening)
   const open = !document.querySelector('.dc-view');  // not on screen yet = the tab is being opened
+  if (DC.ws != null && DC.ws !== dc_ws()) p61b_dcReset();  // 2.66.1 (#1945): another workspace -> its data, open or not
   if (!DC.loading && ((!DC.docs && !DC.err) || (open && (Date.now() - (DC.at || 0) > 3000 || DC.atWs !== dc_ws())))) setTimeout(dc_load, 0);
   const id = dc_hashId();
   if (id && (!DC.doc || DC.doc.id !== id) && !$('.dc-md')) setTimeout(() => dc_open(id), 0);

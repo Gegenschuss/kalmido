@@ -10,7 +10,8 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return r.json(); };
 const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return true; await sleep(100); } return false; };
-const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+// 2.80.1: calendar days, not n * 24 h (shortly after midnight in the week before the clock change, +8 * 24 h landed a day early)
+const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const lastModal = d => [...d.querySelectorAll('.modal')].pop();
 const ptr = (w, el, type, x = 0) => {  // jsdom has no PointerEvent: a MouseEvent with pointerType / pointerId
   const e = new w.MouseEvent(type, {bubbles: true, cancelable: true, button: 0, clientX: x, clientY: 10});
@@ -45,7 +46,7 @@ const span = (s, e) => `${ds(s)}..${ds(e)}`;
   ptr(w, d, 'pointermove', 0);
   check(!bar(Bt).classList.contains('dch-ghost') && !bar(Bt).style.transform, 'back to the start: the preview is gone');
   ptr(w, d, 'pointermove', 2 * DW); ptr(w, d, 'pointerup', 2 * DW);
-  check(await until(async () => await dates(Bt) === span(5, 6) && await dates(Cc) === span(8, 9)), 'drop: the whole chain moved 2 days (server)');
+  check(await until(async () => await dates(Bt) === span(5, 6) && await dates(Cc) === span(8, 9)), 'drop: the whole chain moved 2 days (server) ' + `A ${await dates(A)} B ${await dates(Bt)} C ${await dates(Cc)} want B ${span(5, 6)} C ${span(8, 9)}`);
   check(await until(() => /2 dependent tasks moved/.test(toastText(d)) && d.querySelector('#toast button')), `toast with the number and Undo: ${toastText(d)}`);
   d.querySelector('#toast button').click();
   check(await until(async () => await dates(A) === span(0, 2) && await dates(Bt) === span(3, 4) && await dates(Cc) === span(6, 7)), 'one undo takes the whole chain back');

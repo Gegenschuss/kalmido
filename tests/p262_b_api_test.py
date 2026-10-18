@@ -5,6 +5,8 @@
  - with "replies" an agent's comment reaches me (News) only when it answers my comment (reply_to), follows right after my
    comment on that task, or mentions me; an unrelated agent comment stays quiet
  - comments by people always reach me as before; "all" brings every agent comment as before; a list bell "All" does not outrank it (leader decision), the task's "Urgent" does
+ - 2.66.1 (#1943): the bell (unread_me) counts the agent's comments that reach me (replies / mentions; with "all" every
+   comment), a bundle counts when any unread item in it is for me; an agent's completion / assignment has no number
 usage: p262_b_api_test.py <datadir>"""
 import os
 import dbx as dbxm
@@ -143,6 +145,60 @@ check(news_for(ALICE, r.json()["id"]), "#1854: an approval card of an agent reac
 c = agent_says(T, "for the followers")
 check(news_for(BOB, c), "#1854: someone with 'all' still gets the agent's comment")
 check(not news_for(ALICE, c), "#1854: ... and alice with 'replies' does not")
+
+# ================================================================== 2.66.1 (#1943): the bell counts an agent's comments that reach me
+
+
+def unread_me(s):
+    return s.get(B + "/api/news").json()["unread_me"]
+
+
+def all_read(s):
+    check(s.post(B + "/api/news/read", json={"all": True}).ok and unread_me(s) == 0, "#1943: all read")
+
+
+all_read(A)  # alice still has "replies"
+T2 = A.post(B + "/api/tasks", json={"title": "Bell check", "list_id": W["id"]}).json()["id"]
+says(Bo, T2, "bob starts")
+mine = says(A, T2, "my question to the agent")
+says(Bo, T2, "bob in between")  # right after mine: a person's reply, read before the agent answers
+all_read(A)
+agent_says(T2, "the answer to your question", reply_to=mine)
+check(unread_me(A) == 1, "#1943: an agent's reply to my comment counts at the bell " + str(unread_me(A)))
+all_read(A)
+says(Bo, T2, "bob once more")
+c = agent_says(T2, "an unrelated agent note")
+check(not news_for(ALICE, c) and unread_me(A) == 0, "#1943: with 'replies' an unrelated agent comment: no item, no number")
+c = agent_says(T2, f"<@{ALICE}> a mention")
+check(unread_me(A) == 1, "#1943: an agent's mention counts at the bell")
+all_read(A)
+# a bundle (comments one after the other on a task) counts when ANY of its unread items is for me, not only the newest
+T3 = A.post(B + "/api/tasks", json={"title": "Bundle check", "list_id": W["id"]}).json()["id"]
+mine = says(A, T3, "my note")
+agent_says(T3, "reply to you", reply_to=mine)
+says(Bo, T3, "bob after the agent (plain)")
+it = next(x for x in A.get(B + "/api/news").json()["items"] if x.get("task_id") == T3)
+check(it["count"] == 2 and it["to_me"] and unread_me(A) == 1, "#1943: the bundle with the agent's reply is 'For you' " + str(it))
+all_read(A)
+# other agent actions stay Activity: completing, assigning
+check(A.patch(B + "/api/settings", json={"news_kinds": "mention,assign,comment,unblock,share,status,complete"}).ok, "News about completions on")
+T4 = A.post(B + "/api/tasks", json={"title": "Agent completes", "list_id": W["id"]}).json()["id"]
+check(requests.patch(V + f"/tasks/{T4}", headers=CLH, json={"assignee_id": ALICE}).ok, "agent assigns the task to alice")
+check(requests.post(V + f"/tasks/{T4}/complete", headers=CLH).ok, "agent completes the task")
+nj = A.get(B + "/api/news").json()
+kinds = sorted(x["kind"] for x in nj["items"] if x.get("task_id") == T4 and not x["read"])
+check("complete" in kinds and nj["unread_me"] == 0, "#1943: an agent's completion / assignment has no number " + str(kinds) + " " + str(nj["unread_me"]))
+all_read(A)
+# 2.66.1 (#1943): an agent's approval card reaches "only replies" (it waits for me) - so it counts at the bell too
+says(Bo, T2, "bob before the card")
+r = requests.post(V + f"/tasks/{T2}/comments", headers=CLH, json={"body": "May I ship?", "approval": {"title": "Ship it"}})
+check(r.status_code == 201 and unread_me(A) == 1, "#1943: an agent's approval card counts at the bell with 'replies' " + str(unread_me(A)))
+all_read(A)
+# "all": every agent comment that reaches me counts
+check(A.patch(B + "/api/settings", json={"agent_comments": "all"}).ok, "back to 'all'")
+says(Bo, T2, "bob")
+c = agent_says(T2, "a plain agent note")
+check(news_for(ALICE, c) and unread_me(A) == 1, "#1943: with 'all' a plain agent comment counts at the bell")
 
 print(f"p262_b_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

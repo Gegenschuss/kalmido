@@ -49,17 +49,26 @@ NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take")
                "unblock": ("unblock",), "share": ("share", "role", "unshare", "owner", "agentjoin"), "status": ("status",)}
 NEWS_TO_ME = ("mention", "assign", "unassign", "take")  # filter "Mentions & assigned to me"
 # 2.28.0 (#987): "For you": messages from PEOPLE to me -- @mentions, assignments, replies to my comments (data.reply), an
-# approver's decision; everything agents do and every plain change is "Activity". The bell counts only "For you".
+# approver's decision; every plain change is "Activity". The bell counts only "For you".
+# 2.66.1 (#1943): an agent's comments that reach me are "For you" too: its mentions and replies always, its plain comments
+# only with the setting agent_comments = all; whatever else agents do (complete, status, new task, assign) stays Activity.
 NEWS_FOR_ME = ("mention", "assign", "take", "apdecide", "orglist", "connreq", "connok", "dispo", "lytpl")  # 2.55.0 (#1068): lytpl  # 2.50.0 (#1194): dispo; 2.35.0 (#1101): an organisation admin acted on my list
 NEWS_FOR_ME += ("review",)  # 2.60.0 C (#1512)
 NEWS_FOR_ME += ("e2e_key",)  # 2.64.1 (#1817)
 
 
-def news_to_me(kind, actor_id, data, agents):
+def news_to_me(kind, actor_id, data, agents, s=None):
     if kind == "upscan":  # 2.61.0 (#1818): my own file was locked (no actor)
         return True
-    if actor_id in agents or not actor_id:
+    if not actor_id:
         return False
+    if actor_id in agents:  # 2.66.1 (#1943): an agent's comments that reach me count (setting agent_comments)
+        if kind == "mention":
+            return True
+        if kind != "comment":
+            return False
+        d = data or {}
+        return bool(d.get("reply") or d.get("reach")) or (s or {}).get("agent_comments", "all") != "replies"
     if kind in NEWS_FOR_ME:
         return True
     return kind == "comment" and bool((data or {}).get("reply"))
@@ -348,6 +357,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         return pv["lists"].get(tid) not in pl or tid in pv["wr" if full else "vis"]
     out, uids = [], set()
     agents = {x[0] for x in c.execute("SELECT id FROM users WHERE kind='agent'")}
+    s = s or usettings(c, uid)  # 2.66.1 (#1943): agent_comments decides whether an agent's plain comment is "For you"
     for r in rows:
         kind = r["kind"]
         if (mentions_only and kind != "mention") or (to_me and kind not in NEWS_TO_ME):
@@ -387,6 +397,11 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             key = {"evinvite": "event_id", "evshare": "cal_id", "abshare": "book_id"}[kind]
             if not c.execute(q, (dd.get(key), uid)).fetchone():
                 continue
+            if kind == "evinvite":  # 2.87.0 (#1983): only while the invitation counts (former members of the calendar's organisation)
+                from ..events.model import ev_att_ok
+                k = c.execute("SELECT k.org_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?", (dd.get("event_id"),)).fetchone()
+                if not k or not ev_att_ok(c, uid, k["org_id"]):
+                    continue
         elif kind == "connreq":  # 2.49.0 (#1106): while the request is still open
             from ..accounts.discover import disc_request_open
             if not disc_request_open(c, uid, r["actor_id"]):
@@ -430,10 +445,13 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 continue
         read = r["read_at"] is not None
         prev = out[-1] if out else None
+        # 2.66.1 (#1943): a bundle is "For you" as soon as one of its unread items is (not only its first one)
+        p61a_tome = kind == "comment" and not read and news_to_me(kind, r["actor_id"], json.loads(r["data"] or "{}"), agents, s)
         if kind == "comment" and prev and prev["kind"] == "comment" and prev["task_id"] == r["task_id"]:
             prev["ids"].append(r["id"])
             prev["count"] += 1
             prev["read"] = prev["read"] and read
+            prev["to_me"] = prev["to_me"] or p61a_tome
             if r["actor_id"] not in prev["actors"]:
                 prev["actors"].append(r["actor_id"])
             uids.add(r["actor_id"])
@@ -446,6 +464,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             prev["ids"].append(r["id"])
             prev["count"] += 1
             prev["read"] = prev["read"] and read
+            prev["to_me"] = prev["to_me"] or p61a_tome
             if not any(x["id"] == r["task_id"] for x in prev["tasks"]):
                 prev["tasks"].append({"id": r["task_id"], "title": r["t_title"]})
             continue
@@ -458,7 +477,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         data = json.loads(r["data"] or "{}")
         if kind == "status":
             body = data.get("note") or ""
-        tome = news_to_me(kind, r["actor_id"], data, agents)  # 2.28.0 (#987)
+        tome = news_to_me(kind, r["actor_id"], data, agents, s)  # 2.28.0 (#987); 2.66.1 (#1943): s
         if kind == "unblock":  # the blocker's title only if I (still) see it
             bl = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (data.get("blocker"),)).fetchone()
             data = {"title": bl["title"], "hidden": False} if bl and sees(bl["list_id"]) and sees_task(data.get("blocker"), False) \

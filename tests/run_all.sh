@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=12
+SHARDS_DEFINED=13
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -843,6 +843,7 @@ fresh; run p253_a_ui node p253_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.52.0 part C: #1438 address books an organisation owns (hand-over, roles, leaving / account deletion, CardDAV, way back)
 fresh; run p252_c_api "$PY" p252_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p252_c_ui node p252_c_ui.js "$KALMIDO_TEST_DATA"
+shard 11  # 2.80.2: the 2.55-2.62 suites run in shard 11 (shard 10 took 42 min on CI, over the 45 min limit with the rerun)
 # 2.55.0 part E: the newsletter connection (#1455): fake listmonk / Brevo / CleverReach inside the container
 fresh; run p255_e_api "$PY" p255_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p255_e_ui node p255_e_ui.js "$KALMIDO_TEST_DATA"
@@ -922,6 +923,7 @@ fresh; run p262_b_api "$PY" p262_b_api_test.py "$KALMIDO_TEST_DATA"
 # 2.62.0 part A: sending once in the chats (#1530), pinned chat messages (#1848)
 fresh; run p262_a_api "$PY" p262_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p262_a_ui node p262_a_ui.js "$KALMIDO_TEST_DATA"
+shard 2  # 2.80.0: the 2.63-2.66 suites run in shard 2 (shard 10 full)
 # 2.63.0 part D: one space list for knowledge pages, conversation on the job card (#1857 #1482)
 fresh; run p263_d_ui node p263_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.63.0 part A: the public report form - type, file, spam guard, status link (#1513)
@@ -949,6 +951,7 @@ fresh; run p266_b_ui node p266_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.66.0 part A: merging duplicate contacts (#1835): links, CardDAV, undo, rights
 fresh; run p266_a_api "$PY" p266_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p266_a_ui node p266_a_ui.js "$KALMIDO_TEST_DATA"
+shard 12  # 2.80.3: the 2.64.1-2.64.3 suites run in shard 12 (2.80.0: shard 4; shard 4 took 38 min on CI with them)
 # 2.64.1 part C: #1817 lock per list - client data layer
 fresh; run p264a_c_ui node p264a_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.64.1 part D: #1817 lock per list - dialogs and display, #1518
@@ -972,7 +975,7 @@ fresh; run p264b_b_ui node p264b_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p264c_a_api "$PY" p264c_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.64.3 part B: #1817 lock per knowledge space - client (encrypted wiki space in the browser)
 fresh; run p264c_b_ui node p264c_b_ui.js "$KALMIDO_TEST_DATA"
-shard 12  # 2.84.0: from the 2.67 suites on in shard 12 (shard 10 with every suite since 2.53 reached 45 min in a full run)
+shard 13  # 2.84.0: from the 2.67 suites on in their own shard (shard 10 with every suite since 2.53 reached 45 min in a full run; 13 since the merge with 2.80.3)
 # 2.67.0 part A: fixed costs from a spreadsheet in the cash flow, net / gross, the monthly check task (#1838)
 fresh; run p267_a_api "$PY" p267_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p267_a_ui node p267_a_ui.js "$KALMIDO_TEST_DATA"
@@ -997,6 +1000,7 @@ fresh; run p270_b_ui node p270_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.70.0 part C: contracts in view (#1359): contract_notice, the proposal kind notice, health lists and the journal stay closed
 fresh; run p270_c_api "$PY" p270_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p270_c_ui node p270_c_ui.js "$KALMIDO_TEST_DATA"
+shard 1  # 2.80.0: the 2.71-2.73 suites run in shard 1 (shard 10 full)
 # 2.71.0 part B: a task in several lists without a copy (#1459)
 fresh; run p271_b_api "$PY" p271_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p271_b_ui node p271_b_ui.js "$KALMIDO_TEST_DATA"
@@ -1018,6 +1022,7 @@ fresh; run p273_l_ui node p273_l_ui.js "$KALMIDO_TEST_DATA"
 # 2.73.0 part B: moving an account -- account export + import with the mapping of people (#1473)
 fresh; run p273_b_api "$PY" p273_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p273_b_ui node p273_b_ui.js "$KALMIDO_TEST_DATA"
+shard 3  # 2.80.0: the 2.74-2.80 suites (and new ones after them) run in shard 3 (shard 10 ran past the 45 min Mac limit with the 2.6x/2.7x suites)
 # 2.74.0 part A: the supporter licence (#338; own key pair in a temp folder, a hosted restart)
 fresh; run p274_a_api "$PY" p274_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p274_a_ui node p274_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1037,6 +1042,7 @@ fresh; run p278_dup_api "$PY" p278_dup_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p278_dup_ui node p278_dup_ui.js "$KALMIDO_TEST_DATA"
 # 2.79.0: security fixes of audit #476 part 1 (H1 ICS attendees, M1 app passwords, M2 admin scopes, M4 link lock, M5 child accounts, M6 health time, M8 backup folders, M9 proxy default)
 fresh; run p279_sec_api "$PY" p279_sec_api_test.py "$KALMIDO_TEST_DATA"
+shard 13  # 2.84.0 + 2.80.3: the 2.81 suites (and new ones after them) run in shard 13 (shard 3 took 30 min with the 2.74-2.80 suites)
 # 2.81.0 part B: correct archived office documents (client, tax lines, paid, history, #1834), DATEV customer number of locked invoices (#1867)
 fresh; run p281_b_api "$PY" p281_b_api_test.py "$KALMIDO_TEST_DATA"
 # 2.81.0 part A: #1852 stale contact link, #1466 agent contact persons
@@ -1066,6 +1072,10 @@ fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_c_api "$PY" p286_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_d_api "$PY" p286_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_e_api "$PY" p286_e_api_test.py "$KALMIDO_TEST_DATA"
+# 2.66.1 part B: the workspace switch reloads every open view with a workspace link (#1945), the guard list of those views
+fresh; run p2661_b_ui node p2661_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.87.0 (#1983 #1984): organisation boundary of event invitations and list hand-overs (audit T3 H1 + H2)
+fresh; run p287_a_api "$PY" p287_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.87.9 part D (#1965): drags run once per frame, stored on release
 fresh; run p287b_d_ui node p287b_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.87.9 part A (#1919 / #1918): every area as a person without an organisation (the freelancer parity sweep)

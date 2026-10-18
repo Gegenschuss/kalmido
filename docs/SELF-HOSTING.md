@@ -887,6 +887,8 @@ Each tool runs as a short-lived process with limits; tune them for small hosts:
 | `KALMIDO_OCR_MEM_MB` | `1024` | Memory of one tool |
 | `KALMIDO_OCR_LANGS` | `deu+eng` | Tesseract languages (installed ones only) |
 | `KALMIDO_DOCS_SCAN_S` | `60` | Seconds between two looks into the inbox folders "Dokumente/Eingang" |
+| `KALMIDO_DOCS_THUMB_FILL` | `on` | 2.66.1: `off` skips the one-time catch-up of missing previews of imported documents |
+| `KALMIDO_DOCS_THUMB_FILL_S` | `15` | Seconds between two portions (5 documents) of that catch-up |
 | `KALMIDO_FILE_OCR` | `on` | 2.61.0: `off` switches the text recognition of normal files off (below) |
 | `KALMIDO_FILE_OCR_BACKFILL` | `on` | 2.61.0: `off` switches only the catch-up of files stored before off |
 | `KALMIDO_FILE_OCR_BACKFILL_S` | `20` | Seconds between two files of the catch-up |
@@ -922,6 +924,11 @@ Paperless-ngx…* and *Connect Paperless-ngx*.
   changed in the preview).
 - **What comes along:** the original file, the recognised text (no new recognition), the date, tags, correspondent, type,
   and custom fields, notes and the archive serial number as text below the document's text.
+- **Preview images (2.66.1):** imported PDFs and images get their preview image and the QR-code archive number check like an
+  upload (also from a ZIP). Documents imported before get their missing previews once after the update, in small portions in
+  the background while the documents queue is idle; nothing else of them changes. `KALMIDO_DOCS_THUMB_FILL=off` skips it.
+  The catch-up runs once (row `docs_thumb_fill` of the table `settings`); delete that row to run it again, e.g. after installing
+  the PDF tools later.
 - **Never twice:** a document already imported (Paperless-ngx id per instance address) or the same file already in the
   workspace (checksum) is left out, also when the import runs again.
 - **Rules and learning (2.69):** the matching of tags, correspondents and document types becomes document rules of the

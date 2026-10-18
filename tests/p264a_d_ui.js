@@ -61,6 +61,7 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 800, height: 760}});
     await boot('#l/' + L);
+    for (let i = 0; i < 75 && !(await ev(`typeof E2E === 'object'`).catch(() => false)); i++) await sleep(200);  // 2.80.3: e2e.js is an on-demand module (slow CI)
     // every visible button / switch inside el has a name (aria-label, text or title)
     const unnamed = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(b => b.offsetParent && !(b.getAttribute('aria-label') || b.textContent.trim() || b.title || b.labels?.[0]?.textContent.trim())).map(b => b.outerHTML.slice(0, 120))`);
     // the stubs of the data layer (part C) and of the person's keys (e2e.js): recorded calls in window.__c

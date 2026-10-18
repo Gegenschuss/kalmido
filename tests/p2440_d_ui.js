@@ -97,7 +97,9 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   md.remove(); w.eval(`settingsModal('modules')`); await until(() => d.querySelector('.smodal [data-mgarea="review"]')); md = d.querySelector('.smodal');
   const fp = md.querySelector('[data-feat="family"]'); fp.checked = false; change(w, fp); await until(() => !w.eval(`feat('family')`));
   check(md.querySelector('input[data-mgarea="life"]').checked, 'Home stays on while Home & life is on (Family off)');
-  await sleep(800); d.querySelector('.smodal')?.remove();
+  // 2.80.3: the module switch reloads the state and routes again behind the screen - let it finish before the window closes (slow CI)
+  await until(async () => { const f = ((await call('GET', '/api/state')).settings?.features || '').split(','); return !f.includes('family') && f.includes('stats'); });
+  await sleep(2000); d.querySelector('.smodal')?.remove();
   check(!errs.length, 'no script errors (settings) ' + errs.join(' | ')); errs.splice(0);
   w.close();
 
