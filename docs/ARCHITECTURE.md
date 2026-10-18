@@ -134,6 +134,7 @@ The most used helpers:
 | `accounts/layouts.py` | 2.32.0: views built from blocks: the layout format, the project page arrangement (standard + own); people only, never agents. |
 | `accounts/onboarding.py` | Onboarding and the sample project. |
 | `accounts/users.py` | Users and the own account (admin user management, passwords, deletion). |
+| `accounts/useradmin.py` | 2.88.0 (#1980): the user management in pages (search, filter), several accounts at once, deleting an account with its lists handed over or deleted along. |
 | `lists/templates.py` | Task and list templates, built-in project types. |
 | `tasks/dependencies.py` | Dependencies between tasks ("blocked by"). |
 | `tasks/depchain.py` | The dependency chain moving along with a later due date, and "Pull the chain in" (2.67.0). |
@@ -550,6 +551,12 @@ Who may see what is decided in one module, `kalmido/core/access.py`:
   (`acx_task_ok()`), whatever triggered them.
 - **Repair.** The nightly boundary check (`accounts/tenancy.py`) removes memberships in an organisation's list, calendar or
   address book of people outside it and reports counts and ids as a security alert; other findings are counted as before.
+- **Invitations (2.87.0).** Leaving an organisation also ends the invitations to the events of its calendars (the person's
+  and their agents'). An invitation counts only while the person may see the calendar's workspace (`ev_att_ok()`: event
+  view, range, reply, CalDAV invitations, reminders); an organisation's event invites only its people, and a calendar moves
+  into an organisation only while every invited person fits. The boundary check counts left-over invitations
+  (`att_person`, removed; `att_agent`, counted). A list is handed over only to a person the owner may see or a member of it;
+  anyone else gets the same 404 as an unknown id.
 - **Tests.** `tests/p2362_a_api_test.py` checks leaving an organisation, people in two organisations, side channels,
   token allowlists, the layer directly against the database, and scans every route with a numeric id for a refusal.
 

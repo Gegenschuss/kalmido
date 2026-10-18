@@ -20,7 +20,7 @@ from ..calendars.caldav import (
     _el, _privs, _xe, A_, C_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
     dav_response, dav_xml, DAV_MAX_BODY, DAV_NAME_RE, DAV_SYNC_KEEP, DavError, dav_color, dav_report_props,
 )
-from ..events.model import att_rows, ev_delete, ev_expand, events_on, my_cal_ids
+from ..events.model import att_rows, ev_att_ok, ev_delete, ev_expand, events_on, my_cal_ids
 from ..events.ics import etag, ev_lines, EvError, read_vevent, store_parsed, wrap
 
 _CACHE, _LOCK = {}, threading.Lock()
@@ -40,7 +40,9 @@ def evdav_colls(c, u):
         for r in c.execute(f"SELECT * FROM ev_cals WHERE id IN ({q}) ORDER BY owner_id!=?, sort, id", [*ids, u["id"]]):
             out[f"e{r['id']}"] = {"key": f"e{r['id']}", "id": r["id"], "name": r["name"], "color": r["color"], "role": ids[r["id"]],
                                   "description": r["description"]}
-    if collab_all() and c.execute("SELECT 1 FROM event_attendees WHERE user_id=? LIMIT 1", (u["id"],)).fetchone():
+    if collab_all() and any(ev_att_ok(c, u["id"], r[0]) for r in c.execute(  # 2.87.0 (#1983): only invitations one may still see
+            "SELECT DISTINCT k.org_id FROM event_attendees a JOIN events e ON e.id=a.event_id JOIN ev_cals k ON k.id=e.cal_id "
+            "WHERE a.user_id=?", (u["id"],)).fetchall()):
         out["inv"] = {"key": "inv", "id": None, "name": tr("Invitations"), "color": "#94a3b8", "role": "view", "description": ""}
     return out
 
@@ -49,8 +51,9 @@ def _rows(c, u, coll):
     if coll["id"] is not None:
         return c.execute("SELECT * FROM events WHERE cal_id=? AND deleted_at IS NULL ORDER BY id", (coll["id"],)).fetchall()
     mine = set(my_cal_ids(c, u["id"]))
-    return [r for r in c.execute("""SELECT e.* FROM events e JOIN event_attendees a ON a.event_id=e.id AND a.user_id=?
-                                    WHERE e.deleted_at IS NULL ORDER BY e.id""", (u["id"],)) if r["cal_id"] not in mine]
+    return [r for r in c.execute("""SELECT e.*, k.org_id AS cal_org FROM events e JOIN event_attendees a ON a.event_id=e.id AND a.user_id=?
+                                    JOIN ev_cals k ON k.id=e.cal_id WHERE e.deleted_at IS NULL ORDER BY e.id""", (u["id"],))
+            if r["cal_id"] not in mine and ev_att_ok(c, u["id"], r["cal_org"])]  # 2.87.0 (#1983)
 
 
 class EvColl:

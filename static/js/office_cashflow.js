@@ -42,17 +42,50 @@ function rk_cashflowHtml() {
       <table class="rkcftab"><thead><tr><th></th><th class="num">${tr('Actual')}</th><th class="num">${tr('Planned')}</th></tr></thead><tbody>
       <tr><th>${tr('In|cashflow')}</th><td class="num">${val(r.month, 'in', 'actual', r.in.actual)}</td><td class="num">${val(r.month, 'in', 'plan', r.in.plan, 'plan')}</td></tr>
       <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr></tbody></table>
-      ${k ? rk_cfEntries(k) : ''}</section>`;
+      ${rk_cfOpenHtml(r.month)}${k ? rk_cfEntries(k) : ''}</section>`;
   }).join('');
-  return bar + `<div class="rkcfms">${cards}</div><p class="muted ofchint">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, accepted quotations not yet invoiced at the end of their period of service).')} ${d.basis === 'net' ? tr('Net: documents and fixed costs without VAT; purchases and travel receipts as entered.') : tr('Gross: documents and fixed costs incl. VAT; purchases and travel receipts as entered.')}</p>` + rk_fixedHtml() + fci_checkHtml();
+  return bar + `<div class="rkcfms">${cards}</div><p class="muted ofchint">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, sent and accepted quotations without an invoice at the end of their period of service, one version per quotation).')} ${d.basis === 'net' ? tr('Net: documents and fixed costs without VAT; purchases and travel receipts as entered.') : tr('Gross: documents and fixed costs incl. VAT; purchases and travel receipts as entered.')}</p>` + rk_fixedHtml() + fci_checkHtml();
 }
 function rk_cfEntries(k) {
   const [mo, dir, st] = k.split('|');
   const es = (RKF.data.entries || []).filter(e => e.month === mo && e.dir === dir && e.state === st);
   const go = e => e.doc_id ? `href="#office/offers/${e.doc_id}"` : e.trip_id ? `href="#office/travel" data-rkf="trip" data-id="${e.trip_id}"` : e.fixed_id ? `href="#" data-rkf="fixed" data-id="${e.fixed_id}"` : '';
-  return `<ul class="ofclist rkcfents" role="list">${es.map(e => `<li><a class="ofcrow" ${go(e)}><span class="ofcn"><b>${esc(tr(RK_CF_KINDS[e.kind] || e.kind))}${e.number ? ` ${esc(e.number)}` : ''}</b>
-    <small class="muted">${esc([fmtDateLoc(e.date), e.label, e.overdue ? tr('Overdue') : '', e.partial ? tr('the rest after part invoices') : ''].filter(Boolean).join(' · '))}</small></span><span class="rksum">${ofcMoney(e.amount)}</span>${ic('chev', 's')}</a></li>`).join('')}</ul>`;
+  // 2.88.0 (#1915): a sent quotation = an open quotation (dashed, lighter); a chain with an invoice no longer shows a rest
+  return `<ul class="ofclist rkcfents" role="list">${es.map(e => `<li${e.open_offer ? ' class="rkcfopen"' : ''}><a class="ofcrow" ${go(e)}><span class="ofcn"><b>${esc(e.open_offer ? tr('Open quotation|cashflow') : tr(RK_CF_KINDS[e.kind] || e.kind))}${e.number ? ` ${esc(e.number)}` : ''}</b>
+    <small class="muted">${esc([fmtDateLoc(e.date), e.label, e.overdue ? tr('Overdue') : ''].filter(Boolean).join(' · '))}</small></span><span class="rksum">${ofcMoney(e.amount)}</span>${ic('chev', 's')}</a></li>`).join('')}</ul>`;
 }
+// 2.88.0 (#1915): the share of open (sent, not yet accepted) quotations in a month's planned income, marked apart
+function rk_cfOpenHtml(mo) {
+  const sum = (RKF.data.entries || []).filter(e => e.month === mo && e.open_offer).reduce((a, e) => a + +e.amount, 0);
+  return sum ? `<p class="rkcfopenl muted">${esc(tr('Planned incl. open quotations: {0}', ofcMoney(sum)))}</p>` : '';
+}
+// 2.88.0 (#1915): in a quotation's editor, the choice "In the cash flow" (automatic / yes / no) and which version counts;
+// planning only (not printed), so also for sent and finalised quotations; one undo step
+const CF8_OPTS = [['auto', N_('Automatic')], ['yes', N_('Yes')], ['no', N_('No')]];
+function cf8_box(d) {
+  const ch = d.cf_chain; if (d.kind !== 'offer' || !ch) return '';
+  const vs = ch.versions || [], others = vs.filter(v => v.counts && v.id !== d.id).map(v => v.number || tr('Draft'));
+  const hint = ch.invoiced ? tr('An invoice exists for this quotation or one of its versions: the invoice counts, no version of the quotation.')
+    : ch.counts ? (d.status === 'sent' ? tr('This version counts in the cash flow as an open quotation.') : tr('This version counts in the cash flow.'))
+    : others.length ? tr('Counts instead: {0}', others.join(', '))
+    : ['sent', 'accepted'].includes(d.status) || !vs.some(v => ['sent', 'accepted'].includes(v.status)) ? tr('No version counts at the moment; only sent and accepted quotations count.') : tr('This version does not count.');
+  const ver = vs.length > 1 ? `<p class="muted cf8vers">${esc(tr('Version {0} of {1}', vs.findIndex(v => v.id === d.id) + 1, vs.length))}</p>` : '';
+  return `<section class="ofdsec open cf8sec"><h3>${tr('In the cash flow')}</h3><div class="seg" role="group" aria-label="${esc(tr('In the cash flow'))}">${CF8_OPTS.map(([k, n]) => `<button type="button" data-cf8="${k}" data-doc="${d.id}" class="${ch.cashflow === k ? 'on' : ''}" aria-pressed="${ch.cashflow === k}">${esc(tr(n))}</button>`).join('')}</div>
+    <p class="cf8hint ofchint" role="status">${esc(hint)}</p>${ver}</section>`;
+}
+async function cf8_set(did, v) {
+  const j = await api('POST', `/api/office/docs/${did}/cashflow`, {cashflow: v});
+  if (OFD.doc?.id === did) { OFD.doc.cashflow = j.cashflow; OFD.doc.cf_chain = j.cf_chain; ofdDraw(); }
+  RKF.data = null;  // the plan is computed again when it is opened
+  return j;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-cf8]'); if (!b) return;
+  const did = +b.dataset.doc, v = b.dataset.cf8, from = OFD.doc?.id === did ? OFD.doc.cf_chain?.cashflow || 'auto' : 'auto';
+  if (v === from) return;
+  try { await cf8_set(did, v); } catch (x) { toast(x.message || tr('unknown')); return; }
+  offerUndo(tr('Saved'), histAdd({label: tr('Cash flow choice changed'), undo: () => cf8_set(did, from), redo: () => cf8_set(did, v)}));
+});
 function rk_fixedHtml() {
   const fx = RKF.fixed || [], rp = k => tr(RK_CF_REPEATS.find(x => x[0] === k)?.[1] || k);
   // 2.67.0 (#1838): grouped by category (without one last), net and gross per row; import from a spreadsheet + its template

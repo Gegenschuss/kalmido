@@ -189,7 +189,7 @@ async function wsPaneDraw(md) {
   box._j = j;
   const mm = Object.keys(j.mismatches || {}).length;
   const org = o => `<details class="sdet wsorg" data-oid="${o.id}" ${j.orgs.length === 1 ? 'open' : ''}><summary><span class="fem" aria-hidden="true">${esc(o.icon || '🏢')}</span><b>${esc(o.name)}</b> <span class="muted">${esc(trn('{0} member', '{0} members', o.members.length))} · ${esc(trn('{0} list', '{0} lists', o.lists))}${o.role === 'admin' ? ' · ' + esc(tr('you are an admin')) : ''}</span></summary>
-    ${o.members.map(m => `<div class="mrow ${m.disabled ? 'off' : ''}">${av(m.id, m.name)}<span class="n">${esc(m.name)}${m.agent ? ' ' + agentBadge() : ''}${m.id === S.me?.id ? ' ' + tr('(me)') : ''}</span>${o.role === 'admin' && j.manage && !m.agent ? `<select data-wsrole="${m.id}" aria-label="${esc(tr('Role of {0}', m.name))}"><option value="member" ${m.role !== 'admin' ? 'selected' : ''}>${tr('Member')}</option><option value="admin" ${m.role === 'admin' ? 'selected' : ''}>${tr('Admin')}</option></select><button class="iconbtn" data-wsrm="${m.id}" title="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove from the organisation'))}" aria-label="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove {0} from the organisation', m.name))}">${ic('x', 's')}</button>` : `<span class="muted">${m.agent ? tr('Agent') : m.role === 'admin' ? tr('Admin') : tr('Member')}</span>`}</div>`).join('')}
+    ${o.members.map(m => `<div class="mrow ${m.disabled ? 'off' : ''}">${av(m.id, m.name)}<span class="n">${esc(m.name)}${m.agent ? ' ' + agentBadge() : ''}${m.id === S.me?.id ? ' ' + tr('(me)') : ''}</span>${o.role === 'admin' && j.manage && !m.agent ? `<select data-wsrole="${m.id}" aria-label="${esc(tr('Role of {0}', m.name))}"><option value="member" ${m.role !== 'admin' ? 'selected' : ''}>${tr('Member')}</option><option value="admin" ${m.role === 'admin' ? 'selected' : ''}>${tr('Admin')}</option></select><button class="iconbtn" data-wsrm="${m.id}" title="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove from the organisation'))}" aria-label="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove {0} from the organisation', m.name))}">${ic('x', 's')}</button>${m.id !== S.me?.id ? `<button class="iconbtn danger" data-wsdel="${m.id}" title="${esc(tr('Delete account'))}" aria-label="${esc(tr('Delete the account of {0}', m.name))}">${ic('trash', 's')}</button>` : ''/* 2.88.0 (#1980) */}` : `<span class="muted">${m.agent ? tr('Agent') : m.role === 'admin' ? tr('Admin') : tr('Member')}</span>`}</div>`).join('')}
     ${o.role === 'admin' && j.manage ? `<div class="row wsadd"><input id="ws-add-${o.id}" type="email" placeholder="${esc(tr('Add by e-mail address'))}" aria-label="${esc(tr('Add by e-mail address'))}" autocomplete="off"><button class="btn sm" data-wsadd="${o.id}">${ic('plus', 's')} ${tr('Add')}</button></div>
     <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" placeholder="example.com"><button class="btn sm" data-wssave="${o.id}">${tr('Save')}</button></div>` : ''}
     ${o.role === 'admin' ? `<div class="row"><button type="button" class="btn sm" data-oadm="${o.id}">${ic('list', 's')} ${tr('Lists of the organisation')}</button></div>` : ''}
@@ -213,6 +213,13 @@ function wsPaneWire(md) {
   md.addEventListener('click', async e => {
     const oa = e.target.closest('[data-oadm]');
     if (oa) { const o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === +oa.dataset.oadm); oadmOpen(+oa.dataset.oadm, o?.name || ''); return; }  // 2.35.0 (#1101)
+    const wd = e.target.closest('[data-wsdel]');
+    if (wd) {  // 2.88.0 (#1980): an organisation admin deletes an account of only this organisation (else: remove, lists to a member)
+      const o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === +wd.closest('[data-oid]').dataset.oid), m = o?.members.find(x => x.id === +wd.dataset.wsdel);
+      const r = m && await ua8_delete({id: m.id, display_name: m.name});
+      if (r) { if (r === true) toast(tr('Deleted')); await load(); render(); wsPaneDraw(md); }
+      return;
+    }
     const b = e.target.closest('[data-wsadd],[data-wsrm],[data-wssave]'); if (!b) return;
     const oid = +(b.dataset.oidx || b.closest('[data-oid]')?.dataset.oid || 0);
     try {

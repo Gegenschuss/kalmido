@@ -53,7 +53,11 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
   check(Array.isArray(sc.browser) && /lists with a lock/.test(sc.browser.join(' ')) && /except in lists with a lock/.test(sc.plain_note || '') && (sc.plain || []).includes('Tasks'),
     '#1817: the encryption overview gets "Encrypted in the browser (lists with a lock)" ' + JSON.stringify(sc));
 
-  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  await firefox(async ({cmd, ev: ev0, nav, ctx, shot}) => {
+    // 2.87.0: the slow CI runner sometimes reloads the page between two steps: a ReferenceError (E2E / S not yet defined) waits for the boot and retries
+    const ev = async expr => { for (let i = 0; ; i++) { try { return await ev0(expr); } catch (e) {
+      if (i >= 2 || !/ReferenceError: \w+ is not defined/.test(e.message)) throw e;
+      for (let k = 0; k < 75 && !(await ev0(`typeof E2E === 'object' && !!(window.S && S.booted)`).catch(() => false)); k++) await sleep(200); } } };
     const waitFor = async (expr, n = 80) => { for (let i = 0; i < n; i++) { const v = await ev(expr).catch(() => null); if (v) return v; await sleep(250); } return null; };
     const boot = async hash => { await nav(B + 'static/icon.svg'); await nav(B + hash); await waitFor('!!(window.S && S.booted)'); await sleep(500); };
     await nav(B + 'static/icon.svg');
@@ -160,6 +164,7 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
 
     // ---- display: marks, placeholder, detail, the bar
     await boot('#l/' + L);
+    for (let i = 0; i < 75 && !(await ev(`typeof E2E === 'object'`).catch(() => false)); i++) await sleep(200);  // 2.87.0: as after the first boot (CI: E2E is not defined)
     await stub({list_id: L, mode: 'on', gen: 1, rotate: 0, can_manage: true, keys: [{gen: 1}], members: people, pending: [], agents: [], blockers: [], left: {}});
     await setList({e2e: 'on', e2e_gen: 1, e2e_rotate: 0, e2e_pending: 0, e2e_mine: true});
     check(await waitFor(`!!document.querySelector('#side [data-list="${L}"] .le2um, #side .srow[data-list="${L}"] .le2um')`), '#1817: the lock at the list name in the sidebar');

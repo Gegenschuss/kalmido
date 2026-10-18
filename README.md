@@ -23,6 +23,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **2.90.0** (2026-10-18): bookkeeping light in the office - income/expense statement with CSV / PDF, VAT return
   figures, receipt photo, tax reserve in the cash flow, bank reconciliation (CSV / CAMT) and tax dates as recurring tasks;
   also without an organisation.
+- **2.88.0** (2026-10-18): sent quotations count in the cash flow plan as open quotations, one version per quotation
+  with a per-quotation switch; user administration with search, filters, pages and bulk actions, deleting an account
+  hands its lists to another person or deletes them along.
+- **2.87.0** (2026-10-18): hardening from the security audit, part 3 - people who leave an organisation drop out of its
+  appointments, lists are handed over only to visible people; the agent chat header without info button.
 - **2.86.0** (2026-10-17): hardening from the security audit - sign-in floods no longer lock owners out, child
   accounts and instance admins kept to their organisation, stricter rights for approvals, list rules and office data,
   upload limits, sandboxed PDFs, push and mail day limits, agents see only what is shared with them.

@@ -397,6 +397,11 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             key = {"evinvite": "event_id", "evshare": "cal_id", "abshare": "book_id"}[kind]
             if not c.execute(q, (dd.get(key), uid)).fetchone():
                 continue
+            if kind == "evinvite":  # 2.87.0 (#1983): only while the invitation counts (former members of the calendar's organisation)
+                from ..events.model import ev_att_ok
+                k = c.execute("SELECT k.org_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?", (dd.get("event_id"),)).fetchone()
+                if not k or not ev_att_ok(c, uid, k["org_id"]):
+                    continue
         elif kind == "connreq":  # 2.49.0 (#1106): while the request is still open
             from ..accounts.discover import disc_request_open
             if not disc_request_open(c, uid, r["actor_id"]):

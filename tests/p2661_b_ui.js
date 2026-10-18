@@ -40,6 +40,7 @@ const WS_VIEWS = {
   'static/js/agents.js': 'draw',              // agents of the workspace (p2280_ui)
   'static/js/agentchat.js': 'helper',         // the default workspace of a new agent
   'static/js/palette.js': 'draw',
+  'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
   'static/js/tagsview.js': 'draw',
   'static/js/favtiles.js': 'draw',
   'static/js/dupprop.js': 'helper',

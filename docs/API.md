@@ -1200,11 +1200,11 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 |---|---|---|
 | `GET /office` | office | The area (`{id, personal}`), `person_id`, `role`, currency, language, the rules |
 | `GET /office/{services\|texts\|contracts\|clients}` | office | Master data of the area (`q` = search); never purchase prices or markups |
-| `GET /office/docs` | office | `?kind=offer\|invoice\|credit\|reminder&client_id=&status=&open=1` -> `{data: [brief documents]}` |
-| `GET /office/docs/{id}` | office | One document with positions (`agent_flag` per position: `free`, `price`, `discount:<pct>`), sums, `agent_id` |
+| `GET /office/docs` | office | `?kind=offer\|invoice\|credit\|reminder&client_id=&status=&open=1` -> `{data: [brief documents]}` (2.88: quotations with `version_of` = the first quotation of their chain of versions, `cashflow`) |
+| `GET /office/docs/{id}` | office | One document with positions (`agent_flag` per position: `free`, `price`, `discount:<pct>`), sums, `agent_id`; 2.88: a quotation also `version_of`, `cashflow` and `cf_chain` (which version counts in the cash flow) |
 | `GET /office/docs/{id}/pdf` | office | The PDF preview of a draft (marked as a draft); `409` for others |
 | `POST /office/offers` | office | `{client_id?, title, intro?, items: [{service_id?, text?, detail?, qty?, unit?, price?, discount?, kind?}], list_id?, notify?}` -> `201 {doc, chat_message_id?}` |
-| `PATCH /office/offers/{id}` | office | The agent's own draft while it is a draft (`items` replaces the list); `403` for a person's draft, `409` once sent |
+| `PATCH /office/offers/{id}` | office | The agent's own draft while it is a draft (`items` replaces the list; 2.88: `cashflow` auto / yes / no = its share in the cash flow plan once sent); `403` for a person's draft, `409` once sent |
 | `POST /office/offers/{id}/invoice` | office | An accepted quotation -> `201 {doc}` an invoice draft (`parts_mode?`, `notify?`) |
 | `POST /office/reminders` | office | `{invoice_ids, level?: 1-3, notify?}` -> `201 {doc}` a reminder draft over open invoices of one client |
 | `POST /office/payment-suggestions` | office | `{invoice_id, amount, date?, reference?, confidence?: high\|medium\|low, note?}` -> `201` an open suggestion (`exceeds_open` when above the open amount) |

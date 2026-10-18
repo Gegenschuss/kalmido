@@ -68,7 +68,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // 2.18.0 (#651, intended change): the quick reactions are visible in the meta line of every message (no hidden bar)
   check(r1 && r1.querySelectorAll('.cmeta .rxrow .rx.add').length === 3 && !r1.querySelector('.rxhint') && !/counts as/.test(r1.querySelector('[data-e="up"]').getAttribute('aria-label')), 'A2 / #651: a status message: 👍 👎 ❤️ visible, plain reactions');
   check(r2 && !r2.querySelector('.rxhint'), 'A2: an older question has no "👍 = approval" hint (only the newest message)');
-  check(d.querySelector('#achat .chath .ib[data-ii="chat-info"]') && !d.querySelector('#achat .chnote'), 'helper texts: the chat note is behind (i) in the header, not under the input');
+  // 2.87.0 (#1982): no (i) in the chat header any more (it covered the usage ring); the note lives in the agent settings
+  check(!d.querySelector('#achat .chath .ib[data-ii="chat-info"]') && !d.querySelector('#achat .chath #chat-info') && !d.querySelector('#achat .chnote'), 'helper texts: no (i) in the chat header, no note under the input (#1982)');
   check(!d.querySelector('#chat-st .atdots'), 'P11: no typing dots in the header (only the line under the messages)');
   const rp1 = await call('POST', `/api/agents/${AG}/chat/${q1.id}/reactions`, {emoji: 'up'});
   check(rp1.status === 200 && rp1.approval === null, 'A2: 👍 on a status message is a plain reaction, no approval');
@@ -339,12 +340,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     await shot('p2130-chat-390.png');
     const op = await ev(`(() => { const m = [...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)); m.querySelector('.rxtog')?.click(); const b = m.querySelector('.rxrow .rx.add'); const r = b ? b.getBoundingClientRect() : {width: 0, height: 0}; return {w: r.width, h: r.height}; })()`);
     check(op.w >= 43.5 && op.h >= 43.5, '390 #651: the visible reactions are 44 px targets ' + JSON.stringify(op));
-    // the (i) next to the agent's name
-    const ir = await ev(`(() => { const b = document.querySelector('.chath .ib'); const r = b.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`);
-    await tap(ir.x, ir.y); await sleep(200);
-    const tip = await ev(`(() => { const t = document.querySelector('#iitip'); const r = t.getBoundingClientRect(); return {on: !t.classList.contains('hidden'), txt: t.textContent.slice(0, 40), in: r.left >= 0 && r.right <= innerWidth && r.top >= 0}; })()`);
-    check(tip.on && tip.in && tip.txt.length > 10, '390 helper texts: a tap on (i) in the chat header shows the note on screen ' + JSON.stringify(tip));
-    await tap(200, 400); await sleep(100);
+    // 2.87.0 (#1982): the (i) next to the agent's name is gone (it covered the usage ring)
     // an image attachment whose file is gone: a tile that says so instead of a broken image
     await nav(B + '?att=1#l/' + P); await ready(ev);
     await ev(`(() => { openDetail(${T[3]}); return 1; })()`); await sleep(1500);
@@ -571,10 +567,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(m.x), y: Math.round(m.y)}, {type: 'pause', duration: 250}]}]});
     const op2 = await ev(`getComputedStyle([...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)).querySelector('.rxrow .rx.add')).opacity`);
     check(+m.op >= .6 && +op2 >= .6, `1440 ${theme} #651: the quick reactions are visible without hover (${m.op} / ${op2})`);
-    const ib = await ev(`(() => { const r = document.querySelector('#achat .chath .ib').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`);
-    await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(ib.x), y: Math.round(ib.y)}, {type: 'pause', duration: 250}]}]});
-    const tp = await ev(`(() => { const t = document.querySelector('#iitip'); return t && !t.classList.contains('hidden') ? t.textContent.slice(0, 30) : null; })()`);
-    check(tp && /Claude answers/.test(tp), `1440 ${theme} helper texts: hovering (i) shows the tooltip ` + tp);
+    // 2.87.0 (#1982): no (i) tooltip in the chat header any more
     await shot(`p2130-chat-1440-${theme}.png`);
     await cmd('input.releaseActions', {context: ctx});
     await ev(`(() => { chatClose(); return 1; })()`);

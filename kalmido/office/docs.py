@@ -352,6 +352,9 @@ def doc_public(c, oid, r, admin, items=True):
     d["number_at_finalize"] = ofx_number_at_finalize(office_settings(c, oid), r["kind"])
     from .agentdocs import ofa_doc_extra
     ofa_doc_extra(c, d)  # 2.51.0 A (#1348): "drafted by agent X", the project list
+    if r["kind"] == "offer":
+        from .cashflow import cf8_chain
+        d["cf_chain"] = cf8_chain(c, oid, r)  # 2.88.0 (#1915): which version of the chain counts in the cash flow
     return d
 
 
@@ -367,6 +370,8 @@ def doc_brief(r, pm=None):
          "gross": t.get("gross") or 0, "gross_text": fmt_money(t.get("gross") or 0, r["lang"], r["currency"]),
          "net_incl_raw": t.get("net_incl_raw"), "updated_at": r["updated_at"], "created_by": r["created_by"],
          "locked": ofx_locked(r), "due_date": r["due_date"] if "due_date" in r.keys() else None, "cancels_id": r["cancels_id"] if "cancels_id" in r.keys() else None}
+    if r["kind"] == "offer" and "cashflow" in r.keys():  # 2.88.0 (#1915)
+        d.update(version_of=r["version_of"], cashflow=r["cashflow"] or "auto")
     if r["kind"] in ("invoice", "credit"):
         d.update(inv_money_fields(r, pm))
         d["open_text"] = fmt_money(d["open"], r["lang"], r["currency"])
@@ -1018,7 +1023,8 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
 DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "created_by", "date", "valid_until", "totals", "locked_at",
             "locked_by", "sender", "recipient_snapshot", "tax_snapshot", "pack_version",
             "due_date", "paid_at", "pdf_sha256", "xml_sha256", "datev_sent_at",  # 2.38.0: the invoice's own marks
-            "cancels_id", "ref_doc_ids", "source_doc_id"}  # 2.38.0 review: a copy is a fresh document, bound to nothing
+            "cancels_id", "ref_doc_ids", "source_doc_id",  # 2.38.0 review: a copy is a fresh document, bound to nothing
+            "version_of", "cashflow"}  # 2.88.0 (#1915): set below (a quotation's copy = its next version, cash flow auto)
 DUP_ITEM_SKIP = {"id", "tax_pct", "net", "tax_amount"}
 
 
@@ -1035,6 +1041,8 @@ def odoc_duplicate(did):
     ts = iso(now_utc())
     row.update(number="", status="draft", date=today.isoformat(), totals="{}", created_by=uid, created_at=ts, updated_at=ts, sent_at=None,
                valid_until=(today + timedelta(days=int(s.get("offer_valid_days") or 30))).isoformat() if r["kind"] == "offer" else "")
+    if r["kind"] == "offer":  # 2.88.0 (#1915): the chain of versions points at its first quotation (a copy of a copy too)
+        row["version_of"] = r["version_of"] or r["id"]
     nid = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     for it in doc_items(c, did, oid):
         it = {k: v for k, v in it.items() if k not in DUP_ITEM_SKIP}

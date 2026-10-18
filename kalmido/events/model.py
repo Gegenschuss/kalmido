@@ -561,15 +561,26 @@ def att_rows(c, ids):
     return out
 
 
+def ev_att_ok(c, uid, cal_org_id):
+    """2.87.0 (#1983): an invitation counts only while the person may see the workspace of the event's calendar -- a former
+    member of an organisation no longer sees, answers or gets reminders for its events; a private calendar's invitations stay."""
+    return acx_org_ok(c, uid, cal_org_id)
+
+
 def ev_role_of(c, uid, r, cals=None):
     """The person's role for an event: the calendar's, else 'attendee' (invited person), else None."""
     role = (cals or {}).get(r["cal_id"]) if cals is not None else None
+    cal = None
     if role is None:
-        role = ev_role(c, uid, c.execute("SELECT * FROM ev_cals WHERE id=?", (r["cal_id"],)).fetchone())
+        cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (r["cal_id"],)).fetchone()
+        role = ev_role(c, uid, cal)
     if role:
         return role
     if collab_all() and c.execute("SELECT 1 FROM event_attendees WHERE event_id=? AND user_id=?", (r["id"], uid)).fetchone():
-        return "attendee"
+        if cal is None:
+            cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (r["cal_id"],)).fetchone()
+        if cal is not None and ev_att_ok(c, uid, cal["org_id"]):  # 2.87.0 (#1983)
+            return "attendee"
     return None
 
 
@@ -634,9 +645,11 @@ def ev_range(c, uid, lo, hi, cal=None):
                          [*cals, (hi + timedelta(days=1)).isoformat(), (lo - timedelta(days=1)).isoformat()]).fetchall()
     inv = []
     if cal is None and collab_all():
-        inv = c.execute("""SELECT e.*, a.partstat AS my_ps FROM events e JOIN event_attendees a ON a.event_id=e.id AND a.user_id=?
-                           WHERE e.deleted_at IS NULL AND e.first_day<=? AND (e.last_day='' OR e.last_day>=?)""",
-                        (uid, (hi + timedelta(days=1)).isoformat(), (lo - timedelta(days=1)).isoformat())).fetchall()
+        inv = [r for r in c.execute("""SELECT e.*, a.partstat AS my_ps, k.org_id AS cal_org FROM events e JOIN event_attendees a
+                                       ON a.event_id=e.id AND a.user_id=? JOIN ev_cals k ON k.id=e.cal_id
+                                       WHERE e.deleted_at IS NULL AND e.first_day<=? AND (e.last_day='' OR e.last_day>=?)""",
+                                    (uid, (hi + timedelta(days=1)).isoformat(), (lo - timedelta(days=1)).isoformat()))
+               if ev_att_ok(c, uid, r["cal_org"])]  # 2.87.0 (#1983)
     allc = my_cal_ids(c, uid)
     out, seen = [], set()
     nat = {}
@@ -702,9 +715,11 @@ def ev_store(c, uid, cal_id, f, eid=None, uid_=None, href=None, attendees=None, 
     return eid
 
 
-def att_clean(c, items, eid=None):
+def att_clean(c, items, eid=None, cal_id=None):
     """[{user_id} | {contact_id} | {email, name?}, partstat?, role?] -> rows (dicts) for event_attendees. Only a person's own
-    reply is taken (the others keep theirs); a contact already invited stays without a check (an editor may not see it)."""
+    reply is taken (the others keep theirs); a contact already invited stays without a check (an editor may not see it).
+    2.87.0 (#1983): in an organisation's calendar (cal_id) only people of that organisation -- a new one outside it is an
+    unknown user, one invited before who left is dropped."""
     from ..contacts.model import contact_visible
     from ..agents.admin import personal_agent_foreign
     me_ = me() if has_request_context() else None
@@ -713,6 +728,7 @@ def att_clean(c, items, eid=None):
     had_u = {r[0] for r in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL", (eid,))} if eid else set()
     if not isinstance(items, list) or len(items) > EV_ATT_MAX:
         raise BadInput(tr("Invalid value: {0}", "attendees"))
+    cal_org = (c.execute("SELECT org_id FROM ev_cals WHERE id=?", (cal_id,)).fetchone() or [None])[0] if cal_id else None
     out, seen = [], set()
     for a in items:
         if not isinstance(a, dict):
@@ -730,6 +746,11 @@ def att_clean(c, items, eid=None):
             if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (u,)).fetchone() or (me_ and personal_agent_foreign(c, u, me_)) \
                     or (me_ and u not in had_u and not may_see(c, me_, u)):  # 2.22.0 (#752): only people one may see; 2.30.0 (#1036): also newly invited ones of an existing event
                 raise BadInput(tr("unknown user"))
+            if cal_org and not ev_att_ok(c, u, cal_org):
+                if u not in had_u:  # visible (checked above), but not of the calendar's organisation: say why (2.87.0, #1983)
+                    from ..accounts.orgs import ws_fit_problem
+                    raise Denied(409, ws_fit_problem(c, cal_org, u, "cal") or tr("unknown user"))
+                continue
             row["user_id"], key = u, ("u", u)
             if u != me_:
                 row["partstat"] = "needs-action"  # = keep their own reply (att_set)
@@ -866,7 +887,7 @@ def _wd_events(c, users, S, LG, now):
                                          if collab_all() else set())
             if collab_all():
                 who |= {a[0] for a in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL "
-                                                "AND partstat!='declined'", (r["id"],))}
+                                                "AND partstat!='declined'", (r["id"],)) if ev_att_ok(c, a[0], cal["org_id"])}  # 2.87.0 (#1983)
             who = [u for u in who if u in users and "events" in (S.get(u, {}).get("features") or "").split(",")
                    and r["cal_id"] not in set(json.loads(S.get(u, {}).get("evcals_hidden") or "[]") or [])]
             if not who:

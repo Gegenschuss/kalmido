@@ -3,7 +3,7 @@ workspace (private / an organisation) a list and an agent belong to, the organis
 import os
 import re
 
-from flask import g, jsonify
+from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, like_escape, system_ctx
@@ -330,6 +330,12 @@ def obj_org_set(c, table, oid_col, members, obj_id, v, kind):
         p = ws_fit_problem(c, oid, uid, kind)
         if p:
             raise Denied(409, p)
+    if table == "ev_cals" and oid:  # 2.87.0 (#1983): people invited to its events must fit the organisation too
+        for (uid,) in c.execute("SELECT DISTINCT a.user_id FROM event_attendees a JOIN events e ON e.id=a.event_id WHERE e.cal_id=? "
+                                "AND e.deleted_at IS NULL AND a.user_id IS NOT NULL ORDER BY a.user_id", (obj_id,)).fetchall():
+            p = ws_fit_problem(c, oid, uid, kind)
+            if p:
+                raise Denied(409, p)
     c.execute(f"UPDATE {table} SET org_id=? WHERE id=?", (oid, obj_id))
     return True
 
@@ -830,6 +836,9 @@ def org_leave(c, oid, uid, heir):
         for table, mt, key in (("ev_cals", "ev_cal_members", "cal_id"), ("books", "book_members", "book_id")):
             c.execute(f"DELETE FROM {mt} WHERE user_id=? AND {key} IN (SELECT id FROM {table} WHERE org_id=?)", (aid, oid))
         c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, aid))
+    # 2.87.0 (#1983): the leaver and their agents are no longer invited to the events of the organisation's calendars
+    c.execute("DELETE FROM event_attendees WHERE user_id IN (%s) AND event_id IN (SELECT e.id FROM events e JOIN ev_cals k "
+              "ON k.id=e.cal_id WHERE k.org_id=?)" % ",".join("?" * (len(ags) + 1)), (uid, *ags, oid))
     c.execute("UPDATE agents SET org_id=NULL WHERE owner_id=? AND org_id=?", (uid, oid))
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
     # 2.53.0 (#1424, review): the leaver's task bells in the organisation go too (else the nightly boundary check alarms)
@@ -843,7 +852,7 @@ def org_leave(c, oid, uid, heir):
 def org_member_remove(oid, uid):
     """2.28.0 (#935): an organisation admin removes a member (or a member leaves: uid = self). The person's lists of this
     workspace go to the admin who removes them (leaving: to the organisation's first other admin), the person leaves every
-    list of the organisation. The last admin cannot leave."""
+    list of the organisation. The last admin cannot leave. 2.88.0 (#1980): ?to=<id> = another active member gets the lists."""
     c = db()
     if uid != me():
         _need_org_admin(c, oid)
@@ -856,6 +865,15 @@ def org_member_remove(oid, uid):
     if uid != me() and org_role(c, uid, oid) == "admin" and _admins(c, oid) <= 1:
         return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)
     heir = me() if uid != me() else (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (oid, uid)).fetchone() or [None])[0]
+    if uid != me() and request.args.get("to"):  # 2.88.0 (#1980): the admin hands the person's lists to another active member
+        try:
+            to = int(request.args["to"])
+        except ValueError:
+            to = 0
+        if to != me() and not c.execute("""SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id=?
+                                           AND m.user_id!=? AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'""", (oid, to, uid)).fetchone():
+            return err(tr("The lists can only go to another active person of the organisation"), 400)
+        heir = to
     operator = None
     if heir is None:  # the only admin leaves: the operator (an instance admin) takes the organisation over and is told
         operator = (c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' AND id!=? ORDER BY id LIMIT 1", (uid,)).fetchone() or [None])[0]

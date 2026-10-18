@@ -268,6 +268,11 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .rkcftab th{font-weight:500}
 .rkcfents{margin-top:.25rem}
 .rkcfents .ofcrow{text-decoration:none}
+.rkcfents .rkcfopen .ofcrow{border-left:.125rem dashed var(--accent);opacity:.8}
+.rkcfopenl{margin:.25rem 0 0;padding-left:.5rem;border-left:.125rem dashed var(--accent);font-size:.85em}
+.cf8sec .seg{margin:.25rem 0}
+.cf8hint{margin:.25rem 0}
+.cf8vers{margin:0;font-size:.85em}
 .dxset .lacts .numin{max-width:7rem}
 .ofdeditor .ib:not(.ibl),.ofdhead .ib:not(.ibl){width:1.5rem;height:1.5rem}
 .ofdeditor .ib.ibl,.ofdhead .ib.ibl{min-height:1.5rem}

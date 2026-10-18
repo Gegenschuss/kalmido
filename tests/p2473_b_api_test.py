@@ -6,8 +6,8 @@ companies, people and figures only.
    not ticked "in DATEV" (count, filter of the evaluation); the evaluation by month / year / person (shared equally) /
    project / client / category and as CSV; billing receipts on to a draft quotation (purchase = amount, markup), never
    twice, the undo takes the positions back out, a finalised document refuses; amounts / participants encrypted at rest
- - #1652: payments (actual), the open rest of a finalised invoice on its due day, the rest of an accepted quotation after a
-   part invoice at the end of its period of service, purchases of accepted quotations, travel receipts and fixed costs
+ - #1652: payments (actual), the open rest of a finalised invoice on its due day, (2.88.0, #1915: an accepted quotation
+   with a part invoice is no longer in the plan), purchases of accepted quotations, travel receipts and fixed costs
    (once / monthly / quarterly / yearly, end date) land in the right month as actual or planned; 3 / 6 months; fixed costs
    CRUD + encrypted
  - rights: a member gets 403 everywhere, another organisation sees nothing and reaches nothing (404)
@@ -264,8 +264,8 @@ inv_e = by("invoice")
 check(len(inv_e) == 1 and inv_e[0]["state"] == "plan" and inv_e[0]["month"] == max(DUE, TODAY)[:7] and float(inv_e[0]["amount"]) == round(float(G1) - 500, 2),
       f"#1652: the open rest of the invoice on its due day {inv_e} due {DUE}")
 off = by("offer")
-check(len(off) == 1 and off[0]["month"] == M1 and off[0]["date"] == M1 + "-20" and float(off[0]["amount"]) == round(float(G) - float(G1), 2) and off[0]["partial"],
-      f"#1652: the accepted quotation: only the rest after the part invoice, at the end of the period of service {off}")
+# 2.88.0 (#1915): a quotation with a (part) invoice leaves the plan as a whole (was: its rest after the part invoice)
+check(off == [], f"#1652/#1915: the accepted quotation with an invoice is not in the plan any more {off}")
 pur = by("purchase")
 check([(e["month"], e["state"], e["amount"]) for e in pur] == [(M1, "plan", "600.00")], f"#1652: the purchase of the accepted quotation {pur}")
 tr_ = by("trip")
@@ -279,7 +279,7 @@ check([e["month"] for e in fx if e["label"] == "Steuerberatung"] == [M2], "#1652
 check([e["month"] for e in fx if e["label"] == "Versicherung"] == [M0, M3], "#1652: quarterly until its end")
 row1 = cf["rows"][1]
 exp_out = 1200 + 600 + 600
-check(float(row1["out"]["plan"]) == exp_out and float(row1["in"]["plan"]) == round(float(G) - float(G1), 2) + (float(inv_e[0]["amount"]) if inv_e[0]["month"] == M1 else 0),
+check(float(row1["out"]["plan"]) == exp_out and float(row1["in"]["plan"]) == (float(inv_e[0]["amount"]) if inv_e[0]["month"] == M1 else 0),  # 2.88.0 (#1915): no quotation rest
       f"#1652: the sums of next month {row1}")
 row0 = cf["rows"][0]
 check(float(row0["in"]["actual"]) == 500 and float(row0["out"]["actual"]) == 1200 + 90 + 25 and

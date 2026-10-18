@@ -29,6 +29,44 @@ to the tax office (no ELSTER, no payroll).
 
 ### Fixed
 - Documents: the text recognition no longer overwrites an amount typed in while it was still running.
+## [2.88.0] - 2026-10-18
+
+Quotations in the cash flow plan, user administration for hundreds of accounts.
+
+### Added
+- Cash flow: sent quotations now count as *open quotation* (dashed), accepted ones as before; of several versions of a
+  quotation only the newest counts (#1915).
+- Quotations: *Duplicate* creates a new version of the quotation; the switch *In the cash flow* (Automatic / Yes / No)
+  decides which version counts, also on sent or finalised quotations (#1915).
+- User administration: search, filters (active, disabled, admins, invited, awaiting approval, agents) and pages of 50 with
+  the total; select several accounts to disable, enable or add them to an organisation (#1980).
+- Deleting an account that owns lists: hand all lists to one person (default) or delete them along after typing the user
+  name; lists with receipts are only handed over, a warning shows when nobody else holds the key of a locked list.
+  Organisation admins delete only accounts that belong to their organisation alone and have an empty private space,
+  otherwise they remove the person from the organisation and choose who gets its lists (#1980).
+
+### Changed
+- Cash flow: once an invoice for any version of a quotation is finalised, the whole quotation leaves the plan (before:
+  only the invoiced part was taken off) (#1915).
+- Agent API: quotations carry `version_of` and `cashflow`; `cashflow` can be set in the PATCH of an agent's own draft (#1915).
+
+## [2.87.0] - 2026-10-18
+
+Hardening from the security audit, part 3 (two high findings at the organisation boundary) and a calmer agent chat header.
+
+### Security
+- Appointments: a person who leaves an organisation or is removed from it (also with their agents) is no longer invited
+  to the appointments in its calendars - no view, reply, reminder push or CalDAV entry. Appointments in an organisation
+  calendar invite only people of that organisation (in the app with a clear message, over CalDAV and ICS); an
+  appointment or a calendar with outside guests moves into an organisation only after they are removed, and old
+  invitation notes of former members disappear. Guests from outside are invited from a private calendar as before.
+- Lists: a list is handed over only to people you can see (or who are members of it); any other account answers exactly
+  like an unknown one. Freelancers without an organisation hand lists to their contacts as before.
+- The nightly boundary check finds and removes left-over invitations of former members (and counts those of agents).
+
+### Changed
+- Agent chat: the info button next to the agent's name is gone, so it no longer covers the usage ring; the note on when an
+  agent answers is now in the agent's settings (own agents: *Permissions*, team agents: *Edit agent*).
 
 ## [2.86.0] - 2026-10-17
 

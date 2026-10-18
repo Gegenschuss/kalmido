@@ -280,3 +280,33 @@ workspace).
 - The history of the task and the comment show "Rule <name>".
 - Health lists, the basket and locked lists have no rules. Copying a list or making a template does not copy its rules.
 - Agents read rules and can only propose one; the owner or an admin accepts it with 👍.
+
+## Managing many accounts (2.88.0)
+
+*Settings > Administration > Users* is built for hundreds of accounts:
+
+- **Search and filter:** the field above the list finds people by name, user name or e-mail address; the filter next to
+  it shows *People*, *Active*, *Disabled*, *Admins*, *Invited*, *Waiting for approval* or *Agents*. The list shows 50
+  accounts at a time with *Previous page* / *Next page*.
+- **Several at once:** tick the boxes in front of the people and use the bar that appears: *Disable*, *Enable* (one undo
+  step brings them back) or *Add to an organisation*. Every account is checked on its own; the ones that cannot be
+  changed (your own account, a person of an organisation you do not belong to) are named.
+- **Deleting someone who still owns lists:** the delete dialog lists them (the names of lists you may see, with whom
+  they are shared, the lock) and asks what happens to them: **hand them over** to one person (the default; only people
+  every one of the lists may go to are offered, an organisation's list stays in its organisation) or **delete them
+  along** (type the user name to confirm; lists shared with others are pointed out). Either way it happens completely or
+  not at all. Invoices and filed documents do not hang on lists and stay; a list with receipts in its budget can only be
+  handed over, never deleted along (receipts are kept). A list with the lock whose key nobody else holds is pointed out:
+  after a handover its content can no longer be read. Lists of an organisation you do not belong to show neither their
+  name nor the organisation's and can only be handed over. The security log notes the deletion.
+- **Organisation admins** (*Settings > Workspaces*) can delete the account of a member who belongs to their organisation
+  alone, is no server admin and whose private space is empty (no private lists, nothing in the basket, no private
+  calendars, address books, files, pages, mails, habits or time entries -- deleting the account would delete them too),
+  handing the lists over the same way. For anyone else they remove
+  the person from the organisation and choose which member gets the person's lists of the organisation.
+
+API for scripts of the web app (session, not the REST API): `GET /api/users?all=1&limit=50&offset=0&q=&filter=people`
+answers `{users, total, offset, limit, agents}` (without `limit` the whole list as before), `GET /api/users/{id}/delete-info`,
+`DELETE /api/users/{id}?lists=transfer&to={id}` or `?lists=delete&confirm={user name}` (without `lists` an account that
+owns lists still gets 409), `POST /api/users/bulk {ids, action: disable | enable | org_add, org_id}` and
+`DELETE /api/orgs/{org}/members/{id}?to={id}`. Agents do not manage accounts: no REST API or MCP change.

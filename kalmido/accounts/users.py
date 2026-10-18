@@ -112,6 +112,9 @@ def users_list():
     c = db()
     from ..accounts.orgs import visible_people
     if g.user["is_admin"]:
+        if request.args.get("all") == "1" and request.args.get("limit"):  # 2.88.0 (#1980): one page + search / filter / total
+            from ..accounts.useradmin import ua8_users_page
+            return ua8_users_page(c)
         from ..integrations.mail import MAIL_OUT_ON
         vis = None if request.args.get("all") == "1" else visible_people(c, me())
         rows = c.execute("SELECT * FROM users ORDER BY id").fetchall()
@@ -361,25 +364,39 @@ def user_update(uid):
 def user_delete(uid):
     """Refused while the user owns lists besides the inbox (the safer option: nothing shared with
     others disappears). Deletes their inbox (+ its tasks), habits, focus sessions, time entries, filters, tags and
-    settings; tasks they created in other people's lists stay (creator cleared)."""
-    need_admin()
+    settings; tasks they created in other people's lists stay (creator cleared). 2.88.0 (#1980): ?lists=transfer&to=<id>
+    hands the lists to one person first, ?lists=delete&confirm=<user name> deletes them along (useradmin.ua8_lists_settle,
+    the same transaction); an organisation admin deletes an account of their organisation alone (useradmin.ua8_may_delete)."""
+    from ..accounts.useradmin import ua8_audit, ua8_lists_settle, ua8_may_delete
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    if not u or not om_admin_all(c, uid):  # 2.46.0 (#1592)
-        return err(tr("unknown user"), 404)
+    by = ua8_may_delete(c, u, uid)  # 2.46.0 (#1592): an instance admin as om_admin_all; 2.88.0: or the organisation's admin
     if uid == me():
         return err(tr("You cannot delete yourself"))
     with system_ctx(c):  # 2.37.0 (#1150): a count over every organisation (lists the admin cannot see still block the deletion)
         n = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()[0]
-    if n:
+    icons, lfiles, audit = [], [], (None, ())
+    if n and not request.args.get("lists"):
         return err(trn("The user still owns {0} list. Delete it or disable the user instead.",
                        "The user still owns {0} lists. Delete them or disable the user instead.", n), 409)
+    if n:
+        bad, done = ua8_lists_settle(c, u, by)
+        if bad:
+            c.rollback()
+            return bad
+        icons, lfiles, audit = done[0], done[1], (done[2], done[3])
     files = user_purge(c, uid)
     bump(c)
     c.commit()
     unlink_files(files)
     avatar_drop_file(uid, u["avatar"])
-    return jsonify(ok=True)
+    if icons or lfiles:
+        from ..lists.projects import list_files_drop
+        for lid, icon in icons:
+            list_icon_drop_file(lid, icon)
+        list_files_drop(lfiles)
+    ua8_audit(g.user["username"], u["username"], *audit)  # 2.88.0 (#1980): the security log
+    return jsonify(ok=True, lists=n)
 
 
 def user_purge(c, uid):

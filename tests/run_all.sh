@@ -1063,6 +1063,12 @@ fresh; run testclock "$PY" testclock_test.py
 # 2.85.0 part B: feeds (#1162) - follow, RSS/Atom/RDF, SSRF guard, DTD refused, read later, OPML, rights; the view (fake feed server in the container)
 fresh; run p285_b_api "$PY" p285_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p285_b_ui node p285_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.88.0 part A: offers (quotes) with versions in the cash flow plan (#1915)
+fresh; run p288_a_api "$PY" p288_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p288_a_ui node p288_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.88.0 part B: user admin for hundreds of accounts, delete with list hand-over (#1980)
+fresh; run p288_b_api "$PY" p288_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p288_b_ui node p288_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.86.0 (#1896): hardening from audit #476 part 1, groups A-E
 fresh; run p286_a_api "$PY" p286_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"
@@ -1071,6 +1077,8 @@ fresh; run p286_d_api "$PY" p286_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_e_api "$PY" p286_e_api_test.py "$KALMIDO_TEST_DATA"
 # 2.66.1 part B: the workspace switch reloads every open view with a workspace link (#1945), the guard list of those views
 fresh; run p2661_b_ui node p2661_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.87.0 (#1983 #1984): organisation boundary of event invitations and list hand-overs (audit T3 H1 + H2)
+fresh; run p287_a_api "$PY" p287_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.90.0 part A (#1921): bookkeeping light (EUeR, VAT return figures, tax reserve, receipt photo)
 fresh; run p290_a_api "$PY" p290_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p290_a_ui node p290_a_ui.js "$KALMIDO_TEST_DATA"
