@@ -253,6 +253,8 @@ ROUTES = {
     "POST /api/office/trips/{}/items": "office", "PATCH /api/office/trips/{}/items/{}": "office", "DELETE /api/office/trips/{}/items/{}": "office",
     "GET /api/office/trips/report": "office", "GET /api/office/trips/bill-docs": "office", "POST /api/office/trips/bill": "office",
     "POST /api/office/trips/unbill": "office", "GET /api/office/cashflow": "office", "GET /api/office/fixed-costs": "office",
+    # 2.95.0 A (#1932): the per diem report and the rates, office admins (p295_a_api_test.py)
+    # 2.95.0 B (#1932): the import of a per diem spreadsheet, office admins (p295_b_api_test.py)
     "POST /api/office/fixed-costs": "office", "PATCH /api/office/fixed-costs/{}": "office", "DELETE /api/office/fixed-costs/{}": "office",
     # 2.67.0 (#1838): the import of fixed costs, its template, the undo of an import, the monthly check task (office admins)
     "POST /api/office/fixed-costs/import/preview": "office", "POST /api/office/fixed-costs/import": "office", "GET /api/office/fixed-costs/import/template": "office",
