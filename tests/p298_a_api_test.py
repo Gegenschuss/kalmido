@@ -2,7 +2,7 @@
 """2.98.0 API tests, part A (#1953): scheduling polls, own container (start.sh). Invented names only, addresses @example.com.
  - module "events" needed (409 without); people only: an agent token and a personal API token are refused (403)
  - creating: 2-20 times (1 or 21: 400), a link, the poll in the private space; changing the times keeps the votes of a time
- - the public page /vote/<token> without an account: the times, a name + yes / maybe / no, the signed page stamp (too quick or
+ - the public page /s/v/<token> without an account: the times, a name + yes / maybe / no, the signed page stamp (too quick or
    used twice: sent again), the honeypot (pretends, nothing stored), the own vote changed through the cookie and through the
    edit link; the names of the voters with their answers, never an address; show_votes off: no names
  - wrong / regenerated (old) / revoked / expired / deleted token: the same 404 page; an agent never votes through the link
@@ -70,7 +70,7 @@ def mk(s, **kw):
 
 
 def path(url):
-    return "/vote/" + url.rsplit("/vote/", 1)[1]
+    return "/s/v/" + url.rsplit("/s/v/", 1)[1]
 
 
 def page(v, p):
@@ -137,7 +137,7 @@ PID, URL = P["id"], P["url"]
 check(P["space"] == "private" and len(P["options"]) == 3 and P["options"][0]["start"] == "2031-03-10T10:00"
       and P["options"][0]["end"] == "2031-03-10T11:00" and P["options"][2]["end"] == "2031-03-12T09:45" and P["closed_at"] is None,
       "private, three times, the end from the duration or given " + json.dumps(P)[:300])
-check(URL and "/vote/" in URL and P["live"] is True, "a link, live")
+check(URL and "/s/v/" in URL and P["live"] is True, "a link, live")
 PP = path(URL)
 check([x["id"] for x in Bo.get(B + "/api/polls").json()["items"]] == [PID], "listed for the owner")
 
@@ -149,7 +149,7 @@ check(st == 200 and "Team lunch" in txt and "Room 2" in txt and "Europe/Berlin" 
 if st != 200:
     print(subprocess.run(["docker", "logs", "--tail", "60", CT], capture_output=True, text=True).stderr[-4000:], flush=True)
 check("bob@example.com" not in txt and "Alice" not in txt, "the page names nothing of others (no addresses)")
-check("script-src 'self'" in V1.get(B + PP).headers.get("Content-Security-Policy", "") and "Intl.DateTimeFormat" in V1.get(B + "/vote/time.js").text, "own small script only")
+check("script-src 'self'" in V1.get(B + PP).headers.get("Content-Security-Policy", "") and "Intl.DateTimeFormat" in V1.get(B + "/s/v/time.js").text, "own small script only")
 _, _, s2 = page(V2, PP)
 _, _, s3 = page(V3, PP)
 _, _, s4 = page(V4, PP)
@@ -208,7 +208,7 @@ check(len(d["options"]) == 3 and d["options"][1]["id"] == o2 and d["options"][1]
       and all(o["id"] != o3 for o in d["options"]), "a kept time keeps its votes, a dropped one goes")
 
 # ================================================================ links that do not open
-check(page(visitor(), "/vote/" + "x" * 24)[0] == 404 and page(visitor(), "/vote/short")[0] == 404, "unknown token: 404")
+check(page(visitor(), "/s/v/" + "x" * 24)[0] == 404 and page(visitor(), "/s/v/short")[0] == 404, "unknown token: 404")
 r = Bo.patch(B + f"/api/polls/{PID}", json={"regenerate": True})
 NEWP = path(r.json()["poll"]["url"])
 check(NEWP != PP and page(visitor(), PP)[0] == 404 and page(visitor(), NEWP)[0] == 200, "regenerated: the old link 404, the new one opens")
@@ -219,7 +219,7 @@ Bo.patch(B + f"/api/polls/{PID}", json={"link_on": True})
 check(Bo.patch(B + f"/api/polls/{PID}", json={"expires_at": "2020-01-01"}).ok and page(visitor(), PP)[0] == 404, "expired: 404")
 check(Bo.patch(B + f"/api/polls/{PID}", json={"expires_at": None}).ok and page(visitor(), PP)[0] == 200, "no end: opens again")
 st, txt, _ = page(visitor(), PP)
-gone_txt = requests.get(B + "/vote/" + "y" * 24).text
+gone_txt = requests.get(B + "/s/v/" + "y" * 24).text
 check("Team lunch" not in gone_txt, "the 404 page names nothing")
 check(requests.get(B + PP, headers=AGH).status_code == 404, "an agent never opens / votes through the link")
 

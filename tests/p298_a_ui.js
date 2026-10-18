@@ -18,7 +18,7 @@ if (!process.env.P298A_NOSTART) execFileSync('bash', [path.join(__dirname, 'star
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
-const vpath = url => '/vote/' + url.split('/vote/')[1];
+const vpath = url => '/s/v/' + url.split('/s/v/')[1];
 async function vote(p, name, answers, email = '') {  // a visitor: the page (its stamp), 3 s, the form
   const pg = await (await fetch(B + p.replace(/^\//, ''), {headers: {'Accept-Language': 'en'}})).text();
   const stamp = (pg.match(/name="stamp" value="([^"]+)"/) || [])[1] || '';
@@ -63,7 +63,7 @@ const FEAT = 'collab,comments,events,cal,clients,office';
   check(made && made.title === 'Planning day' && made.space === 'private', 'created through the form ' + JSON.stringify(made).slice(0, 200));
   const PID = made && made.id;
   const sw = await until(() => d.querySelector('.tpo-dlg .tpo-link input'));
-  check(sw && /\/vote\//.test(sw.value) && d.querySelector('.tpo-dlg [data-tpo="copy"]') && d.querySelector('.tpo-dlg [data-tpo="qr"]'), 'the poll window: link, copy, QR');
+  check(sw && /\/s\/v\//.test(sw.value) && d.querySelector('.tpo-dlg [data-tpo="copy"]') && d.querySelector('.tpo-dlg [data-tpo="qr"]'), 'the poll window: link, copy, QR');
   check(d.querySelectorAll('.tpo-dlg .tpo-o').length === 3 && /No votes yet/.test(d.querySelector('.tpo-dlg').textContent), 'three times, no votes yet');
   d.querySelector('.tpo-dlg [data-tpo="qr"]')?.click();
   check(await until(() => d.querySelector('.tpo-dlg .tpo-qr img')), 'the QR code');

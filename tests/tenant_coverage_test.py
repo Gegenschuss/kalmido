@@ -170,8 +170,8 @@ ROUTES = {
     # 2.98.0 A (#1953): scheduling polls (p298_a_api_test.py) - routes below this line
     "GET /api/polls": "poll", "POST /api/polls": "poll", "GET /api/polls/{}": "poll", "PATCH /api/polls/{}": "poll",
     "DELETE /api/polls/{}": "poll", "POST /api/polls/{}/restore": "poll", "POST /api/polls/{}/decide": "poll",
-    "POST /api/polls/{}/reopen": "poll", "POST /api/polls/{}/move-space": "poll", "GET /vote/{}": "poll", "POST /vote/{}": "poll",
-    "GET /vote/time.js": "public",
+    "POST /api/polls/{}/reopen": "poll", "POST /api/polls/{}/move-space": "poll", "GET /s/v/{}": "poll", "POST /s/v/{}": "poll",
+    "GET /s/v/time.js": "public",
     # (2.98.0 spacer A)
     # 2.98.0 B (#1954): questionnaires (p298_b_api_test.py) - routes below this line
     # (2.98.0 spacer B)
