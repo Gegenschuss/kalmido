@@ -1209,11 +1209,11 @@ def v1_agent_chat_post(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or is_agent(u) or not agent_shares(c, aid, uid):
         raise Denied(404)
-    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to", "approval", "offer_save", "kind"))
+    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to", "approval", "offer_save", "kind", "job_msg"))
     b = fb if fb is not None else v1_json()
     # 2.28.0 (#1005): answer buttons; 2.30.0 (#1041): permission questions (permission, expires_in)
     unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to",
-                                               "approval", "offer_save", "kind"))  # 2.33.0: reply_to; 2.35.0 (#1103): approval; 2.37.0 (#1159): offer_save
+                                               "approval", "offer_save", "kind", "job_msg"))  # 2.96.0 C (#2015): job_msg; 2.33.0: reply_to; 2.35.0 (#1103): approval; 2.37.0 (#1159): offer_save
     if unknown:
         raise UnknownFields(unknown)
     # 2.41.0 (#1206): kind = message (default) | notice (a small grey line, no push, never unread; older servers answer 400)
@@ -1246,13 +1246,20 @@ def v1_agent_chat_post(uid):
         jpar = as_int(b["job_parent"], "job_parent", 1)
         if not jid or jpar == jid or not c.execute("SELECT 1 FROM agent_jobs WHERE id=? AND agent_id=? AND user_id=?", (jpar, aid, uid)).fetchone():  # review K3: + the person
             raise BadInput(tr("Invalid value: {0}", "job_parent"))
-    b = {k: v for k, v in b.items() if k not in ("job_id", "job_parent")}
+    # 2.96.0 C (#2015): job_msg = the kind of a job message (say | question | result | error); with job_id only
+    from ..agents.jobchat import JCD_KINDS
+    jmsg = b.get("job_msg")
+    if jmsg in ("", None):
+        jmsg = None
+    elif jmsg not in JCD_KINDS or not jid:
+        raise BadInput(tr("Invalid value: {0}", "job_msg"))
+    b = {k: v for k, v in b.items() if k not in ("job_id", "job_parent", "job_msg")}
     if fb is not None and isinstance(b.get("multi"), str):
         b["multi"] = b["multi"].lower() in ("1", "true", "yes")
     r = chat_post(c, aid, uid, "agent", b, files)
     from ..agents.steps import steps_take
     if jid or offer:
-        c.execute("UPDATE agent_chat SET job_id=?, job_parent=?, offer_save=? WHERE id=?", (jid, jpar, 1 if offer else 0, r["id"]))
+        c.execute("UPDATE agent_chat SET job_id=?, job_parent=?, offer_save=?, job_msg=? WHERE id=?", (jid, jpar, 1 if offer else 0, jmsg, r["id"]))
         if jid and jpar:  # 2.59.0 (#1827): the job keeps its leader (once set it stays), so all its messages share the colour
             c.execute("UPDATE agent_jobs SET parent_id=? WHERE id=? AND parent_id IS NULL", (jpar, jid))
         r = c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()

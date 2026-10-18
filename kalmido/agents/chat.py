@@ -174,6 +174,7 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
             "choices": ch, "choice": ans, "choice_state": choice_state(r, ch, ans, newest),
             "job_id": r["job_id"] if "job_id" in r.keys() else None,  # 2.32.0 (#1081): the job whose result this is
             "job_parent": r["job_parent"] if "job_parent" in r.keys() else None,  # 2.47.3 (#1764): the leading job of that part job
+            "job_msg": r["job_msg"] if "job_msg" in r.keys() else None,  # 2.96.0 C (#2015): say | question | result | error (null = unknown)
             # 2.37.0 (#1159): the agent offers "Save as task" under this message (the person saves, never the agent)
             "offer_save": bool(r["offer_save"]) if "offer_save" in r.keys() and r["sender"] == "agent" else False,
             **chat_reply(r),  # 2.33.0 (#1076): reply_to + reply (the quote of the answered message)
@@ -831,10 +832,14 @@ def agent_chat_get(aid):
     # 2.35.0 (#1103): the open approval requests (pinned at the top, also when older than this page)
     ap = chat_approvals_open(c, aid, me())[-APPROVAL_PIN_MAX:]
     from ..collab.chatpins import cpin_agent_list
+    from ..agents.jobchat import jcd_jobs
+    apo = jn9_chat_jobs(c, [chat_dict(r, None, None, newest=nw) for r in ap], me())
+    pins = cpin_agent_list(c, aid, me())
     return jsonify(agent=agent_public(c, a, me()), messages=msgs, now=iso_ms(now_utc()), has_more=more,
-                   steps_live=steps_live(c, aid, me()),
-                   approvals_open=jn9_chat_jobs(c, [chat_dict(r, None, None, newest=nw) for r in ap], me()),
-                   pins=cpin_agent_list(c, aid, me()))  # 2.62.0 (#1848): the pinned messages, also older than this page
+                   steps_live=steps_live(c, aid, me()), approvals_open=apo,
+                   pins=pins,  # 2.62.0 (#1848): the pinned messages, also older than this page
+                   # 2.96.0 C (#2015): the jobs of these messages (name, version, state), for the job cards
+                   jobs=jcd_jobs(c, aid, msgs + apo + pins, me()))  # 2.62.0 (#1848): the pinned messages, also older than this page
 
 
 def chat_task(c, v, uid_a, uid_b):

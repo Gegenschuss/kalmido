@@ -761,6 +761,7 @@ document.addEventListener('click', async e => {
   else if (k === 'cmenu') {
     const id = +a.dataset.id, x = Object.values(SHV.idx).flatMap(d => d.items || []).find(y => y.id === id); if (!x) return;
     menu(a, [{label: tr('Open'), icon: 'sheet', fn: () => go('sheets/' + id)}, {label: tr('Rename…'), icon: 'edit', fn: () => shvRename(id, x.title)},
+      ...sh_smvItems(x),  // 2.96.0 B (#1941)
       '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => shvDelete(id, x.title, S.route.shl || null)}]);
   }
   else if (!sh) return;
@@ -948,3 +949,30 @@ document.addEventListener('copy', e => { if (document.activeElement?.id === 'shv
 document.addEventListener('cut', e => { if (document.activeElement?.id === 'shv-scroll' && SHV.cur && SHV.sh?.can_write) shvCopy(e, true); });
 document.addEventListener('paste', e => { if (document.activeElement?.id === 'shv-scroll' && SHV.cur) shvPaste(e); });
 window.addEventListener('resize', () => { if (S.route.mod === 'sheets' && SHV.deps) requestAnimationFrame(shvDepsDraw); });
+// ---- 2.96.0 B (#1941): a table to the other workspace (private <-> organisation). The shared dialog (spacemove.js) shows the
+// server's dry run (the list attachment that ends, carried-over rows that lose their link, formulas that show "No access");
+// the move back is ONE undo step and brings the attachment and the links back where they fit again.
+const sh_smvOrg = sp => sp && sp !== 'private' ? +sp.slice(4) : null;
+function sh_smvItems(x) {
+  if (!x || S.me?.kind === 'agent' || x.can_write === false || !smv_can(sh_smvOrg(x.space))) return [];
+  return [{label: tr('Move to another workspace…'), icon: 'brief', fn: () => sh_smvMove(x)}];
+}
+async function sh_smvMove(x) {
+  const id = x.id, from = sh_smvOrg(x.space);
+  const req = (to, extra) => rawFetch('POST', `/api/sheets/${id}/move-space`, {to: smv_ws(to), ...extra});
+  const r = await smv_open({what: qn(x.title || tr('Untitled table')), from, check: to => req(to, {dry: 1}),
+    run: async to => { try { return await req(to, {}); } catch (e) { toast(e.message); throw e; } }});
+  if (!r || !r.ok) return;
+  let mid = r.move_id;
+  const after = () => { shvAfterIdx(id); if (SHV.sh?.id === id) shvLoad(id, true); };
+  after();
+  const e = histAdd({label: tr('Moved {0}', qn(x.title || '')), ids: [], snaps: [], lids: [], wsp: r.space,
+    undo: async () => { const b = await req(from, {undo: mid}); mid = b.move_id; after(); return {skipped: []}; },
+    redo: async () => { const b = await req(sh_smvOrg(r.space), {undo: mid}); mid = b.move_id; after(); return {skipped: []}; }});
+  histToast(tr('Moved to {0}', shvSpaceName(r.space)), e);
+}
+SHV_HOOKS.menu.push(sh => sh_smvItems(sh));
+(SHV_HOOKS.side = SHV_HOOKS.side || []).push(sh => {  // the last move between workspaces (both sides see it)
+  const m = sh.moved; if (!m) return '';
+  return `<section class="shvsec shvsmv"><p class="muted">${ic('brief', 's')} ${esc(tr('Moved from {0} to {1}', shvSpaceName(m.from), shvSpaceName(m.to)))} · ${esc(fmtWhen(m.at))}${m.by_name ? ' · ' + esc(m.by_name) : ''}</p></section>`;
+});

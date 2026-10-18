@@ -35,7 +35,7 @@ function umzPreviewHtml(j) {
   const p = j.preview, org = p.kind === 'org', src = p.source.url ? esc(p.source.url) : tr('unknown');
   const people = p.people.length ? `<div class="muted mhint">${tr('People of your lists')}</div>` + p.people.map((x, i) => `<div class="mrow umzp">
     <span class="n">${esc(x.name || tr('Unknown'))}<br><span class="muted">${x.found ? esc(tr('found: {0}', x.found_name)) : esc(tr('not on this server'))}</span></span>
-    ${x.found ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="share"> ${org ? tr('Add to the organisation and share the lists') : tr('Share my lists')}</label>`
+    ${x.found ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="share"> <span data-umzsl>${org && p.targets[0]?.id !== 'private' ? tr('Add to the organisation and share the lists') : tr('Share my lists')}</span></label>`
       : p.can_invite ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="invite"> ${tr('Invite by e-mail')}</label>${x.need_address === false ? '' : `<input type="email" class="umzem" data-umze="${i}" autocomplete="off" placeholder="${esc(tr('Their e-mail address'))}" aria-label="${esc(tr('E-mail address of {0}', x.name || ''))}"><span class="muted umzmis" data-umzm="${i}" hidden>${tr('This is not the address in the file: nobody is invited.')}</span>`}` : `<span class="muted">${tr('Skipped')}</span>`}</div>`).join('')
     + hintK(tr('Nothing is shared without a tick: an address on another server can belong to somebody else here.')) : '';
   const lists = p.lists.length ? `<div class="umzlists">${p.lists.slice(0, 12).map(l => `<div class="mrow"><span class="n">${esc(l.inbox ? tr('Basket') : l.name)}${l.folder ? ` <span class="muted">${esc(l.folder)}</span>` : ''}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}</span></div>`).join('')}${p.lists.length > 12 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', p.lists.length - 12))}</div>` : ''}</div>` : '';
@@ -118,6 +118,11 @@ function umzInit(md) {
   api('GET', '/api/account/import').then(j => { if (j.current && j.current.state !== 'upload') umzImpDraw(md, j.current); }).catch(() => {});
   $('#s-umz-file', md)?.addEventListener('change', e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) umzUpload(md, f).catch(() => umzImpDraw(md, null)); });
   md.addEventListener('change', async e => {  // review M1: a typed address that is not the one in the file -> hint at once
+    if (e.target.id === 's-umz-tgt' && UMZ.cur?.preview?.kind === 'org') {  // 2.96.0 D (#1941): into Private nobody joins an organisation
+      const t = e.target.value === 'private' ? tr('Share my lists') : tr('Add to the organisation and share the lists');
+      md.querySelectorAll('[data-umzsl]').forEach(x => { x.textContent = t; });
+      return;
+    }
     const x = e.target.closest?.('[data-umze]'); if (!x || !UMZ.cur?.preview) return;
     const m = $(`[data-umzm="${x.dataset.umze}"]`, md); if (m) m.hidden = await umzEmailOk(UMZ.cur.preview, +x.dataset.umze, x.value);
   });

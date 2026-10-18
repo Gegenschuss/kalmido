@@ -104,8 +104,9 @@ def abs_state(c, oid):
 
 # ---------------------------------------------------------------- area + rights
 def abs_org(c, uid, want=None, create=True):
-    """The area (orgs.id) uid looks at / enters into: ?org= (a membership, 404 otherwise), else the organisation of the
-    workspace switch, else the first organisation; without any organisation the personal area (pb_personal)."""
+    """The area (orgs.id) uid looks at / enters into: ?org= (a membership, 404 otherwise), else the area of the workspace
+    switch ("org:<id>" that organisation, "private" the personal area), else the first organisation; without any
+    organisation the personal area (pb_personal)."""
     from ..accounts.orgs import user_orgs
     from ..office.model import pb_personal
     orgs = user_orgs(c, uid)
@@ -117,6 +118,8 @@ def abs_org(c, uid, want=None, create=True):
     m = re.fullmatch(r"org:(\d{1,9})", ws)
     if m and int(m.group(1)) in orgs:
         return int(m.group(1))
+    if ws == "private":  # 2.96.0 D (#1941): the switch on "Private" is the personal area, not the first organisation
+        return pb_personal(c, uid, create=create)
     return orgs[0] if orgs else pb_personal(c, uid, create=create)
 
 
@@ -303,10 +306,12 @@ def abs_list():
                      "ORDER BY start_date, id", (oid, last.isoformat(), first.isoformat())).fetchall()
     st = abs_state(c, oid)
     from ..accounts.orgs import user_orgs
+    from ..office.model import pb_personal
     mine = user_orgs(c, uid)
     with_org = [{"id": r[0], "name": r[1]} for r in c.execute(
         "SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id") if r[0] in mine]
-    return jsonify(org_id=oid, orgs=with_org, admin=adm, state=st, states=ABS_STATES, today=today.isoformat(),
+    # 2.96.0 D (#1941): the personal area (when there is one) is offered next to the organisations
+    return jsonify(org_id=oid, orgs=with_org, personal=pb_personal(c, uid, create=False), admin=adm, state=st, states=ABS_STATES, today=today.isoformat(),
                    start=first.isoformat(), end=last.isoformat(),
                    people=[{**user_public(p), "own": p["id"] == uid} for p in people],
                    items=[{**abs_public(r, adm or r["user_id"] == uid, c), "can_edit": adm or r["user_id"] == uid}

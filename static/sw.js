@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v209';
+const CACHE = 'tasks-shell-v210';
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -10,7 +10,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/fonts/AtkinsonHyperlegible-Regular.woff2', '/static/fonts/AtkinsonHyperlegible-Bold.woff2',
   // 2.20.0 (#646): the web client in modules, the same list and order as the script tags in index.html
   // (tools/check_layout.py compares them)
-  '/static/js/reloadguard.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/lazyload.js', '/static/js/lyopts.js', '/static/js/workspace.js', '/static/js/sharews.js', '/static/js/quickadd.js', '/static/js/views.js', '/static/js/render.js', '/static/js/vlist.js', '/static/js/calendar.js', '/static/js/habits.js',
+  '/static/js/reloadguard.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/lazyload.js', '/static/js/lyopts.js', '/static/js/workspace.js', '/static/js/sharews.js', '/static/js/spacemove.js', '/static/js/quickadd.js', '/static/js/views.js', '/static/js/render.js', '/static/js/vlist.js', '/static/js/calendar.js', '/static/js/habits.js',
   '/static/js/detail.js', '/static/js/collab.js', '/static/js/attachments.js', '/static/js/mdtitle.js', '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js', '/static/js/dlgmove.js', '/static/js/setcore.js', '/static/js/custview.js', '/static/js/signoff.js', '/static/js/account.js', '/static/js/servers.js',
   '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/envs.js', '/static/js/sprints.js', '/static/js/projtime.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/sharedlg.js', '/static/js/dnd.js', '/static/js/secdrag.js', '/static/js/dragmulti.js', '/static/js/palette.js',
   '/static/js/backclose.js', '/static/js/agents.js', '/static/js/cleanup.js', '/static/js/dayplan.js', '/static/js/choicecard.js', '/static/js/chatbase.js', '/static/js/jobchat.js', '/static/js/agentview.js', '/static/js/propkinds2.js', '/static/js/listedit.js', '/static/js/git.js', '/static/js/chat.js', '/static/js/refs.js',
