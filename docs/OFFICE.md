@@ -1222,3 +1222,6 @@ tools/einvoice_validate.sh tests/.data/einvoice/*.pdf tests/.data/einvoice/*.xml
 The script needs Docker (veraPDF) and Java 17 or newer (KoSIT); it keeps the downloads in `~/.cache/kalmido-validators`
 (`KALMIDO_VALIDATOR_CACHE`) and writes the KoSIT reports to `reports/` there. Any file of your own installation can be
 checked the same way (download the PDF / XML of a finalised invoice and pass it to the script).
+
+More national e-invoice formats are welcome as pull requests with an official validator run in CI; see
+[CONTRIBUTING.md](../CONTRIBUTING.md), *Contributing national e-invoice formats*.
