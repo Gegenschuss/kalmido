@@ -57,6 +57,7 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   d.querySelector('[data-act="md-more"]').click(); await sleep(100);
   w.eval(`closeDetail(); openDetail(${T1})`); await sleep(900);
   check(d.querySelector('#d-md').classList.contains('clamp') && d.querySelector('[data-act="md-more"]').textContent === 'Show more' && d.querySelector('[data-act="md-more"]').getAttribute('aria-expanded') === 'false', 'Show less folds it for all tasks');
+  await call('alice', 'DELETE', `/api/tasks/${TL3}`);  // keep the list order for the keyboard checks below
   w.eval(`closeDetail(); openDetail(${T2})`); await sleep(900);
   check(!d.querySelector('[data-act="md-more"]'), 'short description: no "Show more"');
   w.eval('closeDetail()'); await sleep(300);
