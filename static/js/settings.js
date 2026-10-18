@@ -1206,11 +1206,12 @@ function aboutVerRows(a) {
   const off = srv && app !== srv;
   return `<div class="row aboutapp${off ? ' off' : ''}"><label>${tr('App in this window')}</label><span>v${esc(app)}${off ? ` · <b>${esc(tr('Server: v{0}', srv))}</b> <button type="button" class="btn sm pri" data-nv="go">${esc(tr('Reload'))}</button>` : ` · <span class="muted">${esc(tr('up to date'))}</span>`}</span></div>`;
 }
-// Settings > Help: the version (2.46.6 (#1710): the admins' update check result moved to Administration > Server, ad_updHtml)
+// Settings > Help: the version, 2.101.0 (#1964): the trademark note (2.46.6 (#1710): the admins' update check result moved to Administration > Server, ad_updHtml)
 function aboutHtml(chk, hint) {
   const a = S.about || {};
   let h = `<h4 id="s-about-h">${tr('About')}</h4><div class="row"><label>${tr('Version')}</label><span class="aboutver">Kalmido v${esc(a.version || '?')}</span></div>${aboutVerRows(a)}
     <div class="row aboutcopy"><label>©</label><span class="muted">2026 Gegenschuss Doberenz Enders Grund eGbR · AGPL-3.0</span></div>
+    <div class="row aboutmarks"><label></label><span class="muted">${tr('Product and company names mentioned in Kalmido are trademarks of their respective owners. Kalmido is an independent project, not affiliated with or endorsed by them.')}</span></div>
     <div class="row aboutlinks"><label></label>${ABOUT_LINKS.map(([u, n, i]) => `<a class="btn sm" href="${u}" target="_blank" rel="noopener noreferrer">${ic(i, 's')} ${tr(n)}</a>`).join('')}</div>`;
   h += sup_aboutHtml();  // 2.74.0 (#338): "Support Kalmido" (self-hosted only)
   return h;
