@@ -144,9 +144,12 @@ check([x["id"] for x in Bo.get(B + "/api/polls").json()["items"]] == [PID], "lis
 # ================================================================ the public page, voting
 V1, V2, V3, V4 = visitor(), visitor(), visitor(), visitor()
 st, txt, s1 = page(V1, PP)
-check(st == 200 and "Team lunch" in txt and "Room 2" in txt and "Europe/Berlin" in txt and s1, "the page: title, place, the zone, a stamp")
+check(st == 200 and "Team lunch" in txt and "Room 2" in txt and "Europe/Berlin" in txt and s1, "the page: title, place, the zone, a stamp "
+      + str(st) + " " + txt[:300])
+if st != 200:
+    print(subprocess.run(["docker", "logs", "--tail", "60", CT], capture_output=True, text=True).stderr[-4000:], flush=True)
 check("bob@example.com" not in txt and "Alice" not in txt, "the page names nothing of others (no addresses)")
-check("script-src 'self'" in V1.get(B + PP).headers.get("Content-Security-Policy", "") and V1.get(B + "/static/vote.js").ok, "own small script only")
+check("script-src 'self'" in V1.get(B + PP).headers.get("Content-Security-Policy", "") and "Intl.DateTimeFormat" in V1.get(B + "/vote/time.js").text, "own small script only")
 _, _, s2 = page(V2, PP)
 _, _, s3 = page(V3, PP)
 _, _, s4 = page(V4, PP)
