@@ -70,7 +70,10 @@ with this exemption reason.
   and **Crew** (Drehpersonal of the shoot calculation: name DE / EN, daily rate = the client's price, internal /
   external, an optional markup in percent). Purchase prices and markups reach only the organisation's admins: members
   get the rows without them (also in the export), never in a PDF.
-- **Equipment** - devices with a daily rate, and **sets** (a bundle of devices with a discount in percent).
+- **Equipment** - devices with a daily rate, and **sets** (a bundle of devices with a discount in percent). 2.92.0: admins also
+  record purchase, depreciation and insurance values (see [Equipment value](#equipment-value-depreciation-and-insurance-list-2920)).
+- **Contracts & insurance** (2.92.0, admins) - business contracts and insurances with notice deadlines, see
+  [Contracts and insurance](#contracts-and-insurance-2920).
 - **Text blocks** - reusable texts in German and English, grouped by kind: the rights catalogue (`rights_time`,
   `rights_territory`, `rights_media`), introduction, closing, note, free block between positions, raw data note.
   The first call of the module copies the country pack's catalogue into the organisation's text blocks.
@@ -449,6 +452,67 @@ adds `gross`), `POST /api/office/fixed-costs/import/preview` (multipart `file`),
 (`{items: [{label, amount, repeat, start, until?, category?, vat_rate?}]}` -> `{created, ids}`),
 `POST /api/office/fixed-costs/delete` (`{ids}`: the undo of an import), `GET /api/office/fixed-costs/import/template`,
 `GET/PUT /api/office/cashflow/check` (`{on, user_id}` -> `{on, user_id, task_id, people, lost}`).
+
+## Contracts and insurance (2.92.0)
+
+The tab **Contracts & insurance** (office admins only; in a personal office its person) keeps the business contracts of the
+office in one place: insurances, rent, leasing, service providers and others. Per contract: name, provider, policy or
+contract number, the contribution per month / quarter / year (net when a VAT rate is set), start, the end of the current
+term, the notice period (days, weeks, months), the automatic renewal (or "ends without renewal"), how many days before the
+deadline to remind, a note and the contract document. The list is grouped by kind and shows the contribution per month and
+the next deadline ("Cancel by 12 Mar 2027 · 41 days left", in red from the reminder lead on).
+
+- **Deadline**: the last day to cancel is the end of the term minus the notice period (the same logic as the household
+  contracts in Home & life). When it has passed and the contract renews, the term rolls on to the next one; a contract
+  without renewal is simply over.
+- **Deadline as a task** (on by default): one task in a list you pick (default: your Basket), due on the last day to cancel,
+  with reminders and a repeat that follows the renewal. Changes to the contract update the task; switching it off,
+  archiving or deleting the contract ends the task (it is completed, never deleted). Agents that may see that list can remind
+  you of the deadline (event `contract_notice`, see AGENTS.md); Kalmido itself never phrases anything.
+- **Cash flow**: with "Contribution in the cash flow" (on by default) the contribution is an outflow in the cash flow like a
+  fixed cost (kind *Contract or insurance*, net or gross by the VAT rate), from the start (else the start of the current
+  term) every period, up to the end of the term when it does not renew. The fixed costs list shows these rows read-only
+  under *From contracts* with a link to the contract - they are never copied into the fixed costs.
+- **Document**: choose a document of the office's documents space (the organisation's, or your own in a personal office)
+  or upload one there; it is stored encrypted like every document.
+- Cost, number and note are encrypted at rest. Every change is one undo step; a deleted contract can be restored by the
+  undo (it is purged after 30 days).
+
+API (office admins; agents and members 403, another office area 404): `GET /api/office/agreements` (`?archived=1`),
+`POST /api/office/agreements`, `GET|PATCH|DELETE /api/office/agreements/<id>`, `POST /api/office/agreements/<id>/restore`.
+Fields: `kind` (insurance | rent | leasing | service | other), `name`, `provider`, `number`, `cost`, `per` (month | quarter |
+year), `vat_pct` (null | "19" | "7" | "0"), `start`, `ends`, `notice`, `notice_unit` (d | w | m), `renew_months` (0-120, 0 =
+ends), `lead_days`, `cashflow` (0|1), `doc_node_id`, `note`, `archived` (0|1, PATCH), `task` (0|1) and `list_id` (the
+deadline task). `GET /api/office/fixed-costs` also answers `agreements` (the contributions in the cash flow, read-only).
+
+## Equipment value, depreciation and insurance list (2.92.0)
+
+Admins of an office (and every person in their personal office) can record what a device cost:
+purchase date, net purchase price, serial number, vendor and the receipt. Open a device and unfold
+**Purchase and value**.
+
+- **Take from receipt** picks a document of the office's document space and proposes date, net price
+  and vendor. The net price is only filled in when the receipt states its VAT rate (19 % or 7 %);
+  otherwise the gross amount is shown as a hint and you enter the net price yourself.
+- **Depreciation**: a useful life is suggested from the category or name (for example computers and
+  software 12 months, cameras, lenses, light and sound 84, drones 84, furniture 156, vehicles 72, everything
+  else 60) and can be changed per device. Devices up to 800 EUR net are written off in full in the
+  purchase year, more expensive ones linearly by the month from the purchase month on. The table in the
+  device shows depreciation and book value per year.
+- **Insurance values**: the new value defaults to the purchase price, the current value to the book
+  value; both can be overwritten. **Insured by** links the device to an insurance contract
+  (Contracts & insurance).
+- The equipment list shows the sums (new value, current value, depreciation of the year) and exports the
+  insurance list as CSV or PDF, optionally filtered by policy.
+
+Members of an organisation see the devices, never their prices or values. All prices, values and
+serial numbers are encrypted at rest. No tax advice; figures without guarantee.
+
+API (office admins; members 403, another office area 404): the fields go through `POST|PATCH /api/office/equipment[/<id>]`
+(`purchase_date`, `purchase_net`, `new_value`, `current_value`, `serial_no`, `vendor`, `receipt_node_id`, `life_months`,
+`agreement_id`); `GET` answers admins also `afa_plan`, `afa_year`, `book_value`, `new_value_eff`, `current_value_eff`,
+`life_suggest`, `life_eff`, `agreement_name`. `GET /api/office/equipment/value` (sums and rows), `value.csv`, `value.pdf`
+(`?agreement_id=`, 0 = not insured), `GET /api/office/equipment/policies`, `GET /api/office/equipment/receipts[/<id>]`.
 
 ## Web API
 
