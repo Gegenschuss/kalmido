@@ -17,7 +17,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + TOK}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
-const enter = (w, el) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
+const enter = (w, el) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true}));  // 2.94.0 (#2024): Ctrl+Enter sends
 const menuItem = (d, label) => [...d.querySelectorAll('[role="menuitem"]')].find(b => b.textContent.trim() === label);
 
 (async () => {

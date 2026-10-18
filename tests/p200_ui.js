@@ -117,7 +117,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   const panel = d.querySelector('#achat');
   check(panel && !panel.classList.contains('hidden') && /Claude/.test(panel.querySelector('.chath').textContent), 'chat side panel open');
   const ci = d.querySelector('#chat-in');
-  ci.value = 'How far is the trailer?'; ci.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', bubbles: true})); await sleep(900);
+  ci.value = 'How far is the trailer?'; ci.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', ctrlKey: true, bubbles: true}))  /* 2.94.0 (#2024) */; await sleep(900);
   check(d.querySelector('#achat .cmsg.me')?.textContent.includes('How far is the trailer?'), 'my message shown');
   const cht = (await v1('GET', '/agent/chats')).data;
   check(cht.length === 1 && cht[0].body === 'How far is the trailer?', 'agent receives it');
