@@ -175,6 +175,12 @@ r2 = A.post(B + f"{DR}/{D1}/trip")
 check(r2.status_code == 200 and r2.json()["existing"] and r2.json()["trip"]["id"] == t.get("id"), "take over again: the same trip " + r2.text[:120])
 check(sum(1 for x in A.get(B + O + "/trips?year=2026").json()["trips"] if x["dest"] == "Lübeck") == 1, "exactly one trip")
 check(next(d for d in A.get(B + DR + f"?vehicle_id={VP}&year=2026").json()["drives"] if d["id"] == D1)["trip_id"] == t.get("id"), "the drive knows its trip")
+# 2.93.0 B (#1928 review): the takeover in the change log; later other km -> a hint, the trip keeps its km
+check([x["action"] for x in A.get(B + f"{DR}/{D1}/log").json()["log"]] == ["create", "change", "trip"], "the log: the takeover once")
+r = A.patch(B + f"{DR}/{D1}", json={"odo_end": "10140"})
+check(r.ok and r.json()["km"] == "140.0" and r.json()["trip_km"] == "130.0" and r.json()["trip_hint"] == "The trip in the travel expenses still has 130.0 km."
+      and next(x for x in A.get(B + O + "/trips?year=2026").json()["trips"] if x["id"] == t.get("id"))["km"] == "130.00", "other km: a hint, the trip unchanged " + r.text[:300])
+check(A.patch(B + f"{DR}/{D1}", json={"odo_end": "10130"}).json()["trip_hint"] == "", "the same km again: no hint")
 check(A.post(B + f"{DR}/{D2}/trip").status_code == 400, "a private drive is not taken over")
 
 # ---------------------------------------------------------------- report, rate, EUeR
