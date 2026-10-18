@@ -330,6 +330,13 @@ check(pub.get(f"{B}/s/b/alice-termine").status_code == 404 and pub.get(f"{B}/s/b
 TOK4 = link_in(ms3[1], "c") if len(ms3) > 1 else "z" * 43
 check(pub.get(f"{B}/s/b/c/{TOK4}").status_code == 404, "no confirmation while the page is off")
 A.put(B + AP + "/page", json={"enabled": True})
+# 2.94.0 (#1929 review): the person cancels an open booking: its confirmation link shows the state (410), not the bad-link 404
+if len(ms3) > 2:
+    TOK5 = link_in(ms3[2], "c")
+    B5 = dbx("SELECT id FROM appt_bookings WHERE email=? ORDER BY id OFFSET 2 LIMIT 1", (M3,))[0][0]
+    check(A.post(B + f"{AP}/bookings/{B5}/cancel", json={}).ok, "the person cancels an open booking")
+    r = pub.get(f"{B}/s/b/c/{TOK5}")
+    check(r.status_code == 410, "its confirmation link: 410, not 404 " + str(r.status_code))
 
 # ================================================================== a freelancer without an organisation
 r = Do.get(B + AP + "/page").json()

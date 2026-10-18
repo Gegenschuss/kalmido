@@ -191,7 +191,8 @@ The customer chooses a time and types name, e-mail and optionally a phone number
 a confirmation link and holds the time for 30 minutes. Only the button on the confirmation page books it (a link that a
 mail scanner opens confirms nothing). Then Kalmido makes the event (the customer as invitee, the details in the notes), a
 contact in your address book (an existing contact with the same e-mail is used), the lead (if chosen), and sends a second
-mail with a link to cancel. You get a push like for an invitation.
+mail with a link to cancel. You get a push like for an invitation. The mails go out under your name; a customer's reply goes to
+the e-mail address of your account.
 
 Your bookings are listed in the same window. **Call off…** cancels a booking: the event is deleted (restorable from the
 calendar's deleted events) and the customer gets a mail with your reason. A customer can cancel with the link in the mail
@@ -199,7 +200,7 @@ until the appointment starts; you get a push.
 
 Protection: unknown and switched-off pages look the same (no guessing of addresses), the links in the mails are random
 (256 bits, only their hash is stored), a hidden field catches simple bots, posts from other sites and too many requests
-from one address are refused, one e-mail address can have at most 3 unconfirmed bookings, a page at most 20, and the
+from one address are refused, one e-mail address can have at most 3 unconfirmed bookings, a page at most 50, and the
 server's daily limit of mails per recipient applies. Unconfirmed bookings are deleted a week after they expired. The
 booking page is separate from the disposition (bookings of people and equipment in the office).
 
