@@ -401,4 +401,78 @@ document.addEventListener('toggle', e => {
 
 // ---- 2.95.0 B (#1932): the import of a per diem spreadsheet (part B fills this block; server kalmido/office/vmaimport.py).
 // rk_impBtn: the button that opens the import (empty list, evaluation view).
-function rk_impBtn() { return ''; }
+function rk_impBtn() { return `<button type="button" class="btn sm rki-btn" data-rki="pick">${ic('upload', 's')}<span>${tr('Take over from Excel')}</span></button>`; }
+function rk_impPick() {
+  const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  i.onchange = () => { if (i.files[0]) rk_impPreview(i.files[0]); }; i.click();
+}
+async function rk_impPreview(file) {
+  const fd = new FormData(); fd.append('file', file);
+  let j;
+  try {
+    const r = await fetch('/api/office/trips/import/preview', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
+    j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.statusText);
+  } catch (x) { toast(x.message || tr('unknown')); return; }
+  rk_impModal(j, file.name);
+}
+// a sheet = a person: a person of the office (u<id>) or the sheet's name as a free name (n)
+function rk_impModal(j, name) {
+  const sheets = j.sheets || [], ppl = j.people || [];
+  sheets.forEach(s => { s.pv = s.person?.id ? `u${s.person.id}` : 'n'; });
+  const md = modal(''), card = $('.card', md), ok = r => r.sel && r.status !== 'error';
+  md.classList.add('ofcdlg', 'fcidlg', 'rki-dlg');
+  const amt = v => v == null ? '–' : ofcMoney(v);
+  const rowHtml = (r, si, i) => {
+    const sub = [r.date_to && r.date_to !== r.date_from ? `${fmtDateLoc(r.date_from)} – ${fmtDateLoc(r.date_to)}` : (r.date_from ? fmtDateLoc(r.date_from) : tr('Row {0}', r.row)),
+      r.t_start && r.t_end ? `${r.t_start}–${r.t_end}` : '', r.purpose === 'acquisition' ? tr('Acquisition / research') : r.project].filter(Boolean).join(' · ');
+    const why = (r.reasons || []).join(' · ');
+    if (r.status === 'error') return `<li class="fcirow err"><span class="fcick" aria-hidden="true">${ic('x', 's')}</span><span class="ofcn"><b>${esc(r.dest || tr('Row {0}', r.row))}</b><small>${esc(tr('Row {0}', r.row))} · ${esc(why)}</small></span></li>`;
+    return `<li class="fcirow rki-row ${r.sel ? 'on' : ''} ${r.status}"><label class="fcick"><input type="checkbox" data-rki="sel" data-s="${si}" data-i="${i}" ${r.sel ? 'checked' : ''} aria-label="${esc(tr('Take over {0}', r.dest || tr('Trip')))}"></label>
+      <span class="ofcn"><b>${esc(r.dest || tr('Trip'))}</b><small class="muted">${esc(sub)}</small>${why ? `<small class="rki-why">${esc(why)}</small>` : ''}</span>
+      <span class="fciamt"><span>${amt(r.amount)}</span><small class="muted">${esc(tr('Excel: {0}', r.excel == null ? '–' : ofcMoney(r.excel)))}</small></span></li>`;
+  };
+  const draw = () => {
+    const n = sheets.reduce((a, s) => a + s.rows.filter(ok).length, 0), cnt = k => sheets.reduce((a, s) => a + s.rows.filter(r => r.status === k).length, 0);
+    card.innerHTML = `<h3>${tr('Take over per diems from Excel')}</h3><p class="muted">${esc(name)} · ${esc([cnt('new') ? trn('{0} new', '{0} new', cnt('new')) : '', cnt('warn') ? trn('{0} with a hint', '{0} with a hint', cnt('warn')) : '', cnt('dup') ? trn('{0} already there', '{0} already there', cnt('dup')) : '', cnt('error') ? trn('{0} with an error', '{0} with an error', cnt('error')) : ''].filter(Boolean).join(' · '))}</p>
+      ${sheets.map((s, si) => `<section class="rki-sheet"><div class="rki-head"><label class="rki-pl" for="rki-p${si}">${esc(s.sheet)}</label>
+        <select id="rki-p${si}" data-rki="person" data-s="${si}">${ppl.map(p => `<option value="u${p.id}" ${s.pv === `u${p.id}` ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="n" ${s.pv === 'n' ? 'selected' : ''}>${esc(tr('As a free name: {0}', s.person?.name || s.sheet))}</option></select>
+        <small class="muted rki-sum">${esc(tr('Sum: Excel {0}, calculated {1}', ofcMoney(s.sum_excel), ofcMoney(s.sum_calc)))}</small></div>
+        <ul class="fcilist rki-list" role="list">${s.rows.map((r, i) => rowHtml(r, si, i)).join('')}</ul></section>`).join('')}
+      <div class="aerr" role="alert"></div>
+      <div class="foot"><span class="spacer"></span><button class="btn" data-rki="close">${tr('Cancel')}</button><button class="btn pri" data-rki="go" ${n ? '' : 'disabled'}>${esc(trn('Take over {0} trip', 'Take over {0} trips', n))}</button></div>`;
+  };
+  draw();
+  md.addEventListener('change', e => {
+    const t = e.target.closest('[data-rki]'); if (!t) return;
+    const s = sheets[+t.dataset.s]; if (!s) return;
+    if (t.dataset.rki === 'person') s.pv = t.value;
+    else if (t.dataset.rki === 'sel') { const r = s.rows[+t.dataset.i]; if (r) r.sel = t.checked; }
+    else return;
+    const sel = t.dataset.rki === 'person' ? `#rki-p${t.dataset.s}` : `[data-rki="sel"][data-s="${t.dataset.s}"][data-i="${t.dataset.i}"]`;
+    draw(); $(sel, md)?.focus();
+  });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button[data-rki]'); if (!b) return;
+    if (b.dataset.rki === 'close') { md.remove(); return; }
+    if (b.dataset.rki !== 'go') return;
+    const trips = sheets.flatMap(s => s.rows.filter(ok).map(r => ({date_from: r.date_from, date_to: r.date_to, dest: r.dest, overnight: r.overnight,
+      people: [s.pv === 'n' ? {name: s.person?.name || s.sheet} : {id: +s.pv.slice(1)}], purpose: r.purpose, project: r.project, note: r.note,
+      country: r.country, place: r.place, t_start: r.t_start, t_end: r.t_end, vma_days: r.vma_days})));
+    if (!await importTargetConfirm({what: trn('{0} trip', '{0} trips', trips.length), ws: ofcWs(), place: tr('Office')})) return;
+    b.disabled = true;
+    try {
+      const k = await api('POST', '/api/office/trips/import', {trips});
+      const ys = [...new Set(trips.map(t => t.date_from.slice(0, 4)))];
+      md.remove(); Object.assign(RK, {open: null, filter: 'all', view: 'trips'});
+      if (RK.year && !ys.includes(RK.year)) RK.year = ys.length === 1 ? ys[0] : '';  // show what came in
+      rk_reload();
+      toast(trn('{0} trip imported', '{0} trips imported', k.created), async () => { await api('POST', '/api/office/trips/delete', {ids: k.ids}); rk_reload(); });
+    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+  });
+  return md;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-rki="pick"]'); if (!b) return;
+  e.preventDefault(); rk_impPick();
+});

@@ -471,3 +471,13 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .rkv-total{display:flex;align-items:center;gap:.5rem;padding:.5rem 0}
 
 /* 2.95.0 B (#1932): the import of a per diem spreadsheet (rki-) */
+.rki-sheet{margin:.75rem 0 0}
+.rki-head{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem .625rem}
+.rki-pl{font-weight:600}
+.rki-head select{min-height:2.75rem;max-width:100%}
+.rki-sum{flex:1 1 100%}
+.rki-list{max-height:none}
+.rki-dlg .card{max-height:90vh;overflow-y:auto}
+.fcirow .ofcn .rki-why{color:var(--muted);white-space:normal}
+.fcirow.warn .ofcn .rki-why{color:var(--accent)}
+@media (max-width:40rem){.rki-head select{flex:1 1 100%}.rki-row .ofcn{flex:1 1 calc(100% - 3.5rem)}}
