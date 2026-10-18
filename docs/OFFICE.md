@@ -358,6 +358,24 @@ e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addre
 - **Search**: subject, sender and text (a hashed word index, no plain index).
 - **Agents** have no access to filed mails in 2.84 (no API route, no MCP tool).
 
+## Subscriptions and tools (2.91)
+
+The office tab "Subscriptions & tools" (office admins; in a personal office its owner) shows every fixed cost marked as a
+subscription: price, repeat, the next renewal, the last day to cancel (notice period in days), who uses it and a "hardly
+used" switch. At the top are the sums per month and per year (net or gross; quarterly and yearly amounts spread over the
+months, one-off costs not counted) and, when some are marked, what the hardly used ones cost a year. Subscriptions are
+ordinary fixed costs: the fixed costs list in the cash flow, the spreadsheet import (optional columns "Abo" and
+"Kündigungsfrist" in days) and this view edit the same rows, and the cash flow counts them once. A reminder (days before the
+last day to cancel, for an office admin) puts a task "Check subscription: <name>" into that person's inbox, due on the last
+day to cancel, with a link to the view and never an amount; it comes once per deadline and stays when the reminder is
+switched off. Suggestions list fixed costs that look like software or a small repeating tool; nothing is marked by itself.
+The list can be downloaded as CSV.
+
+Routes (office admins): `GET /api/office/subs` {items, totals, candidates, people, remind_people}, `GET
+/api/office/subs.csv`; writing goes through the fixed cost routes with the fields `sub`, `notice_days`, `seats` (user ids
+of the office area or free names), `low_use`, `remind_days`, `remind_user`, `url` (http / https). Answers of the fixed
+costs carry `next_renewal`, `cancel_by`, `per_month` / `per_year` (gross) and `per_month_net` / `per_year_net`.
+
 ## Sales pipeline and figures (2.50)
 
 Two tabs for the admins of the office area (a personal office: its owner; members get `403`).
@@ -639,6 +657,30 @@ fee of a finalised reminder stays open after its invoices are paid. Reminder ans
 the invoice stay unchanged; the fee does not keep an invoice from being `paid`. A finalised reminder whose invoices are
 all paid or cancelled has the derived state `done` ("Settled", `settled: true`, never stored); the list shows settled
 reminders below the open ones.
+
+## Invoice series (2.91)
+
+An invoice can be repeated as a series: in the editor of an invoice choose "Repeat as series", pick the interval (monthly,
+quarterly, yearly), the start of the first period of service and an optional start of the last period. On the day of every
+period Kalmido makes a new invoice from the template: a normal invoice with the date of that day, the period of service of
+the period (`service_from` / `service_to`), the next number when it is finalised and the e-invoice (ZUGFeRD / XRechnung)
+like any other invoice. By default it is a draft that waits for you (a task in your inbox links to it, never an amount);
+with "Send automatically" it is finalised and mailed to the client's invoice address at once - if a check fails (missing
+fields, no address, mail not set up, the send budget) it stays a draft without a number and the task names the reason.
+Placeholders in the project title, introduction, closing and positions are filled per period: `{period}`
+(01.10.2026 - 31.10.2026), `{month}` (October 2026), `{quarter}` (Q4 2026), `{year}`; unknown braces stay, the template
+keeps them. A period starting on the 31st falls on the last day of shorter months. The series are listed above the
+invoices ("Invoice series": pause, make now, edit, delete with undo, restore from the deleted ones); an invoice made by a
+series shows "From series ..., period ..." and carries `series_id` / `series_period` (one invoice per series and period).
+The cash flow shows the expected income of the coming periods as "Invoice series" (kind `series`, planned, due on the
+period start plus the template's payment term) until the invoice exists; a draft of the series counts once. A missed
+period is made later, of more than three missed periods only the newest. Only admins of the office area (and a person in
+their personal office) manage series.
+
+Routes (office admins): `GET /api/office/series` (`?bin=1` the deleted ones), `POST /api/office/series` {template_id, every
+monthly | quarterly | yearly, start, until?, auto_send?, title?}, `PATCH /api/office/series/<id>`, `DELETE
+/api/office/series/<id>` (into the bin), `POST /api/office/series/<id>/restore`, `POST /api/office/series/<id>/run` (make the
+next period now). Table `office_inv_series`.
 
 ## Sending and DATEV
 
