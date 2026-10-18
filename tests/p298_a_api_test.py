@@ -282,10 +282,10 @@ check(PID in [x["id"] for x in Bo.get(B + "/api/polls?deleted=1").json()["items"
 check(Bo.post(B + f"/api/polls/{PID}/restore").ok and page(visitor(), PP)[0] == 200, "restored: link opens again")
 
 # ================================================================ moving between workspaces (P4)
-tl = Bo.post(B + "/api/lists", json={"name": "Private things"}).json()
+tl = Bo.post(B + "/api/lists", json={"name": "Private things", "org_id": None}).json()
 tid = Bo.post(B + "/api/tasks", json={"list_id": tl["id"], "title": "Plan lunch"}).json()["id"]
 r = mk(Bo, title="With a task", task_id=tid)
-check(r.status_code == 201 and r.json()["poll"]["task_id"] == tid, "bound to a private task")
+check(r.status_code == 201 and r.json()["poll"]["task_id"] == tid, "bound to a private task " + r.text[:200])
 TP = r.json()["poll"]["id"]
 check(mk(Bo, title="x", space=SP, task_id=tid).status_code == 400, "a task of another workspace cannot be chosen")
 check(mk(Ca, title="x", task_id=tid).status_code == 400, "a task the person does not see cannot be chosen")
