@@ -275,6 +275,12 @@ ROUTES = {
     "GET /api/attachments/{}/preview": "attachment", "GET /api/attachments/{}/agents": "attachment",
     "GET /api/list-files/{}/preview": "attachment", "GET /api/files/nodes/{}/preview": "file",
     # 2.93.0 A (#1927): document templates and documents with signature, office admins (p293_a_api_test.py)
+    "GET /api/office/doc-templates": "office", "POST /api/office/doc-templates": "office", "PATCH /api/office/doc-templates/{}": "office",
+    "DELETE /api/office/doc-templates/{}": "office", "POST /api/office/doc-templates/{}/restore": "office", "GET /api/office/doc-templates/starters": "office",
+    "GET /api/office/gen-docs": "office", "POST /api/office/gen-docs": "office", "GET /api/office/gen-docs/{}": "office", "PATCH /api/office/gen-docs/{}": "office",
+    "DELETE /api/office/gen-docs/{}": "office", "POST /api/office/gen-docs/{}/restore": "office", "POST /api/office/gen-docs/preview": "office",
+    "POST /api/office/gen-docs/{}/final": "office", "GET /api/office/gen-docs/{}/pdf": "office", "POST /api/office/gen-docs/{}/signoff": "office",
+    "GET /api/office/gen-docs/{}/signoffs": "office",
 
     # 2.93.0 B (#1928): the logbook, office admins (p293_b_api_test.py)
     "GET /api/office/vehicles": "office", "POST /api/office/vehicles": "office", "PATCH /api/office/vehicles/{}": "office",
