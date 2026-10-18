@@ -386,7 +386,8 @@ costs carry `next_renewal`, `cancel_by`, `per_month` / `per_year` (gross) and `p
 
 Two tabs for the admins of the office area (a personal office: its owner; members get `403`).
 
-- **Pipeline** - deals from the first inquiry to the order, in four stages: *Inquiry*, *Quotation sent*, *Order*, *Lost*.
+- **Pipeline** - deals from the first inquiry to the order, in four stages: *Inquiry*, *Quotation sent*, *Order*, *Lost*
+  (2.94: before them the leads, see below).
   A deal has a name, a client of the area or a free contact name, a net value in the office currency, a probability
   (preset 20 / 50 / 100 / 0 % by stage; a value changed by hand stays when the stage changes, *Order* and *Lost* always
   set 100 / 0), an expected date, a note and a reason when lost. On a computer the stages are columns (drag a card into
@@ -412,6 +413,27 @@ Routes: `GET /api/office/deals` (`items`, `summary`, `stages`, `probabilities`, 
 `PATCH /api/office/deals/<id>` (answers `before` = the old values, the undo), `DELETE /api/office/deals/<id>`,
 `POST /api/office/deals/<id>/restore`, `POST /api/office/deals/<id>/offer`, `POST /api/office/deals/<id>/project`,
 `GET /api/office/deals/summary`, `GET /api/office/kpi`. Clients, lists and quotations of another area are refused.
+
+### Leads (2.94)
+
+Leads are people who might become clients: the first column *Leads* of the pipeline, before *Inquiry* (the same deals,
+stage `lead`, preset 10 %). A lead has a source (website, recommendation, event, social media, appointment booking,
+import, agent, other), a next step, a follow-up day, the person, company, e-mail and phone. The column is sorted by
+follow-up day; a day that has come is marked in the accent colour, the toolbar counts the leads and those to follow up.
+Leads never count in the open sum, the weighted sum or the forecast. *Convert into a client* makes a client of the area
+from company / person / e-mail / phone (the person as its contact person) - or takes an existing client with the same
+e-mail or company name, which is offered - and moves the deal to *Inquiry*; the undo moves it back and removes a client
+made by the conversion as long as nothing else uses it. *Import CSV* reads a file with columns such as name, company,
+e-mail, phone, source, next step, follow-up, note, value (German, English, Spanish, French, Italian and Dutch headers;
+at most 1000 rows): a preview first, then the rows without errors are taken over; e-mails already in the pipeline or
+earlier in the file are skipped as duplicates. An import is one undo step (its leads go into the bin). A confirmed
+appointment booking adds a lead with the source *appointment booking* when its booking page names an office area.
+Agents (scope `office`, the office switches, acting for an admin) list leads, add leads and change the next step,
+follow-up day or note - they never convert, delete or set another stage.
+
+Routes: `GET` / `POST /api/office/deals/<id>/convert` (`{client_id?}`; `GET` = fitting existing clients),
+`POST /api/office/deals/<id>/unconvert` (`{remove_client?}`), `POST /api/office/leads/import` (`{text, commit?}`),
+`POST /api/office/leads/import/undo` (`{ids}`); agents `GET` / `POST /api/v1/office/leads`, `PATCH /api/v1/office/leads/<id>`.
 
 ## Cash flow and fixed costs (2.67)
 
