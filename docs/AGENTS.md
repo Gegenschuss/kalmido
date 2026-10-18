@@ -702,7 +702,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `sprint_started` | 2.60.0 (#343): a sprint of a project list shared with the agent started (switched on, started by hand, or the next one after closing) | `list_id`, `list`, `sprint` (id, num, title, start, end, goal, state, progress) |
 | `sprint_closed` | 2.60.0 (#343): a sprint was closed (by a person or after its last day); `sprint.review` holds the done / moved / added task ids, counts and points | `list_id`, `list`, `sprint` (with `review`), `next_sprint_id` |
 | `chat_pinned` | 2.62.0 (#1848): the person pinned or unpinned a message of the agent's chat (see [Pinned chat messages](#pinned-chat-messages-2620)); information only, nothing to answer (the reference launcher starts no run) | `message` (the chat message, with `pinned_at` / `pinned_by`), `pinned` (true / false), `user` `{id, name}` |
-| `contract_notice` | 2.70.0 (#1359): the last day to cancel a contract (Home & life) in a list shared with the agent is near: from the contract's own lead (else 30 days) before it; once per contract, deadline and agent; never from a health list; only while the person has the module *Contracts* on. Answer with ONE `propose_contract_notice` (see [Contracts and notice deadlines](#contracts-and-notice-deadlines-2700)) | `task_id`, `list_id`, `name`, `provider`, `cost`, `per`, `monthly`, `yearly`, `notice`, `notice_unit`, `due` (cancel by), `ends`, `renew_months`, `days`, `user` `{id, name}`, `lang`, `hint` |
+| `contract_notice` | 2.70.0 (#1359): the last day to cancel a contract (Home & life) in a list shared with the agent is near: from the contract's own lead (else 30 days) before it; once per contract, deadline and agent; never from a health list; only while the person has the module *Contracts* on. 2.92.0 (#1925): also a business contract of the office (Office > Contracts & insurance, its deadline task carries `fam.office_agreement`; `office` true; the person needs the office module instead). Answer with ONE `propose_contract_notice` (see [Contracts and notice deadlines](#contracts-and-notice-deadlines-2700)) | `task_id`, `list_id`, `name`, `provider`, `cost`, `per`, `monthly`, `yearly`, `notice`, `notice_unit`, `due` (cancel by), `ends`, `renew_months`, `days`, `user` `{id, name}`, `lang`, `office` (2.92.0), `hint` |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -2840,6 +2840,9 @@ Home & life keeps a contract as a task (the last day to cancel is its due date, 
 phrases anything: once per contract and deadline the agents that see the contract's list get the event `contract_notice`
 (the contract's own lead before the last day to cancel, else 30 days; never from a health list, never across the agent's
 organisation or its list limit). The agent answers with ONE sentence; the person decides.
+Since 2.92.0 (#1925) business contracts and insurances of the office (Office > Contracts & insurance) come the same way: the
+option "Deadline as a task" keeps one such task in a list the office admin picks (`fam.office_agreement` = the contract's id,
+the event says `office: true`).
 
 | What | Endpoint | MCP | Scope |
 |---|---|---|---|

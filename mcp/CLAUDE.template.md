@@ -391,7 +391,8 @@ you: never guess its value. Formulas: `=SUMME(B2:B9)`, `=stunden*satz`, `=projek
 ### Contracts and notice deadlines (2.70.0)
 The event `contract_notice` comes once per contract and deadline when the last day to cancel a contract in a list shared
 with you is near (the contract's own lead, else 30 days): `name`, `provider`, `cost` / `per`, `monthly`, `due` (cancel by),
-`ends`, `renew_months`, `user` and `lang` (the person whose contract it is). Answer with ONE `propose_contract_notice`: one
+`ends`, `renew_months`, `user` and `lang` (the person whose contract it is); `office` true = a business contract or insurance
+of the person's office (2.92.0), else a household one. Answer with ONE `propose_contract_notice`: one
 sentence in their language that says what cancelling saves or what staying costs and until when they can decide, without
 pressure; never write that something was cancelled. The person takes it as a note on the contract (optionally with a reminder)
 or discards it (event `job`). You never cancel, send or change a contract yourself; health lists and the journal never reach you.
