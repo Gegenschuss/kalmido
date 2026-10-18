@@ -21,7 +21,7 @@ import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
-from freelancer_fixture import freelancer  # noqa: E402
+from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -56,7 +56,8 @@ def b64u(n):
 
 def e2e_keys():
     return {"pub": {"kty": "EC", "crv": "P-256", "x": b64u(32), "y": b64u(32), "ext": True, "key_ops": []},
-            "bundle_pass": {"v": 1, "kdf": "pbkdf2-sha256", "iter": 600000, "salt": b64(16), "iv": b64(12), "ct": b64(200)}}
+            "bundle_pass": {"v": 1, "kdf": "pbkdf2-sha256", "iter": 600000, "salt": b64(16), "iv": b64(12), "ct": b64(200)},
+            "bundle_rec": {"v": 1, "kdf": "hkdf-sha256", "salt": b64(16), "iv": b64(12), "ct": b64(200)}}
 
 
 if not os.environ.get("P296B_NOSTART"):
@@ -222,7 +223,7 @@ check(Bo.get(B + f"/api/sheets/{TS}").status_code == 404, "... then it is hers a
 # ================================================================ a person without an organisation
 # freelancer-matrix: wiki
 # freelancer-matrix: sheets
-FID, Fl = freelancer(B, A)
+FID, Fl = freelancer(B, A, features=FEATURES + ",sheets")
 FP = page(Fl, "Notes/Idea", "an idea")
 check(mv(Fl, pages=[FP], space="private", to=SP).status_code == 409, "freelancer: no organisation to move a page to (409)")
 check(mv(Fl, folder="Notes", space="private", to="private").status_code == 409, "freelancer: the private space is the only one (409)")
