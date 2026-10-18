@@ -310,6 +310,23 @@ S5 = A.post(B + f"{GD}/{G3}/signoff", json={}).json()
 T5 = S5["url"].split("/s/q/")[1]
 check(anon("/s/q/" + T5).status_code == 200, "a new link works")
 check(A.delete(B + f"{GD}/{G3}").ok and anon("/s/q/" + T5).text == UNKNOWN.text, "archiving the document stops its link")
+# 2.93.0 (#1927) review: archived while the customer has the page open -> the same void answer, nothing signed
+G6 = A.post(B + GD, json={"template_id": TC, "client_id": CL}).json()["id"]
+A.post(B + f"{GD}/{G6}/final")
+T6 = A.post(B + f"{GD}/{G6}/signoff", json={}).json()["url"].split("/s/q/")[1]
+FK6 = form_key(anon("/s/q/" + T6).text)
+sql("UPDATE office_gen_docs SET archived=1 WHERE id=?", (G6,), write=True)  # archived, the link row still open (the race window)
+r = post(T6, f=FK6, name="Max Muster", ok="1", do="accept")
+check(r.status_code == 404 and r.text == UNKNOWN.text, f"archived before the decision: the same void answer ({r.status_code})")
+st6 = sql("SELECT d.status, s.state FROM office_gen_docs d JOIN office_signoffs s ON s.gen_doc_id=d.id WHERE d.id=?", (G6,))[0]
+check(st6[0] == "final" and st6[1] == "open", f"archived before the decision: status stays {st6}")
+G7 = A.post(B + GD, json={"template_id": TC, "client_id": CL}).json()["id"]
+A.post(B + f"{GD}/{G7}/final")
+T7 = A.post(B + f"{GD}/{G7}/signoff", json={}).json()["url"].split("/s/q/")[1]
+FK7 = form_key(anon("/s/q/" + T7).text)
+check(A.delete(B + f"{GD}/{G7}").ok, "archive with an open link")
+r = post(T7, f=FK7, name="Max Muster", ok="1", do="accept")
+check(r.status_code == 404 and r.text == UNKNOWN.text and A.get(B + f"{GD}/{G7}").json()["status"] == "final", "archived through the app: decision void, status stays")
 sql("UPDATE office_gen_docs SET body_hash=? WHERE id=?", ("0" * 64, G2), write=True)  # (decided already: no effect on the page)
 check(anon("/s/q/" + T3).status_code == 200, "a decided link keeps its confirmation page")
 
