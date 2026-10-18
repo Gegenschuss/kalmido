@@ -285,7 +285,7 @@ j = Bo.get(B + f"/api/attachments/{F_DOCX}/agents").json()
 check([a["id"] for a in j.get("agents", [])] == [CL] and j["agents"][0]["name"] == "Claude" and j.get("task_id") == T,
       f"#1926: the agent of the list can summarise {j}")
 cur = dbx("SELECT COALESCE(MAX(id), 0) FROM agent_events WHERE agent_id=?", (CL,))[0][0]
-body = f"<@{CL}> Please summarise the attachment “auftrag.docx” (attachment_id {F_DOCX}) and post the summary as a comment."
+body = f"<@{CL}> Please summarize the attachment “auftrag.docx” (attachment_id {F_DOCX}) and post the summary as a comment."
 r = Bo.post(B + f"/api/tasks/{T}/comments", json={"body": body})
 check(r.ok and f"<@{CL}>" in r.json().get("body", ""), f"#1926: the comment keeps the mention {r.text[:200]}")
 ev = dbx("SELECT event, payload FROM agent_events WHERE agent_id=? AND id>? ORDER BY id", (CL, cur))
