@@ -1108,6 +1108,17 @@ fresh; run p287b_a_api "$PY" p287b_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.87.9 part B (#1940 #1938 #1936 #1935 #1934): import target confirmation, Paperless in the settings, search
 fresh; run p287b_b_api "$PY" p287b_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p287b_b_ui node p287b_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.96.0 part A (#1941): files, folders and documents between the private space and an organisation
+fresh; run p296_a_api "$PY" p296_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p296_a_ui node p296_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.96.0 part B (#1941): wiki pages / folders and tables between the private space and an organisation
+fresh; run p296_b_api "$PY" p296_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p296_b_ui node p296_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.96.0 part C (#2015): one thread card per job in the agent chat, the chat filter
+fresh; run p296_c_api "$PY" p296_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p296_c_ui node p296_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.96.0 part D (#1941 / #1918): an organisation's export into the private space, the own absence area in "Private"
+fresh; run p296_d_api "$PY" p296_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.87.9 part E (#1914 #1920 #1909 #1933 #1937 #1952 #1963): polish
 fresh; run p287b_e_ui node p287b_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.90.0 part A (#1921): bookkeeping light (EUeR, VAT return figures, tax reserve, receipt photo)
