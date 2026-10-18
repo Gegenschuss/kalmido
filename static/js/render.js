@@ -609,7 +609,12 @@ function topFolded() {
 }
 // UX1 (U01, owner decision 4): the header's "…" menu. Phones: "Undo: …" / "Redo: …" first (no ← → there), then the rarer
 // view actions (select, sort), then the list's own menu or the filter
-function topMoreItems() {
+function topMoreItems() {  // 2.99.0 B (#2183): + the knowledge pages' "Space" section
+  const out = topMoreItems0();
+  if (S.route.mod !== 'wiki' || S.me?.kid || typeof w299_areaItems !== 'function') return out;
+  return [...out, ...(out.length ? ['-'] : []), ...w299_areaItems()];
+}
+function topMoreItems0() {
   if (S.me?.kid) return [{label: tr('Account'), icon: 'user', fn: () => settingsModal('account')}, {label: tr('Settings'), icon: 'gear', fn: () => settingsModal()},
     ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])];  // 2.19.0: a child's "…": its account only
   const m = S.route.mod, k = S.route.key, fold = topFolded(), out = [], sec = [];

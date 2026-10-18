@@ -37,3 +37,6 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 .wkac button.on,.wkac button:hover{background:var(--accent-soft)}
 .wktpl{display:flex;flex-direction:column;gap:.25rem;margin-bottom:.5rem}
 .wkmen{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;font-size:var(--fs-s)}
+/* 2.99.0 B (#2183): the page menu shows on hover / keyboard focus of the title row; touch devices always see it */
+@media (hover:hover){.nthead [data-wk="pmenu"]{opacity:0;transition:opacity .2s}.nthead:hover [data-wk="pmenu"],.nthead:focus-within [data-wk="pmenu"],.nthead [data-wk="pmenu"][aria-expanded="true"]{opacity:1}}
+@media (prefers-reduced-motion:reduce){.nthead [data-wk="pmenu"]{transition:none}}
