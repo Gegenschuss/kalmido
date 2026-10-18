@@ -425,6 +425,10 @@ docker compose up -d kalmido
       bind:
         create_host_path: false
   ```
+- **Leftover file versions (2.97.0).** Once a night the server compares the file store folders (`attachments/files/<id>/`)
+  with the versions in the database and removes stored files no version names and that are older than a day (left behind
+  when the server stopped in the middle of a move between workspaces); at most 200 folders per watchdog tick, the server log
+  names the number (`files cleanup: N stored file(s) without a version removed`).
 - **After a move, check the attachments.** Compare the number and the total size of the files in the data folder's
   `attachments/` with the old server, not only the database (a copy that stopped half-way still starts fine).
 - **Encryption at rest.** Put the data disk on LUKS (or your platform's disk encryption) and keep the key off the
