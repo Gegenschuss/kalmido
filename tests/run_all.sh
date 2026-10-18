@@ -1079,6 +1079,12 @@ fresh; run p286_e_api "$PY" p286_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2661_b_ui node p2661_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.87.0 (#1983 #1984): organisation boundary of event invitations and list hand-overs (audit T3 H1 + H2)
 fresh; run p287_a_api "$PY" p287_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.91.0 part A (#1923): invoice series (recurring invoices, drafts or sent, cash flow)
+fresh; run p291_a_api "$PY" p291_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p291_a_ui node p291_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.91.0 part B (#1924): subscriptions and tools (notice period, users, renewal reminder, hardly used)
+fresh; run p291_b_api "$PY" p291_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p291_b_ui node p291_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
