@@ -922,6 +922,51 @@ that the law requires in written form (they need a qualified signature). Kalmido
 advanced or qualified signature. The same flow confirms the **acceptance** of a project, a section or a milestone from the
 list's Share dialog > Public link (*Request acceptance*); the customer's list page shows the open request.
 
+## Documents from templates (2.93.0)
+
+Tab *Documents* (admins of the office area; members `403`, agents `403`, another area `404`; a person without an
+organisation uses it in the personal office). Two parts: **templates** and the **documents** made from them. The task
+templates of the lists are something else and stay as they are.
+
+**Templates** (`office_doc_templates`): kind (contract, order confirmation, non-disclosure agreement, other), name,
+language (de / en), text and *Documents from it can be signed by the customer*. The text is plain: a line starting with
+`#` is a heading (`##` a smaller one), `-` a list item, an empty line starts a new paragraph. Variables are written as
+`{{name}}` and inserted with the button bar: `{{client.name}}`, `{{client.address}}`, `{{client.contact}}`,
+`{{project.title}}`, `{{offer.number}}`, `{{offer.date}}`, `{{offer.total}}`, `{{company.name}}`, `{{company.address}}`,
+`{{today}}`. They are replaced by a plain text search, never evaluated; an unknown name stays as it is in the preview
+(marked) and is left empty in the PDF. *Use sample* takes over one of three short samples (service agreement, order
+confirmation, non-disclosure agreement) in the office's document language (or the other one) as an own template.
+Samples are sample text, no legal advice.
+
+**Documents** (`office_gen_docs`): made from a template for a client (required), optionally a project list (one the
+admin sees, of the same office area) and a quotation of the same client. A draft keeps the text with its variables; the
+preview fills them from the current client (name, address from the billing fields, default contact person), project,
+quotation (number, date, total incl. VAT) and company. *Finish* fills the variables for good, freezes the text
+(`body_hash` = SHA-256 of it) and files the PDF (letterhead and logo like a quotation) into the office documents space,
+in a folder named after the client. A finished document never changes: *Edit a copy* starts a new draft with its text.
+Archive instead of delete (undo restores). The client page lists the client's documents; the documents list filters by
+client, project and status. In a quotation's menu, *Create order confirmation* opens the dialog with client and quotation
+set.
+
+**Signature by the customer**: a finished document that may be signed gets a link (`office_signoffs`, kind `document`,
+the same rules as the approval of a quotation: 256-bit token, one live link per document, optional expiry, rate limits,
+form check value, the same `404` for unknown, expired, stopped and voided links). The customer page `/s/q/<token>` shows
+the text (escaped, no scripts), its SHA-256 and the PDF; the customer types a name, ticks *I sign this document* and signs
+or declines with an optional reason. Afterwards the document is *Signed* / *Declined*, the person who made the link gets
+a push (*Approval requests*), the office log has the decision, and the signed PDF (the original plus a block with name,
+time in UTC, the SHA-256 of the text and *Simple electronic signature*) is filed next to the original when an admin opens
+the documents next. Archiving a document or changing its text stops its link. This is a simple electronic signature:
+not for contracts that the law requires in written form.
+
+Routes (office admins only): `GET/POST /api/office/doc-templates` (`{starter: contract|confirmation|nda, lang?}` takes over
+a sample), `GET /api/office/doc-templates/starters?lang=`, `PATCH/DELETE /api/office/doc-templates/<id>`,
+`POST /api/office/doc-templates/<id>/restore`, `GET/POST /api/office/gen-docs` (`?client_id=&list_id=&status=&archived=1`;
+`{copy_of: id}` = edit a copy), `GET/PATCH/DELETE /api/office/gen-docs/<id>` (`PATCH` of a finished document `409`),
+`POST /api/office/gen-docs/<id>/restore`, `POST /api/office/gen-docs/preview`, `POST /api/office/gen-docs/<id>/final`,
+`GET /api/office/gen-docs/<id>/pdf` (`?signed=1`), `POST /api/office/gen-docs/<id>/signoff`,
+`GET /api/office/gen-docs/<id>/signoffs`; a link is stopped with `POST /api/office/signoffs/<sid>/revoke`. Template and
+document texts are encrypted at rest in organisations with encryption.
+
 ## Access log
 
 Every change and every read of documents and master data is written to the office log (`office_doc_log`): who, when,
@@ -1016,7 +1061,9 @@ Since 2.50.0 also `office_deals` (the sales pipeline; under row-level security, 
 Since 2.90.0 also `office_bank_imports` and `office_bank_tx` (the bank reconciliation; under row-level security,
 `amount`, `counterpart`, `purpose` and `iban` encrypted at rest, `deleted_at` = taken back and restorable) and the nullable
 columns `vat_pct` and `paid_at` of `rc_receipts` (VAT rate and payment day of a receipt); 2.87.0 runs on with them.
-Since 2.93.0 also `office_vehicles`, `office_drives` and `office_drive_log` (the logbook; under row-level security, the
+Since 2.93.0 also `office_doc_templates` and `office_gen_docs` (document templates and the documents made from them; the
+texts encrypted at rest, archived = removed and restorable), the column `gen_doc_id` of `office_signoffs` (a signature
+link of such a document), and `office_vehicles`, `office_drives` and `office_drive_log` (the logbook; under row-level security, the
 plate, start / destination / purpose and the logged values encrypted at rest, `deleted_at` = deleted and restorable) and
 the settings key `km_rate`; 2.92 runs on with them.
 
