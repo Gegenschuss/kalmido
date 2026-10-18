@@ -76,7 +76,7 @@ def _date(v, name, required=False):
 
 
 # ---------------------------------------------------------------- fixed costs
-def rk_fixed_clean(b, cur=None):
+def rk_fixed_clean(b, cur=None, c=None, oid=None):
     cur = cur or {}
     out = {}
     if "label" in b or not cur:
@@ -119,6 +119,8 @@ def rk_fixed_clean(b, cur=None):
     st, un = out.get("start", cur.get("start")), out.get("until", cur.get("until"))
     if st and un and un < st:
         raise BadInput(tr("The end is before the start"))
+    from .subs import abo_clean
+    out.update(abo_clean(c, oid, b, cur))  # 2.91.0 B (#1924): the subscription fields (sub, notice_days, seats, ...)
     return out
 
 
@@ -127,6 +129,8 @@ def _fixed_public(c, oid, r):
     out = {k: d.get(k) for k in ("id", "label", "amount", "start", "until", "repeat", "category", "vat_rate")}
     out["category"], out["vat_rate"] = out["category"] or "", int(out["vat_rate"] or 0)  # 2.67.0 (#1838)
     out["gross"] = dstr(fci_gross(out["amount"], out["vat_rate"]))
+    from .subs import abo_public
+    out.update(abo_public(d, out))  # 2.91.0 B (#1924): the subscription fields + next_renewal, cancel_by, per_month / per_year
     return out
 
 
@@ -181,7 +185,7 @@ def rk_fixed_post():
         raise BadInput(tr("Invalid data"))
     if c.execute("SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=?", (oid,)).fetchone()[0] >= MAX_FIXED:
         raise BadInput(tr("Too many entries"))
-    row = rk_fixed_clean(b)
+    row = rk_fixed_clean(b, c=c, oid=oid)  # 2.91.0 B (#1924): c, oid for seats / remind_user
     ts = iso(now_utc())
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)
     row = oc_enc_fields(c, oid, "office_fixed_costs", row)
@@ -205,7 +209,7 @@ def rk_fixed_patch(fid):
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    row = rk_fixed_clean(b, cur)
+    row = rk_fixed_clean(b, cur, c=c, oid=oid)  # 2.91.0 B (#1924)
     if row:
         row["updated_at"] = iso(now_utc())
         row = oc_enc_fields(c, oid, "office_fixed_costs", row)
@@ -285,7 +289,7 @@ def cf8_chain(c, oid, r):
 
 def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
     """{from, months, currency, today, basis, rows: [{month, in: {actual, plan}, out: {actual, plan}, balance}], entries: [...]}.
-    An entry: {month, dir in|out, state actual|plan, kind payment|invoice|offer|purchase|trip|fixed, date, amount, label,
+    An entry: {month, dir in|out, state actual|plan, kind payment|invoice|offer|series|purchase|trip|fixed, date, amount, label,
     number, doc_id | trip_id | fixed_id, overdue} (kind credit = a refund paid on a credit note, out; kind offer carries
     open_offer: true for a sent quotation not yet accepted, 2.88.0, #1915).
     2.67.0 (#1838): basis gross (default; the start page too) | net. Fixed costs are entered net with a VAT rate: gross adds
@@ -383,6 +387,8 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
         for day in rk_fixed_days(f, first, _add_months(last_month, 1) + "-00"):
             put(day, "out", "actual" if day <= today else "plan", "fixed", dec(f["amount"] if net else f["gross"]), f["label"], fixed_id=f["id"],
                 repeat=f["repeat"], category=f["category"], vat_rate=f["vat_rate"])
+    from .recurring import rin_cashflow
+    rin_cashflow(c, oid, put, first, _add_months(last_month, 1) + "-00", today, nf)  # 2.91.0 A (#1923): in: the coming periods of invoice series (plan)
     entries.sort(key=lambda e: (e["month"], e["dir"], e["date"], e["kind"]))
     rows = []
     cum_bal = cum_res = dec(0)

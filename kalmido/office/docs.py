@@ -1024,7 +1024,8 @@ DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "cr
             "locked_by", "sender", "recipient_snapshot", "tax_snapshot", "pack_version",
             "due_date", "paid_at", "pdf_sha256", "xml_sha256", "datev_sent_at",  # 2.38.0: the invoice's own marks
             "cancels_id", "ref_doc_ids", "source_doc_id",  # 2.38.0 review: a copy is a fresh document, bound to nothing
-            "version_of", "cashflow"}  # 2.88.0 (#1915): set below (a quotation's copy = its next version, cash flow auto)
+            "version_of", "cashflow",  # 2.88.0 (#1915): set below (a quotation's copy = its next version, cash flow auto)
+            "series_id", "series_period"}  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
 DUP_ITEM_SKIP = {"id", "tax_pct", "net", "tax_amount"}
 
 

@@ -246,12 +246,14 @@ OX_AREAS = (
     ("office/document_items.json", "office_doc_items", f"doc_id IN ({DSQ})"),
     ("office/document_parts.json", "office_doc_parts", "org_id=?"),  # 2.47.0 (#1215): the parts of quotations
     ("office/purchases.json", "office_purchases", "org_id=?"),  # 2.47.0 (#1649): purchase of accepted quotations (amount decrypted)
+    ("office/invoice_series.json", "office_inv_series", "org_id=?"),  # 2.91.0 A (#1923): invoice series (template, interval, next period)
     ("office/payments.json", "office_payments", "org_id=?"),
     ("office/pay-props.json", "office_pay_props", "org_id=?"),  # 2.51.0 (#1350): agents' payment match proposals
     ("office/signoffs.json", "office_signoffs", "org_id=?"),  # 2.50.0 (#1200): approval links + protocol (the token never)
     ("office/trips.json", "office_trips", "org_id=?"),  # 2.47.3 (#1022): travel expenses (decrypted like the others)
     ("office/trip_items.json", "office_trip_items", "org_id=?"),
     ("office/fixed_costs.json", "office_fixed_costs", "org_id=?"),  # 2.47.3 (#1652): fixed costs of the cash flow
+    ("office/sub_reminders.json", "office_sub_reminders", "org_id=?"),  # 2.91.0 B (#1924): reminder tasks before a subscription renews
     ("office/deals.json", "office_deals", "org_id=?"),  # 2.50.0 (#1196): the sales pipeline
     ("office/archive.json", "office_archive", "org_id=?"),
     ("office/archive-log.json", "office_archive_log", "org_id=?"),  # 2.81.0 B (#1834): the history of the archived documents
