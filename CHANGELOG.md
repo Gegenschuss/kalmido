@@ -28,9 +28,28 @@ Appointment booking for customers, leads before the sales pipeline, Enter in the
 - Team chat and agent chat (also editing a message): Enter makes a new line, Ctrl+Enter or Cmd+Enter sends, like the
   comments; the phone keyboard shows a return key, the send button names the shortcut (#2024).
 
+## [2.93.0] - 2026-10-18
+
+Documents from templates with a customer signature, and a logbook in the office.
+
+### Added
+- Office > Documents (admins; a person without organisation in the personal office): own templates for contracts, order
+  confirmations and NDAs with variables from client, project, quotation and company; three samples in German and English
+  to take over (no legal advice). A document for a client (optionally with project and quotation) shows a live preview,
+  *Finalise* freezes the text (SHA-256) and files the PDF in the client's folder of the documents; the client page lists
+  them, a quotation offers *Create order confirmation* (#1927).
+- Signature by customer link for such documents: the same simple electronic signature as the quotation approval (name +
+  confirmation, time, checksum); the signed PDF with a signature block is filed next to the original (#1927).
+- Travel expenses > Logbook: vehicles (private car with mileage allowance or company car), drives with odometer (km is
+  computed, gaps shown as a warning), kind business / private / home - workplace, client and project; every change is
+  logged with the values before, deleting can be undone. Business drives go into the travel expenses with one click
+  (once, without amounts). Year report per vehicle with business share and mileage allowance (rate per year), CSV / PDF
+  with the change log (#1928).
+- The mileage allowance of business drives with a private car is its own expense line in the income/expense statement
+  (2.90). No tax advice (#1928).
+
 ### Fixed
-- Office: parts of the layout added since 2.91 (subscriptions, contracts, equipment) applied on phones only (a missing
-  closing brace in office.css).
+- Office: the styles after the subscriptions block applied on phones only (a bracket missing since 2.91.0).
 
 ## [2.92.3] - 2026-10-18
 

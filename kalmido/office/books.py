@@ -260,12 +260,17 @@ def bk_euer(c, oid, year):
                                                                     "v": [Decimal(0)] * 3, "count": 0})
             x["v"] = [x["v"][0] + a, x["v"][1], x["v"][2] + a]  # travel receipts carry no input tax here
             x["count"] += 1
+    # 2.93.0 B (#1928): the mileage allowance of the logbook (business drives with a private car; no input tax)
+    from .logbook import lb_allowance_year
+    km = lb_allowance_year(c, oid, year)
+    if km["count"]:
+        exp["km"] = {"label": tr("Mileage allowance"), "v": [km["amount"], Decimal(0), km["amount"]], "count": km["count"]}
     m2 = lambda v: dstr(money(v))  # noqa: E731
     order = lambda k: (0, -int(dec(k[3:]))) if k.startswith("vat") else (1 if k == "exempt" else 2, 0)  # noqa: E731
     income = [{"key": k, "label": _income_label(k), "net": m2(v[0]), "vat": m2(v[1]), "gross": m2(v[2])}
               for k, v in sorted(inc.items(), key=lambda kv: order(kv[0]))]
     expenses = [{"key": k, "label": x["label"], "net": m2(x["v"][0]), "vat": m2(x["v"][1]), "gross": m2(x["v"][2]), "count": x["count"]}
-                for k, x in sorted(exp.items(), key=lambda kv: (kv[0][:2] == "t:", kv[0] == "c:", kv[1]["label"].casefold()))]
+                for k, x in sorted(exp.items(), key=lambda kv: (kv[0] == "km", kv[0][:2] == "t:", kv[0] == "c:", kv[1]["label"].casefold()))]
     tot = lambda rows, f: sum((dec(r[f]) for r in rows), Decimal(0))  # noqa: E731
     i_net, i_gross = tot(income, "net"), tot(income, "gross")
     e_net, e_gross = tot(expenses, "net"), tot(expenses, "gross")
@@ -277,7 +282,8 @@ def bk_euer(c, oid, year):
             "expense_total": {"net": m2(e_net), "vat": m2(tot(expenses, "vat")), "gross": m2(e_gross)},
             "profit": m2(profit), "missing_vat": 0 if small else missing, "tax_reserve_pct": pct,
             "tax_reserve": m2(profit * pct / 100) if pct and profit > 0 else "0.00",
-            "notes": [tr(BK_NOTE), tr("Income = payments received (cash principle); expenses = receipts and travel expenses.")]}
+            "notes": [tr(BK_NOTE), tr("Income = payments received (cash principle); expenses = receipts and travel expenses.")]
+            + ([tr("Mileage allowance from the logbook (business drives with a private car).")] if km["count"] else [])}
 
 
 # ---------------------------------------------------------------- VAT return figures

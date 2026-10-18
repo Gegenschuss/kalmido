@@ -68,6 +68,9 @@ FIELDS = {
     "office_trip_items": ("amount", "amount_home"),  # 2.47.3 (#1022): the amounts of a travel receipt
     "office_fixed_costs": ("amount",),  # 2.47.3 (#1652): fixed costs of the cash flow
     "office_bank_tx": ("amount", "counterpart", "purpose", "iban"),  # 2.90.0 B (#1921): imported bank bookings
+    "office_doc_templates": ("body",), "office_gen_docs": ("body",),  # 2.93.0 A (#1927): document templates, documents
+    "office_vehicles": ("plate",), "office_drives": ("start_place", "dest", "purpose"),  # 2.93.0 B (#1928): the logbook
+    "office_drive_log": ("prev",),  # 2.93.0 B (#1928): the change log of the logbook
     "office_deals": ("value", "contact", "note", "lost_reason"),  # 2.50.0 (#1196): the sales pipeline
     "hub_absences": ("kind", "note"),  # 2.50.0 (#1195): the kind of an absence (sick leave = health data) and its note
     # 2.72.0 (#1333): the household budget -- per row with the key of its list's space (column sid, life/budget.py bud_enc;
@@ -97,6 +100,8 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_trips": N_("Travel expenses"), "office_trip_items": N_("Travel expenses"), "office_fixed_costs": N_("Fixed costs"),
                  "office_deals": N_("Sales pipeline"),  # 2.50.0 (#1196)
                  "office_bank_tx": N_("Bank statements"),  # 2.90.0 B (#1921)
+                 "office_doc_templates": N_("Document templates and documents"), "office_gen_docs": N_("Document templates and documents"),  # 2.93.0 A (#1927)
+                 "office_vehicles": N_("Logbook"), "office_drives": N_("Logbook"), "office_drive_log": N_("Logbook"),  # 2.93.0 B (#1928)
                  "hub_absences": N_("Kind and note of absences"),  # 2.50.0 (#1195)
                  # 2.72.0 (#1333): amounts, texts and limits of the household budget, its receipts
                  "budget_entries": N_("Household budget"), "budget_recurring": N_("Household budget"), "budget_cats": N_("Household budget"),

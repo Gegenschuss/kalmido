@@ -41,7 +41,7 @@ SIG_POST_RATE = 10          # decisions per client address and minute
 SIG_BAD_LIMIT = 30          # unknown / expired tokens per address within the fail window (shared with the list links)
 SIG_LINK_HOUR = 20          # decision attempts per link and hour
 NAME_MAX, EMAIL_MAX, REASON_MAX, UA_MAX = 120, 200, 1000, 300
-SIG_KINDS = ("offer", "acceptance")
+SIG_KINDS = ("offer", "acceptance", "document")  # 2.93.0 A (#1927): document = a document made from a template (office/doctpl.py)
 LOG_TEXT = {"accepted": "signoff_accepted", "declined": "signoff_declined"}
 SIG_PDF_KEEP_DAYS = 30      # 2.86.0 (N17): a decided quotation's PDF stays downloadable this long when the link has no expiry
 SIG_NOTE = N_("Simple electronic signature: usually enough to accept a quotation or confirm an acceptance; not for contracts that the law requires in written form (they need a qualified signature). This is not legal advice.")  # noqa: E501
@@ -54,6 +54,8 @@ def sig_token_new(c, purpose):
 
 
 def sig_purpose(r):
+    if r["kind"] == "document":  # 2.93.0 A (#1927)
+        return f"signoff:document:{r['gen_doc_id'] or 0}"
     return f"signoff:{r['kind']}:{r['doc_id'] or 0}:{r['list_id'] or 0}"
 
 
@@ -140,7 +142,7 @@ def sig_public(c, r, full=True):
     (2.50.0 #1200 review: personal data of the customer only for the admins / the list's owner)."""
     d = sig_dec(c, r)
     live = d["state"] == "open" and not d["revoked_at"] and not (d["expires_at"] and parse_iso(d["expires_at"]) <= now_utc())
-    return {"id": d["id"], "kind": d["kind"], "doc_id": d["doc_id"], "list_id": d["list_id"], "section_id": d["section_id"],
+    return {"id": d["id"], "kind": d["kind"], "doc_id": d["doc_id"], "gen_doc_id": d.get("gen_doc_id"), "list_id": d["list_id"], "section_id": d["section_id"],
             "task_id": d["task_id"], "title": d["title"], "state": d["state"], "expires_at": d["expires_at"], "revoked_at": d["revoked_at"],
             "signer_name": d["signer_name"], "signer_email": d["signer_email"], "reason": d["reason"], "signed_at": d["signed_at"],
             "ip": d["ip"], "user_agent": d["user_agent"], "doc_hash": d["doc_hash"], "created_at": d["created_at"], "created_by": d["created_by"],
@@ -164,25 +166,29 @@ def sig_notify(c, r, st, name):
     lg = s.get("lang") or "en"
     what = r["title"] or ""
     title = tr("Approved by the customer", lg=lg) if st == "accepted" else tr("Declined by the customer", lg=lg)
+    if r["kind"] == "document" and st == "accepted":  # 2.93.0 A (#1927)
+        title = tr("Signed by the customer", lg=lg)
     msg = f"{name}: {what}"
-    click = f"#office/offers/{r['doc_id']}" if r["doc_id"] else f"#l/{r['list_id']}"
+    click = f"#office/offers/{r['doc_id']}" if r["doc_id"] else f"#office/gendocs/{r['gen_doc_id']}" if r["kind"] == "document" else f"#l/{r['list_id']}"
     return lambda: notify(uid, title, msg, prio="4", click=click, s=s)
 
 
 # ---------------------------------------------------------------- managing (members of the organisation / list owner)
-def sig_create(c, oid, kind, title, doc_hash, uid, expires, doc_id=None, list_id=None, section_id=None, task_id=None):
+def sig_create(c, oid, kind, title, doc_hash, uid, expires, doc_id=None, list_id=None, section_id=None, task_id=None, gen_doc_id=None):
     """A new link (an open link of the same object is revoked first: one live link per object). -> (row, token)."""
     ts = iso(now_utc())
-    if doc_id:
+    if gen_doc_id:  # 2.93.0 A (#1927): a document made from a template
+        c.execute("UPDATE office_signoffs SET revoked_at=? WHERE gen_doc_id=? AND state='open' AND revoked_at IS NULL", (ts, gen_doc_id))
+    elif doc_id:
         c.execute("UPDATE office_signoffs SET revoked_at=? WHERE doc_id=? AND state='open' AND revoked_at IS NULL", (ts, doc_id))
     else:
         c.execute("UPDATE office_signoffs SET revoked_at=? WHERE list_id=? AND kind='acceptance' AND state='open' AND revoked_at IS NULL "
                   "AND section_id IS NOT DISTINCT FROM ? AND task_id IS NOT DISTINCT FROM ?", (ts, list_id, section_id, task_id))
-    proto = {"kind": kind, "doc_id": doc_id, "list_id": list_id}
+    proto = {"kind": kind, "doc_id": doc_id, "list_id": list_id, "gen_doc_id": gen_doc_id}
     tok, h, sealed = sig_token_new(c, sig_purpose(proto))
-    sid = insert_id(c, "INSERT INTO office_signoffs(org_id, kind, doc_id, list_id, section_id, task_id, title, token_hash, token, expires_at, "
-                       "state, doc_hash, created_by, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,'open',?,?,?)",
-                    (oid, kind, doc_id, list_id, section_id, task_id, title[:300], h, sealed, expires, doc_hash, uid, ts))
+    sid = insert_id(c, "INSERT INTO office_signoffs(org_id, kind, doc_id, list_id, section_id, task_id, gen_doc_id, title, token_hash, token, expires_at, "
+                       "state, doc_hash, created_by, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'open',?,?,?)",
+                    (oid, kind, doc_id, list_id, section_id, task_id, gen_doc_id, title[:300], h, sealed, expires, doc_hash, uid, ts))
     return c.execute("SELECT * FROM office_signoffs WHERE id=?", (sid,)).fetchone(), tok
 
 
@@ -228,12 +234,15 @@ def sig_offer_revoke(sid):
     from .docs import _ctx
     from .ledger import ofx_log
     c, uid, oid = _ctx()
-    r = c.execute("SELECT * FROM office_signoffs WHERE id=? AND org_id=? AND doc_id IS NOT NULL", (sid, oid)).fetchone()
+    r = c.execute("SELECT * FROM office_signoffs WHERE id=? AND org_id=? AND (doc_id IS NOT NULL OR gen_doc_id IS NOT NULL)", (sid, oid)).fetchone()
     if not r:
         raise Denied(404)
+    if r["gen_doc_id"] and office_role(c, uid, oid) != "admin":  # 2.93.0 A (#1927): documents are the admins' (like office/doctpl.py)
+        raise Denied(403)
     if r["state"] == "open" and not r["revoked_at"]:
         c.execute("UPDATE office_signoffs SET revoked_at=? WHERE id=?", (iso(now_utc()), sid))
-        ofx_log(c, oid, "signoff_revoke", doc_id=r["doc_id"], detail={"signoff": sid})
+        ofx_log(c, oid, "signoff_revoke", target="gen_doc" if r["gen_doc_id"] else "doc", doc_id=r["doc_id"],
+                detail={"signoff": sid, **({"gen_doc": r["gen_doc_id"]} if r["gen_doc_id"] else {})})
         c.commit()
     return jsonify(sig_public(c, c.execute("SELECT * FROM office_signoffs WHERE id=?", (sid,)).fetchone(), office_role(c, uid, oid) == "admin"))
 
@@ -328,6 +337,9 @@ def sig_check(c, r):
         if not d or d["status"] != "sent" or sig_doc_hash(c, r["org_id"], r["doc_id"])[0] != r["doc_hash"]:
             return True
         return None
+    if r["kind"] == "document":  # 2.93.0 A (#1927): the document is finished, not archived, its text unchanged
+        from .doctpl import dt_sig_valid
+        return None if dt_sig_valid(c, r) else True
     lr = c.execute("SELECT l.id FROM lists l JOIN users u ON u.id=l.owner_id WHERE l.id=? AND u.disabled=0", (r["list_id"],)).fetchone()
     if not lr or sig_list_hash(c, r) != r["doc_hash"]:
         return True
@@ -403,21 +415,29 @@ def sig_page(c, r, token, lg, error=None, code=200):
     note = e(tr(SIG_NOTE, lg=lg))
     if r["state"] != "open":
         d = sig_dec(c, r)
-        h = tr("Accepted", lg=lg) if d["state"] == "accepted" else tr("Declined", lg=lg)
+        doc = r["kind"] == "document"  # 2.93.0 A (#1927)
+        h = (tr("Signed", lg=lg) if doc else tr("Accepted", lg=lg)) if d["state"] == "accepted" else tr("Declined", lg=lg)
         when = d["signed_at"] or ""
+        pdf_t = tr("Download the signed document (PDF)", lg=lg) if doc else tr("Download the quotation (PDF)", lg=lg)
         main = (f'<div class="msg"><h1>{e(h)}</h1><p>{e(r["title"])}</p><p>{e(tr("By {0} on {1} (UTC).", d["signer_name"] or "", when[:16].replace("T", " "), lg=lg))}</p>'
-                + (f'<p><a class="pdf" href="{SIG_PREFIX}{e(token)}/pdf" download rel="nofollow">{e(tr("Download the quotation (PDF)", lg=lg))}</a></p>'
-                   if r["kind"] == "offer" and h6c_sig_pdf_ok(c, r) else "")  # 2.86.0 (N17)
+                + (f'<p><a class="pdf" href="{SIG_PREFIX}{e(token)}/pdf" download rel="nofollow">{e(pdf_t)}</a></p>'
+                   if (r["kind"] == "offer" or (doc and d["state"] == "accepted")) and h6c_sig_pdf_ok(c, r) else "")  # 2.86.0 (N17)
                 + f'<p class="sub">{e(tr("Thank you. You can close this page.", lg=lg))}</p></div>')
         return pub_html(h, main, lg)
-    head = sig_offer_html(c, r, lg, token) if r["kind"] == "offer" else sig_list_html(c, r, lg)
-    acc = tr("I accept the quotation", lg=lg) if r["kind"] == "offer" else tr("I confirm the acceptance", lg=lg)
+    if r["kind"] == "document":  # 2.93.0 A (#1927)
+        from .doctpl import dt_sig_html
+        head = dt_sig_html(c, r, lg, token, SIG_PREFIX)
+    else:
+        head = sig_offer_html(c, r, lg, token) if r["kind"] == "offer" else sig_list_html(c, r, lg)
+    acc = (tr("I accept the quotation", lg=lg) if r["kind"] == "offer" else tr("I sign this document", lg=lg) if r["kind"] == "document"
+           else tr("I confirm the acceptance", lg=lg))
+    go = tr("Sign bindingly", lg=lg) if r["kind"] == "document" else tr("Accept bindingly", lg=lg)
     form = (f'<form method="post" action="{SIG_PREFIX}{e(token)}" class="fform sigf">'
             f'<input type="hidden" name="f" value="{sig_form_key(c, r)}">'
             f'<label for="sg-name">{e(tr("Your name", lg=lg))}</label><input id="sg-name" name="name" maxlength="{NAME_MAX}" autocomplete="name" required>'
             f'<label for="sg-mail">{e(tr("E-mail (optional)", lg=lg))}</label><input id="sg-mail" name="email" type="email" maxlength="{EMAIL_MAX}" autocomplete="email">'
             f'<label class="ok"><input type="checkbox" name="ok" value="1"> {e(acc)}</label>'
-            f'<button type="submit" name="do" value="accept">{e(tr("Accept bindingly", lg=lg))}</button>'
+            f'<button type="submit" name="do" value="accept">{e(go)}</button>'
             f'<details class="decl"><summary>{e(tr("Decline", lg=lg))}</summary>'
             f'<label for="sg-why">{e(tr("Reason (optional)", lg=lg))}</label><textarea id="sg-why" name="reason" rows="3" maxlength="{REASON_MAX}"></textarea>'
             f'<button type="submit" name="do" value="decline" class="sec">{e(tr("Decline", lg=lg))}</button></details>'
@@ -445,6 +465,10 @@ def h6c_sig_pdf_ok(c, r):
     end = parse_iso(r["expires_at"]) if r["expires_at"] else (parse_iso(r["signed_at"]) + timedelta(days=SIG_PDF_KEEP_DAYS) if r["signed_at"] else None)
     if not end or end <= now_utc():
         return False
+    if r["kind"] == "document":  # 2.93.0 A (#1927): the signed document while it is still the one signed
+        from .doctpl import dt_hash, dt_sig_row
+        d = dt_sig_row(c, r)
+        return bool(d) and not d["archived"] and dt_hash(d["body"]) == r["doc_hash"]
     try:
         return sig_doc_hash(c, r["org_id"], r["doc_id"])[0] == r["doc_hash"]
     except Denied:  # the quotation is gone
@@ -462,6 +486,16 @@ def sig_pdf_get(token):
     r, bad = sig_open(c, token)
     if bad:
         return bad
+    if r["kind"] == "document":  # 2.93.0 A (#1927): written from the frozen text (the original, after signing the signed one)
+        from .doctpl import dt_disposition, dt_sig_pdf
+        x = dt_sig_pdf(c, r) if h6c_sig_pdf_ok(c, r) and r["state"] in ("open", "accepted") else None
+        if not x:
+            return pub_gone()
+        resp = _file_response(x[0], "document.pdf", "application/pdf")
+        resp.headers["Content-Disposition"] = dt_disposition(x[1])  # the title cleaned (quotes, line breaks), UTF-8
+        resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        resp.headers["Referrer-Policy"] = "no-referrer"
+        return resp
     if r["kind"] != "offer" or not h6c_sig_pdf_ok(c, r):
         return pub_gone()
     d = doc_row(c, r["org_id"], r["doc_id"])
@@ -506,7 +540,7 @@ def sig_decide(token):
     if email and ("@" not in email or " " in email):
         return sig_page(c, r, token, lg, tr("Please check the e-mail address.", lg=lg), 400)
     if do == "accept" and request.form.get("ok") != "1":
-        return sig_page(c, r, token, lg, tr("Please tick the box to accept.", lg=lg), 400)
+        return sig_page(c, r, token, lg, tr("Please tick the box to sign.", lg=lg) if r["kind"] == "document" else tr("Please tick the box to accept.", lg=lg), 400)
     write_lock(c, f"office_signoff_{int(r['id'])}")  # two decisions at once: the second sees the first
     cur = c.execute("SELECT * FROM office_signoffs WHERE id=?", (r["id"],)).fetchone()
     if cur["state"] != "open" or cur["revoked_at"] or sig_check(c, cur):
@@ -529,6 +563,19 @@ def sig_decide(token):
             odoc_set_status(c, r["org_id"], r["doc_id"], st, None)  # the same status change as in the app (purchase, pipeline)
         finally:
             g.user = PUB_ACTOR
+    elif r["kind"] == "document":  # 2.93.0 A (#1927): the document signed | declined; the signed PDF is filed by the next admin read
+        from .doctpl import dt_sig_decided
+        from .ledger import ofx_log
+        proto["gen_doc"] = r["gen_doc_id"]
+        g.user = None
+        try:
+            ofx_log(c, r["org_id"], LOG_TEXT[st], target="gen_doc", detail=proto)
+            done = dt_sig_decided(c, r, st)
+        finally:
+            g.user = PUB_ACTOR
+        if not done:  # archived meanwhile: nothing recorded, the same answer as a void link
+            c.rollback()
+            return pub_gone()
     elif r["list_id"]:
         proto["tasks"] = [[t["id"], t["title"], t["status"]] for t in sig_list_tasks(c, r)]
         c.execute("INSERT INTO list_activity(list_id, user_id, kind, data, created_at) VALUES(?,?,?,?,?)",
