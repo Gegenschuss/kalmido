@@ -257,6 +257,8 @@ L3 = A.post(B + "/api/lists", json={"name": "Alice only", "org_id": ORG}).json()
 t3 = A.post(B + "/api/tasks", json={"title": "Secret task", "list_id": L3}).json()["id"]
 r = A.post(B + f"/api/sheets/{LS['id']}/rows-from-list", json={"list_id": L3})
 check(r.ok and r.json()["added"] == 1, "rows of a second list " + r.text[:200])
+B2 = r.json() if r.ok else {"batch": "x"}
+check(len(sheet(A, LS["id"])["columns"]) == 5, "a second list uses the same task columns")
 bs = sheet(Bo, LS["id"])
 secret = [c for c in bs["cells"] if f"{t3}" in (c["raw"] or "")]
 check(secret and all(c["error"] == "denied" and c["value"] is None and "Secret" not in str(c["display"]) for c in secret),
@@ -279,6 +281,11 @@ check(A.post(B + f"/api/sheets/{LS['id']}/links/{B3['batch']}/undo").ok and not 
 A.delete(B + f"/api/tasks/{tl[1]}")
 cm = cell(sheet(A, LS["id"]), m, cols["Title"]) if m else None
 check(cm and cm["error"] == "deleted" and cm["last_value"] == "Mix", "a task in the trash: Source deleted with the last value " + str(cm))
+check(A.post(B + f"/api/sheets/{LS['id']}/links/{B1['batch']}/undo").ok
+      and {"Title", "Status", "Due", "Time", "Assignee"} <= {c["title"] for c in sheet(A, LS["id"])["columns"]},
+      "undo of the first press while the second list's rows use the columns: they stay")
+A.post(B + f"/api/sheets/{LS['id']}/links/{B1['batch']}/redo")
+check(A.post(B + f"/api/sheets/{LS['id']}/links/{B2['batch']}/undo").ok, "undo of the second list's rows")
 r = A.post(B + f"/api/sheets/{LS['id']}/links/{B1['batch']}/undo")
 ls = sheet(A, LS["id"])
 check(r.ok and [c["id"] for c in ls["columns"]] == blank, "undo of the first press: the blank columns are back, the task columns gone "
