@@ -52,8 +52,9 @@ const FEAT = 'cal,comments,collab,clients';
   w.eval(`go('office/services')`); await until(() => d.querySelector('.office[data-ofctab="services"] .ofcbar'), 60);
   // 2.47.3 (#1022, #1652): travel expenses and cash flow are two more tabs (admins only)
   // 2.50.0 (#1196, #1197): pipeline and figures are two more tabs (admins only)
-  // 2.87.9 (#1917): the office menu with its four groups instead of the tab row: ten points of the office for the admin
-  check([...d.querySelectorAll('#view .ofmenu [data-ofm]')].filter(b => b.dataset.go.startsWith('office/')).length === 14, 'the menu has 14 office points (admin; 2.92.1: + books, bank, subscriptions, contracts and insurance)');
+  // 2.87.9 (#1917): the office menu with its four groups instead of the tab row; 2.92.0 (#1925): bookkeeping, bank (2.90),
+  // subscriptions (2.91) and contracts (2.92) joined - an admin sees a point for every tab of OFC_TABS
+  check([...d.querySelectorAll('#view .ofmenu [data-ofm]')].filter(b => b.dataset.go.startsWith('office/')).length === w.eval('OFC_TABS.length') && w.eval('OFC_TABS.length') >= 14, 'the menu has every office point (admin)');
   check(d.querySelector('#view .ofmenu [data-ofm][aria-current="page"]')?.dataset.go === 'office/services', 'point Services shown');
   check(!!d.querySelector('.office [data-ofc="new"][data-kind="services"]'), 'admin: "New service"');
   check(/Nothing here yet/.test(d.querySelector('.office .ofcbody')?.textContent || ''), 'empty hint');
