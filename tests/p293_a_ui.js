@@ -38,7 +38,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   const api = (m, u, b) => `fetch('${u}', {method: '${m}', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}${b ? `, body: JSON.stringify(${JSON.stringify(b)})` : ''}}).then(r => r.json())`;
-  const noSide = `(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('#view *')].filter(e => e.getClientRects().length && !e.closest('.seg') && !e.closest('.ofctabs')).every(e => e.getBoundingClientRect().right <= W + 1); })()`;
+  const noSide = `(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('#view *')].filter(e => e.getClientRects().length && !e.closest('.seg') && !e.closest('.ofctabs') && !e.closest('.ofmenu')).every(e => e.getBoundingClientRect().right <= W + 1); })()`;
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await nav(B + 'static/icon.svg');

@@ -98,8 +98,9 @@ const FEAT = 'cal,comments,collab,office,clients';
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('.ofctabs [data-go="office/offers"]')`, 80), 'the office (member)');
-    check(await ev(`!document.querySelector('.ofctabs [data-go="office/travel"]')`), 'a member does not see the travel expenses / logbook');
+    // 2.93.0 (#1928): the office menu of 2.92.2 (#1917) replaces the tab row .ofctabs
+    check(await ready(ev, `!!document.querySelector('#view .ofmenu [data-ofm="offers"]')`, 80), 'the office (member)');
+    check(await ev(`!document.querySelector('#view .ofmenu [data-ofm="travel"]')`), 'a member does not see the travel expenses / logbook');
   }, false);
 
   console.log(`p293_b_ui: ${ok} ok, ${F.length} failed`);
