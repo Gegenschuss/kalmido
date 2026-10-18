@@ -109,8 +109,8 @@ RO, ro = agent("readbot", ["read", "sheets:read"], org=ORG)
 X0, x0 = agent("plainbot", ["read", "tasks:write"], org=ORG)
 DA, da = agent("davebot", SW, owner=uid["dave"])
 check(Bo.put(B + f"/api/lists/{W}/members", json={"user_id": TA, "role": "edit"}).ok, "setup: the garden list shared with the agent")
-check(Bo.put(B + f"/api/lists/{W}/members", json={"user_id": RO, "role": "view"}).ok, "setup: the read agent reads the list")
-check(Bo.put(B + f"/api/lists/{W}/members", json={"user_id": X0, "role": "edit"}).ok, "setup: the plain agent edits the list")
+W2 = Bo.post(B + "/api/lists", json={"name": "Orchard", "org_id": ORG}).json()["id"]  # one agent per list
+check(Bo.put(B + f"/api/lists/{W2}/members", json={"user_id": RO, "role": "view"}).ok, "setup: the read agent reads another list")
 
 # ================================================================== API v1: create in one step, batches
 check(x0.get(V + "/sheets").status_code == 403, "without sheets:read: 403")
@@ -168,8 +168,10 @@ vs = ta.get(V + f"/sheets/{SID}/vars").json()["data"]
 toks = {v["token"] for v in vs}
 check("liste.garden.offen" in toks and "hier.offen" in toks, "vars: the shared list and hier")
 check(not any("secret" in t for t in toks), "vars: never a list not shared with the agent")
-check(ro.get(V + f"/sheets/{SID}").ok and ro.put(V + f"/sheets/{SID}/cells", json={"cells": [{"cell": "A1", "raw": "x"}]}).status_code == 403,
+S9 = Bo.post(B + "/api/sheets", json={"title": "Orchard", "space": f"org:{ORG}", "list_id": W2}).json()["id"]
+check(ro.get(V + f"/sheets/{S9}").ok and ro.put(V + f"/sheets/{S9}/cells", json={"cells": [{"cell": "A1", "raw": "x"}]}).status_code == 403,
       "sheets:read only: reads, writes 403")
+check(ro.get(V + f"/sheets/{SID}").status_code == 404, "another agent's list: 404")
 
 # a table the agent created: one undo moves it to the trash
 r = ta.post(V + "/sheets", json={"title": "Scratch", "space": f"org:{ORG}"})
