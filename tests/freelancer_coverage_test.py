@@ -26,7 +26,7 @@ KINDS = {
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
                         "and import in the private space; every GET of the area as the freelancer (no 403 / 5xx)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
-    "office": ("matrix", SUITE + ", p2473_a_api_test.py: the personal office (the freelancer is its admin): settings, company "
+    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless"),
     "files": ("matrix", SUITE + ": the own file store (folders, upload, content, versions) and documents; every GET"),
     "wiki": ("matrix", SUITE + ": knowledge pages in the private space (create, change, search, export, trash)"),
@@ -292,7 +292,7 @@ ROUTES = {
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/docs": "office",
     "POST /api/office/docs/from-time": "office", "POST /api/office/docs/reminder": "office",
     "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/{}/datev": "office",
-    "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
+    "POST /api/office/docs/{}/cashflow": "office", "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/invoice": "office",
     "POST /api/office/docs/{}/number": "office", "POST /api/office/docs/{}/parts": "office",
     "POST /api/office/docs/{}/payments": "office", "POST /api/office/docs/{}/send": "office",
@@ -509,6 +509,9 @@ ROUTES = {
     # ---- team (43)
     "DELETE /api/disc/blocks/{}": "team", "DELETE /api/disc/connections/{}": "team", "DELETE /api/disc/requests/{}": "team",
     "DELETE /api/e2e/keys": "team", "DELETE /api/team/messages/{}": "team", "DELETE /api/users/{}": "team",
+    # 2.87.9 after the merge of 2.88.0 (#1980): the instance admin's account administration (an organisation admin only
+    # deletes inside the own organisation)
+    "GET /api/users/{}/delete-info": "admin", "POST /api/users/bulk": "admin",
     "DELETE /api/v1/team/messages/{}": "team", "GET /api/avatar/{}/{}.jpg": "team", "GET /api/disc": "team",
     "GET /api/e2e/keys": "team", "GET /api/e2e/pub/{}": "team", "GET /api/team": "team",
     "GET /api/team/rooms/{}/messages": "team", "GET /api/users": "team", "GET /api/v1/team/rooms": "team",
