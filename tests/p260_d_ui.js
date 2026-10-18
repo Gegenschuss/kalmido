@@ -61,7 +61,7 @@ const FEAT = 'cal,comments,collab,clients,office';
   };
   // 2.87.9 (#1917): the office menu (computer: four groups; phone: the group's points) replaces the tab row; the same rules
   // 2.98.0 (#2180): computer = the office rail (one point per line, nothing cut off); phone = ONE row of tabs that scrolls
-  // sideways instead of wrapping (Moritz' choice of variant A, 18.10.2026), the active tab in sight
+  // sideways instead of wrapping (design variant A of #2180), the active tab in sight
   const tabs = `(() => { const bar = document.querySelector('#view .ofrail, #view .ofpb'); if (!bar) return null; const b = bar.getBoundingClientRect(); const bs = [...bar.querySelectorAll('[data-ofm]')], ts = bs.map(x => x.getBoundingClientRect());
     const row = bar.querySelector('.ofpts'), rb = row && row.getBoundingClientRect(), on = bar.querySelector('[data-ofm].on'), ob = on && on.getBoundingClientRect();
     const k = document.querySelector('.office .ofdkinds'); const kb = k && k.getBoundingClientRect();
