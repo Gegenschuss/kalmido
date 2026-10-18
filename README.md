@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.92.0** (2026-10-18): contracts and insurance in the office (notice deadlines as tasks, contributions in the cash
+  flow), equipment value with depreciation and an insurance list, Word and Excel preview with *Summarize* by a connected
+  agent, and three phone fixes from the 2.88 device tests.
 - **2.91.0** (2026-10-18): recurring invoices (monthly, quarterly, yearly; drafts or sent automatically, in the cash
   flow) and an office overview of subscriptions and tools with sums, notice periods, users, renewal reminders and a
   *hardly used* mark.

@@ -7,6 +7,30 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.92.0] - 2026-10-18
+
+Contracts and insurance in the office, equipment value, Word and Excel preview, fixes from the 2.88 device tests.
+
+### Added
+- Office > Contracts & insurance (admins; a person without organisation in the personal office): insurances, rent,
+  leasing, service providers with term, notice period, contribution and document; the last day to cancel becomes a task
+  in a list you pick (agents that see it can remind you, `contract_notice` with `office: true`), contributions flow into
+  the cash flow and show read-only under the fixed costs (#1925).
+- Equipment: purchase date, net price, serial number, vendor and receipt (taken over from a receipt); depreciation with a
+  suggested useful life (GWG up to 800 EUR at once, else linear by the month) and the book value per year; new and current
+  value for the insurance, sums, insurance list as CSV / PDF, the policy that covers a device. Prices and values are
+  encrypted and reach only admins; the year's depreciation counts in the income/expense statement (2.90), the
+  device's receipt there only with its input tax. No tax advice (#1931).
+- Word (.docx) and Excel (.xlsx) preview for task files, comments, project files and the file store, read in a sandboxed
+  process; their text is searchable and readable for agents. *Summarize* in the preview of a task file asks a connected
+  agent that may see the task (a comment that mentions it); Kalmido calls no language model itself (#1926).
+
+### Fixed
+- Delete account: the deleting admin is preselected as the new owner of the lists, else nobody (the button waits for a
+  choice); invited accounts that never signed in come last (#2008).
+- Quotation on the phone: the "Saved / Undo" message no longer covers the "In the cash flow" choice (#2009).
+- User list on the phone: the selection bar sits at the bottom, the list no longer jumps on the first tick (#2010).
+
 ## [2.91.0] - 2026-10-18
 
 Recurring invoices, an overview of subscriptions and tools.
