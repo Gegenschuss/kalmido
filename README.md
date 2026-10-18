@@ -20,7 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
-- **2.92.1** (2026-10-18): before every import Kalmido names the target and asks (*Rather to private*), Paperless-ngx in the
+- **2.92.2** (2026-10-18): before every import Kalmido names the target and asks (*Rather to private*), Paperless-ngx in the
   settings, an office menu in four groups, organisation pictures, smoother dragging everywhere, freelancer parity guard.
 - **2.92.0** (2026-10-18): contracts and insurance in the office (notice deadlines as tasks, contributions in the cash
   flow), equipment value with depreciation and an insurance list, Word and Excel preview with *Summarize* by a connected
