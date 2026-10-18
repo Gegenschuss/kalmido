@@ -462,6 +462,9 @@ APP_ONLY = [
      "(each one undo step); agents work inside a sheet through the table tools and create tasks / office drafts their own ways",
      ("=GET /api/sheets/{}/links", "=POST /api/sheets/{}/to-tasks", "=POST /api/sheets/{}/to-offer", "=POST /api/sheets/{}/rows-from-list",
       "=POST /api/sheets/{}/links/{}/undo", "=POST /api/sheets/{}/links/{}/redo")),
+    ("2.94.0 B (#1929): the appointment booking page (settings, appointment types, the bookings and cancelling one) is a person's "
+     "own page; customers book on the public page without an account, agents get no access (no agent API in 2.94)",
+     ("* /api/appt/",)),
 ]
 
 

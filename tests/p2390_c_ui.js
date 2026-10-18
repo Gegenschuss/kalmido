@@ -15,7 +15,7 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
-const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true}));
+const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
 const FEAT = 'cal,comments,collab,agents';
 const V = B + 'api/v1';
 
@@ -88,7 +88,7 @@ const V = B + 'api/v1';
   w.eval(`chatEditStart(${mine.id})`);
   ta = await until(() => cm(d, mine.id)?.querySelector('textarea.ach-edit'));
   ta.value = 'Plan the week with five tasks';
-  key(w, ta, 'Enter');
+  key(w, ta, 'Enter', {ctrlKey: true});  // 2.94.0 (#2024)
   await until(() => /five tasks/.test(cm(d, mine.id)?.querySelector('.cbub')?.textContent || ''));
   const j = await call('GET', `/api/agents/${AG}/chat`);
   const m = (j.messages || []).find(x => x.id === mine.id);

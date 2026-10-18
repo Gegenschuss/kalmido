@@ -791,7 +791,7 @@ document.addEventListener('keydown', e => {
     if ((e.key === 'Enter' || e.key === 'Tab') && !e.isComposing) { e.preventDefault(); e.stopImmediatePropagation(); mentionPick(S.mp.i); return; }
     if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); mentionClose(); return; }
   }
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (t.id === 'c-input' || t.classList.contains('c-edit-input'))) {  // 2.94.0 (#2024): the team chat boxes handle Ctrl+Enter in chat.js
     e.preventDefault(); e.stopImmediatePropagation();
     if (t.id === 'c-input') sendComment(); else $(`[data-act="c-edit-save"][data-cid="${t.dataset.cid}"]`)?.click();
   }

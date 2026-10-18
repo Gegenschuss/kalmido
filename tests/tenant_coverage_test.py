@@ -52,7 +52,7 @@ KINDS = {
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
     "org": ("matrix", "p2280_api_test.py: organisations, their members and admins"),
-    "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3)"),
+    "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3); p294_b_api_test.py (the booking page: types / bookings of another person 404, the public pages)"),
     "event": ("matrix", "p2300_tenant_test.py: events by id, ranges, invitations"),
     "book": ("matrix", "p2300_tenant_test.py: address books by id, sharing (B2), workspace (B3)"),
     "contact": ("matrix", "p2300_tenant_test.py: contacts by id, links to tasks"),
@@ -67,7 +67,7 @@ KINDS = {
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
     # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
     # personal office (a hidden area only its owner reaches). No /api/v1, no MCP in stage 1
-    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook)"),
+    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook), p294_a_api_test.py (leads)"),
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share"),
@@ -293,6 +293,16 @@ ROUTES = {
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
     "GET /api/office/deals/summary": "office", "GET /api/office/kpi": "office",
+    # 2.94.0 A (#1930): leads before the pipeline (office admins; agents with the office switch via v1; p294_a_api_test.py)
+    "GET /api/office/deals/{}/convert": "office", "POST /api/office/deals/{}/convert": "office", "POST /api/office/deals/{}/unconvert": "office",
+    "POST /api/office/leads/import": "office", "POST /api/office/leads/import/undo": "office",
+    "GET /api/v1/office/leads": "office", "POST /api/v1/office/leads": "office", "PATCH /api/v1/office/leads/{}": "office",
+    # 2.94.0 B (#1929): appointment booking settings and bookings of the person (p294_b_api_test.py)
+    "GET /api/appt/page": "calendar", "PUT /api/appt/page": "calendar", "GET /api/appt/types": "calendar", "POST /api/appt/types": "calendar",
+    "PATCH /api/appt/types/{}": "calendar", "DELETE /api/appt/types/{}": "calendar", "POST /api/appt/types/{}/restore": "calendar",
+    "GET /api/appt/bookings": "calendar", "POST /api/appt/bookings/{}/cancel": "calendar",
+    "GET /s/b/{}": "calendar", "GET /s/b/{}/{}": "calendar", "GET /s/b/{}/{}/{}": "calendar", "POST /s/b/{}/{}/{}": "calendar",
+    "GET /s/b/c/{}": "calendar", "POST /s/b/c/{}": "calendar", "GET /s/b/x/{}": "calendar", "POST /s/b/x/{}": "calendar",
     # 2.51.0 (#1348, #1350): agents in the office (drafts only) and the switches / payment suggestions of people (p251_a_api_test.py)
     "GET /api/office/agents/{}": "office", "PATCH /api/office/agents/{}": "office", "GET /api/office/pay-props": "office",
     "POST /api/office/pay-props/{}": "office", "GET /api/v1/office": "office", "GET /api/v1/office/{}": "office",

@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.94.0** (2026-10-18): a public booking page for customers (free times from your calendar, mail confirmation,
+  event + contact + lead), leads before the sales pipeline (follow-up, convert to client, CSV import, agents), and Enter in
+  the chats makes a new line.
 - **2.93.0** (2026-10-18): documents from your own templates (contracts, order confirmations, NDAs) with variables
   from client, project and quotation, as PDF in the client's folder and signed by the customer through a link; a
   logbook in the travel expenses with change log, year report and the mileage allowance in the income/expense statement.

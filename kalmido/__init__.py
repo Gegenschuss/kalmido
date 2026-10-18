@@ -77,6 +77,7 @@ ORDER = (
     "notify.sev",  # 2.36.2 (#1133)
     "calendars.subscriptions",
     "calendars.davwrite",  # 2.52.0 B (#1128): writing into CalDAV subscriptions
+    "calendars.apptbook",  # 2.94.0 B (#1929): appointment booking by customers (public page, no login)
     "admin.backup",
     "api.v1",
     "notify.caps",  # 2.33.0 (#927)
@@ -202,6 +203,7 @@ ORDER = (
     "office.travel",  # 2.47.3 (#1022, part B): travel expenses (trips, receipts, evaluation, billing on)
     "office.cashflow",  # 2.47.3 (#1652, part B): cash flow per month + fixed costs
     "office.pipeline",  # 2.50.0 B (#1196): the sales pipeline
+    "office.leads",  # 2.94.0 A (#1930): leads before the pipeline (stage lead): convert, CSV import, agents
     "office.kpi",  # 2.50.0 B (#1197): the business figures
     "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
     "office.books",  # 2.90.0 A (#1921): bookkeeping light: income/expense statement (EUeR), VAT return figures, tax reserve, receipt photo

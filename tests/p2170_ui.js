@@ -131,7 +131,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(d.querySelector('#tc-msgs[role="log"]') && d.querySelector('.tcrhead').textContent.includes('Website'), 'the channel opens with a log and its name');
   const box = d.querySelector('#tc-in');
   type(w, box, 'Hi @Bob, the text is ready');
-  key(w, box, 'Enter'); await sleep(500);
+  key(w, box, 'Enter', {ctrlKey: true}); await sleep(500);  // 2.94.0 (#2024)
   const sent = (await call('GET', `/api/team/rooms/${w.eval('S.tc.rid')}/messages`)).messages.pop();
   check(sent && sent.body === `Hi <@${BOB}>, the text is ready`, '#419: Enter sends, @Bob becomes a mention ' + JSON.stringify(sent?.body));
   check(box.value === '' && d.activeElement === box, 'the box is empty and keeps the focus');
@@ -151,7 +151,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Edit/.test(b.textContent))); await sleep(100);
   const ed = d.querySelector('#tc-msgs .tc-edit');
   check(ed && ed.value.includes('@Bob'), 'edit shows the text with @Bob');
-  ed.value = 'Hi @Bob, the text is ready now'; key(w, ed, 'Enter');
+  ed.value = 'Hi @Bob, the text is ready now'; key(w, ed, 'Enter', {ctrlKey: true});  // 2.94.0 (#2024)
   check(await until(async () => (await call('GET', `/api/team/rooms/${RID}/messages`)).messages.find(m => m.id === sent.id)?.edited_at), '#419: edited (Enter saves)');
   check(await until(() => /edited/.test(d.querySelector('#tc-msgs .cmsg.me .cmeta')?.textContent || '')), 'marked "edited"');
   // mute
