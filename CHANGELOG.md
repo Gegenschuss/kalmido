@@ -31,6 +31,7 @@ Appointment booking for customers, leads before the sales pipeline, Enter in the
 ### Fixed
 - Office: parts of the layout added since 2.91 (subscriptions, contracts, equipment) applied on phones only (a missing
   closing brace in office.css).
+
 ## [2.92.3] - 2026-10-18
 
 ### Fixed
