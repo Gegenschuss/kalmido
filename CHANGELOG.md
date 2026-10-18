@@ -7,44 +7,77 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-## [2.89.2] - 2026-10-18
+## [2.92.0] - 2026-10-18
 
-Freelancer parity, an office menu in four groups, import targets you confirm, Paperless-ngx in the settings and a round of polish.
+Contracts and insurance in the office, equipment value, Word and Excel preview, fixes from the 2.88 device tests.
 
 ### Added
-- Before every import (Paperless-ngx connection and ZIP, tasks from Todoist / Trello / Asana / Microsoft To Do / TickTick / ICS,
-  contacts, calendars, budget CSV, office data, wiki pages, account move, feeds) Kalmido says in words where the data goes - an
-  organisation (and who sees it) or your private space - and asks first; from an organisation, *Rather to private* imports into
-  your own space instead (#1940).
-- Organisations can use their own picture as their symbol instead of an emoji: set by their admins, shown to members only,
-  sealed with the organisation's key (#1913).
-- The office has one menu in four groups - Sell, Money, On the road, Administration - instead of two tab rows; on the phone a
-  start page with four tiles and the key figures; the path shows only on detail pages (#1917).
-- Search (Mod+K) finds the Paperless-ngx import, the sub-points of every area, the senders, document types and tags of your
-  documents and the top folders of your files (#1934).
-- Document rows in the office (quotations, invoices, credit notes, reminders) have their own menu: dots button, right click or a
-  long press - open, duplicate, preview, e-invoice XML, DATEV, delete (#1920).
-- New test guard `freelancer_coverage`: every route is checked for a person without an organisation or carries a reason; the
-  live update refuses a release when it is red (#1919). The sweep found no function that needs an organisation (#1918).
-
-### Changed
-- Paperless-ngx moved to *Settings > Integrations* (per workspace); the documents' settings keep the progress of a running import
-  and a jump there. The progress says it runs in the background - and to keep the window open while a file uploads (#1936, #1935).
-- The list column *Date* is called *Due*; an empty cell shows a dash (#1914).
-- Pinned chat messages stand one below the other; from three on the area scrolls on its own (#1909).
-- Sidebar: search and workspace in one line, the workspace as a round button - also without an organisation (#1933).
-- Every dialog with a header can be moved; the background behind a dialog darkens less (#1937).
-- One font size and field height in all forms (16 px on touch screens, against the zoom on iOS); dates and numbers in the normal
-  font with even digits (#1952).
-- Approval cards: the app's own thumbs instead of emoji; while a card is open, the reactions below it show no thumbs, and a
-  thumb no longer decides an approval or permission card - only its Yes / No buttons do (#1963).
-- Dragging is smooth everywhere: panel and column widths, chat windows and dividers, dialogs, tasks in lists and boards (mouse
-  and touch), calendar, mind map, timeline and the smaller drag places update once per frame and store on release (#1965).
+- Office > Contracts & insurance (admins; a person without organisation in the personal office): insurances, rent,
+  leasing, service providers with term, notice period, contribution and document; the last day to cancel becomes a task
+  in a list you pick (agents that see it can remind you, `contract_notice` with `office: true`), contributions flow into
+  the cash flow and show read-only under the fixed costs (#1925).
+- Equipment: purchase date, net price, serial number, vendor and receipt (taken over from a receipt); depreciation with a
+  suggested useful life (GWG up to 800 EUR at once, else linear by the month) and the book value per year; new and current
+  value for the insurance, sums, insurance list as CSV / PDF, the policy that covers a device. Prices and values are
+  encrypted and reach only admins; the year's depreciation counts in the income/expense statement (2.90), the
+  device's receipt there only with its input tax. No tax advice (#1931).
+- Word (.docx) and Excel (.xlsx) preview for task files, comments, project files and the file store, read in a sandboxed
+  process; their text is searchable and readable for agents. *Summarize* in the preview of a task file asks a connected
+  agent that may see the task (a comment that mentions it); Kalmido calls no language model itself (#1926).
 
 ### Fixed
-- The Paperless-ngx import progress no longer stops when the settings are closed and opened again; it asks again after a lost
-  answer and reports when it is done (#1938).
+- Delete account: the deleting admin is preselected as the new owner of the lists, else nobody (the button waits for a
+  choice); invited accounts that never signed in come last (#2008).
+- Quotation on the phone: the "Saved / Undo" message no longer covers the "In the cash flow" choice (#2009).
+- User list on the phone: the selection bar sits at the bottom, the list no longer jumps on the first tick (#2010).
 
+## [2.91.0] - 2026-10-18
+
+Recurring invoices, an overview of subscriptions and tools.
+
+### Added
+- Invoice series: any invoice can be repeated monthly, quarterly or yearly (start, optional last period). Every period
+  makes a normal invoice from the template with its period of service; placeholders `{period}`, `{month}`, `{quarter}`,
+  `{year}` are filled in the texts. By default a draft waits for you (a task in your inbox links to it); *Send
+  automatically* finalises and mails it, with the next number and the e-invoice as always. Series are listed above the
+  invoices (pause, make now, edit, delete with undo) (#1923).
+- Cash flow: the expected income of invoice series shows as *Invoice series* until the invoice exists (#1923).
+- Office tab *Subscriptions & tools*: every fixed cost marked as a subscription with price, next renewal, last day to
+  cancel, users and a *hardly used* switch; sums per month and per year and what the hardly used ones cost; suggestions
+  for fixed costs that look like a subscription; CSV export. Subscriptions are ordinary fixed costs, the cash flow counts
+  them once (#1924).
+- A reminder before the last day to cancel a subscription as a task in the chosen admin's inbox (never an amount); the
+  fixed costs import reads the optional columns *Abo* and *Kündigungsfrist* (#1924).
+
+### Changed
+- Agent API: invoices made by a series carry `series_id` and `series_period` (#1923).
+
+### Notes
+- Database: new tables `office_inv_series`, `office_sub_reminders` and new columns on `office_docs` / `office_fixed_costs`,
+  all additive. Going back to the previous version works; there, duplicating an invoice made by a series fails until you
+  update again.
+## [2.90.0] - 2026-10-18
+
+Bookkeeping light and tax dates in *Office & finance* (#1921, #1922): the running bookkeeping of a self-employed person
+without a second tool. Works the same in a personal office without an organisation. No tax advice; Kalmido sends nothing
+to the tax office (no ELSTER, no payroll).
+
+### Added
+- **Bookkeeping** tab: the income/expense statement of a year (payments received by VAT rate against receipts and travel
+  expenses, by category) with CSV and PDF export, and the VAT return figures (fields 81, 86, 21, 45, 66, 83) per month or
+  quarter to type into ELSTER, on cash or accrual basis.
+- **Photograph receipt**: the phone camera puts a receipt straight into the office's documents; amount and date come from
+  the existing text recognition, category and VAT rate (new: 19 / 7 / 0 % or unknown, also in the document's receipt slot)
+  are added in one sheet.
+- **Tax reserve**: a percentage of the net money received, shown per month in the cash flow with "freely available".
+- **Bank** tab: import a bank statement (CSV or CAMT.052 / .053), duplicates skipped, every booking with suggestions -
+  money in to open invoices (records the payment, partly paid too), money out to receipts; private / ignore, undo,
+  take back an import. Amounts and counterparts are encrypted at rest.
+- **Tax dates**: VAT return (monthly / quarterly, permanent extension), income tax and trade tax prepayments as one
+  recurring task each, with lead time, linked to the VAT return figures.
+
+### Fixed
+- Documents: the text recognition no longer overwrites an amount typed in while it was still running.
 ## [2.89.1] - 2026-10-18
 
 CI fixes of 2.89.0.

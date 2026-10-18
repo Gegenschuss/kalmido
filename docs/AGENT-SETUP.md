@@ -316,6 +316,7 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   (same e-mail / phone, a name variant with a shared detail), ids from the input; the person merges them.
 - The event contract_notice (2.70.0): a contract's last day to cancel is near. Send ONE sentence with
   propose_contract_notice (what it costs, until when they can decide, no pressure); the person takes it as a note.
+  Since 2.92.0 business contracts and insurances of the office come the same way (data.office true).
 - Set your status (set_status) while you work on something, and back to idle when done.
 - Before you answer a task event, read the whole task: description, properties and all comments (get_task).
 - Answer task events only with a comment on the task, never with a copy in your chat.

@@ -88,12 +88,18 @@ a person without an organisation is the admin of the personal office and sees al
   and **Crew** (Drehpersonal of the shoot calculation: name DE / EN, daily rate = the client's price, internal /
   external, an optional markup in percent). Purchase prices and markups reach only the organisation's admins: members
   get the rows without them (also in the export), never in a PDF.
-- **Equipment** - devices with a daily rate, and **sets** (a bundle of devices with a discount in percent).
+- **Equipment** - devices with a daily rate, and **sets** (a bundle of devices with a discount in percent). 2.92.0: admins also
+  record purchase, depreciation and insurance values (see [Equipment value](#equipment-value-depreciation-and-insurance-list-2920)).
+- **Contracts & insurance** (2.92.0, admins) - business contracts and insurances with notice deadlines, see
+  [Contracts and insurance](#contracts-and-insurance-2920).
 - **Text blocks** - reusable texts in German and English, grouped by kind: the rights catalogue (`rights_time`,
   `rights_territory`, `rights_media`), introduction, closing, note, free block between positions, raw data note.
   The first call of the module copies the country pack's catalogue into the organisation's text blocks.
 - **Framework contracts** - one per agency or client: date, raw data included, default rights (three catalogue entries),
   rights note, closing text, special rates per service. A document can pick a contract and deviate from it.
+- **Bookkeeping** (admins, 2.90) - income/expense statement, VAT return figures, tax reserve, receipt photo and tax
+  dates, see below.
+- **Bank** (admins, 2.90) - bank reconciliation, see below.
 - **Settings** - company name and address lines, contact / register / bank lines (printed in the footer), logo,
   brand colour (accent in the print only), document language (de / en), currency (EUR / USD + rate), number scheme with
   a live preview, producing quotient and rate, raw data factor, days a quotation stays valid, default text blocks,
@@ -376,6 +382,24 @@ e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addre
 - **Search**: subject, sender and text (a hashed word index, no plain index).
 - **Agents** have no access to filed mails in 2.84 (no API route, no MCP tool).
 
+## Subscriptions and tools (2.91)
+
+The office tab "Subscriptions & tools" (office admins; in a personal office its owner) shows every fixed cost marked as a
+subscription: price, repeat, the next renewal, the last day to cancel (notice period in days), who uses it and a "hardly
+used" switch. At the top are the sums per month and per year (net or gross; quarterly and yearly amounts spread over the
+months, one-off costs not counted) and, when some are marked, what the hardly used ones cost a year. Subscriptions are
+ordinary fixed costs: the fixed costs list in the cash flow, the spreadsheet import (optional columns "Abo" and
+"Kündigungsfrist" in days) and this view edit the same rows, and the cash flow counts them once. A reminder (days before the
+last day to cancel, for an office admin) puts a task "Check subscription: <name>" into that person's inbox, due on the last
+day to cancel, with a link to the view and never an amount; it comes once per deadline and stays when the reminder is
+switched off. Suggestions list fixed costs that look like software or a small repeating tool; nothing is marked by itself.
+The list can be downloaded as CSV.
+
+Routes (office admins): `GET /api/office/subs` {items, totals, candidates, people, remind_people}, `GET
+/api/office/subs.csv`; writing goes through the fixed cost routes with the fields `sub`, `notice_days`, `seats` (user ids
+of the office area or free names), `low_use`, `remind_days`, `remind_user`, `url` (http / https). Answers of the fixed
+costs carry `next_renewal`, `cancel_by`, `per_month` / `per_year` (gross) and `per_month_net` / `per_year_net`.
+
 ## Sales pipeline and figures (2.50)
 
 Two tabs for the admins of the office area (a personal office: its owner; members get `403`).
@@ -467,6 +491,121 @@ adds `gross`), `POST /api/office/fixed-costs/import/preview` (multipart `file`),
 (`{items: [{label, amount, repeat, start, until?, category?, vat_rate?}]}` -> `{created, ids}`),
 `POST /api/office/fixed-costs/delete` (`{ids}`: the undo of an import), `GET /api/office/fixed-costs/import/template`,
 `GET/PUT /api/office/cashflow/check` (`{on, user_id}` -> `{on, user_id, task_id, people, lost}`).
+
+## Bookkeeping (2.90)
+
+The tab **Bookkeeping** (admins of the office; without an organisation your personal office) covers the running bookkeeping
+of a self-employed person. **Photograph receipt** opens the camera on a phone (the file dialog on a desktop, PDF too): the
+receipt goes into your documents, amount and date are recognised in the background, and you add the category and the VAT
+rate (19 / 7 / 0 % or unknown). The **income/expense statement** of a year counts payments received on your invoices
+(cash principle, split by VAT rate) against your receipts and travel expenses, with export as CSV or PDF. The **VAT return**
+section lists the figures (fields 81, 86, 21, 45, 66, 83) for a month or quarter to type into ELSTER, on cash or accrual basis;
+small businesses get no return. A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
+as "Tax reserve" and "Freely available". No tax advice; figures without guarantee. Kalmido sends nothing to the tax office.
+
+## Bank reconciliation (2.90)
+
+The tab **Bank** (admins of the office area; in a personal office its owner) matches the bookings of your account with
+invoices and receipts. Kalmido has no bank access: you import the file you download from your bank yourself.
+
+- **Import bank statement**: a CSV export (German and English formats: `1.234,56` or `1,234.56`, `DD.MM.YYYY`,
+  `YYYY-MM-DD` …; account lines above the header are skipped) or a CAMT.052 / CAMT.053 XML file. For a CSV you confirm
+  which column holds the date, the amount (one column with a minus for money out, or income and expense apart), the
+  purpose and the counterpart; Kalmido guesses them as in the household budget. A CAMT file goes straight to the
+  preview (booking day, amount with credit / debit, counterpart and IBAN, purpose, the bank's reference). XML files with
+  a DOCTYPE or ENTITY are refused. At most 2 MB and 3000 rows per file.
+- **Duplicates**: a booking already imported into this office area (same day, amount, counterpart, purpose, reference)
+  is skipped and counted; two equal bookings in one file stay two.
+- **Matching**: every open booking shows the best suggestion with its reason. Money in -> open invoices (same amount as
+  open, invoice number in the purpose, customer name); money out -> receipts of the office's documents (same amount,
+  date within 14 days, name). **Match** records a payment on the invoice (day and amount of the booking, transfer; a
+  smaller amount = partly paid) or sets the receipt's payment day (used by the bookkeeping's cash principle). **Other …**
+  searches all open invoices / receipts; **Private** and **Ignore** only mark the booking. **Undo match** removes the
+  payment again; deleting the payment on the invoice opens the booking too. Every step can be undone.
+- **Imports**: the list of imported files; **Take back** removes its bookings (refused while one of them is matched -
+  undo those matches first); its undo brings them back.
+- Amounts, counterparts, purposes and IBANs are encrypted at rest when the encryption of the organisation is on. The
+  DATEV export is unchanged. Agents have no access to the bank reconciliation.
+
+Routes (office admins only; members 403, other areas 404, agents 403): `POST /api/office/bank/import/preview`,
+`POST /api/office/bank/import`, `GET /api/office/bank/imports`, `POST /api/office/bank/imports/<id>/undo|restore`,
+`GET /api/office/bank/tx?state=open|matched|all&from&to`, `GET /api/office/bank/tx/<id>/candidates?q=`,
+`POST /api/office/bank/tx/<id>/match` `{kind: invoice|receipt|private|ignored, id?}`, `POST /api/office/bank/tx/<id>/unmatch`.
+Tables `office_bank_imports`, `office_bank_tx` (see Database).
+
+## Tax dates as tasks (2.90)
+
+At the bottom of **Bookkeeping**, **Tax dates** keeps the usual German deadlines in view: the VAT return (none, monthly
+or quarterly, optionally with the permanent extension), the income tax prepayments (10 March, June, September, December)
+and the trade tax prepayments (15 February, May, August, November). Each kind switched on becomes ONE recurring task in
+the basket of the person chosen (an admin of the office; in a personal office its owner), due on the deadline minus the
+lead time (default 3 days); the title names the real deadline, the VAT task links to the VAT return figures.
+Switching a kind off or changing it ends the old task (done, never deleted) and creates a new one when needed; a task
+completed or deleted by hand comes back on the next save. A deadline on a weekend or holiday moves to the next working
+day (Kalmido does not shift it). No tax advice; figures without guarantee.
+
+Routes (office admins only): `GET /api/office/tax-dates`, `PUT /api/office/tax-dates`.
+
+## Contracts and insurance (2.92.0)
+
+The tab **Contracts & insurance** (office admins only; in a personal office its person) keeps the business contracts of the
+office in one place: insurances, rent, leasing, service providers and others. Per contract: name, provider, policy or
+contract number, the contribution per month / quarter / year (net when a VAT rate is set), start, the end of the current
+term, the notice period (days, weeks, months), the automatic renewal (or "ends without renewal"), how many days before the
+deadline to remind, a note and the contract document. The list is grouped by kind and shows the contribution per month and
+the next deadline ("Cancel by 12 Mar 2027 · 41 days left", in red from the reminder lead on).
+
+- **Deadline**: the last day to cancel is the end of the term minus the notice period (the same logic as the household
+  contracts in Home & life). When it has passed and the contract renews, the term rolls on to the next one; a contract
+  without renewal is simply over.
+- **Deadline as a task** (on by default): one task in a list you pick (default: your Basket), due on the last day to cancel,
+  with reminders and a repeat that follows the renewal. Changes to the contract update the task; switching it off,
+  archiving or deleting the contract ends the task (it is completed, never deleted). Agents that may see that list can remind
+  you of the deadline (event `contract_notice`, see AGENTS.md); Kalmido itself never phrases anything.
+- **Cash flow**: with "Contribution in the cash flow" (on by default) the contribution is an outflow in the cash flow like a
+  fixed cost (kind *Contract or insurance*, net or gross by the VAT rate), from the start (else the start of the current
+  term) every period, up to the end of the term when it does not renew. The fixed costs list shows these rows read-only
+  under *From contracts* with a link to the contract - they are never copied into the fixed costs.
+- **Document**: choose a document of the office's documents space (the organisation's, or your own in a personal office)
+  or upload one there; it is stored encrypted like every document.
+- Cost, number and note are encrypted at rest. Every change is one undo step; a deleted contract can be restored by the
+  undo (it is purged after 30 days).
+
+API (office admins; agents and members 403, another office area 404): `GET /api/office/agreements` (`?archived=1`),
+`POST /api/office/agreements`, `GET|PATCH|DELETE /api/office/agreements/<id>`, `POST /api/office/agreements/<id>/restore`.
+Fields: `kind` (insurance | rent | leasing | service | other), `name`, `provider`, `number`, `cost`, `per` (month | quarter |
+year), `vat_pct` (null | "19" | "7" | "0"), `start`, `ends`, `notice`, `notice_unit` (d | w | m), `renew_months` (0-120, 0 =
+ends), `lead_days`, `cashflow` (0|1), `doc_node_id`, `note`, `archived` (0|1, PATCH), `task` (0|1) and `list_id` (the
+deadline task). `GET /api/office/fixed-costs` also answers `agreements` (the contributions in the cash flow, read-only).
+
+## Equipment value, depreciation and insurance list (2.92.0)
+
+Admins of an office (and every person in their personal office) can record what a device cost:
+purchase date, net purchase price, serial number, vendor and the receipt. Open a device and unfold
+**Purchase and value**.
+
+- **Take from receipt** picks a document of the office's document space and proposes date, net price
+  and vendor. The net price is only filled in when the receipt states its VAT rate (19 % or 7 %);
+  otherwise the gross amount is shown as a hint and you enter the net price yourself.
+- **Depreciation**: a useful life is suggested from the category or name (for example computers and
+  software 12 months, cameras, lenses, light and sound 84, drones 84, furniture 156, vehicles 72, everything
+  else 60) and can be changed per device. Devices up to 800 EUR net are written off in full in the
+  purchase year, more expensive ones linearly by the month from the purchase month on. The table in the
+  device shows depreciation and book value per year.
+- **Insurance values**: the new value defaults to the purchase price, the current value to the book
+  value; both can be overwritten. **Insured by** links the device to an insurance contract
+  (Contracts & insurance).
+- The equipment list shows the sums (new value, current value, depreciation of the year) and exports the
+  insurance list as CSV or PDF, optionally filtered by policy.
+
+Members of an organisation see the devices, never their prices or values. All prices, values and
+serial numbers are encrypted at rest. No tax advice; figures without guarantee.
+
+API (office admins; members 403, another office area 404): the fields go through `POST|PATCH /api/office/equipment[/<id>]`
+(`purchase_date`, `purchase_net`, `new_value`, `current_value`, `serial_no`, `vendor`, `receipt_node_id`, `life_months`,
+`agreement_id`); `GET` answers admins also `afa_plan`, `afa_year`, `book_value`, `new_value_eff`, `current_value_eff`,
+`life_suggest`, `life_eff`, `agreement_name`. `GET /api/office/equipment/value` (sums and rows), `value.csv`, `value.pdf`
+(`?agreement_id=`, 0 = not insured), `GET /api/office/equipment/policies`, `GET /api/office/equipment/receipts[/<id>]`.
 
 ## Web API
 
@@ -658,6 +797,30 @@ the invoice stay unchanged; the fee does not keep an invoice from being `paid`. 
 all paid or cancelled has the derived state `done` ("Settled", `settled: true`, never stored); the list shows settled
 reminders below the open ones.
 
+## Invoice series (2.91)
+
+An invoice can be repeated as a series: in the editor of an invoice choose "Repeat as series", pick the interval (monthly,
+quarterly, yearly), the start of the first period of service and an optional start of the last period. On the day of every
+period Kalmido makes a new invoice from the template: a normal invoice with the date of that day, the period of service of
+the period (`service_from` / `service_to`), the next number when it is finalised and the e-invoice (ZUGFeRD / XRechnung)
+like any other invoice. By default it is a draft that waits for you (a task in your inbox links to it, never an amount);
+with "Send automatically" it is finalised and mailed to the client's invoice address at once - if a check fails (missing
+fields, no address, mail not set up, the send budget) it stays a draft without a number and the task names the reason.
+Placeholders in the project title, introduction, closing and positions are filled per period: `{period}`
+(01.10.2026 - 31.10.2026), `{month}` (October 2026), `{quarter}` (Q4 2026), `{year}`; unknown braces stay, the template
+keeps them. A period starting on the 31st falls on the last day of shorter months. The series are listed above the
+invoices ("Invoice series": pause, make now, edit, delete with undo, restore from the deleted ones); an invoice made by a
+series shows "From series ..., period ..." and carries `series_id` / `series_period` (one invoice per series and period).
+The cash flow shows the expected income of the coming periods as "Invoice series" (kind `series`, planned, due on the
+period start plus the template's payment term) until the invoice exists; a draft of the series counts once. A missed
+period is made later, of more than three missed periods only the newest. Only admins of the office area (and a person in
+their personal office) manage series.
+
+Routes (office admins): `GET /api/office/series` (`?bin=1` the deleted ones), `POST /api/office/series` {template_id, every
+monthly | quarterly | yearly, start, until?, auto_send?, title?}, `PATCH /api/office/series/<id>`, `DELETE
+/api/office/series/<id>` (into the bin), `POST /api/office/series/<id>/restore`, `POST /api/office/series/<id>/run` (make the
+next period now). Table `office_inv_series`.
+
 ## Sending and DATEV
 
 `POST /api/office/docs/<id>/send` with `{to, cc?, subject?, text?, datev?}` mails a finalised document with its files
@@ -840,6 +1003,9 @@ back to an older release run `python -m kalmido.admin.orgcrypt_cli decrypt-all`.
 Since 2.45.1 also the column `name_en` of `office_equipment` (text, default empty); 2.45.0 runs on with it.
 Since 2.50.0 also `office_deals` (the sales pipeline; under row-level security, `value`, `contact`, `note` and
 `lost_reason` encrypted at rest, `deleted_at` = deleted and restorable); 2.49.0 runs on with it.
+Since 2.90.0 also `office_bank_imports` and `office_bank_tx` (the bank reconciliation; under row-level security,
+`amount`, `counterpart`, `purpose` and `iban` encrypted at rest, `deleted_at` = taken back and restorable) and the nullable
+columns `vat_pct` and `paid_at` of `rc_receipts` (VAT rate and payment day of a receipt); 2.87.0 runs on with them.
 
 ## E-invoices (ZUGFeRD / XRechnung) and PDF/A-3
 

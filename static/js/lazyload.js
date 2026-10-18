@@ -9,7 +9,9 @@ const LD_MODS = {
   settings: ['acctset', 'settings'],  // 2.65.0 (#1823): acctset.js = the settings sections of account.js
   contacts: ['contacts', 'newsletter'],  // 2.65.0 (#1823): newsletter.js
   office: ['office', 'office_docs', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow',
-    'office_pipeline', 'office_kpi', 'office_datev', 'officeagents', 'office_packs'],  // 2.76.0 A (#1023): office_packs
+    'office_pipeline', 'office_kpi', 'office_datev', 'officeagents', 'office_packs',
+    'office_books', 'office_bank', 'office_taxdates',  // 2.90.0 (#1921, #1922)
+    'office_recurring', 'office_subs'],  // 2.91.0 (#1923, #1924)  // 2.76.0 A (#1023): office_packs
   // 2.65.0 (#1823): more areas load on first use (the start loads about a third less)
   agentchat: ['agentchat', 'agentsetup'],
   pdf: ['pdfview'],

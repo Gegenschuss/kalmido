@@ -56,13 +56,22 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
   await firefox(async ({cmd, ev: ev0, nav, ctx, shot}) => {
     const UP = `typeof E2E === 'object' && typeof S === 'object' && !!S.booted`;
     // 2.87.0: the slow CI runner sometimes reloads the page between two steps: a ReferenceError (E2E / S not yet defined) waits for the boot and retries
-    const ev = async expr => { for (let i = 0; ; i++) { try { return await ev0(expr); } catch (e) {
-      if (i >= 2 || !/ReferenceError: \w+ is not defined/.test(e.message)) throw e;
+    // 2.88.1: on CI the app can be "up" and the next step still meets no E2E (seen right after the second boot): the 2nd try
+    // loads the page again (only used right after a boot, see stub), the error then says what the page looked like
+    const DIAG = `[location.href, document.readyState, performance.getEntriesByType('navigation')[0]?.type, Math.round(performance.now()), typeof E2E, typeof S, typeof S === 'object' && S.booted, !!navigator.serviceWorker?.controller, sessionStorage.getItem('kalmido-rl-n'), document.scripts.length].join(' | ')`;
+    let lastHash = '';
+    const ev = async (expr, reboot) => { for (let i = 0; ; i++) { try { return await ev0(expr); } catch (e) {
+      if (!/ReferenceError: \w+ is not defined/.test(e.message)) throw e;
+      const d = await ev0(DIAG).catch(x => 'no diag: ' + x.message);
+      if (i >= 2) throw new Error(e.message + ' (page: ' + d + ')');
+      console.log('p264a_d_ui: ' + e.message + ', try ' + (i + 1) + ' (page: ' + d + ')');
+      if (reboot && i === 1) await boot(lastHash);
       for (let k = 0; k < 75 && !(await ev0(UP).catch(() => false)); k++) await sleep(200); } } };
     const waitFor = async (expr, n = 80) => { for (let i = 0; i < n; i++) { const v = await ev(expr).catch(() => null); if (v) return v; await sleep(250); } return null; };
     // 2.88.1 (CI): the second boot sometimes ends on a page without the app (E2E never defined, also after 45 s of waiting) - the
     // app is up only when its globals are there (S is a const: window.S never exists); otherwise say where the page is and load again
     const boot = async hash => {
+      lastHash = hash;
       for (let a = 0; a < 3; a++) {
         await nav(B + 'static/icon.svg'); await nav(B + hash);
         if (await waitFor(UP, 60)) { await sleep(500); return; }
@@ -88,7 +97,7 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
       window.le2eAcceptKey = uid => { __c.push(['accept', uid]); };
       window.le2eReady = () => false;
       window.le2eLocked = t => !!t && t.list_id === ${L};
-      return 1; })()`);
+      return 1; })()`, true);
     const setList = o => ev(`(() => { Object.assign(listById(${L}), ${JSON.stringify(o)}); render(); return 1; })()`);
     const people = [{user_id: ME, name: 'Alice', role: 'owner', kind: 'person', has_keys: true, pub: {kty: 'EC', crv: 'P-256', x: 'a', y: 'b'}, key_gens: [1]},
       {user_id: BOB, name: 'Bob', role: 'edit', kind: 'person', has_keys: true, pub: {kty: 'EC', crv: 'P-256', x: 'c', y: 'd'}, key_gens: []},

@@ -4,7 +4,7 @@
 // here, with a repeat. Server: kalmido/office/cashflow.py. No bank access.
 const RKF = {data: null, q: '', months: 3, from: '', open: null, fixed: null, err: null, oid: null, basis: LS.get('cfBasis', 'gross') === 'net' ? 'net' : 'gross', check: null};  // 2.67.0 (#1838): basis, check
 const RK_CF_KINDS = {payment: N_('Payment'), credit: N_('Refund on a credit note'), invoice: N_('Invoice'), offer: N_('Quotation, not yet invoiced'),
-  purchase: N_('Purchase'), trip: N_('Travel expenses'), fixed: N_('Fixed cost')};
+  purchase: N_('Purchase'), trip: N_('Travel expenses'), fixed: N_('Fixed cost'), series: N_('Invoice series|cashflow')};  // 2.91.0 A (#1923): series
 const RK_CF_REPEATS = [['monthly', N_('monthly')], ['quarterly', N_('quarterly')], ['yearly', N_('yearly')], ['once', N_('once')]];
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['cashflow', 'trend', N_('Cash flow'), 1, () => rk_cashflowHtml()]);  // admins only
 
@@ -41,15 +41,18 @@ function rk_cashflowHtml() {
       <span class="rkcfbal ${+r.balance < 0 ? 'neg' : ''}">${tr('Balance')} ${ofcMoney(r.balance)}</span></header>${bars(r)}
       <table class="rkcftab"><thead><tr><th></th><th class="num">${tr('Actual')}</th><th class="num">${tr('Planned')}</th></tr></thead><tbody>
       <tr><th>${tr('In|cashflow')}</th><td class="num">${val(r.month, 'in', 'actual', r.in.actual)}</td><td class="num">${val(r.month, 'in', 'plan', r.in.plan, 'plan')}</td></tr>
-      <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr></tbody></table>
+      <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr>${bk_cfReserveRows(r)}</tbody></table>
       ${rk_cfOpenHtml(r.month)}${k ? rk_cfEntries(k) : ''}</section>`;
   }).join('');
   return bar + `<div class="rkcfms">${cards}</div><p class="muted ofchint">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, sent and accepted quotations without an invoice at the end of their period of service, one version per quotation).')} ${d.basis === 'net' ? tr('Net: documents and fixed costs without VAT; purchases and travel receipts as entered.') : tr('Gross: documents and fixed costs incl. VAT; purchases and travel receipts as entered.')}</p>` + rk_fixedHtml() + fci_checkHtml();
 }
+// 2.90.0 A (#1921): with a tax reserve (Bookkeeping, tax_reserve_pct > 0): the month's reserve and what is free after all reserves so far
+const bk_cfReserveRows = r => r.reserve == null ? '' : `<tr class="bk-cfres"><th>${tr('Tax reserve')}</th><td class="num" colspan="2">${ofcMoney(r.reserve)}</td></tr>
+      <tr class="bk-cffree"><th>${tr('Freely available')}</th><td class="num ${+r.free < 0 ? 'neg' : ''}" colspan="2">${ofcMoney(r.free)}</td></tr>`;
 function rk_cfEntries(k) {
   const [mo, dir, st] = k.split('|');
   const es = (RKF.data.entries || []).filter(e => e.month === mo && e.dir === dir && e.state === st);
-  const go = e => e.doc_id ? `href="#office/offers/${e.doc_id}"` : e.trip_id ? `href="#office/travel" data-rkf="trip" data-id="${e.trip_id}"` : e.fixed_id ? `href="#" data-rkf="fixed" data-id="${e.fixed_id}"` : '';
+  const go = e => e.doc_id ? `href="#office/offers/${e.doc_id}"` : e.series_id ? `href="#office/offers" data-rin-go="${e.series_id}"` : e.trip_id ? `href="#office/travel" data-rkf="trip" data-id="${e.trip_id}"` : e.fixed_id ? `href="#" data-rkf="fixed" data-id="${e.fixed_id}"` : '';
   // 2.88.0 (#1915): a sent quotation = an open quotation (dashed, lighter); a chain with an invoice no longer shows a rest
   return `<ul class="ofclist rkcfents" role="list">${es.map(e => `<li${e.open_offer ? ' class="rkcfopen"' : ''}><a class="ofcrow" ${go(e)}><span class="ofcn"><b>${esc(e.open_offer ? tr('Open quotation|cashflow') : tr(RK_CF_KINDS[e.kind] || e.kind))}${e.number ? ` ${esc(e.number)}` : ''}</b>
     <small class="muted">${esc([fmtDateLoc(e.date), e.label, e.overdue ? tr('Overdue') : ''].filter(Boolean).join(' · '))}</small></span><span class="rksum">${ofcMoney(e.amount)}</span>${ic('chev', 's')}</a></li>`).join('')}</ul>`;
@@ -90,8 +93,8 @@ function rk_fixedHtml() {
   const fx = RKF.fixed || [], rp = k => tr(RK_CF_REPEATS.find(x => x[0] === k)?.[1] || k);
   // 2.67.0 (#1838): grouped by category (without one last), net and gross per row; import from a spreadsheet + its template
   const cats = [...new Set(fx.map(f => f.category || ''))].sort((a, b) => !a - !b || a.localeCompare(b, undefined, {sensitivity: 'base'}));
-  const row = f => `<li><button type="button" class="ofcrow" data-rkf="fixed" data-id="${f.id}"><span class="ofcn"><b>${esc(f.label)}</b><small class="muted">${esc([rp(f.repeat), tr('from {0}', fmtDateLoc(f.start)), f.until ? tr('until {0}', fmtDateLoc(f.until)) : '', tr('VAT {0} %', f.vat_rate || 0)].filter(Boolean).join(' · '))}</small></span><span class="rksum fcisum"><span>${ofcMoney(f.amount)} <small class="muted">${tr('net')}</small></span><small class="muted">${ofcMoney(f.gross ?? f.amount)} ${tr('gross')}</small></span>${ic('chev', 's')}</button></li>`;
-  return `<div class="ofcbar fcibar"><h3 class="ofcgrp">${tr('Fixed costs')}</h3><span class="spacer"></span><a class="btn sm ghost" href="/api/office/fixed-costs/import/template" download>${ic('download', 's')}<span>${tr('Download template')}</span></a><button class="btn sm" data-rkf="fimp">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button><button class="btn sm pri" data-rkf="fnew">${ic('plus', 's')}<span>${tr('New fixed cost')}</span></button></div>`
+  const row = f => `<li><button type="button" class="ofcrow" data-rkf="fixed" data-id="${f.id}"><span class="ofcn"><b>${esc(f.label)}${f.sub ? ` <span class="abo-tag">${tr('Subscription')}</span>` : ''}</b><small class="muted">${esc([rp(f.repeat), tr('from {0}', fmtDateLoc(f.start)), f.until ? tr('until {0}', fmtDateLoc(f.until)) : '', tr('VAT {0} %', f.vat_rate || 0)].filter(Boolean).join(' · '))}</small></span><span class="rksum fcisum"><span>${ofcMoney(f.amount)} <small class="muted">${tr('net')}</small></span><small class="muted">${ofcMoney(f.gross ?? f.amount)} ${tr('gross')}</small></span>${ic('chev', 's')}</button></li>`;
+  return `<div class="ofcbar fcibar"><h3 class="ofcgrp">${tr('Fixed costs')}</h3><span class="spacer"></span>${fx.some(f => f.sub) ? `<a class="btn sm ghost" href="#office/subs" data-abo="go">${ic('repeat', 's')}<span>${tr('Subscriptions & tools')}</span></a>` : ''}<a class="btn sm ghost" href="/api/office/fixed-costs/import/template" download>${ic('download', 's')}<span>${tr('Download template')}</span></a><button class="btn sm" data-rkf="fimp">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button><button class="btn sm pri" data-rkf="fnew">${ic('plus', 's')}<span>${tr('New fixed cost')}</span></button></div>`
     + (fx.length ? cats.map(k => `${cats.length > 1 || k ? `<h4 class="fcicat">${esc(k || tr('Without category'))}</h4>` : ''}<ul class="ofclist" role="list">${fx.filter(f => (f.category || '') === k).map(row).join('')}</ul>`).join('')
       : `<p class="muted lempty">${tr('No fixed costs yet, e.g. rent or software subscriptions.')}</p>`);
 }
@@ -114,7 +117,7 @@ function rk_fixedModal(f) {
     try {
       if (b.dataset.m === 'del') {
         const j = await api('DELETE', `/api/office/fixed-costs/${f.id}`); md.remove(); rk_cfReload();
-        const o = j.item; toast(tr('Deleted'), async () => { await api('POST', '/api/office/fixed-costs', {label: o.label, amount: o.amount, start: o.start, until: o.until, repeat: o.repeat, category: o.category || '', vat_rate: o.vat_rate || 0}); rk_cfReload(); });
+        const o = j.item; toast(tr('Deleted'), async () => { await api('POST', '/api/office/fixed-costs', {label: o.label, amount: o.amount, start: o.start, until: o.until, repeat: o.repeat, category: o.category || '', vat_rate: o.vat_rate || 0, ...aboFields(o)}); rk_cfReload(); });  // 2.91.0 B (#1924): + the subscription fields
         return;
       }
       const v = id => $(id, md)?.value ?? '';
@@ -158,7 +161,7 @@ function fci_modal(rows, name) {
       <ul class="fcilist" role="list">${rows.map((r, i) => r.status === 'error'
         ? `<li class="fcirow err"><span class="fcick" aria-hidden="true">${ic('x', 's')}</span><span class="ofcn"><b>${esc(r.label || tr('Row {0}', r.row))}</b><small>${esc(tr('Row {0}', r.row))} · ${esc(r.reason)}</small></span></li>`
         : `<li class="fcirow ${r.sel ? 'on' : ''} ${r.status}"><label class="fcick"><input type="checkbox" data-fci="sel" data-i="${i}" ${r.sel ? 'checked' : ''} aria-label="${esc(tr('Take over {0}', r.label))}"></label>
-          <span class="ofcn"><b>${esc(r.label)}${r.part ? ` <small class="muted">${esc(r.part)}</small>` : ''}</b><small class="muted">${esc([rp(r.repeat), tr('from {0}', fmtDateLoc(r.start)), r.category, r.status === 'dup' ? r.reason : ''].filter(Boolean).join(' · '))}</small></span>
+          <span class="ofcn"><b>${esc(r.label)}${r.part ? ` <small class="muted">${esc(r.part)}</small>` : ''}</b><small class="muted">${esc([rp(r.repeat), tr('from {0}', fmtDateLoc(r.start)), r.category, r.sub ? tr('Subscription') : '', r.notice_days ? tr('notice {0} days', r.notice_days) : '', r.status === 'dup' ? r.reason : ''].filter(Boolean).join(' · '))}</small></span>
           <span class="fciamt"><span>${ofcMoney(r.amount)} <small class="muted">${tr('net')}</small></span><select data-fci="vat" data-i="${i}" aria-label="${esc(tr('VAT rate'))}">${FCI_VATS.map(v => `<option value="${v}" ${+r.vat_rate === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></span></li>`).join('')}</ul>
       <div class="aerr" role="alert"></div>
       <div class="foot"><span class="spacer"></span><button class="btn" data-fci="close">${tr('Cancel')}</button><button class="btn pri" data-fci="go" ${n ? '' : 'disabled'}>${esc(trn('Take over {0} row', 'Take over {0} rows', n))}</button></div>`;
@@ -173,7 +176,7 @@ function fci_modal(rows, name) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-fci]'); if (!b) return;
     if (b.dataset.fci === 'close') { md.remove(); return; }
-    const items = rows.filter(r => r.sel && r.status !== 'error').map(r => ({label: r.label, amount: r.amount, repeat: r.repeat, start: r.start, category: r.category, vat_rate: r.vat_rate}));
+    const items = rows.filter(r => r.sel && r.status !== 'error').map(r => ({label: r.label, amount: r.amount, repeat: r.repeat, start: r.start, category: r.category, vat_rate: r.vat_rate, sub: r.sub || 0, notice_days: r.notice_days || 0}));  // 2.91.0 B (#1924): + sub, notice_days
     b.disabled = true;
     try {
       const j = await api('POST', '/api/office/fixed-costs/import', {items});
