@@ -53,7 +53,11 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
   check(Array.isArray(sc.browser) && /lists with a lock/.test(sc.browser.join(' ')) && /except in lists with a lock/.test(sc.plain_note || '') && (sc.plain || []).includes('Tasks'),
     '#1817: the encryption overview gets "Encrypted in the browser (lists with a lock)" ' + JSON.stringify(sc));
 
-  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  await firefox(async ({cmd, ev: ev0, nav, ctx, shot}) => {
+    // 2.87.0: the slow CI runner sometimes reloads the page between two steps: a ReferenceError (E2E / S not yet defined) waits for the boot and retries
+    const ev = async expr => { for (let i = 0; ; i++) { try { return await ev0(expr); } catch (e) {
+      if (i >= 2 || !/ReferenceError: \w+ is not defined/.test(e.message)) throw e;
+      for (let k = 0; k < 75 && !(await ev0(`typeof E2E === 'object' && !!(window.S && S.booted)`).catch(() => false)); k++) await sleep(200); } } };
     const waitFor = async (expr, n = 80) => { for (let i = 0; i < n; i++) { const v = await ev(expr).catch(() => null); if (v) return v; await sleep(250); } return null; };
     const boot = async hash => { await nav(B + 'static/icon.svg'); await nav(B + hash); await waitFor('!!(window.S && S.booted)'); await sleep(500); };
     await nav(B + 'static/icon.svg');
