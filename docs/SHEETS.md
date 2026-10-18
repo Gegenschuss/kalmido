@@ -88,3 +88,36 @@ organisation's projects, lists and clients). If a source is deleted, the cell sh
 
 Errors in a cell: "Circular reference" (cells that depend on each other), "Division by zero", "Reference not found" (a
 deleted row / column - Undo brings it back), "Wrong type of value", "Formula error" (a typo; the formula is not saved).
+
+## Carrying a table over: tasks, quotation, list as rows (2.89.0)
+
+A table is never linked silently to the rest of Kalmido. Everything below happens only when you press the button in the
+table's menu (the "…" at the top right), and every press is **one undo step**.
+
+**Create tasks from rows.** Choose several rows first (drag over them or Shift + arrow keys) or take all rows. In the dialog
+pick the list (only lists of the table's space you may add tasks to), the column for the title and, if you like, a column
+for the due date (a date column or text like `20.11.2026`) and one for the notes. Rows without a title and rows carried over
+before are skipped. Each task's history says "carried over the task from a table" with a link to the table (without the
+table's name: the list may be shared with people who cannot open the table). The row gets a small mark in its row head; the
+side panel shows "Carried over" with a link to the task. Undo moves the tasks to the trash and removes the marks.
+
+**Take over as a quotation.** Only when Office & finance is on for the table's space (an organisation's table: that
+organisation's office; a private table: your own personal office). Map the columns for description, quantity, unit and unit
+price and choose a client of that office. Units are recognised from the usual words (`Tag`, `Std`, `Stk`, `pauschal`, `day`,
+`hour`, `piece`, `flat` ...). Kalmido creates a **draft** in the office - nothing is finalised, numbered or sent beyond what the
+office itself does for a new quotation. The office history of the quotation says "created from a table", the table shows the
+quotation in the side panel. Undo deletes the draft when you are the office's admin and it is still a draft; otherwise the
+draft stays and you delete it in the office.
+
+**List as rows.** Pick a project or list of the table's space: Kalmido adds one row per task with the columns Title, Status,
+Due, Time (booked hours) and Assignee. The cells are **live Kalmido values** (`=aufgabe.<id>.titel`, `.status`, `.faellig`,
+`.zeit`, `.zustaendig`): renaming or completing the task shows up in the table. A new, empty table makes room for the five
+columns (its blank start columns step aside). New tasks of the list come in only when you press **Fetch new tasks of <list>**
+in the menu - only the missing rows are appended, into the same columns. Rows of a second list use the same columns.
+
+Like every Kalmido variable, `aufgabe.<id>.<field>` is evaluated for the person looking: someone who does not see the task
+(another list, a participant who sees only their own tasks) gets "No access" without a value; a task in the trash shows
+"Source deleted" with the last value that person saw. You may also type `=aufgabe.<id>.zeit` yourself, for a task you see.
+
+These buttons are for people only; agents work inside a table with the table tools and create tasks or office drafts in
+their own ways.
