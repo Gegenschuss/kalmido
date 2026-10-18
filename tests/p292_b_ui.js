@@ -59,7 +59,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `!!document.querySelector('.modal .ast-sec[open] .ast-plan')`), 'the device dialog with purchase and value');
     check(await ev(`(() => { const t = document.querySelector('.modal .ast-plan'); const r = t.querySelectorAll('tbody tr'); return r.length === 8 && r[0].textContent.includes('2024') && r[0].textContent.includes('285.71'); })()`),
       'the depreciation table: 8 years, the first one by the month ' + await ev(`document.querySelector('.modal .ast-plan tbody tr')?.textContent`));
-    check(await ev(`document.querySelector('#of-serial_no').value === 'SN-0815' && document.querySelector('#of-purchase_net').value === '2,400.00'`), 'the stored values in the fields');
+    check(await ev(`document.querySelector('#of-serial_no').value === 'SN-0815' && ofcNum(document.querySelector('#of-purchase_net').value) === 2400`), 'the stored values in the fields');
     check(await ev(`/book value/.test(document.querySelector('.modal .ast-sec').textContent) && /No tax advice/.test(document.querySelector('.modal .ast-sec').textContent)`), 'the explanation and the note in the dialog');
     await shot('p292-b-dialog.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
