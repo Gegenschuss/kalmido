@@ -47,6 +47,7 @@ const WS_VIEWS = {
   'static/js/favtiles.js': 'draw',
   'static/js/dupprop.js': 'helper',
   'static/js/newsletter.js': 'helper',        // a dialog with its own workspace choice
+  'static/js/polls.js': 'helper',             // 2.99.0 (#1953, CI 2.98.0): the polls dialog lists all polls with their space; the workspace only preselects a new poll's space
   'static/js/workspace.js': 'helper',         // the switch itself
   'static/js/wscolor.js': 'helper',
   // 2.87.9: files that read the shown workspace since 2.85 / 2.87.9

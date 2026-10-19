@@ -66,6 +66,7 @@
 .tpo-rows{display:flex;flex-direction:column;gap:.375rem}
 .tpo-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,7rem) auto;gap:.375rem;align-items:center}
 .tpo-row input{min-height:2.5rem}
+.tpo-row .dpw,.tpo-row .dpbtn{width:100%;min-height:2.5rem}  /* 2.99.0 (#1953): own pickers */
 .tpo-sub{margin:.125rem 0 .5rem;font-size:var(--fs-xs)}
 .tpo-link{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.375rem;align-items:center;margin:.25rem 0}
 .tpo-link input{min-height:2.5rem;font:var(--fs-xs) var(--mono)}
