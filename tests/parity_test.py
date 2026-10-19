@@ -441,6 +441,10 @@ APP_ONLY = [
     ("2.48.0 (#1356): a receipt's project / category is set and agents' suggestions are accepted / rejected / reopened by people "
      "only; agents suggest with POST /documents/{id}/receipt-suggestion",
      ("* /api/docs/{}/receipt", "* /api/receipt-suggestions/")),
+    # 2.121.0 (#2095): the hint on a receipt which cash entries point at it -- part of the cash book, which is office admins only
+    # (no agent API for the cash book in 2.121, like the rest of /api/office)
+    ("2.121.0 (#2095): the cash book hint on a receipt (office admins only, like the cash book itself)",
+     ("=GET /api/docs/{}/cashbook",)),
     # 2.55.0 (#1455): the newsletter connection holds access data of an outside service and decides who gets mail: people only
     ("2.55.0 (#1455): the newsletter connection, segments, sync and the consent of contacts are set by people (admins / the "
      "person); agents read the consent with the contact (field newsletter), no new agent rights", ("* /api/newsletter",)),
