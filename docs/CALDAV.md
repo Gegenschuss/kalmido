@@ -133,6 +133,16 @@ come back with their links. Contacts of a synced external account cannot be merg
 of an organisation's address book only merge with contacts of the same organisation; personal address books only
 with books of the same owner (not into a book someone shared with you).
 
+**On the contact's card** (2.119.1): an address opens your map app on a tap (Apple Maps on Apple devices, else Google
+Maps; nothing is loaded before the tap). *More › Create as client* (with the module Clients) makes a client from the
+contact: its company (else its name), first e-mail, phone and address, and the contact as the client's default contact
+person, linked to the contact when the address book fits the client (an organisation's address book: a client of that
+organisation; your own private address book: a private client; other books: a client of the book's workspace without the
+link). One undo step deletes the client again; a linked contact shows *Open client* instead. *Contact history* lists,
+newest first, the filed e-mails from or to the contact's addresses, the quotations, invoices and credit notes of its
+clients (only with the module Office and a role in that office) and its events - only what you may open anyway; *Show
+more* loads older entries, a tap opens the entry.
+
 **Finding duplicates with an agent** (2.70.0): in *Contacts › More › Find duplicates with an agent…* (or the command
 palette) pick an address book you may change and an agent. The dialog says exactly what the agent gets: name, company,
 e-mail addresses and phone numbers of that book's contacts, nothing else (no notes, addresses, birthdays). The agent

@@ -398,6 +398,7 @@ ROUTES = {
     "PATCH /api/contacts/{}": "contact", "DELETE /api/contacts/{}": "contact", "POST /api/tasks/{}/contacts": "contact",
     "DELETE /api/tasks/{}/contacts/{}": "contact", "PUT /api/v1/contacts/{}/care": "contact",
     "PUT /api/contacts/{}/care": "contact",
+    "GET /api/contacts/{}/history": "contact",  # 2.119.1 B (#2083): contact_visible, then each source checked (p21191_b_api_test.py)
     "POST /api/contacts/bulk": "contact", "POST /api/v1/contacts/bulk": "contact",  # 2.46.1 (#1554): every id checked first (p2461_c_api_test.py)
     # 2.66.0 (#1835): every id checked (write), one scope only, undo checks the target + every book (p266_a_api_test.py)
     "POST /api/contacts/merge": "contact", "POST /api/contacts/merges/{}/undo": "contact",

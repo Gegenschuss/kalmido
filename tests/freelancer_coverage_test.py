@@ -450,7 +450,8 @@ ROUTES = {
     "DELETE /api/v1/contacts/{}": "pim", "DELETE /api/v1/event-calendars/{}": "pim",
     "DELETE /api/v1/event-calendars/{}/members/{}": "pim", "DELETE /api/v1/events/{}": "pim", "GET /api/books": "pim",
     "GET /api/books/imports/{}": "pim", "GET /api/books/{}/export.vcf": "pim", "GET /api/calendars": "pim",
-    "GET /api/calendars/events": "pim", "GET /api/contacts": "pim", "GET /api/contacts/{}": "pim", "GET /api/evcals": "pim",
+    "GET /api/calendars/events": "pim", "GET /api/contacts": "pim", "GET /api/contacts/{}": "pim", "GET /api/contacts/{}/history": "pim",  # 2.119.1 B (#2083)
+    "GET /api/evcals": "pim",
     "GET /api/evcals/{}/export.ics": "pim", "GET /api/events": "pim", "GET /api/events/{}": "pim",
     "GET /api/v1/address-books": "pim", "GET /api/v1/address-books/{}/export": "pim", "GET /api/v1/contacts": "pim",
     "GET /api/v1/contacts/{}": "pim", "GET /api/v1/event-calendars": "pim", "GET /api/v1/event-calendars/{}/export": "pim",
